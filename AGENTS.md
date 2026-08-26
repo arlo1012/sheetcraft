@@ -12,11 +12,9 @@
 
 - Vue 3 with `<script setup lang="ts">` and strict TypeScript.
 - Vite and Bun for development and builds.
-- Tailwind CSS for ordinary layout and spacing.
 - Product-owned CSS variables and layers for stable design tokens.
 - SCSS `@use` modules for shared tokens and base styles.
 - Scoped SCSS for complex component-specific states.
-- Keep Tailwind's CSS entry separate from the Sass compile path.
 - Lucide Vue is the primary icon set. Add Iconify only when a confirmed domain
   icon cannot be expressed by Lucide.
 - Do not add TDesign or another UI framework unless the user explicitly changes

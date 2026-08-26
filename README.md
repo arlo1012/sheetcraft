@@ -1,8 +1,8 @@
 # idea10
 
-Clean-slate frontend initialized with Vue 3, TypeScript, Vite, Bun, Tailwind CSS,
-SCSS, and product-owned CSS tokens. The current screen is intentionally an
-empty workspace; features will be added from explicit requirements.
+Clean-slate frontend initialized with Vue 3, TypeScript, Vite, Bun, SCSS, and
+product-owned CSS tokens. The current screen is intentionally an empty
+workspace; features will be added from explicit requirements.
 
 ## Commands
 
@@ -27,18 +27,15 @@ objects, component registries, or generic dynamic renderers.
 TypeScript objects may describe domain data, state, and command payloads. They
 must not become a second declarative UI language.
 
-Use Tailwind for ordinary layout and spacing. Keep stable design roles in CSS
-variables and CSS layers. SCSS modules organize shared tokens and base styles;
-scoped SCSS owns component-specific interaction states that are clearer in
-semantic selectors. Tailwind's CSS entry remains separate from the Sass compile
-path.
+Use product-owned CSS variables and CSS layers for stable design roles. SCSS
+modules organize shared tokens and base styles; scoped SCSS owns
+component-specific layout and interaction states.
 
 ## Source Modules
 
 - `src/app`: application bootstrap and top-level composition.
 - `src/modules/<feature>`: one product capability and its concrete components.
 - `src/shared`: proven cross-module primitives, utilities, and style tokens.
-- `src/styles`: global framework entries such as Tailwind.
 
 Do not create a shared abstraction for code used by only one module.
 
