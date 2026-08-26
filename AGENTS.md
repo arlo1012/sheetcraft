@@ -28,6 +28,11 @@
   registries, or `<component :is>` factories.
 - TypeScript objects may model data, state, permissions, and command payloads;
   they must not model the visual component tree.
+- Before implementing a feature, search the existing modules, components, and
+  composables for a suitable capability or abstraction to reuse.
+- Consider whether the same interaction or component will recur in later
+  features. Extract a loosely coupled common component when the repeated
+  contract is clear; keep genuinely one-off behavior inside its owning module.
 - Extract shared primitives only when they remove real duplication while
   keeping feature components independently understandable.
 
@@ -45,7 +50,13 @@
 - Keep files focused and avoid implementation-heavy index files.
 - Prefer typed props, emits, and slots for component contracts.
 - Add dependencies only when an implemented requirement needs them.
-- Run targeted tests first, then typecheck, lint, format check, and build for
-  completed frontend changes.
+- Run only the unit tests for the changed feature or module by default. Do not
+  run the full unit-test suite for a small change unless the user asks for it or
+  the change affects shared contracts or multiple modules.
+- Expand verification only when the change risk or affected boundary requires
+  it. Keep typecheck, lint, formatting, and build checks scoped when the tooling
+  supports it.
 - Use real-browser verification for visible interaction changes.
-- Do not commit unless the user explicitly asks for `提交`.
+- After completing and verifying a small, self-contained requirement, commit it
+  promptly with a conventional commit message. Keep unrelated changes out of
+  that commit.
