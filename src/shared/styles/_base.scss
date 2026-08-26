@@ -1,0 +1,28 @@
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #app {
+    min-width: 320px;
+    min-height: 100%;
+    margin: 0;
+  }
+
+  body {
+    min-height: 100dvh;
+    background: var(--ui-surface-canvas);
+    color: var(--ui-text-primary);
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
