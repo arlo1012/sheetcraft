@@ -47,9 +47,15 @@
 
 ## Engineering
 
+- Keep this file concise and limited to stable collaboration, architecture, and
+  verification rules. Do not record feature behavior, task status, business
+  checklists, or historical implementation notes here.
 - Keep files focused and avoid implementation-heavy index files.
 - Prefer typed props, emits, and slots for component contracts.
 - Add dependencies only when an implemented requirement needs them.
+- Mirror source ownership under `src/tests`, then split each matching test
+  directory into small scenario-focused files. Treat that directory as the
+  aggregate test entry for its source capability.
 - Run only the unit tests for the changed feature or module by default. Do not
   run the full unit-test suite for a small change unless the user asks for it or
   the change affects shared contracts or multiple modules.

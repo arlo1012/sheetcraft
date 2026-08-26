@@ -1,8 +1,13 @@
 # idea10
 
 Clean-slate frontend initialized with Vue 3, TypeScript, Vite, Bun, SCSS, and
-product-owned CSS tokens. The current screen is intentionally an empty
-workspace; features will be added from explicit requirements.
+product-owned CSS tokens. The current milestone provides a focused spreadsheet
+editing foundation: a sparse workbook model, command-based undo and redo,
+virtualized fixed-size cells, pinned headers, single-cell selection, keyboard
+navigation, and in-cell editing with IME-safe composition.
+
+Formulas, formatting, clipboard operations, multi-cell ranges, persistence, and
+Ribbon tools are intentionally outside the current milestone.
 
 ## Commands
 
@@ -10,11 +15,17 @@ workspace; features will be added from explicit requirements.
 bun install
 bun run dev
 bun run test
+bun run test -- src/tests/modules/workbook/input
 bun run typecheck
 bun run lint
 bun run format:check
 bun run build
 ```
+
+The test tree mirrors source ownership. For example,
+`src/modules/workbook/input.ts` maps to `src/tests/modules/workbook/input/`,
+where number, text, and formatting scenarios live in small test files. Run that
+directory as its aggregate entry instead of adding a package script per case.
 
 The development server listens on `0.0.0.0:7200`.
 
@@ -34,7 +45,10 @@ component-specific layout and interaction states.
 ## Source Modules
 
 - `src/app`: application bootstrap and top-level composition.
-- `src/modules/<feature>`: one product capability and its concrete components.
+- `src/modules/workbook`: sparse workbook data, input parsing, commands, and
+  inverse-command history.
+- `src/modules/sheet-grid`: viewport geometry, selection movement, concrete grid
+  components, and editor interactions.
 - `src/shared`: proven cross-module primitives, utilities, and style tokens.
 
 Do not create a shared abstraction for code used by only one module.
