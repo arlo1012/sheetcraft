@@ -44,6 +44,7 @@ import {
   type CellSelection,
 } from "../selection";
 import { useGridClipboard, type GridPastePayload } from "../useGridClipboard";
+import { createSheetGridViewState, type SheetGridViewState } from "../view-state";
 import CellEditor from "./CellEditor.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
 import SheetColumnHeaders from "./SheetColumnHeaders.vue";
@@ -63,6 +64,7 @@ const props = withDefaults(
     columnExpansionStep?: number;
     rowExpansionTail?: number;
     columnExpansionTail?: number;
+    viewState?: SheetGridViewState;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -82,6 +84,7 @@ const emit = defineEmits<{
   undo: [];
   redo: [];
   selectionChange: [payload: { active: CellAddress; range: CellRange }];
+  viewStateChange: [viewState: SheetGridViewState];
 }>();
 
 const ROW_HEADER_WIDTH = 48;
@@ -217,6 +220,18 @@ function applyGridExtent(nextExtent: GridExtent): void {
   gridExtent.columnCount = nextExtent.columnCount;
 }
 
+function getCurrentViewState(): SheetGridViewState {
+  return createSheetGridViewState({
+    selection: selection.value,
+    scrollPosition,
+    gridExtent,
+  });
+}
+
+function emitViewState(): void {
+  emit("viewStateChange", getCurrentViewState());
+}
+
 function getGridExtentPolicy() {
   return {
     growth: {
@@ -298,6 +313,7 @@ function setSelection(
     range: getSelectionRange(nextSelection),
   });
   ensureCellVisible(visibleAddress);
+  emitViewState();
   if (restoreFocus) {
     focusEditor();
   }
@@ -834,39 +850,50 @@ function onScroll(event: Event): void {
   scrollPosition.x = scroller.scrollLeft;
   scrollPosition.y = scroller.scrollTop;
   ensureGridExtentCoversViewport();
+  emitViewState();
+}
+
+function restoreViewState(viewState?: SheetGridViewState): void {
+  const nextViewState = viewState
+    ? createSheetGridViewState(viewState)
+    : createSheetGridViewState({
+        gridExtent: createGridExtent({
+          rowCount: props.initialRowCount,
+          columnCount: props.initialColumnCount,
+        }),
+      });
+  stopDragSelection();
+  stopDimensionResize();
+  clearPendingClipboard();
+  selection.value = nextViewState.selection;
+  editingValue.value = "";
+  isEditing.value = false;
+  isComposing.value = false;
+  shouldFinishAfterComposition = false;
+  pendingSelectionAfterComposition = undefined;
+  applyGridExtent(nextViewState.gridExtent);
+  ensureGridExtentContains(nextViewState.selection.focus);
+  const scroller = scrollerRef.value;
+  if (scroller) {
+    scroller.scrollLeft = nextViewState.scrollPosition.x;
+    scroller.scrollTop = nextViewState.scrollPosition.y;
+  }
+  scrollPosition.x = nextViewState.scrollPosition.x;
+  scrollPosition.y = nextViewState.scrollPosition.y;
+  ensureGridExtentCoversViewport();
 }
 
 watch(
   () => props.sheet.id,
   () => {
-    stopDragSelection();
-    stopDimensionResize();
-    clearPendingClipboard();
-    selection.value = createCellSelection({ row: 0, column: 0 });
-    editingValue.value = "";
-    isEditing.value = false;
-    isComposing.value = false;
-    shouldFinishAfterComposition = false;
-    pendingSelectionAfterComposition = undefined;
-    applyGridExtent(
-      createGridExtent({
-        rowCount: props.initialRowCount,
-        columnCount: props.initialColumnCount,
-      }),
-    );
-    const scroller = scrollerRef.value;
-    if (scroller) {
-      scroller.scrollLeft = 0;
-      scroller.scrollTop = 0;
-    }
-    scrollPosition.x = 0;
-    scrollPosition.y = 0;
+    restoreViewState(props.viewState);
     focusEditor();
   },
 );
 
 onMounted(() => {
   updateViewportSize();
+  restoreViewState(props.viewState);
   const scroller = scrollerRef.value;
   if (scroller && typeof ResizeObserver !== "undefined") {
     resizeObserver = new ResizeObserver(updateViewportSize);

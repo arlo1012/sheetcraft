@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { computed, reactive } from "vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
+import type { SheetGridViewState } from "../modules/sheet-grid/view-state";
+import WorkbookSheetTabs from "../modules/workbook/components/WorkbookSheetTabs.vue";
 import type { GridPastePayload } from "../modules/sheet-grid/useGridClipboard";
 import {
+  createAddSheetCommand,
   createClearCellRangeCommand,
+  createDeleteSheetCommand,
   createPasteCellValuesCommand,
+  createRenameSheetCommand,
   createResizeSheetDimensionCommand,
   createSetCellValueCommand,
 } from "../modules/workbook/commands";
@@ -18,6 +23,8 @@ import {
 import { parseCellInput } from "../modules/workbook/input";
 import {
   getActiveSheet,
+  getWorkbookSheets,
+  setActiveSheet,
   type CellAddress,
   type CellRange,
   type SheetDimensionAxis,
@@ -25,6 +32,8 @@ import {
 
 const session = reactive(createWorkbookSession()) as WorkbookSession;
 const activeSheet = computed(() => getActiveSheet(session.workbook));
+const sheets = computed(() => getWorkbookSheets(session.workbook));
+const viewStates = reactive(new Map<string, SheetGridViewState>());
 
 function commitCell(payload: { address: CellAddress; input: string }): void {
   executeWorkbookCommand(
@@ -64,6 +73,42 @@ function resizeDimension(payload: { axis: SheetDimensionAxis; index: number; siz
     payload.axis === "column" ? "Resize column" : "Resize row",
   );
 }
+
+function selectSheet(sheetId: string): void {
+  setActiveSheet(session.workbook, sheetId);
+}
+
+function addSheet(): void {
+  executeWorkbookCommand(session, createAddSheetCommand(session.workbook), "Add sheet");
+}
+
+function renameSheet(payload: { sheetId: string; name: string }): void {
+  try {
+    executeWorkbookCommand(
+      session,
+      createRenameSheetCommand(payload.sheetId, payload.name),
+      "Rename sheet",
+    );
+  } catch {
+    // The tab input is restored from the unchanged workbook name.
+  }
+}
+
+function deleteSheet(sheetId: string): void {
+  executeWorkbookCommand(
+    session,
+    createDeleteSheetCommand(session.workbook, sheetId),
+    "Delete sheet",
+  );
+}
+
+function getActiveSheetViewState(): SheetGridViewState | undefined {
+  return viewStates.get(activeSheet.value.id);
+}
+
+function updateActiveSheetViewState(viewState: SheetGridViewState): void {
+  viewStates.set(activeSheet.value.id, viewState);
+}
 </script>
 
 <template>
@@ -71,18 +116,25 @@ function resizeDimension(payload: { axis: SheetDimensionAxis; index: number; siz
     <div class="spreadsheet-workspace__grid">
       <SheetGrid
         :sheet="activeSheet"
+        :view-state="getActiveSheetViewState()"
         @clear-cells="clearCells"
         @commit-cell="commitCell"
         @paste-cells="pasteCells"
         @resize-dimension="resizeDimension"
         @undo="undoWorkbookCommand(session)"
         @redo="redoWorkbookCommand(session)"
+        @view-state-change="updateActiveSheetViewState"
       />
     </div>
-    <footer class="spreadsheet-workspace__footer" aria-label="Workbook sheets">
-      <span class="spreadsheet-workspace__sheet-tab" aria-current="page">
-        {{ activeSheet.name }}
-      </span>
+    <footer class="spreadsheet-workspace__footer">
+      <WorkbookSheetTabs
+        :sheets="sheets"
+        :active-sheet-id="session.workbook.activeSheetId"
+        @select="selectSheet"
+        @add="addSheet"
+        @rename="renameSheet"
+        @delete="deleteSheet"
+      />
       <span class="spreadsheet-workspace__status">Ready</span>
     </footer>
   </section>
@@ -113,25 +165,6 @@ function resizeDimension(payload: { axis: SheetDimensionAxis; index: number; siz
     border-top: 1px solid var(--ui-border-strong);
     color: var(--ui-text-secondary);
     font-size: 12px;
-  }
-
-  &__sheet-tab {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    min-width: 88px;
-    padding: 0 16px;
-    background: var(--ui-surface-primary);
-    color: var(--ui-text-primary);
-    font-weight: 600;
-
-    &::after {
-      position: absolute;
-      inset: auto 0 0;
-      height: 2px;
-      background: var(--ui-brand-primary);
-      content: "";
-    }
   }
 
   &__status {
