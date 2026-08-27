@@ -95,6 +95,25 @@ describe("SheetGrid clipboard", () => {
     expect(wrapper.get('[aria-live="polite"]').text()).toContain("does not fit");
   });
 
+  test("ignores non-text clipboard content without clearing the selected cells", async () => {
+    const { session, sheet, wrapper } = mountSheetGrid();
+    setCellValue(sheet, { row: 0, column: 0 }, "keep A1");
+    setCellValue(sheet, { row: 0, column: 1 }, "keep B1");
+    await wrapper
+      .get('[data-row="0"][data-column="1"]')
+      .trigger("mousedown", { button: 0, shiftKey: true });
+    const image = createTestClipboardEvent("paste", new Map([["image/png", "opaque"]]));
+
+    wrapper.get("input.cell-editor").element.dispatchEvent(image.event);
+    await wrapper.vm.$nextTick();
+
+    expect(image.event.defaultPrevented).toBe(true);
+    expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("keep A1");
+    expect(getCellValue(sheet, { row: 0, column: 1 })).toBe("keep B1");
+    expect(session.history.undoStack).toHaveLength(0);
+    expect(wrapper.get('[aria-live="polite"]').text()).toContain("does not contain text");
+  });
+
   test("leaves editing clipboard events to the native input", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
     const editor = wrapper.get("input.cell-editor");

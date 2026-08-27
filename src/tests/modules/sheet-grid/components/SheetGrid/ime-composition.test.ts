@@ -34,6 +34,27 @@ describe("cell editor IME composition", () => {
     expect(session.history.undoStack).toHaveLength(0);
   });
 
+  test("preserves an existing edit draft when a nested composition is canceled", async () => {
+    const { session, sheet, wrapper } = mountSheetGrid();
+    const editor = wrapper.get("input.cell-editor");
+    await editor.trigger("keydown", { key: "F2" });
+    await editor.setValue("draft");
+
+    await editor.trigger("compositionstart");
+    await editor.setValue("draft unfinished");
+    await editor.setValue("draft");
+    await editor.trigger("compositionend", { data: "" });
+
+    expect(wrapper.get("input.cell-editor").classes()).toContain("is-editing");
+    expect((wrapper.get("input.cell-editor").element as HTMLInputElement).value).toBe("draft");
+    expect(getCellValue(sheet, { row: 0, column: 0 })).toBeNull();
+    expect(session.history.undoStack).toHaveLength(0);
+
+    await wrapper.get("input.cell-editor").trigger("keydown", { key: "Enter" });
+    expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("draft");
+    expect(session.history.undoStack).toHaveLength(1);
+  });
+
   test("finishes a deferred blur after composition ends", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
     const editor = wrapper.get("input.cell-editor");

@@ -91,6 +91,10 @@ export function useGridClipboard(options: {
     const localToken = data.getData(LOCAL_CLIPBOARD_TYPE);
     const pending = pendingClipboard.value;
     const isMatchingLocalClipboard = Boolean(pending && localToken && localToken === pending.token);
+    if (!isMatchingLocalClipboard && !Array.from(data.types).includes("text/plain")) {
+      options.onFeedback("Clipboard does not contain text.");
+      return;
+    }
     const values =
       isMatchingLocalClipboard && pending ? pending.values : parseTsvToCellValues(text);
     const selection = options.getSelection();

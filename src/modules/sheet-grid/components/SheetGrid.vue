@@ -98,6 +98,7 @@ const gridExtent = reactive<GridExtent>(
 );
 let resizeObserver: ResizeObserver | null = null;
 let compositionStartValue = "";
+let wasEditingBeforeComposition = false;
 let shouldFinishAfterComposition = false;
 let pendingSelectionAfterComposition: CellSelection | undefined;
 let dragSelection:
@@ -304,6 +305,7 @@ function finishEdit(destination?: CellSelection, restoreFocus = true): void {
 
   isEditing.value = false;
   isComposing.value = false;
+  wasEditingBeforeComposition = false;
   shouldFinishAfterComposition = false;
   pendingSelectionAfterComposition = undefined;
   editingValue.value = "";
@@ -317,6 +319,7 @@ function finishEdit(destination?: CellSelection, restoreFocus = true): void {
 function cancelEdit(restoreFocus = true): void {
   isEditing.value = false;
   isComposing.value = false;
+  wasEditingBeforeComposition = false;
   shouldFinishAfterComposition = false;
   pendingSelectionAfterComposition = undefined;
   editingValue.value = "";
@@ -630,6 +633,7 @@ function onEditorInput(value: string): void {
 
 function onCompositionStart(): void {
   compositionStartValue = editingValue.value;
+  wasEditingBeforeComposition = isEditing.value;
   shouldFinishAfterComposition = false;
   pendingSelectionAfterComposition = undefined;
   if (!isEditing.value) {
@@ -641,7 +645,19 @@ function onCompositionStart(): void {
 
 function onCompositionEnd(value: string, event: CompositionEvent): void {
   isComposing.value = false;
+  const shouldPreserveExistingEdit = wasEditingBeforeComposition;
+  wasEditingBeforeComposition = false;
   if (event.data === "" && value === compositionStartValue) {
+    if (shouldPreserveExistingEdit) {
+      editingValue.value = compositionStartValue;
+      if (shouldFinishAfterComposition) {
+        finishEdit(pendingSelectionAfterComposition, !pendingSelectionAfterComposition);
+      } else {
+        shouldFinishAfterComposition = false;
+        pendingSelectionAfterComposition = undefined;
+      }
+      return;
+    }
     const destination = pendingSelectionAfterComposition;
     const restoreFocus = !shouldFinishAfterComposition;
     cancelEdit(restoreFocus);
