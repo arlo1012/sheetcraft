@@ -1,5 +1,13 @@
 import { describe, expect, test } from "vitest";
-import { setCellValue } from "../../../../../modules/workbook/workbook";
+import {
+  DEFAULT_COLUMN_WIDTH,
+  DEFAULT_ROW_HEIGHT,
+  MAX_COLUMN_WIDTH,
+  MIN_COLUMN_WIDTH,
+  getColumnWidth,
+  getRowHeight,
+  setCellValue,
+} from "../../../../../modules/workbook/workbook";
 import { mountSheetGrid } from "./fixture";
 
 describe("SheetGrid accessibility", () => {
@@ -34,5 +42,30 @@ describe("SheetGrid accessibility", () => {
     );
     expect(wrapper.findAll("input.cell-editor")).toHaveLength(1);
     expect(wrapper.find('[aria-live="polite"]').exists()).toBe(true);
+  });
+
+  test("exposes keyboard-adjustable row and column resize separators", async () => {
+    const { session, sheet, wrapper } = mountSheetGrid();
+    const columnHandle = wrapper.get('[data-resize-column="0"]');
+    const rowHandle = wrapper.get('[data-resize-row="0"]');
+
+    expect(columnHandle.attributes()).toMatchObject({
+      role: "separator",
+      "aria-label": "Column A width",
+      "aria-orientation": "vertical",
+      "aria-valuemin": String(MIN_COLUMN_WIDTH),
+      "aria-valuemax": String(MAX_COLUMN_WIDTH),
+      "aria-valuenow": String(DEFAULT_COLUMN_WIDTH),
+      tabindex: "0",
+    });
+    expect(rowHandle.attributes("aria-orientation")).toBe("horizontal");
+    expect(rowHandle.attributes("aria-valuenow")).toBe(String(DEFAULT_ROW_HEIGHT));
+
+    await columnHandle.trigger("keydown", { key: "ArrowRight" });
+    await rowHandle.trigger("keydown", { key: "ArrowDown" });
+
+    expect(getColumnWidth(sheet, 0)).toBe(DEFAULT_COLUMN_WIDTH + 8);
+    expect(getRowHeight(sheet, 0)).toBe(DEFAULT_ROW_HEIGHT + 8);
+    expect(session.history.undoStack).toHaveLength(2);
   });
 });

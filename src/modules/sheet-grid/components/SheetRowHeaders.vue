@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
+import { MAX_ROW_HEIGHT, MIN_ROW_HEIGHT } from "../../workbook/workbook";
+import type { SheetGeometry } from "../geometry";
 
 const props = defineProps<{
   startRow: number;
   endRow: number;
-  rowHeight: number;
+  geometry: SheetGeometry;
   scrollTop: number;
   selectedStartRow: number;
   selectedEndRow: number;
 }>();
+
+const emit = defineEmits<{
+  resizeStart: [payload: { index: number; event: PointerEvent }];
+  resize: [payload: { index: number; size: number }];
+}>();
+
+const KEYBOARD_RESIZE_STEP = 8;
 
 const rows = computed(() => {
   const result: number[] = [];
@@ -20,14 +29,33 @@ const rows = computed(() => {
 
 function getHeaderStyle(row: number): CSSProperties {
   return {
-    top: `${row * props.rowHeight - props.scrollTop}px`,
-    height: `${props.rowHeight}px`,
+    top: `${props.geometry.getRowOffset(row) - props.scrollTop}px`,
+    height: `${props.geometry.getRowHeight(row)}px`,
   };
+}
+
+function onResizeHandleKeydown(row: number, event: KeyboardEvent): void {
+  const currentSize = props.geometry.getRowHeight(row);
+  let size: number;
+  if (event.key === "ArrowUp") {
+    size = Math.max(MIN_ROW_HEIGHT, currentSize - KEYBOARD_RESIZE_STEP);
+  } else if (event.key === "ArrowDown") {
+    size = Math.min(MAX_ROW_HEIGHT, currentSize + KEYBOARD_RESIZE_STEP);
+  } else if (event.key === "Home") {
+    size = MIN_ROW_HEIGHT;
+  } else if (event.key === "End") {
+    size = MAX_ROW_HEIGHT;
+  } else {
+    return;
+  }
+
+  event.preventDefault();
+  emit("resize", { index: row, size });
 }
 </script>
 
 <template>
-  <div class="sheet-row-headers" aria-hidden="true">
+  <div class="sheet-row-headers" role="presentation">
     <div
       v-for="row in rows"
       :key="row"
@@ -36,7 +64,20 @@ function getHeaderStyle(row: number): CSSProperties {
       :style="getHeaderStyle(row)"
       :data-row="row"
     >
-      {{ row + 1 }}
+      <span aria-hidden="true">{{ row + 1 }}</span>
+      <span
+        class="sheet-row-headers__resize-handle"
+        :data-resize-row="row"
+        role="separator"
+        aria-orientation="horizontal"
+        :aria-label="`Row ${row + 1} height`"
+        :aria-valuemin="MIN_ROW_HEIGHT"
+        :aria-valuemax="MAX_ROW_HEIGHT"
+        :aria-valuenow="geometry.getRowHeight(row)"
+        tabindex="0"
+        @pointerdown.left.prevent.stop="emit('resizeStart', { index: row, event: $event })"
+        @keydown.stop="onResizeHandleKeydown(row, $event)"
+      />
     </div>
   </div>
 </template>
@@ -68,6 +109,20 @@ function getHeaderStyle(row: number): CSSProperties {
       background: var(--ui-brand-soft);
       color: var(--ui-brand-primary);
       font-weight: 600;
+    }
+  }
+
+  &__resize-handle {
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 1;
+    height: 6px;
+    cursor: row-resize;
+    touch-action: none;
+
+    &:focus-visible {
+      background: var(--ui-brand-primary);
+      outline: none;
     }
   }
 }

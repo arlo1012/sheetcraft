@@ -18,9 +18,6 @@ describe("SheetGrid viewport", () => {
     expect(wrapper.get('[data-row="50"][data-column="8"]').attributes("style")).toContain(
       "left: -32px",
     );
-    expect(wrapper.get("[data-sheet-grid-lines]").attributes("style")).toContain(
-      "background-position: -32px 0px",
-    );
     expect(wrapper.findAll(".sheet-cell-layer__cell").length).toBeLessThan(1_000);
   });
 

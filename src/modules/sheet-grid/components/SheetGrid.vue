@@ -11,12 +11,17 @@ import {
 } from "vue";
 import { formatCellValueForDisplay, formatCellValueForInput } from "../../workbook/input";
 import {
+  MAX_COLUMN_WIDTH,
+  MAX_ROW_HEIGHT,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
+  MIN_COLUMN_WIDTH,
+  MIN_ROW_HEIGHT,
   getCellValue,
   type CellAddress,
   type CellRange,
   type Sheet,
+  type SheetDimensionAxis,
 } from "../../workbook/workbook";
 import {
   DEFAULT_GRID_EXTENT_POLICY,
@@ -73,6 +78,7 @@ const emit = defineEmits<{
   commitCell: [payload: { address: CellAddress; input: string }];
   clearCells: [range: CellRange];
   pasteCells: [payload: GridPastePayload];
+  resizeDimension: [payload: { axis: SheetDimensionAxis; index: number; size: number }];
   undo: [];
   redo: [];
   selectionChange: [payload: { active: CellAddress; range: CellRange }];
@@ -114,13 +120,36 @@ let dragSelection:
     }
   | undefined;
 let autoScrollFrame: number | undefined;
+const dimensionResize = ref<
+  | {
+      axis: SheetDimensionAxis;
+      index: number;
+      pointerId: number;
+      captureTarget: HTMLElement | null;
+      startClientPosition: number;
+      startSize: number;
+      previewSize: number;
+    }
+  | undefined
+>();
 
-const geometry = computed(() =>
-  createSheetGeometry({
+const geometry = computed(() => {
+  const rowHeights = new Map(props.sheet.rowHeights);
+  const columnWidths = new Map(props.sheet.columnWidths);
+  const resize = dimensionResize.value;
+  if (resize?.axis === "row") {
+    rowHeights.set(resize.index, resize.previewSize);
+  } else if (resize?.axis === "column") {
+    columnWidths.set(resize.index, resize.previewSize);
+  }
+
+  return createSheetGeometry({
     rowCount: gridExtent.rowCount,
     columnCount: gridExtent.columnCount,
-  }),
-);
+    rowHeights,
+    columnWidths,
+  });
+});
 const totalSize = computed(() => geometry.value.getTotalSize());
 const visibleRange = computed(() =>
   geometry.value.getVisibleRange(scrollPosition, viewportSize, 2),
@@ -157,11 +186,6 @@ const gridViewportStyle = computed<CSSProperties>(() => ({
   width: `${viewportSize.width}px`,
   height: `${viewportSize.height}px`,
 }));
-const gridLineStyle = computed<CSSProperties>(() => ({
-  backgroundPosition: `${-(scrollPosition.x % geometry.value.columnWidth)}px ${-(scrollPosition.y % geometry.value.rowHeight)}px`,
-  backgroundSize: `${geometry.value.columnWidth}px ${geometry.value.rowHeight}px`,
-}));
-
 const { clipboardMode, clipboardRange, clearPendingClipboard, onCopy, onCut, onPaste } =
   useGridClipboard({
     getSheet: () => props.sheet,
@@ -216,10 +240,7 @@ function ensureGridExtentCoversViewport(): void {
       gridExtent,
       scrollPosition,
       viewportSize,
-      {
-        rowHeight: geometry.value.rowHeight,
-        columnWidth: geometry.value.columnWidth,
-      },
+      geometry.value,
       getGridExtentPolicy(),
     ),
   );
@@ -383,6 +404,119 @@ function stopDragSelection(): void {
   dragSelection = undefined;
   window.removeEventListener("mousemove", onDragMouseMove);
   window.removeEventListener("mouseup", onDragMouseUp);
+}
+
+function stopDimensionResize(): void {
+  const resize = dimensionResize.value;
+  const target = resize?.captureTarget;
+  target?.removeEventListener("lostpointercapture", onDimensionResizeLostCapture);
+  if (resize && target?.hasPointerCapture?.(resize.pointerId)) {
+    target.releasePointerCapture(resize.pointerId);
+  }
+  dimensionResize.value = undefined;
+  window.removeEventListener("pointermove", onDimensionResizeMove);
+  window.removeEventListener("pointerup", onDimensionResizeEnd);
+  window.removeEventListener("pointercancel", onDimensionResizeCancel);
+  window.removeEventListener("blur", onDimensionResizeBlur);
+}
+
+function clampDimensionSize(axis: SheetDimensionAxis, size: number): number {
+  const minimum = axis === "row" ? MIN_ROW_HEIGHT : MIN_COLUMN_WIDTH;
+  const maximum = axis === "row" ? MAX_ROW_HEIGHT : MAX_COLUMN_WIDTH;
+  return Math.min(Math.max(Math.round(size), minimum), maximum);
+}
+
+function onDimensionResizeRequest(
+  axis: SheetDimensionAxis,
+  payload: { index: number; size: number },
+): void {
+  emit("resizeDimension", { axis, ...payload });
+}
+
+function onDimensionResizeStart(
+  axis: SheetDimensionAxis,
+  payload: { index: number; event: PointerEvent },
+): void {
+  stopDragSelection();
+  stopDimensionResize();
+  const startSize =
+    axis === "row"
+      ? geometry.value.getRowHeight(payload.index)
+      : geometry.value.getColumnWidth(payload.index);
+  const target = payload.event.currentTarget as HTMLElement | null;
+  dimensionResize.value = {
+    axis,
+    index: payload.index,
+    pointerId: payload.event.pointerId,
+    captureTarget: target,
+    startClientPosition: axis === "row" ? payload.event.clientY : payload.event.clientX,
+    startSize,
+    previewSize: startSize,
+  };
+
+  target?.setPointerCapture?.(payload.event.pointerId);
+  target?.addEventListener("lostpointercapture", onDimensionResizeLostCapture);
+  window.addEventListener("pointermove", onDimensionResizeMove);
+  window.addEventListener("pointerup", onDimensionResizeEnd);
+  window.addEventListener("pointercancel", onDimensionResizeCancel);
+  window.addEventListener("blur", onDimensionResizeBlur);
+}
+
+function onDimensionResizeMove(event: PointerEvent): void {
+  const resize = dimensionResize.value;
+  if (!resize || event.pointerId !== resize.pointerId) {
+    return;
+  }
+  event.preventDefault();
+  const clientPosition = resize.axis === "row" ? event.clientY : event.clientX;
+  resize.previewSize = clampDimensionSize(
+    resize.axis,
+    resize.startSize + clientPosition - resize.startClientPosition,
+  );
+}
+
+function onDimensionResizeEnd(event: PointerEvent): void {
+  const resize = dimensionResize.value;
+  if (!resize || event.pointerId !== resize.pointerId) {
+    return;
+  }
+  const payload = {
+    axis: resize.axis,
+    index: resize.index,
+    size: resize.previewSize,
+  };
+  const changed = resize.previewSize !== resize.startSize;
+  stopDimensionResize();
+  if (changed) {
+    emit("resizeDimension", payload);
+  }
+}
+
+function onDimensionResizeCancel(event: PointerEvent): void {
+  if (event.pointerId !== dimensionResize.value?.pointerId) {
+    return;
+  }
+  stopDimensionResize();
+}
+
+function onDimensionResizeLostCapture(event: PointerEvent): void {
+  if (event.pointerId !== dimensionResize.value?.pointerId) {
+    return;
+  }
+  stopDimensionResize();
+}
+
+function onDimensionResizeBlur(): void {
+  stopDimensionResize();
+}
+
+function onGridKeydown(event: KeyboardEvent): void {
+  if (!dimensionResize.value || event.key !== "Escape") {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  stopDimensionResize();
 }
 
 function updateDragSelectionAddress(): void {
@@ -706,6 +840,7 @@ watch(
   () => props.sheet.id,
   () => {
     stopDragSelection();
+    stopDimensionResize();
     clearPendingClipboard();
     selection.value = createCellSelection({ row: 0, column: 0 });
     editingValue.value = "";
@@ -743,34 +878,44 @@ onMounted(() => {
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   stopDragSelection();
+  stopDimensionResize();
 });
 </script>
 
 <template>
   <section
     class="sheet-grid"
+    :class="{
+      'is-resizing-column': dimensionResize?.axis === 'column',
+      'is-resizing-row': dimensionResize?.axis === 'row',
+    }"
     :style="{
       '--sheet-row-header-width': `${ROW_HEADER_WIDTH}px`,
       '--sheet-column-header-height': `${COLUMN_HEADER_HEIGHT}px`,
     }"
     :aria-label="`${sheet.name} worksheet`"
+    @keydown.capture="onGridKeydown"
   >
     <div class="sheet-grid__corner" aria-hidden="true" />
     <SheetColumnHeaders
       :start-column="visibleRange.startColumn"
       :end-column="visibleRange.endColumn"
-      :column-width="geometry.columnWidth"
+      :geometry="geometry"
       :scroll-left="scrollPosition.x"
       :selected-start-column="selectedRange.start.column"
       :selected-end-column="selectedRange.end.column"
+      @resize="onDimensionResizeRequest('column', $event)"
+      @resize-start="onDimensionResizeStart('column', $event)"
     />
     <SheetRowHeaders
       :start-row="visibleRange.startRow"
       :end-row="visibleRange.endRow"
-      :row-height="geometry.rowHeight"
+      :geometry="geometry"
       :scroll-top="scrollPosition.y"
       :selected-start-row="selectedRange.start.row"
       :selected-end-row="selectedRange.end.row"
+      @resize="onDimensionResizeRequest('row', $event)"
+      @resize-start="onDimensionResizeStart('row', $event)"
     />
 
     <div
@@ -813,12 +958,6 @@ onBeforeUnmount(() => {
               />
             </template>
           </SheetCellLayer>
-          <div
-            data-sheet-grid-lines
-            class="sheet-grid__lines"
-            :style="gridLineStyle"
-            aria-hidden="true"
-          />
           <SheetSelectionOverlay
             :active-rect="activeCellRect"
             :range-rect="selectedRangeRect"
@@ -843,6 +982,14 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow: hidden;
   background: var(--ui-surface-primary);
+
+  &.is-resizing-column {
+    cursor: col-resize;
+  }
+
+  &.is-resizing-row {
+    cursor: row-resize;
+  }
 
   &__corner {
     position: absolute;
@@ -875,24 +1022,6 @@ onBeforeUnmount(() => {
     left: 0;
     overflow: hidden;
     background: var(--ui-surface-primary);
-  }
-
-  &__lines {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    background-image:
-      linear-gradient(
-        to right,
-        transparent calc(100% - 1px),
-        var(--ui-border-default) calc(100% - 1px)
-      ),
-      linear-gradient(
-        to bottom,
-        transparent calc(100% - 1px),
-        var(--ui-border-default) calc(100% - 1px)
-      );
-    pointer-events: none;
   }
 
   &__assistive-status {

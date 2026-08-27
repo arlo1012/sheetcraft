@@ -1,12 +1,17 @@
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
+  getColumnWidth,
   getCellValue,
+  getRowHeight,
   isCellAddressInBounds,
+  setColumnWidth,
   setCellValue,
+  setRowHeight,
   type CellAddress,
   type CellRange,
   type CellValue,
+  type SheetDimensionAxis,
   type Workbook,
 } from "./workbook";
 import { getCellMatrixSize } from "./clipboard";
@@ -28,7 +33,18 @@ export type ClearCellRangeCommand = {
   range: CellRange;
 };
 
-export type WorkbookCommand = SetCellValuesCommand | ClearCellRangeCommand;
+export type ResizeSheetDimensionCommand = {
+  type: "resizeSheetDimension";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  index: number;
+  size: number;
+};
+
+export type WorkbookCommand =
+  | SetCellValuesCommand
+  | ClearCellRangeCommand
+  | ResizeSheetDimensionCommand;
 
 function assertCellAddress(address: CellAddress): void {
   if (!isCellAddressInBounds(address)) {
@@ -89,6 +105,15 @@ export function createClearCellRangeCommand(
     sheetId,
     range: normalizedRange,
   };
+}
+
+export function createResizeSheetDimensionCommand(
+  sheetId: string,
+  axis: SheetDimensionAxis,
+  index: number,
+  size: number,
+): ResizeSheetDimensionCommand {
+  return { type: "resizeSheetDimension", sheetId, axis, index, size };
 }
 
 export function createPasteCellValuesCommand(
@@ -217,11 +242,41 @@ function applyClearCellRangeCommand(
   return reverseChanges.length > 0 ? createBatchSetCellValuesCommand(reverseChanges) : null;
 }
 
+function applyResizeSheetDimensionCommand(
+  workbook: Workbook,
+  command: ResizeSheetDimensionCommand,
+): WorkbookCommand | null {
+  if (command.axis !== "row" && command.axis !== "column") {
+    throw new RangeError(`Unknown sheet dimension axis ${command.axis}.`);
+  }
+  const sheet = workbook.sheets.get(command.sheetId);
+  if (!sheet) {
+    throw new Error(`Sheet ${command.sheetId} does not exist.`);
+  }
+
+  const previousSize =
+    command.axis === "row"
+      ? getRowHeight(sheet, command.index)
+      : getColumnWidth(sheet, command.index);
+  const changed =
+    command.axis === "row"
+      ? setRowHeight(sheet, command.index, command.size)
+      : setColumnWidth(sheet, command.index, command.size);
+
+  return changed
+    ? createResizeSheetDimensionCommand(command.sheetId, command.axis, command.index, previousSize)
+    : null;
+}
+
 export function applyWorkbookCommand(
   workbook: Workbook,
   command: WorkbookCommand,
 ): WorkbookCommand | null {
-  return command.type === "clearCellRange"
-    ? applyClearCellRangeCommand(workbook, command)
-    : applySetCellValuesCommand(workbook, command);
+  if (command.type === "clearCellRange") {
+    return applyClearCellRangeCommand(workbook, command);
+  }
+  if (command.type === "resizeSheetDimension") {
+    return applyResizeSheetDimensionCommand(workbook, command);
+  }
+  return applySetCellValuesCommand(workbook, command);
 }

@@ -80,8 +80,8 @@ const visibleRows = computed<VisibleRow[]>(() => {
       key: row,
       row,
       style: {
-        top: `${props.geometry.getCellViewportRect({ row, column: 0 }, props.scrollPosition).y}px`,
-        height: `${props.geometry.rowHeight}px`,
+        top: `${props.geometry.getRowOffset(row) - props.scrollPosition.y}px`,
+        height: `${props.geometry.getRowHeight(row)}px`,
       },
       cells,
     });
@@ -149,11 +149,14 @@ const visibleRows = computed<VisibleRow[]>(() => {
     overflow: hidden;
     padding: 0 5px;
     background: var(--ui-surface-primary);
+    border-right: 1px solid var(--ui-border-default);
+    border-bottom: 1px solid var(--ui-border-default);
     color: var(--ui-text-primary);
     font-size: 13px;
     line-height: 1;
     white-space: nowrap;
     user-select: none;
+    box-sizing: border-box;
 
     &.is-active {
       overflow: visible;

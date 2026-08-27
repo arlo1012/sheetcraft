@@ -24,16 +24,63 @@ describe("sheet geometry", () => {
     expect(geometry.getCellAtPoint({ x: -1, y: 0 })).toBeNull();
   });
 
+  test("uses sparse row and column overrides for coordinates and hit testing", () => {
+    const variableGeometry = createSheetGeometry({
+      rowCount: 5,
+      columnCount: 5,
+      rowHeight: 20,
+      columnWidth: 80,
+      rowHeights: new Map([
+        [1, 30],
+        [3, 10],
+      ]),
+      columnWidths: new Map([
+        [1, 100],
+        [3, 40],
+      ]),
+    });
+
+    expect(variableGeometry.getRowOffset(3)).toBe(70);
+    expect(variableGeometry.getColumnOffset(3)).toBe(260);
+    expect(variableGeometry.getCellRect({ row: 3, column: 3 })).toEqual({
+      x: 260,
+      y: 70,
+      width: 40,
+      height: 10,
+    });
+    expect(variableGeometry.getCellAtPoint({ x: 179, y: 49 })).toEqual({ row: 1, column: 1 });
+    expect(variableGeometry.getCellAtPoint({ x: 180, y: 50 })).toEqual({ row: 2, column: 2 });
+    expect(variableGeometry.getTotalSize()).toEqual({ width: 380, height: 100 });
+  });
+
+  test("ignores valid dimension overrides outside the allocated grid extent", () => {
+    const geometryWithFutureDimensions = createSheetGeometry({
+      rowCount: 10,
+      columnCount: 10,
+      rowHeights: new Map([[700_000, 40]]),
+      columnWidths: new Map([[16_000, 144]]),
+    });
+
+    expect(geometryWithFutureDimensions.getTotalSize()).toEqual({ width: 960, height: 240 });
+  });
+
   test("keeps rendered cell coordinates local at deep logical rows", () => {
-    const deepGeometry = createSheetGeometry({ rowCount: 700_000, columnCount: 50 });
-    const scrollPosition = { x: 0, y: 699_049 * deepGeometry.rowHeight };
+    const deepGeometry = createSheetGeometry({
+      rowCount: 700_000,
+      columnCount: 50,
+      rowHeights: new Map([
+        [1, 40],
+        [699_049, 48],
+      ]),
+    });
+    const scrollPosition = { x: 0, y: deepGeometry.getRowOffset(699_049) };
 
     expect(deepGeometry.getCellViewportRect({ row: 699_049, column: 0 }, scrollPosition).y).toBe(0);
     expect(deepGeometry.getCellViewportRect({ row: 699_050, column: 0 }, scrollPosition).y).toBe(
-      24,
+      48,
     );
     expect(deepGeometry.getCellViewportRect({ row: 699_051, column: 0 }, scrollPosition).y).toBe(
-      48,
+      72,
     );
   });
 
@@ -61,6 +108,33 @@ describe("sheet geometry", () => {
         { width: 240, height: 100 },
       ),
     ).toEqual({ x: 240, y: 80 });
+  });
+
+  test("uses variable dimensions for visible ranges and scroll adjustment", () => {
+    const variableGeometry = createSheetGeometry({
+      rowCount: 10,
+      columnCount: 10,
+      rowHeight: 20,
+      columnWidth: 80,
+      rowHeights: new Map([[2, 40]]),
+      columnWidths: new Map([[2, 160]]),
+    });
+
+    expect(
+      variableGeometry.getVisibleRange({ x: 160, y: 40 }, { width: 160, height: 40 }, 0),
+    ).toEqual({
+      startRow: 2,
+      endRow: 2,
+      startColumn: 2,
+      endColumn: 2,
+    });
+    expect(
+      variableGeometry.getScrollPositionForCell(
+        { row: 3, column: 3 },
+        { x: 0, y: 0 },
+        { width: 160, height: 40 },
+      ),
+    ).toEqual({ x: 240, y: 60 });
   });
 
   test("formats spreadsheet column and cell labels", () => {

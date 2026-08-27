@@ -4,6 +4,7 @@ import type { GridPastePayload } from "../../../../../modules/sheet-grid/useGrid
 import {
   createClearCellRangeCommand,
   createPasteCellValuesCommand,
+  createResizeSheetDimensionCommand,
   createSetCellValueCommand,
 } from "../../../../../modules/workbook/commands";
 import {
@@ -14,7 +15,11 @@ import {
   type WorkbookSession,
 } from "../../../../../modules/workbook/history";
 import { parseCellInput } from "../../../../../modules/workbook/input";
-import { getActiveSheet, type CellRange } from "../../../../../modules/workbook/workbook";
+import {
+  getActiveSheet,
+  type CellRange,
+  type SheetDimensionAxis,
+} from "../../../../../modules/workbook/workbook";
 import SheetGrid from "../../../../../modules/sheet-grid/components/SheetGrid.vue";
 
 export type SheetGridFixtureOptions = {
@@ -53,6 +58,12 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
           createPasteCellValuesCommand(sheet.id, payload.plan.anchor, payload.plan.values, {
             clearRange: payload.clearRange,
           }),
+        );
+      },
+      onResizeDimension(payload: { axis: SheetDimensionAxis; index: number; size: number }) {
+        executeWorkbookCommand(
+          session,
+          createResizeSheetDimensionCommand(sheet.id, payload.axis, payload.index, payload.size),
         );
       },
       onUndo() {

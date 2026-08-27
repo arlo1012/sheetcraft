@@ -1,15 +1,23 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import { columnIndexToLabel } from "../geometry";
+import { MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } from "../../workbook/workbook";
+import { columnIndexToLabel, type SheetGeometry } from "../geometry";
 
 const props = defineProps<{
   startColumn: number;
   endColumn: number;
-  columnWidth: number;
+  geometry: SheetGeometry;
   scrollLeft: number;
   selectedStartColumn: number;
   selectedEndColumn: number;
 }>();
+
+const emit = defineEmits<{
+  resizeStart: [payload: { index: number; event: PointerEvent }];
+  resize: [payload: { index: number; size: number }];
+}>();
+
+const KEYBOARD_RESIZE_STEP = 8;
 
 const columns = computed(() => {
   const result: number[] = [];
@@ -21,14 +29,33 @@ const columns = computed(() => {
 
 function getHeaderStyle(column: number): CSSProperties {
   return {
-    left: `${column * props.columnWidth - props.scrollLeft}px`,
-    width: `${props.columnWidth}px`,
+    left: `${props.geometry.getColumnOffset(column) - props.scrollLeft}px`,
+    width: `${props.geometry.getColumnWidth(column)}px`,
   };
+}
+
+function onResizeHandleKeydown(column: number, event: KeyboardEvent): void {
+  const currentSize = props.geometry.getColumnWidth(column);
+  let size: number;
+  if (event.key === "ArrowLeft") {
+    size = Math.max(MIN_COLUMN_WIDTH, currentSize - KEYBOARD_RESIZE_STEP);
+  } else if (event.key === "ArrowRight") {
+    size = Math.min(MAX_COLUMN_WIDTH, currentSize + KEYBOARD_RESIZE_STEP);
+  } else if (event.key === "Home") {
+    size = MIN_COLUMN_WIDTH;
+  } else if (event.key === "End") {
+    size = MAX_COLUMN_WIDTH;
+  } else {
+    return;
+  }
+
+  event.preventDefault();
+  emit("resize", { index: column, size });
 }
 </script>
 
 <template>
-  <div class="sheet-column-headers" aria-hidden="true">
+  <div class="sheet-column-headers" role="presentation">
     <div
       v-for="column in columns"
       :key="column"
@@ -39,7 +66,20 @@ function getHeaderStyle(column: number): CSSProperties {
       :style="getHeaderStyle(column)"
       :data-column="column"
     >
-      {{ columnIndexToLabel(column) }}
+      <span aria-hidden="true">{{ columnIndexToLabel(column) }}</span>
+      <span
+        class="sheet-column-headers__resize-handle"
+        :data-resize-column="column"
+        role="separator"
+        aria-orientation="vertical"
+        :aria-label="`Column ${columnIndexToLabel(column)} width`"
+        :aria-valuemin="MIN_COLUMN_WIDTH"
+        :aria-valuemax="MAX_COLUMN_WIDTH"
+        :aria-valuenow="geometry.getColumnWidth(column)"
+        tabindex="0"
+        @pointerdown.left.prevent.stop="emit('resizeStart', { index: column, event: $event })"
+        @keydown.stop="onResizeHandleKeydown(column, $event)"
+      />
     </div>
   </div>
 </template>
@@ -71,6 +111,20 @@ function getHeaderStyle(column: number): CSSProperties {
       background: var(--ui-brand-soft);
       color: var(--ui-brand-primary);
       font-weight: 600;
+    }
+  }
+
+  &__resize-handle {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: 1;
+    width: 6px;
+    cursor: col-resize;
+    touch-action: none;
+
+    &:focus-visible {
+      background: var(--ui-brand-primary);
+      outline: none;
     }
   }
 }

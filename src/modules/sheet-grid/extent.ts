@@ -1,5 +1,5 @@
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellAddress } from "../workbook/workbook";
-import type { Point, Size } from "./geometry";
+import type { Point, SheetGeometry, Size } from "./geometry";
 
 export type GridExtent = {
   rowCount: number;
@@ -90,21 +90,16 @@ export function expandGridExtentForViewport(
   current: GridExtent,
   scrollPosition: Point,
   viewportSize: Size,
-  cellSize: { rowHeight: number; columnWidth: number },
+  geometry: SheetGeometry,
   policy: GridExtentPolicy,
 ): GridExtent {
-  const lastVisibleRow = Math.floor(
-    (Math.max(0, scrollPosition.y) + Math.max(0, viewportSize.height - 1)) / cellSize.rowHeight,
-  );
-  const lastVisibleColumn = Math.floor(
-    (Math.max(0, scrollPosition.x) + Math.max(0, viewportSize.width - 1)) / cellSize.columnWidth,
-  );
+  const visibleRange = geometry.getVisibleRange(scrollPosition, viewportSize, 0);
 
   return expandGridExtent(
     current,
     {
-      rowCount: lastVisibleRow + 1 + policy.tail.rowCount,
-      columnCount: lastVisibleColumn + 1 + policy.tail.columnCount,
+      rowCount: visibleRange.endRow + 1 + policy.tail.rowCount,
+      columnCount: visibleRange.endColumn + 1 + policy.tail.columnCount,
     },
     policy.growth,
   );

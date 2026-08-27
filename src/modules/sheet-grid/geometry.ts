@@ -1,9 +1,13 @@
 import {
+  DEFAULT_COLUMN_WIDTH,
+  DEFAULT_ROW_HEIGHT,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   isCellAddressInBounds,
   type CellAddress,
 } from "../workbook/workbook";
+
+export { DEFAULT_COLUMN_WIDTH, DEFAULT_ROW_HEIGHT } from "../workbook/workbook";
 
 export type Size = {
   width: number;
@@ -29,6 +33,10 @@ export type SheetGeometry = {
   columnCount: number;
   rowHeight: number;
   columnWidth: number;
+  getRowHeight: (row: number) => number;
+  getColumnWidth: (column: number) => number;
+  getRowOffset: (row: number) => number;
+  getColumnOffset: (column: number) => number;
   getTotalSize: () => Size;
   getCellRect: (address: CellAddress) => Rect;
   getCellViewportRect: (address: CellAddress, scrollPosition: Point) => Rect;
@@ -45,11 +53,107 @@ export type SheetGeometry = {
   ) => Point;
 };
 
-export const DEFAULT_ROW_HEIGHT = 24;
-export const DEFAULT_COLUMN_WIDTH = 96;
+type SparseAxisMetrics = {
+  getSize: (index: number) => number;
+  getOffset: (index: number) => number;
+  getTotalSize: () => number;
+  getIndexAt: (offset: number) => number | null;
+};
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum);
+}
+
+function lowerBound(values: readonly number[], target: number): number {
+  let low = 0;
+  let high = values.length;
+  while (low < high) {
+    const middle = low + Math.floor((high - low) / 2);
+    if (values[middle]! < target) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
+  }
+  return low;
+}
+
+function assertPositiveInteger(value: number, name: string): void {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new RangeError(`${name} must be a positive integer.`);
+  }
+}
+
+function createSparseAxisMetrics(
+  count: number,
+  defaultSize: number,
+  overrides: ReadonlyMap<number, number>,
+): SparseAxisMetrics {
+  const entries = [...overrides]
+    .filter(([index, size]) => {
+      if (!Number.isInteger(index) || index < 0) {
+        throw new RangeError(`Dimension index ${index} is invalid.`);
+      }
+      if (!Number.isInteger(size) || size <= 0) {
+        throw new RangeError(`Dimension size ${size} must be a positive integer.`);
+      }
+      return index < count && size !== defaultSize;
+    })
+    .sort(([left], [right]) => left - right);
+  const indexes: number[] = [];
+  const sizes: number[] = [];
+  const cumulativeDeltas: number[] = [];
+  let cumulativeDelta = 0;
+
+  for (const [index, size] of entries) {
+    indexes.push(index);
+    sizes.push(size);
+    cumulativeDelta += size - defaultSize;
+    cumulativeDeltas.push(cumulativeDelta);
+  }
+
+  function getDeltaBefore(index: number): number {
+    const position = lowerBound(indexes, index) - 1;
+    return position >= 0 ? cumulativeDeltas[position]! : 0;
+  }
+
+  function getSize(index: number): number {
+    const position = lowerBound(indexes, index);
+    return indexes[position] === index ? sizes[position]! : defaultSize;
+  }
+
+  function getOffset(index: number): number {
+    return index * defaultSize + getDeltaBefore(index);
+  }
+
+  const totalSize = getOffset(count);
+
+  return {
+    getSize,
+    getOffset,
+    getTotalSize: () => totalSize,
+    getIndexAt(offset) {
+      if (offset < 0 || offset >= totalSize) {
+        return null;
+      }
+
+      let low = 0;
+      let high = count - 1;
+      while (low <= high) {
+        const index = low + Math.floor((high - low) / 2);
+        const start = getOffset(index);
+        const end = start + getSize(index);
+        if (offset < start) {
+          high = index - 1;
+        } else if (offset >= end) {
+          low = index + 1;
+        } else {
+          return index;
+        }
+      }
+      return null;
+    },
+  };
 }
 
 function assertGeometryAddress(address: CellAddress, rowCount: number, columnCount: number): void {
@@ -63,73 +167,106 @@ export function createSheetGeometry(options?: {
   columnCount?: number;
   rowHeight?: number;
   columnWidth?: number;
+  rowHeights?: ReadonlyMap<number, number>;
+  columnWidths?: ReadonlyMap<number, number>;
 }): SheetGeometry {
   const rowCount = options?.rowCount ?? MAX_SHEET_ROWS;
   const columnCount = options?.columnCount ?? MAX_SHEET_COLUMNS;
   const rowHeight = options?.rowHeight ?? DEFAULT_ROW_HEIGHT;
   const columnWidth = options?.columnWidth ?? DEFAULT_COLUMN_WIDTH;
+  assertPositiveInteger(rowCount, "Grid row count");
+  assertPositiveInteger(columnCount, "Grid column count");
+  assertPositiveInteger(rowHeight, "Default row height");
+  assertPositiveInteger(columnWidth, "Default column width");
 
-  if (
-    rowCount <= 0 ||
-    rowCount > MAX_SHEET_ROWS ||
-    columnCount <= 0 ||
-    columnCount > MAX_SHEET_COLUMNS ||
-    rowHeight <= 0 ||
-    columnWidth <= 0
-  ) {
-    throw new RangeError("Sheet geometry dimensions must be positive.");
+  if (rowCount > MAX_SHEET_ROWS || columnCount > MAX_SHEET_COLUMNS) {
+    throw new RangeError("Sheet geometry dimensions exceed the sheet limits.");
   }
 
+  const rowMetrics = createSparseAxisMetrics(rowCount, rowHeight, options?.rowHeights ?? new Map());
+  const columnMetrics = createSparseAxisMetrics(
+    columnCount,
+    columnWidth,
+    options?.columnWidths ?? new Map(),
+  );
   const totalSize = {
-    width: columnCount * columnWidth,
-    height: rowCount * rowHeight,
+    width: columnMetrics.getTotalSize(),
+    height: rowMetrics.getTotalSize(),
   };
+
+  function getCellRect(address: CellAddress): Rect {
+    assertGeometryAddress(address, rowCount, columnCount);
+    return {
+      x: columnMetrics.getOffset(address.column),
+      y: rowMetrics.getOffset(address.row),
+      width: columnMetrics.getSize(address.column),
+      height: rowMetrics.getSize(address.row),
+    };
+  }
+
+  function getIndexAtOrEdge(metrics: SparseAxisMetrics, offset: number, count: number): number {
+    return metrics.getIndexAt(offset) ?? count - 1;
+  }
 
   return {
     rowCount,
     columnCount,
     rowHeight,
     columnWidth,
-    getTotalSize: () => ({ ...totalSize }),
-    getCellRect(address) {
-      assertGeometryAddress(address, rowCount, columnCount);
-      return {
-        x: address.column * columnWidth,
-        y: address.row * rowHeight,
-        width: columnWidth,
-        height: rowHeight,
-      };
+    getRowHeight(row) {
+      assertGeometryAddress({ row, column: 0 }, rowCount, columnCount);
+      return rowMetrics.getSize(row);
     },
+    getColumnWidth(column) {
+      assertGeometryAddress({ row: 0, column }, rowCount, columnCount);
+      return columnMetrics.getSize(column);
+    },
+    getRowOffset(row) {
+      assertGeometryAddress({ row, column: 0 }, rowCount, columnCount);
+      return rowMetrics.getOffset(row);
+    },
+    getColumnOffset(column) {
+      assertGeometryAddress({ row: 0, column }, rowCount, columnCount);
+      return columnMetrics.getOffset(column);
+    },
+    getTotalSize: () => ({ ...totalSize }),
+    getCellRect,
     getCellViewportRect(address, scrollPosition) {
-      assertGeometryAddress(address, rowCount, columnCount);
+      const rect = getCellRect(address);
       return {
-        x: address.column * columnWidth - scrollPosition.x,
-        y: address.row * rowHeight - scrollPosition.y,
-        width: columnWidth,
-        height: rowHeight,
+        x: rect.x - scrollPosition.x,
+        y: rect.y - scrollPosition.y,
+        width: rect.width,
+        height: rect.height,
       };
     },
     getCellAtPoint(point) {
       if (point.x < 0 || point.y < 0 || point.x >= totalSize.width || point.y >= totalSize.height) {
         return null;
       }
-
-      return {
-        row: Math.floor(point.y / rowHeight),
-        column: Math.floor(point.x / columnWidth),
-      };
+      const row = rowMetrics.getIndexAt(point.y);
+      const column = columnMetrics.getIndexAt(point.x);
+      return row === null || column === null ? null : { row, column };
     },
     getVisibleRange(scrollPosition, viewportSize, overscan = 2) {
       const normalizedOverscan = Math.max(0, Math.floor(overscan));
       const visibleWidth = Math.max(0, viewportSize.width);
       const visibleHeight = Math.max(0, viewportSize.height);
-      const startRow = Math.floor(Math.max(0, scrollPosition.y) / rowHeight);
-      const startColumn = Math.floor(Math.max(0, scrollPosition.x) / columnWidth);
-      const visibleEndRow = Math.floor(
-        (Math.max(0, scrollPosition.y) + Math.max(0, visibleHeight - 1)) / rowHeight,
+      const startRow = getIndexAtOrEdge(rowMetrics, Math.max(0, scrollPosition.y), rowCount);
+      const startColumn = getIndexAtOrEdge(
+        columnMetrics,
+        Math.max(0, scrollPosition.x),
+        columnCount,
       );
-      const visibleEndColumn = Math.floor(
-        (Math.max(0, scrollPosition.x) + Math.max(0, visibleWidth - 1)) / columnWidth,
+      const visibleEndRow = getIndexAtOrEdge(
+        rowMetrics,
+        Math.max(0, scrollPosition.y) + Math.max(0, visibleHeight - 1),
+        rowCount,
+      );
+      const visibleEndColumn = getIndexAtOrEdge(
+        columnMetrics,
+        Math.max(0, scrollPosition.x) + Math.max(0, visibleWidth - 1),
+        columnCount,
       );
 
       return {
@@ -140,13 +277,7 @@ export function createSheetGeometry(options?: {
       };
     },
     getScrollPositionForCell(address, scrollPosition, viewportSize) {
-      assertGeometryAddress(address, rowCount, columnCount);
-      const rect = {
-        x: address.column * columnWidth,
-        y: address.row * rowHeight,
-        width: columnWidth,
-        height: rowHeight,
-      };
+      const rect = getCellRect(address);
       let x = Math.max(0, scrollPosition.x);
       let y = Math.max(0, scrollPosition.y);
 
@@ -155,7 +286,6 @@ export function createSheetGeometry(options?: {
       } else if (rect.x + rect.width > x + viewportSize.width) {
         x = rect.x + rect.width - viewportSize.width;
       }
-
       if (rect.y < y) {
         y = rect.y;
       } else if (rect.y + rect.height > y + viewportSize.height) {
@@ -182,7 +312,6 @@ export function columnIndexToLabel(column: number): string {
     label = String.fromCharCode(65 + remainder) + label;
     value = Math.floor((value - 1) / 26);
   }
-
   return label;
 }
 

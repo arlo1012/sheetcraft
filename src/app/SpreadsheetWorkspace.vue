@@ -5,6 +5,7 @@ import type { GridPastePayload } from "../modules/sheet-grid/useGridClipboard";
 import {
   createClearCellRangeCommand,
   createPasteCellValuesCommand,
+  createResizeSheetDimensionCommand,
   createSetCellValueCommand,
 } from "../modules/workbook/commands";
 import {
@@ -15,7 +16,12 @@ import {
   type WorkbookSession,
 } from "../modules/workbook/history";
 import { parseCellInput } from "../modules/workbook/input";
-import { getActiveSheet, type CellAddress, type CellRange } from "../modules/workbook/workbook";
+import {
+  getActiveSheet,
+  type CellAddress,
+  type CellRange,
+  type SheetDimensionAxis,
+} from "../modules/workbook/workbook";
 
 const session = reactive(createWorkbookSession()) as WorkbookSession;
 const activeSheet = computed(() => getActiveSheet(session.workbook));
@@ -45,6 +51,19 @@ function clearCells(range: CellRange): void {
     "Clear cells",
   );
 }
+
+function resizeDimension(payload: { axis: SheetDimensionAxis; index: number; size: number }): void {
+  executeWorkbookCommand(
+    session,
+    createResizeSheetDimensionCommand(
+      activeSheet.value.id,
+      payload.axis,
+      payload.index,
+      payload.size,
+    ),
+    payload.axis === "column" ? "Resize column" : "Resize row",
+  );
+}
 </script>
 
 <template>
@@ -55,6 +74,7 @@ function clearCells(range: CellRange): void {
         @clear-cells="clearCells"
         @commit-cell="commitCell"
         @paste-cells="pasteCells"
+        @resize-dimension="resizeDimension"
         @undo="undoWorkbookCommand(session)"
         @redo="redoWorkbookCommand(session)"
       />
