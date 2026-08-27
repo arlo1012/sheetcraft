@@ -1,10 +1,19 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import App from "../../../app/App.vue";
+import { createAppI18n, type AppLocale } from "../../../shared/i18n";
+
+function mountApp(locale: AppLocale = "en-US") {
+  return mount(App, {
+    global: {
+      plugins: [createAppI18n(locale)],
+    },
+  });
+}
 
 describe("App", () => {
   test("mounts the spreadsheet workspace", () => {
-    const wrapper = mount(App);
+    const wrapper = mountApp();
 
     expect(wrapper.get("[data-app-root]").attributes("aria-label")).toBe("idea10 workspace");
     expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet1");
@@ -14,7 +23,7 @@ describe("App", () => {
   });
 
   test("creates, renames, and deletes sheets from the sheet tabs", async () => {
-    const wrapper = mount(App);
+    const wrapper = mountApp();
 
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
     expect(wrapper.findAll('[role="tab"]')).toHaveLength(2);
@@ -33,7 +42,7 @@ describe("App", () => {
   });
 
   test("switches sheet tabs with the standard arrow and boundary keys", async () => {
-    const wrapper = mount(App);
+    const wrapper = mountApp();
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
 
@@ -50,7 +59,7 @@ describe("App", () => {
   });
 
   test("restores each sheet's selection and scroll position after switching tabs", async () => {
-    const wrapper = mount(App);
+    const wrapper = mountApp();
     const scroller = wrapper.get(".sheet-grid__scroller");
     (scroller.element as HTMLDivElement).scrollTop = 120;
     (scroller.element as HTMLDivElement).scrollLeft = 192;
@@ -67,7 +76,7 @@ describe("App", () => {
   });
 
   test("navigates to an A1 address and finds sparse sheet values", async () => {
-    const wrapper = mount(App);
+    const wrapper = mountApp();
     const addressInput = wrapper.get('[aria-label="Cell address"]');
 
     await addressInput.setValue("D20");
@@ -88,7 +97,7 @@ describe("App", () => {
   });
 
   test("reports invalid addresses and missing search results without moving", async () => {
-    const wrapper = mount(App);
+    const wrapper = mountApp();
 
     await wrapper.get('[aria-label="Cell address"]').setValue("XFE1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
@@ -101,7 +110,7 @@ describe("App", () => {
   });
 
   test("defers address navigation until IME composition commits to its source cell", async () => {
-    const wrapper = mount(App);
+    const wrapper = mountApp();
     const editor = wrapper.get("input.cell-editor");
     await editor.trigger("compositionstart");
     await editor.setValue("中文");
@@ -116,5 +125,48 @@ describe("App", () => {
     await wrapper.get('[aria-label="Cell address"]').setValue("A1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
     expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain("中文");
+  });
+
+  test("reports localized sheet-name validation without mutating the workbook", async () => {
+    const wrapper = mountApp();
+    await wrapper.get('[aria-label="Add sheet"]').trigger("click");
+
+    await wrapper.get('[title="Sheet2 (double-click to rename)"]').trigger("dblclick");
+    const renameInput = wrapper.get('[aria-label="Rename Sheet2"]');
+    await renameInput.setValue(" ");
+    await renameInput.trigger("keydown", { key: "Enter" });
+    expect(wrapper.text()).toContain("Sheet name cannot be empty");
+    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet2");
+
+    await wrapper.get('[title="Sheet2 (double-click to rename)"]').trigger("dblclick");
+    await wrapper.get('[aria-label="Rename Sheet2"]').setValue("Sheet1");
+    await wrapper.get('[aria-label="Rename Sheet2"]').trigger("keydown", { key: "Enter" });
+    expect(wrapper.text()).toContain("A sheet named Sheet1 already exists");
+    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet2");
+  });
+
+  test("switches visible, status, and assistive text between English and Chinese", async () => {
+    const wrapper = mountApp();
+
+    await wrapper.get('[aria-label="Cell address"]').setValue("XFE1");
+    await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
+    expect(wrapper.text()).toContain("Invalid address");
+
+    await wrapper.get('select[aria-label="Language"]').setValue("zh-CN");
+
+    expect(wrapper.get("[data-app-root]").attributes("aria-label")).toBe("idea10 工作区");
+    expect(wrapper.get("section.sheet-grid").attributes("aria-label")).toBe("Sheet1 工作表");
+    expect(wrapper.get('select[aria-label="语言"]').element).toBeInstanceOf(HTMLSelectElement);
+    expect(wrapper.text()).toContain("单元格地址无效");
+    expect(wrapper.text()).toContain("就绪");
+
+    await wrapper.get('[data-select-row="2"]').trigger("contextmenu", {
+      clientX: 16,
+      clientY: 72,
+    });
+    expect(wrapper.get('[role="dialog"]').attributes("aria-label")).toBe("行操作");
+    expect(wrapper.get('[role="dialog"]').text()).toContain("向下插入 1 行");
+    expect(document.documentElement.lang).toBe("zh-CN");
+    expect(localStorage.getItem("idea10.locale")).toBe("zh-CN");
   });
 });

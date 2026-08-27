@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
+import { useAppI18n } from "../../../shared/i18n";
 import { MAX_ROW_HEIGHT, MIN_ROW_HEIGHT } from "../../workbook/workbook";
 import type { SheetGeometry } from "../geometry";
+
+const { t } = useAppI18n();
 
 const props = defineProps<{
   startRow: number;
@@ -10,11 +13,14 @@ const props = defineProps<{
   scrollTop: number;
   selectedStartRow: number;
   selectedEndRow: number;
+  selected: boolean;
 }>();
 
 const emit = defineEmits<{
   resizeStart: [payload: { index: number; event: PointerEvent }];
   resize: [payload: { index: number; size: number }];
+  select: [payload: { row: number; shiftKey: boolean }];
+  openContextMenu: [payload: { row: number; clientX: number; clientY: number }];
 }>();
 
 const KEYBOARD_RESIZE_STEP = 8;
@@ -52,6 +58,24 @@ function onResizeHandleKeydown(row: number, event: KeyboardEvent): void {
   event.preventDefault();
   emit("resize", { index: row, size });
 }
+
+function onHeaderKeydown(row: number, event: KeyboardEvent): void {
+  if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
+    event.preventDefault();
+    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    emit("openContextMenu", {
+      row,
+      clientX: bounds.left + bounds.width / 2,
+      clientY: bounds.top + bounds.height / 2,
+    });
+    return;
+  }
+  if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") {
+    return;
+  }
+  event.preventDefault();
+  emit("select", { row, shiftKey: event.shiftKey });
+}
 </script>
 
 <template>
@@ -60,21 +84,35 @@ function onResizeHandleKeydown(row: number, event: KeyboardEvent): void {
       v-for="row in rows"
       :key="row"
       class="sheet-row-headers__item"
-      :class="{ 'is-active': row >= selectedStartRow && row <= selectedEndRow }"
+      :class="{ 'is-active': selected && row >= selectedStartRow && row <= selectedEndRow }"
       :style="getHeaderStyle(row)"
       :data-row="row"
     >
-      <span aria-hidden="true">{{ row + 1 }}</span>
+      <button
+        type="button"
+        class="sheet-row-headers__select-button"
+        :data-select-row="row"
+        :aria-label="t('grid.selectRow', { row: row + 1 })"
+        :aria-pressed="selected && row >= selectedStartRow && row <= selectedEndRow"
+        @mousedown.left.prevent="emit('select', { row, shiftKey: $event.shiftKey })"
+        @contextmenu.prevent="
+          emit('openContextMenu', { row, clientX: $event.clientX, clientY: $event.clientY })
+        "
+        @keydown="onHeaderKeydown(row, $event)"
+      >
+        <span aria-hidden="true">{{ row + 1 }}</span>
+      </button>
       <span
         class="sheet-row-headers__resize-handle"
         :data-resize-row="row"
         role="separator"
         aria-orientation="horizontal"
-        :aria-label="`Row ${row + 1} height`"
+        :aria-label="t('grid.rowHeight', { row: row + 1 })"
         :aria-valuemin="MIN_ROW_HEIGHT"
         :aria-valuemax="MAX_ROW_HEIGHT"
         :aria-valuenow="geometry.getRowHeight(row)"
         tabindex="0"
+        @mousedown.stop
         @pointerdown.left.prevent.stop="emit('resizeStart', { index: row, event: $event })"
         @keydown.stop="onResizeHandleKeydown(row, $event)"
       />
@@ -104,11 +142,26 @@ function onResizeHandleKeydown(row: number, event: KeyboardEvent): void {
     border-bottom: 1px solid var(--ui-border-default);
     color: var(--ui-text-secondary);
     font-size: 12px;
-
     &.is-active {
       background: var(--ui-brand-soft);
       color: var(--ui-brand-primary);
       font-weight: 600;
+    }
+  }
+
+  &__select-button {
+    width: 100%;
+    height: 100%;
+    padding: 0 0 6px;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--ui-brand-primary);
+      outline-offset: -2px;
     }
   }
 

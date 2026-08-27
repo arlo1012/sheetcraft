@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
+import { useAppI18n } from "../../../shared/i18n";
 import { MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } from "../../workbook/workbook";
 import { columnIndexToLabel, type SheetGeometry } from "../geometry";
+
+const { t } = useAppI18n();
 
 const props = defineProps<{
   startColumn: number;
@@ -10,11 +13,14 @@ const props = defineProps<{
   scrollLeft: number;
   selectedStartColumn: number;
   selectedEndColumn: number;
+  selected: boolean;
 }>();
 
 const emit = defineEmits<{
   resizeStart: [payload: { index: number; event: PointerEvent }];
   resize: [payload: { index: number; size: number }];
+  select: [payload: { column: number; shiftKey: boolean }];
+  openContextMenu: [payload: { column: number; clientX: number; clientY: number }];
 }>();
 
 const KEYBOARD_RESIZE_STEP = 8;
@@ -52,6 +58,24 @@ function onResizeHandleKeydown(column: number, event: KeyboardEvent): void {
   event.preventDefault();
   emit("resize", { index: column, size });
 }
+
+function onHeaderKeydown(column: number, event: KeyboardEvent): void {
+  if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
+    event.preventDefault();
+    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    emit("openContextMenu", {
+      column,
+      clientX: bounds.left + bounds.width / 2,
+      clientY: bounds.top + bounds.height / 2,
+    });
+    return;
+  }
+  if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") {
+    return;
+  }
+  event.preventDefault();
+  emit("select", { column, shiftKey: event.shiftKey });
+}
 </script>
 
 <template>
@@ -61,22 +85,36 @@ function onResizeHandleKeydown(column: number, event: KeyboardEvent): void {
       :key="column"
       class="sheet-column-headers__item"
       :class="{
-        'is-active': column >= selectedStartColumn && column <= selectedEndColumn,
+        'is-active': selected && column >= selectedStartColumn && column <= selectedEndColumn,
       }"
       :style="getHeaderStyle(column)"
       :data-column="column"
     >
-      <span aria-hidden="true">{{ columnIndexToLabel(column) }}</span>
+      <button
+        type="button"
+        class="sheet-column-headers__select-button"
+        :data-select-column="column"
+        :aria-label="t('grid.selectColumn', { column: columnIndexToLabel(column) })"
+        :aria-pressed="selected && column >= selectedStartColumn && column <= selectedEndColumn"
+        @mousedown.left.prevent="emit('select', { column, shiftKey: $event.shiftKey })"
+        @contextmenu.prevent="
+          emit('openContextMenu', { column, clientX: $event.clientX, clientY: $event.clientY })
+        "
+        @keydown="onHeaderKeydown(column, $event)"
+      >
+        <span aria-hidden="true">{{ columnIndexToLabel(column) }}</span>
+      </button>
       <span
         class="sheet-column-headers__resize-handle"
         :data-resize-column="column"
         role="separator"
         aria-orientation="vertical"
-        :aria-label="`Column ${columnIndexToLabel(column)} width`"
+        :aria-label="t('grid.columnWidth', { column: columnIndexToLabel(column) })"
         :aria-valuemin="MIN_COLUMN_WIDTH"
         :aria-valuemax="MAX_COLUMN_WIDTH"
         :aria-valuenow="geometry.getColumnWidth(column)"
         tabindex="0"
+        @mousedown.stop
         @pointerdown.left.prevent.stop="emit('resizeStart', { index: column, event: $event })"
         @keydown.stop="onResizeHandleKeydown(column, $event)"
       />
@@ -106,11 +144,26 @@ function onResizeHandleKeydown(column: number, event: KeyboardEvent): void {
     border-right: 1px solid var(--ui-border-default);
     color: var(--ui-text-secondary);
     font-size: 12px;
-
     &.is-active {
       background: var(--ui-brand-soft);
       color: var(--ui-brand-primary);
       font-weight: 600;
+    }
+  }
+
+  &__select-button {
+    width: 100%;
+    height: 100%;
+    padding: 0 6px 0 0;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--ui-brand-primary);
+      outline-offset: -2px;
     }
   }
 

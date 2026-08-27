@@ -1,14 +1,9 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import { formatCellValueForDisplay } from "../../workbook/input";
-import {
-  getCellValue,
-  type CellAddress,
-  type CellRange,
-  type Sheet,
-} from "../../workbook/workbook";
+import { getCellValue, type CellAddress, type Sheet } from "../../workbook/workbook";
 import type { Point, SheetGeometry, VisibleCellRange } from "../geometry";
-import { isCellInRange } from "../selection";
+import { isCellSelected, type CellSelection } from "../selection";
 
 type VisibleCell = {
   key: string;
@@ -29,7 +24,7 @@ const props = defineProps<{
   geometry: SheetGeometry;
   visibleRange: VisibleCellRange;
   activeCell: CellAddress;
-  selectedRange: CellRange;
+  selection: CellSelection;
   scrollPosition: Point;
 }>();
 
@@ -109,14 +104,14 @@ const visibleRows = computed<VisibleRow[]>(() => {
           'has-value': cell.text.length > 0,
           'is-active':
             cell.address.row === activeCell.row && cell.address.column === activeCell.column,
-          'is-selected': isCellInRange(cell.address, selectedRange),
+          'is-selected': isCellSelected(cell.address, selection),
         }"
         :style="cell.style"
         :data-row="cell.address.row"
         :data-column="cell.address.column"
         role="gridcell"
         :aria-colindex="cell.address.column + 1"
-        :aria-selected="isCellInRange(cell.address, selectedRange)"
+        :aria-selected="isCellSelected(cell.address, selection)"
         @mousedown.left.prevent="emit('cellMousedown', cell.address, $event)"
         @dblclick.left.prevent="emit('cellDoubleClick', cell.address, $event)"
       >

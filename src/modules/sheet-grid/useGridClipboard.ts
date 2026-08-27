@@ -8,7 +8,7 @@ import {
   type PastePlan,
 } from "../workbook/clipboard";
 import type { CellRange, Sheet } from "../workbook/workbook";
-import { getSelectionRange, type CellSelection } from "./selection";
+import { getSelectionMode, getSelectionRange, type CellSelection } from "./selection";
 
 const LOCAL_CLIPBOARD_TYPE = "application/x-idea10-cells";
 
@@ -16,6 +16,17 @@ export type GridPastePayload = {
   plan: PastePlan;
   clearRange?: CellRange;
 };
+
+export type GridClipboardFeedback =
+  | "unavailable"
+  | "axisCopyUnsupported"
+  | "readyToMove"
+  | "copied"
+  | "axisPasteUnsupported"
+  | "missingText"
+  | "rangeMismatch"
+  | "moved"
+  | "pasted";
 
 type PendingClipboard = {
   mode: "copy" | "cut";
@@ -31,7 +42,7 @@ export function useGridClipboard(options: {
   isEditing: () => boolean;
   isComposing: () => boolean;
   onPaste: (payload: GridPastePayload) => void;
-  onFeedback: (message: string) => void;
+  onFeedback: (feedback: GridClipboardFeedback) => void;
 }) {
   const pendingClipboard = shallowRef<PendingClipboard | null>(null);
   const clipboardRange: ComputedRef<CellRange | null> = computed(
@@ -53,7 +64,12 @@ export function useGridClipboard(options: {
 
     event.preventDefault();
     if (!event.clipboardData) {
-      options.onFeedback("Clipboard is unavailable.");
+      options.onFeedback("unavailable");
+      return;
+    }
+
+    if (getSelectionMode(options.getSelection()) !== "cells") {
+      options.onFeedback("axisCopyUnsupported");
       return;
     }
 
@@ -64,7 +80,7 @@ export function useGridClipboard(options: {
     event.clipboardData.setData("text/plain", text);
     event.clipboardData.setData(LOCAL_CLIPBOARD_TYPE, token);
     pendingClipboard.value = { mode, range, token, text, values };
-    options.onFeedback(mode === "cut" ? "Cells ready to move." : "Cells copied.");
+    options.onFeedback(mode === "cut" ? "readyToMove" : "copied");
   }
 
   function onCopy(event: ClipboardEvent): void {
@@ -83,7 +99,12 @@ export function useGridClipboard(options: {
     event.preventDefault();
     const data = event.clipboardData;
     if (!data) {
-      options.onFeedback("Clipboard is unavailable.");
+      options.onFeedback("unavailable");
+      return;
+    }
+
+    if (getSelectionMode(options.getSelection()) !== "cells") {
+      options.onFeedback("axisPasteUnsupported");
       return;
     }
 
@@ -92,7 +113,7 @@ export function useGridClipboard(options: {
     const pending = pendingClipboard.value;
     const isMatchingLocalClipboard = Boolean(pending && localToken && localToken === pending.token);
     if (!isMatchingLocalClipboard && !Array.from(data.types).includes("text/plain")) {
-      options.onFeedback("Clipboard does not contain text.");
+      options.onFeedback("missingText");
       return;
     }
     const values =
@@ -103,7 +124,7 @@ export function useGridClipboard(options: {
       pasteFromActiveCell: isLocalCut,
     });
     if (!plan) {
-      options.onFeedback("Clipboard data does not fit the selected range.");
+      options.onFeedback("rangeMismatch");
       return;
     }
 
@@ -111,7 +132,7 @@ export function useGridClipboard(options: {
     if (isLocalCut) {
       pendingClipboard.value = null;
     }
-    options.onFeedback(isLocalCut ? "Cells moved." : "Cells pasted.");
+    options.onFeedback(isLocalCut ? "moved" : "pasted");
   }
 
   function clearPendingClipboard(): void {

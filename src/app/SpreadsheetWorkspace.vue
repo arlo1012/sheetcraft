@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
+import LocaleSwitcher from "./LocaleSwitcher.vue";
 import { formatCellAddress, parseCellAddress } from "../modules/sheet-grid/address";
 import GridNavigationBar from "../modules/sheet-grid/components/GridNavigationBar.vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
@@ -9,7 +10,9 @@ import type { GridPastePayload } from "../modules/sheet-grid/useGridClipboard";
 import {
   createAddSheetCommand,
   createClearCellRangeCommand,
+  createDeleteSheetAxisCommand,
   createDeleteSheetCommand,
+  createInsertSheetAxisCommand,
   createPasteCellValuesCommand,
   createRenameSheetCommand,
   createResizeSheetDimensionCommand,
@@ -32,19 +35,32 @@ import {
   type CellRange,
   type SheetDimensionAxis,
 } from "../modules/workbook/workbook";
+import { useAppI18n, type MessageKey, type MessageParams } from "../shared/i18n";
 
+type FeedbackState = {
+  key: MessageKey;
+  params?: MessageParams;
+};
+
+const { t } = useAppI18n();
 const session = reactive(createWorkbookSession()) as WorkbookSession;
 const activeSheet = computed(() => getActiveSheet(session.workbook));
 const sheets = computed(() => getWorkbookSheets(session.workbook));
 const viewStates = reactive(new Map<string, SheetGridViewState>());
 const gridRef = ref<InstanceType<typeof SheetGrid>>();
 const searchQuery = ref("");
-const navigationFeedback = ref("");
-const workspaceStatus = ref("Ready");
+const navigationFeedback = ref<FeedbackState>();
+const workspaceStatus = ref<FeedbackState>({ key: "workspace.ready" });
 const activeAddress = computed(
   () => viewStates.get(activeSheet.value.id)?.selection.active ?? { row: 0, column: 0 },
 );
 const activeAddressLabel = computed(() => formatCellAddress(activeAddress.value));
+const navigationFeedbackText = computed(() =>
+  navigationFeedback.value ? t(navigationFeedback.value.key, navigationFeedback.value.params) : "",
+);
+const workspaceStatusText = computed(() =>
+  t(workspaceStatus.value.key, workspaceStatus.value.params),
+);
 
 function commitCell(payload: { address: CellAddress; input: string }): void {
   executeWorkbookCommand(
@@ -85,26 +101,60 @@ function resizeDimension(payload: { axis: SheetDimensionAxis; index: number; siz
   );
 }
 
+function insertAxis(payload: { axis: SheetDimensionAxis; index: number; count: number }): void {
+  executeWorkbookCommand(
+    session,
+    createInsertSheetAxisCommand(activeSheet.value.id, payload.axis, payload.index, payload.count),
+    payload.axis === "row" ? "Insert rows" : "Insert columns",
+  );
+}
+
+function deleteAxis(payload: { axis: SheetDimensionAxis; index: number; count: number }): void {
+  executeWorkbookCommand(
+    session,
+    createDeleteSheetAxisCommand(activeSheet.value.id, payload.axis, payload.index, payload.count),
+    payload.axis === "row" ? "Delete rows" : "Delete columns",
+  );
+}
+
 function selectSheet(sheetId: string): void {
   setActiveSheet(session.workbook, sheetId);
-  navigationFeedback.value = "";
+  navigationFeedback.value = undefined;
 }
 
 function addSheet(): void {
   executeWorkbookCommand(session, createAddSheetCommand(session.workbook), "Add sheet");
-  workspaceStatus.value = "Ready";
+  workspaceStatus.value = { key: "workspace.ready" };
 }
 
 function renameSheet(payload: { sheetId: string; name: string }): void {
+  const normalizedName = payload.name.trim();
+  if (!normalizedName) {
+    workspaceStatus.value = { key: "workspace.sheetNameEmpty" };
+    return;
+  }
+
+  const duplicate = sheets.value.some(
+    (sheet) =>
+      sheet.id !== payload.sheetId && sheet.name.toLowerCase() === normalizedName.toLowerCase(),
+  );
+  if (duplicate) {
+    workspaceStatus.value = {
+      key: "workspace.sheetNameDuplicate",
+      params: { name: normalizedName },
+    };
+    return;
+  }
+
   try {
     executeWorkbookCommand(
       session,
       createRenameSheetCommand(payload.sheetId, payload.name),
       "Rename sheet",
     );
-    workspaceStatus.value = "Ready";
-  } catch (error) {
-    workspaceStatus.value = error instanceof Error ? error.message : "Unable to rename sheet";
+    workspaceStatus.value = { key: "workspace.ready" };
+  } catch {
+    workspaceStatus.value = { key: "workspace.renameFailed" };
   }
 }
 
@@ -114,7 +164,7 @@ function deleteSheet(sheetId: string): void {
     createDeleteSheetCommand(session.workbook, sheetId),
     "Delete sheet",
   );
-  workspaceStatus.value = "Ready";
+  workspaceStatus.value = { key: "workspace.ready" };
 }
 
 function getActiveSheetViewState(): SheetGridViewState | undefined {
@@ -128,22 +178,22 @@ function updateActiveSheetViewState(viewState: SheetGridViewState): void {
 function navigateToAddress(input: string): void {
   const address = parseCellAddress(input);
   if (!address) {
-    navigationFeedback.value = "Invalid address";
+    navigationFeedback.value = { key: "workspace.invalidAddress" };
     return;
   }
 
-  navigationFeedback.value = "";
+  navigationFeedback.value = undefined;
   gridRef.value?.navigateToCell(address);
 }
 
 function updateSearchQuery(query: string): void {
   searchQuery.value = query;
-  navigationFeedback.value = "";
+  navigationFeedback.value = undefined;
 }
 
 function findCell(direction: SheetSearchDirection): void {
   if (!searchQuery.value.trim()) {
-    navigationFeedback.value = "Enter a search term";
+    navigationFeedback.value = { key: "workspace.enterSearchTerm" };
     return;
   }
 
@@ -154,21 +204,24 @@ function findCell(direction: SheetSearchDirection): void {
     direction,
   );
   if (!match) {
-    navigationFeedback.value = "No matches";
+    navigationFeedback.value = { key: "workspace.noMatches" };
     return;
   }
 
   gridRef.value?.navigateToCell(match);
-  navigationFeedback.value = `Found ${formatCellAddress(match)}`;
+  navigationFeedback.value = {
+    key: "workspace.found",
+    params: { address: formatCellAddress(match) },
+  };
 }
 </script>
 
 <template>
-  <section class="spreadsheet-workspace" aria-label="Spreadsheet editor">
+  <section class="spreadsheet-workspace" :aria-label="t('workspace.editor')">
     <GridNavigationBar
       :address="activeAddressLabel"
       :search-query="searchQuery"
-      :search-feedback="navigationFeedback"
+      :search-feedback="navigationFeedbackText"
       @navigate="navigateToAddress"
       @update-search-query="updateSearchQuery"
       @find="findCell"
@@ -180,6 +233,8 @@ function findCell(direction: SheetSearchDirection): void {
         :view-state="getActiveSheetViewState()"
         @clear-cells="clearCells"
         @commit-cell="commitCell"
+        @delete-axis="deleteAxis"
+        @insert-axis="insertAxis"
         @paste-cells="pasteCells"
         @resize-dimension="resizeDimension"
         @undo="undoWorkbookCommand(session)"
@@ -196,7 +251,12 @@ function findCell(direction: SheetSearchDirection): void {
         @rename="renameSheet"
         @delete="deleteSheet"
       />
-      <span class="spreadsheet-workspace__status" aria-live="polite">{{ workspaceStatus }}</span>
+      <div class="spreadsheet-workspace__footer-tools">
+        <span class="spreadsheet-workspace__status" aria-live="polite">
+          {{ workspaceStatusText }}
+        </span>
+        <LocaleSwitcher />
+      </div>
     </footer>
   </section>
 </template>
@@ -233,6 +293,12 @@ function findCell(direction: SheetSearchDirection): void {
     align-items: center;
     padding-right: 12px;
     color: var(--ui-text-muted);
+  }
+
+  &__footer-tools {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
   }
 }
 </style>

@@ -19,6 +19,7 @@ export function createSheetGridViewState(options?: {
           active: { ...options.selection.active },
           anchor: { ...options.selection.anchor },
           focus: { ...options.selection.focus },
+          mode: options.selection.mode,
         }
       : createCellSelection({ row: 0, column: 0 }),
     scrollPosition: options?.scrollPosition ? { ...options.scrollPosition } : { x: 0, y: 0 },

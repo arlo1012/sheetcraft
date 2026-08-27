@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { Plus, Trash2 } from "lucide-vue-next";
 import { nextTick, ref, type ComponentPublicInstance } from "vue";
+import { useAppI18n } from "../../../shared/i18n";
 import type { Sheet } from "../workbook";
+
+const { t } = useAppI18n();
 
 const props = defineProps<{
   sheets: readonly Sheet[];
@@ -41,7 +44,7 @@ function startRename(sheet: Sheet): void {
 function commitRename(sheet: Sheet): void {
   const name = renameValue.value.trim();
   renamingSheetId.value = undefined;
-  if (name && name !== sheet.name) {
+  if (name !== sheet.name) {
     emit("rename", { sheetId: sheet.id, name });
   }
 }
@@ -77,14 +80,14 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
 <template>
   <div class="workbook-sheet-tabs">
-    <div class="workbook-sheet-tabs__list" role="tablist" aria-label="Workbook sheets">
+    <div class="workbook-sheet-tabs__list" role="tablist" :aria-label="t('sheetTabs.list')">
       <div v-for="sheet in props.sheets" :key="sheet.id" class="workbook-sheet-tabs__item">
         <input
           v-if="renamingSheetId === sheet.id"
           :ref="setRenameInput"
           v-model="renameValue"
           class="workbook-sheet-tabs__rename-input"
-          :aria-label="`Rename ${sheet.name}`"
+          :aria-label="t('sheetTabs.rename', { name: sheet.name })"
           @blur="commitRename(sheet)"
           @keydown.enter.prevent="commitRename(sheet)"
           @keydown.escape.prevent="cancelRename"
@@ -98,7 +101,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
           role="tab"
           :aria-selected="sheet.id === props.activeSheetId"
           :tabindex="sheet.id === props.activeSheetId ? 0 : -1"
-          :title="`${sheet.name} (double-click to rename)`"
+          :title="t('sheetTabs.renameHint', { name: sheet.name })"
           @click="emit('select', sheet.id)"
           @dblclick="startRename(sheet)"
           @keydown="onTabKeydown(sheet.id, $event)"
@@ -110,8 +113,8 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     <button
       class="workbook-sheet-tabs__delete"
       type="button"
-      aria-label="Delete active sheet"
-      title="Delete active sheet"
+      :aria-label="t('sheetTabs.deleteActive')"
+      :title="t('sheetTabs.deleteActive')"
       :disabled="props.sheets.length === 1"
       @click="emit('delete', props.activeSheetId)"
     >
@@ -120,8 +123,8 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     <button
       class="workbook-sheet-tabs__add"
       type="button"
-      aria-label="Add sheet"
-      title="Add sheet"
+      :aria-label="t('sheetTabs.add')"
+      :title="t('sheetTabs.add')"
       @click="emit('add')"
     >
       <Plus :size="16" aria-hidden="true" />

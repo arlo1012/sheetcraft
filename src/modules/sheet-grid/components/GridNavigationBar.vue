@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronUp, Search } from "lucide-vue-next";
 import { ref, watch } from "vue";
+import { useAppI18n } from "../../../shared/i18n";
+
+const { t } = useAppI18n();
 
 const props = defineProps<{
   address: string;
@@ -29,15 +32,15 @@ function submitAddress(): void {
 </script>
 
 <template>
-  <div class="grid-navigation-bar" aria-label="Sheet navigation">
+  <div class="grid-navigation-bar" :aria-label="t('navigation.sheet')">
     <form
       class="grid-navigation-bar__address"
-      aria-label="Go to cell"
+      :aria-label="t('navigation.goToCell')"
       @submit.prevent="submitAddress"
     >
       <input
         v-model="addressDraft"
-        aria-label="Cell address"
+        :aria-label="t('navigation.cellAddress')"
         autocomplete="off"
         spellcheck="false"
         @blur="addressDraft = address"
@@ -51,9 +54,9 @@ function submitAddress(): void {
       <Search :size="15" aria-hidden="true" />
       <input
         :value="searchQuery"
-        aria-label="Find in sheet"
+        :aria-label="t('navigation.findInSheet')"
         autocomplete="off"
-        placeholder="Find"
+        :placeholder="t('navigation.findPlaceholder')"
         spellcheck="false"
         @input="emit('updateSearchQuery', ($event.target as HTMLInputElement).value)"
         @keydown.enter.prevent="emit('find', $event.shiftKey ? 'backward' : 'forward')"
@@ -61,16 +64,16 @@ function submitAddress(): void {
       <span class="grid-navigation-bar__feedback" aria-live="polite">{{ searchFeedback }}</span>
       <button
         type="button"
-        aria-label="Find previous"
-        title="Find previous"
+        :aria-label="t('navigation.findPrevious')"
+        :title="t('navigation.findPrevious')"
         @click="emit('find', 'backward')"
       >
         <ChevronUp :size="15" aria-hidden="true" />
       </button>
       <button
         type="button"
-        aria-label="Find next"
-        title="Find next"
+        :aria-label="t('navigation.findNext')"
+        :title="t('navigation.findNext')"
         @click="emit('find', 'forward')"
       >
         <ChevronDown :size="15" aria-hidden="true" />

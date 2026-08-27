@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { useAppI18n } from "../shared/i18n";
 import SpreadsheetWorkspace from "./SpreadsheetWorkspace.vue";
+
+const { t } = useAppI18n();
 </script>
 
 <template>
-  <main data-app-root aria-label="idea10 workspace" class="app-workspace">
+  <main data-app-root :aria-label="t('app.workspace')" class="app-workspace">
     <SpreadsheetWorkspace />
   </main>
 </template>

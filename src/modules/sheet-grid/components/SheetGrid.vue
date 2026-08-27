@@ -10,6 +10,7 @@ import {
   type CSSProperties,
 } from "vue";
 import { formatCellValueForDisplay, formatCellValueForInput } from "../../workbook/input";
+import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import {
   MAX_COLUMN_WIDTH,
   MAX_ROW_HEIGHT,
@@ -34,18 +35,26 @@ import {
 import { createSheetGeometry, getCellAddressLabel, type Point, type Size } from "../geometry";
 import {
   areCellAddressesEqual,
+  createAxisSelection,
   createCellSelection,
+  extendAxisSelection,
   extendCellSelection,
   getSelectionAutoScrollDelta,
+  getSelectionMode,
   getSelectionRange,
   isSingleCellSelection,
   moveActiveCellWithinSelection,
   moveCellSelection,
   type CellSelection,
 } from "../selection";
-import { useGridClipboard, type GridPastePayload } from "../useGridClipboard";
+import {
+  useGridClipboard,
+  type GridClipboardFeedback,
+  type GridPastePayload,
+} from "../useGridClipboard";
 import { createSheetGridViewState, type SheetGridViewState } from "../view-state";
 import CellEditor from "./CellEditor.vue";
+import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
 import SheetColumnHeaders from "./SheetColumnHeaders.vue";
 import SheetRowHeaders from "./SheetRowHeaders.vue";
@@ -53,6 +62,25 @@ import SheetSelectionOverlay from "./SheetSelectionOverlay.vue";
 
 type CellEditorHandle = {
   focus: (options?: { selectAll?: boolean; clientX?: number }) => void;
+};
+
+type AxisContextMenuState = {
+  axis: SheetDimensionAxis;
+  index: number;
+  count: number;
+  position: Point;
+};
+
+const CLIPBOARD_MESSAGE_KEYS: Record<GridClipboardFeedback, MessageKey> = {
+  unavailable: "clipboard.unavailable",
+  axisCopyUnsupported: "clipboard.axisCopyUnsupported",
+  readyToMove: "clipboard.readyToMove",
+  copied: "clipboard.copied",
+  axisPasteUnsupported: "clipboard.axisPasteUnsupported",
+  missingText: "clipboard.missingText",
+  rangeMismatch: "clipboard.rangeMismatch",
+  moved: "clipboard.moved",
+  pasted: "clipboard.pasted",
 };
 
 const props = withDefaults(
@@ -81,6 +109,8 @@ const emit = defineEmits<{
   clearCells: [range: CellRange];
   pasteCells: [payload: GridPastePayload];
   resizeDimension: [payload: { axis: SheetDimensionAxis; index: number; size: number }];
+  insertAxis: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
+  deleteAxis: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
   undo: [];
   redo: [];
   selectionChange: [payload: { active: CellAddress; range: CellRange }];
@@ -90,14 +120,19 @@ const emit = defineEmits<{
 const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 28;
 const DEFAULT_VIEWPORT_SIZE: Size = { width: 960, height: 600 };
+const AXIS_MENU_WIDTH = 272;
+const AXIS_MENU_HEIGHT = 220;
 
+const { t } = useAppI18n();
+const rootRef = ref<HTMLElement | null>(null);
 const scrollerRef = ref<HTMLDivElement | null>(null);
 const editorRef = ref<CellEditorHandle | null>(null);
 const selection = ref<CellSelection>(createCellSelection({ row: 0, column: 0 }));
 const editingValue = ref("");
 const isEditing = ref(false);
 const isComposing = ref(false);
-const clipboardFeedback = ref("");
+const clipboardFeedbackKey = ref<GridClipboardFeedback>();
+const axisContextMenu = ref<AxisContextMenuState>();
 const scrollPosition = reactive<Point>({ x: 0, y: 0 });
 const viewportSize = reactive<Size>({ ...DEFAULT_VIEWPORT_SIZE });
 const gridExtent = reactive<GridExtent>(
@@ -158,7 +193,12 @@ const visibleRange = computed(() =>
   geometry.value.getVisibleRange(scrollPosition, viewportSize, 2),
 );
 const activeCell = computed(() => selection.value.active);
-const selectedRange = computed(() => getSelectionRange(selection.value));
+const selectedRange = computed(() =>
+  getSelectionRange(selection.value, {
+    rowCount: gridExtent.rowCount,
+    columnCount: gridExtent.columnCount,
+  }),
+);
 const activeCellRect = computed(() =>
   geometry.value.getCellViewportRect(activeCell.value, scrollPosition),
 );
@@ -180,6 +220,9 @@ const selectedRangeRect = computed(() => getRangeViewportRect(selectedRange.valu
 const activeCellLabel = computed(() => getCellAddressLabel(activeCell.value));
 const activeCellDisplayValue = computed(() =>
   formatCellValueForDisplay(getCellValue(props.sheet, activeCell.value)),
+);
+const clipboardFeedback = computed(() =>
+  clipboardFeedbackKey.value ? t(CLIPBOARD_MESSAGE_KEYS[clipboardFeedbackKey.value]) : "",
 );
 const gridCanvasStyle = computed<CSSProperties>(() => ({
   width: `${totalSize.value.width}px`,
@@ -203,12 +246,13 @@ const { clipboardMode, clipboardRange, clearPendingClipboard, onCopy, onCut, onP
           active: { ...payload.plan.anchor },
           anchor: { ...payload.plan.range.start },
           focus: { ...payload.plan.range.end },
+          mode: "cells",
         },
         payload.plan.range.end,
       );
     },
     onFeedback: (message) => {
-      clipboardFeedback.value = message;
+      clipboardFeedbackKey.value = message;
     },
   });
 const clipboardRangeRect = computed(() =>
@@ -276,7 +320,10 @@ function focusEditor(selectAll = false, clientX?: number): void {
   void nextTick(() => editorRef.value?.focus({ selectAll, clientX }));
 }
 
-function ensureCellVisible(address: CellAddress): void {
+function ensureSelectionVisible(
+  address: CellAddress,
+  mode = getSelectionMode(selection.value),
+): void {
   const scroller = scrollerRef.value;
   if (!scroller) {
     return;
@@ -287,11 +334,11 @@ function ensureCellVisible(address: CellAddress): void {
     scrollPosition,
     viewportSize,
   );
-  if (nextScrollPosition.x !== scrollPosition.x) {
+  if (mode !== "rows" && mode !== "all" && nextScrollPosition.x !== scrollPosition.x) {
     scroller.scrollLeft = nextScrollPosition.x;
     scrollPosition.x = nextScrollPosition.x;
   }
-  if (nextScrollPosition.y !== scrollPosition.y) {
+  if (mode !== "columns" && mode !== "all" && nextScrollPosition.y !== scrollPosition.y) {
     scroller.scrollTop = nextScrollPosition.y;
     scrollPosition.y = nextScrollPosition.y;
   }
@@ -302,17 +349,19 @@ function setSelection(
   visibleAddress: CellAddress = nextSelection.active,
   restoreFocus = true,
 ): void {
+  axisContextMenu.value = undefined;
   selection.value = {
     active: { ...nextSelection.active },
     anchor: { ...nextSelection.anchor },
     focus: { ...nextSelection.focus },
+    mode: nextSelection.mode,
   };
   ensureGridExtentContains(visibleAddress);
   emit("selectionChange", {
     active: { ...nextSelection.active },
     range: getSelectionRange(nextSelection),
   });
-  ensureCellVisible(visibleAddress);
+  ensureSelectionVisible(visibleAddress, nextSelection.mode);
   emitViewState();
   if (restoreFocus) {
     focusEditor();
@@ -667,6 +716,143 @@ function onCellMouseDown(address: CellAddress, event: MouseEvent): void {
   }
 }
 
+function selectAxis(
+  mode: "rows" | "columns" | "all",
+  address: CellAddress,
+  shiftKey: boolean,
+  restoreFocus = true,
+): void {
+  const nextSelection =
+    shiftKey && mode !== "all"
+      ? extendAxisSelection(selection.value, mode, address)
+      : createAxisSelection(mode, address);
+  if (isComposing.value) {
+    pendingSelectionAfterComposition = nextSelection;
+    shouldFinishAfterComposition = true;
+    return;
+  }
+  if (isEditing.value) {
+    finishEdit(nextSelection, restoreFocus);
+  } else {
+    setSelection(nextSelection, address, restoreFocus);
+  }
+}
+
+function onColumnHeaderSelect(payload: { column: number; shiftKey: boolean }): void {
+  selectAxis("columns", { row: 0, column: payload.column }, payload.shiftKey);
+}
+
+function onRowHeaderSelect(payload: { row: number; shiftKey: boolean }): void {
+  selectAxis("rows", { row: payload.row, column: 0 }, payload.shiftKey);
+}
+
+function isAxisIndexSelected(axis: SheetDimensionAxis, index: number): boolean {
+  const expectedMode = axis === "row" ? "rows" : "columns";
+  if (getSelectionMode(selection.value) !== expectedMode) {
+    return false;
+  }
+  const range = selectedRange.value;
+  return axis === "row"
+    ? index >= range.start.row && index <= range.end.row
+    : index >= range.start.column && index <= range.end.column;
+}
+
+function openAxisContextMenu(
+  axis: SheetDimensionAxis,
+  index: number,
+  clientX: number,
+  clientY: number,
+): void {
+  if (isComposing.value) {
+    return;
+  }
+  if (!isAxisIndexSelected(axis, index)) {
+    const address = axis === "row" ? { row: index, column: 0 } : { row: 0, column: index };
+    selectAxis(axis === "row" ? "rows" : "columns", address, false, false);
+  }
+
+  const range = selectedRange.value;
+  const start = axis === "row" ? range.start.row : range.start.column;
+  const end = axis === "row" ? range.end.row : range.end.column;
+  const bounds = rootRef.value?.getBoundingClientRect();
+  const localX = clientX - (bounds?.left ?? 0);
+  const localY = clientY - (bounds?.top ?? 0);
+  const width = bounds?.width || viewportSize.width + ROW_HEADER_WIDTH;
+  const height = bounds?.height || viewportSize.height + COLUMN_HEADER_HEIGHT;
+  axisContextMenu.value = {
+    axis,
+    index: start,
+    count: end - start + 1,
+    position: {
+      x: Math.max(0, Math.min(localX, width - AXIS_MENU_WIDTH)),
+      y: Math.max(0, Math.min(localY, height - AXIS_MENU_HEIGHT)),
+    },
+  };
+}
+
+function getAxisMaximum(axis: SheetDimensionAxis): number {
+  return axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
+}
+
+function requestAxisInsert(payload: { direction: "before" | "after"; count: number }): void {
+  const menu = axisContextMenu.value;
+  if (!menu) {
+    return;
+  }
+  const index = payload.direction === "before" ? menu.index : menu.index + menu.count;
+  if (payload.count > getAxisMaximum(menu.axis) - index) {
+    return;
+  }
+  clearPendingClipboard();
+  emit("insertAxis", {
+    axis: menu.axis,
+    index,
+    count: payload.count,
+  });
+  axisContextMenu.value = undefined;
+  focusEditor();
+}
+
+function requestAxisDelete(): void {
+  const menu = axisContextMenu.value;
+  if (!menu) {
+    return;
+  }
+  clearPendingClipboard();
+  emit("deleteAxis", { axis: menu.axis, index: menu.index, count: menu.count });
+  axisContextMenu.value = undefined;
+  focusEditor();
+}
+
+function requestAxisResize(size: number): void {
+  const menu = axisContextMenu.value;
+  if (!menu || menu.count !== 1) {
+    return;
+  }
+  emit("resizeDimension", { axis: menu.axis, index: menu.index, size });
+}
+
+function requestAxisClear(): void {
+  if (!axisContextMenu.value) {
+    return;
+  }
+  clearPendingClipboard();
+  emit("clearCells", getSelectionRange(selection.value));
+  axisContextMenu.value = undefined;
+  focusEditor();
+}
+
+function closeAxisContextMenu(restoreFocus: boolean): void {
+  axisContextMenu.value = undefined;
+  if (restoreFocus) {
+    focusEditor();
+  }
+}
+
+function onCornerClick(): void {
+  selectAxis("all", { row: 0, column: 0 }, false, false);
+}
+
 function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
   if (isComposing.value) {
     return;
@@ -759,10 +945,29 @@ function onEditorKeydown(event: KeyboardEvent): void {
     return;
   }
 
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+    event.preventDefault();
+    selectAxis("all", { row: 0, column: 0 }, false);
+    return;
+  }
+
+  if (event.key === " " || event.key === "Spacebar") {
+    if (event.shiftKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      selectAxis("rows", activeCell.value, false);
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey) {
+      event.preventDefault();
+      selectAxis("columns", activeCell.value, false);
+      return;
+    }
+  }
+
   if (event.key === "Delete" || event.key === "Backspace") {
     event.preventDefault();
     clearPendingClipboard();
-    clipboardFeedback.value = "";
+    clipboardFeedbackKey.value = undefined;
     emit("clearCells", getSelectionRange(selection.value));
     return;
   }
@@ -879,6 +1084,7 @@ function restoreViewState(viewState?: SheetGridViewState): void {
       });
   stopDragSelection();
   stopDimensionResize();
+  axisContextMenu.value = undefined;
   clearPendingClipboard();
   selection.value = nextViewState.selection;
   editingValue.value = "";
@@ -928,6 +1134,7 @@ defineExpose({ navigateToCell });
 
 <template>
   <section
+    ref="rootRef"
     class="sheet-grid"
     :class="{
       'is-resizing-column': dimensionResize?.axis === 'column',
@@ -937,10 +1144,16 @@ defineExpose({ navigateToCell });
       '--sheet-row-header-width': `${ROW_HEADER_WIDTH}px`,
       '--sheet-column-header-height': `${COLUMN_HEADER_HEIGHT}px`,
     }"
-    :aria-label="`${sheet.name} worksheet`"
+    :aria-label="t('grid.worksheet', { name: sheet.name })"
     @keydown.capture="onGridKeydown"
   >
-    <div class="sheet-grid__corner" aria-hidden="true" />
+    <button
+      type="button"
+      class="sheet-grid__corner"
+      :class="{ 'is-active': getSelectionMode(selection) === 'all' }"
+      :aria-label="t('grid.selectAll')"
+      @click="onCornerClick"
+    />
     <SheetColumnHeaders
       :start-column="visibleRange.startColumn"
       :end-column="visibleRange.endColumn"
@@ -948,8 +1161,13 @@ defineExpose({ navigateToCell });
       :scroll-left="scrollPosition.x"
       :selected-start-column="selectedRange.start.column"
       :selected-end-column="selectedRange.end.column"
+      :selected="getSelectionMode(selection) === 'columns' || getSelectionMode(selection) === 'all'"
       @resize="onDimensionResizeRequest('column', $event)"
       @resize-start="onDimensionResizeStart('column', $event)"
+      @select="onColumnHeaderSelect"
+      @open-context-menu="
+        openAxisContextMenu('column', $event.column, $event.clientX, $event.clientY)
+      "
     />
     <SheetRowHeaders
       :start-row="visibleRange.startRow"
@@ -958,8 +1176,11 @@ defineExpose({ navigateToCell });
       :scroll-top="scrollPosition.y"
       :selected-start-row="selectedRange.start.row"
       :selected-end-row="selectedRange.end.row"
+      :selected="getSelectionMode(selection) === 'rows' || getSelectionMode(selection) === 'all'"
       @resize="onDimensionResizeRequest('row', $event)"
       @resize-start="onDimensionResizeStart('row', $event)"
+      @select="onRowHeaderSelect"
+      @open-context-menu="openAxisContextMenu('row', $event.row, $event.clientX, $event.clientY)"
     />
 
     <div
@@ -979,7 +1200,7 @@ defineExpose({ navigateToCell });
             :geometry="geometry"
             :visible-range="visibleRange"
             :active-cell="activeCell"
-            :selected-range="selectedRange"
+            :selection="selection"
             :scroll-position="scrollPosition"
             @cell-mousedown="onCellMouseDown"
             @cell-double-click="onCellDoubleClick"
@@ -1013,6 +1234,30 @@ defineExpose({ navigateToCell });
         </div>
       </div>
     </div>
+    <SheetAxisContextMenu
+      v-if="axisContextMenu"
+      :axis="axisContextMenu.axis"
+      :selection-count="axisContextMenu.count"
+      :max-before-count="getAxisMaximum(axisContextMenu.axis) - axisContextMenu.index"
+      :max-after-count="
+        getAxisMaximum(axisContextMenu.axis) - axisContextMenu.index - axisContextMenu.count
+      "
+      :current-size="
+        axisContextMenu.count === 1
+          ? axisContextMenu.axis === 'row'
+            ? geometry.getRowHeight(axisContextMenu.index)
+            : geometry.getColumnWidth(axisContextMenu.index)
+          : undefined
+      "
+      :minimum-size="axisContextMenu.axis === 'row' ? MIN_ROW_HEIGHT : MIN_COLUMN_WIDTH"
+      :maximum-size="axisContextMenu.axis === 'row' ? MAX_ROW_HEIGHT : MAX_COLUMN_WIDTH"
+      :position="axisContextMenu.position"
+      @insert="requestAxisInsert"
+      @resize="requestAxisResize"
+      @delete="requestAxisDelete"
+      @clear="requestAxisClear"
+      @close="closeAxisContextMenu"
+    />
     <span class="sheet-grid__assistive-status" aria-live="polite">{{ clipboardFeedback }}</span>
   </section>
 </template>
@@ -1044,6 +1289,19 @@ defineExpose({ navigateToCell });
     background: var(--ui-surface-muted);
     border-right: 1px solid var(--ui-border-strong);
     border-bottom: 1px solid var(--ui-border-strong);
+    padding: 0;
+    appearance: none;
+    cursor: pointer;
+
+    &.is-active {
+      background: var(--ui-brand-soft);
+    }
+
+    &:focus-visible {
+      z-index: 6;
+      outline: 2px solid var(--ui-brand-primary);
+      outline-offset: -2px;
+    }
   }
 
   &__scroller {

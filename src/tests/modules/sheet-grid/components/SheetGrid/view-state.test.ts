@@ -10,6 +10,7 @@ describe("SheetGrid view state", () => {
         active: { row: 8, column: 4 },
         anchor: { row: 7, column: 3 },
         focus: { row: 8, column: 4 },
+        mode: "cells",
       },
       scrollPosition: { x: 288, y: 168 },
       gridExtent: { rowCount: 100, columnCount: 50 },

@@ -3,6 +3,8 @@ import { reactive } from "vue";
 import type { GridPastePayload } from "../../../../../modules/sheet-grid/useGridClipboard";
 import {
   createClearCellRangeCommand,
+  createDeleteSheetAxisCommand,
+  createInsertSheetAxisCommand,
   createPasteCellValuesCommand,
   createResizeSheetDimensionCommand,
   createSetCellValueCommand,
@@ -21,8 +23,10 @@ import {
   type SheetDimensionAxis,
 } from "../../../../../modules/workbook/workbook";
 import SheetGrid from "../../../../../modules/sheet-grid/components/SheetGrid.vue";
+import { createAppI18n } from "../../../../../shared/i18n";
 
 export type SheetGridFixtureOptions = {
+  attachTo?: HTMLElement;
   initialRowCount?: number;
   initialColumnCount?: number;
   rowExpansionStep?: number;
@@ -35,6 +39,10 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
   const session = reactive(createWorkbookSession()) as WorkbookSession;
   const sheet = getActiveSheet(session.workbook);
   const wrapper = mount(SheetGrid, {
+    attachTo: options?.attachTo,
+    global: {
+      plugins: [createAppI18n("en-US")],
+    },
     props: {
       sheet,
       initialRowCount: options?.initialRowCount ?? 100,
@@ -64,6 +72,18 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
         executeWorkbookCommand(
           session,
           createResizeSheetDimensionCommand(sheet.id, payload.axis, payload.index, payload.size),
+        );
+      },
+      onInsertAxis(payload: { axis: SheetDimensionAxis; index: number; count: number }) {
+        executeWorkbookCommand(
+          session,
+          createInsertSheetAxisCommand(sheet.id, payload.axis, payload.index, payload.count),
+        );
+      },
+      onDeleteAxis(payload: { axis: SheetDimensionAxis; index: number; count: number }) {
+        executeWorkbookCommand(
+          session,
+          createDeleteSheetAxisCommand(sheet.id, payload.axis, payload.index, payload.count),
         );
       },
       onUndo() {

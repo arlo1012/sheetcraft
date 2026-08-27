@@ -1,11 +1,27 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import GridNavigationBar from "../../../../../modules/sheet-grid/components/GridNavigationBar.vue";
+import { createAppI18n } from "../../../../../shared/i18n";
+
+function mountNavigationBar(props: {
+  address: string;
+  searchQuery: string;
+  searchFeedback?: string;
+}) {
+  return mount(GridNavigationBar, {
+    global: {
+      plugins: [createAppI18n("en-US")],
+    },
+    props,
+  });
+}
 
 describe("GridNavigationBar", () => {
   test("submits addresses and search directions", async () => {
-    const wrapper = mount(GridNavigationBar, {
-      props: { address: "A1", searchQuery: "needle", searchFeedback: "" },
+    const wrapper = mountNavigationBar({
+      address: "A1",
+      searchQuery: "needle",
+      searchFeedback: "",
     });
 
     await wrapper.get('[aria-label="Cell address"]').setValue("B12");
@@ -18,9 +34,7 @@ describe("GridNavigationBar", () => {
   });
 
   test("keeps the address draft synchronized with navigation", async () => {
-    const wrapper = mount(GridNavigationBar, {
-      props: { address: "A1", searchQuery: "" },
-    });
+    const wrapper = mountNavigationBar({ address: "A1", searchQuery: "" });
     const input = wrapper.get<HTMLInputElement>('[aria-label="Cell address"]');
 
     await input.setValue("invalid");

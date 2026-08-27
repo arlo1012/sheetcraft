@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useAppI18n } from "../../../shared/i18n";
+
+const { t } = useAppI18n();
 
 const props = defineProps<{
   modelValue: string;
@@ -22,10 +25,13 @@ const emit = defineEmits<{
 const inputRef = ref<HTMLInputElement | null>(null);
 const accessibleLabel = computed(() => {
   if (props.editing) {
-    return `Edit cell ${props.addressLabel}`;
+    return t("cell.edit", { address: props.addressLabel });
   }
 
-  return `Cell ${props.addressLabel}, ${props.displayValue || "blank"}`;
+  return t("cell.value", {
+    address: props.addressLabel,
+    value: props.displayValue || t("cell.blank"),
+  });
 });
 
 function readInputValue(event: Event): string {

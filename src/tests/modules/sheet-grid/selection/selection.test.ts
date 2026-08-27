@@ -1,8 +1,11 @@
 import { describe, expect, test } from "vitest";
 import {
   areCellAddressesEqual,
+  createAxisSelection,
   createCellSelection,
+  extendAxisSelection,
   getSelectionRange,
+  isCellSelected,
   isCellInRange,
   isSingleCellSelection,
   moveActiveCellWithinSelection,
@@ -38,6 +41,7 @@ describe("sheet selection", () => {
       active: { row: 4, column: 5 },
       anchor: { row: 4, column: 5 },
       focus: { row: 1, column: 2 },
+      mode: "cells" as const,
     };
 
     expect(getSelectionRange(selection)).toEqual({
@@ -61,6 +65,7 @@ describe("sheet selection", () => {
       active: { row: 2, column: 2 },
       anchor: { row: 2, column: 2 },
       focus: { row: 4, column: 3 },
+      mode: "cells",
     });
     expect(isSingleCellSelection(extended)).toBe(false);
     expect(
@@ -68,11 +73,28 @@ describe("sheet selection", () => {
     ).toEqual(createCellSelection({ row: 2, column: 3 }));
   });
 
+  test("models whole axes without expanding their render range to sheet limits", () => {
+    const rows = extendAxisSelection(createAxisSelection("rows", { row: 2, column: 0 }), "rows", {
+      row: 4,
+      column: 0,
+    });
+    const columns = createAxisSelection("columns", { row: 0, column: 3 });
+
+    expect(getSelectionRange(rows, { rowCount: 10, columnCount: 5 })).toEqual({
+      start: { row: 2, column: 0 },
+      end: { row: 4, column: 4 },
+    });
+    expect(isCellSelected({ row: 3, column: 99 }, rows)).toBe(true);
+    expect(isCellSelected({ row: 1, column: 0 }, rows)).toBe(false);
+    expect(isCellSelected({ row: 999, column: 3 }, columns)).toBe(true);
+  });
+
   test("cycles the active cell through a retained range", () => {
     const selection = {
       active: { row: 0, column: 0 },
       anchor: { row: 0, column: 0 },
       focus: { row: 1, column: 1 },
+      mode: "cells" as const,
     };
 
     const tabbed = moveActiveCellWithinSelection(selection, "forward-row");
