@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, reactive } from "vue";
+import { computed, reactive, ref } from "vue";
+import { formatCellAddress, parseCellAddress } from "../modules/sheet-grid/address";
+import GridNavigationBar from "../modules/sheet-grid/components/GridNavigationBar.vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
 import type { SheetGridViewState } from "../modules/sheet-grid/view-state";
 import WorkbookSheetTabs from "../modules/workbook/components/WorkbookSheetTabs.vue";
@@ -21,6 +23,7 @@ import {
   type WorkbookSession,
 } from "../modules/workbook/history";
 import { parseCellInput } from "../modules/workbook/input";
+import { findCellByText, type SheetSearchDirection } from "../modules/workbook/search";
 import {
   getActiveSheet,
   getWorkbookSheets,
@@ -34,6 +37,14 @@ const session = reactive(createWorkbookSession()) as WorkbookSession;
 const activeSheet = computed(() => getActiveSheet(session.workbook));
 const sheets = computed(() => getWorkbookSheets(session.workbook));
 const viewStates = reactive(new Map<string, SheetGridViewState>());
+const gridRef = ref<InstanceType<typeof SheetGrid>>();
+const searchQuery = ref("");
+const navigationFeedback = ref("");
+const workspaceStatus = ref("Ready");
+const activeAddress = computed(
+  () => viewStates.get(activeSheet.value.id)?.selection.active ?? { row: 0, column: 0 },
+);
+const activeAddressLabel = computed(() => formatCellAddress(activeAddress.value));
 
 function commitCell(payload: { address: CellAddress; input: string }): void {
   executeWorkbookCommand(
@@ -76,10 +87,12 @@ function resizeDimension(payload: { axis: SheetDimensionAxis; index: number; siz
 
 function selectSheet(sheetId: string): void {
   setActiveSheet(session.workbook, sheetId);
+  navigationFeedback.value = "";
 }
 
 function addSheet(): void {
   executeWorkbookCommand(session, createAddSheetCommand(session.workbook), "Add sheet");
+  workspaceStatus.value = "Ready";
 }
 
 function renameSheet(payload: { sheetId: string; name: string }): void {
@@ -89,8 +102,9 @@ function renameSheet(payload: { sheetId: string; name: string }): void {
       createRenameSheetCommand(payload.sheetId, payload.name),
       "Rename sheet",
     );
-  } catch {
-    // The tab input is restored from the unchanged workbook name.
+    workspaceStatus.value = "Ready";
+  } catch (error) {
+    workspaceStatus.value = error instanceof Error ? error.message : "Unable to rename sheet";
   }
 }
 
@@ -100,6 +114,7 @@ function deleteSheet(sheetId: string): void {
     createDeleteSheetCommand(session.workbook, sheetId),
     "Delete sheet",
   );
+  workspaceStatus.value = "Ready";
 }
 
 function getActiveSheetViewState(): SheetGridViewState | undefined {
@@ -109,12 +124,58 @@ function getActiveSheetViewState(): SheetGridViewState | undefined {
 function updateActiveSheetViewState(viewState: SheetGridViewState): void {
   viewStates.set(activeSheet.value.id, viewState);
 }
+
+function navigateToAddress(input: string): void {
+  const address = parseCellAddress(input);
+  if (!address) {
+    navigationFeedback.value = "Invalid address";
+    return;
+  }
+
+  navigationFeedback.value = "";
+  gridRef.value?.navigateToCell(address);
+}
+
+function updateSearchQuery(query: string): void {
+  searchQuery.value = query;
+  navigationFeedback.value = "";
+}
+
+function findCell(direction: SheetSearchDirection): void {
+  if (!searchQuery.value.trim()) {
+    navigationFeedback.value = "Enter a search term";
+    return;
+  }
+
+  const match = findCellByText(
+    activeSheet.value,
+    searchQuery.value,
+    activeAddress.value,
+    direction,
+  );
+  if (!match) {
+    navigationFeedback.value = "No matches";
+    return;
+  }
+
+  gridRef.value?.navigateToCell(match);
+  navigationFeedback.value = `Found ${formatCellAddress(match)}`;
+}
 </script>
 
 <template>
   <section class="spreadsheet-workspace" aria-label="Spreadsheet editor">
+    <GridNavigationBar
+      :address="activeAddressLabel"
+      :search-query="searchQuery"
+      :search-feedback="navigationFeedback"
+      @navigate="navigateToAddress"
+      @update-search-query="updateSearchQuery"
+      @find="findCell"
+    />
     <div class="spreadsheet-workspace__grid">
       <SheetGrid
+        ref="gridRef"
         :sheet="activeSheet"
         :view-state="getActiveSheetViewState()"
         @clear-cells="clearCells"
@@ -135,7 +196,7 @@ function updateActiveSheetViewState(viewState: SheetGridViewState): void {
         @rename="renameSheet"
         @delete="deleteSheet"
       />
-      <span class="spreadsheet-workspace__status">Ready</span>
+      <span class="spreadsheet-workspace__status" aria-live="polite">{{ workspaceStatus }}</span>
     </footer>
   </section>
 </template>
@@ -143,7 +204,7 @@ function updateActiveSheetViewState(viewState: SheetGridViewState): void {
 <style scoped lang="scss">
 .spreadsheet-workspace {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 30px;
+  grid-template-rows: 34px minmax(0, 1fr) 30px;
   width: 100%;
   height: 100dvh;
   min-width: 320px;

@@ -323,6 +323,21 @@ function setActiveCell(address: CellAddress, restoreFocus = true): void {
   setSelection(createCellSelection(address), address, restoreFocus);
 }
 
+function navigateToCell(address: CellAddress): void {
+  const nextSelection = createCellSelection(address);
+  if (isComposing.value) {
+    pendingSelectionAfterComposition = nextSelection;
+    shouldFinishAfterComposition = true;
+    return;
+  }
+
+  if (isEditing.value) {
+    finishEdit(nextSelection);
+  } else {
+    setSelection(nextSelection, address);
+  }
+}
+
 function beginEdit(mode: "append" | "replace", initialValue = "", clientX?: number): void {
   editingValue.value =
     mode === "append"
@@ -907,6 +922,8 @@ onBeforeUnmount(() => {
   stopDragSelection();
   stopDimensionResize();
 });
+
+defineExpose({ navigateToCell });
 </script>
 
 <template>
