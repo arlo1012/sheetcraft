@@ -39,6 +39,11 @@ export type Workbook = {
   activeSheetId: string;
 };
 
+export type RemovedSheet = {
+  sheet: Sheet;
+  index: number;
+};
+
 let fallbackId = 0;
 
 function createId(prefix: string): string {
@@ -57,11 +62,19 @@ export function createCellKey(address: CellAddress): string {
 export function createSheet(name = "Sheet1", id = createId("sheet")): Sheet {
   return {
     id,
-    name,
+    name: normalizeSheetName(name),
     cells: new Map(),
     rowHeights: new Map(),
     columnWidths: new Map(),
   };
+}
+
+export function normalizeSheetName(name: string): string {
+  const normalizedName = name.trim();
+  if (!normalizedName) {
+    throw new Error("Sheet name cannot be empty.");
+  }
+  return normalizedName;
 }
 
 export function createWorkbook(options?: {
@@ -85,6 +98,109 @@ export function getActiveSheet(workbook: Workbook): Sheet {
   }
 
   return sheet;
+}
+
+export function getWorkbookSheets(workbook: Workbook): Sheet[] {
+  return [...workbook.sheets.values()];
+}
+
+export function getSheetIndex(workbook: Workbook, sheetId: string): number {
+  return getWorkbookSheets(workbook).findIndex((sheet) => sheet.id === sheetId);
+}
+
+export function getNextSheetName(workbook: Workbook): string {
+  const names = new Set(getWorkbookSheets(workbook).map((sheet) => sheet.name.toLowerCase()));
+  let index = 1;
+  while (names.has(`sheet${index}`)) {
+    index += 1;
+  }
+  return `Sheet${index}`;
+}
+
+function assertSheetNameAvailable(
+  workbook: Workbook,
+  name: string,
+  excludedSheetId?: string,
+): void {
+  const normalizedName = normalizeSheetName(name).toLowerCase();
+  const duplicate = getWorkbookSheets(workbook).some(
+    (sheet) => sheet.id !== excludedSheetId && sheet.name.toLowerCase() === normalizedName,
+  );
+  if (duplicate) {
+    throw new Error(`A sheet named ${name.trim()} already exists.`);
+  }
+}
+
+function replaceWorkbookSheets(workbook: Workbook, sheets: readonly Sheet[]): void {
+  workbook.sheets.clear();
+  for (const sheet of sheets) {
+    workbook.sheets.set(sheet.id, sheet);
+  }
+}
+
+export function insertSheet(workbook: Workbook, sheet: Sheet, index = workbook.sheets.size): void {
+  if (workbook.sheets.has(sheet.id)) {
+    throw new Error(`Sheet ${sheet.id} already exists.`);
+  }
+  if (!Number.isInteger(index) || index < 0 || index > workbook.sheets.size) {
+    throw new RangeError(`Sheet index ${index} is outside the workbook.`);
+  }
+  assertSheetNameAvailable(workbook, sheet.name);
+
+  const sheets = getWorkbookSheets(workbook);
+  sheets.splice(index, 0, sheet);
+  replaceWorkbookSheets(workbook, sheets);
+}
+
+export function removeSheet(workbook: Workbook, sheetId: string): RemovedSheet {
+  if (workbook.sheets.size <= 1) {
+    throw new Error("A workbook must contain at least one sheet.");
+  }
+  const index = getSheetIndex(workbook, sheetId);
+  if (index < 0) {
+    throw new Error(`Sheet ${sheetId} does not exist.`);
+  }
+
+  const sheets = getWorkbookSheets(workbook);
+  const nextActiveSheetId =
+    workbook.activeSheetId === sheetId
+      ? (sheets[index + 1] ?? sheets[index - 1])?.id
+      : workbook.activeSheetId;
+  if (!nextActiveSheetId) {
+    throw new Error("Unable to select a sheet after deletion.");
+  }
+  const [sheet] = sheets.splice(index, 1);
+  if (!sheet) {
+    throw new Error(`Sheet ${sheetId} disappeared while removing it.`);
+  }
+  replaceWorkbookSheets(workbook, sheets);
+  workbook.activeSheetId = nextActiveSheetId;
+  return { sheet, index };
+}
+
+export function renameSheet(workbook: Workbook, sheetId: string, name: string): boolean {
+  const sheet = workbook.sheets.get(sheetId);
+  if (!sheet) {
+    throw new Error(`Sheet ${sheetId} does not exist.`);
+  }
+  const normalizedName = normalizeSheetName(name);
+  if (sheet.name === normalizedName) {
+    return false;
+  }
+  assertSheetNameAvailable(workbook, normalizedName, sheetId);
+  sheet.name = normalizedName;
+  return true;
+}
+
+export function setActiveSheet(workbook: Workbook, sheetId: string): boolean {
+  if (!workbook.sheets.has(sheetId)) {
+    throw new Error(`Sheet ${sheetId} does not exist.`);
+  }
+  if (workbook.activeSheetId === sheetId) {
+    return false;
+  }
+  workbook.activeSheetId = sheetId;
+  return true;
 }
 
 export function getCell(sheet: Sheet, address: CellAddress): Cell | undefined {

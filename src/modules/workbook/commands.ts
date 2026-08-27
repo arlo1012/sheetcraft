@@ -1,17 +1,25 @@
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
+  createSheet,
   getColumnWidth,
   getCellValue,
+  getNextSheetName,
+  getSheetIndex,
   getRowHeight,
+  insertSheet,
   isCellAddressInBounds,
+  removeSheet,
+  renameSheet,
   setColumnWidth,
   setCellValue,
+  setActiveSheet,
   setRowHeight,
   type CellAddress,
   type CellRange,
   type CellValue,
   type SheetDimensionAxis,
+  type Sheet,
   type Workbook,
 } from "./workbook";
 import { getCellMatrixSize } from "./clipboard";
@@ -41,10 +49,32 @@ export type ResizeSheetDimensionCommand = {
   size: number;
 };
 
+export type AddSheetCommand = {
+  type: "addSheet";
+  sheet: Sheet;
+  index: number;
+  activeSheetId: string;
+};
+
+export type DeleteSheetCommand = {
+  type: "deleteSheet";
+  sheetId: string;
+  activeSheetId: string;
+};
+
+export type RenameSheetCommand = {
+  type: "renameSheet";
+  sheetId: string;
+  name: string;
+};
+
 export type WorkbookCommand =
   | SetCellValuesCommand
   | ClearCellRangeCommand
-  | ResizeSheetDimensionCommand;
+  | ResizeSheetDimensionCommand
+  | AddSheetCommand
+  | DeleteSheetCommand
+  | RenameSheetCommand;
 
 function assertCellAddress(address: CellAddress): void {
   if (!isCellAddressInBounds(address)) {
@@ -114,6 +144,44 @@ export function createResizeSheetDimensionCommand(
   size: number,
 ): ResizeSheetDimensionCommand {
   return { type: "resizeSheetDimension", sheetId, axis, index, size };
+}
+
+export function createAddSheetCommand(
+  workbook: Workbook,
+  options?: { id?: string; name?: string; index?: number },
+): AddSheetCommand {
+  const sheet = createSheet(options?.name ?? getNextSheetName(workbook), options?.id);
+  return {
+    type: "addSheet",
+    sheet,
+    index: options?.index ?? workbook.sheets.size,
+    activeSheetId: sheet.id,
+  };
+}
+
+export function createDeleteSheetCommand(workbook: Workbook, sheetId: string): DeleteSheetCommand {
+  const index = getSheetIndex(workbook, sheetId);
+  if (index < 0) {
+    throw new Error(`Sheet ${sheetId} does not exist.`);
+  }
+  if (workbook.sheets.size <= 1) {
+    throw new Error("A workbook must contain at least one sheet.");
+  }
+
+  const sheets = [...workbook.sheets.values()];
+  const nextActiveSheetId =
+    workbook.activeSheetId === sheetId
+      ? (sheets[index + 1] ?? sheets[index - 1])?.id
+      : workbook.activeSheetId;
+  if (!nextActiveSheetId) {
+    throw new Error("Unable to select a sheet after deletion.");
+  }
+
+  return { type: "deleteSheet", sheetId, activeSheetId: nextActiveSheetId };
+}
+
+export function createRenameSheetCommand(sheetId: string, name: string): RenameSheetCommand {
+  return { type: "renameSheet", sheetId, name };
 }
 
 export function createPasteCellValuesCommand(
@@ -268,6 +336,49 @@ function applyResizeSheetDimensionCommand(
     : null;
 }
 
+function applyAddSheetCommand(workbook: Workbook, command: AddSheetCommand): WorkbookCommand {
+  if (command.activeSheetId !== command.sheet.id && !workbook.sheets.has(command.activeSheetId)) {
+    throw new Error(`Sheet ${command.activeSheetId} does not exist.`);
+  }
+  const previousActiveSheetId = workbook.activeSheetId;
+  insertSheet(workbook, command.sheet, command.index);
+  setActiveSheet(workbook, command.activeSheetId);
+  return {
+    type: "deleteSheet",
+    sheetId: command.sheet.id,
+    activeSheetId: previousActiveSheetId,
+  };
+}
+
+function applyDeleteSheetCommand(workbook: Workbook, command: DeleteSheetCommand): WorkbookCommand {
+  if (command.activeSheetId === command.sheetId || !workbook.sheets.has(command.activeSheetId)) {
+    throw new Error(`Sheet ${command.activeSheetId} does not exist after deletion.`);
+  }
+  const previousActiveSheetId = workbook.activeSheetId;
+  const { sheet, index } = removeSheet(workbook, command.sheetId);
+  setActiveSheet(workbook, command.activeSheetId);
+  return {
+    type: "addSheet",
+    sheet,
+    index,
+    activeSheetId: previousActiveSheetId,
+  };
+}
+
+function applyRenameSheetCommand(
+  workbook: Workbook,
+  command: RenameSheetCommand,
+): WorkbookCommand | null {
+  const sheet = workbook.sheets.get(command.sheetId);
+  if (!sheet) {
+    throw new Error(`Sheet ${command.sheetId} does not exist.`);
+  }
+  const previousName = sheet.name;
+  return renameSheet(workbook, command.sheetId, command.name)
+    ? createRenameSheetCommand(command.sheetId, previousName)
+    : null;
+}
+
 export function applyWorkbookCommand(
   workbook: Workbook,
   command: WorkbookCommand,
@@ -277,6 +388,15 @@ export function applyWorkbookCommand(
   }
   if (command.type === "resizeSheetDimension") {
     return applyResizeSheetDimensionCommand(workbook, command);
+  }
+  if (command.type === "addSheet") {
+    return applyAddSheetCommand(workbook, command);
+  }
+  if (command.type === "deleteSheet") {
+    return applyDeleteSheetCommand(workbook, command);
+  }
+  if (command.type === "renameSheet") {
+    return applyRenameSheetCommand(workbook, command);
   }
   return applySetCellValuesCommand(workbook, command);
 }
