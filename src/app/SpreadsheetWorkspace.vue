@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, reactive } from "vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
-import { createSetCellValueCommand } from "../modules/workbook/commands";
+import type { GridPastePayload } from "../modules/sheet-grid/useGridClipboard";
+import {
+  createPasteCellValuesCommand,
+  createSetCellValueCommand,
+} from "../modules/workbook/commands";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
@@ -22,6 +26,16 @@ function commitCell(payload: { address: CellAddress; input: string }): void {
     "Edit cell",
   );
 }
+
+function pasteCells(payload: GridPastePayload): void {
+  executeWorkbookCommand(
+    session,
+    createPasteCellValuesCommand(activeSheet.value.id, payload.plan.anchor, payload.plan.values, {
+      clearRange: payload.clearRange,
+    }),
+    payload.clearRange ? "Move cells" : "Paste cells",
+  );
+}
 </script>
 
 <template>
@@ -30,6 +44,7 @@ function commitCell(payload: { address: CellAddress; input: string }): void {
       <SheetGrid
         :sheet="activeSheet"
         @commit-cell="commitCell"
+        @paste-cells="pasteCells"
         @undo="undoWorkbookCommand(session)"
         @redo="redoWorkbookCommand(session)"
       />

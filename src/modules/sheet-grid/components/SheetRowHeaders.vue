@@ -6,7 +6,8 @@ const props = defineProps<{
   endRow: number;
   rowHeight: number;
   scrollTop: number;
-  activeRow: number;
+  selectedStartRow: number;
+  selectedEndRow: number;
 }>();
 
 const rows = computed(() => {
@@ -31,7 +32,7 @@ function getHeaderStyle(row: number): CSSProperties {
       v-for="row in rows"
       :key="row"
       class="sheet-row-headers__item"
-      :class="{ 'is-active': row === activeRow }"
+      :class="{ 'is-active': row >= selectedStartRow && row <= selectedEndRow }"
       :style="getHeaderStyle(row)"
       :data-row="row"
     >

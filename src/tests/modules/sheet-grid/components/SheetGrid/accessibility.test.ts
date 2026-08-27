@@ -20,4 +20,19 @@ describe("SheetGrid accessibility", () => {
 
     expect(wrapper.get("input.cell-editor").attributes("aria-label")).toBe("Cell B1, Budget");
   });
+
+  test("marks visible range cells selected while keeping one active editor", async () => {
+    const { wrapper } = mountSheetGrid();
+    await wrapper
+      .get('[data-row="1"][data-column="2"]')
+      .trigger("mousedown", { button: 0, shiftKey: true });
+
+    expect(wrapper.get('[role="grid"]').attributes("aria-multiselectable")).toBe("true");
+    expect(wrapper.get('[data-row="0"][data-column="2"]').attributes("aria-selected")).toBe("true");
+    expect(wrapper.get('[data-row="2"][data-column="2"]').attributes("aria-selected")).toBe(
+      "false",
+    );
+    expect(wrapper.findAll("input.cell-editor")).toHaveLength(1);
+    expect(wrapper.find('[aria-live="polite"]').exists()).toBe(true);
+  });
 });

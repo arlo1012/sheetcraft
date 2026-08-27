@@ -7,7 +7,8 @@ const props = defineProps<{
   endColumn: number;
   columnWidth: number;
   scrollLeft: number;
-  activeColumn: number;
+  selectedStartColumn: number;
+  selectedEndColumn: number;
 }>();
 
 const columns = computed(() => {
@@ -32,7 +33,9 @@ function getHeaderStyle(column: number): CSSProperties {
       v-for="column in columns"
       :key="column"
       class="sheet-column-headers__item"
-      :class="{ 'is-active': column === activeColumn }"
+      :class="{
+        'is-active': column >= selectedStartColumn && column <= selectedEndColumn,
+      }"
       :style="getHeaderStyle(column)"
       :data-column="column"
     >

@@ -8,6 +8,11 @@ export type CellAddress = {
   column: number;
 };
 
+export type CellRange = {
+  start: CellAddress;
+  end: CellAddress;
+};
+
 export type Cell = {
   value: Exclude<CellValue, null>;
 };

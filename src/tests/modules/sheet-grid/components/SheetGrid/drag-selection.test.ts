@@ -1,0 +1,69 @@
+import { afterEach, describe, expect, test, vi } from "vitest";
+import { activeCell, mountSheetGrid } from "./fixture";
+
+function dispatchMouse(type: string, options: MouseEventInit): void {
+  window.dispatchEvent(new MouseEvent(type, options));
+}
+
+describe("SheetGrid drag selection", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test("selects a reverse rectangle without writing history", async () => {
+    const { session, wrapper } = mountSheetGrid();
+    await wrapper.get('[data-row="3"][data-column="3"]').trigger("mousedown", {
+      button: 0,
+      buttons: 1,
+      clientX: 346,
+      clientY: 94,
+    });
+
+    dispatchMouse("mousemove", { buttons: 1, clientX: 10, clientY: 10 });
+    dispatchMouse("mouseup", { button: 0, clientX: 10, clientY: 10 });
+    await wrapper.vm.$nextTick();
+
+    expect(activeCell(wrapper)).toBe("D4");
+    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 384px");
+    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("height: 96px");
+    expect(session.history.undoStack).toHaveLength(0);
+  });
+
+  test("scrolls while dragging in the viewport edge band", async () => {
+    let scheduledFrame: FrameRequestCallback | undefined;
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      scheduledFrame = callback;
+      return 1;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+
+    const { wrapper } = mountSheetGrid();
+    const scroller = wrapper.get(".sheet-grid__scroller");
+    vi.spyOn(scroller.element, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 400,
+      bottom: 200,
+      width: 400,
+      height: 200,
+      toJSON: () => ({}),
+    });
+
+    await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", {
+      button: 0,
+      buttons: 1,
+      clientX: 10,
+      clientY: 10,
+    });
+    dispatchMouse("mousemove", { buttons: 1, clientX: 410, clientY: 210 });
+    scheduledFrame?.(0);
+    dispatchMouse("mouseup", { button: 0, clientX: 410, clientY: 210 });
+    await wrapper.vm.$nextTick();
+
+    expect((scroller.element as HTMLDivElement).scrollLeft).toBeGreaterThan(0);
+    expect((scroller.element as HTMLDivElement).scrollTop).toBeGreaterThan(0);
+    expect(wrapper.get("[data-selection-range]").attributes("style")).not.toContain("width: 96px");
+  });
+});

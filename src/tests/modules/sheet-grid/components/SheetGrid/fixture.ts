@@ -1,6 +1,10 @@
 import { mount } from "@vue/test-utils";
 import { reactive } from "vue";
-import { createSetCellValueCommand } from "../../../../../modules/workbook/commands";
+import type { GridPastePayload } from "../../../../../modules/sheet-grid/useGridClipboard";
+import {
+  createPasteCellValuesCommand,
+  createSetCellValueCommand,
+} from "../../../../../modules/workbook/commands";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
@@ -37,6 +41,14 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
         executeWorkbookCommand(
           session,
           createSetCellValueCommand(sheet.id, payload.address, parseCellInput(payload.input)),
+        );
+      },
+      onPasteCells(payload: GridPastePayload) {
+        executeWorkbookCommand(
+          session,
+          createPasteCellValuesCommand(sheet.id, payload.plan.anchor, payload.plan.values, {
+            clearRange: payload.clearRange,
+          }),
         );
       },
       onUndo() {

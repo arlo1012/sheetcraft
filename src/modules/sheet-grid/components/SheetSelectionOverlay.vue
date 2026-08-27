@@ -3,38 +3,91 @@ import { computed, type CSSProperties } from "vue";
 import type { Rect } from "../geometry";
 
 const props = defineProps<{
-  rect: Rect;
+  activeRect: Rect;
+  rangeRect: Rect;
   addressLabel: string;
   editing: boolean;
+  clipboardRect?: Rect | null;
+  clipboardMode?: "copy" | "cut" | null;
 }>();
 
-const selectionStyle = computed<CSSProperties>(() => ({
-  left: `${props.rect.x}px`,
-  top: `${props.rect.y}px`,
-  width: `${props.rect.width}px`,
-  height: `${props.rect.height}px`,
-}));
+function getRectStyle(rect: Rect): CSSProperties {
+  return {
+    left: `${rect.x}px`,
+    top: `${rect.y}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+  };
+}
+
+const rangeStyle = computed<CSSProperties>(() => getRectStyle(props.rangeRect));
+const activeStyle = computed<CSSProperties>(() => getRectStyle(props.activeRect));
+const clipboardStyle = computed<CSSProperties | undefined>(() =>
+  props.clipboardRect ? getRectStyle(props.clipboardRect) : undefined,
+);
 </script>
 
 <template>
   <div
-    class="sheet-selection-overlay"
+    class="sheet-selection-overlay__range"
     :class="{ 'is-editing': editing }"
-    :style="selectionStyle"
+    :style="rangeStyle"
+    data-selection-range
+    aria-hidden="true"
+  />
+  <div
+    class="sheet-selection-overlay__active"
+    :class="{ 'is-editing': editing }"
+    :style="activeStyle"
     :data-active-cell="addressLabel"
+    aria-hidden="true"
+  />
+  <div
+    v-if="clipboardRect"
+    class="sheet-selection-overlay__clipboard"
+    :class="`is-${clipboardMode}`"
+    :style="clipboardStyle"
+    data-clipboard-range
     aria-hidden="true"
   />
 </template>
 
 <style scoped lang="scss">
 .sheet-selection-overlay {
-  position: absolute;
-  z-index: 2;
-  border: 2px solid var(--ui-brand-primary);
-  pointer-events: none;
+  &__range,
+  &__active,
+  &__clipboard {
+    position: absolute;
+    pointer-events: none;
+  }
 
-  &.is-editing {
-    border-color: transparent;
+  &__range {
+    z-index: 2;
+    background: color-mix(in srgb, var(--ui-brand-primary) 8%, transparent);
+    border: 2px solid var(--ui-brand-primary);
+
+    &.is-editing {
+      background: transparent;
+      border-color: transparent;
+    }
+  }
+
+  &__active {
+    z-index: 3;
+    border: 2px solid var(--ui-brand-primary);
+
+    &.is-editing {
+      border-color: transparent;
+    }
+  }
+
+  &__clipboard {
+    z-index: 4;
+    border: 1px dashed var(--ui-brand-primary);
+
+    &.is-cut {
+      border-width: 2px;
+    }
   }
 }
 </style>

@@ -1,11 +1,15 @@
 import {
+  MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
   getCellValue,
   isCellAddressInBounds,
   setCellValue,
   type CellAddress,
+  type CellRange,
   type CellValue,
   type Workbook,
 } from "./workbook";
+import { getCellMatrixSize } from "./clipboard";
 
 export type CellValueChange = {
   sheetId: string;
@@ -47,6 +51,69 @@ export function createBatchSetCellValuesCommand(
       address: { ...change.address },
     })),
   };
+}
+
+function normalizeRange(range: CellRange): CellRange {
+  return {
+    start: {
+      row: Math.min(range.start.row, range.end.row),
+      column: Math.min(range.start.column, range.end.column),
+    },
+    end: {
+      row: Math.max(range.start.row, range.end.row),
+      column: Math.max(range.start.column, range.end.column),
+    },
+  };
+}
+
+export function createPasteCellValuesCommand(
+  sheetId: string,
+  anchor: CellAddress,
+  values: readonly (readonly CellValue[])[],
+  options?: { clearRange?: CellRange },
+): SetCellValuesCommand {
+  const size = getCellMatrixSize(values);
+  const end = {
+    row: anchor.row + size.rowCount - 1,
+    column: anchor.column + size.columnCount - 1,
+  };
+  assertCellAddress(anchor);
+  assertCellAddress(end);
+
+  const changes = new Map<string, CellValueChange>();
+  const setChange = (address: CellAddress, value: CellValue) => {
+    changes.set(`${address.row}:${address.column}`, {
+      sheetId,
+      address,
+      value,
+    });
+  };
+
+  if (options?.clearRange) {
+    const clearRange = normalizeRange(options.clearRange);
+    assertCellAddress(clearRange.start);
+    assertCellAddress(clearRange.end);
+    for (let row = clearRange.start.row; row <= clearRange.end.row; row += 1) {
+      for (let column = clearRange.start.column; column <= clearRange.end.column; column += 1) {
+        setChange({ row, column }, null);
+      }
+    }
+  }
+
+  for (let row = 0; row < size.rowCount; row += 1) {
+    for (let column = 0; column < size.columnCount; column += 1) {
+      setChange(
+        { row: anchor.row + row, column: anchor.column + column },
+        values[row]?.[column] ?? null,
+      );
+    }
+  }
+
+  if (end.row >= MAX_SHEET_ROWS || end.column >= MAX_SHEET_COLUMNS) {
+    throw new RangeError("Pasted cells exceed the sheet limits.");
+  }
+
+  return createBatchSetCellValuesCommand([...changes.values()]);
 }
 
 export function applyWorkbookCommand(

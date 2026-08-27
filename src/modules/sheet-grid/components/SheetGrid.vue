@@ -15,6 +15,7 @@ import {
   MAX_SHEET_ROWS,
   getCellValue,
   type CellAddress,
+  type CellRange,
   type Sheet,
 } from "../../workbook/workbook";
 import {
@@ -26,7 +27,18 @@ import {
   type GridExtent,
 } from "../extent";
 import { createSheetGeometry, getCellAddressLabel, type Point, type Size } from "../geometry";
-import { areCellAddressesEqual, moveCellAddress } from "../selection";
+import {
+  areCellAddressesEqual,
+  createCellSelection,
+  extendCellSelection,
+  getSelectionAutoScrollDelta,
+  getSelectionRange,
+  isSingleCellSelection,
+  moveActiveCellWithinSelection,
+  moveCellSelection,
+  type CellSelection,
+} from "../selection";
+import { useGridClipboard, type GridPastePayload } from "../useGridClipboard";
 import CellEditor from "./CellEditor.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
 import SheetColumnHeaders from "./SheetColumnHeaders.vue";
@@ -59,9 +71,10 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   commitCell: [payload: { address: CellAddress; input: string }];
+  pasteCells: [payload: GridPastePayload];
   undo: [];
   redo: [];
-  selectionChange: [address: CellAddress];
+  selectionChange: [payload: { active: CellAddress; range: CellRange }];
 }>();
 
 const ROW_HEADER_WIDTH = 48;
@@ -70,10 +83,11 @@ const DEFAULT_VIEWPORT_SIZE: Size = { width: 960, height: 600 };
 
 const scrollerRef = ref<HTMLDivElement | null>(null);
 const editorRef = ref<CellEditorHandle | null>(null);
-const activeCell = ref<CellAddress>({ row: 0, column: 0 });
+const selection = ref<CellSelection>(createCellSelection({ row: 0, column: 0 }));
 const editingValue = ref("");
 const isEditing = ref(false);
 const isComposing = ref(false);
+const clipboardFeedback = ref("");
 const scrollPosition = reactive<Point>({ x: 0, y: 0 });
 const viewportSize = reactive<Size>({ ...DEFAULT_VIEWPORT_SIZE });
 const gridExtent = reactive<GridExtent>(
@@ -85,6 +99,19 @@ const gridExtent = reactive<GridExtent>(
 let resizeObserver: ResizeObserver | null = null;
 let compositionStartValue = "";
 let shouldFinishAfterComposition = false;
+let pendingSelectionAfterComposition: CellSelection | undefined;
+let dragSelection:
+  | {
+      start: CellAddress;
+      baseSelection: CellSelection;
+      startX: number;
+      startY: number;
+      pointerX: number;
+      pointerY: number;
+      moved: boolean;
+    }
+  | undefined;
+let autoScrollFrame: number | undefined;
 
 const geometry = computed(() =>
   createSheetGeometry({
@@ -96,9 +123,26 @@ const totalSize = computed(() => geometry.value.getTotalSize());
 const visibleRange = computed(() =>
   geometry.value.getVisibleRange(scrollPosition, viewportSize, 2),
 );
+const activeCell = computed(() => selection.value.active);
+const selectedRange = computed(() => getSelectionRange(selection.value));
 const activeCellRect = computed(() =>
   geometry.value.getCellViewportRect(activeCell.value, scrollPosition),
 );
+function getRangeViewportRect(range: CellRange) {
+  const startRect = geometry.value.getCellViewportRect(range.start, scrollPosition);
+  const endRect = geometry.value.getCellViewportRect(range.end, scrollPosition);
+  const left = Math.max(0, startRect.x);
+  const top = Math.max(0, startRect.y);
+  const right = Math.min(viewportSize.width, endRect.x + endRect.width);
+  const bottom = Math.min(viewportSize.height, endRect.y + endRect.height);
+  return {
+    x: left,
+    y: top,
+    width: Math.max(0, right - left),
+    height: Math.max(0, bottom - top),
+  };
+}
+const selectedRangeRect = computed(() => getRangeViewportRect(selectedRange.value));
 const activeCellLabel = computed(() => getCellAddressLabel(activeCell.value));
 const activeCellDisplayValue = computed(() =>
   formatCellValueForDisplay(getCellValue(props.sheet, activeCell.value)),
@@ -115,6 +159,32 @@ const gridLineStyle = computed<CSSProperties>(() => ({
   backgroundPosition: `${-(scrollPosition.x % geometry.value.columnWidth)}px ${-(scrollPosition.y % geometry.value.rowHeight)}px`,
   backgroundSize: `${geometry.value.columnWidth}px ${geometry.value.rowHeight}px`,
 }));
+
+const { clipboardMode, clipboardRange, clearPendingClipboard, onCopy, onCut, onPaste } =
+  useGridClipboard({
+    getSheet: () => props.sheet,
+    getSelection: () => selection.value,
+    isEditing: () => isEditing.value,
+    isComposing: () => isComposing.value,
+    onPaste: (payload) => {
+      emit("pasteCells", payload);
+      ensureGridExtentContains(payload.plan.range.end);
+      setSelection(
+        {
+          active: { ...payload.plan.anchor },
+          anchor: { ...payload.plan.range.start },
+          focus: { ...payload.plan.range.end },
+        },
+        payload.plan.range.end,
+      );
+    },
+    onFeedback: (message) => {
+      clipboardFeedback.value = message;
+    },
+  });
+const clipboardRangeRect = computed(() =>
+  clipboardRange.value ? getRangeViewportRect(clipboardRange.value) : null,
+);
 
 function applyGridExtent(nextExtent: GridExtent): void {
   gridExtent.rowCount = nextExtent.rowCount;
@@ -189,11 +259,29 @@ function ensureCellVisible(address: CellAddress): void {
   }
 }
 
-function setActiveCell(address: CellAddress): void {
-  activeCell.value = { ...address };
-  emit("selectionChange", { ...address });
-  ensureCellVisible(address);
-  focusEditor();
+function setSelection(
+  nextSelection: CellSelection,
+  visibleAddress: CellAddress = nextSelection.active,
+  restoreFocus = true,
+): void {
+  selection.value = {
+    active: { ...nextSelection.active },
+    anchor: { ...nextSelection.anchor },
+    focus: { ...nextSelection.focus },
+  };
+  ensureGridExtentContains(visibleAddress);
+  emit("selectionChange", {
+    active: { ...nextSelection.active },
+    range: getSelectionRange(nextSelection),
+  });
+  ensureCellVisible(visibleAddress);
+  if (restoreFocus) {
+    focusEditor();
+  }
+}
+
+function setActiveCell(address: CellAddress, restoreFocus = true): void {
+  setSelection(createCellSelection(address), address, restoreFocus);
 }
 
 function beginEdit(mode: "append" | "replace", initialValue = "", clientX?: number): void {
@@ -205,8 +293,9 @@ function beginEdit(mode: "append" | "replace", initialValue = "", clientX?: numb
   focusEditor(false, clientX);
 }
 
-function finishEdit(destination?: CellAddress, restoreFocus = true): void {
+function finishEdit(destination?: CellSelection, restoreFocus = true): void {
   if (isEditing.value) {
+    clearPendingClipboard();
     emit("commitCell", {
       address: { ...activeCell.value },
       input: editingValue.value,
@@ -216,9 +305,10 @@ function finishEdit(destination?: CellAddress, restoreFocus = true): void {
   isEditing.value = false;
   isComposing.value = false;
   shouldFinishAfterComposition = false;
+  pendingSelectionAfterComposition = undefined;
   editingValue.value = "";
   if (destination) {
-    setActiveCell(destination);
+    setSelection(destination);
   } else if (restoreFocus) {
     focusEditor();
   }
@@ -228,42 +318,192 @@ function cancelEdit(restoreFocus = true): void {
   isEditing.value = false;
   isComposing.value = false;
   shouldFinishAfterComposition = false;
+  pendingSelectionAfterComposition = undefined;
   editingValue.value = "";
   if (restoreFocus) {
     focusEditor();
   }
 }
 
-function moveSelection(delta: { rows?: number; columns?: number }, commitEdit: boolean): void {
-  const destination = moveCellAddress(activeCell.value, delta, {
-    rowCount: MAX_SHEET_ROWS,
-    columnCount: MAX_SHEET_COLUMNS,
-  });
-  ensureGridExtentContains(destination);
+function moveSelection(
+  delta: { rows?: number; columns?: number },
+  commitEdit: boolean,
+  extend = false,
+): void {
+  const destination = moveCellSelection(
+    selection.value,
+    delta,
+    {
+      rowCount: MAX_SHEET_ROWS,
+      columnCount: MAX_SHEET_COLUMNS,
+    },
+    extend,
+  );
+  const visibleAddress = extend ? destination.focus : destination.active;
+  ensureGridExtentContains(visibleAddress);
 
   if (commitEdit) {
     finishEdit(destination);
   } else {
-    setActiveCell(destination);
+    setSelection(destination, visibleAddress);
   }
 }
 
-function onCellMouseDown(address: CellAddress): void {
-  if (isEditing.value) {
-    finishEdit(address);
+function getCellAtClientPoint(clientX: number, clientY: number): CellAddress | null {
+  const scroller = scrollerRef.value;
+  if (!scroller) {
+    return null;
+  }
+  const bounds = scroller.getBoundingClientRect();
+  const width = bounds.width || viewportSize.width;
+  const height = bounds.height || viewportSize.height;
+  const x = Math.min(Math.max(clientX - bounds.left, 0), Math.max(0, width - 1));
+  const y = Math.min(Math.max(clientY - bounds.top, 0), Math.max(0, height - 1));
+  return geometry.value.getCellAtPoint({ x: x + scrollPosition.x, y: y + scrollPosition.y });
+}
+
+function cancelAutoScroll(): void {
+  if (autoScrollFrame === undefined) {
+    return;
+  }
+  if (typeof cancelAnimationFrame === "function") {
+    cancelAnimationFrame(autoScrollFrame);
+  } else {
+    window.clearTimeout(autoScrollFrame);
+  }
+  autoScrollFrame = undefined;
+}
+
+function stopDragSelection(): void {
+  cancelAutoScroll();
+  dragSelection = undefined;
+  window.removeEventListener("mousemove", onDragMouseMove);
+  window.removeEventListener("mouseup", onDragMouseUp);
+}
+
+function updateDragSelectionAddress(): void {
+  if (!dragSelection) {
+    return;
+  }
+  const address = getCellAtClientPoint(dragSelection.pointerX, dragSelection.pointerY);
+  if (!address) {
+    return;
+  }
+  ensureGridExtentContains(address);
+  setSelection(extendCellSelection(dragSelection.baseSelection, address), address, false);
+}
+
+function requestAutoScrollFrame(callback: FrameRequestCallback): number {
+  return typeof requestAnimationFrame === "function"
+    ? requestAnimationFrame(callback)
+    : window.setTimeout(() => callback(performance.now()), 16);
+}
+
+function runSelectionAutoScroll(): void {
+  autoScrollFrame = undefined;
+  const scroller = scrollerRef.value;
+  if (!dragSelection || !scroller) {
     return;
   }
 
-  if (!areCellAddressesEqual(activeCell.value, address)) {
-    setActiveCell(address);
-  } else {
+  const bounds = scroller.getBoundingClientRect();
+  const delta = getSelectionAutoScrollDelta(
+    { x: dragSelection.pointerX, y: dragSelection.pointerY },
+    {
+      left: bounds.left,
+      top: bounds.top,
+      right: bounds.right || bounds.left + viewportSize.width,
+      bottom: bounds.bottom || bounds.top + viewportSize.height,
+    },
+  );
+  if (delta.x === 0 && delta.y === 0) {
+    return;
+  }
+
+  scroller.scrollLeft = Math.max(0, scroller.scrollLeft + delta.x);
+  scroller.scrollTop = Math.max(0, scroller.scrollTop + delta.y);
+  scrollPosition.x = scroller.scrollLeft;
+  scrollPosition.y = scroller.scrollTop;
+  ensureGridExtentCoversViewport();
+  updateDragSelectionAddress();
+  autoScrollFrame = requestAutoScrollFrame(runSelectionAutoScroll);
+}
+
+function scheduleSelectionAutoScroll(): void {
+  cancelAutoScroll();
+  if (!dragSelection) {
+    return;
+  }
+  autoScrollFrame = requestAutoScrollFrame(runSelectionAutoScroll);
+}
+
+function onDragMouseMove(event: MouseEvent): void {
+  if (!dragSelection) {
+    return;
+  }
+  dragSelection.pointerX = event.clientX;
+  dragSelection.pointerY = event.clientY;
+  if (
+    !dragSelection.moved &&
+    Math.hypot(event.clientX - dragSelection.startX, event.clientY - dragSelection.startY) >= 3
+  ) {
+    dragSelection.moved = true;
+  }
+  if (!dragSelection.moved) {
+    return;
+  }
+  updateDragSelectionAddress();
+  scheduleSelectionAutoScroll();
+}
+
+function onDragMouseUp(): void {
+  const moved = dragSelection?.moved ?? false;
+  stopDragSelection();
+  if (moved) {
     focusEditor();
   }
 }
 
+function onCellMouseDown(address: CellAddress, event: MouseEvent): void {
+  const previousSelection = selection.value;
+  const nextSelection = event.shiftKey
+    ? extendCellSelection(previousSelection, address)
+    : createCellSelection(address);
+
+  if (isComposing.value) {
+    pendingSelectionAfterComposition = nextSelection;
+    shouldFinishAfterComposition = true;
+    return;
+  }
+
+  if (isEditing.value) {
+    finishEdit(nextSelection);
+  } else {
+    setSelection(nextSelection, address);
+  }
+
+  if (event.buttons === 1) {
+    stopDragSelection();
+    dragSelection = {
+      start: { ...address },
+      baseSelection: nextSelection,
+      startX: event.clientX,
+      startY: event.clientY,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      moved: false,
+    };
+    window.addEventListener("mousemove", onDragMouseMove);
+    window.addEventListener("mouseup", onDragMouseUp);
+  }
+}
+
 function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
+  if (isComposing.value) {
+    return;
+  }
   if (!areCellAddressesEqual(activeCell.value, address)) {
-    setActiveCell(address);
+    setActiveCell(address, false);
   }
   beginEdit("append", "", event.clientX);
 }
@@ -276,6 +516,7 @@ function handleHistoryShortcut(event: KeyboardEvent): boolean {
   const key = event.key.toLowerCase();
   if (key === "z") {
     event.preventDefault();
+    clearPendingClipboard();
     if (event.shiftKey) {
       emit("redo");
     } else {
@@ -285,11 +526,37 @@ function handleHistoryShortcut(event: KeyboardEvent): boolean {
   }
   if (key === "y") {
     event.preventDefault();
+    clearPendingClipboard();
     emit("redo");
     return true;
   }
 
   return false;
+}
+
+function traverseSelection(key: "Enter" | "Tab", reverse: boolean, commitEdit: boolean): void {
+  if (!isSingleCellSelection(selection.value)) {
+    const direction =
+      key === "Tab"
+        ? reverse
+          ? "backward-row"
+          : "forward-row"
+        : reverse
+          ? "backward-column"
+          : "forward-column";
+    const destination = moveActiveCellWithinSelection(selection.value, direction);
+    if (commitEdit) {
+      finishEdit(destination);
+    } else {
+      setSelection(destination);
+    }
+    return;
+  }
+
+  moveSelection(
+    key === "Tab" ? { columns: reverse ? -1 : 1 } : { rows: reverse ? -1 : 1 },
+    commitEdit,
+  );
 }
 
 function onEditorKeydown(event: KeyboardEvent): void {
@@ -313,12 +580,12 @@ function onEditorKeydown(event: KeyboardEvent): void {
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      moveSelection({ rows: event.shiftKey ? -1 : 1 }, true);
+      traverseSelection("Enter", event.shiftKey, true);
       return;
     }
     if (event.key === "Tab") {
       event.preventDefault();
-      moveSelection({ columns: event.shiftKey ? -1 : 1 }, true);
+      traverseSelection("Tab", event.shiftKey, true);
     }
     return;
   }
@@ -328,13 +595,17 @@ function onEditorKeydown(event: KeyboardEvent): void {
     ArrowDown: { rows: 1 },
     ArrowLeft: { columns: -1 },
     ArrowRight: { columns: 1 },
-    Enter: { rows: event.shiftKey ? -1 : 1 },
-    Tab: { columns: event.shiftKey ? -1 : 1 },
   };
   const delta = navigation[event.key];
   if (delta) {
     event.preventDefault();
-    moveSelection(delta, false);
+    moveSelection(delta, false, event.shiftKey);
+    return;
+  }
+
+  if (event.key === "Enter" || event.key === "Tab") {
+    event.preventDefault();
+    traverseSelection(event.key, event.shiftKey, false);
     return;
   }
 
@@ -360,6 +631,7 @@ function onEditorInput(value: string): void {
 function onCompositionStart(): void {
   compositionStartValue = editingValue.value;
   shouldFinishAfterComposition = false;
+  pendingSelectionAfterComposition = undefined;
   if (!isEditing.value) {
     editingValue.value = "";
     isEditing.value = true;
@@ -370,14 +642,19 @@ function onCompositionStart(): void {
 function onCompositionEnd(value: string, event: CompositionEvent): void {
   isComposing.value = false;
   if (event.data === "" && value === compositionStartValue) {
-    cancelEdit(!shouldFinishAfterComposition);
+    const destination = pendingSelectionAfterComposition;
+    const restoreFocus = !shouldFinishAfterComposition;
+    cancelEdit(restoreFocus);
+    if (destination) {
+      setSelection(destination);
+    }
     return;
   }
   if (isEditing.value) {
     editingValue.value = value;
   }
   if (shouldFinishAfterComposition) {
-    finishEdit(undefined, false);
+    finishEdit(pendingSelectionAfterComposition, !pendingSelectionAfterComposition);
   }
 }
 
@@ -403,11 +680,14 @@ function onScroll(event: Event): void {
 watch(
   () => props.sheet.id,
   () => {
-    activeCell.value = { row: 0, column: 0 };
+    stopDragSelection();
+    clearPendingClipboard();
+    selection.value = createCellSelection({ row: 0, column: 0 });
     editingValue.value = "";
     isEditing.value = false;
     isComposing.value = false;
     shouldFinishAfterComposition = false;
+    pendingSelectionAfterComposition = undefined;
     applyGridExtent(
       createGridExtent({
         rowCount: props.initialRowCount,
@@ -435,7 +715,10 @@ onMounted(() => {
   focusEditor();
 });
 
-onBeforeUnmount(() => resizeObserver?.disconnect());
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  stopDragSelection();
+});
 </script>
 
 <template>
@@ -453,14 +736,16 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
       :end-column="visibleRange.endColumn"
       :column-width="geometry.columnWidth"
       :scroll-left="scrollPosition.x"
-      :active-column="activeCell.column"
+      :selected-start-column="selectedRange.start.column"
+      :selected-end-column="selectedRange.end.column"
     />
     <SheetRowHeaders
       :start-row="visibleRange.startRow"
       :end-row="visibleRange.endRow"
       :row-height="geometry.rowHeight"
       :scroll-top="scrollPosition.y"
-      :active-row="activeCell.row"
+      :selected-start-row="selectedRange.start.row"
+      :selected-end-row="selectedRange.end.row"
     />
 
     <div
@@ -470,6 +755,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
       :aria-label="sheet.name"
       :aria-rowcount="gridExtent.rowCount"
       :aria-colcount="gridExtent.columnCount"
+      aria-multiselectable="true"
       @scroll="onScroll"
     >
       <div class="sheet-grid__canvas" :style="gridCanvasStyle">
@@ -479,6 +765,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
             :geometry="geometry"
             :visible-range="visibleRange"
             :active-cell="activeCell"
+            :selected-range="selectedRange"
             :scroll-position="scrollPosition"
             @cell-mousedown="onCellMouseDown"
             @cell-double-click="onCellDoubleClick"
@@ -494,6 +781,9 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
                 @blur="onEditorBlur"
                 @composition-start="onCompositionStart"
                 @composition-end="onCompositionEnd"
+                @copy="onCopy"
+                @cut="onCut"
+                @paste="onPaste"
                 @update:model-value="onEditorInput"
               />
             </template>
@@ -505,13 +795,17 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
             aria-hidden="true"
           />
           <SheetSelectionOverlay
-            :rect="activeCellRect"
+            :active-rect="activeCellRect"
+            :range-rect="selectedRangeRect"
             :address-label="activeCellLabel"
             :editing="isEditing"
+            :clipboard-rect="clipboardRangeRect"
+            :clipboard-mode="clipboardMode"
           />
         </div>
       </div>
     </div>
+    <span class="sheet-grid__assistive-status" aria-live="polite">{{ clipboardFeedback }}</span>
   </section>
 </template>
 
@@ -574,6 +868,17 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
         var(--ui-border-default) calc(100% - 1px)
       );
     pointer-events: none;
+  }
+
+  &__assistive-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 }
 </style>

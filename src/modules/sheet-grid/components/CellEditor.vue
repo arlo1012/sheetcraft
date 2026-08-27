@@ -14,6 +14,9 @@ const emit = defineEmits<{
   blur: [event: FocusEvent];
   compositionStart: [event: CompositionEvent];
   compositionEnd: [value: string, event: CompositionEvent];
+  copy: [event: ClipboardEvent];
+  cut: [event: ClipboardEvent];
+  paste: [event: ClipboardEvent];
 }>();
 
 const inputRef = ref<HTMLInputElement | null>(null);
@@ -95,6 +98,9 @@ defineExpose({ focus });
     @blur="emit('blur', $event)"
     @compositionstart="emit('compositionStart', $event)"
     @compositionend="emit('compositionEnd', readInputValue($event), $event)"
+    @copy="emit('copy', $event)"
+    @cut="emit('cut', $event)"
+    @paste="emit('paste', $event)"
   />
 </template>
 
