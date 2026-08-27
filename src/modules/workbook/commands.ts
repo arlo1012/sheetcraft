@@ -11,6 +11,8 @@ import {
   isCellAddressInBounds,
   removeSheet,
   renameSheet,
+  createSheetSparseState,
+  replaceSheetSparseState,
   setColumnWidth,
   setCellValue,
   setActiveSheet,
@@ -19,6 +21,7 @@ import {
   type CellRange,
   type CellValue,
   type SheetDimensionAxis,
+  type SheetSparseState,
   type Sheet,
   type Workbook,
 } from "./workbook";
@@ -68,13 +71,38 @@ export type RenameSheetCommand = {
   name: string;
 };
 
+export type InsertSheetAxisCommand = {
+  type: "insertSheetAxis";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  index: number;
+  count: number;
+};
+
+export type DeleteSheetAxisCommand = {
+  type: "deleteSheetAxis";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  index: number;
+  count: number;
+};
+
+type ReplaceSheetSparseStateCommand = {
+  type: "replaceSheetSparseState";
+  sheetId: string;
+  state: SheetSparseState;
+};
+
 export type WorkbookCommand =
   | SetCellValuesCommand
   | ClearCellRangeCommand
   | ResizeSheetDimensionCommand
   | AddSheetCommand
   | DeleteSheetCommand
-  | RenameSheetCommand;
+  | RenameSheetCommand
+  | InsertSheetAxisCommand
+  | DeleteSheetAxisCommand
+  | ReplaceSheetSparseStateCommand;
 
 function assertCellAddress(address: CellAddress): void {
   if (!isCellAddressInBounds(address)) {
@@ -182,6 +210,24 @@ export function createDeleteSheetCommand(workbook: Workbook, sheetId: string): D
 
 export function createRenameSheetCommand(sheetId: string, name: string): RenameSheetCommand {
   return { type: "renameSheet", sheetId, name };
+}
+
+export function createInsertSheetAxisCommand(
+  sheetId: string,
+  axis: SheetDimensionAxis,
+  index: number,
+  count = 1,
+): InsertSheetAxisCommand {
+  return { type: "insertSheetAxis", sheetId, axis, index, count };
+}
+
+export function createDeleteSheetAxisCommand(
+  sheetId: string,
+  axis: SheetDimensionAxis,
+  index: number,
+  count = 1,
+): DeleteSheetAxisCommand {
+  return { type: "deleteSheetAxis", sheetId, axis, index, count };
 }
 
 export function createPasteCellValuesCommand(
@@ -379,6 +425,136 @@ function applyRenameSheetCommand(
     : null;
 }
 
+function createReplaceSheetSparseStateCommand(
+  sheetId: string,
+  state: SheetSparseState,
+): ReplaceSheetSparseStateCommand {
+  return {
+    type: "replaceSheetSparseState",
+    sheetId,
+    state: {
+      cells: state.cells.map((cell) => ({ address: { ...cell.address }, value: cell.value })),
+      rowHeights: state.rowHeights.map((dimension) => ({ ...dimension })),
+      columnWidths: state.columnWidths.map((dimension) => ({ ...dimension })),
+    },
+  };
+}
+
+function assertSheetAxisRange(axis: SheetDimensionAxis, index: number, count: number): number {
+  if (axis !== "row" && axis !== "column") {
+    throw new RangeError(`Unknown sheet dimension axis ${axis}.`);
+  }
+  const maximum = axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
+  if (!Number.isInteger(index) || index < 0 || index >= maximum) {
+    throw new RangeError(
+      `${axis === "row" ? "Row" : "Column"} index ${index} is outside the sheet.`,
+    );
+  }
+  if (!Number.isInteger(count) || count <= 0 || count > maximum - index) {
+    throw new RangeError(`Cannot change ${count} ${axis}s starting at index ${index}.`);
+  }
+  return maximum;
+}
+
+function transformAxisIndex(
+  value: number,
+  index: number,
+  count: number,
+  maximum: number,
+  operation: "insert" | "delete",
+): number | null {
+  if (operation === "insert") {
+    if (value >= maximum - count) {
+      return null;
+    }
+    return value >= index ? value + count : value;
+  }
+  if (value >= index && value < index + count) {
+    return null;
+  }
+  return value >= index + count ? value - count : value;
+}
+
+function transformSheetSparseState(
+  state: SheetSparseState,
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  maximum: number,
+  operation: "insert" | "delete",
+): SheetSparseState {
+  const cells = state.cells.flatMap((cell) => {
+    const sourceIndex = axis === "row" ? cell.address.row : cell.address.column;
+    const targetIndex = transformAxisIndex(sourceIndex, index, count, maximum, operation);
+    if (targetIndex === null) {
+      return [];
+    }
+    return [
+      {
+        address:
+          axis === "row"
+            ? { row: targetIndex, column: cell.address.column }
+            : { row: cell.address.row, column: targetIndex },
+        value: cell.value,
+      },
+    ];
+  });
+  const transformDimensions = (dimensions: SheetSparseState["rowHeights"]) =>
+    dimensions.flatMap((dimension) => {
+      const targetIndex = transformAxisIndex(dimension.index, index, count, maximum, operation);
+      return targetIndex === null ? [] : [{ index: targetIndex, size: dimension.size }];
+    });
+
+  return {
+    cells,
+    rowHeights:
+      axis === "row"
+        ? transformDimensions(state.rowHeights)
+        : state.rowHeights.map((item) => ({ ...item })),
+    columnWidths:
+      axis === "column"
+        ? transformDimensions(state.columnWidths)
+        : state.columnWidths.map((item) => ({ ...item })),
+  };
+}
+
+function applyReplaceSheetSparseStateCommand(
+  workbook: Workbook,
+  command: ReplaceSheetSparseStateCommand,
+): WorkbookCommand | null {
+  const sheet = workbook.sheets.get(command.sheetId);
+  if (!sheet) {
+    throw new Error(`Sheet ${command.sheetId} does not exist.`);
+  }
+  const previousState = createSheetSparseState(sheet);
+  return replaceSheetSparseState(sheet, command.state)
+    ? createReplaceSheetSparseStateCommand(command.sheetId, previousState)
+    : null;
+}
+
+function applySheetAxisCommand(
+  workbook: Workbook,
+  command: InsertSheetAxisCommand | DeleteSheetAxisCommand,
+): WorkbookCommand | null {
+  const maximum = assertSheetAxisRange(command.axis, command.index, command.count);
+  const sheet = workbook.sheets.get(command.sheetId);
+  if (!sheet) {
+    throw new Error(`Sheet ${command.sheetId} does not exist.`);
+  }
+  const previousState = createSheetSparseState(sheet);
+  const nextState = transformSheetSparseState(
+    previousState,
+    command.axis,
+    command.index,
+    command.count,
+    maximum,
+    command.type === "insertSheetAxis" ? "insert" : "delete",
+  );
+  return replaceSheetSparseState(sheet, nextState)
+    ? createReplaceSheetSparseStateCommand(command.sheetId, previousState)
+    : null;
+}
+
 export function applyWorkbookCommand(
   workbook: Workbook,
   command: WorkbookCommand,
@@ -397,6 +573,12 @@ export function applyWorkbookCommand(
   }
   if (command.type === "renameSheet") {
     return applyRenameSheetCommand(workbook, command);
+  }
+  if (command.type === "insertSheetAxis" || command.type === "deleteSheetAxis") {
+    return applySheetAxisCommand(workbook, command);
+  }
+  if (command.type === "replaceSheetSparseState") {
+    return applyReplaceSheetSparseStateCommand(workbook, command);
   }
   return applySetCellValuesCommand(workbook, command);
 }

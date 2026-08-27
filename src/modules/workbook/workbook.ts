@@ -33,6 +33,22 @@ export type Sheet = {
   columnWidths: Map<number, number>;
 };
 
+export type SheetSparseCell = {
+  address: CellAddress;
+  value: Exclude<CellValue, null>;
+};
+
+export type SheetSparseDimension = {
+  index: number;
+  size: number;
+};
+
+export type SheetSparseState = {
+  cells: SheetSparseCell[];
+  rowHeights: SheetSparseDimension[];
+  columnWidths: SheetSparseDimension[];
+};
+
 export type Workbook = {
   id: string;
   sheets: Map<string, Sheet>;
@@ -229,6 +245,16 @@ export function setCellValue(sheet: Sheet, address: CellAddress, value: CellValu
   return true;
 }
 
+function assertStoredCellValue(value: unknown): asserts value is Exclude<CellValue, null> {
+  if (
+    value === null ||
+    value === "" ||
+    (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
+  ) {
+    throw new TypeError("Sparse cell values must be non-empty strings, numbers, or booleans.");
+  }
+}
+
 function assertDimensionIndex(index: number, maximum: number, axis: string): void {
   if (!Number.isInteger(index) || index < 0 || index >= maximum) {
     throw new RangeError(`${axis} index ${index} is outside the sheet.`);
@@ -280,6 +306,130 @@ export function setColumnWidth(sheet: Sheet, column: number, width: number): boo
   assertDimensionIndex(column, MAX_SHEET_COLUMNS, "Column");
   assertDimensionSize(width, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH, "Column width");
   return setDimension(sheet.columnWidths, column, width, DEFAULT_COLUMN_WIDTH);
+}
+
+function compareCellAddresses(left: CellAddress, right: CellAddress): number {
+  return left.row - right.row || left.column - right.column;
+}
+
+function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
+  const cellKeys = new Set<string>();
+  const rowIndexes = new Set<number>();
+  const columnIndexes = new Set<number>();
+
+  const cells = state.cells.map((cell) => {
+    if (!isCellAddressInBounds(cell.address)) {
+      throw new RangeError(
+        `Cell address ${cell.address.row}:${cell.address.column} is outside the sheet.`,
+      );
+    }
+    assertStoredCellValue(cell.value);
+    const address = { ...cell.address };
+    const key = createCellKey(address);
+    if (cellKeys.has(key)) {
+      throw new Error(`Sparse state contains duplicate cell ${key}.`);
+    }
+    cellKeys.add(key);
+    return { address, value: cell.value };
+  });
+
+  const rowHeights = state.rowHeights.map((dimension) => {
+    assertDimensionIndex(dimension.index, MAX_SHEET_ROWS, "Row");
+    assertDimensionSize(dimension.size, MIN_ROW_HEIGHT, MAX_ROW_HEIGHT, "Row height");
+    if (dimension.size === DEFAULT_ROW_HEIGHT) {
+      throw new Error("Sparse state cannot store a default row height.");
+    }
+    if (rowIndexes.has(dimension.index)) {
+      throw new Error(`Sparse state contains duplicate row dimension ${dimension.index}.`);
+    }
+    rowIndexes.add(dimension.index);
+    return { ...dimension };
+  });
+
+  const columnWidths = state.columnWidths.map((dimension) => {
+    assertDimensionIndex(dimension.index, MAX_SHEET_COLUMNS, "Column");
+    assertDimensionSize(dimension.size, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH, "Column width");
+    if (dimension.size === DEFAULT_COLUMN_WIDTH) {
+      throw new Error("Sparse state cannot store a default column width.");
+    }
+    if (columnIndexes.has(dimension.index)) {
+      throw new Error(`Sparse state contains duplicate column dimension ${dimension.index}.`);
+    }
+    columnIndexes.add(dimension.index);
+    return { ...dimension };
+  });
+
+  cells.sort((left, right) => compareCellAddresses(left.address, right.address));
+  rowHeights.sort((left, right) => left.index - right.index);
+  columnWidths.sort((left, right) => left.index - right.index);
+  return { cells, rowHeights, columnWidths };
+}
+
+function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseState): boolean {
+  if (
+    left.cells.length !== right.cells.length ||
+    left.rowHeights.length !== right.rowHeights.length ||
+    left.columnWidths.length !== right.columnWidths.length
+  ) {
+    return false;
+  }
+  return (
+    left.cells.every(
+      (cell, index) =>
+        cell.address.row === right.cells[index]?.address.row &&
+        cell.address.column === right.cells[index]?.address.column &&
+        Object.is(cell.value, right.cells[index]?.value),
+    ) &&
+    left.rowHeights.every(
+      (dimension, index) =>
+        dimension.index === right.rowHeights[index]?.index &&
+        dimension.size === right.rowHeights[index]?.size,
+    ) &&
+    left.columnWidths.every(
+      (dimension, index) =>
+        dimension.index === right.columnWidths[index]?.index &&
+        dimension.size === right.columnWidths[index]?.size,
+    )
+  );
+}
+
+export function createSheetSparseState(sheet: Sheet): SheetSparseState {
+  return normalizeSheetSparseState({
+    cells: [...sheet.cells].map(([key, cell]) => {
+      const separator = key.indexOf(":");
+      return {
+        address: {
+          row: Number(key.slice(0, separator)),
+          column: Number(key.slice(separator + 1)),
+        },
+        value: cell.value,
+      };
+    }),
+    rowHeights: [...sheet.rowHeights].map(([index, size]) => ({ index, size })),
+    columnWidths: [...sheet.columnWidths].map(([index, size]) => ({ index, size })),
+  });
+}
+
+export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): boolean {
+  const nextState = normalizeSheetSparseState(state);
+  const currentState = createSheetSparseState(sheet);
+  if (areSheetSparseStatesEqual(currentState, nextState)) {
+    return false;
+  }
+
+  sheet.cells.clear();
+  sheet.rowHeights.clear();
+  sheet.columnWidths.clear();
+  for (const cell of nextState.cells) {
+    sheet.cells.set(createCellKey(cell.address), { value: cell.value });
+  }
+  for (const dimension of nextState.rowHeights) {
+    sheet.rowHeights.set(dimension.index, dimension.size);
+  }
+  for (const dimension of nextState.columnWidths) {
+    sheet.columnWidths.set(dimension.index, dimension.size);
+  }
+  return true;
 }
 
 export function isCellAddressInBounds(address: CellAddress): boolean {
