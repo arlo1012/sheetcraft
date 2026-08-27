@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils";
 import { reactive } from "vue";
 import type { GridPastePayload } from "../../../../../modules/sheet-grid/useGridClipboard";
 import {
+  createClearCellRangeCommand,
   createPasteCellValuesCommand,
   createSetCellValueCommand,
 } from "../../../../../modules/workbook/commands";
@@ -13,7 +14,7 @@ import {
   type WorkbookSession,
 } from "../../../../../modules/workbook/history";
 import { parseCellInput } from "../../../../../modules/workbook/input";
-import { getActiveSheet } from "../../../../../modules/workbook/workbook";
+import { getActiveSheet, type CellRange } from "../../../../../modules/workbook/workbook";
 import SheetGrid from "../../../../../modules/sheet-grid/components/SheetGrid.vue";
 
 export type SheetGridFixtureOptions = {
@@ -37,6 +38,9 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
       columnExpansionStep: options?.columnExpansionStep ?? 10,
       rowExpansionTail: options?.rowExpansionTail ?? 5,
       columnExpansionTail: options?.columnExpansionTail ?? 2,
+      onClearCells(range: CellRange) {
+        executeWorkbookCommand(session, createClearCellRangeCommand(sheet.id, range));
+      },
       onCommitCell(payload) {
         executeWorkbookCommand(
           session,

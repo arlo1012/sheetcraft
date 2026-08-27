@@ -3,11 +3,12 @@
 Clean-slate frontend initialized with Vue 3, TypeScript, Vite, Bun, SCSS, and
 product-owned CSS tokens. The current milestone provides a focused spreadsheet
 editing foundation: a sparse workbook model, command-based undo and redo,
-virtualized fixed-size cells, pinned headers, single-cell selection, keyboard
-navigation, and in-cell editing with IME-safe composition.
+virtualized fixed-size cells, pinned headers, rectangular range selection,
+keyboard navigation, in-cell editing with IME-safe composition, atomic range
+clearing, and TSV clipboard workflows.
 
-Formulas, formatting, clipboard operations, multi-cell ranges, persistence, and
-Ribbon tools are intentionally outside the current milestone.
+Formulas, cell formatting, persistence, and Ribbon tools are intentionally
+outside the current milestone.
 
 ## Commands
 

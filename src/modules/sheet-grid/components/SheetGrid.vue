@@ -71,6 +71,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   commitCell: [payload: { address: CellAddress; input: string }];
+  clearCells: [range: CellRange];
   pasteCells: [payload: GridPastePayload];
   undo: [];
   redo: [];
@@ -590,6 +591,14 @@ function onEditorKeydown(event: KeyboardEvent): void {
       event.preventDefault();
       traverseSelection("Tab", event.shiftKey, true);
     }
+    return;
+  }
+
+  if (event.key === "Delete" || event.key === "Backspace") {
+    event.preventDefault();
+    clearPendingClipboard();
+    clipboardFeedback.value = "";
+    emit("clearCells", getSelectionRange(selection.value));
     return;
   }
 

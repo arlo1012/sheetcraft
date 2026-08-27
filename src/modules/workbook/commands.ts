@@ -22,7 +22,13 @@ export type SetCellValuesCommand = {
   changes: CellValueChange[];
 };
 
-export type WorkbookCommand = SetCellValuesCommand;
+export type ClearCellRangeCommand = {
+  type: "clearCellRange";
+  sheetId: string;
+  range: CellRange;
+};
+
+export type WorkbookCommand = SetCellValuesCommand | ClearCellRangeCommand;
 
 function assertCellAddress(address: CellAddress): void {
   if (!isCellAddressInBounds(address)) {
@@ -63,6 +69,25 @@ function normalizeRange(range: CellRange): CellRange {
       row: Math.max(range.start.row, range.end.row),
       column: Math.max(range.start.column, range.end.column),
     },
+  };
+}
+
+function assertCellRange(range: CellRange): void {
+  assertCellAddress(range.start);
+  assertCellAddress(range.end);
+}
+
+export function createClearCellRangeCommand(
+  sheetId: string,
+  range: CellRange,
+): ClearCellRangeCommand {
+  const normalizedRange = normalizeRange(range);
+  assertCellRange(normalizedRange);
+
+  return {
+    type: "clearCellRange",
+    sheetId,
+    range: normalizedRange,
   };
 }
 
@@ -116,9 +141,9 @@ export function createPasteCellValuesCommand(
   return createBatchSetCellValuesCommand([...changes.values()]);
 }
 
-export function applyWorkbookCommand(
+function applySetCellValuesCommand(
   workbook: Workbook,
-  command: WorkbookCommand,
+  command: SetCellValuesCommand,
 ): WorkbookCommand | null {
   const reverseChanges: CellValueChange[] = [];
 
@@ -148,4 +173,55 @@ export function applyWorkbookCommand(
   }
 
   return reverseChanges.length > 0 ? createBatchSetCellValuesCommand(reverseChanges) : null;
+}
+
+function parseCellKey(key: string): CellAddress {
+  const separator = key.indexOf(":");
+  return {
+    row: Number(key.slice(0, separator)),
+    column: Number(key.slice(separator + 1)),
+  };
+}
+
+function applyClearCellRangeCommand(
+  workbook: Workbook,
+  command: ClearCellRangeCommand,
+): WorkbookCommand | null {
+  const range = normalizeRange(command.range);
+  assertCellRange(range);
+  const sheet = workbook.sheets.get(command.sheetId);
+  if (!sheet) {
+    throw new Error(`Sheet ${command.sheetId} does not exist.`);
+  }
+
+  const reverseChanges: CellValueChange[] = [];
+  for (const [key, cell] of sheet.cells) {
+    const address = parseCellKey(key);
+    if (
+      address.row < range.start.row ||
+      address.row > range.end.row ||
+      address.column < range.start.column ||
+      address.column > range.end.column
+    ) {
+      continue;
+    }
+
+    reverseChanges.push({
+      sheetId: command.sheetId,
+      address,
+      value: cell.value,
+    });
+    setCellValue(sheet, address, null);
+  }
+
+  return reverseChanges.length > 0 ? createBatchSetCellValuesCommand(reverseChanges) : null;
+}
+
+export function applyWorkbookCommand(
+  workbook: Workbook,
+  command: WorkbookCommand,
+): WorkbookCommand | null {
+  return command.type === "clearCellRange"
+    ? applyClearCellRangeCommand(workbook, command)
+    : applySetCellValuesCommand(workbook, command);
 }

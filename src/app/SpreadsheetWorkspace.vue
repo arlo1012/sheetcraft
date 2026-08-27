@@ -3,6 +3,7 @@ import { computed, reactive } from "vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
 import type { GridPastePayload } from "../modules/sheet-grid/useGridClipboard";
 import {
+  createClearCellRangeCommand,
   createPasteCellValuesCommand,
   createSetCellValueCommand,
 } from "../modules/workbook/commands";
@@ -14,7 +15,7 @@ import {
   type WorkbookSession,
 } from "../modules/workbook/history";
 import { parseCellInput } from "../modules/workbook/input";
-import { getActiveSheet, type CellAddress } from "../modules/workbook/workbook";
+import { getActiveSheet, type CellAddress, type CellRange } from "../modules/workbook/workbook";
 
 const session = reactive(createWorkbookSession()) as WorkbookSession;
 const activeSheet = computed(() => getActiveSheet(session.workbook));
@@ -36,6 +37,14 @@ function pasteCells(payload: GridPastePayload): void {
     payload.clearRange ? "Move cells" : "Paste cells",
   );
 }
+
+function clearCells(range: CellRange): void {
+  executeWorkbookCommand(
+    session,
+    createClearCellRangeCommand(activeSheet.value.id, range),
+    "Clear cells",
+  );
+}
 </script>
 
 <template>
@@ -43,6 +52,7 @@ function pasteCells(payload: GridPastePayload): void {
     <div class="spreadsheet-workspace__grid">
       <SheetGrid
         :sheet="activeSheet"
+        @clear-cells="clearCells"
         @commit-cell="commitCell"
         @paste-cells="pasteCells"
         @undo="undoWorkbookCommand(session)"
