@@ -333,16 +333,17 @@
     var(--td-font-family);
   --td-font-title-large: 600 var(--td-font-size-title-large) / var(--td-line-height-title-large)
     var(--td-font-family);
-  --td-font-headline-small: 600 var(--td-font-size-headline-small) /
-    var(--td-line-height-headline-small) var(--td-font-family);
-  --td-font-headline-medium: 600 var(--td-font-size-headline-medium) /
-    var(--td-line-height-headline-medium) var(--td-font-family);
-  --td-font-headline-large: 600 var(--td-font-size-headline-large) /
-    var(--td-line-height-headline-large) var(--td-font-family);
-  --td-font-display-medium: 600 var(--td-font-size-display-medium) /
-    var(--td-line-height-display-medium) var(--td-font-family);
-  --td-font-display-large: 600 var(--td-font-size-display-large) /
-    var(--td-line-height-display-large) var(--td-font-family);
+  --td-font-headline-small: 600
+    var(--td-font-size-headline-small) / var(--td-line-height-headline-small) var(--td-font-family);
+  --td-font-headline-medium: 600
+    var(--td-font-size-headline-medium) / var(--td-line-height-headline-medium)
+    var(--td-font-family);
+  --td-font-headline-large: 600
+    var(--td-font-size-headline-large) / var(--td-line-height-headline-large) var(--td-font-family);
+  --td-font-display-medium: 600
+    var(--td-font-size-display-medium) / var(--td-line-height-display-medium) var(--td-font-family);
+  --td-font-display-large: 600
+    var(--td-font-size-display-large) / var(--td-line-height-display-large) var(--td-font-family);
   --td-radius-small: 2px;
   --td-radius-default: 4px;
   --td-radius-medium: 6px;
