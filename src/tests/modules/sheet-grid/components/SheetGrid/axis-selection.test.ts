@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { getCellValue, getRowHeight, setCellValue } from "../../../../../modules/workbook/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
-import { activeCell, mountSheetGrid } from "./fixture";
+import { activeCell, getFloatingDialog, hasFloatingDialog, mountSheetGrid } from "./fixture";
 
 describe("SheetGrid axis selection", () => {
   test("selects rows and columns from headers, with Shift extending the same axis", async () => {
@@ -194,7 +194,7 @@ describe("SheetGrid axis selection", () => {
       clientX: 16,
       clientY: 72,
     });
-    const dialog = wrapper.get('[role="dialog"]');
+    const dialog = getFloatingDialog();
     expect(dialog.text()).toContain("Insert 1 row below");
     await dialog.get('input[type="number"]').setValue(2);
     await dialog.findAll("button")[1]?.trigger("click");
@@ -218,9 +218,8 @@ describe("SheetGrid axis selection", () => {
       clientX: 16,
       clientY: 96,
     });
-    expect(wrapper.get('[role="dialog"]').text()).toContain("Delete 2 rows");
-    await wrapper
-      .get('[role="dialog"]')
+    expect(getFloatingDialog().text()).toContain("Delete 2 rows");
+    await getFloatingDialog()
       .findAll("button")
       .find((button) => button.text().includes("Delete 2 rows"))
       ?.trigger("click");
@@ -238,7 +237,7 @@ describe("SheetGrid axis selection", () => {
       clientX: 240,
       clientY: 16,
     });
-    const dialog = wrapper.get('[role="dialog"]');
+    const dialog = getFloatingDialog();
     expect(dialog.text()).toContain("Insert 1 column after");
     await dialog.get('input[type="number"]').setValue(2);
     await dialog.findAll("button")[1]?.trigger("click");
@@ -259,8 +258,7 @@ describe("SheetGrid axis selection", () => {
       clientX: 336,
       clientY: 16,
     });
-    await wrapper
-      .get('[role="dialog"]')
+    await getFloatingDialog()
       .findAll("button")
       .find((button) => button.text().includes("Delete 2 columns"))
       ?.trigger("click");
@@ -276,7 +274,7 @@ describe("SheetGrid axis selection", () => {
 
     (rowHeader.element as HTMLButtonElement).focus();
     await rowHeader.trigger("keydown", { key: "F10", shiftKey: true });
-    const dialog = wrapper.get('[role="dialog"]');
+    const dialog = getFloatingDialog();
     expect(dialog.attributes("aria-label")).toBe("Row actions");
     const sizeInput = dialog.findAll('input[type="number"]')[1];
     await sizeInput?.setValue(40);
@@ -288,8 +286,7 @@ describe("SheetGrid axis selection", () => {
       clientX: 16,
       clientY: 72,
     });
-    await wrapper
-      .get('[role="dialog"]')
+    await getFloatingDialog()
       .findAll("button")
       .find((button) => button.text().includes("Clear row contents"))
       ?.trigger("click");
@@ -306,12 +303,12 @@ describe("SheetGrid axis selection", () => {
 
       (rowHeader.element as HTMLButtonElement).focus();
       await rowHeader.trigger("keydown", { key: "F10", shiftKey: true });
-      const dialog = wrapper.get('[role="dialog"]');
+      const dialog = getFloatingDialog();
       expect(dialog.element.contains(document.activeElement)).toBe(true);
 
       await dialog.trigger("keydown", { key: "Escape" });
 
-      expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+      expect(hasFloatingDialog()).toBe(false);
       expect(document.activeElement).toBe(rowHeader.element);
     } finally {
       wrapper.unmount();

@@ -67,6 +67,9 @@ export const enUS = {
     alignCenter: "Align center",
     alignRight: "Align right",
     mixed: "Mixed",
+    resetColor: "Reset",
+    cancelColor: "Cancel",
+    applyColor: "Apply",
     selectionTooLarge: "This selection is too large to format in one action.",
   },
   clipboard: {

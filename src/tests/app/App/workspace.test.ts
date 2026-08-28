@@ -1,15 +1,25 @@
-import { mount } from "@vue/test-utils";
-import { describe, expect, test } from "vitest";
+import { DOMWrapper, mount } from "@vue/test-utils";
+import { afterEach, describe, expect, test } from "vitest";
 import App from "../../../app/App.vue";
 import { createAppI18n, type AppLocale } from "../../../shared/i18n";
 
 function mountApp(locale: AppLocale = "en-US") {
-  return mount(App, {
+  const wrapper = mount(App, {
     global: {
       plugins: [createAppI18n(locale)],
     },
   });
+  mountedWrappers.push(wrapper);
+  return wrapper;
 }
+
+const mountedWrappers: Array<{ unmount(): void }> = [];
+
+afterEach(() => {
+  for (const wrapper of mountedWrappers.splice(0)) {
+    wrapper.unmount();
+  }
+});
 
 describe("App", () => {
   test("mounts the spreadsheet workspace", () => {
@@ -165,8 +175,9 @@ describe("App", () => {
       clientX: 16,
       clientY: 72,
     });
-    expect(wrapper.get('[role="dialog"]').attributes("aria-label")).toBe("行操作");
-    expect(wrapper.get('[role="dialog"]').text()).toContain("向下插入 1 行");
+    const dialog = new DOMWrapper(document.body).get('[role="dialog"]');
+    expect(dialog.attributes("aria-label")).toBe("行操作");
+    expect(dialog.text()).toContain("向下插入 1 行");
     expect(document.documentElement.lang).toBe("zh-CN");
     expect(localStorage.getItem("idea10.locale")).toBe("zh-CN");
   });

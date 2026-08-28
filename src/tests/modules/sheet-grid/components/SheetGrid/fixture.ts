@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { DOMWrapper, mount } from "@vue/test-utils";
 import { reactive } from "vue";
 import type { GridPastePayload } from "../../../../../modules/sheet-grid/useGridClipboard";
 import {
@@ -97,6 +97,14 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
   });
 
   return { session, sheet, wrapper };
+}
+
+export function getFloatingDialog() {
+  return new DOMWrapper(document.body).get('[role="dialog"]');
+}
+
+export function hasFloatingDialog(): boolean {
+  return document.body.querySelector('[role="dialog"]') !== null;
 }
 
 export function activeCell(

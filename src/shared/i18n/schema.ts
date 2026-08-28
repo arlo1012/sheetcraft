@@ -67,6 +67,9 @@ export type MessageSchema = {
     alignCenter: string;
     alignRight: string;
     mixed: string;
+    resetColor: string;
+    cancelColor: string;
+    applyColor: string;
     selectionTooLarge: string;
   };
   clipboard: {

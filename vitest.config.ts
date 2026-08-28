@@ -6,5 +6,10 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     include: ["src/**/*.test.ts"],
+    server: {
+      deps: {
+        inline: ["tdesign-vue-next"],
+      },
+    },
   },
 });

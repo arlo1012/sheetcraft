@@ -1,5 +1,5 @@
-import { mount } from "@vue/test-utils";
-import { describe, expect, test } from "vitest";
+import { DOMWrapper, mount } from "@vue/test-utils";
+import { afterEach, describe, expect, test } from "vitest";
 import HomeFormatToolbar from "../../../../../modules/home-tools/components/HomeFormatToolbar.vue";
 import type { SelectionCellStyleState } from "../../../../../modules/workbook/style-state";
 import { createAppI18n } from "../../../../../shared/i18n";
@@ -21,11 +21,49 @@ function createStyleState(
 }
 
 function mountToolbar(state = createStyleState(), disabled = false) {
-  return mount(HomeFormatToolbar, {
-    global: { plugins: [createAppI18n("en-US")] },
+  const host = document.createElement("div");
+  document.body.append(host);
+  const wrapper = mount(HomeFormatToolbar, {
+    attachTo: host,
+    global: {
+      plugins: [createAppI18n("en-US")],
+      stubs: {
+        TConfigProvider: {
+          props: ["globalConfig"],
+          template: "<div><slot /></div>",
+        },
+        TColorPickerPanel: {
+          emits: ["change"],
+          template: `
+            <div data-color-picker-panel>
+              <button data-color="#123456" @click="$emit('change', '#123456')">#123456</button>
+              <button data-color="#abcdef" @click="$emit('change', '#abcdef')">#abcdef</button>
+            </div>
+          `,
+        },
+      },
+    },
     props: { state, disabled },
   });
+  mountedWrappers.push({ host, wrapper });
+  return wrapper;
 }
+
+const mountedWrappers: Array<{
+  host: HTMLElement;
+  wrapper: { unmount(): void };
+}> = [];
+
+function getTeleportedDialog() {
+  return new DOMWrapper(document.body).get('[role="dialog"]');
+}
+
+afterEach(() => {
+  for (const { host, wrapper } of mountedWrappers.splice(0)) {
+    wrapper.unmount();
+    host.remove();
+  }
+});
 
 function emittedPatches(wrapper: ReturnType<typeof mountToolbar>) {
   return (wrapper.emitted("applyStyle") ?? []).map((event) => event[0]);
@@ -46,25 +84,39 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper)).toEqual([{ bold: null }, { italic: true }]);
   });
 
-  test("emits validated font, color, and alignment patches", async () => {
+  test("emits validated font and alignment patches", async () => {
     const wrapper = mountToolbar();
 
     await wrapper.get('[aria-label="Font family"]').setValue("Arial");
     await wrapper.get('[aria-label="Font size"]').setValue("18");
-    await wrapper.get('[aria-label="Text color"]').setValue("#123456");
-    await wrapper.get('[aria-label="Fill color"]').setValue("#abcdef");
     await wrapper.get('[aria-label="Align center"]').trigger("click");
 
     expect(emittedPatches(wrapper)).toEqual([
       { fontFamily: "Arial" },
       { fontSize: 18 },
-      { textColor: "#123456" },
-      { fillColor: "#abcdef" },
       { horizontalAlign: "center" },
     ]);
 
     await wrapper.get('[aria-label="Font size"]').setValue("90");
-    expect(emittedPatches(wrapper)).toHaveLength(5);
+    expect(emittedPatches(wrapper)).toHaveLength(3);
+  });
+
+  test("applies each drafted color as one formatting patch", async () => {
+    const wrapper = mountToolbar();
+    const textColor = wrapper.get('[aria-label="Text color"]');
+
+    expect(textColor.attributes("aria-expanded")).toBe("false");
+    await textColor.trigger("click");
+    expect(textColor.attributes("aria-expanded")).toBe("true");
+    await new DOMWrapper(document.body).get('[data-color="#123456"]').trigger("click");
+    expect(emittedPatches(wrapper)).toEqual([]);
+    await getTeleportedDialog().get("button.is-primary").trigger("click");
+
+    await wrapper.get('[aria-label="Fill color"]').trigger("click");
+    await new DOMWrapper(document.body).get('[data-color="#abcdef"]').trigger("click");
+    await getTeleportedDialog().get("button.is-primary").trigger("click");
+
+    expect(emittedPatches(wrapper)).toEqual([{ textColor: "#123456" }, { fillColor: "#abcdef" }]);
   });
 
   test("shows mixed values and disables every control for unsupported selections", () => {
@@ -80,7 +132,7 @@ describe("HomeFormatToolbar", () => {
     expect(wrapper.get('[aria-label="Font family"]').element).toHaveProperty("value", "");
     expect(wrapper.get('[aria-label="Font size"]').element).toHaveProperty("value", "");
     expect(wrapper.get('[aria-label="Text color, mixed"]').element).toBeInstanceOf(
-      HTMLInputElement,
+      HTMLButtonElement,
     );
     const toolbar = wrapper.get(".home-format-toolbar");
     expect(toolbar.attributes("role")).toBe("group");
@@ -100,10 +152,10 @@ describe("HomeFormatToolbar", () => {
     );
 
     expect(wrapper.get('[aria-label="Text color, mixed"]').element).toBeInstanceOf(
-      HTMLInputElement,
+      HTMLButtonElement,
     );
     expect(wrapper.get('[aria-label="Fill color, mixed"]').element).toBeInstanceOf(
-      HTMLInputElement,
+      HTMLButtonElement,
     );
     expect(wrapper.get('[aria-label="Horizontal alignment, mixed"]').attributes("role")).toBe(
       "group",
@@ -132,5 +184,17 @@ describe("HomeFormatToolbar", () => {
 
     expect(wrapper.emitted("undo")).toBeUndefined();
     expect(wrapper.emitted("redo")).toBeUndefined();
+  });
+
+  test("cancels a drafted color with Escape and restores trigger focus", async () => {
+    const wrapper = mountToolbar();
+    const trigger = wrapper.get('[aria-label="Text color"]');
+    await trigger.trigger("click");
+    await new DOMWrapper(document.body).get('[data-color="#123456"]').trigger("click");
+    await getTeleportedDialog().trigger("keydown", { key: "Escape" });
+
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger.element);
+    expect(emittedPatches(wrapper)).toEqual([]);
   });
 });

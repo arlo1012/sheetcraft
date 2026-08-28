@@ -4,6 +4,7 @@ import {
   nextTick,
   onBeforeUnmount,
   onMounted,
+  markRaw,
   reactive,
   ref,
   watch,
@@ -11,6 +12,7 @@ import {
 } from "vue";
 import { formatCellValueForDisplay, formatCellValueForInput } from "../../workbook/input";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
+import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import {
   MAX_COLUMN_WIDTH,
   MAX_ROW_HEIGHT,
@@ -70,7 +72,7 @@ type AxisContextMenuState = {
   axis: SheetDimensionAxis;
   index: number;
   count: number;
-  position: Point;
+  anchor: FloatingReference;
   trigger: HTMLButtonElement;
 };
 
@@ -123,8 +125,6 @@ const emit = defineEmits<{
 const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 28;
 const DEFAULT_VIEWPORT_SIZE: Size = { width: 960, height: 600 };
-const AXIS_MENU_WIDTH = 272;
-const AXIS_MENU_HEIGHT = 220;
 
 const { t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
@@ -781,19 +781,14 @@ function openAxisContextMenu(
   const range = selectedRange.value;
   const start = axis === "row" ? range.start.row : range.start.column;
   const end = axis === "row" ? range.end.row : range.end.column;
-  const bounds = rootRef.value?.getBoundingClientRect();
-  const localX = clientX - (bounds?.left ?? 0);
-  const localY = clientY - (bounds?.top ?? 0);
-  const width = bounds?.width || viewportSize.width + ROW_HEADER_WIDTH;
-  const height = bounds?.height || viewportSize.height + COLUMN_HEADER_HEIGHT;
   axisContextMenu.value = {
     axis,
     index: start,
     count: end - start + 1,
-    position: {
-      x: Math.max(0, Math.min(localX, width - AXIS_MENU_WIDTH)),
-      y: Math.max(0, Math.min(localY, height - AXIS_MENU_HEIGHT)),
-    },
+    anchor: markRaw({
+      contextElement: rootRef.value ?? trigger,
+      getBoundingClientRect: () => new DOMRect(clientX, clientY, 0, 0),
+    }),
     trigger,
   };
 }
@@ -1082,6 +1077,7 @@ function onEditorBlur(): void {
 
 function onScroll(event: Event): void {
   const scroller = event.currentTarget as HTMLDivElement;
+  axisContextMenu.value = undefined;
   scrollPosition.x = scroller.scrollLeft;
   scrollPosition.y = scroller.scrollTop;
   ensureGridExtentCoversViewport();
@@ -1269,7 +1265,7 @@ defineExpose({ navigateToCell });
       "
       :minimum-size="axisContextMenu.axis === 'row' ? MIN_ROW_HEIGHT : MIN_COLUMN_WIDTH"
       :maximum-size="axisContextMenu.axis === 'row' ? MAX_ROW_HEIGHT : MAX_COLUMN_WIDTH"
-      :position="axisContextMenu.position"
+      :anchor="axisContextMenu.anchor"
       @insert="requestAxisInsert"
       @resize="requestAxisResize"
       @delete="requestAxisDelete"

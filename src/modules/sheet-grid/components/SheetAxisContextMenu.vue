@@ -8,15 +8,11 @@ import {
   Scaling,
   Trash2,
 } from "lucide-vue-next";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-  type CSSProperties,
-} from "vue";
+  useFloatingPanel,
+  type FloatingReference,
+} from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import type { SheetDimensionAxis } from "../../workbook/workbook";
 
@@ -28,7 +24,7 @@ const props = defineProps<{
   currentSize?: number;
   minimumSize: number;
   maximumSize: number;
-  position: { x: number; y: number };
+  anchor: FloatingReference;
 }>();
 
 const emit = defineEmits<{
@@ -40,13 +36,14 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const menuRef = ref<HTMLDivElement>();
+const menuRef = ref<HTMLDivElement | null>(null);
 const countDraft = ref(props.selectionCount);
 const sizeDraft = ref(props.currentSize);
-const menuStyle = computed<CSSProperties>(() => ({
-  left: `${props.position.x}px`,
-  top: `${props.position.y}px`,
-}));
+const menuOpen = computed(() => true);
+const menuAnchor = computed(() => props.anchor);
+const { floatingStyles: menuStyle } = useFloatingPanel(menuAnchor, menuRef, menuOpen, {
+  offset: 4,
+});
 const maximumInsertCount = computed(() => Math.max(props.maxBeforeCount, props.maxAfterCount));
 const insertCount = computed(() =>
   normalizeInteger(countDraft.value, 1, Math.max(1, maximumInsertCount.value)),
@@ -191,72 +188,77 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    ref="menuRef"
-    class="sheet-axis-context-menu"
-    :style="menuStyle"
-    role="dialog"
-    aria-modal="false"
-    :aria-label="t(axis === 'row' ? 'axisMenu.rowActions' : 'axisMenu.columnActions')"
-    @contextmenu.prevent
-    @keydown="onPopoverKeydown"
-  >
-    <label class="sheet-axis-context-menu__count-row">
-      <span>{{ t("axisMenu.insertCount") }}</span>
-      <input
-        v-model.number="countDraft"
-        type="number"
-        min="1"
-        :max="Math.max(1, maximumInsertCount)"
-        @change="normalizeInsertCount"
-      />
-      <span>{{ axisUnit }}</span>
-    </label>
-    <button type="button" :disabled="insertCount > maxBeforeCount" @click="requestInsert('before')">
-      <ArrowUp v-if="axis === 'row'" :size="15" aria-hidden="true" />
-      <ArrowLeft v-else :size="15" aria-hidden="true" />
-      <span>{{ getInsertLabel("before") }}</span>
-    </button>
-    <button type="button" :disabled="insertCount > maxAfterCount" @click="requestInsert('after')">
-      <ArrowDown v-if="axis === 'row'" :size="15" aria-hidden="true" />
-      <ArrowRight v-else :size="15" aria-hidden="true" />
-      <span>{{ getInsertLabel("after") }}</span>
-    </button>
+  <Teleport to="body">
+    <div
+      ref="menuRef"
+      class="sheet-axis-context-menu"
+      :style="menuStyle"
+      role="dialog"
+      aria-modal="false"
+      :aria-label="t(axis === 'row' ? 'axisMenu.rowActions' : 'axisMenu.columnActions')"
+      @contextmenu.prevent
+      @keydown="onPopoverKeydown"
+    >
+      <label class="sheet-axis-context-menu__count-row">
+        <span>{{ t("axisMenu.insertCount") }}</span>
+        <input
+          v-model.number="countDraft"
+          type="number"
+          min="1"
+          :max="Math.max(1, maximumInsertCount)"
+          @change="normalizeInsertCount"
+        />
+        <span>{{ axisUnit }}</span>
+      </label>
+      <button
+        type="button"
+        :disabled="insertCount > maxBeforeCount"
+        @click="requestInsert('before')"
+      >
+        <ArrowUp v-if="axis === 'row'" :size="15" aria-hidden="true" />
+        <ArrowLeft v-else :size="15" aria-hidden="true" />
+        <span>{{ getInsertLabel("before") }}</span>
+      </button>
+      <button type="button" :disabled="insertCount > maxAfterCount" @click="requestInsert('after')">
+        <ArrowDown v-if="axis === 'row'" :size="15" aria-hidden="true" />
+        <ArrowRight v-else :size="15" aria-hidden="true" />
+        <span>{{ getInsertLabel("after") }}</span>
+      </button>
 
-    <label v-if="currentSize !== undefined" class="sheet-axis-context-menu__size-row">
-      <Scaling :size="15" aria-hidden="true" />
-      <span>{{ t(axis === "row" ? "axisMenu.rowHeight" : "axisMenu.columnWidth") }}</span>
-      <input
-        v-model.number="sizeDraft"
-        type="number"
-        :min="minimumSize"
-        :max="maximumSize"
-        @change="requestResize"
-        @keydown.enter.prevent="requestResize"
-      />
-      <span>{{ t("axisMenu.pixels") }}</span>
-    </label>
+      <label v-if="currentSize !== undefined" class="sheet-axis-context-menu__size-row">
+        <Scaling :size="15" aria-hidden="true" />
+        <span>{{ t(axis === "row" ? "axisMenu.rowHeight" : "axisMenu.columnWidth") }}</span>
+        <input
+          v-model.number="sizeDraft"
+          type="number"
+          :min="minimumSize"
+          :max="maximumSize"
+          @change="requestResize"
+          @keydown.enter.prevent="requestResize"
+        />
+        <span>{{ t("axisMenu.pixels") }}</span>
+      </label>
 
-    <div class="sheet-axis-context-menu__separator" role="separator" />
-    <button type="button" @click="emit('delete')">
-      <Trash2 :size="15" aria-hidden="true" />
-      <span>{{ getSelectionActionLabel("delete") }}</span>
-    </button>
-    <button type="button" @click="emit('clear')">
-      <Eraser :size="15" aria-hidden="true" />
-      <span>{{ getSelectionActionLabel("clear") }}</span>
-    </button>
-  </div>
+      <div class="sheet-axis-context-menu__separator" role="separator" />
+      <button type="button" @click="emit('delete')">
+        <Trash2 :size="15" aria-hidden="true" />
+        <span>{{ getSelectionActionLabel("delete") }}</span>
+      </button>
+      <button type="button" @click="emit('clear')">
+        <Eraser :size="15" aria-hidden="true" />
+        <span>{{ getSelectionActionLabel("clear") }}</span>
+      </button>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped lang="scss">
 .sheet-axis-context-menu {
-  position: absolute;
-  z-index: 20;
+  z-index: 100;
   display: grid;
   width: 272px;
-  max-width: calc(100% - 8px);
-  max-height: calc(100% - 8px);
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
   padding: 4px;
   overflow-y: auto;
   overscroll-behavior: contain;

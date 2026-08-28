@@ -67,6 +67,9 @@ export const zhCN = {
     alignCenter: "居中对齐",
     alignRight: "右对齐",
     mixed: "混合",
+    resetColor: "重置",
+    cancelColor: "取消",
+    applyColor: "应用",
     selectionTooLarge: "所选区域过大，无法一次设置格式。",
   },
   clipboard: {
