@@ -75,6 +75,7 @@ function pasteCells(payload: GridPastePayload): void {
     session,
     createPasteCellValuesCommand(activeSheet.value.id, payload.plan.anchor, payload.plan.values, {
       clearRange: payload.clearRange,
+      styles: payload.styles,
     }),
     payload.clearRange ? "Move cells" : "Paste cells",
   );

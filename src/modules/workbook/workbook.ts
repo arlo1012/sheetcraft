@@ -22,7 +22,8 @@ export type CellRange = {
 export type SheetDimensionAxis = "row" | "column";
 
 export type Cell = {
-  value: Exclude<CellValue, null>;
+  value?: Exclude<CellValue, null>;
+  style?: CellStyle;
 };
 
 export type Sheet = {
@@ -35,7 +36,8 @@ export type Sheet = {
 
 export type SheetSparseCell = {
   address: CellAddress;
-  value: Exclude<CellValue, null>;
+  value?: Exclude<CellValue, null>;
+  style?: CellStyle;
 };
 
 export type SheetSparseDimension = {
@@ -227,6 +229,10 @@ export function getCellValue(sheet: Sheet, address: CellAddress): CellValue {
   return getCell(sheet, address)?.value ?? null;
 }
 
+export function getCellStyle(sheet: Sheet, address: CellAddress): Readonly<CellStyle> | undefined {
+  return getCell(sheet, address)?.style;
+}
+
 export function setCellValue(sheet: Sheet, address: CellAddress, value: CellValue): boolean {
   const normalizedValue = value === "" ? null : value;
   const previousValue = getCellValue(sheet, address);
@@ -236,12 +242,39 @@ export function setCellValue(sheet: Sheet, address: CellAddress, value: CellValu
   }
 
   const key = createCellKey(address);
+  const cell = sheet.cells.get(key);
   if (normalizedValue === null) {
-    sheet.cells.delete(key);
+    if (cell?.style) {
+      sheet.cells.set(key, { style: cell.style });
+    } else {
+      sheet.cells.delete(key);
+    }
   } else {
-    sheet.cells.set(key, { value: normalizedValue });
+    sheet.cells.set(key, { value: normalizedValue, style: cell?.style });
   }
 
+  return true;
+}
+
+export function setCellStyle(
+  sheet: Sheet,
+  address: CellAddress,
+  style: CellStyle | null | undefined,
+): boolean {
+  const normalizedStyle = normalizeCellStyle(style);
+  const key = createCellKey(address);
+  const cell = sheet.cells.get(key);
+  if (areCellStylesEqual(cell?.style, normalizedStyle)) {
+    return false;
+  }
+
+  if (cell?.value !== undefined) {
+    sheet.cells.set(key, { value: cell.value, style: normalizedStyle });
+  } else if (normalizedStyle) {
+    sheet.cells.set(key, { style: normalizedStyle });
+  } else {
+    sheet.cells.delete(key);
+  }
   return true;
 }
 
@@ -323,14 +356,24 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
         `Cell address ${cell.address.row}:${cell.address.column} is outside the sheet.`,
       );
     }
-    assertStoredCellValue(cell.value);
+    if (cell.value !== undefined) {
+      assertStoredCellValue(cell.value);
+    }
+    const style = normalizeCellStyle(cell.style);
+    if (cell.value === undefined && !style) {
+      throw new Error("Sparse state cells must contain a value or style.");
+    }
     const address = { ...cell.address };
     const key = createCellKey(address);
     if (cellKeys.has(key)) {
       throw new Error(`Sparse state contains duplicate cell ${key}.`);
     }
     cellKeys.add(key);
-    return { address, value: cell.value };
+    return {
+      address,
+      ...(cell.value === undefined ? {} : { value: cell.value }),
+      ...(style ? { style } : {}),
+    };
   });
 
   const rowHeights = state.rowHeights.map((dimension) => {
@@ -378,7 +421,8 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
       (cell, index) =>
         cell.address.row === right.cells[index]?.address.row &&
         cell.address.column === right.cells[index]?.address.column &&
-        Object.is(cell.value, right.cells[index]?.value),
+        Object.is(cell.value, right.cells[index]?.value) &&
+        areCellStylesEqual(cell.style, right.cells[index]?.style),
     ) &&
     left.rowHeights.every(
       (dimension, index) =>
@@ -402,7 +446,8 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
           row: Number(key.slice(0, separator)),
           column: Number(key.slice(separator + 1)),
         },
-        value: cell.value,
+        ...(cell.value === undefined ? {} : { value: cell.value }),
+        ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
       };
     }),
     rowHeights: [...sheet.rowHeights].map(([index, size]) => ({ index, size })),
@@ -421,7 +466,10 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   sheet.rowHeights.clear();
   sheet.columnWidths.clear();
   for (const cell of nextState.cells) {
-    sheet.cells.set(createCellKey(cell.address), { value: cell.value });
+    sheet.cells.set(createCellKey(cell.address), {
+      ...(cell.value === undefined ? {} : { value: cell.value }),
+      ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
+    });
   }
   for (const dimension of nextState.rowHeights) {
     sheet.rowHeights.set(dimension.index, dimension.size);
@@ -442,3 +490,9 @@ export function isCellAddressInBounds(address: CellAddress): boolean {
     address.column < MAX_SHEET_COLUMNS
   );
 }
+import {
+  areCellStylesEqual,
+  cloneCellStyle,
+  normalizeCellStyle,
+  type CellStyle,
+} from "./cell-style";

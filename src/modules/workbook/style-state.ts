@@ -1,0 +1,143 @@
+import {
+  MAX_CELL_STYLE_PATCH_CELLS,
+  type CellStyle,
+  type HorizontalCellAlignment,
+} from "./cell-style";
+import type { CellRange, Sheet } from "./workbook";
+
+export type ToggleStyleState = "on" | "off" | "mixed";
+
+export type StyleValueState<Value> = {
+  value: Value | undefined;
+  mixed: boolean;
+};
+
+export type SelectionCellStyleState = {
+  fontFamily: StyleValueState<string>;
+  fontSize: StyleValueState<number>;
+  bold: ToggleStyleState;
+  italic: ToggleStyleState;
+  underline: ToggleStyleState;
+  textColor: StyleValueState<string>;
+  fillColor: StyleValueState<string>;
+  horizontalAlign: StyleValueState<HorizontalCellAlignment>;
+};
+
+type ValueAccumulator<Value> = {
+  initialized: boolean;
+  value: Value | undefined;
+  mixed: boolean;
+};
+
+function normalizeRange(range: CellRange): CellRange {
+  return {
+    start: {
+      row: Math.min(range.start.row, range.end.row),
+      column: Math.min(range.start.column, range.end.column),
+    },
+    end: {
+      row: Math.max(range.start.row, range.end.row),
+      column: Math.max(range.start.column, range.end.column),
+    },
+  };
+}
+
+function addValue<Value>(accumulator: ValueAccumulator<Value>, value: Value | undefined): void {
+  if (!accumulator.initialized) {
+    accumulator.initialized = true;
+    accumulator.value = value;
+  } else if (!Object.is(accumulator.value, value)) {
+    accumulator.mixed = true;
+  }
+}
+
+function createAccumulator<Value>(): ValueAccumulator<Value> {
+  return { initialized: false, value: undefined, mixed: false };
+}
+
+function toValueState<Value>(accumulator: ValueAccumulator<Value>): StyleValueState<Value> {
+  return { value: accumulator.value, mixed: accumulator.mixed };
+}
+
+function toToggleState(accumulator: ValueAccumulator<true>): ToggleStyleState {
+  if (accumulator.mixed) {
+    return "mixed";
+  }
+  return accumulator.value ? "on" : "off";
+}
+
+function parseCellKey(key: string): { row: number; column: number } {
+  const separator = key.indexOf(":");
+  return {
+    row: Number(key.slice(0, separator)),
+    column: Number(key.slice(separator + 1)),
+  };
+}
+
+export function getCellRangeSize(range: CellRange): number {
+  const normalized = normalizeRange(range);
+  return (
+    (normalized.end.row - normalized.start.row + 1) *
+    (normalized.end.column - normalized.start.column + 1)
+  );
+}
+
+export function isCellStyleRangeSupported(range: CellRange): boolean {
+  return getCellRangeSize(range) <= MAX_CELL_STYLE_PATCH_CELLS;
+}
+
+export function getSelectionCellStyleState(
+  sheet: Sheet,
+  range: CellRange,
+): SelectionCellStyleState {
+  const normalized = normalizeRange(range);
+  const fontFamily = createAccumulator<string>();
+  const fontSize = createAccumulator<number>();
+  const bold = createAccumulator<true>();
+  const italic = createAccumulator<true>();
+  const underline = createAccumulator<true>();
+  const textColor = createAccumulator<string>();
+  const fillColor = createAccumulator<string>();
+  const horizontalAlign = createAccumulator<HorizontalCellAlignment>();
+  let materializedCellCount = 0;
+
+  const addStyle = (style: CellStyle | undefined) => {
+    addValue(fontFamily, style?.fontFamily);
+    addValue(fontSize, style?.fontSize);
+    addValue(bold, style?.bold);
+    addValue(italic, style?.italic);
+    addValue(underline, style?.underline);
+    addValue(textColor, style?.textColor);
+    addValue(fillColor, style?.fillColor);
+    addValue(horizontalAlign, style?.horizontalAlign);
+  };
+
+  for (const [key, cell] of sheet.cells) {
+    const address = parseCellKey(key);
+    if (
+      address.row < normalized.start.row ||
+      address.row > normalized.end.row ||
+      address.column < normalized.start.column ||
+      address.column > normalized.end.column
+    ) {
+      continue;
+    }
+    materializedCellCount += 1;
+    addStyle(cell.style);
+  }
+
+  if (materializedCellCount < getCellRangeSize(normalized)) {
+    addStyle(undefined);
+  }
+
+  return {
+    fontFamily: toValueState(fontFamily),
+    fontSize: toValueState(fontSize),
+    bold: toToggleState(bold),
+    italic: toToggleState(italic),
+    underline: toToggleState(underline),
+    textColor: toValueState(textColor),
+    fillColor: toValueState(fillColor),
+    horizontalAlign: toValueState(horizontalAlign),
+  };
+}

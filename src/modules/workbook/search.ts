@@ -32,7 +32,11 @@ export function findCellByText(
   let nearest: CellAddress | null = null;
   let wrap: CellAddress | null = null;
   for (const [key, cell] of sheet.cells) {
-    if (!formatCellValueForDisplay(cell.value).toLowerCase().includes(normalizedQuery)) {
+    if (
+      !formatCellValueForDisplay(cell.value ?? null)
+        .toLowerCase()
+        .includes(normalizedQuery)
+    ) {
       continue;
     }
 

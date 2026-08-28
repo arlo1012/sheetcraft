@@ -17,11 +17,13 @@ import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   createSheetSparseState,
+  getCellStyle,
   getActiveSheet,
   getCellValue,
   getColumnWidth,
   getRowHeight,
   setCellValue,
+  setCellStyle,
   setColumnWidth,
   setRowHeight,
 } from "../../../../modules/workbook/workbook";
@@ -32,6 +34,7 @@ describe("sheet axis structure commands", () => {
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 1, column: 3 }, "above");
     setCellValue(sheet, { row: 2, column: 1 }, "move");
+    setCellStyle(sheet, { row: 2, column: 1 }, { bold: true });
     setCellValue(sheet, { row: MAX_SHEET_ROWS - 1, column: 4 }, "tail");
     setRowHeight(sheet, 2, 40);
     setRowHeight(sheet, MAX_SHEET_ROWS - 1, 48);
@@ -43,6 +46,7 @@ describe("sheet axis structure commands", () => {
     expect(getCellValue(sheet, { row: 1, column: 3 })).toBe("above");
     expect(getCellValue(sheet, { row: 2, column: 1 })).toBeNull();
     expect(getCellValue(sheet, { row: 3, column: 1 })).toBe("move");
+    expect(getCellStyle(sheet, { row: 3, column: 1 })).toEqual({ bold: true });
     expect(getCellValue(sheet, { row: MAX_SHEET_ROWS - 1, column: 4 })).toBeNull();
     expect(getRowHeight(sheet, 3)).toBe(40);
     expect(getRowHeight(sheet, MAX_SHEET_ROWS - 1)).toBe(DEFAULT_ROW_HEIGHT);

@@ -7,7 +7,8 @@ import {
   type CellValueMatrix,
   type PastePlan,
 } from "../workbook/clipboard";
-import type { CellRange, Sheet } from "../workbook/workbook";
+import { getCellStyle, type CellRange, type Sheet } from "../workbook/workbook";
+import { cloneCellStyle, type CellStyle } from "../workbook/cell-style";
 import { getSelectionMode, getSelectionRange, type CellSelection } from "./selection";
 
 const LOCAL_CLIPBOARD_TYPE = "application/x-idea10-cells";
@@ -15,6 +16,7 @@ const LOCAL_CLIPBOARD_TYPE = "application/x-idea10-cells";
 export type GridPastePayload = {
   plan: PastePlan;
   clearRange?: CellRange;
+  styles?: Array<Array<CellStyle | null>>;
 };
 
 export type GridClipboardFeedback =
@@ -34,7 +36,26 @@ type PendingClipboard = {
   token: string;
   text: string;
   values: CellValueMatrix;
+  styles: Array<Array<CellStyle | null>>;
 };
+
+function getCellRangeStyles(sheet: Sheet, range: CellRange): Array<Array<CellStyle | null>> {
+  const startRow = Math.min(range.start.row, range.end.row);
+  const endRow = Math.max(range.start.row, range.end.row);
+  const startColumn = Math.min(range.start.column, range.end.column);
+  const endColumn = Math.max(range.start.column, range.end.column);
+  const styles: Array<Array<CellStyle | null>> = [];
+  for (let row = startRow; row <= endRow; row += 1) {
+    const rowStyles: Array<CellStyle | null> = [];
+    for (let column = startColumn; column <= endColumn; column += 1) {
+      rowStyles.push(
+        cloneCellStyle(getCellStyle(sheet, { row, column }) as CellStyle | undefined) ?? null,
+      );
+    }
+    styles.push(rowStyles);
+  }
+  return styles;
+}
 
 export function useGridClipboard(options: {
   getSheet: () => Sheet;
@@ -75,11 +96,12 @@ export function useGridClipboard(options: {
 
     const range = getSelectionRange(options.getSelection());
     const values = getCellRangeValues(options.getSheet(), range);
+    const styles = getCellRangeStyles(options.getSheet(), range);
     const text = serializeCellValuesToTsv(values);
     const token = createToken();
     event.clipboardData.setData("text/plain", text);
     event.clipboardData.setData(LOCAL_CLIPBOARD_TYPE, token);
-    pendingClipboard.value = { mode, range, token, text, values };
+    pendingClipboard.value = { mode, range, token, text, values, styles };
     options.onFeedback(mode === "cut" ? "readyToMove" : "copied");
   }
 
@@ -128,7 +150,11 @@ export function useGridClipboard(options: {
       return;
     }
 
-    options.onPaste({ plan, clearRange: isLocalCut ? pending?.range : undefined });
+    options.onPaste({
+      plan,
+      clearRange: isLocalCut ? pending?.range : undefined,
+      styles: isMatchingLocalClipboard ? pending?.styles : undefined,
+    });
     if (isLocalCut) {
       pendingClipboard.value = null;
     }

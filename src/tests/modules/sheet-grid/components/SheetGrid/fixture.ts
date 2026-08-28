@@ -65,6 +65,7 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
           session,
           createPasteCellValuesCommand(sheet.id, payload.plan.anchor, payload.plan.values, {
             clearRange: payload.clearRange,
+            styles: payload.styles,
           }),
         );
       },

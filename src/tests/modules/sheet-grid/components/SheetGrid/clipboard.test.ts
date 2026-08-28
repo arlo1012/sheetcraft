@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { getCellValue, setCellValue } from "../../../../../modules/workbook/workbook";
+import {
+  getCellStyle,
+  getCellValue,
+  setCellStyle,
+  setCellValue,
+} from "../../../../../modules/workbook/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
 import { mountSheetGrid } from "./fixture";
 
@@ -63,6 +68,34 @@ describe("SheetGrid clipboard", () => {
     expect(getCellValue(sheet, { row: 2, column: 2 })).toBe("D");
     expect(session.history.undoStack).toHaveLength(1);
     expect(wrapper.find("[data-clipboard-range]").exists()).toBe(false);
+  });
+
+  test("copies local styles and leaves destination styles intact for external text", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    setCellValue(sheet, { row: 0, column: 0 }, "styled");
+    setCellStyle(sheet, { row: 0, column: 0 }, { bold: true, fillColor: "#fde68a" });
+    setCellStyle(sheet, { row: 2, column: 2 }, { italic: true });
+
+    const copied = createTestClipboardEvent("copy");
+    wrapper.get("input.cell-editor").element.dispatchEvent(copied.event);
+    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
+    wrapper
+      .get("input.cell-editor")
+      .element.dispatchEvent(createTestClipboardEvent("paste", copied.data).event);
+    await wrapper.vm.$nextTick();
+    expect(getCellStyle(sheet, { row: 1, column: 1 })).toEqual({
+      bold: true,
+      fillColor: "#fde68a",
+    });
+
+    await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });
+    wrapper
+      .get("input.cell-editor")
+      .element.dispatchEvent(
+        createTestClipboardEvent("paste", new Map([["text/plain", "external"]])).event,
+      );
+    await wrapper.vm.$nextTick();
+    expect(getCellStyle(sheet, { row: 2, column: 2 })).toEqual({ italic: true });
   });
 
   test("tiles a single external cell over a selected range", async () => {
