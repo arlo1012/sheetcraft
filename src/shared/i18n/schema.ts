@@ -47,6 +47,28 @@ export type MessageSchema = {
     rowHeight: string;
     columnWidth: string;
   };
+  format: {
+    toolbar: string;
+    font: string;
+    fontFamily: string;
+    fontSize: string;
+    emphasis: string;
+    bold: string;
+    italic: string;
+    underline: string;
+    colors: string;
+    textColor: string;
+    textColorMixed: string;
+    fillColor: string;
+    fillColorMixed: string;
+    horizontalAlignment: string;
+    horizontalAlignmentMixed: string;
+    alignLeft: string;
+    alignCenter: string;
+    alignRight: string;
+    mixed: string;
+    selectionTooLarge: string;
+  };
   clipboard: {
     unavailable: string;
     axisCopyUnsupported: string;

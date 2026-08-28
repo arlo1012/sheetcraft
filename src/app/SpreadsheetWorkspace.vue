@@ -5,10 +5,12 @@ import { formatCellAddress, parseCellAddress } from "../modules/sheet-grid/addre
 import GridNavigationBar from "../modules/sheet-grid/components/GridNavigationBar.vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
 import type { SheetGridViewState } from "../modules/sheet-grid/view-state";
+import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
 import WorkbookSheetTabs from "../modules/workbook/components/WorkbookSheetTabs.vue";
 import type { GridPastePayload } from "../modules/sheet-grid/useGridClipboard";
 import {
   createAddSheetCommand,
+  createApplyCellStyleCommand,
   createClearCellRangeCommand,
   createDeleteSheetAxisCommand,
   createDeleteSheetCommand,
@@ -18,6 +20,7 @@ import {
   createResizeSheetDimensionCommand,
   createSetCellValueCommand,
 } from "../modules/workbook/commands";
+import type { CellStylePatch } from "../modules/workbook/cell-style";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
@@ -27,6 +30,11 @@ import {
 } from "../modules/workbook/history";
 import { parseCellInput } from "../modules/workbook/input";
 import { findCellByText, type SheetSearchDirection } from "../modules/workbook/search";
+import {
+  createDefaultSelectionCellStyleState,
+  getSelectionCellStyleState,
+  isCellStyleRangeSupported,
+} from "../modules/workbook/style-state";
 import {
   getActiveSheet,
   getWorkbookSheets,
@@ -47,6 +55,7 @@ const session = reactive(createWorkbookSession()) as WorkbookSession;
 const activeSheet = computed(() => getActiveSheet(session.workbook));
 const sheets = computed(() => getWorkbookSheets(session.workbook));
 const viewStates = reactive(new Map<string, SheetGridViewState>());
+const selectionRanges = reactive(new Map<string, CellRange>());
 const gridRef = ref<InstanceType<typeof SheetGrid>>();
 const searchQuery = ref("");
 const navigationFeedback = ref<FeedbackState>();
@@ -55,6 +64,19 @@ const activeAddress = computed(
   () => viewStates.get(activeSheet.value.id)?.selection.active ?? { row: 0, column: 0 },
 );
 const activeAddressLabel = computed(() => formatCellAddress(activeAddress.value));
+const activeSelectionRange = computed<CellRange>(
+  () =>
+    selectionRanges.get(activeSheet.value.id) ?? {
+      start: { ...activeAddress.value },
+      end: { ...activeAddress.value },
+    },
+);
+const isFormattingSupported = computed(() => isCellStyleRangeSupported(activeSelectionRange.value));
+const activeSelectionStyle = computed(() =>
+  isFormattingSupported.value
+    ? getSelectionCellStyleState(activeSheet.value, activeSelectionRange.value)
+    : createDefaultSelectionCellStyleState(),
+);
 const navigationFeedbackText = computed(() =>
   navigationFeedback.value ? t(navigationFeedback.value.key, navigationFeedback.value.params) : "",
 );
@@ -87,6 +109,19 @@ function clearCells(range: CellRange): void {
     createClearCellRangeCommand(activeSheet.value.id, range),
     "Clear cells",
   );
+}
+
+function applyCellStyle(patch: CellStylePatch): void {
+  if (!isFormattingSupported.value) {
+    workspaceStatus.value = { key: "format.selectionTooLarge" };
+    return;
+  }
+  executeWorkbookCommand(
+    session,
+    createApplyCellStyleCommand(activeSheet.value.id, activeSelectionRange.value, patch),
+    "Format cells",
+  );
+  workspaceStatus.value = { key: "workspace.ready" };
 }
 
 function resizeDimension(payload: { axis: SheetDimensionAxis; index: number; size: number }): void {
@@ -165,6 +200,8 @@ function deleteSheet(sheetId: string): void {
     createDeleteSheetCommand(session.workbook, sheetId),
     "Delete sheet",
   );
+  selectionRanges.delete(sheetId);
+  viewStates.delete(sheetId);
   workspaceStatus.value = { key: "workspace.ready" };
 }
 
@@ -174,6 +211,13 @@ function getActiveSheetViewState(): SheetGridViewState | undefined {
 
 function updateActiveSheetViewState(viewState: SheetGridViewState): void {
   viewStates.set(activeSheet.value.id, viewState);
+}
+
+function updateActiveSelection(payload: { active: CellAddress; range: CellRange }): void {
+  selectionRanges.set(activeSheet.value.id, {
+    start: { ...payload.range.start },
+    end: { ...payload.range.end },
+  });
 }
 
 function navigateToAddress(input: string): void {
@@ -227,6 +271,13 @@ function findCell(direction: SheetSearchDirection): void {
       @update-search-query="updateSearchQuery"
       @find="findCell"
     />
+    <HomeFormatToolbar
+      :state="activeSelectionStyle"
+      :disabled="!isFormattingSupported"
+      @apply-style="applyCellStyle"
+      @undo="undoWorkbookCommand(session)"
+      @redo="redoWorkbookCommand(session)"
+    />
     <div class="spreadsheet-workspace__grid">
       <SheetGrid
         ref="gridRef"
@@ -238,6 +289,7 @@ function findCell(direction: SheetSearchDirection): void {
         @insert-axis="insertAxis"
         @paste-cells="pasteCells"
         @resize-dimension="resizeDimension"
+        @selection-change="updateActiveSelection"
         @undo="undoWorkbookCommand(session)"
         @redo="redoWorkbookCommand(session)"
         @view-state-change="updateActiveSheetViewState"
@@ -265,7 +317,8 @@ function findCell(direction: SheetSearchDirection): void {
 <style scoped lang="scss">
 .spreadsheet-workspace {
   display: grid;
-  grid-template-rows: 34px minmax(0, 1fr) 30px;
+  grid-template-rows: 34px 40px minmax(0, 1fr) 30px;
+  grid-template-columns: minmax(0, 1fr);
   width: 100%;
   height: 100dvh;
   min-width: 320px;

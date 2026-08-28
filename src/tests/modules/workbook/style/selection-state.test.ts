@@ -27,4 +27,20 @@ describe("selection cell style state", () => {
     expect(withBlank.bold).toBe("mixed");
     expect(withBlank.textColor.mixed).toBe(true);
   });
+
+  test("queries a small selection directly when the sheet contains many other cells", () => {
+    const sheet = getActiveSheet(createWorkbook());
+    setCellStyle(sheet, { row: 1, column: 1 }, { bold: true });
+    for (let row = 10; row < 30; row += 1) {
+      setCellStyle(sheet, { row, column: 5 }, { italic: true });
+    }
+
+    const state = getSelectionCellStyleState(sheet, {
+      start: { row: 1, column: 1 },
+      end: { row: 1, column: 1 },
+    });
+
+    expect(state.bold).toBe("on");
+    expect(state.italic).toBe("off");
+  });
 });

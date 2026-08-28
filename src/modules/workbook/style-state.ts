@@ -3,7 +3,7 @@ import {
   type CellStyle,
   type HorizontalCellAlignment,
 } from "./cell-style";
-import type { CellRange, Sheet } from "./workbook";
+import { getCellStyle, type CellRange, type Sheet } from "./workbook";
 
 export type ToggleStyleState = "on" | "off" | "mixed";
 
@@ -74,6 +74,19 @@ function parseCellKey(key: string): { row: number; column: number } {
   };
 }
 
+export function createDefaultSelectionCellStyleState(): SelectionCellStyleState {
+  return {
+    fontFamily: { value: undefined, mixed: false },
+    fontSize: { value: undefined, mixed: false },
+    bold: "off",
+    italic: "off",
+    underline: "off",
+    textColor: { value: undefined, mixed: false },
+    fillColor: { value: undefined, mixed: false },
+    horizontalAlign: { value: undefined, mixed: false },
+  };
+}
+
 export function getCellRangeSize(range: CellRange): number {
   const normalized = normalizeRange(range);
   return (
@@ -112,22 +125,31 @@ export function getSelectionCellStyleState(
     addValue(horizontalAlign, style?.horizontalAlign);
   };
 
-  for (const [key, cell] of sheet.cells) {
-    const address = parseCellKey(key);
-    if (
-      address.row < normalized.start.row ||
-      address.row > normalized.end.row ||
-      address.column < normalized.start.column ||
-      address.column > normalized.end.column
-    ) {
-      continue;
+  const rangeSize = getCellRangeSize(normalized);
+  if (rangeSize <= sheet.cells.size) {
+    for (let row = normalized.start.row; row <= normalized.end.row; row += 1) {
+      for (let column = normalized.start.column; column <= normalized.end.column; column += 1) {
+        addStyle(getCellStyle(sheet, { row, column }) as CellStyle | undefined);
+      }
     }
-    materializedCellCount += 1;
-    addStyle(cell.style);
-  }
+  } else {
+    for (const [key, cell] of sheet.cells) {
+      const address = parseCellKey(key);
+      if (
+        address.row < normalized.start.row ||
+        address.row > normalized.end.row ||
+        address.column < normalized.start.column ||
+        address.column > normalized.end.column
+      ) {
+        continue;
+      }
+      materializedCellCount += 1;
+      addStyle(cell.style);
+    }
 
-  if (materializedCellCount < getCellRangeSize(normalized)) {
-    addStyle(undefined);
+    if (materializedCellCount < rangeSize) {
+      addStyle(undefined);
+    }
   }
 
   return {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 
 const { t } = useAppI18n();
@@ -9,6 +9,7 @@ const props = defineProps<{
   addressLabel: string;
   displayValue: string;
   editing: boolean;
+  style?: CSSProperties;
 }>();
 
 const emit = defineEmits<{
@@ -97,6 +98,7 @@ defineExpose({ focus });
     :spellcheck="false"
     :aria-label="accessibleLabel"
     :data-cell-editor="addressLabel"
+    :style="editing ? style : undefined"
     @input="emit('update:modelValue', readInputValue($event))"
     @mousedown.stop
     @dblclick.stop

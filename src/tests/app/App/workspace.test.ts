@@ -157,6 +157,7 @@ describe("App", () => {
     expect(wrapper.get("[data-app-root]").attributes("aria-label")).toBe("idea10 工作区");
     expect(wrapper.get("section.sheet-grid").attributes("aria-label")).toBe("Sheet1 工作表");
     expect(wrapper.get('select[aria-label="语言"]').element).toBeInstanceOf(HTMLSelectElement);
+    expect(wrapper.get(".home-format-toolbar").attributes("aria-label")).toBe("单元格格式");
     expect(wrapper.text()).toContain("单元格地址无效");
     expect(wrapper.text()).toContain("就绪");
 
@@ -168,5 +169,43 @@ describe("App", () => {
     expect(wrapper.get('[role="dialog"]').text()).toContain("向下插入 1 行");
     expect(document.documentElement.lang).toBe("zh-CN");
     expect(localStorage.getItem("idea10.locale")).toBe("zh-CN");
+  });
+
+  test("formats the current selection as one reversible workbook action", async () => {
+    const wrapper = mountApp();
+    await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", {
+      button: 0,
+      shiftKey: true,
+    });
+
+    await wrapper.get('[aria-label="Bold"]').trigger("click");
+    expect(wrapper.get('[aria-label="Bold"]').attributes("aria-pressed")).toBe("true");
+    expect(
+      (wrapper.get('[data-row="0"][data-column="0"]').element as HTMLElement).style.fontWeight,
+    ).toBe("700");
+    expect(
+      (wrapper.get('[data-row="0"][data-column="1"]').element as HTMLElement).style.fontWeight,
+    ).toBe("700");
+
+    await wrapper.get('[aria-label="Bold"]').trigger("keydown", { key: "z", ctrlKey: true });
+    expect(wrapper.get('[aria-label="Bold"]').attributes("aria-pressed")).toBe("false");
+    expect(
+      (wrapper.get('[data-row="0"][data-column="0"]').element as HTMLElement).style.fontWeight,
+    ).toBe("");
+    expect(
+      (wrapper.get('[data-row="0"][data-column="1"]').element as HTMLElement).style.fontWeight,
+    ).toBe("");
+  });
+
+  test("disables formatting when a whole-column selection exceeds the command limit", async () => {
+    const wrapper = mountApp();
+    await wrapper.get('[data-select-column="0"]').trigger("mousedown", { button: 0 });
+
+    const toolbar = wrapper.get(".home-format-toolbar");
+    expect(toolbar.attributes("aria-disabled")).toBe("true");
+    expect(toolbar.attributes("title")).toBe(
+      "This selection is too large to format in one action.",
+    );
+    expect((wrapper.get('[aria-label="Bold"]').element as HTMLButtonElement).disabled).toBe(true);
   });
 });
