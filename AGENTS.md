@@ -5,10 +5,9 @@
 - This branch is a clean implementation with no compatibility obligation to
   the previous frontend structure.
 - Add only behavior requested for the new implementation.
-- The `refactor/ui-style-v2` branch contains historical feature behavior and
-  interaction implementations worth consulting. Reimplement relevant behavior
-  against the current architecture instead of copying its frontend structure
-  by default.
+- The `refactor/ui-style-v2` branch is an optional reference when historical
+  behavior would resolve a concrete uncertainty. It is neither required nor
+  authoritative; implement current requirements against the new architecture.
 
 ## Technology
 
