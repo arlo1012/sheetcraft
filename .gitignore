@@ -19,3 +19,4 @@ tmp/
 tmp2/
 .playwright-cli/
 .playwright-mcp/
+output/
