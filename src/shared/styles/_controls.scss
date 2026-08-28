@@ -1,0 +1,8 @@
+.ui-toolbar-icon-button {
+  min-width: var(--ui-toolbar-icon-control-width);
+
+  &.is-active {
+    background: var(--ui-state-selected-background);
+    color: var(--ui-state-selected-foreground);
+  }
+}

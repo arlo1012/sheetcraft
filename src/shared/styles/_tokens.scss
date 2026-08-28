@@ -1,40 +1,29 @@
 @layer theme {
   :root {
-    color-scheme: light;
-    --ui-font-family:
-      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --ui-font-family: var(--td-font-family);
     font-family: var(--ui-font-family);
     font-synthesis: none;
     text-rendering: optimizeLegibility;
 
-    --ui-surface-canvas: #f7f8fa;
-    --ui-surface-primary: #ffffff;
-    --ui-surface-muted: #f0f2f5;
-    --ui-surface-hover: #e7eaee;
-    --ui-border-default: #d9dde5;
-    --ui-border-strong: #b8bec8;
-    --ui-text-primary: #20242c;
-    --ui-text-secondary: #5c6370;
-    --ui-text-muted: #747c88;
-    --ui-text-disabled: #a1a7b0;
-    --ui-brand-primary: #176b4d;
-    --ui-brand-hover: #227c5b;
-    --ui-brand-active: #10543c;
-    --ui-brand-disabled: #9cc7b6;
-    --ui-brand-soft: #dcefe7;
-    --ui-brand-soft-hover: #cae6dc;
-    --ui-status-danger: #c9362b;
-    --ui-status-danger-hover: #ad2f26;
-    --ui-status-danger-active: #92251e;
-    --ui-status-danger-focus: #f4d8d5;
-    --ui-status-danger-disabled: #e7aaa5;
+    --ui-surface-canvas: var(--td-bg-color-page);
+    --ui-surface-primary: var(--td-bg-color-container);
+    --ui-surface-muted: var(--td-bg-color-secondarycontainer);
+    --ui-surface-hover: var(--td-bg-color-container-hover);
+    --ui-border-default: var(--td-border-level-1-color);
+    --ui-border-strong: var(--td-component-border);
+    --ui-text-primary: var(--td-text-color-primary);
+    --ui-text-secondary: var(--td-text-color-secondary);
+    --ui-text-muted: var(--td-text-color-placeholder);
+    --ui-brand-primary: var(--td-brand-color);
+    --ui-brand-soft: var(--td-brand-color-focus);
+    --ui-status-danger: var(--td-error-color);
     --ui-state-selected-background: var(--ui-brand-soft);
     --ui-state-selected-foreground: var(--ui-brand-primary);
-    --ui-control-height-small: 28px;
+    --ui-control-height-small: var(--td-comp-size-xs);
     --ui-toolbar-icon-control-width: 30px;
     --ui-floating-viewport-inset: 8px;
-    --ui-floating-shadow: 0 8px 24px rgb(32 36 44 / 18%);
-    --ui-radius-control: 4px;
-    --ui-radius-surface: 6px;
+    --ui-floating-shadow: var(--td-shadow-2);
+    --ui-radius-control: var(--td-radius-default);
+    --ui-radius-surface: var(--td-radius-medium);
   }
 }
