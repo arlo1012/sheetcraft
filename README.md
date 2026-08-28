@@ -5,10 +5,11 @@ product-owned CSS tokens. The current milestone provides a focused spreadsheet
 editing foundation: a sparse workbook model, command-based undo and redo,
 virtualized cells with independently resizable rows and columns, pinned headers,
 rectangular range selection, keyboard navigation, in-cell editing with IME-safe
-composition, atomic range clearing, and TSV clipboard workflows.
+composition, atomic range clearing, TSV clipboard workflows, cell formatting, a
+compact Home Ribbon, and selection summaries in the workbook status bar.
 
-Formulas, cell formatting, persistence, and Ribbon tools are intentionally
-outside the current milestone.
+Formulas, persistence, additional Ribbon categories, and sheet view or zoom
+controls are intentionally outside the current milestone.
 
 ## Commands
 

@@ -40,6 +40,10 @@ describe("App", () => {
     expect(wrapper.get('[role="grid"]').attributes("aria-rowcount")).toBe("1000");
     expect(wrapper.get('[role="grid"]').attributes("aria-colcount")).toBe("100");
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
+    expect(wrapper.get(".spreadsheet-ribbon").attributes("aria-label")).toBe("Workbook tools");
+    expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("Home");
+    expect(wrapper.get(".workbook-status-bar").attributes("aria-label")).toBe("Workbook status");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:0");
   });
 
   test("creates, renames, and deletes sheets from the sheet tabs", async () => {
@@ -181,6 +185,9 @@ describe("App", () => {
 
     expect(wrapper.get("[data-app-root]").attributes("aria-label")).toBe("idea10 工作区");
     expect(wrapper.get("section.sheet-grid").attributes("aria-label")).toBe("Sheet1 工作表");
+    expect(wrapper.get(".spreadsheet-ribbon").attributes("aria-label")).toBe("工作簿工具");
+    expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("开始");
+    expect(wrapper.get(".workbook-status-bar").attributes("aria-label")).toBe("工作簿状态");
     expect(wrapper.get("[data-locale-select] input").element).toBeInstanceOf(HTMLInputElement);
     expect(wrapper.get(".home-format-toolbar").attributes("aria-label")).toBe("单元格格式");
     expect(wrapper.text()).toContain("单元格地址无效");
@@ -195,6 +202,60 @@ describe("App", () => {
     expect(dialog.text()).toContain("向下插入 1 行");
     expect(document.documentElement.lang).toBe("zh-CN");
     expect(localStorage.getItem("idea10.locale")).toBe("zh-CN");
+  });
+
+  test("summarizes the populated values in the current selection", async () => {
+    const wrapper = mountApp();
+    const editor = wrapper.get("input.cell-editor");
+
+    await editor.trigger("keydown", { key: "1" });
+    await editor.setValue("10");
+    await editor.trigger("keydown", { key: "Enter" });
+    const nextEditor = wrapper.get("input.cell-editor");
+    await nextEditor.trigger("keydown", { key: "2" });
+    await nextEditor.setValue("20");
+    await nextEditor.trigger("keydown", { key: "Enter" });
+
+    await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", { button: 0 });
+    await wrapper.get('[data-row="1"][data-column="0"]').trigger("mousedown", {
+      button: 0,
+      shiftKey: true,
+    });
+
+    const summary = wrapper.get("[data-selection-summary]").text();
+    expect(summary).toContain("Average:15");
+    expect(summary).toContain("Count:2");
+    expect(summary).toContain("Sum:30");
+  });
+
+  test("summarizes whole rows, columns, and the full sheet", async () => {
+    const wrapper = mountApp();
+    const enterValue = async (value: string): Promise<void> => {
+      const editor = wrapper.get("input.cell-editor");
+      await editor.trigger("keydown", { key: value[0] });
+      await editor.setValue(value);
+      await editor.trigger("keydown", { key: "Enter" });
+    };
+
+    await enterValue("10");
+    await enterValue("99");
+    await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await enterValue("20");
+
+    await wrapper.get('[aria-label="Select row 1"]').trigger("mousedown", { button: 0 });
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:15");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count:2");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum:30");
+
+    await wrapper.get('[aria-label="Select column A"]').trigger("mousedown", { button: 0 });
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:54.5");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count:2");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum:109");
+
+    await wrapper.get('[aria-label="Select all cells"]').trigger("click");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:43");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count:3");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum:129");
   });
 
   test("formats the current selection as one reversible workbook action", async () => {

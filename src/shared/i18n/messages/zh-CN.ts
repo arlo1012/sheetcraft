@@ -7,6 +7,12 @@ export const zhCN = {
     localeChinese: "中文",
     localeEnglish: "English",
   },
+  ribbon: {
+    label: "工作簿工具",
+    categories: "功能区分类",
+    home: "开始",
+    homeTools: "开始工具",
+  },
   workspace: {
     editor: "电子表格编辑器",
     ready: "就绪",
@@ -33,6 +39,13 @@ export const zhCN = {
     renameHint: "{name}（双击重命名）",
     deleteActive: "删除当前工作表",
     add: "添加工作表",
+  },
+  statusBar: {
+    label: "工作簿状态",
+    selectionSummary: "选区统计",
+    average: "均值:",
+    count: "计数:",
+    sum: "求和:",
   },
   cell: {
     edit: "编辑单元格 {address}",

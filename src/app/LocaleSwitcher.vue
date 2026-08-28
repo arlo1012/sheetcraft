@@ -25,6 +25,7 @@ function onLocaleChange(value: SelectValue): void {
     <TSelect
       class="locale-switcher__select"
       data-locale-select
+      borderless
       size="small"
       :model-value="locale"
       :options="localeOptions"
@@ -39,12 +40,12 @@ function onLocaleChange(value: SelectValue): void {
   flex: 0 0 auto;
   align-items: center;
   gap: 4px;
-  height: 34px;
-  padding: 0 8px;
+  height: 32px;
+  padding: 0 6px;
   color: var(--td-text-color-placeholder);
 
   &__select {
-    width: 96px;
+    width: 88px;
   }
 }
 </style>

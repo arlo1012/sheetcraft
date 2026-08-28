@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
-import LocaleSwitcher from "./LocaleSwitcher.vue";
+import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import { formatCellAddress, parseCellAddress } from "../modules/sheet-grid/address";
 import GridNavigationBar from "../modules/sheet-grid/components/GridNavigationBar.vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
 import type { SheetGridViewState } from "../modules/sheet-grid/view-state";
-import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
-import WorkbookSheetTabs from "../modules/workbook/components/WorkbookSheetTabs.vue";
+import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.vue";
 import type { GridPastePayload } from "../modules/sheet-grid/useGridClipboard";
 import {
   createAddSheetCommand,
@@ -30,6 +29,7 @@ import {
 } from "../modules/workbook/history";
 import { parseCellInput } from "../modules/workbook/input";
 import { findCellByText, type SheetSearchDirection } from "../modules/workbook/search";
+import { getSelectionSummary } from "../modules/workbook/selection-summary";
 import {
   createDefaultSelectionCellStyleState,
   getSelectionCellStyleState,
@@ -76,6 +76,9 @@ const activeSelectionStyle = computed(() =>
   isFormattingSupported.value
     ? getSelectionCellStyleState(activeSheet.value, activeSelectionRange.value)
     : createDefaultSelectionCellStyleState(),
+);
+const activeSelectionSummary = computed(() =>
+  getSelectionSummary(activeSheet.value, activeSelectionRange.value),
 );
 const navigationFeedbackText = computed(() =>
   navigationFeedback.value ? t(navigationFeedback.value.key, navigationFeedback.value.params) : "",
@@ -263,6 +266,13 @@ function findCell(direction: SheetSearchDirection): void {
 
 <template>
   <section class="spreadsheet-workspace" :aria-label="t('workspace.editor')">
+    <SpreadsheetRibbon
+      :state="activeSelectionStyle"
+      :disabled="!isFormattingSupported"
+      @apply-style="applyCellStyle"
+      @undo="undoWorkbookCommand(session)"
+      @redo="redoWorkbookCommand(session)"
+    />
     <GridNavigationBar
       :address="activeAddressLabel"
       :search-query="searchQuery"
@@ -270,13 +280,6 @@ function findCell(direction: SheetSearchDirection): void {
       @navigate="navigateToAddress"
       @update-search-query="updateSearchQuery"
       @find="findCell"
-    />
-    <HomeFormatToolbar
-      :state="activeSelectionStyle"
-      :disabled="!isFormattingSupported"
-      @apply-style="applyCellStyle"
-      @undo="undoWorkbookCommand(session)"
-      @redo="redoWorkbookCommand(session)"
     />
     <div class="spreadsheet-workspace__grid">
       <SheetGrid
@@ -295,29 +298,23 @@ function findCell(direction: SheetSearchDirection): void {
         @view-state-change="updateActiveSheetViewState"
       />
     </div>
-    <footer class="spreadsheet-workspace__footer">
-      <WorkbookSheetTabs
-        :sheets="sheets"
-        :active-sheet-id="session.workbook.activeSheetId"
-        @select="selectSheet"
-        @add="addSheet"
-        @rename="renameSheet"
-        @delete="deleteSheet"
-      />
-      <div class="spreadsheet-workspace__footer-tools">
-        <span class="spreadsheet-workspace__status" aria-live="polite">
-          {{ workspaceStatusText }}
-        </span>
-        <LocaleSwitcher />
-      </div>
-    </footer>
+    <WorkbookStatusBar
+      :sheets="sheets"
+      :active-sheet-id="session.workbook.activeSheetId"
+      :status-text="workspaceStatusText"
+      :selection-summary="activeSelectionSummary"
+      @select="selectSheet"
+      @add="addSheet"
+      @rename="renameSheet"
+      @delete="deleteSheet"
+    />
   </section>
 </template>
 
 <style scoped lang="scss">
 .spreadsheet-workspace {
   display: grid;
-  grid-template-rows: 34px 40px minmax(0, 1fr) 30px;
+  grid-template-rows: 72px 34px minmax(0, 1fr) 30px;
   grid-template-columns: minmax(0, 1fr);
   width: 100%;
   height: 100dvh;
@@ -329,30 +326,6 @@ function findCell(direction: SheetSearchDirection): void {
   &__grid {
     min-width: 0;
     min-height: 0;
-  }
-
-  &__footer {
-    display: flex;
-    align-items: stretch;
-    justify-content: space-between;
-    gap: 16px;
-    background: var(--td-bg-color-secondarycontainer);
-    border-top: 1px solid var(--td-component-border);
-    color: var(--td-text-color-secondary);
-    font-size: 12px;
-  }
-
-  &__status {
-    display: inline-flex;
-    align-items: center;
-    padding-right: 12px;
-    color: var(--td-text-color-placeholder);
-  }
-
-  &__footer-tools {
-    display: flex;
-    flex: 0 0 auto;
-    align-items: stretch;
   }
 }
 </style>

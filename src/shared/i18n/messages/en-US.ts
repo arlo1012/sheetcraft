@@ -7,6 +7,12 @@ export const enUS = {
     localeChinese: "Chinese",
     localeEnglish: "English",
   },
+  ribbon: {
+    label: "Workbook tools",
+    categories: "Ribbon categories",
+    home: "Home",
+    homeTools: "Home tools",
+  },
   workspace: {
     editor: "Spreadsheet editor",
     ready: "Ready",
@@ -33,6 +39,13 @@ export const enUS = {
     renameHint: "{name} (double-click to rename)",
     deleteActive: "Delete active sheet",
     add: "Add sheet",
+  },
+  statusBar: {
+    label: "Workbook status",
+    selectionSummary: "Selection summary",
+    average: "Average:",
+    count: "Count:",
+    sum: "Sum:",
   },
   cell: {
     edit: "Edit cell {address}",

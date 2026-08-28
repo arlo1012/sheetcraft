@@ -7,6 +7,12 @@ export type MessageSchema = {
     localeChinese: string;
     localeEnglish: string;
   };
+  ribbon: {
+    label: string;
+    categories: string;
+    home: string;
+    homeTools: string;
+  };
   workspace: {
     editor: string;
     ready: string;
@@ -33,6 +39,13 @@ export type MessageSchema = {
     renameHint: string;
     deleteActive: string;
     add: string;
+  };
+  statusBar: {
+    label: string;
+    selectionSummary: string;
+    average: string;
+    count: string;
+    sum: string;
   };
   cell: {
     edit: string;

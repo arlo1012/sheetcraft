@@ -91,8 +91,7 @@ function onKeydown(event: KeyboardEvent): void {
   padding: 5px 8px;
   overflow-x: auto;
   overflow-y: hidden;
-  background: var(--td-bg-color-secondarycontainer);
-  border-bottom: 1px solid var(--td-border-level-1-color);
+  background: transparent;
   scrollbar-width: thin;
 
   &__separator {
