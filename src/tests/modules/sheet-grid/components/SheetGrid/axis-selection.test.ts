@@ -297,6 +297,28 @@ describe("SheetGrid axis selection", () => {
     expect(session.history.undoStack).toHaveLength(2);
   });
 
+  test("restores the triggering header focus when the keyboard-opened menu closes", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const { wrapper } = mountSheetGrid({ attachTo: host });
+    try {
+      const rowHeader = wrapper.get('[data-select-row="2"]');
+
+      (rowHeader.element as HTMLButtonElement).focus();
+      await rowHeader.trigger("keydown", { key: "F10", shiftKey: true });
+      const dialog = wrapper.get('[role="dialog"]');
+      expect(dialog.element.contains(document.activeElement)).toBe(true);
+
+      await dialog.trigger("keydown", { key: "Escape" });
+
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+      expect(document.activeElement).toBe(rowHeader.element);
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
+  });
+
   test("defers a header selection while composing", async () => {
     const { wrapper } = mountSheetGrid();
     const editor = wrapper.get("input.cell-editor");

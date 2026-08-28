@@ -20,7 +20,9 @@ const emit = defineEmits<{
   resizeStart: [payload: { index: number; event: PointerEvent }];
   resize: [payload: { index: number; size: number }];
   select: [payload: { row: number; shiftKey: boolean }];
-  openContextMenu: [payload: { row: number; clientX: number; clientY: number }];
+  openContextMenu: [
+    payload: { row: number; clientX: number; clientY: number; trigger: HTMLButtonElement },
+  ];
 }>();
 
 const KEYBOARD_RESIZE_STEP = 8;
@@ -62,11 +64,13 @@ function onResizeHandleKeydown(row: number, event: KeyboardEvent): void {
 function onHeaderKeydown(row: number, event: KeyboardEvent): void {
   if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
     event.preventDefault();
-    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const trigger = event.currentTarget as HTMLButtonElement;
+    const bounds = trigger.getBoundingClientRect();
     emit("openContextMenu", {
       row,
       clientX: bounds.left + bounds.width / 2,
       clientY: bounds.top + bounds.height / 2,
+      trigger,
     });
     return;
   }
@@ -75,6 +79,15 @@ function onHeaderKeydown(row: number, event: KeyboardEvent): void {
   }
   event.preventDefault();
   emit("select", { row, shiftKey: event.shiftKey });
+}
+
+function onHeaderContextMenu(row: number, event: MouseEvent): void {
+  emit("openContextMenu", {
+    row,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    trigger: event.currentTarget as HTMLButtonElement,
+  });
 }
 </script>
 
@@ -95,9 +108,7 @@ function onHeaderKeydown(row: number, event: KeyboardEvent): void {
         :aria-label="t('grid.selectRow', { row: row + 1 })"
         :aria-pressed="selected && row >= selectedStartRow && row <= selectedEndRow"
         @mousedown.left.prevent="emit('select', { row, shiftKey: $event.shiftKey })"
-        @contextmenu.prevent="
-          emit('openContextMenu', { row, clientX: $event.clientX, clientY: $event.clientY })
-        "
+        @contextmenu.prevent="onHeaderContextMenu(row, $event)"
         @keydown="onHeaderKeydown(row, $event)"
       >
         <span aria-hidden="true">{{ row + 1 }}</span>

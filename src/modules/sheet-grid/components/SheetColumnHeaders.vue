@@ -20,7 +20,14 @@ const emit = defineEmits<{
   resizeStart: [payload: { index: number; event: PointerEvent }];
   resize: [payload: { index: number; size: number }];
   select: [payload: { column: number; shiftKey: boolean }];
-  openContextMenu: [payload: { column: number; clientX: number; clientY: number }];
+  openContextMenu: [
+    payload: {
+      column: number;
+      clientX: number;
+      clientY: number;
+      trigger: HTMLButtonElement;
+    },
+  ];
 }>();
 
 const KEYBOARD_RESIZE_STEP = 8;
@@ -62,11 +69,13 @@ function onResizeHandleKeydown(column: number, event: KeyboardEvent): void {
 function onHeaderKeydown(column: number, event: KeyboardEvent): void {
   if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
     event.preventDefault();
-    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const trigger = event.currentTarget as HTMLButtonElement;
+    const bounds = trigger.getBoundingClientRect();
     emit("openContextMenu", {
       column,
       clientX: bounds.left + bounds.width / 2,
       clientY: bounds.top + bounds.height / 2,
+      trigger,
     });
     return;
   }
@@ -75,6 +84,15 @@ function onHeaderKeydown(column: number, event: KeyboardEvent): void {
   }
   event.preventDefault();
   emit("select", { column, shiftKey: event.shiftKey });
+}
+
+function onHeaderContextMenu(column: number, event: MouseEvent): void {
+  emit("openContextMenu", {
+    column,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    trigger: event.currentTarget as HTMLButtonElement,
+  });
 }
 </script>
 
@@ -97,9 +115,7 @@ function onHeaderKeydown(column: number, event: KeyboardEvent): void {
         :aria-label="t('grid.selectColumn', { column: columnIndexToLabel(column) })"
         :aria-pressed="selected && column >= selectedStartColumn && column <= selectedEndColumn"
         @mousedown.left.prevent="emit('select', { column, shiftKey: $event.shiftKey })"
-        @contextmenu.prevent="
-          emit('openContextMenu', { column, clientX: $event.clientX, clientY: $event.clientY })
-        "
+        @contextmenu.prevent="onHeaderContextMenu(column, $event)"
         @keydown="onHeaderKeydown(column, $event)"
       >
         <span aria-hidden="true">{{ columnIndexToLabel(column) }}</span>

@@ -69,6 +69,7 @@ type AxisContextMenuState = {
   index: number;
   count: number;
   position: Point;
+  trigger: HTMLButtonElement;
 };
 
 const CLIPBOARD_MESSAGE_KEYS: Record<GridClipboardFeedback, MessageKey> = {
@@ -762,6 +763,7 @@ function openAxisContextMenu(
   index: number,
   clientX: number,
   clientY: number,
+  trigger: HTMLButtonElement,
 ): void {
   if (isComposing.value) {
     return;
@@ -787,6 +789,7 @@ function openAxisContextMenu(
       x: Math.max(0, Math.min(localX, width - AXIS_MENU_WIDTH)),
       y: Math.max(0, Math.min(localY, height - AXIS_MENU_HEIGHT)),
     },
+    trigger,
   };
 }
 
@@ -843,9 +846,16 @@ function requestAxisClear(): void {
 }
 
 function closeAxisContextMenu(restoreFocus: boolean): void {
+  const trigger = axisContextMenu.value?.trigger;
   axisContextMenu.value = undefined;
   if (restoreFocus) {
-    focusEditor();
+    void nextTick(() => {
+      if (trigger?.isConnected) {
+        trigger.focus();
+      } else {
+        focusEditor();
+      }
+    });
   }
 }
 
@@ -1166,7 +1176,7 @@ defineExpose({ navigateToCell });
       @resize-start="onDimensionResizeStart('column', $event)"
       @select="onColumnHeaderSelect"
       @open-context-menu="
-        openAxisContextMenu('column', $event.column, $event.clientX, $event.clientY)
+        openAxisContextMenu('column', $event.column, $event.clientX, $event.clientY, $event.trigger)
       "
     />
     <SheetRowHeaders
@@ -1180,7 +1190,9 @@ defineExpose({ navigateToCell });
       @resize="onDimensionResizeRequest('row', $event)"
       @resize-start="onDimensionResizeStart('row', $event)"
       @select="onRowHeaderSelect"
-      @open-context-menu="openAxisContextMenu('row', $event.row, $event.clientX, $event.clientY)"
+      @open-context-menu="
+        openAxisContextMenu('row', $event.row, $event.clientX, $event.clientY, $event.trigger)
+      "
     />
 
     <div
