@@ -1,4 +1,5 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
+import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { afterEach, describe, expect, test } from "vitest";
 import HomeFormatToolbar from "../../../../../modules/home-tools/components/HomeFormatToolbar.vue";
 import type { SelectionCellStyleState } from "../../../../../modules/workbook/style-state";
@@ -86,9 +87,15 @@ describe("HomeFormatToolbar", () => {
 
   test("emits validated font and alignment patches", async () => {
     const wrapper = mountToolbar();
+    const fontFamily = wrapper.findComponent(TSelect);
+    const fontSize = wrapper.get<HTMLInputElement>(".font-format-controls__size input");
 
-    await wrapper.get('[aria-label="Font family"]').setValue("Arial");
-    await wrapper.get('[aria-label="Font size"]').setValue("18");
+    await fontSize.trigger("blur");
+    expect(emittedPatches(wrapper)).toEqual([]);
+
+    fontFamily.vm.$emit("change", "Arial");
+    await fontSize.setValue("18");
+    await fontSize.trigger("blur");
     await wrapper.get('[aria-label="Align center"]').trigger("click");
 
     expect(emittedPatches(wrapper)).toEqual([
@@ -97,8 +104,14 @@ describe("HomeFormatToolbar", () => {
       { horizontalAlign: "center" },
     ]);
 
-    await wrapper.get('[aria-label="Font size"]').setValue("90");
+    await fontSize.setValue("90");
+    await fontSize.trigger("blur");
     expect(emittedPatches(wrapper)).toHaveLength(3);
+
+    await fontSize.setValue("20");
+    fontSize.element.focus();
+    await fontSize.trigger("keydown", { key: "Enter" });
+    expect(emittedPatches(wrapper).at(-1)).toEqual({ fontSize: 20 });
   });
 
   test("applies each drafted color as one formatting patch", async () => {
@@ -110,11 +123,11 @@ describe("HomeFormatToolbar", () => {
     expect(textColor.attributes("aria-expanded")).toBe("true");
     await new DOMWrapper(document.body).get('[data-color="#123456"]').trigger("click");
     expect(emittedPatches(wrapper)).toEqual([]);
-    await getTeleportedDialog().get("button.is-primary").trigger("click");
+    await getTeleportedDialog().get('[data-color-action="apply"]').trigger("click");
 
     await wrapper.get('[aria-label="Fill color"]').trigger("click");
     await new DOMWrapper(document.body).get('[data-color="#abcdef"]').trigger("click");
-    await getTeleportedDialog().get("button.is-primary").trigger("click");
+    await getTeleportedDialog().get('[data-color-action="apply"]').trigger("click");
 
     expect(emittedPatches(wrapper)).toEqual([{ textColor: "#123456" }, { fillColor: "#abcdef" }]);
   });
@@ -129,15 +142,15 @@ describe("HomeFormatToolbar", () => {
       true,
     );
 
-    expect(wrapper.get('[aria-label="Font family"]').element).toHaveProperty("value", "");
-    expect(wrapper.get('[aria-label="Font size"]').element).toHaveProperty("value", "");
+    expect(wrapper.get(".font-format-controls__family input").element).toHaveProperty("value", "");
+    expect(wrapper.get(".font-format-controls__size input").element).toHaveProperty("value", "");
     expect(wrapper.get('[aria-label="Text color, mixed"]').element).toBeInstanceOf(
       HTMLButtonElement,
     );
     const toolbar = wrapper.get(".home-format-toolbar");
     expect(toolbar.attributes("role")).toBe("group");
     expect(toolbar.attributes("aria-disabled")).toBe("true");
-    for (const control of wrapper.findAll("button, input, select")) {
+    for (const control of wrapper.findAll("button, input")) {
       expect((control.element as HTMLButtonElement | HTMLInputElement).disabled).toBe(true);
     }
   });
@@ -177,7 +190,7 @@ describe("HomeFormatToolbar", () => {
   test("leaves native undo handling inside the editable font-size input", async () => {
     const wrapper = mountToolbar();
 
-    await wrapper.get('[aria-label="Font size"]').trigger("keydown", {
+    await wrapper.get(".font-format-controls__size input").trigger("keydown", {
       key: "z",
       ctrlKey: true,
     });

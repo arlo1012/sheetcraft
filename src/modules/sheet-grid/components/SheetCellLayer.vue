@@ -153,7 +153,6 @@ const visibleRows = computed<VisibleRow[]>(() => {
     line-height: 1;
     white-space: nowrap;
     user-select: none;
-    box-sizing: border-box;
 
     &.is-active {
       overflow: visible;

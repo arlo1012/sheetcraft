@@ -1,10 +1,6 @@
 <script setup lang="ts">
-import { ConfigProvider } from "tdesign-vue-next/es/config-provider";
-import type { GlobalConfigProvider } from "tdesign-vue-next/es/config-provider/type";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
-import enUS from "tdesign-vue-next/es/locale/en_US";
-import zhCN from "tdesign-vue-next/es/locale/zh_CN";
-import "tdesign-vue-next/es/style/index.css";
 import {
   computed,
   nextTick,
@@ -65,16 +61,13 @@ const emit = defineEmits<{
   change: [color: string | null];
 }>();
 
-const { locale, t } = useAppI18n();
+const { t } = useAppI18n();
 const triggerRef = ref<HTMLButtonElement | null>(null);
 const panelRef = ref<HTMLDivElement | null>(null);
 const open = ref(false);
 const draftColor = ref(props.value ?? props.defaultColor);
 const panelId = `cell-color-picker-${useId().replaceAll(":", "")}`;
 const currentColor = computed(() => props.value ?? props.defaultColor);
-const tdesignLocale = computed<GlobalConfigProvider>(
-  () => (locale.value === "zh-CN" ? zhCN : enUS) as unknown as GlobalConfigProvider,
-);
 const swatchStyle = computed<CSSProperties>(() => ({ backgroundColor: currentColor.value }));
 const { floatingStyles } = useFloatingPanel(triggerRef, panelRef, open);
 
@@ -195,25 +188,45 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
       tabindex="-1"
       @keydown="onPanelKeydown"
     >
-      <ConfigProvider :global-config="tdesignLocale">
-        <ColorPickerPanel
-          :model-value="draftColor"
-          :color-modes="['monochrome']"
-          format="HEX"
-          :enable-alpha="false"
-          :recent-colors="DISABLED_RECENT_COLORS"
-          :show-primary-color-preview="false"
-          :swatch-colors="[...SWATCH_COLORS]"
-          @change="updateDraft"
-        />
-      </ConfigProvider>
+      <ColorPickerPanel
+        :model-value="draftColor"
+        :color-modes="['monochrome']"
+        format="HEX"
+        :enable-alpha="false"
+        :recent-colors="DISABLED_RECENT_COLORS"
+        :show-primary-color-preview="false"
+        :swatch-colors="[...SWATCH_COLORS]"
+        @change="updateDraft"
+      />
       <div class="cell-color-picker__actions">
-        <button type="button" @click="resetColor">{{ t("format.resetColor") }}</button>
+        <TButton
+          type="button"
+          variant="text"
+          size="small"
+          data-color-action="reset"
+          @click="resetColor"
+        >
+          {{ t("format.resetColor") }}
+        </TButton>
         <span aria-hidden="true" />
-        <button type="button" @click="closePanel(true)">{{ t("format.cancelColor") }}</button>
-        <button type="button" class="is-primary" @click="applyColor">
+        <TButton
+          type="button"
+          variant="outline"
+          size="small"
+          data-color-action="cancel"
+          @click="closePanel(true)"
+        >
+          {{ t("format.cancelColor") }}
+        </TButton>
+        <TButton
+          type="button"
+          theme="primary"
+          size="small"
+          data-color-action="apply"
+          @click="applyColor"
+        >
           {{ t("format.applyColor") }}
-        </button>
+        </TButton>
       </div>
     </div>
   </Teleport>
@@ -286,32 +299,10 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
   &__actions {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
     gap: 6px;
     padding: 8px;
     border-top: 1px solid var(--ui-border-default);
-
-    button {
-      min-height: 28px;
-      padding: 0 10px;
-      background: var(--ui-surface-primary);
-      border: 1px solid var(--ui-border-default);
-      border-radius: var(--ui-radius-control);
-      color: var(--ui-text-primary);
-      cursor: pointer;
-
-      &:hover,
-      &:focus-visible {
-        border-color: var(--ui-border-strong);
-        outline: none;
-        background: var(--ui-surface-hover);
-      }
-
-      &.is-primary {
-        background: var(--ui-brand-primary);
-        border-color: var(--ui-brand-primary);
-        color: var(--ui-surface-primary);
-      }
-    }
   }
 }
 </style>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Bold, Italic, Underline } from "lucide-vue-next";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import type { CellStylePatch } from "../../workbook/cell-style";
 import type { SelectionCellStyleState, ToggleStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
@@ -26,8 +27,11 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
 
 <template>
   <div class="text-format-controls" role="group" :aria-label="t('format.emphasis')">
-    <button
+    <TButton
       type="button"
+      variant="text"
+      shape="square"
+      size="small"
       class="text-format-controls__button"
       :class="{ 'is-active': state.bold === 'on', 'is-mixed': state.bold === 'mixed' }"
       :disabled="disabled"
@@ -36,10 +40,15 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
       :aria-pressed="ariaPressed(state.bold)"
       @click="toggle('bold', state.bold)"
     >
-      <Bold :size="17" :stroke-width="2.2" aria-hidden="true" />
-    </button>
-    <button
+      <template #icon>
+        <Bold :size="17" :stroke-width="2.2" aria-hidden="true" />
+      </template>
+    </TButton>
+    <TButton
       type="button"
+      variant="text"
+      shape="square"
+      size="small"
       class="text-format-controls__button"
       :class="{ 'is-active': state.italic === 'on', 'is-mixed': state.italic === 'mixed' }"
       :disabled="disabled"
@@ -48,10 +57,15 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
       :aria-pressed="ariaPressed(state.italic)"
       @click="toggle('italic', state.italic)"
     >
-      <Italic :size="17" :stroke-width="2.2" aria-hidden="true" />
-    </button>
-    <button
+      <template #icon>
+        <Italic :size="17" :stroke-width="2.2" aria-hidden="true" />
+      </template>
+    </TButton>
+    <TButton
       type="button"
+      variant="text"
+      shape="square"
+      size="small"
       class="text-format-controls__button"
       :class="{ 'is-active': state.underline === 'on', 'is-mixed': state.underline === 'mixed' }"
       :disabled="disabled"
@@ -60,8 +74,10 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
       :aria-pressed="ariaPressed(state.underline)"
       @click="toggle('underline', state.underline)"
     >
-      <Underline :size="17" :stroke-width="2.2" aria-hidden="true" />
-    </button>
+      <template #icon>
+        <Underline :size="17" :stroke-width="2.2" aria-hidden="true" />
+      </template>
+    </TButton>
   </div>
 </template>
 
@@ -73,27 +89,8 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
 
   &__button {
     position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     width: 30px;
     height: 28px;
-    padding: 0;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: var(--ui-radius-control);
-    color: var(--ui-text-primary);
-    cursor: pointer;
-
-    &:hover:not(:disabled) {
-      background: var(--ui-surface-hover);
-    }
-
-    &:focus-visible {
-      border-color: var(--ui-brand-primary);
-      outline: none;
-      box-shadow: 0 0 0 2px var(--ui-brand-soft);
-    }
 
     &.is-active {
       background: var(--ui-brand-soft);
@@ -108,11 +105,6 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
       height: 2px;
       background: var(--ui-text-muted);
       content: "";
-    }
-
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.45;
     }
   }
 }

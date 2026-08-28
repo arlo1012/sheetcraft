@@ -8,6 +8,9 @@ import {
   Scaling,
   Trash2,
 } from "lucide-vue-next";
+import { Button as TButton } from "tdesign-vue-next/es/button";
+import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
+import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   useFloatingPanel,
@@ -37,8 +40,8 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 const menuRef = ref<HTMLDivElement | null>(null);
-const countDraft = ref(props.selectionCount);
-const sizeDraft = ref(props.currentSize);
+const countDraft = ref<InputNumberValue>(props.selectionCount);
+const sizeDraft = ref<InputNumberValue | undefined>(props.currentSize);
 const menuOpen = computed(() => true);
 const menuAnchor = computed(() => props.anchor);
 const { floatingStyles: menuStyle } = useFloatingPanel(menuAnchor, menuRef, menuOpen, {
@@ -65,11 +68,16 @@ watch(
   },
 );
 
-function normalizeInteger(value: number | undefined, minimum: number, maximum: number): number {
-  if (!Number.isFinite(value)) {
+function normalizeInteger(
+  value: InputNumberValue | undefined,
+  minimum: number,
+  maximum: number,
+): number {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
     return minimum;
   }
-  return Math.min(maximum, Math.max(minimum, Math.round(value ?? minimum)));
+  return Math.min(maximum, Math.max(minimum, Math.round(numericValue)));
 }
 
 function normalizeInsertCount(): number {
@@ -82,12 +90,27 @@ function requestInsert(direction: "before" | "after"): void {
 }
 
 function requestResize(): void {
-  if (sizeDraft.value === undefined) {
+  if (sizeDraft.value === undefined || sizeDraft.value === "") {
     return;
   }
   const size = normalizeInteger(sizeDraft.value, props.minimumSize, props.maximumSize);
   sizeDraft.value = size;
+  if (size === props.currentSize) {
+    return;
+  }
   emit("resize", size);
+}
+
+function updateCountDraft(value: InputNumberValue): void {
+  countDraft.value = value;
+}
+
+function updateSizeDraft(value: InputNumberValue): void {
+  sizeDraft.value = value;
+}
+
+function blurNumberInput(_value: InputNumberValue, context: { e: KeyboardEvent }): void {
+  (context.e.target as HTMLInputElement).blur();
 }
 
 function getInsertLabel(direction: "before" | "after"): string {
@@ -154,7 +177,8 @@ function onPopoverKeydown(event: KeyboardEvent): void {
     return;
   }
   const items = [
-    ...(menuRef.value?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []),
+    ...(menuRef.value?.querySelectorAll<HTMLButtonElement>("[data-axis-action]:not(:disabled)") ??
+      []),
   ];
   const currentIndex = items.indexOf(event.target as HTMLButtonElement);
   let nextIndex: number | undefined;
@@ -177,7 +201,7 @@ onMounted(() => {
   document.addEventListener("pointerdown", onDocumentPointerDown);
   document.addEventListener("keydown", onDocumentKeydown);
   void nextTick(() =>
-    menuRef.value?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus(),
+    menuRef.value?.querySelector<HTMLButtonElement>("[data-axis-action]:not(:disabled)")?.focus(),
   );
 });
 
@@ -201,53 +225,107 @@ onBeforeUnmount(() => {
     >
       <label class="sheet-axis-context-menu__count-row">
         <span>{{ t("axisMenu.insertCount") }}</span>
-        <input
-          v-model.number="countDraft"
-          type="number"
-          min="1"
+        <TInputNumber
+          class="sheet-axis-context-menu__number-input"
+          theme="normal"
+          size="small"
+          align="right"
+          :model-value="countDraft"
+          :min="1"
           :max="Math.max(1, maximumInsertCount)"
-          @change="normalizeInsertCount"
+          :decimal-places="0"
+          :step="1"
+          :allow-input-over-limit="true"
+          @change="updateCountDraft"
+          @blur="normalizeInsertCount"
+          @enter="blurNumberInput"
         />
         <span>{{ axisUnit }}</span>
       </label>
-      <button
+      <TButton
         type="button"
+        variant="text"
+        size="small"
+        block
+        class="sheet-axis-context-menu__action"
+        data-axis-action="insert-before"
         :disabled="insertCount > maxBeforeCount"
         @click="requestInsert('before')"
       >
-        <ArrowUp v-if="axis === 'row'" :size="15" aria-hidden="true" />
-        <ArrowLeft v-else :size="15" aria-hidden="true" />
-        <span>{{ getInsertLabel("before") }}</span>
-      </button>
-      <button type="button" :disabled="insertCount > maxAfterCount" @click="requestInsert('after')">
-        <ArrowDown v-if="axis === 'row'" :size="15" aria-hidden="true" />
-        <ArrowRight v-else :size="15" aria-hidden="true" />
-        <span>{{ getInsertLabel("after") }}</span>
-      </button>
+        <template #icon>
+          <ArrowUp v-if="axis === 'row'" :size="15" aria-hidden="true" />
+          <ArrowLeft v-else :size="15" aria-hidden="true" />
+        </template>
+        {{ getInsertLabel("before") }}
+      </TButton>
+      <TButton
+        type="button"
+        variant="text"
+        size="small"
+        block
+        class="sheet-axis-context-menu__action"
+        data-axis-action="insert-after"
+        :disabled="insertCount > maxAfterCount"
+        @click="requestInsert('after')"
+      >
+        <template #icon>
+          <ArrowDown v-if="axis === 'row'" :size="15" aria-hidden="true" />
+          <ArrowRight v-else :size="15" aria-hidden="true" />
+        </template>
+        {{ getInsertLabel("after") }}
+      </TButton>
 
       <label v-if="currentSize !== undefined" class="sheet-axis-context-menu__size-row">
         <Scaling :size="15" aria-hidden="true" />
         <span>{{ t(axis === "row" ? "axisMenu.rowHeight" : "axisMenu.columnWidth") }}</span>
-        <input
-          v-model.number="sizeDraft"
-          type="number"
+        <TInputNumber
+          class="sheet-axis-context-menu__number-input"
+          theme="normal"
+          size="small"
+          align="right"
+          :model-value="sizeDraft"
           :min="minimumSize"
           :max="maximumSize"
-          @change="requestResize"
-          @keydown.enter.prevent="requestResize"
+          :decimal-places="0"
+          :step="1"
+          :allow-input-over-limit="true"
+          @change="updateSizeDraft"
+          @blur="requestResize"
+          @enter="blurNumberInput"
         />
         <span>{{ t("axisMenu.pixels") }}</span>
       </label>
 
       <div class="sheet-axis-context-menu__separator" role="separator" />
-      <button type="button" @click="emit('delete')">
-        <Trash2 :size="15" aria-hidden="true" />
-        <span>{{ getSelectionActionLabel("delete") }}</span>
-      </button>
-      <button type="button" @click="emit('clear')">
-        <Eraser :size="15" aria-hidden="true" />
-        <span>{{ getSelectionActionLabel("clear") }}</span>
-      </button>
+      <TButton
+        type="button"
+        theme="danger"
+        variant="text"
+        size="small"
+        block
+        class="sheet-axis-context-menu__action"
+        data-axis-action="delete"
+        @click="emit('delete')"
+      >
+        <template #icon>
+          <Trash2 :size="15" aria-hidden="true" />
+        </template>
+        {{ getSelectionActionLabel("delete") }}
+      </TButton>
+      <TButton
+        type="button"
+        variant="text"
+        size="small"
+        block
+        class="sheet-axis-context-menu__action"
+        data-axis-action="clear"
+        @click="emit('clear')"
+      >
+        <template #icon>
+          <Eraser :size="15" aria-hidden="true" />
+        </template>
+        {{ getSelectionActionLabel("clear") }}
+      </TButton>
     </div>
   </Teleport>
 </template>
@@ -267,52 +345,22 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   box-shadow: 0 8px 24px rgb(32 36 44 / 18%);
 
-  button {
+  &__action {
     display: grid;
     grid-template-columns: 20px minmax(0, 1fr);
     align-items: center;
+    justify-content: stretch;
+    width: 100%;
     min-height: 32px;
     padding: 0 8px;
-    background: transparent;
-    border: 0;
-    border-radius: 3px;
-    color: var(--ui-text-primary);
-    font: inherit;
     font-size: 12px;
     letter-spacing: 0;
     text-align: left;
-    cursor: pointer;
-
-    &:hover:not(:disabled),
-    &:focus-visible {
-      background: var(--ui-brand-soft);
-      outline: none;
-    }
-
-    &:disabled {
-      color: var(--ui-text-muted);
-      cursor: not-allowed;
-      opacity: 0.55;
-    }
   }
 
-  input {
-    width: 48px;
-    height: 24px;
+  &__number-input {
+    width: 56px;
     min-width: 0;
-    padding: 0 4px;
-    background: var(--ui-surface-primary);
-    border: 1px solid var(--ui-border-default);
-    border-radius: 3px;
-    color: var(--ui-text-primary);
-    font-size: 12px;
-    letter-spacing: 0;
-    text-align: right;
-
-    &:focus-visible {
-      border-color: var(--ui-brand-primary);
-      outline: 1px solid var(--ui-brand-primary);
-    }
   }
 
   &__count-row {
@@ -323,10 +371,6 @@ onBeforeUnmount(() => {
     padding: 0 8px;
     color: var(--ui-text-secondary);
     font-size: 12px;
-
-    input {
-      width: 56px;
-    }
 
     > span:last-child {
       padding-left: 5px;
@@ -341,10 +385,6 @@ onBeforeUnmount(() => {
     padding: 0 8px;
     color: var(--ui-text-primary);
     font-size: 12px;
-
-    input {
-      width: 56px;
-    }
 
     > span:last-child {
       padding-left: 5px;

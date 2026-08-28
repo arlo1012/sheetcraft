@@ -196,8 +196,8 @@ describe("SheetGrid axis selection", () => {
     });
     const dialog = getFloatingDialog();
     expect(dialog.text()).toContain("Insert 1 row below");
-    await dialog.get('input[type="number"]').setValue(2);
-    await dialog.findAll("button")[1]?.trigger("click");
+    await dialog.get(".sheet-axis-context-menu__count-row input").setValue(2);
+    await dialog.get('[data-axis-action="insert-after"]').trigger("click");
     expect(getCellValue(sheet, { row: 2, column: 0 })).toBe("selected");
     expect(getCellValue(sheet, { row: 3, column: 0 })).toBeNull();
     expect(getCellValue(sheet, { row: 5, column: 0 })).toBe("move");
@@ -219,10 +219,7 @@ describe("SheetGrid axis selection", () => {
       clientY: 96,
     });
     expect(getFloatingDialog().text()).toContain("Delete 2 rows");
-    await getFloatingDialog()
-      .findAll("button")
-      .find((button) => button.text().includes("Delete 2 rows"))
-      ?.trigger("click");
+    await getFloatingDialog().get('[data-axis-action="delete"]').trigger("click");
 
     expect(getCellValue(sheet, { row: 2, column: 0 })).toBe("keep");
     expect(session.history.undoStack).toHaveLength(1);
@@ -239,8 +236,8 @@ describe("SheetGrid axis selection", () => {
     });
     const dialog = getFloatingDialog();
     expect(dialog.text()).toContain("Insert 1 column after");
-    await dialog.get('input[type="number"]').setValue(2);
-    await dialog.findAll("button")[1]?.trigger("click");
+    await dialog.get(".sheet-axis-context-menu__count-row input").setValue(2);
+    await dialog.get('[data-axis-action="insert-after"]').trigger("click");
 
     expect(getCellValue(sheet, { row: 0, column: 2 })).toBe("selected");
     expect(getCellValue(sheet, { row: 0, column: 3 })).toBeNull();
@@ -258,10 +255,7 @@ describe("SheetGrid axis selection", () => {
       clientX: 336,
       clientY: 16,
     });
-    await getFloatingDialog()
-      .findAll("button")
-      .find((button) => button.text().includes("Delete 2 columns"))
-      ?.trigger("click");
+    await getFloatingDialog().get('[data-axis-action="delete"]').trigger("click");
 
     expect(getCellValue(sheet, { row: 0, column: 2 })).toBe("keep");
     expect(session.history.undoStack).toHaveLength(1);
@@ -276,9 +270,13 @@ describe("SheetGrid axis selection", () => {
     await rowHeader.trigger("keydown", { key: "F10", shiftKey: true });
     const dialog = getFloatingDialog();
     expect(dialog.attributes("aria-label")).toBe("Row actions");
-    const sizeInput = dialog.findAll('input[type="number"]')[1];
-    await sizeInput?.setValue(40);
-    await sizeInput?.trigger("change");
+    const sizeInput = dialog.get(".sheet-axis-context-menu__size-row input");
+    await sizeInput.trigger("blur");
+    expect(session.history.undoStack).toHaveLength(0);
+
+    await sizeInput.setValue(40);
+    (sizeInput.element as HTMLInputElement).focus();
+    await sizeInput.trigger("keydown", { key: "Enter" });
     expect(getRowHeight(sheet, 2)).toBe(40);
     expect(session.history.undoStack).toHaveLength(1);
 
@@ -286,10 +284,7 @@ describe("SheetGrid axis selection", () => {
       clientX: 16,
       clientY: 72,
     });
-    await getFloatingDialog()
-      .findAll("button")
-      .find((button) => button.text().includes("Clear row contents"))
-      ?.trigger("click");
+    await getFloatingDialog().get('[data-axis-action="clear"]').trigger("click");
     expect(getCellValue(sheet, { row: 2, column: 1 })).toBeNull();
     expect(session.history.undoStack).toHaveLength(2);
   });
@@ -304,7 +299,15 @@ describe("SheetGrid axis selection", () => {
       (rowHeader.element as HTMLButtonElement).focus();
       await rowHeader.trigger("keydown", { key: "F10", shiftKey: true });
       const dialog = getFloatingDialog();
-      expect(dialog.element.contains(document.activeElement)).toBe(true);
+      const actions = dialog.findAll<HTMLButtonElement>("[data-axis-action]");
+      expect(document.activeElement).toBe(actions[0]?.element);
+
+      await actions[0]?.trigger("keydown", { key: "ArrowDown" });
+      expect(document.activeElement).toBe(actions[1]?.element);
+      await actions[1]?.trigger("keydown", { key: "End" });
+      expect(document.activeElement).toBe(actions.at(-1)?.element);
+      await actions.at(-1)?.trigger("keydown", { key: "Home" });
+      expect(document.activeElement).toBe(actions[0]?.element);
 
       await dialog.trigger("keydown", { key: "Escape" });
 

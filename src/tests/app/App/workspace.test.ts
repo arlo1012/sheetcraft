@@ -1,6 +1,8 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
+import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { afterEach, describe, expect, test } from "vitest";
 import App from "../../../app/App.vue";
+import LocaleSwitcher from "../../../app/LocaleSwitcher.vue";
 import { createAppI18n, type AppLocale } from "../../../shared/i18n";
 
 function mountApp(locale: AppLocale = "en-US") {
@@ -11,6 +13,14 @@ function mountApp(locale: AppLocale = "en-US") {
   });
   mountedWrappers.push(wrapper);
   return wrapper;
+}
+
+function getAddressInput(wrapper: ReturnType<typeof mountApp>) {
+  return wrapper.get<HTMLInputElement>(".grid-navigation-bar__address-input input");
+}
+
+function getSearchInput(wrapper: ReturnType<typeof mountApp>) {
+  return wrapper.get<HTMLInputElement>(".grid-navigation-bar__search-input input");
 }
 
 const mountedWrappers: Array<{ unmount(): void }> = [];
@@ -35,6 +45,9 @@ describe("App", () => {
   test("creates, renames, and deletes sheets from the sheet tabs", async () => {
     const wrapper = mountApp();
 
+    expect(
+      (wrapper.get('[aria-label="Delete active sheet"]').element as HTMLButtonElement).disabled,
+    ).toBe(true);
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
     expect(wrapper.findAll('[role="tab"]')).toHaveLength(2);
     expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet2");
@@ -87,7 +100,7 @@ describe("App", () => {
 
   test("navigates to an A1 address and finds sparse sheet values", async () => {
     const wrapper = mountApp();
-    const addressInput = wrapper.get('[aria-label="Cell address"]');
+    const addressInput = getAddressInput(wrapper);
 
     await addressInput.setValue("D20");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
@@ -99,7 +112,7 @@ describe("App", () => {
     await editor.trigger("keydown", { key: "Enter" });
     await addressInput.setValue("A1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
-    await wrapper.get('[aria-label="Find in sheet"]').setValue("needle");
+    await getSearchInput(wrapper).setValue("needle");
     await wrapper.get('[aria-label="Find next"]').trigger("click");
 
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("D20");
@@ -109,12 +122,12 @@ describe("App", () => {
   test("reports invalid addresses and missing search results without moving", async () => {
     const wrapper = mountApp();
 
-    await wrapper.get('[aria-label="Cell address"]').setValue("XFE1");
+    await getAddressInput(wrapper).setValue("XFE1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
     expect(wrapper.text()).toContain("Invalid address");
 
-    await wrapper.get('[aria-label="Find in sheet"]').setValue("missing");
+    await getSearchInput(wrapper).setValue("missing");
     await wrapper.get('[aria-label="Find next"]').trigger("click");
     expect(wrapper.text()).toContain("No matches");
   });
@@ -125,14 +138,14 @@ describe("App", () => {
     await editor.trigger("compositionstart");
     await editor.setValue("中文");
 
-    await wrapper.get('[aria-label="Cell address"]').setValue("C3");
+    await getAddressInput(wrapper).setValue("C3");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
 
     await editor.trigger("compositionend", { data: "中文" });
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("C3");
 
-    await wrapper.get('[aria-label="Cell address"]').setValue("A1");
+    await getAddressInput(wrapper).setValue("A1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
     expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain("中文");
   });
@@ -158,15 +171,17 @@ describe("App", () => {
   test("switches visible, status, and assistive text between English and Chinese", async () => {
     const wrapper = mountApp();
 
-    await wrapper.get('[aria-label="Cell address"]').setValue("XFE1");
+    await getAddressInput(wrapper).setValue("XFE1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
     expect(wrapper.text()).toContain("Invalid address");
 
-    await wrapper.get('select[aria-label="Language"]').setValue("zh-CN");
+    const localeSelect = wrapper.findComponent(LocaleSwitcher).findComponent(TSelect);
+    localeSelect.vm.$emit("change", "zh-CN");
+    await wrapper.vm.$nextTick();
 
     expect(wrapper.get("[data-app-root]").attributes("aria-label")).toBe("idea10 工作区");
     expect(wrapper.get("section.sheet-grid").attributes("aria-label")).toBe("Sheet1 工作表");
-    expect(wrapper.get('select[aria-label="语言"]').element).toBeInstanceOf(HTMLSelectElement);
+    expect(wrapper.get("[data-locale-select] input").element).toBeInstanceOf(HTMLInputElement);
     expect(wrapper.get(".home-format-toolbar").attributes("aria-label")).toBe("单元格格式");
     expect(wrapper.text()).toContain("单元格地址无效");
     expect(wrapper.text()).toContain("就绪");

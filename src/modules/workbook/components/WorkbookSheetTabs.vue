@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Plus, Trash2 } from "lucide-vue-next";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { nextTick, ref, type ComponentPublicInstance } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { Sheet } from "../workbook";
@@ -110,25 +111,35 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
         </button>
       </div>
     </div>
-    <button
+    <TButton
       class="workbook-sheet-tabs__delete"
       type="button"
+      variant="text"
+      shape="square"
+      size="small"
       :aria-label="t('sheetTabs.deleteActive')"
       :title="t('sheetTabs.deleteActive')"
       :disabled="props.sheets.length === 1"
       @click="emit('delete', props.activeSheetId)"
     >
-      <Trash2 :size="14" aria-hidden="true" />
-    </button>
-    <button
+      <template #icon>
+        <Trash2 :size="14" aria-hidden="true" />
+      </template>
+    </TButton>
+    <TButton
       class="workbook-sheet-tabs__add"
       type="button"
+      variant="text"
+      shape="square"
+      size="small"
       :aria-label="t('sheetTabs.add')"
       :title="t('sheetTabs.add')"
       @click="emit('add')"
     >
-      <Plus :size="16" aria-hidden="true" />
-    </button>
+      <template #icon>
+        <Plus :size="16" aria-hidden="true" />
+      </template>
+    </TButton>
   </div>
 </template>
 
@@ -158,7 +169,6 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     background: transparent;
     border: 0;
     color: var(--ui-text-secondary);
-    font: inherit;
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -194,23 +204,9 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
   &__add {
     display: inline-grid;
     width: 30px;
+    height: 100%;
     place-items: center;
-    background: transparent;
-    border: 0;
-    color: var(--ui-text-muted);
-    cursor: pointer;
     border-left: 1px solid var(--ui-border-strong);
-
-    &:hover:not(:disabled),
-    &:focus-visible:not(:disabled) {
-      background: var(--ui-surface-primary);
-      color: var(--ui-text-primary);
-    }
-
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.45;
-    }
   }
 
   &__add {

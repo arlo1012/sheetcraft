@@ -174,7 +174,6 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
     background: transparent;
     border: 0;
     color: inherit;
-    font: inherit;
     cursor: pointer;
 
     &:focus-visible {

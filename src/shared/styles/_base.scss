@@ -17,6 +17,25 @@
     min-height: 100dvh;
     background: var(--ui-surface-canvas);
     color: var(--ui-text-primary);
+
+    --td-brand-color: var(--ui-brand-primary);
+    --td-brand-color-hover: var(--ui-brand-primary);
+    --td-brand-color-focus: var(--ui-brand-soft);
+    --td-brand-color-active: var(--ui-brand-primary);
+    --td-brand-color-disabled: var(--ui-border-strong);
+    --td-brand-color-light: var(--ui-brand-soft);
+    --td-brand-color-light-hover: var(--ui-brand-soft);
+    --td-bg-color-container: var(--ui-surface-primary);
+    --td-bg-color-container-hover: var(--ui-surface-hover);
+    --td-bg-color-container-active: var(--ui-surface-muted);
+    --td-bg-color-secondarycontainer: var(--ui-surface-muted);
+    --td-bg-color-secondarycontainer-hover: var(--ui-surface-hover);
+    --td-component-stroke: var(--ui-border-default);
+    --td-component-border: var(--ui-border-strong);
+    --td-text-color-primary: var(--ui-text-primary);
+    --td-text-color-secondary: var(--ui-text-secondary);
+    --td-text-color-placeholder: var(--ui-text-muted);
+    --td-radius-default: var(--ui-radius-control);
   }
 
   button,
@@ -24,5 +43,16 @@
   textarea,
   select {
     font: inherit;
+  }
+
+  .ui-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 }

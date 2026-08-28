@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { Languages } from "lucide-vue-next";
+import { Select as TSelect } from "tdesign-vue-next/es/select";
+import type { SelectValue } from "tdesign-vue-next/es/select/type";
+import { computed } from "vue";
 import { isAppLocale, useAppI18n } from "../shared/i18n";
 
 const { locale, setLocale, t } = useAppI18n();
+const localeOptions = computed(() => [
+  { label: t("app.localeChinese"), value: "zh-CN" },
+  { label: t("app.localeEnglish"), value: "en-US" },
+]);
 
-function onLocaleChange(event: Event): void {
-  const locale = (event.target as HTMLSelectElement).value;
-  if (isAppLocale(locale)) {
-    setLocale(locale);
+function onLocaleChange(value: SelectValue): void {
+  if (typeof value === "string" && isAppLocale(value)) {
+    setLocale(value);
   }
 }
 </script>
@@ -15,10 +21,15 @@ function onLocaleChange(event: Event): void {
 <template>
   <label class="locale-switcher">
     <Languages :size="15" aria-hidden="true" />
-    <select :value="locale" :aria-label="t('app.language')" @change="onLocaleChange">
-      <option value="zh-CN">{{ t("app.localeChinese") }}</option>
-      <option value="en-US">{{ t("app.localeEnglish") }}</option>
-    </select>
+    <span class="ui-visually-hidden">{{ t("app.language") }}</span>
+    <TSelect
+      class="locale-switcher__select"
+      data-locale-select
+      size="small"
+      :model-value="locale"
+      :options="localeOptions"
+      @change="onLocaleChange"
+    />
   </label>
 </template>
 
@@ -32,23 +43,8 @@ function onLocaleChange(event: Event): void {
   padding: 0 8px;
   color: var(--ui-text-muted);
 
-  select {
-    height: 26px;
-    padding: 0 22px 0 6px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 3px;
-    color: var(--ui-text-secondary);
-    font-size: 12px;
-    letter-spacing: 0;
-    cursor: pointer;
-
-    &:hover,
-    &:focus-visible {
-      background: var(--ui-surface-primary);
-      border-color: var(--ui-border-default);
-      outline: none;
-    }
+  &__select {
+    width: 96px;
   }
 }
 </style>

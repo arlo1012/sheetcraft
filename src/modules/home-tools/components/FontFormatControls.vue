@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
+import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
+import { Select as TSelect } from "tdesign-vue-next/es/select";
+import type { SelectValue } from "tdesign-vue-next/es/select/type";
+import { computed, ref, watch } from "vue";
 import {
   DEFAULT_CELL_FONT_SIZE,
   MAX_CELL_FONT_SIZE,
@@ -18,6 +22,7 @@ const FONT_FAMILIES = [
   "Microsoft YaHei",
   "SimSun",
 ] as const;
+const FONT_FAMILY_OPTIONS = FONT_FAMILIES.map((family) => ({ label: family, value: family }));
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -30,64 +35,87 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 const fontFamilyValue = computed(() =>
-  props.state.fontFamily.mixed ? "" : (props.state.fontFamily.value ?? DEFAULT_FONT_FAMILY),
+  props.state.fontFamily.mixed ? undefined : (props.state.fontFamily.value ?? DEFAULT_FONT_FAMILY),
 );
-const fontSizeValue = computed(() =>
+const fontSizeValue = computed<InputNumberValue>(() =>
   props.state.fontSize.mixed ? "" : String(props.state.fontSize.value ?? DEFAULT_CELL_FONT_SIZE),
 );
+const fontSizeDraft = ref<InputNumberValue>(fontSizeValue.value);
 
-function readSelectValue(event: Event): string {
-  return (event.target as HTMLSelectElement).value;
-}
-
-function setFontFamily(event: Event): void {
-  const value = readSelectValue(event);
-  if (!value) {
+function setFontFamily(value: SelectValue): void {
+  if (typeof value !== "string" || !value) {
     return;
   }
   emit("applyStyle", { fontFamily: value === DEFAULT_FONT_FAMILY ? null : value });
 }
 
-function setFontSize(event: Event): void {
-  const input = event.target as HTMLInputElement;
-  const value = Number(input.value);
-  if (!Number.isInteger(value) || value < MIN_CELL_FONT_SIZE || value > MAX_CELL_FONT_SIZE) {
-    input.value = fontSizeValue.value;
+function updateFontSizeDraft(value: InputNumberValue): void {
+  fontSizeDraft.value = value;
+}
+
+function commitFontSize(value: InputNumberValue): void {
+  const numericValue = Number(value);
+  if (
+    !Number.isInteger(numericValue) ||
+    numericValue < MIN_CELL_FONT_SIZE ||
+    numericValue > MAX_CELL_FONT_SIZE
+  ) {
+    fontSizeDraft.value = fontSizeValue.value;
     return;
   }
-  emit("applyStyle", { fontSize: value === DEFAULT_CELL_FONT_SIZE ? null : value });
+  const currentValue = props.state.fontSize.value ?? DEFAULT_CELL_FONT_SIZE;
+  if (!props.state.fontSize.mixed && numericValue === currentValue) {
+    return;
+  }
+  emit("applyStyle", {
+    fontSize: numericValue === DEFAULT_CELL_FONT_SIZE ? null : numericValue,
+  });
 }
+
+function commitFontSizeOnEnter(value: InputNumberValue, context: { e: KeyboardEvent }): void {
+  updateFontSizeDraft(value);
+  (context.e.target as HTMLInputElement).blur();
+}
+
+watch(fontSizeValue, (value) => {
+  fontSizeDraft.value = value;
+});
 </script>
 
 <template>
   <div class="font-format-controls" role="group" :aria-label="t('format.font')">
-    <select
-      class="font-format-controls__family"
-      :value="fontFamilyValue"
-      :disabled="disabled"
-      :aria-label="t('format.fontFamily')"
-      :title="t('format.fontFamily')"
-      @change="setFontFamily"
-    >
-      <option v-if="state.fontFamily.mixed" disabled value="">{{ t("format.mixed") }}</option>
-      <option v-for="family in FONT_FAMILIES" :key="family" :value="family">
-        {{ family }}
-      </option>
-    </select>
-    <input
-      class="font-format-controls__size"
-      type="number"
-      inputmode="numeric"
-      :min="MIN_CELL_FONT_SIZE"
-      :max="MAX_CELL_FONT_SIZE"
-      step="1"
-      :value="fontSizeValue"
-      :placeholder="state.fontSize.mixed ? t('format.mixed') : undefined"
-      :disabled="disabled"
-      :aria-label="t('format.fontSize')"
-      :title="t('format.fontSize')"
-      @change="setFontSize"
-    />
+    <label class="font-format-controls__field" :title="t('format.fontFamily')">
+      <span class="ui-visually-hidden">{{ t("format.fontFamily") }}</span>
+      <TSelect
+        class="font-format-controls__family"
+        size="small"
+        :model-value="fontFamilyValue"
+        :options="FONT_FAMILY_OPTIONS"
+        :placeholder="state.fontFamily.mixed ? t('format.mixed') : undefined"
+        :disabled="disabled"
+        @change="setFontFamily"
+      />
+    </label>
+    <label class="font-format-controls__field" :title="t('format.fontSize')">
+      <span class="ui-visually-hidden">{{ t("format.fontSize") }}</span>
+      <TInputNumber
+        class="font-format-controls__size"
+        theme="normal"
+        size="small"
+        align="right"
+        :min="MIN_CELL_FONT_SIZE"
+        :max="MAX_CELL_FONT_SIZE"
+        :decimal-places="0"
+        :step="1"
+        :allow-input-over-limit="true"
+        :model-value="fontSizeDraft"
+        :placeholder="state.fontSize.mixed ? t('format.mixed') : undefined"
+        :disabled="disabled"
+        @change="updateFontSizeDraft"
+        @blur="commitFontSize"
+        @enter="commitFontSizeOnEnter"
+      />
+    </label>
   </div>
 </template>
 
@@ -98,31 +126,9 @@ function setFontSize(event: Event): void {
   align-items: center;
   gap: 4px;
 
-  &__family,
-  &__size {
-    height: 28px;
+  &__field {
+    display: inline-flex;
     min-width: 0;
-    padding: 0 7px;
-    background: var(--ui-surface-primary);
-    border: 1px solid var(--ui-border-default);
-    border-radius: var(--ui-radius-control);
-    color: var(--ui-text-primary);
-    outline: none;
-
-    &:hover:not(:disabled) {
-      border-color: var(--ui-border-strong);
-    }
-
-    &:focus-visible {
-      border-color: var(--ui-brand-primary);
-      box-shadow: 0 0 0 2px var(--ui-brand-soft);
-    }
-
-    &:disabled {
-      color: var(--ui-text-muted);
-      cursor: not-allowed;
-      opacity: 0.62;
-    }
   }
 
   &__family {

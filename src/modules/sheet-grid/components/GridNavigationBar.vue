@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronUp, Search } from "lucide-vue-next";
+import { Button as TButton } from "tdesign-vue-next/es/button";
+import { Input as TInput } from "tdesign-vue-next/es/input";
+import type { InputValue } from "tdesign-vue-next/es/input/type";
 import { ref, watch } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 
@@ -29,6 +32,29 @@ watch(
 function submitAddress(): void {
   emit("navigate", addressDraft.value);
 }
+
+function submitAddressFromInput(_value: InputValue, context: { e: KeyboardEvent }): void {
+  context.e.preventDefault();
+  submitAddress();
+}
+
+function updateAddressDraft(value: InputValue): void {
+  addressDraft.value = String(value).toUpperCase();
+}
+
+function onAddressKeydown(_value: InputValue, context: { e: KeyboardEvent }): void {
+  if (context.e.key === "Escape") {
+    addressDraft.value = props.address;
+  }
+}
+
+function updateSearch(value: InputValue): void {
+  emit("updateSearchQuery", String(value));
+}
+
+function findFromSearch(_value: InputValue, context: { e: KeyboardEvent }): void {
+  emit("find", context.e.shiftKey ? "backward" : "forward");
+}
 </script>
 
 <template>
@@ -38,46 +64,68 @@ function submitAddress(): void {
       :aria-label="t('navigation.goToCell')"
       @submit.prevent="submitAddress"
     >
-      <input
-        v-model="addressDraft"
-        :aria-label="t('navigation.cellAddress')"
-        autocomplete="off"
-        spellcheck="false"
-        @blur="addressDraft = address"
-        @keydown.escape="addressDraft = address"
-      />
+      <label class="grid-navigation-bar__address-control">
+        <span class="ui-visually-hidden">{{ t("navigation.cellAddress") }}</span>
+        <TInput
+          class="grid-navigation-bar__address-input"
+          size="small"
+          :model-value="addressDraft"
+          autocomplete="off"
+          :spell-check="false"
+          @change="updateAddressDraft"
+          @blur="addressDraft = address"
+          @enter="submitAddressFromInput"
+          @keydown="onAddressKeydown"
+        />
+      </label>
     </form>
 
     <div class="grid-navigation-bar__divider" aria-hidden="true" />
 
     <div class="grid-navigation-bar__search" role="search">
       <Search :size="15" aria-hidden="true" />
-      <input
-        :value="searchQuery"
-        :aria-label="t('navigation.findInSheet')"
-        autocomplete="off"
-        :placeholder="t('navigation.findPlaceholder')"
-        spellcheck="false"
-        @input="emit('updateSearchQuery', ($event.target as HTMLInputElement).value)"
-        @keydown.enter.prevent="emit('find', $event.shiftKey ? 'backward' : 'forward')"
-      />
+      <label class="grid-navigation-bar__search-control">
+        <span class="ui-visually-hidden">{{ t("navigation.findInSheet") }}</span>
+        <TInput
+          class="grid-navigation-bar__search-input"
+          size="small"
+          :model-value="searchQuery"
+          autocomplete="off"
+          :placeholder="t('navigation.findPlaceholder')"
+          :spell-check="false"
+          @change="updateSearch"
+          @enter="findFromSearch"
+        />
+      </label>
       <span class="grid-navigation-bar__feedback" aria-live="polite">{{ searchFeedback }}</span>
-      <button
+      <TButton
         type="button"
+        variant="text"
+        shape="square"
+        size="small"
+        class="grid-navigation-bar__search-button"
         :aria-label="t('navigation.findPrevious')"
         :title="t('navigation.findPrevious')"
         @click="emit('find', 'backward')"
       >
-        <ChevronUp :size="15" aria-hidden="true" />
-      </button>
-      <button
+        <template #icon>
+          <ChevronUp :size="15" aria-hidden="true" />
+        </template>
+      </TButton>
+      <TButton
         type="button"
+        variant="text"
+        shape="square"
+        size="small"
+        class="grid-navigation-bar__search-button"
         :aria-label="t('navigation.findNext')"
         :title="t('navigation.findNext')"
         @click="emit('find', 'forward')"
       >
-        <ChevronDown :size="15" aria-hidden="true" />
-      </button>
+        <template #icon>
+          <ChevronDown :size="15" aria-hidden="true" />
+        </template>
+      </TButton>
     </div>
   </div>
 </template>
@@ -92,38 +140,18 @@ function submitAddress(): void {
   background: var(--ui-surface-muted);
   border-bottom: 1px solid var(--ui-border-strong);
 
-  input {
-    height: 26px;
-    min-width: 0;
-    padding: 0 8px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 3px;
-    color: var(--ui-text-primary);
-    font: inherit;
-    letter-spacing: 0;
-    outline: none;
-
-    &:hover {
-      border-color: var(--ui-border-default);
-    }
-
-    &:focus {
-      background: var(--ui-surface-primary);
-      border-color: var(--ui-brand-primary);
-    }
-  }
-
   &__address {
     flex: 0 0 92px;
+  }
 
-    input {
-      width: 100%;
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      box-sizing: border-box;
-    }
+  &__address-control,
+  &__search-control {
+    display: block;
+    min-width: 0;
+  }
+
+  &__address-input {
+    width: 100%;
   }
 
   &__divider {
@@ -138,34 +166,20 @@ function submitAddress(): void {
     align-items: center;
     min-width: 0;
     color: var(--ui-text-muted);
+  }
 
-    input {
-      width: min(220px, 28vw);
-      font-size: 12px;
-    }
+  &__search-control {
+    width: min(220px, 28vw);
+  }
 
-    button {
-      display: inline-grid;
-      place-items: center;
-      width: 26px;
-      height: 26px;
-      padding: 0;
-      background: transparent;
-      border: 0;
-      border-radius: 3px;
-      color: var(--ui-text-secondary);
-      cursor: pointer;
+  &__search-input {
+    width: 100%;
+  }
 
-      &:hover {
-        background: var(--ui-surface-primary);
-        color: var(--ui-text-primary);
-      }
-
-      &:focus-visible {
-        outline: 2px solid var(--ui-brand-primary);
-        outline-offset: -2px;
-      }
-    }
+  &__search-button {
+    flex: 0 0 26px;
+    width: 26px;
+    height: 26px;
   }
 
   &__feedback {

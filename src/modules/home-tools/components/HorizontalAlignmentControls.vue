@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { TextAlignCenter, TextAlignEnd, TextAlignStart } from "lucide-vue-next";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { computed } from "vue";
 import type { CellStylePatch, HorizontalCellAlignment } from "../../workbook/cell-style";
 import type { SelectionCellStyleState } from "../../workbook/style-state";
@@ -42,8 +43,11 @@ function align(alignment: HorizontalCellAlignment): void {
     role="group"
     :aria-label="groupLabel"
   >
-    <button
+    <TButton
       type="button"
+      variant="text"
+      shape="square"
+      size="small"
       class="horizontal-alignment-controls__button"
       :class="{ 'is-active': isActive('left') }"
       :disabled="disabled"
@@ -52,10 +56,15 @@ function align(alignment: HorizontalCellAlignment): void {
       :aria-pressed="isActive('left')"
       @click="align('left')"
     >
-      <TextAlignStart :size="17" :stroke-width="2" aria-hidden="true" />
-    </button>
-    <button
+      <template #icon>
+        <TextAlignStart :size="17" :stroke-width="2" aria-hidden="true" />
+      </template>
+    </TButton>
+    <TButton
       type="button"
+      variant="text"
+      shape="square"
+      size="small"
       class="horizontal-alignment-controls__button"
       :class="{ 'is-active': isActive('center') }"
       :disabled="disabled"
@@ -64,10 +73,15 @@ function align(alignment: HorizontalCellAlignment): void {
       :aria-pressed="isActive('center')"
       @click="align('center')"
     >
-      <TextAlignCenter :size="17" :stroke-width="2" aria-hidden="true" />
-    </button>
-    <button
+      <template #icon>
+        <TextAlignCenter :size="17" :stroke-width="2" aria-hidden="true" />
+      </template>
+    </TButton>
+    <TButton
       type="button"
+      variant="text"
+      shape="square"
+      size="small"
       class="horizontal-alignment-controls__button"
       :class="{ 'is-active': isActive('right') }"
       :disabled="disabled"
@@ -76,8 +90,10 @@ function align(alignment: HorizontalCellAlignment): void {
       :aria-pressed="isActive('right')"
       @click="align('right')"
     >
-      <TextAlignEnd :size="17" :stroke-width="2" aria-hidden="true" />
-    </button>
+      <template #icon>
+        <TextAlignEnd :size="17" :stroke-width="2" aria-hidden="true" />
+      </template>
+    </TButton>
   </div>
 </template>
 
@@ -89,36 +105,12 @@ function align(alignment: HorizontalCellAlignment): void {
   align-items: center;
 
   &__button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     width: 30px;
     height: 28px;
-    padding: 0;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: var(--ui-radius-control);
-    color: var(--ui-text-primary);
-    cursor: pointer;
-
-    &:hover:not(:disabled) {
-      background: var(--ui-surface-hover);
-    }
-
-    &:focus-visible {
-      border-color: var(--ui-brand-primary);
-      outline: none;
-      box-shadow: 0 0 0 2px var(--ui-brand-soft);
-    }
 
     &.is-active {
       background: var(--ui-brand-soft);
       color: var(--ui-brand-primary);
-    }
-
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.45;
     }
   }
 
