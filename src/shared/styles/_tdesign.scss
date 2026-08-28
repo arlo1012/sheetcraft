@@ -1,0 +1,50 @@
+body {
+  --td-font-family: var(--ui-font-family);
+  --td-font-family-medium: var(--ui-font-family);
+  --td-brand-color: var(--ui-brand-primary);
+  --td-brand-color-hover: var(--ui-brand-hover);
+  --td-brand-color-focus: var(--ui-brand-soft);
+  --td-brand-color-active: var(--ui-brand-active);
+  --td-brand-color-disabled: var(--ui-brand-disabled);
+  --td-brand-color-light: var(--ui-brand-soft);
+  --td-brand-color-light-hover: var(--ui-brand-soft-hover);
+  --td-bg-color-container: var(--ui-surface-primary);
+  --td-bg-color-container-hover: var(--ui-surface-hover);
+  --td-bg-color-container-active: var(--ui-surface-muted);
+  --td-bg-color-container-select: var(--ui-surface-primary);
+  --td-bg-color-specialcomponent: var(--ui-surface-primary);
+  --td-bg-color-secondarycontainer: var(--ui-surface-muted);
+  --td-bg-color-secondarycontainer-hover: var(--ui-surface-hover);
+  --td-bg-color-secondarycontainer-active: var(--ui-border-default);
+  --td-bg-color-component: var(--ui-surface-muted);
+  --td-bg-color-component-hover: var(--ui-surface-hover);
+  --td-bg-color-component-active: var(--ui-border-default);
+  --td-bg-color-component-disabled: var(--ui-surface-muted);
+  --td-component-stroke: var(--ui-border-default);
+  --td-component-border: var(--ui-border-strong);
+  --td-border-level-1-color: var(--ui-border-default);
+  --td-border-level-2-color: var(--ui-border-default);
+  --td-text-color-primary: var(--ui-text-primary);
+  --td-text-color-secondary: var(--ui-text-secondary);
+  --td-text-color-placeholder: var(--ui-text-muted);
+  --td-text-color-disabled: var(--ui-text-disabled);
+  --td-text-color-brand: var(--ui-brand-primary);
+  --td-error-color: var(--ui-status-danger);
+  --td-error-color-hover: var(--ui-status-danger-hover);
+  --td-error-color-active: var(--ui-status-danger-active);
+  --td-error-color-focus: var(--ui-status-danger-focus);
+  --td-error-color-disabled: var(--ui-status-danger-disabled);
+  --td-comp-size-xs: var(--ui-control-height-small);
+  --td-radius-default: var(--ui-radius-control);
+  --td-radius-medium: var(--ui-radius-surface);
+  --td-shadow-2: var(--ui-floating-shadow);
+}
+
+.ui-toolbar-icon-button {
+  min-width: var(--ui-toolbar-icon-control-width);
+
+  &.is-active {
+    background: var(--ui-state-selected-background);
+    color: var(--ui-state-selected-foreground);
+  }
+}

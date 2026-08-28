@@ -48,7 +48,7 @@ function align(alignment: HorizontalCellAlignment): void {
       variant="text"
       shape="square"
       size="small"
-      class="horizontal-alignment-controls__button"
+      class="ui-toolbar-icon-button horizontal-alignment-controls__button"
       :class="{ 'is-active': isActive('left') }"
       :disabled="disabled"
       :aria-label="t('format.alignLeft')"
@@ -65,7 +65,7 @@ function align(alignment: HorizontalCellAlignment): void {
       variant="text"
       shape="square"
       size="small"
-      class="horizontal-alignment-controls__button"
+      class="ui-toolbar-icon-button horizontal-alignment-controls__button"
       :class="{ 'is-active': isActive('center') }"
       :disabled="disabled"
       :aria-label="t('format.alignCenter')"
@@ -82,7 +82,7 @@ function align(alignment: HorizontalCellAlignment): void {
       variant="text"
       shape="square"
       size="small"
-      class="horizontal-alignment-controls__button"
+      class="ui-toolbar-icon-button horizontal-alignment-controls__button"
       :class="{ 'is-active': isActive('right') }"
       :disabled="disabled"
       :aria-label="t('format.alignRight')"
@@ -103,16 +103,6 @@ function align(alignment: HorizontalCellAlignment): void {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-
-  &__button {
-    width: 30px;
-    height: 28px;
-
-    &.is-active {
-      background: var(--ui-brand-soft);
-      color: var(--ui-brand-primary);
-    }
-  }
 
   &.is-mixed::after {
     position: absolute;

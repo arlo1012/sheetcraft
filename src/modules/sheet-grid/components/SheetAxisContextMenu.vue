@@ -335,15 +335,15 @@ onBeforeUnmount(() => {
   z-index: 100;
   display: grid;
   width: 272px;
-  max-width: calc(100vw - 16px);
-  max-height: calc(100vh - 16px);
+  max-width: calc(100vw - var(--ui-floating-viewport-inset) - var(--ui-floating-viewport-inset));
+  max-height: calc(100vh - var(--ui-floating-viewport-inset) - var(--ui-floating-viewport-inset));
   padding: 4px;
   overflow-y: auto;
   overscroll-behavior: contain;
   background: var(--ui-surface-primary);
   border: 1px solid var(--ui-border-strong);
-  border-radius: 4px;
-  box-shadow: 0 8px 24px rgb(32 36 44 / 18%);
+  border-radius: var(--ui-radius-control);
+  box-shadow: var(--ui-floating-shadow);
 
   &__action {
     display: grid;

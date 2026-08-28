@@ -177,9 +177,7 @@ function findFromSearch(_value: InputValue, context: { e: KeyboardEvent }): void
   }
 
   &__search-button {
-    flex: 0 0 26px;
-    width: 26px;
-    height: 26px;
+    flex: 0 0 auto;
   }
 
   &__feedback {

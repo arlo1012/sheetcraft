@@ -282,13 +282,13 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
 
   &__panel {
     z-index: 100;
-    max-width: calc(100vw - 16px);
-    max-height: calc(100vh - 16px);
+    max-width: calc(100vw - var(--ui-floating-viewport-inset) - var(--ui-floating-viewport-inset));
+    max-height: calc(100vh - var(--ui-floating-viewport-inset) - var(--ui-floating-viewport-inset));
     overflow: auto;
     background: var(--ui-surface-primary);
     border: 1px solid var(--ui-border-strong);
     border-radius: var(--ui-radius-surface);
-    box-shadow: 0 8px 24px rgb(32 36 44 / 18%);
+    box-shadow: var(--ui-floating-shadow);
 
     &:focus-visible {
       outline: 2px solid var(--ui-brand-primary);

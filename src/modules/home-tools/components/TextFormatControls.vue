@@ -32,7 +32,7 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
       variant="text"
       shape="square"
       size="small"
-      class="text-format-controls__button"
+      class="ui-toolbar-icon-button text-format-controls__button"
       :class="{ 'is-active': state.bold === 'on', 'is-mixed': state.bold === 'mixed' }"
       :disabled="disabled"
       :aria-label="t('format.bold')"
@@ -49,7 +49,7 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
       variant="text"
       shape="square"
       size="small"
-      class="text-format-controls__button"
+      class="ui-toolbar-icon-button text-format-controls__button"
       :class="{ 'is-active': state.italic === 'on', 'is-mixed': state.italic === 'mixed' }"
       :disabled="disabled"
       :aria-label="t('format.italic')"
@@ -66,7 +66,7 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
       variant="text"
       shape="square"
       size="small"
-      class="text-format-controls__button"
+      class="ui-toolbar-icon-button text-format-controls__button"
       :class="{ 'is-active': state.underline === 'on', 'is-mixed': state.underline === 'mixed' }"
       :disabled="disabled"
       :aria-label="t('format.underline')"
@@ -89,13 +89,6 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
 
   &__button {
     position: relative;
-    width: 30px;
-    height: 28px;
-
-    &.is-active {
-      background: var(--ui-brand-soft);
-      color: var(--ui-brand-primary);
-    }
 
     &.is-mixed::after {
       position: absolute;
