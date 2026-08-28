@@ -168,7 +168,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     overflow: hidden;
     background: transparent;
     border: 0;
-    color: var(--ui-text-secondary);
+    color: var(--td-text-color-secondary);
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -179,8 +179,8 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
     &.is-active {
       position: relative;
-      background: var(--ui-surface-primary);
-      color: var(--ui-text-primary);
+      background: var(--td-bg-color-container);
+      color: var(--td-text-color-primary);
       font-weight: 600;
 
       &::after {
@@ -189,28 +189,25 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
         bottom: 0;
         left: 0;
         height: 2px;
-        background: var(--ui-brand-primary);
+        background: var(--td-brand-color);
         content: "";
       }
     }
   }
 
   &__rename-input {
-    outline: 2px solid var(--ui-brand-primary);
+    outline: 2px solid var(--td-brand-color);
     outline-offset: -2px;
   }
 
   &__delete,
   &__add {
     display: inline-grid;
+    flex: 0 0 30px;
     width: 30px;
     height: 100%;
     place-items: center;
-    border-left: 1px solid var(--ui-border-strong);
-  }
-
-  &__add {
-    flex: 0 0 30px;
+    border-left: 1px solid var(--td-component-border);
   }
 }
 </style>

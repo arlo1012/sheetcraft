@@ -25,8 +25,8 @@ const tdesignLocale = computed<GlobalConfigProvider>(
 .app-workspace {
   width: 100%;
   min-height: 100dvh;
-  background: var(--ui-surface-canvas);
-  color: var(--ui-text-primary);
+  background: var(--td-bg-color-page);
+  color: var(--td-text-color-primary);
   isolation: isolate;
 }
 </style>

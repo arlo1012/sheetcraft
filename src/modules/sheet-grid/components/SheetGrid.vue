@@ -1284,7 +1284,7 @@ defineExpose({ navigateToCell });
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--ui-surface-primary);
+  background: var(--td-bg-color-container);
 
   &.is-resizing-column {
     cursor: col-resize;
@@ -1300,20 +1300,20 @@ defineExpose({ navigateToCell });
     z-index: 5;
     width: var(--sheet-row-header-width);
     height: var(--sheet-column-header-height);
-    background: var(--ui-surface-muted);
-    border-right: 1px solid var(--ui-border-strong);
-    border-bottom: 1px solid var(--ui-border-strong);
+    background: var(--td-bg-color-secondarycontainer);
+    border-right: 1px solid var(--td-component-border);
+    border-bottom: 1px solid var(--td-component-border);
     padding: 0;
     appearance: none;
     cursor: pointer;
 
     &.is-active {
-      background: var(--ui-brand-soft);
+      background: var(--td-brand-color-focus);
     }
 
     &:focus-visible {
       z-index: 6;
-      outline: 2px solid var(--ui-brand-primary);
+      outline: 2px solid var(--td-brand-color);
       outline-offset: -2px;
     }
   }
@@ -1322,9 +1322,9 @@ defineExpose({ navigateToCell });
     position: absolute;
     inset: var(--sheet-column-header-height) 0 0 var(--sheet-row-header-width);
     overflow: auto;
-    background: var(--ui-surface-primary);
+    background: var(--td-bg-color-container);
     outline: none;
-    scrollbar-color: var(--ui-border-strong) var(--ui-surface-muted);
+    scrollbar-color: var(--td-component-border) var(--td-bg-color-secondarycontainer);
     scrollbar-width: thin;
   }
 
@@ -1337,7 +1337,7 @@ defineExpose({ navigateToCell });
     top: 0;
     left: 0;
     overflow: hidden;
-    background: var(--ui-surface-primary);
+    background: var(--td-bg-color-container);
   }
 
   &__assistive-status {

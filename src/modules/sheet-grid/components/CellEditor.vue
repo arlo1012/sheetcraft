@@ -134,10 +134,10 @@ defineExpose({ focus });
   pointer-events: none;
 
   &.is-editing {
-    background: var(--ui-surface-primary);
-    border-color: var(--ui-brand-primary);
-    color: var(--ui-text-primary);
-    caret-color: var(--ui-text-primary);
+    background: var(--td-bg-color-container);
+    border-color: var(--td-brand-color);
+    color: var(--td-text-color-primary);
+    caret-color: var(--td-text-color-primary);
     pointer-events: auto;
     box-shadow: 0 1px 3px rgb(32 36 44 / 16%);
   }

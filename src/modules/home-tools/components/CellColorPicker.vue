@@ -244,19 +244,19 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     padding: 0;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: var(--ui-radius-control);
-    color: var(--ui-text-primary);
+    border-radius: var(--td-radius-default);
+    color: var(--td-text-color-primary);
     cursor: pointer;
 
     &:hover:not(:disabled) {
-      background: var(--ui-surface-hover);
+      background: var(--td-bg-color-container-hover);
     }
 
     &:focus-visible,
     &[aria-expanded="true"] {
-      border-color: var(--ui-brand-primary);
+      border-color: var(--td-brand-color);
       outline: none;
-      box-shadow: 0 0 0 2px var(--ui-brand-soft);
+      box-shadow: 0 0 0 2px var(--td-brand-color-focus);
     }
 
     &:disabled {
@@ -276,22 +276,22 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
 
   &__trigger.is-mixed &__swatch {
     background: transparent !important;
-    border-color: var(--ui-text-muted);
+    border-color: var(--td-text-color-placeholder);
     border-style: dashed;
   }
 
   &__panel {
     z-index: 100;
-    max-width: calc(100vw - var(--ui-floating-viewport-inset) - var(--ui-floating-viewport-inset));
-    max-height: calc(100vh - var(--ui-floating-viewport-inset) - var(--ui-floating-viewport-inset));
+    max-width: calc(100vw - var(--td-size-4) - var(--td-size-4));
+    max-height: calc(100vh - var(--td-size-4) - var(--td-size-4));
     overflow: auto;
-    background: var(--ui-surface-primary);
-    border: 1px solid var(--ui-border-strong);
-    border-radius: var(--ui-radius-surface);
-    box-shadow: var(--ui-floating-shadow);
+    background: var(--td-bg-color-container);
+    border: 1px solid var(--td-component-border);
+    border-radius: var(--td-radius-medium);
+    box-shadow: var(--td-shadow-2);
 
     &:focus-visible {
-      outline: 2px solid var(--ui-brand-primary);
+      outline: 2px solid var(--td-brand-color);
       outline-offset: 2px;
     }
   }
@@ -302,7 +302,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     align-items: center;
     gap: 6px;
     padding: 8px;
-    border-top: 1px solid var(--ui-border-default);
+    border-top: 1px solid var(--td-border-level-1-color);
   }
 }
 </style>

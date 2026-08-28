@@ -41,7 +41,7 @@ function onLocaleChange(value: SelectValue): void {
   gap: 4px;
   height: 34px;
   padding: 0 8px;
-  color: var(--ui-text-muted);
+  color: var(--td-text-color-placeholder);
 
   &__select {
     width: 96px;

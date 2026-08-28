@@ -110,7 +110,7 @@ function align(alignment: HorizontalCellAlignment): void {
     bottom: 2px;
     left: 6px;
     height: 2px;
-    background: var(--ui-text-muted);
+    background: var(--td-text-color-placeholder);
     content: "";
     pointer-events: none;
   }

@@ -145,8 +145,8 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
   z-index: 4;
   height: var(--sheet-column-header-height);
   overflow: hidden;
-  background: var(--ui-surface-muted);
-  border-bottom: 1px solid var(--ui-border-strong);
+  background: var(--td-bg-color-secondarycontainer);
+  border-bottom: 1px solid var(--td-component-border);
   user-select: none;
 
   &__item {
@@ -157,12 +157,12 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    border-right: 1px solid var(--ui-border-default);
-    color: var(--ui-text-secondary);
+    border-right: 1px solid var(--td-border-level-1-color);
+    color: var(--td-text-color-secondary);
     font-size: 12px;
     &.is-active {
-      background: var(--ui-brand-soft);
-      color: var(--ui-brand-primary);
+      background: var(--td-brand-color-focus);
+      color: var(--td-brand-color);
       font-weight: 600;
     }
   }
@@ -177,7 +177,7 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
     cursor: pointer;
 
     &:focus-visible {
-      outline: 2px solid var(--ui-brand-primary);
+      outline: 2px solid var(--td-brand-color);
       outline-offset: -2px;
     }
   }
@@ -191,7 +191,7 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
     touch-action: none;
 
     &:focus-visible {
-      background: var(--ui-brand-primary);
+      background: var(--td-brand-color);
       outline: none;
     }
   }

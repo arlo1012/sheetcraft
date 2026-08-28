@@ -137,8 +137,8 @@ function findFromSearch(_value: InputValue, context: { e: KeyboardEvent }): void
   min-width: 0;
   height: 34px;
   padding: 0 8px;
-  background: var(--ui-surface-muted);
-  border-bottom: 1px solid var(--ui-border-strong);
+  background: var(--td-bg-color-secondarycontainer);
+  border-bottom: 1px solid var(--td-component-border);
 
   &__address {
     flex: 0 0 92px;
@@ -158,14 +158,14 @@ function findFromSearch(_value: InputValue, context: { e: KeyboardEvent }): void
     width: 1px;
     height: 20px;
     margin: 0 8px;
-    background: var(--ui-border-default);
+    background: var(--td-border-level-1-color);
   }
 
   &__search {
     display: flex;
     align-items: center;
     min-width: 0;
-    color: var(--ui-text-muted);
+    color: var(--td-text-color-placeholder);
   }
 
   &__search-control {
@@ -183,7 +183,7 @@ function findFromSearch(_value: InputValue, context: { e: KeyboardEvent }): void
   &__feedback {
     min-width: 64px;
     padding: 0 6px;
-    color: var(--ui-text-muted);
+    color: var(--td-text-color-placeholder);
     font-size: 11px;
     white-space: nowrap;
   }

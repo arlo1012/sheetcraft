@@ -145,10 +145,10 @@ const visibleRows = computed<VisibleRow[]>(() => {
     align-items: center;
     overflow: hidden;
     padding: 0 5px;
-    background: var(--ui-surface-primary);
-    border-right: 1px solid var(--ui-border-default);
-    border-bottom: 1px solid var(--ui-border-default);
-    color: var(--ui-text-primary);
+    background: var(--td-bg-color-container);
+    border-right: 1px solid var(--td-border-level-1-color);
+    border-bottom: 1px solid var(--td-border-level-1-color);
+    color: var(--td-text-color-primary);
     font-size: 13px;
     line-height: 1;
     white-space: nowrap;

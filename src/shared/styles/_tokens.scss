@@ -1,29 +1,7 @@
 @layer theme {
   :root {
-    --ui-font-family: var(--td-font-family);
-    font-family: var(--ui-font-family);
+    font-family: var(--td-font-family);
     font-synthesis: none;
     text-rendering: optimizeLegibility;
-
-    --ui-surface-canvas: var(--td-bg-color-page);
-    --ui-surface-primary: var(--td-bg-color-container);
-    --ui-surface-muted: var(--td-bg-color-secondarycontainer);
-    --ui-surface-hover: var(--td-bg-color-container-hover);
-    --ui-border-default: var(--td-border-level-1-color);
-    --ui-border-strong: var(--td-component-border);
-    --ui-text-primary: var(--td-text-color-primary);
-    --ui-text-secondary: var(--td-text-color-secondary);
-    --ui-text-muted: var(--td-text-color-placeholder);
-    --ui-brand-primary: var(--td-brand-color);
-    --ui-brand-soft: var(--td-brand-color-focus);
-    --ui-status-danger: var(--td-error-color);
-    --ui-state-selected-background: var(--ui-brand-soft);
-    --ui-state-selected-foreground: var(--ui-brand-primary);
-    --ui-control-height-small: var(--td-comp-size-xs);
-    --ui-toolbar-icon-control-width: 30px;
-    --ui-floating-viewport-inset: 8px;
-    --ui-floating-shadow: var(--td-shadow-2);
-    --ui-radius-control: var(--td-radius-default);
-    --ui-radius-surface: var(--td-radius-medium);
   }
 }

@@ -63,8 +63,8 @@ const clipboardStyle = computed<CSSProperties | undefined>(() =>
 
   &__range {
     z-index: 2;
-    background: color-mix(in srgb, var(--ui-brand-primary) 8%, transparent);
-    border: 2px solid var(--ui-brand-primary);
+    background: color-mix(in srgb, var(--td-brand-color) 8%, transparent);
+    border: 2px solid var(--td-brand-color);
 
     &.is-editing {
       background: transparent;
@@ -74,7 +74,7 @@ const clipboardStyle = computed<CSSProperties | undefined>(() =>
 
   &__active {
     z-index: 3;
-    border: 2px solid var(--ui-brand-primary);
+    border: 2px solid var(--td-brand-color);
 
     &.is-editing {
       border-color: transparent;
@@ -83,7 +83,7 @@ const clipboardStyle = computed<CSSProperties | undefined>(() =>
 
   &__clipboard {
     z-index: 4;
-    border: 1px dashed var(--ui-brand-primary);
+    border: 1px dashed var(--td-brand-color);
 
     &.is-cut {
       border-width: 2px;

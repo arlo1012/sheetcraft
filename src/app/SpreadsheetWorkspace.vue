@@ -324,7 +324,7 @@ function findCell(direction: SheetSearchDirection): void {
   min-width: 320px;
   min-height: 360px;
   overflow: hidden;
-  background: var(--ui-surface-primary);
+  background: var(--td-bg-color-container);
 
   &__grid {
     min-width: 0;
@@ -336,9 +336,9 @@ function findCell(direction: SheetSearchDirection): void {
     align-items: stretch;
     justify-content: space-between;
     gap: 16px;
-    background: var(--ui-surface-muted);
-    border-top: 1px solid var(--ui-border-strong);
-    color: var(--ui-text-secondary);
+    background: var(--td-bg-color-secondarycontainer);
+    border-top: 1px solid var(--td-component-border);
+    color: var(--td-text-color-secondary);
     font-size: 12px;
   }
 
@@ -346,7 +346,7 @@ function findCell(direction: SheetSearchDirection): void {
     display: inline-flex;
     align-items: center;
     padding-right: 12px;
-    color: var(--ui-text-muted);
+    color: var(--td-text-color-placeholder);
   }
 
   &__footer-tools {

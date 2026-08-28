@@ -335,15 +335,15 @@ onBeforeUnmount(() => {
   z-index: 100;
   display: grid;
   width: 272px;
-  max-width: calc(100vw - var(--ui-floating-viewport-inset) - var(--ui-floating-viewport-inset));
-  max-height: calc(100vh - var(--ui-floating-viewport-inset) - var(--ui-floating-viewport-inset));
+  max-width: calc(100vw - var(--td-size-4) - var(--td-size-4));
+  max-height: calc(100vh - var(--td-size-4) - var(--td-size-4));
   padding: 4px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--ui-surface-primary);
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-control);
-  box-shadow: var(--ui-floating-shadow);
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-default);
+  box-shadow: var(--td-shadow-2);
 
   &__action {
     display: grid;
@@ -369,7 +369,7 @@ onBeforeUnmount(() => {
     align-items: center;
     min-height: 32px;
     padding: 0 8px;
-    color: var(--ui-text-secondary);
+    color: var(--td-text-color-secondary);
     font-size: 12px;
 
     > span:last-child {
@@ -383,19 +383,19 @@ onBeforeUnmount(() => {
     align-items: center;
     min-height: 34px;
     padding: 0 8px;
-    color: var(--ui-text-primary);
+    color: var(--td-text-color-primary);
     font-size: 12px;
 
     > span:last-child {
       padding-left: 5px;
-      color: var(--ui-text-secondary);
+      color: var(--td-text-color-secondary);
     }
   }
 
   &__separator {
     height: 1px;
     margin: 4px -4px;
-    background: var(--ui-border-default);
+    background: var(--td-border-level-1-color);
   }
 }
 </style>

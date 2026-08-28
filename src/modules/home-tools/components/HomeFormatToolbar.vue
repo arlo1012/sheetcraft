@@ -91,8 +91,8 @@ function onKeydown(event: KeyboardEvent): void {
   padding: 5px 8px;
   overflow-x: auto;
   overflow-y: hidden;
-  background: var(--ui-surface-muted);
-  border-bottom: 1px solid var(--ui-border-default);
+  background: var(--td-bg-color-secondarycontainer);
+  border-bottom: 1px solid var(--td-border-level-1-color);
   scrollbar-width: thin;
 
   &__separator {
@@ -100,7 +100,7 @@ function onKeydown(event: KeyboardEvent): void {
     width: 1px;
     height: 20px;
     margin: 0 2px;
-    background: var(--ui-border-default);
+    background: var(--td-border-level-1-color);
   }
 }
 </style>
