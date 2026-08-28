@@ -5,8 +5,10 @@
 - This branch is a clean implementation with no compatibility obligation to
   the previous frontend structure.
 - Add only behavior requested for the new implementation.
-- Historical branches are reference material, not code sources to copy by
-  default.
+- The `refactor/ui-style-v2` branch contains historical feature behavior and
+  interaction implementations worth consulting. Reimplement relevant behavior
+  against the current architecture instead of copying its frontend structure
+  by default.
 
 ## Technology
 
@@ -62,7 +64,10 @@
 - Expand verification only when the change risk or affected boundary requires
   it. Keep typecheck, lint, formatting, and build checks scoped when the tooling
   supports it.
-- Use real-browser verification for visible interaction changes.
+- Reserve real-browser debugging and verification for substantial or high-risk
+  visible interaction changes, uncertain browser-specific behavior, or an
+  explicit user request. Prefer focused component and unit tests for small,
+  localized UI changes.
 - After completing and verifying a small, self-contained requirement, commit it
   promptly with a conventional commit message. Keep unrelated changes out of
   that commit.
