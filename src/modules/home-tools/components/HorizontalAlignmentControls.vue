@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { TextAlignCenter, TextAlignEnd, TextAlignStart } from "lucide-vue-next";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import { computed } from "vue";
 import type { CellStylePatch, HorizontalCellAlignment } from "../../workbook/cell-style";
 import type { SelectionCellStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
+import RibbonIconAction from "./RibbonIconAction.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -43,57 +43,36 @@ function align(alignment: HorizontalCellAlignment): void {
     role="group"
     :aria-label="groupLabel"
   >
-    <TButton
-      type="button"
-      variant="text"
-      shape="square"
-      size="small"
+    <RibbonIconAction
       class="ui-toolbar-icon-button horizontal-alignment-controls__button"
       :class="{ 'is-active': isActive('left') }"
       :disabled="disabled"
-      :aria-label="t('format.alignLeft')"
-      :title="t('format.alignLeft')"
-      :aria-pressed="isActive('left')"
-      @click="align('left')"
+      :label="t('format.alignLeft')"
+      :pressed="isActive('left')"
+      @activate="align('left')"
     >
-      <template #icon>
-        <TextAlignStart :size="17" :stroke-width="2" aria-hidden="true" />
-      </template>
-    </TButton>
-    <TButton
-      type="button"
-      variant="text"
-      shape="square"
-      size="small"
+      <TextAlignStart :size="17" :stroke-width="2" aria-hidden="true" />
+    </RibbonIconAction>
+    <RibbonIconAction
       class="ui-toolbar-icon-button horizontal-alignment-controls__button"
       :class="{ 'is-active': isActive('center') }"
       :disabled="disabled"
-      :aria-label="t('format.alignCenter')"
-      :title="t('format.alignCenter')"
-      :aria-pressed="isActive('center')"
-      @click="align('center')"
+      :label="t('format.alignCenter')"
+      :pressed="isActive('center')"
+      @activate="align('center')"
     >
-      <template #icon>
-        <TextAlignCenter :size="17" :stroke-width="2" aria-hidden="true" />
-      </template>
-    </TButton>
-    <TButton
-      type="button"
-      variant="text"
-      shape="square"
-      size="small"
+      <TextAlignCenter :size="17" :stroke-width="2" aria-hidden="true" />
+    </RibbonIconAction>
+    <RibbonIconAction
       class="ui-toolbar-icon-button horizontal-alignment-controls__button"
       :class="{ 'is-active': isActive('right') }"
       :disabled="disabled"
-      :aria-label="t('format.alignRight')"
-      :title="t('format.alignRight')"
-      :aria-pressed="isActive('right')"
-      @click="align('right')"
+      :label="t('format.alignRight')"
+      :pressed="isActive('right')"
+      @activate="align('right')"
     >
-      <template #icon>
-        <TextAlignEnd :size="17" :stroke-width="2" aria-hidden="true" />
-      </template>
-    </TButton>
+      <TextAlignEnd :size="17" :stroke-width="2" aria-hidden="true" />
+    </RibbonIconAction>
   </div>
 </template>
 

@@ -3,6 +3,8 @@ import { getCellValue, type CellRange, type CellValue, type Sheet } from "./work
 export type SelectionSummary = {
   average: number;
   count: number;
+  numericCount: number;
+  selectedCellCount: number;
   sum: number;
 };
 
@@ -74,6 +76,8 @@ export function getSelectionSummary(sheet: Sheet, range: CellRange): SelectionSu
   return {
     average: numericCount === 0 ? 0 : sum / numericCount,
     count,
+    numericCount,
+    selectedCellCount: rangeSize,
     sum: Object.is(sum, -0) ? 0 : sum,
   };
 }

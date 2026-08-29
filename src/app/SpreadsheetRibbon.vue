@@ -44,7 +44,7 @@ const { t } = useAppI18n();
 <style scoped lang="scss">
 .spreadsheet-ribbon {
   display: grid;
-  grid-template-rows: 32px 40px;
+  grid-template-rows: 32px 64px;
   min-width: 0;
   background: var(--td-bg-color-container);
   border-bottom: 1px solid var(--td-component-border);

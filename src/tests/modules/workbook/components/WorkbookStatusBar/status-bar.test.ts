@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { DOMWrapper, mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import WorkbookStatusBar from "../../../../../modules/workbook/components/WorkbookStatusBar.vue";
 import { createSheet } from "../../../../../modules/workbook/workbook";
@@ -12,7 +12,13 @@ function mountStatusBar(locale: "en-US" | "zh-CN" = "en-US") {
       sheets,
       activeSheetId: "sheet-2",
       statusText: locale === "zh-CN" ? "就绪" : "Ready",
-      selectionSummary: { average: 15, count: 3, sum: 30 },
+      selectionSummary: {
+        average: 15,
+        count: 3,
+        numericCount: 2,
+        selectedCellCount: 3,
+        sum: 30,
+      },
     },
   });
 }
@@ -26,17 +32,18 @@ describe("WorkbookStatusBar", () => {
     expect(wrapper.get("[data-selection-summary]").attributes("aria-label")).toBe(
       "Selection summary",
     );
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:15");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Count:3");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:15");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum:30");
 
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
     await wrapper.get('[title="Sheet1 (double-click to rename)"]').trigger("click");
-    await wrapper.get('[aria-label="Delete active sheet"]').trigger("click");
+    await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
+    await new DOMWrapper(document.body).findAll('[role="menuitem"]')[1]?.trigger("click");
 
     expect(wrapper.emitted("add")).toHaveLength(1);
     expect(wrapper.emitted("select")?.[0]).toEqual(["sheet-1"]);
-    expect(wrapper.emitted("delete")?.[0]).toEqual(["sheet-2"]);
+    expect(wrapper.emitted("delete")?.[0]).toEqual(["sheet-1"]);
   });
 
   test("localizes status labels without changing sheet content", () => {
@@ -47,5 +54,52 @@ describe("WorkbookStatusBar", () => {
     expect(wrapper.get("[data-selection-summary]").text()).toContain("计数:3");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("求和:30");
     expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("Sheet2");
+  });
+
+  test("keeps the status quiet when a single empty cell is selected", () => {
+    const wrapper = mount(WorkbookStatusBar, {
+      global: { plugins: [createAppI18n("en-US")] },
+      props: {
+        sheets: [createSheet("Sheet1", "sheet-1")],
+        activeSheetId: "sheet-1",
+        statusText: "",
+        selectionSummary: {
+          average: 0,
+          count: 0,
+          numericCount: 0,
+          selectedCellCount: 1,
+          sum: 0,
+        },
+      },
+    });
+
+    expect(wrapper.find("[data-selection-summary]").exists()).toBe(false);
+    expect(wrapper.get('[aria-live="polite"]').classes()).toContain("is-empty");
+    expect(
+      wrapper.get('[aria-label="Normal view, not available yet"]').attributes("disabled"),
+    ).toBe("");
+  });
+
+  test("shows count alone for a multi-cell text selection", () => {
+    const wrapper = mount(WorkbookStatusBar, {
+      global: { plugins: [createAppI18n("en-US")] },
+      props: {
+        sheets: [createSheet("Sheet1", "sheet-1")],
+        activeSheetId: "sheet-1",
+        statusText: "",
+        selectionSummary: {
+          average: 0,
+          count: 2,
+          numericCount: 0,
+          selectedCellCount: 2,
+          sum: 0,
+        },
+      },
+    });
+
+    const summary = wrapper.get("[data-selection-summary]").text();
+    expect(summary).toContain("Count:2");
+    expect(summary).not.toContain("Average:");
+    expect(summary).not.toContain("Sum:");
   });
 });

@@ -20,7 +20,7 @@ describe("selection summary", () => {
         start: { row: 0, column: 2 },
         end: { row: 0, column: 0 },
       }),
-    ).toEqual({ average: 15, count: 3, sum: 30 });
+    ).toEqual({ average: 15, count: 3, numericCount: 2, selectedCellCount: 3, sum: 30 });
   });
 
   test("ignores style-only cells and avoids scanning empty whole-axis ranges", () => {
@@ -34,7 +34,13 @@ describe("selection summary", () => {
         start: { row: 0, column: 0 },
         end: { row: MAX_SHEET_ROWS - 1, column: 0 },
       }),
-    ).toEqual({ average: 0, count: 1, sum: 0 });
+    ).toEqual({
+      average: 0,
+      count: 1,
+      numericCount: 1,
+      selectedCellCount: MAX_SHEET_ROWS,
+      sum: 0,
+    });
   });
 
   test("reads a small selection directly instead of scanning a large sparse sheet", () => {
@@ -50,7 +56,7 @@ describe("selection summary", () => {
         start: { row: 0, column: 0 },
         end: { row: 0, column: 0 },
       }),
-    ).toEqual({ average: 7, count: 1, sum: 7 });
+    ).toEqual({ average: 7, count: 1, numericCount: 1, selectedCellCount: 1, sum: 7 });
     expect(iteratorSpy).not.toHaveBeenCalled();
   });
 });

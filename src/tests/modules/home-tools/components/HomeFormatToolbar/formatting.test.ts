@@ -85,6 +85,26 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper)).toEqual([{ bold: null }, { italic: true }]);
   });
 
+  test("uses lightweight keyboard-operable buttons for emphasis and alignment", async () => {
+    const wrapper = mountToolbar();
+    const bold = wrapper.get('[aria-label="Bold"]');
+    const center = wrapper.get('[aria-label="Align center"]');
+
+    expect(bold.element).toBeInstanceOf(HTMLSpanElement);
+    expect(center.element).toBeInstanceOf(HTMLSpanElement);
+    for (const action of [bold, center]) {
+      expect(action.attributes()).toMatchObject({
+        role: "button",
+        tabindex: "0",
+        "aria-disabled": "false",
+      });
+    }
+
+    await bold.trigger("keydown", { key: "Enter" });
+    await center.trigger("keydown", { key: " " });
+    expect(emittedPatches(wrapper)).toEqual([{ bold: true }, { horizontalAlign: "center" }]);
+  });
+
   test("emits validated font and alignment patches", async () => {
     const wrapper = mountToolbar();
     const fontFamily = wrapper.findComponent(TSelect);
@@ -132,7 +152,7 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper)).toEqual([{ textColor: "#123456" }, { fillColor: "#abcdef" }]);
   });
 
-  test("shows mixed values and disables every control for unsupported selections", () => {
+  test("disables formatting controls while keeping history actions available", async () => {
     const wrapper = mountToolbar(
       createStyleState({
         fontFamily: { value: "Arial", mixed: true },
@@ -149,10 +169,48 @@ describe("HomeFormatToolbar", () => {
     );
     const toolbar = wrapper.get(".home-format-toolbar");
     expect(toolbar.attributes("role")).toBe("group");
-    expect(toolbar.attributes("aria-disabled")).toBe("true");
+    expect(toolbar.attributes("aria-disabled")).toBeUndefined();
     for (const control of wrapper.findAll("button, input")) {
       expect((control.element as HTMLButtonElement | HTMLInputElement).disabled).toBe(true);
     }
+    for (const control of wrapper.findAll(
+      '[aria-label="Bold"], [aria-label="Italic"], [aria-label="Underline"], [aria-label="Align left"], [aria-label="Align center"], [aria-label="Align right"]',
+    )) {
+      expect(control.attributes()).toMatchObject({ tabindex: "-1", "aria-disabled": "true" });
+      await control.trigger("click");
+      await control.trigger("keydown", { key: "Enter" });
+      await control.trigger("keydown", { key: " " });
+    }
+    await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
+    await wrapper.get('[data-ribbon-action="redo"]').trigger("keydown", { key: " " });
+    expect(emittedPatches(wrapper)).toEqual([]);
+    expect(wrapper.emitted("undo")).toHaveLength(1);
+    expect(wrapper.emitted("redo")).toHaveLength(1);
+  });
+
+  test("renders two explicit rows, concrete groups, and warning disabled placeholders", () => {
+    const wrapper = mountToolbar();
+
+    expect(
+      new Set(wrapper.findAll("[data-ribbon-row]").map((row) => row.attributes("data-ribbon-row"))),
+    ).toEqual(new Set(["1", "2"]));
+    expect(wrapper.findAll("[data-ribbon-group]")).toHaveLength(5);
+    expect(wrapper.findAll("[data-ribbon-group=font]")).toHaveLength(1);
+    expect(wrapper.findAll("[data-ribbon-group=history]")).toHaveLength(1);
+    expect(wrapper.findAll("[data-ribbon-group=alignment]")).toHaveLength(1);
+    expect(wrapper.findAll("[data-ribbon-group=cell]")).toHaveLength(1);
+    expect(wrapper.findAll("[data-ribbon-group=number]")).toHaveLength(1);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(6);
+    for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
+      expect(placeholder.classes()).toContain("is-warning");
+      expect(placeholder.attributes()).toMatchObject({
+        role: "button",
+        tabindex: "-1",
+        "aria-disabled": "true",
+      });
+    }
+    expect(wrapper.findAll(".text-format-controls .t-button")).toHaveLength(0);
+    expect(wrapper.findAll(".horizontal-alignment-controls .t-button")).toHaveLength(0);
   });
 
   test("exposes mixed color and alignment state to assistive technology", () => {

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, reactive, ref } from "vue";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import { formatCellAddress, parseCellAddress } from "../modules/sheet-grid/address";
-import GridNavigationBar from "../modules/sheet-grid/components/GridNavigationBar.vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
 import type { SheetGridViewState } from "../modules/sheet-grid/view-state";
+import WorkbookFormulaBar from "../modules/workbook/components/WorkbookFormulaBar.vue";
 import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.vue";
 import type { GridPastePayload } from "../modules/sheet-grid/useGridClipboard";
 import {
@@ -27,7 +27,7 @@ import {
   undoWorkbookCommand,
   type WorkbookSession,
 } from "../modules/workbook/history";
-import { parseCellInput } from "../modules/workbook/input";
+import { formatCellValueForInput, parseCellInput } from "../modules/workbook/input";
 import { findCellByText, type SheetSearchDirection } from "../modules/workbook/search";
 import { getSelectionSummary } from "../modules/workbook/selection-summary";
 import {
@@ -37,7 +37,9 @@ import {
 } from "../modules/workbook/style-state";
 import {
   getActiveSheet,
+  getCellValue,
   getWorkbookSheets,
+  MAX_SHEET_ROWS,
   setActiveSheet,
   type CellAddress,
   type CellRange,
@@ -58,12 +60,15 @@ const viewStates = reactive(new Map<string, SheetGridViewState>());
 const selectionRanges = reactive(new Map<string, CellRange>());
 const gridRef = ref<InstanceType<typeof SheetGrid>>();
 const searchQuery = ref("");
-const navigationFeedback = ref<FeedbackState>();
-const workspaceStatus = ref<FeedbackState>({ key: "workspace.ready" });
+const workspaceStatus = ref<FeedbackState>();
+let workspaceStatusTimer: number | undefined;
 const activeAddress = computed(
   () => viewStates.get(activeSheet.value.id)?.selection.active ?? { row: 0, column: 0 },
 );
 const activeAddressLabel = computed(() => formatCellAddress(activeAddress.value));
+const activeCellInput = computed(() =>
+  formatCellValueForInput(getCellValue(activeSheet.value, activeAddress.value)),
+);
 const activeSelectionRange = computed<CellRange>(
   () =>
     selectionRanges.get(activeSheet.value.id) ?? {
@@ -80,12 +85,26 @@ const activeSelectionStyle = computed(() =>
 const activeSelectionSummary = computed(() =>
   getSelectionSummary(activeSheet.value, activeSelectionRange.value),
 );
-const navigationFeedbackText = computed(() =>
-  navigationFeedback.value ? t(navigationFeedback.value.key, navigationFeedback.value.params) : "",
-);
 const workspaceStatusText = computed(() =>
-  t(workspaceStatus.value.key, workspaceStatus.value.params),
+  workspaceStatus.value ? t(workspaceStatus.value.key, workspaceStatus.value.params) : "",
 );
+
+function clearWorkspaceStatus(): void {
+  if (workspaceStatusTimer !== undefined) {
+    window.clearTimeout(workspaceStatusTimer);
+    workspaceStatusTimer = undefined;
+  }
+  workspaceStatus.value = undefined;
+}
+
+function showWorkspaceStatus(status: FeedbackState): void {
+  clearWorkspaceStatus();
+  workspaceStatus.value = status;
+  workspaceStatusTimer = window.setTimeout(() => {
+    workspaceStatus.value = undefined;
+    workspaceStatusTimer = undefined;
+  }, 2_800);
+}
 
 function commitCell(payload: { address: CellAddress; input: string }): void {
   executeWorkbookCommand(
@@ -93,6 +112,7 @@ function commitCell(payload: { address: CellAddress; input: string }): void {
     createSetCellValueCommand(activeSheet.value.id, payload.address, parseCellInput(payload.input)),
     "Edit cell",
   );
+  clearWorkspaceStatus();
 }
 
 function pasteCells(payload: GridPastePayload): void {
@@ -116,7 +136,7 @@ function clearCells(range: CellRange): void {
 
 function applyCellStyle(patch: CellStylePatch): void {
   if (!isFormattingSupported.value) {
-    workspaceStatus.value = { key: "format.selectionTooLarge" };
+    showWorkspaceStatus({ key: "format.selectionTooLarge" });
     return;
   }
   executeWorkbookCommand(
@@ -124,7 +144,7 @@ function applyCellStyle(patch: CellStylePatch): void {
     createApplyCellStyleCommand(activeSheet.value.id, activeSelectionRange.value, patch),
     "Format cells",
   );
-  workspaceStatus.value = { key: "workspace.ready" };
+  clearWorkspaceStatus();
 }
 
 function resizeDimension(payload: { axis: SheetDimensionAxis; index: number; size: number }): void {
@@ -158,18 +178,18 @@ function deleteAxis(payload: { axis: SheetDimensionAxis; index: number; count: n
 
 function selectSheet(sheetId: string): void {
   setActiveSheet(session.workbook, sheetId);
-  navigationFeedback.value = undefined;
+  clearWorkspaceStatus();
 }
 
 function addSheet(): void {
   executeWorkbookCommand(session, createAddSheetCommand(session.workbook), "Add sheet");
-  workspaceStatus.value = { key: "workspace.ready" };
+  clearWorkspaceStatus();
 }
 
 function renameSheet(payload: { sheetId: string; name: string }): void {
   const normalizedName = payload.name.trim();
   if (!normalizedName) {
-    workspaceStatus.value = { key: "workspace.sheetNameEmpty" };
+    showWorkspaceStatus({ key: "workspace.sheetNameEmpty" });
     return;
   }
 
@@ -178,10 +198,10 @@ function renameSheet(payload: { sheetId: string; name: string }): void {
       sheet.id !== payload.sheetId && sheet.name.toLowerCase() === normalizedName.toLowerCase(),
   );
   if (duplicate) {
-    workspaceStatus.value = {
+    showWorkspaceStatus({
       key: "workspace.sheetNameDuplicate",
       params: { name: normalizedName },
-    };
+    });
     return;
   }
 
@@ -191,9 +211,9 @@ function renameSheet(payload: { sheetId: string; name: string }): void {
       createRenameSheetCommand(payload.sheetId, payload.name),
       "Rename sheet",
     );
-    workspaceStatus.value = { key: "workspace.ready" };
+    clearWorkspaceStatus();
   } catch {
-    workspaceStatus.value = { key: "workspace.renameFailed" };
+    showWorkspaceStatus({ key: "workspace.renameFailed" });
   }
 }
 
@@ -205,7 +225,7 @@ function deleteSheet(sheetId: string): void {
   );
   selectionRanges.delete(sheetId);
   viewStates.delete(sheetId);
-  workspaceStatus.value = { key: "workspace.ready" };
+  clearWorkspaceStatus();
 }
 
 function getActiveSheetViewState(): SheetGridViewState | undefined {
@@ -226,22 +246,30 @@ function updateActiveSelection(payload: { active: CellAddress; range: CellRange 
 function navigateToAddress(input: string): void {
   const address = parseCellAddress(input);
   if (!address) {
-    navigationFeedback.value = { key: "workspace.invalidAddress" };
+    showWorkspaceStatus({ key: "workspace.invalidAddress" });
     return;
   }
 
-  navigationFeedback.value = undefined;
+  clearWorkspaceStatus();
   gridRef.value?.navigateToCell(address);
+}
+
+function traverseFromFormulaBar(payload: { address: CellAddress; direction: "up" | "down" }): void {
+  const rowOffset = payload.direction === "up" ? -1 : 1;
+  gridRef.value?.navigateToCell({
+    row: Math.max(0, Math.min(payload.address.row + rowOffset, MAX_SHEET_ROWS - 1)),
+    column: payload.address.column,
+  });
 }
 
 function updateSearchQuery(query: string): void {
   searchQuery.value = query;
-  navigationFeedback.value = undefined;
+  clearWorkspaceStatus();
 }
 
 function findCell(direction: SheetSearchDirection): void {
   if (!searchQuery.value.trim()) {
-    navigationFeedback.value = { key: "workspace.enterSearchTerm" };
+    showWorkspaceStatus({ key: "workspace.enterSearchTerm" });
     return;
   }
 
@@ -252,16 +280,18 @@ function findCell(direction: SheetSearchDirection): void {
     direction,
   );
   if (!match) {
-    navigationFeedback.value = { key: "workspace.noMatches" };
+    showWorkspaceStatus({ key: "workspace.noMatches" });
     return;
   }
 
   gridRef.value?.navigateToCell(match);
-  navigationFeedback.value = {
+  showWorkspaceStatus({
     key: "workspace.found",
     params: { address: formatCellAddress(match) },
-  };
+  });
 }
+
+onBeforeUnmount(clearWorkspaceStatus);
 </script>
 
 <template>
@@ -273,11 +303,14 @@ function findCell(direction: SheetSearchDirection): void {
       @undo="undoWorkbookCommand(session)"
       @redo="redoWorkbookCommand(session)"
     />
-    <GridNavigationBar
-      :address="activeAddressLabel"
+    <WorkbookFormulaBar
+      :address="activeAddress"
+      :address-label="activeAddressLabel"
+      :input-value="activeCellInput"
       :search-query="searchQuery"
-      :search-feedback="navigationFeedbackText"
       @navigate="navigateToAddress"
+      @commit-cell="commitCell"
+      @traverse="traverseFromFormulaBar"
       @update-search-query="updateSearchQuery"
       @find="findCell"
     />
@@ -314,7 +347,7 @@ function findCell(direction: SheetSearchDirection): void {
 <style scoped lang="scss">
 .spreadsheet-workspace {
   display: grid;
-  grid-template-rows: 72px 34px minmax(0, 1fr) 30px;
+  grid-template-rows: auto 34px minmax(0, 1fr) 30px;
   grid-template-columns: minmax(0, 1fr);
   width: 100%;
   height: 100dvh;

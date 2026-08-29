@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Bold, Italic, Underline } from "lucide-vue-next";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import type { CellStylePatch } from "../../workbook/cell-style";
 import type { SelectionCellStyleState, ToggleStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
+import RibbonIconAction from "./RibbonIconAction.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -27,57 +27,36 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
 
 <template>
   <div class="text-format-controls" role="group" :aria-label="t('format.emphasis')">
-    <TButton
-      type="button"
-      variant="text"
-      shape="square"
-      size="small"
+    <RibbonIconAction
       class="ui-toolbar-icon-button text-format-controls__button"
       :class="{ 'is-active': state.bold === 'on', 'is-mixed': state.bold === 'mixed' }"
       :disabled="disabled"
-      :aria-label="t('format.bold')"
-      :title="t('format.bold')"
-      :aria-pressed="ariaPressed(state.bold)"
-      @click="toggle('bold', state.bold)"
+      :label="t('format.bold')"
+      :pressed="ariaPressed(state.bold)"
+      @activate="toggle('bold', state.bold)"
     >
-      <template #icon>
-        <Bold :size="17" :stroke-width="2.2" aria-hidden="true" />
-      </template>
-    </TButton>
-    <TButton
-      type="button"
-      variant="text"
-      shape="square"
-      size="small"
+      <Bold :size="17" :stroke-width="2.2" aria-hidden="true" />
+    </RibbonIconAction>
+    <RibbonIconAction
       class="ui-toolbar-icon-button text-format-controls__button"
       :class="{ 'is-active': state.italic === 'on', 'is-mixed': state.italic === 'mixed' }"
       :disabled="disabled"
-      :aria-label="t('format.italic')"
-      :title="t('format.italic')"
-      :aria-pressed="ariaPressed(state.italic)"
-      @click="toggle('italic', state.italic)"
+      :label="t('format.italic')"
+      :pressed="ariaPressed(state.italic)"
+      @activate="toggle('italic', state.italic)"
     >
-      <template #icon>
-        <Italic :size="17" :stroke-width="2.2" aria-hidden="true" />
-      </template>
-    </TButton>
-    <TButton
-      type="button"
-      variant="text"
-      shape="square"
-      size="small"
+      <Italic :size="17" :stroke-width="2.2" aria-hidden="true" />
+    </RibbonIconAction>
+    <RibbonIconAction
       class="ui-toolbar-icon-button text-format-controls__button"
       :class="{ 'is-active': state.underline === 'on', 'is-mixed': state.underline === 'mixed' }"
       :disabled="disabled"
-      :aria-label="t('format.underline')"
-      :title="t('format.underline')"
-      :aria-pressed="ariaPressed(state.underline)"
-      @click="toggle('underline', state.underline)"
+      :label="t('format.underline')"
+      :pressed="ariaPressed(state.underline)"
+      @activate="toggle('underline', state.underline)"
     >
-      <template #icon>
-        <Underline :size="17" :stroke-width="2.2" aria-hidden="true" />
-      </template>
-    </TButton>
+      <Underline :size="17" :stroke-width="2.2" aria-hidden="true" />
+    </RibbonIconAction>
   </div>
 </template>
 

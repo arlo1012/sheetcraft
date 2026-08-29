@@ -24,10 +24,38 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(1);
     expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-label")).toBe("Home tools");
     expect(wrapper.get(".home-format-toolbar").attributes("aria-label")).toBe("Cell formatting");
+    expect(
+      new Set(
+        wrapper
+          .get("[data-ribbon-tools]")
+          .findAll("[data-ribbon-row]")
+          .map((row) => row.attributes("data-ribbon-row")),
+      ),
+    ).toEqual(new Set(["1", "2"]));
+    expect(wrapper.get('[data-ribbon-group="font"] [data-ribbon-row="1"]')).toBeTruthy();
+    expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-row="2"]')).toBeTruthy();
     expect(wrapper.get("[data-locale-select] input").element).toBeInstanceOf(HTMLInputElement);
 
     await wrapper.get('[aria-label="Bold"]').trigger("click");
     expect(wrapper.emitted("applyStyle")?.[0]).toEqual([{ bold: true }]);
+  });
+
+  test("keeps concrete history actions and unavailable placeholders in the ribbon", async () => {
+    const wrapper = mountRibbon();
+
+    await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
+    await wrapper.get('[data-ribbon-action="redo"]').trigger("keydown", { key: "Enter" });
+
+    expect(wrapper.emitted("undo")).toHaveLength(1);
+    expect(wrapper.emitted("redo")).toHaveLength(1);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(6);
+    for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
+      expect(placeholder.attributes()).toMatchObject({
+        role: "button",
+        tabindex: "-1",
+        "aria-disabled": "true",
+      });
+    }
   });
 
   test("localizes the category and surface labels", () => {

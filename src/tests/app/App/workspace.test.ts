@@ -1,34 +1,47 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import App from "../../../app/App.vue";
 import LocaleSwitcher from "../../../app/LocaleSwitcher.vue";
 import { createAppI18n, type AppLocale } from "../../../shared/i18n";
 
 function mountApp(locale: AppLocale = "en-US") {
+  const host = document.createElement("div");
+  document.body.append(host);
   const wrapper = mount(App, {
+    attachTo: host,
     global: {
       plugins: [createAppI18n(locale)],
     },
   });
   mountedWrappers.push(wrapper);
+  mountedHosts.push(host);
   return wrapper;
 }
 
 function getAddressInput(wrapper: ReturnType<typeof mountApp>) {
-  return wrapper.get<HTMLInputElement>(".grid-navigation-bar__address-input input");
+  return wrapper.get<HTMLInputElement>("[data-address-input]");
+}
+
+function getFormulaInput(wrapper: ReturnType<typeof mountApp>) {
+  return wrapper.get<HTMLInputElement>("[data-formula-input]");
 }
 
 function getSearchInput(wrapper: ReturnType<typeof mountApp>) {
-  return wrapper.get<HTMLInputElement>(".grid-navigation-bar__search-input input");
+  return wrapper.get<HTMLInputElement>("[data-search-input]");
 }
 
 const mountedWrappers: Array<{ unmount(): void }> = [];
+const mountedHosts: HTMLElement[] = [];
 
 afterEach(() => {
   for (const wrapper of mountedWrappers.splice(0)) {
     wrapper.unmount();
   }
+  for (const host of mountedHosts.splice(0)) {
+    host.remove();
+  }
+  vi.useRealTimers();
 });
 
 describe("App", () => {
@@ -43,15 +56,20 @@ describe("App", () => {
     expect(wrapper.get(".spreadsheet-ribbon").attributes("aria-label")).toBe("Workbook tools");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("Home");
     expect(wrapper.get(".workbook-status-bar").attributes("aria-label")).toBe("Workbook status");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:0");
+    expect(wrapper.get(".workbook-status-bar__status").text()).toBe("");
+    expect(wrapper.find("[data-selection-summary]").exists()).toBe(false);
   });
 
   test("creates, renames, and deletes sheets from the sheet tabs", async () => {
     const wrapper = mountApp();
 
-    expect(
-      (wrapper.get('[aria-label="Delete active sheet"]').element as HTMLButtonElement).disabled,
-    ).toBe(true);
+    await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
+    let sheetMenu = new DOMWrapper(document.body).get('[role="menu"]');
+    expect(sheetMenu.get<HTMLButtonElement>('[role="menuitem"]:last-child').element.disabled).toBe(
+      true,
+    );
+    await sheetMenu.trigger("keydown", { key: "Escape" });
+
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
     expect(wrapper.findAll('[role="tab"]')).toHaveLength(2);
     expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet2");
@@ -63,7 +81,9 @@ describe("App", () => {
     await renameInput.trigger("keydown", { key: "Enter" });
     expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Budget");
 
-    await wrapper.get('[aria-label="Delete active sheet"]').trigger("click");
+    await wrapper.get('[aria-label="Actions for Budget"]').trigger("click");
+    sheetMenu = new DOMWrapper(document.body).get('[role="menu"]');
+    await sheetMenu.findAll('[role="menuitem"]')[1]?.trigger("click");
     expect(wrapper.findAll('[role="tab"]')).toHaveLength(1);
     expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet1");
   });
@@ -102,7 +122,7 @@ describe("App", () => {
     expect(restoredScroller.scrollLeft).toBe(192);
   });
 
-  test("navigates to an A1 address and finds sparse sheet values", async () => {
+  test("navigates to an A1 address and edits the active cell from the formula bar", async () => {
     const wrapper = mountApp();
     const addressInput = getAddressInput(wrapper);
 
@@ -110,30 +130,62 @@ describe("App", () => {
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("D20");
 
-    const editor = wrapper.get("input.cell-editor");
-    await editor.trigger("keydown", { key: "n" });
-    await editor.setValue("needle");
-    await editor.trigger("keydown", { key: "Enter" });
+    const formulaInput = getFormulaInput(wrapper);
+    await formulaInput.trigger("focus");
+    await formulaInput.setValue("42");
+    await formulaInput.trigger("keydown", { key: "Enter" });
+    await formulaInput.trigger("blur");
+    expect(wrapper.get('[data-row="19"][data-column="3"]').text()).toContain("42");
+    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("D21");
+    expect(document.activeElement).toBe(wrapper.get("input.cell-editor").element);
+
     await addressInput.setValue("A1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
+    expect(getFormulaInput(wrapper).element.value).toBe("");
+
+    await addressInput.setValue("D20");
+    await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
+
+    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("D20");
+    expect(getFormulaInput(wrapper).element.value).toBe("42");
+  });
+
+  test("finds sparse sheet values from the formula bar search", async () => {
+    const wrapper = mountApp();
+
+    await getFormulaInput(wrapper).trigger("focus");
+    await getFormulaInput(wrapper).setValue("needle");
+    await getFormulaInput(wrapper).trigger("keydown", { key: "Enter" });
+    await getAddressInput(wrapper).setValue("A1");
+    await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
+
     await getSearchInput(wrapper).setValue("needle");
     await wrapper.get('[aria-label="Find next"]').trigger("click");
 
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("D20");
-    expect(wrapper.text()).toContain("Found D20");
+    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
+    expect(wrapper.get(".workbook-status-bar__status").text()).toBe("Found A1");
   });
 
-  test("reports invalid addresses and missing search results without moving", async () => {
+  test("reports invalid addresses transiently without moving", async () => {
     const wrapper = mountApp();
 
     await getAddressInput(wrapper).setValue("XFE1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
-    expect(wrapper.text()).toContain("Invalid address");
+    expect(wrapper.get(".workbook-status-bar__status").text()).toBe("Invalid address");
+  });
 
-    await getSearchInput(wrapper).setValue("missing");
-    await wrapper.get('[aria-label="Find next"]').trigger("click");
-    expect(wrapper.text()).toContain("No matches");
+  test("clears transient feedback and returns to a quiet status", async () => {
+    vi.useFakeTimers();
+    const wrapper = mountApp();
+
+    await getAddressInput(wrapper).setValue("invalid");
+    await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
+    expect(wrapper.get(".workbook-status-bar__status").text()).toBe("Invalid address");
+
+    await vi.advanceTimersByTimeAsync(3_000);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get(".workbook-status-bar__status").text()).toBe("");
   });
 
   test("defers address navigation until IME composition commits to its source cell", async () => {
@@ -190,8 +242,9 @@ describe("App", () => {
     expect(wrapper.get(".workbook-status-bar").attributes("aria-label")).toBe("工作簿状态");
     expect(wrapper.get("[data-locale-select] input").element).toBeInstanceOf(HTMLInputElement);
     expect(wrapper.get(".home-format-toolbar").attributes("aria-label")).toBe("单元格格式");
+    expect(wrapper.get("[data-formula-bar]").attributes("aria-label")).toBe("地址和公式栏");
     expect(wrapper.text()).toContain("单元格地址无效");
-    expect(wrapper.text()).toContain("就绪");
+    expect(wrapper.text()).not.toContain("就绪");
 
     await wrapper.get('[data-select-row="2"]').trigger("contextmenu", {
       clientX: 16,
@@ -288,11 +341,12 @@ describe("App", () => {
     const wrapper = mountApp();
     await wrapper.get('[data-select-column="0"]').trigger("mousedown", { button: 0 });
 
-    const toolbar = wrapper.get(".home-format-toolbar");
-    expect(toolbar.attributes("aria-disabled")).toBe("true");
-    expect(toolbar.attributes("title")).toBe(
+    const fontGroup = wrapper.get('[data-ribbon-group="font"]');
+    expect(fontGroup.attributes("aria-disabled")).toBe("true");
+    expect(fontGroup.attributes("title")).toBe(
       "This selection is too large to format in one action.",
     );
-    expect((wrapper.get('[aria-label="Bold"]').element as HTMLButtonElement).disabled).toBe(true);
+    expect(wrapper.get('[aria-label="Bold"]').attributes("aria-disabled")).toBe("true");
+    expect(wrapper.get('[aria-label="Bold"]').attributes("tabindex")).toBe("-1");
   });
 });

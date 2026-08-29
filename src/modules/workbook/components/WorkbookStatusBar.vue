@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { FileSpreadsheet, LayoutDashboard, ZoomIn, ZoomOut } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import type { SelectionSummary } from "../selection-summary";
 import type { Sheet } from "../workbook";
@@ -23,6 +24,9 @@ const { locale, t } = useAppI18n();
 const numberFormatter = computed(
   () => new Intl.NumberFormat(locale.value, { maximumFractionDigits: 6 }),
 );
+const shouldShowSummary = computed(
+  () => props.selectionSummary.selectedCellCount > 1 && props.selectionSummary.count > 0,
+);
 
 function formatNumber(value: number): string {
   return numberFormatter.value.format(Object.is(value, -0) ? 0 : value);
@@ -41,27 +45,91 @@ function formatNumber(value: number): string {
         @delete="emit('delete', $event)"
       />
     </div>
-    <span class="workbook-status-bar__status" aria-live="polite">
+    <span
+      class="workbook-status-bar__status"
+      :class="{ 'is-empty': !statusText }"
+      aria-live="polite"
+    >
       {{ statusText }}
     </span>
     <dl
+      v-if="shouldShowSummary"
       class="workbook-status-bar__summary"
       :aria-label="t('statusBar.selectionSummary')"
       data-selection-summary
     >
       <div class="workbook-status-bar__stat">
-        <dt>{{ t("statusBar.average") }}</dt>
-        <dd>{{ formatNumber(selectionSummary.average) }}</dd>
-      </div>
-      <div class="workbook-status-bar__stat">
         <dt>{{ t("statusBar.count") }}</dt>
         <dd>{{ formatNumber(selectionSummary.count) }}</dd>
       </div>
-      <div class="workbook-status-bar__stat">
+      <div v-if="selectionSummary.numericCount > 0" class="workbook-status-bar__stat">
+        <dt>{{ t("statusBar.average") }}</dt>
+        <dd>{{ formatNumber(selectionSummary.average) }}</dd>
+      </div>
+      <div v-if="selectionSummary.numericCount > 0" class="workbook-status-bar__stat">
         <dt>{{ t("statusBar.sum") }}</dt>
         <dd>{{ formatNumber(selectionSummary.sum) }}</dd>
       </div>
     </dl>
+    <div
+      class="workbook-status-bar__view-zoom"
+      role="group"
+      :aria-label="t('statusBar.viewAndZoom')"
+    >
+      <button
+        class="workbook-status-bar__placeholder"
+        type="button"
+        role="button"
+        disabled
+        :aria-label="t('app.unavailableFeature', { feature: t('statusBar.normalView') })"
+        :title="t('app.unavailableFeature', { feature: t('statusBar.normalView') })"
+      >
+        <LayoutDashboard :size="14" aria-hidden="true" />
+      </button>
+      <button
+        class="workbook-status-bar__placeholder"
+        type="button"
+        role="button"
+        disabled
+        :aria-label="t('app.unavailableFeature', { feature: t('statusBar.pageLayoutView') })"
+        :title="t('app.unavailableFeature', { feature: t('statusBar.pageLayoutView') })"
+      >
+        <FileSpreadsheet :size="14" aria-hidden="true" />
+      </button>
+      <span class="workbook-status-bar__view-zoom-separator" aria-hidden="true" />
+      <button
+        class="workbook-status-bar__placeholder"
+        type="button"
+        role="button"
+        disabled
+        :aria-label="t('app.unavailableFeature', { feature: t('statusBar.zoomOut') })"
+        :title="t('app.unavailableFeature', { feature: t('statusBar.zoomOut') })"
+      >
+        <ZoomOut :size="14" aria-hidden="true" />
+      </button>
+      <button
+        class="workbook-status-bar__zoom-level"
+        type="button"
+        role="button"
+        disabled
+        :aria-label="
+          t('app.unavailableFeature', { feature: t('statusBar.zoomLevel', { value: 100 }) })
+        "
+        :title="t('app.unavailableFeature', { feature: t('statusBar.zoomLevel', { value: 100 }) })"
+      >
+        {{ t("statusBar.zoomLevel", { value: 100 }) }}
+      </button>
+      <button
+        class="workbook-status-bar__placeholder"
+        type="button"
+        role="button"
+        disabled
+        :aria-label="t('app.unavailableFeature', { feature: t('statusBar.zoomIn') })"
+        :title="t('app.unavailableFeature', { feature: t('statusBar.zoomIn') })"
+      >
+        <ZoomIn :size="14" aria-hidden="true" />
+      </button>
+    </div>
   </footer>
 </template>
 
@@ -93,6 +161,12 @@ function formatNumber(value: number): string {
     color: var(--td-text-color-placeholder);
     text-overflow: ellipsis;
     white-space: nowrap;
+
+    &.is-empty {
+      flex-basis: 0;
+      min-width: 0;
+      padding: 0;
+    }
   }
 
   &__summary {
@@ -119,6 +193,48 @@ function formatNumber(value: number): string {
     }
   }
 
+  &__view-zoom {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+    padding: 0 8px;
+    border-left: 1px solid var(--td-border-level-1-color);
+  }
+
+  &__placeholder,
+  &__zoom-level {
+    display: inline-grid;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 3px;
+    color: var(--td-warning-color-6, #d68a00);
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.72;
+    }
+  }
+
+  &__zoom-level {
+    width: auto;
+    min-width: 42px;
+    padding: 0 4px;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__view-zoom-separator {
+    width: 1px;
+    height: 14px;
+    margin: 0 3px;
+    background: var(--td-border-level-1-color);
+  }
+
   @media (max-width: 720px) {
     &__status {
       position: absolute;
@@ -142,7 +258,16 @@ function formatNumber(value: number): string {
       gap: 0;
     }
 
-    &__stat:not(:nth-child(2)) {
+    &__stat:not(:first-child) {
+      display: none;
+    }
+
+    &__view-zoom {
+      padding: 0 4px;
+    }
+
+    &__view-zoom-separator,
+    &__zoom-level {
       display: none;
     }
   }

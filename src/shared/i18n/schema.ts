@@ -6,12 +6,26 @@ export type MessageSchema = {
     language: string;
     localeChinese: string;
     localeEnglish: string;
+    unavailableFeature: string;
   };
   ribbon: {
     label: string;
     categories: string;
     home: string;
     homeTools: string;
+    historyTools: string;
+    fontTools: string;
+    alignmentTools: string;
+    cellTools: string;
+    numberTools: string;
+    undo: string;
+    redo: string;
+    formatPainter: string;
+    borders: string;
+    wrapText: string;
+    mergeCells: string;
+    numberFormat: string;
+    percentFormat: string;
   };
   workspace: {
     editor: string;
@@ -33,11 +47,20 @@ export type MessageSchema = {
     findPrevious: string;
     findNext: string;
   };
+  formulaBar: {
+    label: string;
+    goToCell: string;
+    cellAddress: string;
+    editor: string;
+    placeholder: string;
+  };
   sheetTabs: {
     list: string;
     rename: string;
     renameHint: string;
-    deleteActive: string;
+    menu: string;
+    renameAction: string;
+    deleteAction: string;
     add: string;
   };
   statusBar: {
@@ -46,6 +69,12 @@ export type MessageSchema = {
     average: string;
     count: string;
     sum: string;
+    viewAndZoom: string;
+    normalView: string;
+    pageLayoutView: string;
+    zoomOut: string;
+    zoomIn: string;
+    zoomLevel: string;
   };
   cell: {
     edit: string;
