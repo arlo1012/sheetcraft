@@ -146,41 +146,24 @@ function setFontSize(value: SelectValue): void {
   display: inline-grid;
   flex: 0 0 auto;
   grid-template-columns: 96px 44px;
+  column-gap: 2px;
   align-items: stretch;
   height: 28px;
-  overflow: hidden;
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-border);
-  border-radius: var(--td-radius-default);
-
-  &.is-disabled {
-    background: var(--td-bg-color-component-disabled);
-  }
 
   &__field {
-    position: relative;
     display: inline-flex;
     min-width: 0;
-    height: 26px;
-    border-radius: 2px 0 0 2px;
-
-    &:last-child {
-      border-radius: 0 2px 2px 0;
-    }
-
-    & + & {
-      border-left: 1px solid var(--td-border-level-1-color);
-    }
+    height: 28px;
+    overflow: hidden;
+    border-radius: 2px;
   }
 
-  &:not(.is-disabled) &__field:hover {
+  &:not(.is-disabled) &__field:is(:hover, :focus-within) {
     background: var(--td-bg-color-container-hover);
   }
 
-  &:not(.is-disabled) &__field:focus-within {
-    z-index: 1;
-    background: var(--td-brand-color-light);
-    box-shadow: 0 0 0 1px var(--td-brand-color);
+  &.is-disabled &__field {
+    background: var(--td-bg-color-component-disabled);
   }
 
   &__family,
@@ -189,11 +172,21 @@ function setFontSize(value: SelectValue): void {
   }
 
   :deep(.t-input) {
-    height: 26px;
+    height: 28px;
     padding-right: 6px;
     padding-left: 6px;
     background: transparent;
-    border-radius: 0;
+    border: 0;
+    border-radius: 2px;
+    box-shadow: none;
+  }
+
+  :deep(.t-input:hover),
+  :deep(.t-input.t-is-focused),
+  :deep(.t-input.t-is-disabled) {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
   }
 
   :deep(.t-input__suffix) {
