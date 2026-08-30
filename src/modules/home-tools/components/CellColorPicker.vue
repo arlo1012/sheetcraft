@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronDown } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
 import {
@@ -173,6 +174,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
   >
     <slot />
     <span class="cell-color-picker__swatch" :style="swatchStyle" aria-hidden="true" />
+    <ChevronDown class="cell-color-picker__disclosure" :size="10" aria-hidden="true" />
   </button>
 
   <Teleport to="body">
@@ -239,9 +241,10 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 27px;
+    width: 40px;
     height: 26px;
-    padding: 0;
+    gap: 3px;
+    padding: 0 4px;
     background: transparent;
     border: 1px solid transparent;
     border-radius: var(--td-radius-default);
@@ -267,11 +270,16 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
 
   &__swatch {
     position: absolute;
-    right: 6px;
+    right: 17px;
     bottom: 3px;
     left: 6px;
     height: 3px;
     border: 1px solid rgb(32 36 44 / 22%);
+  }
+
+  &__disclosure {
+    flex: 0 0 auto;
+    color: var(--td-text-color-placeholder);
   }
 
   &__trigger.is-mixed &__swatch {

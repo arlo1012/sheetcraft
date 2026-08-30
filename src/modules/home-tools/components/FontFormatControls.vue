@@ -145,7 +145,7 @@ function setFontSize(value: SelectValue): void {
 .font-format-controls {
   display: inline-grid;
   flex: 0 0 auto;
-  grid-template-columns: 96px 44px;
+  grid-template-columns: 124px 44px;
   column-gap: 2px;
   align-items: stretch;
   height: 28px;

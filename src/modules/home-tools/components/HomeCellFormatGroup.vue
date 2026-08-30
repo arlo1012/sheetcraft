@@ -127,7 +127,11 @@ const { t } = useAppI18n();
   &__typography-tools {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 4px;
+  }
+
+  &__lane--appearance {
+    justify-items: center;
   }
 
   &__lane--styles {

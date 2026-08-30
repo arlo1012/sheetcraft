@@ -38,6 +38,14 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
     </RibbonIconAction>
     <RibbonIconAction
       class="text-format-controls__button"
+      :label="t('app.unavailableFeature', { feature: t('ribbon.strikethrough') })"
+      disabled
+      data-ribbon-placeholder="strikethrough"
+    >
+      <Strikethrough :size="15" aria-hidden="true" />
+    </RibbonIconAction>
+    <RibbonIconAction
+      class="text-format-controls__button"
       :disabled="disabled"
       :label="t('format.italic')"
       :pressed="ariaPressed(state.italic)"
@@ -54,14 +62,6 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
     >
       <Underline :size="17" :stroke-width="2.2" aria-hidden="true" />
     </RibbonIconAction>
-    <RibbonIconAction
-      class="text-format-controls__button"
-      :label="t('app.unavailableFeature', { feature: t('ribbon.strikethrough') })"
-      disabled
-      data-ribbon-placeholder="strikethrough"
-    >
-      <Strikethrough :size="15" aria-hidden="true" />
-    </RibbonIconAction>
   </div>
 </template>
 
@@ -70,7 +70,7 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
 
   &__button {
     position: relative;
