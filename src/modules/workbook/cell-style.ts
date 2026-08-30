@@ -1,6 +1,7 @@
 export const MIN_CELL_FONT_SIZE = 8;
 export const MAX_CELL_FONT_SIZE = 72;
 export const DEFAULT_CELL_FONT_SIZE = 13;
+export const DEFAULT_CELL_FONT_FAMILY = "Inter";
 export const DEFAULT_CELL_TEXT_COLOR = "#20242c";
 export const DEFAULT_CELL_FILL_COLOR = "#ffffff";
 export const MAX_CELL_STYLE_PATCH_CELLS = 100_000;
@@ -18,6 +19,7 @@ export type CellStyle = {
   fillColor?: string;
   horizontalAlign?: HorizontalCellAlignment;
   verticalAlign?: VerticalCellAlignment;
+  wrapText?: true;
 };
 
 export type CellStylePatch = {
@@ -34,6 +36,7 @@ export const CELL_STYLE_KEYS = [
   "fillColor",
   "horizontalAlign",
   "verticalAlign",
+  "wrapText",
 ] as const satisfies readonly (keyof CellStyle)[];
 
 export function createClearCellStylePatch(): CellStylePatch {
@@ -107,7 +110,7 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
   if (key === "fontSize") {
     return normalizeFontSize(value) as CellStyle[Key];
   }
-  if (key === "bold" || key === "italic" || key === "underline") {
+  if (key === "bold" || key === "italic" || key === "underline" || key === "wrapText") {
     if (value !== true) {
       throw new TypeError(`Cell ${key} must be true, false, or null.`);
     }

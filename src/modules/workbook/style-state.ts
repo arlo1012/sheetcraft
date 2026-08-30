@@ -23,6 +23,7 @@ export type SelectionCellStyleState = {
   fillColor: StyleValueState<string>;
   horizontalAlign: StyleValueState<HorizontalCellAlignment>;
   verticalAlign: StyleValueState<VerticalCellAlignment>;
+  wrapText: ToggleStyleState;
 };
 
 type ValueAccumulator<Value> = {
@@ -87,6 +88,7 @@ export function createDefaultSelectionCellStyleState(): SelectionCellStyleState 
     fillColor: { value: undefined, mixed: false },
     horizontalAlign: { value: undefined, mixed: false },
     verticalAlign: { value: undefined, mixed: false },
+    wrapText: "off",
   };
 }
 
@@ -116,6 +118,7 @@ export function getSelectionCellStyleState(
   const fillColor = createAccumulator<string>();
   const horizontalAlign = createAccumulator<HorizontalCellAlignment>();
   const verticalAlign = createAccumulator<VerticalCellAlignment>();
+  const wrapText = createAccumulator<true>();
   let materializedCellCount = 0;
 
   const addStyle = (style: CellStyle | undefined) => {
@@ -128,6 +131,7 @@ export function getSelectionCellStyleState(
     addValue(fillColor, style?.fillColor);
     addValue(horizontalAlign, style?.horizontalAlign);
     addValue(verticalAlign, style?.verticalAlign);
+    addValue(wrapText, style?.wrapText);
   };
 
   const rangeSize = getCellRangeSize(normalized);
@@ -167,5 +171,6 @@ export function getSelectionCellStyleState(
     fillColor: toValueState(fillColor),
     horizontalAlign: toValueState(horizontalAlign),
     verticalAlign: toValueState(verticalAlign),
+    wrapText: toToggleState(wrapText),
   };
 }

@@ -80,6 +80,7 @@ describe("SheetGrid clipboard", () => {
         bold: true,
         fillColor: "#fde68a",
         verticalAlign: "bottom",
+        wrapText: true,
       },
     );
     setCellStyle(sheet, { row: 2, column: 2 }, { italic: true });
@@ -95,6 +96,7 @@ describe("SheetGrid clipboard", () => {
       bold: true,
       fillColor: "#fde68a",
       verticalAlign: "bottom",
+      wrapText: true,
     });
 
     await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });

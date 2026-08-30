@@ -350,6 +350,39 @@ describe("App", () => {
     expect(wrapper.get('[aria-label="Bold"]').attributes("aria-pressed")).toBe("false");
   });
 
+  test("toggles wrapped content and its derived row height through workbook history", async () => {
+    const wrapper = mountApp();
+    const editor = wrapper.get("input.cell-editor");
+    await editor.trigger("keydown", { key: "A" });
+    await editor.setValue(
+      "A long sentence with enough words to wrap across several lines in the first cell.",
+    );
+    await editor.trigger("keydown", { key: "Enter" });
+    await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", { button: 0 });
+    const wrapText = wrapper.get('[data-ribbon-action="wrap-text"]');
+
+    await wrapText.trigger("click");
+    expect(wrapText.attributes("aria-pressed")).toBe("true");
+    expect(
+      Number.parseFloat(
+        (wrapper.get('[data-row="0"][data-column="0"]').element.parentElement as HTMLElement).style
+          .height,
+      ),
+    ).toBeGreaterThan(24);
+
+    await wrapText.trigger("click");
+    expect(wrapText.attributes("aria-pressed")).toBe("false");
+    expect(
+      (wrapper.get('[data-row="0"][data-column="0"]').element.parentElement as HTMLElement).style
+        .height,
+    ).toBe("24px");
+
+    await wrapText.trigger("keydown", { key: "z", ctrlKey: true });
+    expect(wrapText.attributes("aria-pressed")).toBe("true");
+    await wrapText.trigger("keydown", { key: "z", ctrlKey: true, shiftKey: true });
+    expect(wrapText.attributes("aria-pressed")).toBe("false");
+  });
+
   test("disables formatting when a whole-column selection exceeds the command limit", async () => {
     const wrapper = mountApp();
     await wrapper.get('[data-select-column="0"]').trigger("mousedown", { button: 0 });
@@ -361,6 +394,9 @@ describe("App", () => {
     );
     expect(wrapper.get('[aria-label="Bold"]').attributes("aria-disabled")).toBe("true");
     expect(wrapper.get('[aria-label="Bold"]').attributes("tabindex")).toBe("-1");
+    expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
     expect(wrapper.get('[data-ribbon-action="clear-formatting"]').attributes("aria-disabled")).toBe(
       "true",
     );

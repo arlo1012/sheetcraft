@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { setCellStyle, setCellValue } from "../../../../../modules/workbook/workbook";
 import { activeCell, mountSheetGrid } from "./fixture";
 
 describe("SheetGrid viewport", () => {
@@ -68,5 +69,25 @@ describe("SheetGrid viewport", () => {
 
     expect(activeCell(wrapper)).toBe("A2");
     expect((scroller.element as HTMLDivElement).scrollTop).toBe(24);
+  });
+
+  test("anchors the first visible row when wrapped content above it reflows", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    const scroller = wrapper.get(".sheet-grid__scroller");
+    (scroller.element as HTMLDivElement).scrollTop = 1_200;
+    await scroller.trigger("scroll");
+    expect(wrapper.get('[data-row="50"][data-column="0"]').element.parentElement?.style.top).toBe(
+      "0px",
+    );
+
+    setCellValue(sheet, { row: 0, column: 0 }, "wrapped ".repeat(40));
+    setCellStyle(sheet, { row: 0, column: 0 }, { wrapText: true });
+    await wrapper.vm.$nextTick();
+
+    expect((scroller.element as HTMLDivElement).scrollTop).toBeGreaterThan(1_200);
+    expect(wrapper.get('[data-row="50"][data-column="0"]').element.parentElement?.style.top).toBe(
+      "0px",
+    );
+    expect(wrapper.findAll(".sheet-cell-layer__cell").length).toBeLessThan(1_000);
   });
 });

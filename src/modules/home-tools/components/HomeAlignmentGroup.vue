@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ALargeSmall, TableCellsMerge, TextWrap } from "lucide-vue-next";
 import type { CellStylePatch } from "../../workbook/cell-style";
-import type { SelectionCellStyleState } from "../../workbook/style-state";
+import type { SelectionCellStyleState, ToggleStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import HorizontalAlignmentControls from "./HorizontalAlignmentControls.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
@@ -17,6 +17,14 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
+
+function ariaPressed(state: ToggleStyleState): boolean | "mixed" {
+  return state === "mixed" ? "mixed" : state === "on";
+}
+
+function toggleWrapText(state: ToggleStyleState): void {
+  emit("applyStyle", { wrapText: state === "on" ? null : true });
+}
 </script>
 
 <template>
@@ -43,11 +51,12 @@ const { t } = useAppI18n();
         <ALargeSmall class="home-alignment-group__orientation-icon" :size="15" aria-hidden="true" />
       </RibbonIconAction>
       <RibbonIconAction
-        :label="t('app.unavailableFeature', { feature: t('ribbon.wrapText') })"
+        :label="t('ribbon.wrapText')"
         :text="t('ribbon.wrapText')"
-        disabled
-        disclosure
-        data-ribbon-placeholder="wrap-text"
+        :disabled="disabled"
+        :pressed="ariaPressed(state.wrapText)"
+        data-ribbon-action="wrap-text"
+        @activate="toggleWrapText(state.wrapText)"
       >
         <TextWrap :size="15" aria-hidden="true" />
       </RibbonIconAction>

@@ -3,6 +3,7 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
 import { computed } from "vue";
 import {
+  DEFAULT_CELL_FONT_FAMILY,
   DEFAULT_CELL_FONT_SIZE,
   MAX_CELL_FONT_SIZE,
   MIN_CELL_FONT_SIZE,
@@ -11,7 +12,6 @@ import {
 import type { SelectionCellStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 
-const DEFAULT_FONT_FAMILY = "Inter";
 const FONT_FAMILIES = [
   "Inter",
   "Arial",
@@ -44,12 +44,14 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 const fontFamilyOptions = computed(() =>
   FONT_FAMILIES.map((family) => ({
-    label: family === DEFAULT_FONT_FAMILY ? t("format.defaultFont") : family,
+    label: family === DEFAULT_CELL_FONT_FAMILY ? t("format.defaultFont") : family,
     value: family,
   })),
 );
 const fontFamilyValue = computed(() =>
-  props.state.fontFamily.mixed ? undefined : (props.state.fontFamily.value ?? DEFAULT_FONT_FAMILY),
+  props.state.fontFamily.mixed
+    ? undefined
+    : (props.state.fontFamily.value ?? DEFAULT_CELL_FONT_FAMILY),
 );
 const fontSizeValue = computed(() =>
   props.state.fontSize.mixed ? undefined : (props.state.fontSize.value ?? DEFAULT_CELL_FONT_SIZE),
@@ -71,7 +73,7 @@ function setFontFamily(value: SelectValue): void {
   if (typeof value !== "string" || !value) {
     return;
   }
-  emit("applyStyle", { fontFamily: value === DEFAULT_FONT_FAMILY ? null : value });
+  emit("applyStyle", { fontFamily: value === DEFAULT_CELL_FONT_FAMILY ? null : value });
 }
 
 function setFontSize(value: SelectValue): void {

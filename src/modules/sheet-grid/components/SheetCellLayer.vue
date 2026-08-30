@@ -10,6 +10,7 @@ type VisibleCell = {
   key: string;
   address: CellAddress;
   text: string;
+  wrapped: boolean;
   style: CSSProperties;
 };
 
@@ -60,15 +61,17 @@ const visibleRows = computed<VisibleRow[]>(() => {
     for (const column of [...columnIndexes].sort((left, right) => left - right)) {
       const address = { row, column };
       const rect = props.geometry.getCellViewportRect(address, props.scrollPosition);
+      const cellStyle = getCellStyle(props.sheet, address);
       cells.push({
         key: `${row}:${column}`,
         address,
         text: formatCellValueForDisplay(getCellValue(props.sheet, address)),
+        wrapped: Boolean(cellStyle?.wrapText),
         style: {
           left: `${rect.x}px`,
           width: `${rect.width}px`,
           height: "100%",
-          ...getCellContentStyle(getCellStyle(props.sheet, address)),
+          ...getCellContentStyle(cellStyle),
         },
       });
     }
@@ -104,6 +107,7 @@ const visibleRows = computed<VisibleRow[]>(() => {
         class="sheet-cell-layer__cell"
         :class="{
           'has-value': cell.text.length > 0,
+          'is-wrapped': cell.wrapped,
           'is-active':
             cell.address.row === activeCell.row && cell.address.column === activeCell.column,
           'is-selected': isCellSelected(cell.address, selection),
@@ -157,11 +161,21 @@ const visibleRows = computed<VisibleRow[]>(() => {
     &.is-active {
       overflow: visible;
     }
+
+    &.is-wrapped.is-active {
+      overflow: hidden;
+    }
   }
 
   &__value {
     overflow: hidden;
     text-overflow: clip;
+  }
+
+  &__cell.is-wrapped &__value {
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
   }
 }
 </style>

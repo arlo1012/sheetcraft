@@ -1,5 +1,6 @@
 import type { CSSProperties } from "vue";
 import type { CellStyle } from "../workbook/cell-style";
+import { WRAPPED_CELL_LINE_HEIGHT, WRAPPED_CELL_VERTICAL_PADDING } from "./auto-row-height";
 
 const ALIGNMENT_JUSTIFICATION = {
   left: "flex-start",
@@ -29,8 +30,21 @@ function getTypographyStyle(style: Readonly<CellStyle> | undefined): CSSProperti
 }
 
 export function getCellContentStyle(style: Readonly<CellStyle> | undefined): CSSProperties {
+  const wrapTextStyle: CSSProperties = style?.wrapText
+    ? {
+        whiteSpace: "pre-wrap",
+        overflowWrap: "anywhere",
+        wordBreak: "normal",
+        lineHeight: String(WRAPPED_CELL_LINE_HEIGHT),
+        paddingTop: `${WRAPPED_CELL_VERTICAL_PADDING / 2}px`,
+        paddingBottom: `${WRAPPED_CELL_VERTICAL_PADDING / 2}px`,
+        ...(style.horizontalAlign ? { textAlign: style.horizontalAlign } : {}),
+      }
+    : {};
+
   return {
     ...getTypographyStyle(style),
+    ...wrapTextStyle,
     ...(style?.fillColor ? { backgroundColor: style.fillColor } : {}),
     ...(style?.horizontalAlign
       ? { justifyContent: ALIGNMENT_JUSTIFICATION[style.horizontalAlign] }

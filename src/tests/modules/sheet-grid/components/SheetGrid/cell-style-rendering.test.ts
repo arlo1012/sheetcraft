@@ -1,6 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { setCellStyle } from "../../../../../modules/workbook/workbook";
+import { setCellStyle, setCellValue } from "../../../../../modules/workbook/workbook";
 import { mountSheetGrid } from "./fixture";
 
 describe("SheetGrid cell style rendering", () => {
@@ -88,5 +88,27 @@ describe("SheetGrid cell style rendering", () => {
     const editor = wrapper.get("input.cell-editor");
     await editor.trigger("keydown", { key: "A" });
     expect((editor.element as HTMLInputElement).style.minHeight).toBe("74px");
+  });
+
+  test("renders wrapped cell content with constrained multiline styles", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    setCellValue(sheet, { row: 0, column: 0 }, "A very long unbroken-value-that-must-wrap");
+    setCellStyle(sheet, { row: 0, column: 0 }, { wrapText: true, horizontalAlign: "right" });
+    await nextTick();
+
+    const cell = wrapper.get('[data-row="0"][data-column="0"]');
+    const style = (cell.element as HTMLElement).style;
+    expect(cell.classes()).toContain("is-wrapped");
+    expect(style.whiteSpace).toBe("pre-wrap");
+    expect(style.overflowWrap).toBe("anywhere");
+    expect(style.textAlign).toBe("right");
+    expect(cell.get(".sheet-cell-layer__value").attributes("style")).toBeUndefined();
+    expect((cell.element.parentElement as HTMLElement).style.height).not.toBe("24px");
+
+    setCellStyle(sheet, { row: 0, column: 0 }, null);
+    await nextTick();
+    expect(cell.classes()).not.toContain("is-wrapped");
+    expect(style.whiteSpace).toBe("");
+    expect((cell.element.parentElement as HTMLElement).style.height).toBe("24px");
   });
 });

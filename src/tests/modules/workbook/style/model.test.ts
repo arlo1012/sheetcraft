@@ -49,6 +49,7 @@ describe("cell style model", () => {
         textColor: "#ABCDEF",
         horizontalAlign: "center",
         verticalAlign: "bottom",
+        wrapText: true,
       }),
     ).toEqual({
       fontFamily: "Georgia",
@@ -57,13 +58,17 @@ describe("cell style model", () => {
       textColor: "#abcdef",
       horizontalAlign: "center",
       verticalAlign: "bottom",
+      wrapText: true,
     });
     expect(normalizeCellStyle({ verticalAlign: "middle" })).toBeUndefined();
     expect(normalizeCellStylePatch({ verticalAlign: "middle" })).toEqual({
       verticalAlign: null,
     });
+    expect(normalizeCellStylePatch({ wrapText: false })).toEqual({ wrapText: null });
+    expect(normalizeCellStyle({ wrapText: true })).toEqual({ wrapText: true });
     expect(() => normalizeCellStyle({ fontSize: 7 })).toThrow(RangeError);
     expect(() => normalizeCellStyle({ fillColor: "red" })).toThrow(TypeError);
     expect(() => normalizeCellStyle({ verticalAlign: "baseline" as never })).toThrow(TypeError);
+    expect(() => normalizeCellStyle({ wrapText: "yes" as never })).toThrow(TypeError);
   });
 });

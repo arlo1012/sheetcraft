@@ -11,6 +11,7 @@ import {
   type CSSProperties,
 } from "vue";
 import { formatCellValueForDisplay, formatCellValueForInput } from "../../workbook/input";
+import { DEFAULT_CELL_FONT_FAMILY } from "../../workbook/cell-style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import {
@@ -56,6 +57,13 @@ import {
   type GridPastePayload,
 } from "../useGridClipboard";
 import { createSheetGridViewState, type SheetGridViewState } from "../view-state";
+import {
+  createApproximateTextMeasurer,
+  createAutoRowHeightCalculator,
+  mergeRowHeightOverrides,
+  type AutoRowHeightFont,
+  type TextMeasurer,
+} from "../auto-row-height";
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
@@ -145,6 +153,8 @@ const gridExtent = reactive<GridExtent>(
   }),
 );
 let resizeObserver: ResizeObserver | null = null;
+let fontFaceSet: FontFaceSet | undefined;
+let fontLoadingDoneListener: (() => void) | undefined;
 let compositionStartValue = "";
 let wasEditingBeforeComposition = false;
 let shouldFinishAfterComposition = false;
@@ -174,23 +184,89 @@ const dimensionResize = ref<
   | undefined
 >();
 
-const geometry = computed(() => {
-  const rowHeights = new Map(props.sheet.rowHeights);
+const approximateTextMeasurer = createApproximateTextMeasurer();
+let canvasContext: CanvasRenderingContext2D | null | undefined;
+const textMeasurer = markRaw<TextMeasurer>({
+  measure(text: string, font: AutoRowHeightFont): number {
+    if (canvasContext === undefined) {
+      canvasContext =
+        typeof document !== "undefined" && typeof CanvasRenderingContext2D !== "undefined"
+          ? document.createElement("canvas").getContext("2d")
+          : null;
+    }
+    if (!canvasContext) {
+      return approximateTextMeasurer.measure(text, font);
+    }
+    const family = font.family.includes(",") ? font.family : JSON.stringify(font.family);
+    canvasContext.font = `${font.italic ? "italic " : ""}${font.weight} ${font.size}px ${family}`;
+    return canvasContext.measureText(text).width;
+  },
+});
+const autoRowHeightCalculator = markRaw(createAutoRowHeightCalculator(textMeasurer));
+const defaultFontFamily = ref(DEFAULT_CELL_FONT_FAMILY);
+const fontMetricsVersion = ref(0);
+
+const effectiveColumnWidths = computed(() => {
   const columnWidths = new Map(props.sheet.columnWidths);
+  const resize = dimensionResize.value;
+  if (resize?.axis === "column") {
+    columnWidths.set(resize.index, resize.previewSize);
+  }
+  return columnWidths;
+});
+
+const automaticRowHeights = computed(() => {
+  return autoRowHeightCalculator.reconcile({
+    cells: props.sheet.cells,
+    columnWidths: effectiveColumnWidths.value,
+    rowCount: gridExtent.rowCount,
+    columnCount: gridExtent.columnCount,
+    defaultFontFamily: defaultFontFamily.value,
+    measurementVersion: fontMetricsVersion.value,
+  });
+});
+
+const effectiveRowHeights = computed(() => {
+  const rowHeights = mergeRowHeightOverrides(automaticRowHeights.value, props.sheet.rowHeights);
   const resize = dimensionResize.value;
   if (resize?.axis === "row") {
     rowHeights.set(resize.index, resize.previewSize);
-  } else if (resize?.axis === "column") {
-    columnWidths.set(resize.index, resize.previewSize);
   }
+  return rowHeights;
+});
 
+const geometry = computed(() => {
   return createSheetGeometry({
     rowCount: gridExtent.rowCount,
     columnCount: gridExtent.columnCount,
-    rowHeights,
-    columnWidths,
+    rowHeights: effectiveRowHeights.value,
+    columnWidths: effectiveColumnWidths.value,
   });
 });
+
+watch(
+  geometry,
+  (nextGeometry, previousGeometry) => {
+    const scroller = scrollerRef.value;
+    if (!scroller || scrollPosition.y <= 0) {
+      return;
+    }
+    const anchor = previousGeometry.getCellAtPoint({ x: 0, y: scrollPosition.y });
+    if (!anchor || anchor.row >= nextGeometry.rowCount) {
+      return;
+    }
+    const offsetWithinRow = scrollPosition.y - previousGeometry.getRowOffset(anchor.row);
+    const nextScrollTop =
+      nextGeometry.getRowOffset(anchor.row) +
+      Math.min(offsetWithinRow, nextGeometry.getRowHeight(anchor.row) - 1);
+    if (nextScrollTop !== scrollPosition.y) {
+      scroller.scrollTop = nextScrollTop;
+      scrollPosition.y = nextScrollTop;
+      emitViewState();
+    }
+  },
+  { flush: "sync" },
+);
 const totalSize = computed(() => geometry.value.getTotalSize());
 const visibleRange = computed(() =>
   geometry.value.getVisibleRange(scrollPosition, viewportSize, 2),
@@ -1121,12 +1197,32 @@ function restoreViewState(viewState?: SheetGridViewState): void {
 watch(
   () => props.sheet.id,
   () => {
+    autoRowHeightCalculator.clear();
     restoreViewState(props.viewState);
     focusEditor();
   },
 );
 
 onMounted(() => {
+  const root = rootRef.value;
+  const resolvedFontFamily = root ? getComputedStyle(root).fontFamily.trim() : "";
+  if (resolvedFontFamily) {
+    defaultFontFamily.value = resolvedFontFamily;
+  }
+  if (typeof document !== "undefined" && "fonts" in document) {
+    fontFaceSet = document.fonts;
+    const refreshFontMetrics = () => {
+      autoRowHeightCalculator.clear();
+      fontMetricsVersion.value += 1;
+    };
+    fontFaceSet.addEventListener("loadingdone", refreshFontMetrics);
+    void fontFaceSet.ready.then(() => {
+      if (rootRef.value) {
+        refreshFontMetrics();
+      }
+    });
+    fontLoadingDoneListener = refreshFontMetrics;
+  }
   updateViewportSize();
   restoreViewState(props.viewState);
   const scroller = scrollerRef.value;
@@ -1138,6 +1234,9 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  if (fontFaceSet && fontLoadingDoneListener) {
+    fontFaceSet.removeEventListener("loadingdone", fontLoadingDoneListener);
+  }
   resizeObserver?.disconnect();
   stopDragSelection();
   stopDimensionResize();

@@ -87,6 +87,36 @@ describe("cell style commands", () => {
     expect(getCellStyle(sheet, { row: 1, column: 1 })).toEqual({ underline: true });
   });
 
+  test("toggles wrapping as one reversible range style action", () => {
+    const session = createWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellValue(sheet, { row: 0, column: 0 }, "first");
+    setCellValue(sheet, { row: 0, column: 1 }, "second");
+    setCellStyle(sheet, { row: 0, column: 0 }, { wrapText: true, bold: true });
+    setCellStyle(sheet, { row: 0, column: 1 }, { wrapText: true, italic: true });
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellStyleCommand(
+          sheet.id,
+          { start: { row: 0, column: 1 }, end: { row: 0, column: 0 } },
+          { wrapText: null },
+        ),
+      ),
+    ).toBe(true);
+    expect(session.history.undoStack).toHaveLength(1);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({ bold: true });
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toEqual({ italic: true });
+    expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("first");
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({ wrapText: true, bold: true });
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toEqual({ wrapText: true, italic: true });
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({ bold: true });
+  });
+
   test("clears mixed styles without changing values and restores them exactly", () => {
     const session = createWorkbookSession();
     const sheet = getActiveSheet(session.workbook);

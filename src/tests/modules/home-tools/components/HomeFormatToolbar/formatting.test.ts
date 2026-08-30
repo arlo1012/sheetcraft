@@ -19,6 +19,7 @@ function createStyleState(
     fillColor: { value: undefined, mixed: false },
     horizontalAlign: { value: undefined, mixed: false },
     verticalAlign: { value: undefined, mixed: false },
+    wrapText: "off",
     ...overrides,
   };
 }
@@ -105,6 +106,31 @@ describe("HomeFormatToolbar", () => {
     await bold.trigger("keydown", { key: "Enter" });
     await center.trigger("keydown", { key: " " });
     expect(emittedPatches(wrapper)).toEqual([{ bold: true }, { horizontalAlign: "center" }]);
+  });
+
+  test("toggles wrapping from pointer and keyboard activation", async () => {
+    const wrapper = mountToolbar(createStyleState({ wrapText: "mixed" }));
+    const wrapText = wrapper.get('[data-ribbon-action="wrap-text"]');
+
+    expect(wrapText.attributes()).toMatchObject({
+      role: "button",
+      tabindex: "0",
+      "aria-disabled": "false",
+      "aria-label": "Wrap text",
+      "aria-pressed": "mixed",
+    });
+    await wrapText.trigger("click");
+    await wrapText.trigger("keydown", { key: "Enter" });
+    await wrapText.trigger("keydown", { key: " " });
+    expect(emittedPatches(wrapper)).toEqual([
+      { wrapText: true },
+      { wrapText: true },
+      { wrapText: true },
+    ]);
+
+    await wrapper.setProps({ state: createStyleState({ wrapText: "on" }) });
+    await wrapText.trigger("click");
+    expect(emittedPatches(wrapper).at(-1)).toEqual({ wrapText: null });
   });
 
   test("emits a complete clear-formatting patch from pointer and keyboard activation", async () => {
@@ -207,7 +233,7 @@ describe("HomeFormatToolbar", () => {
       expect((control.element as HTMLButtonElement | HTMLInputElement).disabled).toBe(true);
     }
     for (const control of wrapper.findAll(
-      '[aria-label="Bold"], [aria-label="Italic"], [aria-label="Underline"], [aria-label="Clear formatting"], [aria-label="Align left"], [aria-label="Align center"], [aria-label="Align right"]',
+      '[aria-label="Bold"], [aria-label="Italic"], [aria-label="Underline"], [aria-label="Clear formatting"], [aria-label="Wrap text"], [aria-label="Align left"], [aria-label="Align center"], [aria-label="Align right"]',
     )) {
       expect(control.attributes()).toMatchObject({ tabindex: "-1", "aria-disabled": "true" });
       await control.trigger("click");
@@ -317,6 +343,9 @@ describe("HomeFormatToolbar", () => {
     expect(
       wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="clear-formatting"]'),
     ).toBeTruthy();
+    expect(
+      wrapper.get('[data-ribbon-group="alignment"] [data-ribbon-action="wrap-text"]'),
+    ).toBeTruthy();
     for (const action of ["text-orientation"]) {
       const control = wrapper.get(`[data-ribbon-placeholder="${action}"]`);
       expect(control.find(".ribbon-icon-action__text").exists()).toBe(false);
@@ -326,7 +355,7 @@ describe("HomeFormatToolbar", () => {
         "aria-disabled": "true",
       });
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(30);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(29);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",
@@ -400,7 +429,7 @@ describe("HomeFormatToolbar", () => {
     await menu.trigger("keydown", { key: "Tab" });
 
     expect(document.body.querySelector('[role="menu"]')).toBeNull();
-    expect(document.activeElement).toBe(wrapper.get('[aria-label="Align left"]').element);
+    expect(document.activeElement).toBe(wrapper.get('[data-ribbon-action="wrap-text"]').element);
   });
 
   test("cancels a drafted color with Escape and restores trigger focus", async () => {

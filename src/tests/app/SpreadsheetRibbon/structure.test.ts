@@ -64,7 +64,10 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="clear-formatting"]').attributes("aria-disabled")).toBe(
       "false",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(30);
+    expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
+      "false",
+    );
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(29);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",
@@ -82,6 +85,9 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-label")).toBe("开始工具");
     expect(wrapper.get('[data-ribbon-action="clear-formatting"]').attributes("aria-label")).toBe(
       "清除格式",
+    );
+    expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-label")).toBe(
+      "自动换行",
     );
     expect(wrapper.get(".font-format-controls__family input").element).toHaveProperty(
       "value",
