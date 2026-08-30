@@ -322,6 +322,14 @@ describe("HomeFormatToolbar", () => {
     expect(wrapper.get('[aria-label="Fill color, mixed"]').element).toBeInstanceOf(
       HTMLButtonElement,
     );
+    expect(wrapper.get('[data-cell-color-icon="text"]').classes()).toContain("is-mixed");
+    expect(wrapper.get('[data-cell-color-icon="fill"]').classes()).toContain("is-mixed");
+    expect(wrapper.get('[data-cell-color-icon="text"]').attributes("style")).toContain(
+      "--cell-color-indicator: #123456",
+    );
+    expect(wrapper.get('[data-cell-color-icon="fill"]').attributes("style")).toContain(
+      "--cell-color-indicator: #abcdef",
+    );
     expect(wrapper.get('[aria-label="Horizontal alignment, mixed"]').attributes("role")).toBe(
       "group",
     );

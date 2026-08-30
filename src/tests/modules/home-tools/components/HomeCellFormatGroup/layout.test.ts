@@ -70,6 +70,13 @@ describe("HomeCellFormatGroup layout", () => {
     for (const colorIcon of colorIcons) {
       expect(colorIcon.attributes()).toMatchObject({ width: "18", height: "18" });
     }
+    expect(wrapper.find(".cell-color-picker__swatch").exists()).toBe(false);
+    expect(wrapper.get('[data-cell-color-icon="text"]').attributes("style")).toContain(
+      "--cell-color-indicator: #20242c",
+    );
+    expect(wrapper.get('[data-cell-color-icon="fill"]').attributes("style")).toContain(
+      "--cell-color-indicator: #ffffff",
+    );
   });
 
   test.each([

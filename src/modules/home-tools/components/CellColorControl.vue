@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Baseline, PaintBucket } from "lucide-vue-next";
-import { computed } from "vue";
+import { computed, type CSSProperties } from "vue";
 import {
   DEFAULT_CELL_FILL_COLOR,
   DEFAULT_CELL_TEXT_COLOR,
@@ -27,6 +27,9 @@ const colorState = computed(() =>
 const defaultColor = computed(() =>
   props.kind === "text" ? DEFAULT_CELL_TEXT_COLOR : DEFAULT_CELL_FILL_COLOR,
 );
+const indicatorStyle = computed<CSSProperties>(() => ({
+  "--cell-color-indicator": colorState.value.value ?? defaultColor.value,
+}));
 const label = computed(() => {
   if (props.kind === "text") {
     return t(props.state.textColor.mixed ? "format.textColorMixed" : "format.textColor");
@@ -49,8 +52,15 @@ function applyColor(color: string | null): void {
       :disabled="disabled"
       @change="applyColor"
     >
-      <Baseline v-if="kind === 'text'" :size="18" :stroke-width="1.8" aria-hidden="true" />
-      <PaintBucket v-else :size="18" :stroke-width="1.8" aria-hidden="true" />
+      <span
+        class="cell-color-control__icon"
+        :class="[`cell-color-control__icon--${kind}`, { 'is-mixed': colorState.mixed }]"
+        :style="indicatorStyle"
+        :data-cell-color-icon="kind"
+      >
+        <Baseline v-if="kind === 'text'" :size="18" :stroke-width="1.8" aria-hidden="true" />
+        <PaintBucket v-else :size="18" :stroke-width="1.8" aria-hidden="true" />
+      </span>
     </CellColorPicker>
   </div>
 </template>
@@ -61,5 +71,31 @@ function applyColor(color: string | null): void {
   align-items: center;
   width: 100%;
   height: var(--cell-format-control-height, 26px);
+
+  &__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+
+    &--text :deep(path:first-of-type) {
+      stroke: var(--cell-color-indicator);
+      stroke-width: 3;
+    }
+
+    &--fill :deep(path:nth-of-type(3)) {
+      fill: var(--cell-color-indicator);
+      stroke: var(--td-text-color-secondary);
+      stroke-width: 1.5;
+    }
+
+    &--text.is-mixed :deep(path:first-of-type),
+    &--fill.is-mixed :deep(path:nth-of-type(3)) {
+      fill: transparent;
+      stroke: var(--td-text-color-placeholder);
+      stroke-dasharray: 2 2;
+    }
+  }
 }
 </style>

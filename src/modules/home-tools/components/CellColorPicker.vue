@@ -2,16 +2,7 @@
 import { ChevronDown } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  useId,
-  watch,
-  type CSSProperties,
-} from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 
@@ -69,7 +60,6 @@ const open = ref(false);
 const draftColor = ref(props.value ?? props.defaultColor);
 const panelId = `cell-color-picker-${useId().replaceAll(":", "")}`;
 const currentColor = computed(() => props.value ?? props.defaultColor);
-const swatchStyle = computed<CSSProperties>(() => ({ backgroundColor: currentColor.value }));
 const { floatingStyles } = useFloatingPanel(triggerRef, panelRef, open);
 
 function normalizeColor(color: string): string | undefined {
@@ -175,7 +165,6 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     <span class="cell-color-picker__icon" aria-hidden="true">
       <slot />
     </span>
-    <span class="cell-color-picker__swatch" :style="swatchStyle" aria-hidden="true" />
     <ChevronDown
       class="cell-color-picker__disclosure"
       :class="{ 'is-expanded': open }"
@@ -296,16 +285,6 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     }
   }
 
-  &__swatch {
-    position: absolute;
-    right: 17px;
-    bottom: 2px;
-    left: 5px;
-    height: 3px;
-    border-radius: 1px;
-    box-shadow: inset 0 0 0 1px rgb(32 36 44 / 22%);
-  }
-
   &__disclosure {
     flex: 0 0 auto;
     color: var(--td-text-color-placeholder);
@@ -314,11 +293,6 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     &.is-expanded {
       transform: rotate(180deg);
     }
-  }
-
-  &__trigger.is-mixed &__swatch {
-    background: transparent !important;
-    box-shadow: inset 0 0 0 1px var(--td-text-color-placeholder);
   }
 
   &__panel {
