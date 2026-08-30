@@ -347,9 +347,16 @@ function onSearchKeydown(event: KeyboardEvent): void {
 
   &__formula-input {
     overflow: auto;
+    scrollbar-width: none;
     line-height: 18px;
     resize: none;
     white-space: pre;
+
+    &::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+    }
   }
 
   &__search {

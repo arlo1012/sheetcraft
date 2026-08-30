@@ -261,10 +261,17 @@ defineExpose({ focus, insertLineBreak });
     min-height: calc(1em + 2px);
     padding: 2px 4px;
     overflow: auto;
+    scrollbar-width: none;
     color: var(--td-text-color-primary);
     caret-color: var(--td-text-color-primary);
     line-height: 1.25;
     pointer-events: auto;
+
+    &::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+    }
   }
 
   &.is-wrapped {
