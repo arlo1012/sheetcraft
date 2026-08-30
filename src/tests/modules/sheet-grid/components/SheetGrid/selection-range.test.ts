@@ -25,7 +25,7 @@ describe("SheetGrid range selection", () => {
 
   test("extends with Shift arrows and ordinary arrows reset to one moved cell", async () => {
     const { session, wrapper } = mountSheetGrid();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
 
     await editor.trigger("keydown", { key: "ArrowRight", shiftKey: true });
     await editor.trigger("keydown", { key: "ArrowDown", shiftKey: true });
@@ -44,7 +44,7 @@ describe("SheetGrid range selection", () => {
 
   test("cycles Tab and Enter inside a retained range", async () => {
     const { wrapper } = mountSheetGrid();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
     await wrapper
       .get('[data-row="1"][data-column="1"]')
       .trigger("mousedown", { button: 0, shiftKey: true });
@@ -52,7 +52,7 @@ describe("SheetGrid range selection", () => {
     await editor.trigger("keydown", { key: "Tab" });
     expect(activeCell(wrapper)).toBe("B1");
     expect(selectionStyle(wrapper)).toContain("width: 192px");
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "Enter" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Enter" });
     expect(activeCell(wrapper)).toBe("B2");
     expect(selectionStyle(wrapper)).toContain("height: 48px");
   });

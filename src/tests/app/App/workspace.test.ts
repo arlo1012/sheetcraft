@@ -24,7 +24,7 @@ function getAddressInput(wrapper: ReturnType<typeof mountApp>) {
 }
 
 function getFormulaInput(wrapper: ReturnType<typeof mountApp>) {
-  return wrapper.get<HTMLInputElement>("[data-formula-input]");
+  return wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
 }
 
 function getSearchInput(wrapper: ReturnType<typeof mountApp>) {
@@ -137,7 +137,7 @@ describe("App", () => {
     await formulaInput.trigger("blur");
     expect(wrapper.get('[data-row="19"][data-column="3"]').text()).toContain("42");
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("D21");
-    expect(document.activeElement).toBe(wrapper.get("input.cell-editor").element);
+    expect(document.activeElement).toBe(wrapper.get("textarea.cell-editor").element);
 
     await addressInput.setValue("A1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
@@ -190,7 +190,7 @@ describe("App", () => {
 
   test("defers address navigation until IME composition commits to its source cell", async () => {
     const wrapper = mountApp();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
     await editor.trigger("compositionstart");
     await editor.setValue("中文");
 
@@ -259,12 +259,12 @@ describe("App", () => {
 
   test("summarizes the populated values in the current selection", async () => {
     const wrapper = mountApp();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
 
     await editor.trigger("keydown", { key: "1" });
     await editor.setValue("10");
     await editor.trigger("keydown", { key: "Enter" });
-    const nextEditor = wrapper.get("input.cell-editor");
+    const nextEditor = wrapper.get("textarea.cell-editor");
     await nextEditor.trigger("keydown", { key: "2" });
     await nextEditor.setValue("20");
     await nextEditor.trigger("keydown", { key: "Enter" });
@@ -284,7 +284,7 @@ describe("App", () => {
   test("summarizes whole rows, columns, and the full sheet", async () => {
     const wrapper = mountApp();
     const enterValue = async (value: string): Promise<void> => {
-      const editor = wrapper.get("input.cell-editor");
+      const editor = wrapper.get("textarea.cell-editor");
       await editor.trigger("keydown", { key: value[0] });
       await editor.setValue(value);
       await editor.trigger("keydown", { key: "Enter" });
@@ -352,7 +352,7 @@ describe("App", () => {
 
   test("toggles wrapped content and its derived row height through workbook history", async () => {
     const wrapper = mountApp();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
     await editor.trigger("keydown", { key: "A" });
     await editor.setValue(
       "A long sentence with enough words to wrap across several lines in the first cell.",

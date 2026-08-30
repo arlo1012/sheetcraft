@@ -36,10 +36,10 @@ describe("SheetGrid axis selection", () => {
     const { wrapper } = mountSheetGrid();
 
     await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: " ", shiftKey: true });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: " ", shiftKey: true });
     expect(wrapper.get('[data-row="2"][data-column="8"]').attributes("aria-selected")).toBe("true");
 
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: " ", ctrlKey: true });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: " ", ctrlKey: true });
     expect(wrapper.get('[data-row="8"][data-column="2"]').attributes("aria-selected")).toBe("true");
 
     await wrapper.get("button.sheet-grid__corner").trigger("click");
@@ -49,17 +49,17 @@ describe("SheetGrid axis selection", () => {
     expect(rangeStyle).toContain("height: 600px");
 
     await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "a", ctrlKey: true });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "a", ctrlKey: true });
     expect(wrapper.get('[data-row="8"][data-column="8"]').attributes("aria-selected")).toBe("true");
 
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "F2" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "F2" });
     const editingSelectAll = new KeyboardEvent("keydown", {
       key: "a",
       ctrlKey: true,
       bubbles: true,
       cancelable: true,
     });
-    wrapper.get("input.cell-editor").element.dispatchEvent(editingSelectAll);
+    wrapper.get("textarea.cell-editor").element.dispatchEvent(editingSelectAll);
     expect(editingSelectAll.defaultPrevented).toBe(false);
   });
 
@@ -69,7 +69,7 @@ describe("SheetGrid axis selection", () => {
       button: 0,
     });
 
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "ArrowRight" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "ArrowRight" });
     expect(activeCell(wrapper)).toBe("B3");
     expect(wrapper.get('[data-row="2"][data-column="8"]').attributes("aria-selected")).toBe(
       "false",
@@ -125,14 +125,14 @@ describe("SheetGrid axis selection", () => {
     });
 
     const copied = createTestClipboardEvent("copy");
-    wrapper.get("input.cell-editor").element.dispatchEvent(copied.event);
+    wrapper.get("textarea.cell-editor").element.dispatchEvent(copied.event);
     await wrapper.vm.$nextTick();
     expect(copied.event.defaultPrevented).toBe(true);
     expect(copied.data.get("text/plain")).toBeUndefined();
     expect(wrapper.get('[aria-live="polite"]').text()).toContain("whole rows and columns");
 
     const pasted = createTestClipboardEvent("paste", new Map([["text/plain", "1"]]));
-    wrapper.get("input.cell-editor").element.dispatchEvent(pasted.event);
+    wrapper.get("textarea.cell-editor").element.dispatchEvent(pasted.event);
     await wrapper.vm.$nextTick();
     expect(pasted.event.defaultPrevented).toBe(true);
     expect(sheet.cells.size).toBe(0);
@@ -147,7 +147,7 @@ describe("SheetGrid axis selection", () => {
       button: 0,
     });
 
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "Delete" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Delete" });
     expect(getCellValue(sheet, { row: 2, column: 1 })).toBeNull();
     expect(getCellValue(sheet, { row: 3, column: 1 })).toBe("keep");
     expect(session.history.undoStack).toHaveLength(1);
@@ -165,7 +165,7 @@ describe("SheetGrid axis selection", () => {
       });
       wrapper.get('[data-select-row="2"]').element.dispatchEvent(pointerSelection);
       await wrapper.vm.$nextTick();
-      const editor = wrapper.get<HTMLInputElement>("input.cell-editor");
+      const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
       expect(pointerSelection.defaultPrevented).toBe(true);
       expect(document.activeElement).toBe(editor.element);
 
@@ -203,7 +203,7 @@ describe("SheetGrid axis selection", () => {
     expect(getCellValue(sheet, { row: 5, column: 0 })).toBe("move");
     expect(session.history.undoStack).toHaveLength(1);
 
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
     expect(getCellValue(sheet, { row: 3, column: 0 })).toBe("move");
 
     setCellValue(sheet, { row: 4, column: 0 }, "keep");
@@ -244,7 +244,7 @@ describe("SheetGrid axis selection", () => {
     expect(getCellValue(sheet, { row: 0, column: 5 })).toBe("move");
     expect(session.history.undoStack).toHaveLength(1);
 
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
     setCellValue(sheet, { row: 0, column: 4 }, "keep");
     await wrapper.get('[data-select-column="2"]').trigger("mousedown", { button: 0 });
     await wrapper.get('[data-select-column="3"]').trigger("mousedown", {
@@ -321,7 +321,7 @@ describe("SheetGrid axis selection", () => {
 
   test("defers a header selection while composing", async () => {
     const { wrapper } = mountSheetGrid();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
     await editor.trigger("compositionstart");
 
     await wrapper.get('[data-select-row="2"]').trigger("mousedown", {

@@ -108,6 +108,7 @@ function countWrappedLines(
   availableWidth: number,
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
+  wrapText: boolean,
 ): number {
   const maximumLines = Math.max(
     1,
@@ -116,9 +117,13 @@ function countWrappedLines(
         (font.size * WRAPPED_CELL_LINE_HEIGHT),
     ),
   );
+  const paragraphs = text.replace(/\r\n?/gu, "\n").split("\n");
+  if (!wrapText) {
+    return Math.min(paragraphs.length, maximumLines);
+  }
   let lineCount = 0;
 
-  for (const paragraph of text.replace(/\r\n?/gu, "\n").split("\n")) {
+  for (const paragraph of paragraphs) {
     lineCount += 1;
     let lineWidth = 0;
 
@@ -164,12 +169,15 @@ function countWrappedLines(
   return Math.max(1, lineCount);
 }
 
-function getCellFont(style: Readonly<CellStyle>, defaultFontFamily: string): AutoRowHeightFont {
+function getCellFont(
+  style: Readonly<CellStyle> | undefined,
+  defaultFontFamily: string,
+): AutoRowHeightFont {
   return {
-    family: style.fontFamily ?? defaultFontFamily,
-    size: style.fontSize ?? DEFAULT_CELL_FONT_SIZE,
-    weight: style.bold ? 700 : 400,
-    italic: Boolean(style.italic),
+    family: style?.fontFamily ?? defaultFontFamily,
+    size: style?.fontSize ?? DEFAULT_CELL_FONT_SIZE,
+    weight: style?.bold ? 700 : 400,
+    italic: Boolean(style?.italic),
   };
 }
 
@@ -178,6 +186,7 @@ export function measureWrappedCellHeight(
   columnWidth: number,
   font: AutoRowHeightFont,
   measurer: TextMeasurer,
+  wrapText = true,
 ): number {
   if (!text) {
     return DEFAULT_ROW_HEIGHT;
@@ -186,7 +195,7 @@ export function measureWrappedCellHeight(
     1,
     columnWidth - WRAPPED_CELL_HORIZONTAL_PADDING - WRAPPED_CELL_GRIDLINE_WIDTH,
   );
-  const lineCount = countWrappedLines(text, availableWidth, font, measurer);
+  const lineCount = countWrappedLines(text, availableWidth, font, measurer, wrapText);
   return Math.min(
     MAX_ROW_HEIGHT,
     Math.max(
@@ -217,13 +226,13 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
           address.row >= input.rowCount ||
           address.column < 0 ||
           address.column >= input.columnCount ||
-          !cell.style?.wrapText ||
           cell.value === undefined
         ) {
           continue;
         }
         const text = formatCellValueForDisplay(cell.value);
-        if (!text) {
+        const wrapText = Boolean(cell.style?.wrapText);
+        if (!text || (!wrapText && !/[\r\n]/u.test(text))) {
           continue;
         }
 
@@ -232,7 +241,7 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
         const font = getCellFont(cell.style, defaultFontFamily);
         const fingerprint = JSON.stringify([
           text,
-          columnWidth,
+          wrapText ? columnWidth : undefined,
           font,
           input.measurementVersion ?? 0,
         ]);
@@ -240,7 +249,7 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
         const height =
           cached?.fingerprint === fingerprint
             ? cached.height
-            : measureWrappedCellHeight(text, columnWidth, font, measurer);
+            : measureWrappedCellHeight(text, columnWidth, font, measurer, wrapText);
         if (!cached || cached.fingerprint !== fingerprint) {
           cellHeights.set(key, { fingerprint, height });
         }

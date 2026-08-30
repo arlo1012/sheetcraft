@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, nextTick, ref, watch, type CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { insertTextAtSelection } from "../../../shared/forms/text-selection";
+import type { Rect, Size } from "../geometry";
 
 const { t } = useAppI18n();
 
@@ -9,6 +11,9 @@ const props = defineProps<{
   addressLabel: string;
   displayValue: string;
   editing: boolean;
+  wrapText: boolean;
+  cellRect: Rect;
+  viewportSize: Size;
   style?: CSSProperties;
   frameStyle?: CSSProperties;
 }>();
@@ -24,7 +29,26 @@ const emit = defineEmits<{
   paste: [event: ClipboardEvent];
 }>();
 
-const inputRef = ref<HTMLInputElement | null>(null);
+const inputRef = ref<HTMLTextAreaElement | null>(null);
+const measuredWidth = ref(0);
+const measuredHeight = ref(0);
+let measurementSequence = 0;
+
+const minimumFrameSize = computed(() => ({
+  width: props.cellRect.width + 2,
+  height: props.cellRect.height + 2,
+}));
+const maximumFrameSize = computed(() => ({
+  width: Math.max(minimumFrameSize.value.width, props.viewportSize.width - props.cellRect.x + 1),
+  height: Math.max(minimumFrameSize.value.height, props.viewportSize.height - props.cellRect.y + 1),
+}));
+const editorFrameStyle = computed<CSSProperties>(() => ({
+  ...(props.editing ? props.frameStyle : {}),
+  left: "-1px",
+  top: "-1px",
+  width: `${props.editing ? measuredWidth.value : minimumFrameSize.value.width}px`,
+  height: `${props.editing ? measuredHeight.value : minimumFrameSize.value.height}px`,
+}));
 const accessibleLabel = computed(() => {
   if (props.editing) {
     return t("cell.edit", { address: props.addressLabel });
@@ -36,8 +60,54 @@ const accessibleLabel = computed(() => {
   });
 });
 
+async function measureEditor(): Promise<void> {
+  const sequence = ++measurementSequence;
+  measuredWidth.value = minimumFrameSize.value.width;
+  measuredHeight.value = minimumFrameSize.value.height;
+  if (!props.editing) {
+    return;
+  }
+
+  await nextTick();
+  const input = inputRef.value;
+  if (!input || sequence !== measurementSequence || !props.editing) {
+    return;
+  }
+
+  const frameBorderSize = 4;
+  const contentWidth = props.wrapText
+    ? minimumFrameSize.value.width
+    : input.scrollWidth + frameBorderSize;
+  const contentHeight = input.scrollHeight + frameBorderSize;
+  measuredWidth.value = Math.min(
+    maximumFrameSize.value.width,
+    Math.max(minimumFrameSize.value.width, contentWidth),
+  );
+  measuredHeight.value = Math.min(
+    maximumFrameSize.value.height,
+    Math.max(minimumFrameSize.value.height, contentHeight),
+  );
+}
+
+watch(
+  () => [
+    props.modelValue,
+    props.editing,
+    props.wrapText,
+    props.cellRect.x,
+    props.cellRect.y,
+    props.cellRect.width,
+    props.cellRect.height,
+    props.viewportSize.width,
+    props.viewportSize.height,
+    props.style,
+  ],
+  () => void measureEditor(),
+  { immediate: true, flush: "post" },
+);
+
 function readInputValue(event: Event): string {
-  return (event.target as HTMLInputElement).value;
+  return (event.target as HTMLTextAreaElement).value;
 }
 
 function getCaretIndex(clientX: number): number {
@@ -85,6 +155,23 @@ function focus(options?: { selectAll?: boolean; clientX?: number }): void {
   input.setSelectionRange(caretIndex, caretIndex);
 }
 
+function insertLineBreak(): void {
+  const input = inputRef.value;
+  if (!input) {
+    return;
+  }
+  const insertion = insertTextAtSelection(
+    props.modelValue,
+    input.selectionStart,
+    input.selectionEnd,
+    "\n",
+  );
+  emit("update:modelValue", insertion.value);
+  void nextTick(() => {
+    input.setSelectionRange(insertion.caret, insertion.caret);
+  });
+}
+
 function onFrameMousedown(event: MouseEvent): void {
   if (!props.editing || event.target !== event.currentTarget) {
     return;
@@ -93,27 +180,29 @@ function onFrameMousedown(event: MouseEvent): void {
   focus({ clientX: event.clientX });
 }
 
-defineExpose({ focus });
+defineExpose({ focus, insertLineBreak });
 </script>
 
 <template>
   <div
     class="cell-editor-frame"
     :class="{ 'is-editing': editing }"
-    :style="editing ? frameStyle : undefined"
+    :style="editorFrameStyle"
     data-cell-editor-frame
     @mousedown.stop="onFrameMousedown"
     @dblclick.stop
   >
-    <input
+    <textarea
       ref="inputRef"
       class="cell-editor"
-      :class="{ 'is-editing': editing }"
+      :class="{ 'is-editing': editing, 'is-wrapped': wrapText }"
       :value="modelValue"
-      type="text"
+      rows="1"
+      :wrap="wrapText ? 'soft' : 'off'"
       autocomplete="off"
       :spellcheck="false"
       :aria-label="accessibleLabel"
+      aria-keyshortcuts="Alt+Enter"
       :data-cell-editor="addressLabel"
       :style="editing ? style : undefined"
       @input="emit('update:modelValue', readInputValue($event))"
@@ -133,16 +222,14 @@ defineExpose({ focus });
 <style scoped lang="scss">
 .cell-editor-frame {
   position: absolute;
-  inset: -1px;
   z-index: 3;
   display: flex;
-  width: calc(100% + 2px);
-  height: calc(100% + 2px);
   background: transparent;
   border: 2px solid transparent;
   pointer-events: none;
 
   &.is-editing {
+    z-index: 5;
     background: var(--td-bg-color-container);
     border-color: var(--td-brand-color);
     pointer-events: auto;
@@ -166,14 +253,24 @@ defineExpose({ focus });
   font-size: 13px;
   line-height: 1;
   pointer-events: none;
+  resize: none;
+  white-space: pre;
 
   &.is-editing {
-    height: calc(1em + 2px);
+    height: 100%;
     min-height: calc(1em + 2px);
+    padding: 2px 4px;
+    overflow: auto;
     color: var(--td-text-color-primary);
     caret-color: var(--td-text-color-primary);
-    line-height: 1;
+    line-height: 1.25;
     pointer-events: auto;
+  }
+
+  &.is-wrapped {
+    overflow-x: hidden;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
   }
 }
 </style>

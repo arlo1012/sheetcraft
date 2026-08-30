@@ -15,7 +15,7 @@ describe("SheetGrid accessibility", () => {
     const { wrapper } = mountSheetGrid();
     const activeGridCell = wrapper.get('[role="gridcell"][aria-selected="true"]');
 
-    expect(activeGridCell.get('input[aria-label="Cell A1, blank"]')).toBeDefined();
+    expect(activeGridCell.get('textarea[aria-label="Cell A1, blank"]')).toBeDefined();
     expect(activeGridCell.element.parentElement?.getAttribute("role")).toBe("row");
     expect(activeGridCell.element.parentElement?.getAttribute("aria-rowindex")).toBe("1");
   });
@@ -26,7 +26,7 @@ describe("SheetGrid accessibility", () => {
 
     await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", { button: 0 });
 
-    expect(wrapper.get("input.cell-editor").attributes("aria-label")).toBe("Cell B1, Budget");
+    expect(wrapper.get("textarea.cell-editor").attributes("aria-label")).toBe("Cell B1, Budget");
   });
 
   test("marks visible range cells selected while keeping one active editor", async () => {
@@ -40,7 +40,7 @@ describe("SheetGrid accessibility", () => {
     expect(wrapper.get('[data-row="2"][data-column="2"]').attributes("aria-selected")).toBe(
       "false",
     );
-    expect(wrapper.findAll("input.cell-editor")).toHaveLength(1);
+    expect(wrapper.findAll("textarea.cell-editor")).toHaveLength(1);
     expect(wrapper.find('[aria-live="polite"]').exists()).toBe(true);
   });
 

@@ -65,17 +65,19 @@ describe("SheetGrid cell style rendering", () => {
     );
     await nextTick();
 
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
+    const frameStyle = wrapper.get<HTMLElement>("[data-cell-editor-frame]").element.style;
     expect(editor.attributes("style")).toBeUndefined();
+    expect(frameStyle.backgroundColor).toBe("");
+    expect(frameStyle.alignItems).toBe("");
 
     await editor.trigger("keydown", { key: "x" });
-    const style = (editor.element as HTMLInputElement).style;
+    const style = (editor.element as HTMLTextAreaElement).style;
     expect(style.fontFamily).toBe('"Courier New"');
     expect(style.fontSize).toBe("20px");
     expect(style.color).toBe("#654321");
     expect(style.backgroundColor).toBe("");
     expect(style.textAlign).toBe("right");
-    const frameStyle = wrapper.get<HTMLElement>("[data-cell-editor-frame]").element.style;
     expect(frameStyle.backgroundColor).toBe("#fedcba");
     expect(frameStyle.alignItems).toBe("flex-start");
   });
@@ -85,9 +87,9 @@ describe("SheetGrid cell style rendering", () => {
     setCellStyle(sheet, { row: 0, column: 0 }, { fontSize: 72 });
     await nextTick();
 
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
     await editor.trigger("keydown", { key: "A" });
-    expect((editor.element as HTMLInputElement).style.minHeight).toBe("74px");
+    expect((editor.element as HTMLTextAreaElement).style.minHeight).toBe("74px");
   });
 
   test("renders wrapped cell content with constrained multiline styles", async () => {
@@ -110,5 +112,21 @@ describe("SheetGrid cell style rendering", () => {
     expect(cell.classes()).not.toContain("is-wrapped");
     expect(style.whiteSpace).toBe("");
     expect((cell.element.parentElement as HTMLElement).style.height).toBe("24px");
+  });
+
+  test("preserves explicit line breaks without enabling soft wrapping", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    setCellValue(sheet, { row: 0, column: 0 }, "first\nsecond");
+    await nextTick();
+
+    const cell = wrapper.get('[data-row="0"][data-column="0"]');
+    const style = (cell.element as HTMLElement).style;
+    expect(cell.classes()).toContain("is-multiline");
+    expect(cell.classes()).not.toContain("is-wrapped");
+    expect(style.whiteSpace).toBe("pre");
+    expect(style.overflowWrap).toBe("");
+    expect(
+      Number.parseFloat((cell.element.parentElement as HTMLElement).style.height),
+    ).toBeGreaterThan(24);
   });
 });

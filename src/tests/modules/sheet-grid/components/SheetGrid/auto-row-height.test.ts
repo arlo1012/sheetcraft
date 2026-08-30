@@ -66,4 +66,22 @@ describe("SheetGrid automatic row height", () => {
     await nextTick();
     expect(renderedRowHeight(wrapper, 0)).toBe(automaticHeight);
   });
+
+  test("keeps row geometry stable until a wrapped edit is committed", async () => {
+    const { session, sheet, wrapper } = mountSheetGrid();
+    setCellStyle(sheet, { row: 0, column: 0 }, { wrapText: true });
+    const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
+
+    await editor.trigger("keydown", { key: "F2" });
+    await editor.setValue("A long wrapped draft that changes row geometry before it is committed.");
+
+    expect(renderedRowHeight(wrapper, 0)).toBe(DEFAULT_ROW_HEIGHT);
+    expect(editor.attributes("wrap")).toBe("soft");
+    expect(editor.attributes("aria-keyshortcuts")).toBe("Alt+Enter");
+    expect(session.history.undoStack).toHaveLength(0);
+
+    await editor.trigger("keydown", { key: "Enter" });
+    expect(renderedRowHeight(wrapper, 0)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
+    expect(session.history.undoStack).toHaveLength(1);
+  });
 });

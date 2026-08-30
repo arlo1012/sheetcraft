@@ -1,11 +1,16 @@
+import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { getCellValue, setCellValue } from "../../../../../modules/workbook/workbook";
+import {
+  DEFAULT_ROW_HEIGHT,
+  getCellValue,
+  setCellValue,
+} from "../../../../../modules/workbook/workbook";
 import { activeCell, mountSheetGrid } from "./fixture";
 
 describe("cell editor", () => {
   test("replaces content with printable input and commits with Enter", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
 
     await editor.trigger("keydown", { key: "4" });
     await editor.setValue("42");
@@ -22,17 +27,17 @@ describe("cell editor", () => {
     setCellValue(sheet, { row: 1, column: 0 }, "Original");
     await wrapper.get('[data-row="1"][data-column="0"]').trigger("mousedown", { button: 0 });
 
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "Enter" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Enter" });
     expect(activeCell(wrapper)).toBe("A3");
-    expect(wrapper.get("input.cell-editor").classes()).not.toContain("is-editing");
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "Enter", shiftKey: true });
+    expect(wrapper.get("textarea.cell-editor").classes()).not.toContain("is-editing");
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Enter", shiftKey: true });
     expect(activeCell(wrapper)).toBe("A2");
     expect(session.history.undoStack).toHaveLength(0);
 
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "F2" });
-    const editor = wrapper.get("input.cell-editor");
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "F2" });
+    const editor = wrapper.get("textarea.cell-editor");
     expect(editor.classes()).toContain("is-editing");
-    expect((editor.element as HTMLInputElement).value).toBe("Original");
+    expect((editor.element as HTMLTextAreaElement).value).toBe("Original");
     await editor.setValue("Changed");
     await editor.trigger("keydown", { key: "Enter" });
     expect(getCellValue(sheet, { row: 1, column: 0 })).toBe("Changed");
@@ -45,9 +50,9 @@ describe("cell editor", () => {
     setCellValue(sheet, { row: 1, column: 1 }, "Original");
 
     await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
     await editor.trigger("keydown", { key: "F2" });
-    expect((editor.element as HTMLInputElement).value).toBe("Original");
+    expect((editor.element as HTMLTextAreaElement).value).toBe("Original");
 
     await editor.setValue("Changed");
     await editor.trigger("keydown", { key: "Escape" });
@@ -58,7 +63,7 @@ describe("cell editor", () => {
 
   test("preserves explicitly escaped text after reopening and committing it", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
 
     await editor.trigger("keydown", { key: "'" });
     await editor.setValue("'0012");
@@ -66,9 +71,11 @@ describe("cell editor", () => {
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("0012");
 
     await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", { button: 0 });
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "F2" });
-    expect((wrapper.get("input.cell-editor").element as HTMLInputElement).value).toBe("'0012");
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "Enter" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "F2" });
+    expect((wrapper.get("textarea.cell-editor").element as HTMLTextAreaElement).value).toBe(
+      "'0012",
+    );
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Enter" });
 
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("0012");
     expect(session.history.undoStack).toHaveLength(1);
@@ -76,7 +83,7 @@ describe("cell editor", () => {
 
   test("commits once when selecting another cell and supports Tab traversal", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
 
     await editor.trigger("keydown", { key: "a" });
     await wrapper.get('[data-row="2"][data-column="3"]').trigger("mousedown", { button: 0 });
@@ -84,19 +91,19 @@ describe("cell editor", () => {
     expect(activeCell(wrapper)).toBe("D3");
     expect(session.history.undoStack).toHaveLength(1);
 
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "b" });
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "Tab" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "b" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Tab" });
     expect(getCellValue(sheet, { row: 2, column: 3 })).toBe("b");
     expect(activeCell(wrapper)).toBe("E3");
 
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "c" });
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "Tab", shiftKey: true });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "c" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Tab", shiftKey: true });
     expect(activeCell(wrapper)).toBe("D3");
   });
 
   test("keeps editing when the editor itself receives a pointer event", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
 
     await editor.trigger("keydown", { key: "a" });
     await editor.trigger("mousedown", { button: 0 });
@@ -109,7 +116,7 @@ describe("cell editor", () => {
 
   test("keeps an in-progress editor mounted when its cell scrolls outside the viewport", async () => {
     const { session, wrapper } = mountSheetGrid();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
     const scroller = wrapper.get(".sheet-grid__scroller");
 
     await editor.trigger("keydown", { key: "d" });
@@ -117,8 +124,60 @@ describe("cell editor", () => {
     (scroller.element as HTMLDivElement).scrollTop = 1_200;
     await scroller.trigger("scroll");
 
-    expect((wrapper.get("input.cell-editor").element as HTMLInputElement).value).toBe("Draft");
-    expect(wrapper.get("input.cell-editor").classes()).toContain("is-editing");
+    expect((wrapper.get("textarea.cell-editor").element as HTMLTextAreaElement).value).toBe(
+      "Draft",
+    );
+    expect(wrapper.get("textarea.cell-editor").classes()).toContain("is-editing");
     expect(session.history.undoStack).toHaveLength(0);
+  });
+
+  test("inserts a line break with Alt+Enter and commits it with plain Enter", async () => {
+    const { session, sheet, wrapper } = mountSheetGrid();
+    const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
+
+    await editor.trigger("keydown", { key: "F2" });
+    await editor.setValue("firstXXsecond");
+    editor.element.setSelectionRange(5, 7);
+    await editor.trigger("keydown", { key: "Enter", altKey: true });
+
+    expect(editor.element.value).toBe("first\nsecond");
+    expect(editor.element.selectionStart).toBe(6);
+    expect(editor.classes()).toContain("is-editing");
+    expect(activeCell(wrapper)).toBe("A1");
+    expect(getCellValue(sheet, { row: 0, column: 0 })).toBeNull();
+    expect(session.history.undoStack).toHaveLength(0);
+    const firstRow = wrapper.get('[data-row="0"][data-column="0"]').element
+      .parentElement as HTMLElement;
+    expect(Number.parseFloat(firstRow.style.height)).toBe(DEFAULT_ROW_HEIGHT);
+
+    await editor.trigger("keydown", { key: "Enter" });
+    expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("first\nsecond");
+    expect(Number.parseFloat(firstRow.style.height)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
+    expect(activeCell(wrapper)).toBe("A2");
+    expect(session.history.undoStack).toHaveLength(1);
+  });
+
+  test("expands the edit overlay right and down without changing row geometry", async () => {
+    const { wrapper } = mountSheetGrid();
+    const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
+    const frame = wrapper.get<HTMLElement>("[data-cell-editor-frame]");
+    const firstRow = wrapper.get('[data-row="0"][data-column="0"]').element
+      .parentElement as HTMLElement;
+    const initialWidth = Number.parseFloat(frame.element.style.width);
+
+    Object.defineProperties(editor.element, {
+      scrollWidth: { configurable: true, get: () => 240 },
+      scrollHeight: { configurable: true, get: () => 72 },
+    });
+    await editor.trigger("keydown", { key: "F2" });
+    await editor.setValue("first line\nsecond line with more content");
+    await nextTick();
+
+    expect(Number.parseFloat(frame.element.style.width)).toBeGreaterThan(initialWidth);
+    expect(Number.parseFloat(frame.element.style.height)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
+    expect(Number.parseFloat(firstRow.style.height)).toBe(DEFAULT_ROW_HEIGHT);
+    expect(frame.element.parentElement).toBe(
+      wrapper.get('[role="gridcell"][aria-selected="true"]').element,
+    );
   });
 });

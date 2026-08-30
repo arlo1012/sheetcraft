@@ -10,6 +10,7 @@ type VisibleCell = {
   key: string;
   address: CellAddress;
   text: string;
+  multiline: boolean;
   wrapped: boolean;
   style: CSSProperties;
 };
@@ -28,6 +29,7 @@ const props = defineProps<{
   activeCell: CellAddress;
   selection: CellSelection;
   scrollPosition: Point;
+  editing: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -62,16 +64,19 @@ const visibleRows = computed<VisibleRow[]>(() => {
       const address = { row, column };
       const rect = props.geometry.getCellViewportRect(address, props.scrollPosition);
       const cellStyle = getCellStyle(props.sheet, address);
+      const text = formatCellValueForDisplay(getCellValue(props.sheet, address));
+      const preservesLineBreaks = /[\r\n]/u.test(text);
       cells.push({
         key: `${row}:${column}`,
         address,
-        text: formatCellValueForDisplay(getCellValue(props.sheet, address)),
+        text,
+        multiline: Boolean(cellStyle?.wrapText) || preservesLineBreaks,
         wrapped: Boolean(cellStyle?.wrapText),
         style: {
           left: `${rect.x}px`,
           width: `${rect.width}px`,
           height: "100%",
-          ...getCellContentStyle(cellStyle),
+          ...getCellContentStyle(cellStyle, preservesLineBreaks),
         },
       });
     }
@@ -107,9 +112,14 @@ const visibleRows = computed<VisibleRow[]>(() => {
         class="sheet-cell-layer__cell"
         :class="{
           'has-value': cell.text.length > 0,
+          'is-multiline': cell.multiline,
           'is-wrapped': cell.wrapped,
           'is-active':
             cell.address.row === activeCell.row && cell.address.column === activeCell.column,
+          'is-editing':
+            editing &&
+            cell.address.row === activeCell.row &&
+            cell.address.column === activeCell.column,
           'is-selected': isCellSelected(cell.address, selection),
         }"
         :style="cell.style"
@@ -162,7 +172,7 @@ const visibleRows = computed<VisibleRow[]>(() => {
       overflow: visible;
     }
 
-    &.is-wrapped.is-active {
+    &.is-multiline.is-active:not(.is-editing) {
       overflow: hidden;
     }
   }
@@ -172,7 +182,7 @@ const visibleRows = computed<VisibleRow[]>(() => {
     text-overflow: clip;
   }
 
-  &__cell.is-wrapped &__value {
+  &__cell.is-multiline &__value {
     min-width: 0;
     max-width: 100%;
     overflow: visible;

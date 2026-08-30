@@ -2,6 +2,7 @@
 import { ChevronDown, ChevronUp, Search } from "lucide-vue-next";
 import { nextTick, ref, watch } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import type { CellAddress } from "../workbook";
 
 const props = defineProps<{
@@ -21,7 +22,7 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 const addressInput = ref<HTMLInputElement>();
-const formulaInput = ref<HTMLInputElement>();
+const formulaInput = ref<HTMLTextAreaElement>();
 const addressDraft = ref(props.addressLabel);
 const formulaDraft = ref(props.inputValue);
 const formulaSourceValue = ref(props.inputValue);
@@ -50,7 +51,7 @@ watch(
 );
 
 function readInputValue(event: Event): string {
-  return (event.target as HTMLInputElement).value;
+  return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
 }
 
 function syncFormulaFromProps(): void {
@@ -119,8 +120,28 @@ function commitFormulaDraft(): void {
   emit("commitCell", payload);
 }
 
+function insertFormulaLineBreak(): void {
+  const input = formulaInput.value;
+  if (!input) {
+    return;
+  }
+  const insertion = insertTextAtSelection(
+    formulaDraft.value,
+    input.selectionStart,
+    input.selectionEnd,
+    "\n",
+  );
+  formulaDraft.value = insertion.value;
+  void nextTick(() => {
+    input.setSelectionRange(insertion.caret, insertion.caret);
+  });
+}
+
 function onFormulaKeydown(event: KeyboardEvent): void {
-  if (event.key === "Enter" && !event.isComposing && !isComposing.value) {
+  if (event.key === "Enter" && event.altKey && !event.isComposing && !isComposing.value) {
+    event.preventDefault();
+    insertFormulaLineBreak();
+  } else if (event.key === "Enter" && !event.isComposing && !isComposing.value) {
     event.preventDefault();
     commitFormulaDraft();
     emit("traverse", {
@@ -195,16 +216,18 @@ function onSearchKeydown(event: KeyboardEvent): void {
           t("formulaBar.editor", { address: formulaFocused ? formulaTargetLabel : addressLabel })
         }}
       </span>
-      <input
+      <textarea
         ref="formulaInput"
         class="workbook-formula-bar__formula-input"
         :value="formulaDraft"
-        type="text"
+        rows="1"
+        wrap="off"
         autocomplete="off"
         :spellcheck="false"
         :aria-label="
           t('formulaBar.editor', { address: formulaFocused ? formulaTargetLabel : addressLabel })
         "
+        aria-keyshortcuts="Alt+Enter"
         :placeholder="t('formulaBar.placeholder')"
         data-formula-input
         @input="onFormulaInput"
@@ -320,6 +343,13 @@ function onSearchKeydown(event: KeyboardEvent): void {
 
   &__formula {
     padding: 4px 6px;
+  }
+
+  &__formula-input {
+    overflow: auto;
+    line-height: 18px;
+    resize: none;
+    white-space: pre;
   }
 
   &__search {

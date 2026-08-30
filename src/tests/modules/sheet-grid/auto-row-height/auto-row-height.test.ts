@@ -32,6 +32,10 @@ describe("automatic row height", () => {
       DEFAULT_ROW_HEIGHT,
     );
     expect(measureWrappedCellHeight("a\nb", 42, baseFont, fixedMeasurer)).toBe(30);
+    expect(measureWrappedCellHeight("a\nb", 42, baseFont, fixedMeasurer, false)).toBe(30);
+    expect(measureWrappedCellHeight("abcdefg", 42, baseFont, fixedMeasurer, false)).toBe(
+      DEFAULT_ROW_HEIGHT,
+    );
     expect(measureWrappedCellHeight("", 42, baseFont, fixedMeasurer)).toBe(DEFAULT_ROW_HEIGHT);
   });
 
@@ -111,5 +115,17 @@ describe("automatic row height", () => {
         [2, 40],
       ]),
     );
+  });
+
+  test("derives height for explicit line breaks without a wrap style", () => {
+    const calculator = createAutoRowHeightCalculator(fixedMeasurer);
+    const heights = calculator.reconcile({
+      cells: new Map([["0:0", { value: "first\nsecond" }]]),
+      columnWidths: new Map([[0, 42]]),
+      rowCount: 2,
+      columnCount: 2,
+    });
+
+    expect(heights.get(0)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
   });
 });

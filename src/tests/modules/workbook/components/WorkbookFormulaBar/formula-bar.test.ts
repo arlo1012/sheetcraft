@@ -24,6 +24,8 @@ describe("WorkbookFormulaBar", () => {
     expect(wrapper.get("form").attributes("aria-label")).toBe("转到单元格");
     expect(wrapper.get("[data-address-input]").attributes("aria-label")).toBe("单元格地址");
     expect(wrapper.get("[data-formula-input]").attributes("aria-label")).toBe("编辑单元格 A1");
+    expect(wrapper.get("[data-formula-input]").attributes("aria-keyshortcuts")).toBe("Alt+Enter");
+    expect(wrapper.get("[data-formula-input]").element).toBeInstanceOf(HTMLTextAreaElement);
     expect(wrapper.get("[data-search-input]").attributes("aria-label")).toBe("在工作表中查找");
     expect(wrapper.get(".workbook-formula-bar__fx").attributes("aria-hidden")).toBe("true");
   });
@@ -47,7 +49,7 @@ describe("WorkbookFormulaBar", () => {
 
   test("commits the formula draft to the cell that owned the edit", async () => {
     const wrapper = mountFormulaBar();
-    const input = wrapper.get<HTMLInputElement>("[data-formula-input]");
+    const input = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
 
     await input.trigger("focus");
     await input.setValue("001");
@@ -68,7 +70,7 @@ describe("WorkbookFormulaBar", () => {
 
   test("traverses from an unchanged draft and searches in both directions", async () => {
     const wrapper = mountFormulaBar();
-    const formulaInput = wrapper.get<HTMLInputElement>("[data-formula-input]");
+    const formulaInput = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
     const searchInput = wrapper.get<HTMLInputElement>("[data-search-input]");
 
     await formulaInput.trigger("focus");
@@ -90,7 +92,7 @@ describe("WorkbookFormulaBar", () => {
 
   test("cancels with Escape and defers commit during IME composition", async () => {
     const wrapper = mountFormulaBar();
-    const input = wrapper.get<HTMLInputElement>("[data-formula-input]");
+    const input = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
 
     await input.trigger("focus");
     await input.setValue("draft");
@@ -109,6 +111,30 @@ describe("WorkbookFormulaBar", () => {
 
     expect(wrapper.emitted("commitCell")).toEqual([
       [{ address: { row: 0, column: 0 }, input: "中文" }],
+    ]);
+  });
+
+  test("inserts a line break with Alt+Enter and commits it with plain Enter", async () => {
+    const wrapper = mountFormulaBar();
+    const input = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
+
+    await input.trigger("focus");
+    await input.setValue("firstsecond");
+    input.element.setSelectionRange(5, 5);
+    await input.trigger("keydown", { key: "Enter", altKey: true });
+
+    expect(input.element.value).toBe("first\nsecond");
+    expect(input.element.selectionStart).toBe(6);
+    expect(wrapper.emitted("commitCell")).toBeUndefined();
+    expect(wrapper.emitted("traverse")).toBeUndefined();
+
+    await input.trigger("keydown", { key: "Enter" });
+    await input.trigger("blur");
+    expect(wrapper.emitted("commitCell")).toEqual([
+      [{ address: { row: 0, column: 0 }, input: "first\nsecond" }],
+    ]);
+    expect(wrapper.emitted("traverse")).toEqual([
+      [{ address: { row: 0, column: 0 }, direction: "down" }],
     ]);
   });
 });

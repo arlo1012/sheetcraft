@@ -29,22 +29,26 @@ function getTypographyStyle(style: Readonly<CellStyle> | undefined): CSSProperti
   };
 }
 
-export function getCellContentStyle(style: Readonly<CellStyle> | undefined): CSSProperties {
-  const wrapTextStyle: CSSProperties = style?.wrapText
-    ? {
-        whiteSpace: "pre-wrap",
-        overflowWrap: "anywhere",
-        wordBreak: "normal",
-        lineHeight: String(WRAPPED_CELL_LINE_HEIGHT),
-        paddingTop: `${WRAPPED_CELL_VERTICAL_PADDING / 2}px`,
-        paddingBottom: `${WRAPPED_CELL_VERTICAL_PADDING / 2}px`,
-        ...(style.horizontalAlign ? { textAlign: style.horizontalAlign } : {}),
-      }
-    : {};
+export function getCellContentStyle(
+  style: Readonly<CellStyle> | undefined,
+  preserveLineBreaks = false,
+): CSSProperties {
+  const multilineStyle: CSSProperties =
+    style?.wrapText || preserveLineBreaks
+      ? {
+          whiteSpace: style?.wrapText ? "pre-wrap" : "pre",
+          ...(style?.wrapText ? { overflowWrap: "anywhere" } : {}),
+          wordBreak: "normal",
+          lineHeight: String(WRAPPED_CELL_LINE_HEIGHT),
+          paddingTop: `${WRAPPED_CELL_VERTICAL_PADDING / 2}px`,
+          paddingBottom: `${WRAPPED_CELL_VERTICAL_PADDING / 2}px`,
+          ...(style?.horizontalAlign ? { textAlign: style.horizontalAlign } : {}),
+        }
+      : {};
 
   return {
     ...getTypographyStyle(style),
-    ...wrapTextStyle,
+    ...multilineStyle,
     ...(style?.fillColor ? { backgroundColor: style.fillColor } : {}),
     ...(style?.horizontalAlign
       ? { justifyContent: ALIGNMENT_JUSTIFICATION[style.horizontalAlign] }

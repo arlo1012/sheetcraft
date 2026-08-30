@@ -50,8 +50,8 @@ describe("SheetGrid viewport", () => {
     await scroller.trigger("scroll");
     await wrapper.get('[data-row="29"][data-column="11"]').trigger("mousedown", { button: 0 });
 
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "Enter" });
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "Tab" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Enter" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Tab" });
 
     expect(activeCell(wrapper)).toBe("M31");
     expect(scroller.attributes("aria-rowcount")).toBe("35");
@@ -65,7 +65,7 @@ describe("SheetGrid viewport", () => {
     (scroller.element as HTMLDivElement).scrollTop = 1_200;
     await scroller.trigger("scroll");
 
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "ArrowDown" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "ArrowDown" });
 
     expect(activeCell(wrapper)).toBe("A2");
     expect((scroller.element as HTMLDivElement).scrollTop).toBe(24);

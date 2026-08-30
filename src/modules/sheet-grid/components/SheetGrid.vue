@@ -74,6 +74,7 @@ import { getCellEditorFrameStyle, getCellEditorStyle } from "../cell-presentatio
 
 type CellEditorHandle = {
   focus: (options?: { selectAll?: boolean; clientX?: number }) => void;
+  insertLineBreak: () => void;
 };
 
 type AxisContextMenuState = {
@@ -305,6 +306,9 @@ const activeCellEditorStyle = computed(() =>
 );
 const activeCellEditorFrameStyle = computed(() =>
   getCellEditorFrameStyle(getCellStyle(props.sheet, activeCell.value)),
+);
+const activeCellWrapText = computed(() =>
+  Boolean(getCellStyle(props.sheet, activeCell.value)?.wrapText),
 );
 const clipboardFeedback = computed(() =>
   clipboardFeedbackKey.value ? t(CLIPBOARD_MESSAGE_KEYS[clipboardFeedbackKey.value]) : "",
@@ -1024,6 +1028,10 @@ function onEditorKeydown(event: KeyboardEvent): void {
     }
     if (event.key === "Enter") {
       event.preventDefault();
+      if (event.altKey) {
+        editorRef.value?.insertLineBreak();
+        return;
+      }
       traverseSelection("Enter", event.shiftKey, true);
       return;
     }
@@ -1317,6 +1325,7 @@ defineExpose({ navigateToCell });
             :active-cell="activeCell"
             :selection="selection"
             :scroll-position="scrollPosition"
+            :editing="isEditing"
             @cell-mousedown="onCellMouseDown"
             @cell-double-click="onCellDoubleClick"
           >
@@ -1327,6 +1336,9 @@ defineExpose({ navigateToCell });
                 :address-label="activeCellLabel"
                 :display-value="activeCellDisplayValue"
                 :editing="isEditing"
+                :wrap-text="activeCellWrapText"
+                :cell-rect="activeCellRect"
+                :viewport-size="viewportSize"
                 :style="activeCellEditorStyle"
                 :frame-style="activeCellEditorFrameStyle"
                 @keydown="onEditorKeydown"

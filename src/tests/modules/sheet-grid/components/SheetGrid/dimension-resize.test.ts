@@ -69,11 +69,11 @@ describe("SheetGrid dimension resizing", () => {
 
     expect(getColumnWidth(sheet, 0)).toBe(136);
     expect(session.history.undoStack).toHaveLength(1);
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
     expect(getColumnWidth(sheet, 0)).toBe(DEFAULT_COLUMN_WIDTH);
     expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 192px");
     await wrapper
-      .get("input.cell-editor")
+      .get("textarea.cell-editor")
       .trigger("keydown", { key: "z", ctrlKey: true, shiftKey: true });
     expect(getColumnWidth(sheet, 0)).toBe(136);
   });
@@ -114,7 +114,7 @@ describe("SheetGrid dimension resizing", () => {
       clientX: DEFAULT_COLUMN_WIDTH + 20,
     });
     dispatchPointer("pointerup", { pointerId: 5, clientX: DEFAULT_COLUMN_WIDTH + 20 });
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
     expect(session.history.redoStack).toHaveLength(1);
 
     await wrapper.get('[data-resize-column="0"]').trigger("pointerdown", {
@@ -129,7 +129,7 @@ describe("SheetGrid dimension resizing", () => {
     expect(session.history.undoStack).toHaveLength(0);
     expect(session.history.redoStack).toHaveLength(1);
     await wrapper
-      .get("input.cell-editor")
+      .get("textarea.cell-editor")
       .trigger("keydown", { key: "z", ctrlKey: true, shiftKey: true });
     expect(getColumnWidth(sheet, 0)).toBe(DEFAULT_COLUMN_WIDTH + 20);
   });
@@ -193,7 +193,7 @@ describe("SheetGrid dimension resizing", () => {
 
   test("keeps edit drafts and clipboard state while resizing", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
     const copied = createTestClipboardEvent("copy");
     editor.element.dispatchEvent(copied.event);
     await editor.trigger("keydown", { key: "F2" });
@@ -209,11 +209,13 @@ describe("SheetGrid dimension resizing", () => {
       pointerId: 3,
       clientX: DEFAULT_COLUMN_WIDTH + 20,
     });
-    await wrapper.get("input.cell-editor").trigger("keydown", { key: "Escape" });
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Escape" });
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.get("input.cell-editor").classes()).toContain("is-editing");
-    expect((wrapper.get("input.cell-editor").element as HTMLInputElement).value).toBe("draft");
+    expect(wrapper.get("textarea.cell-editor").classes()).toContain("is-editing");
+    expect((wrapper.get("textarea.cell-editor").element as HTMLTextAreaElement).value).toBe(
+      "draft",
+    );
     expect(wrapper.find("[data-clipboard-range]").exists()).toBe(true);
     expect(getColumnWidth(sheet, 0)).toBe(DEFAULT_COLUMN_WIDTH);
     expect(session.history.undoStack).toHaveLength(0);
@@ -221,7 +223,7 @@ describe("SheetGrid dimension resizing", () => {
 
   test("resizes without committing an active IME composition", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
-    const editor = wrapper.get("input.cell-editor");
+    const editor = wrapper.get("textarea.cell-editor");
     await editor.trigger("compositionstart");
     await editor.setValue("中文");
 
@@ -240,8 +242,8 @@ describe("SheetGrid dimension resizing", () => {
 
     expect(getRowHeight(sheet, 0)).toBe(36);
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBeNull();
-    expect((wrapper.get("input.cell-editor").element as HTMLInputElement).value).toBe("中文");
-    expect(wrapper.get("input.cell-editor").classes()).toContain("is-editing");
+    expect((wrapper.get("textarea.cell-editor").element as HTMLTextAreaElement).value).toBe("中文");
+    expect(wrapper.get("textarea.cell-editor").classes()).toContain("is-editing");
     expect(session.history.undoStack).toHaveLength(1);
   });
 
