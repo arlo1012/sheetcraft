@@ -36,6 +36,7 @@ const { t } = useAppI18n();
       :aria-label="t('format.typographyTools')"
     >
       <FontFormatControls
+        class="home-cell-format-group__font-tools"
         :state="state"
         :disabled="disabled"
         @apply-style="emit('applyStyle', $event)"
@@ -62,6 +63,7 @@ const { t } = useAppI18n();
       :aria-label="t('format.appearanceTools')"
     >
       <RibbonIconAction
+        class="home-cell-format-group__appearance-action"
         :label="t('app.unavailableFeature', { feature: t('ribbon.borders') })"
         disabled
         disclosure
@@ -113,10 +115,18 @@ const { t } = useAppI18n();
 .home-cell-format-group {
   @include ribbon.shell;
 
+  --cell-format-primary-track: 126px;
+  --cell-format-compact-track: 40px;
+  --cell-format-column-gap: 4px;
+  --cell-format-control-height: 26px;
+
   display: grid;
-  grid-template-columns: repeat(3, max-content);
+  grid-template-columns:
+    var(--cell-format-primary-track) var(--cell-format-compact-track)
+    var(--cell-format-compact-track) max-content;
+  grid-template-rows: repeat(2, 27px);
   align-content: center;
-  column-gap: 4px;
+  column-gap: var(--cell-format-column-gap);
 
   &__lane {
     @include ribbon.stack;
@@ -124,20 +134,41 @@ const { t } = useAppI18n();
     min-width: 0;
   }
 
+  &__lane--typography {
+    grid-column: 1 / span 2;
+    grid-row: 1 / span 2;
+    grid-template-columns: var(--cell-format-primary-track) var(--cell-format-compact-track);
+    column-gap: var(--cell-format-column-gap);
+  }
+
+  &__font-tools,
   &__typography-tools {
-    display: flex;
+    grid-column: 1 / -1;
+  }
+
+  &__typography-tools {
+    display: grid;
+    grid-template-columns: var(--cell-format-primary-track) var(--cell-format-compact-track);
     align-items: center;
-    gap: 4px;
+    column-gap: var(--cell-format-column-gap);
   }
 
   &__lane--appearance {
-    justify-items: center;
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    justify-items: stretch;
   }
 
   &__lane--styles {
+    grid-column: 4;
+    grid-row: 1 / span 2;
     min-width: max-content;
     padding-left: 4px;
     border-left: 1px solid var(--td-border-level-1-color);
+  }
+
+  &__appearance-action {
+    width: 100%;
   }
 
   &__style-action {

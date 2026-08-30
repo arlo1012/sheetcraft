@@ -59,5 +59,7 @@ function applyColor(color: string | null): void {
 .cell-color-control {
   display: inline-flex;
   align-items: center;
+  width: 100%;
+  height: var(--cell-format-control-height, 26px);
 }
 </style>

@@ -145,15 +145,18 @@ function setFontSize(value: SelectValue): void {
 .font-format-controls {
   display: inline-grid;
   flex: 0 0 auto;
-  grid-template-columns: 124px 44px;
-  column-gap: 2px;
+  grid-template-columns: var(--cell-format-primary-track, 126px) var(
+      --cell-format-compact-track,
+      40px
+    );
+  column-gap: var(--cell-format-column-gap, 4px);
   align-items: stretch;
-  height: 28px;
+  height: var(--cell-format-control-height, 26px);
 
   &__field {
     display: inline-flex;
     min-width: 0;
-    height: 28px;
+    height: var(--cell-format-control-height, 26px);
     overflow: hidden;
     border-radius: 2px;
   }
@@ -172,7 +175,7 @@ function setFontSize(value: SelectValue): void {
   }
 
   :deep(.t-input) {
-    height: 28px;
+    height: var(--cell-format-control-height, 26px);
     padding-right: 6px;
     padding-left: 6px;
     background: transparent;
@@ -196,6 +199,20 @@ function setFontSize(value: SelectValue): void {
   :deep(.t-fake-arrow) {
     width: 12px;
     height: 12px;
+  }
+
+  &__size :deep(.t-input) {
+    padding-right: 3px;
+    padding-left: 4px;
+  }
+
+  &__size :deep(.t-input__suffix) {
+    margin-left: 1px;
+  }
+
+  &__size :deep(.t-fake-arrow) {
+    width: 10px;
+    height: 10px;
   }
 }
 </style>

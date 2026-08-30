@@ -67,10 +67,12 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
 
 <style scoped lang="scss">
 .text-format-controls {
-  display: inline-flex;
-  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 27px);
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  width: 100%;
+  height: var(--cell-format-control-height, 26px);
 
   &__button {
     position: relative;
