@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  ALargeSmall,
   AlignVerticalJustifyCenter,
   AppWindow,
   ArrowDownAZ,
@@ -7,6 +8,7 @@ import {
   CirclePlus,
   Database,
   DollarSign,
+  Eraser,
   FileImage,
   FilePenLine,
   Grid2X2,
@@ -119,6 +121,13 @@ function onKeydown(event: KeyboardEvent): void {
         >
           <Paintbrush :size="15" aria-hidden="true" />
         </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.clearFormatting') })"
+          disabled
+          data-ribbon-placeholder="clear-formatting"
+        >
+          <Eraser :size="15" aria-hidden="true" />
+        </RibbonIconAction>
       </div>
     </div>
 
@@ -195,12 +204,23 @@ function onKeydown(event: KeyboardEvent): void {
       <div class="home-format-toolbar__row" data-ribbon-row="1">
         <RibbonIconAction
           :label="t('app.unavailableFeature', { feature: t('ribbon.verticalAlignment') })"
-          :text="t('ribbon.verticalAlignment')"
           disabled
           disclosure
           data-ribbon-placeholder="vertical-alignment"
         >
           <AlignVerticalJustifyCenter :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.textOrientation') })"
+          disabled
+          disclosure
+          data-ribbon-placeholder="text-orientation"
+        >
+          <ALargeSmall
+            class="home-format-toolbar__orientation-icon"
+            :size="15"
+            aria-hidden="true"
+          />
         </RibbonIconAction>
         <RibbonIconAction
           :label="t('app.unavailableFeature', { feature: t('ribbon.wrapText') })"
@@ -346,50 +366,55 @@ function onKeydown(event: KeyboardEvent): void {
     </div>
 
     <div
-      class="home-format-toolbar__group"
+      class="home-format-toolbar__group home-format-toolbar__group--insert"
       data-ribbon-group="insert"
       role="group"
       :aria-label="t('ribbon.insertTools')"
     >
-      <div class="home-format-toolbar__row" data-ribbon-row="1">
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.insert') })"
-          :text="t('ribbon.insert')"
-          disabled
-          disclosure
-          data-ribbon-placeholder="insert"
-        >
-          <CirclePlus :size="15" aria-hidden="true" />
-        </RibbonIconAction>
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.image') })"
-          :text="t('ribbon.image')"
-          disabled
-          disclosure
-          data-ribbon-placeholder="image"
-        >
-          <ImageIcon :size="15" aria-hidden="true" />
-        </RibbonIconAction>
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.chart') })"
-          :text="t('ribbon.chart')"
-          disabled
-          disclosure
-          data-ribbon-placeholder="chart"
-        >
-          <ChartNoAxesColumn :size="15" aria-hidden="true" />
-        </RibbonIconAction>
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.pivotTable') })"
-          :text="t('ribbon.pivotTable')"
-          disabled
-          disclosure
-          data-ribbon-placeholder="pivot-table"
-        >
-          <Table2 :size="15" aria-hidden="true" />
-        </RibbonIconAction>
-      </div>
-      <div class="home-format-toolbar__row" data-ribbon-row="2" aria-hidden="true" />
+      <RibbonIconAction
+        class="home-format-toolbar__stacked-action"
+        :label="t('app.unavailableFeature', { feature: t('ribbon.insert') })"
+        :text="t('ribbon.insert')"
+        disabled
+        disclosure
+        data-ribbon-placeholder="insert"
+        data-ribbon-span="2"
+      >
+        <CirclePlus :size="16" aria-hidden="true" />
+      </RibbonIconAction>
+      <RibbonIconAction
+        class="home-format-toolbar__stacked-action"
+        :label="t('app.unavailableFeature', { feature: t('ribbon.image') })"
+        :text="t('ribbon.image')"
+        disabled
+        disclosure
+        data-ribbon-placeholder="image"
+        data-ribbon-span="2"
+      >
+        <ImageIcon :size="16" aria-hidden="true" />
+      </RibbonIconAction>
+      <RibbonIconAction
+        class="home-format-toolbar__stacked-action"
+        :label="t('app.unavailableFeature', { feature: t('ribbon.chart') })"
+        :text="t('ribbon.chart')"
+        disabled
+        disclosure
+        data-ribbon-placeholder="chart"
+        data-ribbon-span="2"
+      >
+        <ChartNoAxesColumn :size="16" aria-hidden="true" />
+      </RibbonIconAction>
+      <RibbonIconAction
+        class="home-format-toolbar__stacked-action"
+        :label="t('app.unavailableFeature', { feature: t('ribbon.pivotTable') })"
+        :text="t('ribbon.pivotTable')"
+        disabled
+        disclosure
+        data-ribbon-placeholder="pivot-table"
+        data-ribbon-span="2"
+      >
+        <Table2 :size="16" aria-hidden="true" />
+      </RibbonIconAction>
     </div>
 
     <div
@@ -398,16 +423,18 @@ function onKeydown(event: KeyboardEvent): void {
       role="group"
       :aria-label="t('ribbon.automationTools')"
     >
+      <RibbonIconAction
+        class="home-format-toolbar__stacked-action"
+        :label="t('app.unavailableFeature', { feature: t('ribbon.quickTools') })"
+        :text="t('ribbon.quickTools')"
+        disabled
+        disclosure
+        data-ribbon-placeholder="quick-tools"
+        data-ribbon-span="2"
+      >
+        <WandSparkles :size="16" aria-hidden="true" />
+      </RibbonIconAction>
       <div class="home-format-toolbar__row" data-ribbon-row="1">
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.quickTools') })"
-          :text="t('ribbon.quickTools')"
-          disabled
-          disclosure
-          data-ribbon-placeholder="quick-tools"
-        >
-          <WandSparkles :size="15" aria-hidden="true" />
-        </RibbonIconAction>
         <RibbonIconAction
           :label="t('app.unavailableFeature', { feature: t('ribbon.generateIcon') })"
           :text="t('ribbon.generateIcon')"
@@ -527,11 +554,22 @@ function onKeydown(event: KeyboardEvent): void {
 
     &--automation {
       flex: 0 0 314px;
+      grid-template-columns: 52px minmax(0, 1fr);
       min-width: 0;
+      column-gap: 2px;
 
       .home-format-toolbar__row {
+        grid-column: 2;
         justify-content: flex-start;
       }
+    }
+
+    &--insert {
+      flex: 0 0 240px;
+      grid-template-columns: repeat(4, 52px);
+      grid-auto-flow: column;
+      justify-content: space-between;
+      column-gap: 2px;
     }
 
     &--utility {
@@ -543,12 +581,42 @@ function onKeydown(event: KeyboardEvent): void {
   }
 
   &__stacked-action {
+    position: relative;
     grid-row: 1 / 3;
+    justify-self: center;
     align-self: stretch;
     width: 48px;
+    min-width: 48px;
     height: auto;
     flex-direction: column;
     gap: 3px;
+    padding: 2px 1px;
+
+    :deep(.ribbon-icon-action__disclosure) {
+      position: absolute;
+      top: 7px;
+      right: 2px;
+    }
+
+    &.ribbon-icon-action.has-text {
+      width: 48px;
+      min-width: 48px;
+      gap: 3px;
+      padding: 2px 1px;
+    }
+
+    :deep(.ribbon-icon-action__text) {
+      max-width: 100%;
+      overflow: visible;
+      line-height: 13px;
+      text-align: center;
+      text-overflow: clip;
+      white-space: normal;
+    }
+  }
+
+  &__orientation-icon {
+    transform: rotate(-18deg);
   }
 }
 </style>

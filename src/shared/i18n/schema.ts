@@ -25,6 +25,7 @@ export type MessageSchema = {
     undo: string;
     redo: string;
     formatPainter: string;
+    clearFormatting: string;
     borders: string;
     wrapText: string;
     mergeCells: string;
@@ -45,6 +46,7 @@ export type MessageSchema = {
     pivotTable: string;
     quickTools: string;
     verticalAlignment: string;
+    textOrientation: string;
     strikethrough: string;
     currencyFormat: string;
     decreaseDecimal: string;

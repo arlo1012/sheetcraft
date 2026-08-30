@@ -188,7 +188,7 @@ describe("HomeFormatToolbar", () => {
     expect(wrapper.emitted("redo")).toHaveLength(1);
   });
 
-  test("renders two explicit rows, ordered groups, and disabled future tools", () => {
+  test("renders ordered two-row groups, spanning actions, and disabled future tools", () => {
     const wrapper = mountToolbar();
 
     const groups = wrapper.findAll("[data-ribbon-group]");
@@ -203,12 +203,18 @@ describe("HomeFormatToolbar", () => {
       "utility",
     ]);
     for (const group of groups.filter(
-      (group) => group.attributes("data-ribbon-group") !== "utility",
+      (group) => !["insert", "utility"].includes(group.attributes("data-ribbon-group") ?? ""),
     )) {
       expect(
         group.findAll(":scope > [data-ribbon-row]").map((row) => row.attributes("data-ribbon-row")),
       ).toEqual(["1", "2"]);
     }
+    expect(wrapper.findAll('[data-ribbon-group="insert"] [data-ribbon-span="2"]')).toHaveLength(4);
+    expect(
+      wrapper
+        .get('[data-ribbon-group="automation"] [data-ribbon-placeholder="quick-tools"]')
+        .attributes("data-ribbon-span"),
+    ).toBe("2");
     expect(wrapper.get('[data-ribbon-group="utility"] [data-ribbon-span="2"]')).toBeTruthy();
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="undo"]')).toBeTruthy();
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="redo"]')).toBeTruthy();
@@ -220,7 +226,16 @@ describe("HomeFormatToolbar", () => {
         .find('[data-ribbon-group="cell"] [data-ribbon-placeholder="format-painter"]')
         .exists(),
     ).toBe(false);
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(30);
+    for (const action of ["clear-formatting", "vertical-alignment", "text-orientation"]) {
+      const control = wrapper.get(`[data-ribbon-placeholder="${action}"]`);
+      expect(control.find(".ribbon-icon-action__text").exists()).toBe(false);
+      expect(control.attributes()).toMatchObject({
+        role: "button",
+        tabindex: "-1",
+        "aria-disabled": "true",
+      });
+    }
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(32);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",
