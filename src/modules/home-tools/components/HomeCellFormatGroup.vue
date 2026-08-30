@@ -132,6 +132,8 @@ const { t } = useAppI18n();
 
   &__lane--styles {
     min-width: max-content;
+    padding-left: 4px;
+    border-left: 1px solid var(--td-border-level-1-color);
   }
 
   &__style-action {
