@@ -239,8 +239,8 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 28px;
+    width: 27px;
+    height: 26px;
     padding: 0;
     background: transparent;
     border: 1px solid transparent;

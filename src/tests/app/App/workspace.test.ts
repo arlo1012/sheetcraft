@@ -341,9 +341,9 @@ describe("App", () => {
     const wrapper = mountApp();
     await wrapper.get('[data-select-column="0"]').trigger("mousedown", { button: 0 });
 
-    const fontGroup = wrapper.get('[data-ribbon-group="font"]');
-    expect(fontGroup.attributes("aria-disabled")).toBe("true");
-    expect(fontGroup.attributes("title")).toBe(
+    const formatGroup = wrapper.get('[data-ribbon-group="cell"]');
+    expect(formatGroup.attributes("aria-disabled")).toBe("true");
+    expect(formatGroup.attributes("title")).toBe(
       "This selection is too large to format in one action.",
     );
     expect(wrapper.get('[aria-label="Bold"]').attributes("aria-disabled")).toBe("true");

@@ -44,9 +44,9 @@ const { t } = useAppI18n();
 <style scoped lang="scss">
 .spreadsheet-ribbon {
   display: grid;
-  grid-template-rows: 32px 64px;
+  grid-template-rows: 30px 64px;
   min-width: 0;
-  background: var(--td-bg-color-container);
+  background: var(--td-bg-color-page);
   border-bottom: 1px solid var(--td-component-border);
 
   &__categories {
@@ -60,16 +60,16 @@ const { t } = useAppI18n();
   &__category-list {
     display: flex;
     min-width: 0;
-    padding-left: 6px;
+    padding-left: 4px;
   }
 
   &__category {
     position: relative;
     display: inline-flex;
     align-items: center;
-    padding: 0 12px;
+    padding: 0 10px;
     color: var(--td-brand-color);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
 
@@ -87,6 +87,7 @@ const { t } = useAppI18n();
   &__panel {
     min-width: 0;
     overflow: hidden;
+    background: var(--td-bg-color-page);
   }
 }
 </style>

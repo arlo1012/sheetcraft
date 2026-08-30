@@ -40,12 +40,12 @@ function onLocaleChange(value: SelectValue): void {
   flex: 0 0 auto;
   align-items: center;
   gap: 4px;
-  height: 32px;
+  height: 30px;
   padding: 0 6px;
   color: var(--td-text-color-placeholder);
 
   &__select {
-    width: 88px;
+    width: 82px;
   }
 }
 </style>

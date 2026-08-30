@@ -22,7 +22,6 @@ const FONT_FAMILIES = [
   "Microsoft YaHei",
   "SimSun",
 ] as const;
-const FONT_FAMILY_OPTIONS = FONT_FAMILIES.map((family) => ({ label: family, value: family }));
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -34,6 +33,12 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
+const fontFamilyOptions = computed(() =>
+  FONT_FAMILIES.map((family) => ({
+    label: family === DEFAULT_FONT_FAMILY ? t("format.defaultFont") : family,
+    value: family,
+  })),
+);
 const fontFamilyValue = computed(() =>
   props.state.fontFamily.mixed ? undefined : (props.state.fontFamily.value ?? DEFAULT_FONT_FAMILY),
 );
@@ -90,7 +95,7 @@ watch(fontSizeValue, (value) => {
         class="font-format-controls__family"
         size="small"
         :model-value="fontFamilyValue"
-        :options="FONT_FAMILY_OPTIONS"
+        :options="fontFamilyOptions"
         :placeholder="state.fontFamily.mixed ? t('format.mixed') : undefined"
         :disabled="disabled"
         @change="setFontFamily"
@@ -132,11 +137,11 @@ watch(fontSizeValue, (value) => {
   }
 
   &__family {
-    width: 132px;
+    width: 116px;
   }
 
   &__size {
-    width: 58px;
+    width: 48px;
   }
 }
 </style>

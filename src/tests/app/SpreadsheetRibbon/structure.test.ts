@@ -32,7 +32,7 @@ describe("SpreadsheetRibbon", () => {
           .map((row) => row.attributes("data-ribbon-row")),
       ),
     ).toEqual(new Set(["1", "2"]));
-    expect(wrapper.get('[data-ribbon-group="font"] [data-ribbon-row="1"]')).toBeTruthy();
+    expect(wrapper.get('[data-ribbon-group="cell"] [data-ribbon-row="1"]')).toBeTruthy();
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-row="2"]')).toBeTruthy();
     expect(wrapper.get("[data-locale-select] input").element).toBeInstanceOf(HTMLInputElement);
 
@@ -48,7 +48,7 @@ describe("SpreadsheetRibbon", () => {
 
     expect(wrapper.emitted("undo")).toHaveLength(1);
     expect(wrapper.emitted("redo")).toHaveLength(1);
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(6);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(20);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",
@@ -64,5 +64,9 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get("header").attributes("aria-label")).toBe("工作簿工具");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("开始");
     expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-label")).toBe("开始工具");
+    expect(wrapper.get(".font-format-controls__family input").element).toHaveProperty(
+      "value",
+      "默认字体",
+    );
   });
 });

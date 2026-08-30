@@ -18,6 +18,9 @@ export type MessageSchema = {
     alignmentTools: string;
     cellTools: string;
     numberTools: string;
+    dataTools: string;
+    insertTools: string;
+    utilityTools: string;
     undo: string;
     redo: string;
     formatPainter: string;
@@ -25,7 +28,22 @@ export type MessageSchema = {
     wrapText: string;
     mergeCells: string;
     numberFormat: string;
+    generalFormat: string;
     percentFormat: string;
+    tableStyles: string;
+    conditionalFormatting: string;
+    filter: string;
+    freeze: string;
+    sum: string;
+    sort: string;
+    data: string;
+    protect: string;
+    insert: string;
+    image: string;
+    chart: string;
+    pivotTable: string;
+    quickTools: string;
+    print: string;
   };
   workspace: {
     editor: string;
@@ -92,6 +110,7 @@ export type MessageSchema = {
   format: {
     toolbar: string;
     font: string;
+    defaultFont: string;
     fontFamily: string;
     fontSize: string;
     emphasis: string;

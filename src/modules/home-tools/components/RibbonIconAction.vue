@@ -1,15 +1,19 @@
 <script setup lang="ts">
+import { ChevronDown } from "lucide-vue-next";
+
 const props = withDefaults(
   defineProps<{
     label: string;
+    text?: string;
     disabled?: boolean;
     pressed?: boolean | "mixed";
-    warning?: boolean;
+    disclosure?: boolean;
   }>(),
   {
+    text: undefined,
     disabled: false,
     pressed: undefined,
-    warning: false,
+    disclosure: false,
   },
 );
 
@@ -39,7 +43,7 @@ function onKeydown(event: KeyboardEvent): void {
       'is-disabled': disabled,
       'is-pressed': pressed === true,
       'is-mixed': pressed === 'mixed',
-      'is-warning': warning,
+      'has-text': text,
     }"
     role="button"
     :tabindex="disabled ? -1 : 0"
@@ -50,7 +54,16 @@ function onKeydown(event: KeyboardEvent): void {
     @click="activate"
     @keydown="onKeydown"
   >
-    <slot />
+    <span class="ribbon-icon-action__icon" aria-hidden="true">
+      <slot />
+    </span>
+    <span v-if="text" class="ribbon-icon-action__text" aria-hidden="true">{{ text }}</span>
+    <ChevronDown
+      v-if="disclosure"
+      class="ribbon-icon-action__disclosure"
+      :size="11"
+      aria-hidden="true"
+    />
   </span>
 </template>
 
@@ -60,7 +73,7 @@ function onKeydown(event: KeyboardEvent): void {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 30px;
+  width: 27px;
   height: 26px;
   border: 1px solid transparent;
   border-radius: 4px;
@@ -84,12 +97,35 @@ function onKeydown(event: KeyboardEvent): void {
 
   &.is-disabled {
     cursor: default;
-    opacity: 0.52;
+    color: var(--td-text-color-secondary);
+    opacity: 0.64;
   }
 
-  &.is-warning {
-    color: var(--td-warning-color, #d97706);
-    opacity: 0.72;
+  &.has-text {
+    width: auto;
+    min-width: 27px;
+    gap: 3px;
+    padding: 0 3px;
+  }
+
+  &__icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__text {
+    overflow: hidden;
+    font-size: 11px;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__disclosure {
+    flex: 0 0 auto;
+    color: var(--td-text-color-placeholder);
   }
 }
 </style>

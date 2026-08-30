@@ -188,21 +188,26 @@ describe("HomeFormatToolbar", () => {
     expect(wrapper.emitted("redo")).toHaveLength(1);
   });
 
-  test("renders two explicit rows, concrete groups, and warning disabled placeholders", () => {
+  test("renders two explicit rows, ordered groups, and disabled future tools", () => {
     const wrapper = mountToolbar();
 
-    expect(
-      new Set(wrapper.findAll("[data-ribbon-row]").map((row) => row.attributes("data-ribbon-row"))),
-    ).toEqual(new Set(["1", "2"]));
-    expect(wrapper.findAll("[data-ribbon-group]")).toHaveLength(5);
-    expect(wrapper.findAll("[data-ribbon-group=font]")).toHaveLength(1);
-    expect(wrapper.findAll("[data-ribbon-group=history]")).toHaveLength(1);
-    expect(wrapper.findAll("[data-ribbon-group=alignment]")).toHaveLength(1);
-    expect(wrapper.findAll("[data-ribbon-group=cell]")).toHaveLength(1);
-    expect(wrapper.findAll("[data-ribbon-group=number]")).toHaveLength(1);
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(6);
+    const groups = wrapper.findAll("[data-ribbon-group]");
+    expect(groups.map((group) => group.attributes("data-ribbon-group"))).toEqual([
+      "history",
+      "cell",
+      "alignment",
+      "number",
+      "data",
+      "insert",
+      "utility",
+    ]);
+    for (const group of groups) {
+      expect(
+        group.findAll(":scope > [data-ribbon-row]").map((row) => row.attributes("data-ribbon-row")),
+      ).toEqual(["1", "2"]);
+    }
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(20);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
-      expect(placeholder.classes()).toContain("is-warning");
       expect(placeholder.attributes()).toMatchObject({
         role: "button",
         tabindex: "-1",
