@@ -107,15 +107,13 @@ describe("HomeFormatToolbar", () => {
 
   test("emits validated font and alignment patches", async () => {
     const wrapper = mountToolbar();
-    const fontFamily = wrapper.findComponent(TSelect);
-    const fontSize = wrapper.get<HTMLInputElement>(".font-format-controls__size input");
-
-    await fontSize.trigger("blur");
-    expect(emittedPatches(wrapper)).toEqual([]);
+    const fontSelectors = wrapper.findAllComponents(TSelect);
+    expect(fontSelectors).toHaveLength(2);
+    const fontFamily = fontSelectors[0]!;
+    const fontSize = fontSelectors[1]!;
 
     fontFamily.vm.$emit("change", "Arial");
-    await fontSize.setValue("18");
-    await fontSize.trigger("blur");
+    fontSize.vm.$emit("change", 18);
     await wrapper.get('[aria-label="Align center"]').trigger("click");
 
     expect(emittedPatches(wrapper)).toEqual([
@@ -124,13 +122,10 @@ describe("HomeFormatToolbar", () => {
       { horizontalAlign: "center" },
     ]);
 
-    await fontSize.setValue("90");
-    await fontSize.trigger("blur");
+    fontSize.vm.$emit("change", 90);
     expect(emittedPatches(wrapper)).toHaveLength(3);
 
-    await fontSize.setValue("20");
-    fontSize.element.focus();
-    await fontSize.trigger("keydown", { key: "Enter" });
+    fontSize.vm.$emit("change", 20);
     expect(emittedPatches(wrapper).at(-1)).toEqual({ fontSize: 20 });
   });
 
@@ -334,10 +329,10 @@ describe("HomeFormatToolbar", () => {
     expect(wrapper.emitted("redo")).toHaveLength(2);
   });
 
-  test("leaves native undo handling inside the editable font-size input", async () => {
+  test("leaves native keyboard handling inside the font selectors", async () => {
     const wrapper = mountToolbar();
 
-    await wrapper.get(".font-format-controls__size input").trigger("keydown", {
+    await wrapper.get(".font-format-controls__family input").trigger("keydown", {
       key: "z",
       ctrlKey: true,
     });

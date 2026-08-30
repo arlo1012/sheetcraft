@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
-import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import {
   DEFAULT_CELL_FONT_SIZE,
   MAX_CELL_FONT_SIZE,
@@ -21,6 +19,9 @@ const FONT_FAMILIES = [
   "Courier New",
   "Microsoft YaHei",
   "SimSun",
+] as const;
+const FONT_SIZE_PRESETS = [
+  8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 22, 24, 28, 32, 36, 48, 72,
 ] as const;
 
 const props = defineProps<{
@@ -42,10 +43,21 @@ const fontFamilyOptions = computed(() =>
 const fontFamilyValue = computed(() =>
   props.state.fontFamily.mixed ? undefined : (props.state.fontFamily.value ?? DEFAULT_FONT_FAMILY),
 );
-const fontSizeValue = computed<InputNumberValue>(() =>
-  props.state.fontSize.mixed ? "" : String(props.state.fontSize.value ?? DEFAULT_CELL_FONT_SIZE),
+const fontSizeValue = computed(() =>
+  props.state.fontSize.mixed ? undefined : (props.state.fontSize.value ?? DEFAULT_CELL_FONT_SIZE),
 );
-const fontSizeDraft = ref<InputNumberValue>(fontSizeValue.value);
+const fontSizeOptions = computed(() => {
+  const values = new Set<number>(FONT_SIZE_PRESETS);
+  if (props.state.fontSize.value !== undefined) {
+    values.add(props.state.fontSize.value);
+  }
+  return [...values]
+    .sort((left, right) => left - right)
+    .map((value) => ({
+      label: String(value),
+      value,
+    }));
+});
 
 function setFontFamily(value: SelectValue): void {
   if (typeof value !== "string" || !value) {
@@ -54,37 +66,23 @@ function setFontFamily(value: SelectValue): void {
   emit("applyStyle", { fontFamily: value === DEFAULT_FONT_FAMILY ? null : value });
 }
 
-function updateFontSizeDraft(value: InputNumberValue): void {
-  fontSizeDraft.value = value;
-}
-
-function commitFontSize(value: InputNumberValue): void {
-  const numericValue = Number(value);
+function setFontSize(value: SelectValue): void {
   if (
-    !Number.isInteger(numericValue) ||
-    numericValue < MIN_CELL_FONT_SIZE ||
-    numericValue > MAX_CELL_FONT_SIZE
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < MIN_CELL_FONT_SIZE ||
+    value > MAX_CELL_FONT_SIZE
   ) {
-    fontSizeDraft.value = fontSizeValue.value;
     return;
   }
   const currentValue = props.state.fontSize.value ?? DEFAULT_CELL_FONT_SIZE;
-  if (!props.state.fontSize.mixed && numericValue === currentValue) {
+  if (!props.state.fontSize.mixed && value === currentValue) {
     return;
   }
   emit("applyStyle", {
-    fontSize: numericValue === DEFAULT_CELL_FONT_SIZE ? null : numericValue,
+    fontSize: value === DEFAULT_CELL_FONT_SIZE ? null : value,
   });
 }
-
-function commitFontSizeOnEnter(value: InputNumberValue, context: { e: KeyboardEvent }): void {
-  updateFontSizeDraft(value);
-  (context.e.target as HTMLInputElement).blur();
-}
-
-watch(fontSizeValue, (value) => {
-  fontSizeDraft.value = value;
-});
 </script>
 
 <template>
@@ -103,22 +101,14 @@ watch(fontSizeValue, (value) => {
     </label>
     <label class="font-format-controls__field" :title="t('format.fontSize')">
       <span class="ui-visually-hidden">{{ t("format.fontSize") }}</span>
-      <TInputNumber
+      <TSelect
         class="font-format-controls__size"
-        theme="normal"
         size="small"
-        align="right"
-        :min="MIN_CELL_FONT_SIZE"
-        :max="MAX_CELL_FONT_SIZE"
-        :decimal-places="0"
-        :step="1"
-        :allow-input-over-limit="true"
-        :model-value="fontSizeDraft"
+        :model-value="fontSizeValue"
+        :options="fontSizeOptions"
         :placeholder="state.fontSize.mixed ? t('format.mixed') : undefined"
         :disabled="disabled"
-        @change="updateFontSizeDraft"
-        @blur="commitFontSize"
-        @enter="commitFontSizeOnEnter"
+        @change="setFontSize"
       />
     </label>
   </div>
@@ -129,7 +119,7 @@ watch(fontSizeValue, (value) => {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
 
   &__field {
     display: inline-flex;
@@ -137,11 +127,25 @@ watch(fontSizeValue, (value) => {
   }
 
   &__family {
-    width: 116px;
+    width: 96px;
   }
 
   &__size {
-    width: 48px;
+    width: 44px;
+  }
+
+  :deep(.t-input) {
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+
+  :deep(.t-input__suffix) {
+    margin-left: 3px;
+  }
+
+  :deep(.t-fake-arrow) {
+    width: 12px;
+    height: 12px;
   }
 }
 </style>
