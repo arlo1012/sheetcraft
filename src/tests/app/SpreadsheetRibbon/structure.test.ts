@@ -25,6 +25,11 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-label")).toBe("Home tools");
     expect(wrapper.get(".home-format-toolbar").attributes("aria-label")).toBe("Cell formatting");
     expect(
+      wrapper.get(
+        "[data-ribbon-tools] > [data-ribbon-scroll-viewport] > .home-format-toolbar__rail",
+      ),
+    ).toBeTruthy();
+    expect(
       new Set(
         wrapper
           .get("[data-ribbon-tools]")
@@ -32,7 +37,12 @@ describe("SpreadsheetRibbon", () => {
           .map((row) => row.attributes("data-ribbon-row")),
       ),
     ).toEqual(new Set(["1", "2"]));
-    expect(wrapper.get('[data-ribbon-group="cell"] [data-ribbon-row="1"]')).toBeTruthy();
+    expect(
+      wrapper
+        .get('[data-ribbon-group="cell"]')
+        .findAll(":scope > [data-cell-format-lane]")
+        .map((lane) => lane.attributes("data-cell-format-lane")),
+    ).toEqual(["typography", "appearance", "styles"]);
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-row="2"]')).toBeTruthy();
     expect(wrapper.get("[data-locale-select] input").element).toBeInstanceOf(HTMLInputElement);
 

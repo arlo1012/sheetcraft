@@ -24,6 +24,8 @@ export const enUS = {
     utilityTools: "Utilities",
     undo: "Undo",
     redo: "Redo",
+    scrollLeft: "Scroll ribbon left",
+    scrollRight: "Scroll ribbon right",
     formatPainter: "Format painter",
     clearFormatting: "Clear formatting",
     borders: "Cell borders",

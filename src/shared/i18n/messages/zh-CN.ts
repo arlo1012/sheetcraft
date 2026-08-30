@@ -24,6 +24,8 @@ export const zhCN = {
     utilityTools: "实用工具",
     undo: "撤销",
     redo: "重做",
+    scrollLeft: "向左滚动功能区",
+    scrollRight: "向右滚动功能区",
     formatPainter: "格式刷",
     clearFormatting: "清除格式",
     borders: "单元格边框",

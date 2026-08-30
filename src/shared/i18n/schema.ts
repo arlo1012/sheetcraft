@@ -24,6 +24,8 @@ export type MessageSchema = {
     utilityTools: string;
     undo: string;
     redo: string;
+    scrollLeft: string;
+    scrollRight: string;
     formatPainter: string;
     clearFormatting: string;
     borders: string;
