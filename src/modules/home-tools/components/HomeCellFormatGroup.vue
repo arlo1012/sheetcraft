@@ -69,7 +69,7 @@ const { t } = useAppI18n();
         disclosure
         data-ribbon-placeholder="borders"
       >
-        <Grid2X2 :size="15" aria-hidden="true" />
+        <Grid2X2 :size="18" :stroke-width="1.8" aria-hidden="true" />
       </RibbonIconAction>
       <CellColorControl
         kind="fill"

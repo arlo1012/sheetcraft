@@ -132,10 +132,13 @@ describe("HomeFormatToolbar", () => {
   test("applies each drafted color as one formatting patch", async () => {
     const wrapper = mountToolbar();
     const textColor = wrapper.get('[aria-label="Text color"]');
+    const textColorDisclosure = textColor.get("[data-color-disclosure]");
 
     expect(textColor.attributes("aria-expanded")).toBe("false");
+    expect(textColorDisclosure.classes()).not.toContain("is-expanded");
     await textColor.trigger("click");
     expect(textColor.attributes("aria-expanded")).toBe("true");
+    expect(textColorDisclosure.classes()).toContain("is-expanded");
     await new DOMWrapper(document.body).get('[data-color="#123456"]').trigger("click");
     expect(emittedPatches(wrapper)).toEqual([]);
     await getTeleportedDialog().get('[data-color-action="apply"]').trigger("click");
@@ -145,6 +148,13 @@ describe("HomeFormatToolbar", () => {
     await getTeleportedDialog().get('[data-color-action="apply"]').trigger("click");
 
     expect(emittedPatches(wrapper)).toEqual([{ textColor: "#123456" }, { fillColor: "#abcdef" }]);
+  });
+
+  test("shows disclosure icons only for controls with an available menu", () => {
+    const wrapper = mountToolbar();
+
+    expect(wrapper.findAll("[data-color-disclosure]")).toHaveLength(2);
+    expect(wrapper.find(".is-disabled .ribbon-icon-action__disclosure").exists()).toBe(false);
   });
 
   test("disables formatting controls while keeping history actions available", async () => {
@@ -345,6 +355,7 @@ describe("HomeFormatToolbar", () => {
     const wrapper = mountToolbar();
     const trigger = wrapper.get('[aria-label="Text color"]');
     await trigger.trigger("click");
+    expect(document.activeElement).toBe(getTeleportedDialog().element);
     await new DOMWrapper(document.body).get('[data-color="#123456"]').trigger("click");
     await getTeleportedDialog().trigger("keydown", { key: "Escape" });
 

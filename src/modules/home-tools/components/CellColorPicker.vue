@@ -172,9 +172,17 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     :aria-controls="open ? panelId : undefined"
     @click="togglePanel"
   >
-    <slot />
+    <span class="cell-color-picker__icon" aria-hidden="true">
+      <slot />
+    </span>
     <span class="cell-color-picker__swatch" :style="swatchStyle" aria-hidden="true" />
-    <ChevronDown class="cell-color-picker__disclosure" :size="10" aria-hidden="true" />
+    <ChevronDown
+      class="cell-color-picker__disclosure"
+      :class="{ 'is-expanded': open }"
+      :size="10"
+      data-color-disclosure
+      aria-hidden="true"
+    />
   </button>
 
   <Teleport to="body">
@@ -243,8 +251,8 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     justify-content: center;
     width: var(--cell-format-compact-track, 40px);
     height: var(--cell-format-control-height, 26px);
-    gap: 3px;
-    padding: 0 4px;
+    gap: 2px;
+    padding: 0 3px;
     background: transparent;
     border: 1px solid transparent;
     border-radius: var(--td-radius-default);
@@ -255,11 +263,17 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
       background: var(--td-bg-color-container-hover);
     }
 
-    &:focus-visible,
-    &[aria-expanded="true"] {
+    &:focus-visible:not([aria-expanded="true"]) {
       border-color: var(--td-brand-color);
       outline: none;
       box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+    }
+
+    &[aria-expanded="true"] {
+      background: var(--td-bg-color-container-hover);
+      border-color: transparent;
+      outline: none;
+      box-shadow: none;
     }
 
     &:disabled {
@@ -268,24 +282,43 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     }
   }
 
+  &__icon {
+    display: inline-flex;
+    flex: 0 0 18px;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+
+    :deep(svg) {
+      width: 18px;
+      height: 18px;
+    }
+  }
+
   &__swatch {
     position: absolute;
     right: 17px;
-    bottom: 3px;
-    left: 6px;
+    bottom: 2px;
+    left: 5px;
     height: 3px;
-    border: 1px solid rgb(32 36 44 / 22%);
+    border-radius: 1px;
+    box-shadow: inset 0 0 0 1px rgb(32 36 44 / 22%);
   }
 
   &__disclosure {
     flex: 0 0 auto;
     color: var(--td-text-color-placeholder);
+    transition: transform 120ms ease;
+
+    &.is-expanded {
+      transform: rotate(180deg);
+    }
   }
 
   &__trigger.is-mixed &__swatch {
     background: transparent !important;
-    border-color: var(--td-text-color-placeholder);
-    border-style: dashed;
+    box-shadow: inset 0 0 0 1px var(--td-text-color-placeholder);
   }
 
   &__panel {

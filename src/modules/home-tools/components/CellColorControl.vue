@@ -49,8 +49,8 @@ function applyColor(color: string | null): void {
       :disabled="disabled"
       @change="applyColor"
     >
-      <Baseline v-if="kind === 'text'" :size="17" :stroke-width="2" aria-hidden="true" />
-      <PaintBucket v-else :size="17" :stroke-width="2" aria-hidden="true" />
+      <Baseline v-if="kind === 'text'" :size="18" :stroke-width="1.8" aria-hidden="true" />
+      <PaintBucket v-else :size="18" :stroke-width="1.8" aria-hidden="true" />
     </CellColorPicker>
   </div>
 </template>

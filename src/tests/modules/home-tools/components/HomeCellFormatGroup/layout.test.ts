@@ -61,6 +61,15 @@ describe("HomeCellFormatGroup layout", () => {
     expect(
       wrapper.get('[data-cell-format-lane="appearance"] [data-cell-color-control="fill"]'),
     ).toBeTruthy();
+    expect(wrapper.get('[data-ribbon-placeholder="borders"] svg').attributes()).toMatchObject({
+      width: "18",
+      height: "18",
+    });
+    const colorIcons = wrapper.findAll(".cell-color-picker__icon svg");
+    expect(colorIcons).toHaveLength(2);
+    for (const colorIcon of colorIcons) {
+      expect(colorIcon.attributes()).toMatchObject({ width: "18", height: "18" });
+    }
   });
 
   test.each([

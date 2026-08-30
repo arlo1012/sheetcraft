@@ -62,7 +62,7 @@ function onKeydown(event: KeyboardEvent): void {
     </span>
     <span v-if="text" class="ribbon-icon-action__text" aria-hidden="true">{{ text }}</span>
     <ChevronDown
-      v-if="disclosure"
+      v-if="disclosure && !disabled"
       class="ribbon-icon-action__disclosure"
       :size="11"
       aria-hidden="true"
