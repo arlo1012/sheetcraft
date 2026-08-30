@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bold, Italic, Underline } from "lucide-vue-next";
+import { Bold, Italic, Strikethrough, Underline } from "lucide-vue-next";
 import type { CellStylePatch } from "../../workbook/cell-style";
 import type { SelectionCellStyleState, ToggleStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
@@ -28,8 +28,7 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
 <template>
   <div class="text-format-controls" role="group" :aria-label="t('format.emphasis')">
     <RibbonIconAction
-      class="ui-toolbar-icon-button text-format-controls__button"
-      :class="{ 'is-active': state.bold === 'on', 'is-mixed': state.bold === 'mixed' }"
+      class="text-format-controls__button"
       :disabled="disabled"
       :label="t('format.bold')"
       :pressed="ariaPressed(state.bold)"
@@ -38,8 +37,7 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
       <Bold :size="17" :stroke-width="2.2" aria-hidden="true" />
     </RibbonIconAction>
     <RibbonIconAction
-      class="ui-toolbar-icon-button text-format-controls__button"
-      :class="{ 'is-active': state.italic === 'on', 'is-mixed': state.italic === 'mixed' }"
+      class="text-format-controls__button"
       :disabled="disabled"
       :label="t('format.italic')"
       :pressed="ariaPressed(state.italic)"
@@ -48,14 +46,21 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
       <Italic :size="17" :stroke-width="2.2" aria-hidden="true" />
     </RibbonIconAction>
     <RibbonIconAction
-      class="ui-toolbar-icon-button text-format-controls__button"
-      :class="{ 'is-active': state.underline === 'on', 'is-mixed': state.underline === 'mixed' }"
+      class="text-format-controls__button"
       :disabled="disabled"
       :label="t('format.underline')"
       :pressed="ariaPressed(state.underline)"
       @activate="toggle('underline', state.underline)"
     >
       <Underline :size="17" :stroke-width="2.2" aria-hidden="true" />
+    </RibbonIconAction>
+    <RibbonIconAction
+      class="text-format-controls__button"
+      :label="t('app.unavailableFeature', { feature: t('ribbon.strikethrough') })"
+      disabled
+      data-ribbon-placeholder="strikethrough"
+    >
+      <Strikethrough :size="15" aria-hidden="true" />
     </RibbonIconAction>
   </div>
 </template>
@@ -65,6 +70,7 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
+  gap: 2px;
 
   &__button {
     position: relative;

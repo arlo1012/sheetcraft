@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Grid2X2, Sparkles, Strikethrough, TableProperties } from "lucide-vue-next";
+import { Grid2X2, Sparkles, TableProperties } from "lucide-vue-next";
 import type { CellStylePatch } from "../../workbook/cell-style";
 import type { SelectionCellStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
-import CellColorControls from "./CellColorControls.vue";
+import CellColorControl from "./CellColorControl.vue";
 import FontFormatControls from "./FontFormatControls.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
 import TextFormatControls from "./TextFormatControls.vue";
@@ -29,12 +29,38 @@ const { t } = useAppI18n();
     :aria-disabled="disabled"
     :title="disabled ? t('format.selectionTooLarge') : undefined"
   >
-    <div class="home-cell-format-group__row" data-ribbon-row="1">
+    <div
+      class="home-cell-format-group__lane home-cell-format-group__lane--typography"
+      data-cell-format-lane="typography"
+      role="group"
+      :aria-label="t('format.typographyTools')"
+    >
       <FontFormatControls
         :state="state"
         :disabled="disabled"
         @apply-style="emit('applyStyle', $event)"
       />
+      <div class="home-cell-format-group__typography-tools">
+        <TextFormatControls
+          :state="state"
+          :disabled="disabled"
+          @apply-style="emit('applyStyle', $event)"
+        />
+        <CellColorControl
+          kind="text"
+          :state="state"
+          :disabled="disabled"
+          @apply-style="emit('applyStyle', $event)"
+        />
+      </div>
+    </div>
+
+    <div
+      class="home-cell-format-group__lane home-cell-format-group__lane--appearance"
+      data-cell-format-lane="appearance"
+      role="group"
+      :aria-label="t('format.appearanceTools')"
+    >
       <RibbonIconAction
         :label="t('app.unavailableFeature', { feature: t('ribbon.borders') })"
         disabled
@@ -43,7 +69,22 @@ const { t } = useAppI18n();
       >
         <Grid2X2 :size="15" aria-hidden="true" />
       </RibbonIconAction>
+      <CellColorControl
+        kind="fill"
+        :state="state"
+        :disabled="disabled"
+        @apply-style="emit('applyStyle', $event)"
+      />
+    </div>
+
+    <div
+      class="home-cell-format-group__lane home-cell-format-group__lane--styles"
+      data-cell-format-lane="styles"
+      role="group"
+      :aria-label="t('format.styleRuleTools')"
+    >
       <RibbonIconAction
+        class="home-cell-format-group__style-action"
         :label="t('app.unavailableFeature', { feature: t('ribbon.tableStyles') })"
         :text="t('ribbon.tableStyles')"
         disabled
@@ -52,26 +93,8 @@ const { t } = useAppI18n();
       >
         <TableProperties :size="15" aria-hidden="true" />
       </RibbonIconAction>
-    </div>
-    <div class="home-cell-format-group__row" data-ribbon-row="2">
-      <TextFormatControls
-        :state="state"
-        :disabled="disabled"
-        @apply-style="emit('applyStyle', $event)"
-      />
       <RibbonIconAction
-        :label="t('app.unavailableFeature', { feature: t('ribbon.strikethrough') })"
-        disabled
-        data-ribbon-placeholder="strikethrough"
-      >
-        <Strikethrough :size="15" aria-hidden="true" />
-      </RibbonIconAction>
-      <CellColorControls
-        :state="state"
-        :disabled="disabled"
-        @apply-style="emit('applyStyle', $event)"
-      />
-      <RibbonIconAction
+        class="home-cell-format-group__style-action"
         :label="t('app.unavailableFeature', { feature: t('ribbon.conditionalFormatting') })"
         :text="t('ribbon.conditionalFormatting')"
         disabled
@@ -88,12 +111,34 @@ const { t } = useAppI18n();
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-cell-format-group {
-  @include ribbon.compact;
+  @include ribbon.shell;
 
-  min-width: 334px;
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  align-content: center;
+  column-gap: 4px;
 
-  &__row {
-    @include ribbon.row;
+  &__lane {
+    @include ribbon.stack;
+
+    min-width: 0;
+  }
+
+  &__typography-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__lane--styles {
+    min-width: max-content;
+  }
+
+  &__style-action {
+    width: 100%;
+    justify-content: flex-start;
+    padding-right: 3px;
+    padding-left: 3px;
   }
 }
 </style>

@@ -202,12 +202,19 @@ describe("HomeFormatToolbar", () => {
       "automation",
       "utility",
     ]);
-    for (const groupName of ["history", "cell", "alignment", "number"]) {
+    for (const groupName of ["history", "alignment", "number"]) {
       const group = wrapper.get(`[data-ribbon-group="${groupName}"]`);
       expect(
         group.findAll(":scope > [data-ribbon-row]").map((row) => row.attributes("data-ribbon-row")),
       ).toEqual(["1", "2"]);
     }
+
+    const cellGroup = wrapper.get('[data-ribbon-group="cell"]');
+    expect(
+      cellGroup
+        .findAll(":scope > [data-cell-format-lane]")
+        .map((lane) => lane.attributes("data-cell-format-lane")),
+    ).toEqual(["typography", "appearance", "styles"]);
 
     const tallActions = {
       data: ["filter", "protect"],

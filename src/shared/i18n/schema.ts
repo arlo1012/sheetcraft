@@ -127,10 +127,12 @@ export type MessageSchema = {
     fontFamily: string;
     fontSize: string;
     emphasis: string;
+    typographyTools: string;
+    appearanceTools: string;
+    styleRuleTools: string;
     bold: string;
     italic: string;
     underline: string;
-    colors: string;
     textColor: string;
     textColorMixed: string;
     fillColor: string;
