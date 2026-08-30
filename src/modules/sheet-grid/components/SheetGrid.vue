@@ -62,7 +62,7 @@ import SheetCellLayer from "./SheetCellLayer.vue";
 import SheetColumnHeaders from "./SheetColumnHeaders.vue";
 import SheetRowHeaders from "./SheetRowHeaders.vue";
 import SheetSelectionOverlay from "./SheetSelectionOverlay.vue";
-import { getCellEditorStyle } from "../cell-presentation";
+import { getCellEditorFrameStyle, getCellEditorStyle } from "../cell-presentation";
 
 type CellEditorHandle = {
   focus: (options?: { selectAll?: boolean; clientX?: number }) => void;
@@ -226,6 +226,9 @@ const activeCellDisplayValue = computed(() =>
 );
 const activeCellEditorStyle = computed(() =>
   getCellEditorStyle(getCellStyle(props.sheet, activeCell.value)),
+);
+const activeCellEditorFrameStyle = computed(() =>
+  getCellEditorFrameStyle(getCellStyle(props.sheet, activeCell.value)),
 );
 const clipboardFeedback = computed(() =>
   clipboardFeedbackKey.value ? t(CLIPBOARD_MESSAGE_KEYS[clipboardFeedbackKey.value]) : "",
@@ -1226,6 +1229,7 @@ defineExpose({ navigateToCell });
                 :display-value="activeCellDisplayValue"
                 :editing="isEditing"
                 :style="activeCellEditorStyle"
+                :frame-style="activeCellEditorFrameStyle"
                 @keydown="onEditorKeydown"
                 @blur="onEditorBlur"
                 @composition-start="onCompositionStart"

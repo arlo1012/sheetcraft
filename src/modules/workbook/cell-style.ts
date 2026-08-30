@@ -6,6 +6,7 @@ export const DEFAULT_CELL_FILL_COLOR = "#ffffff";
 export const MAX_CELL_STYLE_PATCH_CELLS = 100_000;
 
 export type HorizontalCellAlignment = "left" | "center" | "right";
+export type VerticalCellAlignment = "top" | "middle" | "bottom";
 
 export type CellStyle = {
   fontFamily?: string;
@@ -16,6 +17,7 @@ export type CellStyle = {
   textColor?: string;
   fillColor?: string;
   horizontalAlign?: HorizontalCellAlignment;
+  verticalAlign?: VerticalCellAlignment;
 };
 
 export type CellStylePatch = {
@@ -31,10 +33,12 @@ export const CELL_STYLE_KEYS = [
   "textColor",
   "fillColor",
   "horizontalAlign",
+  "verticalAlign",
 ] as const satisfies readonly (keyof CellStyle)[];
 
 const CELL_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const HORIZONTAL_ALIGNMENTS = new Set<HorizontalCellAlignment>(["left", "center", "right"]);
+const VERTICAL_ALIGNMENTS = new Set<VerticalCellAlignment>(["top", "middle", "bottom"]);
 
 function normalizeFontFamily(value: unknown): string {
   if (typeof value !== "string") {
@@ -68,11 +72,18 @@ function normalizeColor(value: unknown, field: string): string {
   return value.toLowerCase();
 }
 
-function normalizeAlignment(value: unknown): HorizontalCellAlignment {
+function normalizeHorizontalAlignment(value: unknown): HorizontalCellAlignment {
   if (typeof value !== "string" || !HORIZONTAL_ALIGNMENTS.has(value as HorizontalCellAlignment)) {
     throw new TypeError("Cell horizontal alignment must be left, center, or right.");
   }
   return value as HorizontalCellAlignment;
+}
+
+function normalizeVerticalAlignment(value: unknown): VerticalCellAlignment | undefined {
+  if (typeof value !== "string" || !VERTICAL_ALIGNMENTS.has(value as VerticalCellAlignment)) {
+    throw new TypeError("Cell vertical alignment must be top, middle, or bottom.");
+  }
+  return value === "middle" ? undefined : (value as VerticalCellAlignment);
 }
 
 function normalizeStyleValue<Key extends keyof CellStyle>(
@@ -100,7 +111,10 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
       key === "textColor" ? "Cell text color" : "Cell fill color",
     ) as CellStyle[Key];
   }
-  return normalizeAlignment(value) as CellStyle[Key];
+  if (key === "horizontalAlign") {
+    return normalizeHorizontalAlignment(value) as CellStyle[Key];
+  }
+  return normalizeVerticalAlignment(value) as CellStyle[Key];
 }
 
 export function normalizeCellStyle(style: CellStyle | null | undefined): CellStyle | undefined {

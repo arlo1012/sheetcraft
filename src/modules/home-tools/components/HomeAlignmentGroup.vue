@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import {
-  ALargeSmall,
-  AlignVerticalJustifyCenter,
-  TableCellsMerge,
-  TextWrap,
-} from "lucide-vue-next";
+import { ALargeSmall, TableCellsMerge, TextWrap } from "lucide-vue-next";
 import type { CellStylePatch } from "../../workbook/cell-style";
 import type { SelectionCellStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import HorizontalAlignmentControls from "./HorizontalAlignmentControls.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
+import VerticalAlignmentMenu from "./VerticalAlignmentMenu.vue";
 
 defineProps<{
   state: SelectionCellStyleState;
@@ -33,14 +29,11 @@ const { t } = useAppI18n();
     :title="disabled ? t('format.selectionTooLarge') : undefined"
   >
     <div class="home-alignment-group__row" data-ribbon-row="1">
-      <RibbonIconAction
-        :label="t('app.unavailableFeature', { feature: t('ribbon.verticalAlignment') })"
-        disabled
-        disclosure
-        data-ribbon-placeholder="vertical-alignment"
-      >
-        <AlignVerticalJustifyCenter :size="15" aria-hidden="true" />
-      </RibbonIconAction>
+      <VerticalAlignmentMenu
+        :state="state.verticalAlign"
+        :disabled="disabled"
+        @apply-style="emit('applyStyle', $event)"
+      />
       <RibbonIconAction
         :label="t('app.unavailableFeature', { feature: t('ribbon.textOrientation') })"
         disabled

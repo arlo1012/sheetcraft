@@ -1,5 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { normalizeCellStyle } from "../../../../modules/workbook/cell-style";
+import {
+  normalizeCellStyle,
+  normalizeCellStylePatch,
+} from "../../../../modules/workbook/cell-style";
 import {
   getActiveSheet,
   getCellStyle,
@@ -36,6 +39,7 @@ describe("cell style model", () => {
         italic: true,
         textColor: "#ABCDEF",
         horizontalAlign: "center",
+        verticalAlign: "bottom",
       }),
     ).toEqual({
       fontFamily: "Georgia",
@@ -43,8 +47,14 @@ describe("cell style model", () => {
       italic: true,
       textColor: "#abcdef",
       horizontalAlign: "center",
+      verticalAlign: "bottom",
+    });
+    expect(normalizeCellStyle({ verticalAlign: "middle" })).toBeUndefined();
+    expect(normalizeCellStylePatch({ verticalAlign: "middle" })).toEqual({
+      verticalAlign: null,
     });
     expect(() => normalizeCellStyle({ fontSize: 7 })).toThrow(RangeError);
     expect(() => normalizeCellStyle({ fillColor: "red" })).toThrow(TypeError);
+    expect(() => normalizeCellStyle({ verticalAlign: "baseline" as never })).toThrow(TypeError);
   });
 });

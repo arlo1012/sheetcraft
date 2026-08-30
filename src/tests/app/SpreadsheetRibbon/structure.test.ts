@@ -58,7 +58,10 @@ describe("SpreadsheetRibbon", () => {
 
     expect(wrapper.emitted("undo")).toHaveLength(1);
     expect(wrapper.emitted("redo")).toHaveLength(1);
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(32);
+    expect(wrapper.get("[data-vertical-alignment-trigger]").attributes("aria-haspopup")).toBe(
+      "menu",
+    );
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(31);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",

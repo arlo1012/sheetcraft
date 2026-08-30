@@ -18,6 +18,7 @@ describe("SheetGrid cell style rendering", () => {
         textColor: "#123456",
         fillColor: "#abcdef",
         horizontalAlign: "center",
+        verticalAlign: "bottom",
       },
     );
     await nextTick();
@@ -32,6 +33,7 @@ describe("SheetGrid cell style rendering", () => {
     expect(style.color).toBe("#123456");
     expect(style.backgroundColor).toBe("#abcdef");
     expect(style.justifyContent).toBe("center");
+    expect(style.alignItems).toBe("flex-end");
     expect(cell.text()).toBe("");
   });
 
@@ -46,6 +48,7 @@ describe("SheetGrid cell style rendering", () => {
         textColor: "#654321",
         fillColor: "#fedcba",
         horizontalAlign: "right",
+        verticalAlign: "top",
       },
     );
     await nextTick();
@@ -58,17 +61,20 @@ describe("SheetGrid cell style rendering", () => {
     expect(style.fontFamily).toBe('"Courier New"');
     expect(style.fontSize).toBe("20px");
     expect(style.color).toBe("#654321");
-    expect(style.backgroundColor).toBe("#fedcba");
+    expect(style.backgroundColor).toBe("");
     expect(style.textAlign).toBe("right");
+    const frameStyle = wrapper.get<HTMLElement>("[data-cell-editor-frame]").element.style;
+    expect(frameStyle.backgroundColor).toBe("#fedcba");
+    expect(frameStyle.alignItems).toBe("flex-start");
   });
 
-  test("expands the editor vertically for the maximum supported font size", async () => {
+  test("sizes the editor to one formatted line at the maximum supported font size", async () => {
     const { sheet, wrapper } = mountSheetGrid();
     setCellStyle(sheet, { row: 0, column: 0 }, { fontSize: 72 });
     await nextTick();
 
     const editor = wrapper.get("input.cell-editor");
     await editor.trigger("keydown", { key: "A" });
-    expect((editor.element as HTMLInputElement).style.minHeight).toBe("80px");
+    expect((editor.element as HTMLInputElement).style.minHeight).toBe("74px");
   });
 });

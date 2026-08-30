@@ -73,7 +73,15 @@ describe("SheetGrid clipboard", () => {
   test("copies local styles and leaves destination styles intact for external text", async () => {
     const { sheet, wrapper } = mountSheetGrid();
     setCellValue(sheet, { row: 0, column: 0 }, "styled");
-    setCellStyle(sheet, { row: 0, column: 0 }, { bold: true, fillColor: "#fde68a" });
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        bold: true,
+        fillColor: "#fde68a",
+        verticalAlign: "bottom",
+      },
+    );
     setCellStyle(sheet, { row: 2, column: 2 }, { italic: true });
 
     const copied = createTestClipboardEvent("copy");
@@ -86,6 +94,7 @@ describe("SheetGrid clipboard", () => {
     expect(getCellStyle(sheet, { row: 1, column: 1 })).toEqual({
       bold: true,
       fillColor: "#fde68a",
+      verticalAlign: "bottom",
     });
 
     await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });

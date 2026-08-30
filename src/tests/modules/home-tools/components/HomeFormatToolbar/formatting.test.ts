@@ -17,6 +17,7 @@ function createStyleState(
     textColor: { value: undefined, mixed: false },
     fillColor: { value: undefined, mixed: false },
     horizontalAlign: { value: undefined, mixed: false },
+    verticalAlign: { value: undefined, mixed: false },
     ...overrides,
   };
 }
@@ -115,15 +116,20 @@ describe("HomeFormatToolbar", () => {
     fontFamily.vm.$emit("change", "Arial");
     fontSize.vm.$emit("change", 18);
     await wrapper.get('[aria-label="Align center"]').trigger("click");
+    await wrapper.get("[data-vertical-alignment-trigger]").trigger("click");
+    await new DOMWrapper(document.body)
+      .get('[data-vertical-alignment-option="bottom"]')
+      .trigger("click");
 
     expect(emittedPatches(wrapper)).toEqual([
       { fontFamily: "Arial" },
       { fontSize: 18 },
       { horizontalAlign: "center" },
+      { verticalAlign: "bottom" },
     ]);
 
     fontSize.vm.$emit("change", 90);
-    expect(emittedPatches(wrapper)).toHaveLength(3);
+    expect(emittedPatches(wrapper)).toHaveLength(4);
 
     fontSize.vm.$emit("change", 20);
     expect(emittedPatches(wrapper).at(-1)).toEqual({ fontSize: 20 });
@@ -286,7 +292,7 @@ describe("HomeFormatToolbar", () => {
         .find('[data-ribbon-group="cell"] [data-ribbon-placeholder="format-painter"]')
         .exists(),
     ).toBe(false);
-    for (const action of ["clear-formatting", "vertical-alignment", "text-orientation"]) {
+    for (const action of ["clear-formatting", "text-orientation"]) {
       const control = wrapper.get(`[data-ribbon-placeholder="${action}"]`);
       expect(control.find(".ribbon-icon-action__text").exists()).toBe(false);
       expect(control.attributes()).toMatchObject({
@@ -295,7 +301,7 @@ describe("HomeFormatToolbar", () => {
         "aria-disabled": "true",
       });
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(32);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(31);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",
@@ -313,6 +319,7 @@ describe("HomeFormatToolbar", () => {
         textColor: { value: "#123456", mixed: true },
         fillColor: { value: "#abcdef", mixed: true },
         horizontalAlign: { value: "center", mixed: true },
+        verticalAlign: { value: "top", mixed: true },
       }),
     );
 
@@ -333,6 +340,7 @@ describe("HomeFormatToolbar", () => {
     expect(wrapper.get('[aria-label="Horizontal alignment, mixed"]').attributes("role")).toBe(
       "group",
     );
+    expect(wrapper.get('[aria-label="Vertical alignment, mixed"]').classes()).toContain("is-mixed");
   });
 
   test("forwards workbook history shortcuts while a toolbar control owns focus", async () => {
@@ -357,6 +365,17 @@ describe("HomeFormatToolbar", () => {
 
     expect(wrapper.emitted("undo")).toBeUndefined();
     expect(wrapper.emitted("redo")).toBeUndefined();
+  });
+
+  test("returns Tab from the teleported vertical menu to the ribbon sequence", async () => {
+    const wrapper = mountToolbar();
+    await wrapper.get("[data-vertical-alignment-trigger]").trigger("click");
+    const menu = new DOMWrapper(document.body).get('[role="menu"]');
+
+    await menu.trigger("keydown", { key: "Tab" });
+
+    expect(document.body.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(wrapper.get('[aria-label="Align left"]').element);
   });
 
   test("cancels a drafted color with Escape and restores trigger focus", async () => {

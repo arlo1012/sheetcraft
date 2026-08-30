@@ -141,9 +141,15 @@ export type MessageSchema = {
     fillColorMixed: string;
     horizontalAlignment: string;
     horizontalAlignmentMixed: string;
+    verticalAlignment: string;
+    verticalAlignmentValue: string;
+    verticalAlignmentMixed: string;
     alignLeft: string;
     alignCenter: string;
     alignRight: string;
+    alignTop: string;
+    alignMiddle: string;
+    alignBottom: string;
     mixed: string;
     resetColor: string;
     cancelColor: string;

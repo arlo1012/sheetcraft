@@ -30,7 +30,7 @@ describe("cell style commands", () => {
         createApplyCellStyleCommand(
           sheet.id,
           { start: { row: 0, column: 0 }, end: { row: 0, column: 2 } },
-          { bold: true, fillColor: "#FDE68A" },
+          { bold: true, fillColor: "#FDE68A", verticalAlign: "top" },
         ),
       ),
     ).toBe(true);
@@ -39,15 +39,18 @@ describe("cell style commands", () => {
       bold: true,
       textColor: "#112233",
       fillColor: "#fde68a",
+      verticalAlign: "top",
     });
     expect(getCellStyle(sheet, { row: 0, column: 1 })).toEqual({
       italic: true,
       bold: true,
       fillColor: "#fde68a",
+      verticalAlign: "top",
     });
     expect(getCellStyle(sheet, { row: 0, column: 2 })).toEqual({
       bold: true,
       fillColor: "#fde68a",
+      verticalAlign: "top",
     });
 
     expect(undoWorkbookCommand(session)).toBe(true);
@@ -59,6 +62,7 @@ describe("cell style commands", () => {
     expect(getCellStyle(sheet, { row: 0, column: 2 })).toBeUndefined();
     expect(redoWorkbookCommand(session)).toBe(true);
     expect(getCellStyle(sheet, { row: 0, column: 2 })?.bold).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 2 })?.verticalAlign).toBe("top");
   });
 
   test("clears values without clearing styles", () => {

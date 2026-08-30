@@ -14,6 +14,7 @@ function createStyleState(): SelectionCellStyleState {
     textColor: { value: undefined, mixed: false },
     fillColor: { value: undefined, mixed: false },
     horizontalAlign: { value: undefined, mixed: false },
+    verticalAlign: { value: undefined, mixed: false },
   };
 }
 

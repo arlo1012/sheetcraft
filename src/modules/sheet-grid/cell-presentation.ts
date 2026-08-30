@@ -7,7 +7,13 @@ const ALIGNMENT_JUSTIFICATION = {
   right: "flex-end",
 } as const;
 
-function getTextStyle(style: Readonly<CellStyle> | undefined): CSSProperties {
+const VERTICAL_ALIGNMENT = {
+  top: "flex-start",
+  middle: "center",
+  bottom: "flex-end",
+} as const;
+
+function getTypographyStyle(style: Readonly<CellStyle> | undefined): CSSProperties {
   if (!style) {
     return {};
   }
@@ -19,23 +25,31 @@ function getTextStyle(style: Readonly<CellStyle> | undefined): CSSProperties {
     ...(style.italic ? { fontStyle: "italic" } : {}),
     ...(style.underline ? { textDecoration: "underline" } : {}),
     ...(style.textColor ? { color: style.textColor } : {}),
-    ...(style.fillColor ? { backgroundColor: style.fillColor } : {}),
   };
 }
 
 export function getCellContentStyle(style: Readonly<CellStyle> | undefined): CSSProperties {
   return {
-    ...getTextStyle(style),
+    ...getTypographyStyle(style),
+    ...(style?.fillColor ? { backgroundColor: style.fillColor } : {}),
     ...(style?.horizontalAlign
       ? { justifyContent: ALIGNMENT_JUSTIFICATION[style.horizontalAlign] }
       : {}),
+    ...(style?.verticalAlign ? { alignItems: VERTICAL_ALIGNMENT[style.verticalAlign] } : {}),
   };
 }
 
 export function getCellEditorStyle(style: Readonly<CellStyle> | undefined): CSSProperties {
   return {
-    ...getTextStyle(style),
-    ...(style?.fontSize ? { minHeight: `${style.fontSize + 8}px` } : {}),
+    ...getTypographyStyle(style),
+    ...(style?.fontSize ? { minHeight: `${style.fontSize + 2}px` } : {}),
     ...(style?.horizontalAlign ? { textAlign: style.horizontalAlign } : {}),
+  };
+}
+
+export function getCellEditorFrameStyle(style: Readonly<CellStyle> | undefined): CSSProperties {
+  return {
+    ...(style?.fillColor ? { backgroundColor: style.fillColor } : {}),
+    alignItems: VERTICAL_ALIGNMENT[style?.verticalAlign ?? "middle"],
   };
 }

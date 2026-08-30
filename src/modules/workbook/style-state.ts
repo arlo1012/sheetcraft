@@ -2,6 +2,7 @@ import {
   MAX_CELL_STYLE_PATCH_CELLS,
   type CellStyle,
   type HorizontalCellAlignment,
+  type VerticalCellAlignment,
 } from "./cell-style";
 import { getCellStyle, type CellRange, type Sheet } from "./workbook";
 
@@ -21,6 +22,7 @@ export type SelectionCellStyleState = {
   textColor: StyleValueState<string>;
   fillColor: StyleValueState<string>;
   horizontalAlign: StyleValueState<HorizontalCellAlignment>;
+  verticalAlign: StyleValueState<VerticalCellAlignment>;
 };
 
 type ValueAccumulator<Value> = {
@@ -84,6 +86,7 @@ export function createDefaultSelectionCellStyleState(): SelectionCellStyleState 
     textColor: { value: undefined, mixed: false },
     fillColor: { value: undefined, mixed: false },
     horizontalAlign: { value: undefined, mixed: false },
+    verticalAlign: { value: undefined, mixed: false },
   };
 }
 
@@ -112,6 +115,7 @@ export function getSelectionCellStyleState(
   const textColor = createAccumulator<string>();
   const fillColor = createAccumulator<string>();
   const horizontalAlign = createAccumulator<HorizontalCellAlignment>();
+  const verticalAlign = createAccumulator<VerticalCellAlignment>();
   let materializedCellCount = 0;
 
   const addStyle = (style: CellStyle | undefined) => {
@@ -123,6 +127,7 @@ export function getSelectionCellStyleState(
     addValue(textColor, style?.textColor);
     addValue(fillColor, style?.fillColor);
     addValue(horizontalAlign, style?.horizontalAlign);
+    addValue(verticalAlign, style?.verticalAlign);
   };
 
   const rangeSize = getCellRangeSize(normalized);
@@ -161,5 +166,6 @@ export function getSelectionCellStyleState(
     textColor: toValueState(textColor),
     fillColor: toValueState(fillColor),
     horizontalAlign: toValueState(horizontalAlign),
+    verticalAlign: toValueState(verticalAlign),
   };
 }

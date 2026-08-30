@@ -10,6 +10,7 @@ const props = defineProps<{
   displayValue: string;
   editing: boolean;
   style?: CSSProperties;
+  frameStyle?: CSSProperties;
 }>();
 
 const emit = defineEmits<{
@@ -84,47 +85,80 @@ function focus(options?: { selectAll?: boolean; clientX?: number }): void {
   input.setSelectionRange(caretIndex, caretIndex);
 }
 
+function onFrameMousedown(event: MouseEvent): void {
+  if (!props.editing || event.target !== event.currentTarget) {
+    return;
+  }
+  event.preventDefault();
+  focus({ clientX: event.clientX });
+}
+
 defineExpose({ focus });
 </script>
 
 <template>
-  <input
-    ref="inputRef"
-    class="cell-editor"
+  <div
+    class="cell-editor-frame"
     :class="{ 'is-editing': editing }"
-    :value="modelValue"
-    type="text"
-    autocomplete="off"
-    :spellcheck="false"
-    :aria-label="accessibleLabel"
-    :data-cell-editor="addressLabel"
-    :style="editing ? style : undefined"
-    @input="emit('update:modelValue', readInputValue($event))"
-    @mousedown.stop
+    :style="editing ? frameStyle : undefined"
+    data-cell-editor-frame
+    @mousedown.stop="onFrameMousedown"
     @dblclick.stop
-    @keydown="emit('keydown', $event)"
-    @blur="emit('blur', $event)"
-    @compositionstart="emit('compositionStart', $event)"
-    @compositionend="emit('compositionEnd', readInputValue($event), $event)"
-    @copy="emit('copy', $event)"
-    @cut="emit('cut', $event)"
-    @paste="emit('paste', $event)"
-  />
+  >
+    <input
+      ref="inputRef"
+      class="cell-editor"
+      :class="{ 'is-editing': editing }"
+      :value="modelValue"
+      type="text"
+      autocomplete="off"
+      :spellcheck="false"
+      :aria-label="accessibleLabel"
+      :data-cell-editor="addressLabel"
+      :style="editing ? style : undefined"
+      @input="emit('update:modelValue', readInputValue($event))"
+      @mousedown.stop
+      @dblclick.stop
+      @keydown="emit('keydown', $event)"
+      @blur="emit('blur', $event)"
+      @compositionstart="emit('compositionStart', $event)"
+      @compositionend="emit('compositionEnd', readInputValue($event), $event)"
+      @copy="emit('copy', $event)"
+      @cut="emit('cut', $event)"
+      @paste="emit('paste', $event)"
+    />
+  </div>
 </template>
 
 <style scoped lang="scss">
-.cell-editor {
+.cell-editor-frame {
   position: absolute;
   inset: -1px;
   z-index: 3;
+  display: flex;
   width: calc(100% + 2px);
   height: calc(100% + 2px);
+  background: transparent;
+  border: 2px solid transparent;
+  pointer-events: none;
+
+  &.is-editing {
+    background: var(--td-bg-color-container);
+    border-color: var(--td-brand-color);
+    pointer-events: auto;
+    box-shadow: 0 1px 3px rgb(32 36 44 / 16%);
+  }
+}
+
+.cell-editor {
+  width: 100%;
+  height: 100%;
   min-width: 0;
   margin: 0;
   padding: 0 4px;
   overflow: hidden;
   background: transparent;
-  border: 2px solid transparent;
+  border: 0;
   border-radius: 0;
   outline: none;
   color: transparent;
@@ -134,12 +168,12 @@ defineExpose({ focus });
   pointer-events: none;
 
   &.is-editing {
-    background: var(--td-bg-color-container);
-    border-color: var(--td-brand-color);
+    height: calc(1em + 2px);
+    min-height: calc(1em + 2px);
     color: var(--td-text-color-primary);
     caret-color: var(--td-text-color-primary);
+    line-height: 1;
     pointer-events: auto;
-    box-shadow: 0 1px 3px rgb(32 36 44 / 16%);
   }
 }
 </style>
