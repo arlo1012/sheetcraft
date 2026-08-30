@@ -129,7 +129,7 @@ watch(fontSizeValue, (value) => {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 
   &__field {
     display: inline-flex;

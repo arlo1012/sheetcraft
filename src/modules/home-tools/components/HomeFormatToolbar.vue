@@ -3,7 +3,6 @@ import {
   AlignVerticalJustifyCenter,
   AppWindow,
   ArrowDownAZ,
-  BadgeCheck,
   ChartNoAxesColumn,
   CirclePlus,
   Database,
@@ -13,22 +12,19 @@ import {
   Grid2X2,
   Hash,
   Image as ImageIcon,
-  Link,
   ListFilter,
-  ListX,
   LockKeyhole,
-  MessageSquare,
   MoveLeft,
   MoveRight,
   Paintbrush,
   Percent,
   Printer,
-  Puzzle,
   Redo2,
   Shapes,
   Sigma,
   Snowflake,
   Sparkles,
+  Strikethrough,
   Table2,
   TableCellsMerge,
   TableProperties,
@@ -107,14 +103,21 @@ function onKeydown(event: KeyboardEvent): void {
         >
           <Undo2 :size="16" aria-hidden="true" />
         </RibbonIconAction>
-      </div>
-      <div class="home-format-toolbar__row" data-ribbon-row="2">
         <RibbonIconAction
           :label="t('ribbon.redo')"
           data-ribbon-action="redo"
           @activate="emit('redo')"
         >
           <Redo2 :size="16" aria-hidden="true" />
+        </RibbonIconAction>
+      </div>
+      <div class="home-format-toolbar__row" data-ribbon-row="2">
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.formatPainter') })"
+          disabled
+          data-ribbon-placeholder="format-painter"
+        >
+          <Paintbrush :size="15" aria-hidden="true" />
         </RibbonIconAction>
       </div>
     </div>
@@ -152,18 +155,18 @@ function onKeydown(event: KeyboardEvent): void {
         </RibbonIconAction>
       </div>
       <div class="home-format-toolbar__row" data-ribbon-row="2">
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.formatPainter') })"
-          disabled
-          data-ribbon-placeholder="format-painter"
-        >
-          <Paintbrush :size="15" aria-hidden="true" />
-        </RibbonIconAction>
         <TextFormatControls
           :state="state"
           :disabled="disabled"
           @apply-style="emit('applyStyle', $event)"
         />
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.strikethrough') })"
+          disabled
+          data-ribbon-placeholder="strikethrough"
+        >
+          <Strikethrough :size="15" aria-hidden="true" />
+        </RibbonIconAction>
         <CellColorControls
           :state="state"
           :disabled="disabled"
@@ -339,23 +342,6 @@ function onKeydown(event: KeyboardEvent): void {
         >
           <Database :size="15" aria-hidden="true" />
         </RibbonIconAction>
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.dataValidation') })"
-          :text="t('ribbon.dataValidation')"
-          disabled
-          disclosure
-          data-ribbon-placeholder="data-validation"
-        >
-          <BadgeCheck :size="15" aria-hidden="true" />
-        </RibbonIconAction>
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.removeDuplicates') })"
-          :text="t('ribbon.removeDuplicates')"
-          disabled
-          data-ribbon-placeholder="remove-duplicates"
-        >
-          <ListX :size="15" aria-hidden="true" />
-        </RibbonIconAction>
       </div>
     </div>
 
@@ -403,34 +389,7 @@ function onKeydown(event: KeyboardEvent): void {
           <Table2 :size="15" aria-hidden="true" />
         </RibbonIconAction>
       </div>
-      <div class="home-format-toolbar__row" data-ribbon-row="2">
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.link') })"
-          :text="t('ribbon.link')"
-          disabled
-          disclosure
-          data-ribbon-placeholder="link"
-        >
-          <Link :size="15" aria-hidden="true" />
-        </RibbonIconAction>
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.comment') })"
-          :text="t('ribbon.comment')"
-          disabled
-          data-ribbon-placeholder="comment"
-        >
-          <MessageSquare :size="15" aria-hidden="true" />
-        </RibbonIconAction>
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.addOns') })"
-          :text="t('ribbon.addOns')"
-          disabled
-          disclosure
-          data-ribbon-placeholder="add-ons"
-        >
-          <Puzzle :size="15" aria-hidden="true" />
-        </RibbonIconAction>
-      </div>
+      <div class="home-format-toolbar__row" data-ribbon-row="2" aria-hidden="true" />
     </div>
 
     <div
@@ -519,11 +478,11 @@ function onKeydown(event: KeyboardEvent): void {
   display: flex;
   align-items: stretch;
   min-width: 0;
-  height: 64px;
-  padding: 3px 8px;
+  height: 68px;
+  padding: 5px 8px;
   overflow-x: auto;
   overflow-y: hidden;
-  background: var(--td-bg-color-page);
+  background: var(--td-bg-color-container);
   scrollbar-width: thin;
 
   &__row {
@@ -539,7 +498,7 @@ function onKeydown(event: KeyboardEvent): void {
     flex: 0 0 auto;
     grid-template-rows: repeat(2, 27px);
     align-content: center;
-    padding: 2px 3px;
+    padding: 1px 3px;
     border-right: 1px solid var(--td-border-level-1-color);
 
     &:first-child {
@@ -550,17 +509,33 @@ function onKeydown(event: KeyboardEvent): void {
       border-right: 0;
     }
 
-    &--automation {
-      flex: 1 1 300px;
-      min-width: 300px;
+    &[data-ribbon-group="history"] {
+      flex-basis: 80px;
 
       .home-format-toolbar__row {
-        justify-content: space-evenly;
+        justify-content: center;
+      }
+    }
+
+    &[data-ribbon-group="cell"] {
+      flex-basis: 309px;
+
+      .home-format-toolbar__row {
+        justify-content: space-between;
+      }
+    }
+
+    &--automation {
+      flex: 0 0 314px;
+      min-width: 0;
+
+      .home-format-toolbar__row {
+        justify-content: flex-start;
       }
     }
 
     &--utility {
-      flex: 0 0 58px;
+      flex: 0 0 80px;
       place-items: center;
       padding-right: 2px;
       padding-left: 6px;

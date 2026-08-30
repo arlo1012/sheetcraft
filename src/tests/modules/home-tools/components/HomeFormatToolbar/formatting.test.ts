@@ -210,7 +210,17 @@ describe("HomeFormatToolbar", () => {
       ).toEqual(["1", "2"]);
     }
     expect(wrapper.get('[data-ribbon-group="utility"] [data-ribbon-span="2"]')).toBeTruthy();
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(34);
+    expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="undo"]')).toBeTruthy();
+    expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="redo"]')).toBeTruthy();
+    expect(
+      wrapper.get('[data-ribbon-group="history"] [data-ribbon-placeholder="format-painter"]'),
+    ).toBeTruthy();
+    expect(
+      wrapper
+        .find('[data-ribbon-group="cell"] [data-ribbon-placeholder="format-painter"]')
+        .exists(),
+    ).toBe(false);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(30);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",

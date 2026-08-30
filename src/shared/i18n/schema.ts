@@ -45,14 +45,10 @@ export type MessageSchema = {
     pivotTable: string;
     quickTools: string;
     verticalAlignment: string;
+    strikethrough: string;
     currencyFormat: string;
     decreaseDecimal: string;
     increaseDecimal: string;
-    dataValidation: string;
-    removeDuplicates: string;
-    link: string;
-    comment: string;
-    addOns: string;
     generateIcon: string;
     smartTable: string;
     appGenerator: string;

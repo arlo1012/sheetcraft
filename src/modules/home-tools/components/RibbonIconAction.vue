@@ -76,7 +76,7 @@ function onKeydown(event: KeyboardEvent): void {
   width: 27px;
   height: 26px;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: 2px;
   color: var(--td-text-color-primary);
   cursor: pointer;
   outline: none;
@@ -98,14 +98,13 @@ function onKeydown(event: KeyboardEvent): void {
   &.is-disabled {
     cursor: default;
     color: var(--td-text-color-secondary);
-    opacity: 0.64;
   }
 
   &.has-text {
     width: auto;
     min-width: 27px;
-    gap: 3px;
-    padding: 0 3px;
+    gap: 2px;
+    padding: 0 1px;
   }
 
   &__icon {
@@ -125,6 +124,8 @@ function onKeydown(event: KeyboardEvent): void {
 
   &__disclosure {
     flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
     color: var(--td-text-color-placeholder);
   }
 }

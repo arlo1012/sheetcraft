@@ -48,7 +48,7 @@ describe("SpreadsheetRibbon", () => {
 
     expect(wrapper.emitted("undo")).toHaveLength(1);
     expect(wrapper.emitted("redo")).toHaveLength(1);
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(34);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(30);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",
