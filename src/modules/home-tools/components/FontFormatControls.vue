@@ -86,12 +86,24 @@ function setFontSize(value: SelectValue): void {
 </script>
 
 <template>
-  <div class="font-format-controls" role="group" :aria-label="t('format.font')">
-    <label class="font-format-controls__field" :title="t('format.fontFamily')">
+  <div
+    class="font-format-controls"
+    :class="{ 'is-disabled': disabled }"
+    role="group"
+    data-font-format-control
+    :aria-label="t('format.font')"
+    :aria-disabled="disabled"
+  >
+    <label
+      class="font-format-controls__field"
+      data-font-format-segment="family"
+      :title="t('format.fontFamily')"
+    >
       <span class="ui-visually-hidden">{{ t("format.fontFamily") }}</span>
       <TSelect
         class="font-format-controls__family"
         size="small"
+        borderless
         :model-value="fontFamilyValue"
         :options="fontFamilyOptions"
         :placeholder="state.fontFamily.mixed ? t('format.mixed') : undefined"
@@ -99,11 +111,16 @@ function setFontSize(value: SelectValue): void {
         @change="setFontFamily"
       />
     </label>
-    <label class="font-format-controls__field" :title="t('format.fontSize')">
+    <label
+      class="font-format-controls__field"
+      data-font-format-segment="size"
+      :title="t('format.fontSize')"
+    >
       <span class="ui-visually-hidden">{{ t("format.fontSize") }}</span>
       <TSelect
         class="font-format-controls__size"
         size="small"
+        borderless
         :model-value="fontSizeValue"
         :options="fontSizeOptions"
         :placeholder="state.fontSize.mixed ? t('format.mixed') : undefined"
@@ -116,27 +133,50 @@ function setFontSize(value: SelectValue): void {
 
 <style scoped lang="scss">
 .font-format-controls {
-  display: inline-flex;
+  display: inline-grid;
   flex: 0 0 auto;
-  align-items: center;
-  gap: 2px;
+  grid-template-columns: 96px 44px;
+  align-items: stretch;
+  height: 28px;
+  overflow: hidden;
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-component-border);
+  border-radius: var(--td-radius-default);
+
+  &:hover:not(.is-disabled) {
+    border-color: var(--td-text-color-placeholder);
+  }
+
+  &:focus-within:not(.is-disabled) {
+    border-color: var(--td-brand-color);
+    box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+  }
+
+  &.is-disabled {
+    background: var(--td-bg-color-component-disabled);
+  }
 
   &__field {
     display: inline-flex;
     min-width: 0;
+    height: 26px;
+
+    & + & {
+      border-left: 1px solid var(--td-border-level-1-color);
+    }
   }
 
-  &__family {
-    width: 96px;
-  }
-
+  &__family,
   &__size {
-    width: 44px;
+    width: 100%;
   }
 
   :deep(.t-input) {
+    height: 26px;
     padding-right: 6px;
     padding-left: 6px;
+    background: transparent;
+    border-radius: 0;
   }
 
   :deep(.t-input__suffix) {

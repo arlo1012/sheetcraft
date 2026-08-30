@@ -50,6 +50,12 @@ describe("HomeCellFormatGroup layout", () => {
     expect(placeholders(wrapper, "appearance")).toEqual(["borders"]);
     expect(placeholders(wrapper, "styles")).toEqual(["table-styles", "conditional-formatting"]);
     expect(
+      wrapper
+        .get("[data-font-format-control]")
+        .findAll(":scope > [data-font-format-segment]")
+        .map((segment) => segment.attributes("data-font-format-segment")),
+    ).toEqual(["family", "size"]);
+    expect(
       wrapper.get('[data-cell-format-lane="typography"] [data-cell-color-control="text"]'),
     ).toBeTruthy();
     expect(
