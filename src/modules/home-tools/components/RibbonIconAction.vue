@@ -8,12 +8,14 @@ const props = withDefaults(
     disabled?: boolean;
     pressed?: boolean | "mixed";
     disclosure?: boolean;
+    variant?: "compact" | "tall";
   }>(),
   {
     text: undefined,
     disabled: false,
     pressed: undefined,
     disclosure: false,
+    variant: "compact",
   },
 );
 
@@ -44,6 +46,7 @@ function onKeydown(event: KeyboardEvent): void {
       'is-pressed': pressed === true,
       'is-mixed': pressed === 'mixed',
       'has-text': text,
+      'is-tall': variant === 'tall',
     }"
     role="button"
     :tabindex="disabled ? -1 : 0"
@@ -107,16 +110,53 @@ function onKeydown(event: KeyboardEvent): void {
     padding: 0 1px;
   }
 
+  &.is-tall {
+    position: relative;
+    align-self: stretch;
+    width: 58px;
+    min-width: 58px;
+    height: 54px;
+    flex-direction: column;
+    gap: 3px;
+    padding: 2px;
+
+    &.has-text {
+      width: 58px;
+      min-width: 58px;
+      gap: 3px;
+      padding: 2px;
+    }
+
+    .ribbon-icon-action__text {
+      max-width: 100%;
+      overflow: visible;
+      line-height: 13px;
+      text-align: center;
+      text-overflow: clip;
+      white-space: normal;
+    }
+
+    .ribbon-icon-action__disclosure {
+      position: absolute;
+      top: 7px;
+      right: 2px;
+    }
+  }
+
   &__icon {
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
+
+    &:empty {
+      display: none;
+    }
   }
 
   &__text {
     overflow: hidden;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1;
     text-overflow: ellipsis;
     white-space: nowrap;

@@ -188,7 +188,7 @@ describe("HomeFormatToolbar", () => {
     expect(wrapper.emitted("redo")).toHaveLength(1);
   });
 
-  test("renders ordered two-row groups, spanning actions, and disabled future tools", () => {
+  test("renders ordered compact and mixed-layout tool groups", () => {
     const wrapper = mountToolbar();
 
     const groups = wrapper.findAll("[data-ribbon-group]");
@@ -202,22 +202,70 @@ describe("HomeFormatToolbar", () => {
       "automation",
       "utility",
     ]);
-    for (const group of groups.filter(
-      (group) => !["insert", "utility"].includes(group.attributes("data-ribbon-group") ?? ""),
-    )) {
+    for (const groupName of ["history", "cell", "alignment", "number"]) {
+      const group = wrapper.get(`[data-ribbon-group="${groupName}"]`);
       expect(
         group.findAll(":scope > [data-ribbon-row]").map((row) => row.attributes("data-ribbon-row")),
       ).toEqual(["1", "2"]);
     }
-    expect(wrapper.findAll('[data-ribbon-group="insert"] [data-ribbon-span="2"]')).toHaveLength(4);
+
+    const tallActions = {
+      data: ["filter", "protect"],
+      insert: ["insert", "image"],
+      automation: ["quick-tools", "generate-icon"],
+      utility: ["print"],
+    };
+    for (const [groupName, actionNames] of Object.entries(tallActions)) {
+      const actions = wrapper.findAll(
+        `[data-ribbon-group="${groupName}"] [data-ribbon-layout="tall"]`,
+      );
+      expect(actions.map((action) => action.attributes("data-ribbon-placeholder"))).toEqual(
+        actionNames,
+      );
+      for (const action of actions) {
+        expect(action.classes()).toContain("is-tall");
+        expect(action.attributes("data-ribbon-span")).toBe("2");
+      }
+    }
+
+    for (const [stackName, actionNames] of [
+      ["freeze-sort", ["freeze", "sort"]],
+      ["sum-data", ["sum", "data"]],
+      ["chart-pivot", ["chart", "pivot-table"]],
+    ] as const) {
+      const actions = wrapper
+        .get(`[data-ribbon-stack="${stackName}"]`)
+        .findAll("[data-ribbon-placeholder]");
+      expect(actions.map((action) => action.attributes("data-ribbon-placeholder"))).toEqual(
+        actionNames,
+      );
+      expect(actions.map((action) => action.attributes("data-ribbon-row"))).toEqual(["1", "2"]);
+    }
+
     expect(
       wrapper
-        .get('[data-ribbon-group="automation"] [data-ribbon-placeholder="quick-tools"]')
-        .attributes("data-ribbon-span"),
-    ).toBe("2");
-    expect(wrapper.get('[data-ribbon-group="utility"] [data-ribbon-span="2"]')).toBeTruthy();
+        .get('[data-ribbon-grid="automation-secondary"]')
+        .findAll("[data-ribbon-placeholder]")
+        .map((action) => ({
+          name: action.attributes("data-ribbon-placeholder"),
+          row: action.attributes("data-ribbon-row"),
+          column: action.attributes("data-ribbon-column"),
+        })),
+    ).toEqual([
+      { name: "smart-table", row: "1", column: "1" },
+      { name: "app-generator", row: "1", column: "2" },
+      { name: "pdf-to-editable", row: "2", column: "1" },
+      { name: "pdf-to-image", row: "2", column: "2" },
+    ]);
+
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="undo"]')).toBeTruthy();
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="redo"]')).toBeTruthy();
+    expect(
+      wrapper
+        .get('[data-ribbon-placeholder="number-format"]')
+        .get(".ribbon-icon-action__icon svg")
+        .classes(),
+    ).toContain("lucide-hash");
     expect(
       wrapper.get('[data-ribbon-group="history"] [data-ribbon-placeholder="format-painter"]'),
     ).toBeTruthy();
