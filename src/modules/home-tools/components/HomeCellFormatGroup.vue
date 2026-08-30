@@ -169,6 +169,12 @@ const { t } = useAppI18n();
 
   &__appearance-action {
     width: 100%;
+
+    &::after {
+      flex: 0 0 12px;
+      width: 12px;
+      content: "";
+    }
   }
 
   &__style-action {

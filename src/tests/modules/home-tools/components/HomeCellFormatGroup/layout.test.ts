@@ -51,6 +51,12 @@ describe("HomeCellFormatGroup layout", () => {
     expect(placeholders(wrapper, "styles")).toEqual(["table-styles", "conditional-formatting"]);
     expect(
       wrapper
+        .get(".text-format-controls")
+        .findAll('[role="button"]')
+        .map((action) => action.attributes("aria-label")),
+    ).toEqual(["Bold", "Italic", "Underline", "Strikethrough, not available yet"]);
+    expect(
+      wrapper
         .get("[data-font-format-control]")
         .findAll(":scope > [data-font-format-segment]")
         .map((segment) => segment.attributes("data-font-format-segment")),
