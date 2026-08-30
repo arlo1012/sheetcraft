@@ -23,6 +23,14 @@ const FONT_FAMILIES = [
 const FONT_SIZE_PRESETS = [
   8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 22, 24, 28, 32, 36, 48, 72,
 ] as const;
+const fontFamilyPopupProps = {
+  overlayStyle: { minWidth: "168px" },
+  overlayInnerStyle: { minWidth: "168px" },
+};
+const fontSizePopupProps = {
+  overlayStyle: { minWidth: "72px" },
+  overlayInnerStyle: { minWidth: "72px" },
+};
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -106,6 +114,7 @@ function setFontSize(value: SelectValue): void {
         borderless
         :model-value="fontFamilyValue"
         :options="fontFamilyOptions"
+        :popup-props="fontFamilyPopupProps"
         :placeholder="state.fontFamily.mixed ? t('format.mixed') : undefined"
         :disabled="disabled"
         @change="setFontFamily"
@@ -123,6 +132,7 @@ function setFontSize(value: SelectValue): void {
         borderless
         :model-value="fontSizeValue"
         :options="fontSizeOptions"
+        :popup-props="fontSizePopupProps"
         :placeholder="state.fontSize.mixed ? t('format.mixed') : undefined"
         :disabled="disabled"
         @change="setFontSize"
@@ -143,27 +153,34 @@ function setFontSize(value: SelectValue): void {
   border: 1px solid var(--td-component-border);
   border-radius: var(--td-radius-default);
 
-  &:hover:not(.is-disabled) {
-    border-color: var(--td-text-color-placeholder);
-  }
-
-  &:focus-within:not(.is-disabled) {
-    border-color: var(--td-brand-color);
-    box-shadow: 0 0 0 2px var(--td-brand-color-focus);
-  }
-
   &.is-disabled {
     background: var(--td-bg-color-component-disabled);
   }
 
   &__field {
+    position: relative;
     display: inline-flex;
     min-width: 0;
     height: 26px;
+    border-radius: 2px 0 0 2px;
+
+    &:last-child {
+      border-radius: 0 2px 2px 0;
+    }
 
     & + & {
       border-left: 1px solid var(--td-border-level-1-color);
     }
+  }
+
+  &:not(.is-disabled) &__field:hover {
+    background: var(--td-bg-color-container-hover);
+  }
+
+  &:not(.is-disabled) &__field:focus-within {
+    z-index: 1;
+    background: var(--td-brand-color-light);
+    box-shadow: 0 0 0 1px var(--td-brand-color);
   }
 
   &__family,
