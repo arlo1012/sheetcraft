@@ -60,6 +60,11 @@ function applyColor(color: string | null): void {
       >
         <Baseline v-if="kind === 'text'" :size="18" :stroke-width="1.8" aria-hidden="true" />
         <PaintBucket v-else :size="18" :stroke-width="1.8" aria-hidden="true" />
+        <span
+          v-if="kind === 'fill'"
+          class="cell-color-control__fill-indicator"
+          data-fill-indicator
+        />
       </span>
     </CellColorPicker>
   </div>
@@ -84,18 +89,38 @@ function applyColor(color: string | null): void {
       stroke-width: 3;
     }
 
-    &--fill :deep(path:nth-of-type(3)) {
-      fill: var(--cell-color-indicator);
-      stroke: var(--td-text-color-secondary);
-      stroke-width: 1.5;
+    &--fill {
+      position: relative;
+
+      :deep(svg) {
+        transform: translateY(-1px);
+      }
+
+      :deep(path:nth-of-type(3)) {
+        display: none;
+      }
     }
 
-    &--text.is-mixed :deep(path:first-of-type),
-    &--fill.is-mixed :deep(path:nth-of-type(3)) {
-      fill: transparent;
+    &--text.is-mixed :deep(path:first-of-type) {
       stroke: var(--td-text-color-placeholder);
       stroke-dasharray: 2 2;
     }
+  }
+
+  &__fill-indicator {
+    position: absolute;
+    right: 2px;
+    bottom: 0;
+    left: 2px;
+    height: 3px;
+    background: var(--cell-color-indicator);
+    border-radius: 1px;
+    box-shadow: inset 0 0 0 1px rgb(32 36 44 / 22%);
+  }
+
+  &__icon--fill.is-mixed &__fill-indicator {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--td-text-color-placeholder);
   }
 }
 </style>

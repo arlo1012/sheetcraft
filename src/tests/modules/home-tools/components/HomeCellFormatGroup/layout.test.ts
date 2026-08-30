@@ -71,6 +71,10 @@ describe("HomeCellFormatGroup layout", () => {
       expect(colorIcon.attributes()).toMatchObject({ width: "18", height: "18" });
     }
     expect(wrapper.find(".cell-color-picker__swatch").exists()).toBe(false);
+    expect(wrapper.get('[data-cell-color-icon="fill"] [data-fill-indicator]')).toBeTruthy();
+    expect(wrapper.find('[data-cell-color-icon="text"] [data-fill-indicator]').exists()).toBe(
+      false,
+    );
     expect(wrapper.get('[data-cell-color-icon="text"]').attributes("style")).toContain(
       "--cell-color-indicator: #20242c",
     );
