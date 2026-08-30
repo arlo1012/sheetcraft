@@ -199,14 +199,18 @@ describe("HomeFormatToolbar", () => {
       "number",
       "data",
       "insert",
+      "automation",
       "utility",
     ]);
-    for (const group of groups) {
+    for (const group of groups.filter(
+      (group) => group.attributes("data-ribbon-group") !== "utility",
+    )) {
       expect(
         group.findAll(":scope > [data-ribbon-row]").map((row) => row.attributes("data-ribbon-row")),
       ).toEqual(["1", "2"]);
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(20);
+    expect(wrapper.get('[data-ribbon-group="utility"] [data-ribbon-span="2"]')).toBeTruthy();
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(34);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",

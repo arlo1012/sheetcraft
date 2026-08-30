@@ -20,6 +20,7 @@ export type MessageSchema = {
     numberTools: string;
     dataTools: string;
     insertTools: string;
+    automationTools: string;
     utilityTools: string;
     undo: string;
     redo: string;
@@ -43,6 +44,20 @@ export type MessageSchema = {
     chart: string;
     pivotTable: string;
     quickTools: string;
+    verticalAlignment: string;
+    currencyFormat: string;
+    decreaseDecimal: string;
+    increaseDecimal: string;
+    dataValidation: string;
+    removeDuplicates: string;
+    link: string;
+    comment: string;
+    addOns: string;
+    generateIcon: string;
+    smartTable: string;
+    appGenerator: string;
+    pdfToEditable: string;
+    pdfToImage: string;
     print: string;
   };
   workspace: {

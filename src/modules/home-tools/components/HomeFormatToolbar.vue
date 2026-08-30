@@ -1,18 +1,31 @@
 <script setup lang="ts">
 import {
+  AlignVerticalJustifyCenter,
+  AppWindow,
   ArrowDownAZ,
+  BadgeCheck,
   ChartNoAxesColumn,
   CirclePlus,
   Database,
+  DollarSign,
+  FileImage,
+  FilePenLine,
   Grid2X2,
   Hash,
   Image as ImageIcon,
+  Link,
   ListFilter,
+  ListX,
   LockKeyhole,
+  MessageSquare,
+  MoveLeft,
+  MoveRight,
   Paintbrush,
   Percent,
   Printer,
+  Puzzle,
   Redo2,
+  Shapes,
   Sigma,
   Snowflake,
   Sparkles,
@@ -137,15 +150,6 @@ function onKeydown(event: KeyboardEvent): void {
         >
           <TableProperties :size="15" aria-hidden="true" />
         </RibbonIconAction>
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.conditionalFormatting') })"
-          :text="t('ribbon.conditionalFormatting')"
-          disabled
-          disclosure
-          data-ribbon-placeholder="conditional-formatting"
-        >
-          <Sparkles :size="15" aria-hidden="true" />
-        </RibbonIconAction>
       </div>
       <div class="home-format-toolbar__row" data-ribbon-row="2">
         <RibbonIconAction
@@ -165,6 +169,15 @@ function onKeydown(event: KeyboardEvent): void {
           :disabled="disabled"
           @apply-style="emit('applyStyle', $event)"
         />
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.conditionalFormatting') })"
+          :text="t('ribbon.conditionalFormatting')"
+          disabled
+          disclosure
+          data-ribbon-placeholder="conditional-formatting"
+        >
+          <Sparkles :size="15" aria-hidden="true" />
+        </RibbonIconAction>
       </div>
     </div>
 
@@ -178,6 +191,15 @@ function onKeydown(event: KeyboardEvent): void {
     >
       <div class="home-format-toolbar__row" data-ribbon-row="1">
         <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.verticalAlignment') })"
+          :text="t('ribbon.verticalAlignment')"
+          disabled
+          disclosure
+          data-ribbon-placeholder="vertical-alignment"
+        >
+          <AlignVerticalJustifyCenter :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+        <RibbonIconAction
           :label="t('app.unavailableFeature', { feature: t('ribbon.wrapText') })"
           :text="t('ribbon.wrapText')"
           disabled
@@ -186,6 +208,13 @@ function onKeydown(event: KeyboardEvent): void {
         >
           <TextWrap :size="15" aria-hidden="true" />
         </RibbonIconAction>
+      </div>
+      <div class="home-format-toolbar__row" data-ribbon-row="2">
+        <HorizontalAlignmentControls
+          :state="state"
+          :disabled="disabled"
+          @apply-style="emit('applyStyle', $event)"
+        />
         <RibbonIconAction
           :label="t('app.unavailableFeature', { feature: t('ribbon.mergeCells') })"
           :text="t('ribbon.mergeCells')"
@@ -195,13 +224,6 @@ function onKeydown(event: KeyboardEvent): void {
         >
           <TableCellsMerge :size="15" aria-hidden="true" />
         </RibbonIconAction>
-      </div>
-      <div class="home-format-toolbar__row" data-ribbon-row="2">
-        <HorizontalAlignmentControls
-          :state="state"
-          :disabled="disabled"
-          @apply-style="emit('applyStyle', $event)"
-        />
       </div>
     </div>
 
@@ -229,6 +251,27 @@ function onKeydown(event: KeyboardEvent): void {
           data-ribbon-placeholder="percent-format"
         >
           <Percent :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.currencyFormat') })"
+          disabled
+          data-ribbon-placeholder="currency-format"
+        >
+          <DollarSign :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.decreaseDecimal') })"
+          disabled
+          data-ribbon-placeholder="decrease-decimal"
+        >
+          <MoveLeft :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.increaseDecimal') })"
+          disabled
+          data-ribbon-placeholder="increase-decimal"
+        >
+          <MoveRight :size="15" aria-hidden="true" />
         </RibbonIconAction>
       </div>
     </div>
@@ -296,6 +339,23 @@ function onKeydown(event: KeyboardEvent): void {
         >
           <Database :size="15" aria-hidden="true" />
         </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.dataValidation') })"
+          :text="t('ribbon.dataValidation')"
+          disabled
+          disclosure
+          data-ribbon-placeholder="data-validation"
+        >
+          <BadgeCheck :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.removeDuplicates') })"
+          :text="t('ribbon.removeDuplicates')"
+          disabled
+          data-ribbon-placeholder="remove-duplicates"
+        >
+          <ListX :size="15" aria-hidden="true" />
+        </RibbonIconAction>
       </div>
     </div>
 
@@ -345,6 +405,42 @@ function onKeydown(event: KeyboardEvent): void {
       </div>
       <div class="home-format-toolbar__row" data-ribbon-row="2">
         <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.link') })"
+          :text="t('ribbon.link')"
+          disabled
+          disclosure
+          data-ribbon-placeholder="link"
+        >
+          <Link :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.comment') })"
+          :text="t('ribbon.comment')"
+          disabled
+          data-ribbon-placeholder="comment"
+        >
+          <MessageSquare :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.addOns') })"
+          :text="t('ribbon.addOns')"
+          disabled
+          disclosure
+          data-ribbon-placeholder="add-ons"
+        >
+          <Puzzle :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+      </div>
+    </div>
+
+    <div
+      class="home-format-toolbar__group home-format-toolbar__group--automation"
+      data-ribbon-group="automation"
+      role="group"
+      :aria-label="t('ribbon.automationTools')"
+    >
+      <div class="home-format-toolbar__row" data-ribbon-row="1">
+        <RibbonIconAction
           :label="t('app.unavailableFeature', { feature: t('ribbon.quickTools') })"
           :text="t('ribbon.quickTools')"
           disabled
@@ -352,6 +448,48 @@ function onKeydown(event: KeyboardEvent): void {
           data-ribbon-placeholder="quick-tools"
         >
           <WandSparkles :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.generateIcon') })"
+          :text="t('ribbon.generateIcon')"
+          disabled
+          data-ribbon-placeholder="generate-icon"
+        >
+          <Shapes :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.smartTable') })"
+          :text="t('ribbon.smartTable')"
+          disabled
+          data-ribbon-placeholder="smart-table"
+        >
+          <TableProperties :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+      </div>
+      <div class="home-format-toolbar__row" data-ribbon-row="2">
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.appGenerator') })"
+          :text="t('ribbon.appGenerator')"
+          disabled
+          data-ribbon-placeholder="app-generator"
+        >
+          <AppWindow :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.pdfToEditable') })"
+          :text="t('ribbon.pdfToEditable')"
+          disabled
+          data-ribbon-placeholder="pdf-to-editable"
+        >
+          <FilePenLine :size="15" aria-hidden="true" />
+        </RibbonIconAction>
+        <RibbonIconAction
+          :label="t('app.unavailableFeature', { feature: t('ribbon.pdfToImage') })"
+          :text="t('ribbon.pdfToImage')"
+          disabled
+          data-ribbon-placeholder="pdf-to-image"
+        >
+          <FileImage :size="15" aria-hidden="true" />
         </RibbonIconAction>
       </div>
     </div>
@@ -362,17 +500,16 @@ function onKeydown(event: KeyboardEvent): void {
       role="group"
       :aria-label="t('ribbon.utilityTools')"
     >
-      <div class="home-format-toolbar__row" data-ribbon-row="1">
-        <RibbonIconAction
-          :label="t('app.unavailableFeature', { feature: t('ribbon.print') })"
-          :text="t('ribbon.print')"
-          disabled
-          data-ribbon-placeholder="print"
-        >
-          <Printer :size="15" aria-hidden="true" />
-        </RibbonIconAction>
-      </div>
-      <div class="home-format-toolbar__row" data-ribbon-row="2" aria-hidden="true" />
+      <RibbonIconAction
+        class="home-format-toolbar__stacked-action"
+        :label="t('app.unavailableFeature', { feature: t('ribbon.print') })"
+        :text="t('ribbon.print')"
+        disabled
+        data-ribbon-placeholder="print"
+        data-ribbon-span="2"
+      >
+        <Printer :size="16" aria-hidden="true" />
+      </RibbonIconAction>
     </div>
   </div>
 </template>
@@ -392,6 +529,7 @@ function onKeydown(event: KeyboardEvent): void {
   &__row {
     display: flex;
     align-items: center;
+    gap: 2px;
     min-width: 0;
     min-height: 27px;
   }
@@ -401,7 +539,7 @@ function onKeydown(event: KeyboardEvent): void {
     flex: 0 0 auto;
     grid-template-rows: repeat(2, 27px);
     align-content: center;
-    padding: 2px 5px;
+    padding: 2px 3px;
     border-right: 1px solid var(--td-border-level-1-color);
 
     &:first-child {
@@ -412,15 +550,30 @@ function onKeydown(event: KeyboardEvent): void {
       border-right: 0;
     }
 
+    &--automation {
+      flex: 1 1 300px;
+      min-width: 300px;
+
+      .home-format-toolbar__row {
+        justify-content: space-evenly;
+      }
+    }
+
     &--utility {
-      margin-left: auto;
+      flex: 0 0 58px;
+      place-items: center;
+      padding-right: 2px;
+      padding-left: 6px;
     }
   }
 
-  @media (max-width: 1280px) {
-    &__group--utility {
-      margin-left: 0;
-    }
+  &__stacked-action {
+    grid-row: 1 / 3;
+    align-self: stretch;
+    width: 48px;
+    height: auto;
+    flex-direction: column;
+    gap: 3px;
   }
 }
 </style>
