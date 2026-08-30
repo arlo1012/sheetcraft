@@ -234,7 +234,12 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
       @focusin="onViewportFocusIn"
     >
       <div ref="railRef" class="home-format-toolbar__rail">
-        <HomeHistoryGroup @undo="emit('undo')" @redo="emit('redo')" />
+        <HomeHistoryGroup
+          :disabled="disabled"
+          @apply-style="emit('applyStyle', $event)"
+          @undo="emit('undo')"
+          @redo="emit('redo')"
+        />
         <HomeCellFormatGroup
           :state="state"
           :disabled="disabled"

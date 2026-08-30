@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { Eraser, Paintbrush, Redo2, Undo2 } from "lucide-vue-next";
+import { createClearCellStylePatch, type CellStylePatch } from "../../workbook/cell-style";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonIconAction from "./RibbonIconAction.vue";
 
+defineProps<{
+  disabled: boolean;
+}>();
+
 const emit = defineEmits<{
+  applyStyle: [patch: CellStylePatch];
   undo: [];
   redo: [];
 }>();
@@ -43,9 +49,10 @@ const { t } = useAppI18n();
         <Paintbrush :size="15" aria-hidden="true" />
       </RibbonIconAction>
       <RibbonIconAction
-        :label="t('app.unavailableFeature', { feature: t('ribbon.clearFormatting') })"
-        disabled
-        data-ribbon-placeholder="clear-formatting"
+        :label="t('ribbon.clearFormatting')"
+        :disabled="disabled"
+        data-ribbon-action="clear-formatting"
+        @activate="emit('applyStyle', createClearCellStylePatch())"
       >
         <Eraser :size="15" aria-hidden="true" />
       </RibbonIconAction>

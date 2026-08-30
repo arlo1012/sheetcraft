@@ -2,6 +2,7 @@ import { DOMWrapper, mount } from "@vue/test-utils";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { afterEach, describe, expect, test } from "vitest";
 import HomeFormatToolbar from "../../../../../modules/home-tools/components/HomeFormatToolbar.vue";
+import { createClearCellStylePatch } from "../../../../../modules/workbook/cell-style";
 import type { SelectionCellStyleState } from "../../../../../modules/workbook/style-state";
 import { createAppI18n } from "../../../../../shared/i18n";
 
@@ -106,6 +107,27 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper)).toEqual([{ bold: true }, { horizontalAlign: "center" }]);
   });
 
+  test("emits a complete clear-formatting patch from pointer and keyboard activation", async () => {
+    const wrapper = mountToolbar();
+    const clearFormatting = wrapper.get('[data-ribbon-action="clear-formatting"]');
+
+    expect(clearFormatting.attributes()).toMatchObject({
+      role: "button",
+      tabindex: "0",
+      "aria-disabled": "false",
+      "aria-label": "Clear formatting",
+    });
+    await clearFormatting.trigger("click");
+    await clearFormatting.trigger("keydown", { key: "Enter" });
+    await clearFormatting.trigger("keydown", { key: " " });
+
+    expect(emittedPatches(wrapper)).toEqual([
+      createClearCellStylePatch(),
+      createClearCellStylePatch(),
+      createClearCellStylePatch(),
+    ]);
+  });
+
   test("emits validated font and alignment patches", async () => {
     const wrapper = mountToolbar();
     const fontSelectors = wrapper.findAllComponents(TSelect);
@@ -185,7 +207,7 @@ describe("HomeFormatToolbar", () => {
       expect((control.element as HTMLButtonElement | HTMLInputElement).disabled).toBe(true);
     }
     for (const control of wrapper.findAll(
-      '[aria-label="Bold"], [aria-label="Italic"], [aria-label="Underline"], [aria-label="Align left"], [aria-label="Align center"], [aria-label="Align right"]',
+      '[aria-label="Bold"], [aria-label="Italic"], [aria-label="Underline"], [aria-label="Clear formatting"], [aria-label="Align left"], [aria-label="Align center"], [aria-label="Align right"]',
     )) {
       expect(control.attributes()).toMatchObject({ tabindex: "-1", "aria-disabled": "true" });
       await control.trigger("click");
@@ -292,7 +314,10 @@ describe("HomeFormatToolbar", () => {
         .find('[data-ribbon-group="cell"] [data-ribbon-placeholder="format-painter"]')
         .exists(),
     ).toBe(false);
-    for (const action of ["clear-formatting", "text-orientation"]) {
+    expect(
+      wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="clear-formatting"]'),
+    ).toBeTruthy();
+    for (const action of ["text-orientation"]) {
       const control = wrapper.get(`[data-ribbon-placeholder="${action}"]`);
       expect(control.find(".ribbon-icon-action__text").exists()).toBe(false);
       expect(control.attributes()).toMatchObject({
@@ -301,7 +326,7 @@ describe("HomeFormatToolbar", () => {
         "aria-disabled": "true",
       });
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(31);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(30);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",

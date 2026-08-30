@@ -3,6 +3,7 @@ import {
   createApplyCellStyleCommand,
   createClearCellRangeCommand,
 } from "../../../../modules/workbook/commands";
+import { createClearCellStylePatch } from "../../../../modules/workbook/cell-style";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
@@ -84,6 +85,84 @@ describe("cell style commands", () => {
     undoWorkbookCommand(session);
     expect(getCellValue(sheet, { row: 1, column: 1 })).toBe("keep style");
     expect(getCellStyle(sheet, { row: 1, column: 1 })).toEqual({ underline: true });
+  });
+
+  test("clears mixed styles without changing values and restores them exactly", () => {
+    const session = createWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const firstStyle = {
+      fontFamily: "Arial",
+      fontSize: 18,
+      bold: true,
+      italic: true,
+      underline: true,
+      textColor: "#112233",
+      fillColor: "#abcdef",
+      horizontalAlign: "right",
+      verticalAlign: "top",
+    } as const;
+    const secondStyle = {
+      fontSize: 14,
+      fillColor: "#fedcba",
+      verticalAlign: "bottom",
+    } as const;
+    const styleOnly = { italic: true, horizontalAlign: "center" } as const;
+    setCellValue(sheet, { row: 0, column: 0 }, "text");
+    setCellValue(sheet, { row: 0, column: 1 }, 42);
+    setCellStyle(sheet, { row: 0, column: 0 }, firstStyle);
+    setCellStyle(sheet, { row: 0, column: 1 }, secondStyle);
+    setCellStyle(sheet, { row: 0, column: 2 }, styleOnly);
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellStyleCommand(
+          sheet.id,
+          { start: { row: 0, column: 2 }, end: { row: 0, column: 0 } },
+          createClearCellStylePatch(),
+        ),
+      ),
+    ).toBe(true);
+
+    expect(session.history.undoStack).toHaveLength(1);
+    expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("text");
+    expect(getCellValue(sheet, { row: 0, column: 1 })).toBe(42);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 0, column: 2 })).toBeUndefined();
+    expect(sheet.cells.size).toBe(2);
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual(firstStyle);
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toEqual(secondStyle);
+    expect(getCellStyle(sheet, { row: 0, column: 2 })).toEqual(styleOnly);
+    expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("text");
+    expect(getCellValue(sheet, { row: 0, column: 1 })).toBe(42);
+
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 0, column: 2 })).toBeUndefined();
+    expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("text");
+    expect(getCellValue(sheet, { row: 0, column: 1 })).toBe(42);
+  });
+
+  test("does not record clearing an unformatted range", () => {
+    const session = createWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellStyleCommand(
+          sheet.id,
+          { start: { row: 0, column: 0 }, end: { row: 0, column: 1 } },
+          createClearCellStylePatch(),
+        ),
+      ),
+    ).toBe(false);
+    expect(session.history.undoStack).toHaveLength(0);
+    expect(sheet.cells.size).toBe(0);
   });
 
   test("rejects style patches that would materialize an excessive range", () => {

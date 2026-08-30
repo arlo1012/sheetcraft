@@ -36,6 +36,14 @@ export const CELL_STYLE_KEYS = [
   "verticalAlign",
 ] as const satisfies readonly (keyof CellStyle)[];
 
+export function createClearCellStylePatch(): CellStylePatch {
+  const patch: CellStylePatch = {};
+  for (const key of CELL_STYLE_KEYS) {
+    Object.assign(patch, { [key]: null });
+  }
+  return patch;
+}
+
 const CELL_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const HORIZONTAL_ALIGNMENTS = new Set<HorizontalCellAlignment>(["left", "center", "right"]);
 const VERTICAL_ALIGNMENTS = new Set<VerticalCellAlignment>(["top", "middle", "bottom"]);

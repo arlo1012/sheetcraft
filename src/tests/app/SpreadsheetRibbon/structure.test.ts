@@ -61,7 +61,10 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get("[data-vertical-alignment-trigger]").attributes("aria-haspopup")).toBe(
       "menu",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(31);
+    expect(wrapper.get('[data-ribbon-action="clear-formatting"]').attributes("aria-disabled")).toBe(
+      "false",
+    );
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(30);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",
@@ -77,6 +80,9 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get("header").attributes("aria-label")).toBe("工作簿工具");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("开始");
     expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-label")).toBe("开始工具");
+    expect(wrapper.get('[data-ribbon-action="clear-formatting"]').attributes("aria-label")).toBe(
+      "清除格式",
+    );
     expect(wrapper.get(".font-format-controls__family input").element).toHaveProperty(
       "value",
       "默认字体",

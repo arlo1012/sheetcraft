@@ -311,7 +311,7 @@ describe("App", () => {
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum:129");
   });
 
-  test("formats the current selection as one reversible workbook action", async () => {
+  test("formats and clears the current selection as reversible workbook actions", async () => {
     const wrapper = mountApp();
     await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", {
       button: 0,
@@ -327,7 +327,8 @@ describe("App", () => {
       (wrapper.get('[data-row="0"][data-column="1"]').element as HTMLElement).style.fontWeight,
     ).toBe("700");
 
-    await wrapper.get('[aria-label="Bold"]').trigger("keydown", { key: "z", ctrlKey: true });
+    const clearFormatting = wrapper.get('[data-ribbon-action="clear-formatting"]');
+    await clearFormatting.trigger("click");
     expect(wrapper.get('[aria-label="Bold"]').attributes("aria-pressed")).toBe("false");
     expect(
       (wrapper.get('[data-row="0"][data-column="0"]').element as HTMLElement).style.fontWeight,
@@ -335,6 +336,18 @@ describe("App", () => {
     expect(
       (wrapper.get('[data-row="0"][data-column="1"]').element as HTMLElement).style.fontWeight,
     ).toBe("");
+
+    await clearFormatting.trigger("keydown", { key: "z", ctrlKey: true });
+    expect(wrapper.get('[aria-label="Bold"]').attributes("aria-pressed")).toBe("true");
+    expect(
+      (wrapper.get('[data-row="0"][data-column="0"]').element as HTMLElement).style.fontWeight,
+    ).toBe("700");
+    expect(
+      (wrapper.get('[data-row="0"][data-column="1"]').element as HTMLElement).style.fontWeight,
+    ).toBe("700");
+
+    await clearFormatting.trigger("keydown", { key: "z", ctrlKey: true, shiftKey: true });
+    expect(wrapper.get('[aria-label="Bold"]').attributes("aria-pressed")).toBe("false");
   });
 
   test("disables formatting when a whole-column selection exceeds the command limit", async () => {
@@ -348,5 +361,11 @@ describe("App", () => {
     );
     expect(wrapper.get('[aria-label="Bold"]').attributes("aria-disabled")).toBe("true");
     expect(wrapper.get('[aria-label="Bold"]').attributes("tabindex")).toBe("-1");
+    expect(wrapper.get('[data-ribbon-action="clear-formatting"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
+    expect(wrapper.get('[data-ribbon-action="clear-formatting"]').attributes("tabindex")).toBe(
+      "-1",
+    );
   });
 });

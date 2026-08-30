@@ -35,6 +35,18 @@ describe("SheetGrid cell style rendering", () => {
     expect(style.justifyContent).toBe("center");
     expect(style.alignItems).toBe("flex-end");
     expect(cell.text()).toBe("");
+
+    setCellStyle(sheet, { row: 0, column: 0 }, null);
+    await nextTick();
+    expect(style.fontFamily).toBe("");
+    expect(style.fontSize).toBe("");
+    expect(style.fontWeight).toBe("");
+    expect(style.fontStyle).toBe("");
+    expect(style.textDecoration).toBe("");
+    expect(style.color).toBe("");
+    expect(style.backgroundColor).toBe("");
+    expect(style.justifyContent).toBe("");
+    expect(style.alignItems).toBe("");
   });
 
   test("applies the active cell style to the editor only while editing", async () => {

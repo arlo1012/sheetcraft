@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
+  CELL_STYLE_KEYS,
+  createClearCellStylePatch,
   normalizeCellStyle,
   normalizeCellStylePatch,
 } from "../../../../modules/workbook/cell-style";
@@ -13,6 +15,13 @@ import {
 } from "../../../../modules/workbook/workbook";
 
 describe("cell style model", () => {
+  test("derives a complete clear patch from the supported style keys", () => {
+    const patch = createClearCellStylePatch();
+
+    expect(Object.keys(patch)).toEqual(CELL_STYLE_KEYS);
+    expect(Object.values(patch)).toEqual(CELL_STYLE_KEYS.map(() => null));
+  });
+
   test("stores style-only cells and preserves their style when content is cleared", () => {
     const sheet = getActiveSheet(createWorkbook());
     const address = { row: 2, column: 3 };
