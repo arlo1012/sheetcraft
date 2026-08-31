@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
-import type { CellStylePatch } from "../modules/workbook/cell-style";
+import type { CellBorderAction, CellStylePatch } from "../modules/workbook/cell-style";
 import type { SelectionCellStyleState } from "../modules/workbook/style-state";
 import { useAppI18n } from "../shared/i18n";
 import LocaleSwitcher from "./LocaleSwitcher.vue";
@@ -11,6 +11,7 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
+  applyBorders: [action: CellBorderAction];
   applyStyle: [patch: CellStylePatch];
   undo: [];
   redo: [];
@@ -33,6 +34,7 @@ const { t } = useAppI18n();
       <HomeFormatToolbar
         :state="state"
         :disabled="disabled"
+        @apply-borders="emit('applyBorders', $event)"
         @apply-style="emit('applyStyle', $event)"
         @undo="emit('undo')"
         @redo="emit('redo')"

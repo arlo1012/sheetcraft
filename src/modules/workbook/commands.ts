@@ -34,6 +34,8 @@ import {
   mergeCellStyle,
   normalizeCellStyle,
   normalizeCellStylePatch,
+  normalizeCellBorderAction,
+  type CellBorderAction,
   type CellStyle,
   type CellStylePatch,
 } from "./cell-style";
@@ -48,6 +50,7 @@ export type CellValueChange = {
 export type SetCellValuesCommand = {
   type: "setCellValues";
   changes: CellValueChange[];
+  reconcileBorders?: true;
 };
 
 export type ClearCellRangeCommand = {
@@ -61,6 +64,13 @@ export type ApplyCellStyleCommand = {
   sheetId: string;
   range: CellRange;
   patch: CellStylePatch;
+};
+
+export type ApplyCellBordersCommand = {
+  type: "applyCellBorders";
+  sheetId: string;
+  range: CellRange;
+  action: CellBorderAction;
 };
 
 export type RestoreCellStylesCommand = {
@@ -122,6 +132,7 @@ export type WorkbookCommand =
   | SetCellValuesCommand
   | ClearCellRangeCommand
   | ApplyCellStyleCommand
+  | ApplyCellBordersCommand
   | RestoreCellStylesCommand
   | ResizeSheetDimensionCommand
   | AddSheetCommand
@@ -150,6 +161,7 @@ export function createSetCellValueCommand(
 
 export function createBatchSetCellValuesCommand(
   changes: readonly CellValueChange[],
+  options?: { reconcileBorders?: boolean },
 ): SetCellValuesCommand {
   return {
     type: "setCellValues",
@@ -158,6 +170,7 @@ export function createBatchSetCellValuesCommand(
       address: { ...change.address },
       ...("style" in change ? { style: cloneCellStyle(change.style ?? undefined) ?? null } : {}),
     })),
+    ...(options?.reconcileBorders ? { reconcileBorders: true } : {}),
   };
 }
 
@@ -212,6 +225,28 @@ export function createApplyCellStyleCommand(
     sheetId,
     range: normalizedRange,
     patch: normalizeCellStylePatch(patch),
+  };
+}
+
+export function createApplyCellBordersCommand(
+  sheetId: string,
+  range: CellRange,
+  action: CellBorderAction,
+): ApplyCellBordersCommand {
+  const normalizedRange = normalizeRange(range);
+  assertCellRange(normalizedRange);
+  const rowCount = normalizedRange.end.row - normalizedRange.start.row + 1;
+  const columnCount = normalizedRange.end.column - normalizedRange.start.column + 1;
+  if (rowCount * columnCount > MAX_CELL_STYLE_PATCH_CELLS) {
+    throw new RangeError(
+      `Cell style changes are limited to ${MAX_CELL_STYLE_PATCH_CELLS} cells per command.`,
+    );
+  }
+  return {
+    type: "applyCellBorders",
+    sheetId,
+    range: normalizedRange,
+    action: normalizeCellBorderAction(action),
   };
 }
 
@@ -341,7 +376,9 @@ export function createPasteCellValuesCommand(
     throw new RangeError("Pasted cells exceed the sheet limits.");
   }
 
-  return createBatchSetCellValuesCommand([...changes.values()]);
+  return createBatchSetCellValuesCommand([...changes.values()], {
+    reconcileBorders: Boolean(options?.styles),
+  });
 }
 
 function applySetCellValuesCommand(
@@ -349,13 +386,64 @@ function applySetCellValuesCommand(
   command: SetCellValuesCommand,
 ): WorkbookCommand | null {
   const reverseChanges: CellValueChange[] = [];
+  const reverseChangesByAddress = new Map<string, CellValueChange>();
+  const initialStates = new Map<
+    string,
+    { sheetId: string; address: CellAddress; value: CellValue; style: CellStyle | undefined }
+  >();
+  const getChangeKey = (sheetId: string, address: CellAddress) =>
+    `${sheetId}:${address.row}:${address.column}`;
 
   for (const change of command.changes) {
     assertCellAddress(change.address);
     if (!workbook.sheets.has(change.sheetId)) {
       throw new Error(`Sheet ${change.sheetId} does not exist.`);
     }
+    const key = getChangeKey(change.sheetId, change.address);
+    if (initialStates.has(key)) {
+      continue;
+    }
+    const sheet = workbook.sheets.get(change.sheetId);
+    if (!sheet) {
+      throw new Error(`Sheet ${change.sheetId} disappeared while applying the command.`);
+    }
+    initialStates.set(key, {
+      sheetId: change.sheetId,
+      address: { ...change.address },
+      value: getCellValue(sheet, change.address),
+      style: cloneCellStyle(getCellStyle(sheet, change.address) as CellStyle | undefined),
+    });
   }
+
+  const recordReverseChange = (
+    sheetId: string,
+    address: CellAddress,
+    includeStyle: boolean,
+    fallback?: { value: CellValue; style: CellStyle | undefined },
+  ) => {
+    const key = getChangeKey(sheetId, address);
+    const previous =
+      initialStates.get(key) ??
+      (fallback ? { sheetId, address: { ...address }, ...fallback } : undefined);
+    if (!previous) {
+      throw new Error(`Missing previous state for cell ${address.row}:${address.column}.`);
+    }
+    const existing = reverseChangesByAddress.get(key);
+    if (existing) {
+      if (includeStyle && !("style" in existing)) {
+        Object.assign(existing, { style: previous.style ?? null });
+      }
+      return;
+    }
+    const reverseChange: CellValueChange = {
+      sheetId,
+      address: { ...address },
+      value: previous.value,
+      ...(includeStyle ? { style: previous.style ?? null } : {}),
+    };
+    reverseChanges.unshift(reverseChange);
+    reverseChangesByAddress.set(key, reverseChange);
+  };
 
   for (const change of command.changes) {
     const sheet = workbook.sheets.get(change.sheetId);
@@ -363,23 +451,59 @@ function applySetCellValuesCommand(
       throw new Error(`Sheet ${change.sheetId} disappeared while applying the command.`);
     }
 
-    const previousValue = getCellValue(sheet, change.address);
-    const previousStyle = cloneCellStyle(
-      getCellStyle(sheet, change.address) as CellStyle | undefined,
-    );
     const valueChanged = setCellValue(sheet, change.address, change.value);
     const styleChanged =
       "style" in change ? setCellStyle(sheet, change.address, change.style) : false;
     if (!valueChanged && !styleChanged) {
       continue;
     }
+    recordReverseChange(change.sheetId, change.address, "style" in change);
+  }
 
-    reverseChanges.unshift({
-      sheetId: change.sheetId,
-      address: { ...change.address },
-      value: previousValue,
-      ...("style" in change ? { style: previousStyle ?? null } : {}),
-    });
+  if (command.reconcileBorders) {
+    const targetsBySheet = new Map<
+      string,
+      Map<string, { address: CellAddress; patch: CellBorderPatch }>
+    >();
+    for (const change of command.changes) {
+      if (!("style" in change)) {
+        continue;
+      }
+      const targets = targetsBySheet.get(change.sheetId) ?? new Map();
+      targets.set(getCellBorderTargetKey(change.address), {
+        address: { ...change.address },
+        patch: getExactCellBorderPatch(normalizeCellStyle(change.style)),
+      });
+      targetsBySheet.set(change.sheetId, targets);
+    }
+    for (const [sheetId, targets] of targetsBySheet) {
+      const cleanupPatches = new Map<string, { address: CellAddress; patch: CellStylePatch }>();
+      reconcileCellBorderTargets(targets, (address, patch) => {
+        const key = getCellBorderTargetKey(address);
+        const existing = cleanupPatches.get(key);
+        if (existing) {
+          Object.assign(existing.patch, patch);
+          return;
+        }
+        cleanupPatches.set(key, { address: { ...address }, patch: { ...patch } });
+      });
+
+      const sheet = workbook.sheets.get(sheetId);
+      if (!sheet) {
+        throw new Error(`Sheet ${sheetId} disappeared while reconciling borders.`);
+      }
+      for (const { address, patch } of cleanupPatches.values()) {
+        const previousValue = getCellValue(sheet, address);
+        const previousStyle = cloneCellStyle(getCellStyle(sheet, address) as CellStyle | undefined);
+        if (!setCellStyle(sheet, address, mergeCellStyle(previousStyle, patch))) {
+          continue;
+        }
+        recordReverseChange(sheetId, address, true, {
+          value: previousValue,
+          style: previousStyle,
+        });
+      }
+    }
   }
 
   return reverseChanges.length > 0 ? createBatchSetCellValuesCommand(reverseChanges) : null;
@@ -452,18 +576,282 @@ function applyCellStyleCommand(
   if (!sheet) {
     throw new Error(`Sheet ${command.sheetId} does not exist.`);
   }
+
+  const patches = new Map<string, { address: CellAddress; patch: CellStylePatch }>();
+  const addPatch = (address: CellAddress, patch: CellStylePatch) => {
+    const key = getCellBorderTargetKey(address);
+    const existing = patches.get(key);
+    if (existing) {
+      Object.assign(existing.patch, patch);
+      return;
+    }
+    patches.set(key, { address: { ...address }, patch: { ...patch } });
+  };
+  const targetBorderPatches = new Map<string, { address: CellAddress; patch: CellBorderPatch }>();
+  const borderPatch = getExplicitCellBorderPatch(command.patch);
   const reverseChanges: RestoreCellStylesCommand["changes"] = [];
   for (let row = command.range.start.row; row <= command.range.end.row; row += 1) {
     for (let column = command.range.start.column; column <= command.range.end.column; column += 1) {
       const address = { row, column };
-      const previousStyle = cloneCellStyle(getCellStyle(sheet, address) as CellStyle | undefined);
-      const nextStyle = mergeCellStyle(previousStyle, command.patch);
-      if (!setCellStyle(sheet, address, nextStyle)) {
-        continue;
+      addPatch(address, command.patch);
+      if (Object.keys(borderPatch).length > 0) {
+        targetBorderPatches.set(getCellBorderTargetKey(address), {
+          address,
+          patch: { ...borderPatch },
+        });
       }
-      reverseChanges.push({ address, style: previousStyle ?? null });
     }
   }
+  reconcileCellBorderTargets(targetBorderPatches, addPatch);
+
+  for (const { address, patch } of patches.values()) {
+    const previousStyle = cloneCellStyle(getCellStyle(sheet, address) as CellStyle | undefined);
+    const nextStyle = mergeCellStyle(previousStyle, patch);
+    if (!setCellStyle(sheet, address, nextStyle)) {
+      continue;
+    }
+    reverseChanges.push({ address, style: previousStyle ?? null });
+  }
+  return reverseChanges.length > 0
+    ? createRestoreCellStylesCommand(command.sheetId, reverseChanges)
+    : null;
+}
+
+type CellBorderSide = "borderTop" | "borderRight" | "borderBottom" | "borderLeft";
+
+type CellBorderPatch = Pick<CellStylePatch, CellBorderSide>;
+
+const CELL_BORDER_SIDES = [
+  "borderTop",
+  "borderRight",
+  "borderBottom",
+  "borderLeft",
+] as const satisfies readonly CellBorderSide[];
+
+const OPPOSITE_CELL_BORDER_SIDES: Record<CellBorderSide, CellBorderSide> = {
+  borderTop: "borderBottom",
+  borderRight: "borderLeft",
+  borderBottom: "borderTop",
+  borderLeft: "borderRight",
+};
+
+function getNeighborAddress(address: CellAddress, side: CellBorderSide): CellAddress | undefined {
+  const offset =
+    side === "borderTop"
+      ? { row: -1, column: 0 }
+      : side === "borderRight"
+        ? { row: 0, column: 1 }
+        : side === "borderBottom"
+          ? { row: 1, column: 0 }
+          : { row: 0, column: -1 };
+  const neighbor = { row: address.row + offset.row, column: address.column + offset.column };
+  return isCellAddressInBounds(neighbor) ? neighbor : undefined;
+}
+
+function hasMatchingCellBorder(
+  left: CellStylePatch[CellBorderSide],
+  right: CellStylePatch[CellBorderSide],
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (!left || !right || typeof left !== "object" || typeof right !== "object") {
+    return false;
+  }
+  return left.style === right.style && left.color === right.color;
+}
+
+function hasCellBorder(value: CellStylePatch[CellBorderSide]): boolean {
+  return Boolean(value && typeof value === "object");
+}
+
+function getCellBorderTargetKey(address: CellAddress): string {
+  return `${address.row}:${address.column}`;
+}
+
+function getExplicitCellBorderPatch(style: CellStylePatch): CellBorderPatch {
+  const patch: CellBorderPatch = {};
+  for (const side of CELL_BORDER_SIDES) {
+    if (side in style) {
+      Object.assign(patch, { [side]: style[side] });
+    }
+  }
+  return patch;
+}
+
+function getExactCellBorderPatch(style: CellStyle | undefined): CellBorderPatch {
+  return {
+    borderTop: style?.borderTop ?? null,
+    borderRight: style?.borderRight ?? null,
+    borderBottom: style?.borderBottom ?? null,
+    borderLeft: style?.borderLeft ?? null,
+  };
+}
+
+function reconcileCellBorderTargets(
+  targets: ReadonlyMap<string, { address: CellAddress; patch: CellBorderPatch }>,
+  addPatch: (address: CellAddress, patch: CellStylePatch) => void,
+): void {
+  const processedEdges = new Set<string>();
+  for (const target of targets.values()) {
+    for (const side of CELL_BORDER_SIDES) {
+      if (!(side in target.patch)) {
+        continue;
+      }
+      const neighbor = getNeighborAddress(target.address, side);
+      if (!neighbor) {
+        continue;
+      }
+      const oppositeSide = OPPOSITE_CELL_BORDER_SIDES[side];
+      const ownerAddress =
+        side === "borderTop" || side === "borderLeft" ? neighbor : target.address;
+      const ownerSide = side === "borderTop" || side === "borderLeft" ? oppositeSide : side;
+      const edgeKey = `${getCellBorderTargetKey(ownerAddress)}:${ownerSide}`;
+      if (processedEdges.has(edgeKey)) {
+        continue;
+      }
+      processedEdges.add(edgeKey);
+
+      const ownerTarget = targets.get(getCellBorderTargetKey(ownerAddress));
+      const fallbackAddress = getNeighborAddress(ownerAddress, ownerSide);
+      if (!fallbackAddress) {
+        continue;
+      }
+      const fallbackSide = OPPOSITE_CELL_BORDER_SIDES[ownerSide];
+      const fallbackTarget = targets.get(getCellBorderTargetKey(fallbackAddress));
+      const ownerBorder = ownerTarget?.patch[ownerSide];
+      const fallbackBorder = fallbackTarget?.patch[fallbackSide];
+      const winnerIsOwner =
+        hasCellBorder(ownerBorder) ||
+        (!hasCellBorder(fallbackBorder) &&
+          !(fallbackTarget && fallbackSide in fallbackTarget.patch));
+      const winnerSide = winnerIsOwner ? ownerSide : fallbackSide;
+      const winnerBorder = winnerIsOwner ? ownerBorder : fallbackBorder;
+      const loserAddress = winnerIsOwner ? fallbackAddress : ownerAddress;
+      if (!loserAddress) {
+        continue;
+      }
+      const loserSide = OPPOSITE_CELL_BORDER_SIDES[winnerSide];
+      const intendedLoserBorder = targets.get(getCellBorderTargetKey(loserAddress))?.patch[
+        loserSide
+      ];
+      if (hasMatchingCellBorder(winnerBorder, intendedLoserBorder)) {
+        continue;
+      }
+      addPatch(loserAddress, { [loserSide]: null });
+    }
+  }
+}
+
+function getCellBorderPatch(
+  range: CellRange,
+  action: CellBorderAction,
+  row: number,
+  column: number,
+): CellBorderPatch {
+  if (action.preset === "none") {
+    return {
+      borderTop: null,
+      borderRight: null,
+      borderBottom: null,
+      borderLeft: null,
+    };
+  }
+
+  const border = action.border;
+  const isTop = row === range.start.row;
+  const isRight = column === range.end.column;
+  const isBottom = row === range.end.row;
+  const isLeft = column === range.start.column;
+  const patch: CellBorderPatch = {};
+  const apply = (side: CellBorderSide) => {
+    Object.assign(patch, { [side]: border });
+  };
+
+  if (action.preset === "all") {
+    apply("borderTop");
+    apply("borderRight");
+    apply("borderBottom");
+    apply("borderLeft");
+  } else if (action.preset === "outer") {
+    if (isTop) apply("borderTop");
+    if (isRight) apply("borderRight");
+    if (isBottom) apply("borderBottom");
+    if (isLeft) apply("borderLeft");
+  } else if (action.preset === "inner") {
+    if (!isRight) apply("borderRight");
+    if (!isBottom) apply("borderBottom");
+  } else if (action.preset === "top" && isTop) {
+    apply("borderTop");
+  } else if (action.preset === "right" && isRight) {
+    apply("borderRight");
+  } else if (action.preset === "bottom" && isBottom) {
+    apply("borderBottom");
+  } else if (action.preset === "left" && isLeft) {
+    apply("borderLeft");
+  } else if (action.preset === "innerHorizontal" && !isBottom) {
+    apply("borderBottom");
+  } else if (action.preset === "innerVertical" && !isRight) {
+    apply("borderRight");
+  }
+
+  return patch;
+}
+
+function applyCellBordersCommand(
+  workbook: Workbook,
+  command: ApplyCellBordersCommand,
+): WorkbookCommand | null {
+  const range = normalizeRange(command.range);
+  assertCellRange(range);
+  const rowCount = range.end.row - range.start.row + 1;
+  const columnCount = range.end.column - range.start.column + 1;
+  if (rowCount * columnCount > MAX_CELL_STYLE_PATCH_CELLS) {
+    throw new RangeError(
+      `Cell style changes are limited to ${MAX_CELL_STYLE_PATCH_CELLS} cells per command.`,
+    );
+  }
+  const action = normalizeCellBorderAction(command.action);
+  const sheet = workbook.sheets.get(command.sheetId);
+  if (!sheet) {
+    throw new Error(`Sheet ${command.sheetId} does not exist.`);
+  }
+
+  const patches = new Map<string, { address: CellAddress; patch: CellStylePatch }>();
+  const addPatch = (address: CellAddress, patch: CellStylePatch) => {
+    const key = `${address.row}:${address.column}`;
+    const existing = patches.get(key);
+    if (existing) {
+      Object.assign(existing.patch, patch);
+      return;
+    }
+    patches.set(key, { address: { ...address }, patch: { ...patch } });
+  };
+
+  const targetBorderPatches = new Map<string, { address: CellAddress; patch: CellBorderPatch }>();
+  for (let row = range.start.row; row <= range.end.row; row += 1) {
+    for (let column = range.start.column; column <= range.end.column; column += 1) {
+      const patch = getCellBorderPatch(range, action, row, column);
+      if (Object.keys(patch).length === 0) {
+        continue;
+      }
+      const address = { row, column };
+      addPatch(address, patch);
+      targetBorderPatches.set(getCellBorderTargetKey(address), { address, patch });
+    }
+  }
+  reconcileCellBorderTargets(targetBorderPatches, addPatch);
+
+  const reverseChanges: RestoreCellStylesCommand["changes"] = [];
+  for (const { address, patch } of patches.values()) {
+    const previousStyle = cloneCellStyle(getCellStyle(sheet, address) as CellStyle | undefined);
+    const nextStyle = mergeCellStyle(previousStyle, patch);
+    if (!setCellStyle(sheet, address, nextStyle)) {
+      continue;
+    }
+    reverseChanges.push({ address, style: previousStyle ?? null });
+  }
+
   return reverseChanges.length > 0
     ? createRestoreCellStylesCommand(command.sheetId, reverseChanges)
     : null;
@@ -719,6 +1107,9 @@ export function applyWorkbookCommand(
   }
   if (command.type === "applyCellStyle") {
     return applyCellStyleCommand(workbook, command);
+  }
+  if (command.type === "applyCellBorders") {
+    return applyCellBordersCommand(workbook, command);
   }
   if (command.type === "restoreCellStyles") {
     return applyRestoreCellStylesCommand(workbook, command);

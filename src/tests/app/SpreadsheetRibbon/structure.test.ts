@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { DOMWrapper, mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import SpreadsheetRibbon from "../../../app/SpreadsheetRibbon.vue";
 import { createDefaultSelectionCellStyleState } from "../../../modules/workbook/style-state";
@@ -48,6 +48,12 @@ describe("SpreadsheetRibbon", () => {
 
     await wrapper.get('[aria-label="Bold"]').trigger("click");
     expect(wrapper.emitted("applyStyle")?.[0]).toEqual([{ bold: true }]);
+
+    await wrapper.get("[data-cell-border-trigger]").trigger("click");
+    await new DOMWrapper(document.body).get('[data-border-preset="outer"]').trigger("click");
+    expect(wrapper.emitted("applyBorders")?.[0]).toEqual([
+      { preset: "outer", border: { style: "thin", color: "#20242c" } },
+    ]);
   });
 
   test("keeps concrete history actions and unavailable placeholders in the ribbon", async () => {
@@ -67,7 +73,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
       "false",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(29);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(28);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",

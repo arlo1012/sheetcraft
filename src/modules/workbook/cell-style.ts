@@ -8,6 +8,29 @@ export const MAX_CELL_STYLE_PATCH_CELLS = 100_000;
 
 export type HorizontalCellAlignment = "left" | "center" | "right";
 export type VerticalCellAlignment = "top" | "middle" | "bottom";
+export type CellBorderLineStyle = "thin" | "medium" | "dashed" | "dotted" | "double";
+
+export type CellBorder = {
+  style: CellBorderLineStyle;
+  color: string;
+};
+
+export type CellBorderPreset =
+  | "none"
+  | "all"
+  | "outer"
+  | "inner"
+  | "top"
+  | "right"
+  | "bottom"
+  | "left"
+  | "innerHorizontal"
+  | "innerVertical";
+
+export type CellBorderAction = {
+  preset: CellBorderPreset;
+  border?: CellBorder;
+};
 
 export type CellStyle = {
   fontFamily?: string;
@@ -20,6 +43,10 @@ export type CellStyle = {
   horizontalAlign?: HorizontalCellAlignment;
   verticalAlign?: VerticalCellAlignment;
   wrapText?: true;
+  borderTop?: CellBorder;
+  borderRight?: CellBorder;
+  borderBottom?: CellBorder;
+  borderLeft?: CellBorder;
 };
 
 export type CellStylePatch = {
@@ -37,6 +64,10 @@ export const CELL_STYLE_KEYS = [
   "horizontalAlign",
   "verticalAlign",
   "wrapText",
+  "borderTop",
+  "borderRight",
+  "borderBottom",
+  "borderLeft",
 ] as const satisfies readonly (keyof CellStyle)[];
 
 export function createClearCellStylePatch(): CellStylePatch {
@@ -50,6 +81,25 @@ export function createClearCellStylePatch(): CellStylePatch {
 const CELL_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const HORIZONTAL_ALIGNMENTS = new Set<HorizontalCellAlignment>(["left", "center", "right"]);
 const VERTICAL_ALIGNMENTS = new Set<VerticalCellAlignment>(["top", "middle", "bottom"]);
+const BORDER_LINE_STYLES = new Set<CellBorderLineStyle>([
+  "thin",
+  "medium",
+  "dashed",
+  "dotted",
+  "double",
+]);
+const BORDER_PRESETS = new Set<CellBorderPreset>([
+  "none",
+  "all",
+  "outer",
+  "inner",
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "innerHorizontal",
+  "innerVertical",
+]);
 
 function normalizeFontFamily(value: unknown): string {
   if (typeof value !== "string") {
@@ -81,6 +131,35 @@ function normalizeColor(value: unknown, field: string): string {
     throw new TypeError(`${field} must be a six-digit hexadecimal color.`);
   }
   return value.toLowerCase();
+}
+
+export function normalizeCellBorder(border: CellBorder): CellBorder {
+  if (!border || typeof border !== "object") {
+    throw new TypeError("Cell border must be an object.");
+  }
+  if (
+    typeof border.style !== "string" ||
+    !BORDER_LINE_STYLES.has(border.style as CellBorderLineStyle)
+  ) {
+    throw new TypeError("Cell border style must be thin, medium, dashed, dotted, or double.");
+  }
+  return {
+    style: border.style as CellBorderLineStyle,
+    color: normalizeColor(border.color, "Cell border color"),
+  };
+}
+
+export function normalizeCellBorderAction(action: CellBorderAction): CellBorderAction {
+  if (!action || typeof action !== "object" || !BORDER_PRESETS.has(action.preset)) {
+    throw new TypeError("Unknown cell border preset.");
+  }
+  if (action.preset === "none") {
+    return { preset: "none" };
+  }
+  if (!action.border) {
+    throw new TypeError("A cell border is required for this preset.");
+  }
+  return { preset: action.preset, border: normalizeCellBorder(action.border) };
 }
 
 function normalizeHorizontalAlignment(value: unknown): HorizontalCellAlignment {
@@ -121,6 +200,14 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
       value,
       key === "textColor" ? "Cell text color" : "Cell fill color",
     ) as CellStyle[Key];
+  }
+  if (
+    key === "borderTop" ||
+    key === "borderRight" ||
+    key === "borderBottom" ||
+    key === "borderLeft"
+  ) {
+    return normalizeCellBorder(value as CellBorder) as CellStyle[Key];
   }
   if (key === "horizontalAlign") {
     return normalizeHorizontalAlignment(value) as CellStyle[Key];
@@ -178,12 +265,33 @@ export function mergeCellStyle(
 }
 
 export function cloneCellStyle(style: CellStyle | undefined): CellStyle | undefined {
-  return style ? { ...style } : undefined;
+  if (!style) {
+    return undefined;
+  }
+  return normalizeCellStyle(style);
 }
 
 export function areCellStylesEqual(
   left: CellStyle | undefined,
   right: CellStyle | undefined,
 ): boolean {
-  return CELL_STYLE_KEYS.every((key) => Object.is(left?.[key], right?.[key]));
+  return CELL_STYLE_KEYS.every((key) => {
+    const leftValue = left?.[key];
+    const rightValue = right?.[key];
+    if (
+      key === "borderTop" ||
+      key === "borderRight" ||
+      key === "borderBottom" ||
+      key === "borderLeft"
+    ) {
+      return (
+        leftValue === rightValue ||
+        (leftValue !== undefined &&
+          rightValue !== undefined &&
+          (leftValue as CellBorder).style === (rightValue as CellBorder).style &&
+          (leftValue as CellBorder).color === (rightValue as CellBorder).color)
+      );
+    }
+    return Object.is(leftValue, rightValue);
+  });
 }

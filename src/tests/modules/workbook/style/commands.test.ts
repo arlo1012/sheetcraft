@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  createApplyCellBordersCommand,
   createApplyCellStyleCommand,
   createClearCellRangeCommand,
 } from "../../../../modules/workbook/commands";
@@ -19,6 +20,8 @@ import {
 } from "../../../../modules/workbook/workbook";
 
 describe("cell style commands", () => {
+  const border = { style: "thin" as const, color: "#123456" };
+
   test("applies a range patch as one entry and restores mixed styles exactly", () => {
     const session = createWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
@@ -207,5 +210,280 @@ describe("cell style commands", () => {
       ),
     ).toThrow(RangeError);
     expect(sheet.cells.size).toBe(0);
+  });
+
+  test("applies all borders to a single cell and restores its exact prior style", () => {
+    const session = createWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellStyle(sheet, { row: 3, column: 4 }, { bold: true });
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellBordersCommand(
+          sheet.id,
+          { start: { row: 3, column: 4 }, end: { row: 3, column: 4 } },
+          { preset: "all", border },
+        ),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, { row: 3, column: 4 })).toEqual({
+      bold: true,
+      borderTop: border,
+      borderRight: border,
+      borderBottom: border,
+      borderLeft: border,
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 3, column: 4 })).toEqual({ bold: true });
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 3, column: 4 })?.borderTop).toEqual(border);
+  });
+
+  test("applies outer borders without clearing existing internal edges", () => {
+    const session = createWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const preservedBorder = { style: "dotted" as const, color: "#abcdef" };
+    setCellStyle(sheet, { row: 1, column: 1 }, { borderLeft: preservedBorder });
+
+    executeWorkbookCommand(
+      session,
+      createApplyCellBordersCommand(
+        sheet.id,
+        { start: { row: 0, column: 0 }, end: { row: 1, column: 2 } },
+        { preset: "outer", border },
+      ),
+    );
+
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({
+      borderTop: border,
+      borderLeft: border,
+    });
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toEqual({ borderTop: border });
+    expect(getCellStyle(sheet, { row: 0, column: 2 })).toEqual({
+      borderTop: border,
+      borderRight: border,
+    });
+    expect(getCellStyle(sheet, { row: 1, column: 1 })).toEqual({
+      borderLeft: preservedBorder,
+      borderBottom: border,
+    });
+    expect(getCellStyle(sheet, { row: 1, column: 2 })).toEqual({
+      borderRight: border,
+      borderBottom: border,
+    });
+  });
+
+  test("uses right and bottom edges for internal borders and clears every edge with none", () => {
+    const session = createWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const range = { start: { row: 0, column: 0 }, end: { row: 1, column: 1 } };
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellBordersCommand(sheet.id, range, { preset: "inner", border }),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({
+      borderRight: border,
+      borderBottom: border,
+    });
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toEqual({ borderBottom: border });
+    expect(getCellStyle(sheet, { row: 1, column: 0 })).toEqual({ borderRight: border });
+    expect(getCellStyle(sheet, { row: 1, column: 1 })).toBeUndefined();
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellBordersCommand(sheet.id, range, { preset: "none" }),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 1, column: 0 })).toBeUndefined();
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({
+      borderRight: border,
+      borderBottom: border,
+    });
+  });
+
+  test("does not record an internal border preset for a single cell", () => {
+    const session = createWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellBordersCommand(
+          sheet.id,
+          { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+          { preset: "inner", border },
+        ),
+      ),
+    ).toBe(false);
+    expect(session.history.undoStack).toHaveLength(0);
+  });
+
+  test("makes outer borders win against each conflicting external neighbor and restores them", () => {
+    const session = createWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const oldBorder = { style: "double" as const, color: "#abcdef" };
+    const range = { start: { row: 1, column: 1 }, end: { row: 2, column: 2 } };
+    setCellStyle(sheet, { row: 0, column: 1 }, { borderBottom: oldBorder });
+    setCellStyle(sheet, { row: 1, column: 0 }, { borderRight: oldBorder });
+    setCellStyle(sheet, { row: 3, column: 1 }, { borderTop: oldBorder });
+    setCellStyle(sheet, { row: 1, column: 3 }, { borderLeft: oldBorder });
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellBordersCommand(sheet.id, range, { preset: "outer", border }),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, { row: 1, column: 1 })).toEqual({
+      borderTop: border,
+      borderLeft: border,
+    });
+    expect(getCellStyle(sheet, { row: 2, column: 2 })).toEqual({
+      borderRight: border,
+      borderBottom: border,
+    });
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 1, column: 0 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 3, column: 1 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 1, column: 3 })).toBeUndefined();
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toEqual({ borderBottom: oldBorder });
+    expect(getCellStyle(sheet, { row: 1, column: 0 })).toEqual({ borderRight: oldBorder });
+    expect(getCellStyle(sheet, { row: 3, column: 1 })).toEqual({ borderTop: oldBorder });
+    expect(getCellStyle(sheet, { row: 1, column: 3 })).toEqual({ borderLeft: oldBorder });
+  });
+
+  test("keeps matching intended all borders while clearing conflicting external edges", () => {
+    const session = createWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const oldBorder = { style: "dashed" as const, color: "#abcdef" };
+    const range = { start: { row: 1, column: 1 }, end: { row: 2, column: 2 } };
+    setCellStyle(sheet, { row: 0, column: 1 }, { borderBottom: oldBorder });
+    setCellStyle(sheet, { row: 1, column: 0 }, { borderRight: oldBorder });
+    setCellStyle(sheet, { row: 3, column: 2 }, { borderTop: oldBorder });
+    setCellStyle(sheet, { row: 2, column: 3 }, { borderLeft: oldBorder });
+
+    executeWorkbookCommand(
+      session,
+      createApplyCellBordersCommand(sheet.id, range, { preset: "all", border }),
+    );
+
+    expect(getCellStyle(sheet, { row: 1, column: 1 })).toEqual({
+      borderTop: border,
+      borderRight: border,
+      borderBottom: border,
+      borderLeft: border,
+    });
+    expect(getCellStyle(sheet, { row: 1, column: 2 })).toEqual({
+      borderTop: border,
+      borderRight: border,
+      borderBottom: border,
+      borderLeft: border,
+    });
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 1, column: 0 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 3, column: 2 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 2, column: 3 })).toBeUndefined();
+  });
+
+  test("clears conflicting internal and external shared edges for inner and none presets", () => {
+    const session = createWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const oldBorder = { style: "dotted" as const, color: "#abcdef" };
+    const innerRange = { start: { row: 4, column: 4 }, end: { row: 5, column: 5 } };
+    setCellStyle(sheet, { row: 4, column: 5 }, { borderLeft: oldBorder });
+    setCellStyle(sheet, { row: 5, column: 4 }, { borderTop: oldBorder });
+
+    executeWorkbookCommand(
+      session,
+      createApplyCellBordersCommand(sheet.id, innerRange, { preset: "inner", border }),
+    );
+    expect(getCellStyle(sheet, { row: 4, column: 5 })).toEqual({ borderBottom: border });
+    expect(getCellStyle(sheet, { row: 5, column: 4 })).toEqual({ borderRight: border });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 4, column: 5 })).toEqual({ borderLeft: oldBorder });
+    expect(getCellStyle(sheet, { row: 5, column: 4 })).toEqual({ borderTop: oldBorder });
+
+    const noneRange = { start: { row: 7, column: 7 }, end: { row: 7, column: 7 } };
+    setCellStyle(
+      sheet,
+      { row: 7, column: 7 },
+      {
+        borderTop: oldBorder,
+        borderRight: oldBorder,
+        borderBottom: oldBorder,
+        borderLeft: oldBorder,
+      },
+    );
+    setCellStyle(sheet, { row: 6, column: 7 }, { borderBottom: oldBorder });
+    setCellStyle(sheet, { row: 7, column: 8 }, { borderLeft: oldBorder });
+    setCellStyle(sheet, { row: 8, column: 7 }, { borderTop: oldBorder });
+    setCellStyle(sheet, { row: 7, column: 6 }, { borderRight: oldBorder });
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellBordersCommand(sheet.id, noneRange, { preset: "none" }),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, { row: 7, column: 7 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 6, column: 7 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 7, column: 8 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 8, column: 7 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 7, column: 6 })).toBeUndefined();
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 7, column: 7 })?.borderTop).toEqual(oldBorder);
+    expect(getCellStyle(sheet, { row: 6, column: 7 })).toEqual({ borderBottom: oldBorder });
+    expect(getCellStyle(sheet, { row: 7, column: 8 })).toEqual({ borderLeft: oldBorder });
+  });
+
+  test("clears neighboring shared edges when clear formatting explicitly removes borders", () => {
+    const session = createWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const oldBorder = { style: "medium" as const, color: "#abcdef" };
+    const range = { start: { row: 1, column: 1 }, end: { row: 1, column: 1 } };
+    setCellStyle(
+      sheet,
+      { row: 1, column: 1 },
+      {
+        bold: true,
+        borderTop: oldBorder,
+        borderRight: oldBorder,
+        borderBottom: oldBorder,
+        borderLeft: oldBorder,
+      },
+    );
+    setCellStyle(sheet, { row: 0, column: 1 }, { borderBottom: oldBorder });
+    setCellStyle(sheet, { row: 1, column: 0 }, { borderRight: oldBorder });
+    setCellStyle(sheet, { row: 2, column: 1 }, { borderTop: oldBorder });
+    setCellStyle(sheet, { row: 1, column: 2 }, { borderLeft: oldBorder });
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellStyleCommand(sheet.id, range, createClearCellStylePatch()),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, { row: 1, column: 1 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 1, column: 0 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 2, column: 1 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 1, column: 2 })).toBeUndefined();
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 1, column: 1 })?.borderTop).toEqual(oldBorder);
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toEqual({ borderBottom: oldBorder });
+    expect(getCellStyle(sheet, { row: 1, column: 0 })).toEqual({ borderRight: oldBorder });
+    expect(getCellStyle(sheet, { row: 2, column: 1 })).toEqual({ borderTop: oldBorder });
+    expect(getCellStyle(sheet, { row: 1, column: 2 })).toEqual({ borderLeft: oldBorder });
   });
 });

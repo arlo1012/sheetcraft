@@ -9,6 +9,7 @@ import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.
 import type { GridPastePayload } from "../modules/sheet-grid/useGridClipboard";
 import {
   createAddSheetCommand,
+  createApplyCellBordersCommand,
   createApplyCellStyleCommand,
   createClearCellRangeCommand,
   createDeleteSheetAxisCommand,
@@ -19,7 +20,7 @@ import {
   createResizeSheetDimensionCommand,
   createSetCellValueCommand,
 } from "../modules/workbook/commands";
-import type { CellStylePatch } from "../modules/workbook/cell-style";
+import type { CellBorderAction, CellStylePatch } from "../modules/workbook/cell-style";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
@@ -143,6 +144,19 @@ function applyCellStyle(patch: CellStylePatch): void {
     session,
     createApplyCellStyleCommand(activeSheet.value.id, activeSelectionRange.value, patch),
     "Format cells",
+  );
+  clearWorkspaceStatus();
+}
+
+function applyCellBorders(action: CellBorderAction): void {
+  if (!isFormattingSupported.value) {
+    showWorkspaceStatus({ key: "format.selectionTooLarge" });
+    return;
+  }
+  executeWorkbookCommand(
+    session,
+    createApplyCellBordersCommand(activeSheet.value.id, activeSelectionRange.value, action),
+    "Format cell borders",
   );
   clearWorkspaceStatus();
 }
@@ -299,6 +313,7 @@ onBeforeUnmount(clearWorkspaceStatus);
     <SpreadsheetRibbon
       :state="activeSelectionStyle"
       :disabled="!isFormattingSupported"
+      @apply-borders="applyCellBorders"
       @apply-style="applyCellStyle"
       @undo="undoWorkbookCommand(session)"
       @redo="redoWorkbookCommand(session)"

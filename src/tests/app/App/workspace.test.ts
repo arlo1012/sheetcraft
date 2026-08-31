@@ -350,6 +350,42 @@ describe("App", () => {
     expect(wrapper.get('[aria-label="Bold"]').attributes("aria-pressed")).toBe("false");
   });
 
+  test("applies, restores, and clears range borders through the ribbon", async () => {
+    const wrapper = mountApp();
+    await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", {
+      button: 0,
+      shiftKey: true,
+    });
+
+    const borderTrigger = wrapper.get("[data-cell-border-trigger]");
+    await borderTrigger.trigger("click");
+    await new DOMWrapper(document.body).get('[data-border-preset="outer"]').trigger("click");
+
+    const firstCell = wrapper.get('[data-row="0"][data-column="0"]');
+    const secondCell = wrapper.get('[data-row="0"][data-column="1"]');
+    expect(
+      firstCell.get<HTMLElement>(".sheet-cell-layer__border--top").element.style.borderTop,
+    ).toBe("1px solid #20242c");
+    expect(
+      firstCell.get<HTMLElement>(".sheet-cell-layer__border--left").element.style.borderLeft,
+    ).toBe("1px solid #20242c");
+    expect(
+      secondCell.get<HTMLElement>(".sheet-cell-layer__border--right").element.style.borderRight,
+    ).toBe("1px solid #20242c");
+
+    await borderTrigger.trigger("keydown", { key: "z", ctrlKey: true });
+    expect(firstCell.find(".sheet-cell-layer__border--top").exists()).toBe(false);
+    expect(secondCell.find(".sheet-cell-layer__border--right").exists()).toBe(false);
+
+    await borderTrigger.trigger("keydown", { key: "z", ctrlKey: true, shiftKey: true });
+    expect(firstCell.find(".sheet-cell-layer__border--top").exists()).toBe(true);
+    expect(secondCell.find(".sheet-cell-layer__border--right").exists()).toBe(true);
+
+    await wrapper.get('[data-ribbon-action="clear-formatting"]').trigger("click");
+    expect(firstCell.find(".sheet-cell-layer__border--top").exists()).toBe(false);
+    expect(secondCell.find(".sheet-cell-layer__border--right").exists()).toBe(false);
+  });
+
   test("toggles wrapped content and its derived row height through workbook history", async () => {
     const wrapper = mountApp();
     const editor = wrapper.get("textarea.cell-editor");

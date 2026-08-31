@@ -49,7 +49,7 @@ describe("HomeCellFormatGroup layout", () => {
         .map((lane) => lane.attributes("data-cell-format-lane")),
     ).toEqual(["typography", "appearance", "styles"]);
     expect(placeholders(wrapper, "typography")).toEqual(["strikethrough"]);
-    expect(placeholders(wrapper, "appearance")).toEqual(["borders"]);
+    expect(placeholders(wrapper, "appearance")).toEqual([]);
     expect(placeholders(wrapper, "styles")).toEqual(["table-styles", "conditional-formatting"]);
     expect(
       wrapper
@@ -69,7 +69,7 @@ describe("HomeCellFormatGroup layout", () => {
     expect(
       wrapper.get('[data-cell-format-lane="appearance"] [data-cell-color-control="fill"]'),
     ).toBeTruthy();
-    expect(wrapper.get('[data-ribbon-placeholder="borders"] svg').attributes()).toMatchObject({
+    expect(wrapper.get("[data-cell-border-trigger] svg").attributes()).toMatchObject({
       width: "18",
       height: "18",
     });

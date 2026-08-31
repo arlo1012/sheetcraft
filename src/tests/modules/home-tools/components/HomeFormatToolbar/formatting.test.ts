@@ -204,6 +204,19 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper)).toEqual([{ textColor: "#123456" }, { fillColor: "#abcdef" }]);
   });
 
+  test("forwards border presets without converting them into style patches", async () => {
+    const wrapper = mountToolbar();
+    await wrapper.get("[data-cell-border-trigger]").trigger("click");
+    await new DOMWrapper(document.body)
+      .get('[data-border-preset="innerVertical"]')
+      .trigger("click");
+
+    expect(wrapper.emitted("applyBorders")).toEqual([
+      [{ preset: "innerVertical", border: { style: "thin", color: "#20242c" } }],
+    ]);
+    expect(emittedPatches(wrapper)).toEqual([]);
+  });
+
   test("shows disclosure icons only for controls with an available menu", () => {
     const wrapper = mountToolbar();
 
@@ -355,7 +368,7 @@ describe("HomeFormatToolbar", () => {
         "aria-disabled": "true",
       });
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(29);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(28);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.attributes()).toMatchObject({
         role: "button",
@@ -430,6 +443,30 @@ describe("HomeFormatToolbar", () => {
 
     expect(document.body.querySelector('[role="menu"]')).toBeNull();
     expect(document.activeElement).toBe(wrapper.get('[data-ribbon-action="wrap-text"]').element);
+  });
+
+  test("returns Tab from the border menu to the ribbon sequence", async () => {
+    const wrapper = mountToolbar();
+    const trigger = wrapper.get("[data-cell-border-trigger]");
+    await trigger.trigger("click");
+    const panel = new DOMWrapper(document.body).get("[data-cell-border-panel]");
+    await panel.trigger("keydown", { key: "Tab" });
+
+    expect(document.body.querySelector("[data-cell-border-panel]")).toBeNull();
+    expect(document.activeElement).toBe(wrapper.get('[aria-label="Fill color"]').element);
+  });
+
+  test("forwards history shortcuts from the teleported border menus", async () => {
+    const wrapper = mountToolbar();
+    await wrapper.get("[data-cell-border-trigger]").trigger("click");
+    const panel = new DOMWrapper(document.body).get("[data-cell-border-panel]");
+    await panel.trigger("keydown", { key: "z", ctrlKey: true });
+    await panel.get('[data-border-menu-row="style"]').trigger("click");
+    const submenu = new DOMWrapper(document.body).get('[data-border-submenu="style"]');
+    await submenu.trigger("keydown", { key: "z", metaKey: true, shiftKey: true });
+
+    expect(wrapper.emitted("undo")).toHaveLength(1);
+    expect(wrapper.emitted("redo")).toHaveLength(1);
   });
 
   test("cancels a drafted color with Escape and restores trigger focus", async () => {

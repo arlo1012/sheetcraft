@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import type { CellStylePatch } from "../../workbook/cell-style";
+import type { CellBorderAction, CellStylePatch } from "../../workbook/cell-style";
 import type { SelectionCellStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
+import { getWorkbookHistoryShortcut } from "../history-shortcuts";
 import HomeAlignmentGroup from "./HomeAlignmentGroup.vue";
 import HomeAutomationGroup from "./HomeAutomationGroup.vue";
 import HomeCellFormatGroup from "./HomeCellFormatGroup.vue";
@@ -20,6 +21,7 @@ defineProps<{
 
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
+  applyBorders: [action: CellBorderAction];
   undo: [];
   redo: [];
 }>();
@@ -137,27 +139,14 @@ function onViewportFocusIn(event: FocusEvent): void {
 }
 
 function onKeydown(event: KeyboardEvent): void {
-  if (!event.ctrlKey && !event.metaKey) {
+  const action = getWorkbookHistoryShortcut(event);
+  if (!action) {
     return;
   }
-  const target = event.target;
-  if (
-    target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLInputElement && target.type !== "color") ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  ) {
-    return;
-  }
-  const key = event.key.toLowerCase();
-  if (key === "z") {
-    event.preventDefault();
-    if (event.shiftKey) {
-      emit("redo");
-    } else {
-      emit("undo");
-    }
-  } else if (key === "y") {
-    event.preventDefault();
+  event.preventDefault();
+  if (action === "undo") {
+    emit("undo");
+  } else {
     emit("redo");
   }
 }
@@ -244,6 +233,9 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           :state="state"
           :disabled="disabled"
           @apply-style="emit('applyStyle', $event)"
+          @apply-borders="emit('applyBorders', $event)"
+          @undo="emit('undo')"
+          @redo="emit('redo')"
         />
         <HomeAlignmentGroup
           :state="state"

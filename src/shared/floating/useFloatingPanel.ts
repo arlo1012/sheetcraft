@@ -3,6 +3,7 @@ import {
   flip,
   offset,
   shift,
+  type MaybeReadonlyRefOrGetter,
   useFloating,
   type Placement,
   type VirtualElement,
@@ -12,7 +13,7 @@ import type { Ref } from "vue";
 export type FloatingReference = HTMLElement | VirtualElement;
 
 export type FloatingPanelOptions = {
-  placement?: Placement;
+  placement?: MaybeReadonlyRefOrGetter<Placement>;
   offset?: number;
   padding?: number;
 };

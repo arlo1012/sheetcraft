@@ -1,7 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
   CELL_STYLE_KEYS,
+  areCellStylesEqual,
+  cloneCellStyle,
   createClearCellStylePatch,
+  normalizeCellBorderAction,
   normalizeCellStyle,
   normalizeCellStylePatch,
 } from "../../../../modules/workbook/cell-style";
@@ -66,9 +69,52 @@ describe("cell style model", () => {
     });
     expect(normalizeCellStylePatch({ wrapText: false })).toEqual({ wrapText: null });
     expect(normalizeCellStyle({ wrapText: true })).toEqual({ wrapText: true });
+    expect(normalizeCellStyle({ borderTop: { style: "dashed", color: "#ABCDEF" } })).toEqual({
+      borderTop: { style: "dashed", color: "#abcdef" },
+    });
     expect(() => normalizeCellStyle({ fontSize: 7 })).toThrow(RangeError);
     expect(() => normalizeCellStyle({ fillColor: "red" })).toThrow(TypeError);
+    expect(() =>
+      normalizeCellStyle({ borderLeft: { style: "wide" as never, color: "#112233" } }),
+    ).toThrow(TypeError);
+    expect(() => normalizeCellStyle({ borderRight: { style: "thin", color: "blue" } })).toThrow(
+      TypeError,
+    );
     expect(() => normalizeCellStyle({ verticalAlign: "baseline" as never })).toThrow(TypeError);
     expect(() => normalizeCellStyle({ wrapText: "yes" as never })).toThrow(TypeError);
+  });
+
+  test("deep clones and structurally compares borders", () => {
+    const original = {
+      bold: true as const,
+      borderTop: { style: "double" as const, color: "#112233" },
+    };
+    const clone = cloneCellStyle(original);
+
+    expect(clone).toEqual(original);
+    expect(clone?.borderTop).not.toBe(original.borderTop);
+    expect(areCellStylesEqual(original, clone)).toBe(true);
+    if (clone?.borderTop) {
+      clone.borderTop.color = "#abcdef";
+    }
+    expect(original.borderTop.color).toBe("#112233");
+    expect(areCellStylesEqual(original, clone)).toBe(false);
+  });
+
+  test("normalizes border actions and requires a border except for none", () => {
+    expect(
+      normalizeCellBorderAction({
+        preset: "outer",
+        border: { style: "medium", color: "#ABCDEF" },
+      }),
+    ).toEqual({ preset: "outer", border: { style: "medium", color: "#abcdef" } });
+    expect(normalizeCellBorderAction({ preset: "none" })).toEqual({ preset: "none" });
+    expect(() => normalizeCellBorderAction({ preset: "inner" } as never)).toThrow(TypeError);
+    expect(
+      normalizeCellBorderAction({
+        preset: "none",
+        border: { style: "thin", color: "#112233" },
+      }),
+    ).toEqual({ preset: "none" });
   });
 });

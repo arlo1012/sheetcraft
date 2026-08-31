@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { Grid2X2, Sparkles, TableProperties } from "lucide-vue-next";
-import type { CellStylePatch } from "../../workbook/cell-style";
+import { Sparkles, TableProperties } from "lucide-vue-next";
+import type { CellBorderAction, CellStylePatch } from "../../workbook/cell-style";
 import type { SelectionCellStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import CellColorControl from "./CellColorControl.vue";
+import CellBorderMenu from "./CellBorderMenu.vue";
 import FontFormatControls from "./FontFormatControls.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
 import TextFormatControls from "./TextFormatControls.vue";
@@ -15,6 +16,9 @@ defineProps<{
 
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
+  applyBorders: [action: CellBorderAction];
+  undo: [];
+  redo: [];
 }>();
 
 const { t } = useAppI18n();
@@ -62,15 +66,12 @@ const { t } = useAppI18n();
       role="group"
       :aria-label="t('format.appearanceTools')"
     >
-      <RibbonIconAction
-        class="home-cell-format-group__appearance-action"
-        :label="t('app.unavailableFeature', { feature: t('ribbon.borders') })"
-        disabled
-        disclosure
-        data-ribbon-placeholder="borders"
-      >
-        <Grid2X2 :size="18" :stroke-width="1.8" aria-hidden="true" />
-      </RibbonIconAction>
+      <CellBorderMenu
+        :disabled="disabled"
+        @apply-borders="emit('applyBorders', $event)"
+        @undo="emit('undo')"
+        @redo="emit('redo')"
+      />
       <CellColorControl
         kind="fill"
         :state="state"
@@ -165,16 +166,6 @@ const { t } = useAppI18n();
     min-width: max-content;
     padding-left: 4px;
     border-left: 1px solid var(--td-border-level-1-color);
-  }
-
-  &__appearance-action {
-    width: 100%;
-
-    &::after {
-      flex: 0 0 12px;
-      width: 12px;
-      content: "";
-    }
   }
 
   &__style-action {
