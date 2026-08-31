@@ -5,6 +5,7 @@ import type { Rect } from "../geometry";
 const props = defineProps<{
   activeRect: Rect;
   rangeRect: Rect;
+  rangeOutlineRect: Rect;
   addressLabel: string;
   editing: boolean;
   clipboardRect?: Rect | null;
@@ -20,19 +21,31 @@ function getRectStyle(rect: Rect): CSSProperties {
   };
 }
 
+function getOutlineStyle(rect: Rect): CSSProperties {
+  return { ...getRectStyle(rect), borderWidth: "1px" };
+}
+
 const rangeStyle = computed<CSSProperties>(() => getRectStyle(props.rangeRect));
-const activeStyle = computed<CSSProperties>(() => getRectStyle(props.activeRect));
+const rangeOutlineStyle = computed<CSSProperties>(() => getOutlineStyle(props.rangeOutlineRect));
+const activeStyle = computed<CSSProperties>(() => getOutlineStyle(props.activeRect));
 const clipboardStyle = computed<CSSProperties | undefined>(() =>
-  props.clipboardRect ? getRectStyle(props.clipboardRect) : undefined,
+  props.clipboardRect ? { ...getRectStyle(props.clipboardRect), borderWidth: "2px" } : undefined,
 );
 </script>
 
 <template>
   <div
-    class="sheet-selection-overlay__range"
+    class="sheet-selection-overlay__range-fill"
     :class="{ 'is-editing': editing }"
     :style="rangeStyle"
     data-selection-range
+    aria-hidden="true"
+  />
+  <div
+    class="sheet-selection-overlay__range-outline"
+    :class="{ 'is-editing': editing }"
+    :style="rangeOutlineStyle"
+    data-selection-outline
     aria-hidden="true"
   />
   <div
@@ -54,27 +67,37 @@ const clipboardStyle = computed<CSSProperties | undefined>(() =>
 
 <style scoped lang="scss">
 .sheet-selection-overlay {
-  &__range,
+  &__range-fill,
+  &__range-outline,
   &__active,
   &__clipboard {
     position: absolute;
     pointer-events: none;
   }
 
-  &__range {
-    z-index: 2;
+  &__range-fill {
+    z-index: 1;
     background: color-mix(in srgb, var(--td-brand-color) 8%, transparent);
-    border: 2px solid var(--td-brand-color);
 
     &.is-editing {
       background: transparent;
+    }
+  }
+
+  &__range-outline {
+    z-index: 4;
+    border-style: solid;
+    border-color: var(--td-brand-color);
+
+    &.is-editing {
       border-color: transparent;
     }
   }
 
   &__active {
-    z-index: 3;
-    border: 2px solid var(--td-brand-color);
+    z-index: 4;
+    border-style: solid;
+    border-color: var(--td-brand-color);
 
     &.is-editing {
       border-color: transparent;
@@ -82,12 +105,9 @@ const clipboardStyle = computed<CSSProperties | undefined>(() =>
   }
 
   &__clipboard {
-    z-index: 4;
-    border: 1px dashed var(--td-brand-color);
-
-    &.is-cut {
-      border-width: 2px;
-    }
+    z-index: 6;
+    border-style: dashed;
+    border-color: var(--td-brand-color);
   }
 }
 </style>

@@ -20,6 +20,10 @@ describe("SheetGrid range selection", () => {
     expect(wrapper.get('[data-row="3"][data-column="3"]').attributes("aria-selected")).toBe(
       "false",
     );
+    expect((wrapper.get("[data-selection-outline]").element as HTMLElement).style.borderWidth).toBe(
+      "1px",
+    );
+    expect(wrapper.find(".sheet-selection-overlay__range-fill").exists()).toBe(true);
     expect(session.history.undoStack).toHaveLength(0);
   });
 
@@ -40,6 +44,36 @@ describe("SheetGrid range selection", () => {
     expect(selectionStyle(wrapper)).toContain("width: 96px");
     expect(selectionStyle(wrapper)).toContain("height: 24px");
     expect(session.history.undoStack).toHaveLength(0);
+  });
+
+  test("aligns non-origin selection outlines with the preceding gridline pixels", async () => {
+    const { wrapper } = mountSheetGrid();
+    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await wrapper
+      .get('[data-row="2"][data-column="2"]')
+      .trigger("mousedown", { button: 0, shiftKey: true });
+
+    const fillStyle = (wrapper.get("[data-selection-range]").element as HTMLElement).style;
+    const outlineStyle = (wrapper.get("[data-selection-outline]").element as HTMLElement).style;
+    const activeStyle = (wrapper.get("[data-active-cell]").element as HTMLElement).style;
+    expect({
+      left: fillStyle.left,
+      top: fillStyle.top,
+      width: fillStyle.width,
+      height: fillStyle.height,
+    }).toEqual({ left: "96px", top: "24px", width: "192px", height: "48px" });
+    expect({
+      left: outlineStyle.left,
+      top: outlineStyle.top,
+      width: outlineStyle.width,
+      height: outlineStyle.height,
+    }).toEqual({ left: "95px", top: "23px", width: "193px", height: "49px" });
+    expect({
+      left: activeStyle.left,
+      top: activeStyle.top,
+      width: activeStyle.width,
+      height: activeStyle.height,
+    }).toEqual({ left: "95px", top: "23px", width: "97px", height: "25px" });
   });
 
   test("cycles Tab and Enter inside a retained range", async () => {

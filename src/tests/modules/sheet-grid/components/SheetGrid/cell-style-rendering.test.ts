@@ -1,7 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { setCellStyle, setCellValue } from "../../../../../modules/workbook/workbook";
-import { getCellBorderEdges } from "../../../../../modules/sheet-grid/cell-presentation";
 import { mountSheetGrid } from "./fixture";
 
 describe("SheetGrid cell style rendering", () => {
@@ -152,48 +151,7 @@ describe("SheetGrid cell style rendering", () => {
     expect(style.paddingRight).toBe("");
   });
 
-  test("maps border styles and resolves shared edge conflicts consistently", () => {
-    expect(
-      getCellBorderEdges(
-        {
-          borderTop: { style: "dotted", color: "#445566" },
-          borderRight: { style: "thin", color: "#112233" },
-          borderBottom: { style: "dashed", color: "#778899" },
-          borderLeft: { style: "double", color: "#aabbcc" },
-        },
-        {
-          top: { borderBottom: { style: "medium", color: "#010203" } },
-          right: { borderLeft: { style: "double", color: "#040506" } },
-          bottom: { borderTop: { style: "medium", color: "#070809" } },
-          left: { borderRight: { style: "thin", color: "#0a0b0c" } },
-        },
-        true,
-        true,
-      ),
-    ).toEqual({
-      top: "2px solid #010203",
-      right: "1px solid #112233",
-      bottom: "1px dashed #778899",
-      left: "1px solid #0a0b0c",
-    });
-
-    expect(
-      getCellBorderEdges(
-        undefined,
-        {
-          right: { borderLeft: { style: "dotted", color: "#102030" } },
-          bottom: { borderTop: { style: "double", color: "#405060" } },
-        },
-        false,
-        false,
-      ),
-    ).toEqual({
-      right: "1px dotted #102030",
-      bottom: "3px double #405060",
-    });
-  });
-
-  test("renders explicit borders as shared layout-independent cell overlays", async () => {
+  test("renders explicit borders on a shared sheet layer", async () => {
     const { sheet, wrapper } = mountSheetGrid();
     setCellStyle(
       sheet,
@@ -221,27 +179,30 @@ describe("SheetGrid cell style rendering", () => {
     );
     await nextTick();
 
-    const cell = wrapper.get('[data-row="0"][data-column="0"]');
-    const topBorder = cell.get<HTMLElement>(".sheet-cell-layer__border--top").element.style;
-    const rightBorderElement = cell.get<HTMLElement>(".sheet-cell-layer__border--right").element;
-    const bottomBorderElement = cell.get<HTMLElement>(".sheet-cell-layer__border--bottom").element;
-    const rightBorder = rightBorderElement.style;
-    const bottomBorder = bottomBorderElement.style;
-    const leftBorder = cell.get<HTMLElement>(".sheet-cell-layer__border--left").element.style;
+    const getSegmentStyle = (orientation: string, edge: number) =>
+      wrapper.get<HTMLElement>(
+        `[data-border-orientation="${orientation}"][data-border-edge="${edge}"]`,
+      ).element.style;
+    const topBorder = getSegmentStyle("horizontal", 0);
+    const rightBorder = getSegmentStyle("vertical", 1);
+    const bottomBorder = getSegmentStyle("horizontal", 1);
+    const leftBorder = getSegmentStyle("vertical", 0);
     expect(topBorder.borderTop).toBe("2px solid #112233");
-    expect(rightBorder.borderRight).toBe("2px solid #445566");
-    expect(bottomBorder.borderBottom).toBe("3px double #778899");
+    expect(topBorder.width).toBe("96px");
+    expect(rightBorder.borderLeft).toBe("2px solid #445566");
+    expect(rightBorder.left).toBe("94px");
+    expect(rightBorder.height).toBe("24px");
+    expect(bottomBorder.borderTop).toBe("3px double #778899");
+    expect(bottomBorder.top).toBe("21px");
     expect(leftBorder.borderLeft).toBe("3px double #aabbcc");
-    expect(rightBorder.right).toBe("-1px");
-    expect(bottomBorder.bottom).toBe("-1px");
-    expect((cell.element as HTMLElement).style.height).toBe("100%");
-    expect((cell.element as HTMLElement).style.borderRight).toBe("");
-
-    const rightCell = wrapper.get('[data-row="0"][data-column="1"]');
-    expect(rightCell.find(".sheet-cell-layer__border--left").exists()).toBe(false);
+    expect(
+      wrapper.get<HTMLElement>('[data-border-row-edge="1"][data-border-column-edge="1"]').element
+        .style.backgroundColor,
+    ).toBe("#778899");
+    expect(wrapper.find(".sheet-cell-layer__border").exists()).toBe(false);
   });
 
-  test("keeps trailing borders visible on the active multiline cell", async () => {
+  test("keeps borders independent from active multiline content clipping", async () => {
     const { sheet, wrapper } = mountSheetGrid();
     setCellValue(sheet, { row: 0, column: 0 }, "first\nsecond");
     setCellStyle(
@@ -257,12 +218,14 @@ describe("SheetGrid cell style rendering", () => {
     const cell = wrapper.get<HTMLElement>('[data-row="0"][data-column="0"]');
     expect(cell.classes()).toContain("is-active");
     expect(cell.classes()).toContain("is-multiline");
-    expect(cell.get<HTMLElement>(".sheet-cell-layer__border--right").element.style.right).toBe(
-      "-1px",
-    );
-    expect(cell.get<HTMLElement>(".sheet-cell-layer__border--bottom").element.style.bottom).toBe(
-      "-1px",
-    );
+    expect(
+      wrapper.get<HTMLElement>('[data-border-orientation="vertical"][data-border-edge="1"]').element
+        .style.borderLeft,
+    ).toBe("1px solid #112233");
+    expect(
+      wrapper.get<HTMLElement>('[data-border-orientation="horizontal"][data-border-edge="1"]')
+        .element.style.borderTop,
+    ).toBe("1px solid #445566");
   });
 
   test("keeps top and left borders at the virtual range boundary", async () => {
@@ -300,11 +263,16 @@ describe("SheetGrid cell style rendering", () => {
     expect(firstVirtualRow).toBeGreaterThan(0);
     expect(firstVirtualColumn).toBeGreaterThan(0);
 
-    const boundaryCell = wrapper.get(
-      `[data-row="${firstVirtualRow}"][data-column="${firstVirtualColumn}"]`,
-    );
-    expect(boundaryCell.find(".sheet-cell-layer__border--top").exists()).toBe(true);
-    expect(boundaryCell.find(".sheet-cell-layer__border--left").exists()).toBe(true);
+    expect(
+      wrapper
+        .find(`[data-border-orientation="horizontal"][data-border-edge="${firstVirtualRow}"]`)
+        .exists(),
+    ).toBe(true);
+    expect(
+      wrapper
+        .find(`[data-border-orientation="vertical"][data-border-edge="${firstVirtualColumn}"]`)
+        .exists(),
+    ).toBe(true);
   });
 
   test("does not let an off-range active cell suppress an unrelated boundary edge", async () => {
@@ -329,12 +297,13 @@ describe("SheetGrid cell style rendering", () => {
     expect(wrapper.find('[data-row="0"][data-column="1"]').exists()).toBe(false);
     expect(wrapper.find('[data-row="1"][data-column="0"]').exists()).toBe(false);
 
-    const boundaryCell = wrapper.get('[data-row="1"][data-column="1"]');
     expect(
-      boundaryCell.get<HTMLElement>(".sheet-cell-layer__border--top").element.style.borderTop,
+      wrapper.get<HTMLElement>('[data-border-orientation="horizontal"][data-border-edge="1"]')
+        .element.style.borderTop,
     ).toBe("2px solid #112233");
     expect(
-      boundaryCell.get<HTMLElement>(".sheet-cell-layer__border--left").element.style.borderLeft,
+      wrapper.get<HTMLElement>('[data-border-orientation="vertical"][data-border-edge="1"]').element
+        .style.borderLeft,
     ).toBe("3px double #445566");
   });
 });

@@ -361,29 +361,25 @@ describe("App", () => {
     await borderTrigger.trigger("click");
     await new DOMWrapper(document.body).get('[data-border-preset="outer"]').trigger("click");
 
-    const firstCell = wrapper.get('[data-row="0"][data-column="0"]');
-    const secondCell = wrapper.get('[data-row="0"][data-column="1"]');
-    expect(
-      firstCell.get<HTMLElement>(".sheet-cell-layer__border--top").element.style.borderTop,
-    ).toBe("1px solid #20242c");
-    expect(
-      firstCell.get<HTMLElement>(".sheet-cell-layer__border--left").element.style.borderLeft,
-    ).toBe("1px solid #20242c");
-    expect(
-      secondCell.get<HTMLElement>(".sheet-cell-layer__border--right").element.style.borderRight,
-    ).toBe("1px solid #20242c");
+    const findBorder = (orientation: "horizontal" | "vertical", edge: number) =>
+      wrapper.find<HTMLElement>(
+        `[data-border-orientation="${orientation}"][data-border-edge="${edge}"]`,
+      );
+    expect(findBorder("horizontal", 0).element.style.borderTop).toBe("1px solid #20242c");
+    expect(findBorder("vertical", 0).element.style.borderLeft).toBe("1px solid #20242c");
+    expect(findBorder("vertical", 2).element.style.borderLeft).toBe("1px solid #20242c");
 
     await borderTrigger.trigger("keydown", { key: "z", ctrlKey: true });
-    expect(firstCell.find(".sheet-cell-layer__border--top").exists()).toBe(false);
-    expect(secondCell.find(".sheet-cell-layer__border--right").exists()).toBe(false);
+    expect(findBorder("horizontal", 0).exists()).toBe(false);
+    expect(findBorder("vertical", 2).exists()).toBe(false);
 
     await borderTrigger.trigger("keydown", { key: "z", ctrlKey: true, shiftKey: true });
-    expect(firstCell.find(".sheet-cell-layer__border--top").exists()).toBe(true);
-    expect(secondCell.find(".sheet-cell-layer__border--right").exists()).toBe(true);
+    expect(findBorder("horizontal", 0).exists()).toBe(true);
+    expect(findBorder("vertical", 2).exists()).toBe(true);
 
     await wrapper.get('[data-ribbon-action="clear-formatting"]').trigger("click");
-    expect(firstCell.find(".sheet-cell-layer__border--top").exists()).toBe(false);
-    expect(secondCell.find(".sheet-cell-layer__border--right").exists()).toBe(false);
+    expect(findBorder("horizontal", 0).exists()).toBe(false);
+    expect(findBorder("vertical", 2).exists()).toBe(false);
   });
 
   test("toggles wrapped content and its derived row height through workbook history", async () => {

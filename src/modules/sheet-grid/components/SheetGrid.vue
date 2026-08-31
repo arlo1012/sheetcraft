@@ -67,6 +67,7 @@ import {
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
+import SheetBorderLayer from "./SheetBorderLayer.vue";
 import SheetColumnHeaders from "./SheetColumnHeaders.vue";
 import SheetRowHeaders from "./SheetRowHeaders.vue";
 import SheetSelectionOverlay from "./SheetSelectionOverlay.vue";
@@ -282,11 +283,11 @@ const selectedRange = computed(() =>
 const activeCellRect = computed(() =>
   geometry.value.getCellViewportRect(activeCell.value, scrollPosition),
 );
-function getRangeViewportRect(range: CellRange) {
+function getRangeViewportRect(range: CellRange, alignToGridlines = false) {
   const startRect = geometry.value.getCellViewportRect(range.start, scrollPosition);
   const endRect = geometry.value.getCellViewportRect(range.end, scrollPosition);
-  const left = Math.max(0, startRect.x);
-  const top = Math.max(0, startRect.y);
+  const left = Math.max(0, startRect.x - (alignToGridlines && range.start.column > 0 ? 1 : 0));
+  const top = Math.max(0, startRect.y - (alignToGridlines && range.start.row > 0 ? 1 : 0));
   const right = Math.min(viewportSize.width, endRect.x + endRect.width);
   const bottom = Math.min(viewportSize.height, endRect.y + endRect.height);
   return {
@@ -297,6 +298,10 @@ function getRangeViewportRect(range: CellRange) {
   };
 }
 const selectedRangeRect = computed(() => getRangeViewportRect(selectedRange.value));
+const selectedRangeOutlineRect = computed(() => getRangeViewportRect(selectedRange.value, true));
+const activeCellOutlineRect = computed(() =>
+  getRangeViewportRect({ start: activeCell.value, end: activeCell.value }, true),
+);
 const activeCellLabel = computed(() => getCellAddressLabel(activeCell.value));
 const activeCellDisplayValue = computed(() =>
   formatCellValueForDisplay(getCellValue(props.sheet, activeCell.value)),
@@ -345,7 +350,7 @@ const { clipboardMode, clipboardRange, clearPendingClipboard, onCopy, onCut, onP
     },
   });
 const clipboardRangeRect = computed(() =>
-  clipboardRange.value ? getRangeViewportRect(clipboardRange.value) : null,
+  clipboardRange.value ? getRangeViewportRect(clipboardRange.value, true) : null,
 );
 
 function applyGridExtent(nextExtent: GridExtent): void {
@@ -680,12 +685,21 @@ function onDimensionResizeBlur(): void {
 }
 
 function onGridKeydown(event: KeyboardEvent): void {
-  if (!dimensionResize.value || event.key !== "Escape") {
+  if (event.key !== "Escape") {
     return;
   }
-  event.preventDefault();
-  event.stopPropagation();
-  stopDimensionResize();
+  if (dimensionResize.value) {
+    event.preventDefault();
+    event.stopPropagation();
+    stopDimensionResize();
+    return;
+  }
+  if (!isEditing.value && clipboardRange.value) {
+    event.preventDefault();
+    event.stopPropagation();
+    clearPendingClipboard();
+    clipboardFeedbackKey.value = undefined;
+  }
 }
 
 function updateDragSelectionAddress(): void {
@@ -1353,12 +1367,19 @@ defineExpose({ navigateToCell });
             </template>
           </SheetCellLayer>
           <SheetSelectionOverlay
-            :active-rect="activeCellRect"
+            :active-rect="activeCellOutlineRect"
             :range-rect="selectedRangeRect"
+            :range-outline-rect="selectedRangeOutlineRect"
             :address-label="activeCellLabel"
             :editing="isEditing"
             :clipboard-rect="clipboardRangeRect"
             :clipboard-mode="clipboardMode"
+          />
+          <SheetBorderLayer
+            :sheet="sheet"
+            :geometry="geometry"
+            :visible-range="visibleRange"
+            :scroll-position="scrollPosition"
           />
         </div>
       </div>

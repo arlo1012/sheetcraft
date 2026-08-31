@@ -9,6 +9,44 @@ import { createTestClipboardEvent } from "./clipboard-fixture";
 import { mountSheetGrid } from "./fixture";
 
 describe("SheetGrid clipboard", () => {
+  test("aligns the copy outline to gridlines and cancels it with Escape", async () => {
+    const { session, wrapper } = mountSheetGrid();
+    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await wrapper
+      .get('[data-row="2"][data-column="2"]')
+      .trigger("mousedown", { button: 0, shiftKey: true });
+
+    const copied = createTestClipboardEvent("copy");
+    wrapper.get("textarea.cell-editor").element.dispatchEvent(copied.event);
+    await wrapper.vm.$nextTick();
+
+    const clipboardStyle = (wrapper.get("[data-clipboard-range]").element as HTMLElement).style;
+    expect({
+      left: clipboardStyle.left,
+      top: clipboardStyle.top,
+      width: clipboardStyle.width,
+      height: clipboardStyle.height,
+      borderWidth: clipboardStyle.borderWidth,
+    }).toEqual({
+      left: "95px",
+      top: "23px",
+      width: "193px",
+      height: "49px",
+      borderWidth: "2px",
+    });
+
+    const escape = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    wrapper.get("textarea.cell-editor").element.dispatchEvent(escape);
+    await wrapper.vm.$nextTick();
+    expect(escape.defaultPrevented).toBe(true);
+    expect(wrapper.find("[data-clipboard-range]").exists()).toBe(false);
+    expect(session.history.undoStack).toHaveLength(0);
+  });
+
   test("copies TSV and pastes the exact local value matrix as one history entry", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
     setCellValue(sheet, { row: 0, column: 0 }, "0012");

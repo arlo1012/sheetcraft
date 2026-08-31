@@ -2,11 +2,7 @@
 import { computed, type CSSProperties } from "vue";
 import { formatCellValueForDisplay } from "../../workbook/input";
 import { getCellStyle, getCellValue, type CellAddress, type Sheet } from "../../workbook/workbook";
-import {
-  getCellBorderEdges,
-  getCellContentStyle,
-  type CellBorderEdges,
-} from "../cell-presentation";
+import { getCellContentStyle } from "../cell-presentation";
 import type { Point, SheetGeometry, VisibleCellRange } from "../geometry";
 import { isCellSelected, type CellSelection } from "../selection";
 
@@ -17,7 +13,6 @@ type VisibleCell = {
   multiline: boolean;
   wrapped: boolean;
   style: CSSProperties;
-  borders: CellBorderEdges;
 };
 
 type VisibleRow = {
@@ -26,8 +21,6 @@ type VisibleRow = {
   style: CSSProperties;
   cells: VisibleCell[];
 };
-
-const TRAILING_GRIDLINE_OFFSET = "-1px";
 
 const props = defineProps<{
   sheet: Sheet;
@@ -54,7 +47,6 @@ const visibleRows = computed<VisibleRow[]>(() => {
 
   const orderedRowIndexes = [...rowIndexes].sort((left, right) => left - right);
   const columnIndexesByRow = new Map<number, number[]>();
-  const renderedCellKeys = new Set<string>();
 
   for (const row of orderedRowIndexes) {
     const columnIndexes = new Set<number>();
@@ -72,9 +64,6 @@ const visibleRows = computed<VisibleRow[]>(() => {
     }
     const orderedColumnIndexes = [...columnIndexes].sort((left, right) => left - right);
     columnIndexesByRow.set(row, orderedColumnIndexes);
-    for (const column of orderedColumnIndexes) {
-      renderedCellKeys.add(`${row}:${column}`);
-    }
   }
 
   for (const row of orderedRowIndexes) {
@@ -97,23 +86,6 @@ const visibleRows = computed<VisibleRow[]>(() => {
           height: "100%",
           ...getCellContentStyle(cellStyle, preservesLineBreaks),
         },
-        borders: getCellBorderEdges(
-          cellStyle,
-          {
-            top: row > 0 ? getCellStyle(props.sheet, { row: row - 1, column }) : undefined,
-            right:
-              column + 1 < props.geometry.columnCount
-                ? getCellStyle(props.sheet, { row, column: column + 1 })
-                : undefined,
-            bottom:
-              row + 1 < props.geometry.rowCount
-                ? getCellStyle(props.sheet, { row: row + 1, column })
-                : undefined,
-            left: column > 0 ? getCellStyle(props.sheet, { row, column: column - 1 }) : undefined,
-          },
-          !renderedCellKeys.has(`${row - 1}:${column}`),
-          !renderedCellKeys.has(`${row}:${column - 1}`),
-        ),
       });
     }
 
@@ -168,30 +140,6 @@ const visibleRows = computed<VisibleRow[]>(() => {
         @dblclick.left.prevent="emit('cellDoubleClick', cell.address, $event)"
       >
         <span v-if="cell.text" class="sheet-cell-layer__value">{{ cell.text }}</span>
-        <span
-          v-if="cell.borders.top"
-          class="sheet-cell-layer__border sheet-cell-layer__border--top"
-          :style="{ borderTop: cell.borders.top }"
-          aria-hidden="true"
-        />
-        <span
-          v-if="cell.borders.right"
-          class="sheet-cell-layer__border sheet-cell-layer__border--right"
-          :style="{ borderRight: cell.borders.right, right: TRAILING_GRIDLINE_OFFSET }"
-          aria-hidden="true"
-        />
-        <span
-          v-if="cell.borders.bottom"
-          class="sheet-cell-layer__border sheet-cell-layer__border--bottom"
-          :style="{ borderBottom: cell.borders.bottom, bottom: TRAILING_GRIDLINE_OFFSET }"
-          aria-hidden="true"
-        />
-        <span
-          v-if="cell.borders.left"
-          class="sheet-cell-layer__border sheet-cell-layer__border--left"
-          :style="{ borderLeft: cell.borders.left }"
-          aria-hidden="true"
-        />
         <slot
           v-if="cell.address.row === activeCell.row && cell.address.column === activeCell.column"
           name="active-cell"
@@ -217,9 +165,7 @@ const visibleRows = computed<VisibleRow[]>(() => {
     top: 0;
     display: flex;
     align-items: center;
-    // Trailing border overlays sit on the gridline, one pixel beyond the content clip.
-    overflow: clip;
-    overflow-clip-margin: 1px;
+    overflow: hidden;
     padding: 0 5px;
     background: var(--td-bg-color-container);
     border-right: 1px solid var(--td-border-level-1-color);
@@ -235,39 +181,13 @@ const visibleRows = computed<VisibleRow[]>(() => {
     }
 
     &.is-multiline.is-active:not(.is-editing) {
-      overflow: clip;
+      overflow: hidden;
     }
   }
 
   &__value {
     overflow: hidden;
     text-overflow: clip;
-  }
-
-  &__border {
-    position: absolute;
-    z-index: 1;
-    pointer-events: none;
-
-    &--top,
-    &--bottom {
-      right: 0;
-      left: 0;
-    }
-
-    &--left,
-    &--right {
-      top: 0;
-      bottom: 0;
-    }
-
-    &--top {
-      top: 0;
-    }
-
-    &--left {
-      left: 0;
-    }
   }
 
   &__cell.is-multiline &__value {
