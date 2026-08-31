@@ -32,6 +32,8 @@ const emit = defineEmits<{
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 const measuredWidth = ref(0);
 const measuredHeight = ref(0);
+const EDITOR_FRAME_BORDER_SIZE = 4;
+const EDITOR_TRAILING_SAFETY_SPACE = 6;
 let measurementSequence = 0;
 
 const minimumFrameSize = computed(() => ({
@@ -74,11 +76,10 @@ async function measureEditor(): Promise<void> {
     return;
   }
 
-  const frameBorderSize = 4;
   const contentWidth = props.wrapText
     ? minimumFrameSize.value.width
-    : input.scrollWidth + frameBorderSize;
-  const contentHeight = input.scrollHeight + frameBorderSize;
+    : input.scrollWidth + EDITOR_FRAME_BORDER_SIZE + EDITOR_TRAILING_SAFETY_SPACE;
+  const contentHeight = input.scrollHeight + EDITOR_FRAME_BORDER_SIZE;
   measuredWidth.value = Math.min(
     maximumFrameSize.value.width,
     Math.max(minimumFrameSize.value.width, contentWidth),

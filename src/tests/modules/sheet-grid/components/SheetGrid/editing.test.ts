@@ -173,6 +173,7 @@ describe("cell editor", () => {
     await editor.setValue("first line\nsecond line with more content");
     await nextTick();
 
+    expect(Number.parseFloat(frame.element.style.width)).toBe(250);
     expect(Number.parseFloat(frame.element.style.width)).toBeGreaterThan(initialWidth);
     expect(Number.parseFloat(frame.element.style.height)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
     expect(Number.parseFloat(firstRow.style.height)).toBe(DEFAULT_ROW_HEIGHT);
