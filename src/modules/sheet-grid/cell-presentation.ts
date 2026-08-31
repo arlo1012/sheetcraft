@@ -29,26 +29,37 @@ function getTypographyStyle(style: Readonly<CellStyle> | undefined): CSSProperti
   };
 }
 
+function getSingleLineEdgeStyle(
+  style: Readonly<CellStyle> | undefined,
+  multiline: boolean,
+): CSSProperties {
+  if (multiline || style?.horizontalAlign === "center") {
+    return {};
+  }
+  return style?.horizontalAlign === "right" ? { paddingLeft: "0px" } : { paddingRight: "0px" };
+}
+
 export function getCellContentStyle(
   style: Readonly<CellStyle> | undefined,
   preserveLineBreaks = false,
 ): CSSProperties {
-  const multilineStyle: CSSProperties =
-    style?.wrapText || preserveLineBreaks
-      ? {
-          whiteSpace: style?.wrapText ? "pre-wrap" : "pre",
-          ...(style?.wrapText ? { overflowWrap: "anywhere" } : {}),
-          wordBreak: "normal",
-          lineHeight: String(WRAPPED_CELL_LINE_HEIGHT),
-          paddingTop: `${WRAPPED_CELL_VERTICAL_PADDING / 2}px`,
-          paddingBottom: `${WRAPPED_CELL_VERTICAL_PADDING / 2}px`,
-          ...(style?.horizontalAlign ? { textAlign: style.horizontalAlign } : {}),
-        }
-      : {};
+  const multiline = Boolean(style?.wrapText) || preserveLineBreaks;
+  const multilineStyle: CSSProperties = multiline
+    ? {
+        whiteSpace: style?.wrapText ? "pre-wrap" : "pre",
+        ...(style?.wrapText ? { overflowWrap: "anywhere" } : {}),
+        wordBreak: "normal",
+        lineHeight: String(WRAPPED_CELL_LINE_HEIGHT),
+        paddingTop: `${WRAPPED_CELL_VERTICAL_PADDING / 2}px`,
+        paddingBottom: `${WRAPPED_CELL_VERTICAL_PADDING / 2}px`,
+        ...(style?.horizontalAlign ? { textAlign: style.horizontalAlign } : {}),
+      }
+    : {};
 
   return {
     ...getTypographyStyle(style),
     ...multilineStyle,
+    ...getSingleLineEdgeStyle(style, multiline),
     ...(style?.fillColor ? { backgroundColor: style.fillColor } : {}),
     ...(style?.horizontalAlign
       ? { justifyContent: ALIGNMENT_JUSTIFICATION[style.horizontalAlign] }

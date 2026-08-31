@@ -129,4 +129,25 @@ describe("SheetGrid cell style rendering", () => {
       Number.parseFloat((cell.element.parentElement as HTMLElement).style.height),
     ).toBeGreaterThan(24);
   });
+
+  test("uses the full trailing edge for single-line overflow", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    setCellValue(sheet, { row: 0, column: 0 }, "A long single-line value");
+    await nextTick();
+
+    const cell = wrapper.get('[data-row="0"][data-column="0"]');
+    const style = (cell.element as HTMLElement).style;
+    expect(style.paddingRight).toBe("0px");
+    expect(style.paddingLeft).toBe("");
+
+    setCellStyle(sheet, { row: 0, column: 0 }, { horizontalAlign: "right" });
+    await nextTick();
+    expect(style.paddingLeft).toBe("0px");
+    expect(style.paddingRight).toBe("");
+
+    setCellStyle(sheet, { row: 0, column: 0 }, { wrapText: true });
+    await nextTick();
+    expect(style.paddingLeft).toBe("");
+    expect(style.paddingRight).toBe("");
+  });
 });
