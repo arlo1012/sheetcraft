@@ -241,6 +241,30 @@ describe("SheetGrid cell style rendering", () => {
     expect(rightCell.find(".sheet-cell-layer__border--left").exists()).toBe(false);
   });
 
+  test("keeps trailing borders visible on the active multiline cell", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    setCellValue(sheet, { row: 0, column: 0 }, "first\nsecond");
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        borderRight: { style: "thin", color: "#112233" },
+        borderBottom: { style: "thin", color: "#445566" },
+      },
+    );
+    await nextTick();
+
+    const cell = wrapper.get<HTMLElement>('[data-row="0"][data-column="0"]');
+    expect(cell.classes()).toContain("is-active");
+    expect(cell.classes()).toContain("is-multiline");
+    expect(cell.get<HTMLElement>(".sheet-cell-layer__border--right").element.style.right).toBe(
+      "-1px",
+    );
+    expect(cell.get<HTMLElement>(".sheet-cell-layer__border--bottom").element.style.bottom).toBe(
+      "-1px",
+    );
+  });
+
   test("keeps top and left borders at the virtual range boundary", async () => {
     const { sheet, wrapper } = mountSheetGrid();
     for (let row = 1; row < 16; row += 1) {

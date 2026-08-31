@@ -817,8 +817,10 @@ onBeforeUnmount(() => {
       &:hover,
       &:focus-visible {
         background: var(--td-bg-color-container-hover);
-        border-color: var(--td-brand-color);
         outline: none;
+      }
+      &:focus-visible {
+        box-shadow: 0 0 0 2px var(--td-brand-color-focus);
       }
     }
   }
@@ -851,7 +853,14 @@ onBeforeUnmount(() => {
       background-image:
         linear-gradient(currentcolor 1px, transparent 1px),
         linear-gradient(90deg, currentcolor 1px, transparent 1px);
-      background-size: 6px 6px;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size:
+        100% 1px,
+        1px 100%;
+    }
+    &--all {
+      background-image: none;
     }
     &--outer::after {
       border: 1px solid currentcolor;

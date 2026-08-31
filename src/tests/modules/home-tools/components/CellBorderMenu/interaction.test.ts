@@ -47,6 +47,9 @@ describe("CellBorderMenu interaction", () => {
     expect(menu.attributes("role")).toBe("menu");
     expect(menu.findAll("[data-border-preset]")).toHaveLength(10);
     expect(menu.findAll("[data-border-preset] span:not([aria-hidden])")).toHaveLength(0);
+    expect(menu.get('[data-border-preset="all"] .cell-border-menu__preview').classes()).toContain(
+      "cell-border-menu__preview--all",
+    );
     expect(menu.findAll("[data-border-menu-row]").map((item) => item.text())).toEqual([
       "Border color",
       "Border style",

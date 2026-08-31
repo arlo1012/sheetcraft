@@ -217,7 +217,9 @@ const visibleRows = computed<VisibleRow[]>(() => {
     top: 0;
     display: flex;
     align-items: center;
-    overflow: hidden;
+    // Trailing border overlays sit on the gridline, one pixel beyond the content clip.
+    overflow: clip;
+    overflow-clip-margin: 1px;
     padding: 0 5px;
     background: var(--td-bg-color-container);
     border-right: 1px solid var(--td-border-level-1-color);
@@ -233,7 +235,7 @@ const visibleRows = computed<VisibleRow[]>(() => {
     }
 
     &.is-multiline.is-active:not(.is-editing) {
-      overflow: hidden;
+      overflow: clip;
     }
   }
 
