@@ -25,7 +25,9 @@ export type CellBorderPreset =
   | "bottom"
   | "left"
   | "innerHorizontal"
-  | "innerVertical";
+  | "innerVertical"
+  | "diagonalUp"
+  | "diagonalDown";
 
 export type CellBorderAction = {
   preset: CellBorderPreset;
@@ -47,6 +49,8 @@ export type CellStyle = {
   borderRight?: CellBorder;
   borderBottom?: CellBorder;
   borderLeft?: CellBorder;
+  borderDiagonalUp?: CellBorder;
+  borderDiagonalDown?: CellBorder;
 };
 
 export type CellStylePatch = {
@@ -68,6 +72,8 @@ export const CELL_STYLE_KEYS = [
   "borderRight",
   "borderBottom",
   "borderLeft",
+  "borderDiagonalUp",
+  "borderDiagonalDown",
 ] as const satisfies readonly (keyof CellStyle)[];
 
 export function createClearCellStylePatch(): CellStylePatch {
@@ -99,6 +105,8 @@ const BORDER_PRESETS = new Set<CellBorderPreset>([
   "left",
   "innerHorizontal",
   "innerVertical",
+  "diagonalUp",
+  "diagonalDown",
 ]);
 
 function normalizeFontFamily(value: unknown): string {
@@ -205,7 +213,9 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
     key === "borderTop" ||
     key === "borderRight" ||
     key === "borderBottom" ||
-    key === "borderLeft"
+    key === "borderLeft" ||
+    key === "borderDiagonalUp" ||
+    key === "borderDiagonalDown"
   ) {
     return normalizeCellBorder(value as CellBorder) as CellStyle[Key];
   }
@@ -282,7 +292,9 @@ export function areCellStylesEqual(
       key === "borderTop" ||
       key === "borderRight" ||
       key === "borderBottom" ||
-      key === "borderLeft"
+      key === "borderLeft" ||
+      key === "borderDiagonalUp" ||
+      key === "borderDiagonalDown"
     ) {
       return (
         leftValue === rightValue ||

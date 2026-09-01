@@ -119,6 +119,8 @@ describe("SheetGrid clipboard", () => {
         fillColor: "#fde68a",
         verticalAlign: "bottom",
         wrapText: true,
+        borderDiagonalUp: { style: "thin", color: "#112233" },
+        borderDiagonalDown: { style: "dashed", color: "#445566" },
       },
     );
     setCellStyle(sheet, { row: 2, column: 2 }, { italic: true });
@@ -135,6 +137,8 @@ describe("SheetGrid clipboard", () => {
       fillColor: "#fde68a",
       verticalAlign: "bottom",
       wrapText: true,
+      borderDiagonalUp: { style: "thin", color: "#112233" },
+      borderDiagonalDown: { style: "dashed", color: "#445566" },
     });
 
     await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });

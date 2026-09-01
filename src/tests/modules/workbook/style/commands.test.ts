@@ -274,6 +274,36 @@ describe("cell style commands", () => {
     });
   });
 
+  test("applies both diagonal directions per cell and restores them through history", () => {
+    const session = createWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const range = { start: { row: 1, column: 1 }, end: { row: 1, column: 2 } };
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellBordersCommand(sheet.id, range, { preset: "diagonalUp", border }),
+      ),
+    ).toBe(true);
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellBordersCommand(sheet.id, range, { preset: "diagonalDown", border }),
+      ),
+    ).toBe(true);
+    for (let column = 1; column <= 2; column += 1) {
+      expect(getCellStyle(sheet, { row: 1, column })).toEqual({
+        borderDiagonalUp: border,
+        borderDiagonalDown: border,
+      });
+    }
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 1, column: 1 })).toEqual({ borderDiagonalUp: border });
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 1, column: 1 })?.borderDiagonalDown).toEqual(border);
+  });
+
   test("uses right and bottom edges for internal borders and clears every edge with none", () => {
     const session = createWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
@@ -293,6 +323,16 @@ describe("cell style commands", () => {
     expect(getCellStyle(sheet, { row: 1, column: 0 })).toEqual({ borderRight: border });
     expect(getCellStyle(sheet, { row: 1, column: 1 })).toBeUndefined();
 
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        ...getCellStyle(sheet, { row: 0, column: 0 }),
+        borderDiagonalUp: border,
+        borderDiagonalDown: border,
+      },
+    );
+
     expect(
       executeWorkbookCommand(
         session,
@@ -306,6 +346,8 @@ describe("cell style commands", () => {
     expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({
       borderRight: border,
       borderBottom: border,
+      borderDiagonalUp: border,
+      borderDiagonalDown: border,
     });
   });
 

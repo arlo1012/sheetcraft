@@ -4,6 +4,8 @@ import type { Sheet } from "../../workbook/workbook";
 import {
   resolveBorderJunctions,
   resolveVisibleBorderSegments,
+  resolveVisibleDiagonalBorderSegments,
+  type SheetDiagonalBorderSegment,
   type SheetBorderJunction,
   type SheetBorderSegment,
 } from "../border-presentation";
@@ -25,6 +27,14 @@ const segments = computed(() =>
   ),
 );
 const junctions = computed(() => resolveBorderJunctions(segments.value));
+const diagonalSegments = computed(() =>
+  resolveVisibleDiagonalBorderSegments(
+    props.sheet,
+    props.geometry,
+    props.visibleRange,
+    props.scrollPosition,
+  ),
+);
 
 function getSegmentStyle(segment: SheetBorderSegment): CSSProperties {
   if (segment.orientation === "horizontal") {
@@ -52,6 +62,25 @@ function getJunctionStyle(junction: SheetBorderJunction): CSSProperties {
     backgroundColor: junction.color,
   };
 }
+
+function getDiagonalCellStyle(segment: SheetDiagonalBorderSegment): CSSProperties {
+  return {
+    left: `${segment.x}px`,
+    top: `${segment.y}px`,
+    width: `${segment.width}px`,
+    height: `${segment.height}px`,
+    zIndex: segment.thickness,
+  };
+}
+
+function getDiagonalLineStyle(segment: SheetDiagonalBorderSegment): CSSProperties {
+  return {
+    top: segment.direction === "up" ? `${segment.height - segment.thickness}px` : "0",
+    width: `${segment.length}px`,
+    borderTop: segment.css,
+    transform: `rotate(${segment.angle}deg)`,
+  };
+}
 </script>
 
 <template>
@@ -69,6 +98,18 @@ function getJunctionStyle(junction: SheetBorderJunction): CSSProperties {
       :data-border-start="segment.start"
       :data-border-end="segment.end"
     />
+    <span
+      v-for="segment in diagonalSegments"
+      :key="segment.key"
+      class="sheet-border-layer__diagonal-cell"
+      :style="getDiagonalCellStyle(segment)"
+      data-sheet-diagonal-border-segment
+      :data-border-direction="segment.direction"
+      :data-border-row="segment.row"
+      :data-border-column="segment.column"
+    >
+      <span class="sheet-border-layer__diagonal-line" :style="getDiagonalLineStyle(segment)" />
+    </span>
     <span
       v-for="junction in junctions"
       :key="junction.key"
@@ -94,6 +135,20 @@ function getJunctionStyle(junction: SheetBorderJunction): CSSProperties {
     box-sizing: content-box;
     width: 0;
     height: 0;
+  }
+
+  &__diagonal-cell {
+    position: absolute;
+    display: block;
+    overflow: hidden;
+  }
+
+  &__diagonal-line {
+    position: absolute;
+    left: 0;
+    display: block;
+    height: 0;
+    transform-origin: left top;
   }
 
   &__junction {

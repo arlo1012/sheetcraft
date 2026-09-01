@@ -72,6 +72,11 @@ describe("cell style model", () => {
     expect(normalizeCellStyle({ borderTop: { style: "dashed", color: "#ABCDEF" } })).toEqual({
       borderTop: { style: "dashed", color: "#abcdef" },
     });
+    expect(
+      normalizeCellStyle({ borderDiagonalDown: { style: "medium", color: "#ABCDEF" } }),
+    ).toEqual({
+      borderDiagonalDown: { style: "medium", color: "#abcdef" },
+    });
     expect(() => normalizeCellStyle({ fontSize: 7 })).toThrow(RangeError);
     expect(() => normalizeCellStyle({ fillColor: "red" })).toThrow(TypeError);
     expect(() =>
@@ -88,11 +93,13 @@ describe("cell style model", () => {
     const original = {
       bold: true as const,
       borderTop: { style: "double" as const, color: "#112233" },
+      borderDiagonalUp: { style: "dashed" as const, color: "#445566" },
     };
     const clone = cloneCellStyle(original);
 
     expect(clone).toEqual(original);
     expect(clone?.borderTop).not.toBe(original.borderTop);
+    expect(clone?.borderDiagonalUp).not.toBe(original.borderDiagonalUp);
     expect(areCellStylesEqual(original, clone)).toBe(true);
     if (clone?.borderTop) {
       clone.borderTop.color = "#abcdef";
@@ -109,6 +116,12 @@ describe("cell style model", () => {
       }),
     ).toEqual({ preset: "outer", border: { style: "medium", color: "#abcdef" } });
     expect(normalizeCellBorderAction({ preset: "none" })).toEqual({ preset: "none" });
+    expect(
+      normalizeCellBorderAction({
+        preset: "diagonalUp",
+        border: { style: "thin", color: "#ABCDEF" },
+      }),
+    ).toEqual({ preset: "diagonalUp", border: { style: "thin", color: "#abcdef" } });
     expect(() => normalizeCellBorderAction({ preset: "inner" } as never)).toThrow(TypeError);
     expect(
       normalizeCellBorderAction({

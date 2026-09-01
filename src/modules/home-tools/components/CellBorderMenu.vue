@@ -287,12 +287,12 @@ onBeforeUnmount(() => {
           type="button"
           role="menuitem"
           data-border-menu-item
-          data-border-preset="none"
-          :aria-label="t('format.borderNone')"
-          :title="t('format.borderNone')"
-          @click="selectPreset({ preset: 'none' })"
+          data-border-preset="diagonalUp"
+          :aria-label="t('format.borderDiagonalUp')"
+          :title="t('format.borderDiagonalUp')"
+          @click="applyPreset('diagonalUp')"
         >
-          <CellBorderPresetIcon preset="none" />
+          <CellBorderPresetIcon preset="diagonalUp" />
         </button>
         <button
           type="button"
@@ -392,6 +392,28 @@ onBeforeUnmount(() => {
           @click="applyPreset('right')"
         >
           <CellBorderPresetIcon preset="right" />
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          data-border-menu-item
+          data-border-preset="none"
+          :aria-label="t('format.borderNone')"
+          :title="t('format.borderNone')"
+          @click="selectPreset({ preset: 'none' })"
+        >
+          <CellBorderPresetIcon preset="none" />
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          data-border-menu-item
+          data-border-preset="diagonalDown"
+          :aria-label="t('format.borderDiagonalDown')"
+          :title="t('format.borderDiagonalDown')"
+          @click="applyPreset('diagonalDown')"
+        >
+          <CellBorderPresetIcon preset="diagonalDown" />
         </button>
       </div>
       <div class="cell-border-menu__rows">
@@ -773,8 +795,8 @@ onBeforeUnmount(() => {
   }
   &__presets {
     display: grid;
-    grid-template-columns: repeat(5, 26px);
-    grid-template-rows: repeat(2, 26px);
+    grid-template-columns: repeat(4, 26px);
+    grid-template-rows: repeat(3, 26px);
     justify-content: space-between;
     gap: 2px;
     padding-bottom: 5px;

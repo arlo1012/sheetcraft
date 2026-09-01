@@ -748,13 +748,15 @@ function getCellBorderPatch(
   action: CellBorderAction,
   row: number,
   column: number,
-): CellBorderPatch {
+): CellStylePatch {
   if (action.preset === "none") {
     return {
       borderTop: null,
       borderRight: null,
       borderBottom: null,
       borderLeft: null,
+      borderDiagonalUp: null,
+      borderDiagonalDown: null,
     };
   }
 
@@ -763,7 +765,7 @@ function getCellBorderPatch(
   const isRight = column === range.end.column;
   const isBottom = row === range.end.row;
   const isLeft = column === range.start.column;
-  const patch: CellBorderPatch = {};
+  const patch: CellStylePatch = {};
   const apply = (side: CellBorderSide) => {
     Object.assign(patch, { [side]: border });
   };
@@ -793,6 +795,10 @@ function getCellBorderPatch(
     apply("borderBottom");
   } else if (action.preset === "innerVertical" && !isRight) {
     apply("borderRight");
+  } else if (action.preset === "diagonalUp") {
+    patch.borderDiagonalUp = border;
+  } else if (action.preset === "diagonalDown") {
+    patch.borderDiagonalDown = border;
   }
 
   return patch;
@@ -837,7 +843,13 @@ function applyCellBordersCommand(
       }
       const address = { row, column };
       addPatch(address, patch);
-      targetBorderPatches.set(getCellBorderTargetKey(address), { address, patch });
+      const sharedBorderPatch = getExplicitCellBorderPatch(patch);
+      if (Object.keys(sharedBorderPatch).length > 0) {
+        targetBorderPatches.set(getCellBorderTargetKey(address), {
+          address,
+          patch: sharedBorderPatch,
+        });
+      }
     }
   }
   reconcileCellBorderTargets(targetBorderPatches, addPatch);

@@ -151,6 +151,8 @@ export const enUS = {
     borderRight: "Right border",
     borderBottom: "Bottom border",
     borderLeft: "Left border",
+    borderDiagonalUp: "Diagonal up border",
+    borderDiagonalDown: "Diagonal down border",
     borderLineStyle: "Border style",
     borderLineThin: "Thin",
     borderLineMedium: "Medium",

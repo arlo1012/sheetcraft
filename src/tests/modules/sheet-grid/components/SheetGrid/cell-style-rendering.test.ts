@@ -202,6 +202,35 @@ describe("SheetGrid cell style rendering", () => {
     expect(wrapper.find(".sheet-cell-layer__border").exists()).toBe(false);
   });
 
+  test("renders both diagonal border directions inside their cell", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        borderDiagonalUp: { style: "thin", color: "#112233" },
+        borderDiagonalDown: { style: "double", color: "#445566" },
+      },
+    );
+    await nextTick();
+
+    const up = wrapper.get<HTMLElement>(
+      '[data-sheet-diagonal-border-segment][data-border-direction="up"]',
+    );
+    const down = wrapper.get<HTMLElement>(
+      '[data-sheet-diagonal-border-segment][data-border-direction="down"]',
+    );
+    expect(up.attributes()).toMatchObject({ "data-border-row": "0", "data-border-column": "0" });
+    expect(up.element.style.width).toBe("96px");
+    expect(up.element.style.height).toBe("24px");
+    expect(up.get<HTMLElement>(".sheet-border-layer__diagonal-line").element.style.borderTop).toBe(
+      "1px solid #112233",
+    );
+    expect(
+      down.get<HTMLElement>(".sheet-border-layer__diagonal-line").element.style.borderTop,
+    ).toBe("3px double #445566");
+  });
+
   test("keeps borders independent from active multiline content clipping", async () => {
     const { sheet, wrapper } = mountSheetGrid();
     setCellValue(sheet, { row: 0, column: 0 }, "first\nsecond");

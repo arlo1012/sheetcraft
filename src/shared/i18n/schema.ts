@@ -151,6 +151,8 @@ export type MessageSchema = {
     borderRight: string;
     borderBottom: string;
     borderLeft: string;
+    borderDiagonalUp: string;
+    borderDiagonalDown: string;
     borderLineStyle: string;
     borderLineThin: string;
     borderLineMedium: string;

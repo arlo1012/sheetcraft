@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   resolveBorderJunctions,
   resolveVisibleBorderSegments,
+  resolveVisibleDiagonalBorderSegments,
   type SheetBorderSegment,
 } from "../../../../modules/sheet-grid/border-presentation";
 import { createSheetGeometry } from "../../../../modules/sheet-grid/geometry";
@@ -25,6 +26,59 @@ function coversPoint(segment: SheetBorderSegment, x: number, y: number): boolean
 }
 
 describe("sheet border presentation", () => {
+  test("resolves both diagonal directions against each visible cell geometry", () => {
+    const sheet = createSheet();
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        borderDiagonalUp: { style: "thin", color: "#112233" },
+        borderDiagonalDown: { style: "medium", color: "#445566" },
+      },
+    );
+    setCellStyle(
+      sheet,
+      { row: 1, column: 1 },
+      {
+        borderDiagonalUp: { style: "double", color: "#778899" },
+      },
+    );
+    const geometry = createSheetGeometry({
+      rowCount: 2,
+      columnCount: 2,
+      rowHeight: 30,
+      columnWidth: 40,
+    });
+
+    const segments = resolveVisibleDiagonalBorderSegments(
+      sheet,
+      geometry,
+      { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0 },
+      { x: 5, y: 7 },
+    );
+
+    expect(segments).toHaveLength(2);
+    expect(segments[0]).toMatchObject({
+      direction: "up",
+      row: 0,
+      column: 0,
+      x: -5,
+      y: -7,
+      width: 40,
+      height: 30,
+      length: 50,
+      thickness: 1,
+      css: "1px solid #112233",
+    });
+    expect(segments[0]?.angle).toBeCloseTo(-36.87, 2);
+    expect(segments[1]).toMatchObject({
+      direction: "down",
+      thickness: 2,
+      css: "2px solid #445566",
+    });
+    expect(segments[1]?.angle).toBeCloseTo(36.87, 2);
+  });
+
   test("resolves a 3 by 3 grid into continuous runs that own every center intersection", () => {
     const sheet = createSheet();
     const border = { style: "thin", color: "#20242c" } as const;

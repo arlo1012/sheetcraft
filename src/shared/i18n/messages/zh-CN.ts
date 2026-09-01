@@ -151,6 +151,8 @@ export const zhCN = {
     borderRight: "右边框",
     borderBottom: "下边框",
     borderLeft: "左边框",
+    borderDiagonalUp: "左下到右上斜线边框",
+    borderDiagonalDown: "左上到右下斜线边框",
     borderLineStyle: "边框样式",
     borderLineThin: "细线",
     borderLineMedium: "中等线",

@@ -30,6 +30,25 @@ export type SheetBorderJunction = {
   color: string;
 };
 
+export type SheetDiagonalBorderDirection = "up" | "down";
+
+export type SheetDiagonalBorderSegment = {
+  key: string;
+  direction: SheetDiagonalBorderDirection;
+  row: number;
+  column: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  length: number;
+  angle: number;
+  thickness: number;
+  css: string;
+  style: CellBorder["style"];
+  color: string;
+};
+
 const BORDER_LINE_STYLE_CSS: Record<CellBorder["style"], string> = {
   thin: "1px solid",
   medium: "2px solid",
@@ -203,6 +222,47 @@ export function resolveVisibleBorderSegments(
       runBorder = border;
     }
     flushRun(visibleRange.endRow);
+  }
+
+  return segments;
+}
+
+export function resolveVisibleDiagonalBorderSegments(
+  sheet: Sheet,
+  geometry: SheetGeometry,
+  visibleRange: VisibleCellRange,
+  scrollPosition: Point,
+): SheetDiagonalBorderSegment[] {
+  const segments: SheetDiagonalBorderSegment[] = [];
+
+  for (let row = visibleRange.startRow; row <= visibleRange.endRow; row += 1) {
+    for (let column = visibleRange.startColumn; column <= visibleRange.endColumn; column += 1) {
+      const style = getCellStyle(sheet, { row, column });
+      const rect = geometry.getCellViewportRect({ row, column }, scrollPosition);
+      const length = Math.hypot(rect.width, rect.height);
+      const angle = (Math.atan2(rect.height, rect.width) * 180) / Math.PI;
+      const addSegment = (
+        direction: SheetDiagonalBorderDirection,
+        border: CellBorder | undefined,
+      ) => {
+        if (!border) return;
+        segments.push({
+          key: `diagonal-${direction}:${row}:${column}`,
+          direction,
+          row,
+          column,
+          ...rect,
+          length,
+          angle: direction === "up" ? -angle : angle,
+          thickness: getCellBorderThickness(border),
+          css: getCellBorderCss(border),
+          style: border.style,
+          color: border.color,
+        });
+      };
+      addSegment("up", style?.borderDiagonalUp);
+      addSegment("down", style?.borderDiagonalDown);
+    }
   }
 
   return segments;

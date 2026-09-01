@@ -48,8 +48,8 @@ describe("CellBorderMenu interaction", () => {
 
     const menu = getMenu();
     expect(menu.attributes("role")).toBe("menu");
-    expect(menu.findAll("[data-border-preset]")).toHaveLength(10);
-    expect(menu.findAll("[data-border-preset-icon]")).toHaveLength(10);
+    expect(menu.findAll("[data-border-preset]")).toHaveLength(12);
+    expect(menu.findAll("[data-border-preset-icon]")).toHaveLength(12);
     expect(
       menu.findAll("[data-border-preset-icon]").every((icon) => icon.attributes("aria-hidden")),
     ).toBe(true);
@@ -58,7 +58,7 @@ describe("CellBorderMenu interaction", () => {
         .findAll("[data-border-preset-icon]")
         .map((icon) => icon.attributes("data-border-preset-icon")),
     ).toEqual([
-      "none",
+      "diagonalUp",
       "all",
       "outer",
       "inner",
@@ -68,6 +68,8 @@ describe("CellBorderMenu interaction", () => {
       "left",
       "bottom",
       "right",
+      "none",
+      "diagonalDown",
     ]);
     expect(
       menu
@@ -87,12 +89,28 @@ describe("CellBorderMenu interaction", () => {
     expect(
       menu.get('[data-border-preset-icon="inner"]').findAll(".cell-border-preset-icon__line"),
     ).toHaveLength(2);
+    expect(
+      menu
+        .get('[data-border-preset-icon="diagonalUp"] .cell-border-preset-icon__diagonal')
+        .classes(),
+    ).toContain("is-up");
+    expect(
+      menu
+        .get('[data-border-preset-icon="diagonalDown"] .cell-border-preset-icon__diagonal')
+        .classes(),
+    ).toContain("is-down");
+    expect(
+      menu
+        .get('[data-border-preset-icon="none"]')
+        .find(".cell-border-preset-icon__diagonal")
+        .exists(),
+    ).toBe(false);
     expect(menu.findAll("[data-border-menu-row]").map((item) => item.text())).toEqual([
       "Border color",
       "Border style",
       "More settings",
     ]);
-    expect(document.activeElement).toBe(menu.get('[data-border-preset="none"]').element);
+    expect(document.activeElement).toBe(menu.get('[data-border-preset="diagonalUp"]').element);
     await menu.trigger("keydown", { key: "ArrowDown" });
     const all = menu.get('[data-border-preset="all"]');
     expect(document.activeElement).toBe(all.element);
@@ -103,6 +121,20 @@ describe("CellBorderMenu interaction", () => {
     ]);
     expect(document.body.querySelector("[data-cell-border-panel]")).toBeNull();
     expect(document.activeElement).toBe(trigger.element);
+  });
+
+  test("applies both diagonal border directions", async () => {
+    const wrapper = mountMenu();
+    const trigger = wrapper.get<HTMLButtonElement>("[data-cell-border-trigger]");
+    await trigger.trigger("click");
+    await getMenu().get('[data-border-preset="diagonalUp"]').trigger("click");
+    await trigger.trigger("click");
+    await getMenu().get('[data-border-preset="diagonalDown"]').trigger("click");
+
+    expect(wrapper.emitted("applyBorders")).toEqual([
+      [{ preset: "diagonalUp", border: { style: "thin", color: "#20242c" } }],
+      [{ preset: "diagonalDown", border: { style: "thin", color: "#20242c" } }],
+    ]);
   });
 
   test("opens localized color and style submenus with real line samples", async () => {

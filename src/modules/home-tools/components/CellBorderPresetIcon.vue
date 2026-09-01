@@ -31,7 +31,8 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
     <template v-if="hasInnerVertical">
       <span class="cell-border-preset-icon__line is-vertical" />
     </template>
-    <span v-if="preset === 'none'" class="cell-border-preset-icon__slash" />
+    <span v-if="preset === 'diagonalUp'" class="cell-border-preset-icon__diagonal is-up" />
+    <span v-if="preset === 'diagonalDown'" class="cell-border-preset-icon__diagonal is-down" />
   </span>
 </template>
 
@@ -44,7 +45,7 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
 
   &__guide,
   &__line,
-  &__slash {
+  &__diagonal {
     position: absolute;
     display: block;
     pointer-events: none;
@@ -139,15 +140,23 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
     }
   }
 
-  &__slash {
+  &__diagonal {
     z-index: 2;
-    top: 8px;
-    left: -2px;
-    width: 22px;
+    left: 1px;
+    width: 22.6274px;
     height: 1px;
-    background: var(--td-text-color-placeholder);
-    transform: rotate(-45deg);
-    transform-origin: center;
+    background: currentcolor;
+    transform-origin: left center;
+
+    &.is-up {
+      bottom: 1px;
+      transform: rotate(-45deg);
+    }
+
+    &.is-down {
+      top: 1px;
+      transform: rotate(45deg);
+    }
   }
 }
 </style>
