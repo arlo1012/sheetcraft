@@ -91,7 +91,7 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
     &.is-horizontal {
       right: 0;
       left: 0;
-      height: 2px;
+      height: 1px;
     }
 
     &.is-left,
@@ -99,7 +99,7 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
     &.is-vertical {
       top: 0;
       bottom: 0;
-      width: 2px;
+      width: 1px;
     }
 
     &.is-top {
@@ -119,19 +119,19 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
     }
 
     &.is-first.is-horizontal {
-      top: 5px;
+      top: 6px;
     }
 
     &.is-second.is-horizontal {
-      top: 11px;
+      top: 12px;
     }
 
     &.is-first.is-vertical {
-      left: 5px;
+      left: 6px;
     }
 
     &.is-second.is-vertical {
-      left: 11px;
+      left: 12px;
     }
   }
 
@@ -140,7 +140,7 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
     top: 8px;
     left: -2px;
     width: 22px;
-    height: 2px;
+    height: 1px;
     background: var(--td-text-color-placeholder);
     transform: rotate(-45deg);
     transform-origin: center;
