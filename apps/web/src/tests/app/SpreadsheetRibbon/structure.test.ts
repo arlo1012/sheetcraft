@@ -60,25 +60,26 @@ describe("SpreadsheetRibbon", () => {
     const wrapper = mountRibbon();
 
     await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
-    await wrapper.get('[data-ribbon-action="redo"]').trigger("keydown", { key: "Enter" });
+    await wrapper.get('[data-ribbon-action="redo"]').trigger("click");
 
     expect(wrapper.emitted("undo")).toHaveLength(1);
     expect(wrapper.emitted("redo")).toHaveLength(1);
     expect(wrapper.get("[data-vertical-alignment-trigger]").attributes("aria-haspopup")).toBe(
       "menu",
     );
-    expect(wrapper.get('[data-ribbon-action="clear-formatting"]').attributes("aria-disabled")).toBe(
-      "false",
-    );
+    const clearFormatting = wrapper.get('[data-ribbon-action="clear-formatting"]');
+    expect(clearFormatting.element).toBeInstanceOf(HTMLButtonElement);
+    expect(clearFormatting.attributes("type")).toBe("button");
+    expect(clearFormatting.attributes("disabled")).toBeUndefined();
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
       "false",
     );
     expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(28);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
+      expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({
-        role: "button",
-        tabindex: "-1",
-        "aria-disabled": "true",
+        type: "button",
+        disabled: "",
       });
     }
   });
