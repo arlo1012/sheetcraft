@@ -1,14 +1,15 @@
 import { describe, expect, test } from "vitest";
+import { createTestSheet } from "../helpers.js";
 import {
   getCellRangeValues,
   parseTsvToCellValues,
   serializeCellValuesToTsv,
 } from "../../clipboard.js";
-import { createSheet, setCellValue } from "../../workbook.js";
+import { setCellValue } from "../../workbook.js";
 
 describe("workbook TSV clipboard", () => {
   test("serializes a rectangular range with empty cells", () => {
-    const sheet = createSheet();
+    const sheet = createTestSheet();
     setCellValue(sheet, { row: 1, column: 1 }, "Name");
     setCellValue(sheet, { row: 1, column: 2 }, 42);
     setCellValue(sheet, { row: 2, column: 2 }, true);

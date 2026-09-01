@@ -1,4 +1,4 @@
-import { defaultIdFactory, type IdFactory } from "./runtime.js";
+import type { IdFactory } from "./runtime.js";
 
 export const MAX_SHEET_ROWS = 1_048_576;
 export const MAX_SHEET_COLUMNS = 16_384;
@@ -68,13 +68,9 @@ export function createCellKey(address: CellAddress): string {
   return `${address.row}:${address.column}`;
 }
 
-export function createSheet(
-  name = "Sheet1",
-  id?: string,
-  idFactory: IdFactory = defaultIdFactory,
-): Sheet {
+export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory): Sheet {
   return {
-    id: id ?? idFactory("sheet"),
+    id: id ?? createRequiredId("sheet", idFactory),
     name: normalizeSheetName(name),
     cells: new Map(),
     rowHeights: new Map(),
@@ -96,14 +92,28 @@ export function createWorkbook(options?: {
   sheetName?: string;
   idFactory?: IdFactory;
 }): Workbook {
-  const idFactory = options?.idFactory ?? defaultIdFactory;
+  const idFactory = options?.idFactory;
+  if (!options?.id && !idFactory) {
+    throw new Error("A workbook ID or IdFactory is required.");
+  }
   const sheet = createSheet(options?.sheetName, options?.sheetId, idFactory);
 
   return {
-    id: options?.id ?? idFactory("workbook"),
+    id: options?.id ?? createRequiredId("workbook", idFactory),
     sheets: new Map([[sheet.id, sheet]]),
     activeSheetId: sheet.id,
   };
+}
+
+function createRequiredId(prefix: string, idFactory: IdFactory | undefined): string {
+  if (!idFactory) {
+    throw new Error(`A ${prefix} ID or IdFactory is required.`);
+  }
+  const id = idFactory(prefix);
+  if (!id || !id.trim()) {
+    throw new Error(`IdFactory returned an empty ${prefix} ID.`);
+  }
+  return id;
 }
 
 export function getActiveSheet(workbook: Workbook): Sheet {

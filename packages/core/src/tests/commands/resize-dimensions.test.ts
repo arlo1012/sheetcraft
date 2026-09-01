@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { createResizeSheetDimensionCommand } from "../../../../modules/workbook/commands";
+import { createTestWorkbookSession } from "../helpers.js";
+import { createResizeSheetDimensionCommand } from "../../commands/index.js";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
@@ -7,17 +8,12 @@ import {
   getActiveSheet,
   getColumnWidth,
   getRowHeight,
-} from "@idea10/core/workbook";
-import {
-  createWorkbookSession,
-  executeWorkbookCommand,
-  redoWorkbookCommand,
-  undoWorkbookCommand,
-} from "../../../../modules/workbook/history";
+} from "../../workbook.js";
+import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 
 describe("resize sheet dimension command", () => {
   test("resizes one sheet dimension as an atomic reversible command", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
 
     expect(
@@ -35,7 +31,7 @@ describe("resize sheet dimension command", () => {
   });
 
   test("does not record a no-op dimension resize or discard redo history", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     executeWorkbookCommand(session, createResizeSheetDimensionCommand(sheet.id, "column", 3, 140));
     undoWorkbookCommand(session);
@@ -53,7 +49,7 @@ describe("resize sheet dimension command", () => {
   });
 
   test("rejects an invalid resize before changing workbook state", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
 
     expect(() =>

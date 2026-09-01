@@ -15,9 +15,21 @@
       "types": "./dist/coordinates.d.ts",
       "import": "./dist/coordinates.js"
     },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
+    },
+    "./history": {
+      "types": "./dist/history.d.ts",
+      "import": "./dist/history.js"
+    },
     "./clipboard": {
       "types": "./dist/clipboard.d.ts",
       "import": "./dist/clipboard.js"
+    },
+    "./commands": {
+      "types": "./dist/commands/index.d.ts",
+      "import": "./dist/commands/index.js"
     },
     "./input": {
       "types": "./dist/input.d.ts",
@@ -42,6 +54,10 @@
     "./selection-summary": {
       "types": "./dist/selection-summary.d.ts",
       "import": "./dist/selection-summary.js"
+    },
+    "./serialization": {
+      "types": "./dist/serialization.d.ts",
+      "import": "./dist/serialization.js"
     },
     "./workbook": {
       "types": "./dist/workbook.d.ts",

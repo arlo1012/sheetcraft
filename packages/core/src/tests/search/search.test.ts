@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
+import { createTestSheet } from "../helpers.js";
 import { findCellByText } from "../../search.js";
-import { createSheet, setCellValue } from "../../workbook.js";
+import { setCellValue } from "../../workbook.js";
 
 describe("sparse sheet search", () => {
   test("finds values in row order and wraps in either direction", () => {
-    const sheet = createSheet();
+    const sheet = createTestSheet();
     setCellValue(sheet, { row: 9, column: 1 }, "Needle last");
     setCellValue(sheet, { row: 1, column: 4 }, "needle first");
     setCellValue(sheet, { row: 3, column: 0 }, "other");
@@ -28,7 +29,7 @@ describe("sparse sheet search", () => {
   });
 
   test("matches formatted booleans and numbers without materializing empty cells", () => {
-    const sheet = createSheet();
+    const sheet = createTestSheet();
     setCellValue(sheet, { row: 800_000, column: 10_000 }, true);
     setCellValue(sheet, { row: 2, column: 2 }, 1200);
 

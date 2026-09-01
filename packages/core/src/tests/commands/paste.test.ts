@@ -1,22 +1,18 @@
 import { describe, expect, test } from "vitest";
-import { createPasteCellValuesCommand } from "../../../../modules/workbook/commands";
-import {
-  createWorkbookSession,
-  executeWorkbookCommand,
-  redoWorkbookCommand,
-  undoWorkbookCommand,
-} from "../../../../modules/workbook/history";
+import { createTestWorkbookSession } from "../helpers.js";
+import { createPasteCellValuesCommand } from "../../commands/index.js";
+import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import {
   getActiveSheet,
   getCellStyle,
   getCellValue,
   setCellStyle,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "../../workbook.js";
 
 describe("paste cell values command", () => {
   test("pastes a matrix as one history entry", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
 
     executeWorkbookCommand(
@@ -38,7 +34,7 @@ describe("paste cell values command", () => {
   });
 
   test("moves an overlapping cut range atomically", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 0, column: 0 }, "A");
     setCellValue(sheet, { row: 0, column: 1 }, "B");
@@ -70,7 +66,7 @@ describe("paste cell values command", () => {
   });
 
   test("makes pasted local border styles win against conflicting neighboring edges", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const border = { style: "medium" as const, color: "#123456" };
     const oldBorder = { style: "dashed" as const, color: "#abcdef" };
@@ -118,7 +114,7 @@ describe("paste cell values command", () => {
   });
 
   test("clears external edges for a pasted null style and restores them through history", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const oldBorder = { style: "dotted" as const, color: "#abcdef" };
     setCellStyle(sheet, { row: 1, column: 2 }, { borderBottom: oldBorder });
@@ -146,7 +142,7 @@ describe("paste cell values command", () => {
   });
 
   test("clears external edges for a pasted style with no border fields", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const oldBorder = { style: "double" as const, color: "#abcdef" };
     setCellStyle(sheet, { row: 4, column: 5 }, { borderBottom: oldBorder });
@@ -174,7 +170,7 @@ describe("paste cell values command", () => {
   });
 
   test("resolves conflicting pasted internal edges with the left and upper owner", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const rightOwner = { style: "thin" as const, color: "#123456" };
     const leftFallback = { style: "double" as const, color: "#abcdef" };
@@ -213,7 +209,7 @@ describe("paste cell values command", () => {
   });
 
   test("keeps an internal fallback border when the left or upper owner has no border", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const verticalFallback = { style: "thin" as const, color: "#123456" };
     const horizontalFallback = { style: "medium" as const, color: "#abcdef" };
@@ -256,7 +252,7 @@ describe("paste cell values command", () => {
   });
 
   test("rejects an empty, uneven, or overflowing matrix before mutation", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
 
     expect(() => createPasteCellValuesCommand(sheet.id, { row: 0, column: 0 }, [])).toThrow();

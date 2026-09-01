@@ -1,25 +1,18 @@
 import { describe, expect, test } from "vitest";
-import {
-  createClearCellRangeCommand,
-  createSetCellValueCommand,
-} from "../../../../modules/workbook/commands";
-import {
-  createWorkbookSession,
-  executeWorkbookCommand,
-  redoWorkbookCommand,
-  undoWorkbookCommand,
-} from "../../../../modules/workbook/history";
+import { createTestWorkbookSession } from "../helpers.js";
+import { createClearCellRangeCommand, createSetCellValueCommand } from "../../commands/index.js";
+import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   getActiveSheet,
   getCellValue,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "../../workbook.js";
 
 describe("clear cell range command", () => {
   test("clears a sparse range as one reversible history entry", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 1, column: 1 }, "B2");
     setCellValue(sheet, { row: 2, column: 2 }, 3);
@@ -50,7 +43,7 @@ describe("clear cell range command", () => {
   });
 
   test("clears sparse values across a full-sheet range", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 0, column: 0 }, "first");
     setCellValue(sheet, { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 }, "last");
@@ -69,7 +62,7 @@ describe("clear cell range command", () => {
   });
 
   test("does not record an empty clear or discard redo history", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     executeWorkbookCommand(
       session,

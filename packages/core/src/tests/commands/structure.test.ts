@@ -1,16 +1,12 @@
 import { describe, expect, test } from "vitest";
+import { createTestWorkbookSession } from "../helpers.js";
 import {
   applyWorkbookCommand,
   createDeleteSheetAxisCommand,
   createInsertSheetAxisCommand,
   type WorkbookCommand,
-} from "../../../../modules/workbook/commands";
-import {
-  createWorkbookSession,
-  executeWorkbookCommand,
-  redoWorkbookCommand,
-  undoWorkbookCommand,
-} from "../../../../modules/workbook/history";
+} from "../../commands/index.js";
+import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
@@ -26,11 +22,11 @@ import {
   setCellStyle,
   setColumnWidth,
   setRowHeight,
-} from "@idea10/core/workbook";
+} from "../../workbook.js";
 
 describe("sheet axis structure commands", () => {
   test("inserts rows by shifting sparse cells and row dimensions while dropping the tail", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 1, column: 3 }, "above");
     setCellValue(sheet, { row: 2, column: 1 }, "move");
@@ -54,7 +50,7 @@ describe("sheet axis structure commands", () => {
   });
 
   test("deletes multiple rows, including their dimensions, and leaves the tail default", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 1, column: 0 }, "above");
     setCellValue(sheet, { row: 2, column: 0 }, "delete-1");
@@ -73,7 +69,7 @@ describe("sheet axis structure commands", () => {
   });
 
   test("inserts and deletes columns without changing row dimensions", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 5, column: 1 }, "left");
     setCellValue(sheet, { row: 5, column: 2 }, "move");
@@ -98,7 +94,7 @@ describe("sheet axis structure commands", () => {
   });
 
   test("round-trips inserted tail overflow and deleted cells through undo and redo", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 1, column: 0 }, "selected");
     setCellValue(sheet, { row: MAX_SHEET_ROWS - 1, column: 0 }, "overflow");
@@ -120,7 +116,7 @@ describe("sheet axis structure commands", () => {
   });
 
   test("supports the first and final valid axis bands", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 0, column: 0 }, "first");
     setCellValue(sheet, { row: MAX_SHEET_ROWS - 3, column: 0 }, "near-tail");
@@ -138,7 +134,7 @@ describe("sheet axis structure commands", () => {
   });
 
   test("does not record an empty structure change or discard redo history", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 0, column: 0 }, "redo");
     executeWorkbookCommand(session, createDeleteSheetAxisCommand(sheet.id, "row", 0));
@@ -154,7 +150,7 @@ describe("sheet axis structure commands", () => {
   });
 
   test("rejects invalid axis ranges atomically", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 2, column: 2 }, "keep");
     setRowHeight(sheet, 2, 40);
@@ -173,12 +169,12 @@ describe("sheet axis structure commands", () => {
   });
 
   test("validates an internal sparse-state replacement before mutating the sheet", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 2, column: 2 }, "keep");
     const before = createSheetSparseState(sheet);
     const command = {
-      type: "replaceSheetSparseState",
+      type: "restoreSheetState",
       sheetId: sheet.id,
       state: {
         cells: [

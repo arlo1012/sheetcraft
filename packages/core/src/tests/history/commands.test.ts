@@ -1,19 +1,15 @@
 import { describe, expect, test } from "vitest";
+import { createTestWorkbookSession } from "../helpers.js";
 import {
   createBatchSetCellValuesCommand,
   createSetCellValueCommand,
-} from "../../../../modules/workbook/commands";
-import {
-  createWorkbookSession,
-  executeWorkbookCommand,
-  redoWorkbookCommand,
-  undoWorkbookCommand,
-} from "../../../../modules/workbook/history";
-import { getActiveSheet, getCellValue } from "@idea10/core/workbook";
+} from "../../commands/index.js";
+import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
+import { getActiveSheet, getCellValue } from "../../workbook.js";
 
 describe("workbook commands and history", () => {
   test("executes a cell edit and supports undo and redo", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
 
     expect(
@@ -32,7 +28,7 @@ describe("workbook commands and history", () => {
   });
 
   test("records a batch as one atomic history entry", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
 
     executeWorkbookCommand(
@@ -50,7 +46,7 @@ describe("workbook commands and history", () => {
   });
 
   test("validates a complete batch before changing workbook state", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const command = createBatchSetCellValuesCommand([
       { sheetId: sheet.id, address: { row: 0, column: 0 }, value: "A" },
@@ -63,7 +59,7 @@ describe("workbook commands and history", () => {
   });
 
   test("does not record no-ops and clears redo after a new edit", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const address = { row: 0, column: 0 };
 
@@ -79,5 +75,19 @@ describe("workbook commands and history", () => {
     executeWorkbookCommand(session, createSetCellValueCommand(sheet.id, address, "Two"));
     expect(session.history.redoStack).toHaveLength(0);
     expect(redoWorkbookCommand(session)).toBe(false);
+  });
+
+  test("keeps a corrupt undo entry when applying it fails", () => {
+    const session = createTestWorkbookSession();
+    session.history.undoStack.push({
+      command: {
+        type: "unknownCommand",
+      } as unknown as import("../../commands/contracts.js").WorkbookCommand,
+      operation: "cells.edit",
+    });
+
+    expect(() => undoWorkbookCommand(session)).toThrow("Unknown workbook command.");
+    expect(session.history.undoStack).toHaveLength(1);
+    expect(session.history.redoStack).toHaveLength(0);
   });
 });

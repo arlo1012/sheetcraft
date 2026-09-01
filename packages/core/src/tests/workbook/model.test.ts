@@ -1,10 +1,12 @@
 import { describe, expect, test } from "vitest";
+import { createTestWorkbook } from "../helpers.js";
 import { createSequentialIdFactory } from "../../runtime.js";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
   MAX_COLUMN_WIDTH,
   MAX_ROW_HEIGHT,
+  createSheet,
   createWorkbook,
   getActiveSheet,
   getColumnWidth,
@@ -23,6 +25,11 @@ describe("workbook model", () => {
     expect(workbook.id).toBe("workbook-42");
   });
 
+  test("requires an explicit ID or an injected ID factory", () => {
+    expect(() => createWorkbook()).toThrow("A workbook ID or IdFactory is required.");
+    expect(() => createSheet()).toThrow("A sheet ID or IdFactory is required.");
+  });
+
   test("creates a workbook with an active Sheet1", () => {
     const workbook = createWorkbook({ id: "book-1", sheetId: "sheet-1" });
 
@@ -31,7 +38,7 @@ describe("workbook model", () => {
   });
 
   test("stores cells sparsely and removes empty values", () => {
-    const sheet = getActiveSheet(createWorkbook());
+    const sheet = getActiveSheet(createTestWorkbook());
 
     expect(setCellValue(sheet, { row: 2, column: 3 }, "Draft")).toBe(true);
     expect(getCellValue(sheet, { row: 2, column: 3 })).toBe("Draft");
@@ -43,7 +50,7 @@ describe("workbook model", () => {
   });
 
   test("preserves supported primitive value types", () => {
-    const sheet = getActiveSheet(createWorkbook());
+    const sheet = getActiveSheet(createTestWorkbook());
 
     setCellValue(sheet, { row: 0, column: 0 }, "Text");
     setCellValue(sheet, { row: 0, column: 1 }, 42);
@@ -55,7 +62,7 @@ describe("workbook model", () => {
   });
 
   test("stores non-default row and column dimensions sparsely", () => {
-    const sheet = getActiveSheet(createWorkbook());
+    const sheet = getActiveSheet(createTestWorkbook());
 
     expect(getRowHeight(sheet, 42)).toBe(DEFAULT_ROW_HEIGHT);
     expect(getColumnWidth(sheet, 9)).toBe(DEFAULT_COLUMN_WIDTH);
@@ -71,7 +78,7 @@ describe("workbook model", () => {
   });
 
   test("validates sheet dimension indexes and sizes", () => {
-    const sheet = getActiveSheet(createWorkbook());
+    const sheet = getActiveSheet(createTestWorkbook());
 
     expect(() => setRowHeight(sheet, -1, DEFAULT_ROW_HEIGHT)).toThrow(RangeError);
     expect(() => setColumnWidth(sheet, 0.5, DEFAULT_COLUMN_WIDTH)).toThrow(RangeError);

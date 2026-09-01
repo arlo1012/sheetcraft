@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest";
+import { createTestWorkbook } from "../helpers.js";
 import { getSelectionCellStyleState } from "../../style-state.js";
-import { createWorkbook, getActiveSheet, setCellStyle } from "../../workbook.js";
+import { getActiveSheet, setCellStyle } from "../../workbook.js";
 
 describe("selection cell style state", () => {
   test("reports uniform, off, and mixed properties without scanning empty cells", () => {
-    const sheet = getActiveSheet(createWorkbook());
+    const sheet = getActiveSheet(createTestWorkbook());
     setCellStyle(
       sheet,
       { row: 0, column: 0 },
@@ -47,7 +48,7 @@ describe("selection cell style state", () => {
   });
 
   test("queries a small selection directly when the sheet contains many other cells", () => {
-    const sheet = getActiveSheet(createWorkbook());
+    const sheet = getActiveSheet(createTestWorkbook());
     setCellStyle(sheet, { row: 1, column: 1 }, { bold: true });
     for (let row = 10; row < 30; row += 1) {
       setCellStyle(sheet, { row, column: 5 }, { italic: true });

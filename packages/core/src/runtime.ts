@@ -11,7 +11,3 @@ export function createSequentialIdFactory(initialValue = 0): IdFactory {
     return `${prefix}-${sequence}`;
   };
 }
-
-const fallbackIdFactory = createSequentialIdFactory();
-
-export const defaultIdFactory: IdFactory = (prefix) => fallbackIdFactory(`${prefix}-generated`);

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { createTestWorkbook } from "../helpers.js";
 import {
   CELL_STYLE_KEYS,
   areCellStylesEqual,
@@ -12,7 +13,6 @@ import {
   getActiveSheet,
   getCellStyle,
   getCellValue,
-  createWorkbook,
   setCellStyle,
   setCellValue,
 } from "../../workbook.js";
@@ -26,7 +26,7 @@ describe("cell style model", () => {
   });
 
   test("stores style-only cells and preserves their style when content is cleared", () => {
-    const sheet = getActiveSheet(createWorkbook());
+    const sheet = getActiveSheet(createTestWorkbook());
     const address = { row: 2, column: 3 };
 
     expect(setCellStyle(sheet, address, { bold: true, fillColor: "#FDE68A" })).toBe(true);

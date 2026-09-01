@@ -12,7 +12,7 @@ import {
 
 describe("workbook sheets", () => {
   test("keeps sheet order in the workbook map insertion order", () => {
-    const workbook = createWorkbook({ sheetId: "sheet-1" });
+    const workbook = createWorkbook({ id: "workbook-1", sheetId: "sheet-1" });
     insertSheet(workbook, createSheet("Sheet2", "sheet-2"));
     insertSheet(workbook, createSheet("Sheet3", "sheet-3"), 1);
 
@@ -24,7 +24,11 @@ describe("workbook sheets", () => {
   });
 
   test("trims names, requires case-insensitive uniqueness, and finds the first available default", () => {
-    const workbook = createWorkbook({ sheetId: "sheet-1", sheetName: " Sheet1 " });
+    const workbook = createWorkbook({
+      id: "workbook-1",
+      sheetId: "sheet-1",
+      sheetName: " Sheet1 ",
+    });
     insertSheet(workbook, createSheet("Sheet3", "sheet-3"));
 
     expect(getNextSheetName(workbook)).toBe("Sheet2");
@@ -33,7 +37,7 @@ describe("workbook sheets", () => {
   });
 
   test("keeps the active sheet valid when removing it through the model API", () => {
-    const workbook = createWorkbook({ sheetId: "sheet-1" });
+    const workbook = createWorkbook({ id: "workbook-1", sheetId: "sheet-1" });
     insertSheet(workbook, createSheet("Sheet2", "sheet-2"));
     insertSheet(workbook, createSheet("Sheet3", "sheet-3"));
     setActiveSheet(workbook, "sheet-2");

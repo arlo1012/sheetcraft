@@ -19,7 +19,7 @@ import {
   createRenameSheetCommand,
   createResizeSheetDimensionCommand,
   createSetCellValueCommand,
-} from "../modules/workbook/commands";
+} from "@idea10/core/commands";
 import type { CellBorderAction, CellStylePatch } from "@idea10/core/style";
 import {
   createWorkbookSession,
@@ -27,7 +27,7 @@ import {
   redoWorkbookCommand,
   undoWorkbookCommand,
   type WorkbookSession,
-} from "../modules/workbook/history";
+} from "@idea10/core/history";
 import { formatCellValueForInput, parseCellInput } from "@idea10/core/input";
 import { findCellByText, type SheetSearchDirection } from "@idea10/core/search";
 import { getSelectionSummary } from "@idea10/core/selection-summary";
@@ -47,6 +47,7 @@ import {
   type SheetDimensionAxis,
 } from "@idea10/core/workbook";
 import { useAppI18n, type MessageKey, type MessageParams } from "../shared/i18n";
+import { createBrowserIdFactory } from "../shared/runtime/browser-id-factory";
 
 type FeedbackState = {
   key: MessageKey;
@@ -54,7 +55,9 @@ type FeedbackState = {
 };
 
 const { t } = useAppI18n();
-const session = reactive(createWorkbookSession()) as WorkbookSession;
+const session = reactive(
+  createWorkbookSession({ idFactory: createBrowserIdFactory() }),
+) as WorkbookSession;
 const activeSheet = computed(() => getActiveSheet(session.workbook));
 const sheets = computed(() => getWorkbookSheets(session.workbook));
 const viewStates = reactive(new Map<string, SheetGridViewState>());
@@ -111,7 +114,7 @@ function commitCell(payload: { address: CellAddress; input: string }): void {
   executeWorkbookCommand(
     session,
     createSetCellValueCommand(activeSheet.value.id, payload.address, parseCellInput(payload.input)),
-    "Edit cell",
+    "cells.edit",
   );
   clearWorkspaceStatus();
 }
@@ -123,7 +126,7 @@ function pasteCells(payload: GridPastePayload): void {
       clearRange: payload.clearRange,
       styles: payload.styles,
     }),
-    payload.clearRange ? "Move cells" : "Paste cells",
+    payload.clearRange ? "cells.move" : "cells.paste",
   );
 }
 
@@ -131,7 +134,7 @@ function clearCells(range: CellRange): void {
   executeWorkbookCommand(
     session,
     createClearCellRangeCommand(activeSheet.value.id, range),
-    "Clear cells",
+    "cells.clear",
   );
 }
 
@@ -143,7 +146,7 @@ function applyCellStyle(patch: CellStylePatch): void {
   executeWorkbookCommand(
     session,
     createApplyCellStyleCommand(activeSheet.value.id, activeSelectionRange.value, patch),
-    "Format cells",
+    "format.cells",
   );
   clearWorkspaceStatus();
 }
@@ -156,7 +159,7 @@ function applyCellBorders(action: CellBorderAction): void {
   executeWorkbookCommand(
     session,
     createApplyCellBordersCommand(activeSheet.value.id, activeSelectionRange.value, action),
-    "Format cell borders",
+    "format.borders",
   );
   clearWorkspaceStatus();
 }
@@ -170,7 +173,7 @@ function resizeDimension(payload: { axis: SheetDimensionAxis; index: number; siz
       payload.index,
       payload.size,
     ),
-    payload.axis === "column" ? "Resize column" : "Resize row",
+    "dimensions.resize",
   );
 }
 
@@ -178,7 +181,7 @@ function insertAxis(payload: { axis: SheetDimensionAxis; index: number; count: n
   executeWorkbookCommand(
     session,
     createInsertSheetAxisCommand(activeSheet.value.id, payload.axis, payload.index, payload.count),
-    payload.axis === "row" ? "Insert rows" : "Insert columns",
+    "structure.insert",
   );
 }
 
@@ -186,7 +189,7 @@ function deleteAxis(payload: { axis: SheetDimensionAxis; index: number; count: n
   executeWorkbookCommand(
     session,
     createDeleteSheetAxisCommand(activeSheet.value.id, payload.axis, payload.index, payload.count),
-    payload.axis === "row" ? "Delete rows" : "Delete columns",
+    "structure.delete",
   );
 }
 
@@ -196,7 +199,11 @@ function selectSheet(sheetId: string): void {
 }
 
 function addSheet(): void {
-  executeWorkbookCommand(session, createAddSheetCommand(session.workbook), "Add sheet");
+  executeWorkbookCommand(
+    session,
+    createAddSheetCommand(session.workbook, { idFactory: session.idFactory }),
+    "sheets.add",
+  );
   clearWorkspaceStatus();
 }
 
@@ -223,7 +230,7 @@ function renameSheet(payload: { sheetId: string; name: string }): void {
     executeWorkbookCommand(
       session,
       createRenameSheetCommand(payload.sheetId, payload.name),
-      "Rename sheet",
+      "sheets.rename",
     );
     clearWorkspaceStatus();
   } catch {
@@ -235,7 +242,7 @@ function deleteSheet(sheetId: string): void {
   executeWorkbookCommand(
     session,
     createDeleteSheetCommand(session.workbook, sheetId),
-    "Delete sheet",
+    "sheets.delete",
   );
   selectionRanges.delete(sheetId);
   viewStates.delete(sheetId);

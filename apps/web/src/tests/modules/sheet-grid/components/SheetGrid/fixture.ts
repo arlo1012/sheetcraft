@@ -8,18 +8,19 @@ import {
   createPasteCellValuesCommand,
   createResizeSheetDimensionCommand,
   createSetCellValueCommand,
-} from "../../../../../modules/workbook/commands";
+} from "@idea10/core/commands";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
   redoWorkbookCommand,
   undoWorkbookCommand,
   type WorkbookSession,
-} from "../../../../../modules/workbook/history";
+} from "@idea10/core/history";
 import { parseCellInput } from "@idea10/core/input";
 import { getActiveSheet, type CellRange, type SheetDimensionAxis } from "@idea10/core/workbook";
 import SheetGrid from "../../../../../modules/sheet-grid/components/SheetGrid.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
+import { createBrowserIdFactory } from "../../../../../shared/runtime/browser-id-factory";
 
 export type SheetGridFixtureOptions = {
   attachTo?: HTMLElement;
@@ -32,7 +33,9 @@ export type SheetGridFixtureOptions = {
 };
 
 export function mountSheetGrid(options?: SheetGridFixtureOptions) {
-  const session = reactive(createWorkbookSession()) as WorkbookSession;
+  const session = reactive(
+    createWorkbookSession({ idFactory: createBrowserIdFactory() }),
+  ) as WorkbookSession;
   const sheet = getActiveSheet(session.workbook);
   const wrapper = mount(SheetGrid, {
     attachTo: options?.attachTo,

@@ -1,20 +1,16 @@
 import { describe, expect, test } from "vitest";
+import { createTestWorkbookSession } from "../helpers.js";
 import {
   createAddSheetCommand,
   createDeleteSheetCommand,
   createRenameSheetCommand,
-} from "../../../../modules/workbook/commands";
-import {
-  createWorkbookSession,
-  executeWorkbookCommand,
-  redoWorkbookCommand,
-  undoWorkbookCommand,
-} from "../../../../modules/workbook/history";
-import { getWorkbookSheets, setActiveSheet } from "@idea10/core/workbook";
+} from "../../commands/index.js";
+import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
+import { getWorkbookSheets, setActiveSheet } from "../../workbook.js";
 
 describe("sheet commands", () => {
   test("adds a sheet, activates it, and restores map order through undo and redo", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const initialSheetId = session.workbook.activeSheetId;
 
     executeWorkbookCommand(session, createAddSheetCommand(session.workbook, { id: "sheet-2" }));
@@ -37,7 +33,7 @@ describe("sheet commands", () => {
   });
 
   test("renames and deletes sheets reversibly while selecting the next sheet after active deletion", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const firstSheetId = session.workbook.activeSheetId;
     executeWorkbookCommand(session, createAddSheetCommand(session.workbook, { id: "sheet-2" }));
     executeWorkbookCommand(session, createAddSheetCommand(session.workbook, { id: "sheet-3" }));
@@ -66,7 +62,7 @@ describe("sheet commands", () => {
   });
 
   test("does not allow the final sheet to be deleted", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
 
     expect(() =>
       createDeleteSheetCommand(session.workbook, session.workbook.activeSheetId),

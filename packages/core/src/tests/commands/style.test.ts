@@ -1,29 +1,25 @@
 import { describe, expect, test } from "vitest";
+import { createTestWorkbookSession } from "../helpers.js";
 import {
   createApplyCellBordersCommand,
   createApplyCellStyleCommand,
   createClearCellRangeCommand,
-} from "../../../../modules/workbook/commands";
-import { createClearCellStylePatch } from "@idea10/core/style";
-import {
-  createWorkbookSession,
-  executeWorkbookCommand,
-  redoWorkbookCommand,
-  undoWorkbookCommand,
-} from "../../../../modules/workbook/history";
+} from "../../commands/index.js";
+import { createClearCellStylePatch } from "../../style.js";
+import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import {
   getActiveSheet,
   getCellStyle,
   getCellValue,
   setCellStyle,
   setCellValue,
-} from "@idea10/core/workbook";
+} from "../../workbook.js";
 
 describe("cell style commands", () => {
   const border = { style: "thin" as const, color: "#123456" };
 
   test("applies a range patch as one entry and restores mixed styles exactly", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellStyle(sheet, { row: 0, column: 0 }, { bold: true, textColor: "#112233" });
     setCellStyle(sheet, { row: 0, column: 1 }, { italic: true });
@@ -70,7 +66,7 @@ describe("cell style commands", () => {
   });
 
   test("clears values without clearing styles", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 1, column: 1 }, "keep style");
     setCellStyle(sheet, { row: 1, column: 1 }, { underline: true });
@@ -91,7 +87,7 @@ describe("cell style commands", () => {
   });
 
   test("toggles wrapping as one reversible range style action", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 0, column: 0 }, "first");
     setCellValue(sheet, { row: 0, column: 1 }, "second");
@@ -121,7 +117,7 @@ describe("cell style commands", () => {
   });
 
   test("clears mixed styles without changing values and restores them exactly", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const firstStyle = {
       fontFamily: "Arial",
@@ -181,7 +177,7 @@ describe("cell style commands", () => {
   });
 
   test("does not record clearing an unformatted range", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
 
     expect(
@@ -199,7 +195,7 @@ describe("cell style commands", () => {
   });
 
   test("rejects style patches that would materialize an excessive range", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
 
     expect(() =>
@@ -213,7 +209,7 @@ describe("cell style commands", () => {
   });
 
   test("applies all borders to a single cell and restores its exact prior style", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     setCellStyle(sheet, { row: 3, column: 4 }, { bold: true });
 
@@ -241,7 +237,7 @@ describe("cell style commands", () => {
   });
 
   test("applies outer borders without clearing existing internal edges", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const preservedBorder = { style: "dotted" as const, color: "#abcdef" };
     setCellStyle(sheet, { row: 1, column: 1 }, { borderLeft: preservedBorder });
@@ -275,7 +271,7 @@ describe("cell style commands", () => {
   });
 
   test("applies both diagonal directions per cell and restores them through history", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const range = { start: { row: 1, column: 1 }, end: { row: 1, column: 2 } };
 
@@ -305,7 +301,7 @@ describe("cell style commands", () => {
   });
 
   test("uses right and bottom edges for internal borders and clears every edge with none", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const range = { start: { row: 0, column: 0 }, end: { row: 1, column: 1 } };
 
@@ -352,7 +348,7 @@ describe("cell style commands", () => {
   });
 
   test("does not record an internal border preset for a single cell", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
 
     expect(
@@ -369,7 +365,7 @@ describe("cell style commands", () => {
   });
 
   test("makes outer borders win against each conflicting external neighbor and restores them", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const oldBorder = { style: "double" as const, color: "#abcdef" };
     const range = { start: { row: 1, column: 1 }, end: { row: 2, column: 2 } };
@@ -405,7 +401,7 @@ describe("cell style commands", () => {
   });
 
   test("keeps matching intended all borders while clearing conflicting external edges", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const oldBorder = { style: "dashed" as const, color: "#abcdef" };
     const range = { start: { row: 1, column: 1 }, end: { row: 2, column: 2 } };
@@ -438,7 +434,7 @@ describe("cell style commands", () => {
   });
 
   test("clears conflicting internal and external shared edges for inner and none presets", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const oldBorder = { style: "dotted" as const, color: "#abcdef" };
     const innerRange = { start: { row: 4, column: 4 }, end: { row: 5, column: 5 } };
@@ -489,7 +485,7 @@ describe("cell style commands", () => {
   });
 
   test("clears neighboring shared edges when clear formatting explicitly removes borders", () => {
-    const session = createWorkbookSession();
+    const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const oldBorder = { style: "medium" as const, color: "#abcdef" };
     const range = { start: { row: 1, column: 1 }, end: { row: 1, column: 1 } };
