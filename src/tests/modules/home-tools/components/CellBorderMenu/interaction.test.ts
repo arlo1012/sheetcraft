@@ -3,7 +3,10 @@ import { afterEach, describe, expect, test } from "vitest";
 import CellBorderMenu from "../../../../../modules/home-tools/components/CellBorderMenu.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 
-const mountedWrappers: Array<{ host: HTMLElement; wrapper: { unmount(): void } }> = [];
+const mountedWrappers: Array<{
+  host: HTMLElement;
+  wrapper: { unmount(): void };
+}> = [];
 
 function mountMenu(locale: "en-US" | "zh-CN" = "en-US", disabled = false) {
   const host = document.createElement("div");
@@ -46,10 +49,38 @@ describe("CellBorderMenu interaction", () => {
     const menu = getMenu();
     expect(menu.attributes("role")).toBe("menu");
     expect(menu.findAll("[data-border-preset]")).toHaveLength(10);
-    expect(menu.findAll("[data-border-preset] span:not([aria-hidden])")).toHaveLength(0);
-    expect(menu.get('[data-border-preset="all"] .cell-border-menu__preview').classes()).toContain(
-      "cell-border-menu__preview--all",
-    );
+    expect(menu.findAll("[data-border-preset-icon]")).toHaveLength(10);
+    expect(
+      menu.findAll("[data-border-preset-icon]").every((icon) => icon.attributes("aria-hidden")),
+    ).toBe(true);
+    expect(
+      menu
+        .findAll("[data-border-preset-icon]")
+        .map((icon) => icon.attributes("data-border-preset-icon")),
+    ).toEqual([
+      "none",
+      "all",
+      "outer",
+      "inner",
+      "top",
+      "innerHorizontal",
+      "innerVertical",
+      "left",
+      "bottom",
+      "right",
+    ]);
+    expect(
+      menu
+        .get('[data-border-preset-icon="innerHorizontal"]')
+        .find(".cell-border-preset-icon__line.is-top")
+        .exists(),
+    ).toBe(false);
+    expect(
+      menu
+        .get('[data-border-preset-icon="innerVertical"]')
+        .find(".cell-border-preset-icon__line.is-left")
+        .exists(),
+    ).toBe(false);
     expect(menu.findAll("[data-border-menu-row]").map((item) => item.text())).toEqual([
       "Border color",
       "Border style",
@@ -151,12 +182,18 @@ describe("CellBorderMenu interaction", () => {
 
   test("stacks the submenu below the parent menu on narrow viewports", async () => {
     const previousWidth = window.innerWidth;
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
     const wrapper = mountMenu();
     await wrapper.get<HTMLButtonElement>("[data-cell-border-trigger]").trigger("click");
     await getMenu().get('[data-border-menu-row="settings"]').trigger("click");
 
     expect(getSubmenu("settings").attributes("data-border-submenu-layout")).toBe("stacked");
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: previousWidth,
+    });
   });
 });

@@ -13,6 +13,7 @@ import type { CellBorder, CellBorderAction, CellBorderLineStyle } from "../../wo
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import { getWorkbookHistoryShortcut } from "../history-shortcuts";
+import CellBorderPresetIcon from "./CellBorderPresetIcon.vue";
 
 type BorderSubmenu = "color" | "style" | "settings";
 
@@ -117,7 +118,10 @@ function selectPreset(action: CellBorderAction): void {
 function applyPreset(preset: Exclude<CellBorderAction["preset"], "none">): void {
   const normalizedColor = normalizeColor(color.value);
   if (normalizedColor)
-    selectPreset({ preset, border: { style: lineStyle.value, color: normalizedColor } });
+    selectPreset({
+      preset,
+      border: { style: lineStyle.value, color: normalizedColor },
+    });
 }
 function updateColor(event: Event): void {
   const nextColor = normalizeColor((event.target as HTMLInputElement).value);
@@ -288,10 +292,7 @@ onBeforeUnmount(() => {
           :title="t('format.borderNone')"
           @click="selectPreset({ preset: 'none' })"
         >
-          <span
-            class="cell-border-menu__preview cell-border-menu__preview--none"
-            aria-hidden="true"
-          />
+          <CellBorderPresetIcon preset="none" />
         </button>
         <button
           type="button"
@@ -302,10 +303,7 @@ onBeforeUnmount(() => {
           :title="t('format.borderAll')"
           @click="applyPreset('all')"
         >
-          <span
-            class="cell-border-menu__preview cell-border-menu__preview--all"
-            aria-hidden="true"
-          />
+          <CellBorderPresetIcon preset="all" />
         </button>
         <button
           type="button"
@@ -316,10 +314,7 @@ onBeforeUnmount(() => {
           :title="t('format.borderOuter')"
           @click="applyPreset('outer')"
         >
-          <span
-            class="cell-border-menu__preview cell-border-menu__preview--outer"
-            aria-hidden="true"
-          />
+          <CellBorderPresetIcon preset="outer" />
         </button>
         <button
           type="button"
@@ -330,10 +325,7 @@ onBeforeUnmount(() => {
           :title="t('format.borderInner')"
           @click="applyPreset('inner')"
         >
-          <span
-            class="cell-border-menu__preview cell-border-menu__preview--inner"
-            aria-hidden="true"
-          />
+          <CellBorderPresetIcon preset="inner" />
         </button>
         <button
           type="button"
@@ -344,10 +336,7 @@ onBeforeUnmount(() => {
           :title="t('format.borderTop')"
           @click="applyPreset('top')"
         >
-          <span
-            class="cell-border-menu__preview cell-border-menu__preview--top"
-            aria-hidden="true"
-          />
+          <CellBorderPresetIcon preset="top" />
         </button>
         <button
           type="button"
@@ -358,10 +347,7 @@ onBeforeUnmount(() => {
           :title="t('format.borderInnerHorizontal')"
           @click="applyPreset('innerHorizontal')"
         >
-          <span
-            class="cell-border-menu__preview cell-border-menu__preview--inner-horizontal"
-            aria-hidden="true"
-          />
+          <CellBorderPresetIcon preset="innerHorizontal" />
         </button>
         <button
           type="button"
@@ -372,10 +358,7 @@ onBeforeUnmount(() => {
           :title="t('format.borderInnerVertical')"
           @click="applyPreset('innerVertical')"
         >
-          <span
-            class="cell-border-menu__preview cell-border-menu__preview--inner-vertical"
-            aria-hidden="true"
-          />
+          <CellBorderPresetIcon preset="innerVertical" />
         </button>
         <button
           type="button"
@@ -386,10 +369,7 @@ onBeforeUnmount(() => {
           :title="t('format.borderLeft')"
           @click="applyPreset('left')"
         >
-          <span
-            class="cell-border-menu__preview cell-border-menu__preview--left"
-            aria-hidden="true"
-          />
+          <CellBorderPresetIcon preset="left" />
         </button>
         <button
           type="button"
@@ -400,10 +380,7 @@ onBeforeUnmount(() => {
           :title="t('format.borderBottom')"
           @click="applyPreset('bottom')"
         >
-          <span
-            class="cell-border-menu__preview cell-border-menu__preview--bottom"
-            aria-hidden="true"
-          />
+          <CellBorderPresetIcon preset="bottom" />
         </button>
         <button
           type="button"
@@ -414,10 +391,7 @@ onBeforeUnmount(() => {
           :title="t('format.borderRight')"
           @click="applyPreset('right')"
         >
-          <span
-            class="cell-border-menu__preview cell-border-menu__preview--right"
-            aria-hidden="true"
-          />
+          <CellBorderPresetIcon preset="right" />
         </button>
       </div>
       <div class="cell-border-menu__rows">
@@ -668,7 +642,9 @@ onBeforeUnmount(() => {
         </button>
       </template>
       <template v-else>
-        <div class="cell-border-menu__settings-heading">{{ t("format.borderMoreSettings") }}</div>
+        <div class="cell-border-menu__settings-heading">
+          {{ t("format.borderMoreSettings") }}
+        </div>
         <label class="cell-border-menu__settings-color"
           ><span>{{ t("format.borderColor") }}</span
           ><input
@@ -824,74 +800,6 @@ onBeforeUnmount(() => {
       }
     }
   }
-  &__preview {
-    position: relative;
-    display: block;
-    width: 16px;
-    height: 16px;
-    background-image:
-      linear-gradient(var(--td-border-level-1-color) 1px, transparent 1px),
-      linear-gradient(90deg, var(--td-border-level-1-color) 1px, transparent 1px);
-    background-position: -1px -1px;
-    background-size: 6px 6px;
-    &::after {
-      position: absolute;
-      inset: 0;
-      content: "";
-    }
-    &--none::after {
-      background: linear-gradient(
-        135deg,
-        transparent 45%,
-        var(--td-text-color-placeholder) 48%,
-        var(--td-text-color-placeholder) 52%,
-        transparent 55%
-      );
-    }
-    &--all::after {
-      border: 1px solid currentcolor;
-      background-image:
-        linear-gradient(currentcolor 1px, transparent 1px),
-        linear-gradient(90deg, currentcolor 1px, transparent 1px);
-      background-position: center;
-      background-repeat: no-repeat;
-      background-size:
-        100% 1px,
-        1px 100%;
-    }
-    &--all {
-      background-image: none;
-    }
-    &--outer::after {
-      border: 1px solid currentcolor;
-    }
-    &--inner::after {
-      background-image:
-        linear-gradient(currentcolor 1px, transparent 1px),
-        linear-gradient(90deg, currentcolor 1px, transparent 1px);
-      background-size: 6px 6px;
-    }
-    &--inner-horizontal::after {
-      background-image: linear-gradient(currentcolor 1px, transparent 1px);
-      background-size: 6px 6px;
-    }
-    &--inner-vertical::after {
-      background-image: linear-gradient(90deg, currentcolor 1px, transparent 1px);
-      background-size: 6px 6px;
-    }
-    &--top::after {
-      border-top: 1px solid currentcolor;
-    }
-    &--right::after {
-      border-right: 1px solid currentcolor;
-    }
-    &--bottom::after {
-      border-bottom: 1px solid currentcolor;
-    }
-    &--left::after {
-      border-left: 1px solid currentcolor;
-    }
-  }
   &__rows {
     display: grid;
     gap: 1px;
@@ -923,11 +831,14 @@ onBeforeUnmount(() => {
         white-space: nowrap;
       }
       &:hover,
-      &:focus-visible,
       &[aria-expanded="true"] {
         background: var(--td-bg-color-container-hover);
-        border-color: var(--td-brand-color);
         outline: none;
+      }
+      &:focus-visible {
+        background: var(--td-bg-color-container-hover);
+        outline: none;
+        box-shadow: 0 0 0 2px var(--td-brand-color-focus);
       }
     }
   }
