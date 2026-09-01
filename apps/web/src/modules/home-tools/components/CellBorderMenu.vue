@@ -1,19 +1,13 @@
 <script setup lang="ts">
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Grid2X2,
-  List,
-  PencilLine,
-  Settings2,
-} from "lucide-vue-next";
+import { ChevronDown, ChevronRight, Grid2X2, List, PencilLine, Settings2 } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import type { CellBorder, CellBorderAction, CellBorderLineStyle } from "@idea10/core/style";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import { getWorkbookHistoryShortcut } from "../history-shortcuts";
-import CellBorderPresetIcon from "./CellBorderPresetIcon.vue";
+import BorderColorPanel from "./BorderColorPanel.vue";
+import BorderLineStylePanel from "./BorderLineStylePanel.vue";
+import BorderPresetGrid from "./BorderPresetGrid.vue";
 
 type BorderSubmenu = "color" | "style" | "settings";
 
@@ -115,17 +109,13 @@ function selectPreset(action: CellBorderAction): void {
   emit("applyBorders", action);
   closeAll(true);
 }
-function applyPreset(preset: Exclude<CellBorderAction["preset"], "none">): void {
-  const normalizedColor = normalizeColor(color.value);
-  if (normalizedColor)
-    selectPreset({
-      preset,
-      border: { style: lineStyle.value, color: normalizedColor },
-    });
+function setColor(value: string): void {
+  const normalizedColor = normalizeColor(value);
+  if (normalizedColor) color.value = normalizedColor;
 }
+
 function updateColor(event: Event): void {
-  const nextColor = normalizeColor((event.target as HTMLInputElement).value);
-  if (nextColor) color.value = nextColor;
+  setColor((event.target as HTMLInputElement).value);
 }
 function selectLineStyle(style: CellBorderLineStyle): void {
   lineStyle.value = style;
@@ -282,140 +272,7 @@ onBeforeUnmount(() => {
       data-cell-border-panel
       @keydown="onMenuKeydown"
     >
-      <div class="cell-border-menu__presets" :aria-label="t('format.borderPresets')">
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-preset="none"
-          :aria-label="t('format.borderNone')"
-          :title="t('format.borderNone')"
-          @click="selectPreset({ preset: 'none' })"
-        >
-          <CellBorderPresetIcon preset="none" />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-preset="all"
-          :aria-label="t('format.borderAll')"
-          :title="t('format.borderAll')"
-          @click="applyPreset('all')"
-        >
-          <CellBorderPresetIcon preset="all" />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-preset="outer"
-          :aria-label="t('format.borderOuter')"
-          :title="t('format.borderOuter')"
-          @click="applyPreset('outer')"
-        >
-          <CellBorderPresetIcon preset="outer" />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-preset="inner"
-          :aria-label="t('format.borderInner')"
-          :title="t('format.borderInner')"
-          @click="applyPreset('inner')"
-        >
-          <CellBorderPresetIcon preset="inner" />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-preset="top"
-          :aria-label="t('format.borderTop')"
-          :title="t('format.borderTop')"
-          @click="applyPreset('top')"
-        >
-          <CellBorderPresetIcon preset="top" />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-preset="innerHorizontal"
-          :aria-label="t('format.borderInnerHorizontal')"
-          :title="t('format.borderInnerHorizontal')"
-          @click="applyPreset('innerHorizontal')"
-        >
-          <CellBorderPresetIcon preset="innerHorizontal" />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-preset="innerVertical"
-          :aria-label="t('format.borderInnerVertical')"
-          :title="t('format.borderInnerVertical')"
-          @click="applyPreset('innerVertical')"
-        >
-          <CellBorderPresetIcon preset="innerVertical" />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-preset="left"
-          :aria-label="t('format.borderLeft')"
-          :title="t('format.borderLeft')"
-          @click="applyPreset('left')"
-        >
-          <CellBorderPresetIcon preset="left" />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-preset="bottom"
-          :aria-label="t('format.borderBottom')"
-          :title="t('format.borderBottom')"
-          @click="applyPreset('bottom')"
-        >
-          <CellBorderPresetIcon preset="bottom" />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-preset="right"
-          :aria-label="t('format.borderRight')"
-          :title="t('format.borderRight')"
-          @click="applyPreset('right')"
-        >
-          <CellBorderPresetIcon preset="right" />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-preset="diagonalUp"
-          :aria-label="t('format.borderDiagonalUp')"
-          :title="t('format.borderDiagonalUp')"
-          @click="applyPreset('diagonalUp')"
-        >
-          <CellBorderPresetIcon preset="diagonalUp" />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-preset="diagonalDown"
-          :aria-label="t('format.borderDiagonalDown')"
-          :title="t('format.borderDiagonalDown')"
-          @click="applyPreset('diagonalDown')"
-        >
-          <CellBorderPresetIcon preset="diagonalDown" />
-        </button>
-      </div>
+      <BorderPresetGrid :border="{ style: lineStyle, color }" @select="selectPreset" />
       <div class="cell-border-menu__rows">
         <button
           ref="colorRowRef"
@@ -428,8 +285,9 @@ onBeforeUnmount(() => {
           :aria-controls="activeSubmenu === 'color' ? submenuId : undefined"
           @click="openSubmenu('color')"
         >
-          <PencilLine :size="16" aria-hidden="true" /><span>{{ t("format.borderColor") }}</span
-          ><ChevronRight :size="15" aria-hidden="true" />
+          <PencilLine :size="16" aria-hidden="true" />
+          <span>{{ t("format.borderColor") }}</span>
+          <ChevronRight :size="15" aria-hidden="true" />
         </button>
         <button
           ref="styleRowRef"
@@ -442,8 +300,9 @@ onBeforeUnmount(() => {
           :aria-controls="activeSubmenu === 'style' ? submenuId : undefined"
           @click="openSubmenu('style')"
         >
-          <List :size="16" aria-hidden="true" /><span>{{ t("format.borderLineStyle") }}</span
-          ><ChevronRight :size="15" aria-hidden="true" />
+          <List :size="16" aria-hidden="true" />
+          <span>{{ t("format.borderLineStyle") }}</span>
+          <ChevronRight :size="15" aria-hidden="true" />
         </button>
         <button
           ref="settingsRowRef"
@@ -456,10 +315,9 @@ onBeforeUnmount(() => {
           :aria-controls="activeSubmenu === 'settings' ? submenuId : undefined"
           @click="openSubmenu('settings')"
         >
-          <Settings2 :size="16" aria-hidden="true" /><span>{{
-            t("format.borderMoreSettings")
-          }}</span
-          ><ChevronRight :size="15" aria-hidden="true" />
+          <Settings2 :size="16" aria-hidden="true" />
+          <span>{{ t("format.borderMoreSettings") }}</span>
+          <ChevronRight :size="15" aria-hidden="true" />
         </button>
       </div>
     </div>
@@ -483,261 +341,31 @@ onBeforeUnmount(() => {
       :data-border-submenu-layout="stackedSubmenu ? 'stacked' : 'side'"
       @keydown="onSubmenuKeydown"
     >
-      <template v-if="activeSubmenu === 'color'">
-        <div
-          class="cell-border-menu__color-grid"
-          role="radiogroup"
-          :aria-label="t('format.borderColor')"
-        >
-          <button
-            type="button"
-            role="radio"
-            data-border-color="#20242c"
-            :aria-label="t('format.borderColorValue', { value: '#20242c' })"
-            :aria-checked="color === '#20242c'"
-            @click="color = '#20242c'"
-          >
-            <span style="--border-swatch-color: #20242c" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            role="radio"
-            data-border-color="#6b7280"
-            :aria-label="t('format.borderColorValue', { value: '#6b7280' })"
-            :aria-checked="color === '#6b7280'"
-            @click="color = '#6b7280'"
-          >
-            <span style="--border-swatch-color: #6b7280" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            role="radio"
-            data-border-color="#ef4444"
-            :aria-label="t('format.borderColorValue', { value: '#ef4444' })"
-            :aria-checked="color === '#ef4444'"
-            @click="color = '#ef4444'"
-          >
-            <span style="--border-swatch-color: #ef4444" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            role="radio"
-            data-border-color="#f97316"
-            :aria-label="t('format.borderColorValue', { value: '#f97316' })"
-            :aria-checked="color === '#f97316'"
-            @click="color = '#f97316'"
-          >
-            <span style="--border-swatch-color: #f97316" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            role="radio"
-            data-border-color="#eab308"
-            :aria-label="t('format.borderColorValue', { value: '#eab308' })"
-            :aria-checked="color === '#eab308'"
-            @click="color = '#eab308'"
-          >
-            <span style="--border-swatch-color: #eab308" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            role="radio"
-            data-border-color="#22c55e"
-            :aria-label="t('format.borderColorValue', { value: '#22c55e' })"
-            :aria-checked="color === '#22c55e'"
-            @click="color = '#22c55e'"
-          >
-            <span style="--border-swatch-color: #22c55e" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            role="radio"
-            data-border-color="#3b82f6"
-            :aria-label="t('format.borderColorValue', { value: '#3b82f6' })"
-            :aria-checked="color === '#3b82f6'"
-            @click="color = '#3b82f6'"
-          >
-            <span style="--border-swatch-color: #3b82f6" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            role="radio"
-            data-border-color="#8b5cf6"
-            :aria-label="t('format.borderColorValue', { value: '#8b5cf6' })"
-            :aria-checked="color === '#8b5cf6'"
-            @click="color = '#8b5cf6'"
-          >
-            <span style="--border-swatch-color: #8b5cf6" aria-hidden="true" />
-          </button>
-        </div>
-        <label class="cell-border-menu__custom-color"
-          ><span>{{ t("format.customBorderColor") }}</span
-          ><input
-            :value="color"
-            type="color"
-            data-border-custom-color
-            :aria-label="t('format.customBorderColor')"
-            @input="updateColor"
-        /></label>
-      </template>
-      <template v-else-if="activeSubmenu === 'style'">
-        <button
-          type="button"
-          role="menuitemradio"
-          data-border-line-option="thin"
-          :aria-label="t('format.borderLineThin')"
-          :aria-checked="lineStyle === 'thin'"
-          @click="selectLineStyle('thin')"
-        >
-          <span
-            class="cell-border-menu__line-sample cell-border-menu__line-sample--thin"
-            aria-hidden="true"
-          /><Check :size="15" :class="{ 'is-visible': lineStyle === 'thin' }" aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          role="menuitemradio"
-          data-border-line-option="medium"
-          :aria-label="t('format.borderLineMedium')"
-          :aria-checked="lineStyle === 'medium'"
-          @click="selectLineStyle('medium')"
-        >
-          <span
-            class="cell-border-menu__line-sample cell-border-menu__line-sample--medium"
-            aria-hidden="true"
-          /><Check
-            :size="15"
-            :class="{ 'is-visible': lineStyle === 'medium' }"
-            aria-hidden="true"
-          />
-        </button>
-        <button
-          type="button"
-          role="menuitemradio"
-          data-border-line-option="dashed"
-          :aria-label="t('format.borderLineDashed')"
-          :aria-checked="lineStyle === 'dashed'"
-          @click="selectLineStyle('dashed')"
-        >
-          <span
-            class="cell-border-menu__line-sample cell-border-menu__line-sample--dashed"
-            aria-hidden="true"
-          /><Check
-            :size="15"
-            :class="{ 'is-visible': lineStyle === 'dashed' }"
-            aria-hidden="true"
-          />
-        </button>
-        <button
-          type="button"
-          role="menuitemradio"
-          data-border-line-option="dotted"
-          :aria-label="t('format.borderLineDotted')"
-          :aria-checked="lineStyle === 'dotted'"
-          @click="selectLineStyle('dotted')"
-        >
-          <span
-            class="cell-border-menu__line-sample cell-border-menu__line-sample--dotted"
-            aria-hidden="true"
-          /><Check
-            :size="15"
-            :class="{ 'is-visible': lineStyle === 'dotted' }"
-            aria-hidden="true"
-          />
-        </button>
-        <button
-          type="button"
-          role="menuitemradio"
-          data-border-line-option="double"
-          :aria-label="t('format.borderLineDouble')"
-          :aria-checked="lineStyle === 'double'"
-          @click="selectLineStyle('double')"
-        >
-          <span
-            class="cell-border-menu__line-sample cell-border-menu__line-sample--double"
-            aria-hidden="true"
-          /><Check
-            :size="15"
-            :class="{ 'is-visible': lineStyle === 'double' }"
-            aria-hidden="true"
-          />
-        </button>
-      </template>
+      <BorderColorPanel v-if="activeSubmenu === 'color'" :model-value="color" @update="setColor" />
+      <BorderLineStylePanel
+        v-else-if="activeSubmenu === 'style'"
+        :model-value="lineStyle"
+        @select="selectLineStyle"
+      />
       <template v-else>
         <div class="cell-border-menu__settings-heading">
           {{ t("format.borderMoreSettings") }}
         </div>
-        <label class="cell-border-menu__settings-color"
-          ><span>{{ t("format.borderColor") }}</span
-          ><input
+        <label class="cell-border-menu__settings-color">
+          <span>{{ t("format.borderColor") }}</span>
+          <input
             :value="color"
             type="color"
             data-border-settings-color
             :aria-label="t('format.borderColor')"
             @input="updateColor"
-        /></label>
-        <div class="cell-border-menu__settings-styles" :aria-label="t('format.borderLineStyle')">
-          <button
-            type="button"
-            data-border-settings-style="thin"
-            :aria-label="t('format.borderLineThin')"
-            :aria-pressed="lineStyle === 'thin'"
-            @click="lineStyle = 'thin'"
-          >
-            <span
-              class="cell-border-menu__line-sample cell-border-menu__line-sample--thin"
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            type="button"
-            data-border-settings-style="medium"
-            :aria-label="t('format.borderLineMedium')"
-            :aria-pressed="lineStyle === 'medium'"
-            @click="lineStyle = 'medium'"
-          >
-            <span
-              class="cell-border-menu__line-sample cell-border-menu__line-sample--medium"
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            type="button"
-            data-border-settings-style="dashed"
-            :aria-label="t('format.borderLineDashed')"
-            :aria-pressed="lineStyle === 'dashed'"
-            @click="lineStyle = 'dashed'"
-          >
-            <span
-              class="cell-border-menu__line-sample cell-border-menu__line-sample--dashed"
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            type="button"
-            data-border-settings-style="dotted"
-            :aria-label="t('format.borderLineDotted')"
-            :aria-pressed="lineStyle === 'dotted'"
-            @click="lineStyle = 'dotted'"
-          >
-            <span
-              class="cell-border-menu__line-sample cell-border-menu__line-sample--dotted"
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            type="button"
-            data-border-settings-style="double"
-            :aria-label="t('format.borderLineDouble')"
-            :aria-pressed="lineStyle === 'double'"
-            @click="lineStyle = 'double'"
-          >
-            <span
-              class="cell-border-menu__line-sample cell-border-menu__line-sample--double"
-              aria-hidden="true"
-            />
-          </button>
-        </div>
+          />
+        </label>
+        <BorderLineStylePanel
+          variant="settings"
+          :model-value="lineStyle"
+          @select="lineStyle = $event"
+        />
       </template>
     </div>
   </Teleport>
@@ -793,35 +421,6 @@ onBeforeUnmount(() => {
     width: 168px;
     padding: 5px;
   }
-  &__presets {
-    display: grid;
-    grid-template-columns: repeat(4, 26px);
-    grid-template-rows: repeat(3, 26px);
-    justify-content: space-between;
-    gap: 2px;
-    padding-bottom: 5px;
-    > button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 26px;
-      height: 26px;
-      padding: 0;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 2px;
-      color: var(--idea-text-primary);
-      cursor: pointer;
-      &:hover,
-      &:focus-visible {
-        background: var(--idea-surface-hover);
-        outline: none;
-      }
-      &:focus-visible {
-        box-shadow: 0 0 0 2px var(--idea-action-focus);
-      }
-    }
-  }
   &__rows {
     display: grid;
     gap: 1px;
@@ -868,85 +467,6 @@ onBeforeUnmount(() => {
     width: 174px;
     padding: 6px;
   }
-  &__submenu.is-style {
-    display: grid;
-    gap: 2px;
-  }
-  &__submenu.is-style > button {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 16px;
-    align-items: center;
-    width: 100%;
-    height: 29px;
-    padding: 0 7px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 2px;
-    cursor: pointer;
-    &:hover,
-    &:focus-visible {
-      background: var(--idea-surface-hover);
-      border-color: var(--idea-action-primary);
-      outline: none;
-    }
-    > svg {
-      opacity: 0;
-      color: var(--idea-action-primary);
-    }
-    > svg.is-visible {
-      opacity: 1;
-    }
-  }
-  &__line-sample {
-    display: block;
-    width: 100%;
-    height: 0;
-    border-top: 1px solid var(--idea-text-primary);
-  }
-  &__line-sample--medium {
-    border-top-width: 2px;
-  }
-  &__line-sample--dashed {
-    border-top-style: dashed;
-  }
-  &__line-sample--dotted {
-    border-top-style: dotted;
-  }
-  &__line-sample--double {
-    height: 3px;
-    border-top: 3px double var(--idea-text-primary);
-  }
-  &__color-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-    padding-bottom: 7px;
-    border-bottom: 1px solid var(--idea-border-subtle);
-    > button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      height: 24px;
-      padding: 3px;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 2px;
-      cursor: pointer;
-      &:hover,
-      &:focus-visible,
-      &[aria-checked="true"] {
-        border-color: var(--idea-action-primary);
-        outline: none;
-      }
-      > span {
-        width: 100%;
-        height: 100%;
-        background: var(--border-swatch-color);
-        border: 1px solid var(--idea-border-control);
-      }
-    }
-  }
-  &__custom-color,
   &__settings-color {
     display: flex;
     align-items: center;
@@ -964,9 +484,6 @@ onBeforeUnmount(() => {
       cursor: pointer;
     }
   }
-  &__custom-color {
-    margin-top: 7px;
-  }
   &__submenu.is-settings {
     display: grid;
     gap: 9px;
@@ -976,29 +493,6 @@ onBeforeUnmount(() => {
     color: var(--idea-text-primary);
     font-size: 13px;
     font-weight: 600;
-  }
-  &__settings-styles {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 3px;
-  }
-  &__settings-styles > button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 26px;
-    padding: 0 3px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 2px;
-    cursor: pointer;
-    &:hover,
-    &:focus-visible,
-    &[aria-pressed="true"] {
-      background: var(--idea-surface-hover);
-      border-color: var(--idea-action-primary);
-      outline: none;
-    }
   }
 }
 @media (prefers-reduced-motion: reduce) {

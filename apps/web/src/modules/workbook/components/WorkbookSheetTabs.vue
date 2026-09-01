@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { MoreHorizontal, Plus } from "lucide-vue-next";
+import { Plus } from "lucide-vue-next";
 import { nextTick, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { Sheet } from "@idea10/core/workbook";
+import SheetTabMenu from "./SheetTabMenu.vue";
 
 const { t } = useAppI18n();
 
@@ -22,10 +23,15 @@ const renamingSheetId = ref<string>();
 const renameValue = ref("");
 const renameInput = ref<HTMLInputElement>();
 const tabButtons = new Map<string, HTMLButtonElement>();
-const menuTriggerButtons = new Map<string, HTMLButtonElement>();
+type SheetTabMenuInstance = ComponentPublicInstance & {
+  containsTarget: (target: Node) => boolean;
+  focusTrigger: () => void;
+  getTriggerRect: () => DOMRect | undefined;
+};
+
+const sheetTabMenus = new Map<string, SheetTabMenuInstance>();
 const openMenuSheetId = ref<string>();
 const root = ref<HTMLElement>();
-const menuRoot = ref<HTMLElement>();
 const menuPosition = ref({ left: 4, bottom: 34 });
 
 function setRenameInput(input: Element | ComponentPublicInstance | null): void {
@@ -40,19 +46,15 @@ function setTabButton(sheetId: string, element: Element | ComponentPublicInstanc
   }
 }
 
-function setMenuTriggerButton(
+function setSheetTabMenu(
   sheetId: string,
-  element: Element | ComponentPublicInstance | null,
+  instance: Element | ComponentPublicInstance | null,
 ): void {
-  if (element instanceof HTMLButtonElement) {
-    menuTriggerButtons.set(sheetId, element);
+  if (instance && "focusTrigger" in instance && "containsTarget" in instance) {
+    sheetTabMenus.set(sheetId, instance as SheetTabMenuInstance);
   } else {
-    menuTriggerButtons.delete(sheetId);
+    sheetTabMenus.delete(sheetId);
   }
-}
-
-function setMenuRoot(element: Element | ComponentPublicInstance | null): void {
-  menuRoot.value = element instanceof HTMLElement ? element : undefined;
 }
 
 function startRename(sheet: Sheet): void {
@@ -73,15 +75,11 @@ function cancelRename(): void {
   renamingSheetId.value = undefined;
 }
 
-function menuId(sheetId: string): string {
-  return `workbook-sheet-menu-${sheetId}`;
-}
-
 function closeMenu(restoreFocus = false): void {
   const sheetId = openMenuSheetId.value;
   openMenuSheetId.value = undefined;
   if (restoreFocus && sheetId) {
-    void nextTick(() => menuTriggerButtons.get(sheetId)?.focus());
+    void nextTick(() => sheetTabMenus.get(sheetId)?.focusTrigger());
   }
 }
 
@@ -96,13 +94,10 @@ function openMenu(sheet: Sheet, pointer?: { clientX: number; clientY: number }):
   if (pointer) {
     setMenuPosition(pointer.clientX, pointer.clientY);
   } else {
-    const rect = menuTriggerButtons.get(sheet.id)?.getBoundingClientRect();
+    const rect = sheetTabMenus.get(sheet.id)?.getTriggerRect();
     setMenuPosition(rect?.left ?? 4, rect?.top ?? window.innerHeight - 30);
   }
   openMenuSheetId.value = sheet.id;
-  void nextTick(() => {
-    menuRoot.value?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
-  });
 }
 
 function toggleMenu(sheet: Sheet): void {
@@ -141,7 +136,7 @@ function onDocumentPointerDown(event: PointerEvent): void {
     openMenuSheetId.value &&
     event.target instanceof Node &&
     !root.value?.contains(event.target) &&
-    !menuRoot.value?.contains(event.target)
+    !sheetTabMenus.get(openMenuSheetId.value)?.containsTarget(event.target)
   ) {
     closeMenu();
   }
@@ -152,36 +147,6 @@ function onDocumentKeydown(event: KeyboardEvent): void {
     event.preventDefault();
     closeMenu(true);
   }
-}
-
-function onMenuKeydown(event: KeyboardEvent): void {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    closeMenu(true);
-    return;
-  }
-  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-    return;
-  }
-  const items = Array.from(
-    menuRoot.value?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [],
-  );
-  if (items.length === 0) {
-    return;
-  }
-  event.preventDefault();
-  const currentIndex = items.findIndex((item) => item === document.activeElement);
-  let nextIndex: number;
-  if (event.key === "Home") {
-    nextIndex = 0;
-  } else if (event.key === "End") {
-    nextIndex = items.length - 1;
-  } else if (event.key === "ArrowUp") {
-    nextIndex = currentIndex <= 0 ? items.length - 1 : currentIndex - 1;
-  } else {
-    nextIndex = currentIndex < 0 || currentIndex === items.length - 1 ? 0 : currentIndex + 1;
-  }
-  items[nextIndex]?.focus();
 }
 
 onMounted(() => {
@@ -255,42 +220,17 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
         >
           {{ sheet.name }}
         </button>
-        <button
-          :ref="(element) => setMenuTriggerButton(sheet.id, element)"
-          class="workbook-sheet-tabs__menu-trigger"
-          type="button"
-          :aria-label="t('sheetTabs.menu', { name: sheet.name })"
-          aria-haspopup="menu"
-          :aria-controls="openMenuSheetId === sheet.id ? menuId(sheet.id) : undefined"
-          :aria-expanded="openMenuSheetId === sheet.id"
-          @click="toggleMenu(sheet)"
-        >
-          <MoreHorizontal :size="15" aria-hidden="true" />
-        </button>
-        <Teleport to="body">
-          <div
-            v-if="openMenuSheetId === sheet.id"
-            :id="menuId(sheet.id)"
-            :ref="setMenuRoot"
-            class="workbook-sheet-tabs__menu"
-            role="menu"
-            :aria-label="t('sheetTabs.menu', { name: sheet.name })"
-            :style="{ left: `${menuPosition.left}px`, bottom: `${menuPosition.bottom}px` }"
-            @keydown="onMenuKeydown"
-          >
-            <button type="button" role="menuitem" @click="renameFromMenu(sheet)">
-              {{ t("sheetTabs.renameAction") }}
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              :disabled="props.sheets.length === 1"
-              @click="deleteFromMenu(sheet)"
-            >
-              {{ t("sheetTabs.deleteAction") }}
-            </button>
-          </div>
-        </Teleport>
+        <SheetTabMenu
+          :ref="(instance) => setSheetTabMenu(sheet.id, instance)"
+          :sheet="sheet"
+          :sheet-count="props.sheets.length"
+          :is-open="openMenuSheetId === sheet.id"
+          :position="menuPosition"
+          @toggle="toggleMenu(sheet)"
+          @rename="renameFromMenu(sheet)"
+          @delete="deleteFromMenu(sheet)"
+          @close="closeMenu(true)"
+        />
       </div>
     </div>
     <button
@@ -324,8 +264,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
   }
 
   &__tab,
-  &__rename-input,
-  &__menu-trigger {
+  &__rename-input {
     width: 112px;
     min-width: 72px;
     padding: 0 10px;
@@ -359,22 +298,6 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     }
   }
 
-  &__menu-trigger {
-    display: grid;
-    width: 24px;
-    min-width: 24px;
-    place-items: center;
-    padding: 0;
-    cursor: pointer;
-
-    &[aria-expanded="true"],
-    &:hover,
-    &:focus-visible {
-      background: var(--idea-surface-hover);
-      outline: none;
-    }
-  }
-
   &__rename-input {
     outline: 2px solid var(--idea-action-primary);
     outline-offset: -2px;
@@ -399,45 +322,6 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     &:focus-visible {
       background: var(--idea-surface-hover);
       outline: none;
-    }
-  }
-
-  &__menu {
-    position: fixed;
-    z-index: 80;
-    display: grid;
-    min-width: 132px;
-    padding: 4px;
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-control);
-    border-radius: 4px;
-    box-shadow: var(--idea-shadow-floating, 0 3px 10px rgb(0 0 0 / 12%));
-
-    button {
-      min-height: 28px;
-      padding: 0 8px;
-      background: transparent;
-      border: 0;
-      border-radius: 3px;
-      color: var(--idea-text-primary);
-      font: inherit;
-      text-align: left;
-      white-space: nowrap;
-
-      &:not(:disabled) {
-        cursor: pointer;
-      }
-
-      &:hover:not(:disabled),
-      &:focus-visible:not(:disabled) {
-        background: var(--idea-surface-hover);
-        outline: none;
-      }
-
-      &:disabled {
-        color: var(--idea-text-disabled);
-        cursor: not-allowed;
-      }
     }
   }
 }

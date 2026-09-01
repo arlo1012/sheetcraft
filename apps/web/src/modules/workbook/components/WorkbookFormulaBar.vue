@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronUp, Search } from "lucide-vue-next";
 import { nextTick, ref, watch } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import type { CellAddress } from "@idea10/core/workbook";
+import WorkbookFormulaBarAddressInput from "./WorkbookFormulaBarAddressInput.vue";
+import WorkbookFormulaBarSearchControls from "./WorkbookFormulaBarSearchControls.vue";
 
 const props = defineProps<{
   address: CellAddress;
@@ -21,25 +22,13 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const addressInput = ref<HTMLInputElement>();
 const formulaInput = ref<HTMLTextAreaElement>();
-const addressDraft = ref(props.addressLabel);
 const formulaDraft = ref(props.inputValue);
 const formulaSourceValue = ref(props.inputValue);
 const formulaTarget = ref<CellAddress>({ ...props.address });
 const formulaTargetLabel = ref(props.addressLabel);
-const addressFocused = ref(false);
 const formulaFocused = ref(false);
 const isComposing = ref(false);
-
-watch(
-  () => props.addressLabel,
-  (address) => {
-    if (!addressFocused.value) {
-      addressDraft.value = address;
-    }
-  },
-);
 
 watch(
   () => [props.address.row, props.address.column, props.inputValue] as const,
@@ -59,41 +48,6 @@ function syncFormulaFromProps(): void {
   formulaTargetLabel.value = props.addressLabel;
   formulaSourceValue.value = props.inputValue;
   formulaDraft.value = props.inputValue;
-}
-
-function resetAddress(): void {
-  addressDraft.value = props.addressLabel;
-}
-
-function onAddressInput(event: Event): void {
-  addressDraft.value = readInputValue(event).toUpperCase();
-}
-
-function onAddressFocus(event: FocusEvent): void {
-  addressFocused.value = true;
-  (event.target as HTMLInputElement).select();
-}
-
-function onAddressBlur(): void {
-  addressFocused.value = false;
-  resetAddress();
-}
-
-function submitAddress(): void {
-  emit("navigate", addressDraft.value.trim().toUpperCase());
-  resetAddress();
-  addressInput.value?.blur();
-}
-
-function onAddressKeydown(event: KeyboardEvent): void {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    submitAddress();
-  } else if (event.key === "Escape") {
-    event.preventDefault();
-    resetAddress();
-    addressInput.value?.blur();
-  }
 }
 
 function onFormulaFocus(): void {
@@ -163,18 +117,6 @@ function onFormulaBlur(): void {
   formulaFocused.value = false;
   void nextTick(syncFormulaFromProps);
 }
-
-function onSearchInput(event: Event): void {
-  emit("updateSearchQuery", readInputValue(event));
-}
-
-function onSearchKeydown(event: KeyboardEvent): void {
-  if (event.key !== "Enter" || event.isComposing) {
-    return;
-  }
-  event.preventDefault();
-  emit("find", event.shiftKey ? "backward" : "forward");
-}
 </script>
 
 <template>
@@ -184,29 +126,10 @@ function onSearchKeydown(event: KeyboardEvent): void {
     :aria-label="t('formulaBar.label')"
     data-formula-bar
   >
-    <form
-      class="workbook-formula-bar__address"
-      :aria-label="t('formulaBar.goToCell')"
-      @submit.prevent="submitAddress"
-    >
-      <label class="workbook-formula-bar__field">
-        <span class="ui-visually-hidden">{{ t("formulaBar.cellAddress") }}</span>
-        <input
-          ref="addressInput"
-          class="workbook-formula-bar__address-input"
-          :value="addressDraft"
-          type="text"
-          autocomplete="off"
-          :spellcheck="false"
-          :aria-label="t('formulaBar.cellAddress')"
-          data-address-input
-          @input="onAddressInput"
-          @focus="onAddressFocus"
-          @blur="onAddressBlur"
-          @keydown="onAddressKeydown"
-        />
-      </label>
-    </form>
+    <WorkbookFormulaBarAddressInput
+      :address-label="addressLabel"
+      @navigate="emit('navigate', $event)"
+    />
 
     <span class="workbook-formula-bar__fx" aria-hidden="true">fx</span>
 
@@ -239,42 +162,11 @@ function onSearchKeydown(event: KeyboardEvent): void {
       />
     </label>
 
-    <div class="workbook-formula-bar__search" role="search">
-      <Search class="workbook-formula-bar__search-icon" :size="14" aria-hidden="true" />
-      <label class="workbook-formula-bar__field workbook-formula-bar__search-field">
-        <span class="ui-visually-hidden">{{ t("navigation.findInSheet") }}</span>
-        <input
-          class="workbook-formula-bar__search-input"
-          :value="searchQuery"
-          type="search"
-          autocomplete="off"
-          :spellcheck="false"
-          :aria-label="t('navigation.findInSheet')"
-          :placeholder="t('navigation.findPlaceholder')"
-          data-search-input
-          @input="onSearchInput"
-          @keydown="onSearchKeydown"
-        />
-      </label>
-      <button
-        class="workbook-formula-bar__search-action"
-        type="button"
-        :aria-label="t('navigation.findPrevious')"
-        :title="t('navigation.findPrevious')"
-        @click="emit('find', 'backward')"
-      >
-        <ChevronUp :size="15" aria-hidden="true" />
-      </button>
-      <button
-        class="workbook-formula-bar__search-action"
-        type="button"
-        :aria-label="t('navigation.findNext')"
-        :title="t('navigation.findNext')"
-        @click="emit('find', 'forward')"
-      >
-        <ChevronDown :size="15" aria-hidden="true" />
-      </button>
-    </div>
+    <WorkbookFormulaBarSearchControls
+      :search-query="searchQuery"
+      @update-search-query="emit('updateSearchQuery', $event)"
+      @find="emit('find', $event)"
+    />
   </div>
 </template>
 
@@ -288,7 +180,6 @@ function onSearchKeydown(event: KeyboardEvent): void {
   background: var(--idea-surface-secondary);
   border-bottom: 1px solid var(--idea-border-control);
 
-  &__address,
   &__field,
   &__formula {
     min-width: 0;
@@ -300,13 +191,7 @@ function onSearchKeydown(event: KeyboardEvent): void {
     display: block;
   }
 
-  &__address {
-    padding: 4px 6px;
-  }
-
-  &__address-input,
-  &__formula-input,
-  &__search-input {
+  &__formula-input {
     width: 100%;
     min-width: 0;
     height: 100%;
@@ -322,11 +207,6 @@ function onSearchKeydown(event: KeyboardEvent): void {
     &:focus {
       border-color: var(--idea-action-primary);
     }
-  }
-
-  &__address-input {
-    text-align: center;
-    font-variant-numeric: tabular-nums;
   }
 
   &__fx {
@@ -359,72 +239,12 @@ function onSearchKeydown(event: KeyboardEvent): void {
     }
   }
 
-  &__search {
-    display: grid;
-    grid-template-columns: 14px minmax(64px, 1fr) 24px 24px;
-    align-items: center;
-    gap: 2px;
-    min-width: 0;
-    height: 100%;
-    padding: 4px 6px 4px 4px;
-    border-left: 1px solid var(--idea-border-control);
-    color: var(--idea-text-muted);
-  }
-
-  &__search-field {
-    overflow: hidden;
-  }
-
-  &__search-input {
-    padding-right: 6px;
-    padding-left: 6px;
-
-    &::-webkit-search-cancel-button {
-      display: none;
-    }
-  }
-
-  &__search-action {
-    display: inline-grid;
-    width: 24px;
-    height: 24px;
-    place-items: center;
-    padding: 0;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 3px;
-    color: var(--idea-text-secondary);
-    cursor: pointer;
-
-    &:hover,
-    &:focus-visible {
-      background: var(--idea-surface-hover);
-      border-color: var(--idea-border-control);
-      outline: none;
-    }
-  }
-
   @media (max-width: 520px) {
     grid-template-columns: 72px 24px minmax(64px, 1fr) 128px;
-
-    &__address {
-      padding-right: 4px;
-      padding-left: 4px;
-    }
 
     &__formula {
       padding-right: 4px;
       padding-left: 4px;
-    }
-
-    &__search {
-      grid-template-columns: minmax(64px, 1fr) 24px 24px;
-      padding-right: 2px;
-      padding-left: 2px;
-    }
-
-    &__search-icon {
-      display: none;
     }
   }
 }
