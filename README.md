@@ -24,10 +24,11 @@ bun run format:check
 bun run build
 ```
 
-The test tree mirrors source ownership. For example,
-`src/modules/workbook/input.ts` maps to `src/tests/modules/workbook/input/`,
-where number, text, and formatting scenarios live in small test files. Run that
-directory as its aggregate entry instead of adding a package script per case.
+The Web test tree mirrors source ownership. For example,
+`apps/web/src/modules/workbook/input.ts` maps to
+`apps/web/src/tests/modules/workbook/input/`, where number, text, and formatting
+scenarios live in small test files. Run that directory as its aggregate entry
+instead of adding a package script per case.
 
 The development server listens on `0.0.0.0:7200`.
 
@@ -46,12 +47,15 @@ component-specific layout and interaction states.
 
 ## Source Modules
 
-- `src/app`: application bootstrap and top-level composition.
-- `src/modules/workbook`: sparse workbook data, input parsing, commands, and
-  inverse-command history.
-- `src/modules/sheet-grid`: viewport geometry, selection movement, concrete grid
-  components, and editor interactions.
-- `src/shared`: proven cross-module primitives, utilities, and style tokens.
+- `apps/web/src/app`: Web application bootstrap and top-level composition.
+- `apps/web/src/modules/workbook`: sparse workbook data, input parsing,
+  commands, and inverse-command history pending extraction to `@idea10/core`.
+- `apps/web/src/modules/sheet-grid`: viewport geometry, selection movement,
+  concrete grid components, and editor interactions.
+- `apps/web/src/shared`: proven cross-module Web primitives, utilities, and
+  style tokens.
+- `packages`: runtime-neutral packages shared by Web, workers, servers, and
+  other frontends.
 
 Do not create a shared abstraction for code used by only one module.
 

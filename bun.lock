@@ -4,13 +4,6 @@
   "workspaces": {
     "": {
       "name": "idea10",
-      "dependencies": {
-        "@floating-ui/vue": "^2.0.1",
-        "lucide-vue-next": "^1.0.0",
-        "tdesign-vue-next": "^1.20.7",
-        "vue": "^3.5.41",
-        "vue-i18n": "^11.4.10",
-      },
       "devDependencies": {
         "@types/node": "^26.3.0",
         "@vitejs/plugin-vue": "^6.0.8",
@@ -23,6 +16,17 @@
         "vite": "^8.2.2",
         "vitest": "^4.1.11",
         "vue-tsc": "^3.3.11",
+      },
+    },
+    "apps/web": {
+      "name": "@idea10/web",
+      "version": "0.0.0",
+      "dependencies": {
+        "@floating-ui/vue": "^2.0.1",
+        "lucide-vue-next": "^1.0.0",
+        "tdesign-vue-next": "^1.20.7",
+        "vue": "^3.5.41",
+        "vue-i18n": "^11.4.10",
       },
     },
   },
@@ -44,6 +48,8 @@
     "@floating-ui/utils": ["@floating-ui/utils@0.2.12", "", {}, "sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww=="],
 
     "@floating-ui/vue": ["@floating-ui/vue@2.0.1", "", { "dependencies": { "@floating-ui/dom": "^1.8.0", "@floating-ui/utils": "^0.2.12" }, "peerDependencies": { "vue": ">=3.3.0" } }, "sha512-043dyEKD9TDSfz080YH2vobubgg+NIo/9Fw4RAl7sEMpD8Am1DNrrSTl/GpMBjyGHoD/FbJY2QLawY+HSQsEIA=="],
+
+    "@idea10/web": ["@idea10/web@workspace:apps/web"],
 
     "@intlify/core-base": ["@intlify/core-base@11.4.10", "", { "dependencies": { "@intlify/devtools-types": "11.4.10", "@intlify/message-compiler": "11.4.10", "@intlify/shared": "11.4.10" } }, "sha512-+yJ74JRWVJokdgG9zYNMyTSzeNV3O9T4vVxk8PvLFHmI+R/BYA//cITh7vhRK37hWLZ4/kTcKcUz1dlWOpypIg=="],
 
