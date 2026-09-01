@@ -83,7 +83,7 @@ describe("CellBorderMenu interaction", () => {
     ).toBe(false);
     expect(
       menu.get('[data-border-preset-icon="all"]').findAll(".cell-border-preset-icon__guide"),
-    ).toHaveLength(2);
+    ).toHaveLength(6);
     expect(
       menu.get('[data-border-preset-icon="inner"]').findAll(".cell-border-preset-icon__line"),
     ).toHaveLength(2);

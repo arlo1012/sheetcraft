@@ -13,6 +13,10 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
 
 <template>
   <span class="cell-border-preset-icon" :data-border-preset-icon="preset" aria-hidden="true">
+    <span class="cell-border-preset-icon__guide is-top" />
+    <span class="cell-border-preset-icon__guide is-right" />
+    <span class="cell-border-preset-icon__guide is-bottom" />
+    <span class="cell-border-preset-icon__guide is-left" />
     <span class="cell-border-preset-icon__guide is-horizontal" />
     <span class="cell-border-preset-icon__guide is-vertical" />
 
@@ -49,18 +53,44 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
   &__guide {
     background: var(--td-border-level-1-color);
 
+    &.is-top,
+    &.is-bottom,
     &.is-horizontal {
-      top: 9px;
       right: 0;
       left: 0;
       height: 1px;
     }
 
+    &.is-left,
+    &.is-right,
     &.is-vertical {
       top: 0;
       bottom: 0;
-      left: 9px;
       width: 1px;
+    }
+
+    &.is-top {
+      top: 0;
+    }
+
+    &.is-right {
+      right: 0;
+    }
+
+    &.is-bottom {
+      bottom: 0;
+    }
+
+    &.is-left {
+      left: 0;
+    }
+
+    &.is-horizontal {
+      top: 9px;
+    }
+
+    &.is-vertical {
+      left: 9px;
     }
   }
 
