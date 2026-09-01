@@ -60,7 +60,7 @@ const DIAGONAL_STROKE_DASH_ARRAY: Partial<Record<SheetDiagonalBorderSegment["sty
   dashed: "6 3",
   dotted: "0 2",
 };
-const DIAGONAL_VERTICAL_ALIGNMENT_OFFSET = -0.5;
+const DIAGONAL_PIXEL_ALIGNMENT_OFFSET = -0.5;
 
 function getSegmentStyle(segment: SheetBorderSegment): CSSProperties {
   if (segment.orientation === "horizontal") {
@@ -90,14 +90,14 @@ function getJunctionStyle(junction: SheetBorderJunction): CSSProperties {
 }
 
 function getDiagonalLineParts(segment: SheetDiagonalBorderSegment): DiagonalLinePart[] {
-  const x1 = segment.x;
-  const x2 = segment.x + segment.width;
+  const x1 = segment.x + DIAGONAL_PIXEL_ALIGNMENT_OFFSET;
+  const x2 = segment.x + segment.width + DIAGONAL_PIXEL_ALIGNMENT_OFFSET;
   const y1 =
     (segment.direction === "up" ? segment.y + segment.height : segment.y) +
-    DIAGONAL_VERTICAL_ALIGNMENT_OFFSET;
+    DIAGONAL_PIXEL_ALIGNMENT_OFFSET;
   const y2 =
     (segment.direction === "up" ? segment.y : segment.y + segment.height) +
-    DIAGONAL_VERTICAL_ALIGNMENT_OFFSET;
+    DIAGONAL_PIXEL_ALIGNMENT_OFFSET;
   const normalX = -(y2 - y1) / segment.length;
   const normalY = (x2 - x1) / segment.length;
   const offsets = segment.style === "double" ? [-1, 1] : [0];

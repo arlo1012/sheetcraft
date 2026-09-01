@@ -225,9 +225,9 @@ describe("SheetGrid cell style rendering", () => {
     const downLines = down.findAll(".sheet-border-layer__diagonal-line");
     expect(upLines).toHaveLength(1);
     expect(upLines[0]?.attributes()).toMatchObject({
-      x1: "0",
+      x1: "-0.5",
       y1: "23.5",
-      x2: "96",
+      x2: "95.5",
       y2: "-0.5",
       stroke: "#112233",
       "stroke-width": "1",
@@ -260,7 +260,7 @@ describe("SheetGrid cell style rendering", () => {
       (Number.parseFloat(firstDown?.attributes("x1") ?? "") +
         Number.parseFloat(secondDown?.attributes("x1") ?? "")) /
         2,
-    ).toBeCloseTo(0, 5);
+    ).toBeCloseTo(-0.5, 5);
     expect(
       (Number.parseFloat(firstDown?.attributes("y2") ?? "") +
         Number.parseFloat(secondDown?.attributes("y2") ?? "")) /
@@ -317,8 +317,8 @@ describe("SheetGrid cell style rendering", () => {
     const second = layer.get(
       '[data-border-row="0"][data-border-column="1"][data-border-direction="up"] line',
     );
-    expect(first.attributes()).toMatchObject({ x2: "96", y2: "23.5" });
-    expect(second.attributes()).toMatchObject({ x1: "96", y1: "23.5" });
+    expect(first.attributes()).toMatchObject({ x2: "95.5", y2: "23.5" });
+    expect(second.attributes()).toMatchObject({ x1: "95.5", y1: "23.5" });
   });
 
   test("keeps borders independent from active multiline content clipping", async () => {
