@@ -13,10 +13,8 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
 
 <template>
   <span class="cell-border-preset-icon" :data-border-preset-icon="preset" aria-hidden="true">
-    <span class="cell-border-preset-icon__guide is-horizontal is-first" />
-    <span class="cell-border-preset-icon__guide is-horizontal is-second" />
-    <span class="cell-border-preset-icon__guide is-vertical is-first" />
-    <span class="cell-border-preset-icon__guide is-vertical is-second" />
+    <span class="cell-border-preset-icon__guide is-horizontal" />
+    <span class="cell-border-preset-icon__guide is-vertical" />
 
     <span v-if="hasOuter || preset === 'top'" class="cell-border-preset-icon__line is-top" />
     <span v-if="hasOuter || preset === 'right'" class="cell-border-preset-icon__line is-right" />
@@ -24,12 +22,10 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
     <span v-if="hasOuter || preset === 'left'" class="cell-border-preset-icon__line is-left" />
 
     <template v-if="hasInnerHorizontal">
-      <span class="cell-border-preset-icon__line is-horizontal is-first" />
-      <span class="cell-border-preset-icon__line is-horizontal is-second" />
+      <span class="cell-border-preset-icon__line is-horizontal" />
     </template>
     <template v-if="hasInnerVertical">
-      <span class="cell-border-preset-icon__line is-vertical is-first" />
-      <span class="cell-border-preset-icon__line is-vertical is-second" />
+      <span class="cell-border-preset-icon__line is-vertical" />
     </template>
     <span v-if="preset === 'none'" class="cell-border-preset-icon__slash" />
   </span>
@@ -54,6 +50,7 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
     background: var(--td-border-level-1-color);
 
     &.is-horizontal {
+      top: 9px;
       right: 0;
       left: 0;
       height: 1px;
@@ -62,23 +59,8 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
     &.is-vertical {
       top: 0;
       bottom: 0;
+      left: 9px;
       width: 1px;
-    }
-
-    &.is-first.is-horizontal {
-      top: 6px;
-    }
-
-    &.is-second.is-horizontal {
-      top: 12px;
-    }
-
-    &.is-first.is-vertical {
-      left: 6px;
-    }
-
-    &.is-second.is-vertical {
-      left: 12px;
     }
   }
 
@@ -118,20 +100,12 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
       left: 0;
     }
 
-    &.is-first.is-horizontal {
-      top: 6px;
+    &.is-horizontal {
+      top: 9px;
     }
 
-    &.is-second.is-horizontal {
-      top: 12px;
-    }
-
-    &.is-first.is-vertical {
-      left: 6px;
-    }
-
-    &.is-second.is-vertical {
-      left: 12px;
+    &.is-vertical {
+      left: 9px;
     }
   }
 

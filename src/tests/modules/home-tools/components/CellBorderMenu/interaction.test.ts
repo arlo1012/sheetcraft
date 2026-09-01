@@ -81,6 +81,12 @@ describe("CellBorderMenu interaction", () => {
         .find(".cell-border-preset-icon__line.is-left")
         .exists(),
     ).toBe(false);
+    expect(
+      menu.get('[data-border-preset-icon="all"]').findAll(".cell-border-preset-icon__guide"),
+    ).toHaveLength(2);
+    expect(
+      menu.get('[data-border-preset-icon="inner"]').findAll(".cell-border-preset-icon__line"),
+    ).toHaveLength(2);
     expect(menu.findAll("[data-border-menu-row]").map((item) => item.text())).toEqual([
       "Border color",
       "Border style",
