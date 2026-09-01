@@ -27,7 +27,7 @@ function coversPoint(segment: SheetBorderSegment, x: number, y: number): boolean
 
 describe("sheet border presentation", () => {
   test("resolves both diagonal directions against each visible cell geometry", () => {
-    const sheet = createSheet();
+    const sheet = createSheet("Sheet1", "sheet-1");
     setCellStyle(
       sheet,
       { row: 0, column: 0 },
@@ -80,7 +80,7 @@ describe("sheet border presentation", () => {
   });
 
   test("resolves a 3 by 3 grid into continuous runs that own every center intersection", () => {
-    const sheet = createSheet();
+    const sheet = createSheet("Sheet1", "sheet-1");
     const border = { style: "thin", color: "#20242c" } as const;
     for (let row = 0; row < 3; row += 1) {
       for (let column = 0; column < 3; column += 1) {
@@ -122,7 +122,7 @@ describe("sheet border presentation", () => {
   });
 
   test("uses upper and left owners for shared-edge conflicts", () => {
-    const sheet = createSheet();
+    const sheet = createSheet("Sheet1", "sheet-1");
     setCellStyle(
       sheet,
       { row: 0, column: 0 },
@@ -167,7 +167,7 @@ describe("sheet border presentation", () => {
   });
 
   test("aligns a selected range's borders with the existing gridline tracks", () => {
-    const sheet = createSheet();
+    const sheet = createSheet("Sheet1", "sheet-1");
     const border = { style: "thin", color: "#20242c" } as const;
     setCellStyle(
       sheet,
@@ -212,7 +212,7 @@ describe("sheet border presentation", () => {
   });
 
   test("resolves virtual-range boundaries from off-range owners", () => {
-    const sheet = createSheet();
+    const sheet = createSheet("Sheet1", "sheet-1");
     setCellStyle(
       sheet,
       { row: 2, column: 4 },
@@ -260,7 +260,7 @@ describe("sheet border presentation", () => {
   });
 
   test("keeps partially clipped thick borders on their physical grid track", () => {
-    const sheet = createSheet();
+    const sheet = createSheet("Sheet1", "sheet-1");
     setCellStyle(
       sheet,
       { row: 2, column: 2 },
@@ -281,7 +281,7 @@ describe("sheet border presentation", () => {
   });
 
   test("gives every crossing a deterministic one-pixel owner", () => {
-    const sheet = createSheet();
+    const sheet = createSheet("Sheet1", "sheet-1");
     setCellStyle(
       sheet,
       { row: 0, column: 0 },
