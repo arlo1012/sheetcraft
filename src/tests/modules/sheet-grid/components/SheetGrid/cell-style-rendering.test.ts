@@ -228,15 +228,19 @@ describe("SheetGrid cell style rendering", () => {
     const upLineStyle = upLine.style;
     const downLineStyle = downLine.style;
     const diagonalLength = Math.hypot(96, 24);
+    const visualDiagonalLength = diagonalLength + 2;
     expect(upLineStyle.borderTop).toBe("1px solid #112233");
-    expect(Number.parseFloat(upLineStyle.left)).toBeCloseTo((96 - diagonalLength) / 2, 5);
+    expect(Number.parseFloat(upLineStyle.left)).toBeCloseTo((96 - visualDiagonalLength) / 2, 5);
     expect(Number.parseFloat(upLineStyle.top)).toBeCloseTo((24 - 1) / 2, 5);
+    expect(Number.parseFloat(upLineStyle.width)).toBeCloseTo(visualDiagonalLength, 5);
     expect(upLineStyle.transform).toBe(`rotate(${(-Math.atan2(24, 96) * 180) / Math.PI}deg)`);
     expect(upLineStyle.transformOrigin).toBe("center");
     expect(downLineStyle.borderTop).toBe("3px double #445566");
-    expect(Number.parseFloat(downLineStyle.left)).toBeCloseTo((96 - diagonalLength) / 2, 5);
+    expect(Number.parseFloat(downLineStyle.left)).toBeCloseTo((96 - visualDiagonalLength) / 2, 5);
     expect(Number.parseFloat(downLineStyle.top)).toBeCloseTo((24 - 3) / 2, 5);
+    expect(Number.parseFloat(downLineStyle.width)).toBeCloseTo(visualDiagonalLength, 5);
     expect(downLineStyle.transform).toBe(`rotate(${(Math.atan2(24, 96) * 180) / Math.PI}deg)`);
+    expect(up.element.style.overflow).toBe("visible");
   });
 
   test("keeps borders independent from active multiline content clipping", async () => {

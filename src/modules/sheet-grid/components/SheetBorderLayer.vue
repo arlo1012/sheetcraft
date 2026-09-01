@@ -18,6 +18,8 @@ const props = defineProps<{
   scrollPosition: Point;
 }>();
 
+const DIAGONAL_ENDPOINT_OVERLAP = 1;
+
 const segments = computed(() =>
   resolveVisibleBorderSegments(
     props.sheet,
@@ -69,15 +71,17 @@ function getDiagonalCellStyle(segment: SheetDiagonalBorderSegment): CSSPropertie
     top: `${segment.y}px`,
     width: `${segment.width}px`,
     height: `${segment.height}px`,
+    overflow: "visible",
     zIndex: segment.thickness,
   };
 }
 
 function getDiagonalLineStyle(segment: SheetDiagonalBorderSegment): CSSProperties {
+  const visualLength = segment.length + DIAGONAL_ENDPOINT_OVERLAP * 2;
   return {
-    left: `${(segment.width - segment.length) / 2}px`,
+    left: `${(segment.width - visualLength) / 2}px`,
     top: `${(segment.height - segment.thickness) / 2}px`,
-    width: `${segment.length}px`,
+    width: `${visualLength}px`,
     borderTop: segment.css,
     transform: `rotate(${segment.angle}deg)`,
     transformOrigin: "center",
@@ -142,7 +146,6 @@ function getDiagonalLineStyle(segment: SheetDiagonalBorderSegment): CSSPropertie
   &__diagonal-cell {
     position: absolute;
     display: block;
-    overflow: hidden;
   }
 
   &__diagonal-line {
