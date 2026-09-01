@@ -1,7 +1,7 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import SpreadsheetRibbon from "../../../app/SpreadsheetRibbon.vue";
-import { createDefaultSelectionCellStyleState } from "../../../modules/workbook/style-state";
+import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
 import { createAppI18n } from "../../../shared/i18n";
 
 function mountRibbon(locale: "en-US" | "zh-CN" = "en-US") {

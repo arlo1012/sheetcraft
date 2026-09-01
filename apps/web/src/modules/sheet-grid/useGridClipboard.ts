@@ -6,10 +6,14 @@ import {
   serializeCellValuesToTsv,
   type CellValueMatrix,
   type PastePlan,
-} from "../workbook/clipboard";
+} from "@idea10/core/clipboard";
 import { getCellStyle, type CellRange, type Sheet } from "@idea10/core/workbook";
 import { cloneCellStyle, type CellStyle } from "@idea10/core/style";
-import { getSelectionMode, getSelectionRange, type CellSelection } from "./selection";
+import {
+  getSelectionMode,
+  getSelectionRange,
+  type CellSelection,
+} from "@idea10/sheet-engine/selection";
 
 const LOCAL_CLIPBOARD_TYPE = "application/x-idea10-cells";
 

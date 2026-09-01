@@ -25,6 +25,7 @@
       "dependencies": {
         "@floating-ui/vue": "^2.0.1",
         "@idea10/core": "workspace:*",
+        "@idea10/sheet-engine": "workspace:*",
         "lucide-vue-next": "^1.0.0",
         "tdesign-vue-next": "^1.20.7",
         "vue": "^3.5.41",
@@ -34,6 +35,13 @@
     "packages/core": {
       "name": "@idea10/core",
       "version": "0.1.0",
+    },
+    "packages/sheet-engine": {
+      "name": "@idea10/sheet-engine",
+      "version": "0.1.0",
+      "dependencies": {
+        "@idea10/core": "workspace:*",
+      },
     },
   },
   "packages": {
@@ -56,6 +64,8 @@
     "@floating-ui/vue": ["@floating-ui/vue@2.0.1", "", { "dependencies": { "@floating-ui/dom": "^1.8.0", "@floating-ui/utils": "^0.2.12" }, "peerDependencies": { "vue": ">=3.3.0" } }, "sha512-043dyEKD9TDSfz080YH2vobubgg+NIo/9Fw4RAl7sEMpD8Am1DNrrSTl/GpMBjyGHoD/FbJY2QLawY+HSQsEIA=="],
 
     "@idea10/core": ["@idea10/core@workspace:packages/core"],
+
+    "@idea10/sheet-engine": ["@idea10/sheet-engine@workspace:packages/sheet-engine"],
 
     "@idea10/web": ["@idea10/web@workspace:apps/web"],
 

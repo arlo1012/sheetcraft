@@ -9,7 +9,7 @@ import {
   MIN_CELL_FONT_SIZE,
   type CellStylePatch,
 } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "../../workbook/style-state";
+import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 
 const FONT_FAMILIES = [

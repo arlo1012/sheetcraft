@@ -1,6 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { createSheetGridViewState } from "../../../../../modules/sheet-grid/view-state";
+import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
 import { mountSheetGrid } from "./fixture";
 
 describe("SheetGrid view state", () => {

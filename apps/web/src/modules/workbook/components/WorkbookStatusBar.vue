@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { FileSpreadsheet, LayoutDashboard, ZoomIn, ZoomOut } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
-import type { SelectionSummary } from "../selection-summary";
+import type { SelectionSummary } from "@idea10/core/selection-summary";
 import type { Sheet } from "@idea10/core/workbook";
 import WorkbookSheetTabs from "./WorkbookSheetTabs.vue";
 

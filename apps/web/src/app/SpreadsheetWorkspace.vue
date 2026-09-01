@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, reactive, ref } from "vue";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
-import type { SheetGridViewState } from "../modules/sheet-grid/view-state";
+import type { SheetGridViewState } from "@idea10/sheet-engine/view-state";
 import WorkbookFormulaBar from "../modules/workbook/components/WorkbookFormulaBar.vue";
 import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.vue";
 import type { GridPastePayload } from "../modules/sheet-grid/useGridClipboard";
@@ -28,14 +28,14 @@ import {
   undoWorkbookCommand,
   type WorkbookSession,
 } from "../modules/workbook/history";
-import { formatCellValueForInput, parseCellInput } from "../modules/workbook/input";
-import { findCellByText, type SheetSearchDirection } from "../modules/workbook/search";
-import { getSelectionSummary } from "../modules/workbook/selection-summary";
+import { formatCellValueForInput, parseCellInput } from "@idea10/core/input";
+import { findCellByText, type SheetSearchDirection } from "@idea10/core/search";
+import { getSelectionSummary } from "@idea10/core/selection-summary";
 import {
   createDefaultSelectionCellStyleState,
   getSelectionCellStyleState,
   isCellStyleRangeSupported,
-} from "../modules/workbook/style-state";
+} from "@idea10/core/style-state";
 import {
   getActiveSheet,
   getCellValue,

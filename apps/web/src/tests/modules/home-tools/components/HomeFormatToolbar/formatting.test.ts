@@ -3,7 +3,7 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { afterEach, describe, expect, test } from "vitest";
 import HomeFormatToolbar from "../../../../../modules/home-tools/components/HomeFormatToolbar.vue";
 import { createClearCellStylePatch } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "../../../../../modules/workbook/style-state";
+import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { createAppI18n } from "../../../../../shared/i18n";
 
 function createStyleState(

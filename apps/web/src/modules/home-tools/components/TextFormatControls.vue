@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Bold, Italic, Strikethrough, Underline } from "lucide-vue-next";
 import type { CellStylePatch } from "@idea10/core/style";
-import type { SelectionCellStyleState, ToggleStyleState } from "../../workbook/style-state";
+import type { SelectionCellStyleState, ToggleStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonIconAction from "./RibbonIconAction.vue";
 

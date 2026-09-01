@@ -10,7 +10,8 @@ import {
   watch,
   type CSSProperties,
 } from "vue";
-import { formatCellValueForDisplay, formatCellValueForInput } from "../../workbook/input";
+import { formatCellValueForDisplay, formatCellValueForInput } from "@idea10/core/input";
+import { getCellAddressLabel } from "@idea10/core/coordinates";
 import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";

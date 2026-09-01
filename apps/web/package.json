@@ -15,6 +15,7 @@
   "dependencies": {
     "@floating-ui/vue": "^2.0.1",
     "@idea10/core": "workspace:*",
+    "@idea10/sheet-engine": "workspace:*",
     "lucide-vue-next": "^1.0.0",
     "tdesign-vue-next": "^1.20.7",
     "vue": "^3.5.41",

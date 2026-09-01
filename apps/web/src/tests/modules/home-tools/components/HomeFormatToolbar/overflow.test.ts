@@ -2,7 +2,7 @@ import { mount, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import HomeFormatToolbar from "../../../../../modules/home-tools/components/HomeFormatToolbar.vue";
-import type { SelectionCellStyleState } from "../../../../../modules/workbook/style-state";
+import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { createAppI18n, type AppLocale } from "../../../../../shared/i18n";
 
 function createStyleState(): SelectionCellStyleState {
