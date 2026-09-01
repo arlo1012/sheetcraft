@@ -3,6 +3,32 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [vue()],
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: "vue-runtime",
+              test: /node_modules[\\/](?:@vue|vue|vue-i18n|@floating-ui)[\\/]/,
+              priority: 30,
+            },
+            {
+              name: "tdesign",
+              test: /node_modules[\\/]tdesign-vue-next[\\/]/,
+              priority: 20,
+              includeDependenciesRecursively: true,
+            },
+            {
+              name: "icons",
+              test: /node_modules[\\/]lucide-vue-next[\\/]/,
+              priority: 10,
+            },
+          ],
+        },
+      },
+    },
+  },
   server: {
     host: "0.0.0.0",
     port: 7200,
