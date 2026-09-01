@@ -244,22 +244,22 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     padding: 0 3px;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: var(--td-radius-default);
-    color: var(--td-text-color-primary);
+    border-radius: var(--idea-radius-default);
+    color: var(--idea-text-primary);
     cursor: pointer;
 
     &:hover:not(:disabled) {
-      background: var(--td-bg-color-container-hover);
+      background: var(--idea-surface-hover);
     }
 
     &:focus-visible:not([aria-expanded="true"]) {
-      border-color: var(--td-brand-color);
+      border-color: var(--idea-action-primary);
       outline: none;
-      box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+      box-shadow: 0 0 0 2px var(--idea-action-focus);
     }
 
     &[aria-expanded="true"] {
-      background: var(--td-bg-color-container-hover);
+      background: var(--idea-surface-hover);
       border-color: transparent;
       outline: none;
       box-shadow: none;
@@ -287,7 +287,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
 
   &__disclosure {
     flex: 0 0 auto;
-    color: var(--td-text-color-placeholder);
+    color: var(--idea-text-muted);
     transition: transform 120ms ease;
 
     &.is-expanded {
@@ -297,16 +297,16 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
 
   &__panel {
     z-index: 100;
-    max-width: calc(100vw - var(--td-size-4) - var(--td-size-4));
-    max-height: calc(100vh - var(--td-size-4) - var(--td-size-4));
+    max-width: calc(100vw - var(--idea-space-4) - var(--idea-space-4));
+    max-height: calc(100vh - var(--idea-space-4) - var(--idea-space-4));
     overflow: auto;
-    background: var(--td-bg-color-container);
-    border: 1px solid var(--td-component-border);
-    border-radius: var(--td-radius-medium);
-    box-shadow: var(--td-shadow-2);
+    background: var(--idea-surface-panel);
+    border: 1px solid var(--idea-border-control);
+    border-radius: var(--idea-radius-medium);
+    box-shadow: var(--idea-shadow-floating);
 
     &:focus-visible {
-      outline: 2px solid var(--td-brand-color);
+      outline: 2px solid var(--idea-action-primary);
       outline-offset: 2px;
     }
   }
@@ -317,7 +317,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
     align-items: center;
     gap: 6px;
     padding: 8px;
-    border-top: 1px solid var(--td-border-level-1-color);
+    border-top: 1px solid var(--idea-border-subtle);
   }
 }
 </style>

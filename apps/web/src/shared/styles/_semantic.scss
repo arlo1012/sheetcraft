@@ -1,0 +1,105 @@
+@layer theme {
+  :root,
+  :root[theme-mode="light"] {
+    --idea-action-primary: var(--idea-palette-brand-7);
+    --idea-action-primary-hover: var(--idea-palette-brand-6);
+    --idea-action-primary-active: var(--idea-palette-brand-8);
+    --idea-action-primary-disabled: var(--idea-palette-brand-3);
+    --idea-action-primary-subtle: var(--idea-palette-brand-1);
+    --idea-action-focus: var(--idea-palette-brand-2);
+    --idea-status-warning: var(--idea-palette-warning-5);
+    --idea-status-warning-strong: var(--idea-palette-warning-6);
+    --idea-status-error: var(--idea-palette-error-6);
+    --idea-status-success: var(--idea-palette-success-5);
+    --idea-surface-canvas: var(--idea-palette-neutral-1);
+    --idea-surface-panel: #fff;
+    --idea-surface-hover: var(--idea-palette-neutral-3);
+    --idea-surface-active: var(--idea-palette-neutral-3);
+    --idea-surface-selected: #fff;
+    --idea-surface-secondary: var(--idea-palette-neutral-2);
+    --idea-surface-secondary-hover: var(--idea-palette-neutral-3);
+    --idea-surface-secondary-active: var(--idea-palette-neutral-4);
+    --idea-surface-component: var(--idea-palette-neutral-2);
+    --idea-surface-component-hover: var(--idea-palette-neutral-3);
+    --idea-surface-component-active: var(--idea-palette-neutral-4);
+    --idea-surface-secondary-component: var(--idea-palette-neutral-4);
+    --idea-surface-secondary-component-hover: var(--idea-palette-neutral-5);
+    --idea-surface-secondary-component-active: var(--idea-palette-neutral-6);
+    --idea-surface-special: #fff;
+    --idea-surface-disabled: var(--idea-palette-neutral-2);
+    --idea-text-primary: var(--idea-palette-on-light-primary);
+    --idea-text-secondary: var(--idea-palette-on-light-secondary);
+    --idea-text-muted: var(--idea-palette-on-light-muted);
+    --idea-text-disabled: var(--idea-palette-on-light-disabled);
+    --idea-text-inverse: #fff;
+    --idea-text-link: var(--idea-palette-brand-8);
+    --idea-border-subtle: var(--idea-palette-neutral-4);
+    --idea-border-control: var(--idea-palette-neutral-6);
+    --idea-border-strong: var(--idea-palette-neutral-4);
+    --idea-shadow-floating: 0 8px 24px rgb(32 36 44 / 18%);
+    --idea-mask-active: rgb(0 0 0 / 60%);
+    --idea-mask-disabled: rgb(255 255 255 / 60%);
+    --idea-shadow-raised:
+      0 1px 10px rgb(0 0 0 / 5%), 0 4px 5px rgb(0 0 0 / 8%), 0 2px 4px -1px rgb(0 0 0 / 12%);
+    --idea-shadow-dialog:
+      0 6px 30px 5px rgb(0 0 0 / 5%), 0 16px 24px 2px rgb(0 0 0 / 4%),
+      0 8px 10px -5px rgb(0 0 0 / 8%);
+    --idea-shadow-inset: #e7eaef;
+    --idea-table-shadow: rgb(0 0 0 / 8%);
+    --idea-scrollbar-thumb: rgb(0 0 0 / 10%);
+    --idea-scrollbar-thumb-hover: rgb(0 0 0 / 30%);
+    --idea-scrollbar-track: #fff;
+  }
+
+  :root.dark,
+  :root[theme-mode="dark"] {
+    --idea-action-primary: var(--idea-palette-brand-8);
+    --idea-action-primary-hover: var(--idea-palette-brand-7);
+    --idea-action-primary-active: var(--idea-palette-brand-9);
+    --idea-action-primary-disabled: var(--idea-palette-brand-3);
+    --idea-action-primary-subtle: var(--idea-palette-brand-1);
+    --idea-action-focus: var(--idea-palette-brand-2);
+    --idea-status-warning: var(--idea-palette-warning-5);
+    --idea-status-warning-strong: var(--idea-palette-warning-6);
+    --idea-status-error: var(--idea-palette-error-6);
+    --idea-status-success: var(--idea-palette-success-5);
+    --idea-surface-canvas: var(--idea-palette-neutral-14);
+    --idea-surface-panel: var(--idea-palette-neutral-13);
+    --idea-surface-hover: var(--idea-palette-neutral-12);
+    --idea-surface-active: var(--idea-palette-neutral-10);
+    --idea-surface-selected: var(--idea-palette-neutral-9);
+    --idea-surface-secondary: var(--idea-palette-neutral-12);
+    --idea-surface-secondary-hover: var(--idea-palette-neutral-11);
+    --idea-surface-secondary-active: var(--idea-palette-neutral-9);
+    --idea-surface-component: var(--idea-palette-neutral-11);
+    --idea-surface-component-hover: var(--idea-palette-neutral-10);
+    --idea-surface-component-active: var(--idea-palette-neutral-9);
+    --idea-surface-secondary-component: var(--idea-palette-neutral-10);
+    --idea-surface-secondary-component-hover: var(--idea-palette-neutral-9);
+    --idea-surface-secondary-component-active: var(--idea-palette-neutral-8);
+    --idea-surface-special: transparent;
+    --idea-surface-disabled: var(--idea-palette-neutral-12);
+    --idea-text-primary: var(--idea-palette-on-dark-primary);
+    --idea-text-secondary: var(--idea-palette-on-dark-secondary);
+    --idea-text-muted: var(--idea-palette-on-dark-muted);
+    --idea-text-disabled: var(--idea-palette-on-dark-disabled);
+    --idea-text-inverse: #fff;
+    --idea-text-link: var(--idea-palette-brand-8);
+    --idea-border-subtle: var(--idea-palette-neutral-11);
+    --idea-border-control: var(--idea-palette-neutral-9);
+    --idea-border-strong: var(--idea-palette-neutral-9);
+    --idea-shadow-floating:
+      0 8px 10px rgb(0 0 0 / 12%), 0 3px 14px rgb(0 0 0 / 10%), 0 5px 5px rgb(0 0 0 / 16%);
+    --idea-mask-active: rgb(0 0 0 / 40%);
+    --idea-mask-disabled: rgb(0 0 0 / 60%);
+    --idea-shadow-raised:
+      0 4px 6px rgb(0 0 0 / 6%), 0 1px 10px rgb(0 0 0 / 8%), 0 2px 4px rgb(0 0 0 / 12%);
+    --idea-shadow-dialog:
+      0 16px 24px rgb(0 0 0 / 14%), 0 6px 30px rgb(0 0 0 / 12%), 0 8px 10px rgb(0 0 0 / 20%);
+    --idea-shadow-inset: #5e5e5e;
+    --idea-table-shadow: rgb(0 0 0 / 55%);
+    --idea-scrollbar-thumb: rgb(255 255 255 / 10%);
+    --idea-scrollbar-thumb-hover: rgb(255 255 255 / 30%);
+    --idea-scrollbar-track: #333;
+  }
+}

@@ -42,7 +42,7 @@ function onLocaleChange(value: SelectValue): void {
   gap: 4px;
   height: 30px;
   padding: 0 6px;
-  color: var(--td-text-color-placeholder);
+  color: var(--idea-text-muted);
 
   &__select {
     width: 82px;

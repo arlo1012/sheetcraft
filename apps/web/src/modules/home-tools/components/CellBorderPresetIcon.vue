@@ -52,7 +52,7 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
   }
 
   &__guide {
-    background: var(--td-border-level-1-color);
+    background: var(--idea-border-subtle);
 
     &.is-top,
     &.is-bottom,

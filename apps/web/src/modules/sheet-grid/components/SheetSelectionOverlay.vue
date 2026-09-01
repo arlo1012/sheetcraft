@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import type { Rect } from "../geometry";
+import type { Rect } from "@idea10/sheet-engine/geometry";
 
 const props = defineProps<{
   activeRect: Rect;
@@ -77,7 +77,7 @@ const clipboardStyle = computed<CSSProperties | undefined>(() =>
 
   &__range-fill {
     z-index: 1;
-    background: color-mix(in srgb, var(--td-brand-color) 8%, transparent);
+    background: color-mix(in srgb, var(--idea-action-primary) 8%, transparent);
 
     &.is-editing {
       background: transparent;
@@ -87,7 +87,7 @@ const clipboardStyle = computed<CSSProperties | undefined>(() =>
   &__range-outline {
     z-index: 4;
     border-style: solid;
-    border-color: var(--td-brand-color);
+    border-color: var(--idea-action-primary);
 
     &.is-editing {
       border-color: transparent;
@@ -97,7 +97,7 @@ const clipboardStyle = computed<CSSProperties | undefined>(() =>
   &__active {
     z-index: 4;
     border-style: solid;
-    border-color: var(--td-brand-color);
+    border-color: var(--idea-action-primary);
 
     &.is-editing {
       border-color: transparent;
@@ -107,7 +107,7 @@ const clipboardStyle = computed<CSSProperties | undefined>(() =>
   &__clipboard {
     z-index: 6;
     border-style: dashed;
-    border-color: var(--td-brand-color);
+    border-color: var(--idea-action-primary);
   }
 }
 </style>

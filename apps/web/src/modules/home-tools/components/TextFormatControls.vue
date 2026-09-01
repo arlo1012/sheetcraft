@@ -83,7 +83,7 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
       bottom: 3px;
       left: 5px;
       height: 2px;
-      background: var(--td-text-color-placeholder);
+      background: var(--idea-text-muted);
       content: "";
     }
   }

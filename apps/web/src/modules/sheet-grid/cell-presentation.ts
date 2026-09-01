@@ -1,6 +1,9 @@
 import type { CSSProperties } from "vue";
 import type { CellStyle } from "@idea10/core/style";
-import { WRAPPED_CELL_LINE_HEIGHT, WRAPPED_CELL_VERTICAL_PADDING } from "./auto-row-height";
+import {
+  WRAPPED_CELL_LINE_HEIGHT,
+  WRAPPED_CELL_VERTICAL_PADDING,
+} from "@idea10/sheet-engine/row-height";
 
 const ALIGNMENT_JUSTIFICATION = {
   left: "flex-start",

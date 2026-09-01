@@ -285,8 +285,8 @@ function onSearchKeydown(event: KeyboardEvent): void {
   align-items: center;
   min-width: 0;
   height: 34px;
-  background: var(--td-bg-color-secondarycontainer);
-  border-bottom: 1px solid var(--td-component-border);
+  background: var(--idea-surface-secondary);
+  border-bottom: 1px solid var(--idea-border-control);
 
   &__address,
   &__field,
@@ -311,16 +311,16 @@ function onSearchKeydown(event: KeyboardEvent): void {
     min-width: 0;
     height: 100%;
     padding: 0 8px;
-    background: var(--td-bg-color-container);
+    background: var(--idea-surface-panel);
     border: 1px solid transparent;
     border-radius: 2px;
     outline: none;
-    color: var(--td-text-color-primary);
+    color: var(--idea-text-primary);
     font-size: 12px;
     letter-spacing: 0;
 
     &:focus {
-      border-color: var(--td-brand-color);
+      border-color: var(--idea-action-primary);
     }
   }
 
@@ -334,8 +334,8 @@ function onSearchKeydown(event: KeyboardEvent): void {
     align-items: center;
     justify-content: center;
     height: 22px;
-    border-right: 1px solid var(--td-component-border);
-    color: var(--td-text-color-placeholder);
+    border-right: 1px solid var(--idea-border-control);
+    color: var(--idea-text-muted);
     font-family: Georgia, serif;
     font-size: 14px;
     font-style: italic;
@@ -367,8 +367,8 @@ function onSearchKeydown(event: KeyboardEvent): void {
     min-width: 0;
     height: 100%;
     padding: 4px 6px 4px 4px;
-    border-left: 1px solid var(--td-component-border);
-    color: var(--td-text-color-placeholder);
+    border-left: 1px solid var(--idea-border-control);
+    color: var(--idea-text-muted);
   }
 
   &__search-field {
@@ -393,13 +393,13 @@ function onSearchKeydown(event: KeyboardEvent): void {
     background: transparent;
     border: 1px solid transparent;
     border-radius: 3px;
-    color: var(--td-text-color-secondary);
+    color: var(--idea-text-secondary);
     cursor: pointer;
 
     &:hover,
     &:focus-visible {
-      background: var(--td-bg-color-container-hover);
-      border-color: var(--td-component-border);
+      background: var(--idea-surface-hover);
+      border-color: var(--idea-border-control);
       outline: none;
     }
   }

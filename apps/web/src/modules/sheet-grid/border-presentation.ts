@@ -1,6 +1,6 @@
 import type { CellBorder, CellStyle } from "@idea10/core/style";
 import { getCellStyle, type Sheet } from "@idea10/core/workbook";
-import type { Point, SheetGeometry, VisibleCellRange } from "./geometry";
+import type { Point, SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
 
 export type SheetBorderOrientation = "horizontal" | "vertical";
 export type SheetBorderPlacement = "before" | "after";

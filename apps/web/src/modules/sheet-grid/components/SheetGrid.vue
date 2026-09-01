@@ -36,8 +36,8 @@ import {
   expandGridExtentForAddress,
   expandGridExtentForViewport,
   type GridExtent,
-} from "../extent";
-import { createSheetGeometry, getCellAddressLabel, type Point, type Size } from "../geometry";
+} from "@idea10/sheet-engine/extent";
+import { createSheetGeometry, type Point, type Size } from "@idea10/sheet-engine/geometry";
 import {
   areCellAddressesEqual,
   createAxisSelection,
@@ -51,20 +51,20 @@ import {
   moveActiveCellWithinSelection,
   moveCellSelection,
   type CellSelection,
-} from "../selection";
+} from "@idea10/sheet-engine/selection";
 import {
   useGridClipboard,
   type GridClipboardFeedback,
   type GridPastePayload,
 } from "../useGridClipboard";
-import { createSheetGridViewState, type SheetGridViewState } from "../view-state";
+import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
 import {
   createApproximateTextMeasurer,
   createAutoRowHeightCalculator,
   mergeRowHeightOverrides,
   type AutoRowHeightFont,
   type TextMeasurer,
-} from "../auto-row-height";
+} from "@idea10/sheet-engine/row-height";
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
@@ -1421,7 +1421,7 @@ defineExpose({ navigateToCell });
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--td-bg-color-container);
+  background: var(--idea-surface-panel);
 
   &.is-resizing-column {
     cursor: col-resize;
@@ -1437,20 +1437,20 @@ defineExpose({ navigateToCell });
     z-index: 5;
     width: var(--sheet-row-header-width);
     height: var(--sheet-column-header-height);
-    background: var(--td-bg-color-secondarycontainer);
-    border-right: 1px solid var(--td-component-border);
-    border-bottom: 1px solid var(--td-component-border);
+    background: var(--idea-surface-secondary);
+    border-right: 1px solid var(--idea-border-control);
+    border-bottom: 1px solid var(--idea-border-control);
     padding: 0;
     appearance: none;
     cursor: pointer;
 
     &.is-active {
-      background: var(--td-brand-color-focus);
+      background: var(--idea-action-focus);
     }
 
     &:focus-visible {
       z-index: 6;
-      outline: 2px solid var(--td-brand-color);
+      outline: 2px solid var(--idea-action-primary);
       outline-offset: -2px;
     }
   }
@@ -1459,9 +1459,9 @@ defineExpose({ navigateToCell });
     position: absolute;
     inset: var(--sheet-column-header-height) 0 0 var(--sheet-row-header-width);
     overflow: auto;
-    background: var(--td-bg-color-container);
+    background: var(--idea-surface-panel);
     outline: none;
-    scrollbar-color: var(--td-component-border) var(--td-bg-color-secondarycontainer);
+    scrollbar-color: var(--idea-border-control) var(--idea-surface-secondary);
     scrollbar-width: thin;
   }
 
@@ -1474,7 +1474,7 @@ defineExpose({ navigateToCell });
     top: 0;
     left: 0;
     overflow: hidden;
-    background: var(--td-bg-color-container);
+    background: var(--idea-surface-panel);
   }
 
   &__assistive-status {

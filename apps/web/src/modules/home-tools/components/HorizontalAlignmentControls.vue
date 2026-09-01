@@ -89,7 +89,7 @@ function align(alignment: HorizontalCellAlignment): void {
     bottom: 2px;
     left: 6px;
     height: 2px;
-    background: var(--td-text-color-placeholder);
+    background: var(--idea-text-muted);
     content: "";
     pointer-events: none;
   }

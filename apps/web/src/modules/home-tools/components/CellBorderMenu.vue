@@ -756,16 +756,16 @@ onBeforeUnmount(() => {
     background: transparent;
     border: 1px solid transparent;
     border-radius: 2px;
-    color: var(--td-text-color-primary);
+    color: var(--idea-text-primary);
     cursor: pointer;
     &:hover:not(:disabled),
     &.is-expanded {
-      background: var(--td-bg-color-container-hover);
+      background: var(--idea-surface-hover);
     }
     &:focus-visible:not(.is-expanded) {
-      border-color: var(--td-brand-color);
+      border-color: var(--idea-action-primary);
       outline: none;
-      box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+      box-shadow: 0 0 0 2px var(--idea-action-focus);
     }
     &:disabled {
       cursor: not-allowed;
@@ -773,7 +773,7 @@ onBeforeUnmount(() => {
     }
   }
   &__disclosure {
-    color: var(--td-text-color-placeholder);
+    color: var(--idea-text-muted);
     transition: transform 120ms ease;
     &.is-expanded {
       transform: rotate(180deg);
@@ -784,10 +784,10 @@ onBeforeUnmount(() => {
     z-index: 100;
     max-height: calc(100vh - 16px);
     overflow-y: auto;
-    background: var(--td-bg-color-container);
-    border: 1px solid var(--td-component-border);
-    border-radius: var(--td-radius-medium);
-    box-shadow: var(--td-shadow-2);
+    background: var(--idea-surface-panel);
+    border: 1px solid var(--idea-border-control);
+    border-radius: var(--idea-radius-medium);
+    box-shadow: var(--idea-shadow-floating);
   }
   &__panel {
     width: 168px;
@@ -810,15 +810,15 @@ onBeforeUnmount(() => {
       background: transparent;
       border: 1px solid transparent;
       border-radius: 2px;
-      color: var(--td-text-color-primary);
+      color: var(--idea-text-primary);
       cursor: pointer;
       &:hover,
       &:focus-visible {
-        background: var(--td-bg-color-container-hover);
+        background: var(--idea-surface-hover);
         outline: none;
       }
       &:focus-visible {
-        box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+        box-shadow: 0 0 0 2px var(--idea-action-focus);
       }
     }
   }
@@ -826,7 +826,7 @@ onBeforeUnmount(() => {
     display: grid;
     gap: 1px;
     padding-top: 5px;
-    border-top: 1px solid var(--td-border-level-1-color);
+    border-top: 1px solid var(--idea-border-subtle);
     > button {
       display: grid;
       grid-template-columns: 18px minmax(0, 1fr) 16px;
@@ -838,13 +838,13 @@ onBeforeUnmount(() => {
       background: transparent;
       border: 1px solid transparent;
       border-radius: 2px;
-      color: var(--td-text-color-primary);
+      color: var(--idea-text-primary);
       cursor: pointer;
       font: inherit;
       font-size: 13px;
       text-align: left;
       > svg:last-child {
-        color: var(--td-text-color-placeholder);
+        color: var(--idea-text-muted);
       }
       > span {
         min-width: 0;
@@ -854,13 +854,13 @@ onBeforeUnmount(() => {
       }
       &:hover,
       &[aria-expanded="true"] {
-        background: var(--td-bg-color-container-hover);
+        background: var(--idea-surface-hover);
         outline: none;
       }
       &:focus-visible {
-        background: var(--td-bg-color-container-hover);
+        background: var(--idea-surface-hover);
         outline: none;
-        box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+        box-shadow: 0 0 0 2px var(--idea-action-focus);
       }
     }
   }
@@ -885,13 +885,13 @@ onBeforeUnmount(() => {
     cursor: pointer;
     &:hover,
     &:focus-visible {
-      background: var(--td-bg-color-container-hover);
-      border-color: var(--td-brand-color);
+      background: var(--idea-surface-hover);
+      border-color: var(--idea-action-primary);
       outline: none;
     }
     > svg {
       opacity: 0;
-      color: var(--td-brand-color);
+      color: var(--idea-action-primary);
     }
     > svg.is-visible {
       opacity: 1;
@@ -901,7 +901,7 @@ onBeforeUnmount(() => {
     display: block;
     width: 100%;
     height: 0;
-    border-top: 1px solid var(--td-text-color-primary);
+    border-top: 1px solid var(--idea-text-primary);
   }
   &__line-sample--medium {
     border-top-width: 2px;
@@ -914,14 +914,14 @@ onBeforeUnmount(() => {
   }
   &__line-sample--double {
     height: 3px;
-    border-top: 3px double var(--td-text-color-primary);
+    border-top: 3px double var(--idea-text-primary);
   }
   &__color-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 4px;
     padding-bottom: 7px;
-    border-bottom: 1px solid var(--td-border-level-1-color);
+    border-bottom: 1px solid var(--idea-border-subtle);
     > button {
       display: inline-flex;
       align-items: center;
@@ -935,14 +935,14 @@ onBeforeUnmount(() => {
       &:hover,
       &:focus-visible,
       &[aria-checked="true"] {
-        border-color: var(--td-brand-color);
+        border-color: var(--idea-action-primary);
         outline: none;
       }
       > span {
         width: 100%;
         height: 100%;
         background: var(--border-swatch-color);
-        border: 1px solid var(--td-component-border);
+        border: 1px solid var(--idea-border-control);
       }
     }
   }
@@ -953,13 +953,13 @@ onBeforeUnmount(() => {
     justify-content: space-between;
     gap: 8px;
     min-width: 0;
-    color: var(--td-text-color-primary);
+    color: var(--idea-text-primary);
     font-size: 13px;
     input {
       width: 28px;
       height: 22px;
       padding: 1px;
-      border: 1px solid var(--td-component-border);
+      border: 1px solid var(--idea-border-control);
       border-radius: 2px;
       cursor: pointer;
     }
@@ -973,7 +973,7 @@ onBeforeUnmount(() => {
     padding: 9px;
   }
   &__settings-heading {
-    color: var(--td-text-color-primary);
+    color: var(--idea-text-primary);
     font-size: 13px;
     font-weight: 600;
   }
@@ -995,8 +995,8 @@ onBeforeUnmount(() => {
     &:hover,
     &:focus-visible,
     &[aria-pressed="true"] {
-      background: var(--td-bg-color-container-hover);
-      border-color: var(--td-brand-color);
+      background: var(--idea-surface-hover);
+      border-color: var(--idea-action-primary);
       outline: none;
     }
   }

@@ -80,27 +80,27 @@ function onKeydown(event: KeyboardEvent): void {
   height: 26px;
   border: 1px solid transparent;
   border-radius: 2px;
-  color: var(--td-text-color-primary);
+  color: var(--idea-text-primary);
   cursor: pointer;
   outline: none;
 
   &:hover:not(.is-disabled) {
-    background: var(--td-bg-color-container-hover);
+    background: var(--idea-surface-hover);
   }
 
   &:focus-visible {
-    border-color: var(--td-brand-color);
-    box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+    border-color: var(--idea-action-primary);
+    box-shadow: 0 0 0 2px var(--idea-action-focus);
   }
 
   &.is-pressed {
-    background: var(--td-brand-color-light);
-    color: var(--td-brand-color);
+    background: var(--idea-action-primary-subtle);
+    color: var(--idea-action-primary);
   }
 
   &.is-disabled {
     cursor: default;
-    color: var(--td-text-color-secondary);
+    color: var(--idea-text-secondary);
   }
 
   &.has-text {
@@ -166,7 +166,7 @@ function onKeydown(event: KeyboardEvent): void {
     flex: 0 0 auto;
     width: 9px;
     height: 9px;
-    color: var(--td-text-color-placeholder);
+    color: var(--idea-text-muted);
   }
 }
 </style>

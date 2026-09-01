@@ -118,7 +118,7 @@ function applyColor(color: string | null): void {
 
   &__icon.is-mixed &__indicator {
     background: transparent;
-    box-shadow: inset 0 0 0 1px var(--td-text-color-placeholder);
+    box-shadow: inset 0 0 0 1px var(--idea-text-muted);
   }
 }
 </style>

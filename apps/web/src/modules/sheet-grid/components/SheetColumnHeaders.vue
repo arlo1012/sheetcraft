@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { columnIndexToLabel } from "@idea10/core/coordinates";
 import { MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } from "@idea10/core/workbook";
-import { columnIndexToLabel, type SheetGeometry } from "../geometry";
+import type { SheetGeometry } from "@idea10/sheet-engine/geometry";
 
 const { t } = useAppI18n();
 
@@ -145,8 +146,8 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
   z-index: 4;
   height: var(--sheet-column-header-height);
   overflow: hidden;
-  background: var(--td-bg-color-secondarycontainer);
-  border-bottom: 1px solid var(--td-component-border);
+  background: var(--idea-surface-secondary);
+  border-bottom: 1px solid var(--idea-border-control);
   user-select: none;
 
   &__item {
@@ -157,12 +158,12 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    border-right: 1px solid var(--td-border-level-1-color);
-    color: var(--td-text-color-secondary);
+    border-right: 1px solid var(--idea-border-subtle);
+    color: var(--idea-text-secondary);
     font-size: 12px;
     &.is-active {
-      background: var(--td-brand-color-focus);
-      color: var(--td-brand-color);
+      background: var(--idea-action-focus);
+      color: var(--idea-action-primary);
       font-weight: 600;
     }
   }
@@ -177,7 +178,7 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
     cursor: pointer;
 
     &:focus-visible {
-      outline: 2px solid var(--td-brand-color);
+      outline: 2px solid var(--idea-action-primary);
       outline-offset: -2px;
     }
   }
@@ -191,7 +192,7 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
     touch-action: none;
 
     &:focus-visible {
-      background: var(--td-brand-color);
+      background: var(--idea-action-primary);
       outline: none;
     }
   }

@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch, type CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
-import type { Rect, Size } from "../geometry";
+import type { Rect, Size } from "@idea10/sheet-engine/geometry";
 
 const { t } = useAppI18n();
 
@@ -231,8 +231,8 @@ defineExpose({ focus, insertLineBreak });
 
   &.is-editing {
     z-index: 5;
-    background: var(--td-bg-color-container);
-    border-color: var(--td-brand-color);
+    background: var(--idea-surface-panel);
+    border-color: var(--idea-action-primary);
     pointer-events: auto;
     box-shadow: 0 1px 3px rgb(32 36 44 / 16%);
   }
@@ -263,8 +263,8 @@ defineExpose({ focus, insertLineBreak });
     padding: 2px 4px;
     overflow: auto;
     scrollbar-width: none;
-    color: var(--td-text-color-primary);
-    caret-color: var(--td-text-color-primary);
+    color: var(--idea-text-primary);
+    caret-color: var(--idea-text-primary);
     line-height: 1.25;
     pointer-events: auto;
 

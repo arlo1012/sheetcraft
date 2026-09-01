@@ -9,7 +9,7 @@ import {
   type SheetBorderJunction,
   type SheetBorderSegment,
 } from "../border-presentation";
-import type { Point, SheetGeometry, VisibleCellRange } from "../geometry";
+import type { Point, SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
 
 const props = defineProps<{
   sheet: Sheet;

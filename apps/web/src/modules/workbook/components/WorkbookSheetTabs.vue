@@ -332,7 +332,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     overflow: hidden;
     background: transparent;
     border: 0;
-    color: var(--td-text-color-secondary);
+    color: var(--idea-text-secondary);
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -343,8 +343,8 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
     &.is-active {
       position: relative;
-      background: var(--td-bg-color-container);
-      color: var(--td-text-color-primary);
+      background: var(--idea-surface-panel);
+      color: var(--idea-text-primary);
       font-weight: 600;
 
       &::after {
@@ -353,7 +353,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
         bottom: 0;
         left: 0;
         height: 2px;
-        background: var(--td-brand-color);
+        background: var(--idea-action-primary);
         content: "";
       }
     }
@@ -370,13 +370,13 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     &[aria-expanded="true"],
     &:hover,
     &:focus-visible {
-      background: var(--td-bg-color-container-hover);
+      background: var(--idea-surface-hover);
       outline: none;
     }
   }
 
   &__rename-input {
-    outline: 2px solid var(--td-brand-color);
+    outline: 2px solid var(--idea-action-primary);
     outline-offset: -2px;
   }
 
@@ -386,18 +386,18 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     width: 30px;
     height: 100%;
     place-items: center;
-    border-left: 1px solid var(--td-component-border);
+    border-left: 1px solid var(--idea-border-control);
     padding: 0;
     background: transparent;
     border-top: 0;
     border-right: 0;
     border-bottom: 0;
     cursor: pointer;
-    color: var(--td-text-color-secondary);
+    color: var(--idea-text-secondary);
 
     &:hover,
     &:focus-visible {
-      background: var(--td-bg-color-container-hover);
+      background: var(--idea-surface-hover);
       outline: none;
     }
   }
@@ -408,10 +408,10 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     display: grid;
     min-width: 132px;
     padding: 4px;
-    background: var(--td-bg-color-container);
-    border: 1px solid var(--td-component-border);
+    background: var(--idea-surface-panel);
+    border: 1px solid var(--idea-border-control);
     border-radius: 4px;
-    box-shadow: var(--td-shadow-2, 0 3px 10px rgb(0 0 0 / 12%));
+    box-shadow: var(--idea-shadow-floating, 0 3px 10px rgb(0 0 0 / 12%));
 
     button {
       min-height: 28px;
@@ -419,7 +419,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
       background: transparent;
       border: 0;
       border-radius: 3px;
-      color: var(--td-text-color-primary);
+      color: var(--idea-text-primary);
       font: inherit;
       text-align: left;
       white-space: nowrap;
@@ -430,12 +430,12 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
       &:hover:not(:disabled),
       &:focus-visible:not(:disabled) {
-        background: var(--td-bg-color-container-hover);
+        background: var(--idea-surface-hover);
         outline: none;
       }
 
       &:disabled {
-        color: var(--td-text-color-disabled);
+        color: var(--idea-text-disabled);
         cursor: not-allowed;
       }
     }

@@ -111,7 +111,7 @@ function setFontSize(value: SelectValue): void {
     >
       <span class="ui-visually-hidden">{{ t("format.fontFamily") }}</span>
       <TSelect
-        class="font-format-controls__family"
+        class="font-format-controls__family idea-ribbon-select"
         size="small"
         borderless
         :model-value="fontFamilyValue"
@@ -129,7 +129,7 @@ function setFontSize(value: SelectValue): void {
     >
       <span class="ui-visually-hidden">{{ t("format.fontSize") }}</span>
       <TSelect
-        class="font-format-controls__size"
+        class="font-format-controls__size idea-ribbon-select idea-ribbon-select--compact"
         size="small"
         borderless
         :model-value="fontSizeValue"
@@ -164,57 +164,16 @@ function setFontSize(value: SelectValue): void {
   }
 
   &:not(.is-disabled) &__field:is(:hover, :focus-within) {
-    background: var(--td-bg-color-container-hover);
+    background: var(--idea-surface-hover);
   }
 
   &.is-disabled &__field {
-    background: var(--td-bg-color-component-disabled);
+    background: var(--idea-surface-disabled);
   }
 
   &__family,
   &__size {
     width: 100%;
-  }
-
-  :deep(.t-input) {
-    height: var(--cell-format-control-height, 26px);
-    padding-right: 6px;
-    padding-left: 6px;
-    background: transparent;
-    border: 0;
-    border-radius: 2px;
-    box-shadow: none;
-  }
-
-  :deep(.t-input:hover),
-  :deep(.t-input.t-is-focused),
-  :deep(.t-input.t-is-disabled) {
-    background: transparent;
-    border: 0;
-    box-shadow: none;
-  }
-
-  :deep(.t-input__suffix) {
-    margin-left: 3px;
-  }
-
-  :deep(.t-fake-arrow) {
-    width: 12px;
-    height: 12px;
-  }
-
-  &__size :deep(.t-input) {
-    padding-right: 3px;
-    padding-left: 4px;
-  }
-
-  &__size :deep(.t-input__suffix) {
-    margin-left: 1px;
-  }
-
-  &__size :deep(.t-fake-arrow) {
-    width: 10px;
-    height: 10px;
   }
 }
 </style>

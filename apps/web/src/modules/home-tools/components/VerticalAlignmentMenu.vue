@@ -320,18 +320,18 @@ onBeforeUnmount(() => {
     background: transparent;
     border: 1px solid transparent;
     border-radius: 2px;
-    color: var(--td-text-color-primary);
+    color: var(--idea-text-primary);
     cursor: pointer;
 
     &:hover:not(:disabled),
     &.is-expanded {
-      background: var(--td-bg-color-container-hover);
+      background: var(--idea-surface-hover);
     }
 
     &:focus-visible:not(.is-expanded) {
-      border-color: var(--td-brand-color);
+      border-color: var(--idea-action-primary);
       outline: none;
-      box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+      box-shadow: 0 0 0 2px var(--idea-action-focus);
     }
 
     &.is-expanded {
@@ -344,7 +344,7 @@ onBeforeUnmount(() => {
       bottom: 2px;
       left: 7px;
       height: 2px;
-      background: var(--td-text-color-placeholder);
+      background: var(--idea-text-muted);
       content: "";
       pointer-events: none;
     }
@@ -365,7 +365,7 @@ onBeforeUnmount(() => {
 
   &__disclosure {
     flex: 0 0 auto;
-    color: var(--td-text-color-placeholder);
+    color: var(--idea-text-muted);
     transition: transform 120ms ease;
 
     &.is-expanded {
@@ -378,10 +378,10 @@ onBeforeUnmount(() => {
     display: grid;
     min-width: 148px;
     padding: 4px;
-    background: var(--td-bg-color-container);
-    border: 1px solid var(--td-component-border);
-    border-radius: var(--td-radius-medium);
-    box-shadow: var(--td-shadow-2);
+    background: var(--idea-surface-panel);
+    border: 1px solid var(--idea-border-control);
+    border-radius: var(--idea-radius-medium);
+    box-shadow: var(--idea-shadow-floating);
 
     > button {
       display: grid;
@@ -394,14 +394,14 @@ onBeforeUnmount(() => {
       background: transparent;
       border: 0;
       border-radius: 2px;
-      color: var(--td-text-color-primary);
+      color: var(--idea-text-primary);
       cursor: pointer;
       font: inherit;
       text-align: left;
 
       &:hover,
       &:focus-visible {
-        background: var(--td-bg-color-container-hover);
+        background: var(--idea-surface-hover);
         outline: none;
       }
     }

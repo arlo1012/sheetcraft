@@ -165,7 +165,7 @@ const { t } = useAppI18n();
     grid-row: 1 / span 2;
     min-width: max-content;
     padding-left: 4px;
-    border-left: 1px solid var(--td-border-level-1-color);
+    border-left: 1px solid var(--idea-border-subtle);
   }
 
   &__style-action {

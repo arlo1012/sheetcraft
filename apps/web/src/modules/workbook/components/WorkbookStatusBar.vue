@@ -139,9 +139,9 @@ function formatNumber(value: number): string {
   align-items: stretch;
   min-width: 0;
   height: 30px;
-  background: var(--td-bg-color-container);
-  border-top: 1px solid var(--td-component-border);
-  color: var(--td-text-color-secondary);
+  background: var(--idea-surface-panel);
+  border-top: 1px solid var(--idea-border-control);
+  color: var(--idea-text-secondary);
   font-size: 12px;
 
   &__sheets {
@@ -158,7 +158,7 @@ function formatNumber(value: number): string {
     min-width: 60px;
     padding: 0 12px;
     overflow: hidden;
-    color: var(--td-text-color-placeholder);
+    color: var(--idea-text-muted);
     text-overflow: ellipsis;
     white-space: nowrap;
 
@@ -177,7 +177,7 @@ function formatNumber(value: number): string {
     min-width: 0;
     margin: 0;
     padding: 0 12px;
-    border-left: 1px solid var(--td-border-level-1-color);
+    border-left: 1px solid var(--idea-border-subtle);
     font-variant-numeric: tabular-nums;
   }
 
@@ -189,7 +189,7 @@ function formatNumber(value: number): string {
 
     dd {
       margin: 0;
-      color: var(--td-text-color-primary);
+      color: var(--idea-text-primary);
     }
   }
 
@@ -199,7 +199,7 @@ function formatNumber(value: number): string {
     align-items: center;
     gap: 2px;
     padding: 0 8px;
-    border-left: 1px solid var(--td-border-level-1-color);
+    border-left: 1px solid var(--idea-border-subtle);
   }
 
   &__placeholder,
@@ -212,7 +212,7 @@ function formatNumber(value: number): string {
     background: transparent;
     border: 0;
     border-radius: 3px;
-    color: var(--td-warning-color-6, #d68a00);
+    color: var(--idea-status-warning-strong, #d68a00);
 
     &:disabled {
       cursor: not-allowed;
@@ -232,7 +232,7 @@ function formatNumber(value: number): string {
     width: 1px;
     height: 14px;
     margin: 0 3px;
-    background: var(--td-border-level-1-color);
+    background: var(--idea-border-subtle);
   }
 
   @media (max-width: 720px) {

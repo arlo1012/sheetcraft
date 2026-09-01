@@ -335,15 +335,15 @@ onBeforeUnmount(() => {
   z-index: 100;
   display: grid;
   width: 272px;
-  max-width: calc(100vw - var(--td-size-4) - var(--td-size-4));
-  max-height: calc(100vh - var(--td-size-4) - var(--td-size-4));
+  max-width: calc(100vw - var(--idea-space-4) - var(--idea-space-4));
+  max-height: calc(100vh - var(--idea-space-4) - var(--idea-space-4));
   padding: 4px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--td-component-border);
-  border-radius: var(--td-radius-default);
-  box-shadow: var(--td-shadow-2);
+  background: var(--idea-surface-panel);
+  border: 1px solid var(--idea-border-control);
+  border-radius: var(--idea-radius-default);
+  box-shadow: var(--idea-shadow-floating);
 
   &__action {
     display: grid;
@@ -369,7 +369,7 @@ onBeforeUnmount(() => {
     align-items: center;
     min-height: 32px;
     padding: 0 8px;
-    color: var(--td-text-color-secondary);
+    color: var(--idea-text-secondary);
     font-size: 12px;
 
     > span:last-child {
@@ -383,19 +383,19 @@ onBeforeUnmount(() => {
     align-items: center;
     min-height: 34px;
     padding: 0 8px;
-    color: var(--td-text-color-primary);
+    color: var(--idea-text-primary);
     font-size: 12px;
 
     > span:last-child {
       padding-left: 5px;
-      color: var(--td-text-color-secondary);
+      color: var(--idea-text-secondary);
     }
   }
 
   &__separator {
     height: 1px;
     margin: 4px -4px;
-    background: var(--td-border-level-1-color);
+    background: var(--idea-border-subtle);
   }
 }
 </style>

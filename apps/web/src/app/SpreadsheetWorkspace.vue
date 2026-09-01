@@ -369,7 +369,7 @@ onBeforeUnmount(clearWorkspaceStatus);
   min-width: 320px;
   min-height: 360px;
   overflow: hidden;
-  background: var(--td-bg-color-container);
+  background: var(--idea-surface-panel);
 
   &__grid {
     min-width: 0;
