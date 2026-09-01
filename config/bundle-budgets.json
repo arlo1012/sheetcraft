@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "description": "Temporary refactor budgets based on the pre-split Web build baseline. Recalibrate after stable chunking is introduced.",
+  "distDirectory": "apps/web/dist",
+  "entryAssets": {
+    "javascript": {
+      "pattern": "^index-.*\\.js$",
+      "maximumRawBytes": 650000,
+      "maximumGzipBytes": 200000
+    },
+    "css": {
+      "pattern": "^index-.*\\.css$",
+      "maximumRawBytes": 200000,
+      "maximumGzipBytes": 30000
+    }
+  },
+  "totalAssets": {
+    "javascript": {
+      "maximumRawBytes": 650000,
+      "maximumGzipBytes": 200000
+    },
+    "css": {
+      "maximumRawBytes": 200000,
+      "maximumGzipBytes": 30000
+    }
+  }
+}
