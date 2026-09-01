@@ -7,7 +7,7 @@ import {
   normalizeCellBorderAction,
   normalizeCellStyle,
   normalizeCellStylePatch,
-} from "../../../../modules/workbook/cell-style";
+} from "../../style.js";
 import {
   getActiveSheet,
   getCellStyle,
@@ -15,7 +15,7 @@ import {
   createWorkbook,
   setCellStyle,
   setCellValue,
-} from "../../../../modules/workbook/workbook";
+} from "../../workbook.js";
 
 describe("cell style model", () => {
   test("derives a complete clear patch from the supported style keys", () => {

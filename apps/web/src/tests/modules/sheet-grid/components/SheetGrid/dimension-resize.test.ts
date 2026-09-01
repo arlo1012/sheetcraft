@@ -6,7 +6,7 @@ import {
   getCellValue,
   getColumnWidth,
   getRowHeight,
-} from "../../../../../modules/workbook/workbook";
+} from "@idea10/core/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
 import { mountSheetGrid } from "./fixture";
 

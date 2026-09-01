@@ -1,10 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { getSelectionCellStyleState } from "../../../../modules/workbook/style-state";
-import {
-  createWorkbook,
-  getActiveSheet,
-  setCellStyle,
-} from "../../../../modules/workbook/workbook";
+import { createWorkbook, getActiveSheet, setCellStyle } from "@idea10/core/workbook";
 
 describe("selection cell style state", () => {
   test("reports uniform, off, and mixed properties without scanning empty cells", () => {

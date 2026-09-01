@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { CellBorderAction } from "../../workbook/cell-style";
+import type { CellBorderAction } from "@idea10/core/style";
 
 const props = defineProps<{ preset: CellBorderAction["preset"] }>();
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref } from "vue";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
-import { formatCellAddress, parseCellAddress } from "../modules/sheet-grid/address";
+import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
 import type { SheetGridViewState } from "../modules/sheet-grid/view-state";
 import WorkbookFormulaBar from "../modules/workbook/components/WorkbookFormulaBar.vue";
@@ -20,7 +20,7 @@ import {
   createResizeSheetDimensionCommand,
   createSetCellValueCommand,
 } from "../modules/workbook/commands";
-import type { CellBorderAction, CellStylePatch } from "../modules/workbook/cell-style";
+import type { CellBorderAction, CellStylePatch } from "@idea10/core/style";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
@@ -45,7 +45,7 @@ import {
   type CellAddress,
   type CellRange,
   type SheetDimensionAxis,
-} from "../modules/workbook/workbook";
+} from "@idea10/core/workbook";
 import { useAppI18n, type MessageKey, type MessageParams } from "../shared/i18n";
 
 type FeedbackState = {

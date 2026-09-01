@@ -1,10 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import {
-  DEFAULT_ROW_HEIGHT,
-  getCellValue,
-  setCellValue,
-} from "../../../../../modules/workbook/workbook";
+import { DEFAULT_ROW_HEIGHT, getCellValue, setCellValue } from "@idea10/core/workbook";
 import { activeCell, mountSheetGrid } from "./fixture";
 
 describe("cell editor", () => {

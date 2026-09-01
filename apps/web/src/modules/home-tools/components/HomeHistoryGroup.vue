@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Eraser, Paintbrush, Redo2, Undo2 } from "lucide-vue-next";
-import { createClearCellStylePatch, type CellStylePatch } from "../../workbook/cell-style";
+import { createClearCellStylePatch, type CellStylePatch } from "@idea10/core/style";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonIconAction from "./RibbonIconAction.vue";
 

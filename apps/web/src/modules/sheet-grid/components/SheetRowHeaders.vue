@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
-import { MAX_ROW_HEIGHT, MIN_ROW_HEIGHT } from "../../workbook/workbook";
+import { MAX_ROW_HEIGHT, MIN_ROW_HEIGHT } from "@idea10/core/workbook";
 import type { SheetGeometry } from "../geometry";
 
 const { t } = useAppI18n();

@@ -5,9 +5,10 @@ import {
   MAX_SHEET_ROWS,
   isCellAddressInBounds,
   type CellAddress,
-} from "../workbook/workbook";
+} from "@idea10/core/workbook";
 
-export { DEFAULT_COLUMN_WIDTH, DEFAULT_ROW_HEIGHT } from "../workbook/workbook";
+export { DEFAULT_COLUMN_WIDTH, DEFAULT_ROW_HEIGHT } from "@idea10/core/workbook";
+export { columnIndexToLabel, getCellAddressLabel } from "@idea10/core/coordinates";
 
 export type Size = {
   width: number;
@@ -298,23 +299,4 @@ export function createSheetGeometry(options?: {
       };
     },
   };
-}
-
-export function columnIndexToLabel(column: number): string {
-  if (!Number.isInteger(column) || column < 0) {
-    throw new RangeError("Column index must be a non-negative integer.");
-  }
-
-  let value = column + 1;
-  let label = "";
-  while (value > 0) {
-    const remainder = (value - 1) % 26;
-    label = String.fromCharCode(65 + remainder) + label;
-    value = Math.floor((value - 1) / 26);
-  }
-  return label;
-}
-
-export function getCellAddressLabel(address: CellAddress): string {
-  return `${columnIndexToLabel(address.column)}${address.row + 1}`;
 }

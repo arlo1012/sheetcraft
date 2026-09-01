@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setCellStyle, setCellValue } from "../../../../../modules/workbook/workbook";
+import { setCellStyle, setCellValue } from "@idea10/core/workbook";
 import { activeCell, mountSheetGrid } from "./fixture";
 
 describe("SheetGrid viewport", () => {

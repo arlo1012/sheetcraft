@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Search } from "lucide-vue-next";
 import { nextTick, ref, watch } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
-import type { CellAddress } from "../workbook";
+import type { CellAddress } from "@idea10/core/workbook";
 
 const props = defineProps<{
   address: CellAddress;

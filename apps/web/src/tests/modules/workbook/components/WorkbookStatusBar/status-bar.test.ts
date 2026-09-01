@@ -1,7 +1,7 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import WorkbookStatusBar from "../../../../../modules/workbook/components/WorkbookStatusBar.vue";
-import { createSheet } from "../../../../../modules/workbook/workbook";
+import { createSheet } from "@idea10/core/workbook";
 import { createAppI18n } from "../../../../../shared/i18n";
 
 function mountStatusBar(locale: "en-US" | "zh-CN" = "en-US") {

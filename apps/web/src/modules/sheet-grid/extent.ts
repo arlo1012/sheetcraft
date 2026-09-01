@@ -1,4 +1,4 @@
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellAddress } from "../workbook/workbook";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellAddress } from "@idea10/core/workbook";
 import type { Point, SheetGeometry, Size } from "./geometry";
 
 export type GridExtent = {

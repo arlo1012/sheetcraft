@@ -9,7 +9,7 @@ import {
   Settings2,
 } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
-import type { CellBorder, CellBorderAction, CellBorderLineStyle } from "../../workbook/cell-style";
+import type { CellBorder, CellBorderAction, CellBorderLineStyle } from "@idea10/core/style";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import { getWorkbookHistoryShortcut } from "../history-shortcuts";

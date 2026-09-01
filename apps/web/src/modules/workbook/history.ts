@@ -1,5 +1,5 @@
 import { applyWorkbookCommand, type WorkbookCommand } from "./commands";
-import { createWorkbook, type Workbook } from "./workbook";
+import { createWorkbook, type Workbook } from "@idea10/core/workbook";
 
 export type HistoryEntry = {
   command: WorkbookCommand;

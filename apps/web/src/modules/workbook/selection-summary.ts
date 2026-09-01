@@ -1,4 +1,4 @@
-import { getCellValue, type CellRange, type CellValue, type Sheet } from "./workbook";
+import { getCellValue, type CellRange, type CellValue, type Sheet } from "@idea10/core/workbook";
 
 export type SelectionSummary = {
   average: number;

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "../../../../modules/workbook/workbook";
-import { formatCellAddress, parseCellAddress } from "../../../../modules/sheet-grid/address";
+import { formatCellAddress, parseCellAddress } from "../../coordinates.js";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "../../workbook.js";
 
 describe("cell address navigation", () => {
   test("parses case-insensitive and absolute A1 references", () => {

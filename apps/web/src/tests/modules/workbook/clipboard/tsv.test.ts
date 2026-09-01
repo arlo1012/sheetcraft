@@ -4,7 +4,7 @@ import {
   parseTsvToCellValues,
   serializeCellValuesToTsv,
 } from "../../../../modules/workbook/clipboard";
-import { createSheet, setCellValue } from "../../../../modules/workbook/workbook";
+import { createSheet, setCellValue } from "@idea10/core/workbook";
 
 describe("workbook TSV clipboard", () => {
   test("serializes a rectangular range with empty cells", () => {

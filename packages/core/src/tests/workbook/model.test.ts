@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { createSequentialIdFactory } from "../../runtime.js";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
@@ -12,9 +13,16 @@ import {
   setColumnWidth,
   setCellValue,
   setRowHeight,
-} from "../../../../modules/workbook/workbook";
+} from "../../workbook.js";
 
 describe("workbook model", () => {
+  test("accepts a deterministic runtime ID factory", () => {
+    const workbook = createWorkbook({ idFactory: createSequentialIdFactory(40) });
+
+    expect(getActiveSheet(workbook).id).toBe("sheet-41");
+    expect(workbook.id).toBe("workbook-42");
+  });
+
   test("creates a workbook with an active Sheet1", () => {
     const workbook = createWorkbook({ id: "book-1", sheetId: "sheet-1" });
 

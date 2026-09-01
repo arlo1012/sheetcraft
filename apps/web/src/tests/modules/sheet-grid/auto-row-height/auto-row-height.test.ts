@@ -6,7 +6,7 @@ import {
   type AutoRowHeightFont,
   type TextMeasurer,
 } from "../../../../modules/sheet-grid/auto-row-height";
-import { DEFAULT_ROW_HEIGHT, MAX_ROW_HEIGHT } from "../../../../modules/workbook/workbook";
+import { DEFAULT_ROW_HEIGHT, MAX_ROW_HEIGHT } from "@idea10/core/workbook";
 
 const baseFont: AutoRowHeightFont = {
   family: "Test Sans",

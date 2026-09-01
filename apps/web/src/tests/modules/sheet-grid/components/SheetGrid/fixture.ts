@@ -17,11 +17,7 @@ import {
   type WorkbookSession,
 } from "../../../../../modules/workbook/history";
 import { parseCellInput } from "../../../../../modules/workbook/input";
-import {
-  getActiveSheet,
-  type CellRange,
-  type SheetDimensionAxis,
-} from "../../../../../modules/workbook/workbook";
+import { getActiveSheet, type CellRange, type SheetDimensionAxis } from "@idea10/core/workbook";
 import SheetGrid from "../../../../../modules/sheet-grid/components/SheetGrid.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 

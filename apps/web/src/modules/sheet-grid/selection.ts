@@ -3,7 +3,7 @@ import {
   MAX_SHEET_ROWS,
   type CellAddress,
   type CellRange,
-} from "../workbook/workbook";
+} from "@idea10/core/workbook";
 
 export type SelectionMode = "cells" | "rows" | "columns" | "all";
 

@@ -6,7 +6,7 @@ import {
   setCellValue,
   setColumnWidth,
   setRowHeight,
-} from "../../../../../modules/workbook/workbook";
+} from "@idea10/core/workbook";
 import { mountSheetGrid } from "./fixture";
 
 function renderedRowHeight(

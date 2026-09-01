@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ALargeSmall, TableCellsMerge, TextWrap } from "lucide-vue-next";
-import type { CellStylePatch } from "../../workbook/cell-style";
+import type { CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState, ToggleStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import HorizontalAlignmentControls from "./HorizontalAlignmentControls.vue";

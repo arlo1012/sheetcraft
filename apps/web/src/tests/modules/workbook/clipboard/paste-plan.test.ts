@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createPastePlan } from "../../../../modules/workbook/clipboard";
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "../../../../modules/workbook/workbook";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "@idea10/core/workbook";
 
 describe("clipboard paste plan", () => {
   test("expands a matrix from a single active cell", () => {

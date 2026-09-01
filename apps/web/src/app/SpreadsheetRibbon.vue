@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
-import type { CellBorderAction, CellStylePatch } from "../modules/workbook/cell-style";
+import type { CellBorderAction, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "../modules/workbook/style-state";
 import { useAppI18n } from "../shared/i18n";
 import LocaleSwitcher from "./LocaleSwitcher.vue";

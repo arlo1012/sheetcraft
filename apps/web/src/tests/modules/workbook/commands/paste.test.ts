@@ -12,7 +12,7 @@ import {
   getCellValue,
   setCellStyle,
   setCellValue,
-} from "../../../../modules/workbook/workbook";
+} from "@idea10/core/workbook";
 
 describe("paste cell values command", () => {
   test("pastes a matrix as one history entry", () => {

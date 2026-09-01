@@ -1,3 +1,5 @@
+import { defaultIdFactory, type IdFactory } from "./runtime.js";
+
 export const MAX_SHEET_ROWS = 1_048_576;
 export const MAX_SHEET_COLUMNS = 16_384;
 export const DEFAULT_ROW_HEIGHT = 24;
@@ -62,24 +64,17 @@ export type RemovedSheet = {
   index: number;
 };
 
-let fallbackId = 0;
-
-function createId(prefix: string): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-
-  fallbackId += 1;
-  return `${prefix}-${fallbackId}`;
-}
-
 export function createCellKey(address: CellAddress): string {
   return `${address.row}:${address.column}`;
 }
 
-export function createSheet(name = "Sheet1", id = createId("sheet")): Sheet {
+export function createSheet(
+  name = "Sheet1",
+  id?: string,
+  idFactory: IdFactory = defaultIdFactory,
+): Sheet {
   return {
-    id,
+    id: id ?? idFactory("sheet"),
     name: normalizeSheetName(name),
     cells: new Map(),
     rowHeights: new Map(),
@@ -99,11 +94,13 @@ export function createWorkbook(options?: {
   id?: string;
   sheetId?: string;
   sheetName?: string;
+  idFactory?: IdFactory;
 }): Workbook {
-  const sheet = createSheet(options?.sheetName, options?.sheetId);
+  const idFactory = options?.idFactory ?? defaultIdFactory;
+  const sheet = createSheet(options?.sheetName, options?.sheetId, idFactory);
 
   return {
-    id: options?.id ?? createId("workbook"),
+    id: options?.id ?? idFactory("workbook"),
     sheets: new Map([[sheet.id, sheet]]),
     activeSheetId: sheet.id,
   };
@@ -490,9 +487,4 @@ export function isCellAddressInBounds(address: CellAddress): boolean {
     address.column < MAX_SHEET_COLUMNS
   );
 }
-import {
-  areCellStylesEqual,
-  cloneCellStyle,
-  normalizeCellStyle,
-  type CellStyle,
-} from "./cell-style";
+import { areCellStylesEqual, cloneCellStyle, normalizeCellStyle, type CellStyle } from "./style.js";

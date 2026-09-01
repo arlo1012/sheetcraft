@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getCellValue, getRowHeight, setCellValue } from "../../../../../modules/workbook/workbook";
+import { getCellValue, getRowHeight, setCellValue } from "@idea10/core/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
 import { activeCell, getFloatingDialog, hasFloatingDialog, mountSheetGrid } from "./fixture";
 

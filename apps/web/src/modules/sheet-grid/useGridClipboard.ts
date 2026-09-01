@@ -7,8 +7,8 @@ import {
   type CellValueMatrix,
   type PastePlan,
 } from "../workbook/clipboard";
-import { getCellStyle, type CellRange, type Sheet } from "../workbook/workbook";
-import { cloneCellStyle, type CellStyle } from "../workbook/cell-style";
+import { getCellStyle, type CellRange, type Sheet } from "@idea10/core/workbook";
+import { cloneCellStyle, type CellStyle } from "@idea10/core/style";
 import { getSelectionMode, getSelectionRange, type CellSelection } from "./selection";
 
 const LOCAL_CLIPBOARD_TYPE = "application/x-idea10-cells";

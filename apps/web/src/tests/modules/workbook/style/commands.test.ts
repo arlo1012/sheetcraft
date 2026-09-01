@@ -4,7 +4,7 @@ import {
   createApplyCellStyleCommand,
   createClearCellRangeCommand,
 } from "../../../../modules/workbook/commands";
-import { createClearCellStylePatch } from "../../../../modules/workbook/cell-style";
+import { createClearCellStylePatch } from "@idea10/core/style";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
@@ -17,7 +17,7 @@ import {
   getCellValue,
   setCellStyle,
   setCellValue,
-} from "../../../../modules/workbook/workbook";
+} from "@idea10/core/workbook";
 
 describe("cell style commands", () => {
   const border = { style: "thin" as const, color: "#123456" };

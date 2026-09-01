@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Sparkles, TableProperties } from "lucide-vue-next";
-import type { CellBorderAction, CellStylePatch } from "../../workbook/cell-style";
+import type { CellBorderAction, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import CellColorControl from "./CellColorControl.vue";

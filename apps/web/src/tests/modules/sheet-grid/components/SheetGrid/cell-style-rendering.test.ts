@@ -1,6 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { setCellStyle, setCellValue } from "../../../../../modules/workbook/workbook";
+import { setCellStyle, setCellValue } from "@idea10/core/workbook";
 import { mountSheetGrid } from "./fixture";
 
 describe("SheetGrid cell style rendering", () => {

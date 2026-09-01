@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import type { Sheet } from "../../workbook/workbook";
+import type { Sheet } from "@idea10/core/workbook";
 import {
   resolveBorderJunctions,
   resolveVisibleBorderSegments,

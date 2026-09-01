@@ -1,5 +1,5 @@
 import { formatCellValueForDisplay } from "./input";
-import type { CellAddress, Sheet } from "./workbook";
+import type { CellAddress, Sheet } from "@idea10/core/workbook";
 
 export type SheetSearchDirection = "forward" | "backward";
 

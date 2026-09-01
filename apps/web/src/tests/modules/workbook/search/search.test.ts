@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { findCellByText } from "../../../../modules/workbook/search";
-import { createSheet, setCellValue } from "../../../../modules/workbook/workbook";
+import { createSheet, setCellValue } from "@idea10/core/workbook";
 
 describe("sparse sheet search", () => {
   test("finds values in row order and wraps in either direction", () => {

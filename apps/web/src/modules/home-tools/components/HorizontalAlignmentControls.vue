@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { TextAlignCenter, TextAlignEnd, TextAlignStart } from "lucide-vue-next";
 import { computed } from "vue";
-import type { CellStylePatch, HorizontalCellAlignment } from "../../workbook/cell-style";
+import type { CellStylePatch, HorizontalCellAlignment } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonIconAction from "./RibbonIconAction.vue";

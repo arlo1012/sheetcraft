@@ -3,8 +3,8 @@ import {
   type CellStyle,
   type HorizontalCellAlignment,
   type VerticalCellAlignment,
-} from "./cell-style";
-import { getCellStyle, type CellRange, type Sheet } from "./workbook";
+} from "@idea10/core/style";
+import { getCellStyle, type CellRange, type Sheet } from "@idea10/core/workbook";
 
 export type ToggleStyleState = "on" | "off" | "mixed";
 

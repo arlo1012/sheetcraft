@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import type { CellBorderAction, CellStylePatch } from "../../workbook/cell-style";
+import type { CellBorderAction, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import { getWorkbookHistoryShortcut } from "../history-shortcuts";

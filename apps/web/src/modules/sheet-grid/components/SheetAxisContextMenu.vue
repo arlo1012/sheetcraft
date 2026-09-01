@@ -17,7 +17,7 @@ import {
   type FloatingReference,
 } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
-import type { SheetDimensionAxis } from "../../workbook/workbook";
+import type { SheetDimensionAxis } from "@idea10/core/workbook";
 
 const props = defineProps<{
   axis: SheetDimensionAxis;

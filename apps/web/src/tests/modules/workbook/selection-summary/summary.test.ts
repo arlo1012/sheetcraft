@@ -1,11 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { getSelectionSummary } from "../../../../modules/workbook/selection-summary";
-import {
-  MAX_SHEET_ROWS,
-  createSheet,
-  setCellStyle,
-  setCellValue,
-} from "../../../../modules/workbook/workbook";
+import { MAX_SHEET_ROWS, createSheet, setCellStyle, setCellValue } from "@idea10/core/workbook";
 
 describe("selection summary", () => {
   test("summarizes populated and numeric cells inside a reversed range", () => {

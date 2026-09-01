@@ -1,6 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test, vi } from "vitest";
-import { getCellValue } from "../../../../../modules/workbook/workbook";
+import { getCellValue } from "@idea10/core/workbook";
 import { activeCell, mountSheetGrid } from "./fixture";
 
 describe("cell editor IME composition", () => {

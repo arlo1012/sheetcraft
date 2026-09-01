@@ -8,7 +8,7 @@ import {
   MAX_CELL_FONT_SIZE,
   MIN_CELL_FONT_SIZE,
   type CellStylePatch,
-} from "../../workbook/cell-style";
+} from "@idea10/core/style";
 import type { SelectionCellStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 

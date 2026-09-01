@@ -26,7 +26,7 @@ import {
   setCellStyle,
   setColumnWidth,
   setRowHeight,
-} from "../../../../modules/workbook/workbook";
+} from "@idea10/core/workbook";
 
 describe("sheet axis structure commands", () => {
   test("inserts rows by shifting sparse cells and row dimensions while dropping the tail", () => {

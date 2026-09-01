@@ -5,7 +5,7 @@ import {
   DEFAULT_CELL_FILL_COLOR,
   DEFAULT_CELL_TEXT_COLOR,
   type CellStylePatch,
-} from "../../workbook/cell-style";
+} from "@idea10/core/style";
 import type { SelectionCellStyleState } from "../../workbook/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import CellColorPicker from "./CellColorPicker.vue";

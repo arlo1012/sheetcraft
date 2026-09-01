@@ -1,4 +1,4 @@
-import type { CellValue } from "./workbook";
+import type { CellValue } from "@idea10/core/workbook";
 
 const NUMBER_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
 

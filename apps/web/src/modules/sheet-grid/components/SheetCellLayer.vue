@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import { formatCellValueForDisplay } from "../../workbook/input";
-import { getCellStyle, getCellValue, type CellAddress, type Sheet } from "../../workbook/workbook";
+import { getCellStyle, getCellValue, type CellAddress, type Sheet } from "@idea10/core/workbook";
 import { getCellContentStyle } from "../cell-presentation";
 import type { Point, SheetGeometry, VisibleCellRange } from "../geometry";
 import { isCellSelected, type CellSelection } from "../selection";

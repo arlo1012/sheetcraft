@@ -9,7 +9,7 @@ import {
   redoWorkbookCommand,
   undoWorkbookCommand,
 } from "../../../../modules/workbook/history";
-import { getActiveSheet, getCellValue } from "../../../../modules/workbook/workbook";
+import { getActiveSheet, getCellValue } from "@idea10/core/workbook";
 
 describe("workbook commands and history", () => {
   test("executes a cell edit and supports undo and redo", () => {

@@ -6,7 +6,7 @@ import {
   type SheetBorderSegment,
 } from "../../../../modules/sheet-grid/border-presentation";
 import { createSheetGeometry } from "../../../../modules/sheet-grid/geometry";
-import { createSheet, setCellStyle } from "../../../../modules/workbook/workbook";
+import { createSheet, setCellStyle } from "@idea10/core/workbook";
 
 function coversPoint(segment: SheetBorderSegment, x: number, y: number): boolean {
   if (segment.orientation === "horizontal") {

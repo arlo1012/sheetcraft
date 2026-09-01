@@ -10,7 +10,7 @@ import {
   redoWorkbookCommand,
   undoWorkbookCommand,
 } from "../../../../modules/workbook/history";
-import { getWorkbookSheets, setActiveSheet } from "../../../../modules/workbook/workbook";
+import { getWorkbookSheets, setActiveSheet } from "@idea10/core/workbook";
 
 describe("sheet commands", () => {
   test("adds a sheet, activates it, and restores map order through undo and redo", () => {

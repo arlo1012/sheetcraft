@@ -2,7 +2,7 @@
 import { MoreHorizontal, Plus } from "lucide-vue-next";
 import { nextTick, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
-import type { Sheet } from "../workbook";
+import type { Sheet } from "@idea10/core/workbook";
 
 const { t } = useAppI18n();
 

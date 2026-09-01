@@ -2,14 +2,14 @@ import {
   DEFAULT_CELL_FONT_FAMILY,
   DEFAULT_CELL_FONT_SIZE,
   type CellStyle,
-} from "../workbook/cell-style";
+} from "@idea10/core/style";
 import { formatCellValueForDisplay } from "../workbook/input";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
   MAX_ROW_HEIGHT,
   type Cell,
-} from "../workbook/workbook";
+} from "@idea10/core/workbook";
 
 export const WRAPPED_CELL_HORIZONTAL_PADDING = 10;
 export const WRAPPED_CELL_VERTICAL_PADDING = 4;

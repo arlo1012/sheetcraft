@@ -1,10 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  getCellStyle,
-  getCellValue,
-  setCellStyle,
-  setCellValue,
-} from "../../../../../modules/workbook/workbook";
+import { getCellStyle, getCellValue, setCellStyle, setCellValue } from "@idea10/core/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
 import { mountSheetGrid } from "./fixture";
 

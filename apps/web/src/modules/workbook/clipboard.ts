@@ -7,7 +7,7 @@ import {
   type CellRange,
   type CellValue,
   type Sheet,
-} from "./workbook";
+} from "@idea10/core/workbook";
 
 export type CellValueMatrix = CellValue[][];
 

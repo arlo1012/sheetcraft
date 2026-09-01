@@ -8,7 +8,7 @@ import {
   removeSheet,
   renameSheet,
   setActiveSheet,
-} from "../../../../modules/workbook/workbook";
+} from "../../workbook.js";
 
 describe("workbook sheets", () => {
   test("keeps sheet order in the workbook map insertion order", () => {

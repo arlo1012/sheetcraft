@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getCellValue } from "../../../../../modules/workbook/workbook";
+import { getCellValue } from "@idea10/core/workbook";
 import { mountSheetGrid } from "./fixture";
 
 describe("workbook history shortcuts", () => {

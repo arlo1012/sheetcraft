@@ -7,7 +7,7 @@ import {
   ChevronDown,
 } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
-import type { CellStylePatch, VerticalCellAlignment } from "../../workbook/cell-style";
+import type { CellStylePatch, VerticalCellAlignment } from "@idea10/core/style";
 import type { StyleValueState } from "../../workbook/style-state";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";

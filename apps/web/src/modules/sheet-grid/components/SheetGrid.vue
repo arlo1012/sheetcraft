@@ -11,7 +11,7 @@ import {
   type CSSProperties,
 } from "vue";
 import { formatCellValueForDisplay, formatCellValueForInput } from "../../workbook/input";
-import { DEFAULT_CELL_FONT_FAMILY } from "../../workbook/cell-style";
+import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import {
@@ -27,7 +27,7 @@ import {
   type CellRange,
   type Sheet,
   type SheetDimensionAxis,
-} from "../../workbook/workbook";
+} from "@idea10/core/workbook";
 import {
   DEFAULT_GRID_EXTENT_POLICY,
   DEFAULT_INITIAL_GRID_EXTENT,

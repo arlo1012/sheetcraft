@@ -7,7 +7,7 @@ import {
   getActiveSheet,
   getColumnWidth,
   getRowHeight,
-} from "../../../../modules/workbook/workbook";
+} from "@idea10/core/workbook";
 import {
   createWorkbookSession,
   executeWorkbookCommand,

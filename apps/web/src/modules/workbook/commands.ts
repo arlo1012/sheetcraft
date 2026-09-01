@@ -26,7 +26,7 @@ import {
   type SheetSparseState,
   type Sheet,
   type Workbook,
-} from "./workbook";
+} from "@idea10/core/workbook";
 import { getCellMatrixSize } from "./clipboard";
 import {
   MAX_CELL_STYLE_PATCH_CELLS,
@@ -38,7 +38,7 @@ import {
   type CellBorderAction,
   type CellStyle,
   type CellStylePatch,
-} from "./cell-style";
+} from "@idea10/core/style";
 
 export type CellValueChange = {
   sheetId: string;

@@ -15,7 +15,7 @@ import {
   getActiveSheet,
   getCellValue,
   setCellValue,
-} from "../../../../modules/workbook/workbook";
+} from "@idea10/core/workbook";
 
 describe("clear cell range command", () => {
   test("clears a sparse range as one reversible history entry", () => {

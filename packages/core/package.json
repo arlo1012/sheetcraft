@@ -1,0 +1,39 @@
+{
+  "name": "@idea10/core",
+  "version": "0.1.0",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./coordinates": {
+      "types": "./dist/coordinates.d.ts",
+      "import": "./dist/coordinates.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
+    },
+    "./style": {
+      "types": "./dist/style.d.ts",
+      "import": "./dist/style.js"
+    },
+    "./workbook": {
+      "types": "./dist/workbook.d.ts",
+      "import": "./dist/workbook.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
-import { MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } from "../../workbook/workbook";
+import { MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } from "@idea10/core/workbook";
 import { columnIndexToLabel, type SheetGeometry } from "../geometry";
 
 const { t } = useAppI18n();
