@@ -1,9 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  formatCellValueForDisplay,
-  formatCellValueForInput,
-  parseCellInput,
-} from "../../input.js";
+import { formatCellValueForDisplay, formatCellValueForInput, parseCellInput } from "../../input.js";
 
 describe("cell input formatting", () => {
   test("maps blank input to an empty cell", () => {

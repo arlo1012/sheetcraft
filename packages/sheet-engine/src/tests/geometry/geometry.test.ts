@@ -1,7 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  createSheetGeometry,
-} from "../../geometry.js";
+import { createSheetGeometry } from "../../geometry.js";
 import { columnIndexToLabel, getCellAddressLabel } from "@idea10/core/coordinates";
 
 describe("sheet geometry", () => {

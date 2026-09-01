@@ -2,15 +2,35 @@
   "name": "@idea10/sheet-engine",
   "version": "0.1.0",
   "private": true,
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./geometry": { "types": "./dist/geometry.d.ts", "import": "./dist/geometry.js" },
-    "./selection": { "types": "./dist/selection.d.ts", "import": "./dist/selection.js" },
-    "./extent": { "types": "./dist/extent.d.ts", "import": "./dist/extent.js" },
-    "./view-state": { "types": "./dist/view-state.d.ts", "import": "./dist/view-state.js" },
-    "./row-height": { "types": "./dist/row-height.d.ts", "import": "./dist/row-height.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./geometry": {
+      "types": "./dist/geometry.d.ts",
+      "import": "./dist/geometry.js"
+    },
+    "./selection": {
+      "types": "./dist/selection.d.ts",
+      "import": "./dist/selection.js"
+    },
+    "./extent": {
+      "types": "./dist/extent.d.ts",
+      "import": "./dist/extent.js"
+    },
+    "./view-state": {
+      "types": "./dist/view-state.d.ts",
+      "import": "./dist/view-state.js"
+    },
+    "./row-height": {
+      "types": "./dist/row-height.d.ts",
+      "import": "./dist/row-height.js"
+    }
   },
   "scripts": {
     "build": "tsc -b tsconfig.build.json",
