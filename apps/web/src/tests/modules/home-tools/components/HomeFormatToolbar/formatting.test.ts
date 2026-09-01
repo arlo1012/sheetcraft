@@ -459,4 +459,17 @@ describe("HomeFormatToolbar", () => {
     expect(document.activeElement).toBe(trigger.element);
     expect(emittedPatches(wrapper)).toEqual([]);
   });
+
+  test("dismisses a drafted color when focus leaves the panel", async () => {
+    const wrapper = mountToolbar();
+    await wrapper.get('[aria-label="Text color"]').trigger("click");
+    expect(document.activeElement).toBe(getTeleportedDialog().element);
+
+    const outsideControl = wrapper.get('[aria-label="Fill color"]');
+    (outsideControl.element as HTMLButtonElement).focus();
+    await wrapper.vm.$nextTick();
+
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(outsideControl.element);
+  });
 });

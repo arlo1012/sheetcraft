@@ -319,6 +319,28 @@ describe("SheetGrid axis selection", () => {
     }
   });
 
+  test("dismisses the axis menu when focus leaves the dialog", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const { wrapper } = mountSheetGrid({ attachTo: host });
+    try {
+      const rowHeader = wrapper.get('[data-select-row="2"]');
+      (rowHeader.element as HTMLButtonElement).focus();
+      await rowHeader.trigger("keydown", { key: "F10", shiftKey: true });
+      expect(hasFloatingDialog()).toBe(true);
+
+      const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
+      editor.element.focus();
+      await wrapper.vm.$nextTick();
+
+      expect(hasFloatingDialog()).toBe(false);
+      expect(document.activeElement).toBe(editor.element);
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
+  });
+
   test("defers a header selection while composing", async () => {
     const { wrapper } = mountSheetGrid();
     const editor = wrapper.get("textarea.cell-editor");

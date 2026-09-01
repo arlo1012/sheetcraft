@@ -4,7 +4,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import type { CellBorderAction, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
-import { getWorkbookHistoryShortcut } from "../history-shortcuts";
+import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
 import HomeAlignmentGroup from "./HomeAlignmentGroup.vue";
 import HomeAutomationGroup from "./HomeAutomationGroup.vue";
 import HomeCellFormatGroup from "./HomeCellFormatGroup.vue";

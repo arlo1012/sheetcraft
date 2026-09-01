@@ -2,8 +2,8 @@
 import { ChevronDown } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
-import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
+import { computed, nextTick, ref, useId, watch } from "vue";
+import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 
 const SWATCH_COLORS = [
@@ -60,7 +60,11 @@ const open = ref(false);
 const draftColor = ref(props.value ?? props.defaultColor);
 const panelId = `cell-color-picker-${useId().replaceAll(":", "")}`;
 const currentColor = computed(() => props.value ?? props.defaultColor);
-const { floatingStyles } = useFloatingPanel(triggerRef, panelRef, open);
+const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, panelRef, open, {
+  onDismiss: () => {
+    open.value = false;
+  },
+});
 
 function normalizeColor(color: string): string | undefined {
   const normalized = color.trim().toLowerCase();
@@ -68,10 +72,7 @@ function normalizeColor(color: string): string | undefined {
 }
 
 function closePanel(restoreFocus: boolean): void {
-  open.value = false;
-  if (restoreFocus) {
-    void nextTick(() => triggerRef.value?.focus());
-  }
+  dismiss("programmatic", restoreFocus);
 }
 
 function openPanel(): void {
@@ -112,23 +113,6 @@ function resetColor(): void {
   closePanel(true);
 }
 
-function onDocumentPointerDown(event: PointerEvent): void {
-  const target = event.target as Node;
-  if (!open.value || triggerRef.value?.contains(target) || panelRef.value?.contains(target)) {
-    return;
-  }
-  closePanel(false);
-}
-
-function onPanelKeydown(event: KeyboardEvent): void {
-  if (event.key !== "Escape") {
-    return;
-  }
-  event.preventDefault();
-  event.stopPropagation();
-  closePanel(true);
-}
-
 watch(currentColor, (color) => {
   if (!open.value) {
     draftColor.value = color;
@@ -143,9 +127,6 @@ watch(
     }
   },
 );
-
-onMounted(() => document.addEventListener("pointerdown", onDocumentPointerDown));
-onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPointerDown));
 </script>
 
 <template>
@@ -185,7 +166,6 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", onDocumentPoin
       aria-modal="false"
       :aria-label="label"
       tabindex="-1"
-      @keydown="onPanelKeydown"
     >
       <ColorPickerPanel
         :model-value="draftColor"

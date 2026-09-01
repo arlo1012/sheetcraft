@@ -6,7 +6,7 @@ import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismiss
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import { useRovingFocus } from "../../../shared/focus/useRovingFocus";
 import { useAppI18n } from "../../../shared/i18n";
-import { getWorkbookHistoryShortcut } from "../history-shortcuts";
+import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
 import BorderColorPanel from "./BorderColorPanel.vue";
 import BorderLineStylePanel from "./BorderLineStylePanel.vue";
 import BorderPresetGrid from "./BorderPresetGrid.vue";

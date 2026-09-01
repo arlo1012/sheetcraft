@@ -5,6 +5,7 @@ import { getCellAddressLabel } from "@idea10/core/coordinates";
 import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
+import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
 import {
   MAX_COLUMN_WIDTH,
   MAX_ROW_HEIGHT,
@@ -112,7 +113,6 @@ const emit = defineEmits<{
   deleteAxis: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
   undo: [];
   redo: [];
-  selectionChange: [payload: { active: CellAddress; range: CellRange }];
   viewStateChange: [viewState: SheetGridViewState];
 }>();
 
@@ -339,10 +339,6 @@ function setSelection(
     mode: nextSelection.mode,
   };
   ensureGridExtentContains(visibleAddress);
-  emit("selectionChange", {
-    active: { ...nextSelection.active },
-    range: getSelectionRange(nextSelection),
-  });
   ensureSelectionVisible(visibleAddress, nextSelection.mode);
   emitViewState();
   if (restoreFocus) {
@@ -596,29 +592,16 @@ function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
 }
 
 function handleHistoryShortcut(event: KeyboardEvent): boolean {
-  if (isEditing.value || (!event.ctrlKey && !event.metaKey)) {
+  if (isEditing.value) {
     return false;
   }
-
-  const key = event.key.toLowerCase();
-  if (key === "z") {
-    event.preventDefault();
-    clearPendingClipboard();
-    if (event.shiftKey) {
-      emit("redo");
-    } else {
-      emit("undo");
-    }
-    return true;
-  }
-  if (key === "y") {
-    event.preventDefault();
-    clearPendingClipboard();
-    emit("redo");
-    return true;
-  }
-
-  return false;
+  const action = getWorkbookHistoryShortcut(event, { allowEditableTarget: true });
+  if (!action) return false;
+  event.preventDefault();
+  clearPendingClipboard();
+  if (action === "undo") emit("undo");
+  else emit("redo");
+  return true;
 }
 
 function traverseSelection(key: "Enter" | "Tab", reverse: boolean, commitEdit: boolean): void {

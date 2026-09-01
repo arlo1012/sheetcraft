@@ -11,11 +11,9 @@ import {
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import {
-  useFloatingPanel,
-  type FloatingReference,
-} from "../../../shared/floating/useFloatingPanel";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import type { SheetDimensionAxis } from "@idea10/core/workbook";
 
@@ -44,8 +42,9 @@ const countDraft = ref<InputNumberValue>(props.selectionCount);
 const sizeDraft = ref<InputNumberValue | undefined>(props.currentSize);
 const menuOpen = computed(() => true);
 const menuAnchor = computed(() => props.anchor);
-const { floatingStyles: menuStyle } = useFloatingPanel(menuAnchor, menuRef, menuOpen, {
+const { floatingStyles: menuStyle } = useDismissibleFloatingPanel(menuAnchor, menuRef, menuOpen, {
   offset: 4,
+  onDismiss: ({ restoreFocus }) => emit("close", restoreFocus),
 });
 const maximumInsertCount = computed(() => Math.max(props.maxBeforeCount, props.maxAfterCount));
 const insertCount = computed(() =>
@@ -159,19 +158,6 @@ function getSelectionActionLabel(action: "delete" | "clear"): string {
   return t(key, { count });
 }
 
-function onDocumentPointerDown(event: PointerEvent): void {
-  if (!menuRef.value?.contains(event.target as Node)) {
-    emit("close", false);
-  }
-}
-
-function onDocumentKeydown(event: KeyboardEvent): void {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    emit("close", true);
-  }
-}
-
 function onPopoverKeydown(event: KeyboardEvent): void {
   if (event.target instanceof HTMLInputElement) {
     return;
@@ -198,16 +184,9 @@ function onPopoverKeydown(event: KeyboardEvent): void {
 }
 
 onMounted(() => {
-  document.addEventListener("pointerdown", onDocumentPointerDown);
-  document.addEventListener("keydown", onDocumentKeydown);
   void nextTick(() =>
     menuRef.value?.querySelector<HTMLButtonElement>("[data-axis-action]:not(:disabled)")?.focus(),
   );
-});
-
-onBeforeUnmount(() => {
-  document.removeEventListener("pointerdown", onDocumentPointerDown);
-  document.removeEventListener("keydown", onDocumentKeydown);
 });
 </script>
 
