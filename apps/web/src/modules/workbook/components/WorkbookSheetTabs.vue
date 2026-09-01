@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Plus } from "lucide-vue-next";
-import { nextTick, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from "vue";
+import { nextTick, ref, type ComponentPublicInstance } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { Sheet } from "@idea10/core/workbook";
 import SheetTabMenu from "./SheetTabMenu.vue";
@@ -24,14 +24,12 @@ const renameValue = ref("");
 const renameInput = ref<HTMLInputElement>();
 const tabButtons = new Map<string, HTMLButtonElement>();
 type SheetTabMenuInstance = ComponentPublicInstance & {
-  containsTarget: (target: Node) => boolean;
   focusTrigger: () => void;
   getTriggerRect: () => DOMRect | undefined;
 };
 
 const sheetTabMenus = new Map<string, SheetTabMenuInstance>();
 const openMenuSheetId = ref<string>();
-const root = ref<HTMLElement>();
 const menuPosition = ref({ left: 4, bottom: 34 });
 
 function setRenameInput(input: Element | ComponentPublicInstance | null): void {
@@ -50,7 +48,7 @@ function setSheetTabMenu(
   sheetId: string,
   instance: Element | ComponentPublicInstance | null,
 ): void {
-  if (instance && "focusTrigger" in instance && "containsTarget" in instance) {
+  if (instance && "focusTrigger" in instance && "getTriggerRect" in instance) {
     sheetTabMenus.set(sheetId, instance as SheetTabMenuInstance);
   } else {
     sheetTabMenus.delete(sheetId);
@@ -131,34 +129,6 @@ function onSheetContextMenu(sheet: Sheet, event: MouseEvent): void {
   openMenu(sheet, event);
 }
 
-function onDocumentPointerDown(event: PointerEvent): void {
-  if (
-    openMenuSheetId.value &&
-    event.target instanceof Node &&
-    !root.value?.contains(event.target) &&
-    !sheetTabMenus.get(openMenuSheetId.value)?.containsTarget(event.target)
-  ) {
-    closeMenu();
-  }
-}
-
-function onDocumentKeydown(event: KeyboardEvent): void {
-  if (event.key === "Escape" && openMenuSheetId.value) {
-    event.preventDefault();
-    closeMenu(true);
-  }
-}
-
-onMounted(() => {
-  document.addEventListener("pointerdown", onDocumentPointerDown);
-  document.addEventListener("keydown", onDocumentKeydown);
-});
-
-onBeforeUnmount(() => {
-  document.removeEventListener("pointerdown", onDocumentPointerDown);
-  document.removeEventListener("keydown", onDocumentKeydown);
-});
-
 function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
   const index = props.sheets.findIndex((sheet) => sheet.id === sheetId);
   let nextIndex: number;
@@ -186,7 +156,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 </script>
 
 <template>
-  <div ref="root" class="workbook-sheet-tabs">
+  <div class="workbook-sheet-tabs">
     <div class="workbook-sheet-tabs__list" role="tablist" :aria-label="t('sheetTabs.list')">
       <div
         v-for="sheet in props.sheets"
@@ -229,7 +199,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
           @toggle="toggleMenu(sheet)"
           @rename="renameFromMenu(sheet)"
           @delete="deleteFromMenu(sheet)"
-          @close="closeMenu(true)"
+          @close="closeMenu"
         />
       </div>
     </div>

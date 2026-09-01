@@ -54,7 +54,7 @@ describe("HomeCellFormatGroup layout", () => {
     expect(
       wrapper
         .get(".text-format-controls")
-        .findAll('[role="button"]')
+        .findAll("button")
         .map((action) => action.attributes("aria-label")),
     ).toEqual(["Bold", "Italic", "Underline", "Strikethrough, not available yet"]);
     expect(

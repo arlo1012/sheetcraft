@@ -88,70 +88,55 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper)).toEqual([{ bold: null }, { italic: true }]);
   });
 
-  test("uses lightweight keyboard-operable buttons for emphasis and alignment", async () => {
+  test("uses native buttons for emphasis and alignment", async () => {
     const wrapper = mountToolbar();
     const bold = wrapper.get('[aria-label="Bold"]');
     const center = wrapper.get('[aria-label="Align center"]');
 
-    expect(bold.element).toBeInstanceOf(HTMLSpanElement);
-    expect(center.element).toBeInstanceOf(HTMLSpanElement);
+    expect(bold.element).toBeInstanceOf(HTMLButtonElement);
+    expect(center.element).toBeInstanceOf(HTMLButtonElement);
     for (const action of [bold, center]) {
-      expect(action.attributes()).toMatchObject({
-        role: "button",
-        tabindex: "0",
-        "aria-disabled": "false",
-      });
+      expect(action.attributes()).toMatchObject({ type: "button" });
+      expect((action.element as HTMLButtonElement).disabled).toBe(false);
     }
 
-    await bold.trigger("keydown", { key: "Enter" });
-    await center.trigger("keydown", { key: " " });
+    await bold.trigger("click");
+    await center.trigger("click");
     expect(emittedPatches(wrapper)).toEqual([{ bold: true }, { horizontalAlign: "center" }]);
   });
 
-  test("toggles wrapping from pointer and keyboard activation", async () => {
+  test("toggles wrapping from native button activation", async () => {
     const wrapper = mountToolbar(createStyleState({ wrapText: "mixed" }));
     const wrapText = wrapper.get('[data-ribbon-action="wrap-text"]');
 
     expect(wrapText.attributes()).toMatchObject({
-      role: "button",
-      tabindex: "0",
-      "aria-disabled": "false",
+      type: "button",
       "aria-label": "Wrap text",
       "aria-pressed": "mixed",
     });
+    expect(wrapText.element).toBeInstanceOf(HTMLButtonElement);
+    expect((wrapText.element as HTMLButtonElement).disabled).toBe(false);
     await wrapText.trigger("click");
-    await wrapText.trigger("keydown", { key: "Enter" });
-    await wrapText.trigger("keydown", { key: " " });
-    expect(emittedPatches(wrapper)).toEqual([
-      { wrapText: true },
-      { wrapText: true },
-      { wrapText: true },
-    ]);
+    expect(emittedPatches(wrapper)).toEqual([{ wrapText: true }]);
 
     await wrapper.setProps({ state: createStyleState({ wrapText: "on" }) });
     await wrapText.trigger("click");
     expect(emittedPatches(wrapper).at(-1)).toEqual({ wrapText: null });
   });
 
-  test("emits a complete clear-formatting patch from pointer and keyboard activation", async () => {
+  test("emits a complete clear-formatting patch from native button activation", async () => {
     const wrapper = mountToolbar();
     const clearFormatting = wrapper.get('[data-ribbon-action="clear-formatting"]');
 
     expect(clearFormatting.attributes()).toMatchObject({
-      role: "button",
-      tabindex: "0",
-      "aria-disabled": "false",
+      type: "button",
       "aria-label": "Clear formatting",
     });
+    expect(clearFormatting.element).toBeInstanceOf(HTMLButtonElement);
+    expect((clearFormatting.element as HTMLButtonElement).disabled).toBe(false);
     await clearFormatting.trigger("click");
-    await clearFormatting.trigger("keydown", { key: "Enter" });
-    await clearFormatting.trigger("keydown", { key: " " });
 
-    expect(emittedPatches(wrapper)).toEqual([
-      createClearCellStylePatch(),
-      createClearCellStylePatch(),
-      createClearCellStylePatch(),
-    ]);
+    expect(emittedPatches(wrapper)).toEqual([createClearCellStylePatch()]);
   });
 
   test("emits validated font and alignment patches", async () => {
@@ -242,19 +227,20 @@ describe("HomeFormatToolbar", () => {
     const toolbar = wrapper.get(".home-format-toolbar");
     expect(toolbar.attributes("role")).toBe("group");
     expect(toolbar.attributes("aria-disabled")).toBeUndefined();
-    for (const control of wrapper.findAll("button, input")) {
+    for (const control of wrapper.findAll(
+      '[data-ribbon-group]:not([data-ribbon-group="history"]) button, input',
+    )) {
       expect((control.element as HTMLButtonElement | HTMLInputElement).disabled).toBe(true);
     }
     for (const control of wrapper.findAll(
       '[aria-label="Bold"], [aria-label="Italic"], [aria-label="Underline"], [aria-label="Clear formatting"], [aria-label="Wrap text"], [aria-label="Align left"], [aria-label="Align center"], [aria-label="Align right"]',
     )) {
-      expect(control.attributes()).toMatchObject({ tabindex: "-1", "aria-disabled": "true" });
+      expect(control.element).toBeInstanceOf(HTMLButtonElement);
+      expect(control.attributes()).toMatchObject({ type: "button", disabled: "" });
       await control.trigger("click");
-      await control.trigger("keydown", { key: "Enter" });
-      await control.trigger("keydown", { key: " " });
     }
     await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
-    await wrapper.get('[data-ribbon-action="redo"]').trigger("keydown", { key: " " });
+    await wrapper.get('[data-ribbon-action="redo"]').trigger("click");
     expect(emittedPatches(wrapper)).toEqual([]);
     expect(wrapper.emitted("undo")).toHaveLength(1);
     expect(wrapper.emitted("redo")).toHaveLength(1);
@@ -362,22 +348,14 @@ describe("HomeFormatToolbar", () => {
     for (const action of ["text-orientation"]) {
       const control = wrapper.get(`[data-ribbon-placeholder="${action}"]`);
       expect(control.find(".ribbon-icon-action__text").exists()).toBe(false);
-      expect(control.attributes()).toMatchObject({
-        role: "button",
-        tabindex: "-1",
-        "aria-disabled": "true",
-      });
+      expect(control.element).toBeInstanceOf(HTMLButtonElement);
+      expect(control.attributes()).toMatchObject({ type: "button", disabled: "" });
     }
     expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(28);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
-      expect(placeholder.attributes()).toMatchObject({
-        role: "button",
-        tabindex: "-1",
-        "aria-disabled": "true",
-      });
+      expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
+      expect(placeholder.attributes()).toMatchObject({ type: "button", disabled: "" });
     }
-    expect(wrapper.findAll(".text-format-controls .t-button")).toHaveLength(0);
-    expect(wrapper.findAll(".horizontal-alignment-controls .t-button")).toHaveLength(0);
   });
 
   test("exposes mixed color and alignment state to assistive technology", () => {

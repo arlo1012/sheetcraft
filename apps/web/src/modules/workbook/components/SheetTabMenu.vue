@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { MoreHorizontal } from "lucide-vue-next";
-import { nextTick, ref, watch, type ComponentPublicInstance } from "vue";
+import { nextTick, ref, toRef, watch, type ComponentPublicInstance } from "vue";
+import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import { useRovingFocus } from "../../../shared/focus/useRovingFocus";
 import { useAppI18n } from "../../../shared/i18n";
 import type { Sheet } from "@idea10/core/workbook";
 
@@ -17,14 +19,19 @@ const emit = defineEmits<{
   toggle: [];
   rename: [];
   delete: [];
-  close: [];
+  close: [restoreFocus: boolean];
 }>();
 
-const trigger = ref<HTMLButtonElement>();
-const menuRoot = ref<HTMLElement>();
+const trigger = ref<HTMLButtonElement | null>(null);
+const menuRoot = ref<HTMLElement | null>(null);
+const isOpen = toRef(props, "isOpen");
+const { dismiss } = useDismissibleFloatingPanel(trigger, menuRoot, isOpen, {
+  onDismiss: ({ restoreFocus }) => emit("close", restoreFocus),
+});
+const { move: moveRovingFocus } = useRovingFocus();
 
 function setMenuRoot(element: Element | ComponentPublicInstance | null): void {
-  menuRoot.value = element instanceof HTMLElement ? element : undefined;
+  menuRoot.value = element instanceof HTMLElement ? element : null;
 }
 
 function menuId(): string {
@@ -39,42 +46,15 @@ function getTriggerRect(): DOMRect | undefined {
   return trigger.value?.getBoundingClientRect();
 }
 
-function containsTarget(target: Node): boolean {
-  return trigger.value?.contains(target) === true || menuRoot.value?.contains(target) === true;
-}
-
 function focusFirstMenuItem(): void {
   menuRoot.value?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
 }
 
 function onMenuKeydown(event: KeyboardEvent): void {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    emit("close");
-    return;
-  }
-  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-    return;
-  }
   const items = Array.from(
     menuRoot.value?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [],
   );
-  if (items.length === 0) {
-    return;
-  }
-  event.preventDefault();
-  const currentIndex = items.findIndex((item) => item === document.activeElement);
-  let nextIndex: number;
-  if (event.key === "Home") {
-    nextIndex = 0;
-  } else if (event.key === "End") {
-    nextIndex = items.length - 1;
-  } else if (event.key === "ArrowUp") {
-    nextIndex = currentIndex <= 0 ? items.length - 1 : currentIndex - 1;
-  } else {
-    nextIndex = currentIndex < 0 || currentIndex === items.length - 1 ? 0 : currentIndex + 1;
-  }
-  items[nextIndex]?.focus();
+  moveRovingFocus(event, items);
 }
 
 watch(
@@ -84,9 +64,10 @@ watch(
       void nextTick(focusFirstMenuItem);
     }
   },
+  { flush: "post" },
 );
 
-defineExpose({ containsTarget, focusTrigger, getTriggerRect });
+defineExpose({ dismiss, focusTrigger, getTriggerRect });
 </script>
 
 <template>
@@ -157,7 +138,7 @@ defineExpose({ containsTarget, focusTrigger, getTriggerRect });
     background: var(--idea-surface-panel);
     border: 1px solid var(--idea-border-control);
     border-radius: 4px;
-    box-shadow: var(--idea-shadow-floating, 0 3px 10px rgb(0 0 0 / 12%));
+    box-shadow: var(--idea-shadow-floating);
 
     button {
       min-height: 28px;

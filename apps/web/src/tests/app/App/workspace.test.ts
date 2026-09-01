@@ -424,16 +424,8 @@ describe("App", () => {
     expect(formatGroup.attributes("title")).toBe(
       "This selection is too large to format in one action.",
     );
-    expect(wrapper.get('[aria-label="Bold"]').attributes("aria-disabled")).toBe("true");
-    expect(wrapper.get('[aria-label="Bold"]').attributes("tabindex")).toBe("-1");
-    expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-disabled")).toBe(
-      "true",
-    );
-    expect(wrapper.get('[data-ribbon-action="clear-formatting"]').attributes("aria-disabled")).toBe(
-      "true",
-    );
-    expect(wrapper.get('[data-ribbon-action="clear-formatting"]').attributes("tabindex")).toBe(
-      "-1",
-    );
+    expect(wrapper.get('[aria-label="Bold"]').attributes("disabled")).toBe("");
+    expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("disabled")).toBe("");
+    expect(wrapper.get('[data-ribbon-action="clear-formatting"]').attributes("disabled")).toBe("");
   });
 });

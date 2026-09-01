@@ -28,18 +28,10 @@ function activate(): void {
     emit("activate");
   }
 }
-
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") {
-    return;
-  }
-  event.preventDefault();
-  activate();
-}
 </script>
 
 <template>
-  <span
+  <button
     class="ribbon-icon-action"
     :class="{
       'is-disabled': disabled,
@@ -48,14 +40,12 @@ function onKeydown(event: KeyboardEvent): void {
       'has-text': text,
       'is-tall': variant === 'tall',
     }"
-    role="button"
-    :tabindex="disabled ? -1 : 0"
+    type="button"
+    :disabled="disabled"
     :aria-label="label"
-    :aria-disabled="disabled"
     :aria-pressed="pressed"
     :title="label"
     @click="activate"
-    @keydown="onKeydown"
   >
     <span class="ribbon-icon-action__icon" aria-hidden="true">
       <slot />
@@ -67,7 +57,7 @@ function onKeydown(event: KeyboardEvent): void {
       :size="11"
       aria-hidden="true"
     />
-  </span>
+  </button>
 </template>
 
 <style scoped lang="scss">
@@ -78,13 +68,18 @@ function onKeydown(event: KeyboardEvent): void {
   justify-content: center;
   width: 27px;
   height: 26px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  background: transparent;
   border: 1px solid transparent;
   border-radius: 2px;
   color: var(--idea-text-primary);
   cursor: pointer;
+  font: inherit;
   outline: none;
 
-  &:hover:not(.is-disabled) {
+  &:hover:not(:disabled) {
     background: var(--idea-surface-hover);
   }
 
@@ -98,7 +93,7 @@ function onKeydown(event: KeyboardEvent): void {
     color: var(--idea-action-primary);
   }
 
-  &.is-disabled {
+  &:disabled {
     cursor: default;
     color: var(--idea-text-secondary);
   }

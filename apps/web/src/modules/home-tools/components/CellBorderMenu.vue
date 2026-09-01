@@ -2,7 +2,9 @@
 import { ChevronDown, ChevronRight, Grid2X2, List, PencilLine, Settings2 } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import type { CellBorder, CellBorderAction, CellBorderLineStyle } from "@idea10/core/style";
+import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
+import { useRovingFocus } from "../../../shared/focus/useRovingFocus";
 import { useAppI18n } from "../../../shared/i18n";
 import { getWorkbookHistoryShortcut } from "../history-shortcuts";
 import BorderColorPanel from "./BorderColorPanel.vue";
@@ -43,13 +45,26 @@ const submenuAnchorRef = computed(() => {
 const submenuPlacement = computed(() =>
   stackedSubmenu.value ? ("bottom-end" as const) : ("right-start" as const),
 );
-const { floatingStyles: menuStyles } = useFloatingPanel(triggerRef, menuRef, open, { offset: 4 });
+const { floatingStyles: menuStyles, dismiss: dismissMenu } = useDismissibleFloatingPanel(
+  triggerRef,
+  menuRef,
+  open,
+  {
+    offset: 4,
+    additionalInside: () => [submenuRef.value],
+    onDismiss: () => {
+      activeSubmenu.value = null;
+      open.value = false;
+    },
+  },
+);
 const { floatingStyles: submenuStyles } = useFloatingPanel(
   submenuAnchorRef,
   submenuRef,
   submenuOpen,
   { placement: submenuPlacement, offset: 4 },
 );
+const { move: moveRovingFocus } = useRovingFocus();
 const DOCUMENT_FOCUS_TARGET_SELECTOR = [
   'a[href]:not([tabindex="-1"])',
   'button:not(:disabled):not([tabindex="-1"])',
@@ -76,9 +91,7 @@ function normalizeColor(value: string): string | undefined {
   return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : undefined;
 }
 function closeAll(restoreFocus: boolean): void {
-  activeSubmenu.value = null;
-  open.value = false;
-  if (restoreFocus) void nextTick(() => triggerRef.value?.focus());
+  dismissMenu("programmatic", restoreFocus);
 }
 function closeSubmenu(restoreFocus: boolean): void {
   const row =
@@ -137,26 +150,6 @@ function moveFocusFromTrigger(direction: -1 | 1): void {
   closeAll(false);
   void nextTick(() => target?.focus());
 }
-function moveFocus(event: KeyboardEvent, items: HTMLElement[]): boolean {
-  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return false;
-  const currentIndex = items.indexOf(document.activeElement as HTMLElement);
-  if (items.length === 0 || currentIndex < 0) return false;
-  event.preventDefault();
-  const nextIndex =
-    event.key === "Home"
-      ? 0
-      : event.key === "End"
-        ? items.length - 1
-        : event.key === "ArrowUp"
-          ? currentIndex === 0
-            ? items.length - 1
-            : currentIndex - 1
-          : currentIndex === items.length - 1
-            ? 0
-            : currentIndex + 1;
-  items[nextIndex]?.focus();
-  return true;
-}
 function handleHistoryShortcut(event: KeyboardEvent): boolean {
   const action = getWorkbookHistoryShortcut(event);
   if (!action) return false;
@@ -183,12 +176,13 @@ function onMenuKeydown(event: KeyboardEvent): void {
     else if (document.activeElement === settingsRowRef.value) openSubmenu("settings");
     return;
   }
-  moveFocus(event, menuItems());
+  moveRovingFocus(event, menuItems());
 }
 function onSubmenuKeydown(event: KeyboardEvent): void {
   if (handleHistoryShortcut(event)) return;
   if (event.key === "Escape" || event.key === "ArrowLeft") {
     event.preventDefault();
+    event.stopPropagation();
     closeSubmenu(true);
     return;
   }
@@ -197,21 +191,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
     moveFocusFromTrigger(event.shiftKey ? -1 : 1);
     return;
   }
-  moveFocus(event, submenuItems());
-}
-function isInsideMenu(target: EventTarget | null): boolean {
-  return (
-    target instanceof Node &&
-    (triggerRef.value?.contains(target) === true ||
-      menuRef.value?.contains(target) === true ||
-      submenuRef.value?.contains(target) === true)
-  );
-}
-function onDocumentPointerDown(event: PointerEvent): void {
-  if (open.value && !isInsideMenu(event.target)) closeAll(false);
-}
-function onDocumentFocusIn(event: FocusEvent): void {
-  if (open.value && !isInsideMenu(event.target)) closeAll(false);
+  moveRovingFocus(event, submenuItems());
 }
 function updateSubmenuLayout(): void {
   stackedSubmenu.value = window.innerWidth < STACKED_SUBMENU_BREAKPOINT;
@@ -225,13 +205,9 @@ watch(
 onMounted(() => {
   updateSubmenuLayout();
   window.addEventListener("resize", updateSubmenuLayout);
-  document.addEventListener("pointerdown", onDocumentPointerDown);
-  document.addEventListener("focusin", onDocumentFocusIn);
 });
 onBeforeUnmount(() => {
   window.removeEventListener("resize", updateSubmenuLayout);
-  document.removeEventListener("pointerdown", onDocumentPointerDown);
-  document.removeEventListener("focusin", onDocumentFocusIn);
 });
 </script>
 

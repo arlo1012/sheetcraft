@@ -6,10 +6,11 @@ import {
   Check,
   ChevronDown,
 } from "lucide-vue-next";
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
+import { computed, nextTick, ref, useId, watch } from "vue";
 import type { CellStylePatch, VerticalCellAlignment } from "@idea10/core/style";
 import type { StyleValueState } from "@idea10/core/style-state";
-import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
+import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import { useRovingFocus } from "../../../shared/focus/useRovingFocus";
 import { useAppI18n } from "../../../shared/i18n";
 
 const props = defineProps<{
@@ -49,7 +50,13 @@ const triggerLabel = computed(() =>
     ? t("format.verticalAlignmentMixed")
     : t("format.verticalAlignmentValue", { value: currentAlignmentLabel.value }),
 );
-const { floatingStyles } = useFloatingPanel(triggerRef, menuRef, open, { offset: 4 });
+const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, menuRef, open, {
+  offset: 4,
+  onDismiss: () => {
+    open.value = false;
+  },
+});
+const { move: moveRovingFocus } = useRovingFocus();
 
 function menuItems(): HTMLButtonElement[] {
   return Array.from(
@@ -74,13 +81,6 @@ function focusMenuItem(preferred: "selected" | "first" | "last"): void {
   (selected ?? items[1] ?? items[0])?.focus();
 }
 
-function closeMenu(restoreFocus: boolean): void {
-  open.value = false;
-  if (restoreFocus) {
-    void nextTick(() => triggerRef.value?.focus());
-  }
-}
-
 function openMenu(preferred: "selected" | "first" | "last" = "selected"): void {
   if (props.disabled) {
     return;
@@ -91,7 +91,7 @@ function openMenu(preferred: "selected" | "first" | "last" = "selected"): void {
 
 function toggleMenu(): void {
   if (open.value) {
-    closeMenu(true);
+    dismiss("programmatic", true);
   } else {
     openMenu();
   }
@@ -103,7 +103,7 @@ function isSelected(alignment: VerticalCellAlignment): boolean {
 
 function selectAlignment(alignment: VerticalCellAlignment): void {
   emit("applyStyle", { verticalAlign: alignment === "middle" ? null : alignment });
-  closeMenu(true);
+  dismiss("programmatic", true);
 }
 
 function onTriggerKeydown(event: KeyboardEvent): void {
@@ -117,7 +117,7 @@ function onTriggerKeydown(event: KeyboardEvent): void {
 function moveFocusFromTrigger(direction: -1 | 1): void {
   const trigger = triggerRef.value;
   if (!trigger) {
-    closeMenu(false);
+    dismiss("programmatic", false);
     return;
   }
   const focusTargets = Array.from(
@@ -125,7 +125,7 @@ function moveFocusFromTrigger(direction: -1 | 1): void {
   );
   const triggerIndex = focusTargets.indexOf(trigger);
   const target = triggerIndex < 0 ? undefined : focusTargets[triggerIndex + direction];
-  closeMenu(false);
+  dismiss("programmatic", false);
   void nextTick(() => target?.focus());
 }
 
@@ -135,71 +135,17 @@ function onMenuKeydown(event: KeyboardEvent): void {
     moveFocusFromTrigger(event.shiftKey ? -1 : 1);
     return;
   }
-  if (event.key === "Escape") {
-    event.preventDefault();
-    event.stopPropagation();
-    closeMenu(true);
-    return;
-  }
-  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-    return;
-  }
-  const items = menuItems();
-  if (items.length === 0) {
-    return;
-  }
-  event.preventDefault();
-  const currentIndex = items.findIndex((item) => item === document.activeElement);
-  let nextIndex: number;
-  if (event.key === "Home") {
-    nextIndex = 0;
-  } else if (event.key === "End") {
-    nextIndex = items.length - 1;
-  } else if (event.key === "ArrowUp") {
-    nextIndex = currentIndex <= 0 ? items.length - 1 : currentIndex - 1;
-  } else {
-    nextIndex = currentIndex < 0 || currentIndex === items.length - 1 ? 0 : currentIndex + 1;
-  }
-  items[nextIndex]?.focus();
-}
-
-function isInsideMenuControl(target: EventTarget | null): boolean {
-  return (
-    target instanceof Node &&
-    (triggerRef.value?.contains(target) === true || menuRef.value?.contains(target) === true)
-  );
-}
-
-function onDocumentPointerDown(event: PointerEvent): void {
-  if (open.value && !isInsideMenuControl(event.target)) {
-    closeMenu(false);
-  }
-}
-
-function onDocumentFocusIn(event: FocusEvent): void {
-  if (open.value && !isInsideMenuControl(event.target)) {
-    closeMenu(false);
-  }
+  moveRovingFocus(event, menuItems());
 }
 
 watch(
   () => props.disabled,
   (disabled) => {
     if (disabled) {
-      closeMenu(false);
+      dismiss("programmatic", false);
     }
   },
 );
-
-onMounted(() => {
-  document.addEventListener("pointerdown", onDocumentPointerDown);
-  document.addEventListener("focusin", onDocumentFocusIn);
-});
-
-onBeforeUnmount(() => {
-  document.removeEventListener("pointerdown", onDocumentPointerDown);
-  document.removeEventListener("focusin", onDocumentFocusIn);
-});
 </script>
 
 <template>
