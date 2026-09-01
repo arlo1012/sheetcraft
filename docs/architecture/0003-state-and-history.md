@@ -19,8 +19,9 @@ View state is not stored in core command history.
 Each frontend keeps one `SheetViewState` record per Sheet identity. Selection
 ranges and formatting read models are derived from that record instead of
 being written separately. A frontend may retain view state for a deleted Sheet
-while its deletion remains undoable, but that retention is an adapter policy,
-not a workbook command concern.
+while its identity remains referenced by bounded undo or redo history. The Web
+adapter prunes state that is referenced by neither the workbook nor history;
+that retention policy is not a workbook command concern.
 
 Core history descriptions are stable operation codes. The Web adapter maps
 operation and error codes to translated messages when they are displayed.
