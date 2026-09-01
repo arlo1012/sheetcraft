@@ -18,6 +18,8 @@ import {
   createRenameSheetCommand,
   createResizeSheetDimensionCommand,
   createSetCellValueCommand,
+  type WorkbookCommand,
+  type WorkbookOperation,
 } from "@idea10/core/commands";
 import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
 import {
@@ -110,6 +112,38 @@ export function useSpreadsheetWorkspaceController(
     workspaceStatus.value ? t(workspaceStatus.value.key, workspaceStatus.value.params) : "",
   );
 
+  function collectCommandSheetIds(command: WorkbookCommand, sheetIds: Set<string>): void {
+    if (command.type === "setCellValues") {
+      for (const change of command.changes) {
+        sheetIds.add(change.sheetId);
+      }
+    } else if (command.type === "addSheet") {
+      sheetIds.add(command.sheet.id);
+    } else if ("sheetId" in command) {
+      sheetIds.add(command.sheetId);
+    }
+  }
+
+  function pruneViewStates(): void {
+    const retainedSheetIds = new Set(session.workbook.sheets.keys());
+    for (const entry of [...session.history.undoStack, ...session.history.redoStack]) {
+      collectCommandSheetIds(entry.command, retainedSheetIds);
+    }
+    for (const sheetId of viewStates.keys()) {
+      if (!retainedSheetIds.has(sheetId)) {
+        viewStates.delete(sheetId);
+      }
+    }
+  }
+
+  function execute(command: WorkbookCommand, operation?: WorkbookOperation): boolean {
+    const changed = executeWorkbookCommand(session, command, operation);
+    if (changed) {
+      pruneViewStates();
+    }
+    return changed;
+  }
+
   function clearWorkspaceStatus(): void {
     if (workspaceStatusTimer !== undefined) {
       clearTimeout(workspaceStatusTimer);
@@ -128,8 +162,7 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function commitCell(payload: { address: CellAddress; input: string }): void {
-    executeWorkbookCommand(
-      session,
+    execute(
       createSetCellValueCommand(
         activeSheet.value.id,
         payload.address,
@@ -141,8 +174,7 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function pasteCells(payload: GridPastePayload): void {
-    executeWorkbookCommand(
-      session,
+    execute(
       createPasteCellValuesCommand(activeSheet.value.id, payload.plan.anchor, payload.plan.values, {
         clearRange: payload.clearRange,
         styles: payload.styles,
@@ -152,11 +184,7 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function clearCells(range: CellRange): void {
-    executeWorkbookCommand(
-      session,
-      createClearCellRangeCommand(activeSheet.value.id, range),
-      "cells.clear",
-    );
+    execute(createClearCellRangeCommand(activeSheet.value.id, range), "cells.clear");
   }
 
   function applyCellStyle(patch: CellStylePatch): void {
@@ -164,8 +192,7 @@ export function useSpreadsheetWorkspaceController(
       showWorkspaceStatus({ key: "format.selectionTooLarge" });
       return;
     }
-    executeWorkbookCommand(
-      session,
+    execute(
       createApplyCellStyleCommand(activeSheet.value.id, activeSelectionRange.value, patch),
       "format.cells",
     );
@@ -177,8 +204,7 @@ export function useSpreadsheetWorkspaceController(
       showWorkspaceStatus({ key: "format.selectionTooLarge" });
       return;
     }
-    executeWorkbookCommand(
-      session,
+    execute(
       createApplyCellBordersCommand(activeSheet.value.id, activeSelectionRange.value, action),
       "format.borders",
     );
@@ -190,8 +216,7 @@ export function useSpreadsheetWorkspaceController(
     index: number;
     size: number;
   }): void {
-    executeWorkbookCommand(
-      session,
+    execute(
       createResizeSheetDimensionCommand(
         activeSheet.value.id,
         payload.axis,
@@ -203,8 +228,7 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function insertAxis(payload: { axis: SheetDimensionAxis; index: number; count: number }): void {
-    executeWorkbookCommand(
-      session,
+    execute(
       createInsertSheetAxisCommand(
         activeSheet.value.id,
         payload.axis,
@@ -216,8 +240,7 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function deleteAxis(payload: { axis: SheetDimensionAxis; index: number; count: number }): void {
-    executeWorkbookCommand(
-      session,
+    execute(
       createDeleteSheetAxisCommand(
         activeSheet.value.id,
         payload.axis,
@@ -234,8 +257,7 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function addSheet(): void {
-    executeWorkbookCommand(
-      session,
+    execute(
       createAddSheetCommand(session.workbook, { idFactory: session.idFactory }),
       "sheets.add",
     );
@@ -262,11 +284,7 @@ export function useSpreadsheetWorkspaceController(
     }
 
     try {
-      executeWorkbookCommand(
-        session,
-        createRenameSheetCommand(payload.sheetId, payload.name),
-        "sheets.rename",
-      );
+      execute(createRenameSheetCommand(payload.sheetId, payload.name), "sheets.rename");
       clearWorkspaceStatus();
     } catch {
       showWorkspaceStatus({ key: "workspace.renameFailed" });
@@ -274,11 +292,7 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function deleteSheet(sheetId: string): void {
-    executeWorkbookCommand(
-      session,
-      createDeleteSheetCommand(session.workbook, sheetId),
-      "sheets.delete",
-    );
+    execute(createDeleteSheetCommand(session.workbook, sheetId), "sheets.delete");
     clearWorkspaceStatus();
   }
 
@@ -332,11 +346,19 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function undo(): boolean {
-    return undoWorkbookCommand(session);
+    const changed = undoWorkbookCommand(session);
+    if (changed) {
+      pruneViewStates();
+    }
+    return changed;
   }
 
   function redo(): boolean {
-    return redoWorkbookCommand(session);
+    const changed = redoWorkbookCommand(session);
+    if (changed) {
+      pruneViewStates();
+    }
+    return changed;
   }
 
   function setGridNavigator(navigator: Element | ComponentPublicInstance | null): void {

@@ -86,4 +86,21 @@ describe("spreadsheet workspace controller", () => {
     expect(controller.activeSheet.value.id).toBe(firstSheetId);
     expect(controller.activeSheetViewState.value).toEqual(firstViewState);
   });
+
+  test("discards deleted sheet view state after its history entry is evicted", () => {
+    const controller = mountController();
+    const firstSheetId = controller.activeSheet.value.id;
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({ scrollPosition: { x: 40, y: 160 } }),
+    );
+    controller.addSheet();
+    controller.selectSheet(firstSheetId);
+    controller.session.history.maxEntries = 1;
+
+    controller.deleteSheet(firstSheetId);
+    expect(controller.viewStates.has(firstSheetId)).toBe(true);
+
+    controller.renameSheet({ sheetId: controller.activeSheet.value.id, name: "Retained" });
+    expect(controller.viewStates.has(firstSheetId)).toBe(false);
+  });
 });
