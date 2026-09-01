@@ -28,13 +28,22 @@ import type {
   ApplyCellStyleCommand,
   RestoreCellStylesCommand,
 } from "./contracts.js";
-import { assertCellAddress, assertCellRange, getSheetOrThrow, normalizeRange } from "./helpers.js";
+import {
+  assertCellAddress,
+  assertCellRange,
+  getSheetOrThrow,
+  invalidCommandPayload,
+  normalizeRange,
+  validateCommandPayload,
+} from "./helpers.js";
 
 function assertSupportedRange(range: CellRange): void {
   const rowCount = range.end.row - range.start.row + 1;
   const columnCount = range.end.column - range.start.column + 1;
   if (rowCount * columnCount > MAX_CELL_STYLE_PATCH_CELLS) {
-    throw new RangeError(
+    throw invalidCommandPayload(
+      "range",
+      rowCount * columnCount,
       `Cell style changes are limited to ${MAX_CELL_STYLE_PATCH_CELLS} cells per command.`,
     );
   }
@@ -52,7 +61,7 @@ export function createApplyCellStyleCommand(
     type: "applyCellStyle",
     sheetId,
     range: normalizedRange,
-    patch: normalizeCellStylePatch(patch),
+    patch: validateCommandPayload("patch", patch, () => normalizeCellStylePatch(patch)),
   };
 }
 
@@ -68,7 +77,7 @@ export function createApplyCellBordersCommand(
     type: "applyCellBorders",
     sheetId,
     range: normalizedRange,
-    action: normalizeCellBorderAction(action),
+    action: validateCommandPayload("action", action, () => normalizeCellBorderAction(action)),
   };
 }
 
@@ -79,10 +88,15 @@ export function createRestoreCellStylesCommand(
   return {
     type: "restoreCellStyles",
     sheetId,
-    changes: changes.map((change) => ({
-      address: { ...change.address },
-      style: cloneCellStyle(change.style ?? undefined) ?? null,
-    })),
+    changes: validateCommandPayload("changes", changes, () =>
+      changes.map((change) => ({
+        address: { ...change.address },
+        style:
+          validateCommandPayload("changes.style", change.style, () =>
+            cloneCellStyle(change.style ?? undefined),
+          ) ?? null,
+      })),
+    ),
   };
 }
 
@@ -120,13 +134,16 @@ export function applyCellStyleCommand(
   assertCellRange(range);
   assertSupportedRange(range);
   getSheetOrThrow(workbook, command.sheetId);
+  const normalizedPatch = validateCommandPayload("patch", command.patch, () =>
+    normalizeCellStylePatch(command.patch),
+  );
   const patches = new Map<string, { address: CellAddress; patch: CellStylePatch }>();
   const targetBorderPatches = new Map<string, { address: CellAddress; patch: CellBorderPatch }>();
-  const borderPatch = getExplicitCellBorderPatch(command.patch);
+  const borderPatch = getExplicitCellBorderPatch(normalizedPatch);
   for (let row = range.start.row; row <= range.end.row; row += 1) {
     for (let column = range.start.column; column <= range.end.column; column += 1) {
       const address = { row, column };
-      addPatch(patches, address, command.patch);
+      addPatch(patches, address, normalizedPatch);
       if (Object.keys(borderPatch).length > 0) {
         targetBorderPatches.set(getCellBorderTargetKey(address), {
           address,
@@ -196,7 +213,9 @@ export function applyCellBordersCommand(
   const range = normalizeRange(command.range);
   assertCellRange(range);
   assertSupportedRange(range);
-  const action = normalizeCellBorderAction(command.action);
+  const action = validateCommandPayload("action", command.action, () =>
+    normalizeCellBorderAction(command.action),
+  );
   getSheetOrThrow(workbook, command.sheetId);
   const patches = new Map<string, { address: CellAddress; patch: CellStylePatch }>();
   const targetBorderPatches = new Map<string, { address: CellAddress; patch: CellBorderPatch }>();
@@ -227,13 +246,27 @@ export function applyRestoreCellStylesCommand(
 ): RestoreCellStylesCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const addresses = new Set<string>();
-  const normalizedChanges = command.changes.map((change) => {
-    assertCellAddress(change.address);
-    const key = getCellBorderTargetKey(change.address);
-    if (addresses.has(key)) throw new Error(`Cell style restore contains duplicate cell ${key}.`);
-    addresses.add(key);
-    return { address: { ...change.address }, style: normalizeCellStyle(change.style) ?? null };
-  });
+  const normalizedChanges = validateCommandPayload("changes", command.changes, () =>
+    command.changes.map((change) => {
+      assertCellAddress(change.address);
+      const key = getCellBorderTargetKey(change.address);
+      if (addresses.has(key)) {
+        throw invalidCommandPayload(
+          "changes",
+          key,
+          `Cell style restore contains duplicate cell ${key}.`,
+        );
+      }
+      addresses.add(key);
+      return {
+        address: { ...change.address },
+        style:
+          validateCommandPayload("changes.style", change.style, () =>
+            normalizeCellStyle(change.style),
+          ) ?? null,
+      };
+    }),
+  );
   const reverseChanges: RestoreCellStylesCommand["changes"] = [];
   for (const change of normalizedChanges) {
     const previousStyle = cloneCellStyle(

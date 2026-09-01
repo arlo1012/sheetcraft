@@ -27,9 +27,23 @@ import {
   assertCellAddress,
   assertCellRange,
   getSheetOrThrow,
+  invalidCommandPayload,
   normalizeRange,
   parseCellKey,
+  validateCommandPayload,
 } from "./helpers.js";
+
+function normalizeCommandCellValue(value: unknown, field: string): CellValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    (typeof value === "number" && Number.isFinite(value))
+  ) {
+    return value as CellValue;
+  }
+  throw invalidCommandPayload(field, value);
+}
 
 export function createSetCellValueCommand(
   sheetId: string,
@@ -38,7 +52,9 @@ export function createSetCellValueCommand(
 ): SetCellValuesCommand {
   return {
     type: "setCellValues",
-    changes: [{ sheetId, address: { ...address }, value }],
+    changes: [
+      { sheetId, address: { ...address }, value: normalizeCommandCellValue(value, "value") },
+    ],
   };
 }
 
@@ -48,11 +64,18 @@ export function createBatchSetCellValuesCommand(
 ): SetCellValuesCommand {
   return {
     type: "setCellValues",
-    changes: changes.map((change) => ({
+    changes: changes.map((change, index) => ({
       sheetId: change.sheetId,
       address: { ...change.address },
-      value: change.value,
-      ...("style" in change ? { style: cloneCellStyle(change.style ?? undefined) ?? null } : {}),
+      value: normalizeCommandCellValue(change.value, `changes.${index}.value`),
+      ...("style" in change
+        ? {
+            style:
+              validateCommandPayload(`changes.${index}.style`, change.style, () =>
+                cloneCellStyle(change.style ?? undefined),
+              ) ?? null,
+          }
+        : {}),
     })),
     ...(options?.reconcileBorders ? { reconcileBorders: true } : {}),
   };
@@ -76,7 +99,7 @@ export function createPasteCellValuesCommand(
     styles?: readonly (readonly (CellStyle | null)[])[];
   },
 ): SetCellValuesCommand {
-  const size = getCellMatrixSize(values);
+  const size = validateCommandPayload("values", values, () => getCellMatrixSize(values));
   const end = {
     row: anchor.row + size.rowCount - 1,
     column: anchor.column + size.columnCount - 1,
@@ -88,7 +111,11 @@ export function createPasteCellValuesCommand(
     (options.styles.length !== size.rowCount ||
       options.styles.some((row) => row.length !== size.columnCount))
   ) {
-    throw new RangeError("Pasted cell styles must match the pasted value matrix.");
+    throw invalidCommandPayload(
+      "styles",
+      options.styles,
+      "Pasted cell styles must match the pasted value matrix.",
+    );
   }
 
   const changes = new Map<string, CellValueChange>();
@@ -130,6 +157,32 @@ export function applySetCellValuesCommand(
   workbook: Workbook,
   command: SetCellValuesCommand,
 ): SetCellValuesCommand | null {
+  if (!Array.isArray(command.changes)) {
+    throw invalidCommandPayload("changes", command.changes);
+  }
+  const normalizedChanges = command.changes.map((change, index) => {
+    if (!change || typeof change !== "object") {
+      throw invalidCommandPayload(`changes.${index}`, change);
+    }
+    if (!change.address || typeof change.address !== "object") {
+      throw invalidCommandPayload(`changes.${index}.address`, change.address);
+    }
+    assertCellAddress(change.address);
+    getSheetOrThrow(workbook, change.sheetId);
+    return {
+      sheetId: change.sheetId,
+      address: { ...change.address },
+      value: normalizeCommandCellValue(change.value, `changes.${index}.value`),
+      ...(Object.hasOwn(change, "style")
+        ? {
+            style:
+              validateCommandPayload(`changes.${index}.style`, change.style, () =>
+                normalizeCellStyle(change.style),
+              ) ?? null,
+          }
+        : {}),
+    } satisfies CellValueChange;
+  });
   const reverseChanges: CellValueChange[] = [];
   const reverseChangesByAddress = new Map<string, CellValueChange>();
   const initialStates = new Map<
@@ -139,8 +192,7 @@ export function applySetCellValuesCommand(
   const getChangeKey = (sheetId: string, address: CellAddress) =>
     `${sheetId}:${address.row}:${address.column}`;
 
-  for (const change of command.changes) {
-    assertCellAddress(change.address);
+  for (const change of normalizedChanges) {
     const sheet = getSheetOrThrow(workbook, change.sheetId);
     const key = getChangeKey(change.sheetId, change.address);
     if (initialStates.has(key)) continue;
@@ -180,7 +232,7 @@ export function applySetCellValuesCommand(
     reverseChangesByAddress.set(key, reverseChange);
   };
 
-  for (const change of command.changes) {
+  for (const change of normalizedChanges) {
     const sheet = getSheetOrThrow(workbook, change.sheetId);
     const valueChanged = setCellValue(sheet, change.address, change.value);
     const styleChanged =
@@ -195,7 +247,7 @@ export function applySetCellValuesCommand(
       string,
       Map<string, { address: CellAddress; patch: CellBorderPatch }>
     >();
-    for (const change of command.changes) {
+    for (const change of normalizedChanges) {
       if (!("style" in change)) continue;
       const targets = targetsBySheet.get(change.sheetId) ?? new Map();
       targets.set(getCellBorderTargetKey(change.address), {

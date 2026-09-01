@@ -1,6 +1,10 @@
 export type WorkbookErrorCode =
   | "invalid_command"
+  | "invalid_command_payload"
   | "invalid_snapshot"
+  | "last_sheet_removal"
+  | "sheet_name_conflict"
+  | "sheet_not_found"
   | "unsupported_snapshot_version"
   | "workbook_operation_failed";
 
@@ -19,6 +23,13 @@ export class WorkbookDomainError extends Error {
     this.name = "WorkbookDomainError";
     this.data = data;
   }
+}
+
+export function toWorkbookErrorDetail(value: unknown): string | number | boolean | null {
+  if (typeof value === "string" || typeof value === "boolean") {
+    return value;
+  }
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 export function toWorkbookErrorData(error: unknown): WorkbookErrorData {

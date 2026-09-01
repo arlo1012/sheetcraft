@@ -5,6 +5,7 @@ import {
   createApplyCellStyleCommand,
   createClearCellRangeCommand,
 } from "../../commands/index.js";
+import { WorkbookDomainError } from "../../errors.js";
 import { createClearCellStylePatch } from "../../style.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import {
@@ -204,7 +205,11 @@ describe("cell style commands", () => {
         { start: { row: 0, column: 0 }, end: { row: 1000, column: 100 } },
         { bold: true },
       ),
-    ).toThrow(RangeError);
+    ).toThrowError(
+      expect.objectContaining<Partial<WorkbookDomainError>>({
+        data: { code: "invalid_command_payload", details: { field: "range", value: 101_101 } },
+      }),
+    );
     expect(sheet.cells.size).toBe(0);
   });
 

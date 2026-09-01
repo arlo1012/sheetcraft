@@ -19,7 +19,13 @@ import type {
   RestoreSheetStateCommand,
   SheetAxisSparseSlice,
 } from "./contracts.js";
-import { cloneSparseState, getSheetOrThrow, parseCellKey } from "./helpers.js";
+import {
+  cloneSparseState,
+  getSheetOrThrow,
+  invalidCommandPayload,
+  parseCellKey,
+  validateCommandPayload,
+} from "./helpers.js";
 
 export function createInsertSheetAxisCommand(
   sheetId: string,
@@ -92,16 +98,22 @@ function createRestoreSheetAxisSliceCommand(
 
 function assertSheetAxisRange(axis: SheetDimensionAxis, index: number, count: number): number {
   if (axis !== "row" && axis !== "column") {
-    throw new RangeError(`Unknown sheet dimension axis ${axis}.`);
+    throw invalidCommandPayload("axis", axis);
   }
   const maximum = axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
   if (!Number.isInteger(index) || index < 0 || index >= maximum) {
-    throw new RangeError(
+    throw invalidCommandPayload(
+      "index",
+      index,
       `${axis === "row" ? "Row" : "Column"} index ${index} is outside the sheet.`,
     );
   }
   if (!Number.isInteger(count) || count <= 0 || count > maximum - index) {
-    throw new RangeError(`Cannot change ${count} ${axis}s starting at index ${index}.`);
+    throw invalidCommandPayload(
+      "count",
+      count,
+      `Cannot change ${count} ${axis}s starting at index ${index}.`,
+    );
   }
   return maximum;
 }
@@ -264,19 +276,25 @@ function isAxisSliceRestoreCommand(
 
 function validateSheetAxisSlice(command: RestoreSheetAxisSliceCommand, maximum: number): void {
   if (command.operation !== "insert" && command.operation !== "delete") {
-    throw new RangeError(`Unknown axis restore operation ${command.operation}.`);
+    throw invalidCommandPayload("operation", command.operation);
   }
   const start = command.operation === "insert" ? maximum - command.count : command.index;
   const end = command.operation === "insert" ? maximum : command.index + command.count;
   for (const cell of command.slice.cells) {
     const axisIndex = getAxisIndex(cell.address, command.axis);
     if (axisIndex < start || axisIndex >= end) {
-      throw new RangeError(`Axis restore cell ${axisIndex} is outside the restored slice.`);
+      throw invalidCommandPayload(
+        "slice.cells",
+        axisIndex,
+        `Axis restore cell ${axisIndex} is outside the restored slice.`,
+      );
     }
   }
   for (const dimension of command.slice.dimensions) {
     if (dimension.index < start || dimension.index >= end) {
-      throw new RangeError(
+      throw invalidCommandPayload(
+        "slice.dimensions",
+        dimension.index,
         `Axis restore dimension ${dimension.index} is outside the restored slice.`,
       );
     }
@@ -290,11 +308,13 @@ function validateSheetAxisSlice(command: RestoreSheetAxisSliceCommand, maximum: 
     rowHeights: new Map(),
     columnWidths: new Map(),
   };
-  replaceSheetSparseState(validationSheet, {
-    cells: command.slice.cells,
-    rowHeights: command.axis === "row" ? command.slice.dimensions : [],
-    columnWidths: command.axis === "column" ? command.slice.dimensions : [],
-  });
+  validateCommandPayload("slice", command.slice, () =>
+    replaceSheetSparseState(validationSheet, {
+      cells: command.slice.cells,
+      rowHeights: command.axis === "row" ? command.slice.dimensions : [],
+      columnWidths: command.axis === "column" ? command.slice.dimensions : [],
+    }),
+  );
 }
 
 export function applyRestoreSheetStateCommand(
@@ -304,7 +324,7 @@ export function applyRestoreSheetStateCommand(
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   if (isAxisSliceRestoreCommand(command)) {
     const maximum = assertSheetAxisRange(command.axis, command.index, command.count);
-    validateSheetAxisSlice(command, maximum);
+    validateCommandPayload("slice", command.slice, () => validateSheetAxisSlice(command, maximum));
     const inverseOperation = command.operation === "insert" ? "delete" : "insert";
     const transformed = transformSheetAxis(
       sheet,
@@ -322,7 +342,9 @@ export function applyRestoreSheetStateCommand(
   }
 
   const previousState = createSheetSparseState(sheet);
-  return replaceSheetSparseState(sheet, command.state)
+  return validateCommandPayload("state", command.state, () =>
+    replaceSheetSparseState(sheet, command.state),
+  )
     ? createRestoreSheetStateCommand(command.sheetId, previousState)
     : null;
 }

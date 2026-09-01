@@ -24,40 +24,48 @@ export function applyWorkbookCommand(
   workbook: Workbook,
   command: WorkbookCommand,
 ): WorkbookCommand | null {
-  switch (command.type) {
-    case "setCellValues":
-      return applySetCellValuesCommand(workbook, command);
-    case "clearCellRange":
-      return applyClearCellRangeCommand(workbook, command);
-    case "applyCellStyle":
-      return applyCellStyleCommand(workbook, command);
-    case "applyCellBorders":
-      return applyCellBordersCommand(workbook, command);
-    case "restoreCellStyles":
-      return applyRestoreCellStylesCommand(workbook, command);
-    case "resizeSheetDimension":
-      return applyResizeSheetDimensionCommand(workbook, command);
-    case "addSheet":
-      return applyAddSheetCommand(workbook, command);
-    case "deleteSheet":
-      return applyDeleteSheetCommand(workbook, command);
-    case "renameSheet":
-      return applyRenameSheetCommand(workbook, command);
-    case "insertSheetAxis":
-    case "deleteSheetAxis":
-      return applySheetAxisCommand(workbook, command);
-    case "restoreSheetState":
-      return applyRestoreSheetStateCommand(workbook, command);
-    default: {
-      const unknownCommand = command as { type?: unknown };
-      throw new WorkbookDomainError(
-        {
-          code: "invalid_command",
-          details: { type: typeof unknownCommand.type === "string" ? unknownCommand.type : null },
-        },
-        "Unknown workbook command.",
-      );
+  try {
+    switch (command.type) {
+      case "setCellValues":
+        return applySetCellValuesCommand(workbook, command);
+      case "clearCellRange":
+        return applyClearCellRangeCommand(workbook, command);
+      case "applyCellStyle":
+        return applyCellStyleCommand(workbook, command);
+      case "applyCellBorders":
+        return applyCellBordersCommand(workbook, command);
+      case "restoreCellStyles":
+        return applyRestoreCellStylesCommand(workbook, command);
+      case "resizeSheetDimension":
+        return applyResizeSheetDimensionCommand(workbook, command);
+      case "addSheet":
+        return applyAddSheetCommand(workbook, command);
+      case "deleteSheet":
+        return applyDeleteSheetCommand(workbook, command);
+      case "renameSheet":
+        return applyRenameSheetCommand(workbook, command);
+      case "insertSheetAxis":
+      case "deleteSheetAxis":
+        return applySheetAxisCommand(workbook, command);
+      case "restoreSheetState":
+        return applyRestoreSheetStateCommand(workbook, command);
+      default: {
+        const unknownCommand = command as { type?: unknown };
+        throw new WorkbookDomainError(
+          {
+            code: "invalid_command",
+            details: { type: typeof unknownCommand.type === "string" ? unknownCommand.type : null },
+          },
+          "Unknown workbook command.",
+        );
+      }
     }
+  } catch (error) {
+    if (error instanceof WorkbookDomainError) throw error;
+    throw new WorkbookDomainError(
+      toWorkbookErrorData(error),
+      error instanceof Error ? error.message : undefined,
+    );
   }
 }
 

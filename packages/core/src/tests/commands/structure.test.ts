@@ -122,6 +122,102 @@ describe("sheet axis structure commands", () => {
     expect(redoWorkbookCommand(session)).toBe(true);
   });
 
+  test("stores and round-trips a populated multi-row deletion slice", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellValue(sheet, { row: 10, column: 1 }, "deleted-value");
+    setCellStyle(
+      sheet,
+      { row: 10, column: 1 },
+      {
+        borderBottom: { style: "double", color: "#123456" },
+      },
+    );
+    setCellStyle(sheet, { row: 11, column: 2 }, { italic: true });
+    setRowHeight(sheet, 11, 52);
+    setCellValue(sheet, { row: 12, column: 3 }, "shifted-value");
+    const before = createSheetSparseState(sheet);
+
+    executeWorkbookCommand(session, createDeleteSheetAxisCommand(sheet.id, "row", 10, 2));
+
+    const after = createSheetSparseState(sheet);
+    const inverse = session.history.undoStack.at(-1)?.command;
+    expect(inverse).toMatchObject({
+      type: "restoreSheetState",
+      sheetId: sheet.id,
+      axis: "row",
+      index: 10,
+      count: 2,
+      operation: "delete",
+    });
+    if (!inverse || !("slice" in inverse)) {
+      throw new Error("Expected a deleted row axis slice history inverse.");
+    }
+    expect(inverse.slice.cells).toEqual([
+      {
+        address: { row: 10, column: 1 },
+        value: "deleted-value",
+        style: { borderBottom: { style: "double", color: "#123456" } },
+      },
+      { address: { row: 11, column: 2 }, style: { italic: true } },
+    ]);
+    expect(inverse.slice.dimensions).toEqual([{ index: 11, size: 52 }]);
+    expect(getCellValue(sheet, { row: 10, column: 3 })).toBe("shifted-value");
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(before);
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(after);
+  });
+
+  test("stores and round-trips a populated multi-column deletion slice", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellValue(sheet, { row: 1, column: 20 }, "deleted-value");
+    setCellStyle(
+      sheet,
+      { row: 1, column: 20 },
+      {
+        borderRight: { style: "dashed", color: "#abcdef" },
+      },
+    );
+    setCellStyle(sheet, { row: 2, column: 21 }, { bold: true });
+    setColumnWidth(sheet, 21, 180);
+    setCellValue(sheet, { row: 3, column: 22 }, "shifted-value");
+    const before = createSheetSparseState(sheet);
+
+    executeWorkbookCommand(session, createDeleteSheetAxisCommand(sheet.id, "column", 20, 2));
+
+    const after = createSheetSparseState(sheet);
+    const inverse = session.history.undoStack.at(-1)?.command;
+    expect(inverse).toMatchObject({
+      type: "restoreSheetState",
+      sheetId: sheet.id,
+      axis: "column",
+      index: 20,
+      count: 2,
+      operation: "delete",
+    });
+    if (!inverse || !("slice" in inverse)) {
+      throw new Error("Expected a deleted column axis slice history inverse.");
+    }
+    expect(inverse.slice.cells).toEqual([
+      {
+        address: { row: 1, column: 20 },
+        value: "deleted-value",
+        style: { borderRight: { style: "dashed", color: "#abcdef" } },
+      },
+      { address: { row: 2, column: 21 }, style: { bold: true } },
+    ]);
+    expect(inverse.slice.dimensions).toEqual([{ index: 21, size: 180 }]);
+    expect(getCellValue(sheet, { row: 3, column: 20 })).toBe("shifted-value");
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(before);
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(after);
+  });
+
   test("stores only an affected axis slice in large sparse structure history", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
@@ -250,7 +346,11 @@ describe("sheet axis structure commands", () => {
       createInsertSheetAxisCommand(sheet.id, "row", MAX_SHEET_ROWS, 1),
       createDeleteSheetAxisCommand(sheet.id, "column", MAX_SHEET_COLUMNS - 1, 2),
     ]) {
-      expect(() => executeWorkbookCommand(session, command)).toThrow(RangeError);
+      expect(() => executeWorkbookCommand(session, command)).toThrowError(
+        expect.objectContaining({
+          data: expect.objectContaining({ code: "invalid_command_payload" }),
+        }),
+      );
       expect(createSheetSparseState(sheet)).toEqual(before);
       expect(session.history.undoStack).toHaveLength(0);
     }

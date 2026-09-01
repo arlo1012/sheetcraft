@@ -6,6 +6,7 @@ import {
   createRenameSheetCommand,
 } from "../../commands/index.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
+import { WorkbookDomainError } from "../../errors.js";
 import { getWorkbookSheets, setActiveSheet } from "../../workbook.js";
 
 describe("sheet commands", () => {
@@ -66,6 +67,49 @@ describe("sheet commands", () => {
 
     expect(() =>
       createDeleteSheetCommand(session.workbook, session.workbook.activeSheetId),
-    ).toThrow("at least one sheet");
+    ).toThrowError(
+      expect.objectContaining<Partial<WorkbookDomainError>>({
+        data: { code: "last_sheet_removal", details: { sheetId: session.workbook.activeSheetId } },
+      }),
+    );
+  });
+
+  test("uses domain errors for missing-sheet delete command creation", () => {
+    const session = createTestWorkbookSession();
+
+    expect(() => createDeleteSheetCommand(session.workbook, "missing-sheet")).toThrowError(
+      expect.objectContaining<Partial<WorkbookDomainError>>({
+        data: { code: "sheet_not_found", details: { sheetId: "missing-sheet" } },
+      }),
+    );
+  });
+
+  test("rejects invalid public sheet command creator payloads with domain errors", () => {
+    const session = createTestWorkbookSession();
+
+    expect(() => createAddSheetCommand(session.workbook)).toThrowError(
+      expect.objectContaining<Partial<WorkbookDomainError>>({
+        data: { code: "invalid_command_payload", details: { field: "idFactory", value: null } },
+      }),
+    );
+    expect(() => createRenameSheetCommand(session.workbook.activeSheetId, "   ")).toThrowError(
+      expect.objectContaining<Partial<WorkbookDomainError>>({
+        data: { code: "invalid_command_payload", details: { field: "name", value: "   " } },
+      }),
+    );
+    expect(() =>
+      createAddSheetCommand(session.workbook, {
+        idFactory: () => {
+          throw new Error("runtime entropy unavailable");
+        },
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<WorkbookDomainError>>({
+        data: {
+          code: "workbook_operation_failed",
+          details: { reason: "runtime entropy unavailable" },
+        },
+      }),
+    );
   });
 });

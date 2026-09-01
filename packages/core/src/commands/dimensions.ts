@@ -1,4 +1,10 @@
 import {
+  MAX_COLUMN_WIDTH,
+  MAX_ROW_HEIGHT,
+  MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
+  MIN_COLUMN_WIDTH,
+  MIN_ROW_HEIGHT,
   getColumnWidth,
   getRowHeight,
   setColumnWidth,
@@ -6,7 +12,7 @@ import {
   type Workbook,
 } from "../workbook.js";
 import type { ResizeSheetDimensionCommand } from "./contracts.js";
-import { getSheetOrThrow } from "./helpers.js";
+import { getSheetOrThrow, invalidCommandPayload } from "./helpers.js";
 
 export function createResizeSheetDimensionCommand(
   sheetId: string,
@@ -22,7 +28,16 @@ export function applyResizeSheetDimensionCommand(
   command: ResizeSheetDimensionCommand,
 ): ResizeSheetDimensionCommand | null {
   if (command.axis !== "row" && command.axis !== "column") {
-    throw new RangeError(`Unknown sheet dimension axis ${command.axis}.`);
+    throw invalidCommandPayload("axis", command.axis);
+  }
+  const maximumIndex = command.axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
+  if (!Number.isInteger(command.index) || command.index < 0 || command.index >= maximumIndex) {
+    throw invalidCommandPayload("index", command.index);
+  }
+  const minimumSize = command.axis === "row" ? MIN_ROW_HEIGHT : MIN_COLUMN_WIDTH;
+  const maximumSize = command.axis === "row" ? MAX_ROW_HEIGHT : MAX_COLUMN_WIDTH;
+  if (!Number.isInteger(command.size) || command.size < minimumSize || command.size > maximumSize) {
+    throw invalidCommandPayload("size", command.size);
   }
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const previousSize =

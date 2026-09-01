@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createTestWorkbookSession } from "../helpers.js";
+import { WorkbookDomainError } from "../../errors.js";
 import { createResizeSheetDimensionCommand } from "../../commands/index.js";
 import {
   DEFAULT_COLUMN_WIDTH,
@@ -57,7 +58,11 @@ describe("resize sheet dimension command", () => {
         session,
         createResizeSheetDimensionCommand(sheet.id, "row", 4, MIN_ROW_HEIGHT - 1),
       ),
-    ).toThrow(RangeError);
+    ).toThrowError(
+      expect.objectContaining<Partial<WorkbookDomainError>>({
+        data: { code: "invalid_command_payload", details: { field: "size", value: 15 } },
+      }),
+    );
     expect(getRowHeight(sheet, 4)).toBe(DEFAULT_ROW_HEIGHT);
     expect(session.history.undoStack).toHaveLength(0);
   });
