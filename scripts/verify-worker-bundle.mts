@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 type PackageManifest = {
   name: string;
@@ -16,6 +16,33 @@ type PackageManifest = {
 };
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+async function verifyWorkerRoundTrip(outputPath: string): Promise<number> {
+  const worker = new Worker(pathToFileURL(outputPath).href, { type: "module" });
+  try {
+    return await new Promise<number>((resolveValue, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("Worker message round trip timed out.")),
+        5_000,
+      );
+      worker.onmessage = (event: MessageEvent<unknown>) => {
+        clearTimeout(timeout);
+        if (typeof event.data !== "number" || !Number.isFinite(event.data) || event.data <= 0) {
+          reject(new Error(`Worker returned an invalid export count: ${String(event.data)}.`));
+          return;
+        }
+        resolveValue(event.data);
+      };
+      worker.onerror = (event) => {
+        clearTimeout(timeout);
+        reject(event.error ?? new Error(event.message));
+      };
+      worker.postMessage(null);
+    });
+  } finally {
+    worker.terminate();
+  }
+}
 
 function readPackage(relativeDirectory: string, required: boolean): PackageManifest | undefined {
   const packageDirectory = resolve(workspaceRoot, relativeDirectory);
@@ -112,8 +139,10 @@ self.addEventListener("message", () => {
       throw new Error("Browser-target Worker bundle still references a Node builtin.");
     }
 
+    const exportedMemberCount = await verifyWorkerRoundTrip(result.outputs[0].path);
+
     console.log(
-      `Worker browser bundle passed for ${[core.name, sheetEngine?.name].filter(Boolean).join(", ")}.`,
+      `Worker browser bundle and message round trip passed for ${[core.name, sheetEngine?.name].filter(Boolean).join(", ")} (${exportedMemberCount} exports).`,
     );
   } finally {
     rmSync(temporaryDirectory, { recursive: true, force: true });

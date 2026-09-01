@@ -17,7 +17,18 @@ type BrowserGlobalReference = {
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceExtensions = new Set([".ts", ".tsx", ".vue", ".css", ".scss"]);
 const ignoredDirectories = new Set(["dist", "node_modules", ".git", "coverage"]);
-const packageSourceDirectories = ["packages/core/src", "packages/sheet-engine/src"];
+const runtimePackages = [
+  {
+    name: "@idea10/core",
+    sourceDirectory: "packages/core/src",
+    manifest: "packages/core/package.json",
+  },
+  {
+    name: "@idea10/sheet-engine",
+    sourceDirectory: "packages/sheet-engine/src",
+    manifest: "packages/sheet-engine/package.json",
+  },
+] as const;
 const forbiddenRuntimeImports = [
   /^vue(?:\/|$)/u,
   /^@vue\//u,
@@ -114,39 +125,123 @@ function maskNonCodeText(source: string): string {
     }
   };
 
+  const skipQuotedString = (start: number, quote: "'" | '"'): number => {
+    let end = start + 1;
+    while (end < source.length) {
+      if (source[end] === "\\") {
+        end += 2;
+        continue;
+      }
+      if (source[end] === quote) {
+        end += 1;
+        break;
+      }
+      end += 1;
+    }
+    replaceRange(start, end);
+    return end;
+  };
+
+  const skipLineComment = (start: number): number => {
+    const end = source.indexOf("\n", start + 2);
+    const resolvedEnd = end === -1 ? source.length : end;
+    replaceRange(start, resolvedEnd);
+    return resolvedEnd;
+  };
+
+  const skipBlockComment = (start: number): number => {
+    const closingIndex = source.indexOf("*/", start + 2);
+    const end = closingIndex === -1 ? source.length : closingIndex + 2;
+    replaceRange(start, end);
+    return end;
+  };
+
+  const skipTemplateExpression = (start: number): number => {
+    let depth = 1;
+    let index = start;
+    while (index < source.length) {
+      const character = source[index];
+      const nextCharacter = source[index + 1];
+      if (character === "/" && nextCharacter === "/") {
+        index = skipLineComment(index);
+        continue;
+      }
+      if (character === "/" && nextCharacter === "*") {
+        index = skipBlockComment(index);
+        continue;
+      }
+      if (character === "'" || character === '"') {
+        index = skipQuotedString(index, character);
+        continue;
+      }
+      if (character === "`") {
+        index = skipTemplateLiteral(index);
+        continue;
+      }
+      if (character === "{") {
+        depth += 1;
+      } else if (character === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          masked[index] = " ";
+          return index + 1;
+        }
+      }
+      index += 1;
+    }
+    return index;
+  };
+
+  const skipTemplateLiteral = (start: number): number => {
+    masked[start] = " ";
+    let index = start + 1;
+    while (index < source.length) {
+      const character = source[index];
+      const nextCharacter = source[index + 1];
+      if (character === "\\") {
+        masked[index] = " ";
+        if (nextCharacter && nextCharacter !== "\n") {
+          masked[index + 1] = " ";
+        }
+        index += 2;
+        continue;
+      }
+      if (character === "`") {
+        masked[index] = " ";
+        return index + 1;
+      }
+      if (character === "$" && nextCharacter === "{") {
+        masked[index] = " ";
+        masked[index + 1] = " ";
+        index = skipTemplateExpression(index + 2);
+        continue;
+      }
+      if (character !== "\n") {
+        masked[index] = " ";
+      }
+      index += 1;
+    }
+    return index;
+  };
+
   let index = 0;
   while (index < source.length) {
     const character = source[index];
     const nextCharacter = source[index + 1];
     if (character === "/" && nextCharacter === "/") {
-      const end = source.indexOf("\n", index + 2);
-      replaceRange(index, end === -1 ? source.length : end);
-      index = end === -1 ? source.length : end;
+      index = skipLineComment(index);
       continue;
     }
     if (character === "/" && nextCharacter === "*") {
-      const closingIndex = source.indexOf("*/", index + 2);
-      const end = closingIndex === -1 ? source.length : closingIndex + 2;
-      replaceRange(index, end);
-      index = end;
+      index = skipBlockComment(index);
       continue;
     }
-    if (character === "'" || character === '"' || character === "`") {
-      const quote = character;
-      let end = index + 1;
-      while (end < source.length) {
-        if (source[end] === "\\") {
-          end += 2;
-          continue;
-        }
-        if (source[end] === quote) {
-          end += 1;
-          break;
-        }
-        end += 1;
-      }
-      replaceRange(index, end);
-      index = end;
+    if (character === "'" || character === '"') {
+      index = skipQuotedString(index, character);
+      continue;
+    }
+    if (character === "`") {
+      index = skipTemplateLiteral(index);
       continue;
     }
     index += 1;
@@ -197,6 +292,7 @@ function assertBrowserGlobalDetection(): void {
   const operationCode = 'const operation = "history.restore";';
   const browserHistory = 'window.history.pushState({}, "", "/");';
   const bareHistory = 'history.pushState({}, "", "/");';
+  const templateBrowserHistory = "const label = `${window.history.length}`;";
   if (getBrowserGlobalReferences(operationCode).length !== 0) {
     throw new Error("Boundary detector must ignore browser-global names inside string literals.");
   }
@@ -211,6 +307,53 @@ function assertBrowserGlobalDetection(): void {
     false
   ) {
     throw new Error("Boundary detector must reject bare history browser access.");
+  }
+  if (
+    getBrowserGlobalReferences(templateBrowserHistory).some(
+      (reference) => reference.name === "window",
+    ) === false
+  ) {
+    throw new Error("Boundary detector must reject browser access inside template interpolation.");
+  }
+}
+
+function getDependencyDirectionViolation(
+  packageName: string,
+  specifier: string,
+): string | undefined {
+  if (packageName === "@idea10/core") {
+    if (/^@idea10\/(?:sheet-engine|web)(?:\/|$)/u.test(specifier)) {
+      return `@idea10/core must not depend on ${specifier}`;
+    }
+    return undefined;
+  }
+  if (packageName === "@idea10/sheet-engine") {
+    if (specifier.startsWith(".") || specifier.startsWith("/")) {
+      return undefined;
+    }
+    if (specifier === "@idea10/core" || specifier.startsWith("@idea10/core/")) {
+      return undefined;
+    }
+    return `@idea10/sheet-engine may only depend on @idea10/core, not ${specifier}`;
+  }
+  return undefined;
+}
+
+function assertDependencyDirection(): void {
+  const rejectedCoreDependency = getDependencyDirectionViolation(
+    "@idea10/core",
+    "@idea10/sheet-engine/selection",
+  );
+  const rejectedSheetEngineDependency = getDependencyDirectionViolation(
+    "@idea10/sheet-engine",
+    "@idea10/web",
+  );
+  const allowedSheetEngineDependency = getDependencyDirectionViolation(
+    "@idea10/sheet-engine",
+    "@idea10/core/workbook",
+  );
+  if (!rejectedCoreDependency || !rejectedSheetEngineDependency || allowedSheetEngineDependency) {
+    throw new Error("Boundary detector dependency-direction regression.");
   }
 }
 
@@ -231,7 +374,11 @@ function addViolation(
   });
 }
 
-function checkRuntimeNeutralPackage(path: string, violations: Violation[]): void {
+function checkRuntimeNeutralPackage(
+  path: string,
+  packageName: string,
+  violations: Violation[],
+): void {
   const source = readFileSync(path, "utf8");
 
   for (const match of source.matchAll(importPattern)) {
@@ -258,6 +405,10 @@ function checkRuntimeNeutralPackage(path: string, violations: Violation[]): void
         `runtime-neutral packages cannot import the Node builtin ${specifier}`,
       );
     }
+    const dependencyDirectionViolation = getDependencyDirectionViolation(packageName, specifier);
+    if (dependencyDirectionViolation) {
+      addViolation(violations, path, source, match.index ?? 0, dependencyDirectionViolation);
+    }
   }
 
   for (const match of getBrowserGlobalReferences(source)) {
@@ -268,6 +419,39 @@ function checkRuntimeNeutralPackage(path: string, violations: Violation[]): void
       match.index,
       `runtime-neutral packages cannot reference browser global ${match.name}`,
     );
+  }
+}
+
+function checkRuntimePackageManifest(
+  manifestPath: string,
+  packageName: string,
+  violations: Violation[],
+): void {
+  if (!existsSync(manifestPath)) {
+    return;
+  }
+  const source = readFileSync(manifestPath, "utf8");
+  const manifest = JSON.parse(source) as {
+    dependencies?: Record<string, string>;
+    optionalDependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
+  };
+  const dependencies = [
+    ...Object.keys(manifest.dependencies ?? {}),
+    ...Object.keys(manifest.optionalDependencies ?? {}),
+    ...Object.keys(manifest.peerDependencies ?? {}),
+  ];
+  for (const dependency of dependencies) {
+    const dependencyDirectionViolation = getDependencyDirectionViolation(packageName, dependency);
+    if (dependencyDirectionViolation) {
+      addViolation(
+        violations,
+        manifestPath,
+        source,
+        source.indexOf(`"${dependency}"`),
+        dependencyDirectionViolation,
+      );
+    }
   }
 }
 
@@ -336,21 +520,27 @@ function checkWebSource(path: string, violations: Violation[]): void {
 
 function main(): void {
   assertBrowserGlobalDetection();
+  assertDependencyDirection();
   const violations: Violation[] = [];
   const checkedPackageDirectories: string[] = [];
 
-  for (const relativeDirectory of packageSourceDirectories) {
-    const directory = resolve(workspaceRoot, relativeDirectory);
+  for (const runtimePackage of runtimePackages) {
+    const directory = resolve(workspaceRoot, runtimePackage.sourceDirectory);
     const files = collectSourceFiles(directory);
     if (files.length > 0) {
-      checkedPackageDirectories.push(relativeDirectory);
+      checkedPackageDirectories.push(runtimePackage.sourceDirectory);
       for (const file of files) {
         if (toPosixPath(relative(workspaceRoot, file)).includes("/src/tests/")) {
           continue;
         }
-        checkRuntimeNeutralPackage(file, violations);
+        checkRuntimeNeutralPackage(file, runtimePackage.name, violations);
       }
     }
+    checkRuntimePackageManifest(
+      resolve(workspaceRoot, runtimePackage.manifest),
+      runtimePackage.name,
+      violations,
+    );
   }
 
   const webSourceDirectory = resolve(workspaceRoot, "apps/web/src");
