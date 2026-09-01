@@ -13,13 +13,16 @@
 
 - Vue 3 with `<script setup lang="ts">` and strict TypeScript.
 - Vite and Bun for development and builds.
+- TDesign Vue is the primary Web UI framework. Use its public APIs directly
+  when they fit the product contract; do not create one-to-one wrapper
+  components without a repeated product-level need.
 - Product-owned CSS variables and layers for stable design tokens.
 - SCSS `@use` modules for shared tokens and base styles.
 - Scoped SCSS for complex component-specific states.
+- Keep necessary TDesign theme mapping and internal overrides in the shared
+  TDesign adapter layer. Feature components must not override TDesign internals.
 - Lucide Vue is the primary icon set. Add Iconify only when a confirmed domain
   icon cannot be expressed by Lucide.
-- Do not add TDesign or another UI framework unless the user explicitly changes
-  this decision.
 
 ## Tool Composition
 
@@ -39,12 +42,24 @@
 
 ## Module Boundaries
 
-- Keep application bootstrap and top-level composition in `src/app`.
-- Put each product capability in `src/modules/<feature>`.
+- Keep repository orchestration at the workspace root and Web application code
+  in `apps/web`.
+- `packages/core` owns runtime-neutral workbook state, commands, history,
+  serialization, and domain errors. It must not depend on Vue, DOM APIs,
+  TDesign, i18n, storage, or networking.
+- `packages/sheet-engine` owns runtime-neutral Sheet geometry, selection, view
+  state, and interaction contracts. It may depend on `@idea10/core`, never on
+  the Web application.
+- Keep Web application bootstrap and top-level composition in
+  `apps/web/src/app`.
+- Put each Web product capability in `apps/web/src/modules/<feature>`.
 - A module owns its components, state, commands, tests, and local styles.
-- Move code to `src/shared` only after multiple modules need the same stable
-  contract or primitive.
+- Move Web code to `apps/web/src/shared` only after multiple modules need the
+  same stable contract or primitive.
+- Dependencies flow from apps to packages and from `sheet-engine` to `core`.
+  Packages must never import application code.
 - Avoid barrel files that hide ownership or accumulate implementation logic.
+  Package entrypoints are allowed only as thin, explicit public API surfaces.
 
 ## Engineering
 
@@ -54,9 +69,11 @@
 - Keep files focused and avoid implementation-heavy index files.
 - Prefer typed props, emits, and slots for component contracts.
 - Add dependencies only when an implemented requirement needs them.
-- Mirror source ownership under `src/tests`, then split each matching test
-  directory into small scenario-focused files. Treat that directory as the
-  aggregate test entry for its source capability.
+- Mirror source ownership in each workspace's test tree, then split each
+  matching test directory into small scenario-focused files. Treat that
+  directory as the aggregate test entry for its source capability.
+- Test `core` and `sheet-engine` in a Node environment. Browser and DOM test
+  environments belong to the Web application only.
 - Run only the unit tests for the changed feature or module by default. Do not
   run the full unit-test suite for a small change unless the user asks for it or
   the change affects shared contracts or multiple modules.
