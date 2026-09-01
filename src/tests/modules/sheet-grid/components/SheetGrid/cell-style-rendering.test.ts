@@ -223,12 +223,20 @@ describe("SheetGrid cell style rendering", () => {
     expect(up.attributes()).toMatchObject({ "data-border-row": "0", "data-border-column": "0" });
     expect(up.element.style.width).toBe("96px");
     expect(up.element.style.height).toBe("24px");
-    expect(up.get<HTMLElement>(".sheet-border-layer__diagonal-line").element.style.borderTop).toBe(
-      "1px solid #112233",
-    );
-    expect(
-      down.get<HTMLElement>(".sheet-border-layer__diagonal-line").element.style.borderTop,
-    ).toBe("3px double #445566");
+    const upLine = up.get<HTMLElement>(".sheet-border-layer__diagonal-line").element;
+    const downLine = down.get<HTMLElement>(".sheet-border-layer__diagonal-line").element;
+    const upLineStyle = upLine.style;
+    const downLineStyle = downLine.style;
+    const diagonalLength = Math.hypot(96, 24);
+    expect(upLineStyle.borderTop).toBe("1px solid #112233");
+    expect(Number.parseFloat(upLineStyle.left)).toBeCloseTo((96 - diagonalLength) / 2, 5);
+    expect(Number.parseFloat(upLineStyle.top)).toBeCloseTo((24 - 1) / 2, 5);
+    expect(upLineStyle.transform).toBe(`rotate(${(-Math.atan2(24, 96) * 180) / Math.PI}deg)`);
+    expect(upLineStyle.transformOrigin).toBe("center");
+    expect(downLineStyle.borderTop).toBe("3px double #445566");
+    expect(Number.parseFloat(downLineStyle.left)).toBeCloseTo((96 - diagonalLength) / 2, 5);
+    expect(Number.parseFloat(downLineStyle.top)).toBeCloseTo((24 - 3) / 2, 5);
+    expect(downLineStyle.transform).toBe(`rotate(${(Math.atan2(24, 96) * 180) / Math.PI}deg)`);
   });
 
   test("keeps borders independent from active multiline content clipping", async () => {

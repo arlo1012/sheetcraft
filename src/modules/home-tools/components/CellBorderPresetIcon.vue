@@ -142,20 +142,19 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
 
   &__diagonal {
     z-index: 2;
-    left: 1px;
+    top: 50%;
+    left: 50%;
     width: 22.6274px;
     height: 1px;
     background: currentcolor;
-    transform-origin: left center;
+    transform-origin: center;
 
     &.is-up {
-      bottom: 1px;
-      transform: rotate(-45deg);
+      transform: translate(-50%, -50%) rotate(-45deg);
     }
 
     &.is-down {
-      top: 1px;
-      transform: rotate(45deg);
+      transform: translate(-50%, -50%) rotate(45deg);
     }
   }
 }

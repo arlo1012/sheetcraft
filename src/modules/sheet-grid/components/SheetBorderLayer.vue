@@ -75,10 +75,12 @@ function getDiagonalCellStyle(segment: SheetDiagonalBorderSegment): CSSPropertie
 
 function getDiagonalLineStyle(segment: SheetDiagonalBorderSegment): CSSProperties {
   return {
-    top: segment.direction === "up" ? `${segment.height - segment.thickness}px` : "0",
+    left: `${(segment.width - segment.length) / 2}px`,
+    top: `${(segment.height - segment.thickness) / 2}px`,
     width: `${segment.length}px`,
     borderTop: segment.css,
     transform: `rotate(${segment.angle}deg)`,
+    transformOrigin: "center",
   };
 }
 </script>
@@ -145,10 +147,8 @@ function getDiagonalLineStyle(segment: SheetDiagonalBorderSegment): CSSPropertie
 
   &__diagonal-line {
     position: absolute;
-    left: 0;
     display: block;
     height: 0;
-    transform-origin: left top;
   }
 
   &__junction {

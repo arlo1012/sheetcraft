@@ -58,7 +58,7 @@ describe("CellBorderMenu interaction", () => {
         .findAll("[data-border-preset-icon]")
         .map((icon) => icon.attributes("data-border-preset-icon")),
     ).toEqual([
-      "diagonalUp",
+      "none",
       "all",
       "outer",
       "inner",
@@ -68,7 +68,7 @@ describe("CellBorderMenu interaction", () => {
       "left",
       "bottom",
       "right",
-      "none",
+      "diagonalUp",
       "diagonalDown",
     ]);
     expect(
@@ -110,7 +110,7 @@ describe("CellBorderMenu interaction", () => {
       "Border style",
       "More settings",
     ]);
-    expect(document.activeElement).toBe(menu.get('[data-border-preset="diagonalUp"]').element);
+    expect(document.activeElement).toBe(menu.get('[data-border-preset="none"]').element);
     await menu.trigger("keydown", { key: "ArrowDown" });
     const all = menu.get('[data-border-preset="all"]');
     expect(document.activeElement).toBe(all.element);

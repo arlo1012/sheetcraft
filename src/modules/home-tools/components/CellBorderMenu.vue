@@ -287,12 +287,12 @@ onBeforeUnmount(() => {
           type="button"
           role="menuitem"
           data-border-menu-item
-          data-border-preset="diagonalUp"
-          :aria-label="t('format.borderDiagonalUp')"
-          :title="t('format.borderDiagonalUp')"
-          @click="applyPreset('diagonalUp')"
+          data-border-preset="none"
+          :aria-label="t('format.borderNone')"
+          :title="t('format.borderNone')"
+          @click="selectPreset({ preset: 'none' })"
         >
-          <CellBorderPresetIcon preset="diagonalUp" />
+          <CellBorderPresetIcon preset="none" />
         </button>
         <button
           type="button"
@@ -397,12 +397,12 @@ onBeforeUnmount(() => {
           type="button"
           role="menuitem"
           data-border-menu-item
-          data-border-preset="none"
-          :aria-label="t('format.borderNone')"
-          :title="t('format.borderNone')"
-          @click="selectPreset({ preset: 'none' })"
+          data-border-preset="diagonalUp"
+          :aria-label="t('format.borderDiagonalUp')"
+          :title="t('format.borderDiagonalUp')"
+          @click="applyPreset('diagonalUp')"
         >
-          <CellBorderPresetIcon preset="none" />
+          <CellBorderPresetIcon preset="diagonalUp" />
         </button>
         <button
           type="button"
