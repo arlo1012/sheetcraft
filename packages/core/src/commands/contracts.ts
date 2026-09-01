@@ -5,6 +5,8 @@ import type {
   CellRange,
   CellValue,
   SheetDimensionAxis,
+  SheetSparseCell,
+  SheetSparseDimension,
   SheetSparseState,
 } from "../workbook.js";
 
@@ -90,11 +92,33 @@ export type DeleteSheetAxisCommand = {
   count: number;
 };
 
-export type RestoreSheetStateCommand = {
+export type RestoreFullSheetStateCommand = {
   type: "restoreSheetState";
   sheetId: string;
   state: SheetSparseState;
 };
+
+export type SheetAxisSparseSlice = {
+  cells: SheetSparseCell[];
+  dimensions: SheetSparseDimension[];
+};
+
+/**
+ * An inverse for a structural axis change. `operation` is the original
+ * operation being reversed; its slice contains only the deleted or truncated
+ * sparse entries needed to restore it.
+ */
+export type RestoreSheetAxisSliceCommand = {
+  type: "restoreSheetState";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  index: number;
+  count: number;
+  operation: "insert" | "delete";
+  slice: SheetAxisSparseSlice;
+};
+
+export type RestoreSheetStateCommand = RestoreFullSheetStateCommand | RestoreSheetAxisSliceCommand;
 
 export type WorkbookCommand =
   | SetCellValuesCommand

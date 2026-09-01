@@ -98,6 +98,13 @@ describe("sheet axis structure commands", () => {
     const sheet = getActiveSheet(session.workbook);
     setCellValue(sheet, { row: 1, column: 0 }, "selected");
     setCellValue(sheet, { row: MAX_SHEET_ROWS - 1, column: 0 }, "overflow");
+    setCellStyle(
+      sheet,
+      { row: MAX_SHEET_ROWS - 1, column: 0 },
+      {
+        borderTop: { style: "double", color: "#123456" },
+      },
+    );
     setRowHeight(sheet, 1, 40);
     setRowHeight(sheet, MAX_SHEET_ROWS - 1, 48);
     const beforeInsert = createSheetSparseState(sheet);
@@ -110,6 +117,87 @@ describe("sheet axis structure commands", () => {
 
     const beforeDelete = createSheetSparseState(sheet);
     executeWorkbookCommand(session, createDeleteSheetAxisCommand(sheet.id, "row", 1));
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(beforeDelete);
+    expect(redoWorkbookCommand(session)).toBe(true);
+  });
+
+  test("stores only an affected axis slice in large sparse structure history", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    for (let row = 0; row < 512; row += 1) {
+      setCellValue(sheet, { row, column: 0 }, `unaffected-${row}`);
+    }
+    setCellValue(sheet, { row: MAX_SHEET_ROWS - 2, column: 1 }, "tail-1");
+    setCellStyle(sheet, { row: MAX_SHEET_ROWS - 2, column: 1 }, { bold: true });
+    setCellValue(sheet, { row: MAX_SHEET_ROWS - 1, column: 2 }, "tail-2");
+    setCellStyle(
+      sheet,
+      { row: MAX_SHEET_ROWS - 1, column: 2 },
+      {
+        borderLeft: { style: "medium", color: "#654321" },
+      },
+    );
+    setRowHeight(sheet, MAX_SHEET_ROWS - 1, 48);
+    const before = createSheetSparseState(sheet);
+
+    executeWorkbookCommand(
+      session,
+      createInsertSheetAxisCommand(sheet.id, "row", MAX_SHEET_ROWS - 2, 2),
+    );
+
+    const inverse = session.history.undoStack.at(-1)?.command;
+    expect(inverse).toMatchObject({
+      type: "restoreSheetState",
+      sheetId: sheet.id,
+      axis: "row",
+      index: MAX_SHEET_ROWS - 2,
+      count: 2,
+      operation: "insert",
+    });
+    if (!inverse || !("slice" in inverse)) {
+      throw new Error("Expected an axis slice history inverse.");
+    }
+    expect(inverse.slice.cells).toHaveLength(2);
+    expect(inverse.slice.dimensions).toEqual([{ index: MAX_SHEET_ROWS - 1, size: 48 }]);
+    expect(inverse.slice.cells.every((cell) => cell.address.row >= MAX_SHEET_ROWS - 2)).toBe(true);
+    expect(JSON.parse(JSON.stringify(inverse))).toEqual(inverse);
+    expect(JSON.stringify(inverse)).not.toContain("unaffected-0");
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(before);
+  });
+
+  test("round-trips column insert truncation and deleted column slices", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellValue(sheet, { row: 2, column: 1 }, "before");
+    setCellValue(sheet, { row: 2, column: MAX_SHEET_COLUMNS - 1 }, "tail");
+    setCellStyle(
+      sheet,
+      { row: 2, column: MAX_SHEET_COLUMNS - 1 },
+      {
+        borderRight: { style: "dashed", color: "#abcdef" },
+      },
+    );
+    setColumnWidth(sheet, 1, 144);
+    setColumnWidth(sheet, MAX_SHEET_COLUMNS - 1, 160);
+    setRowHeight(sheet, 2, 40);
+    const beforeInsert = createSheetSparseState(sheet);
+
+    executeWorkbookCommand(session, createInsertSheetAxisCommand(sheet.id, "column", 1));
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(beforeInsert);
+    expect(redoWorkbookCommand(session)).toBe(true);
+
+    const beforeDelete = createSheetSparseState(sheet);
+    executeWorkbookCommand(session, createDeleteSheetAxisCommand(sheet.id, "column", 1));
+    const inverse = session.history.undoStack.at(-1)?.command;
+    if (!inverse || !("slice" in inverse)) {
+      throw new Error("Expected a deleted column axis slice history inverse.");
+    }
+    expect(inverse.slice.cells.every((cell) => cell.address.column === 1)).toBe(true);
+    expect(inverse.slice.dimensions.every((dimension) => dimension.index === 1)).toBe(true);
     expect(undoWorkbookCommand(session)).toBe(true);
     expect(createSheetSparseState(sheet)).toEqual(beforeDelete);
     expect(redoWorkbookCommand(session)).toBe(true);
@@ -166,6 +254,30 @@ describe("sheet axis structure commands", () => {
       expect(createSheetSparseState(sheet)).toEqual(before);
       expect(session.history.undoStack).toHaveLength(0);
     }
+  });
+
+  test("rejects an out-of-slice axis inverse before mutating the target sheet", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellValue(sheet, { row: 2, column: 2 }, "keep");
+    const before = createSheetSparseState(sheet);
+    const command = {
+      type: "restoreSheetState",
+      sheetId: sheet.id,
+      axis: "row",
+      index: 2,
+      count: 1,
+      operation: "delete",
+      slice: {
+        cells: [{ address: { row: 10, column: 2 }, value: "outside" }],
+        dimensions: [],
+      },
+    } as WorkbookCommand;
+
+    expect(() => applyWorkbookCommand(session.workbook, command)).toThrow(
+      "outside the restored slice",
+    );
+    expect(createSheetSparseState(sheet)).toEqual(before);
   });
 
   test("validates an internal sparse-state replacement before mutating the sheet", () => {
