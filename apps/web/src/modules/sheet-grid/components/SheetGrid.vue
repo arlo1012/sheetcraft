@@ -1,15 +1,5 @@
 <script setup lang="ts">
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  markRaw,
-  reactive,
-  ref,
-  watch,
-  type CSSProperties,
-} from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, markRaw, ref, watch } from "vue";
 import { formatCellValueForDisplay, formatCellValueForInput } from "@idea10/core/input";
 import { getCellAddressLabel } from "@idea10/core/coordinates";
 import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
@@ -32,19 +22,13 @@ import {
 import {
   DEFAULT_GRID_EXTENT_POLICY,
   DEFAULT_INITIAL_GRID_EXTENT,
-  createGridExtent,
-  expandGridExtentForAddress,
-  expandGridExtentForViewport,
-  type GridExtent,
 } from "@idea10/sheet-engine/extent";
-import { createSheetGeometry, type Point, type Size } from "@idea10/sheet-engine/geometry";
 import {
   areCellAddressesEqual,
   createAxisSelection,
   createCellSelection,
   extendAxisSelection,
   extendCellSelection,
-  getSelectionAutoScrollDelta,
   getSelectionMode,
   getSelectionRange,
   isSingleCellSelection,
@@ -65,6 +49,10 @@ import {
   type AutoRowHeightFont,
   type TextMeasurer,
 } from "@idea10/sheet-engine/row-height";
+import { useDimensionResize } from "../composables/useDimensionResize";
+import { useCellEditing } from "../composables/useCellEditing";
+import { useDragSelection } from "../composables/useDragSelection";
+import { useSheetViewport } from "../composables/useSheetViewport";
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
@@ -73,11 +61,6 @@ import SheetColumnHeaders from "./SheetColumnHeaders.vue";
 import SheetRowHeaders from "./SheetRowHeaders.vue";
 import SheetSelectionOverlay from "./SheetSelectionOverlay.vue";
 import { getCellEditorFrameStyle, getCellEditorStyle } from "../cell-presentation";
-
-type CellEditorHandle = {
-  focus: (options?: { selectAll?: boolean; clientX?: number }) => void;
-  insertLineBreak: () => void;
-};
 
 type AxisContextMenuState = {
   axis: SheetDimensionAxis;
@@ -135,57 +118,14 @@ const emit = defineEmits<{
 
 const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 28;
-const DEFAULT_VIEWPORT_SIZE: Size = { width: 960, height: 600 };
 
 const { t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
-const scrollerRef = ref<HTMLDivElement | null>(null);
-const editorRef = ref<CellEditorHandle | null>(null);
 const selection = ref<CellSelection>(createCellSelection({ row: 0, column: 0 }));
-const editingValue = ref("");
-const isEditing = ref(false);
-const isComposing = ref(false);
 const clipboardFeedbackKey = ref<GridClipboardFeedback>();
 const axisContextMenu = ref<AxisContextMenuState>();
-const scrollPosition = reactive<Point>({ x: 0, y: 0 });
-const viewportSize = reactive<Size>({ ...DEFAULT_VIEWPORT_SIZE });
-const gridExtent = reactive<GridExtent>(
-  createGridExtent({
-    rowCount: props.initialRowCount,
-    columnCount: props.initialColumnCount,
-  }),
-);
-let resizeObserver: ResizeObserver | null = null;
 let fontFaceSet: FontFaceSet | undefined;
 let fontLoadingDoneListener: (() => void) | undefined;
-let compositionStartValue = "";
-let wasEditingBeforeComposition = false;
-let shouldFinishAfterComposition = false;
-let pendingSelectionAfterComposition: CellSelection | undefined;
-let dragSelection:
-  | {
-      start: CellAddress;
-      baseSelection: CellSelection;
-      startX: number;
-      startY: number;
-      pointerX: number;
-      pointerY: number;
-      moved: boolean;
-    }
-  | undefined;
-let autoScrollFrame: number | undefined;
-const dimensionResize = ref<
-  | {
-      axis: SheetDimensionAxis;
-      index: number;
-      pointerId: number;
-      captureTarget: HTMLElement | null;
-      startClientPosition: number;
-      startSize: number;
-      previewSize: number;
-    }
-  | undefined
->();
 
 const approximateTextMeasurer = createApproximateTextMeasurer();
 let canvasContext: CanvasRenderingContext2D | null | undefined;
@@ -208,6 +148,74 @@ const textMeasurer = markRaw<TextMeasurer>({
 const autoRowHeightCalculator = markRaw(createAutoRowHeightCalculator(textMeasurer));
 const defaultFontFamily = ref(DEFAULT_CELL_FONT_FAMILY);
 const fontMetricsVersion = ref(0);
+const {
+  dimensionResize,
+  request: requestDimensionResize,
+  start: startDimensionResize,
+  stop: stopDimensionResize,
+} = useDimensionResize({
+  onBeforeStart: () => stopDragSelection(),
+  onCommit: (payload) => emit("resizeDimension", payload),
+});
+const {
+  geometry,
+  getCellAtClientPoint,
+  getRangeViewportRect,
+  gridCanvasStyle,
+  gridExtent,
+  gridViewportStyle,
+  ensureGridExtentContains,
+  ensureGridExtentCoversViewport,
+  ensureSelectionVisible,
+  emitViewState,
+  observe: observeViewport,
+  onScroll,
+  restore: restoreViewport,
+  scrollPosition,
+  scrollerRef,
+  startGeometryWatch,
+  stopObserving: stopObservingViewport,
+  stopGeometryWatching,
+  updateViewportSize,
+  viewportSize,
+  visibleRange,
+} = useSheetViewport({
+  initialExtent: {
+    rowCount: props.initialRowCount,
+    columnCount: props.initialColumnCount,
+  },
+  getGridExtentPolicy: () => ({
+    growth: {
+      rowCount: props.rowExpansionStep,
+      columnCount: props.columnExpansionStep,
+    },
+    tail: {
+      rowCount: props.rowExpansionTail,
+      columnCount: props.columnExpansionTail,
+    },
+  }),
+  getColumnWidths: () => effectiveColumnWidths.value,
+  getRowHeights: () => effectiveRowHeights.value,
+  getSelection: () => selection.value,
+  onScrollStart: () => {
+    axisContextMenu.value = undefined;
+  },
+  onViewStateChange: (viewState) => emit("viewStateChange", viewState),
+});
+const { start: startDragSelection, stop: stopDragSelection } = useDragSelection({
+  getCellAtClientPoint,
+  getScroller: () => scrollerRef.value,
+  getViewportSize: () => viewportSize,
+  onComplete: () => focusEditor(),
+  onEnsureGridExtentContains: ensureGridExtentContains,
+  onEnsureGridExtentCoversViewport: ensureGridExtentCoversViewport,
+  onScrollPositionChange: (position) => {
+    scrollPosition.x = position.x;
+    scrollPosition.y = position.y;
+  },
+  onSelectionChange: (nextSelection, visibleAddress) =>
+    setSelection(nextSelection, visibleAddress, false),
+});
 
 const effectiveColumnWidths = computed(() => {
   const columnWidths = new Map(props.sheet.columnWidths);
@@ -237,44 +245,30 @@ const effectiveRowHeights = computed(() => {
   }
   return rowHeights;
 });
+startGeometryWatch();
 
-const geometry = computed(() => {
-  return createSheetGeometry({
-    rowCount: gridExtent.rowCount,
-    columnCount: gridExtent.columnCount,
-    rowHeights: effectiveRowHeights.value,
-    columnWidths: effectiveColumnWidths.value,
-  });
-});
-
-watch(
-  geometry,
-  (nextGeometry, previousGeometry) => {
-    const scroller = scrollerRef.value;
-    if (!scroller || scrollPosition.y <= 0) {
-      return;
-    }
-    const anchor = previousGeometry.getCellAtPoint({ x: 0, y: scrollPosition.y });
-    if (!anchor || anchor.row >= nextGeometry.rowCount) {
-      return;
-    }
-    const offsetWithinRow = scrollPosition.y - previousGeometry.getRowOffset(anchor.row);
-    const nextScrollTop =
-      nextGeometry.getRowOffset(anchor.row) +
-      Math.min(offsetWithinRow, nextGeometry.getRowHeight(anchor.row) - 1);
-    if (nextScrollTop !== scrollPosition.y) {
-      scroller.scrollTop = nextScrollTop;
-      scrollPosition.y = nextScrollTop;
-      emitViewState();
-    }
-  },
-  { flush: "sync" },
-);
-const totalSize = computed(() => geometry.value.getTotalSize());
-const visibleRange = computed(() =>
-  geometry.value.getVisibleRange(scrollPosition, viewportSize, 2),
-);
 const activeCell = computed(() => selection.value.active);
+const {
+  beginEdit,
+  cancelEdit,
+  deferSelectionWhileComposing,
+  editingValue,
+  editorRef,
+  finishEdit,
+  focusEditor,
+  isComposing,
+  isEditing,
+  onBlur: onEditorBlur,
+  onCompositionEnd,
+  onCompositionStart,
+  onInput: onEditorInput,
+} = useCellEditing({
+  getActiveCell: () => activeCell.value,
+  getInputValue: () => formatCellValueForInput(getCellValue(props.sheet, activeCell.value)),
+  onClearClipboard: () => clearPendingClipboard(),
+  onCommit: (payload) => emit("commitCell", payload),
+  onSelectionChange: (nextSelection) => setSelection(nextSelection),
+});
 const selectedRange = computed(() =>
   getSelectionRange(selection.value, {
     rowCount: gridExtent.rowCount,
@@ -284,20 +278,6 @@ const selectedRange = computed(() =>
 const activeCellRect = computed(() =>
   geometry.value.getCellViewportRect(activeCell.value, scrollPosition),
 );
-function getRangeViewportRect(range: CellRange, alignToGridlines = false) {
-  const startRect = geometry.value.getCellViewportRect(range.start, scrollPosition);
-  const endRect = geometry.value.getCellViewportRect(range.end, scrollPosition);
-  const left = Math.max(0, startRect.x - (alignToGridlines && range.start.column > 0 ? 1 : 0));
-  const top = Math.max(0, startRect.y - (alignToGridlines && range.start.row > 0 ? 1 : 0));
-  const right = Math.min(viewportSize.width, endRect.x + endRect.width);
-  const bottom = Math.min(viewportSize.height, endRect.y + endRect.height);
-  return {
-    x: left,
-    y: top,
-    width: Math.max(0, right - left),
-    height: Math.max(0, bottom - top),
-  };
-}
 const selectedRangeRect = computed(() => getRangeViewportRect(selectedRange.value));
 const selectedRangeOutlineRect = computed(() => getRangeViewportRect(selectedRange.value, true));
 const activeCellOutlineRect = computed(() =>
@@ -319,14 +299,6 @@ const activeCellWrapText = computed(() =>
 const clipboardFeedback = computed(() =>
   clipboardFeedbackKey.value ? t(CLIPBOARD_MESSAGE_KEYS[clipboardFeedbackKey.value]) : "",
 );
-const gridCanvasStyle = computed<CSSProperties>(() => ({
-  width: `${totalSize.value.width}px`,
-  height: `${totalSize.value.height}px`,
-}));
-const gridViewportStyle = computed<CSSProperties>(() => ({
-  width: `${viewportSize.width}px`,
-  height: `${viewportSize.height}px`,
-}));
 const { clipboardMode, clipboardRange, clearPendingClipboard, onCopy, onCut, onPaste } =
   useGridClipboard({
     getSheet: () => props.sheet,
@@ -353,91 +325,6 @@ const { clipboardMode, clipboardRange, clearPendingClipboard, onCopy, onCut, onP
 const clipboardRangeRect = computed(() =>
   clipboardRange.value ? getRangeViewportRect(clipboardRange.value, true) : null,
 );
-
-function applyGridExtent(nextExtent: GridExtent): void {
-  gridExtent.rowCount = nextExtent.rowCount;
-  gridExtent.columnCount = nextExtent.columnCount;
-}
-
-function getCurrentViewState(): SheetGridViewState {
-  return createSheetGridViewState({
-    selection: selection.value,
-    scrollPosition,
-    gridExtent,
-  });
-}
-
-function emitViewState(): void {
-  emit("viewStateChange", getCurrentViewState());
-}
-
-function getGridExtentPolicy() {
-  return {
-    growth: {
-      rowCount: props.rowExpansionStep,
-      columnCount: props.columnExpansionStep,
-    },
-    tail: {
-      rowCount: props.rowExpansionTail,
-      columnCount: props.columnExpansionTail,
-    },
-  };
-}
-
-function ensureGridExtentContains(address: CellAddress): void {
-  applyGridExtent(expandGridExtentForAddress(gridExtent, address, getGridExtentPolicy().growth));
-}
-
-function ensureGridExtentCoversViewport(): void {
-  applyGridExtent(
-    expandGridExtentForViewport(
-      gridExtent,
-      scrollPosition,
-      viewportSize,
-      geometry.value,
-      getGridExtentPolicy(),
-    ),
-  );
-}
-
-function updateViewportSize(): void {
-  const scroller = scrollerRef.value;
-  if (!scroller) {
-    return;
-  }
-
-  viewportSize.width = scroller.clientWidth || DEFAULT_VIEWPORT_SIZE.width;
-  viewportSize.height = scroller.clientHeight || DEFAULT_VIEWPORT_SIZE.height;
-  ensureGridExtentCoversViewport();
-}
-
-function focusEditor(selectAll = false, clientX?: number): void {
-  void nextTick(() => editorRef.value?.focus({ selectAll, clientX }));
-}
-
-function ensureSelectionVisible(
-  address: CellAddress,
-  mode = getSelectionMode(selection.value),
-): void {
-  const scroller = scrollerRef.value;
-  if (!scroller) {
-    return;
-  }
-
-  const nextScrollPosition = geometry.value.getScrollPositionForCell(
-    address,
-    scrollPosition,
-    viewportSize,
-  );
-  if (mode !== "rows" && mode !== "all" && nextScrollPosition.x !== scrollPosition.x) {
-    scroller.scrollLeft = nextScrollPosition.x;
-    scrollPosition.x = nextScrollPosition.x;
-  }
-  if (mode !== "columns" && mode !== "all" && nextScrollPosition.y !== scrollPosition.y) {
-    scroller.scrollTop = nextScrollPosition.y;
-    scrollPosition.y = nextScrollPosition.y;
-  }
-}
 
 function setSelection(
   nextSelection: CellSelection,
@@ -469,9 +356,7 @@ function setActiveCell(address: CellAddress, restoreFocus = true): void {
 
 function navigateToCell(address: CellAddress): void {
   const nextSelection = createCellSelection(address);
-  if (isComposing.value) {
-    pendingSelectionAfterComposition = nextSelection;
-    shouldFinishAfterComposition = true;
+  if (deferSelectionWhileComposing(nextSelection)) {
     return;
   }
 
@@ -479,49 +364,6 @@ function navigateToCell(address: CellAddress): void {
     finishEdit(nextSelection);
   } else {
     setSelection(nextSelection, address);
-  }
-}
-
-function beginEdit(mode: "append" | "replace", initialValue = "", clientX?: number): void {
-  editingValue.value =
-    mode === "append"
-      ? formatCellValueForInput(getCellValue(props.sheet, activeCell.value))
-      : initialValue;
-  isEditing.value = true;
-  focusEditor(false, clientX);
-}
-
-function finishEdit(destination?: CellSelection, restoreFocus = true): void {
-  if (isEditing.value) {
-    clearPendingClipboard();
-    emit("commitCell", {
-      address: { ...activeCell.value },
-      input: editingValue.value,
-    });
-  }
-
-  isEditing.value = false;
-  isComposing.value = false;
-  wasEditingBeforeComposition = false;
-  shouldFinishAfterComposition = false;
-  pendingSelectionAfterComposition = undefined;
-  editingValue.value = "";
-  if (destination) {
-    setSelection(destination);
-  } else if (restoreFocus) {
-    focusEditor();
-  }
-}
-
-function cancelEdit(restoreFocus = true): void {
-  isEditing.value = false;
-  isComposing.value = false;
-  wasEditingBeforeComposition = false;
-  shouldFinishAfterComposition = false;
-  pendingSelectionAfterComposition = undefined;
-  editingValue.value = "";
-  if (restoreFocus) {
-    focusEditor();
   }
 }
 
@@ -549,140 +391,22 @@ function moveSelection(
   }
 }
 
-function getCellAtClientPoint(clientX: number, clientY: number): CellAddress | null {
-  const scroller = scrollerRef.value;
-  if (!scroller) {
-    return null;
-  }
-  const bounds = scroller.getBoundingClientRect();
-  const width = bounds.width || viewportSize.width;
-  const height = bounds.height || viewportSize.height;
-  const x = Math.min(Math.max(clientX - bounds.left, 0), Math.max(0, width - 1));
-  const y = Math.min(Math.max(clientY - bounds.top, 0), Math.max(0, height - 1));
-  return geometry.value.getCellAtPoint({ x: x + scrollPosition.x, y: y + scrollPosition.y });
-}
-
-function cancelAutoScroll(): void {
-  if (autoScrollFrame === undefined) {
-    return;
-  }
-  if (typeof cancelAnimationFrame === "function") {
-    cancelAnimationFrame(autoScrollFrame);
-  } else {
-    window.clearTimeout(autoScrollFrame);
-  }
-  autoScrollFrame = undefined;
-}
-
-function stopDragSelection(): void {
-  cancelAutoScroll();
-  dragSelection = undefined;
-  window.removeEventListener("mousemove", onDragMouseMove);
-  window.removeEventListener("mouseup", onDragMouseUp);
-}
-
-function stopDimensionResize(): void {
-  const resize = dimensionResize.value;
-  const target = resize?.captureTarget;
-  target?.removeEventListener("lostpointercapture", onDimensionResizeLostCapture);
-  if (resize && target?.hasPointerCapture?.(resize.pointerId)) {
-    target.releasePointerCapture(resize.pointerId);
-  }
-  dimensionResize.value = undefined;
-  window.removeEventListener("pointermove", onDimensionResizeMove);
-  window.removeEventListener("pointerup", onDimensionResizeEnd);
-  window.removeEventListener("pointercancel", onDimensionResizeCancel);
-  window.removeEventListener("blur", onDimensionResizeBlur);
-}
-
-function clampDimensionSize(axis: SheetDimensionAxis, size: number): number {
-  const minimum = axis === "row" ? MIN_ROW_HEIGHT : MIN_COLUMN_WIDTH;
-  const maximum = axis === "row" ? MAX_ROW_HEIGHT : MAX_COLUMN_WIDTH;
-  return Math.min(Math.max(Math.round(size), minimum), maximum);
-}
-
 function onDimensionResizeRequest(
   axis: SheetDimensionAxis,
   payload: { index: number; size: number },
 ): void {
-  emit("resizeDimension", { axis, ...payload });
+  requestDimensionResize(axis, payload);
 }
 
 function onDimensionResizeStart(
   axis: SheetDimensionAxis,
   payload: { index: number; event: PointerEvent },
 ): void {
-  stopDragSelection();
-  stopDimensionResize();
   const startSize =
     axis === "row"
       ? geometry.value.getRowHeight(payload.index)
       : geometry.value.getColumnWidth(payload.index);
-  const target = payload.event.currentTarget as HTMLElement | null;
-  dimensionResize.value = {
-    axis,
-    index: payload.index,
-    pointerId: payload.event.pointerId,
-    captureTarget: target,
-    startClientPosition: axis === "row" ? payload.event.clientY : payload.event.clientX,
-    startSize,
-    previewSize: startSize,
-  };
-
-  target?.setPointerCapture?.(payload.event.pointerId);
-  target?.addEventListener("lostpointercapture", onDimensionResizeLostCapture);
-  window.addEventListener("pointermove", onDimensionResizeMove);
-  window.addEventListener("pointerup", onDimensionResizeEnd);
-  window.addEventListener("pointercancel", onDimensionResizeCancel);
-  window.addEventListener("blur", onDimensionResizeBlur);
-}
-
-function onDimensionResizeMove(event: PointerEvent): void {
-  const resize = dimensionResize.value;
-  if (!resize || event.pointerId !== resize.pointerId) {
-    return;
-  }
-  event.preventDefault();
-  const clientPosition = resize.axis === "row" ? event.clientY : event.clientX;
-  resize.previewSize = clampDimensionSize(
-    resize.axis,
-    resize.startSize + clientPosition - resize.startClientPosition,
-  );
-}
-
-function onDimensionResizeEnd(event: PointerEvent): void {
-  const resize = dimensionResize.value;
-  if (!resize || event.pointerId !== resize.pointerId) {
-    return;
-  }
-  const payload = {
-    axis: resize.axis,
-    index: resize.index,
-    size: resize.previewSize,
-  };
-  const changed = resize.previewSize !== resize.startSize;
-  stopDimensionResize();
-  if (changed) {
-    emit("resizeDimension", payload);
-  }
-}
-
-function onDimensionResizeCancel(event: PointerEvent): void {
-  if (event.pointerId !== dimensionResize.value?.pointerId) {
-    return;
-  }
-  stopDimensionResize();
-}
-
-function onDimensionResizeLostCapture(event: PointerEvent): void {
-  if (event.pointerId !== dimensionResize.value?.pointerId) {
-    return;
-  }
-  stopDimensionResize();
-}
-
-function onDimensionResizeBlur(): void {
-  stopDimensionResize();
+  startDimensionResize(axis, { ...payload, startSize });
 }
 
 function onGridKeydown(event: KeyboardEvent): void {
@@ -703,98 +427,13 @@ function onGridKeydown(event: KeyboardEvent): void {
   }
 }
 
-function updateDragSelectionAddress(): void {
-  if (!dragSelection) {
-    return;
-  }
-  const address = getCellAtClientPoint(dragSelection.pointerX, dragSelection.pointerY);
-  if (!address) {
-    return;
-  }
-  ensureGridExtentContains(address);
-  setSelection(extendCellSelection(dragSelection.baseSelection, address), address, false);
-}
-
-function requestAutoScrollFrame(callback: FrameRequestCallback): number {
-  return typeof requestAnimationFrame === "function"
-    ? requestAnimationFrame(callback)
-    : window.setTimeout(() => callback(performance.now()), 16);
-}
-
-function runSelectionAutoScroll(): void {
-  autoScrollFrame = undefined;
-  const scroller = scrollerRef.value;
-  if (!dragSelection || !scroller) {
-    return;
-  }
-
-  const bounds = scroller.getBoundingClientRect();
-  const delta = getSelectionAutoScrollDelta(
-    { x: dragSelection.pointerX, y: dragSelection.pointerY },
-    {
-      left: bounds.left,
-      top: bounds.top,
-      right: bounds.right || bounds.left + viewportSize.width,
-      bottom: bounds.bottom || bounds.top + viewportSize.height,
-    },
-  );
-  if (delta.x === 0 && delta.y === 0) {
-    return;
-  }
-
-  scroller.scrollLeft = Math.max(0, scroller.scrollLeft + delta.x);
-  scroller.scrollTop = Math.max(0, scroller.scrollTop + delta.y);
-  scrollPosition.x = scroller.scrollLeft;
-  scrollPosition.y = scroller.scrollTop;
-  ensureGridExtentCoversViewport();
-  updateDragSelectionAddress();
-  autoScrollFrame = requestAutoScrollFrame(runSelectionAutoScroll);
-}
-
-function scheduleSelectionAutoScroll(): void {
-  cancelAutoScroll();
-  if (!dragSelection) {
-    return;
-  }
-  autoScrollFrame = requestAutoScrollFrame(runSelectionAutoScroll);
-}
-
-function onDragMouseMove(event: MouseEvent): void {
-  if (!dragSelection) {
-    return;
-  }
-  dragSelection.pointerX = event.clientX;
-  dragSelection.pointerY = event.clientY;
-  if (
-    !dragSelection.moved &&
-    Math.hypot(event.clientX - dragSelection.startX, event.clientY - dragSelection.startY) >= 3
-  ) {
-    dragSelection.moved = true;
-  }
-  if (!dragSelection.moved) {
-    return;
-  }
-  updateDragSelectionAddress();
-  scheduleSelectionAutoScroll();
-}
-
-function onDragMouseUp(): void {
-  const moved = dragSelection?.moved ?? false;
-  stopDragSelection();
-  if (moved) {
-    focusEditor();
-  }
-}
-
 function onCellMouseDown(address: CellAddress, event: MouseEvent): void {
   const previousSelection = selection.value;
   const nextSelection = event.shiftKey
     ? extendCellSelection(previousSelection, address)
     : createCellSelection(address);
 
-  if (isComposing.value) {
-    pendingSelectionAfterComposition = nextSelection;
-    shouldFinishAfterComposition = true;
+  if (deferSelectionWhileComposing(nextSelection)) {
     return;
   }
 
@@ -804,20 +443,7 @@ function onCellMouseDown(address: CellAddress, event: MouseEvent): void {
     setSelection(nextSelection, address);
   }
 
-  if (event.buttons === 1) {
-    stopDragSelection();
-    dragSelection = {
-      start: { ...address },
-      baseSelection: nextSelection,
-      startX: event.clientX,
-      startY: event.clientY,
-      pointerX: event.clientX,
-      pointerY: event.clientY,
-      moved: false,
-    };
-    window.addEventListener("mousemove", onDragMouseMove);
-    window.addEventListener("mouseup", onDragMouseUp);
-  }
+  startDragSelection(nextSelection, event);
 }
 
 function selectAxis(
@@ -830,9 +456,7 @@ function selectAxis(
     shiftKey && mode !== "all"
       ? extendAxisSelection(selection.value, mode, address)
       : createAxisSelection(mode, address);
-  if (isComposing.value) {
-    pendingSelectionAfterComposition = nextSelection;
-    shouldFinishAfterComposition = true;
+  if (deferSelectionWhileComposing(nextSelection)) {
     return;
   }
   if (isEditing.value) {
@@ -1115,106 +739,22 @@ function onEditorKeydown(event: KeyboardEvent): void {
   }
 }
 
-function onEditorInput(value: string): void {
-  if (!isEditing.value) {
-    isEditing.value = true;
-  }
-  editingValue.value = value;
-}
-
-function onCompositionStart(): void {
-  compositionStartValue = editingValue.value;
-  wasEditingBeforeComposition = isEditing.value;
-  shouldFinishAfterComposition = false;
-  pendingSelectionAfterComposition = undefined;
-  if (!isEditing.value) {
-    editingValue.value = "";
-    isEditing.value = true;
-  }
-  isComposing.value = true;
-}
-
-function onCompositionEnd(value: string, event: CompositionEvent): void {
-  isComposing.value = false;
-  const shouldPreserveExistingEdit = wasEditingBeforeComposition;
-  wasEditingBeforeComposition = false;
-  if (event.data === "" && value === compositionStartValue) {
-    if (shouldPreserveExistingEdit) {
-      editingValue.value = compositionStartValue;
-      if (shouldFinishAfterComposition) {
-        finishEdit(pendingSelectionAfterComposition, !pendingSelectionAfterComposition);
-      } else {
-        shouldFinishAfterComposition = false;
-        pendingSelectionAfterComposition = undefined;
-      }
-      return;
-    }
-    const destination = pendingSelectionAfterComposition;
-    const restoreFocus = !shouldFinishAfterComposition;
-    cancelEdit(restoreFocus);
-    if (destination) {
-      setSelection(destination);
-    }
-    return;
-  }
-  if (isEditing.value) {
-    editingValue.value = value;
-  }
-  if (shouldFinishAfterComposition) {
-    finishEdit(pendingSelectionAfterComposition, !pendingSelectionAfterComposition);
-  }
-}
-
-function onEditorBlur(): void {
-  if (!isEditing.value) {
-    return;
-  }
-  if (isComposing.value) {
-    shouldFinishAfterComposition = true;
-    return;
-  }
-
-  finishEdit(undefined, false);
-}
-
-function onScroll(event: Event): void {
-  const scroller = event.currentTarget as HTMLDivElement;
-  axisContextMenu.value = undefined;
-  scrollPosition.x = scroller.scrollLeft;
-  scrollPosition.y = scroller.scrollTop;
-  ensureGridExtentCoversViewport();
-  emitViewState();
-}
-
 function restoreViewState(viewState?: SheetGridViewState): void {
   const nextViewState = viewState
     ? createSheetGridViewState(viewState)
     : createSheetGridViewState({
-        gridExtent: createGridExtent({
+        gridExtent: {
           rowCount: props.initialRowCount,
           columnCount: props.initialColumnCount,
-        }),
+        },
       });
   stopDragSelection();
   stopDimensionResize();
   axisContextMenu.value = undefined;
   clearPendingClipboard();
   selection.value = nextViewState.selection;
-  editingValue.value = "";
-  isEditing.value = false;
-  isComposing.value = false;
-  shouldFinishAfterComposition = false;
-  pendingSelectionAfterComposition = undefined;
-  applyGridExtent(nextViewState.gridExtent);
-  ensureGridExtentContains(nextViewState.selection.focus);
-  const scroller = scrollerRef.value;
-  if (scroller) {
-    scroller.scrollLeft = nextViewState.scrollPosition.x;
-    scroller.scrollTop = nextViewState.scrollPosition.y;
-  }
-  scrollPosition.x = nextViewState.scrollPosition.x;
-  scrollPosition.y = nextViewState.scrollPosition.y;
-  ensureGridExtentCoversViewport();
+  cancelEdit(false);
+  restoreViewport(nextViewState);
 }
 
 watch(
@@ -1248,11 +788,7 @@ onMounted(() => {
   }
   updateViewportSize();
   restoreViewState(props.viewState);
-  const scroller = scrollerRef.value;
-  if (scroller && typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(updateViewportSize);
-    resizeObserver.observe(scroller);
-  }
+  observeViewport();
   focusEditor();
 });
 
@@ -1260,7 +796,8 @@ onBeforeUnmount(() => {
   if (fontFaceSet && fontLoadingDoneListener) {
     fontFaceSet.removeEventListener("loadingdone", fontLoadingDoneListener);
   }
-  resizeObserver?.disconnect();
+  stopObservingViewport();
+  stopGeometryWatching();
   stopDragSelection();
   stopDimensionResize();
 });
