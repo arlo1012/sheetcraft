@@ -226,9 +226,9 @@ describe("SheetGrid cell style rendering", () => {
     expect(upLines).toHaveLength(1);
     expect(upLines[0]?.attributes()).toMatchObject({
       x1: "0",
-      y1: "24",
+      y1: "23.5",
       x2: "96",
-      y2: "0",
+      y2: "-0.5",
       stroke: "#112233",
       "stroke-width": "1",
       "stroke-linecap": "butt",
@@ -265,7 +265,7 @@ describe("SheetGrid cell style rendering", () => {
       (Number.parseFloat(firstDown?.attributes("y2") ?? "") +
         Number.parseFloat(secondDown?.attributes("y2") ?? "")) /
         2,
-    ).toBeCloseTo(24, 5);
+    ).toBeCloseTo(23.5, 5);
   });
 
   test("maps dashed and dotted diagonal borders to svg strokes", async () => {
@@ -317,8 +317,8 @@ describe("SheetGrid cell style rendering", () => {
     const second = layer.get(
       '[data-border-row="0"][data-border-column="1"][data-border-direction="up"] line',
     );
-    expect(first.attributes()).toMatchObject({ x2: "96", y2: "24" });
-    expect(second.attributes()).toMatchObject({ x1: "96", y1: "24" });
+    expect(first.attributes()).toMatchObject({ x2: "96", y2: "23.5" });
+    expect(second.attributes()).toMatchObject({ x1: "96", y1: "23.5" });
   });
 
   test("keeps borders independent from active multiline content clipping", async () => {
