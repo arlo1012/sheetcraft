@@ -221,26 +221,104 @@ describe("SheetGrid cell style rendering", () => {
       '[data-sheet-diagonal-border-segment][data-border-direction="down"]',
     );
     expect(up.attributes()).toMatchObject({ "data-border-row": "0", "data-border-column": "0" });
-    expect(up.element.style.width).toBe("96px");
-    expect(up.element.style.height).toBe("24px");
-    const upLine = up.get<HTMLElement>(".sheet-border-layer__diagonal-line").element;
-    const downLine = down.get<HTMLElement>(".sheet-border-layer__diagonal-line").element;
-    const upLineStyle = upLine.style;
-    const downLineStyle = downLine.style;
-    const diagonalLength = Math.hypot(96, 24);
-    const visualDiagonalLength = diagonalLength + 2;
-    expect(upLineStyle.borderTop).toBe("1px solid #112233");
-    expect(Number.parseFloat(upLineStyle.left)).toBeCloseTo((96 - visualDiagonalLength) / 2, 5);
-    expect(Number.parseFloat(upLineStyle.top)).toBeCloseTo((24 - 1) / 2, 5);
-    expect(Number.parseFloat(upLineStyle.width)).toBeCloseTo(visualDiagonalLength, 5);
-    expect(upLineStyle.transform).toBe(`rotate(${(-Math.atan2(24, 96) * 180) / Math.PI}deg)`);
-    expect(upLineStyle.transformOrigin).toBe("center");
-    expect(downLineStyle.borderTop).toBe("3px double #445566");
-    expect(Number.parseFloat(downLineStyle.left)).toBeCloseTo((96 - visualDiagonalLength) / 2, 5);
-    expect(Number.parseFloat(downLineStyle.top)).toBeCloseTo((24 - 3) / 2, 5);
-    expect(Number.parseFloat(downLineStyle.width)).toBeCloseTo(visualDiagonalLength, 5);
-    expect(downLineStyle.transform).toBe(`rotate(${(Math.atan2(24, 96) * 180) / Math.PI}deg)`);
-    expect(up.element.style.overflow).toBe("visible");
+    const upLines = up.findAll(".sheet-border-layer__diagonal-line");
+    const downLines = down.findAll(".sheet-border-layer__diagonal-line");
+    expect(upLines).toHaveLength(1);
+    expect(upLines[0]?.attributes()).toMatchObject({
+      x1: "0",
+      y1: "24",
+      x2: "96",
+      y2: "0",
+      stroke: "#112233",
+      "stroke-width": "1",
+      "stroke-linecap": "butt",
+      "data-diagonal-line-offset": "0",
+    });
+    expect(downLines).toHaveLength(2);
+    expect(downLines.map((line) => line.attributes("data-diagonal-line-offset"))).toEqual([
+      "-1",
+      "1",
+    ]);
+    for (const line of downLines) {
+      expect(line.attributes()).toMatchObject({
+        stroke: "#445566",
+        "stroke-width": "1",
+        "stroke-linecap": "butt",
+      });
+      expect(
+        Number.parseFloat(line.attributes("x2") ?? "") -
+          Number.parseFloat(line.attributes("x1") ?? ""),
+      ).toBeCloseTo(96, 5);
+      expect(
+        Number.parseFloat(line.attributes("y2") ?? "") -
+          Number.parseFloat(line.attributes("y1") ?? ""),
+      ).toBeCloseTo(24, 5);
+    }
+    const firstDown = downLines[0];
+    const secondDown = downLines[1];
+    expect(
+      (Number.parseFloat(firstDown?.attributes("x1") ?? "") +
+        Number.parseFloat(secondDown?.attributes("x1") ?? "")) /
+        2,
+    ).toBeCloseTo(0, 5);
+    expect(
+      (Number.parseFloat(firstDown?.attributes("y2") ?? "") +
+        Number.parseFloat(secondDown?.attributes("y2") ?? "")) /
+        2,
+    ).toBeCloseTo(24, 5);
+  });
+
+  test("maps dashed and dotted diagonal borders to svg strokes", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        borderDiagonalUp: { style: "dashed", color: "#112233" },
+        borderDiagonalDown: { style: "dotted", color: "#445566" },
+      },
+    );
+    await nextTick();
+
+    expect(
+      wrapper
+        .get('[data-sheet-diagonal-border-segment][data-border-direction="up"] line')
+        .attributes(),
+    ).toMatchObject({ "stroke-dasharray": "6 3", "stroke-linecap": "butt" });
+    expect(
+      wrapper
+        .get('[data-sheet-diagonal-border-segment][data-border-direction="down"] line')
+        .attributes(),
+    ).toMatchObject({ "stroke-dasharray": "0 2", "stroke-linecap": "round" });
+  });
+
+  test("renders adjacent diagonal endpoints in the same svg layer", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        borderDiagonalDown: { style: "thin", color: "#112233" },
+      },
+    );
+    setCellStyle(
+      sheet,
+      { row: 0, column: 1 },
+      {
+        borderDiagonalUp: { style: "thin", color: "#112233" },
+      },
+    );
+    await nextTick();
+
+    const layer = wrapper.get('[data-sheet-diagonal-border-layer][data-border-thickness="1"]');
+    const first = layer.get(
+      '[data-border-row="0"][data-border-column="0"][data-border-direction="down"] line',
+    );
+    const second = layer.get(
+      '[data-border-row="0"][data-border-column="1"][data-border-direction="up"] line',
+    );
+    expect(first.attributes()).toMatchObject({ x2: "96", y2: "24" });
+    expect(second.attributes()).toMatchObject({ x1: "96", y1: "24" });
   });
 
   test("keeps borders independent from active multiline content clipping", async () => {

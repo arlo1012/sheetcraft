@@ -18,8 +18,6 @@ const props = defineProps<{
   scrollPosition: Point;
 }>();
 
-const DIAGONAL_ENDPOINT_OVERLAP = 1;
-
 const segments = computed(() =>
   resolveVisibleBorderSegments(
     props.sheet,
@@ -37,6 +35,31 @@ const diagonalSegments = computed(() =>
     props.scrollPosition,
   ),
 );
+const diagonalLayers = computed(() => {
+  const layers = new Map<number, SheetDiagonalBorderSegment[]>();
+  for (const segment of diagonalSegments.value) {
+    const layer = layers.get(segment.thickness) ?? [];
+    layer.push(segment);
+    layers.set(segment.thickness, layer);
+  }
+  return [...layers]
+    .sort(([leftThickness], [rightThickness]) => leftThickness - rightThickness)
+    .map(([thickness, segments]) => ({ thickness, segments }));
+});
+
+type DiagonalLinePart = {
+  key: string;
+  offset: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+};
+
+const DIAGONAL_STROKE_DASH_ARRAY: Partial<Record<SheetDiagonalBorderSegment["style"], string>> = {
+  dashed: "6 3",
+  dotted: "0 2",
+};
 
 function getSegmentStyle(segment: SheetBorderSegment): CSSProperties {
   if (segment.orientation === "horizontal") {
@@ -65,27 +88,23 @@ function getJunctionStyle(junction: SheetBorderJunction): CSSProperties {
   };
 }
 
-function getDiagonalCellStyle(segment: SheetDiagonalBorderSegment): CSSProperties {
-  return {
-    left: `${segment.x}px`,
-    top: `${segment.y}px`,
-    width: `${segment.width}px`,
-    height: `${segment.height}px`,
-    overflow: "visible",
-    zIndex: segment.thickness,
-  };
-}
+function getDiagonalLineParts(segment: SheetDiagonalBorderSegment): DiagonalLinePart[] {
+  const x1 = segment.x;
+  const x2 = segment.x + segment.width;
+  const y1 = segment.direction === "up" ? segment.y + segment.height : segment.y;
+  const y2 = segment.direction === "up" ? segment.y : segment.y + segment.height;
+  const normalX = -(y2 - y1) / segment.length;
+  const normalY = (x2 - x1) / segment.length;
+  const offsets = segment.style === "double" ? [-1, 1] : [0];
 
-function getDiagonalLineStyle(segment: SheetDiagonalBorderSegment): CSSProperties {
-  const visualLength = segment.length + DIAGONAL_ENDPOINT_OVERLAP * 2;
-  return {
-    left: `${(segment.width - visualLength) / 2}px`,
-    top: `${(segment.height - segment.thickness) / 2}px`,
-    width: `${visualLength}px`,
-    borderTop: segment.css,
-    transform: `rotate(${segment.angle}deg)`,
-    transformOrigin: "center",
-  };
+  return offsets.map((offset) => ({
+    key: `${segment.key}:${offset}`,
+    offset,
+    x1: x1 + normalX * offset,
+    y1: y1 + normalY * offset,
+    x2: x2 + normalX * offset,
+    y2: y2 + normalY * offset,
+  }));
 }
 </script>
 
@@ -104,18 +123,40 @@ function getDiagonalLineStyle(segment: SheetDiagonalBorderSegment): CSSPropertie
       :data-border-start="segment.start"
       :data-border-end="segment.end"
     />
-    <span
-      v-for="segment in diagonalSegments"
-      :key="segment.key"
-      class="sheet-border-layer__diagonal-cell"
-      :style="getDiagonalCellStyle(segment)"
-      data-sheet-diagonal-border-segment
-      :data-border-direction="segment.direction"
-      :data-border-row="segment.row"
-      :data-border-column="segment.column"
+    <svg
+      v-for="layer in diagonalLayers"
+      :key="`diagonal-layer:${layer.thickness}`"
+      class="sheet-border-layer__diagonals"
+      :style="{ zIndex: layer.thickness }"
+      focusable="false"
+      data-sheet-diagonal-border-layer
+      :data-border-thickness="layer.thickness"
     >
-      <span class="sheet-border-layer__diagonal-line" :style="getDiagonalLineStyle(segment)" />
-    </span>
+      <g
+        v-for="segment in layer.segments"
+        :key="segment.key"
+        data-sheet-diagonal-border-segment
+        :data-border-direction="segment.direction"
+        :data-border-row="segment.row"
+        :data-border-column="segment.column"
+        :data-border-style="segment.style"
+      >
+        <line
+          v-for="part in getDiagonalLineParts(segment)"
+          :key="part.key"
+          class="sheet-border-layer__diagonal-line"
+          :x1="part.x1"
+          :y1="part.y1"
+          :x2="part.x2"
+          :y2="part.y2"
+          :stroke="segment.color"
+          :stroke-width="segment.style === 'double' ? 1 : segment.thickness"
+          :stroke-dasharray="DIAGONAL_STROKE_DASH_ARRAY[segment.style]"
+          :stroke-linecap="segment.style === 'dotted' ? 'round' : 'butt'"
+          :data-diagonal-line-offset="part.offset"
+        />
+      </g>
+    </svg>
     <span
       v-for="junction in junctions"
       :key="junction.key"
@@ -143,15 +184,17 @@ function getDiagonalLineStyle(segment: SheetDiagonalBorderSegment): CSSPropertie
     height: 0;
   }
 
-  &__diagonal-cell {
+  &__diagonals {
     position: absolute;
+    width: 100%;
+    height: 100%;
     display: block;
+    overflow: visible;
+    inset: 0;
   }
 
   &__diagonal-line {
-    position: absolute;
-    display: block;
-    height: 0;
+    fill: none;
   }
 
   &__junction {
