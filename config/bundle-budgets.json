@@ -1,27 +1,27 @@
 {
   "version": 1,
-  "description": "Temporary refactor budgets based on the pre-split Web build baseline. Recalibrate after stable chunking is introduced.",
+  "description": "Post-split production budgets calibrated against the stable app, Vue, TDesign, and icon chunks.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
       "pattern": "^index-.*\\.js$",
-      "maximumRawBytes": 650000,
-      "maximumGzipBytes": 200000
+      "maximumRawBytes": 190000,
+      "maximumGzipBytes": 55000
     },
     "css": {
       "pattern": "^index-.*\\.css$",
-      "maximumRawBytes": 200000,
-      "maximumGzipBytes": 30000
+      "maximumRawBytes": 75000,
+      "maximumGzipBytes": 12000
     }
   },
   "totalAssets": {
     "javascript": {
-      "maximumRawBytes": 650000,
-      "maximumGzipBytes": 200000
+      "maximumRawBytes": 675000,
+      "maximumGzipBytes": 205000
     },
     "css": {
-      "maximumRawBytes": 200000,
-      "maximumGzipBytes": 30000
+      "maximumRawBytes": 210000,
+      "maximumGzipBytes": 27000
     }
   }
 }
