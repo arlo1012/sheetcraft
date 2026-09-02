@@ -32,6 +32,7 @@ import {
   extendCellSelection,
   getSelectionMode,
   getSelectionRange,
+  isCellSelected,
   isSingleCellSelection,
   moveActiveCellWithinSelection,
   moveCellSelection,
@@ -57,6 +58,7 @@ import { useSheetViewport } from "../composables/useSheetViewport";
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
+import SheetCellContextMenu from "./SheetCellContextMenu.vue";
 import SheetBorderLayer from "./SheetBorderLayer.vue";
 import SheetColumnHeaders from "./SheetColumnHeaders.vue";
 import SheetRowHeaders from "./SheetRowHeaders.vue";
@@ -69,6 +71,10 @@ type AxisContextMenuState = {
   count: number;
   anchor: FloatingReference;
   trigger: HTMLButtonElement;
+};
+
+type CellContextMenuState = {
+  anchor: FloatingReference;
 };
 
 const CLIPBOARD_MESSAGE_KEYS: Record<GridClipboardFeedback, MessageKey> = {
@@ -124,6 +130,7 @@ const rootRef = ref<HTMLElement | null>(null);
 const selection = ref<CellSelection>(createCellSelection({ row: 0, column: 0 }));
 const clipboardFeedbackKey = ref<GridClipboardFeedback>();
 const axisContextMenu = ref<AxisContextMenuState>();
+const cellContextMenu = ref<CellContextMenuState>();
 let fontFaceSet: FontFaceSet | undefined;
 let fontLoadingDoneListener: (() => void) | undefined;
 
@@ -199,6 +206,7 @@ const {
   getSelection: () => selection.value,
   onScrollStart: () => {
     axisContextMenu.value = undefined;
+    cellContextMenu.value = undefined;
   },
   onViewStateChange: (viewState) => emit("viewStateChange", viewState),
 });
@@ -299,29 +307,38 @@ const activeCellWrapText = computed(() =>
 const clipboardFeedback = computed(() =>
   clipboardFeedbackKey.value ? t(CLIPBOARD_MESSAGE_KEYS[clipboardFeedbackKey.value]) : "",
 );
-const { clipboardMode, clipboardRange, clearPendingClipboard, onCopy, onCut, onPaste } =
-  useGridClipboard({
-    getSheet: () => props.sheet,
-    getSelection: () => selection.value,
-    isEditing: () => isEditing.value,
-    isComposing: () => isComposing.value,
-    onPaste: (payload) => {
-      emit("pasteCells", payload);
-      ensureGridExtentContains(payload.plan.range.end);
-      setSelection(
-        {
-          active: { ...payload.plan.anchor },
-          anchor: { ...payload.plan.range.start },
-          focus: { ...payload.plan.range.end },
-          mode: "cells",
-        },
-        payload.plan.range.end,
-      );
-    },
-    onFeedback: (message) => {
-      clipboardFeedbackKey.value = message;
-    },
-  });
+const {
+  clipboardMode,
+  clipboardRange,
+  clearPendingClipboard,
+  copySelection,
+  cutSelection,
+  onCopy,
+  onCut,
+  onPaste,
+  pasteSelection,
+} = useGridClipboard({
+  getSheet: () => props.sheet,
+  getSelection: () => selection.value,
+  isEditing: () => isEditing.value,
+  isComposing: () => isComposing.value,
+  onPaste: (payload) => {
+    emit("pasteCells", payload);
+    ensureGridExtentContains(payload.plan.range.end);
+    setSelection(
+      {
+        active: { ...payload.plan.anchor },
+        anchor: { ...payload.plan.range.start },
+        focus: { ...payload.plan.range.end },
+        mode: "cells",
+      },
+      payload.plan.range.end,
+    );
+  },
+  onFeedback: (message) => {
+    clipboardFeedbackKey.value = message;
+  },
+});
 const clipboardRangeRect = computed(() =>
   clipboardRange.value ? getRangeViewportRect(clipboardRange.value, true) : null,
 );
@@ -332,6 +349,7 @@ function setSelection(
   restoreFocus = true,
 ): void {
   axisContextMenu.value = undefined;
+  cellContextMenu.value = undefined;
   selection.value = {
     active: { ...nextSelection.active },
     anchor: { ...nextSelection.anchor },
@@ -491,6 +509,7 @@ function openAxisContextMenu(
   if (isComposing.value) {
     return;
   }
+  cellContextMenu.value = undefined;
   if (!isAxisIndexSelected(axis, index)) {
     const address = axis === "row" ? { row: index, column: 0 } : { row: 0, column: index };
     selectAxis(axis === "row" ? "rows" : "columns", address, false, false);
@@ -577,6 +596,83 @@ function closeAxisContextMenu(restoreFocus: boolean): void {
   }
 }
 
+function openCellContextMenu(address: CellAddress, event: MouseEvent): void {
+  if (isEditing.value || isComposing.value) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+
+  const retainsSelection =
+    getSelectionMode(selection.value) === "cells" && isCellSelected(address, selection.value);
+  if (!retainsSelection) {
+    setActiveCell(address, false);
+  }
+
+  axisContextMenu.value = undefined;
+  const contextElement = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  cellContextMenu.value = {
+    anchor: markRaw({
+      contextElement: rootRef.value ?? contextElement ?? undefined,
+      getBoundingClientRect: () => new DOMRect(event.clientX, event.clientY, 0, 0),
+    }),
+  };
+}
+
+function openActiveCellContextMenu(): void {
+  if (getSelectionMode(selection.value) !== "cells") {
+    return;
+  }
+  const scroller = scrollerRef.value;
+  if (!scroller) {
+    return;
+  }
+  const bounds = scroller.getBoundingClientRect();
+  const rect = activeCellRect.value;
+  const x = bounds.left + rect.x + Math.min(16, rect.width / 2);
+  const y = bounds.top + rect.y + rect.height;
+  axisContextMenu.value = undefined;
+  cellContextMenu.value = {
+    anchor: markRaw({
+      contextElement: scroller,
+      getBoundingClientRect: () => new DOMRect(x, y, 0, 0),
+    }),
+  };
+}
+
+async function requestCellClipboard(action: "cut" | "copy" | "paste"): Promise<void> {
+  if (!cellContextMenu.value) {
+    return;
+  }
+  cellContextMenu.value = undefined;
+  if (action === "cut") {
+    await cutSelection();
+  } else if (action === "copy") {
+    await copySelection();
+  } else {
+    await pasteSelection();
+  }
+  focusEditor();
+}
+
+function requestCellClear(): void {
+  if (!cellContextMenu.value) {
+    return;
+  }
+  clearPendingClipboard();
+  clipboardFeedbackKey.value = undefined;
+  emit("clearCells", getSelectionRange(selection.value));
+  cellContextMenu.value = undefined;
+  focusEditor();
+}
+
+function closeCellContextMenu(restoreFocus: boolean): void {
+  cellContextMenu.value = undefined;
+  if (restoreFocus) {
+    focusEditor();
+  }
+}
+
 function onCornerClick(): void {
   selectAxis("all", { row: 0, column: 0 }, false, false);
 }
@@ -635,6 +731,17 @@ function onEditorKeydown(event: KeyboardEvent): void {
       event.preventDefault();
       cancelEdit();
     }
+    return;
+  }
+
+  if (
+    !isEditing.value &&
+    getSelectionMode(selection.value) === "cells" &&
+    (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey))
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    openActiveCellContextMenu();
     return;
   }
 
@@ -734,6 +841,7 @@ function restoreViewState(viewState?: SheetGridViewState): void {
   stopDragSelection();
   stopDimensionResize();
   axisContextMenu.value = undefined;
+  cellContextMenu.value = undefined;
   clearPendingClipboard();
   selection.value = nextViewState.selection;
   cancelEdit(false);
@@ -783,6 +891,7 @@ onBeforeUnmount(() => {
   stopGeometryWatching();
   stopDragSelection();
   stopDimensionResize();
+  clearPendingClipboard();
 });
 
 defineExpose({ navigateToCell });
@@ -863,6 +972,7 @@ defineExpose({ navigateToCell });
             :editing="isEditing"
             @cell-mousedown="onCellMouseDown"
             @cell-double-click="onCellDoubleClick"
+            @cell-contextmenu="openCellContextMenu"
           >
             <template #active-cell>
               <CellEditor
@@ -928,6 +1038,15 @@ defineExpose({ navigateToCell });
       @delete="requestAxisDelete"
       @clear="requestAxisClear"
       @close="closeAxisContextMenu"
+    />
+    <SheetCellContextMenu
+      v-if="cellContextMenu"
+      :anchor="cellContextMenu.anchor"
+      @cut="requestCellClipboard('cut')"
+      @copy="requestCellClipboard('copy')"
+      @paste="requestCellClipboard('paste')"
+      @clear="requestCellClear"
+      @close="closeCellContextMenu"
     />
     <span class="sheet-grid__assistive-status" aria-live="polite">{{ clipboardFeedback }}</span>
   </section>

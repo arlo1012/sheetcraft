@@ -191,6 +191,16 @@ export const zhCN = {
     moved: "已移动所选单元格。",
     pasted: "已粘贴所选单元格。",
   },
+  cellMenu: {
+    actions: "单元格操作",
+    cut: "剪切",
+    copy: "复制",
+    paste: "粘贴",
+    clearContents: "清除内容",
+    cutShortcut: "Ctrl+X",
+    copyShortcut: "Ctrl+C",
+    pasteShortcut: "Ctrl+V",
+  },
   axisMenu: {
     rowActions: "行操作",
     columnActions: "列操作",

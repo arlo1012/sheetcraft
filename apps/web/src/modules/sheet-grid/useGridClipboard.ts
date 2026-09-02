@@ -14,8 +14,12 @@ import {
   getSelectionRange,
   type CellSelection,
 } from "@idea10/sheet-engine/selection";
-
-const LOCAL_CLIPBOARD_TYPE = "application/x-idea10-cells";
+import {
+  createBrowserGridClipboardPort,
+  IDEA10_CLIPBOARD_TYPE,
+  type GridClipboardPort,
+  type GridClipboardTransfer,
+} from "./gridClipboardPort";
 
 export type GridPastePayload = {
   plan: PastePlan;
@@ -68,8 +72,11 @@ export function useGridClipboard(options: {
   isComposing: () => boolean;
   onPaste: (payload: GridPastePayload) => void;
   onFeedback: (feedback: GridClipboardFeedback) => void;
+  clipboardPort?: GridClipboardPort;
 }) {
+  const clipboardPort = options.clipboardPort ?? createBrowserGridClipboardPort();
   const pendingClipboard = shallowRef<PendingClipboard | null>(null);
+  let clipboardOperation = 0;
   const clipboardRange: ComputedRef<CellRange | null> = computed(
     () => pendingClipboard.value?.range ?? null,
   );
@@ -82,20 +89,14 @@ export function useGridClipboard(options: {
     return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 
-  function writeSelection(event: ClipboardEvent, mode: "copy" | "cut"): void {
+  function prepareSelection(mode: "copy" | "cut"): PendingClipboard | undefined {
     if (options.isEditing() || options.isComposing()) {
-      return;
-    }
-
-    event.preventDefault();
-    if (!event.clipboardData) {
-      options.onFeedback("unavailable");
-      return;
+      return undefined;
     }
 
     if (getSelectionMode(options.getSelection()) !== "cells") {
       options.onFeedback("axisCopyUnsupported");
-      return;
+      return undefined;
     }
 
     const range = getSelectionRange(options.getSelection());
@@ -103,10 +104,60 @@ export function useGridClipboard(options: {
     const styles = getCellRangeStyles(options.getSheet(), range);
     const text = serializeCellValuesToTsv(values);
     const token = createToken();
-    event.clipboardData.setData("text/plain", text);
-    event.clipboardData.setData(LOCAL_CLIPBOARD_TYPE, token);
-    pendingClipboard.value = { mode, range, token, text, values, styles };
-    options.onFeedback(mode === "cut" ? "readyToMove" : "copied");
+    return { mode, range, token, text, values, styles };
+  }
+
+  function commitPreparedSelection(prepared: PendingClipboard): void {
+    pendingClipboard.value = prepared;
+    options.onFeedback(prepared.mode === "cut" ? "readyToMove" : "copied");
+  }
+
+  function writeSelection(event: ClipboardEvent, mode: "copy" | "cut"): void {
+    if (options.isEditing() || options.isComposing()) {
+      return;
+    }
+    event.preventDefault();
+    if (!event.clipboardData) {
+      options.onFeedback("unavailable");
+      return;
+    }
+
+    const prepared = prepareSelection(mode);
+    if (!prepared) {
+      return;
+    }
+
+    event.clipboardData.setData("text/plain", prepared.text);
+    event.clipboardData.setData(IDEA10_CLIPBOARD_TYPE, prepared.token);
+    clipboardOperation += 1;
+    commitPreparedSelection(prepared);
+  }
+
+  async function writeSelectionToClipboard(mode: "copy" | "cut"): Promise<void> {
+    const prepared = prepareSelection(mode);
+    if (!prepared) {
+      return;
+    }
+    const operation = ++clipboardOperation;
+    const sheetId = options.getSheet().id;
+    let localTokenWritten: boolean;
+    try {
+      ({ localTokenWritten } = await clipboardPort.write({
+        text: prepared.text,
+        localToken: prepared.token,
+      }));
+    } catch {
+      if (operation === clipboardOperation && options.getSheet().id === sheetId) {
+        options.onFeedback("unavailable");
+      }
+      return;
+    }
+    if (operation !== clipboardOperation || options.getSheet().id !== sheetId) {
+      return;
+    }
+    commitPreparedSelection(
+      mode === "cut" && !localTokenWritten ? { ...prepared, mode: "copy" } : prepared,
+    );
   }
 
   function onCopy(event: ClipboardEvent): void {
@@ -117,34 +168,37 @@ export function useGridClipboard(options: {
     writeSelection(event, "cut");
   }
 
-  function onPaste(event: ClipboardEvent): void {
+  function canPaste(): boolean {
     if (options.isEditing() || options.isComposing()) {
-      return;
+      return false;
     }
-
-    event.preventDefault();
-    const data = event.clipboardData;
-    if (!data) {
-      options.onFeedback("unavailable");
-      return;
-    }
-
     if (getSelectionMode(options.getSelection()) !== "cells") {
       options.onFeedback("axisPasteUnsupported");
-      return;
+      return false;
     }
+    return true;
+  }
 
-    const text = data.getData("text/plain");
-    const localToken = data.getData(LOCAL_CLIPBOARD_TYPE);
+  function cloneSelection(selection: CellSelection): CellSelection {
+    return {
+      active: { ...selection.active },
+      anchor: { ...selection.anchor },
+      focus: { ...selection.focus },
+      mode: selection.mode,
+    };
+  }
+
+  function pasteTransfer(transfer: GridClipboardTransfer, selection: CellSelection): void {
+    const text = transfer.text;
+    const localToken = transfer.localToken;
     const pending = pendingClipboard.value;
     const isMatchingLocalClipboard = Boolean(pending && localToken && localToken === pending.token);
-    if (!isMatchingLocalClipboard && !Array.from(data.types).includes("text/plain")) {
+    if (!isMatchingLocalClipboard && text === undefined) {
       options.onFeedback("missingText");
       return;
     }
     const values =
-      isMatchingLocalClipboard && pending ? pending.values : parseTsvToCellValues(text);
-    const selection = options.getSelection();
+      isMatchingLocalClipboard && pending ? pending.values : parseTsvToCellValues(text ?? "");
     const isLocalCut = Boolean(isMatchingLocalClipboard && pending?.mode === "cut");
     const plan = createPastePlan(values, getSelectionRange(selection), selection.active, {
       pasteFromActiveCell: isLocalCut,
@@ -165,7 +219,55 @@ export function useGridClipboard(options: {
     options.onFeedback(isLocalCut ? "moved" : "pasted");
   }
 
+  function onPaste(event: ClipboardEvent): void {
+    if (options.isEditing() || options.isComposing()) {
+      return;
+    }
+    event.preventDefault();
+    if (!canPaste()) {
+      return;
+    }
+
+    const data = event.clipboardData;
+    if (!data) {
+      options.onFeedback("unavailable");
+      return;
+    }
+    const types = Array.from(data.types);
+    clipboardOperation += 1;
+    pasteTransfer(
+      {
+        text: types.includes("text/plain") ? data.getData("text/plain") : undefined,
+        localToken: data.getData(IDEA10_CLIPBOARD_TYPE) || undefined,
+      },
+      cloneSelection(options.getSelection()),
+    );
+  }
+
+  async function pasteSelection(): Promise<void> {
+    if (!canPaste()) {
+      return;
+    }
+    const operation = ++clipboardOperation;
+    const sheetId = options.getSheet().id;
+    const selection = cloneSelection(options.getSelection());
+    let transfer: GridClipboardTransfer;
+    try {
+      transfer = await clipboardPort.read();
+    } catch {
+      if (operation === clipboardOperation && options.getSheet().id === sheetId) {
+        options.onFeedback("unavailable");
+      }
+      return;
+    }
+    if (operation !== clipboardOperation || options.getSheet().id !== sheetId) {
+      return;
+    }
+    pasteTransfer(transfer, selection);
+  }
+
   function clearPendingClipboard(): void {
+    clipboardOperation += 1;
     pendingClipboard.value = null;
   }
 
@@ -173,8 +275,11 @@ export function useGridClipboard(options: {
     clipboardMode,
     clipboardRange,
     clearPendingClipboard,
+    copySelection: () => writeSelectionToClipboard("copy"),
+    cutSelection: () => writeSelectionToClipboard("cut"),
     onCopy,
     onCut,
     onPaste,
+    pasteSelection,
   };
 }

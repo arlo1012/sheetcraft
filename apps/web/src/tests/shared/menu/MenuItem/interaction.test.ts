@@ -55,4 +55,20 @@ describe("MenuItem", () => {
       wrapper.unmount();
     }
   });
+
+  test("keeps a non-interactive shortcut inside the selectable menuitem", async () => {
+    const wrapper = mount(MenuItem, {
+      slots: {
+        default: "Copy",
+        shortcut: "Ctrl+C",
+      },
+    });
+
+    expect(wrapper.attributes("role")).toBe("menuitem");
+    const shortcut = wrapper.get(".idea-menu-item__trailing");
+    expect(shortcut.text()).toBe("Ctrl+C");
+    expect(shortcut.attributes("aria-hidden")).toBe("true");
+    await shortcut.trigger("click");
+    expect(wrapper.emitted("select")).toHaveLength(1);
+  });
 });

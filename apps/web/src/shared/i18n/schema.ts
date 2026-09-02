@@ -191,6 +191,16 @@ export type MessageSchema = {
     moved: string;
     pasted: string;
   };
+  cellMenu: {
+    actions: string;
+    cut: string;
+    copy: string;
+    paste: string;
+    clearContents: string;
+    cutShortcut: string;
+    copyShortcut: string;
+    pasteShortcut: string;
+  };
   axisMenu: {
     rowActions: string;
     columnActions: string;

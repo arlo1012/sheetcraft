@@ -35,6 +35,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   cellMousedown: [address: CellAddress, event: MouseEvent];
   cellDoubleClick: [address: CellAddress, event: MouseEvent];
+  cellContextmenu: [address: CellAddress, event: MouseEvent];
 }>();
 
 const visibleRows = computed<VisibleRow[]>(() => {
@@ -138,6 +139,7 @@ const visibleRows = computed<VisibleRow[]>(() => {
         :aria-selected="isCellSelected(cell.address, selection)"
         @mousedown.left.prevent="emit('cellMousedown', cell.address, $event)"
         @dblclick.left.prevent="emit('cellDoubleClick', cell.address, $event)"
+        @contextmenu="emit('cellContextmenu', cell.address, $event)"
       >
         <span v-if="cell.text" class="sheet-cell-layer__value">{{ cell.text }}</span>
         <slot

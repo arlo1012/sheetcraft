@@ -191,6 +191,16 @@ export const enUS = {
     moved: "Cells moved.",
     pasted: "Cells pasted.",
   },
+  cellMenu: {
+    actions: "Cell actions",
+    cut: "Cut",
+    copy: "Copy",
+    paste: "Paste",
+    clearContents: "Clear contents",
+    cutShortcut: "Ctrl+X",
+    copyShortcut: "Ctrl+C",
+    pasteShortcut: "Ctrl+V",
+  },
   axisMenu: {
     rowActions: "Row actions",
     columnActions: "Column actions",

@@ -84,6 +84,9 @@ function onKeydown(event: KeyboardEvent): void {
       <slot name="icon" />
     </span>
     <span class="idea-menu-item__label"><slot /></span>
+    <span v-if="$slots.shortcut" class="idea-menu-item__trailing" aria-hidden="true">
+      <slot name="shortcut" />
+    </span>
   </li>
 </template>
 
