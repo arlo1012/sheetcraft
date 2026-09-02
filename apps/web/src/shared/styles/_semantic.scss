@@ -36,6 +36,7 @@
     --idea-border-subtle: var(--idea-palette-neutral-4);
     --idea-border-control: var(--idea-palette-neutral-6);
     --idea-border-strong: var(--idea-palette-neutral-4);
+    --idea-shadow-menu: 0 2px 12px 2px rgb(68 73 77 / 16%);
     --idea-shadow-floating: 0 8px 24px rgb(32 36 44 / 18%);
     --idea-mask-active: rgb(0 0 0 / 60%);
     --idea-mask-disabled: rgb(255 255 255 / 60%);
@@ -88,6 +89,7 @@
     --idea-border-subtle: var(--idea-palette-neutral-11);
     --idea-border-control: var(--idea-palette-neutral-9);
     --idea-border-strong: var(--idea-palette-neutral-9);
+    --idea-shadow-menu: 0 4px 16px rgb(0 0 0 / 32%);
     --idea-shadow-floating:
       0 8px 10px rgb(0 0 0 / 12%), 0 3px 14px rgb(0 0 0 / 10%), 0 5px 5px rgb(0 0 0 / 16%);
     --idea-mask-active: rgb(0 0 0 / 40%);

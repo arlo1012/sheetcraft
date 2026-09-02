@@ -195,7 +195,13 @@ export type MessageSchema = {
     rowActions: string;
     columnActions: string;
     insertCount: string;
+    insertAbove: string;
+    insertBelow: string;
+    insertBefore: string;
+    insertAfter: string;
+    rowUnitOne: string;
     rowUnit: string;
+    columnUnitOne: string;
     columnUnit: string;
     insertRowAboveOne: string;
     insertRowsAbove: string;

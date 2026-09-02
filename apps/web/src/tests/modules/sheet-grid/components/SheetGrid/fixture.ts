@@ -98,12 +98,12 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
   return { session, sheet, wrapper };
 }
 
-export function getFloatingDialog() {
-  return new DOMWrapper(document.body).get('[role="dialog"]');
+export function getFloatingMenu() {
+  return new DOMWrapper(document.body).get('ul[role="menu"]');
 }
 
-export function hasFloatingDialog(): boolean {
-  return document.body.querySelector('[role="dialog"]') !== null;
+export function hasFloatingMenu(): boolean {
+  return document.body.querySelector('ul[role="menu"]') !== null;
 }
 
 export function activeCell(

@@ -1,20 +1,11 @@
 <script setup lang="ts">
-import {
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  Eraser,
-  Scaling,
-  Trash2,
-} from "lucide-vue-next";
-import { Button as TButton } from "tdesign-vue-next/es/button";
-import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
-import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
+import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
+import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import type { SheetDimensionAxis } from "@idea10/core/workbook";
 
 const props = defineProps<{
@@ -37,9 +28,10 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const menuRef = ref<HTMLDivElement | null>(null);
-const countDraft = ref<InputNumberValue>(props.selectionCount);
-const sizeDraft = ref<InputNumberValue | undefined>(props.currentSize);
+const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
+const menuRef = computed<HTMLElement | null>(() => menuSurfaceRef.value?.rootElement ?? null);
+const countDraft = ref(String(props.selectionCount));
+const sizeDraft = ref(props.currentSize === undefined ? "" : String(props.currentSize));
 const menuOpen = computed(() => true);
 const menuAnchor = computed(() => props.anchor);
 const { floatingStyles: menuStyle } = useDismissibleFloatingPanel(menuAnchor, menuRef, menuOpen, {
@@ -51,27 +43,31 @@ const insertCount = computed(() =>
   normalizeInteger(countDraft.value, 1, Math.max(1, maximumInsertCount.value)),
 );
 const axisUnit = computed(() =>
-  t(props.axis === "row" ? "axisMenu.rowUnit" : "axisMenu.columnUnit"),
+  t(
+    props.axis === "row"
+      ? insertCount.value === 1
+        ? "axisMenu.rowUnitOne"
+        : "axisMenu.rowUnit"
+      : insertCount.value === 1
+        ? "axisMenu.columnUnitOne"
+        : "axisMenu.columnUnit",
+  ),
 );
 
 watch(
   () => props.selectionCount,
   (count) => {
-    countDraft.value = count;
+    countDraft.value = String(count);
   },
 );
 watch(
   () => props.currentSize,
   (size) => {
-    sizeDraft.value = size;
+    sizeDraft.value = size === undefined ? "" : String(size);
   },
 );
 
-function normalizeInteger(
-  value: InputNumberValue | undefined,
-  minimum: number,
-  maximum: number,
-): number {
+function normalizeInteger(value: string, minimum: number, maximum: number): number {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) {
     return minimum;
@@ -80,7 +76,7 @@ function normalizeInteger(
 }
 
 function normalizeInsertCount(): number {
-  countDraft.value = insertCount.value;
+  countDraft.value = String(insertCount.value);
   return insertCount.value;
 }
 
@@ -89,27 +85,39 @@ function requestInsert(direction: "before" | "after"): void {
 }
 
 function requestResize(): void {
-  if (sizeDraft.value === undefined || sizeDraft.value === "") {
+  if (sizeDraft.value === "") {
     return;
   }
   const size = normalizeInteger(sizeDraft.value, props.minimumSize, props.maximumSize);
-  sizeDraft.value = size;
+  sizeDraft.value = String(size);
   if (size === props.currentSize) {
     return;
   }
   emit("resize", size);
 }
 
-function updateCountDraft(value: InputNumberValue): void {
-  countDraft.value = value;
+function updateCountDraft(event: Event): void {
+  countDraft.value = (event.currentTarget as HTMLInputElement).value;
 }
 
-function updateSizeDraft(value: InputNumberValue): void {
-  sizeDraft.value = value;
+function updateSizeDraft(event: Event): void {
+  sizeDraft.value = (event.currentTarget as HTMLInputElement).value;
 }
 
-function blurNumberInput(_value: InputNumberValue, context: { e: KeyboardEvent }): void {
-  (context.e.target as HTMLInputElement).blur();
+function blurNumberInput(event: KeyboardEvent): void {
+  (event.currentTarget as HTMLInputElement).blur();
+}
+
+function getInsertActionLabel(direction: "before" | "after"): string {
+  const key: MessageKey =
+    props.axis === "row"
+      ? direction === "before"
+        ? "axisMenu.insertAbove"
+        : "axisMenu.insertBelow"
+      : direction === "before"
+        ? "axisMenu.insertBefore"
+        : "axisMenu.insertAfter";
+  return t(key);
 }
 
 function getInsertLabel(direction: "before" | "after"): string {
@@ -158,223 +166,167 @@ function getSelectionActionLabel(action: "delete" | "clear"): string {
   return t(key, { count });
 }
 
-function onPopoverKeydown(event: KeyboardEvent): void {
-  if (event.target instanceof HTMLInputElement) {
-    return;
-  }
-  const items = [
-    ...(menuRef.value?.querySelectorAll<HTMLButtonElement>("[data-axis-action]:not(:disabled)") ??
-      []),
-  ];
-  const currentIndex = items.indexOf(event.target as HTMLButtonElement);
-  let nextIndex: number | undefined;
-  if (event.key === "ArrowDown") {
-    nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length;
-  } else if (event.key === "ArrowUp") {
-    nextIndex = currentIndex <= 0 ? items.length - 1 : currentIndex - 1;
-  } else if (event.key === "Home") {
-    nextIndex = 0;
-  } else if (event.key === "End") {
-    nextIndex = items.length - 1;
-  }
-  if (nextIndex !== undefined) {
-    event.preventDefault();
-    items[nextIndex]?.focus();
-  }
-}
-
 onMounted(() => {
-  void nextTick(() =>
-    menuRef.value?.querySelector<HTMLButtonElement>("[data-axis-action]:not(:disabled)")?.focus(),
-  );
+  void nextTick(() => menuSurfaceRef.value?.focusFirstItem());
 });
 </script>
 
 <template>
   <Teleport to="body">
-    <div
-      ref="menuRef"
+    <MenuSurface
+      ref="menuSurfaceRef"
       class="sheet-axis-context-menu"
       :style="menuStyle"
-      role="dialog"
-      aria-modal="false"
-      :aria-label="t(axis === 'row' ? 'axisMenu.rowActions' : 'axisMenu.columnActions')"
-      @contextmenu.prevent
-      @keydown="onPopoverKeydown"
+      :label="t(axis === 'row' ? 'axisMenu.rowActions' : 'axisMenu.columnActions')"
     >
-      <label class="sheet-axis-context-menu__count-row">
-        <span>{{ t("axisMenu.insertCount") }}</span>
-        <TInputNumber
-          class="sheet-axis-context-menu__number-input"
-          theme="normal"
-          size="small"
-          align="right"
-          :model-value="countDraft"
-          :min="1"
-          :max="Math.max(1, maximumInsertCount)"
-          :decimal-places="0"
-          :step="1"
-          :allow-input-over-limit="true"
-          @change="updateCountDraft"
-          @blur="normalizeInsertCount"
-          @enter="blurNumberInput"
-        />
-        <span>{{ axisUnit }}</span>
-      </label>
-      <TButton
-        type="button"
-        variant="text"
-        size="small"
-        block
-        class="sheet-axis-context-menu__action"
+      <MenuItem
         data-axis-action="insert-before"
         :disabled="insertCount > maxBeforeCount"
-        @click="requestInsert('before')"
+        :aria-label="getInsertLabel('before')"
+        @select="requestInsert('before')"
       >
-        <template #icon>
-          <ArrowUp v-if="axis === 'row'" :size="15" aria-hidden="true" />
-          <ArrowLeft v-else :size="15" aria-hidden="true" />
+        {{ getInsertActionLabel("before") }}
+        <template #trailing>
+          <input
+            class="sheet-axis-context-menu__number-input"
+            data-axis-insert-count="before"
+            type="number"
+            inputmode="numeric"
+            :disabled="insertCount > maxBeforeCount"
+            :value="countDraft"
+            :min="1"
+            :max="Math.max(1, maximumInsertCount)"
+            step="1"
+            :aria-label="getInsertLabel('before')"
+            @input="updateCountDraft"
+            @blur="normalizeInsertCount"
+            @keydown.enter.prevent="blurNumberInput"
+          />
+          <span>{{ axisUnit }}</span>
         </template>
-        {{ getInsertLabel("before") }}
-      </TButton>
-      <TButton
-        type="button"
-        variant="text"
-        size="small"
-        block
-        class="sheet-axis-context-menu__action"
+      </MenuItem>
+      <MenuItem
         data-axis-action="insert-after"
         :disabled="insertCount > maxAfterCount"
-        @click="requestInsert('after')"
+        :aria-label="getInsertLabel('after')"
+        @select="requestInsert('after')"
       >
-        <template #icon>
-          <ArrowDown v-if="axis === 'row'" :size="15" aria-hidden="true" />
-          <ArrowRight v-else :size="15" aria-hidden="true" />
+        {{ getInsertActionLabel("after") }}
+        <template #trailing>
+          <input
+            class="sheet-axis-context-menu__number-input"
+            data-axis-insert-count="after"
+            type="number"
+            inputmode="numeric"
+            :disabled="insertCount > maxAfterCount"
+            :value="countDraft"
+            :min="1"
+            :max="Math.max(1, maximumInsertCount)"
+            step="1"
+            :aria-label="getInsertLabel('after')"
+            @input="updateCountDraft"
+            @blur="normalizeInsertCount"
+            @keydown.enter.prevent="blurNumberInput"
+          />
+          <span>{{ axisUnit }}</span>
         </template>
-        {{ getInsertLabel("after") }}
-      </TButton>
+      </MenuItem>
 
-      <label v-if="currentSize !== undefined" class="sheet-axis-context-menu__size-row">
-        <Scaling :size="15" aria-hidden="true" />
+      <li v-if="currentSize !== undefined" class="sheet-axis-context-menu__size-row" role="none">
         <span>{{ t(axis === "row" ? "axisMenu.rowHeight" : "axisMenu.columnWidth") }}</span>
-        <TInputNumber
-          class="sheet-axis-context-menu__number-input"
-          theme="normal"
-          size="small"
-          align="right"
-          :model-value="sizeDraft"
-          :min="minimumSize"
-          :max="maximumSize"
-          :decimal-places="0"
-          :step="1"
-          :allow-input-over-limit="true"
-          @change="updateSizeDraft"
-          @blur="requestResize"
-          @enter="blurNumberInput"
-        />
-        <span>{{ t("axisMenu.pixels") }}</span>
-      </label>
+        <label class="sheet-axis-context-menu__size-field">
+          <input
+            class="sheet-axis-context-menu__number-input sheet-axis-context-menu__number-input--size"
+            type="number"
+            inputmode="numeric"
+            :value="sizeDraft"
+            :min="minimumSize"
+            :max="maximumSize"
+            step="1"
+            :aria-label="t(axis === 'row' ? 'axisMenu.rowHeight' : 'axisMenu.columnWidth')"
+            @input="updateSizeDraft"
+            @blur="requestResize"
+            @keydown.enter.prevent="blurNumberInput"
+          />
+          <span>{{ t("axisMenu.pixels") }}</span>
+        </label>
+      </li>
 
-      <div class="sheet-axis-context-menu__separator" role="separator" />
-      <TButton
-        type="button"
-        theme="danger"
-        variant="text"
-        size="small"
-        block
-        class="sheet-axis-context-menu__action"
-        data-axis-action="delete"
-        @click="emit('delete')"
-      >
-        <template #icon>
-          <Trash2 :size="15" aria-hidden="true" />
-        </template>
+      <MenuSeparator />
+      <MenuItem danger data-axis-action="delete" @select="emit('delete')">
         {{ getSelectionActionLabel("delete") }}
-      </TButton>
-      <TButton
-        type="button"
-        variant="text"
-        size="small"
-        block
-        class="sheet-axis-context-menu__action"
-        data-axis-action="clear"
-        @click="emit('clear')"
-      >
-        <template #icon>
-          <Eraser :size="15" aria-hidden="true" />
-        </template>
+      </MenuItem>
+      <MenuItem data-axis-action="clear" @select="emit('clear')">
         {{ getSelectionActionLabel("clear") }}
-      </TButton>
-    </div>
+      </MenuItem>
+    </MenuSurface>
   </Teleport>
 </template>
 
 <style scoped lang="scss">
 .sheet-axis-context-menu {
   z-index: 100;
-  display: grid;
-  width: 272px;
-  max-width: calc(100vw - var(--idea-space-4) - var(--idea-space-4));
-  max-height: calc(100vh - var(--idea-space-4) - var(--idea-space-4));
-  padding: 4px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background: var(--idea-surface-panel);
-  border: 1px solid var(--idea-border-control);
-  border-radius: var(--idea-radius-default);
-  box-shadow: var(--idea-shadow-floating);
-
-  &__action {
-    display: grid;
-    grid-template-columns: 20px minmax(0, 1fr);
-    align-items: center;
-    justify-content: stretch;
-    width: 100%;
-    min-height: 32px;
-    padding: 0 8px;
-    font-size: 12px;
-    letter-spacing: 0;
-    text-align: left;
-  }
+  width: 195px;
 
   &__number-input {
-    width: 56px;
-    min-width: 0;
-  }
+    width: 38px;
+    height: 22px;
+    padding: 0 4px;
+    appearance: textfield;
+    background: var(--idea-surface-panel);
+    border: 1px solid var(--idea-border-control);
+    border-radius: var(--idea-radius-small);
+    color: var(--idea-text-primary);
+    font: inherit;
+    letter-spacing: 0;
+    text-align: center;
 
-  &__count-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 56px auto;
-    align-items: center;
-    min-height: 32px;
-    padding: 0 8px;
-    color: var(--idea-text-secondary);
-    font-size: 12px;
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+      margin: 0;
+      appearance: none;
+    }
 
-    > span:last-child {
-      padding-left: 5px;
+    &:hover {
+      border-color: var(--idea-action-primary);
+    }
+
+    &:focus {
+      border-color: var(--idea-action-primary);
+      outline: none;
+      box-shadow: 0 0 0 2px var(--idea-action-focus);
+    }
+
+    &:disabled {
+      background: var(--idea-surface-disabled);
+      border-color: var(--idea-border-subtle);
+      color: var(--idea-text-disabled);
+      cursor: not-allowed;
+    }
+
+    &--size {
+      width: 48px;
     }
   }
 
   &__size-row {
     display: grid;
-    grid-template-columns: 20px minmax(0, 1fr) 56px auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    min-height: 34px;
-    padding: 0 8px;
+    min-height: 30px;
+    gap: 8px;
+    padding: 0 14px;
     color: var(--idea-text-primary);
-    font-size: 12px;
-
-    > span:last-child {
-      padding-left: 5px;
-      color: var(--idea-text-secondary);
-    }
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
+    list-style: none;
   }
 
-  &__separator {
-    height: 1px;
-    margin: 4px -4px;
-    background: var(--idea-border-subtle);
+  &__size-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--idea-text-secondary);
   }
 }
 </style>

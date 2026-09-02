@@ -27,8 +27,13 @@ describe("WorkbookSheetTabs", () => {
 
     const menu = new DOMWrapper(document.body).get('[role="menu"]');
     expect(menu.attributes("aria-label")).toBe("Actions for Sheet2");
+    expect(menu.element.tagName).toBe("UL");
+    expect(menu.find("button").exists()).toBe(false);
     expect(menu.get('[role="menuitem"]').text()).toBe("Rename sheet");
     expect(menu.findAll('[role="menuitem"]')[1]?.text()).toBe("Delete sheet");
+    expect(menu.findAll('[role="menuitem"]').every((item) => item.element.tagName === "LI")).toBe(
+      true,
+    );
     await menu.trigger("keydown", { key: "ArrowDown" });
     expect(document.activeElement).toBe(menu.findAll('[role="menuitem"]')[1]?.element);
 
@@ -45,7 +50,10 @@ describe("WorkbookSheetTabs", () => {
     await trigger.trigger("click");
     const menu = new DOMWrapper(document.body).get('[role="menu"]');
     const deleteAction = menu.findAll('[role="menuitem"]')[1];
-    expect(deleteAction?.attributes("disabled")).toBe("");
+    expect(deleteAction?.attributes("aria-disabled")).toBe("true");
+    expect(deleteAction?.attributes("tabindex")).toBe("-1");
+    await deleteAction?.trigger("click");
+    expect(wrapper.emitted("delete")).toBeUndefined();
 
     await menu.trigger("keydown", { key: "Escape" });
 

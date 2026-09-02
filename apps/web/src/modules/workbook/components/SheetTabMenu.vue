@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { MoreHorizontal } from "lucide-vue-next";
-import { nextTick, ref, toRef, watch, type ComponentPublicInstance } from "vue";
+import { computed, nextTick, ref, toRef, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
-import { useRovingFocus } from "../../../shared/focus/useRovingFocus";
 import { useAppI18n } from "../../../shared/i18n";
+import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import type { Sheet } from "@idea10/core/workbook";
 
 const { t } = useAppI18n();
@@ -23,16 +24,12 @@ const emit = defineEmits<{
 }>();
 
 const trigger = ref<HTMLButtonElement | null>(null);
-const menuRoot = ref<HTMLElement | null>(null);
+const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
+const menuRoot = computed<HTMLElement | null>(() => menuSurfaceRef.value?.rootElement ?? null);
 const isOpen = toRef(props, "isOpen");
 const { dismiss } = useDismissibleFloatingPanel(trigger, menuRoot, isOpen, {
   onDismiss: ({ restoreFocus }) => emit("close", restoreFocus),
 });
-const { move: moveRovingFocus } = useRovingFocus();
-
-function setMenuRoot(element: Element | ComponentPublicInstance | null): void {
-  menuRoot.value = element instanceof HTMLElement ? element : null;
-}
 
 function menuId(): string {
   return `workbook-sheet-menu-${props.sheet.id}`;
@@ -47,14 +44,7 @@ function getTriggerRect(): DOMRect | undefined {
 }
 
 function focusFirstMenuItem(): void {
-  menuRoot.value?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
-}
-
-function onMenuKeydown(event: KeyboardEvent): void {
-  const items = Array.from(
-    menuRoot.value?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [],
-  );
-  moveRovingFocus(event, items);
+  menuSurfaceRef.value?.focusFirstItem();
 }
 
 watch(
@@ -84,23 +74,21 @@ defineExpose({ dismiss, focusTrigger, getTriggerRect });
     <MoreHorizontal :size="15" aria-hidden="true" />
   </button>
   <Teleport to="body">
-    <div
+    <MenuSurface
       v-if="isOpen"
       :id="menuId()"
-      :ref="setMenuRoot"
+      ref="menuSurfaceRef"
       class="workbook-sheet-tabs__menu"
-      role="menu"
-      :aria-label="t('sheetTabs.menu', { name: sheet.name })"
+      :label="t('sheetTabs.menu', { name: sheet.name })"
       :style="{ left: `${position.left}px`, bottom: `${position.bottom}px` }"
-      @keydown="onMenuKeydown"
     >
-      <button type="button" role="menuitem" @click="emit('rename')">
+      <MenuItem @select="emit('rename')">
         {{ t("sheetTabs.renameAction") }}
-      </button>
-      <button type="button" role="menuitem" :disabled="sheetCount === 1" @click="emit('delete')">
+      </MenuItem>
+      <MenuItem :disabled="sheetCount === 1" danger @select="emit('delete')">
         {{ t("sheetTabs.deleteAction") }}
-      </button>
-    </div>
+      </MenuItem>
+    </MenuSurface>
   </Teleport>
 </template>
 
@@ -132,40 +120,7 @@ defineExpose({ dismiss, focusTrigger, getTriggerRect });
   &__menu {
     position: fixed;
     z-index: 80;
-    display: grid;
     min-width: 132px;
-    padding: 4px;
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-control);
-    border-radius: 4px;
-    box-shadow: var(--idea-shadow-floating);
-
-    button {
-      min-height: 28px;
-      padding: 0 8px;
-      background: transparent;
-      border: 0;
-      border-radius: 3px;
-      color: var(--idea-text-primary);
-      font: inherit;
-      text-align: left;
-      white-space: nowrap;
-
-      &:not(:disabled) {
-        cursor: pointer;
-      }
-
-      &:hover:not(:disabled),
-      &:focus-visible:not(:disabled) {
-        background: var(--idea-surface-hover);
-        outline: none;
-      }
-
-      &:disabled {
-        color: var(--idea-text-disabled);
-        cursor: not-allowed;
-      }
-    }
   }
 }
 </style>

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { getCellValue, getRowHeight, setCellValue } from "@idea10/core/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
-import { activeCell, getFloatingDialog, hasFloatingDialog, mountSheetGrid } from "./fixture";
+import { activeCell, getFloatingMenu, hasFloatingMenu, mountSheetGrid } from "./fixture";
 
 describe("SheetGrid axis selection", () => {
   test("selects rows and columns from headers, with Shift extending the same axis", async () => {
@@ -194,10 +194,16 @@ describe("SheetGrid axis selection", () => {
       clientX: 16,
       clientY: 72,
     });
-    const dialog = getFloatingDialog();
-    expect(dialog.text()).toContain("Insert 1 row below");
-    await dialog.get(".sheet-axis-context-menu__count-row input").setValue(2);
-    await dialog.get('[data-axis-action="insert-after"]').trigger("click");
+    const menu = getFloatingMenu();
+    const insertAfter = menu.get('[data-axis-action="insert-after"]');
+    expect(menu.attributes("aria-label")).toBe("Row actions");
+    expect(menu.element.tagName).toBe("UL");
+    expect(menu.find("button").exists()).toBe(false);
+    expect(menu.find(".t-input-number").exists()).toBe(false);
+    expect(insertAfter.attributes("aria-label")).toBe("Insert 1 row below");
+    await menu.get('[data-axis-insert-count="after"]').setValue(2);
+    expect(insertAfter.attributes("aria-label")).toBe("Insert 2 rows below");
+    await insertAfter.trigger("keydown", { key: "Enter" });
     expect(getCellValue(sheet, { row: 2, column: 0 })).toBe("selected");
     expect(getCellValue(sheet, { row: 3, column: 0 })).toBeNull();
     expect(getCellValue(sheet, { row: 5, column: 0 })).toBe("move");
@@ -218,8 +224,8 @@ describe("SheetGrid axis selection", () => {
       clientX: 16,
       clientY: 96,
     });
-    expect(getFloatingDialog().text()).toContain("Delete 2 rows");
-    await getFloatingDialog().get('[data-axis-action="delete"]').trigger("click");
+    expect(getFloatingMenu().text()).toContain("Delete 2 rows");
+    await getFloatingMenu().get('[data-axis-action="delete"]').trigger("click");
 
     expect(getCellValue(sheet, { row: 2, column: 0 })).toBe("keep");
     expect(session.history.undoStack).toHaveLength(1);
@@ -234,10 +240,11 @@ describe("SheetGrid axis selection", () => {
       clientX: 240,
       clientY: 16,
     });
-    const dialog = getFloatingDialog();
-    expect(dialog.text()).toContain("Insert 1 column after");
-    await dialog.get(".sheet-axis-context-menu__count-row input").setValue(2);
-    await dialog.get('[data-axis-action="insert-after"]').trigger("click");
+    const menu = getFloatingMenu();
+    const insertAfter = menu.get('[data-axis-action="insert-after"]');
+    expect(insertAfter.attributes("aria-label")).toBe("Insert 1 column after");
+    await menu.get('[data-axis-insert-count="after"]').setValue(2);
+    await insertAfter.trigger("click");
 
     expect(getCellValue(sheet, { row: 0, column: 2 })).toBe("selected");
     expect(getCellValue(sheet, { row: 0, column: 3 })).toBeNull();
@@ -255,22 +262,22 @@ describe("SheetGrid axis selection", () => {
       clientX: 336,
       clientY: 16,
     });
-    await getFloatingDialog().get('[data-axis-action="delete"]').trigger("click");
+    await getFloatingMenu().get('[data-axis-action="delete"]').trigger("click");
 
     expect(getCellValue(sheet, { row: 0, column: 2 })).toBe("keep");
     expect(session.history.undoStack).toHaveLength(1);
   });
 
-  test("resizes and clears a selected row from the keyboard-opened action dialog", async () => {
+  test("resizes and clears a selected row from the keyboard-opened action menu", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
     setCellValue(sheet, { row: 2, column: 1 }, "clear");
     const rowHeader = wrapper.get('[data-select-row="2"]');
 
     (rowHeader.element as HTMLButtonElement).focus();
     await rowHeader.trigger("keydown", { key: "F10", shiftKey: true });
-    const dialog = getFloatingDialog();
-    expect(dialog.attributes("aria-label")).toBe("Row actions");
-    const sizeInput = dialog.get(".sheet-axis-context-menu__size-row input");
+    const menu = getFloatingMenu();
+    expect(menu.attributes("aria-label")).toBe("Row actions");
+    const sizeInput = menu.get(".sheet-axis-context-menu__size-row input");
     await sizeInput.trigger("blur");
     expect(session.history.undoStack).toHaveLength(0);
 
@@ -284,7 +291,7 @@ describe("SheetGrid axis selection", () => {
       clientX: 16,
       clientY: 72,
     });
-    await getFloatingDialog().get('[data-axis-action="clear"]').trigger("click");
+    await getFloatingMenu().get('[data-axis-action="clear"]').trigger("click");
     expect(getCellValue(sheet, { row: 2, column: 1 })).toBeNull();
     expect(session.history.undoStack).toHaveLength(2);
   });
@@ -298,8 +305,8 @@ describe("SheetGrid axis selection", () => {
 
       (rowHeader.element as HTMLButtonElement).focus();
       await rowHeader.trigger("keydown", { key: "F10", shiftKey: true });
-      const dialog = getFloatingDialog();
-      const actions = dialog.findAll<HTMLButtonElement>("[data-axis-action]");
+      const menu = getFloatingMenu();
+      const actions = menu.findAll<HTMLElement>("[data-axis-action]");
       expect(document.activeElement).toBe(actions[0]?.element);
 
       await actions[0]?.trigger("keydown", { key: "ArrowDown" });
@@ -309,9 +316,9 @@ describe("SheetGrid axis selection", () => {
       await actions.at(-1)?.trigger("keydown", { key: "Home" });
       expect(document.activeElement).toBe(actions[0]?.element);
 
-      await dialog.trigger("keydown", { key: "Escape" });
+      await menu.trigger("keydown", { key: "Escape" });
 
-      expect(hasFloatingDialog()).toBe(false);
+      expect(hasFloatingMenu()).toBe(false);
       expect(document.activeElement).toBe(rowHeader.element);
     } finally {
       wrapper.unmount();
@@ -319,7 +326,7 @@ describe("SheetGrid axis selection", () => {
     }
   });
 
-  test("dismisses the axis menu when focus leaves the dialog", async () => {
+  test("dismisses the axis menu when focus leaves the menu", async () => {
     const host = document.createElement("div");
     document.body.append(host);
     const { wrapper } = mountSheetGrid({ attachTo: host });
@@ -327,13 +334,13 @@ describe("SheetGrid axis selection", () => {
       const rowHeader = wrapper.get('[data-select-row="2"]');
       (rowHeader.element as HTMLButtonElement).focus();
       await rowHeader.trigger("keydown", { key: "F10", shiftKey: true });
-      expect(hasFloatingDialog()).toBe(true);
+      expect(hasFloatingMenu()).toBe(true);
 
       const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
       editor.element.focus();
       await wrapper.vm.$nextTick();
 
-      expect(hasFloatingDialog()).toBe(false);
+      expect(hasFloatingMenu()).toBe(false);
       expect(document.activeElement).toBe(editor.element);
     } finally {
       wrapper.unmount();
