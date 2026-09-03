@@ -70,6 +70,7 @@ export const enUS = {
     renameFailed: "Unable to rename sheet",
     sheetNameEmpty: "Sheet name cannot be empty",
     sheetNameDuplicate: "A sheet named {name} already exists",
+    formatPainterRangeMismatch: "The target selection does not fit the copied formatting.",
   },
   navigation: {
     sheet: "Sheet navigation",

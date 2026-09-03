@@ -6,10 +6,12 @@ import RibbonIconAction from "./RibbonIconAction.vue";
 
 defineProps<{
   disabled: boolean;
+  formatPainterActive?: boolean;
 }>();
 
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
+  activateFormatPainter: [];
   undo: [];
   redo: [];
 }>();
@@ -42,9 +44,11 @@ const { t } = useAppI18n();
     </div>
     <div class="home-history-group__row" data-ribbon-row="2">
       <RibbonIconAction
-        :label="t('app.unavailableFeature', { feature: t('ribbon.formatPainter') })"
-        disabled
-        data-ribbon-placeholder="format-painter"
+        :label="t('ribbon.formatPainter')"
+        :disabled="disabled"
+        :pressed="formatPainterActive"
+        data-ribbon-action="format-painter"
+        @activate="emit('activateFormatPainter')"
       >
         <Paintbrush :size="15" aria-hidden="true" />
       </RibbonIconAction>

@@ -27,6 +27,53 @@ describe("SheetGrid range selection", () => {
     expect(session.history.undoStack).toHaveLength(0);
   });
 
+  test("emits the completed cell selection as a format painter target", async () => {
+    const { wrapper } = mountSheetGrid();
+    await wrapper.setProps({ formatPainterActive: true });
+    await wrapper.get('[data-row="2"][data-column="3"]').trigger("mousedown", {
+      button: 0,
+      buttons: 1,
+    });
+    window.dispatchEvent(new MouseEvent("mouseup", { button: 0 }));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted("formatPainterTarget")).toEqual([
+      [
+        {
+          start: { row: 2, column: 3 },
+          end: { row: 2, column: 3 },
+        },
+      ],
+    ]);
+  });
+
+  test("cancels the armed format painter with Escape", async () => {
+    const { wrapper } = mountSheetGrid();
+    await wrapper.setProps({ formatPainterActive: true });
+
+    await wrapper.get("section.sheet-grid").trigger("keydown", { key: "Escape" });
+
+    expect(wrapper.emitted("cancelFormatPainter")).toEqual([[]]);
+  });
+
+  test("applies the armed format painter to the keyboard selection with Enter", async () => {
+    const { wrapper } = mountSheetGrid();
+    await wrapper.setProps({ formatPainterActive: true });
+    const editor = wrapper.get("textarea.cell-editor");
+
+    await editor.trigger("keydown", { key: "ArrowRight", shiftKey: true });
+    await editor.trigger("keydown", { key: "Enter" });
+
+    expect(wrapper.emitted("formatPainterTarget")).toEqual([
+      [
+        {
+          start: { row: 0, column: 0 },
+          end: { row: 0, column: 1 },
+        },
+      ],
+    ]);
+  });
+
   test("extends with Shift arrows and ordinary arrows reset to one moved cell", async () => {
     const { session, wrapper } = mountSheetGrid();
     const editor = wrapper.get("textarea.cell-editor");

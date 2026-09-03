@@ -8,11 +8,13 @@ import LocaleSwitcher from "./LocaleSwitcher.vue";
 defineProps<{
   state: SelectionCellStyleState;
   disabled: boolean;
+  formatPainterActive?: boolean;
 }>();
 
 const emit = defineEmits<{
   applyBorders: [action: CellBorderAction];
   applyStyle: [patch: CellStylePatch];
+  activateFormatPainter: [];
   undo: [];
   redo: [];
 }>();
@@ -34,8 +36,10 @@ const { t } = useAppI18n();
       <HomeFormatToolbar
         :state="state"
         :disabled="disabled"
+        :format-painter-active="formatPainterActive"
         @apply-borders="emit('applyBorders', $event)"
         @apply-style="emit('applyStyle', $event)"
+        @activate-format-painter="emit('activateFormatPainter')"
         @undo="emit('undo')"
         @redo="emit('redo')"
       />

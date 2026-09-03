@@ -102,6 +102,7 @@ const props = withDefaults(
     rowExpansionTail?: number;
     columnExpansionTail?: number;
     viewState?: SheetGridViewState;
+    formatPainterActive?: boolean;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -120,6 +121,8 @@ const emit = defineEmits<{
   resizeDimension: [payload: { axis: SheetDimensionAxis; index: number; size: number }];
   insertAxis: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
   deleteAxis: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
+  formatPainterTarget: [range: CellRange];
+  cancelFormatPainter: [];
   undo: [];
   redo: [];
   viewStateChange: [viewState: SheetGridViewState];
@@ -217,7 +220,13 @@ const { start: startDragSelection, stop: stopDragSelection } = useDragSelection(
   getCellAtClientPoint,
   getScroller: () => scrollerRef.value,
   getViewportSize: () => viewportSize,
-  onComplete: () => focusEditor(),
+  onComplete: () => {
+    if (props.formatPainterActive) {
+      emit("formatPainterTarget", getSelectionRange(selection.value));
+      return;
+    }
+    focusEditor();
+  },
   onEnsureGridExtentContains: ensureGridExtentContains,
   onEnsureGridExtentCoversViewport: ensureGridExtentCoversViewport,
   onScrollPositionChange: (position) => {
@@ -437,6 +446,12 @@ function onGridKeydown(event: KeyboardEvent): void {
     event.preventDefault();
     event.stopPropagation();
     stopDimensionResize();
+    return;
+  }
+  if (props.formatPainterActive) {
+    event.preventDefault();
+    event.stopPropagation();
+    emit("cancelFormatPainter");
     return;
   }
   if (!isEditing.value && clipboardRange.value) {
@@ -746,6 +761,13 @@ function onEditorKeydown(event: KeyboardEvent): void {
     return;
   }
 
+  if (props.formatPainterActive && event.key === "Enter") {
+    event.preventDefault();
+    event.stopPropagation();
+    emit("formatPainterTarget", getSelectionRange(selection.value));
+    return;
+  }
+
   if (
     !isEditing.value &&
     getSelectionMode(selection.value) === "cells" &&
@@ -906,7 +928,7 @@ onBeforeUnmount(() => {
   clearPendingClipboard();
 });
 
-defineExpose({ navigateToCell });
+defineExpose({ focusGrid: focusEditor, navigateToCell });
 </script>
 
 <template>

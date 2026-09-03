@@ -117,9 +117,9 @@ export function useDragSelection(options: {
   }
 
   function onMouseUp(): void {
-    const moved = dragSelection?.moved ?? false;
+    const completed = Boolean(dragSelection);
     stop();
-    if (moved) {
+    if (completed) {
       options.onComplete();
     }
   }

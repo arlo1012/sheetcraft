@@ -17,11 +17,13 @@ import HomeUtilityGroup from "./HomeUtilityGroup.vue";
 defineProps<{
   state: SelectionCellStyleState;
   disabled: boolean;
+  formatPainterActive?: boolean;
 }>();
 
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
   applyBorders: [action: CellBorderAction];
+  activateFormatPainter: [];
   undo: [];
   redo: [];
 }>();
@@ -225,7 +227,9 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
       <div ref="railRef" class="home-format-toolbar__rail">
         <HomeHistoryGroup
           :disabled="disabled"
+          :format-painter-active="formatPainterActive"
           @apply-style="emit('applyStyle', $event)"
+          @activate-format-painter="emit('activateFormatPainter')"
           @undo="emit('undo')"
           @redo="emit('redo')"
         />

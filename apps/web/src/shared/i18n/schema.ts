@@ -70,6 +70,7 @@ export type MessageSchema = {
     renameFailed: string;
     sheetNameEmpty: string;
     sheetNameDuplicate: string;
+    formatPainterRangeMismatch: string;
   };
   navigation: {
     sheet: string;

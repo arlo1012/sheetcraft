@@ -105,6 +105,25 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper)).toEqual([{ bold: true }, { horizontalAlign: "center" }]);
   });
 
+  test("exposes and activates format painter as a pressed action", async () => {
+    const wrapper = mountToolbar();
+    const formatPainter = wrapper.get('[data-ribbon-action="format-painter"]');
+
+    expect(formatPainter.attributes()).toMatchObject({
+      type: "button",
+      "aria-label": "Format painter",
+      "aria-pressed": "false",
+    });
+    await formatPainter.trigger("click");
+    expect(wrapper.emitted("activateFormatPainter")).toEqual([[]]);
+
+    await wrapper.setProps({ formatPainterActive: true });
+    expect(formatPainter.attributes("aria-pressed")).toBe("true");
+
+    await formatPainter.trigger("click");
+    expect(wrapper.emitted("activateFormatPainter")).toEqual([[], []]);
+  });
+
   test("toggles wrapping from native button activation", async () => {
     const wrapper = mountToolbar(createStyleState({ wrapText: "mixed" }));
     const wrapText = wrapper.get('[data-ribbon-action="wrap-text"]');
@@ -332,12 +351,10 @@ describe("HomeFormatToolbar", () => {
         .classes(),
     ).toContain("lucide-hash");
     expect(
-      wrapper.get('[data-ribbon-group="history"] [data-ribbon-placeholder="format-painter"]'),
+      wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="format-painter"]'),
     ).toBeTruthy();
     expect(
-      wrapper
-        .find('[data-ribbon-group="cell"] [data-ribbon-placeholder="format-painter"]')
-        .exists(),
+      wrapper.find('[data-ribbon-group="cell"] [data-ribbon-action="format-painter"]').exists(),
     ).toBe(false);
     expect(
       wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="clear-formatting"]'),
@@ -351,7 +368,7 @@ describe("HomeFormatToolbar", () => {
       expect(control.element).toBeInstanceOf(HTMLButtonElement);
       expect(control.attributes()).toMatchObject({ type: "button", disabled: "" });
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(28);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(27);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({ type: "button", disabled: "" });

@@ -70,6 +70,7 @@ export const zhCN = {
     renameFailed: "无法重命名工作表",
     sheetNameEmpty: "工作表名称不能为空",
     sheetNameDuplicate: "已存在名为 {name} 的工作表",
+    formatPainterRangeMismatch: "目标选区无法容纳复制的格式。",
   },
   navigation: {
     sheet: "工作表导航",

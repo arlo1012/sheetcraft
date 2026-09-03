@@ -21,7 +21,13 @@ import {
   type WorkbookCommand,
   type WorkbookOperation,
 } from "@idea10/core/commands";
-import { getCellRangeValues } from "@idea10/core/clipboard";
+import {
+  createPastePlan,
+  getCellMatrixSize,
+  getCellRangeValues,
+  tileCellMatrix,
+  type CellValueMatrix,
+} from "@idea10/core/clipboard";
 import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
 import {
   createWorkbookSession,
@@ -52,7 +58,11 @@ import {
 } from "@idea10/core/workbook";
 import { getSelectionRange } from "@idea10/sheet-engine/selection";
 import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
-import type { GridPastePayload } from "../../modules/sheet-grid/useGridClipboard";
+import {
+  getCellRangeStyles,
+  type CellStyleMatrix,
+  type GridPastePayload,
+} from "../../modules/sheet-grid/useGridClipboard";
 import { useAppI18n, type MessageKey, type MessageParams } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 
@@ -61,7 +71,13 @@ type FeedbackState = {
   params?: MessageParams;
 };
 
+type FormatPainterSource = {
+  values: CellValueMatrix;
+  styles: CellStyleMatrix;
+};
+
 export type SheetGridNavigator = {
+  focusGrid(): void;
   navigateToCell(address: CellAddress): void;
 };
 
@@ -79,6 +95,7 @@ export function useSpreadsheetWorkspaceController(
   const viewStates = reactive(new Map<string, SheetGridViewState>());
   const gridRef = shallowRef<SheetGridNavigator>();
   const searchQuery = ref("");
+  const formatPainterSource = ref<FormatPainterSource>();
   const workspaceStatus = ref<FeedbackState>();
   let workspaceStatusTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -112,6 +129,7 @@ export function useSpreadsheetWorkspaceController(
   const workspaceStatusText = computed(() =>
     workspaceStatus.value ? t(workspaceStatus.value.key, workspaceStatus.value.params) : "",
   );
+  const formatPainterActive = computed(() => formatPainterSource.value !== undefined);
 
   function collectCommandSheetIds(command: WorkbookCommand, sheetIds: Set<string>): void {
     if (command.type === "setCellValues") {
@@ -232,6 +250,51 @@ export function useSpreadsheetWorkspaceController(
       createApplyCellBordersCommand(activeSheet.value.id, activeSelectionRange.value, action),
       "format.borders",
     );
+    clearWorkspaceStatus();
+  }
+
+  function activateFormatPainter(): void {
+    if (formatPainterSource.value) {
+      cancelFormatPainter();
+      return;
+    }
+    if (!isFormattingSupported.value) {
+      showWorkspaceStatus({ key: "format.selectionTooLarge" });
+      return;
+    }
+    formatPainterSource.value = {
+      values: getCellRangeValues(activeSheet.value, activeSelectionRange.value),
+      styles: getCellRangeStyles(activeSheet.value, activeSelectionRange.value),
+    };
+    clearWorkspaceStatus();
+    gridRef.value?.focusGrid();
+  }
+
+  function cancelFormatPainter(): void {
+    formatPainterSource.value = undefined;
+    clearWorkspaceStatus();
+  }
+
+  function applyFormatPainterTarget(range: CellRange): void {
+    const source = formatPainterSource.value;
+    if (!source) {
+      return;
+    }
+    if (!isCellStyleRangeSupported(range)) {
+      showWorkspaceStatus({ key: "format.selectionTooLarge" });
+      return;
+    }
+    const plan = createPastePlan(source.values, range, range.start);
+    if (!plan) {
+      showWorkspaceStatus({ key: "workspace.formatPainterRangeMismatch" });
+      return;
+    }
+    pasteCells({
+      kind: "formats",
+      plan,
+      styles: tileCellMatrix(source.styles, getCellMatrixSize(plan.values)),
+    });
+    formatPainterSource.value = undefined;
     clearWorkspaceStatus();
   }
 
@@ -387,7 +450,7 @@ export function useSpreadsheetWorkspaceController(
 
   function setGridNavigator(navigator: Element | ComponentPublicInstance | null): void {
     gridRef.value =
-      navigator && "navigateToCell" in navigator
+      navigator && "navigateToCell" in navigator && "focusGrid" in navigator
         ? (navigator as unknown as SheetGridNavigator)
         : undefined;
   }
@@ -410,11 +473,15 @@ export function useSpreadsheetWorkspaceController(
     activeSelectionStyle,
     activeSelectionSummary,
     workspaceStatusText,
+    formatPainterActive,
     commitCell,
     pasteCells,
     clearCells,
     applyCellStyle,
     applyCellBorders,
+    activateFormatPainter,
+    applyFormatPainterTarget,
+    cancelFormatPainter,
     resizeDimension,
     insertAxis,
     deleteAxis,

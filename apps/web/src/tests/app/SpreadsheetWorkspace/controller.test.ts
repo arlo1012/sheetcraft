@@ -159,4 +159,82 @@ describe("spreadsheet workspace controller", () => {
     expect(getCellStyle(sheet, first)).toEqual({ italic: true });
     expect(getCellStyle(sheet, second)).toEqual({ bold: true });
   });
+
+  test("paints captured formatting across a target selection without changing values", () => {
+    const controller = mountController();
+    const sheet = controller.activeSheet.value;
+    const sourceStart = { row: 1, column: 1 };
+    const sourceEnd = { row: 1, column: 2 };
+    const targetStart = { row: 4, column: 4 };
+    const targetEnd = { row: 5, column: 7 };
+    setCellStyle(sheet, sourceStart, { bold: true, fillColor: "#123456" });
+    setCellStyle(sheet, sourceEnd, { italic: true });
+    setCellValue(sheet, targetStart, "keep first");
+    setCellValue(sheet, targetEnd, "keep last");
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection: {
+          active: sourceStart,
+          anchor: sourceStart,
+          focus: sourceEnd,
+          mode: "cells",
+        },
+      }),
+    );
+
+    controller.activateFormatPainter();
+    expect(controller.formatPainterActive.value).toBe(true);
+    controller.applyFormatPainterTarget({ start: targetStart, end: targetEnd });
+
+    expect(getCellValue(sheet, targetStart)).toBe("keep first");
+    expect(getCellValue(sheet, targetEnd)).toBe("keep last");
+    expect(getCellStyle(sheet, { row: 4, column: 4 })).toEqual({
+      bold: true,
+      fillColor: "#123456",
+    });
+    expect(getCellStyle(sheet, { row: 4, column: 5 })).toEqual({ italic: true });
+    expect(getCellStyle(sheet, { row: 5, column: 4 })).toEqual({
+      bold: true,
+      fillColor: "#123456",
+    });
+    expect(controller.session.history.undoStack).toHaveLength(1);
+    expect(controller.formatPainterActive.value).toBe(false);
+
+    expect(controller.undo()).toBe(true);
+    expect(getCellStyle(sheet, targetStart)).toBeUndefined();
+    expect(getCellStyle(sheet, targetEnd)).toBeUndefined();
+  });
+
+  test("keeps format painter armed when the target range cannot tile the captured format", () => {
+    const controller = mountController();
+    const sheet = controller.activeSheet.value;
+    const sourceStart = { row: 1, column: 1 };
+    const sourceEnd = { row: 1, column: 2 };
+    setCellStyle(sheet, sourceStart, { bold: true });
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection: {
+          active: sourceStart,
+          anchor: sourceStart,
+          focus: sourceEnd,
+          mode: "cells",
+        },
+      }),
+    );
+
+    controller.activateFormatPainter();
+    controller.applyFormatPainterTarget({
+      start: { row: 4, column: 4 },
+      end: { row: 4, column: 6 },
+    });
+
+    expect(controller.formatPainterActive.value).toBe(true);
+    expect(controller.session.history.undoStack).toHaveLength(0);
+    expect(controller.workspaceStatusText.value).toBe(
+      "The target selection does not fit the copied formatting.",
+    );
+
+    controller.cancelFormatPainter();
+    expect(controller.formatPainterActive.value).toBe(false);
+  });
 });

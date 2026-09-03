@@ -350,6 +350,17 @@ describe("App", () => {
     expect(wrapper.get('[aria-label="Bold"]').attributes("aria-pressed")).toBe("false");
   });
 
+  test("arms format painter and cancels it with Escape before a target is selected", async () => {
+    const wrapper = mountApp();
+    const formatPainter = wrapper.get('[data-ribbon-action="format-painter"]');
+
+    await formatPainter.trigger("click");
+    expect(formatPainter.attributes("aria-pressed")).toBe("true");
+
+    await formatPainter.trigger("keydown", { key: "Escape" });
+    expect(formatPainter.attributes("aria-pressed")).toBe("false");
+  });
+
   test("applies, restores, and clears range borders through the ribbon", async () => {
     const wrapper = mountApp();
     await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", {

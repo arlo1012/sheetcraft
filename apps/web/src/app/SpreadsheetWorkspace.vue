@@ -17,6 +17,7 @@ const {
   activeCellInput,
   isFormattingSupported,
   activeSelectionStyle,
+  formatPainterActive,
   activeSelectionSummary,
   workspaceStatusText,
   commitCell,
@@ -24,6 +25,9 @@ const {
   clearCells,
   applyCellStyle,
   applyCellBorders,
+  activateFormatPainter,
+  applyFormatPainterTarget,
+  cancelFormatPainter,
   resizeDimension,
   insertAxis,
   deleteAxis,
@@ -40,15 +44,30 @@ const {
   redo,
   setGridNavigator,
 } = useSpreadsheetWorkspaceController();
+
+function onWorkspaceKeydown(event: KeyboardEvent): void {
+  if (event.key !== "Escape" || !formatPainterActive.value) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  cancelFormatPainter();
+}
 </script>
 
 <template>
-  <section class="spreadsheet-workspace" :aria-label="t('workspace.editor')">
+  <section
+    class="spreadsheet-workspace"
+    :aria-label="t('workspace.editor')"
+    @keydown.capture="onWorkspaceKeydown"
+  >
     <SpreadsheetRibbon
       :state="activeSelectionStyle"
       :disabled="!isFormattingSupported"
+      :format-painter-active="formatPainterActive"
       @apply-borders="applyCellBorders"
       @apply-style="applyCellStyle"
+      @activate-format-painter="activateFormatPainter"
       @undo="undo"
       @redo="redo"
     />
@@ -68,12 +87,15 @@ const {
         :ref="setGridNavigator"
         :sheet="activeSheet"
         :view-state="activeSheetViewState"
+        :format-painter-active="formatPainterActive"
         @clear-cells="clearCells"
         @commit-cell="commitCell"
         @delete-axis="deleteAxis"
+        @format-painter-target="applyFormatPainterTarget"
         @insert-axis="insertAxis"
         @paste-cells="pasteCells"
         @resize-dimension="resizeDimension"
+        @cancel-format-painter="cancelFormatPainter"
         @undo="undo"
         @redo="redo"
         @view-state-change="updateActiveSheetViewState"

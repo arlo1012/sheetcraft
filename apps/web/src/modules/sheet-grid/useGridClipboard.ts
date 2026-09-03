@@ -24,7 +24,7 @@ import {
   type GridClipboardTransfer,
 } from "./gridClipboardPort";
 
-type CellStyleMatrix = Array<Array<CellStyle | null>>;
+export type CellStyleMatrix = Array<Array<CellStyle | null>>;
 
 export type GridPastePayload =
   | {
@@ -62,7 +62,7 @@ type PendingClipboard = {
   localTokenWritten: boolean;
 };
 
-function getCellRangeStyles(sheet: Sheet, range: CellRange): Array<Array<CellStyle | null>> {
+export function getCellRangeStyles(sheet: Sheet, range: CellRange): CellStyleMatrix {
   const startRow = Math.min(range.start.row, range.end.row);
   const endRow = Math.max(range.start.row, range.end.row);
   const startColumn = Math.min(range.start.column, range.end.column);
