@@ -10,6 +10,7 @@ import { applyResizeSheetDimensionCommand } from "./dimensions.js";
 import {
   applyAddSheetCommand,
   applyDeleteSheetCommand,
+  applyMoveSheetCommand,
   applyRenameSheetCommand,
 } from "./sheets.js";
 import { applyRestoreSheetStateCommand, applySheetAxisCommand } from "./structure.js";
@@ -47,6 +48,8 @@ export function applyWorkbookCommand(
         return applyDeleteSheetCommand(workbook, command);
       case "renameSheet":
         return applyRenameSheetCommand(workbook, command);
+      case "moveSheet":
+        return applyMoveSheetCommand(workbook, command);
       case "insertSheetAxis":
       case "deleteSheetAxis":
         return applySheetAxisCommand(workbook, command);

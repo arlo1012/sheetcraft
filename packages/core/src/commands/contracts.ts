@@ -83,6 +83,13 @@ export type RenameSheetCommand = {
   name: string;
 };
 
+export type MoveSheetCommand = {
+  type: "moveSheet";
+  sheetId: string;
+  /** Final zero-based sheet index after the move. */
+  toIndex: number;
+};
+
 export type InsertSheetAxisCommand = {
   type: "insertSheetAxis";
   sheetId: string;
@@ -138,6 +145,7 @@ export type WorkbookCommand =
   | AddSheetCommand
   | DeleteSheetCommand
   | RenameSheetCommand
+  | MoveSheetCommand
   | InsertSheetAxisCommand
   | DeleteSheetAxisCommand
   | RestoreSheetStateCommand;
@@ -153,6 +161,7 @@ export type WorkbookOperation =
   | "sheets.add"
   | "sheets.delete"
   | "sheets.rename"
+  | "sheets.move"
   | "structure.insert"
   | "structure.delete"
   | "history.restore";
@@ -179,6 +188,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "sheets.delete";
     case "renameSheet":
       return "sheets.rename";
+    case "moveSheet":
+      return "sheets.move";
     case "insertSheetAxis":
       return "structure.insert";
     case "deleteSheetAxis":

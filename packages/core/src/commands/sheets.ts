@@ -3,16 +3,23 @@ import type { IdFactory } from "../runtime.js";
 import { deserializeSheet, serializeSheet } from "../serialization.js";
 import {
   createSheet,
+  getNextDuplicateSheetName,
   getNextSheetName,
   getSheetIndex,
   getWorkbookSheets,
   insertSheet,
+  moveSheet,
   removeSheet,
   renameSheet,
   setActiveSheet,
   type Workbook,
 } from "../workbook.js";
-import type { AddSheetCommand, DeleteSheetCommand, RenameSheetCommand } from "./contracts.js";
+import type {
+  AddSheetCommand,
+  DeleteSheetCommand,
+  MoveSheetCommand,
+  RenameSheetCommand,
+} from "./contracts.js";
 import { invalidCommandPayload } from "./helpers.js";
 
 function sheetNotFound(sheetId: unknown): WorkbookDomainError {
@@ -45,19 +52,10 @@ function normalizeCommandSheetName(name: unknown): string {
   return normalizedName;
 }
 
-export function createAddSheetCommand(
+function resolveSheetId(
   workbook: Workbook,
-  options?: { id?: string; name?: string; index?: number; idFactory?: IdFactory },
-): AddSheetCommand {
-  const name =
-    options?.name === undefined
-      ? getNextSheetName(workbook)
-      : normalizeCommandSheetName(options.name);
-  assertSheetNameAvailable(workbook, name);
-  const index = options?.index ?? workbook.sheets.size;
-  if (!Number.isInteger(index) || index < 0 || index > workbook.sheets.size) {
-    throw invalidCommandPayload("index", index);
-  }
+  options: { id?: string; idFactory?: IdFactory } | undefined,
+): string {
   if (options?.id !== undefined && (typeof options.id !== "string" || !options.id.trim())) {
     throw invalidCommandPayload("id", options.id);
   }
@@ -78,15 +76,58 @@ export function createAddSheetCommand(
       throw invalidCommandPayload("idFactory", sheetId);
     }
   }
-  const sheet = createSheet(name, sheetId);
-  if (workbook.sheets.has(sheet.id)) {
-    throw invalidCommandPayload("sheet.id", sheet.id);
+  if (workbook.sheets.has(sheetId)) {
+    throw invalidCommandPayload("sheet.id", sheetId);
   }
+  return sheetId;
+}
+
+export function createAddSheetCommand(
+  workbook: Workbook,
+  options?: { id?: string; name?: string; index?: number; idFactory?: IdFactory },
+): AddSheetCommand {
+  const name =
+    options?.name === undefined
+      ? getNextSheetName(workbook)
+      : normalizeCommandSheetName(options.name);
+  assertSheetNameAvailable(workbook, name);
+  const index = options?.index ?? workbook.sheets.size;
+  if (!Number.isInteger(index) || index < 0 || index > workbook.sheets.size) {
+    throw invalidCommandPayload("index", index);
+  }
+  const sheetId = resolveSheetId(workbook, options);
+  const sheet = createSheet(name, sheetId);
   return {
     type: "addSheet",
     sheet: serializeSheet(sheet),
     index,
     activeSheetId: sheet.id,
+  };
+}
+
+export function createDuplicateSheetCommand(
+  workbook: Workbook,
+  sourceSheetId: string,
+  options?: { id?: string; name?: string; idFactory?: IdFactory },
+): AddSheetCommand {
+  const source = workbook.sheets.get(sourceSheetId);
+  if (!source) throw sheetNotFound(sourceSheetId);
+
+  const name =
+    options?.name === undefined
+      ? getNextDuplicateSheetName(workbook, source.name)
+      : normalizeCommandSheetName(options.name);
+  assertSheetNameAvailable(workbook, name);
+  const sheetId = resolveSheetId(workbook, options);
+  const sheet = serializeSheet(source);
+  sheet.id = sheetId;
+  sheet.name = name;
+
+  return {
+    type: "addSheet",
+    sheet,
+    index: getSheetIndex(workbook, sourceSheetId) + 1,
+    activeSheetId: sheetId,
   };
 }
 
@@ -115,6 +156,18 @@ export function createDeleteSheetCommand(workbook: Workbook, sheetId: string): D
 
 export function createRenameSheetCommand(sheetId: string, name: string): RenameSheetCommand {
   return { type: "renameSheet", sheetId, name: normalizeCommandSheetName(name) };
+}
+
+export function createMoveSheetCommand(
+  workbook: Workbook,
+  sheetId: string,
+  toIndex: number,
+): MoveSheetCommand {
+  if (getSheetIndex(workbook, sheetId) < 0) throw sheetNotFound(sheetId);
+  if (!Number.isInteger(toIndex) || toIndex < 0 || toIndex >= workbook.sheets.size) {
+    throw invalidCommandPayload("toIndex", toIndex);
+  }
+  return { type: "moveSheet", sheetId, toIndex };
 }
 
 export function applyAddSheetCommand(
@@ -183,5 +236,23 @@ export function applyRenameSheetCommand(
   const previousName = sheet.name;
   return renameSheet(workbook, command.sheetId, name)
     ? createRenameSheetCommand(command.sheetId, previousName)
+    : null;
+}
+
+export function applyMoveSheetCommand(
+  workbook: Workbook,
+  command: MoveSheetCommand,
+): MoveSheetCommand | null {
+  const previousIndex = getSheetIndex(workbook, command.sheetId);
+  if (previousIndex < 0) throw sheetNotFound(command.sheetId);
+  if (
+    !Number.isInteger(command.toIndex) ||
+    command.toIndex < 0 ||
+    command.toIndex >= workbook.sheets.size
+  ) {
+    throw invalidCommandPayload("toIndex", command.toIndex);
+  }
+  return moveSheet(workbook, command.sheetId, command.toIndex)
+    ? { type: "moveSheet", sheetId: command.sheetId, toIndex: previousIndex }
     : null;
 }

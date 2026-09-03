@@ -7,7 +7,9 @@ import {
   getActiveSheet,
   getCellStyle,
   getCellValue,
+  getWorkbookSheets,
   insertSheet,
+  moveSheet,
   setActiveSheet,
   setCellStyle,
   setCellValue,
@@ -67,6 +69,23 @@ describe("workbook snapshots", () => {
         { index: 8, size: 30 },
       ],
     });
+  });
+
+  test("round trips a reordered workbook in map order without changing the active sheet", () => {
+    const workbook = createWorkbook({ id: "workbook-1", sheetId: "sheet-1" });
+    insertSheet(workbook, createSheet("Sheet2", "sheet-2"));
+    insertSheet(workbook, createSheet("Sheet3", "sheet-3"));
+    setActiveSheet(workbook, "sheet-2");
+    moveSheet(workbook, "sheet-3", 0);
+
+    const restored = deserializeWorkbook(serializeWorkbook(workbook));
+
+    expect(getWorkbookSheets(restored).map((sheet) => sheet.id)).toEqual([
+      "sheet-3",
+      "sheet-1",
+      "sheet-2",
+    ]);
+    expect(restored.activeSheetId).toBe("sheet-2");
   });
 
   test("rejects unknown snapshot versions with a stable error code", () => {

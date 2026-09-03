@@ -142,6 +142,18 @@ export function getNextSheetName(workbook: Workbook): string {
   return `Sheet${index}`;
 }
 
+export function getNextDuplicateSheetName(workbook: Workbook, sourceName: string): string {
+  const name = normalizeSheetName(sourceName);
+  const names = new Set(getWorkbookSheets(workbook).map((sheet) => sheet.name.toLowerCase()));
+  let index = 2;
+  let candidate = `${name} (${index})`;
+  while (names.has(candidate.toLowerCase())) {
+    index += 1;
+    candidate = `${name} (${index})`;
+  }
+  return candidate;
+}
+
 function assertSheetNameAvailable(
   workbook: Workbook,
   name: string,
@@ -201,6 +213,29 @@ export function removeSheet(workbook: Workbook, sheetId: string): RemovedSheet {
   replaceWorkbookSheets(workbook, sheets);
   workbook.activeSheetId = nextActiveSheetId;
   return { sheet, index };
+}
+
+/** Moves a sheet to its final zero-based position without changing the active sheet. */
+export function moveSheet(workbook: Workbook, sheetId: string, toIndex: number): boolean {
+  const fromIndex = getSheetIndex(workbook, sheetId);
+  if (fromIndex < 0) {
+    throw new Error(`Sheet ${sheetId} does not exist.`);
+  }
+  if (!Number.isInteger(toIndex) || toIndex < 0 || toIndex >= workbook.sheets.size) {
+    throw new RangeError(`Sheet index ${toIndex} is outside the workbook.`);
+  }
+  if (fromIndex === toIndex) {
+    return false;
+  }
+
+  const sheets = getWorkbookSheets(workbook);
+  const [sheet] = sheets.splice(fromIndex, 1);
+  if (!sheet) {
+    throw new Error(`Sheet ${sheetId} disappeared while moving it.`);
+  }
+  sheets.splice(toIndex, 0, sheet);
+  replaceWorkbookSheets(workbook, sheets);
+  return true;
 }
 
 export function renameSheet(workbook: Workbook, sheetId: string, name: string): boolean {
