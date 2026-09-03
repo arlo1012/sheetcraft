@@ -10,6 +10,11 @@ const rootElement = ref<HTMLUListElement | null>(null);
 const { move: moveRovingFocus } = useRovingFocus();
 let itemObserver: MutationObserver | undefined;
 
+function isMenuItem(element: HTMLElement): boolean {
+  const role = element.getAttribute("role");
+  return role === "menuitem" || role === "menuitemcheckbox" || role === "menuitemradio";
+}
+
 function menuItems(): HTMLElement[] {
   const root = rootElement.value;
   if (!root) {
@@ -19,12 +24,11 @@ function menuItems(): HTMLElement[] {
     if (!(child instanceof HTMLElement)) {
       return [];
     }
-    if (child.getAttribute("role") === "menuitem") {
+    if (isMenuItem(child)) {
       return [child];
     }
     return [...child.children].filter(
-      (nested): nested is HTMLElement =>
-        nested instanceof HTMLElement && nested.getAttribute("role") === "menuitem",
+      (nested): nested is HTMLElement => nested instanceof HTMLElement && isMenuItem(nested),
     );
   });
 }
@@ -49,12 +53,19 @@ function focusFirstItem(): void {
   syncTabStop(first)?.focus();
 }
 
+function focusLastItem(): void {
+  const items = enabledItems();
+  syncTabStop(items.at(-1))?.focus();
+}
+
 function onFocusin(event: FocusEvent): void {
   const target = event.target;
   if (!(target instanceof HTMLElement)) {
     return;
   }
-  const item = target.closest<HTMLElement>('[role="menuitem"]');
+  const item = target.closest<HTMLElement>(
+    '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]',
+  );
   if (item && menuItems().includes(item)) {
     syncTabStop(item);
   }
@@ -86,7 +97,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => itemObserver?.disconnect());
 
-defineExpose({ focusFirstItem, rootElement });
+defineExpose({ focusFirstItem, focusLastItem, rootElement });
 </script>
 
 <template>

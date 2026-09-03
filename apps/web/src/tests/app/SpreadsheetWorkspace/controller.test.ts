@@ -160,6 +160,38 @@ describe("spreadsheet workspace controller", () => {
     expect(getCellStyle(sheet, second)).toEqual({ bold: true });
   });
 
+  test("adjusts decimals across a mixed selection as one reversible formatting entry", () => {
+    const controller = mountController();
+    const sheet = controller.activeSheet.value;
+    const first = { row: 2, column: 1 };
+    const second = { row: 2, column: 2 };
+    setCellValue(sheet, first, 0.125);
+    setCellStyle(sheet, first, { numberFormat: { kind: "number", fractionDigits: 2 } });
+    setCellStyle(sheet, second, {
+      numberFormat: { kind: "currency", currency: "CNY", fractionDigits: 4 },
+    });
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection: { active: first, anchor: first, focus: second, mode: "cells" },
+      }),
+    );
+
+    controller.adjustNumberFormatDecimals(-1);
+
+    expect(controller.activeCellInput.value).toBe("0.125");
+    expect(getCellStyle(sheet, first)?.numberFormat).toEqual({ kind: "number", fractionDigits: 1 });
+    expect(getCellStyle(sheet, second)?.numberFormat).toEqual({
+      kind: "currency",
+      currency: "CNY",
+      fractionDigits: 3,
+    });
+    expect(controller.session.history.undoStack).toHaveLength(1);
+
+    expect(controller.undo()).toBe(true);
+    expect(getCellStyle(sheet, first)?.numberFormat?.fractionDigits).toBe(2);
+    expect(getCellStyle(sheet, second)?.numberFormat?.fractionDigits).toBe(4);
+  });
+
   test("paints captured formatting across a target selection without changing values", () => {
     const controller = mountController();
     const sheet = controller.activeSheet.value;

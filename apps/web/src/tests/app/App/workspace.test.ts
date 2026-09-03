@@ -65,9 +65,7 @@ describe("App", () => {
 
     await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
     let sheetMenu = new DOMWrapper(document.body).get('[role="menu"]');
-    expect(sheetMenu.get<HTMLButtonElement>('[role="menuitem"]:last-child').element.disabled).toBe(
-      true,
-    );
+    expect(sheetMenu.get('[role="menuitem"]:last-child').attributes("aria-disabled")).toBe("true");
     await sheetMenu.trigger("keydown", { key: "Escape" });
 
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
@@ -250,9 +248,12 @@ describe("App", () => {
       clientX: 16,
       clientY: 72,
     });
-    const dialog = new DOMWrapper(document.body).get('[role="dialog"]');
-    expect(dialog.attributes("aria-label")).toBe("行操作");
-    expect(dialog.text()).toContain("向下插入 1 行");
+    const menu = new DOMWrapper(document.body).get('[role="menu"]');
+    expect(menu.attributes("aria-label")).toBe("行操作");
+    expect(menu.get('[data-axis-action="insert-after"]').attributes("aria-label")).toBe(
+      "向下插入 1 行",
+    );
+    expect(menu.text()).toContain("在下方插入");
     expect(document.documentElement.lang).toBe("zh-CN");
     expect(localStorage.getItem("idea10.locale")).toBe("zh-CN");
   });

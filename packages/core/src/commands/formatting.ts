@@ -1,5 +1,7 @@
 import {
   MAX_CELL_STYLE_PATCH_CELLS,
+  MAX_NUMBER_FORMAT_FRACTION_DIGITS,
+  MIN_NUMBER_FORMAT_FRACTION_DIGITS,
   cloneCellStyle,
   mergeCellStyle,
   normalizeCellBorderAction,
@@ -8,6 +10,7 @@ import {
   type CellBorderAction,
   type CellStyle,
   type CellStylePatch,
+  type CellNumberFormat,
 } from "../style.js";
 import {
   getCellStyle,
@@ -25,6 +28,7 @@ import {
 } from "./borders.js";
 import type {
   ApplyCellBordersCommand,
+  AdjustCellNumberFormatDecimalsCommand,
   ApplyCellStyleCommand,
   RestoreCellStylesCommand,
 } from "./contracts.js";
@@ -79,6 +83,20 @@ export function createApplyCellBordersCommand(
     range: normalizedRange,
     action: validateCommandPayload("action", action, () => normalizeCellBorderAction(action)),
   };
+}
+
+export function createAdjustCellNumberFormatDecimalsCommand(
+  sheetId: string,
+  range: CellRange,
+  delta: -1 | 1,
+): AdjustCellNumberFormatDecimalsCommand {
+  const normalizedRange = normalizeRange(range);
+  assertCellRange(normalizedRange);
+  assertSupportedRange(normalizedRange);
+  if (delta !== -1 && delta !== 1) {
+    throw invalidCommandPayload("delta", delta, "Number format decimal delta must be -1 or 1.");
+  }
+  return { type: "adjustCellNumberFormatDecimals", sheetId, range: normalizedRange, delta };
 }
 
 export function createRestoreCellStylesCommand(
@@ -155,6 +173,49 @@ export function applyCellStyleCommand(
   reconcileCellBorderTargets(targetBorderPatches, (address, patch) =>
     addPatch(patches, address, patch),
   );
+  return applyStylePatches(workbook, command.sheetId, patches);
+}
+
+function adjustNumberFormat(
+  format: CellNumberFormat | undefined,
+  delta: -1 | 1,
+): CellNumberFormat | undefined {
+  if (!format) {
+    return delta > 0 ? { kind: "number", fractionDigits: 1 } : undefined;
+  }
+  const fractionDigits = Math.max(
+    MIN_NUMBER_FORMAT_FRACTION_DIGITS,
+    Math.min(MAX_NUMBER_FORMAT_FRACTION_DIGITS, format.fractionDigits + delta),
+  );
+  return fractionDigits === format.fractionDigits ? format : { ...format, fractionDigits };
+}
+
+export function applyAdjustCellNumberFormatDecimalsCommand(
+  workbook: Workbook,
+  command: AdjustCellNumberFormatDecimalsCommand,
+): RestoreCellStylesCommand | null {
+  const range = normalizeRange(command.range);
+  assertCellRange(range);
+  assertSupportedRange(range);
+  if (command.delta !== -1 && command.delta !== 1) {
+    throw invalidCommandPayload(
+      "delta",
+      command.delta,
+      "Number format decimal delta must be -1 or 1.",
+    );
+  }
+  const sheet = getSheetOrThrow(workbook, command.sheetId);
+  const patches = new Map<string, { address: CellAddress; patch: CellStylePatch }>();
+  for (let row = range.start.row; row <= range.end.row; row += 1) {
+    for (let column = range.start.column; column <= range.end.column; column += 1) {
+      const address = { row, column };
+      const current = getCellStyle(sheet, address)?.numberFormat;
+      const adjusted = adjustNumberFormat(current, command.delta);
+      if (adjusted !== current) {
+        addPatch(patches, address, { numberFormat: adjusted ?? null });
+      }
+    }
+  }
   return applyStylePatches(workbook, command.sheetId, patches);
 }
 

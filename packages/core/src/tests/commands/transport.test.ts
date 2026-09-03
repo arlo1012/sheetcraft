@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   createAddSheetCommand,
+  createAdjustCellNumberFormatDecimalsCommand,
   createApplyCellBordersCommand,
   createApplyCellStyleCommand,
   createBatchSetCellValuesCommand,
@@ -139,6 +140,21 @@ describe("workbook command transport", () => {
               sheetId: session.workbook.activeSheetId,
               name: "   ",
             },
+          };
+        },
+      },
+      {
+        code: "invalid_command_payload",
+        create: () => {
+          const session = createTestWorkbookSession();
+          return {
+            session,
+            command: {
+              type: "adjustCellNumberFormatDecimals",
+              sheetId: session.workbook.activeSheetId,
+              range: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+              delta: 2,
+            } as unknown as WorkbookCommand,
           };
         },
       },
@@ -307,6 +323,11 @@ describe("workbook command transport", () => {
         sheet.id,
         { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
         { preset: "all", border: { style: "thin", color: "#123456" } },
+      ),
+      createAdjustCellNumberFormatDecimalsCommand(
+        sheet.id,
+        { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+        1,
       ),
       createRestoreCellStylesCommand(sheet.id, [{ address: { row: 0, column: 0 }, style: null }]),
       createResizeSheetDimensionCommand(sheet.id, "row", 0, 30),

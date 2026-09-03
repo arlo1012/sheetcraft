@@ -5,6 +5,8 @@ export const DEFAULT_CELL_FONT_FAMILY = "Inter";
 export const DEFAULT_CELL_TEXT_COLOR = "#20242c";
 export const DEFAULT_CELL_FILL_COLOR = "#ffffff";
 export const MAX_CELL_STYLE_PATCH_CELLS = 100_000;
+export const MIN_NUMBER_FORMAT_FRACTION_DIGITS = 0;
+export const MAX_NUMBER_FORMAT_FRACTION_DIGITS = 20;
 
 export type HorizontalCellAlignment = "left" | "center" | "right";
 export type VerticalCellAlignment = "top" | "middle" | "bottom";
@@ -14,6 +16,10 @@ export type CellBorder = {
   style: CellBorderLineStyle;
   color: string;
 };
+
+export type CellNumberFormat =
+  | { kind: "number" | "percent"; fractionDigits: number }
+  | { kind: "currency"; currency: string; fractionDigits: number };
 
 export type CellBorderPreset =
   | "none"
@@ -45,6 +51,7 @@ export type CellStyle = {
   horizontalAlign?: HorizontalCellAlignment;
   verticalAlign?: VerticalCellAlignment;
   wrapText?: true;
+  numberFormat?: CellNumberFormat;
   borderTop?: CellBorder;
   borderRight?: CellBorder;
   borderBottom?: CellBorder;
@@ -68,6 +75,7 @@ export const CELL_STYLE_KEYS = [
   "horizontalAlign",
   "verticalAlign",
   "wrapText",
+  "numberFormat",
   "borderTop",
   "borderRight",
   "borderBottom",
@@ -108,6 +116,54 @@ const BORDER_PRESETS = new Set<CellBorderPreset>([
   "diagonalUp",
   "diagonalDown",
 ]);
+const NUMBER_FORMAT_KINDS = new Set<CellNumberFormat["kind"]>(["number", "percent", "currency"]);
+const CURRENCY_CODE_PATTERN = /^[A-Z]{3}$/;
+
+export function normalizeCellNumberFormat(format: CellNumberFormat): CellNumberFormat {
+  if (!format || typeof format !== "object" || !NUMBER_FORMAT_KINDS.has(format.kind)) {
+    throw new TypeError("Cell number format kind must be number, percent, or currency.");
+  }
+  if (
+    !Number.isInteger(format.fractionDigits) ||
+    format.fractionDigits < MIN_NUMBER_FORMAT_FRACTION_DIGITS ||
+    format.fractionDigits > MAX_NUMBER_FORMAT_FRACTION_DIGITS
+  ) {
+    throw new RangeError(
+      `Cell number format fraction digits must be an integer between ${MIN_NUMBER_FORMAT_FRACTION_DIGITS} and ${MAX_NUMBER_FORMAT_FRACTION_DIGITS}.`,
+    );
+  }
+  if (format.kind !== "currency") {
+    return { kind: format.kind, fractionDigits: format.fractionDigits };
+  }
+  if (typeof format.currency !== "string") {
+    throw new TypeError("Cell currency format must contain an ISO currency code.");
+  }
+  const currency = format.currency.toUpperCase();
+  if (!CURRENCY_CODE_PATTERN.test(currency)) {
+    throw new TypeError("Cell currency format must contain a three-letter ISO currency code.");
+  }
+  return { kind: "currency", currency, fractionDigits: format.fractionDigits };
+}
+
+export function cloneCellNumberFormat(
+  format: CellNumberFormat | undefined,
+): CellNumberFormat | undefined {
+  return format ? normalizeCellNumberFormat(format) : undefined;
+}
+
+export function areCellNumberFormatsEqual(
+  left: CellNumberFormat | undefined,
+  right: CellNumberFormat | undefined,
+): boolean {
+  return (
+    left === right ||
+    (left !== undefined &&
+      right !== undefined &&
+      left.kind === right.kind &&
+      left.fractionDigits === right.fractionDigits &&
+      (left.kind !== "currency" || (right.kind === "currency" && left.currency === right.currency)))
+  );
+}
 
 function normalizeFontFamily(value: unknown): string {
   if (typeof value !== "string") {
@@ -209,6 +265,9 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
       key === "textColor" ? "Cell text color" : "Cell fill color",
     ) as CellStyle[Key];
   }
+  if (key === "numberFormat") {
+    return normalizeCellNumberFormat(value as CellNumberFormat) as CellStyle[Key];
+  }
   if (
     key === "borderTop" ||
     key === "borderRight" ||
@@ -302,6 +361,12 @@ export function areCellStylesEqual(
           rightValue !== undefined &&
           (leftValue as CellBorder).style === (rightValue as CellBorder).style &&
           (leftValue as CellBorder).color === (rightValue as CellBorder).color)
+      );
+    }
+    if (key === "numberFormat") {
+      return areCellNumberFormatsEqual(
+        leftValue as CellNumberFormat | undefined,
+        rightValue as CellNumberFormat | undefined,
       );
     }
     return Object.is(leftValue, rightValue);

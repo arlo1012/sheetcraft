@@ -74,7 +74,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
       "false",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(28);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(22);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({

@@ -33,6 +33,32 @@ describe("paste cell values command", () => {
     expect(getCellValue(sheet, { row: 3, column: 4 })).toBe("D");
   });
 
+  test("pastes semantic number formatting with local styles and restores it", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const target = { row: 2, column: 3 };
+    setCellValue(sheet, target, 12.5);
+    setCellStyle(sheet, target, { numberFormat: { kind: "percent", fractionDigits: 1 } });
+
+    executeWorkbookCommand(
+      session,
+      createPasteCellValuesCommand(sheet.id, target, [[12.5]], {
+        styles: [[{ numberFormat: { kind: "currency", currency: "cny", fractionDigits: 2 } }]],
+      }),
+    );
+
+    expect(getCellStyle(sheet, target)?.numberFormat).toEqual({
+      kind: "currency",
+      currency: "CNY",
+      fractionDigits: 2,
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, target)?.numberFormat).toEqual({
+      kind: "percent",
+      fractionDigits: 1,
+    });
+  });
+
   test("moves an overlapping cut range atomically", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);

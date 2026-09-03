@@ -169,6 +169,8 @@ export const zhCN = {
     verticalAlignment: "垂直对齐",
     verticalAlignmentValue: "垂直对齐：{value}",
     verticalAlignmentMixed: "垂直对齐，混合",
+    numberFormatValue: "数字格式：{value}",
+    numberFormatMixed: "数字格式，混合",
     alignLeft: "左对齐",
     alignCenter: "居中对齐",
     alignRight: "右对齐",

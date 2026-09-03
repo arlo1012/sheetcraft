@@ -20,7 +20,15 @@ describe("workbook snapshots", () => {
     const workbook = createWorkbook({ id: "workbook-1", sheetId: "sheet-1" });
     const firstSheet = getActiveSheet(workbook);
     setCellValue(firstSheet, { row: 2, column: 1 }, "Budget");
-    setCellStyle(firstSheet, { row: 0, column: 0 }, { bold: true, fillColor: "#AABBCC" });
+    setCellStyle(
+      firstSheet,
+      { row: 0, column: 0 },
+      {
+        bold: true,
+        fillColor: "#AABBCC",
+        numberFormat: { kind: "currency", currency: "cny", fractionDigits: 2 },
+      },
+    );
     setRowHeight(firstSheet, 2, 40);
     setColumnWidth(firstSheet, 1, 144);
     insertSheet(workbook, createSheet("Summary", "sheet-2"));
@@ -37,6 +45,7 @@ describe("workbook snapshots", () => {
     expect(getCellStyle(restored.sheets.get("sheet-1")!, { row: 0, column: 0 })).toEqual({
       bold: true,
       fillColor: "#aabbcc",
+      numberFormat: { kind: "currency", currency: "CNY", fractionDigits: 2 },
     });
   });
 

@@ -169,6 +169,8 @@ export const enUS = {
     verticalAlignment: "Vertical alignment",
     verticalAlignmentValue: "Vertical alignment: {value}",
     verticalAlignmentMixed: "Vertical alignment, mixed",
+    numberFormatValue: "Number format: {value}",
+    numberFormatMixed: "Number format, mixed",
     alignLeft: "Align left",
     alignCenter: "Align center",
     alignRight: "Align right",

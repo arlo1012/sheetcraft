@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import { formatCellValueForDisplay } from "@idea10/core/input";
 import { getCellStyle, getCellValue, type CellAddress, type Sheet } from "@idea10/core/workbook";
 import { getCellContentStyle } from "../cell-presentation";
+import { formatCellValueForGrid } from "../cell-value-presentation";
 import type { Point, SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
 import { isCellSelected, type CellSelection } from "@idea10/sheet-engine/selection";
 
@@ -22,15 +22,21 @@ type VisibleRow = {
   cells: VisibleCell[];
 };
 
-const props = defineProps<{
-  sheet: Sheet;
-  geometry: SheetGeometry;
-  visibleRange: VisibleCellRange;
-  activeCell: CellAddress;
-  selection: CellSelection;
-  scrollPosition: Point;
-  editing: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    sheet: Sheet;
+    geometry: SheetGeometry;
+    visibleRange: VisibleCellRange;
+    activeCell: CellAddress;
+    selection: CellSelection;
+    scrollPosition: Point;
+    editing: boolean;
+    locale?: string;
+  }>(),
+  {
+    locale: "en-US",
+  },
+);
 
 const emit = defineEmits<{
   cellMousedown: [address: CellAddress, event: MouseEvent];
@@ -73,7 +79,11 @@ const visibleRows = computed<VisibleRow[]>(() => {
       const address = { row, column };
       const rect = props.geometry.getCellViewportRect(address, props.scrollPosition);
       const cellStyle = getCellStyle(props.sheet, address);
-      const text = formatCellValueForDisplay(getCellValue(props.sheet, address));
+      const text = formatCellValueForGrid(
+        getCellValue(props.sheet, address),
+        cellStyle,
+        props.locale,
+      );
       const preservesLineBreaks = /[\r\n]/u.test(text);
       cells.push({
         key: `${row}:${column}`,

@@ -1,5 +1,8 @@
 import {
   MAX_CELL_STYLE_PATCH_CELLS,
+  areCellNumberFormatsEqual,
+  cloneCellNumberFormat,
+  type CellNumberFormat,
   type CellStyle,
   type HorizontalCellAlignment,
   type VerticalCellAlignment,
@@ -24,6 +27,7 @@ export type SelectionCellStyleState = {
   horizontalAlign: StyleValueState<HorizontalCellAlignment>;
   verticalAlign: StyleValueState<VerticalCellAlignment>;
   wrapText: ToggleStyleState;
+  numberFormat: StyleValueState<CellNumberFormat>;
 };
 
 type ValueAccumulator<Value> = {
@@ -45,11 +49,15 @@ function normalizeRange(range: CellRange): CellRange {
   };
 }
 
-function addValue<Value>(accumulator: ValueAccumulator<Value>, value: Value | undefined): void {
+function addValue<Value>(
+  accumulator: ValueAccumulator<Value>,
+  value: Value | undefined,
+  equals: (left: Value | undefined, right: Value | undefined) => boolean = Object.is,
+): void {
   if (!accumulator.initialized) {
     accumulator.initialized = true;
     accumulator.value = value;
-  } else if (!Object.is(accumulator.value, value)) {
+  } else if (!equals(accumulator.value, value)) {
     accumulator.mixed = true;
   }
 }
@@ -89,6 +97,7 @@ export function createDefaultSelectionCellStyleState(): SelectionCellStyleState 
     horizontalAlign: { value: undefined, mixed: false },
     verticalAlign: { value: undefined, mixed: false },
     wrapText: "off",
+    numberFormat: { value: undefined, mixed: false },
   };
 }
 
@@ -119,6 +128,7 @@ export function getSelectionCellStyleState(
   const horizontalAlign = createAccumulator<HorizontalCellAlignment>();
   const verticalAlign = createAccumulator<VerticalCellAlignment>();
   const wrapText = createAccumulator<true>();
+  const numberFormat = createAccumulator<CellNumberFormat>();
   let materializedCellCount = 0;
 
   const addStyle = (style: CellStyle | undefined) => {
@@ -132,6 +142,7 @@ export function getSelectionCellStyleState(
     addValue(horizontalAlign, style?.horizontalAlign);
     addValue(verticalAlign, style?.verticalAlign);
     addValue(wrapText, style?.wrapText);
+    addValue(numberFormat, cloneCellNumberFormat(style?.numberFormat), areCellNumberFormatsEqual);
   };
 
   const rangeSize = getCellRangeSize(normalized);
@@ -172,5 +183,6 @@ export function getSelectionCellStyleState(
     horizontalAlign: toValueState(horizontalAlign),
     verticalAlign: toValueState(verticalAlign),
     wrapText: toToggleState(wrapText),
+    numberFormat: toValueState(numberFormat),
   };
 }

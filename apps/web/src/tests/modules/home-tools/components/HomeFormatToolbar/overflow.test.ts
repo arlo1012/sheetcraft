@@ -17,6 +17,7 @@ function createStyleState(): SelectionCellStyleState {
     horizontalAlign: { value: undefined, mixed: false },
     verticalAlign: { value: undefined, mixed: false },
     wrapText: "off",
+    numberFormat: { value: undefined, mixed: false },
   };
 }
 

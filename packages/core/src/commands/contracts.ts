@@ -43,6 +43,13 @@ export type ApplyCellBordersCommand = {
   action: CellBorderAction;
 };
 
+export type AdjustCellNumberFormatDecimalsCommand = {
+  type: "adjustCellNumberFormatDecimals";
+  sheetId: string;
+  range: CellRange;
+  delta: -1 | 1;
+};
+
 export type RestoreCellStylesCommand = {
   type: "restoreCellStyles";
   sheetId: string;
@@ -125,6 +132,7 @@ export type WorkbookCommand =
   | ClearCellRangeCommand
   | ApplyCellStyleCommand
   | ApplyCellBordersCommand
+  | AdjustCellNumberFormatDecimalsCommand
   | RestoreCellStylesCommand
   | ResizeSheetDimensionCommand
   | AddSheetCommand
@@ -156,6 +164,7 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "clearCellRange":
       return "cells.clear";
     case "applyCellStyle":
+    case "adjustCellNumberFormatDecimals":
       return "format.cells";
     case "applyCellBorders":
       return "format.borders";

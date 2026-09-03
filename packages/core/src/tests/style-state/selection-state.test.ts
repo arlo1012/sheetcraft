@@ -14,6 +14,7 @@ describe("selection cell style state", () => {
         textColor: "#112233",
         verticalAlign: "top",
         wrapText: true,
+        numberFormat: { kind: "number", fractionDigits: 2 },
       },
     );
     setCellStyle(
@@ -24,6 +25,7 @@ describe("selection cell style state", () => {
         textColor: "#112233",
         verticalAlign: "top",
         wrapText: true,
+        numberFormat: { kind: "number", fractionDigits: 2 },
       },
     );
 
@@ -36,6 +38,10 @@ describe("selection cell style state", () => {
     expect(uniform.textColor).toEqual({ value: "#112233", mixed: false });
     expect(uniform.verticalAlign).toEqual({ value: "top", mixed: false });
     expect(uniform.wrapText).toBe("on");
+    expect(uniform.numberFormat).toEqual({
+      value: { kind: "number", fractionDigits: 2 },
+      mixed: false,
+    });
 
     const withBlank = getSelectionCellStyleState(sheet, {
       start: { row: 0, column: 0 },
@@ -45,6 +51,7 @@ describe("selection cell style state", () => {
     expect(withBlank.textColor.mixed).toBe(true);
     expect(withBlank.verticalAlign).toEqual({ value: "top", mixed: true });
     expect(withBlank.wrapText).toBe("mixed");
+    expect(withBlank.numberFormat.mixed).toBe(true);
   });
 
   test("queries a small selection directly when the sheet contains many other cells", () => {

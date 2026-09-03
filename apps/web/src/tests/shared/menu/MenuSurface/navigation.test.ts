@@ -62,4 +62,27 @@ describe("MenuSurface", () => {
       wrapper.unmount();
     }
   });
+
+  test("moves focus across menuitemradio and menuitemcheckbox roles", async () => {
+    const wrapper = mount(MenuSurface, {
+      attachTo: document.body,
+      props: { label: "Formats" },
+      slots: {
+        default: `
+          <li role="menuitemradio" tabindex="0" aria-checked="true">General</li>
+          <li role="menuitemcheckbox" tabindex="-1" aria-checked="false">Decimals</li>
+        `,
+      },
+    });
+
+    try {
+      const items = wrapper.findAll<HTMLElement>('[role^="menuitem"]');
+      items[0]?.element.focus();
+      await items[0]?.trigger("keydown", { key: "ArrowDown" });
+      expect(document.activeElement).toBe(items[1]?.element);
+      expect(items.map((item) => item.attributes("tabindex"))).toEqual(["-1", "0"]);
+    } finally {
+      wrapper.unmount();
+    }
+  });
 });

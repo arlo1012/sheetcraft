@@ -5,10 +5,12 @@ const props = withDefaults(
   defineProps<{
     danger?: boolean;
     disabled?: boolean;
+    role?: "menuitem" | "menuitemcheckbox" | "menuitemradio";
   }>(),
   {
     danger: false,
     disabled: false,
+    role: "menuitem",
   },
 );
 
@@ -50,7 +52,7 @@ function onKeydown(event: KeyboardEvent): void {
     <span
       v-bind="$attrs"
       class="idea-menu-item__command"
-      role="menuitem"
+      :role="role"
       tabindex="-1"
       :aria-disabled="disabled"
       @click="requestSelect"
@@ -74,7 +76,7 @@ function onKeydown(event: KeyboardEvent): void {
       'idea-menu-item--disabled': disabled,
       'idea-menu-item--with-icon': $slots.icon,
     }"
-    role="menuitem"
+    :role="role"
     tabindex="-1"
     :aria-disabled="disabled"
     @click="requestSelect"

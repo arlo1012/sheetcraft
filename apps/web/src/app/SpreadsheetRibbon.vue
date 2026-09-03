@@ -14,6 +14,7 @@ defineProps<{
 const emit = defineEmits<{
   applyBorders: [action: CellBorderAction];
   applyStyle: [patch: CellStylePatch];
+  adjustDecimals: [delta: -1 | 1];
   activateFormatPainter: [];
   undo: [];
   redo: [];
@@ -39,6 +40,7 @@ const { t } = useAppI18n();
         :format-painter-active="formatPainterActive"
         @apply-borders="emit('applyBorders', $event)"
         @apply-style="emit('applyStyle', $event)"
+        @adjust-decimals="emit('adjustDecimals', $event)"
         @activate-format-painter="emit('activateFormatPainter')"
         @undo="emit('undo')"
         @redo="emit('redo')"

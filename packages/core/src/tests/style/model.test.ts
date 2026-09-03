@@ -2,10 +2,13 @@ import { describe, expect, test } from "vitest";
 import { createTestWorkbook } from "../helpers.js";
 import {
   CELL_STYLE_KEYS,
+  MAX_NUMBER_FORMAT_FRACTION_DIGITS,
   areCellStylesEqual,
+  areCellNumberFormatsEqual,
   cloneCellStyle,
   createClearCellStylePatch,
   normalizeCellBorderAction,
+  normalizeCellNumberFormat,
   normalizeCellStyle,
   normalizeCellStylePatch,
 } from "../../style.js";
@@ -53,6 +56,7 @@ describe("cell style model", () => {
         horizontalAlign: "center",
         verticalAlign: "bottom",
         wrapText: true,
+        numberFormat: { kind: "currency", currency: "cny", fractionDigits: 2 },
       }),
     ).toEqual({
       fontFamily: "Georgia",
@@ -62,6 +66,7 @@ describe("cell style model", () => {
       horizontalAlign: "center",
       verticalAlign: "bottom",
       wrapText: true,
+      numberFormat: { kind: "currency", currency: "CNY", fractionDigits: 2 },
     });
     expect(normalizeCellStyle({ verticalAlign: "middle" })).toBeUndefined();
     expect(normalizeCellStylePatch({ verticalAlign: "middle" })).toEqual({
@@ -87,11 +92,47 @@ describe("cell style model", () => {
     );
     expect(() => normalizeCellStyle({ verticalAlign: "baseline" as never })).toThrow(TypeError);
     expect(() => normalizeCellStyle({ wrapText: "yes" as never })).toThrow(TypeError);
+    expect(() =>
+      normalizeCellStyle({
+        numberFormat: { kind: "currency", currency: "yuan", fractionDigits: 2 },
+      }),
+    ).toThrow(TypeError);
+    expect(() =>
+      normalizeCellStyle({
+        numberFormat: {
+          kind: "number",
+          fractionDigits: MAX_NUMBER_FORMAT_FRACTION_DIGITS + 1,
+        },
+      }),
+    ).toThrow(RangeError);
+  });
+
+  test("normalizes and compares semantic number formats structurally", () => {
+    expect(
+      normalizeCellNumberFormat({ kind: "currency", currency: "usd", fractionDigits: 2 }),
+    ).toEqual({
+      kind: "currency",
+      currency: "USD",
+      fractionDigits: 2,
+    });
+    expect(
+      areCellNumberFormatsEqual(
+        { kind: "percent", fractionDigits: 1 },
+        { kind: "percent", fractionDigits: 1 },
+      ),
+    ).toBe(true);
+    expect(
+      areCellNumberFormatsEqual(
+        { kind: "currency", currency: "USD", fractionDigits: 2 },
+        { kind: "currency", currency: "CNY", fractionDigits: 2 },
+      ),
+    ).toBe(false);
   });
 
   test("deep clones and structurally compares borders", () => {
     const original = {
       bold: true as const,
+      numberFormat: { kind: "currency" as const, currency: "USD", fractionDigits: 2 },
       borderTop: { style: "double" as const, color: "#112233" },
       borderDiagonalUp: { style: "dashed" as const, color: "#445566" },
     };
@@ -100,6 +141,7 @@ describe("cell style model", () => {
     expect(clone).toEqual(original);
     expect(clone?.borderTop).not.toBe(original.borderTop);
     expect(clone?.borderDiagonalUp).not.toBe(original.borderDiagonalUp);
+    expect(clone?.numberFormat).not.toBe(original.numberFormat);
     expect(areCellStylesEqual(original, clone)).toBe(true);
     if (clone?.borderTop) {
       clone.borderTop.color = "#abcdef";

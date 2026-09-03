@@ -3,6 +3,7 @@ import { createTestWorkbookSession } from "../helpers.js";
 import {
   createApplyCellBordersCommand,
   createApplyCellStyleCommand,
+  createAdjustCellNumberFormatDecimalsCommand,
   createClearCellRangeCommand,
 } from "../../commands/index.js";
 import { WorkbookDomainError } from "../../errors.js";
@@ -85,6 +86,80 @@ describe("cell style commands", () => {
     undoWorkbookCommand(session);
     expect(getCellValue(sheet, { row: 1, column: 1 })).toBe("keep style");
     expect(getCellStyle(sheet, { row: 1, column: 1 })).toEqual({ underline: true });
+  });
+
+  test("adjusts mixed number formats per cell as one reversible action", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        numberFormat: { kind: "number", fractionDigits: 2 },
+      },
+    );
+    setCellStyle(
+      sheet,
+      { row: 0, column: 1 },
+      {
+        numberFormat: { kind: "currency", currency: "USD", fractionDigits: 4 },
+      },
+    );
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createAdjustCellNumberFormatDecimalsCommand(
+          sheet.id,
+          { start: { row: 0, column: 0 }, end: { row: 0, column: 2 } },
+          1,
+        ),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })?.numberFormat).toEqual({
+      kind: "number",
+      fractionDigits: 3,
+    });
+    expect(getCellStyle(sheet, { row: 0, column: 1 })?.numberFormat).toEqual({
+      kind: "currency",
+      currency: "USD",
+      fractionDigits: 5,
+    });
+    expect(getCellStyle(sheet, { row: 0, column: 2 })?.numberFormat).toEqual({
+      kind: "number",
+      fractionDigits: 1,
+    });
+    expect(session.history.undoStack).toHaveLength(1);
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })?.numberFormat?.fractionDigits).toBe(2);
+    expect(getCellStyle(sheet, { row: 0, column: 1 })?.numberFormat?.fractionDigits).toBe(4);
+    expect(getCellStyle(sheet, { row: 0, column: 2 })).toBeUndefined();
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 2 })?.numberFormat?.fractionDigits).toBe(1);
+  });
+
+  test("keeps decrease on General and saturated precision out of history", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const range = { start: { row: 1, column: 1 }, end: { row: 1, column: 1 } };
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createAdjustCellNumberFormatDecimalsCommand(sheet.id, range, -1),
+      ),
+    ).toBe(false);
+    setCellStyle(sheet, range.start, {
+      numberFormat: { kind: "percent", fractionDigits: 0 },
+    });
+    expect(
+      executeWorkbookCommand(
+        session,
+        createAdjustCellNumberFormatDecimalsCommand(sheet.id, range, -1),
+      ),
+    ).toBe(false);
+    expect(session.history.undoStack).toHaveLength(0);
   });
 
   test("toggles wrapping as one reversible range style action", () => {

@@ -169,6 +169,8 @@ export type MessageSchema = {
     verticalAlignment: string;
     verticalAlignmentValue: string;
     verticalAlignmentMixed: string;
+    numberFormatValue: string;
+    numberFormatMixed: string;
     alignLeft: string;
     alignCenter: string;
     alignRight: string;

@@ -23,6 +23,7 @@ defineProps<{
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
   applyBorders: [action: CellBorderAction];
+  adjustDecimals: [delta: -1 | 1];
   activateFormatPainter: [];
   undo: [];
   redo: [];
@@ -246,7 +247,12 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           :disabled="disabled"
           @apply-style="emit('applyStyle', $event)"
         />
-        <HomeNumberGroup />
+        <HomeNumberGroup
+          :state="state"
+          :disabled="disabled"
+          @apply-style="emit('applyStyle', $event)"
+          @adjust-decimals="emit('adjustDecimals', $event)"
+        />
         <HomeDataGroup />
         <HomeInsertGroup />
         <HomeAutomationGroup />

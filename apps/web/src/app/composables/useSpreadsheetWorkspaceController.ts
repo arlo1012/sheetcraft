@@ -8,6 +8,7 @@ import {
 } from "vue";
 import {
   createAddSheetCommand,
+  createAdjustCellNumberFormatDecimalsCommand,
   createApplyCellBordersCommand,
   createApplyCellStyleCommand,
   createClearCellRangeCommand,
@@ -253,6 +254,22 @@ export function useSpreadsheetWorkspaceController(
     clearWorkspaceStatus();
   }
 
+  function adjustNumberFormatDecimals(delta: -1 | 1): void {
+    if (!isFormattingSupported.value) {
+      showWorkspaceStatus({ key: "format.selectionTooLarge" });
+      return;
+    }
+    execute(
+      createAdjustCellNumberFormatDecimalsCommand(
+        activeSheet.value.id,
+        activeSelectionRange.value,
+        delta,
+      ),
+      "format.cells",
+    );
+    clearWorkspaceStatus();
+  }
+
   function activateFormatPainter(): void {
     if (formatPainterSource.value) {
       cancelFormatPainter();
@@ -479,6 +496,7 @@ export function useSpreadsheetWorkspaceController(
     clearCells,
     applyCellStyle,
     applyCellBorders,
+    adjustNumberFormatDecimals,
     activateFormatPainter,
     applyFormatPainterTarget,
     cancelFormatPainter,

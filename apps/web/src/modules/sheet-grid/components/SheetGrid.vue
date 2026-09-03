@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, markRaw, ref, watch } from "vue";
-import { formatCellValueForDisplay, formatCellValueForInput } from "@idea10/core/input";
+import { formatCellValueForInput } from "@idea10/core/input";
 import { getCellAddressLabel } from "@idea10/core/coordinates";
 import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
@@ -64,6 +64,7 @@ import SheetColumnHeaders from "./SheetColumnHeaders.vue";
 import SheetRowHeaders from "./SheetRowHeaders.vue";
 import SheetSelectionOverlay from "./SheetSelectionOverlay.vue";
 import { getCellEditorFrameStyle, getCellEditorStyle } from "../cell-presentation";
+import { formatCellValueForGrid } from "../cell-value-presentation";
 
 type AxisContextMenuState = {
   axis: SheetDimensionAxis;
@@ -131,7 +132,7 @@ const emit = defineEmits<{
 const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 28;
 
-const { t } = useAppI18n();
+const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
 const selection = ref<CellSelection>(createCellSelection({ row: 0, column: 0 }));
 const clipboardFeedbackKey = ref<GridClipboardFeedback>();
@@ -305,7 +306,11 @@ const activeCellOutlineRect = computed(() =>
 );
 const activeCellLabel = computed(() => getCellAddressLabel(activeCell.value));
 const activeCellDisplayValue = computed(() =>
-  formatCellValueForDisplay(getCellValue(props.sheet, activeCell.value)),
+  formatCellValueForGrid(
+    getCellValue(props.sheet, activeCell.value),
+    getCellStyle(props.sheet, activeCell.value),
+    locale.value,
+  ),
 );
 const activeCellEditorStyle = computed(() =>
   getCellEditorStyle(getCellStyle(props.sheet, activeCell.value)),
@@ -1004,6 +1009,7 @@ defineExpose({ focusGrid: focusEditor, navigateToCell });
             :selection="selection"
             :scroll-position="scrollPosition"
             :editing="isEditing"
+            :locale="locale"
             @cell-mousedown="onCellMouseDown"
             @cell-double-click="onCellDoubleClick"
             @cell-contextmenu="openCellContextMenu"

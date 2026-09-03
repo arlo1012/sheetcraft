@@ -20,6 +20,7 @@ function createStyleState(
     horizontalAlign: { value: undefined, mixed: false },
     verticalAlign: { value: undefined, mixed: false },
     wrapText: "off",
+    numberFormat: { value: undefined, mixed: false },
     ...overrides,
   };
 }
@@ -344,12 +345,9 @@ describe("HomeFormatToolbar", () => {
 
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="undo"]')).toBeTruthy();
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="redo"]')).toBeTruthy();
-    expect(
-      wrapper
-        .get('[data-ribbon-placeholder="number-format"]')
-        .get(".ribbon-icon-action__icon svg")
-        .classes(),
-    ).toContain("lucide-hash");
+    expect(wrapper.get("[data-number-format-trigger]").get("svg").classes()).toContain(
+      "lucide-hash",
+    );
     expect(
       wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="format-painter"]'),
     ).toBeTruthy();
@@ -368,7 +366,7 @@ describe("HomeFormatToolbar", () => {
       expect(control.element).toBeInstanceOf(HTMLButtonElement);
       expect(control.attributes()).toMatchObject({ type: "button", disabled: "" });
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(27);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(22);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({ type: "button", disabled: "" });

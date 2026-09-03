@@ -25,6 +25,7 @@ const {
   clearCells,
   applyCellStyle,
   applyCellBorders,
+  adjustNumberFormatDecimals,
   activateFormatPainter,
   applyFormatPainterTarget,
   cancelFormatPainter,
@@ -67,6 +68,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :format-painter-active="formatPainterActive"
       @apply-borders="applyCellBorders"
       @apply-style="applyCellStyle"
+      @adjust-decimals="adjustNumberFormatDecimals"
       @activate-format-painter="activateFormatPainter"
       @undo="undo"
       @redo="redo"

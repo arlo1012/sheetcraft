@@ -2,6 +2,7 @@ import { WorkbookDomainError, toWorkbookErrorData, type WorkbookErrorData } from
 import type { Workbook } from "../workbook.js";
 import {
   applyCellBordersCommand,
+  applyAdjustCellNumberFormatDecimalsCommand,
   applyCellStyleCommand,
   applyRestoreCellStylesCommand,
 } from "./formatting.js";
@@ -34,6 +35,8 @@ export function applyWorkbookCommand(
         return applyCellStyleCommand(workbook, command);
       case "applyCellBorders":
         return applyCellBordersCommand(workbook, command);
+      case "adjustCellNumberFormatDecimals":
+        return applyAdjustCellNumberFormatDecimalsCommand(workbook, command);
       case "restoreCellStyles":
         return applyRestoreCellStylesCommand(workbook, command);
       case "resizeSheetDimension":
