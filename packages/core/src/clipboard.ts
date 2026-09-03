@@ -35,7 +35,7 @@ function normalizeRange(range: CellRange): CellRange {
   };
 }
 
-export function getCellMatrixSize(values: readonly (readonly CellValue[])[]): CellMatrixSize {
+export function getCellMatrixSize<Value>(values: readonly (readonly Value[])[]): CellMatrixSize {
   const firstRow = values[0];
   if (!firstRow || firstRow.length === 0) {
     throw new RangeError("A cell matrix must contain at least one cell.");
@@ -157,16 +157,27 @@ function createRangeFromMatrix(anchor: CellAddress, size: CellMatrixSize): CellR
   return { start: { ...anchor }, end };
 }
 
-function tileCellValues(
-  values: readonly (readonly CellValue[])[],
+export function tileCellMatrix<Value>(
+  values: readonly (readonly Value[])[],
   targetSize: CellMatrixSize,
-): CellValueMatrix {
+): Value[][] {
   const sourceSize = getCellMatrixSize(values);
+  if (
+    !Number.isInteger(targetSize.rowCount) ||
+    !Number.isInteger(targetSize.columnCount) ||
+    targetSize.rowCount <= 0 ||
+    targetSize.columnCount <= 0
+  ) {
+    throw new RangeError("A target cell matrix must contain at least one cell.");
+  }
   return Array.from({ length: targetSize.rowCount }, (_, row) =>
-    Array.from(
-      { length: targetSize.columnCount },
-      (_, column) => values[row % sourceSize.rowCount]?.[column % sourceSize.columnCount] ?? null,
-    ),
+    Array.from({ length: targetSize.columnCount }, (_, column) => {
+      const sourceRow = values[row % sourceSize.rowCount];
+      if (!sourceRow) {
+        throw new RangeError("A cell matrix must contain at least one cell.");
+      }
+      return sourceRow[column % sourceSize.columnCount] as Value;
+    }),
   );
 }
 
@@ -205,6 +216,6 @@ export function createPastePlan(
   return {
     anchor: { ...normalizedTarget.start },
     range: normalizedTarget,
-    values: tileCellValues(values, targetSize),
+    values: tileCellMatrix(values, targetSize),
   };
 }

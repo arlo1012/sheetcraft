@@ -190,12 +190,18 @@ export type MessageSchema = {
     rangeMismatch: string;
     moved: string;
     pasted: string;
+    valuesPasted: string;
+    formatsPasted: string;
+    formatsUnavailable: string;
   };
   cellMenu: {
     actions: string;
     cut: string;
     copy: string;
     paste: string;
+    pasteSpecial: string;
+    pasteValues: string;
+    pasteFormats: string;
     clearContents: string;
     cutShortcut: string;
     copyShortcut: string;

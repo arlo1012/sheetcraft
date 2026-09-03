@@ -1,6 +1,7 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { reactive } from "vue";
 import type { GridPastePayload } from "../../../../../modules/sheet-grid/useGridClipboard";
+import { getCellRangeValues } from "@idea10/core/clipboard";
 import {
   createClearCellRangeCommand,
   createDeleteSheetAxisCommand,
@@ -60,12 +61,22 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
         );
       },
       onPasteCells(payload: GridPastePayload) {
+        const values =
+          payload.kind === "formats"
+            ? getCellRangeValues(sheet, payload.plan.range)
+            : payload.plan.values;
         executeWorkbookCommand(
           session,
-          createPasteCellValuesCommand(sheet.id, payload.plan.anchor, payload.plan.values, {
-            clearRange: payload.clearRange,
-            styles: payload.styles,
-          }),
+          createPasteCellValuesCommand(
+            sheet.id,
+            payload.plan.anchor,
+            values,
+            payload.kind === "all"
+              ? { clearRange: payload.clearRange, styles: payload.styles }
+              : payload.kind === "formats"
+                ? { styles: payload.styles }
+                : undefined,
+          ),
         );
       },
       onResizeDimension(payload: { axis: SheetDimensionAxis; index: number; size: number }) {

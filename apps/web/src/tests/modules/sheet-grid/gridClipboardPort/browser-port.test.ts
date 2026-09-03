@@ -53,6 +53,31 @@ describe("browser grid clipboard port", () => {
     expect(writeText).toHaveBeenCalledWith("plain fallback");
   });
 
+  test("reports a local token written by the legacy copy event", async () => {
+    const setData = vi.fn();
+    vi.stubGlobal("navigator", {});
+    vi.stubGlobal("ClipboardItem", undefined);
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: vi.fn(() => {
+        const event = new Event("copy", { bubbles: true, cancelable: true });
+        Object.defineProperty(event, "clipboardData", { value: { setData } });
+        document.dispatchEvent(event);
+        return true;
+      }),
+    });
+
+    try {
+      await expect(
+        createBrowserGridClipboardPort().write({ text: "legacy", localToken: "token-legacy" }),
+      ).resolves.toEqual({ localTokenWritten: true });
+      expect(setData).toHaveBeenCalledWith("text/plain", "legacy");
+      expect(setData).toHaveBeenCalledWith("application/x-idea10-cells", "token-legacy");
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
+
   test("falls back to readText when reading clipboard items is denied", async () => {
     const read = vi.fn().mockRejectedValue(new DOMException("denied", "NotAllowedError"));
     const readText = vi.fn().mockResolvedValue("plain value");

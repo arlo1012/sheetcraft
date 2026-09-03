@@ -1,9 +1,11 @@
 import { computed, shallowRef, type ComputedRef } from "vue";
 import {
   createPastePlan,
+  getCellMatrixSize,
   getCellRangeValues,
   parseTsvToCellValues,
   serializeCellValuesToTsv,
+  tileCellMatrix,
   type CellValueMatrix,
   type PastePlan,
 } from "@idea10/core/clipboard";
@@ -17,15 +19,24 @@ import {
 import {
   createBrowserGridClipboardPort,
   IDEA10_CLIPBOARD_TYPE,
+  readGridClipboardLocalToken,
   type GridClipboardPort,
   type GridClipboardTransfer,
 } from "./gridClipboardPort";
 
-export type GridPastePayload = {
-  plan: PastePlan;
-  clearRange?: CellRange;
-  styles?: Array<Array<CellStyle | null>>;
-};
+type CellStyleMatrix = Array<Array<CellStyle | null>>;
+
+export type GridPastePayload =
+  | {
+      kind: "all";
+      plan: PastePlan;
+      clearRange?: CellRange;
+      styles?: CellStyleMatrix;
+    }
+  | { kind: "values"; plan: PastePlan }
+  | { kind: "formats"; plan: PastePlan; styles: CellStyleMatrix };
+
+type GridPasteKind = GridPastePayload["kind"];
 
 export type GridClipboardFeedback =
   | "unavailable"
@@ -36,7 +47,10 @@ export type GridClipboardFeedback =
   | "missingText"
   | "rangeMismatch"
   | "moved"
-  | "pasted";
+  | "pasted"
+  | "valuesPasted"
+  | "formatsPasted"
+  | "formatsUnavailable";
 
 type PendingClipboard = {
   mode: "copy" | "cut";
@@ -44,7 +58,8 @@ type PendingClipboard = {
   token: string;
   text: string;
   values: CellValueMatrix;
-  styles: Array<Array<CellStyle | null>>;
+  styles: CellStyleMatrix;
+  localTokenWritten: boolean;
 };
 
 function getCellRangeStyles(sheet: Sheet, range: CellRange): Array<Array<CellStyle | null>> {
@@ -104,7 +119,7 @@ export function useGridClipboard(options: {
     const styles = getCellRangeStyles(options.getSheet(), range);
     const text = serializeCellValuesToTsv(values);
     const token = createToken();
-    return { mode, range, token, text, values, styles };
+    return { mode, range, token, text, values, styles, localTokenWritten: false };
   }
 
   function commitPreparedSelection(prepared: PendingClipboard): void {
@@ -130,7 +145,7 @@ export function useGridClipboard(options: {
     event.clipboardData.setData("text/plain", prepared.text);
     event.clipboardData.setData(IDEA10_CLIPBOARD_TYPE, prepared.token);
     clipboardOperation += 1;
-    commitPreparedSelection(prepared);
+    commitPreparedSelection({ ...prepared, localTokenWritten: true });
   }
 
   async function writeSelectionToClipboard(mode: "copy" | "cut"): Promise<void> {
@@ -155,9 +170,11 @@ export function useGridClipboard(options: {
     if (operation !== clipboardOperation || options.getSheet().id !== sheetId) {
       return;
     }
-    commitPreparedSelection(
-      mode === "cut" && !localTokenWritten ? { ...prepared, mode: "copy" } : prepared,
-    );
+    commitPreparedSelection({
+      ...prepared,
+      mode: mode === "cut" && !localTokenWritten ? "copy" : mode,
+      localTokenWritten,
+    });
   }
 
   function onCopy(event: ClipboardEvent): void {
@@ -188,18 +205,32 @@ export function useGridClipboard(options: {
     };
   }
 
-  function pasteTransfer(transfer: GridClipboardTransfer, selection: CellSelection): void {
+  function pasteTransfer(
+    transfer: GridClipboardTransfer,
+    selection: CellSelection,
+    kind: GridPasteKind,
+  ): void {
     const text = transfer.text;
     const localToken = transfer.localToken;
     const pending = pendingClipboard.value;
     const isMatchingLocalClipboard = Boolean(pending && localToken && localToken === pending.token);
+    const matchingFormatSource =
+      isMatchingLocalClipboard && pending?.mode === "copy" && pending.localTokenWritten
+        ? pending
+        : undefined;
+    if (kind === "formats" && !matchingFormatSource) {
+      options.onFeedback("formatsUnavailable");
+      return;
+    }
     if (!isMatchingLocalClipboard && text === undefined) {
       options.onFeedback("missingText");
       return;
     }
     const values =
       isMatchingLocalClipboard && pending ? pending.values : parseTsvToCellValues(text ?? "");
-    const isLocalCut = Boolean(isMatchingLocalClipboard && pending?.mode === "cut");
+    const isLocalCut = Boolean(
+      kind === "all" && isMatchingLocalClipboard && pending?.mode === "cut",
+    );
     const plan = createPastePlan(values, getSelectionRange(selection), selection.active, {
       pasteFromActiveCell: isLocalCut,
     });
@@ -208,15 +239,59 @@ export function useGridClipboard(options: {
       return;
     }
 
-    options.onPaste({
-      plan,
-      clearRange: isLocalCut ? pending?.range : undefined,
-      styles: isMatchingLocalClipboard ? pending?.styles : undefined,
-    });
+    if (kind === "formats" && matchingFormatSource) {
+      options.onPaste({
+        kind,
+        plan,
+        styles: tileCellMatrix(matchingFormatSource.styles, getCellMatrixSize(plan.values)),
+      });
+    } else if (kind === "values") {
+      options.onPaste({ kind, plan });
+    } else if (kind === "all") {
+      options.onPaste({
+        kind,
+        plan,
+        clearRange: isLocalCut ? pending?.range : undefined,
+        styles:
+          isMatchingLocalClipboard && pending
+            ? tileCellMatrix(pending.styles, getCellMatrixSize(plan.values))
+            : undefined,
+      });
+    }
     if (isLocalCut) {
       pendingClipboard.value = null;
     }
-    options.onFeedback(isLocalCut ? "moved" : "pasted");
+    options.onFeedback(
+      isLocalCut
+        ? "moved"
+        : kind === "values"
+          ? "valuesPasted"
+          : kind === "formats"
+            ? "formatsPasted"
+            : "pasted",
+    );
+  }
+
+  async function pasteClipboardEventTransfer(
+    eventTransfer: GridClipboardTransfer,
+    selection: CellSelection,
+    operation: number,
+    sheetId: string,
+  ): Promise<void> {
+    let transfer = eventTransfer;
+    try {
+      const asyncTransfer = await clipboardPort.read({ preferAsync: true });
+      transfer = {
+        text: eventTransfer.text,
+        localToken: asyncTransfer.localToken,
+      };
+    } catch {
+      // The synchronous event payload remains the safe text-only fallback.
+    }
+    if (operation !== clipboardOperation || options.getSheet().id !== sheetId) {
+      return;
+    }
+    pasteTransfer(transfer, selection, "all");
   }
 
   function onPaste(event: ClipboardEvent): void {
@@ -234,17 +309,21 @@ export function useGridClipboard(options: {
       return;
     }
     const types = Array.from(data.types);
-    clipboardOperation += 1;
-    pasteTransfer(
-      {
-        text: types.includes("text/plain") ? data.getData("text/plain") : undefined,
-        localToken: data.getData(IDEA10_CLIPBOARD_TYPE) || undefined,
-      },
-      cloneSelection(options.getSelection()),
-    );
+    const operation = ++clipboardOperation;
+    const sheetId = options.getSheet().id;
+    const selection = cloneSelection(options.getSelection());
+    const transfer = {
+      text: types.includes("text/plain") ? data.getData("text/plain") : undefined,
+      localToken: readGridClipboardLocalToken(data),
+    };
+    if (!transfer.localToken && pendingClipboard.value?.localTokenWritten) {
+      void pasteClipboardEventTransfer(transfer, selection, operation, sheetId);
+      return;
+    }
+    pasteTransfer(transfer, selection, "all");
   }
 
-  async function pasteSelection(): Promise<void> {
+  async function pasteSelection(kind: GridPasteKind = "all"): Promise<void> {
     if (!canPaste()) {
       return;
     }
@@ -263,7 +342,7 @@ export function useGridClipboard(options: {
     if (operation !== clipboardOperation || options.getSheet().id !== sheetId) {
       return;
     }
-    pasteTransfer(transfer, selection);
+    pasteTransfer(transfer, selection, kind);
   }
 
   function clearPendingClipboard(): void {
@@ -272,6 +351,9 @@ export function useGridClipboard(options: {
   }
 
   return {
+    canPasteFormats: computed(
+      () => pendingClipboard.value?.mode === "copy" && pendingClipboard.value.localTokenWritten,
+    ),
     clipboardMode,
     clipboardRange,
     clearPendingClipboard,
@@ -281,5 +363,7 @@ export function useGridClipboard(options: {
     onCut,
     onPaste,
     pasteSelection,
+    pasteFormatsSelection: () => pasteSelection("formats"),
+    pasteValuesSelection: () => pasteSelection("values"),
   };
 }

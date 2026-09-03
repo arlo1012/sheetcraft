@@ -2,6 +2,7 @@ import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { getCellStyle, getCellValue, setCellStyle, setCellValue } from "@idea10/core/workbook";
 import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { createAppI18n } from "../../../shared/i18n";
@@ -102,5 +103,60 @@ describe("spreadsheet workspace controller", () => {
 
     controller.renameSheet({ sheetId: controller.activeSheet.value.id, name: "Retained" });
     expect(controller.viewStates.has(firstSheetId)).toBe(false);
+  });
+
+  test("pastes values without changing target formatting as one history entry", () => {
+    const controller = mountController();
+    const sheet = controller.activeSheet.value;
+    const target = { row: 2, column: 3 };
+    setCellValue(sheet, target, "target");
+    setCellStyle(sheet, target, { bold: true });
+
+    controller.pasteCells({
+      kind: "values",
+      plan: {
+        anchor: target,
+        range: { start: target, end: target },
+        values: [["source"]],
+      },
+    });
+
+    expect(getCellValue(sheet, target)).toBe("source");
+    expect(getCellStyle(sheet, target)).toEqual({ bold: true });
+    expect(controller.session.history.undoStack).toHaveLength(1);
+    expect(controller.undo()).toBe(true);
+    expect(getCellValue(sheet, target)).toBe("target");
+    expect(getCellStyle(sheet, target)).toEqual({ bold: true });
+  });
+
+  test("pastes exact formatting without changing target values as one history entry", () => {
+    const controller = mountController();
+    const sheet = controller.activeSheet.value;
+    const first = { row: 4, column: 2 };
+    const second = { row: 4, column: 3 };
+    setCellValue(sheet, first, "keep first");
+    setCellValue(sheet, second, "keep second");
+    setCellStyle(sheet, first, { italic: true });
+    setCellStyle(sheet, second, { bold: true });
+
+    controller.pasteCells({
+      kind: "formats",
+      plan: {
+        anchor: first,
+        range: { start: first, end: second },
+        values: [["ignored", "ignored"]],
+      },
+      styles: [[{ bold: true }, null]],
+    });
+
+    expect(getCellValue(sheet, first)).toBe("keep first");
+    expect(getCellValue(sheet, second)).toBe("keep second");
+    expect(getCellStyle(sheet, first)).toEqual({ bold: true });
+    expect(getCellStyle(sheet, second)).toBeUndefined();
+    expect(controller.session.history.undoStack).toHaveLength(1);
+    expect(controller.undo()).toBe(true);
+    expect(getCellValue(sheet, first)).toBe("keep first");
+    expect(getCellStyle(sheet, first)).toEqual({ italic: true });
+    expect(getCellStyle(sheet, second)).toEqual({ bold: true });
   });
 });

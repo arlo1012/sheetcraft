@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createPastePlan } from "../../clipboard.js";
+import { createPastePlan, tileCellMatrix } from "../../clipboard.js";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "../../workbook.js";
 
 describe("clipboard paste plan", () => {
@@ -34,6 +34,14 @@ describe("clipboard paste plan", () => {
       [1, 2, 1, 2],
       [1, 2, 1, 2],
     ]);
+  });
+
+  test("tiles generic cell metadata without coercing null entries", () => {
+    expect(tileCellMatrix([[{ bold: true }, null]], { rowCount: 2, columnCount: 4 })).toEqual([
+      [{ bold: true }, null, { bold: true }, null],
+      [{ bold: true }, null, { bold: true }, null],
+    ]);
+    expect(() => tileCellMatrix([[1]], { rowCount: 0, columnCount: 1 })).toThrow(RangeError);
   });
 
   test("rejects incompatible selected dimensions and sheet overflow", () => {

@@ -11,6 +11,17 @@ import {
   type GridPastePayload,
 } from "../../../../modules/sheet-grid/useGridClipboard";
 
+function createTextPasteEvent(text: string): ClipboardEvent {
+  const event = new Event("paste", { bubbles: true, cancelable: true }) as ClipboardEvent;
+  Object.defineProperty(event, "clipboardData", {
+    value: {
+      types: ["text/plain"],
+      getData: (format: string) => (format === "text/plain" ? text : ""),
+    },
+  });
+  return event;
+}
+
 function createFixture() {
   const sheet = getActiveSheet(createWorkbook({ id: "workbook-1", sheetId: "sheet-1" }));
   let currentSheet = sheet;
@@ -21,7 +32,7 @@ function createFixture() {
   const pastes: GridPastePayload[] = [];
   const port: GridClipboardPort = {
     write: vi.fn(async (nextTransfer) => {
-      transfer = nextTransfer;
+      transfer = localTokenWritten ? nextTransfer : { text: nextTransfer.text };
       return { localTokenWritten };
     }),
     read: vi.fn(async () => transfer),
@@ -73,12 +84,27 @@ describe("useGridClipboard menu commands", () => {
       end: { row: 0, column: 0 },
     });
 
-    fixture.setSelection(createCellSelection({ row: 2, column: 2 }));
+    fixture.setSelection({
+      active: { row: 2, column: 2 },
+      anchor: { row: 2, column: 2 },
+      focus: { row: 3, column: 3 },
+      mode: "cells",
+    });
     await fixture.clipboard.pasteSelection();
+    expect(fixture.pastes[0]?.kind).toBe("all");
     expect(fixture.pastes[0]?.plan.anchor).toEqual({ row: 2, column: 2 });
-    expect(fixture.pastes[0]?.plan.values).toEqual([["source"]]);
-    expect(fixture.pastes[0]?.styles).toEqual([[{ bold: true }]]);
-    expect(fixture.pastes[0]?.clearRange).toBeUndefined();
+    expect(fixture.pastes[0]?.plan.values).toEqual([
+      ["source", "source"],
+      ["source", "source"],
+    ]);
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "all",
+      styles: [
+        [{ bold: true }, { bold: true }],
+        [{ bold: true }, { bold: true }],
+      ],
+      clearRange: undefined,
+    });
     expect(fixture.feedback).toEqual(["copied", "pasted"]);
   });
 
@@ -87,12 +113,16 @@ describe("useGridClipboard menu commands", () => {
     setCellValue(fixture.sheet, { row: 0, column: 0 }, "move");
 
     await fixture.clipboard.cutSelection();
+    expect(fixture.clipboard.canPasteFormats.value).toBe(false);
     fixture.setSelection(createCellSelection({ row: 1, column: 1 }));
     await fixture.clipboard.pasteSelection();
 
-    expect(fixture.pastes[0]?.clearRange).toEqual({
-      start: { row: 0, column: 0 },
-      end: { row: 0, column: 0 },
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "all",
+      clearRange: {
+        start: { row: 0, column: 0 },
+        end: { row: 0, column: 0 },
+      },
     });
     expect(fixture.clipboard.clipboardRange.value).toBeNull();
     expect(fixture.feedback).toEqual(["readyToMove", "moved"]);
@@ -124,7 +154,7 @@ describe("useGridClipboard menu commands", () => {
 
     await fixture.clipboard.pasteSelection();
     expect(fixture.pastes[0]?.plan.values).toEqual([["external"]]);
-    expect(fixture.pastes[0]?.clearRange).toBeUndefined();
+    expect(fixture.pastes[0]).toMatchObject({ kind: "all", clearRange: undefined });
     expect(fixture.feedback.at(-1)).toBe("pasted");
   });
 
@@ -139,7 +169,163 @@ describe("useGridClipboard menu commands", () => {
 
     fixture.setSelection(createCellSelection({ row: 1, column: 1 }));
     await fixture.clipboard.pasteSelection();
-    expect(fixture.pastes[0]?.clearRange).toBeUndefined();
+    expect(fixture.pastes[0]).toMatchObject({ kind: "all", clearRange: undefined });
+  });
+
+  test("pastes only values without forwarding local formatting", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 0, column: 0 }, 42);
+    setCellStyle(fixture.sheet, { row: 0, column: 0 }, { italic: true });
+    await fixture.clipboard.copySelection();
+
+    fixture.setSelection(createCellSelection({ row: 2, column: 3 }));
+    await fixture.clipboard.pasteValuesSelection();
+
+    expect(fixture.pastes).toEqual([
+      {
+        kind: "values",
+        plan: {
+          anchor: { row: 2, column: 3 },
+          range: { start: { row: 2, column: 3 }, end: { row: 2, column: 3 } },
+          values: [[42]],
+        },
+      },
+    ]);
+    expect(fixture.feedback).toEqual(["copied", "valuesPasted"]);
+  });
+
+  test("pastes tiled local formatting and revalidates the clipboard token", async () => {
+    const fixture = createFixture();
+    setCellStyle(fixture.sheet, { row: 0, column: 0 }, { bold: true });
+    await fixture.clipboard.copySelection();
+    expect(fixture.clipboard.canPasteFormats.value).toBe(true);
+
+    fixture.setSelection({
+      active: { row: 2, column: 2 },
+      anchor: { row: 2, column: 2 },
+      focus: { row: 3, column: 3 },
+      mode: "cells",
+    });
+    await fixture.clipboard.pasteFormatsSelection();
+    expect(fixture.pastes[0]).toEqual({
+      kind: "formats",
+      plan: {
+        anchor: { row: 2, column: 2 },
+        range: { start: { row: 2, column: 2 }, end: { row: 3, column: 3 } },
+        values: [
+          [null, null],
+          [null, null],
+        ],
+      },
+      styles: [
+        [{ bold: true }, { bold: true }],
+        [{ bold: true }, { bold: true }],
+      ],
+    });
+
+    fixture.setTransfer({ text: "replaced" });
+    await fixture.clipboard.pasteFormatsSelection();
+    expect(fixture.pastes).toHaveLength(1);
+    expect(fixture.feedback.at(-1)).toBe("formatsUnavailable");
+  });
+
+  test("keeps format paste unavailable when only plain text was written", async () => {
+    const fixture = createFixture();
+    fixture.setLocalTokenWritten(false);
+
+    await fixture.clipboard.copySelection();
+    expect(fixture.clipboard.canPasteFormats.value).toBe(false);
+    await fixture.clipboard.pasteFormatsSelection();
+
+    expect(fixture.pastes).toHaveLength(0);
+    expect(fixture.feedback).toEqual(["copied", "formatsUnavailable"]);
+  });
+
+  test("pastes values from external text", async () => {
+    const fixture = createFixture();
+    fixture.setTransfer({ text: "external\t17" });
+    fixture.setSelection(createCellSelection({ row: 4, column: 1 }));
+
+    await fixture.clipboard.pasteValuesSelection();
+
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "values",
+      plan: { anchor: { row: 4, column: 1 }, values: [["external", 17]] },
+    });
+    expect(fixture.feedback).toEqual(["valuesPasted"]);
+  });
+
+  test("revalidates a filtered native paste event through the async clipboard", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 0, column: 0 }, "rich source");
+    setCellStyle(fixture.sheet, { row: 0, column: 0 }, { bold: true });
+    await fixture.clipboard.copySelection();
+    fixture.setSelection(createCellSelection({ row: 2, column: 2 }));
+
+    fixture.clipboard.onPaste(createTextPasteEvent("rich source"));
+    await vi.waitFor(() => expect(fixture.pastes).toHaveLength(1));
+
+    expect(fixture.port.read).toHaveBeenCalledWith({ preferAsync: true });
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "all",
+      plan: { anchor: { row: 2, column: 2 }, values: [["rich source"]] },
+      styles: [[{ bold: true }]],
+    });
+  });
+
+  test("falls back to event text when async clipboard revalidation is denied", async () => {
+    const fixture = createFixture();
+    await fixture.clipboard.copySelection();
+    vi.mocked(fixture.port.read).mockRejectedValueOnce(
+      new DOMException("denied", "NotAllowedError"),
+    );
+    fixture.setSelection(createCellSelection({ row: 3, column: 1 }));
+
+    fixture.clipboard.onPaste(createTextPasteEvent("external"));
+    await vi.waitFor(() => expect(fixture.pastes).toHaveLength(1));
+
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "all",
+      plan: { anchor: { row: 3, column: 1 }, values: [["external"]] },
+      styles: undefined,
+    });
+  });
+
+  test("keeps captured event text when async revalidation sees newer clipboard text", async () => {
+    const fixture = createFixture();
+    await fixture.clipboard.copySelection();
+    fixture.setTransfer({ text: "newer clipboard text" });
+    fixture.setSelection(createCellSelection({ row: 3, column: 1 }));
+
+    fixture.clipboard.onPaste(createTextPasteEvent("captured event text"));
+    await vi.waitFor(() => expect(fixture.pastes).toHaveLength(1));
+
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "all",
+      plan: { anchor: { row: 3, column: 1 }, values: [["captured event text"]] },
+      styles: undefined,
+    });
+  });
+
+  test("does not apply a delayed native paste after clipboard state is cleared", async () => {
+    const fixture = createFixture();
+    await fixture.clipboard.copySelection();
+    let resolveRead: ((transfer: GridClipboardTransfer) => void) | undefined;
+    vi.mocked(fixture.port.read).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRead = resolve;
+        }),
+    );
+
+    fixture.clipboard.onPaste(createTextPasteEvent("captured"));
+    fixture.clipboard.clearPendingClipboard();
+    resolveRead?.({ text: "captured" });
+    await vi.waitFor(() => expect(fixture.port.read).toHaveBeenCalledOnce());
+    await Promise.resolve();
+
+    expect(fixture.pastes).toHaveLength(0);
+    expect(fixture.feedback).toEqual(["copied"]);
   });
 
   test("does not restore a delayed write after clipboard state is cleared", async () => {

@@ -87,6 +87,9 @@ const CLIPBOARD_MESSAGE_KEYS: Record<GridClipboardFeedback, MessageKey> = {
   rangeMismatch: "clipboard.rangeMismatch",
   moved: "clipboard.moved",
   pasted: "clipboard.pasted",
+  valuesPasted: "clipboard.valuesPasted",
+  formatsPasted: "clipboard.formatsPasted",
+  formatsUnavailable: "clipboard.formatsUnavailable",
 };
 
 const props = withDefaults(
@@ -308,6 +311,7 @@ const clipboardFeedback = computed(() =>
   clipboardFeedbackKey.value ? t(CLIPBOARD_MESSAGE_KEYS[clipboardFeedbackKey.value]) : "",
 );
 const {
+  canPasteFormats,
   clipboardMode,
   clipboardRange,
   clearPendingClipboard,
@@ -317,6 +321,8 @@ const {
   onCut,
   onPaste,
   pasteSelection,
+  pasteFormatsSelection,
+  pasteValuesSelection,
 } = useGridClipboard({
   getSheet: () => props.sheet,
   getSelection: () => selection.value,
@@ -640,7 +646,9 @@ function openActiveCellContextMenu(): void {
   };
 }
 
-async function requestCellClipboard(action: "cut" | "copy" | "paste"): Promise<void> {
+async function requestCellClipboard(
+  action: "cut" | "copy" | "paste" | "paste-values" | "paste-formats",
+): Promise<void> {
   if (!cellContextMenu.value) {
     return;
   }
@@ -649,6 +657,10 @@ async function requestCellClipboard(action: "cut" | "copy" | "paste"): Promise<v
     await cutSelection();
   } else if (action === "copy") {
     await copySelection();
+  } else if (action === "paste-values") {
+    await pasteValuesSelection();
+  } else if (action === "paste-formats") {
+    await pasteFormatsSelection();
   } else {
     await pasteSelection();
   }
@@ -1042,9 +1054,13 @@ defineExpose({ navigateToCell });
     <SheetCellContextMenu
       v-if="cellContextMenu"
       :anchor="cellContextMenu.anchor"
+      :paste-special-disabled="clipboardMode === 'cut'"
+      :paste-formats-disabled="!canPasteFormats"
       @cut="requestCellClipboard('cut')"
       @copy="requestCellClipboard('copy')"
       @paste="requestCellClipboard('paste')"
+      @paste-values="requestCellClipboard('paste-values')"
+      @paste-formats="requestCellClipboard('paste-formats')"
       @clear="requestCellClear"
       @close="closeCellContextMenu"
     />

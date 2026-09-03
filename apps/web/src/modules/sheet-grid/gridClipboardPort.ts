@@ -1,6 +1,5 @@
 export const IDEA10_CLIPBOARD_TYPE = "application/x-idea10-cells";
-
-const WEB_IDEA10_CLIPBOARD_TYPE = `web ${IDEA10_CLIPBOARD_TYPE}`;
+export const WEB_IDEA10_CLIPBOARD_TYPE = `web ${IDEA10_CLIPBOARD_TYPE}`;
 
 export type GridClipboardTransfer = {
   text?: string;
@@ -11,10 +10,22 @@ export type GridClipboardWriteResult = {
   localTokenWritten: boolean;
 };
 
+export type GridClipboardReadOptions = {
+  preferAsync?: boolean;
+};
+
 export type GridClipboardPort = {
   write: (transfer: { text: string; localToken: string }) => Promise<GridClipboardWriteResult>;
-  read: () => Promise<GridClipboardTransfer>;
+  read: (options?: GridClipboardReadOptions) => Promise<GridClipboardTransfer>;
 };
+
+export function readGridClipboardLocalToken(
+  data: Pick<DataTransfer, "getData">,
+): string | undefined {
+  return (
+    data.getData(IDEA10_CLIPBOARD_TYPE) || data.getData(WEB_IDEA10_CLIPBOARD_TYPE) || undefined
+  );
+}
 
 function restoreFocus(element: HTMLElement | null): void {
   if (element?.isConnected) {
@@ -88,7 +99,7 @@ function readWithClipboardEvent(): GridClipboardTransfer | undefined {
     const types = Array.from(event.clipboardData.types);
     transfer = {
       text: types.includes("text/plain") ? event.clipboardData.getData("text/plain") : undefined,
-      localToken: event.clipboardData.getData(IDEA10_CLIPBOARD_TYPE) || undefined,
+      localToken: readGridClipboardLocalToken(event.clipboardData),
     };
   };
 
@@ -177,11 +188,14 @@ export function createBrowserGridClipboardPort(): GridClipboardPort {
       }
 
       if (writeWithClipboardEvent(transfer)) {
-        return { localTokenWritten: false };
+        return { localTokenWritten: true };
       }
       throw new Error("clipboard-unavailable");
     },
-    async read() {
+    async read(options) {
+      if (options?.preferAsync) {
+        return readWithAsyncClipboard();
+      }
       return readWithClipboardEvent() ?? readWithAsyncClipboard();
     },
   };

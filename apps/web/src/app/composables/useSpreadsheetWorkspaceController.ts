@@ -21,6 +21,7 @@ import {
   type WorkbookCommand,
   type WorkbookOperation,
 } from "@idea10/core/commands";
+import { getCellRangeValues } from "@idea10/core/clipboard";
 import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
 import {
   createWorkbookSession,
@@ -174,6 +175,29 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function pasteCells(payload: GridPastePayload): void {
+    if (payload.kind === "formats") {
+      execute(
+        createPasteCellValuesCommand(
+          activeSheet.value.id,
+          payload.plan.anchor,
+          getCellRangeValues(activeSheet.value, payload.plan.range),
+          { styles: payload.styles },
+        ),
+        "cells.paste",
+      );
+      return;
+    }
+    if (payload.kind === "values") {
+      execute(
+        createPasteCellValuesCommand(
+          activeSheet.value.id,
+          payload.plan.anchor,
+          payload.plan.values,
+        ),
+        "cells.paste",
+      );
+      return;
+    }
     execute(
       createPasteCellValuesCommand(activeSheet.value.id, payload.plan.anchor, payload.plan.values, {
         clearRange: payload.clearRange,

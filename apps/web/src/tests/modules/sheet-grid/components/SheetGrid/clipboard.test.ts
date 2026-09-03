@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { getCellStyle, getCellValue, setCellStyle, setCellValue } from "@idea10/core/workbook";
+import {
+  IDEA10_CLIPBOARD_TYPE,
+  WEB_IDEA10_CLIPBOARD_TYPE,
+} from "../../../../../modules/sheet-grid/gridClipboardPort";
 import { createTestClipboardEvent } from "./clipboard-fixture";
 import { mountSheetGrid } from "./fixture";
 
@@ -101,6 +105,31 @@ describe("SheetGrid clipboard", () => {
     expect(getCellValue(sheet, { row: 2, column: 2 })).toBe("D");
     expect(session.history.undoStack).toHaveLength(1);
     expect(wrapper.find("[data-clipboard-range]").exists()).toBe(false);
+  });
+
+  test("recognizes a web-prefixed local token when keyboard paste follows a rich clipboard write", async () => {
+    const { session, sheet, wrapper } = mountSheetGrid();
+    setCellValue(sheet, { row: 0, column: 0 }, "move with style");
+    setCellStyle(sheet, { row: 0, column: 0 }, { bold: true });
+
+    const cut = createTestClipboardEvent("cut");
+    wrapper.get("textarea.cell-editor").element.dispatchEvent(cut.event);
+    const token = cut.data.get(IDEA10_CLIPBOARD_TYPE);
+    expect(token).toBeTruthy();
+
+    const webClipboardData = new Map(cut.data);
+    webClipboardData.delete(IDEA10_CLIPBOARD_TYPE);
+    webClipboardData.set(WEB_IDEA10_CLIPBOARD_TYPE, token ?? "");
+    await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });
+    wrapper
+      .get("textarea.cell-editor")
+      .element.dispatchEvent(createTestClipboardEvent("paste", webClipboardData).event);
+    await wrapper.vm.$nextTick();
+
+    expect(getCellValue(sheet, { row: 0, column: 0 })).toBeNull();
+    expect(getCellValue(sheet, { row: 2, column: 2 })).toBe("move with style");
+    expect(getCellStyle(sheet, { row: 2, column: 2 })).toEqual({ bold: true });
+    expect(session.history.undoStack).toHaveLength(1);
   });
 
   test("copies local styles and leaves destination styles intact for external text", async () => {
