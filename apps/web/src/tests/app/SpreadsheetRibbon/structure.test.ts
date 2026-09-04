@@ -3,13 +3,21 @@ import { describe, expect, test } from "vitest";
 import SpreadsheetRibbon from "../../../app/SpreadsheetRibbon.vue";
 import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
 import { createAppI18n } from "../../../shared/i18n";
+import type {
+  HomeDataToolState,
+  MergeCellsState,
+} from "../../../modules/home-tools/components/data-tool-state";
 
-function mountRibbon(locale: "en-US" | "zh-CN" = "en-US") {
+function mountRibbon(
+  locale: "en-US" | "zh-CN" = "en-US",
+  toolState?: { dataState?: HomeDataToolState; mergeState?: MergeCellsState },
+) {
   return mount(SpreadsheetRibbon, {
     global: { plugins: [createAppI18n(locale)] },
     props: {
       state: createDefaultSelectionCellStyleState(),
       disabled: false,
+      ...toolState,
     },
   });
 }
@@ -80,7 +88,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
       "false",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(21);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(17);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({
@@ -101,7 +109,48 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.emitted("autoSum")).toEqual([[]]);
   });
 
-  test("localizes the category and surface labels", () => {
+  test("forwards concrete data and merge tool intents through the ribbon", async () => {
+    const wrapper = mountRibbon("en-US", {
+      dataState: {
+        activeCell: { row: 2, column: 3 },
+        sortEnabled: true,
+        filterEnabled: true,
+        freezeEnabled: true,
+        filter: {
+          active: true,
+          options: [{ key: { kind: "string", value: "Open" }, label: "Open" }],
+          appliedKeys: [{ kind: "string", value: "Open" }],
+        },
+        freeze: { rows: 0, columns: 0 },
+      },
+      mergeState: { canMerge: true, canUnmerge: false },
+    });
+
+    await wrapper.get('[data-ribbon-action="sort"]').trigger("click");
+    await new DOMWrapper(document.body).get('[data-sort-direction="ascending"]').trigger("click");
+    expect(wrapper.emitted("sort")).toEqual([["ascending"]]);
+
+    await wrapper.get('[data-ribbon-action="filter"]').trigger("click");
+    await new DOMWrapper(document.body).get('[data-filter-action="clear-filter"]').trigger("click");
+    expect(wrapper.emitted("clearFilter")).toEqual([[]]);
+
+    await wrapper.get('[data-ribbon-action="filter"]').trigger("click");
+    await new DOMWrapper(document.body)
+      .get('[data-filter-action="clear-selection"]')
+      .trigger("click");
+    await new DOMWrapper(document.body).get('[data-filter-action="apply"]').trigger("click");
+    expect(wrapper.emitted("applyFilter")).toEqual([[[]]]);
+
+    await wrapper.get('[data-ribbon-action="freeze"]').trigger("click");
+    await new DOMWrapper(document.body).get('[data-freeze-action="top-row"]').trigger("click");
+    expect(wrapper.emitted("freeze")).toEqual([["top-row"]]);
+
+    await wrapper.get('[data-ribbon-action="merge-cells"]').trigger("click");
+    await new DOMWrapper(document.body).get('[data-merge-action="merge"]').trigger("click");
+    expect(wrapper.emitted("merge")).toEqual([[]]);
+  });
+
+  test("localizes the category, surface, and concrete data tool labels", () => {
     const wrapper = mountRibbon("zh-CN");
 
     expect(wrapper.get("header").attributes("aria-label")).toBe("工作簿工具");
@@ -112,6 +161,12 @@ describe("SpreadsheetRibbon", () => {
     );
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-label")).toBe(
       "自动换行",
+    );
+    expect(wrapper.get('[data-ribbon-action="filter"]').attributes("aria-label")).toBe("筛选");
+    expect(wrapper.get('[data-ribbon-action="freeze"]').attributes("aria-label")).toBe("冻结");
+    expect(wrapper.get('[data-ribbon-action="sort"]').attributes("aria-label")).toBe("排序");
+    expect(wrapper.get('[data-ribbon-action="merge-cells"]').attributes("aria-label")).toBe(
+      "合并单元格",
     );
     expect(wrapper.get(".font-format-controls__family input").element).toHaveProperty(
       "value",

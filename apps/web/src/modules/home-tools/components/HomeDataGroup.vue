@@ -1,12 +1,23 @@
 <script setup lang="ts">
-import { ArrowDownAZ, Database, ListFilter, LockKeyhole, Sigma, Snowflake } from "lucide-vue-next";
+import { Database, LockKeyhole, Sigma } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
+import type { FilterValueKey, HomeDataToolState } from "./data-tool-state";
+import FilterValueMenu from "./FilterValueMenu.vue";
+import FreezeMenu from "./FreezeMenu.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
+import SortMenu from "./SortMenu.vue";
+
+defineProps<{ state: HomeDataToolState }>();
 
 const { t } = useAppI18n();
 
 const emit = defineEmits<{
   autoSum: [];
+  sort: [direction: "ascending" | "descending"];
+  applyFilter: [includedKeys: FilterValueKey[]];
+  clearFilter: [];
+  freeze: [mode: "panes" | "top-row" | "first-column"];
+  unfreeze: [];
 }>();
 </script>
 
@@ -17,44 +28,31 @@ const emit = defineEmits<{
     role="group"
     :aria-label="t('ribbon.dataTools')"
   >
-    <RibbonIconAction
+    <FilterValueMenu
       class="home-data-group__filter"
-      variant="tall"
-      :label="t('app.unavailableFeature', { feature: t('ribbon.filter') })"
-      :text="t('ribbon.filter')"
-      disabled
-      disclosure
+      :disabled="!state.filterEnabled"
+      :active="state.filter.active"
+      :options="state.filter.options"
+      :applied-keys="state.filter.appliedKeys"
       data-ribbon-layout="tall"
-      data-ribbon-placeholder="filter"
       data-ribbon-span="2"
-    >
-      <ListFilter :size="17" aria-hidden="true" />
-    </RibbonIconAction>
+      @apply="emit('applyFilter', $event)"
+      @clear-filter="emit('clearFilter')"
+    />
 
     <div
       class="home-data-group__stack home-data-group__freeze-stack"
       data-ribbon-stack="freeze-sort"
     >
-      <RibbonIconAction
-        :label="t('app.unavailableFeature', { feature: t('ribbon.freeze') })"
-        :text="t('ribbon.freeze')"
-        disabled
-        disclosure
-        data-ribbon-placeholder="freeze"
+      <FreezeMenu
+        :disabled="!state.freezeEnabled"
+        :active-cell="state.activeCell"
+        :freeze="state.freeze"
         data-ribbon-row="1"
-      >
-        <Snowflake :size="15" aria-hidden="true" />
-      </RibbonIconAction>
-      <RibbonIconAction
-        :label="t('app.unavailableFeature', { feature: t('ribbon.sort') })"
-        :text="t('ribbon.sort')"
-        disabled
-        disclosure
-        data-ribbon-placeholder="sort"
-        data-ribbon-row="2"
-      >
-        <ArrowDownAZ :size="15" aria-hidden="true" />
-      </RibbonIconAction>
+        @freeze="emit('freeze', $event)"
+        @unfreeze="emit('unfreeze')"
+      />
+      <SortMenu :disabled="!state.sortEnabled" data-ribbon-row="2" @sort="emit('sort', $event)" />
     </div>
 
     <div class="home-data-group__stack home-data-group__sum-stack" data-ribbon-stack="sum-data">

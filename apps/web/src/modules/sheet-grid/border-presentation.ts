@@ -1,6 +1,7 @@
 import type { CellBorder, CellStyle } from "@idea10/core/style";
 import { getCellStyle, type Sheet } from "@idea10/core/workbook";
 import type { Point, SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
+import type { RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
 
 export type SheetBorderOrientation = "horizontal" | "vertical";
 export type SheetBorderPlacement = "before" | "after";
@@ -79,14 +80,14 @@ function areBordersEqual(left: CellBorder | undefined, right: CellBorder | undef
 
 function getHorizontalBorder(
   sheet: Sheet,
-  rowEdge: number,
+  upperRow: number | undefined,
+  lowerRow: number | undefined,
   column: number,
-  rowCount: number,
 ): CellBorder | undefined {
   const upperStyle: Readonly<CellStyle> | undefined =
-    rowEdge > 0 ? getCellStyle(sheet, { row: rowEdge - 1, column }) : undefined;
+    upperRow === undefined ? undefined : getCellStyle(sheet, { row: upperRow, column });
   const lowerStyle: Readonly<CellStyle> | undefined =
-    rowEdge < rowCount ? getCellStyle(sheet, { row: rowEdge, column }) : undefined;
+    lowerRow === undefined ? undefined : getCellStyle(sheet, { row: lowerRow, column });
   return upperStyle?.borderBottom ?? lowerStyle?.borderTop;
 }
 
@@ -103,7 +104,12 @@ function getVerticalBorder(
   return leftStyle?.borderRight ?? rightStyle?.borderLeft;
 }
 
-function getRowEdgeOffset(geometry: SheetGeometry, edge: number): number {
+function getRowEdgeOffset(
+  geometry: SheetGeometry,
+  edge: number,
+  rows?: RowVisibilityIndex,
+): number {
+  if (rows) return rows.getBoundaryOffset(edge) ?? rows.getTotalHeight();
   return edge === geometry.rowCount ? geometry.getTotalSize().height : geometry.getRowOffset(edge);
 }
 
@@ -129,13 +135,50 @@ export function resolveVisibleBorderSegments(
   geometry: SheetGeometry,
   visibleRange: VisibleCellRange,
   scrollPosition: Point,
+  rows?: RowVisibilityIndex,
+  visibleRows?: readonly number[],
+  visibleColumns?: readonly number[],
 ): SheetBorderSegment[] {
   const segments: SheetBorderSegment[] = [];
-  const endRowEdge = Math.min(visibleRange.endRow + 1, geometry.rowCount);
-  const endColumnEdge = Math.min(visibleRange.endColumn + 1, geometry.columnCount);
+  const rowIndexes =
+    visibleRows ??
+    Array.from(
+      { length: visibleRange.endRow - visibleRange.startRow + 1 },
+      (_, index) => visibleRange.startRow + index,
+    );
+  const columnIndexes =
+    visibleColumns ??
+    Array.from(
+      { length: visibleRange.endColumn - visibleRange.startColumn + 1 },
+      (_, index) => visibleRange.startColumn + index,
+    );
+  const columnEdges = [...new Set([...columnIndexes, (columnIndexes.at(-1) ?? 0) + 1])];
 
-  for (let rowEdge = visibleRange.startRow; rowEdge <= endRowEdge; rowEdge += 1) {
-    let runStart = visibleRange.startColumn;
+  type HorizontalBoundary = {
+    edge: number;
+    upperRow: number | undefined;
+    lowerRow: number | undefined;
+  };
+  const horizontalBoundaries: HorizontalBoundary[] = rowIndexes.map((row) => ({
+    edge: row,
+    upperRow: rows ? (rows.getPreviousVisibleRow(row) ?? undefined) : row > 0 ? row - 1 : undefined,
+    lowerRow: row,
+  }));
+  const lastRow = rowIndexes.at(-1);
+  if (lastRow !== undefined) {
+    horizontalBoundaries.push({
+      edge: lastRow + 1,
+      upperRow: lastRow,
+      lowerRow: rows
+        ? (rows.getNextVisibleRow(lastRow) ?? undefined)
+        : lastRow + 1 < geometry.rowCount
+          ? lastRow + 1
+          : undefined,
+    });
+  }
+
+  for (const { edge: rowEdge, upperRow, lowerRow } of horizontalBoundaries) {
+    let runStart = columnIndexes[0] ?? 0;
     let runBorder: CellBorder | undefined;
 
     const flushRun = (endColumn: number) => {
@@ -143,7 +186,7 @@ export function resolveVisibleBorderSegments(
       const thickness = getCellBorderThickness(runBorder);
       const startOffset = getColumnEdgeOffset(geometry, runStart);
       const endOffset = getColumnEdgeOffset(geometry, endColumn + 1);
-      const edgeOffset = getRowEdgeOffset(geometry, rowEdge);
+      const edgeOffset = getRowEdgeOffset(geometry, rowEdge, rows);
       const leadingExtension = runStart === 0 ? 0 : thickness;
       const clippedRun = clipRunStart(
         startOffset - scrollPosition.x - leadingExtension,
@@ -169,25 +212,25 @@ export function resolveVisibleBorderSegments(
       });
     };
 
-    for (let column = visibleRange.startColumn; column <= visibleRange.endColumn; column += 1) {
-      const border = getHorizontalBorder(sheet, rowEdge, column, geometry.rowCount);
+    for (const column of columnIndexes) {
+      const border = getHorizontalBorder(sheet, upperRow, lowerRow, column);
       if (areBordersEqual(border, runBorder)) continue;
       flushRun(column - 1);
       runStart = column;
       runBorder = border;
     }
-    flushRun(visibleRange.endColumn);
+    flushRun(columnIndexes.at(-1) ?? 0);
   }
 
-  for (let columnEdge = visibleRange.startColumn; columnEdge <= endColumnEdge; columnEdge += 1) {
-    let runStart = visibleRange.startRow;
+  for (const columnEdge of columnEdges) {
+    let runStart = rowIndexes[0] ?? 0;
     let runBorder: CellBorder | undefined;
 
     const flushRun = (endRow: number) => {
       if (!runBorder || endRow < runStart) return;
       const thickness = getCellBorderThickness(runBorder);
-      const startOffset = getRowEdgeOffset(geometry, runStart);
-      const endOffset = getRowEdgeOffset(geometry, endRow + 1);
+      const startOffset = getRowEdgeOffset(geometry, runStart, rows);
+      const endOffset = getRowEdgeOffset(geometry, endRow + 1, rows);
       const edgeOffset = getColumnEdgeOffset(geometry, columnEdge);
       const leadingExtension = runStart === 0 ? 0 : thickness;
       const clippedRun = clipRunStart(
@@ -214,14 +257,14 @@ export function resolveVisibleBorderSegments(
       });
     };
 
-    for (let row = visibleRange.startRow; row <= visibleRange.endRow; row += 1) {
+    for (const row of rowIndexes) {
       const border = getVerticalBorder(sheet, row, columnEdge, geometry.columnCount);
       if (areBordersEqual(border, runBorder)) continue;
       flushRun(row - 1);
       runStart = row;
       runBorder = border;
     }
-    flushRun(visibleRange.endRow);
+    flushRun(rowIndexes.at(-1) ?? 0);
   }
 
   return segments;
@@ -232,13 +275,35 @@ export function resolveVisibleDiagonalBorderSegments(
   geometry: SheetGeometry,
   visibleRange: VisibleCellRange,
   scrollPosition: Point,
+  rows?: RowVisibilityIndex,
+  visibleRows?: readonly number[],
+  visibleColumns?: readonly number[],
 ): SheetDiagonalBorderSegment[] {
   const segments: SheetDiagonalBorderSegment[] = [];
 
-  for (let row = visibleRange.startRow; row <= visibleRange.endRow; row += 1) {
-    for (let column = visibleRange.startColumn; column <= visibleRange.endColumn; column += 1) {
+  const rowIndexes =
+    visibleRows ??
+    Array.from(
+      { length: visibleRange.endRow - visibleRange.startRow + 1 },
+      (_, index) => visibleRange.startRow + index,
+    );
+  const columnIndexes =
+    visibleColumns ??
+    Array.from(
+      { length: visibleRange.endColumn - visibleRange.startColumn + 1 },
+      (_, index) => visibleRange.startColumn + index,
+    );
+  for (const row of rowIndexes) {
+    for (const column of columnIndexes) {
       const style = getCellStyle(sheet, { row, column });
-      const rect = geometry.getCellViewportRect({ row, column }, scrollPosition);
+      const rect = rows?.getVisibleRow(row)
+        ? {
+            x: geometry.getColumnOffset(column) - scrollPosition.x,
+            y: rows.getVisibleRow(row)!.offset - scrollPosition.y,
+            width: geometry.getColumnWidth(column),
+            height: rows.getVisibleRow(row)!.height,
+          }
+        : geometry.getCellViewportRect({ row, column }, scrollPosition);
       const length = Math.hypot(rect.width, rect.height);
       const angle = (Math.atan2(rect.height, rect.width) * 180) / Math.PI;
       const addSegment = (

@@ -9,35 +9,28 @@ import {
   type SheetBorderJunction,
   type SheetBorderSegment,
 } from "../border-presentation";
-import type { Point, SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
+import type { SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
+import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
 
 const props = defineProps<{
   sheet: Sheet;
   geometry: SheetGeometry;
-  visibleRange: VisibleCellRange;
-  scrollPosition: Point;
+  layout: SheetViewportLayout;
+  rows: RowVisibilityIndex;
 }>();
 
-const segments = computed(() =>
-  resolveVisibleBorderSegments(
-    props.sheet,
-    props.geometry,
-    props.visibleRange,
-    props.scrollPosition,
-  ),
-);
-const junctions = computed(() => resolveBorderJunctions(segments.value));
-const diagonalSegments = computed(() =>
-  resolveVisibleDiagonalBorderSegments(
-    props.sheet,
-    props.geometry,
-    props.visibleRange,
-    props.scrollPosition,
-  ),
-);
-const diagonalLayers = computed(() => {
+type BorderPane = {
+  id: "topLeft" | "top" | "left" | "body";
+  clipStyle: CSSProperties;
+  segments: SheetBorderSegment[];
+  junctions: SheetBorderJunction[];
+  diagonalLayers: Array<{ thickness: number; segments: SheetDiagonalBorderSegment[] }>;
+};
+
+function getDiagonalLayers(segments: SheetDiagonalBorderSegment[]) {
   const layers = new Map<number, SheetDiagonalBorderSegment[]>();
-  for (const segment of diagonalSegments.value) {
+  for (const segment of segments) {
     const layer = layers.get(segment.thickness) ?? [];
     layer.push(segment);
     layers.set(segment.thickness, layer);
@@ -45,7 +38,69 @@ const diagonalLayers = computed(() => {
   return [...layers]
     .sort(([leftThickness], [rightThickness]) => leftThickness - rightThickness)
     .map(([thickness, segments]) => ({ thickness, segments }));
-});
+}
+
+const panes = computed<BorderPane[]>(() =>
+  (["topLeft", "top", "left", "body"] as const)
+    .filter((id) => {
+      const pane = props.layout.panes[id];
+      return (
+        pane.clip.width > 0 &&
+        pane.clip.height > 0 &&
+        pane.rows.length > 0 &&
+        pane.columns.length > 0
+      );
+    })
+    .map((id) => {
+      const pane = props.layout.panes[id];
+      const rowIndexes = pane.rows.map((row) => row.index);
+      const columnIndexes = pane.columns.map((column) => column.index);
+      const visibleRange: VisibleCellRange = {
+        startRow: Math.min(...rowIndexes, 0),
+        endRow: Math.max(...rowIndexes, 0),
+        startColumn: Math.min(...columnIndexes, 0),
+        endColumn: Math.max(...columnIndexes, 0),
+      };
+      const scrollPosition = {
+        x:
+          id === "topLeft" || id === "left"
+            ? 0
+            : props.layout.frozenSize.width + props.layout.bodyScrollPosition.x - pane.clip.x,
+        y:
+          id === "topLeft" || id === "top"
+            ? 0
+            : props.layout.frozenSize.height + props.layout.bodyScrollPosition.y - pane.clip.y,
+      };
+      const segments = resolveVisibleBorderSegments(
+        props.sheet,
+        props.geometry,
+        visibleRange,
+        scrollPosition,
+        props.rows,
+        rowIndexes,
+        columnIndexes,
+      );
+      return {
+        id,
+        clipStyle: {
+          clipPath: `inset(${pane.clip.y}px ${props.layout.viewportSize.width - pane.clip.x - pane.clip.width}px ${props.layout.viewportSize.height - pane.clip.y - pane.clip.height}px ${pane.clip.x}px)`,
+        },
+        segments,
+        junctions: resolveBorderJunctions(segments),
+        diagonalLayers: getDiagonalLayers(
+          resolveVisibleDiagonalBorderSegments(
+            props.sheet,
+            props.geometry,
+            visibleRange,
+            scrollPosition,
+            props.rows,
+            rowIndexes,
+            columnIndexes,
+          ),
+        ),
+      };
+    }),
+);
 
 type DiagonalLinePart = {
   key: string;
@@ -115,62 +170,70 @@ function getDiagonalLineParts(segment: SheetDiagonalBorderSegment): DiagonalLine
 
 <template>
   <div class="sheet-border-layer" data-sheet-border-layer aria-hidden="true">
-    <span
-      v-for="segment in segments"
-      :key="segment.key"
-      class="sheet-border-layer__segment"
-      :class="`is-${segment.orientation}`"
-      :style="getSegmentStyle(segment)"
-      data-sheet-border-segment
-      :data-border-orientation="segment.orientation"
-      :data-border-placement="segment.placement"
-      :data-border-edge="segment.edge"
-      :data-border-start="segment.start"
-      :data-border-end="segment.end"
-    />
-    <svg
-      v-for="layer in diagonalLayers"
-      :key="`diagonal-layer:${layer.thickness}`"
-      class="sheet-border-layer__diagonals"
-      :style="{ zIndex: layer.thickness }"
-      focusable="false"
-      data-sheet-diagonal-border-layer
-      :data-border-thickness="layer.thickness"
+    <div
+      v-for="pane in panes"
+      :key="pane.id"
+      class="sheet-border-layer__pane"
+      :style="pane.clipStyle"
+      :data-pane="pane.id"
     >
-      <g
-        v-for="segment in layer.segments"
+      <span
+        v-for="segment in pane.segments"
         :key="segment.key"
-        data-sheet-diagonal-border-segment
-        :data-border-direction="segment.direction"
-        :data-border-row="segment.row"
-        :data-border-column="segment.column"
-        :data-border-style="segment.style"
+        class="sheet-border-layer__segment"
+        :class="`is-${segment.orientation}`"
+        :style="getSegmentStyle(segment)"
+        data-sheet-border-segment
+        :data-border-orientation="segment.orientation"
+        :data-border-placement="segment.placement"
+        :data-border-edge="segment.edge"
+        :data-border-start="segment.start"
+        :data-border-end="segment.end"
+      />
+      <svg
+        v-for="layer in pane.diagonalLayers"
+        :key="`diagonal-layer:${layer.thickness}`"
+        class="sheet-border-layer__diagonals"
+        :style="{ zIndex: layer.thickness }"
+        focusable="false"
+        data-sheet-diagonal-border-layer
+        :data-border-thickness="layer.thickness"
       >
-        <line
-          v-for="part in getDiagonalLineParts(segment)"
-          :key="part.key"
-          class="sheet-border-layer__diagonal-line"
-          :x1="part.x1"
-          :y1="part.y1"
-          :x2="part.x2"
-          :y2="part.y2"
-          :stroke="segment.color"
-          :stroke-width="segment.style === 'double' ? 1 : segment.thickness"
-          :stroke-dasharray="DIAGONAL_STROKE_DASH_ARRAY[segment.style]"
-          :stroke-linecap="segment.style === 'dotted' ? 'round' : 'butt'"
-          :data-diagonal-line-offset="part.offset"
-        />
-      </g>
-    </svg>
-    <span
-      v-for="junction in junctions"
-      :key="junction.key"
-      class="sheet-border-layer__junction"
-      :style="getJunctionStyle(junction)"
-      data-sheet-border-junction
-      :data-border-row-edge="junction.rowEdge"
-      :data-border-column-edge="junction.columnEdge"
-    />
+        <g
+          v-for="segment in layer.segments"
+          :key="segment.key"
+          data-sheet-diagonal-border-segment
+          :data-border-direction="segment.direction"
+          :data-border-row="segment.row"
+          :data-border-column="segment.column"
+          :data-border-style="segment.style"
+        >
+          <line
+            v-for="part in getDiagonalLineParts(segment)"
+            :key="part.key"
+            class="sheet-border-layer__diagonal-line"
+            :x1="part.x1"
+            :y1="part.y1"
+            :x2="part.x2"
+            :y2="part.y2"
+            :stroke="segment.color"
+            :stroke-width="segment.style === 'double' ? 1 : segment.thickness"
+            :stroke-dasharray="DIAGONAL_STROKE_DASH_ARRAY[segment.style]"
+            :stroke-linecap="segment.style === 'dotted' ? 'round' : 'butt'"
+            :data-diagonal-line-offset="part.offset"
+          />
+        </g>
+      </svg>
+      <span
+        v-for="junction in pane.junctions"
+        :key="junction.key"
+        class="sheet-border-layer__junction"
+        :style="getJunctionStyle(junction)"
+        data-sheet-border-junction
+        :data-border-row-edge="junction.rowEdge"
+        :data-border-column-edge="junction.columnEdge"
+      />
+    </div>
   </div>
 </template>
 
@@ -180,6 +243,11 @@ function getDiagonalLineParts(segment: SheetDiagonalBorderSegment): DiagonalLine
   z-index: 2;
   inset: 0;
   pointer-events: none;
+
+  &__pane {
+    position: absolute;
+    inset: 0;
+  }
 
   &__segment {
     position: absolute;

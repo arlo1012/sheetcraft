@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import type { CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { columnIndexToLabel } from "@idea10/core/coordinates";
 import { MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } from "@idea10/core/workbook";
@@ -8,10 +8,8 @@ import type { SheetGeometry } from "@idea10/sheet-engine/geometry";
 const { t } = useAppI18n();
 
 const props = defineProps<{
-  startColumn: number;
-  endColumn: number;
+  items: readonly { index: number; offset: number; size: number }[];
   geometry: SheetGeometry;
-  scrollLeft: number;
   selectedStartColumn: number;
   selectedEndColumn: number;
   selected: boolean;
@@ -33,18 +31,10 @@ const emit = defineEmits<{
 
 const KEYBOARD_RESIZE_STEP = 8;
 
-const columns = computed(() => {
-  const result: number[] = [];
-  for (let column = props.startColumn; column <= props.endColumn; column += 1) {
-    result.push(column);
-  }
-  return result;
-});
-
-function getHeaderStyle(column: number): CSSProperties {
+function getHeaderStyle(item: { offset: number; size: number }): CSSProperties {
   return {
-    left: `${props.geometry.getColumnOffset(column) - props.scrollLeft}px`,
-    width: `${props.geometry.getColumnWidth(column)}px`,
+    left: `${item.offset}px`,
+    width: `${item.size}px`,
   };
 }
 
@@ -100,40 +90,43 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
 <template>
   <div class="sheet-column-headers" role="presentation">
     <div
-      v-for="column in columns"
-      :key="column"
+      v-for="item in items"
+      :key="item.index"
       class="sheet-column-headers__item"
       :class="{
-        'is-active': selected && column >= selectedStartColumn && column <= selectedEndColumn,
+        'is-active':
+          selected && item.index >= selectedStartColumn && item.index <= selectedEndColumn,
       }"
-      :style="getHeaderStyle(column)"
-      :data-column="column"
+      :style="getHeaderStyle(item)"
+      :data-column="item.index"
     >
       <button
         type="button"
         class="sheet-column-headers__select-button"
-        :data-select-column="column"
-        :aria-label="t('grid.selectColumn', { column: columnIndexToLabel(column) })"
-        :aria-pressed="selected && column >= selectedStartColumn && column <= selectedEndColumn"
-        @mousedown.left.prevent="emit('select', { column, shiftKey: $event.shiftKey })"
-        @contextmenu.prevent="onHeaderContextMenu(column, $event)"
-        @keydown="onHeaderKeydown(column, $event)"
+        :data-select-column="item.index"
+        :aria-label="t('grid.selectColumn', { column: columnIndexToLabel(item.index) })"
+        :aria-pressed="
+          selected && item.index >= selectedStartColumn && item.index <= selectedEndColumn
+        "
+        @mousedown.left.prevent="emit('select', { column: item.index, shiftKey: $event.shiftKey })"
+        @contextmenu.prevent="onHeaderContextMenu(item.index, $event)"
+        @keydown="onHeaderKeydown(item.index, $event)"
       >
-        <span aria-hidden="true">{{ columnIndexToLabel(column) }}</span>
+        <span aria-hidden="true">{{ columnIndexToLabel(item.index) }}</span>
       </button>
       <span
         class="sheet-column-headers__resize-handle"
-        :data-resize-column="column"
+        :data-resize-column="item.index"
         role="separator"
         aria-orientation="vertical"
-        :aria-label="t('grid.columnWidth', { column: columnIndexToLabel(column) })"
+        :aria-label="t('grid.columnWidth', { column: columnIndexToLabel(item.index) })"
         :aria-valuemin="MIN_COLUMN_WIDTH"
         :aria-valuemax="MAX_COLUMN_WIDTH"
-        :aria-valuenow="geometry.getColumnWidth(column)"
+        :aria-valuenow="geometry.getColumnWidth(item.index)"
         tabindex="0"
         @mousedown.stop
-        @pointerdown.left.prevent.stop="emit('resizeStart', { index: column, event: $event })"
-        @keydown.stop="onResizeHandleKeydown(column, $event)"
+        @pointerdown.left.prevent.stop="emit('resizeStart', { index: item.index, event: $event })"
+        @keydown.stop="onResizeHandleKeydown(item.index, $event)"
       />
     </div>
   </div>

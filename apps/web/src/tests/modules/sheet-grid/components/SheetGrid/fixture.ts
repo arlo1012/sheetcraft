@@ -37,6 +37,7 @@ export type SheetGridFixtureOptions = {
   columnExpansionStep?: number;
   rowExpansionTail?: number;
   columnExpansionTail?: number;
+  beforeMount?: (sheet: ReturnType<typeof getActiveSheet>) => void;
 };
 
 export function mountSheetGrid(options?: SheetGridFixtureOptions) {
@@ -44,6 +45,7 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
     createWorkbookSession({ idFactory: createBrowserIdFactory() }),
   ) as WorkbookSession;
   const sheet = getActiveSheet(session.workbook);
+  options?.beforeMount?.(sheet);
   const wrapper = mount(SheetGrid, {
     attachTo: options?.attachTo,
     global: {

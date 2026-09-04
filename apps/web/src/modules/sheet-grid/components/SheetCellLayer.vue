@@ -6,42 +6,39 @@ import {
   type Sheet,
   type SheetEvaluator,
 } from "@idea10/core/workbook";
+import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import { isCellSelected, type CellSelection } from "@idea10/sheet-engine/selection";
 import { getCellContentStyle } from "../cell-presentation";
 import { formatCellValueForGrid } from "../cell-value-presentation";
-import type { Point, SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
-import { isCellSelected, type CellSelection } from "@idea10/sheet-engine/selection";
 
 type VisibleCell = {
   key: string;
+  paneId: "topLeft" | "top" | "left" | "body";
   address: CellAddress;
   text: string;
   multiline: boolean;
   wrapped: boolean;
   style: CSSProperties;
+  rowStyle: CSSProperties;
 };
 
-type VisibleRow = {
-  key: number;
-  row: number;
+type VisualMergeFragment = {
+  key: string;
+  paneId: VisibleCell["paneId"];
   style: CSSProperties;
-  cells: VisibleCell[];
 };
 
 const props = withDefaults(
   defineProps<{
     sheet: Sheet;
     evaluator: SheetEvaluator;
-    geometry: SheetGeometry;
-    visibleRange: VisibleCellRange;
+    layout: SheetViewportLayout;
     activeCell: CellAddress;
     selection: CellSelection;
-    scrollPosition: Point;
     editing: boolean;
     locale?: string;
   }>(),
-  {
-    locale: "en-US",
-  },
+  { locale: "en-US" },
 );
 
 const emit = defineEmits<{
@@ -50,118 +47,149 @@ const emit = defineEmits<{
   cellContextmenu: [address: CellAddress, event: MouseEvent];
 }>();
 
-const visibleRows = computed<VisibleRow[]>(() => {
-  const rows: VisibleRow[] = [];
-  const rowIndexes = new Set<number>([props.activeCell.row]);
-
-  for (let row = props.visibleRange.startRow; row <= props.visibleRange.endRow; row += 1) {
-    rowIndexes.add(row);
+const visibleCells = computed<VisibleCell[]>(() => {
+  const cells: VisibleCell[] = [];
+  function addCell(address: CellAddress, paneId: VisibleCell["paneId"]): void {
+    if (cells.some((cell) => cell.key === `${address.row}:${address.column}`)) return;
+    const mergedRange = props.layout.getMergedRangeAt(address);
+    const rect = mergedRange
+      ? props.layout.getRangePaneRects(mergedRange).find((pane) => pane.paneId === paneId)?.rect
+      : props.layout.getCellViewportRect(address);
+    if (!rect) return;
+    const cellStyle = getCellStyle(props.sheet, address);
+    const text = formatCellValueForGrid(
+      props.evaluator.getComputedValue(address),
+      cellStyle,
+      props.locale,
+    );
+    const preservesLineBreaks = /[\r\n]/u.test(text);
+    cells.push({
+      key: `${address.row}:${address.column}`,
+      paneId,
+      address,
+      text,
+      multiline: Boolean(cellStyle?.wrapText) || preservesLineBreaks,
+      wrapped: Boolean(cellStyle?.wrapText),
+      style: {
+        left: `${rect.x - props.layout.panes[paneId].clip.x}px`,
+        top: "0px",
+        width: `${rect.width}px`,
+        height: `${rect.height}px`,
+        ...getCellContentStyle(cellStyle, preservesLineBreaks),
+      },
+      rowStyle: {
+        top: `${rect.y - props.layout.panes[paneId].clip.y}px`,
+        height: `${rect.height}px`,
+      },
+    });
   }
+  props.layout.forEachVisibleCell((address, paneId) => {
+    addCell(address, paneId);
+  });
+  addCell(
+    props.layout.getAnchorForAddress(props.activeCell),
+    props.layout.getPaneForAddress(props.activeCell),
+  );
+  return cells;
+});
 
-  const orderedRowIndexes = [...rowIndexes].sort((left, right) => left - right);
-  const columnIndexesByRow = new Map<number, number[]>();
+const visiblePanes = computed(() =>
+  (["topLeft", "top", "left", "body"] as const).map((paneId) => {
+    const clip = props.layout.panes[paneId].clip;
+    return {
+      paneId,
+      cells: visibleCells.value.filter((cell) => cell.paneId === paneId),
+      style: {
+        left: `${clip.x}px`,
+        top: `${clip.y}px`,
+        width: `${clip.width}px`,
+        height: `${clip.height}px`,
+      },
+    };
+  }),
+);
 
-  for (const row of orderedRowIndexes) {
-    const columnIndexes = new Set<number>();
-    if (row >= props.visibleRange.startRow && row <= props.visibleRange.endRow) {
-      for (
-        let column = props.visibleRange.startColumn;
-        column <= props.visibleRange.endColumn;
-        column += 1
-      ) {
-        columnIndexes.add(column);
-      }
-    }
-    if (row === props.activeCell.row) {
-      columnIndexes.add(props.activeCell.column);
-    }
-    const orderedColumnIndexes = [...columnIndexes].sort((left, right) => left - right);
-    columnIndexesByRow.set(row, orderedColumnIndexes);
-  }
-
-  for (const row of orderedRowIndexes) {
-    const cells: VisibleCell[] = [];
-    for (const column of columnIndexesByRow.get(row) ?? []) {
-      const address = { row, column };
-      const rect = props.geometry.getCellViewportRect(address, props.scrollPosition);
-      const cellStyle = getCellStyle(props.sheet, address);
-      const text = formatCellValueForGrid(
-        props.evaluator.getComputedValue(address),
-        cellStyle,
-        props.locale,
-      );
-      const preservesLineBreaks = /[\r\n]/u.test(text);
-      cells.push({
-        key: `${row}:${column}`,
-        address,
-        text,
-        multiline: Boolean(cellStyle?.wrapText) || preservesLineBreaks,
-        wrapped: Boolean(cellStyle?.wrapText),
+const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
+  const fragments: VisualMergeFragment[] = [];
+  for (const cell of visibleCells.value) {
+    const range = props.layout.getMergedRangeAt(cell.address);
+    if (!range) continue;
+    const fillColor = getCellStyle(props.sheet, cell.address)?.fillColor;
+    for (const fragment of props.layout.getRangePaneRects(range)) {
+      if (fragment.paneId === cell.paneId) continue;
+      const clip = props.layout.panes[fragment.paneId].clip;
+      fragments.push({
+        key: `${cell.key}:${fragment.paneId}`,
+        paneId: fragment.paneId,
         style: {
-          left: `${rect.x}px`,
-          width: `${rect.width}px`,
-          height: "100%",
-          ...getCellContentStyle(cellStyle, preservesLineBreaks),
+          left: `${fragment.rect.x - clip.x}px`,
+          top: `${fragment.rect.y - clip.y}px`,
+          width: `${fragment.rect.width}px`,
+          height: `${fragment.rect.height}px`,
+          ...(fillColor ? { backgroundColor: fillColor } : {}),
         },
       });
     }
-
-    rows.push({
-      key: row,
-      row,
-      style: {
-        top: `${props.geometry.getRowOffset(row) - props.scrollPosition.y}px`,
-        height: `${props.geometry.getRowHeight(row)}px`,
-      },
-      cells,
-    });
   }
-
-  return rows;
+  return fragments;
 });
 </script>
 
 <template>
   <div class="sheet-cell-layer">
     <div
-      v-for="visibleRow in visibleRows"
-      :key="visibleRow.key"
-      class="sheet-cell-layer__row"
-      :style="visibleRow.style"
-      role="row"
-      :aria-rowindex="visibleRow.row + 1"
+      v-for="pane in visiblePanes"
+      :key="pane.paneId"
+      class="sheet-cell-layer__pane"
+      :style="pane.style"
+      :data-pane="pane.paneId"
     >
       <div
-        v-for="cell in visibleRow.cells"
+        v-for="fragment in visualMergeFragments.filter((entry) => entry.paneId === pane.paneId)"
+        :key="fragment.key"
+        class="sheet-cell-layer__merge-fragment"
+        :style="fragment.style"
+        aria-hidden="true"
+      />
+      <div
+        v-for="cell in pane.cells"
         :key="cell.key"
-        class="sheet-cell-layer__cell"
-        :class="{
-          'has-value': cell.text.length > 0,
-          'is-multiline': cell.multiline,
-          'is-wrapped': cell.wrapped,
-          'is-active':
-            cell.address.row === activeCell.row && cell.address.column === activeCell.column,
-          'is-editing':
-            editing &&
-            cell.address.row === activeCell.row &&
-            cell.address.column === activeCell.column,
-          'is-selected': isCellSelected(cell.address, selection),
-        }"
-        :style="cell.style"
-        :data-row="cell.address.row"
-        :data-column="cell.address.column"
-        role="gridcell"
-        :aria-colindex="cell.address.column + 1"
-        :aria-selected="isCellSelected(cell.address, selection)"
-        @mousedown.left.prevent="emit('cellMousedown', cell.address, $event)"
-        @dblclick.left.prevent="emit('cellDoubleClick', cell.address, $event)"
-        @contextmenu="emit('cellContextmenu', cell.address, $event)"
+        class="sheet-cell-layer__row"
+        :style="cell.rowStyle"
+        role="row"
+        :aria-rowindex="cell.address.row + 1"
       >
-        <span v-if="cell.text" class="sheet-cell-layer__value">{{ cell.text }}</span>
-        <slot
-          v-if="cell.address.row === activeCell.row && cell.address.column === activeCell.column"
-          name="active-cell"
-        />
+        <div
+          class="sheet-cell-layer__cell"
+          :class="{
+            'has-value': cell.text.length > 0,
+            'is-multiline': cell.multiline,
+            'is-wrapped': cell.wrapped,
+            'is-active':
+              cell.address.row === activeCell.row && cell.address.column === activeCell.column,
+            'is-editing':
+              editing &&
+              cell.address.row === activeCell.row &&
+              cell.address.column === activeCell.column,
+            'is-selected': isCellSelected(cell.address, selection),
+          }"
+          :style="cell.style"
+          :data-row="cell.address.row"
+          :data-column="cell.address.column"
+          role="gridcell"
+          :aria-rowindex="cell.address.row + 1"
+          :aria-colindex="cell.address.column + 1"
+          :aria-selected="isCellSelected(cell.address, selection)"
+          @mousedown.left.prevent="emit('cellMousedown', cell.address, $event)"
+          @dblclick.left.prevent="emit('cellDoubleClick', cell.address, $event)"
+          @contextmenu="emit('cellContextmenu', cell.address, $event)"
+        >
+          <span v-if="cell.text" class="sheet-cell-layer__value">{{ cell.text }}</span>
+          <slot
+            v-if="cell.address.row === activeCell.row && cell.address.column === activeCell.column"
+            name="active-cell"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -172,15 +200,28 @@ const visibleRows = computed<VisibleRow[]>(() => {
   position: absolute;
   inset: 0;
 
+  &__pane {
+    position: absolute;
+    overflow: hidden;
+  }
+
   &__row {
     position: absolute;
     left: 0;
     width: 100%;
   }
 
+  &__merge-fragment {
+    position: absolute;
+    box-sizing: border-box;
+    background: var(--idea-surface-panel);
+    border-right: 1px solid var(--idea-border-subtle);
+    border-bottom: 1px solid var(--idea-border-subtle);
+    pointer-events: none;
+  }
+
   &__cell {
     position: absolute;
-    top: 0;
     display: flex;
     align-items: center;
     overflow: hidden;
@@ -197,7 +238,6 @@ const visibleRows = computed<VisibleRow[]>(() => {
     &.is-active {
       overflow: visible;
     }
-
     &.is-multiline.is-active:not(.is-editing) {
       overflow: hidden;
     }
@@ -207,7 +247,6 @@ const visibleRows = computed<VisibleRow[]>(() => {
     overflow: hidden;
     text-overflow: clip;
   }
-
   &__cell.is-multiline &__value {
     min-width: 0;
     max-width: 100%;

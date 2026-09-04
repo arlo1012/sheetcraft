@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ChevronDown } from "lucide-vue-next";
+import { ref } from "vue";
 
 const props = withDefaults(
   defineProps<{
@@ -22,6 +23,9 @@ const props = withDefaults(
 const emit = defineEmits<{
   activate: [];
 }>();
+const rootElement = ref<HTMLButtonElement | null>(null);
+
+defineExpose({ rootElement });
 
 function activate(): void {
   if (!props.disabled) {
@@ -32,6 +36,7 @@ function activate(): void {
 
 <template>
   <button
+    ref="rootElement"
     class="ribbon-icon-action"
     :class="{
       'is-disabled': disabled,

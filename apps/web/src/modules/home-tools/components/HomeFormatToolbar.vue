@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
-import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import type { CellBorderAction, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
@@ -13,11 +13,20 @@ import HomeHistoryGroup from "./HomeHistoryGroup.vue";
 import HomeInsertGroup from "./HomeInsertGroup.vue";
 import HomeNumberGroup from "./HomeNumberGroup.vue";
 import HomeUtilityGroup from "./HomeUtilityGroup.vue";
+import {
+  createDefaultHomeDataToolState,
+  createDefaultMergeCellsState,
+  type FilterValueKey,
+  type HomeDataToolState,
+  type MergeCellsState,
+} from "./data-tool-state";
 
-defineProps<{
+const props = defineProps<{
   state: SelectionCellStyleState;
   disabled: boolean;
   formatPainterActive?: boolean;
+  dataState?: HomeDataToolState;
+  mergeState?: MergeCellsState;
 }>();
 
 const emit = defineEmits<{
@@ -26,11 +35,22 @@ const emit = defineEmits<{
   adjustDecimals: [delta: -1 | 1];
   activateFormatPainter: [];
   autoSum: [];
+  sort: [direction: "ascending" | "descending"];
+  applyFilter: [includedKeys: FilterValueKey[]];
+  clearFilter: [];
+  freeze: [mode: "panes" | "top-row" | "first-column"];
+  unfreeze: [];
+  merge: [];
+  unmerge: [];
   undo: [];
   redo: [];
 }>();
 
 const { t } = useAppI18n();
+const defaultDataState = createDefaultHomeDataToolState();
+const defaultMergeState = createDefaultMergeCellsState();
+const dataState = computed(() => props.dataState ?? defaultDataState);
+const mergeState = computed(() => props.mergeState ?? defaultMergeState);
 const toolbarRef = ref<HTMLDivElement | null>(null);
 const viewportRef = ref<HTMLDivElement | null>(null);
 const railRef = ref<HTMLDivElement | null>(null);
@@ -246,7 +266,10 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
         <HomeAlignmentGroup
           :state="state"
           :disabled="disabled"
+          :merge-state="mergeState"
           @apply-style="emit('applyStyle', $event)"
+          @merge="emit('merge')"
+          @unmerge="emit('unmerge')"
         />
         <HomeNumberGroup
           :state="state"
@@ -254,7 +277,15 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           @apply-style="emit('applyStyle', $event)"
           @adjust-decimals="emit('adjustDecimals', $event)"
         />
-        <HomeDataGroup @auto-sum="emit('autoSum')" />
+        <HomeDataGroup
+          :state="dataState"
+          @auto-sum="emit('autoSum')"
+          @sort="emit('sort', $event)"
+          @apply-filter="emit('applyFilter', $event)"
+          @clear-filter="emit('clearFilter')"
+          @freeze="emit('freeze', $event)"
+          @unfreeze="emit('unfreeze')"
+        />
         <HomeInsertGroup />
         <HomeAutomationGroup />
         <HomeUtilityGroup />

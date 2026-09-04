@@ -22,6 +22,8 @@ import {
   type SheetEvaluator,
   type SheetDimensionAxis,
 } from "@idea10/core/workbook";
+import { expandSelectionToMergedCellRanges } from "@idea10/core";
+import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import {
   DEFAULT_GRID_EXTENT_POLICY,
   DEFAULT_INITIAL_GRID_EXTENT,
@@ -174,9 +176,9 @@ const {
   onCommit: (payload) => emit("resizeDimension", payload),
 });
 const {
+  columnHeaderItems,
   geometry,
   getCellAtClientPoint,
-  getRangeViewportRect,
   gridCanvasStyle,
   gridExtent,
   gridViewportStyle,
@@ -184,9 +186,12 @@ const {
   ensureGridExtentCoversViewport,
   ensureSelectionVisible,
   emitViewState,
+  layout,
   observe: observeViewport,
   onScroll,
   restore: restoreViewport,
+  rowHeaderItems,
+  rowVisibility,
   scrollPosition,
   scrollerRef,
   startGeometryWatch,
@@ -194,7 +199,6 @@ const {
   stopGeometryWatching,
   updateViewportSize,
   viewportSize,
-  visibleRange,
 } = useSheetViewport({
   initialExtent: {
     rowCount: props.initialRowCount,
@@ -212,6 +216,10 @@ const {
   }),
   getColumnWidths: () => effectiveColumnWidths.value,
   getRowHeights: () => effectiveRowHeights.value,
+  getFreezePanes: () => props.sheet.freezePanes,
+  getMergedCells: () => props.sheet.mergedCells,
+  getHiddenRowIntervals: () =>
+    createSheetFilterHiddenRowIntervals(props.sheet, sheetEvaluator.value),
   getSelection: () => selection.value,
   onScrollStart: () => {
     axisContextMenu.value = undefined;
@@ -307,13 +315,17 @@ const selectedRange = computed(() =>
     columnCount: gridExtent.columnCount,
   }),
 );
-const activeCellRect = computed(() =>
-  geometry.value.getCellViewportRect(activeCell.value, scrollPosition),
+const activeCellRect = computed(
+  () => layout.value.getCellViewportRect(activeCell.value) ?? { x: 0, y: 0, width: 0, height: 0 },
 );
-const selectedRangeRect = computed(() => getRangeViewportRect(selectedRange.value));
-const selectedRangeOutlineRect = computed(() => getRangeViewportRect(selectedRange.value, true));
-const activeCellOutlineRect = computed(() =>
-  getRangeViewportRect({ start: activeCell.value, end: activeCell.value }, true),
+const selectedRangeRects = computed(() => layout.value.getRangeFragments(selectedRange.value));
+const activeCellOutlineRects = computed(() =>
+  layout.value.getRangeFragments(
+    layout.value.getMergedRangeAt(activeCell.value) ?? {
+      start: activeCell.value,
+      end: activeCell.value,
+    },
+  ),
 );
 const activeCellLabel = computed(() => getCellAddressLabel(activeCell.value));
 const activeCellDisplayValue = computed(() =>
@@ -370,9 +382,39 @@ const {
     clipboardFeedbackKey.value = message;
   },
 });
-const clipboardRangeRect = computed(() =>
-  clipboardRange.value ? getRangeViewportRect(clipboardRange.value, true) : null,
+const clipboardRangeRects = computed(() =>
+  clipboardRange.value ? layout.value.getRangeFragments(clipboardRange.value) : [],
 );
+
+function normalizeSelectionForSheet(nextSelection: CellSelection): CellSelection {
+  if (nextSelection.mode !== "cells") {
+    return {
+      active: { ...nextSelection.active },
+      anchor: { ...nextSelection.anchor },
+      focus: { ...nextSelection.focus },
+      mode: nextSelection.mode,
+    };
+  }
+  const range = expandSelectionToMergedCellRanges(
+    { start: nextSelection.anchor, end: nextSelection.focus },
+    props.sheet.mergedCells,
+  );
+  return {
+    active: layout.value.getAnchorForAddress(nextSelection.active),
+    anchor: { ...range.start },
+    focus: { ...range.end },
+    mode: "cells",
+  };
+}
+
+function areSelectionsEqual(left: CellSelection, right: CellSelection): boolean {
+  return (
+    left.mode === right.mode &&
+    areCellAddressesEqual(left.active, right.active) &&
+    areCellAddressesEqual(left.anchor, right.anchor) &&
+    areCellAddressesEqual(left.focus, right.focus)
+  );
+}
 
 function setSelection(
   nextSelection: CellSelection,
@@ -381,12 +423,7 @@ function setSelection(
 ): void {
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
-  selection.value = {
-    active: { ...nextSelection.active },
-    anchor: { ...nextSelection.anchor },
-    focus: { ...nextSelection.focus },
-    mode: nextSelection.mode,
-  };
+  selection.value = normalizeSelectionForSheet(nextSelection);
   ensureGridExtentContains(visibleAddress);
   ensureSelectionVisible(visibleAddress, nextSelection.mode);
   emitViewState();
@@ -398,6 +435,28 @@ function setSelection(
 function setActiveCell(address: CellAddress, restoreFocus = true): void {
   setSelection(createCellSelection(address), address, restoreFocus);
 }
+
+watch(rowVisibility, () => {
+  if (rowVisibility.value.isRowVisible(selection.value.active.row)) return;
+  const column = selection.value.active.column;
+  const replacement =
+    rowVisibility.value.getNextVisibleRow(selection.value.active.row) ??
+    rowVisibility.value.getPreviousVisibleRow(selection.value.active.row) ??
+    props.sheet.filter?.range.start.row ??
+    0;
+  setSelection(createCellSelection({ row: replacement, column }));
+});
+
+watch(
+  () => props.sheet.mergedCells,
+  () => {
+    const normalized = normalizeSelectionForSheet(selection.value);
+    if (areSelectionsEqual(normalized, selection.value)) return;
+    selection.value = normalized;
+    emitViewState();
+  },
+  { deep: true },
+);
 
 function navigateToCell(address: CellAddress): void {
   const nextSelection = createCellSelection(address);
@@ -426,6 +485,17 @@ function moveSelection(
     },
     extend,
   );
+  if (delta.rows) {
+    const source = extend ? selection.value.focus : selection.value.active;
+    const row =
+      delta.rows > 0
+        ? rowVisibility.value.getNextVisibleRow(source.row)
+        : rowVisibility.value.getPreviousVisibleRow(source.row);
+    if (row !== null) {
+      if (!extend) destination.active.row = row;
+      destination.focus.row = row;
+    }
+  }
   const visibleAddress = extend ? destination.focus : destination.active;
   ensureGridExtentContains(visibleAddress);
 
@@ -666,6 +736,7 @@ function openActiveCellContextMenu(): void {
   }
   const bounds = scroller.getBoundingClientRect();
   const rect = activeCellRect.value;
+  if (!rect) return;
   const x = bounds.left + rect.x + Math.min(16, rect.width / 2);
   const y = bounds.top + rect.y + rect.height;
   axisContextMenu.value = undefined;
@@ -893,9 +964,16 @@ function restoreViewState(viewState?: SheetGridViewState): void {
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
   clearPendingClipboard();
-  selection.value = nextViewState.selection;
   cancelEdit(false);
   restoreViewport(nextViewState);
+  const normalized = normalizeSelectionForSheet(nextViewState.selection);
+  selection.value = normalized;
+  if (!areSelectionsEqual(normalized, nextViewState.selection)) emitViewState();
+}
+
+function clearClipboard(): void {
+  clearPendingClipboard();
+  clipboardFeedbackKey.value = undefined;
 }
 
 watch(
@@ -944,7 +1022,7 @@ onBeforeUnmount(() => {
   clearPendingClipboard();
 });
 
-defineExpose({ focusGrid: focusEditor, navigateToCell });
+defineExpose({ clearClipboard, focusGrid: focusEditor, navigateToCell });
 </script>
 
 <template>
@@ -970,10 +1048,8 @@ defineExpose({ focusGrid: focusEditor, navigateToCell });
       @click="onCornerClick"
     />
     <SheetColumnHeaders
-      :start-column="visibleRange.startColumn"
-      :end-column="visibleRange.endColumn"
+      :items="columnHeaderItems"
       :geometry="geometry"
-      :scroll-left="scrollPosition.x"
       :selected-start-column="selectedRange.start.column"
       :selected-end-column="selectedRange.end.column"
       :selected="getSelectionMode(selection) === 'columns' || getSelectionMode(selection) === 'all'"
@@ -985,10 +1061,8 @@ defineExpose({ focusGrid: focusEditor, navigateToCell });
       "
     />
     <SheetRowHeaders
-      :start-row="visibleRange.startRow"
-      :end-row="visibleRange.endRow"
+      :items="rowHeaderItems"
       :geometry="geometry"
-      :scroll-top="scrollPosition.y"
       :selected-start-row="selectedRange.start.row"
       :selected-end-row="selectedRange.end.row"
       :selected="getSelectionMode(selection) === 'rows' || getSelectionMode(selection) === 'all'"
@@ -1015,11 +1089,9 @@ defineExpose({ focusGrid: focusEditor, navigateToCell });
           <SheetCellLayer
             :sheet="sheet"
             :evaluator="sheetEvaluator"
-            :geometry="geometry"
-            :visible-range="visibleRange"
+            :layout="layout"
             :active-cell="activeCell"
             :selection="selection"
-            :scroll-position="scrollPosition"
             :editing="isEditing"
             :locale="locale"
             @cell-mousedown="onCellMouseDown"
@@ -1050,19 +1122,18 @@ defineExpose({ focusGrid: focusEditor, navigateToCell });
             </template>
           </SheetCellLayer>
           <SheetSelectionOverlay
-            :active-rect="activeCellOutlineRect"
-            :range-rect="selectedRangeRect"
-            :range-outline-rect="selectedRangeOutlineRect"
+            :active-rects="activeCellOutlineRects"
+            :range-rects="selectedRangeRects"
             :address-label="activeCellLabel"
             :editing="isEditing"
-            :clipboard-rect="clipboardRangeRect"
+            :clipboard-rects="clipboardRangeRects"
             :clipboard-mode="clipboardMode"
           />
           <SheetBorderLayer
             :sheet="sheet"
             :geometry="geometry"
-            :visible-range="visibleRange"
-            :scroll-position="scrollPosition"
+            :layout="layout"
+            :rows="rowVisibility"
           />
         </div>
       </div>

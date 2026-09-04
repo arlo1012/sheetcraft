@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import { ALargeSmall, TableCellsMerge, TextWrap } from "lucide-vue-next";
+import { ALargeSmall, TextWrap } from "lucide-vue-next";
 import type { CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState, ToggleStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
+import type { MergeCellsState } from "./data-tool-state";
 import HorizontalAlignmentControls from "./HorizontalAlignmentControls.vue";
+import MergeCellsMenu from "./MergeCellsMenu.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
 import VerticalAlignmentMenu from "./VerticalAlignmentMenu.vue";
 
-defineProps<{
+const props = defineProps<{
   state: SelectionCellStyleState;
   disabled: boolean;
+  mergeState: MergeCellsState;
 }>();
 
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
+  merge: [];
+  unmerge: [];
 }>();
 
 const { t } = useAppI18n();
@@ -67,15 +72,12 @@ function toggleWrapText(state: ToggleStyleState): void {
         :disabled="disabled"
         @apply-style="emit('applyStyle', $event)"
       />
-      <RibbonIconAction
-        :label="t('app.unavailableFeature', { feature: t('ribbon.mergeCells') })"
-        :text="t('ribbon.mergeCells')"
-        disabled
-        disclosure
-        data-ribbon-placeholder="merge-cells"
-      >
-        <TableCellsMerge :size="15" aria-hidden="true" />
-      </RibbonIconAction>
+      <MergeCellsMenu
+        :state="props.mergeState"
+        :disabled="disabled"
+        @merge="emit('merge')"
+        @unmerge="emit('unmerge')"
+      />
     </div>
   </section>
 </template>

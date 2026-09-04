@@ -6,6 +6,7 @@ import {
   type SheetBorderSegment,
 } from "../../../../modules/sheet-grid/border-presentation";
 import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
+import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
 import { createSheet, setCellStyle } from "@idea10/core/workbook";
 
 function coversPoint(segment: SheetBorderSegment, x: number, y: number): boolean {
@@ -26,6 +27,74 @@ function coversPoint(segment: SheetBorderSegment, x: number, y: number): boolean
 }
 
 describe("sheet border presentation", () => {
+  test("uses collapsed visible-row coordinates and discrete pane axes", () => {
+    const sheet = createSheet("Sheet1", "sheet-visibility");
+    setCellStyle(
+      sheet,
+      { row: 0, column: 1 },
+      { borderDiagonalDown: { style: "thin", color: "#ff0000" } },
+    );
+    setCellStyle(
+      sheet,
+      { row: 3_000, column: 1 },
+      { borderDiagonalDown: { style: "thin", color: "#000000" } },
+    );
+    const geometry = createSheetGeometry({
+      rowCount: 4_000,
+      columnCount: 4,
+      rowHeight: 20,
+      columnWidth: 40,
+    });
+    const rows = createRowVisibilityIndex({
+      rowCount: 4_000,
+      defaultRowHeight: 20,
+      hiddenIntervals: [{ start: 1, end: 2_999 }],
+    });
+
+    const segments = resolveVisibleDiagonalBorderSegments(
+      sheet,
+      geometry,
+      { startRow: 0, endRow: 3_000, startColumn: 0, endColumn: 3 },
+      { x: 0, y: 0 },
+      rows,
+      [3_000],
+      [1],
+    );
+
+    expect(segments).toMatchObject([{ row: 3_000, column: 1, x: 40, y: 20, height: 20 }]);
+  });
+
+  test("keeps a visible row's bottom border across a hidden row gap", () => {
+    const sheet = createSheet("Sheet1", "sheet-hidden-gap");
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      { borderBottom: { style: "medium", color: "#112233" } },
+    );
+    const geometry = createSheetGeometry({ rowCount: 6, columnCount: 2 });
+    const rows = createRowVisibilityIndex({
+      rowCount: 6,
+      defaultRowHeight: 24,
+      hiddenIntervals: [{ start: 1, end: 2 }],
+    });
+
+    const segments = resolveVisibleBorderSegments(
+      sheet,
+      geometry,
+      { startRow: 0, endRow: 3, startColumn: 0, endColumn: 0 },
+      { x: 0, y: 0 },
+      rows,
+      [0, 3],
+      [0],
+    );
+
+    expect(segments.find(({ key }) => key === "horizontal:3:0-0")).toMatchObject({
+      y: 22,
+      thickness: 2,
+      css: "2px solid #112233",
+    });
+  });
+
   test("resolves both diagonal directions against each visible cell geometry", () => {
     const sheet = createSheet("Sheet1", "sheet-1");
     setCellStyle(

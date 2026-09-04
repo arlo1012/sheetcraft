@@ -309,9 +309,12 @@ describe("HomeFormatToolbar", () => {
       const actions = wrapper.findAll(
         `[data-ribbon-group="${groupName}"] [data-ribbon-layout="tall"]`,
       );
-      expect(actions.map((action) => action.attributes("data-ribbon-placeholder"))).toEqual(
-        actionNames,
-      );
+      expect(
+        actions.map(
+          (action) =>
+            action.attributes("data-ribbon-action") ?? action.attributes("data-ribbon-placeholder"),
+        ),
+      ).toEqual(actionNames);
       for (const action of actions) {
         expect(action.classes()).toContain("is-tall");
         expect(action.attributes("data-ribbon-span")).toBe("2");
@@ -324,10 +327,13 @@ describe("HomeFormatToolbar", () => {
     ] as const) {
       const actions = wrapper
         .get(`[data-ribbon-stack="${stackName}"]`)
-        .findAll("[data-ribbon-placeholder]");
-      expect(actions.map((action) => action.attributes("data-ribbon-placeholder"))).toEqual(
-        actionNames,
-      );
+        .findAll("[data-ribbon-row]");
+      expect(
+        actions.map(
+          (action) =>
+            action.attributes("data-ribbon-action") ?? action.attributes("data-ribbon-placeholder"),
+        ),
+      ).toEqual(actionNames);
       expect(actions.map((action) => action.attributes("data-ribbon-row"))).toEqual(["1", "2"]);
     }
 
@@ -380,7 +386,7 @@ describe("HomeFormatToolbar", () => {
       expect(control.element).toBeInstanceOf(HTMLButtonElement);
       expect(control.attributes()).toMatchObject({ type: "button", disabled: "" });
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(21);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(17);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({ type: "button", disabled: "" });

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import type { CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { MAX_ROW_HEIGHT, MIN_ROW_HEIGHT } from "@idea10/core/workbook";
 import type { SheetGeometry } from "@idea10/sheet-engine/geometry";
@@ -7,10 +7,8 @@ import type { SheetGeometry } from "@idea10/sheet-engine/geometry";
 const { t } = useAppI18n();
 
 const props = defineProps<{
-  startRow: number;
-  endRow: number;
+  items: readonly { index: number; offset: number; size: number }[];
   geometry: SheetGeometry;
-  scrollTop: number;
   selectedStartRow: number;
   selectedEndRow: number;
   selected: boolean;
@@ -27,18 +25,10 @@ const emit = defineEmits<{
 
 const KEYBOARD_RESIZE_STEP = 8;
 
-const rows = computed(() => {
-  const result: number[] = [];
-  for (let row = props.startRow; row <= props.endRow; row += 1) {
-    result.push(row);
-  }
-  return result;
-});
-
-function getHeaderStyle(row: number): CSSProperties {
+function getHeaderStyle(item: { offset: number; size: number }): CSSProperties {
   return {
-    top: `${props.geometry.getRowOffset(row) - props.scrollTop}px`,
-    height: `${props.geometry.getRowHeight(row)}px`,
+    top: `${item.offset}px`,
+    height: `${item.size}px`,
   };
 }
 
@@ -94,38 +84,40 @@ function onHeaderContextMenu(row: number, event: MouseEvent): void {
 <template>
   <div class="sheet-row-headers" role="presentation">
     <div
-      v-for="row in rows"
-      :key="row"
+      v-for="item in items"
+      :key="item.index"
       class="sheet-row-headers__item"
-      :class="{ 'is-active': selected && row >= selectedStartRow && row <= selectedEndRow }"
-      :style="getHeaderStyle(row)"
-      :data-row="row"
+      :class="{
+        'is-active': selected && item.index >= selectedStartRow && item.index <= selectedEndRow,
+      }"
+      :style="getHeaderStyle(item)"
+      :data-row="item.index"
     >
       <button
         type="button"
         class="sheet-row-headers__select-button"
-        :data-select-row="row"
-        :aria-label="t('grid.selectRow', { row: row + 1 })"
-        :aria-pressed="selected && row >= selectedStartRow && row <= selectedEndRow"
-        @mousedown.left.prevent="emit('select', { row, shiftKey: $event.shiftKey })"
-        @contextmenu.prevent="onHeaderContextMenu(row, $event)"
-        @keydown="onHeaderKeydown(row, $event)"
+        :data-select-row="item.index"
+        :aria-label="t('grid.selectRow', { row: item.index + 1 })"
+        :aria-pressed="selected && item.index >= selectedStartRow && item.index <= selectedEndRow"
+        @mousedown.left.prevent="emit('select', { row: item.index, shiftKey: $event.shiftKey })"
+        @contextmenu.prevent="onHeaderContextMenu(item.index, $event)"
+        @keydown="onHeaderKeydown(item.index, $event)"
       >
-        <span aria-hidden="true">{{ row + 1 }}</span>
+        <span aria-hidden="true">{{ item.index + 1 }}</span>
       </button>
       <span
         class="sheet-row-headers__resize-handle"
-        :data-resize-row="row"
+        :data-resize-row="item.index"
         role="separator"
         aria-orientation="horizontal"
-        :aria-label="t('grid.rowHeight', { row: row + 1 })"
+        :aria-label="t('grid.rowHeight', { row: item.index + 1 })"
         :aria-valuemin="MIN_ROW_HEIGHT"
         :aria-valuemax="MAX_ROW_HEIGHT"
-        :aria-valuenow="geometry.getRowHeight(row)"
+        :aria-valuenow="geometry.getRowHeight(item.index)"
         tabindex="0"
         @mousedown.stop
-        @pointerdown.left.prevent.stop="emit('resizeStart', { index: row, event: $event })"
-        @keydown.stop="onResizeHandleKeydown(row, $event)"
+        @pointerdown.left.prevent.stop="emit('resizeStart', { index: item.index, event: $event })"
+        @keydown.stop="onResizeHandleKeydown(item.index, $event)"
       />
     </div>
   </div>

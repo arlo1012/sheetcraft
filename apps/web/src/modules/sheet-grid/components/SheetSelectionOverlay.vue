@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import type { CSSProperties } from "vue";
 import type { Rect } from "@idea10/sheet-engine/geometry";
+import type { SheetViewportRangeFragment } from "@idea10/sheet-engine/viewport-layout";
 
 const props = defineProps<{
-  activeRect: Rect;
-  rangeRect: Rect;
-  rangeOutlineRect: Rect;
+  activeRects: readonly SheetViewportRangeFragment[];
+  rangeRects: readonly SheetViewportRangeFragment[];
   addressLabel: string;
   editing: boolean;
-  clipboardRect?: Rect | null;
+  clipboardRects?: readonly SheetViewportRangeFragment[];
   clipboardMode?: "copy" | "cut" | null;
 }>();
 
@@ -22,44 +22,82 @@ function getRectStyle(rect: Rect): CSSProperties {
 }
 
 function getOutlineStyle(rect: Rect): CSSProperties {
-  return { ...getRectStyle(rect), borderWidth: "1px" };
+  return {
+    left: `${rect.x - 1}px`,
+    top: `${rect.y - 1}px`,
+    width: `${rect.width + 1}px`,
+    height: `${rect.height + 1}px`,
+    borderWidth: "1px",
+  };
 }
 
-const rangeStyle = computed<CSSProperties>(() => getRectStyle(props.rangeRect));
-const rangeOutlineStyle = computed<CSSProperties>(() => getOutlineStyle(props.rangeOutlineRect));
-const activeStyle = computed<CSSProperties>(() => getOutlineStyle(props.activeRect));
-const clipboardStyle = computed<CSSProperties | undefined>(() =>
-  props.clipboardRect ? { ...getRectStyle(props.clipboardRect), borderWidth: "2px" } : undefined,
-);
+function getClipboardStyle(rect: Rect): CSSProperties {
+  return { ...getOutlineStyle(rect), borderWidth: "2px" };
+}
+
+function getRangeOutlineStyle(
+  fragment: SheetViewportRangeFragment,
+  fragments: readonly SheetViewportRangeFragment[],
+): CSSProperties {
+  const rect = fragment.rect;
+  const style = getOutlineStyle(rect);
+  for (const candidate of fragments) {
+    if (candidate === fragment) continue;
+    const other = candidate.rect;
+    const overlapsVertically = other.y < rect.y + rect.height && rect.y < other.y + other.height;
+    const overlapsHorizontally = other.x < rect.x + rect.width && rect.x < other.x + other.width;
+    if (overlapsVertically && other.x + other.width === rect.x)
+      style.borderLeftColor = "transparent";
+    if (overlapsVertically && rect.x + rect.width === other.x)
+      style.borderRightColor = "transparent";
+    if (overlapsHorizontally && other.y + other.height === rect.y)
+      style.borderTopColor = "transparent";
+    if (overlapsHorizontally && rect.y + rect.height === other.y)
+      style.borderBottomColor = "transparent";
+  }
+  return style;
+}
+
+function getFragmentKey(fragment: SheetViewportRangeFragment): string {
+  const { paneId, rect } = fragment;
+  return `${paneId}:${rect.x}:${rect.y}:${rect.width}:${rect.height}`;
+}
 </script>
 
 <template>
   <div
+    v-for="fragment in rangeRects"
+    :key="`range:${getFragmentKey(fragment)}`"
     class="sheet-selection-overlay__range-fill"
     :class="{ 'is-editing': editing }"
-    :style="rangeStyle"
+    :style="getRectStyle(fragment.rect)"
     data-selection-range
     aria-hidden="true"
   />
   <div
+    v-for="fragment in rangeRects"
+    :key="`outline:${getFragmentKey(fragment)}`"
     class="sheet-selection-overlay__range-outline"
     :class="{ 'is-editing': editing }"
-    :style="rangeOutlineStyle"
+    :style="getRangeOutlineStyle(fragment, rangeRects)"
     data-selection-outline
     aria-hidden="true"
   />
   <div
+    v-for="fragment in activeRects"
+    :key="`active:${getFragmentKey(fragment)}`"
     class="sheet-selection-overlay__active"
     :class="{ 'is-editing': editing }"
-    :style="activeStyle"
+    :style="getOutlineStyle(fragment.rect)"
     :data-active-cell="addressLabel"
     aria-hidden="true"
   />
   <div
-    v-if="clipboardRect"
+    v-for="fragment in clipboardRects"
+    :key="`clipboard:${getFragmentKey(fragment)}`"
     class="sheet-selection-overlay__clipboard"
     :class="`is-${clipboardMode}`"
-    :style="clipboardStyle"
+    :style="getClipboardStyle(fragment.rect)"
     data-clipboard-range
     aria-hidden="true"
   />

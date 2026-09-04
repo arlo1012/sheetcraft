@@ -19,11 +19,20 @@ const {
   activeSelectionStyle,
   formatPainterActive,
   activeSelectionSummary,
+  dataToolState,
+  mergeState,
   workspaceStatusText,
   commitCell,
   pasteCells,
   clearCells,
   autoSum,
+  sortSelection,
+  applyFilter,
+  clearFilter,
+  freeze,
+  unfreeze,
+  mergeSelection,
+  unmergeSelection,
   applyCellStyle,
   applyCellBorders,
   adjustNumberFormatDecimals,
@@ -69,11 +78,20 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :state="activeSelectionStyle"
       :disabled="!isFormattingSupported"
       :format-painter-active="formatPainterActive"
+      :data-state="dataToolState"
+      :merge-state="mergeState"
       @apply-borders="applyCellBorders"
       @apply-style="applyCellStyle"
       @adjust-decimals="adjustNumberFormatDecimals"
       @activate-format-painter="activateFormatPainter"
       @auto-sum="autoSum"
+      @sort="sortSelection"
+      @apply-filter="applyFilter"
+      @clear-filter="clearFilter"
+      @freeze="freeze"
+      @unfreeze="unfreeze"
+      @merge="mergeSelection"
+      @unmerge="unmergeSelection"
       @undo="undo"
       @redo="redo"
     />

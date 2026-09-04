@@ -6,15 +6,13 @@ import {
   type GridExtent,
   type GridExtentPolicy,
 } from "@idea10/sheet-engine/extent";
-import {
-  createSheetGeometry,
-  type Point,
-  type Rect,
-  type Size,
-} from "@idea10/sheet-engine/geometry";
+import { createSheetGeometry, type Point, type Size } from "@idea10/sheet-engine/geometry";
+import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import { createRowVisibilityIndex, type HiddenRowInterval } from "@idea10/sheet-engine/visibility";
 import { getSelectionMode, type CellSelection } from "@idea10/sheet-engine/selection";
 import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
-import type { CellAddress, CellRange } from "@idea10/core/workbook";
+import { MergedCellRangeResolver } from "@idea10/core";
+import { DEFAULT_ROW_HEIGHT, type CellAddress, type CellRange } from "@idea10/core/workbook";
 
 const DEFAULT_VIEWPORT_SIZE: Size = { width: 960, height: 600 };
 
@@ -23,6 +21,9 @@ export function useSheetViewport(options: {
   getGridExtentPolicy: () => GridExtentPolicy;
   getColumnWidths: () => ReadonlyMap<number, number>;
   getRowHeights: () => ReadonlyMap<number, number>;
+  getFreezePanes: () => { rows: number; columns: number };
+  getMergedCells: () => readonly CellRange[];
+  getHiddenRowIntervals: () => readonly HiddenRowInterval[];
   getSelection: () => CellSelection;
   onScrollStart: () => void;
   onViewStateChange: (viewState: SheetGridViewState) => void;
@@ -34,6 +35,30 @@ export function useSheetViewport(options: {
   let resizeObserver: ResizeObserver | null = null;
   let stopGeometryWatch: WatchStopHandle | undefined;
 
+  function applyGridExtent(nextExtent: GridExtent): void {
+    gridExtent.rowCount = nextExtent.rowCount;
+    gridExtent.columnCount = nextExtent.columnCount;
+  }
+
+  function ensureGridExtentContains(address: CellAddress): void {
+    applyGridExtent(
+      expandGridExtentForAddress(gridExtent, address, options.getGridExtentPolicy().growth),
+    );
+  }
+
+  function ensureGridExtentContainsMetadata(): void {
+    const freeze = options.getFreezePanes();
+    if (freeze.rows > 0) ensureGridExtentContains({ row: freeze.rows - 1, column: 0 });
+    if (freeze.columns > 0) ensureGridExtentContains({ row: 0, column: freeze.columns - 1 });
+    for (const range of options.getMergedCells()) {
+      ensureGridExtentContains(range.start);
+      ensureGridExtentContains(range.end);
+    }
+  }
+
+  // Metadata may reference cells beyond the initial blank-grid allocation.
+  ensureGridExtentContainsMetadata();
+
   const geometry = computed(() =>
     createSheetGeometry({
       rowCount: gridExtent.rowCount,
@@ -42,23 +67,57 @@ export function useSheetViewport(options: {
       columnWidths: options.getColumnWidths(),
     }),
   );
-  const totalSize = computed(() => geometry.value.getTotalSize());
-  const visibleRange = computed(() =>
-    geometry.value.getVisibleRange(scrollPosition, viewportSize, 2),
+  const rowVisibility = computed(() =>
+    createRowVisibilityIndex({
+      rowCount: gridExtent.rowCount,
+      defaultRowHeight: DEFAULT_ROW_HEIGHT,
+      rowHeights: options.getRowHeights(),
+      hiddenIntervals: options.getHiddenRowIntervals(),
+    }),
   );
+  const mergeResolver = computed(() => new MergedCellRangeResolver(options.getMergedCells()));
+  const layout = computed(() => {
+    return createSheetViewportLayout({
+      geometry: geometry.value,
+      rows: rowVisibility.value,
+      freeze: options.getFreezePanes(),
+      bodyScrollPosition: scrollPosition,
+      viewportSize,
+      overscan: 2,
+      mergeResolver: {
+        getRangeAt: (address) => mergeResolver.value.getRangeAtAddress(address),
+      },
+    });
+  });
   const gridCanvasStyle = computed<CSSProperties>(() => ({
-    width: `${totalSize.value.width}px`,
-    height: `${totalSize.value.height}px`,
+    width: `${layout.value.nativeScrollSize.width}px`,
+    height: `${layout.value.nativeScrollSize.height}px`,
   }));
   const gridViewportStyle = computed<CSSProperties>(() => ({
     width: `${viewportSize.width}px`,
     height: `${viewportSize.height}px`,
   }));
-
-  function applyGridExtent(nextExtent: GridExtent): void {
-    gridExtent.rowCount = nextExtent.rowCount;
-    gridExtent.columnCount = nextExtent.columnCount;
-  }
+  const rowHeaderItems = computed(() => {
+    const items = new Map<number, { index: number; offset: number; size: number }>();
+    for (const pane of [layout.value.panes.topLeft, layout.value.panes.left]) {
+      for (const row of pane.rows) {
+        const rect = layout.value.getCellViewportRect({ row: row.index, column: 0 });
+        if (rect) items.set(row.index, { index: row.index, offset: rect.y, size: row.size });
+      }
+    }
+    return [...items.values()].sort((left, right) => left.offset - right.offset);
+  });
+  const columnHeaderItems = computed(() => {
+    const items = new Map<number, { index: number; offset: number; size: number }>();
+    for (const pane of [layout.value.panes.topLeft, layout.value.panes.top]) {
+      for (const column of pane.columns) {
+        const rect = layout.value.getCellViewportRect({ row: 0, column: column.index });
+        if (rect)
+          items.set(column.index, { index: column.index, offset: rect.x, size: column.size });
+      }
+    }
+    return [...items.values()].sort((left, right) => left.offset - right.offset);
+  });
 
   function getCurrentViewState(): SheetGridViewState {
     return createSheetGridViewState({
@@ -72,13 +131,8 @@ export function useSheetViewport(options: {
     options.onViewStateChange(getCurrentViewState());
   }
 
-  function ensureGridExtentContains(address: CellAddress): void {
-    applyGridExtent(
-      expandGridExtentForAddress(gridExtent, address, options.getGridExtentPolicy().growth),
-    );
-  }
-
   function ensureGridExtentCoversViewport(): void {
+    ensureGridExtentContainsMetadata();
     applyGridExtent(
       expandGridExtentForViewport(
         gridExtent,
@@ -92,63 +146,52 @@ export function useSheetViewport(options: {
 
   function updateViewportSize(): void {
     const scroller = scrollerRef.value;
-    if (!scroller) {
-      return;
-    }
+    if (!scroller) return;
     viewportSize.width = scroller.clientWidth || DEFAULT_VIEWPORT_SIZE.width;
     viewportSize.height = scroller.clientHeight || DEFAULT_VIEWPORT_SIZE.height;
     ensureGridExtentCoversViewport();
   }
 
+  function setNativeScrollPosition(position: Point): void {
+    const scroller = scrollerRef.value;
+    if (scroller) {
+      scroller.scrollLeft = position.x;
+      scroller.scrollTop = position.y;
+    }
+    scrollPosition.x = position.x;
+    scrollPosition.y = position.y;
+  }
+
+  watch(
+    [options.getFreezePanes, options.getMergedCells],
+    () => {
+      ensureGridExtentCoversViewport();
+      setNativeScrollPosition(layout.value.bodyScrollPosition);
+    },
+    { deep: true },
+  );
+
   function ensureSelectionVisible(
     address: CellAddress,
     mode = getSelectionMode(options.getSelection()),
   ): void {
-    const scroller = scrollerRef.value;
-    if (!scroller) {
-      return;
-    }
-    const nextScrollPosition = geometry.value.getScrollPositionForCell(
-      address,
-      scrollPosition,
-      viewportSize,
-    );
-    if (mode !== "rows" && mode !== "all" && nextScrollPosition.x !== scrollPosition.x) {
-      scroller.scrollLeft = nextScrollPosition.x;
-      scrollPosition.x = nextScrollPosition.x;
-    }
-    if (mode !== "columns" && mode !== "all" && nextScrollPosition.y !== scrollPosition.y) {
-      scroller.scrollTop = nextScrollPosition.y;
-      scrollPosition.y = nextScrollPosition.y;
-    }
+    const next = layout.value.getScrollPositionForAddress(address);
+    const position = { ...scrollPosition };
+    if (mode !== "rows" && mode !== "all") position.x = next.x;
+    if (mode !== "columns" && mode !== "all") position.y = next.y;
+    setNativeScrollPosition(position);
   }
 
   function getCellAtClientPoint(clientX: number, clientY: number): CellAddress | null {
     const scroller = scrollerRef.value;
-    if (!scroller) {
-      return null;
-    }
+    if (!scroller) return null;
     const bounds = scroller.getBoundingClientRect();
     const width = bounds.width || viewportSize.width;
     const height = bounds.height || viewportSize.height;
-    const x = Math.min(Math.max(clientX - bounds.left, 0), Math.max(0, width - 1));
-    const y = Math.min(Math.max(clientY - bounds.top, 0), Math.max(0, height - 1));
-    return geometry.value.getCellAtPoint({ x: x + scrollPosition.x, y: y + scrollPosition.y });
-  }
-
-  function getRangeViewportRect(range: CellRange, alignToGridlines = false): Rect {
-    const startRect = geometry.value.getCellViewportRect(range.start, scrollPosition);
-    const endRect = geometry.value.getCellViewportRect(range.end, scrollPosition);
-    const left = Math.max(0, startRect.x - (alignToGridlines && range.start.column > 0 ? 1 : 0));
-    const top = Math.max(0, startRect.y - (alignToGridlines && range.start.row > 0 ? 1 : 0));
-    const right = Math.min(viewportSize.width, endRect.x + endRect.width);
-    const bottom = Math.min(viewportSize.height, endRect.y + endRect.height);
-    return {
-      x: left,
-      y: top,
-      width: Math.max(0, right - left),
-      height: Math.max(0, bottom - top),
-    };
+    return layout.value.getCellAtViewportPoint({
+      x: Math.min(Math.max(clientX - bounds.left, 0), Math.max(0, width - 1)),
+      y: Math.min(Math.max(clientY - bounds.top, 0), Math.max(0, height - 1)),
+    });
   }
 
   function onScroll(event: Event): void {
@@ -161,20 +204,22 @@ export function useSheetViewport(options: {
   }
 
   function restore(viewState?: SheetGridViewState): SheetGridViewState {
-    const nextViewState = viewState
+    const next = viewState
       ? createSheetGridViewState(viewState)
       : createSheetGridViewState({ gridExtent: options.initialExtent });
-    applyGridExtent(nextViewState.gridExtent);
-    ensureGridExtentContains(nextViewState.selection.focus);
-    const scroller = scrollerRef.value;
-    if (scroller) {
-      scroller.scrollLeft = nextViewState.scrollPosition.x;
-      scroller.scrollTop = nextViewState.scrollPosition.y;
-    }
-    scrollPosition.x = nextViewState.scrollPosition.x;
-    scrollPosition.y = nextViewState.scrollPosition.y;
+    applyGridExtent(next.gridExtent);
+    ensureGridExtentContains(next.selection.focus);
+    ensureGridExtentContainsMetadata();
+    const restored = createSheetViewportLayout({
+      geometry: geometry.value,
+      rows: rowVisibility.value,
+      freeze: options.getFreezePanes(),
+      bodyScrollPosition: next.scrollPosition,
+      viewportSize,
+    }).bodyScrollPosition;
+    setNativeScrollPosition(restored);
     ensureGridExtentCoversViewport();
-    return nextViewState;
+    return next;
   }
 
   function observe(): void {
@@ -193,23 +238,25 @@ export function useSheetViewport(options: {
   function startGeometryWatch(): void {
     stopGeometryWatch?.();
     stopGeometryWatch = watch(
-      geometry,
-      (nextGeometry, previousGeometry) => {
+      [geometry, rowVisibility],
+      ([nextGeometry, nextRows], [previousGeometry, previousRows]) => {
         const scroller = scrollerRef.value;
-        if (!scroller || scrollPosition.y <= 0) {
-          return;
-        }
-        const anchor = previousGeometry.getCellAtPoint({ x: 0, y: scrollPosition.y });
-        if (!anchor || anchor.row >= nextGeometry.rowCount) {
-          return;
-        }
-        const offsetWithinRow = scrollPosition.y - previousGeometry.getRowOffset(anchor.row);
-        const nextScrollTop =
-          nextGeometry.getRowOffset(anchor.row) +
-          Math.min(offsetWithinRow, nextGeometry.getRowHeight(anchor.row) - 1);
+        if (!scroller || scrollPosition.y <= 0) return;
+        const oldFreezeHeight = previousRows.getBoundaryOffset(options.getFreezePanes().rows) ?? 0;
+        const anchor = previousRows.getLogicalRowAtOffset(oldFreezeHeight + scrollPosition.y);
+        const nextRow = anchor === null ? null : nextRows.getVisibleRow(anchor);
+        const previousRow = anchor === null ? null : previousRows.getVisibleRow(anchor);
+        if (!nextRow || !previousRow) return;
+        const offsetWithinRow = scrollPosition.y + oldFreezeHeight - previousRow.offset;
+        const nextFreezeHeight = nextRows.getBoundaryOffset(options.getFreezePanes().rows) ?? 0;
+        const nextScrollTop = Math.max(
+          0,
+          nextRow.offset + Math.min(offsetWithinRow, nextRow.height - 1) - nextFreezeHeight,
+        );
         if (nextScrollTop !== scrollPosition.y) {
-          scroller.scrollTop = nextScrollTop;
-          scrollPosition.y = nextScrollTop;
+          void nextGeometry;
+          void previousGeometry;
+          setNativeScrollPosition({ x: scrollPosition.x, y: nextScrollTop });
           emitViewState();
         }
       },
@@ -223,10 +270,10 @@ export function useSheetViewport(options: {
   }
 
   return {
+    columnHeaderItems,
     geometry,
     getCellAtClientPoint,
     getCurrentViewState,
-    getRangeViewportRect,
     gridCanvasStyle,
     gridExtent,
     gridViewportStyle,
@@ -234,9 +281,12 @@ export function useSheetViewport(options: {
     ensureGridExtentCoversViewport,
     ensureSelectionVisible,
     emitViewState,
+    layout,
     observe,
     onScroll,
     restore,
+    rowHeaderItems,
+    rowVisibility,
     scrollPosition,
     scrollerRef,
     startGeometryWatch,
@@ -244,6 +294,5 @@ export function useSheetViewport(options: {
     stopObserving,
     updateViewportSize,
     viewportSize,
-    visibleRange,
   };
 }
