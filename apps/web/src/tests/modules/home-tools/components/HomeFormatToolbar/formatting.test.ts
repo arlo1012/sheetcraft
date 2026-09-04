@@ -250,6 +250,7 @@ describe("HomeFormatToolbar", () => {
     for (const control of wrapper.findAll(
       '[data-ribbon-group]:not([data-ribbon-group="history"]) button, input',
     )) {
+      if (control.attributes("data-ribbon-action") === "auto-sum") continue;
       expect((control.element as HTMLButtonElement | HTMLInputElement).disabled).toBe(true);
     }
     for (const control of wrapper.findAll(
@@ -261,9 +262,13 @@ describe("HomeFormatToolbar", () => {
     }
     await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
     await wrapper.get('[data-ribbon-action="redo"]').trigger("click");
+    const autoSum = wrapper.get('[data-ribbon-action="auto-sum"]');
+    expect((autoSum.element as HTMLButtonElement).disabled).toBe(false);
+    await autoSum.trigger("click");
     expect(emittedPatches(wrapper)).toEqual([]);
     expect(wrapper.emitted("undo")).toHaveLength(1);
     expect(wrapper.emitted("redo")).toHaveLength(1);
+    expect(wrapper.emitted("autoSum")).toHaveLength(1);
   });
 
   test("renders ordered compact and mixed-layout tool groups", () => {
@@ -315,7 +320,6 @@ describe("HomeFormatToolbar", () => {
 
     for (const [stackName, actionNames] of [
       ["freeze-sort", ["freeze", "sort"]],
-      ["sum-data", ["sum", "data"]],
       ["chart-pivot", ["chart", "pivot-table"]],
     ] as const) {
       const actions = wrapper
@@ -326,6 +330,16 @@ describe("HomeFormatToolbar", () => {
       );
       expect(actions.map((action) => action.attributes("data-ribbon-row"))).toEqual(["1", "2"]);
     }
+
+    const autoSum = wrapper.get('[data-ribbon-action="auto-sum"]');
+    expect(autoSum.attributes("data-ribbon-row")).toBe("1");
+    expect(autoSum.attributes("data-ribbon-placeholder")).toBeUndefined();
+    expect(
+      wrapper
+        .get('[data-ribbon-stack="sum-data"]')
+        .findAll("[data-ribbon-placeholder]")
+        .map((action) => action.attributes("data-ribbon-placeholder")),
+    ).toEqual(["data"]);
 
     expect(
       wrapper
@@ -366,7 +380,7 @@ describe("HomeFormatToolbar", () => {
       expect(control.element).toBeInstanceOf(HTMLButtonElement);
       expect(control.attributes()).toMatchObject({ type: "button", disabled: "" });
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(22);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(21);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({ type: "button", disabled: "" });

@@ -1,5 +1,12 @@
+import { nextTick, shallowRef } from "vue";
 import { describe, expect, test, vi } from "vitest";
-import { createWorkbook, getActiveSheet, setCellStyle, setCellValue } from "@idea10/core/workbook";
+import {
+  createWorkbook,
+  getActiveSheet,
+  setCellContent,
+  setCellStyle,
+  setCellValue,
+} from "@idea10/core/workbook";
 import { createCellSelection, type CellSelection } from "@idea10/sheet-engine/selection";
 import type {
   GridClipboardPort,
@@ -24,7 +31,7 @@ function createTextPasteEvent(text: string): ClipboardEvent {
 
 function createFixture() {
   const sheet = getActiveSheet(createWorkbook({ id: "workbook-1", sheetId: "sheet-1" }));
-  let currentSheet = sheet;
+  const currentSheet = shallowRef(sheet);
   let selection: CellSelection = createCellSelection({ row: 0, column: 0 });
   let transfer: GridClipboardTransfer = {};
   let localTokenWritten = true;
@@ -38,7 +45,7 @@ function createFixture() {
     read: vi.fn(async () => transfer),
   };
   const clipboard = useGridClipboard({
-    getSheet: () => currentSheet,
+    getSheet: () => currentSheet.value,
     getSelection: () => selection,
     isEditing: () => false,
     isComposing: () => false,
@@ -56,7 +63,7 @@ function createFixture() {
       selection = nextSelection;
     },
     setSheet(nextSheet: typeof sheet) {
-      currentSheet = nextSheet;
+      currentSheet.value = nextSheet;
     },
     setTransfer(nextTransfer: GridClipboardTransfer) {
       transfer = nextTransfer;
@@ -69,6 +76,31 @@ function createFixture() {
 }
 
 describe("useGridClipboard menu commands", () => {
+  test("retains raw local formula content and its source range for a copied paste", async () => {
+    const fixture = createFixture();
+    setCellContent(
+      fixture.sheet,
+      { row: 0, column: 1 },
+      {
+        kind: "formula",
+        formula: { source: "=A1 + 1" },
+      },
+    );
+
+    fixture.setSelection(createCellSelection({ row: 0, column: 1 }));
+    await fixture.clipboard.copySelection();
+    fixture.setSelection(createCellSelection({ row: 2, column: 3 }));
+    await fixture.clipboard.pasteSelection();
+
+    expect(fixture.pastes).toEqual([
+      expect.objectContaining({
+        kind: "all",
+        contents: [[{ kind: "formula", formula: { source: "=A1 + 1" } }]],
+        sourceRange: { start: { row: 0, column: 1 }, end: { row: 0, column: 1 } },
+      }),
+    ]);
+  });
+
   test("copies values and styles through the system port", async () => {
     const fixture = createFixture();
     setCellValue(fixture.sheet, { row: 0, column: 0 }, "source");
@@ -103,8 +135,8 @@ describe("useGridClipboard menu commands", () => {
         [{ bold: true }, { bold: true }],
         [{ bold: true }, { bold: true }],
       ],
-      clearRange: undefined,
     });
+    expect(fixture.pastes[0]).not.toHaveProperty("moveSource");
     expect(fixture.feedback).toEqual(["copied", "pasted"]);
   });
 
@@ -117,15 +149,37 @@ describe("useGridClipboard menu commands", () => {
     fixture.setSelection(createCellSelection({ row: 1, column: 1 }));
     await fixture.clipboard.pasteSelection();
 
-    expect(fixture.pastes[0]).toMatchObject({
+    expect(fixture.pastes[0]).toEqual({
       kind: "all",
-      clearRange: {
+      plan: {
+        anchor: { row: 1, column: 1 },
+        range: { start: { row: 1, column: 1 }, end: { row: 1, column: 1 } },
+        values: [["move"]],
+      },
+      moveSource: {
         start: { row: 0, column: 0 },
         end: { row: 0, column: 0 },
       },
     });
     expect(fixture.clipboard.clipboardRange.value).toBeNull();
     expect(fixture.feedback).toEqual(["readyToMove", "moved"]);
+  });
+
+  test("clears a pending local cut when the active sheet changes", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 0, column: 0 }, "move");
+    await fixture.clipboard.cutSelection();
+
+    fixture.setSheet(getActiveSheet(createWorkbook({ id: "workbook-2", sheetId: "sheet-2" })));
+    await nextTick();
+
+    expect(fixture.clipboard.clipboardMode.value).toBeNull();
+    expect(fixture.clipboard.clipboardRange.value).toBeNull();
+
+    await fixture.clipboard.pasteSelection();
+
+    expect(fixture.pastes[0]).not.toHaveProperty("moveSource");
+    expect(fixture.feedback).toEqual(["readyToMove", "pasted"]);
   });
 
   test("reports port failures without replacing pending clipboard state or pasting", async () => {
@@ -154,7 +208,7 @@ describe("useGridClipboard menu commands", () => {
 
     await fixture.clipboard.pasteSelection();
     expect(fixture.pastes[0]?.plan.values).toEqual([["external"]]);
-    expect(fixture.pastes[0]).toMatchObject({ kind: "all", clearRange: undefined });
+    expect(fixture.pastes[0]).not.toHaveProperty("moveSource");
     expect(fixture.feedback.at(-1)).toBe("pasted");
   });
 
@@ -169,7 +223,7 @@ describe("useGridClipboard menu commands", () => {
 
     fixture.setSelection(createCellSelection({ row: 1, column: 1 }));
     await fixture.clipboard.pasteSelection();
-    expect(fixture.pastes[0]).toMatchObject({ kind: "all", clearRange: undefined });
+    expect(fixture.pastes[0]).not.toHaveProperty("moveSource");
   });
 
   test("pastes only values without forwarding local formatting", async () => {

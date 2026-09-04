@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, markRaw, ref, watch } from "vue";
-import { formatCellValueForInput } from "@idea10/core/input";
+import { formatCellContentForInput } from "@idea10/core/input";
 import { getCellAddressLabel } from "@idea10/core/coordinates";
 import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
@@ -13,11 +13,13 @@ import {
   MAX_SHEET_ROWS,
   MIN_COLUMN_WIDTH,
   MIN_ROW_HEIGHT,
+  createSheetEvaluator,
+  getCellContent,
   getCellStyle,
-  getCellValue,
   type CellAddress,
   type CellRange,
   type Sheet,
+  type SheetEvaluator,
   type SheetDimensionAxis,
 } from "@idea10/core/workbook";
 import {
@@ -247,9 +249,18 @@ const effectiveColumnWidths = computed(() => {
   return columnWidths;
 });
 
+const sheetEvaluator = computed<SheetEvaluator>(() => {
+  // Value iteration also invalidates an existing sparse cell whose content changes in place.
+  for (const cell of props.sheet.cells.values()) {
+    void cell;
+  }
+  return createSheetEvaluator(props.sheet);
+});
+
 const automaticRowHeights = computed(() => {
   return autoRowHeightCalculator.reconcile({
     cells: props.sheet.cells,
+    getComputedValue: sheetEvaluator.value.getComputedValue,
     columnWidths: effectiveColumnWidths.value,
     rowCount: gridExtent.rowCount,
     columnCount: gridExtent.columnCount,
@@ -285,7 +296,7 @@ const {
   onInput: onEditorInput,
 } = useCellEditing({
   getActiveCell: () => activeCell.value,
-  getInputValue: () => formatCellValueForInput(getCellValue(props.sheet, activeCell.value)),
+  getInputValue: () => formatCellContentForInput(getCellContent(props.sheet, activeCell.value)),
   onClearClipboard: () => clearPendingClipboard(),
   onCommit: (payload) => emit("commitCell", payload),
   onSelectionChange: (nextSelection) => setSelection(nextSelection),
@@ -307,7 +318,7 @@ const activeCellOutlineRect = computed(() =>
 const activeCellLabel = computed(() => getCellAddressLabel(activeCell.value));
 const activeCellDisplayValue = computed(() =>
   formatCellValueForGrid(
-    getCellValue(props.sheet, activeCell.value),
+    sheetEvaluator.value.getComputedValue(activeCell.value),
     getCellStyle(props.sheet, activeCell.value),
     locale.value,
   ),
@@ -1003,6 +1014,7 @@ defineExpose({ focusGrid: focusEditor, navigateToCell });
         <div class="sheet-grid__viewport" :style="gridViewportStyle">
           <SheetCellLayer
             :sheet="sheet"
+            :evaluator="sheetEvaluator"
             :geometry="geometry"
             :visible-range="visibleRange"
             :active-cell="activeCell"

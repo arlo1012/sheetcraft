@@ -1,11 +1,11 @@
-import { formatCellValueForDisplay } from "@idea10/core/input";
+import { formatComputedValueForDisplay } from "@idea10/core/input";
+import type { FormulaValue } from "@idea10/core/formula";
 import type { CellStyle } from "@idea10/core/style";
-import type { CellValue } from "@idea10/core/workbook";
 
 function formatNumericCellValue(value: number, style: Readonly<CellStyle>, locale: string): string {
   const format = style.numberFormat;
   if (!format) {
-    return formatCellValueForDisplay(value);
+    return formatComputedValueForDisplay(value);
   }
 
   const numericValue = Object.is(value, -0) ? 0 : value;
@@ -29,12 +29,12 @@ function formatNumericCellValue(value: number, style: Readonly<CellStyle>, local
 }
 
 export function formatCellValueForGrid(
-  value: CellValue,
+  value: FormulaValue,
   style: Readonly<CellStyle> | undefined,
   locale: string,
 ): string {
   if (typeof value !== "number") {
-    return formatCellValueForDisplay(value);
+    return formatComputedValueForDisplay(value);
   }
   return formatNumericCellValue(value, style ?? {}, locale);
 }

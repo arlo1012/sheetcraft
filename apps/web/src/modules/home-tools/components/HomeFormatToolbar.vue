@@ -25,6 +25,7 @@ const emit = defineEmits<{
   applyBorders: [action: CellBorderAction];
   adjustDecimals: [delta: -1 | 1];
   activateFormatPainter: [];
+  autoSum: [];
   undo: [];
   redo: [];
 }>();
@@ -253,7 +254,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           @apply-style="emit('applyStyle', $event)"
           @adjust-decimals="emit('adjustDecimals', $event)"
         />
-        <HomeDataGroup />
+        <HomeDataGroup @auto-sum="emit('autoSum')" />
         <HomeInsertGroup />
         <HomeAutomationGroup />
         <HomeUtilityGroup />

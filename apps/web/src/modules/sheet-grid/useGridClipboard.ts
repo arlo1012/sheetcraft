@@ -1,11 +1,13 @@
-import { computed, shallowRef, type ComputedRef } from "vue";
+import { computed, shallowRef, watch, type ComputedRef } from "vue";
 import {
   createPastePlan,
   getCellMatrixSize,
+  getCellRangeContents,
   getCellRangeValues,
   parseTsvToCellValues,
   serializeCellValuesToTsv,
   tileCellMatrix,
+  type CellContentMatrix,
   type CellValueMatrix,
   type PastePlan,
 } from "@idea10/core/clipboard";
@@ -30,7 +32,11 @@ export type GridPastePayload =
   | {
       kind: "all";
       plan: PastePlan;
-      clearRange?: CellRange;
+      /** Local cut source. Its presence requires an atomic workbook move rather than a paste. */
+      moveSource?: CellRange;
+      /** Raw local source, retained to preserve formulas across an internal paste. */
+      contents?: CellContentMatrix;
+      sourceRange?: CellRange;
       styles?: CellStyleMatrix;
     }
   | { kind: "values"; plan: PastePlan }
@@ -53,10 +59,12 @@ export type GridClipboardFeedback =
   | "formatsUnavailable";
 
 type PendingClipboard = {
+  sheetId: string;
   mode: "copy" | "cut";
   range: CellRange;
   token: string;
   text: string;
+  contents: CellContentMatrix;
   values: CellValueMatrix;
   styles: CellStyleMatrix;
   localTokenWritten: boolean;
@@ -92,10 +100,14 @@ export function useGridClipboard(options: {
   const clipboardPort = options.clipboardPort ?? createBrowserGridClipboardPort();
   const pendingClipboard = shallowRef<PendingClipboard | null>(null);
   let clipboardOperation = 0;
-  const clipboardRange: ComputedRef<CellRange | null> = computed(
-    () => pendingClipboard.value?.range ?? null,
-  );
-  const clipboardMode = computed(() => pendingClipboard.value?.mode ?? null);
+  const clipboardRange: ComputedRef<CellRange | null> = computed(() => {
+    const pending = pendingClipboard.value;
+    return pending?.sheetId === options.getSheet().id ? pending.range : null;
+  });
+  const clipboardMode = computed(() => {
+    const pending = pendingClipboard.value;
+    return pending?.sheetId === options.getSheet().id ? pending.mode : null;
+  });
 
   function createToken(): string {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -115,11 +127,22 @@ export function useGridClipboard(options: {
     }
 
     const range = getSelectionRange(options.getSelection());
+    const contents = getCellRangeContents(options.getSheet(), range);
     const values = getCellRangeValues(options.getSheet(), range);
     const styles = getCellRangeStyles(options.getSheet(), range);
     const text = serializeCellValuesToTsv(values);
     const token = createToken();
-    return { mode, range, token, text, values, styles, localTokenWritten: false };
+    return {
+      sheetId: options.getSheet().id,
+      mode,
+      range,
+      token,
+      text,
+      contents,
+      values,
+      styles,
+      localTokenWritten: false,
+    };
   }
 
   function commitPreparedSelection(prepared: PendingClipboard): void {
@@ -213,7 +236,12 @@ export function useGridClipboard(options: {
     const text = transfer.text;
     const localToken = transfer.localToken;
     const pending = pendingClipboard.value;
-    const isMatchingLocalClipboard = Boolean(pending && localToken && localToken === pending.token);
+    const isMatchingLocalClipboard = Boolean(
+      pending &&
+      pending.sheetId === options.getSheet().id &&
+      localToken &&
+      localToken === pending.token,
+    );
     const matchingFormatSource =
       isMatchingLocalClipboard && pending?.mode === "copy" && pending.localTokenWritten
         ? pending
@@ -248,15 +276,20 @@ export function useGridClipboard(options: {
     } else if (kind === "values") {
       options.onPaste({ kind, plan });
     } else if (kind === "all") {
-      options.onPaste({
-        kind,
-        plan,
-        clearRange: isLocalCut ? pending?.range : undefined,
-        styles:
-          isMatchingLocalClipboard && pending
-            ? tileCellMatrix(pending.styles, getCellMatrixSize(plan.values))
-            : undefined,
-      });
+      if (isLocalCut && pending) {
+        options.onPaste({ kind, plan, moveSource: pending.range });
+      } else {
+        options.onPaste({
+          kind,
+          plan,
+          contents: isMatchingLocalClipboard && pending ? pending.contents : undefined,
+          sourceRange: isMatchingLocalClipboard && pending ? pending.range : undefined,
+          styles:
+            isMatchingLocalClipboard && pending
+              ? tileCellMatrix(pending.styles, getCellMatrixSize(plan.values))
+              : undefined,
+        });
+      }
     }
     if (isLocalCut) {
       pendingClipboard.value = null;
@@ -350,10 +383,20 @@ export function useGridClipboard(options: {
     pendingClipboard.value = null;
   }
 
+  watch(
+    () => options.getSheet().id,
+    () => clearPendingClipboard(),
+  );
+
   return {
-    canPasteFormats: computed(
-      () => pendingClipboard.value?.mode === "copy" && pendingClipboard.value.localTokenWritten,
-    ),
+    canPasteFormats: computed(() => {
+      const pending = pendingClipboard.value;
+      return Boolean(
+        pending?.sheetId === options.getSheet().id &&
+        pending.mode === "copy" &&
+        pending.localTokenWritten,
+      );
+    }),
     clipboardMode,
     clipboardRange,
     clearPendingClipboard,

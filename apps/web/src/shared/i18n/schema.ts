@@ -38,6 +38,7 @@ export type MessageSchema = {
     conditionalFormatting: string;
     filter: string;
     freeze: string;
+    autoSum: string;
     sum: string;
     sort: string;
     data: string;
@@ -66,6 +67,8 @@ export type MessageSchema = {
     invalidAddress: string;
     enterSearchTerm: string;
     noMatches: string;
+    autoSumUnavailable: string;
+    autoSumApplied: string;
     found: string;
     renameFailed: string;
     sheetNameEmpty: string;

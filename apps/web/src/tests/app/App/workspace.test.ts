@@ -81,7 +81,10 @@ describe("App", () => {
 
     await wrapper.get('[aria-label="Actions for Budget"]').trigger("click");
     sheetMenu = new DOMWrapper(document.body).get('[role="menu"]');
-    await sheetMenu.findAll('[role="menuitem"]')[1]?.trigger("click");
+    await sheetMenu
+      .findAll('[role="menuitem"]')
+      .find((item) => item.text() === "Delete sheet")
+      ?.trigger("click");
     expect(wrapper.findAll('[role="tab"]')).toHaveLength(1);
     expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet1");
   });

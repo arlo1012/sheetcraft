@@ -49,6 +49,12 @@ describe("SpreadsheetRibbon", () => {
     await wrapper.get('[aria-label="Bold"]').trigger("click");
     expect(wrapper.emitted("applyStyle")?.[0]).toEqual([{ bold: true }]);
 
+    const autoSum = wrapper.get('[data-ribbon-action="auto-sum"]');
+    expect(autoSum.attributes()).toMatchObject({ type: "button", "aria-label": "AutoSum" });
+    expect((autoSum.element as HTMLButtonElement).disabled).toBe(false);
+    await autoSum.trigger("click");
+    expect(wrapper.emitted("autoSum")).toEqual([[]]);
+
     await wrapper.get("[data-cell-border-trigger]").trigger("click");
     await new DOMWrapper(document.body).get('[data-border-preset="outer"]').trigger("click");
     expect(wrapper.emitted("applyBorders")?.[0]).toEqual([
@@ -74,7 +80,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
       "false",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(22);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(21);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({
@@ -82,6 +88,17 @@ describe("SpreadsheetRibbon", () => {
         disabled: "",
       });
     }
+  });
+
+  test("keeps AutoSum available when formatting is disabled for a large selection", async () => {
+    const wrapper = mountRibbon();
+    await wrapper.setProps({ disabled: true });
+
+    expect((wrapper.get('[aria-label="Bold"]').element as HTMLButtonElement).disabled).toBe(true);
+    const autoSum = wrapper.get('[data-ribbon-action="auto-sum"]');
+    expect((autoSum.element as HTMLButtonElement).disabled).toBe(false);
+    await autoSum.trigger("click");
+    expect(wrapper.emitted("autoSum")).toEqual([[]]);
   });
 
   test("localizes the category and surface labels", () => {

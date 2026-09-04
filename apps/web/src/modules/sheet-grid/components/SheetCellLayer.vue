@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import { getCellStyle, getCellValue, type CellAddress, type Sheet } from "@idea10/core/workbook";
+import {
+  getCellStyle,
+  type CellAddress,
+  type Sheet,
+  type SheetEvaluator,
+} from "@idea10/core/workbook";
 import { getCellContentStyle } from "../cell-presentation";
 import { formatCellValueForGrid } from "../cell-value-presentation";
 import type { Point, SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
@@ -25,6 +30,7 @@ type VisibleRow = {
 const props = withDefaults(
   defineProps<{
     sheet: Sheet;
+    evaluator: SheetEvaluator;
     geometry: SheetGeometry;
     visibleRange: VisibleCellRange;
     activeCell: CellAddress;
@@ -80,7 +86,7 @@ const visibleRows = computed<VisibleRow[]>(() => {
       const rect = props.geometry.getCellViewportRect(address, props.scrollPosition);
       const cellStyle = getCellStyle(props.sheet, address);
       const text = formatCellValueForGrid(
-        getCellValue(props.sheet, address),
+        props.evaluator.getComputedValue(address),
         cellStyle,
         props.locale,
       );

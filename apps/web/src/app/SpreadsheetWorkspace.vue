@@ -23,6 +23,7 @@ const {
   commitCell,
   pasteCells,
   clearCells,
+  autoSum,
   applyCellStyle,
   applyCellBorders,
   adjustNumberFormatDecimals,
@@ -72,6 +73,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @apply-style="applyCellStyle"
       @adjust-decimals="adjustNumberFormatDecimals"
       @activate-format-painter="activateFormatPainter"
+      @auto-sum="autoSum"
       @undo="undo"
       @redo="redo"
     />

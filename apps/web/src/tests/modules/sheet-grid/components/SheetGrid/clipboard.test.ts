@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { getCellStyle, getCellValue, setCellStyle, setCellValue } from "@idea10/core/workbook";
+import {
+  getCellContent,
+  getCellStyle,
+  getCellValue,
+  setCellContent,
+  setCellStyle,
+  setCellValue,
+} from "@idea10/core/workbook";
 import {
   IDEA10_CLIPBOARD_TYPE,
   WEB_IDEA10_CLIPBOARD_TYPE,
@@ -77,6 +84,73 @@ describe("SheetGrid clipboard", () => {
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
     expect(getCellValue(sheet, { row: 3, column: 3 })).toBeNull();
     expect(getCellValue(sheet, { row: 4, column: 4 })).toBeNull();
+  });
+
+  test("tiles copied formulas with translated references", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    setCellValue(sheet, { row: 0, column: 1 }, 2);
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=B1 + 1" },
+      },
+    );
+
+    const copied = createTestClipboardEvent("copy");
+    wrapper.get("textarea.cell-editor").element.dispatchEvent(copied.event);
+    await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });
+    await wrapper
+      .get('[data-row="3"][data-column="3"]')
+      .trigger("mousedown", { button: 0, shiftKey: true });
+    wrapper
+      .get("textarea.cell-editor")
+      .element.dispatchEvent(createTestClipboardEvent("paste", copied.data).event);
+    await wrapper.vm.$nextTick();
+
+    expect(getCellContent(sheet, { row: 2, column: 2 })).toEqual({
+      kind: "formula",
+      formula: { source: "=D3 + 1" },
+    });
+    expect(getCellContent(sheet, { row: 2, column: 3 })).toEqual({
+      kind: "formula",
+      formula: { source: "=E3 + 1" },
+    });
+    expect(getCellContent(sheet, { row: 3, column: 2 })).toEqual({
+      kind: "formula",
+      formula: { source: "=D4 + 1" },
+    });
+    expect(getCellContent(sheet, { row: 3, column: 3 })).toEqual({
+      kind: "formula",
+      formula: { source: "=E4 + 1" },
+    });
+  });
+
+  test("keeps formula content intact while pasting formats", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    const target = { row: 1, column: 2 };
+    setCellContent(sheet, target, {
+      kind: "formula",
+      formula: { source: "=A1 + 1" },
+    });
+
+    wrapper.vm.$emit("pasteCells", {
+      kind: "formats",
+      plan: {
+        anchor: target,
+        range: { start: target, end: target },
+        values: [[2]],
+      },
+      styles: [[{ bold: true }]],
+    });
+    await wrapper.vm.$nextTick();
+
+    expect(getCellContent(sheet, target)).toEqual({
+      kind: "formula",
+      formula: { source: "=A1 + 1" },
+    });
+    expect(getCellStyle(sheet, target)).toEqual({ bold: true });
   });
 
   test("delays cut clearing and moves an overlapping range atomically", async () => {

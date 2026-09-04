@@ -4,9 +4,12 @@ import { afterEach, describe, expect, test } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import {
   getCellStyle,
+  getCellComputedValue,
+  getCellContent,
   getCellValue,
   getWorkbookSheets,
   setCellStyle,
+  setCellContent,
   setCellValue,
 } from "@idea10/core/workbook";
 import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
@@ -42,6 +45,104 @@ afterEach(() => {
 });
 
 describe("spreadsheet workspace controller", () => {
+  test("keeps formula source in the formula bar while the grid consumes its computed value", () => {
+    const controller = mountController();
+    const sheet = controller.activeSheet.value;
+    setCellValue(sheet, { row: 0, column: 0 }, 4);
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection: {
+          active: { row: 0, column: 1 },
+          anchor: { row: 0, column: 1 },
+          focus: { row: 0, column: 1 },
+          mode: "cells",
+        },
+      }),
+    );
+
+    controller.commitCell({ address: { row: 0, column: 1 }, input: "=A1 * 2" });
+
+    expect(controller.activeCellInput.value).toBe("=A1 * 2");
+    expect(getCellContent(sheet, { row: 0, column: 1 })).toEqual({
+      kind: "formula",
+      formula: { source: "=A1 * 2" },
+    });
+    expect(getCellComputedValue(sheet, { row: 0, column: 1 })).toBe(8);
+  });
+
+  test("rebases copied formula content and dispatches local cuts to the move command", () => {
+    const controller = mountController();
+    const sheet = controller.activeSheet.value;
+    setCellValue(sheet, { row: 0, column: 0 }, 7);
+    setCellContent(
+      sheet,
+      { row: 0, column: 1 },
+      {
+        kind: "formula",
+        formula: { source: "=A1 + 1" },
+      },
+    );
+
+    controller.pasteCells({
+      kind: "all",
+      plan: {
+        anchor: { row: 1, column: 2 },
+        range: { start: { row: 1, column: 2 }, end: { row: 1, column: 2 } },
+        values: [[8]],
+      },
+      contents: [[{ kind: "formula", formula: { source: "=A1 + 1" } }]],
+      sourceRange: { start: { row: 0, column: 1 }, end: { row: 0, column: 1 } },
+    });
+    expect(getCellContent(sheet, { row: 1, column: 2 })).toEqual({
+      kind: "formula",
+      formula: { source: "=B2 + 1" },
+    });
+
+    controller.pasteCells({
+      kind: "all",
+      plan: {
+        anchor: { row: 2, column: 3 },
+        range: { start: { row: 2, column: 3 }, end: { row: 2, column: 3 } },
+        values: [[8]],
+      },
+      moveSource: { start: { row: 0, column: 1 }, end: { row: 0, column: 1 } },
+    });
+    expect(getCellContent(sheet, { row: 0, column: 1 })).toBeNull();
+    expect(getCellContent(sheet, { row: 2, column: 3 })).toEqual({
+      kind: "formula",
+      formula: { source: "=A1 + 1" },
+    });
+  });
+
+  test("inserts Core's AutoSum recommendation as one reversible formula edit", () => {
+    const controller = mountController();
+    const sheet = controller.activeSheet.value;
+    setCellValue(sheet, { row: 0, column: 2 }, 2);
+    setCellValue(sheet, { row: 1, column: 2 }, 3);
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection: {
+          active: { row: 2, column: 2 },
+          anchor: { row: 2, column: 2 },
+          focus: { row: 2, column: 2 },
+          mode: "cells",
+        },
+      }),
+    );
+
+    controller.autoSum();
+
+    expect(getCellContent(sheet, { row: 2, column: 2 })).toEqual({
+      kind: "formula",
+      formula: { source: "=SUM(C1:C2)" },
+    });
+    expect(getCellComputedValue(sheet, { row: 2, column: 2 })).toBe(5);
+    expect(controller.workspaceStatusText.value).toBe("Inserted =SUM(C1:C2)");
+    expect(controller.session.history.undoStack).toHaveLength(1);
+    expect(controller.undo()).toBe(true);
+    expect(getCellContent(sheet, { row: 2, column: 2 })).toBeNull();
+  });
+
   test("uses each sheet view state as the single source of selection", () => {
     const controller = mountController();
     const firstSheetId = controller.activeSheet.value.id;

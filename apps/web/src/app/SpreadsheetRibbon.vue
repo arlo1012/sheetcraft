@@ -16,6 +16,7 @@ const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
   adjustDecimals: [delta: -1 | 1];
   activateFormatPainter: [];
+  autoSum: [];
   undo: [];
   redo: [];
 }>();
@@ -42,6 +43,7 @@ const { t } = useAppI18n();
         @apply-style="emit('applyStyle', $event)"
         @adjust-decimals="emit('adjustDecimals', $event)"
         @activate-format-painter="emit('activateFormatPainter')"
+        @auto-sum="emit('autoSum')"
         @undo="emit('undo')"
         @redo="emit('redo')"
       />

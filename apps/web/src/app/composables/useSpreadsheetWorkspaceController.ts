@@ -16,19 +16,22 @@ import {
   createDeleteSheetCommand,
   createDuplicateSheetCommand,
   createInsertSheetAxisCommand,
+  createMoveCellRangeCommand,
   createMoveSheetCommand,
-  createPasteCellValuesCommand,
+  createPasteCellContentsCommand,
   createRenameSheetCommand,
   createResizeSheetDimensionCommand,
-  createSetCellValueCommand,
+  createSetCellContentCommand,
   type WorkbookCommand,
   type WorkbookOperation,
 } from "@idea10/core/commands";
 import {
   createPastePlan,
   getCellMatrixSize,
+  getCellRangeContents,
   getCellRangeValues,
   tileCellMatrix,
+  translateCellContentForCopy,
   type CellValueMatrix,
 } from "@idea10/core/clipboard";
 import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
@@ -39,7 +42,8 @@ import {
   undoWorkbookCommand,
   type WorkbookSession,
 } from "@idea10/core/history";
-import { formatCellValueForInput, parseCellInput } from "@idea10/core/input";
+import { formatCellContentForInput, parseCellContent } from "@idea10/core/input";
+import { createAutoSumFormula, type CellContent } from "@idea10/core/formula";
 import type { IdFactory } from "@idea10/core/runtime";
 import { findCellByText, type SheetSearchDirection } from "@idea10/core/search";
 import { getSelectionSummary } from "@idea10/core/selection-summary";
@@ -51,7 +55,8 @@ import {
 } from "@idea10/core/style-state";
 import {
   getActiveSheet,
-  getCellValue,
+  createSheetEvaluator,
+  getCellContent,
   getWorkbookSheets,
   MAX_SHEET_ROWS,
   setActiveSheet,
@@ -97,20 +102,27 @@ export function useSpreadsheetWorkspaceController(
   const session = reactive(createWorkbookSession({ idFactory })) as WorkbookSession;
   const viewStates = reactive(new Map<string, SheetGridViewState>());
   const gridRef = shallowRef<SheetGridNavigator>();
+  const workbookVersion = ref(0);
   const searchQuery = ref("");
   const formatPainterSource = ref<FormatPainterSource>();
   const workspaceStatus = ref<FeedbackState>();
   let workspaceStatusTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const activeSheet = computed(() => getActiveSheet(session.workbook));
-  const sheets = computed(() => getWorkbookSheets(session.workbook));
+  const activeSheet = computed(() => {
+    void workbookVersion.value;
+    return getActiveSheet(session.workbook);
+  });
+  const sheets = computed(() => {
+    void workbookVersion.value;
+    return getWorkbookSheets(session.workbook);
+  });
   const activeSheetViewState = computed(() => viewStates.get(activeSheet.value.id));
   const activeAddress = computed(
     () => activeSheetViewState.value?.selection.active ?? { row: 0, column: 0 },
   );
   const activeAddressLabel = computed(() => formatCellAddress(activeAddress.value));
   const activeCellInput = computed(() =>
-    formatCellValueForInput(getCellValue(activeSheet.value, activeAddress.value)),
+    formatCellContentForInput(getCellContent(activeSheet.value, activeAddress.value)),
   );
   const activeSelectionRange = computed<CellRange>(() => {
     const selection = activeSheetViewState.value?.selection;
@@ -135,7 +147,7 @@ export function useSpreadsheetWorkspaceController(
   const formatPainterActive = computed(() => formatPainterSource.value !== undefined);
 
   function collectCommandSheetIds(command: WorkbookCommand, sheetIds: Set<string>): void {
-    if (command.type === "setCellValues") {
+    if (command.type === "setCellContents") {
       for (const change of command.changes) {
         sheetIds.add(change.sheetId);
       }
@@ -161,6 +173,7 @@ export function useSpreadsheetWorkspaceController(
   function execute(command: WorkbookCommand, operation?: WorkbookOperation): boolean {
     const changed = executeWorkbookCommand(session, command, operation);
     if (changed) {
+      workbookVersion.value += 1;
       pruneViewStates();
     }
     return changed;
@@ -185,10 +198,10 @@ export function useSpreadsheetWorkspaceController(
 
   function commitCell(payload: { address: CellAddress; input: string }): void {
     execute(
-      createSetCellValueCommand(
+      createSetCellContentCommand(
         activeSheet.value.id,
         payload.address,
-        parseCellInput(payload.input),
+        parseCellContent(payload.input),
       ),
       "cells.edit",
     );
@@ -198,10 +211,10 @@ export function useSpreadsheetWorkspaceController(
   function pasteCells(payload: GridPastePayload): void {
     if (payload.kind === "formats") {
       execute(
-        createPasteCellValuesCommand(
+        createPasteCellContentsCommand(
           activeSheet.value.id,
           payload.plan.anchor,
-          getCellRangeValues(activeSheet.value, payload.plan.range),
+          getCellRangeContents(activeSheet.value, payload.plan.range),
           { styles: payload.styles },
         ),
         "cells.paste",
@@ -210,26 +223,91 @@ export function useSpreadsheetWorkspaceController(
     }
     if (payload.kind === "values") {
       execute(
-        createPasteCellValuesCommand(
+        createPasteCellContentsCommand(
           activeSheet.value.id,
           payload.plan.anchor,
-          payload.plan.values,
+          toLiteralContents(payload.plan.values),
         ),
         "cells.paste",
       );
       return;
     }
+    if (payload.moveSource) {
+      execute(
+        createMoveCellRangeCommand(activeSheet.value.id, payload.moveSource, payload.plan.anchor),
+        "cells.move",
+      );
+      return;
+    }
+    const contents = getAllPasteContents(payload);
     execute(
-      createPasteCellValuesCommand(activeSheet.value.id, payload.plan.anchor, payload.plan.values, {
-        clearRange: payload.clearRange,
+      createPasteCellContentsCommand(activeSheet.value.id, payload.plan.anchor, contents, {
         styles: payload.styles,
       }),
-      payload.clearRange ? "cells.move" : "cells.paste",
+      "cells.paste",
+    );
+  }
+
+  function toLiteralContents(values: readonly (readonly (string | number | boolean | null)[])[]) {
+    return values.map((row) =>
+      row.map((value) =>
+        value === null ? null : ({ kind: "literal", value } satisfies CellContent),
+      ),
+    );
+  }
+
+  function getAllPasteContents(
+    payload: Extract<GridPastePayload, { kind: "all" }>,
+  ): Array<Array<CellContent | null>> {
+    if (!payload.contents || !payload.sourceRange) {
+      return toLiteralContents(payload.plan.values);
+    }
+
+    const sourceSize = getCellMatrixSize(payload.contents);
+    const targetSize = getCellMatrixSize(payload.plan.values);
+    return Array.from({ length: targetSize.rowCount }, (_, row) =>
+      Array.from({ length: targetSize.columnCount }, (_, column) => {
+        const sourceRow = row % sourceSize.rowCount;
+        const sourceColumn = column % sourceSize.columnCount;
+        const content = payload.contents?.[sourceRow]?.[sourceColumn] ?? null;
+        if (!content) {
+          return content;
+        }
+        return translateCellContentForCopy(
+          content,
+          {
+            row: payload.sourceRange!.start.row + sourceRow,
+            column: payload.sourceRange!.start.column + sourceColumn,
+          },
+          { row: payload.plan.anchor.row + row, column: payload.plan.anchor.column + column },
+        );
+      }),
     );
   }
 
   function clearCells(range: CellRange): void {
     execute(createClearCellRangeCommand(activeSheet.value.id, range), "cells.clear");
+  }
+
+  function autoSum(): void {
+    const target = activeAddress.value;
+    const evaluator = createSheetEvaluator(activeSheet.value);
+    const formula = createAutoSumFormula(target, evaluator.getComputedValue);
+    if (!formula) {
+      showWorkspaceStatus({ key: "workspace.autoSumUnavailable" });
+      return;
+    }
+    if (
+      execute(
+        createSetCellContentCommand(activeSheet.value.id, target, {
+          kind: "formula",
+          formula: { source: formula },
+        }),
+        "cells.edit",
+      )
+    ) {
+      showWorkspaceStatus({ key: "workspace.autoSumApplied", params: { formula } });
+    }
   }
 
   function applyCellStyle(patch: CellStylePatch): void {
@@ -358,7 +436,9 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function selectSheet(sheetId: string): void {
-    setActiveSheet(session.workbook, sheetId);
+    if (setActiveSheet(session.workbook, sheetId)) {
+      workbookVersion.value += 1;
+    }
     clearWorkspaceStatus();
   }
 
@@ -483,6 +563,7 @@ export function useSpreadsheetWorkspaceController(
   function undo(): boolean {
     const changed = undoWorkbookCommand(session);
     if (changed) {
+      workbookVersion.value += 1;
       pruneViewStates();
     }
     return changed;
@@ -491,6 +572,7 @@ export function useSpreadsheetWorkspaceController(
   function redo(): boolean {
     const changed = redoWorkbookCommand(session);
     if (changed) {
+      workbookVersion.value += 1;
       pruneViewStates();
     }
     return changed;
@@ -525,6 +607,7 @@ export function useSpreadsheetWorkspaceController(
     commitCell,
     pasteCells,
     clearCells,
+    autoSum,
     applyCellStyle,
     applyCellBorders,
     adjustNumberFormatDecimals,

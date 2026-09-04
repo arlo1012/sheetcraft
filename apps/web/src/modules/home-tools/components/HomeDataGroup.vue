@@ -4,6 +4,10 @@ import { useAppI18n } from "../../../shared/i18n";
 import RibbonIconAction from "./RibbonIconAction.vue";
 
 const { t } = useAppI18n();
+
+const emit = defineEmits<{
+  autoSum: [];
+}>();
 </script>
 
 <template>
@@ -55,12 +59,11 @@ const { t } = useAppI18n();
 
     <div class="home-data-group__stack home-data-group__sum-stack" data-ribbon-stack="sum-data">
       <RibbonIconAction
-        :label="t('app.unavailableFeature', { feature: t('ribbon.sum') })"
-        :text="t('ribbon.sum')"
-        disabled
-        disclosure
-        data-ribbon-placeholder="sum"
+        :label="t('ribbon.autoSum')"
+        :text="t('ribbon.autoSum')"
+        data-ribbon-action="auto-sum"
         data-ribbon-row="1"
+        @activate="emit('autoSum')"
       >
         <Sigma :size="15" aria-hidden="true" />
       </RibbonIconAction>
