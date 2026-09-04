@@ -15,11 +15,23 @@ type VisibleCell = {
   key: string;
   paneId: "topLeft" | "top" | "left" | "body";
   address: CellAddress;
+  viewportTop: number;
+  viewportHeight: number;
   text: string;
   multiline: boolean;
   wrapped: boolean;
   style: CSSProperties;
-  rowStyle: CSSProperties;
+};
+
+type VisibleRow = {
+  key: string;
+  index: number;
+  style: CSSProperties;
+  panes: Array<{
+    paneId: VisibleCell["paneId"];
+    cells: VisibleCell[];
+    style: CSSProperties;
+  }>;
 };
 
 type VisualMergeFragment = {
@@ -72,15 +84,13 @@ const visibleCells = computed<VisibleCell[]>(() => {
       wrapped: Boolean(cellStyle?.wrapText),
       style: {
         left: `${rect.x - props.layout.panes[paneId].clip.x}px`,
-        top: "0px",
+        top: `${rect.y - props.layout.panes[paneId].clip.y}px`,
         width: `${rect.width}px`,
         height: `${rect.height}px`,
         ...getCellContentStyle(cellStyle, preservesLineBreaks),
       },
-      rowStyle: {
-        top: `${rect.y - props.layout.panes[paneId].clip.y}px`,
-        height: `${rect.height}px`,
-      },
+      viewportTop: rect.y,
+      viewportHeight: rect.height,
     });
   }
   props.layout.forEachVisibleCell((address, paneId) => {
@@ -93,12 +103,11 @@ const visibleCells = computed<VisibleCell[]>(() => {
   return cells;
 });
 
-const visiblePanes = computed(() =>
+const paneClips = computed(() =>
   (["topLeft", "top", "left", "body"] as const).map((paneId) => {
     const clip = props.layout.panes[paneId].clip;
     return {
       paneId,
-      cells: visibleCells.value.filter((cell) => cell.paneId === paneId),
       style: {
         left: `${clip.x}px`,
         top: `${clip.y}px`,
@@ -108,6 +117,58 @@ const visiblePanes = computed(() =>
     };
   }),
 );
+
+const visibleRows = computed<VisibleRow[]>(() => {
+  const rows = new Map<number, { offset: number; height: number; cells: VisibleCell[] }>();
+  for (const cell of visibleCells.value) {
+    const row = rows.get(cell.address.row);
+    if (row) {
+      const bottom = Math.max(row.offset + row.height, cell.viewportTop + cell.viewportHeight);
+      row.offset = Math.min(row.offset, cell.viewportTop);
+      row.height = bottom - row.offset;
+      row.cells.push(cell);
+    } else {
+      rows.set(cell.address.row, {
+        offset: cell.viewportTop,
+        height: cell.viewportHeight,
+        cells: [cell],
+      });
+    }
+  }
+
+  return [...rows.entries()]
+    .map(([index, row]) => ({
+      key: String(index),
+      index,
+      style: { top: `${row.offset}px`, height: `${row.height}px` },
+      panes: paneClips.value
+        .map(({ paneId }) => {
+          const cells = row.cells
+            .filter((cell) => cell.paneId === paneId)
+            .map((cell) => ({
+              ...cell,
+              style: { ...cell.style, top: `${cell.viewportTop - row.offset}px` },
+            }));
+          if (cells.length === 0) return null;
+          const clip = props.layout.panes[paneId].clip;
+          const topInset = Math.max(0, clip.y - row.offset);
+          const bottomInset = Math.max(0, row.offset + row.height - clip.y - clip.height);
+          return {
+            paneId,
+            cells,
+            style: {
+              left: `${clip.x}px`,
+              top: "0px",
+              width: `${clip.width}px`,
+              height: `${row.height}px`,
+              clipPath: `inset(${topInset}px 0 ${bottomInset}px)`,
+            },
+          };
+        })
+        .filter((pane): pane is NonNullable<typeof pane> => pane !== null),
+    }))
+    .sort((left, right) => left.index - right.index);
+});
 
 const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
   const fragments: VisualMergeFragment[] = [];
@@ -138,7 +199,7 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
 <template>
   <div class="sheet-cell-layer">
     <div
-      v-for="pane in visiblePanes"
+      v-for="pane in paneClips"
       :key="pane.paneId"
       class="sheet-cell-layer__pane"
       :style="pane.style"
@@ -150,16 +211,26 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
         class="sheet-cell-layer__merge-fragment"
         :style="fragment.style"
         aria-hidden="true"
-      />
+      ></div>
+    </div>
+    <div
+      v-for="row in visibleRows"
+      :key="row.key"
+      class="sheet-cell-layer__row"
+      :style="row.style"
+      role="row"
+      :aria-rowindex="row.index + 1"
+    >
       <div
-        v-for="cell in pane.cells"
-        :key="cell.key"
-        class="sheet-cell-layer__row"
-        :style="cell.rowStyle"
-        role="row"
-        :aria-rowindex="cell.address.row + 1"
+        v-for="pane in row.panes"
+        :key="pane.paneId"
+        class="sheet-cell-layer__row-pane"
+        :style="pane.style"
+        :data-pane="pane.paneId"
       >
         <div
+          v-for="cell in pane.cells"
+          :key="cell.key"
           class="sheet-cell-layer__cell"
           :class="{
             'has-value': cell.text.length > 0,
@@ -209,6 +280,11 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
     position: absolute;
     left: 0;
     width: 100%;
+  }
+
+  &__row-pane {
+    position: absolute;
+    overflow: hidden;
   }
 
   &__merge-fragment {

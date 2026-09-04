@@ -3,6 +3,20 @@ import { describe, expect, test } from "vitest";
 import { setCellStyle } from "@idea10/core/workbook";
 import { activeCell, mountSheetGrid } from "./fixture";
 
+function expectGridcellsToHaveUniqueLogicalRows(
+  wrapper: ReturnType<typeof mountSheetGrid>["wrapper"],
+): void {
+  const cells = wrapper.findAll<HTMLElement>('[role="gridcell"]');
+  const rowIndexes = new Set(cells.map((cell) => cell.attributes("data-row")));
+  expect(wrapper.findAll('[role="row"]')).toHaveLength(rowIndexes.size);
+  for (const cell of cells) {
+    const row = cell.element.closest<HTMLElement>('[role="row"]');
+    expect(row?.getAttribute("aria-rowindex")).toBe(
+      String(Number(cell.attributes("data-row")) + 1),
+    );
+  }
+}
+
 describe("SheetGrid frozen viewport", () => {
   test("expands for persisted freeze and merge metadata before its first render", () => {
     const { wrapper } = mountSheetGrid({
@@ -34,6 +48,13 @@ describe("SheetGrid frozen viewport", () => {
     expect(wrapper.findAll('[data-row="2"][data-column="1"]')).toHaveLength(1);
     expect(wrapper.findAll('[data-select-row="0"]')).toHaveLength(1);
     expect(wrapper.findAll('[data-select-column="0"]')).toHaveLength(1);
+    expectGridcellsToHaveUniqueLogicalRows(wrapper);
+  });
+
+  test("groups visible gridcells into their logical accessibility rows", () => {
+    const { wrapper } = mountSheetGrid();
+
+    expectGridcellsToHaveUniqueLogicalRows(wrapper);
   });
 
   test("keeps one canonical gridcell when only a merged tail is visible", async () => {
