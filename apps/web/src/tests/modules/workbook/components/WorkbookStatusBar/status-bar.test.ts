@@ -39,11 +39,18 @@ describe("WorkbookStatusBar", () => {
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
     await wrapper.get('[title="Sheet1 (double-click to rename)"]').trigger("click");
     await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
-    await new DOMWrapper(document.body).findAll('[role="menuitem"]')[1]?.trigger("click");
+    await new DOMWrapper(document.body).findAll('[role="menuitem"]')[4]?.trigger("click");
+    await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
+    await new DOMWrapper(document.body).findAll('[role="menuitem"]')[0]?.trigger("click");
+    await wrapper
+      .get('[title="Sheet1 (double-click to rename)"]')
+      .trigger("keydown", { key: "ArrowRight", altKey: true, shiftKey: true });
 
     expect(wrapper.emitted("add")).toHaveLength(1);
     expect(wrapper.emitted("select")?.[0]).toEqual(["sheet-1"]);
     expect(wrapper.emitted("delete")?.[0]).toEqual(["sheet-1"]);
+    expect(wrapper.emitted("duplicate")?.[0]).toEqual(["sheet-1"]);
+    expect(wrapper.emitted("move")?.[0]).toEqual([{ sheetId: "sheet-1", toIndex: 1 }]);
   });
 
   test("localizes status labels without changing sheet content", () => {

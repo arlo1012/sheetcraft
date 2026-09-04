@@ -12,13 +12,17 @@ const { t } = useAppI18n();
 const props = defineProps<{
   sheet: Sheet;
   sheetCount: number;
+  sheetIndex: number;
   isOpen: boolean;
   position: { left: number; bottom: number };
 }>();
 
 const emit = defineEmits<{
   toggle: [];
+  duplicate: [];
   rename: [];
+  moveLeft: [];
+  moveRight: [];
   delete: [];
   close: [restoreFocus: boolean];
 }>();
@@ -82,8 +86,17 @@ defineExpose({ dismiss, focusTrigger, getTriggerRect });
       :label="t('sheetTabs.menu', { name: sheet.name })"
       :style="{ left: `${position.left}px`, bottom: `${position.bottom}px` }"
     >
+      <MenuItem @select="emit('duplicate')">
+        {{ t("sheetTabs.duplicateAction") }}
+      </MenuItem>
       <MenuItem @select="emit('rename')">
         {{ t("sheetTabs.renameAction") }}
+      </MenuItem>
+      <MenuItem :disabled="sheetIndex === 0" @select="emit('moveLeft')">
+        {{ t("sheetTabs.moveLeftAction") }}
+      </MenuItem>
+      <MenuItem :disabled="sheetIndex === sheetCount - 1" @select="emit('moveRight')">
+        {{ t("sheetTabs.moveRightAction") }}
       </MenuItem>
       <MenuItem :disabled="sheetCount === 1" danger @select="emit('delete')">
         {{ t("sheetTabs.deleteAction") }}

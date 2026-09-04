@@ -34,8 +34,10 @@ const {
   deleteAxis,
   selectSheet,
   addSheet,
+  duplicateSheet,
   renameSheet,
   deleteSheet,
+  moveSheet,
   updateActiveSheetViewState,
   navigateToAddress,
   traverseFromFormulaBar,
@@ -110,8 +112,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :selection-summary="activeSelectionSummary"
       @select="selectSheet"
       @add="addSheet"
+      @duplicate="duplicateSheet"
       @rename="renameSheet"
       @delete="deleteSheet"
+      @move="moveSheet"
     />
   </section>
 </template>

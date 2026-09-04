@@ -71,6 +71,8 @@ export type MessageSchema = {
     sheetNameEmpty: string;
     sheetNameDuplicate: string;
     formatPainterRangeMismatch: string;
+    sheetDuplicated: string;
+    sheetMoved: string;
   };
   navigation: {
     sheet: string;
@@ -93,7 +95,10 @@ export type MessageSchema = {
     rename: string;
     renameHint: string;
     menu: string;
+    duplicateAction: string;
     renameAction: string;
+    moveLeftAction: string;
+    moveRightAction: string;
     deleteAction: string;
     add: string;
   };

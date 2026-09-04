@@ -16,7 +16,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [sheetId: string];
   add: [];
+  duplicate: [sheetId: string];
   rename: [payload: { sheetId: string; name: string }];
+  move: [payload: { sheetId: string; toIndex: number }];
   delete: [sheetId: string];
 }>();
 
@@ -41,7 +43,9 @@ function formatNumber(value: number): string {
         :active-sheet-id="activeSheetId"
         @select="emit('select', $event)"
         @add="emit('add')"
+        @duplicate="emit('duplicate', $event)"
         @rename="emit('rename', $event)"
+        @move="emit('move', $event)"
         @delete="emit('delete', $event)"
       />
     </div>

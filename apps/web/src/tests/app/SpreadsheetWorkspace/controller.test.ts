@@ -2,7 +2,13 @@ import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { getCellStyle, getCellValue, setCellStyle, setCellValue } from "@idea10/core/workbook";
+import {
+  getCellStyle,
+  getCellValue,
+  getWorkbookSheets,
+  setCellStyle,
+  setCellValue,
+} from "@idea10/core/workbook";
 import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { createAppI18n } from "../../../shared/i18n";
@@ -103,6 +109,54 @@ describe("spreadsheet workspace controller", () => {
 
     controller.renameSheet({ sheetId: controller.activeSheet.value.id, name: "Retained" });
     expect(controller.viewStates.has(firstSheetId)).toBe(false);
+  });
+
+  test("duplicates and reorders sheets through one reversible Core command each", () => {
+    const controller = mountController();
+    const sourceSheetId = controller.activeSheet.value.id;
+    controller.addSheet();
+    controller.addSheet();
+    controller.selectSheet(sourceSheetId);
+    controller.session.history.undoStack.splice(0);
+    controller.session.history.redoStack.splice(0);
+    const initialSheetIds = getWorkbookSheets(controller.session.workbook).map((sheet) => sheet.id);
+
+    controller.duplicateSheet(sourceSheetId);
+
+    const duplicateSheetId = controller.activeSheet.value.id;
+    expect(getWorkbookSheets(controller.session.workbook).map((sheet) => sheet.id)).toEqual([
+      sourceSheetId,
+      duplicateSheetId,
+      ...initialSheetIds.slice(1),
+    ]);
+    expect(controller.activeSheet.value.name).toBe("Sheet1 (2)");
+    expect(controller.workspaceStatusText.value).toBe("Duplicated Sheet1 (2)");
+    expect(controller.session.history.undoStack).toHaveLength(1);
+
+    expect(controller.undo()).toBe(true);
+    expect(controller.activeSheet.value.id).toBe(sourceSheetId);
+    expect(controller.redo()).toBe(true);
+    expect(controller.activeSheet.value.id).toBe(duplicateSheetId);
+
+    controller.moveSheet({ sheetId: sourceSheetId, toIndex: 2 });
+
+    expect(getWorkbookSheets(controller.session.workbook).map((sheet) => sheet.id)).toEqual([
+      duplicateSheetId,
+      initialSheetIds[1],
+      sourceSheetId,
+      initialSheetIds[2],
+    ]);
+    expect(controller.activeSheet.value.id).toBe(duplicateSheetId);
+    expect(controller.workspaceStatusText.value).toBe("Moved Sheet1 to position 3");
+    expect(controller.session.history.undoStack).toHaveLength(2);
+
+    expect(controller.undo()).toBe(true);
+    expect(getWorkbookSheets(controller.session.workbook).map((sheet) => sheet.id)).toEqual([
+      sourceSheetId,
+      duplicateSheetId,
+      ...initialSheetIds.slice(1),
+    ]);
+    expect(controller.activeSheet.value.id).toBe(duplicateSheetId);
   });
 
   test("pastes values without changing target formatting as one history entry", () => {

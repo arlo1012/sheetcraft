@@ -14,7 +14,9 @@ import {
   createClearCellRangeCommand,
   createDeleteSheetAxisCommand,
   createDeleteSheetCommand,
+  createDuplicateSheetCommand,
   createInsertSheetAxisCommand,
+  createMoveSheetCommand,
   createPasteCellValuesCommand,
   createRenameSheetCommand,
   createResizeSheetDimensionCommand,
@@ -368,6 +370,20 @@ export function useSpreadsheetWorkspaceController(
     clearWorkspaceStatus();
   }
 
+  function duplicateSheet(sheetId: string): void {
+    const command = createDuplicateSheetCommand(session.workbook, sheetId, {
+      idFactory: session.idFactory,
+    });
+    if (execute(command, "sheets.add")) {
+      showWorkspaceStatus({
+        key: "workspace.sheetDuplicated",
+        params: { name: command.sheet.name },
+      });
+      return;
+    }
+    clearWorkspaceStatus();
+  }
+
   function renameSheet(payload: { sheetId: string; name: string }): void {
     const normalizedName = payload.name.trim();
     if (!normalizedName) {
@@ -397,6 +413,21 @@ export function useSpreadsheetWorkspaceController(
 
   function deleteSheet(sheetId: string): void {
     execute(createDeleteSheetCommand(session.workbook, sheetId), "sheets.delete");
+    clearWorkspaceStatus();
+  }
+
+  function moveSheet(payload: { sheetId: string; toIndex: number }): void {
+    const sheet = session.workbook.sheets.get(payload.sheetId);
+    if (!sheet) {
+      return;
+    }
+    if (execute(createMoveSheetCommand(session.workbook, payload.sheetId, payload.toIndex))) {
+      showWorkspaceStatus({
+        key: "workspace.sheetMoved",
+        params: { name: sheet.name, position: payload.toIndex + 1 },
+      });
+      return;
+    }
     clearWorkspaceStatus();
   }
 
@@ -505,8 +536,10 @@ export function useSpreadsheetWorkspaceController(
     deleteAxis,
     selectSheet,
     addSheet,
+    duplicateSheet,
     renameSheet,
     deleteSheet,
+    moveSheet,
     updateActiveSheetViewState,
     navigateToAddress,
     traverseFromFormulaBar,
