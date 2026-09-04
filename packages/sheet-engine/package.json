@@ -15,6 +15,10 @@
       "types": "./dist/geometry.d.ts",
       "import": "./dist/geometry.js"
     },
+    "./frozen-layout": {
+      "types": "./dist/frozen-layout.d.ts",
+      "import": "./dist/frozen-layout.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"
@@ -30,6 +34,14 @@
     "./row-height": {
       "types": "./dist/row-height.d.ts",
       "import": "./dist/row-height.js"
+    },
+    "./viewport-layout": {
+      "types": "./dist/viewport-layout.d.ts",
+      "import": "./dist/viewport-layout.js"
+    },
+    "./visibility": {
+      "types": "./dist/visibility.d.ts",
+      "import": "./dist/visibility.js"
     }
   },
   "scripts": {

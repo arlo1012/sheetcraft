@@ -56,6 +56,12 @@ describe("row visibility index", () => {
     expect(index.getRowOffset(5)).toBe(40);
     expect(index.getVisibleOffset(3)).toBe(75);
     expect(index.getRowOffset(7)).toBeNull();
+    expect(index.getBoundaryOffset(0)).toBe(0);
+    expect(index.getBoundaryOffset(1)).toBe(20);
+    expect(index.getBoundaryOffset(2)).toBe(20);
+    expect(index.getBoundaryOffset(5)).toBe(40);
+    expect(index.getBoundaryOffset(7)).toBe(85);
+    expect(index.getBoundaryOffset(10)).toBe(85);
   });
 
   test("uses custom row-height boundaries for offset hit testing", () => {
@@ -248,6 +254,9 @@ describe("row visibility index", () => {
     expect(index.getVisibleIndex(-1)).toBeNull();
     expect(index.getLogicalRow(3)).toBeNull();
     expect(index.getLogicalRow(0.5)).toBeNull();
+    expect(index.getBoundaryOffset(-1)).toBeNull();
+    expect(index.getBoundaryOffset(3.5)).toBeNull();
+    expect(index.getBoundaryOffset(4)).toBeNull();
     expect(index.getLogicalRowAtOffset(Number.POSITIVE_INFINITY)).toBeNull();
     expect(index.getNextVisibleRow(-1)).toBeNull();
     expect(index.getPreviousVisibleRow(3)).toBeNull();

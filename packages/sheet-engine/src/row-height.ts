@@ -3,11 +3,12 @@ import {
   DEFAULT_CELL_FONT_SIZE,
   type CellStyle,
 } from "@idea10/core/style";
-import { formatCellValueForDisplay } from "@idea10/core/input";
+import { formatComputedValueForDisplay, type FormulaValue } from "@idea10/core";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
   MAX_ROW_HEIGHT,
+  type CellAddress,
   type Cell,
 } from "@idea10/core/workbook";
 
@@ -29,6 +30,11 @@ export type TextMeasurer = {
 
 export type AutoRowHeightInput = {
   cells: ReadonlyMap<string, Readonly<Cell>>;
+  /**
+   * Resolves the current computed value without making sheet-engine evaluate
+   * formula expressions or depend on a particular cell-content representation.
+   */
+  getComputedValue: (address: CellAddress, cell: Readonly<Cell>) => FormulaValue;
   columnWidths: ReadonlyMap<number, number>;
   rowCount: number;
   columnCount: number;
@@ -225,12 +231,11 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
           address.row < 0 ||
           address.row >= input.rowCount ||
           address.column < 0 ||
-          address.column >= input.columnCount ||
-          cell.value === undefined
+          address.column >= input.columnCount
         ) {
           continue;
         }
-        const text = formatCellValueForDisplay(cell.value);
+        const text = formatComputedValueForDisplay(input.getComputedValue(address, cell));
         const wrapText = Boolean(cell.style?.wrapText);
         if (!text || (!wrapText && !/[\r\n]/u.test(text))) {
           continue;

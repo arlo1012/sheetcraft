@@ -61,13 +61,32 @@ describe("automatic row height", () => {
     const measure = vi.fn(fixedMeasurer.measure);
     const calculator = createAutoRowHeightCalculator({ measure });
     const cells = new Map([
-      ["0:0", { value: "abcdefg", style: { wrapText: true as const } }],
-      ["0:1", { value: "abc", style: { wrapText: true as const, fontSize: 20 } }],
-      ["1:0", { value: "ignored", style: { bold: true as const } }],
+      [
+        "0:0",
+        {
+          content: { kind: "literal" as const, value: "abcdefg" },
+          style: { wrapText: true as const },
+        },
+      ],
+      [
+        "0:1",
+        {
+          content: { kind: "literal" as const, value: "abc" },
+          style: { wrapText: true as const, fontSize: 20 },
+        },
+      ],
+      [
+        "1:0",
+        { content: { kind: "literal" as const, value: "ignored" }, style: { bold: true as const } },
+      ],
       ["2:0", { style: { wrapText: true as const } }],
     ]);
     const input = {
       cells,
+      getComputedValue: (address) => {
+        const cell = cells.get(`${address.row}:${address.column}`);
+        return cell?.content?.kind === "literal" ? cell.content.value : null;
+      },
       columnWidths: new Map([
         [0, 42],
         [1, 42],
@@ -86,7 +105,10 @@ describe("automatic row height", () => {
     expect(calculator.reconcile(input)).toEqual(first);
     expect(measure).toHaveBeenCalledTimes(firstMeasureCount);
 
-    cells.set("0:0", { value: "short", style: { wrapText: true } });
+    cells.set("0:0", {
+      content: { kind: "literal", value: "short" },
+      style: { wrapText: true },
+    });
     calculator.reconcile(input);
     expect(measure.mock.calls.length).toBeGreaterThan(firstMeasureCount);
 
@@ -120,7 +142,8 @@ describe("automatic row height", () => {
   test("derives height for explicit line breaks without a wrap style", () => {
     const calculator = createAutoRowHeightCalculator(fixedMeasurer);
     const heights = calculator.reconcile({
-      cells: new Map([["0:0", { value: "first\nsecond" }]]),
+      cells: new Map([["0:0", { content: { kind: "formula", formula: { source: "=A1" } } }]]),
+      getComputedValue: () => "first\nsecond",
       columnWidths: new Map([[0, 42]]),
       rowCount: 2,
       columnCount: 2,

@@ -17,6 +17,12 @@ export type RowVisibilityIndex = {
   getVisibleIndex: (logicalRow: number) => number | null;
   getLogicalRow: (visibleIndex: number) => number | null;
   getVisibleRow: (logicalRow: number) => VisibleRow | null;
+  /**
+   * Returns the physical offset immediately before a logical row boundary.
+   * Hidden rows contribute no height, so this is defined even when the row at
+   * the boundary is hidden.
+   */
+  getBoundaryOffset: (logicalRow: number) => number | null;
   getRowOffset: (logicalRow: number) => number | null;
   getVisibleOffset: (visibleIndex: number) => number | null;
   getLogicalRowAtOffset: (offset: number) => number | null;
@@ -305,6 +311,23 @@ export function createRowVisibilityIndex(options: {
     return null;
   }
 
+  function getBoundaryOffset(logicalRow: number): number | null {
+    if (!Number.isSafeInteger(logicalRow) || logicalRow < 0 || logicalRow > rowCount) {
+      return null;
+    }
+    if (logicalRow === 0) return 0;
+    if (logicalRow === rowCount) return totalHeight;
+
+    const containingSegment = findSegmentByLogicalRow(segments, logicalRow);
+    if (containingSegment) {
+      return getRowOffsetInSegment(containingSegment, logicalRow, defaultRowHeight);
+    }
+
+    const insertion = lowerBound(segmentStarts, logicalRow);
+    const previous = insertion > 0 ? segments[insertion - 1] : undefined;
+    return previous ? previous.offsetStart + previous.height : 0;
+  }
+
   function getNextVisibleRow(logicalRow: number): number | null {
     if (!isLogicalRow(logicalRow, rowCount)) return null;
     const next = findSegmentByLogicalRow(segments, logicalRow + 1);
@@ -332,6 +355,7 @@ export function createRowVisibilityIndex(options: {
     },
     getLogicalRow,
     getVisibleRow,
+    getBoundaryOffset,
     getRowOffset(logicalRow) {
       return getVisibleRow(logicalRow)?.offset ?? null;
     },
