@@ -1,4 +1,5 @@
-import { getCellValue, type CellRange, type CellValue, type Sheet } from "./workbook.js";
+import { createSheetEvaluator, type CellRange, type Sheet } from "./workbook.js";
+import { isFormulaError, type FormulaValue } from "./formula/types.js";
 
 export type SelectionSummary = {
   average: number;
@@ -34,9 +35,10 @@ export function getSelectionSummary(sheet: Sheet, range: CellRange): SelectionSu
   let count = 0;
   let numericCount = 0;
   let sum = 0;
+  const evaluator = createSheetEvaluator(sheet);
 
-  const addValue = (value: CellValue): void => {
-    if (value === null) {
+  const addValue = (value: FormulaValue): void => {
+    if (value === null || isFormulaError(value)) {
       return;
     }
     count += 1;
@@ -49,28 +51,18 @@ export function getSelectionSummary(sheet: Sheet, range: CellRange): SelectionSu
   const rangeSize =
     (normalized.end.row - normalized.start.row + 1) *
     (normalized.end.column - normalized.start.column + 1);
-  if (rangeSize <= sheet.cells.size) {
-    for (let row = normalized.start.row; row <= normalized.end.row; row += 1) {
-      for (let column = normalized.start.column; column <= normalized.end.column; column += 1) {
-        addValue(getCellValue(sheet, { row, column }));
-      }
+  for (const [key, cell] of sheet.cells) {
+    if (cell.content === undefined) continue;
+    const address = parseCellKey(key);
+    if (
+      address.row < normalized.start.row ||
+      address.row > normalized.end.row ||
+      address.column < normalized.start.column ||
+      address.column > normalized.end.column
+    ) {
+      continue;
     }
-  } else {
-    for (const [key, cell] of sheet.cells) {
-      if (cell.value === undefined) {
-        continue;
-      }
-      const address = parseCellKey(key);
-      if (
-        address.row < normalized.start.row ||
-        address.row > normalized.end.row ||
-        address.column < normalized.start.column ||
-        address.column > normalized.end.column
-      ) {
-        continue;
-      }
-      addValue(cell.value);
-    }
+    addValue(evaluator.getComputedValue(address));
   }
 
   return {

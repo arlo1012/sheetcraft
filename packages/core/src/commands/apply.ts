@@ -15,7 +15,11 @@ import {
 } from "./sheets.js";
 import { applyRestoreSheetStateCommand, applySheetAxisCommand } from "./structure.js";
 import type { WorkbookCommand } from "./contracts.js";
-import { applyClearCellRangeCommand, applySetCellValuesCommand } from "./values.js";
+import {
+  applyClearCellRangeCommand,
+  applyMoveCellRangeCommand,
+  applySetCellContentsCommand,
+} from "./values.js";
 
 export type ApplyWorkbookCommandResult =
   | { ok: true; changed: false }
@@ -28,10 +32,12 @@ export function applyWorkbookCommand(
 ): WorkbookCommand | null {
   try {
     switch (command.type) {
-      case "setCellValues":
-        return applySetCellValuesCommand(workbook, command);
+      case "setCellContents":
+        return applySetCellContentsCommand(workbook, command);
       case "clearCellRange":
         return applyClearCellRangeCommand(workbook, command);
+      case "moveCellRange":
+        return applyMoveCellRangeCommand(workbook, command);
       case "applyCellStyle":
         return applyCellStyleCommand(workbook, command);
       case "applyCellBorders":

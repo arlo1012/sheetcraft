@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { createTestWorkbookSession } from "../helpers.js";
 import {
-  createBatchSetCellValuesCommand,
-  createSetCellValueCommand,
+  createBatchSetCellContentsCommand,
+  createSetCellContentCommand,
 } from "../../commands/index.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import { getActiveSheet, getCellValue } from "../../workbook.js";
@@ -15,7 +15,11 @@ describe("workbook commands and history", () => {
     expect(
       executeWorkbookCommand(
         session,
-        createSetCellValueCommand(sheet.id, { row: 1, column: 1 }, "Draft"),
+        createSetCellContentCommand(
+          sheet.id,
+          { row: 1, column: 1 },
+          { kind: "literal", value: "Draft" },
+        ),
       ),
     ).toBe(true);
     expect(getCellValue(sheet, { row: 1, column: 1 })).toBe("Draft");
@@ -33,9 +37,17 @@ describe("workbook commands and history", () => {
 
     executeWorkbookCommand(
       session,
-      createBatchSetCellValuesCommand([
-        { sheetId: sheet.id, address: { row: 0, column: 0 }, value: "A" },
-        { sheetId: sheet.id, address: { row: 0, column: 1 }, value: "B" },
+      createBatchSetCellContentsCommand([
+        {
+          sheetId: sheet.id,
+          address: { row: 0, column: 0 },
+          content: { kind: "literal", value: "A" },
+        },
+        {
+          sheetId: sheet.id,
+          address: { row: 0, column: 1 },
+          content: { kind: "literal", value: "B" },
+        },
       ]),
     );
 
@@ -48,9 +60,17 @@ describe("workbook commands and history", () => {
   test("validates a complete batch before changing workbook state", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
-    const command = createBatchSetCellValuesCommand([
-      { sheetId: sheet.id, address: { row: 0, column: 0 }, value: "A" },
-      { sheetId: "missing-sheet", address: { row: 0, column: 1 }, value: "B" },
+    const command = createBatchSetCellContentsCommand([
+      {
+        sheetId: sheet.id,
+        address: { row: 0, column: 0 },
+        content: { kind: "literal", value: "A" },
+      },
+      {
+        sheetId: "missing-sheet",
+        address: { row: 0, column: 1 },
+        content: { kind: "literal", value: "B" },
+      },
     ]);
 
     expect(() => executeWorkbookCommand(session, command)).toThrow("missing-sheet");
@@ -63,16 +83,25 @@ describe("workbook commands and history", () => {
     const sheet = getActiveSheet(session.workbook);
     const address = { row: 0, column: 0 };
 
-    executeWorkbookCommand(session, createSetCellValueCommand(sheet.id, address, "One"));
+    executeWorkbookCommand(
+      session,
+      createSetCellContentCommand(sheet.id, address, { kind: "literal", value: "One" }),
+    );
     expect(
-      executeWorkbookCommand(session, createSetCellValueCommand(sheet.id, address, "One")),
+      executeWorkbookCommand(
+        session,
+        createSetCellContentCommand(sheet.id, address, { kind: "literal", value: "One" }),
+      ),
     ).toBe(false);
     expect(session.history.undoStack).toHaveLength(1);
 
     undoWorkbookCommand(session);
     expect(session.history.redoStack).toHaveLength(1);
 
-    executeWorkbookCommand(session, createSetCellValueCommand(sheet.id, address, "Two"));
+    executeWorkbookCommand(
+      session,
+      createSetCellContentCommand(sheet.id, address, { kind: "literal", value: "Two" }),
+    );
     expect(session.history.redoStack).toHaveLength(0);
     expect(redoWorkbookCommand(session)).toBe(false);
   });

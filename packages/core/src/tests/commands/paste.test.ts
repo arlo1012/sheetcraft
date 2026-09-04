@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createTestWorkbookSession } from "../helpers.js";
-import { createPasteCellValuesCommand } from "../../commands/index.js";
+import { createPasteCellContentsCommand } from "../../commands/index.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import {
   getActiveSheet,
@@ -8,7 +8,31 @@ import {
   getCellValue,
   setCellStyle,
   setCellValue,
+  type CellAddress,
+  type CellRange,
+  type CellValue,
 } from "../../workbook.js";
+
+function createPasteCommand(
+  sheetId: string,
+  anchor: CellAddress,
+  values: readonly (readonly CellValue[])[],
+  options?: {
+    clearRange?: CellRange;
+    styles?: readonly (readonly (import("../../style.js").CellStyle | null)[])[];
+  },
+) {
+  return createPasteCellContentsCommand(
+    sheetId,
+    anchor,
+    values.map((row) =>
+      row.map((value) =>
+        value === null || value === "" ? null : { kind: "literal" as const, value },
+      ),
+    ),
+    options,
+  );
+}
 
 describe("paste cell values command", () => {
   test("pastes a matrix as one history entry", () => {
@@ -17,7 +41,7 @@ describe("paste cell values command", () => {
 
     executeWorkbookCommand(
       session,
-      createPasteCellValuesCommand(sheet.id, { row: 2, column: 3 }, [
+      createPasteCommand(sheet.id, { row: 2, column: 3 }, [
         ["A", "B"],
         ["C", "D"],
       ]),
@@ -42,7 +66,7 @@ describe("paste cell values command", () => {
 
     executeWorkbookCommand(
       session,
-      createPasteCellValuesCommand(sheet.id, target, [[12.5]], {
+      createPasteCommand(sheet.id, target, [[12.5]], {
         styles: [[{ numberFormat: { kind: "currency", currency: "cny", fractionDigits: 2 } }]],
       }),
     );
@@ -69,7 +93,7 @@ describe("paste cell values command", () => {
 
     executeWorkbookCommand(
       session,
-      createPasteCellValuesCommand(
+      createPasteCommand(
         sheet.id,
         { row: 1, column: 1 },
         [
@@ -104,7 +128,7 @@ describe("paste cell values command", () => {
     expect(
       executeWorkbookCommand(
         session,
-        createPasteCellValuesCommand(sheet.id, { row: 2, column: 2 }, [["pasted"]], {
+        createPasteCommand(sheet.id, { row: 2, column: 2 }, [["pasted"]], {
           styles: [
             [
               {
@@ -150,7 +174,7 @@ describe("paste cell values command", () => {
 
     executeWorkbookCommand(
       session,
-      createPasteCellValuesCommand(sheet.id, { row: 2, column: 2 }, [["plain"]], {
+      createPasteCommand(sheet.id, { row: 2, column: 2 }, [["plain"]], {
         styles: [[null]],
       }),
     );
@@ -178,7 +202,7 @@ describe("paste cell values command", () => {
 
     executeWorkbookCommand(
       session,
-      createPasteCellValuesCommand(sheet.id, { row: 5, column: 5 }, [["formatted"]], {
+      createPasteCommand(sheet.id, { row: 5, column: 5 }, [["formatted"]], {
         styles: [[{ bold: true }]],
       }),
     );
@@ -205,7 +229,7 @@ describe("paste cell values command", () => {
 
     executeWorkbookCommand(
       session,
-      createPasteCellValuesCommand(
+      createPasteCommand(
         sheet.id,
         { row: 8, column: 8 },
         [
@@ -242,7 +266,7 @@ describe("paste cell values command", () => {
 
     executeWorkbookCommand(
       session,
-      createPasteCellValuesCommand(sheet.id, { row: 11, column: 11 }, [["left", "right"]], {
+      createPasteCommand(sheet.id, { row: 11, column: 11 }, [["left", "right"]], {
         styles: [[{ bold: true }, { borderLeft: verticalFallback }]],
       }),
     );
@@ -260,7 +284,7 @@ describe("paste cell values command", () => {
 
     executeWorkbookCommand(
       session,
-      createPasteCellValuesCommand(sheet.id, { row: 14, column: 11 }, [["upper"], ["lower"]], {
+      createPasteCommand(sheet.id, { row: 14, column: 11 }, [["upper"], ["lower"]], {
         styles: [[{ italic: true }], [{ borderTop: horizontalFallback }]],
       }),
     );
@@ -281,12 +305,10 @@ describe("paste cell values command", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
 
-    expect(() => createPasteCellValuesCommand(sheet.id, { row: 0, column: 0 }, [])).toThrow();
+    expect(() => createPasteCommand(sheet.id, { row: 0, column: 0 }, [])).toThrow();
+    expect(() => createPasteCommand(sheet.id, { row: 0, column: 0 }, [[1], [2, 3]])).toThrow();
     expect(() =>
-      createPasteCellValuesCommand(sheet.id, { row: 0, column: 0 }, [[1], [2, 3]]),
-    ).toThrow();
-    expect(() =>
-      createPasteCellValuesCommand(sheet.id, { row: 1_048_575, column: 16_383 }, [[1, 2]]),
+      createPasteCommand(sheet.id, { row: 1_048_575, column: 16_383 }, [[1, 2]]),
     ).toThrow();
     expect(sheet.cells.size).toBe(0);
   });

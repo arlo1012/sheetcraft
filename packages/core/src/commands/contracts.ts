@@ -1,25 +1,25 @@
-import type { SheetSnapshotV1 } from "../serialization.js";
+import type { SheetSnapshotV2 } from "../serialization.js";
+import type { CellContent } from "../formula/types.js";
 import type { CellBorderAction, CellStyle, CellStylePatch } from "../style.js";
 import type {
   CellAddress,
   CellRange,
-  CellValue,
   SheetDimensionAxis,
   SheetSparseCell,
   SheetSparseDimension,
   SheetSparseState,
 } from "../workbook.js";
 
-export type CellValueChange = {
+export type CellContentChange = {
   sheetId: string;
   address: CellAddress;
-  value: CellValue;
+  content: CellContent | null;
   style?: CellStyle | null;
 };
 
-export type SetCellValuesCommand = {
-  type: "setCellValues";
-  changes: CellValueChange[];
+export type SetCellContentsCommand = {
+  type: "setCellContents";
+  changes: CellContentChange[];
   reconcileBorders?: true;
 };
 
@@ -27,6 +27,13 @@ export type ClearCellRangeCommand = {
   type: "clearCellRange";
   sheetId: string;
   range: CellRange;
+};
+
+export type MoveCellRangeCommand = {
+  type: "moveCellRange";
+  sheetId: string;
+  source: CellRange;
+  destination: CellAddress;
 };
 
 export type ApplyCellStyleCommand = {
@@ -66,7 +73,7 @@ export type ResizeSheetDimensionCommand = {
 
 export type AddSheetCommand = {
   type: "addSheet";
-  sheet: SheetSnapshotV1;
+  sheet: SheetSnapshotV2;
   index: number;
   activeSheetId: string;
 };
@@ -115,6 +122,8 @@ export type RestoreFullSheetStateCommand = {
 export type SheetAxisSparseSlice = {
   cells: SheetSparseCell[];
   dimensions: SheetSparseDimension[];
+  /** Exact raw formula sources before the structural change, for lossless undo. */
+  formulaSources?: Array<{ address: CellAddress; source: string }>;
 };
 
 /**
@@ -135,8 +144,9 @@ export type RestoreSheetAxisSliceCommand = {
 export type RestoreSheetStateCommand = RestoreFullSheetStateCommand | RestoreSheetAxisSliceCommand;
 
 export type WorkbookCommand =
-  | SetCellValuesCommand
+  | SetCellContentsCommand
   | ClearCellRangeCommand
+  | MoveCellRangeCommand
   | ApplyCellStyleCommand
   | ApplyCellBordersCommand
   | AdjustCellNumberFormatDecimalsCommand
@@ -168,10 +178,12 @@ export type WorkbookOperation =
 
 export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperation {
   switch (command.type) {
-    case "setCellValues":
+    case "setCellContents":
       return "cells.edit";
     case "clearCellRange":
       return "cells.clear";
+    case "moveCellRange":
+      return "cells.move";
     case "applyCellStyle":
     case "adjustCellNumberFormatDecimals":
       return "format.cells";

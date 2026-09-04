@@ -43,7 +43,7 @@ describe("formula references", () => {
         index: 2,
         count: 1,
       }),
-    ).toBe("=SUM(#REF!) + C3");
+    ).toBe("=SUM(A2:B2) + C3");
     expect(
       transformFormulaForAxis("=A1+$B$2+C3", {
         axis: "column",

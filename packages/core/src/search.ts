@@ -1,5 +1,5 @@
-import { formatCellValueForDisplay } from "./input.js";
-import type { CellAddress, Sheet } from "./workbook.js";
+import { formatComputedValueForDisplay } from "./input.js";
+import { createSheetEvaluator, type CellAddress, type Sheet } from "./workbook.js";
 
 export type SheetSearchDirection = "forward" | "backward";
 
@@ -31,17 +31,15 @@ export function findCellByText(
 
   let nearest: CellAddress | null = null;
   let wrap: CellAddress | null = null;
-  for (const [key, cell] of sheet.cells) {
+  const evaluator = createSheetEvaluator(sheet);
+  for (const [key] of sheet.cells) {
+    const address = parseCellKey(key);
     if (
-      !formatCellValueForDisplay(cell.value ?? null)
+      !address ||
+      !formatComputedValueForDisplay(evaluator.getComputedValue(address))
         .toLowerCase()
         .includes(normalizedQuery)
     ) {
-      continue;
-    }
-
-    const address = parseCellKey(key);
-    if (!address) {
       continue;
     }
 

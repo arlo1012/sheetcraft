@@ -15,16 +15,48 @@ import {
   createSheetSparseState,
   getCellStyle,
   getActiveSheet,
+  getCellContent,
   getCellValue,
   getColumnWidth,
   getRowHeight,
   setCellValue,
+  setCellContent,
   setCellStyle,
   setColumnWidth,
   setRowHeight,
 } from "../../workbook.js";
 
 describe("sheet axis structure commands", () => {
+  test("rewrites formula references and restores exact raw sources across undo and redo", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: 1 });
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: 2 });
+    setCellContent(
+      sheet,
+      { row: 3, column: 1 },
+      { kind: "formula", formula: { source: "=A1+A2+$A$2" } },
+    );
+
+    expect(executeWorkbookCommand(session, createInsertSheetAxisCommand(sheet.id, "row", 1))).toBe(
+      true,
+    );
+    expect(getCellContent(sheet, { row: 4, column: 1 })).toEqual({
+      kind: "formula",
+      formula: { source: "=A1+A3+$A$3" },
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellContent(sheet, { row: 3, column: 1 })).toEqual({
+      kind: "formula",
+      formula: { source: "=A1+A2+$A$2" },
+    });
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getCellContent(sheet, { row: 4, column: 1 })).toEqual({
+      kind: "formula",
+      formula: { source: "=A1+A3+$A$3" },
+    });
+  });
+
   test("inserts rows by shifting sparse cells and row dimensions while dropping the tail", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
@@ -156,7 +188,7 @@ describe("sheet axis structure commands", () => {
     expect(inverse.slice.cells).toEqual([
       {
         address: { row: 10, column: 1 },
-        value: "deleted-value",
+        content: { kind: "literal", value: "deleted-value" },
         style: { borderBottom: { style: "double", color: "#123456" } },
       },
       { address: { row: 11, column: 2 }, style: { italic: true } },
@@ -204,7 +236,7 @@ describe("sheet axis structure commands", () => {
     expect(inverse.slice.cells).toEqual([
       {
         address: { row: 1, column: 20 },
-        value: "deleted-value",
+        content: { kind: "literal", value: "deleted-value" },
         style: { borderRight: { style: "dashed", color: "#abcdef" } },
       },
       { address: { row: 2, column: 21 }, style: { bold: true } },
@@ -369,7 +401,9 @@ describe("sheet axis structure commands", () => {
       count: 1,
       operation: "delete",
       slice: {
-        cells: [{ address: { row: 10, column: 2 }, value: "outside" }],
+        cells: [
+          { address: { row: 10, column: 2 }, content: { kind: "literal", value: "outside" } },
+        ],
         dimensions: [],
       },
     } as WorkbookCommand;
@@ -390,8 +424,8 @@ describe("sheet axis structure commands", () => {
       sheetId: sheet.id,
       state: {
         cells: [
-          { address: { row: 0, column: 0 }, value: "first" },
-          { address: { row: 0, column: 0 }, value: "duplicate" },
+          { address: { row: 0, column: 0 }, content: { kind: "literal", value: "first" } },
+          { address: { row: 0, column: 0 }, content: { kind: "literal", value: "duplicate" } },
         ],
         rowHeights: [],
         columnWidths: [],

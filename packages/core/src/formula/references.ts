@@ -151,6 +151,78 @@ export function translateFormulaForCopy(source: string, offset: FormulaCopyOffse
   });
 }
 
+export function transformFormulaForMove(
+  source: string,
+  sourceRange: { start: FormulaAddress; end: FormulaAddress },
+  destinationStart: FormulaAddress,
+): string {
+  const ast = getFormulaAst(source);
+  if (!ast) return source;
+  const minRow = Math.min(sourceRange.start.row, sourceRange.end.row);
+  const maxRow = Math.max(sourceRange.start.row, sourceRange.end.row);
+  const minColumn = Math.min(sourceRange.start.column, sourceRange.end.column);
+  const maxColumn = Math.max(sourceRange.start.column, sourceRange.end.column);
+  const map = (address: FormulaAddress): FormulaAddress | null =>
+    address.row >= minRow &&
+    address.row <= maxRow &&
+    address.column >= minColumn &&
+    address.column <= maxColumn
+      ? {
+          row: destinationStart.row + address.row - minRow,
+          column: destinationStart.column + address.column - minColumn,
+        }
+      : null;
+  const replacements: Replacement[] = [];
+  walkExpression(ast.expression, (expression) => {
+    if (expression.kind === "reference") {
+      const address = map(expression.reference);
+      if (address)
+        replacements.push({
+          start: expression.reference.start,
+          end: expression.reference.end,
+          text: formatReference(expression.reference, address),
+        });
+    } else if (expression.kind === "range") {
+      const start = map(expression.range.start);
+      const end = map(expression.range.end);
+      const rangeMinRow = Math.min(expression.range.start.row, expression.range.end.row);
+      const rangeMaxRow = Math.max(expression.range.start.row, expression.range.end.row);
+      const rangeMinColumn = Math.min(expression.range.start.column, expression.range.end.column);
+      const rangeMaxColumn = Math.max(expression.range.start.column, expression.range.end.column);
+      const intersects = !(
+        rangeMaxRow < minRow ||
+        rangeMinRow > maxRow ||
+        rangeMaxColumn < minColumn ||
+        rangeMinColumn > maxColumn
+      );
+      const contained =
+        rangeMinRow >= minRow &&
+        rangeMaxRow <= maxRow &&
+        rangeMinColumn >= minColumn &&
+        rangeMaxColumn <= maxColumn;
+      if (intersects && !contained)
+        replacements.push({
+          start: expression.range.startOffset,
+          end: expression.range.endOffset,
+          text: "#REF!",
+        });
+      else if (start && end) {
+        replacements.push({
+          start: expression.range.start.start,
+          end: expression.range.start.end,
+          text: formatReference(expression.range.start, start),
+        });
+        replacements.push({
+          start: expression.range.end.start,
+          end: expression.range.end.end,
+          text: formatReference(expression.range.end, end),
+        });
+      }
+    }
+  });
+  return applyReplacements(ast.source, replacements);
+}
+
 function transformAxisReference(
   reference: FormulaReference,
   transform: FormulaAxisTransform,
@@ -171,6 +243,36 @@ function transformAxisReference(
   return isAddressInBounds(address) ? address : null;
 }
 
+function transformAxisRange(
+  range: FormulaRange,
+  transform: FormulaAxisTransform,
+): { start: FormulaAddress; end: FormulaAddress } | null {
+  if (transform.operation === "insert") {
+    const start = transformAxisReference(range.start, transform);
+    const end = transformAxisReference(range.end, transform);
+    return start && end ? { start, end } : null;
+  }
+  const startAxis = transform.axis === "row" ? range.start.row : range.start.column;
+  const endAxis = transform.axis === "row" ? range.end.row : range.end.column;
+  const lower = Math.min(startAxis, endAxis);
+  const upper = Math.max(startAxis, endAxis);
+  const deletedEnd = transform.index + transform.count;
+  if (lower >= transform.index && upper < deletedEnd) return null;
+  const adjust = (value: number, lowerEdge: boolean) => {
+    if (value < transform.index) return value;
+    if (value >= deletedEnd) return value - transform.count;
+    return lowerEdge ? transform.index : transform.index - 1;
+  };
+  const map = (reference: FormulaReference, lowerEdge: boolean): FormulaAddress =>
+    transform.axis === "row"
+      ? { row: adjust(reference.row, lowerEdge), column: reference.column }
+      : { row: reference.row, column: adjust(reference.column, lowerEdge) };
+  return {
+    start: map(range.start, startAxis === lower),
+    end: map(range.end, endAxis === lower),
+  };
+}
+
 export function transformFormulaForAxis(source: string, transform: FormulaAxisTransform): string {
   const maximum = transform.axis === "row" ? MAX_FORMULA_ROWS : MAX_FORMULA_COLUMNS;
   if (
@@ -185,9 +287,38 @@ export function transformFormulaForAxis(source: string, transform: FormulaAxisTr
   }
   const parsed = parseFormula(source);
   if (!parsed.ok) return source;
-  return replaceTransformedRanges(parsed.ast, (reference) =>
-    transformAxisReference(reference, transform),
-  );
+  const replacements: Replacement[] = [];
+  walkExpression(parsed.ast.expression, (expression) => {
+    if (expression.kind === "reference") {
+      const address = transformAxisReference(expression.reference, transform);
+      replacements.push({
+        start: expression.reference.start,
+        end: expression.reference.end,
+        text: address ? formatReference(expression.reference, address) : "#REF!",
+      });
+    } else if (expression.kind === "range") {
+      const range = transformAxisRange(expression.range, transform);
+      if (!range) {
+        replacements.push({
+          start: expression.range.startOffset,
+          end: expression.range.endOffset,
+          text: "#REF!",
+        });
+      } else {
+        replacements.push({
+          start: expression.range.start.start,
+          end: expression.range.start.end,
+          text: formatReference(expression.range.start, range.start),
+        });
+        replacements.push({
+          start: expression.range.end.start,
+          end: expression.range.end.end,
+          text: formatReference(expression.range.end, range.end),
+        });
+      }
+    }
+  });
+  return applyReplacements(parsed.ast.source, replacements);
 }
 
 export function formatFormulaAddress(address: FormulaAddress): string {

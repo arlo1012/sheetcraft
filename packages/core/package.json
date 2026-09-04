@@ -19,6 +19,10 @@
       "types": "./dist/errors.d.ts",
       "import": "./dist/errors.js"
     },
+    "./formula": {
+      "types": "./dist/formula/index.d.ts",
+      "import": "./dist/formula/index.js"
+    },
     "./history": {
       "types": "./dist/history.d.ts",
       "import": "./dist/history.js"

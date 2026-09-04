@@ -1,8 +1,15 @@
-import { formatCellValueForDisplay, parseCellInput } from "./input.js";
+import {
+  formatComputedValueForDisplay,
+  formatCellValueForDisplay,
+  parseCellInput,
+} from "./input.js";
+import { translateFormulaForCopy } from "./formula/references.js";
+import { isFormulaError, type CellContent, type FormulaValue } from "./formula/types.js";
 import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
-  getCellValue,
+  createSheetEvaluator,
+  getCellContent,
   type CellAddress,
   type CellRange,
   type CellValue,
@@ -10,6 +17,8 @@ import {
 } from "./workbook.js";
 
 export type CellValueMatrix = CellValue[][];
+export type CellContentMatrix = (CellContent | null)[][];
+export type CellComputedValueMatrix = FormulaValue[][];
 
 export type CellMatrixSize = {
   rowCount: number;
@@ -49,19 +58,83 @@ export function getCellMatrixSize<Value>(values: readonly (readonly Value[])[]):
   return { rowCount: values.length, columnCount };
 }
 
-export function getCellRangeValues(sheet: Sheet, range: CellRange): CellValueMatrix {
+export function getCellRangeContents(sheet: Sheet, range: CellRange): CellContentMatrix {
   const normalized = normalizeRange(range);
-  const values: CellValueMatrix = [];
+  const contents: CellContentMatrix = [];
 
   for (let row = normalized.start.row; row <= normalized.end.row; row += 1) {
-    const rowValues: CellValue[] = [];
+    const rowContents: Array<CellContent | null> = [];
     for (let column = normalized.start.column; column <= normalized.end.column; column += 1) {
-      rowValues.push(getCellValue(sheet, { row, column }));
+      rowContents.push(getCellContent(sheet, { row, column }));
+    }
+    contents.push(rowContents);
+  }
+
+  return contents;
+}
+
+export function getCellRangeComputedValues(
+  sheet: Sheet,
+  range: CellRange,
+): CellComputedValueMatrix {
+  const normalized = normalizeRange(range);
+  const evaluator = createSheetEvaluator(sheet);
+  const values: CellComputedValueMatrix = [];
+  for (let row = normalized.start.row; row <= normalized.end.row; row += 1) {
+    const rowValues: FormulaValue[] = [];
+    for (let column = normalized.start.column; column <= normalized.end.column; column += 1) {
+      rowValues.push(evaluator.getComputedValue({ row, column }));
     }
     values.push(rowValues);
   }
-
   return values;
+}
+
+/** Values-only clipboard projection. Formula errors become their display token text. */
+export function getCellRangeValues(sheet: Sheet, range: CellRange): CellValueMatrix {
+  return getCellRangeComputedValues(sheet, range).map((row) =>
+    row.map((value) => (isFormulaError(value) ? formatComputedValueForDisplay(value) : value)),
+  );
+}
+
+export function translateCellContentForCopy(
+  content: CellContent | null,
+  source: CellAddress,
+  destination: CellAddress,
+): CellContent | null {
+  if (!content) return null;
+  if (content.kind === "literal") return { kind: "literal", value: content.value };
+  return {
+    kind: "formula",
+    formula: {
+      source: translateFormulaForCopy(content.formula.source, {
+        row: destination.row - source.row,
+        column: destination.column - source.column,
+      }),
+    },
+  };
+}
+
+/**
+ * Produces raw contents for a copy paste. Formula references move with every
+ * individual source-to-destination cell; callers use the unmodified content
+ * matrix for cut/move operations.
+ */
+export function translateCellContentMatrixForCopy(
+  contents: readonly (readonly (CellContent | null)[])[],
+  sourceAnchor: CellAddress,
+  destinationAnchor: CellAddress,
+): CellContentMatrix {
+  getCellMatrixSize(contents);
+  return contents.map((row, rowOffset) =>
+    row.map((content, columnOffset) =>
+      translateCellContentForCopy(
+        content,
+        { row: sourceAnchor.row + rowOffset, column: sourceAnchor.column + columnOffset },
+        { row: destinationAnchor.row + rowOffset, column: destinationAnchor.column + columnOffset },
+      ),
+    ),
+  );
 }
 
 function encodeTsvField(value: CellValue): string {

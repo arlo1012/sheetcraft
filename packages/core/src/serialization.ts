@@ -13,10 +13,17 @@ import {
   type SheetSparseState,
   type Workbook,
 } from "./workbook.js";
+import type { CellContent } from "./formula/types.js";
 
 export type CellSnapshotV1 = {
   address: CellAddress;
   value?: Exclude<CellValue, null>;
+  style?: CellStyle;
+};
+
+export type CellSnapshotV2 = {
+  address: CellAddress;
+  content?: CellContent;
   style?: CellStyle;
 };
 
@@ -28,11 +35,20 @@ export type SheetSnapshotV1 = {
   columnWidths: SheetSparseDimension[];
 };
 
+export type SheetSnapshotV2 = Omit<SheetSnapshotV1, "cells"> & { cells: CellSnapshotV2[] };
+
 export type WorkbookSnapshotV1 = {
   version: 1;
   id: string;
   activeSheetId: string;
   sheets: SheetSnapshotV1[];
+};
+
+export type WorkbookSnapshotV2 = {
+  version: 2;
+  id: string;
+  activeSheetId: string;
+  sheets: SheetSnapshotV2[];
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -104,17 +120,48 @@ function parseStyle(value: unknown, path: string): CellStyle {
   }
 }
 
-function parseCell(value: unknown, path: string): CellSnapshotV1 {
+function parseCellContent(value: unknown, path: string): CellContent {
   const record = asRecord(value, path);
+  if (record.kind === "literal") {
+    return { kind: "literal", value: parseCellValue(record.value, `${path}.value`) };
+  }
+  if (record.kind === "formula") {
+    const formula = asRecord(record.formula, `${path}.formula`);
+    if (typeof formula.source !== "string" || !formula.source.startsWith("=")) {
+      return fail(`${path}.formula.source`, "Expected a formula source beginning with '='.");
+    }
+    return { kind: "formula", formula: { source: formula.source } };
+  }
+  return fail(`${path}.kind`, "Expected 'literal' or 'formula'.");
+}
+
+function parseCell(value: unknown, path: string, version: 1 | 2): CellSnapshotV2 {
+  const record = asRecord(value, path);
+  const hasContent = Object.hasOwn(record, "content");
   const hasValue = Object.hasOwn(record, "value");
   const hasStyle = Object.hasOwn(record, "style");
-  if (!hasValue && !hasStyle) {
-    return fail(path, "Expected a value or style.");
+  if ((version === 2 && hasValue) || (version === 1 && hasContent)) {
+    return fail(
+      path,
+      version === 2 ? "V2 cells use content, not value." : "V1 cells use value, not content.",
+    );
+  }
+  if ((version === 1 && !hasValue && !hasStyle) || (version === 2 && !hasContent && !hasStyle)) {
+    return fail(path, "Expected content or style.");
   }
 
   return {
     address: parseAddress(record.address, `${path}.address`),
-    ...(hasValue ? { value: parseCellValue(record.value, `${path}.value`) } : {}),
+    ...(version === 1 && hasValue
+      ? {
+          content: {
+            kind: "literal" as const,
+            value: parseCellValue(record.value, `${path}.value`),
+          },
+        }
+      : hasContent
+        ? { content: parseCellContent(record.content, `${path}.content`) }
+        : {}),
     ...(hasStyle ? { style: parseStyle(record.style, `${path}.style`) } : {}),
   };
 }
@@ -127,10 +174,10 @@ function parseDimension(value: unknown, path: string): SheetSparseDimension {
   };
 }
 
-function parseSparseState(record: UnknownRecord, path: string): SheetSparseState {
+function parseSparseState(record: UnknownRecord, path: string, version: 1 | 2): SheetSparseState {
   return {
     cells: asArray(record.cells, `${path}.cells`).map((cell, index) =>
-      parseCell(cell, `${path}.cells[${index}]`),
+      parseCell(cell, `${path}.cells[${index}]`, version),
     ),
     rowHeights: asArray(record.rowHeights, `${path}.rowHeights`).map((dimension, index) =>
       parseDimension(dimension, `${path}.rowHeights[${index}]`),
@@ -141,8 +188,18 @@ function parseSparseState(record: UnknownRecord, path: string): SheetSparseState
   };
 }
 
-function parseSheet(value: unknown, path: string): Sheet {
+function parseSheet(value: unknown, path: string, version?: 1 | 2): Sheet {
   const record = asRecord(value, path);
+  if (version === undefined) {
+    const cells = asArray(record.cells, `${path}.cells`);
+    const hasValue = cells.some((cell) => Object.hasOwn(asRecord(cell, `${path}.cells`), "value"));
+    const hasContent = cells.some((cell) =>
+      Object.hasOwn(asRecord(cell, `${path}.cells`), "content"),
+    );
+    if (hasValue && hasContent)
+      return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
+    version = hasValue ? 1 : 2;
+  }
   const id = asIdentifier(record.id, `${path}.id`);
   let name: string;
   try {
@@ -153,7 +210,7 @@ function parseSheet(value: unknown, path: string): Sheet {
 
   const sheet = createSheet(name, id);
   try {
-    replaceSheetSparseState(sheet, parseSparseState(record, path));
+    replaceSheetSparseState(sheet, parseSparseState(record, path, version));
   } catch (error) {
     if (error instanceof WorkbookDomainError) {
       throw error;
@@ -163,7 +220,7 @@ function parseSheet(value: unknown, path: string): Sheet {
   return sheet;
 }
 
-export function serializeSheet(sheet: Sheet): SheetSnapshotV1 {
+export function serializeSheet(sheet: Sheet): SheetSnapshotV2 {
   return {
     id: sheet.id,
     name: sheet.name,
@@ -175,9 +232,9 @@ export function deserializeSheet(value: unknown): Sheet {
   return parseSheet(value, "$");
 }
 
-export function serializeWorkbook(workbook: Workbook): WorkbookSnapshotV1 {
+export function serializeWorkbook(workbook: Workbook): WorkbookSnapshotV2 {
   return {
-    version: 1,
+    version: 2,
     id: workbook.id,
     activeSheetId: workbook.activeSheetId,
     sheets: getWorkbookSheets(workbook).map(serializeSheet),
@@ -186,7 +243,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshotV1 {
 
 export function deserializeWorkbook(value: unknown): Workbook {
   const record = asRecord(value, "$.");
-  if (record.version !== 1) {
+  if (record.version !== 1 && record.version !== 2) {
     throw new WorkbookDomainError(
       {
         code: "unsupported_snapshot_version",
@@ -208,7 +265,10 @@ export function deserializeWorkbook(value: unknown): Workbook {
     return fail("$.sheets", "A workbook must contain at least one sheet.");
   }
 
-  const sheets = sheetValues.map((sheet, index) => parseSheet(sheet, `$.sheets[${index}]`));
+  const version = record.version;
+  const sheets = sheetValues.map((sheet, index) =>
+    parseSheet(sheet, `$.sheets[${index}]`, version),
+  );
   const sheetIds = new Set<string>();
   const sheetNames = new Set<string>();
   for (const sheet of sheets) {

@@ -4,18 +4,19 @@ import {
   createAdjustCellNumberFormatDecimalsCommand,
   createApplyCellBordersCommand,
   createApplyCellStyleCommand,
-  createBatchSetCellValuesCommand,
+  createBatchSetCellContentsCommand,
   createClearCellRangeCommand,
   createDeleteSheetAxisCommand,
   createDeleteSheetCommand,
   createDuplicateSheetCommand,
   createInsertSheetAxisCommand,
   createMoveSheetCommand,
+  createMoveCellRangeCommand,
   createRenameSheetCommand,
   createResizeSheetDimensionCommand,
   createRestoreCellStylesCommand,
   createRestoreSheetStateCommand,
-  createSetCellValueCommand,
+  createSetCellContentCommand,
   applyWorkbookCommand,
   tryApplyWorkbookCommand,
   type WorkbookCommand,
@@ -61,7 +62,11 @@ describe("workbook command transport", () => {
     const sheet = getActiveSheet(session.workbook);
     executeWorkbookCommand(
       session,
-      createSetCellValueCommand(sheet.id, { row: 2, column: 1 }, "before insert"),
+      createSetCellContentCommand(
+        sheet.id,
+        { row: 2, column: 1 },
+        { kind: "literal", value: "before insert" },
+      ),
     );
 
     const result = tryApplyWorkbookCommand(
@@ -292,7 +297,11 @@ describe("workbook command transport", () => {
 
     executeWorkbookCommand(
       session,
-      createSetCellValueCommand(sheet.id, { row: 0, column: 0 }, "Draft"),
+      createSetCellContentCommand(
+        sheet.id,
+        { row: 0, column: 0 },
+        { kind: "literal", value: "Draft" },
+      ),
       "cells.paste",
     );
 
@@ -308,14 +317,23 @@ describe("workbook command transport", () => {
     const addResult = tryApplyWorkbookCommand(session.workbook, addSheet);
     if (!addResult.ok || !addResult.changed) throw new Error("Expected a sheet to be added.");
     const commands: WorkbookCommand[] = [
-      createSetCellValueCommand(sheet.id, { row: 0, column: 0 }, "A"),
-      createBatchSetCellValuesCommand([
-        { sheetId: sheet.id, address: { row: 0, column: 0 }, value: "A" },
+      createSetCellContentCommand(sheet.id, { row: 0, column: 0 }, { kind: "literal", value: "A" }),
+      createBatchSetCellContentsCommand([
+        {
+          sheetId: sheet.id,
+          address: { row: 0, column: 0 },
+          content: { kind: "literal", value: "A" },
+        },
       ]),
       createClearCellRangeCommand(sheet.id, {
         start: { row: 0, column: 0 },
         end: { row: 0, column: 0 },
       }),
+      createMoveCellRangeCommand(
+        sheet.id,
+        { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+        { row: 1, column: 1 },
+      ),
       createApplyCellStyleCommand(
         sheet.id,
         { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
@@ -346,11 +364,11 @@ describe("workbook command transport", () => {
 
     executeWorkbookCommand(
       session,
-      createSetCellValueCommand(sheet.id, { row: 1, column: 0 }, "A"),
+      createSetCellContentCommand(sheet.id, { row: 1, column: 0 }, { kind: "literal", value: "A" }),
     );
     executeWorkbookCommand(
       session,
-      createSetCellValueCommand(sheet.id, { row: 1, column: 1 }, "B"),
+      createSetCellContentCommand(sheet.id, { row: 1, column: 1 }, { kind: "literal", value: "B" }),
     );
     undoWorkbookCommand(session);
     expect(session.history.undoStack).toHaveLength(1);

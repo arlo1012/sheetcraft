@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { WorkbookDomainError } from "../../errors.js";
-import { deserializeWorkbook, serializeWorkbook } from "../../serialization.js";
+import { deserializeSheet, deserializeWorkbook, serializeWorkbook } from "../../serialization.js";
 import {
   createSheet,
   createWorkbook,
@@ -12,6 +12,8 @@ import {
   moveSheet,
   setActiveSheet,
   setCellStyle,
+  getCellContent,
+  setCellContent,
   setCellValue,
   setColumnWidth,
   setRowHeight,
@@ -61,14 +63,96 @@ describe("workbook snapshots", () => {
 
     expect(serializeWorkbook(workbook).sheets[0]).toMatchObject({
       cells: [
-        { address: { row: 1, column: 7 }, value: "earlier" },
-        { address: { row: 9, column: 2 }, value: "later" },
+        { address: { row: 1, column: 7 }, content: { kind: "literal", value: "earlier" } },
+        { address: { row: 9, column: 2 }, content: { kind: "literal", value: "later" } },
       ],
       rowHeights: [
         { index: 2, size: 31 },
         { index: 8, size: 30 },
       ],
     });
+  });
+
+  test("migrates V1 values and writes V2 raw formula content without a computed cache", () => {
+    const v1 = {
+      version: 1,
+      id: "workbook-1",
+      activeSheetId: "sheet-1",
+      sheets: [
+        {
+          id: "sheet-1",
+          name: "Sheet1",
+          rowHeights: [],
+          columnWidths: [],
+          cells: [{ address: { row: 0, column: 0 }, value: 2 }],
+        },
+      ],
+    };
+    const migrated = deserializeWorkbook(v1);
+    expect(getCellContent(getActiveSheet(migrated), { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: 2,
+    });
+
+    setCellValue(getActiveSheet(migrated), { row: 0, column: 1 }, null);
+    const formulaSheet = getActiveSheet(migrated);
+    setCellContent(
+      formulaSheet,
+      { row: 0, column: 1 },
+      { kind: "formula", formula: { source: "=SUM(" } },
+    );
+    const snapshot = serializeWorkbook(migrated);
+    expect(snapshot.version).toBe(2);
+    expect(snapshot.sheets[0]?.cells).toContainEqual({
+      address: { row: 0, column: 1 },
+      content: { kind: "formula", formula: { source: "=SUM(" } },
+    });
+    expect(JSON.stringify(snapshot)).not.toContain("computed");
+  });
+
+  test("deserializes an independent V1 sheet snapshot", () => {
+    const sheet = deserializeSheet({
+      id: "sheet-1",
+      name: "Sheet1",
+      cells: [{ address: { row: 0, column: 0 }, value: "legacy" }],
+      rowHeights: [],
+      columnWidths: [],
+    });
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "legacy",
+    });
+  });
+
+  test("rejects V2 value fields and formula sources without an equals prefix", () => {
+    const base = {
+      version: 2,
+      id: "workbook-1",
+      activeSheetId: "sheet-1",
+      sheets: [{ id: "sheet-1", name: "Sheet1", rowHeights: [], columnWidths: [], cells: [] }],
+    };
+    expect(() =>
+      deserializeWorkbook({
+        ...base,
+        sheets: [{ ...base.sheets[0], cells: [{ address: { row: 0, column: 0 }, value: 2 }] }],
+      }),
+    ).toThrow("V2 cells use content");
+    expect(() =>
+      deserializeWorkbook({
+        ...base,
+        sheets: [
+          {
+            ...base.sheets[0],
+            cells: [
+              {
+                address: { row: 0, column: 0 },
+                content: { kind: "formula", formula: { source: "A1" } },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow("beginning with '='");
   });
 
   test("round trips a reordered workbook in map order without changing the active sheet", () => {
@@ -89,9 +173,9 @@ describe("workbook snapshots", () => {
   });
 
   test("rejects unknown snapshot versions with a stable error code", () => {
-    expect(() => deserializeWorkbook({ version: 2 })).toThrowError(
+    expect(() => deserializeWorkbook({ version: 3 })).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
-        data: { code: "unsupported_snapshot_version", details: { version: 2 } },
+        data: { code: "unsupported_snapshot_version", details: { version: 3 } },
       }),
     );
   });

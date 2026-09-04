@@ -39,7 +39,7 @@ describe("selection summary", () => {
     });
   });
 
-  test("reads a small selection directly instead of scanning a large sparse sheet", () => {
+  test("scans sparse stored content without iterating the full selected range", () => {
     const sheet = createTestSheet();
     setCellValue(sheet, { row: 0, column: 0 }, 7);
     for (let row = 1; row <= 5_000; row += 1) {
@@ -53,6 +53,6 @@ describe("selection summary", () => {
         end: { row: 0, column: 0 },
       }),
     ).toEqual({ average: 7, count: 1, numericCount: 1, selectedCellCount: 1, sum: 7 });
-    expect(iteratorSpy).not.toHaveBeenCalled();
+    expect(iteratorSpy).toHaveBeenCalledOnce();
   });
 });

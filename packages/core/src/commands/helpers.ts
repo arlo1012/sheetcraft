@@ -1,6 +1,7 @@
 import { WorkbookDomainError, toWorkbookErrorDetail } from "../errors.js";
 import { cloneCellStyle, type CellStyle } from "../style.js";
 import {
+  cloneCellContent,
   isCellAddressInBounds,
   type CellAddress,
   type CellRange,
@@ -39,17 +40,17 @@ export function validateCommandPayload<Value>(
 }
 
 export function assertCellAddress(address: CellAddress): void {
-  if (!isCellAddressInBounds(address)) {
+  if (!address || typeof address !== "object" || !isCellAddressInBounds(address)) {
     throw new WorkbookDomainError(
       {
         code: "invalid_command_payload",
         details: {
           field: "address",
-          row: toWorkbookErrorDetail(address.row),
-          column: toWorkbookErrorDetail(address.column),
+          row: toWorkbookErrorDetail(address?.row),
+          column: toWorkbookErrorDetail(address?.column),
         },
       },
-      `Cell address ${address.row}:${address.column} is outside the sheet.`,
+      `Cell address ${address?.row}:${address?.column} is outside the sheet.`,
     );
   }
 }
@@ -105,7 +106,7 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
   return {
     cells: state.cells.map((cell) => ({
       address: { ...cell.address },
-      ...(cell.value === undefined ? {} : { value: cell.value }),
+      ...(cell.content === undefined ? {} : { content: cloneCellContent(cell.content) }),
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
     })),
     rowHeights: state.rowHeights.map((dimension) => ({ ...dimension })),

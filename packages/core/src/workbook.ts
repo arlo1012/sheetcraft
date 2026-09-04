@@ -1,4 +1,8 @@
+import { evaluateFormula } from "./formula/evaluate.js";
+import { collectFormulaRanges, collectFormulaReferences } from "./formula/references.js";
+import { createFormulaError, type CellContent, type FormulaValue } from "./formula/types.js";
 import type { IdFactory } from "./runtime.js";
+import { areCellStylesEqual, cloneCellStyle, normalizeCellStyle, type CellStyle } from "./style.js";
 
 export const MAX_SHEET_ROWS = 1_048_576;
 export const MAX_SHEET_COLUMNS = 16_384;
@@ -24,7 +28,7 @@ export type CellRange = {
 export type SheetDimensionAxis = "row" | "column";
 
 export type Cell = {
-  value?: Exclude<CellValue, null>;
+  content?: CellContent;
   style?: CellStyle;
 };
 
@@ -38,7 +42,7 @@ export type Sheet = {
 
 export type SheetSparseCell = {
   address: CellAddress;
-  value?: Exclude<CellValue, null>;
+  content?: CellContent;
   style?: CellStyle;
 };
 
@@ -268,7 +272,167 @@ export function getCell(sheet: Sheet, address: CellAddress): Cell | undefined {
 }
 
 export function getCellValue(sheet: Sheet, address: CellAddress): CellValue {
-  return getCell(sheet, address)?.value ?? null;
+  const value = getCellComputedValue(sheet, address);
+  return typeof value === "object" ? null : value;
+}
+
+/** Returns the raw, persisted content. Formula results are never stored in a cell. */
+export function getCellContent(sheet: Sheet, address: CellAddress): CellContent | null {
+  const content = getCell(sheet, address)?.content;
+  return content ? cloneCellContent(content) : null;
+}
+
+/** Evaluates a cell against the current sparse sheet state. */
+export type SheetEvaluator = {
+  getComputedValue: (address: CellAddress) => FormulaValue;
+};
+type SparseRangeIndex = { rows: number[]; byRow: Map<number, CellAddress[]> };
+
+/**
+ * Creates a reusable derived-value evaluator for one current sheet state.
+ * It shares DFS memoization across all requested cells and resolves ranges from
+ * the sparse address index, never by walking a rectangular area.
+ */
+export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
+  const memo = new Map<string, FormulaValue>();
+  const state = new Map<string, "visiting" | "done">();
+  const byRow = new Map<number, CellAddress[]>();
+  for (const address of [...sheet.cells.keys()].map(parseCellKey)) {
+    const row = byRow.get(address.row) ?? [];
+    row.push(address);
+    byRow.set(address.row, row);
+  }
+  for (const row of byRow.values()) row.sort((left, right) => left.column - right.column);
+  const sparseIndex: SparseRangeIndex = { rows: [...byRow.keys()].sort((a, b) => a - b), byRow };
+  const valueFor = (target: CellAddress): FormulaValue => {
+    if (!isCellAddressInBounds(target)) return createFormulaError("REF");
+    const key = createCellKey(target);
+    const content = sheet.cells.get(key)?.content;
+    if (!content) return null;
+    if (content.kind === "literal") return content.value;
+    return memo.get(key) ?? createFormulaError("CYCLE");
+  };
+  const dependenciesFor = (address: CellAddress): CellAddress[] => {
+    const source = sheet.cells.get(createCellKey(address))?.content;
+    if (source?.kind !== "formula") return [];
+    const dependencies = collectFormulaReferences(source.formula.source).map((reference) => ({
+      row: reference.row,
+      column: reference.column,
+    }));
+    for (const range of collectFormulaRanges(source.formula.source)) {
+      dependencies.push(...getSparseRangeAddresses(sparseIndex, range.start, range.end));
+    }
+    return dependencies;
+  };
+  const resolve = (target: CellAddress): FormulaValue => {
+    if (!isCellAddressInBounds(target)) return createFormulaError("REF");
+    const key = createCellKey(target);
+    if (memo.has(key)) return memo.get(key) ?? null;
+    const content = sheet.cells.get(key)?.content;
+    if (!content || content.kind === "literal") return valueFor(target);
+    const stack: Array<{ address: CellAddress; entered: boolean }> = [
+      { address: target, entered: false },
+    ];
+    while (stack.length > 0) {
+      const frame = stack.pop();
+      if (!frame) break;
+      const frameKey = createCellKey(frame.address);
+      if (memo.has(frameKey)) continue;
+      const frameContent = sheet.cells.get(frameKey)?.content;
+      if (!frameContent || frameContent.kind === "literal") continue;
+      if (!frame.entered) {
+        const current = state.get(frameKey);
+        if (current === "visiting") {
+          memo.set(frameKey, createFormulaError("CYCLE"));
+          continue;
+        }
+        state.set(frameKey, "visiting");
+        stack.push({ address: frame.address, entered: true });
+        for (const dependency of dependenciesFor(frame.address).reverse()) {
+          const dependencyKey = createCellKey(dependency);
+          const dependencyContent = sheet.cells.get(dependencyKey)?.content;
+          if (dependencyContent?.kind !== "formula" || memo.has(dependencyKey)) continue;
+          if (state.get(dependencyKey) === "visiting")
+            memo.set(dependencyKey, createFormulaError("CYCLE"));
+          else stack.push({ address: dependency, entered: false });
+        }
+        continue;
+      }
+      const value = evaluateFormula(frameContent.formula.source, {
+        resolveCell: valueFor,
+        resolveRange: (bounds) =>
+          resolveSparseRange(sparseIndex, bounds.start, bounds.end, valueFor),
+      });
+      memo.set(frameKey, value);
+      state.set(frameKey, "done");
+    }
+    return valueFor(target);
+  };
+  return { getComputedValue: resolve };
+}
+
+export function getCellComputedValue(sheet: Sheet, address: CellAddress): FormulaValue {
+  return createSheetEvaluator(sheet).getComputedValue(address);
+}
+
+function* resolveSparseRange(
+  sparseIndex: SparseRangeIndex,
+  start: CellAddress,
+  end: CellAddress,
+  resolve: (address: CellAddress) => FormulaValue,
+): Iterable<FormulaValue> {
+  const addresses = getSparseRangeAddresses(sparseIndex, start, end);
+  for (const address of addresses) yield resolve(address);
+}
+
+function getSparseRangeAddresses(
+  sparseIndex: SparseRangeIndex,
+  start: CellAddress,
+  end: CellAddress,
+): CellAddress[] {
+  const minRow = Math.min(start.row, end.row);
+  const maxRow = Math.max(start.row, end.row);
+  const minColumn = Math.min(start.column, end.column);
+  const maxColumn = Math.max(start.column, end.column);
+  let low = 0;
+  let high = sparseIndex.rows.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if ((sparseIndex.rows[middle] ?? 0) < minRow) low = middle + 1;
+    else high = middle;
+  }
+  const first = low;
+  high = sparseIndex.rows.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if ((sparseIndex.rows[middle] ?? 0) <= maxRow) low = middle + 1;
+    else high = middle;
+  }
+  const addresses: CellAddress[] = [];
+  for (const rowIndex of sparseIndex.rows.slice(first, low)) {
+    const row = sparseIndex.byRow.get(rowIndex) ?? [];
+    let startIndex = 0;
+    let endIndex = row.length;
+    while (startIndex < endIndex) {
+      const middle = Math.floor((startIndex + endIndex) / 2);
+      if ((row[middle]?.column ?? 0) < minColumn) startIndex = middle + 1;
+      else endIndex = middle;
+    }
+    const firstColumn = startIndex;
+    endIndex = row.length;
+    while (startIndex < endIndex) {
+      const middle = Math.floor((startIndex + endIndex) / 2);
+      if ((row[middle]?.column ?? 0) <= maxColumn) startIndex = middle + 1;
+      else endIndex = middle;
+    }
+    addresses.push(...row.slice(firstColumn, startIndex));
+  }
+  return addresses;
+}
+
+function parseCellKey(key: string): CellAddress {
+  const separator = key.indexOf(":");
+  return { row: Number(key.slice(0, separator)), column: Number(key.slice(separator + 1)) };
 }
 
 export function getCellStyle(sheet: Sheet, address: CellAddress): Readonly<CellStyle> | undefined {
@@ -276,25 +440,29 @@ export function getCellStyle(sheet: Sheet, address: CellAddress): Readonly<CellS
 }
 
 export function setCellValue(sheet: Sheet, address: CellAddress, value: CellValue): boolean {
-  const normalizedValue = value === "" ? null : value;
-  const previousValue = getCellValue(sheet, address);
+  return setCellContent(
+    sheet,
+    address,
+    value === null || value === "" ? null : { kind: "literal", value },
+  );
+}
 
-  if (Object.is(previousValue, normalizedValue)) {
-    return false;
-  }
-
+export function setCellContent(
+  sheet: Sheet,
+  address: CellAddress,
+  content: CellContent | null | undefined,
+): boolean {
+  if (!isCellAddressInBounds(address)) throw new RangeError("Cell address is outside the sheet.");
+  const normalizedContent = normalizeCellContent(content);
   const key = createCellKey(address);
   const cell = sheet.cells.get(key);
-  if (normalizedValue === null) {
-    if (cell?.style) {
-      sheet.cells.set(key, { style: cell.style });
-    } else {
-      sheet.cells.delete(key);
-    }
+  if (areCellContentsEqual(cell?.content, normalizedContent)) return false;
+  if (!normalizedContent) {
+    if (cell?.style) sheet.cells.set(key, { style: cell.style });
+    else sheet.cells.delete(key);
   } else {
-    sheet.cells.set(key, { value: normalizedValue, style: cell?.style });
+    sheet.cells.set(key, { content: normalizedContent, style: cell?.style });
   }
-
   return true;
 }
 
@@ -310,8 +478,8 @@ export function setCellStyle(
     return false;
   }
 
-  if (cell?.value !== undefined) {
-    sheet.cells.set(key, { value: cell.value, style: normalizedStyle });
+  if (cell?.content !== undefined) {
+    sheet.cells.set(key, { content: cell.content, style: normalizedStyle });
   } else if (normalizedStyle) {
     sheet.cells.set(key, { style: normalizedStyle });
   } else {
@@ -320,14 +488,52 @@ export function setCellStyle(
   return true;
 }
 
-function assertStoredCellValue(value: unknown): asserts value is Exclude<CellValue, null> {
-  if (
-    value === null ||
-    value === "" ||
-    (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
-  ) {
-    throw new TypeError("Sparse cell values must be non-empty strings, numbers, or booleans.");
+function normalizeCellContent(content: CellContent | null | undefined): CellContent | undefined {
+  if (content === null || content === undefined) return undefined;
+  if (content.kind === "literal") {
+    const value = content.value;
+    if (
+      value === "" ||
+      (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
+    ) {
+      throw new TypeError(
+        "Literal cell content must be a non-empty string, finite number, or boolean.",
+      );
+    }
+    if (typeof value === "number" && !Number.isFinite(value)) {
+      throw new TypeError("Literal cell content numbers must be finite.");
+    }
+    return { kind: "literal", value };
   }
+  if (
+    content.kind === "formula" &&
+    typeof content.formula?.source === "string" &&
+    content.formula.source.startsWith("=")
+  ) {
+    return { kind: "formula", formula: { source: content.formula.source } };
+  }
+  throw new TypeError("Formula cell content must have a source beginning with '='.");
+}
+
+export function cloneCellContent(content: CellContent): CellContent {
+  return content.kind === "literal"
+    ? { kind: "literal", value: content.value }
+    : { kind: "formula", formula: { source: content.formula.source } };
+}
+
+function areCellContentsEqual(
+  left: CellContent | undefined,
+  right: CellContent | undefined,
+): boolean {
+  if (!left || !right) return left === right;
+  return (
+    left.kind === right.kind &&
+    (left.kind === "literal" && right.kind === "literal"
+      ? Object.is(left.value, right.value)
+      : left.kind === "formula" &&
+        right.kind === "formula" &&
+        left.formula.source === right.formula.source)
+  );
 }
 
 function assertDimensionIndex(index: number, maximum: number, axis: string): void {
@@ -398,12 +604,10 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
         `Cell address ${cell.address.row}:${cell.address.column} is outside the sheet.`,
       );
     }
-    if (cell.value !== undefined) {
-      assertStoredCellValue(cell.value);
-    }
+    const content = normalizeCellContent(cell.content);
     const style = normalizeCellStyle(cell.style);
-    if (cell.value === undefined && !style) {
-      throw new Error("Sparse state cells must contain a value or style.");
+    if (content === undefined && !style) {
+      throw new Error("Sparse state cells must contain content or style.");
     }
     const address = { ...cell.address };
     const key = createCellKey(address);
@@ -413,7 +617,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     cellKeys.add(key);
     return {
       address,
-      ...(cell.value === undefined ? {} : { value: cell.value }),
+      ...(content === undefined ? {} : { content }),
       ...(style ? { style } : {}),
     };
   });
@@ -463,7 +667,7 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
       (cell, index) =>
         cell.address.row === right.cells[index]?.address.row &&
         cell.address.column === right.cells[index]?.address.column &&
-        Object.is(cell.value, right.cells[index]?.value) &&
+        areCellContentsEqual(cell.content, right.cells[index]?.content) &&
         areCellStylesEqual(cell.style, right.cells[index]?.style),
     ) &&
     left.rowHeights.every(
@@ -488,7 +692,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
           row: Number(key.slice(0, separator)),
           column: Number(key.slice(separator + 1)),
         },
-        ...(cell.value === undefined ? {} : { value: cell.value }),
+        ...(cell.content === undefined ? {} : { content: cloneCellContent(cell.content) }),
         ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
       };
     }),
@@ -509,7 +713,7 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   sheet.columnWidths.clear();
   for (const cell of nextState.cells) {
     sheet.cells.set(createCellKey(cell.address), {
-      ...(cell.value === undefined ? {} : { value: cell.value }),
+      ...(cell.content === undefined ? {} : { content: cloneCellContent(cell.content) }),
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
     });
   }
@@ -532,4 +736,3 @@ export function isCellAddressInBounds(address: CellAddress): boolean {
     address.column < MAX_SHEET_COLUMNS
   );
 }
-import { areCellStylesEqual, cloneCellStyle, normalizeCellStyle, type CellStyle } from "./style.js";

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createTestWorkbookSession } from "../helpers.js";
-import { createClearCellRangeCommand, createSetCellValueCommand } from "../../commands/index.js";
+import { createClearCellRangeCommand, createSetCellContentCommand } from "../../commands/index.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import {
   MAX_SHEET_COLUMNS,
@@ -66,7 +66,11 @@ describe("clear cell range command", () => {
     const sheet = getActiveSheet(session.workbook);
     executeWorkbookCommand(
       session,
-      createSetCellValueCommand(sheet.id, { row: 0, column: 0 }, "redo me"),
+      createSetCellContentCommand(
+        sheet.id,
+        { row: 0, column: 0 },
+        { kind: "literal", value: "redo me" },
+      ),
     );
     undoWorkbookCommand(session);
 
