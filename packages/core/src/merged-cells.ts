@@ -1,11 +1,5 @@
-import {
-  MAX_SHEET_COLUMNS,
-  MAX_SHEET_ROWS,
-  isCellAddressInBounds,
-  type CellAddress,
-  type CellRange,
-  type SheetDimensionAxis,
-} from "./workbook.js";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, isSheetAddressInBounds } from "./sheet-limits.js";
+import type { CellAddress, CellRange, SheetDimensionAxis } from "./workbook.js";
 
 export type MergedCellRange = CellRange;
 
@@ -20,7 +14,7 @@ function assertCellRange(range: CellRange): void {
   if (!range || typeof range !== "object" || !range.start || !range.end) {
     throw new TypeError("A merged cell range must contain start and end addresses.");
   }
-  if (!isCellAddressInBounds(range.start) || !isCellAddressInBounds(range.end)) {
+  if (!isSheetAddressInBounds(range.start) || !isSheetAddressInBounds(range.end)) {
     throw new RangeError("A merged cell range must be inside the sheet.");
   }
 }
@@ -165,6 +159,86 @@ export function getMergedCellAnchor(
 ): CellAddress | undefined {
   const range = getMergedCellRangeAtAddress(ranges, address);
   return range ? { ...range.start } : undefined;
+}
+
+function rowSegmentKey(start: number, end: number): string {
+  return `${start}:${end}`;
+}
+
+function addRangeToRowSegments(
+  index: Map<string, MergedCellRange[]>,
+  range: MergedCellRange,
+  start = 0,
+  end = MAX_SHEET_ROWS - 1,
+): void {
+  if (range.end.row < start || range.start.row > end) return;
+  if (range.start.row <= start && range.end.row >= end) {
+    const key = rowSegmentKey(start, end);
+    const entries = index.get(key) ?? [];
+    entries.push(range);
+    index.set(key, entries);
+    return;
+  }
+  const middle = Math.floor((start + end) / 2);
+  addRangeToRowSegments(index, range, start, middle);
+  addRangeToRowSegments(index, range, middle + 1, end);
+}
+
+function getRangeAtColumn(
+  ranges: readonly MergedCellRange[] | undefined,
+  column: number,
+): MergedCellRange | undefined {
+  if (!ranges) return undefined;
+  let low = 0;
+  let high = ranges.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if ((ranges[middle]?.start.column ?? 0) <= column) low = middle + 1;
+    else high = middle;
+  }
+  const candidate = ranges[low - 1];
+  return candidate && column <= candidate.end.column ? candidate : undefined;
+}
+
+/**
+ * A read-only merge lookup index for render and hit-test paths. Construction
+ * validates and clones its input; queries follow one row-segment path and run
+ * a column binary search at each level, never scanning every merged range.
+ */
+export class MergedCellRangeResolver {
+  private readonly rangesByRowSegment = new Map<string, MergedCellRange[]>();
+
+  constructor(ranges: readonly CellRange[]) {
+    for (const range of validateMergedCellRanges(ranges)) {
+      addRangeToRowSegments(this.rangesByRowSegment, range);
+    }
+    for (const entries of this.rangesByRowSegment.values()) {
+      entries.sort((left, right) => left.start.column - right.start.column);
+    }
+  }
+
+  getRangeAtAddress(address: CellAddress): MergedCellRange | undefined {
+    if (!isSheetAddressInBounds(address)) return undefined;
+    let start = 0;
+    let end = MAX_SHEET_ROWS - 1;
+    while (start <= end) {
+      const range = getRangeAtColumn(
+        this.rangesByRowSegment.get(rowSegmentKey(start, end)),
+        address.column,
+      );
+      if (range) return cloneRange(range);
+      if (start === end) return undefined;
+      const middle = Math.floor((start + end) / 2);
+      if (address.row <= middle) end = middle;
+      else start = middle + 1;
+    }
+    return undefined;
+  }
+
+  getAnchor(address: CellAddress): CellAddress | undefined {
+    const range = this.getRangeAtAddress(address);
+    return range ? { ...range.start } : undefined;
+  }
 }
 
 export function expandSelectionToMergedCellRanges(

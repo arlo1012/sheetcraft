@@ -19,6 +19,7 @@ import {
   type CellRange,
   type Workbook,
 } from "../workbook.js";
+import { MergedCellRangeResolver } from "../merged-cells.js";
 import {
   getExplicitCellBorderPatch,
   getCellBorderTargetKey,
@@ -144,6 +145,13 @@ function addPatch(
   else patches.set(key, { address: { ...address }, patch: { ...patch } });
 }
 
+function getMergeAwareAddress(
+  resolver: MergedCellRangeResolver,
+  address: CellAddress,
+): CellAddress {
+  return resolver.getAnchor(address) ?? address;
+}
+
 export function applyCellStyleCommand(
   workbook: Workbook,
   command: ApplyCellStyleCommand,
@@ -151,7 +159,8 @@ export function applyCellStyleCommand(
   const range = normalizeRange(command.range);
   assertCellRange(range);
   assertSupportedRange(range);
-  getSheetOrThrow(workbook, command.sheetId);
+  const sheet = getSheetOrThrow(workbook, command.sheetId);
+  const mergeResolver = new MergedCellRangeResolver(sheet.mergedCells);
   const normalizedPatch = validateCommandPayload("patch", command.patch, () =>
     normalizeCellStylePatch(command.patch),
   );
@@ -160,7 +169,7 @@ export function applyCellStyleCommand(
   const borderPatch = getExplicitCellBorderPatch(normalizedPatch);
   for (let row = range.start.row; row <= range.end.row; row += 1) {
     for (let column = range.start.column; column <= range.end.column; column += 1) {
-      const address = { row, column };
+      const address = getMergeAwareAddress(mergeResolver, { row, column });
       addPatch(patches, address, normalizedPatch);
       if (Object.keys(borderPatch).length > 0) {
         targetBorderPatches.set(getCellBorderTargetKey(address), {
@@ -171,7 +180,7 @@ export function applyCellStyleCommand(
     }
   }
   reconcileCellBorderTargets(targetBorderPatches, (address, patch) =>
-    addPatch(patches, address, patch),
+    addPatch(patches, getMergeAwareAddress(mergeResolver, address), patch),
   );
   return applyStylePatches(workbook, command.sheetId, patches);
 }
@@ -205,10 +214,11 @@ export function applyAdjustCellNumberFormatDecimalsCommand(
     );
   }
   const sheet = getSheetOrThrow(workbook, command.sheetId);
+  const mergeResolver = new MergedCellRangeResolver(sheet.mergedCells);
   const patches = new Map<string, { address: CellAddress; patch: CellStylePatch }>();
   for (let row = range.start.row; row <= range.end.row; row += 1) {
     for (let column = range.start.column; column <= range.end.column; column += 1) {
-      const address = { row, column };
+      const address = getMergeAwareAddress(mergeResolver, { row, column });
       const current = getCellStyle(sheet, address)?.numberFormat;
       const adjusted = adjustNumberFormat(current, command.delta);
       if (adjusted !== current) {
@@ -277,14 +287,15 @@ export function applyCellBordersCommand(
   const action = validateCommandPayload("action", command.action, () =>
     normalizeCellBorderAction(command.action),
   );
-  getSheetOrThrow(workbook, command.sheetId);
+  const sheet = getSheetOrThrow(workbook, command.sheetId);
+  const mergeResolver = new MergedCellRangeResolver(sheet.mergedCells);
   const patches = new Map<string, { address: CellAddress; patch: CellStylePatch }>();
   const targetBorderPatches = new Map<string, { address: CellAddress; patch: CellBorderPatch }>();
   for (let row = range.start.row; row <= range.end.row; row += 1) {
     for (let column = range.start.column; column <= range.end.column; column += 1) {
       const patch = getCellBorderPatch(range, action, row, column);
       if (Object.keys(patch).length === 0) continue;
-      const address = { row, column };
+      const address = getMergeAwareAddress(mergeResolver, { row, column });
       addPatch(patches, address, patch);
       const sharedBorderPatch = getExplicitCellBorderPatch(patch);
       if (Object.keys(sharedBorderPatch).length > 0) {
@@ -296,7 +307,7 @@ export function applyCellBordersCommand(
     }
   }
   reconcileCellBorderTargets(targetBorderPatches, (address, patch) =>
-    addPatch(patches, address, patch),
+    addPatch(patches, getMergeAwareAddress(mergeResolver, address), patch),
   );
   return applyStylePatches(workbook, command.sheetId, patches);
 }
@@ -306,11 +317,13 @@ export function applyRestoreCellStylesCommand(
   command: RestoreCellStylesCommand,
 ): RestoreCellStylesCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
+  const mergeResolver = new MergedCellRangeResolver(sheet.mergedCells);
   const addresses = new Set<string>();
   const normalizedChanges = validateCommandPayload("changes", command.changes, () =>
     command.changes.map((change) => {
       assertCellAddress(change.address);
-      const key = getCellBorderTargetKey(change.address);
+      const address = getMergeAwareAddress(mergeResolver, change.address);
+      const key = getCellBorderTargetKey(address);
       if (addresses.has(key)) {
         throw invalidCommandPayload(
           "changes",
@@ -320,7 +333,7 @@ export function applyRestoreCellStylesCommand(
       }
       addresses.add(key);
       return {
-        address: { ...change.address },
+        address,
         style:
           validateCommandPayload("changes.style", change.style, () =>
             normalizeCellStyle(change.style),

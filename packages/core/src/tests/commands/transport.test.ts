@@ -48,6 +48,9 @@ describe("workbook command transport", () => {
       cells: [],
       rowHeights: [],
       columnWidths: [],
+      freezePanes: { rows: 0, columns: 0 },
+      filter: null,
+      mergedCells: [],
     });
     expectTransportSafe(command);
 

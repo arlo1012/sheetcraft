@@ -4,14 +4,22 @@ import {
   cloneCellContent,
   createCellKey,
   createSheetSparseState,
+  getSheetMetadata,
   replaceSheetSparseState,
+  setSheetMetadata,
   type Sheet,
   type SheetDimensionAxis,
+  type SheetFilter,
+  type SheetMetadata,
   type SheetSparseCell,
   type SheetSparseState,
   type Workbook,
 } from "../workbook.js";
 import { transformFormulaForAxis } from "../formula/references.js";
+import {
+  transformMergedCellRangesForAxisDelete,
+  transformMergedCellRangesForAxisInsert,
+} from "../merged-cells.js";
 import { cloneCellStyle } from "../style.js";
 import type {
   DeleteSheetAxisCommand,
@@ -84,6 +92,29 @@ function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
           })),
         }
       : {}),
+    metadata: cloneSheetMetadata(slice.metadata),
+  };
+}
+
+function cloneSheetMetadata(metadata: SheetMetadata): SheetMetadata {
+  return {
+    freezePanes: { ...metadata.freezePanes },
+    filter: metadata.filter
+      ? {
+          range: {
+            start: { ...metadata.filter.range.start },
+            end: { ...metadata.filter.range.end },
+          },
+          columns: metadata.filter.columns.map((column) => ({
+            column: column.column,
+            allowedValues: column.allowedValues.map((value) => ({ ...value })),
+          })),
+        }
+      : null,
+    mergedCells: metadata.mergedCells.map((range) => ({
+      start: { ...range.start },
+      end: { ...range.end },
+    })),
   };
 }
 
@@ -141,6 +172,118 @@ function transformAxisIndex(
   }
   if (value >= index && value < index + count) return null;
   return value >= index + count ? value - count : value;
+}
+
+function transformRangeForAxis(
+  range: { start: { row: number; column: number }; end: { row: number; column: number } },
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  maximum: number,
+  operation: "insert" | "delete",
+): typeof range | null {
+  const start = axis === "row" ? range.start.row : range.start.column;
+  const end = axis === "row" ? range.end.row : range.end.column;
+  const deletedEnd = index + count - 1;
+  let nextStart = start;
+  let nextEnd = end;
+  if (operation === "insert") {
+    if (index <= start) {
+      nextStart += count;
+      nextEnd += count;
+    } else if (index <= end) nextEnd += count;
+    if (nextStart >= maximum) return null;
+    nextEnd = Math.min(maximum - 1, nextEnd);
+  } else if (end < index) {
+    // no-op
+  } else if (start > deletedEnd) {
+    nextStart -= count;
+    nextEnd -= count;
+  } else {
+    nextStart = start < index ? start : index;
+    nextEnd = end > deletedEnd ? end - count : index - 1;
+    if (nextEnd < nextStart) return null;
+  }
+  return axis === "row"
+    ? {
+        start: { row: nextStart, column: range.start.column },
+        end: { row: nextEnd, column: range.end.column },
+      }
+    : {
+        start: { row: range.start.row, column: nextStart },
+        end: { row: range.end.row, column: nextEnd },
+      };
+}
+
+function transformFilterForAxis(
+  filter: SheetFilter | null,
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  maximum: number,
+  operation: "insert" | "delete",
+): SheetFilter | null {
+  if (!filter) return null;
+  if (
+    axis === "row" &&
+    operation === "delete" &&
+    index <= filter.range.start.row &&
+    filter.range.start.row < index + count
+  ) {
+    return null;
+  }
+  const range = transformRangeForAxis(filter.range, axis, index, count, maximum, operation);
+  if (!range) return null;
+  const columns =
+    axis === "row"
+      ? filter.columns.map((column) => ({
+          column: column.column,
+          allowedValues: column.allowedValues.map((value) => ({ ...value })),
+        }))
+      : filter.columns.flatMap((column) => {
+          const next = transformAxisIndex(column.column, index, count, maximum, operation);
+          return next === null
+            ? []
+            : [
+                {
+                  column: next,
+                  allowedValues: column.allowedValues.map((value) => ({ ...value })),
+                },
+              ];
+        });
+  if (range.end.row <= range.start.row) return null;
+  return { range, columns };
+}
+
+function transformSheetMetadataForAxis(
+  metadata: SheetMetadata,
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  maximum: number,
+  operation: "insert" | "delete",
+): SheetMetadata {
+  const freezeValue = axis === "row" ? metadata.freezePanes.rows : metadata.freezePanes.columns;
+  const nextFreezeValue =
+    operation === "insert"
+      ? index <= freezeValue
+        ? Math.min(maximum, freezeValue + count)
+        : freezeValue
+      : freezeValue <= index
+        ? freezeValue
+        : Math.max(index, freezeValue - count);
+  const mergedCells =
+    operation === "insert"
+      ? transformMergedCellRangesForAxisInsert(metadata.mergedCells, axis, index, count)
+      : transformMergedCellRangesForAxisDelete(metadata.mergedCells, axis, index, count);
+  return {
+    freezePanes:
+      axis === "row"
+        ? { rows: nextFreezeValue, columns: metadata.freezePanes.columns }
+        : { rows: metadata.freezePanes.rows, columns: nextFreezeValue },
+    filter: transformFilterForAxis(metadata.filter, axis, index, count, maximum, operation),
+    mergedCells,
+  };
 }
 
 function compareAxisEntries(
@@ -270,7 +413,12 @@ function captureSheetAxisSlice(
     (left, right) =>
       left.address.row - right.address.row || left.address.column - right.address.column,
   );
-  return { cells, dimensions: capturedDimensions, formulaSources };
+  return {
+    cells,
+    dimensions: capturedDimensions,
+    formulaSources,
+    metadata: getSheetMetadata(sheet),
+  };
 }
 
 function restoreSheetAxisSlice(
@@ -314,6 +462,7 @@ function restoreSheetAxisSlice(
     });
     changed = true;
   }
+  if (slice.metadata && setSheetMetadata(sheet, slice.metadata)) changed = true;
   return changed;
 }
 
@@ -328,6 +477,9 @@ function validateSheetAxisSlice(
   maximum: number,
   sheet: Sheet,
 ): void {
+  if (!command.slice.metadata) {
+    throw invalidCommandPayload("slice.metadata", command.slice.metadata);
+  }
   if (command.operation !== "insert" && command.operation !== "delete") {
     throw invalidCommandPayload("operation", command.operation);
   }
@@ -360,12 +512,18 @@ function validateSheetAxisSlice(
     cells: new Map(),
     rowHeights: new Map(),
     columnWidths: new Map(),
+    freezePanes: { rows: 0, columns: 0 },
+    filter: null,
+    mergedCells: [],
   };
   validateCommandPayload("slice", command.slice, () =>
     replaceSheetSparseState(validationSheet, {
       cells: command.slice.cells,
       rowHeights: command.axis === "row" ? command.slice.dimensions : [],
       columnWidths: command.axis === "column" ? command.slice.dimensions : [],
+      freezePanes: command.slice.metadata.freezePanes,
+      filter: command.slice.metadata.filter,
+      mergedCells: command.slice.metadata.mergedCells,
     }),
   );
   for (const formula of command.slice.formulaSources ?? []) {
@@ -412,6 +570,21 @@ function validateSheetAxisSlice(
       );
     }
   }
+  const expectedMetadata = transformSheetMetadataForAxis(
+    command.slice.metadata,
+    command.axis,
+    command.index,
+    command.count,
+    maximum,
+    command.operation,
+  );
+  if (JSON.stringify(expectedMetadata) !== JSON.stringify(getSheetMetadata(sheet))) {
+    throw invalidCommandPayload(
+      "slice.metadata",
+      command.slice.metadata,
+      "Metadata restore is not associated with this structural inverse.",
+    );
+  }
 }
 
 export function applyRestoreSheetStateCommand(
@@ -425,6 +598,14 @@ export function applyRestoreSheetStateCommand(
       validateSheetAxisSlice(command, maximum, sheet),
     );
     const inverseOperation = command.operation === "insert" ? "delete" : "insert";
+    const nextMetadata = transformSheetMetadataForAxis(
+      getSheetMetadata(sheet),
+      command.axis,
+      command.index,
+      command.count,
+      maximum,
+      inverseOperation,
+    );
     const transformed = transformSheetAxis(
       sheet,
       command.axis,
@@ -433,8 +614,9 @@ export function applyRestoreSheetStateCommand(
       maximum,
       inverseOperation,
     );
+    const metadataTransformed = setSheetMetadata(sheet, nextMetadata);
     const restored = restoreSheetAxisSlice(sheet, command.axis, command.slice);
-    if (!transformed && !restored) return null;
+    if (!transformed && !metadataTransformed && !restored) return null;
     return command.operation === "insert"
       ? createInsertSheetAxisCommand(command.sheetId, command.axis, command.index, command.count)
       : createDeleteSheetAxisCommand(command.sheetId, command.axis, command.index, command.count);
@@ -461,6 +643,14 @@ export function applySheetAxisCommand(
     operation === "insert" ? maximum - command.count : command.index,
     operation === "insert" ? maximum : command.index + command.count,
   );
+  const nextMetadata = transformSheetMetadataForAxis(
+    getSheetMetadata(sheet),
+    command.axis,
+    command.index,
+    command.count,
+    maximum,
+    operation,
+  );
   const changed = transformSheetAxis(
     sheet,
     command.axis,
@@ -469,7 +659,8 @@ export function applySheetAxisCommand(
     maximum,
     operation,
   );
-  return changed
+  const metadataChanged = setSheetMetadata(sheet, nextMetadata);
+  return changed || metadataChanged
     ? createRestoreSheetAxisSliceCommand(
         command.sheetId,
         command.axis,

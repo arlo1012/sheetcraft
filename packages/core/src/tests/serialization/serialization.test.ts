@@ -17,6 +17,7 @@ import {
   setCellValue,
   setColumnWidth,
   setRowHeight,
+  setSheetMetadata,
 } from "../../workbook.js";
 
 describe("workbook snapshots", () => {
@@ -71,6 +72,36 @@ describe("workbook snapshots", () => {
         { index: 8, size: 30 },
       ],
     });
+  });
+
+  test("persists sheet metadata and accepts V2 snapshots without metadata fields", () => {
+    const workbook = createWorkbook({ id: "workbook-1", sheetId: "sheet-1" });
+    const sheet = getActiveSheet(workbook);
+    setSheetMetadata(sheet, {
+      freezePanes: { rows: 2, columns: 1 },
+      mergedCells: [{ start: { row: 3, column: 3 }, end: { row: 3, column: 4 } }],
+      filter: {
+        range: { start: { row: 7, column: 0 }, end: { row: 10, column: 1 } },
+        columns: [{ column: 0, allowedValues: [{ kind: "number", value: 1 }] }],
+      },
+    });
+
+    const snapshot = serializeWorkbook(workbook);
+    expect(snapshot.sheets[0]).toMatchObject({
+      freezePanes: { rows: 2, columns: 1 },
+      mergedCells: [{ start: { row: 3, column: 3 }, end: { row: 3, column: 4 } }],
+      filter: {},
+    });
+    expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
+
+    const legacyV2 = structuredClone(snapshot);
+    delete legacyV2.sheets[0]?.freezePanes;
+    delete legacyV2.sheets[0]?.filter;
+    delete legacyV2.sheets[0]?.mergedCells;
+    const restored = deserializeWorkbook(legacyV2);
+    expect(getActiveSheet(restored).freezePanes).toEqual({ rows: 0, columns: 0 });
+    expect(getActiveSheet(restored).filter).toBeNull();
+    expect(getActiveSheet(restored).mergedCells).toEqual([]);
   });
 
   test("migrates V1 values and writes V2 raw formula content without a computed cache", () => {

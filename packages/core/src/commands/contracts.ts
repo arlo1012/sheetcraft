@@ -4,7 +4,9 @@ import type { CellBorderAction, CellStyle, CellStylePatch } from "../style.js";
 import type {
   CellAddress,
   CellRange,
+  FreezePanes,
   SheetDimensionAxis,
+  SheetMetadata,
   SheetSparseCell,
   SheetSparseDimension,
   SheetSparseState,
@@ -71,6 +73,24 @@ export type ResizeSheetDimensionCommand = {
   size: number;
 };
 
+export type SetSheetFreezePanesCommand = {
+  type: "setSheetFreezePanes";
+  sheetId: string;
+  freezePanes: FreezePanes;
+};
+
+export type MergeCellsCommand = {
+  type: "mergeCells";
+  sheetId: string;
+  range: CellRange;
+};
+
+export type UnmergeCellsCommand = {
+  type: "unmergeCells";
+  sheetId: string;
+  range: CellRange;
+};
+
 export type AddSheetCommand = {
   type: "addSheet";
   sheet: SheetSnapshotV2;
@@ -124,6 +144,8 @@ export type SheetAxisSparseSlice = {
   dimensions: SheetSparseDimension[];
   /** Exact raw formula sources before the structural change, for lossless undo. */
   formulaSources?: Array<{ address: CellAddress; source: string }>;
+  /** Exact sheet metadata before the structural change. */
+  metadata: SheetMetadata;
 };
 
 /**
@@ -152,6 +174,9 @@ export type WorkbookCommand =
   | AdjustCellNumberFormatDecimalsCommand
   | RestoreCellStylesCommand
   | ResizeSheetDimensionCommand
+  | SetSheetFreezePanesCommand
+  | MergeCellsCommand
+  | UnmergeCellsCommand
   | AddSheetCommand
   | DeleteSheetCommand
   | RenameSheetCommand
@@ -168,6 +193,9 @@ export type WorkbookOperation =
   | "format.cells"
   | "format.borders"
   | "dimensions.resize"
+  | "view.freeze"
+  | "cells.merge"
+  | "cells.unmerge"
   | "sheets.add"
   | "sheets.delete"
   | "sheets.rename"
@@ -194,6 +222,12 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "history.restore";
     case "resizeSheetDimension":
       return "dimensions.resize";
+    case "setSheetFreezePanes":
+      return "view.freeze";
+    case "mergeCells":
+      return "cells.merge";
+    case "unmergeCells":
+      return "cells.unmerge";
     case "addSheet":
       return "sheets.add";
     case "deleteSheet":

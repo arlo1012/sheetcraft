@@ -23,10 +23,140 @@ import {
   setCellContent,
   setCellStyle,
   setColumnWidth,
+  setSheetMetadata,
   setRowHeight,
 } from "../../workbook.js";
 
 describe("sheet axis structure commands", () => {
+  test("transforms metadata-only sheets and restores exact frozen, merged, and filter state", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setSheetMetadata(sheet, {
+      freezePanes: { rows: 5, columns: 1 },
+      mergedCells: [{ start: { row: 5, column: 2 }, end: { row: 6, column: 3 } }],
+      filter: {
+        range: { start: { row: 8, column: 0 }, end: { row: 12, column: 1 } },
+        columns: [{ column: 1, allowedValues: [{ kind: "string", value: "keep" }] }],
+      },
+    });
+    const before = createSheetSparseState(sheet);
+
+    expect(executeWorkbookCommand(session, createInsertSheetAxisCommand(sheet.id, "row", 3))).toBe(
+      true,
+    );
+    expect(sheet.freezePanes).toEqual({ rows: 6, columns: 1 });
+    expect(sheet.mergedCells).toEqual([
+      { start: { row: 6, column: 2 }, end: { row: 7, column: 3 } },
+    ]);
+    expect(sheet.filter?.range).toEqual({
+      start: { row: 9, column: 0 },
+      end: { row: 13, column: 1 },
+    });
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(before);
+  });
+
+  test("allows fully frozen sheet boundaries and clamps structural inserts at the sheet limit", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setSheetMetadata(sheet, {
+      freezePanes: { rows: MAX_SHEET_ROWS - 1, columns: MAX_SHEET_COLUMNS },
+      filter: null,
+      mergedCells: [],
+    });
+    const before = createSheetSparseState(sheet);
+
+    expect(executeWorkbookCommand(session, createInsertSheetAxisCommand(sheet.id, "row", 0))).toBe(
+      true,
+    );
+    expect(sheet.freezePanes).toEqual({ rows: MAX_SHEET_ROWS, columns: MAX_SHEET_COLUMNS });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(before);
+  });
+
+  test("clears a filter when its header is deleted and restores it through undo", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setSheetMetadata(sheet, {
+      freezePanes: { rows: 0, columns: 0 },
+      filter: {
+        range: { start: { row: 8, column: 2 }, end: { row: 11, column: 3 } },
+        columns: [{ column: 2, allowedValues: [{ kind: "string", value: "keep" }] }],
+      },
+      mergedCells: [],
+    });
+
+    expect(executeWorkbookCommand(session, createDeleteSheetAxisCommand(sheet.id, "row", 8))).toBe(
+      true,
+    );
+    expect(sheet.filter).toBeNull();
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(sheet.filter?.range).toEqual({
+      start: { row: 8, column: 2 },
+      end: { row: 11, column: 3 },
+    });
+  });
+
+  test("clears a filter when deleting its final data row", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setSheetMetadata(sheet, {
+      freezePanes: { rows: 0, columns: 0 },
+      filter: {
+        range: { start: { row: 5, column: 0 }, end: { row: 6, column: 0 } },
+        columns: [],
+      },
+      mergedCells: [],
+    });
+
+    expect(executeWorkbookCommand(session, createDeleteSheetAxisCommand(sheet.id, "row", 6))).toBe(
+      true,
+    );
+    expect(sheet.filter).toBeNull();
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(sheet.filter?.range).toEqual({
+      start: { row: 5, column: 0 },
+      end: { row: 6, column: 0 },
+    });
+  });
+
+  test("shifts filter rows and columns through structural edits and restores their criteria", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setSheetMetadata(sheet, {
+      freezePanes: { rows: 0, columns: 0 },
+      filter: {
+        range: { start: { row: 4, column: 2 }, end: { row: 7, column: 4 } },
+        columns: [
+          { column: 2, allowedValues: [{ kind: "number", value: 1 }] },
+          { column: 4, allowedValues: [{ kind: "boolean", value: true }] },
+        ],
+      },
+      mergedCells: [],
+    });
+    const before = createSheetSparseState(sheet);
+
+    expect(executeWorkbookCommand(session, createInsertSheetAxisCommand(sheet.id, "row", 6))).toBe(
+      true,
+    );
+    expect(sheet.filter?.range).toEqual({
+      start: { row: 4, column: 2 },
+      end: { row: 8, column: 4 },
+    });
+    expect(
+      executeWorkbookCommand(session, createDeleteSheetAxisCommand(sheet.id, "column", 3)),
+    ).toBe(true);
+    expect(sheet.filter?.range).toEqual({
+      start: { row: 4, column: 2 },
+      end: { row: 8, column: 3 },
+    });
+    expect(sheet.filter?.columns.map((column) => column.column)).toEqual([2, 3]);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(before);
+  });
+
   test("rewrites formula references and restores exact raw sources across undo and redo", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
@@ -405,8 +535,13 @@ describe("sheet axis structure commands", () => {
           { address: { row: 10, column: 2 }, content: { kind: "literal", value: "outside" } },
         ],
         dimensions: [],
+        metadata: {
+          freezePanes: { ...sheet.freezePanes },
+          filter: sheet.filter,
+          mergedCells: sheet.mergedCells,
+        },
       },
-    } as WorkbookCommand;
+    } as unknown as WorkbookCommand;
 
     expect(() => applyWorkbookCommand(session.workbook, command)).toThrow(
       "outside the restored slice",
@@ -430,7 +565,7 @@ describe("sheet axis structure commands", () => {
         rowHeights: [],
         columnWidths: [],
       },
-    } as WorkbookCommand;
+    } as unknown as WorkbookCommand;
 
     expect(() => applyWorkbookCommand(session.workbook, command)).toThrow("duplicate cell");
     expect(createSheetSparseState(sheet)).toEqual(before);

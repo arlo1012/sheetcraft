@@ -7,13 +7,17 @@ import {
   normalizeSheetName,
   replaceSheetSparseState,
   type CellAddress,
+  type CellRange,
   type CellValue,
+  type FreezePanes,
   type Sheet,
+  type SheetFilter,
+  type SheetFilterValue,
   type SheetSparseDimension,
   type SheetSparseState,
   type Workbook,
 } from "./workbook.js";
-import type { CellContent } from "./formula/types.js";
+import type { CellContent, FormulaErrorCode } from "./formula/types.js";
 
 export type CellSnapshotV1 = {
   address: CellAddress;
@@ -35,7 +39,12 @@ export type SheetSnapshotV1 = {
   columnWidths: SheetSparseDimension[];
 };
 
-export type SheetSnapshotV2 = Omit<SheetSnapshotV1, "cells"> & { cells: CellSnapshotV2[] };
+export type SheetSnapshotV2 = Omit<SheetSnapshotV1, "cells"> & {
+  cells: CellSnapshotV2[];
+  freezePanes?: FreezePanes;
+  filter?: SheetFilter | null;
+  mergedCells?: CellRange[];
+};
 
 export type WorkbookSnapshotV1 = {
   version: 1;
@@ -174,6 +183,59 @@ function parseDimension(value: unknown, path: string): SheetSparseDimension {
   };
 }
 
+function parseRange(value: unknown, path: string): CellRange {
+  const record = asRecord(value, path);
+  return {
+    start: parseAddress(record.start, `${path}.start`),
+    end: parseAddress(record.end, `${path}.end`),
+  };
+}
+
+function parseFreezePanes(value: unknown, path: string): FreezePanes {
+  const record = asRecord(value, path);
+  return {
+    rows: asInteger(record.rows, `${path}.rows`),
+    columns: asInteger(record.columns, `${path}.columns`),
+  };
+}
+
+function parseFilterValue(value: unknown, path: string): SheetFilterValue {
+  const record = asRecord(value, path);
+  if (record.kind === "blank") return { kind: "blank" };
+  if (record.kind === "boolean" && typeof record.value === "boolean")
+    return { kind: "boolean", value: record.value };
+  if (record.kind === "number" && typeof record.value === "number" && Number.isFinite(record.value))
+    return { kind: "number", value: record.value };
+  if (record.kind === "string" && typeof record.value === "string")
+    return { kind: "string", value: record.value };
+  if (
+    record.kind === "error" &&
+    typeof record.code === "string" &&
+    ["PARSE", "REF", "CYCLE", "VALUE", "DIV0", "NAME"].includes(record.code)
+  )
+    return { kind: "error", code: record.code as FormulaErrorCode };
+  return fail(path, "Invalid filter value.");
+}
+
+function parseFilter(value: unknown, path: string): SheetFilter {
+  const record = asRecord(value, path);
+  return {
+    range: parseRange(record.range, `${path}.range`),
+    columns: asArray(record.columns, `${path}.columns`).map((column, index) => {
+      const columnRecord = asRecord(column, `${path}.columns[${index}]`);
+      return {
+        column: asInteger(columnRecord.column, `${path}.columns[${index}].column`),
+        allowedValues: asArray(
+          columnRecord.allowedValues,
+          `${path}.columns[${index}].allowedValues`,
+        ).map((filterValue, valueIndex) =>
+          parseFilterValue(filterValue, `${path}.columns[${index}].allowedValues[${valueIndex}]`),
+        ),
+      };
+    }),
+  };
+}
+
 function parseSparseState(record: UnknownRecord, path: string, version: 1 | 2): SheetSparseState {
   return {
     cells: asArray(record.cells, `${path}.cells`).map((cell, index) =>
@@ -185,6 +247,22 @@ function parseSparseState(record: UnknownRecord, path: string, version: 1 | 2): 
     columnWidths: asArray(record.columnWidths, `${path}.columnWidths`).map((dimension, index) =>
       parseDimension(dimension, `${path}.columnWidths[${index}]`),
     ),
+    freezePanes:
+      version === 2 && Object.hasOwn(record, "freezePanes")
+        ? parseFreezePanes(record.freezePanes, `${path}.freezePanes`)
+        : { rows: 0, columns: 0 },
+    filter:
+      version === 2 && Object.hasOwn(record, "filter")
+        ? record.filter === null
+          ? null
+          : parseFilter(record.filter, `${path}.filter`)
+        : null,
+    mergedCells:
+      version === 2 && Object.hasOwn(record, "mergedCells")
+        ? asArray(record.mergedCells, `${path}.mergedCells`).map((range, index) =>
+            parseRange(range, `${path}.mergedCells[${index}]`),
+          )
+        : [],
   };
 }
 

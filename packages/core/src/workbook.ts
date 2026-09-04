@@ -1,11 +1,17 @@
 import { evaluateFormula } from "./formula/evaluate.js";
 import { collectFormulaRanges, collectFormulaReferences } from "./formula/references.js";
-import { createFormulaError, type CellContent, type FormulaValue } from "./formula/types.js";
+import {
+  createFormulaError,
+  type CellContent,
+  type FormulaErrorCode,
+  type FormulaValue,
+} from "./formula/types.js";
+import { doMergedCellRangesIntersect, validateMergedCellRanges } from "./merged-cells.js";
 import type { IdFactory } from "./runtime.js";
+import { isSheetAddressInBounds, MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheet-limits.js";
 import { areCellStylesEqual, cloneCellStyle, normalizeCellStyle, type CellStyle } from "./style.js";
 
-export const MAX_SHEET_ROWS = 1_048_576;
-export const MAX_SHEET_COLUMNS = 16_384;
+export { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheet-limits.js";
 export const DEFAULT_ROW_HEIGHT = 24;
 export const DEFAULT_COLUMN_WIDTH = 96;
 export const MIN_ROW_HEIGHT = 16;
@@ -27,6 +33,35 @@ export type CellRange = {
 
 export type SheetDimensionAxis = "row" | "column";
 
+export type FreezePanes = {
+  rows: number;
+  columns: number;
+};
+
+export type SheetFilterValue =
+  | { kind: "blank" }
+  | { kind: "boolean"; value: boolean }
+  | { kind: "number"; value: number }
+  | { kind: "string"; value: string }
+  | { kind: "error"; code: FormulaErrorCode };
+
+export type SheetFilterColumn = {
+  column: number;
+  allowedValues: SheetFilterValue[];
+};
+
+/** Persisted filter criteria. Visibility is derived by the sheet-engine layer. */
+export type SheetFilter = {
+  range: CellRange;
+  columns: SheetFilterColumn[];
+};
+
+export type SheetMetadata = {
+  freezePanes: FreezePanes;
+  filter: SheetFilter | null;
+  mergedCells: CellRange[];
+};
+
 export type Cell = {
   content?: CellContent;
   style?: CellStyle;
@@ -38,6 +73,9 @@ export type Sheet = {
   cells: Map<string, Cell>;
   rowHeights: Map<number, number>;
   columnWidths: Map<number, number>;
+  freezePanes: FreezePanes;
+  filter: SheetFilter | null;
+  mergedCells: CellRange[];
 };
 
 export type SheetSparseCell = {
@@ -55,6 +93,9 @@ export type SheetSparseState = {
   cells: SheetSparseCell[];
   rowHeights: SheetSparseDimension[];
   columnWidths: SheetSparseDimension[];
+  freezePanes: FreezePanes;
+  filter: SheetFilter | null;
+  mergedCells: CellRange[];
 };
 
 export type Workbook = {
@@ -79,6 +120,9 @@ export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory)
     cells: new Map(),
     rowHeights: new Map(),
     columnWidths: new Map(),
+    freezePanes: { rows: 0, columns: 0 },
+    filter: null,
+    mergedCells: [],
   };
 }
 
@@ -593,6 +637,165 @@ function compareCellAddresses(left: CellAddress, right: CellAddress): number {
   return left.row - right.row || left.column - right.column;
 }
 
+function cloneFreezePanes(freezePanes: FreezePanes): FreezePanes {
+  return { rows: freezePanes.rows, columns: freezePanes.columns };
+}
+
+function cloneFilterValue(value: SheetFilterValue): SheetFilterValue {
+  if (value.kind === "blank") return { kind: "blank" };
+  if (value.kind === "error") return { kind: "error", code: value.code };
+  if (value.kind === "boolean") return { kind: "boolean", value: value.value };
+  if (value.kind === "number") return { kind: "number", value: value.value };
+  return { kind: "string", value: value.value };
+}
+
+function cloneSheetFilter(filter: SheetFilter): SheetFilter {
+  return {
+    range: { start: { ...filter.range.start }, end: { ...filter.range.end } },
+    columns: filter.columns.map((column) => ({
+      column: column.column,
+      allowedValues: column.allowedValues.map(cloneFilterValue),
+    })),
+  };
+}
+
+function normalizeFreezePanes(value: FreezePanes): FreezePanes {
+  const rows = value?.rows;
+  const columns = value?.columns;
+  if (!Number.isInteger(rows) || rows < 0 || rows > MAX_SHEET_ROWS) {
+    throw new RangeError("Frozen row count is outside the sheet.");
+  }
+  if (!Number.isInteger(columns) || columns < 0 || columns > MAX_SHEET_COLUMNS) {
+    throw new RangeError("Frozen column count is outside the sheet.");
+  }
+  return { rows, columns };
+}
+
+function normalizeFilterValue(value: SheetFilterValue): SheetFilterValue {
+  if (!value || typeof value !== "object") throw new TypeError("Invalid filter value.");
+  if (value.kind === "blank") return { kind: "blank" };
+  if (value.kind === "boolean" && typeof value.value === "boolean") return { ...value };
+  if (value.kind === "number" && typeof value.value === "number" && Number.isFinite(value.value))
+    return { ...value };
+  if (value.kind === "string" && typeof value.value === "string") return { ...value };
+  if (
+    value.kind === "error" &&
+    ["PARSE", "REF", "CYCLE", "VALUE", "DIV0", "NAME"].includes(value.code)
+  )
+    return { ...value };
+  throw new TypeError("Invalid filter value.");
+}
+
+function filterValueKey(value: SheetFilterValue): string {
+  return value.kind === "blank"
+    ? "blank"
+    : value.kind === "error"
+      ? `error:${value.code}`
+      : `${value.kind}:${String(value.value)}`;
+}
+
+function normalizeSheetFilter(filter: SheetFilter | null): SheetFilter | null {
+  if (filter === null) return null;
+  if (!filter || typeof filter !== "object") throw new TypeError("Invalid sheet filter.");
+  const range = {
+    start: { ...filter.range?.start },
+    end: { ...filter.range?.end },
+  };
+  if (!isCellAddressInBounds(range.start) || !isCellAddressInBounds(range.end)) {
+    throw new RangeError("Filter range is outside the sheet.");
+  }
+  const normalizedRange = {
+    start: {
+      row: Math.min(range.start.row, range.end.row),
+      column: Math.min(range.start.column, range.end.column),
+    },
+    end: {
+      row: Math.max(range.start.row, range.end.row),
+      column: Math.max(range.start.column, range.end.column),
+    },
+  };
+  if (normalizedRange.end.row <= normalizedRange.start.row) {
+    throw new RangeError("A filter range must include a header and at least one data row.");
+  }
+  if (!Array.isArray(filter.columns)) {
+    throw new TypeError("Invalid sheet filter.");
+  }
+  const columns = filter.columns.map((column) => {
+    if (!column || typeof column !== "object" || !Number.isInteger(column.column)) {
+      throw new TypeError("Invalid filter column.");
+    }
+    if (
+      column.column < normalizedRange.start.column ||
+      column.column > normalizedRange.end.column
+    ) {
+      throw new RangeError("Filter column is outside the filter range.");
+    }
+    if (!Array.isArray(column.allowedValues)) throw new TypeError("Invalid filter values.");
+    const valuesByKey = new Map<string, SheetFilterValue>();
+    for (const value of column.allowedValues) {
+      const normalized = normalizeFilterValue(value);
+      const key = filterValueKey(normalized);
+      valuesByKey.set(key, normalized);
+    }
+    const allowedValues = [...valuesByKey.values()];
+    allowedValues.sort((left, right) => {
+      const leftKey = filterValueKey(left);
+      const rightKey = filterValueKey(right);
+      return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+    });
+    return { column: column.column, allowedValues };
+  });
+  columns.sort((left, right) => left.column - right.column);
+  if (columns.some((column, index) => column.column === columns[index - 1]?.column)) {
+    throw new Error("Filter columns must be unique.");
+  }
+  return { range: normalizedRange, columns };
+}
+
+function normalizeSheetMetadata(
+  state: Pick<SheetSparseState, "freezePanes" | "filter" | "mergedCells">,
+): SheetMetadata {
+  const freezePanes = normalizeFreezePanes(state.freezePanes);
+  const mergedCells = validateMergedCellRanges(state.mergedCells);
+  if (
+    mergedCells.some(
+      (range) =>
+        (range.start.row < freezePanes.rows && range.end.row >= freezePanes.rows) ||
+        (range.start.column < freezePanes.columns && range.end.column >= freezePanes.columns),
+    )
+  ) {
+    throw new RangeError("A frozen pane boundary cannot cut through a merged cell range.");
+  }
+  const filter = normalizeSheetFilter(state.filter);
+  if (filter && mergedCells.some((range) => doMergedCellRangesIntersect(range, filter.range))) {
+    throw new RangeError("A filter range cannot intersect merged cells.");
+  }
+  return { freezePanes, filter, mergedCells };
+}
+
+export function getSheetMetadata(sheet: Sheet): SheetMetadata {
+  return normalizeSheetMetadata(sheet);
+}
+
+export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean {
+  const normalized = normalizeSheetMetadata(metadata);
+  const current = getSheetMetadata(sheet);
+  if (areSheetMetadataEqual(current, normalized)) return false;
+  sheet.freezePanes = cloneFreezePanes(normalized.freezePanes);
+  sheet.filter = normalized.filter ? cloneSheetFilter(normalized.filter) : null;
+  sheet.mergedCells = normalized.mergedCells.map((range) => ({
+    start: { ...range.start },
+    end: { ...range.end },
+  }));
+  return true;
+}
+
+function areSheetMetadataEqual(left: SheetMetadata, right: SheetMetadata): boolean {
+  return (
+    JSON.stringify(normalizeSheetMetadata(left)) === JSON.stringify(normalizeSheetMetadata(right))
+  );
+}
+
 function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
   const cellKeys = new Set<string>();
   const rowIndexes = new Set<number>();
@@ -651,14 +854,26 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
   cells.sort((left, right) => compareCellAddresses(left.address, right.address));
   rowHeights.sort((left, right) => left.index - right.index);
   columnWidths.sort((left, right) => left.index - right.index);
-  return { cells, rowHeights, columnWidths };
+  const metadata = normalizeSheetMetadata(state);
+  return {
+    cells,
+    rowHeights,
+    columnWidths,
+    freezePanes: cloneFreezePanes(metadata.freezePanes),
+    filter: metadata.filter ? cloneSheetFilter(metadata.filter) : null,
+    mergedCells: metadata.mergedCells.map((range) => ({
+      start: { ...range.start },
+      end: { ...range.end },
+    })),
+  };
 }
 
 function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseState): boolean {
   if (
     left.cells.length !== right.cells.length ||
     left.rowHeights.length !== right.rowHeights.length ||
-    left.columnWidths.length !== right.columnWidths.length
+    left.columnWidths.length !== right.columnWidths.length ||
+    !areSheetMetadataEqual(left, right)
   ) {
     return false;
   }
@@ -698,6 +913,12 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
     }),
     rowHeights: [...sheet.rowHeights].map(([index, size]) => ({ index, size })),
     columnWidths: [...sheet.columnWidths].map(([index, size]) => ({ index, size })),
+    freezePanes: cloneFreezePanes(sheet.freezePanes),
+    filter: sheet.filter ? cloneSheetFilter(sheet.filter) : null,
+    mergedCells: sheet.mergedCells.map((range) => ({
+      start: { ...range.start },
+      end: { ...range.end },
+    })),
   });
 }
 
@@ -723,16 +944,15 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   for (const dimension of nextState.columnWidths) {
     sheet.columnWidths.set(dimension.index, dimension.size);
   }
+  sheet.freezePanes = cloneFreezePanes(nextState.freezePanes);
+  sheet.filter = nextState.filter ? cloneSheetFilter(nextState.filter) : null;
+  sheet.mergedCells = nextState.mergedCells.map((range) => ({
+    start: { ...range.start },
+    end: { ...range.end },
+  }));
   return true;
 }
 
 export function isCellAddressInBounds(address: CellAddress): boolean {
-  return (
-    Number.isInteger(address.row) &&
-    Number.isInteger(address.column) &&
-    address.row >= 0 &&
-    address.row < MAX_SHEET_ROWS &&
-    address.column >= 0 &&
-    address.column < MAX_SHEET_COLUMNS
-  );
+  return isSheetAddressInBounds(address);
 }

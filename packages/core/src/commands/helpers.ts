@@ -111,6 +111,23 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
     })),
     rowHeights: state.rowHeights.map((dimension) => ({ ...dimension })),
     columnWidths: state.columnWidths.map((dimension) => ({ ...dimension })),
+    freezePanes: { ...state.freezePanes },
+    filter: state.filter
+      ? {
+          range: {
+            start: { ...state.filter.range.start },
+            end: { ...state.filter.range.end },
+          },
+          columns: state.filter.columns.map((column) => ({
+            column: column.column,
+            allowedValues: column.allowedValues.map((value) => ({ ...value })),
+          })),
+        }
+      : null,
+    mergedCells: state.mergedCells.map((range) => ({
+      start: { ...range.start },
+      end: { ...range.end },
+    })),
   };
 }
 

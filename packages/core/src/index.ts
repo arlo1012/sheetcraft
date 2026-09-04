@@ -5,6 +5,7 @@ export * from "./errors.js";
 export * from "./formula/index.js";
 export * from "./history.js";
 export * from "./input.js";
+export * from "./merged-cells.js";
 export * from "./runtime.js";
 export * from "./search.js";
 export * from "./selection-summary.js";

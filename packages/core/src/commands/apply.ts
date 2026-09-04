@@ -8,6 +8,11 @@ import {
 } from "./formatting.js";
 import { applyResizeSheetDimensionCommand } from "./dimensions.js";
 import {
+  applyMergeCellsCommand,
+  applySetSheetFreezePanesCommand,
+  applyUnmergeCellsCommand,
+} from "./metadata.js";
+import {
   applyAddSheetCommand,
   applyDeleteSheetCommand,
   applyMoveSheetCommand,
@@ -48,6 +53,12 @@ export function applyWorkbookCommand(
         return applyRestoreCellStylesCommand(workbook, command);
       case "resizeSheetDimension":
         return applyResizeSheetDimensionCommand(workbook, command);
+      case "setSheetFreezePanes":
+        return applySetSheetFreezePanesCommand(workbook, command);
+      case "mergeCells":
+        return applyMergeCellsCommand(workbook, command);
+      case "unmergeCells":
+        return applyUnmergeCellsCommand(workbook, command);
       case "addSheet":
         return applyAddSheetCommand(workbook, command);
       case "deleteSheet":

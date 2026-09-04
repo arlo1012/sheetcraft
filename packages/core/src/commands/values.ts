@@ -20,6 +20,11 @@ import { cloneCellContent } from "../workbook.js";
 import type { CellContent } from "../formula/types.js";
 import { transformFormulaForMove } from "../formula/references.js";
 import {
+  doMergedCellRangesIntersect,
+  expandSelectionToMergedCellRanges,
+  MergedCellRangeResolver,
+} from "../merged-cells.js";
+import {
   getExactCellBorderPatch,
   getCellBorderTargetKey,
   reconcileCellBorderTargets,
@@ -52,6 +57,9 @@ function normalizeCommandCellContent(value: unknown, field: string): CellContent
       cells: new Map(),
       rowHeights: new Map(),
       columnWidths: new Map(),
+      freezePanes: { rows: 0, columns: 0 },
+      filter: null,
+      mergedCells: [],
     };
     setCellContent(temporary, { row: 0, column: 0 }, value as CellContent);
     return getCellContent(temporary, { row: 0, column: 0 });
@@ -199,6 +207,15 @@ export function applySetCellContentsCommand(
   if (!Array.isArray(command.changes)) {
     throw invalidCommandPayload("changes", command.changes);
   }
+  const resolvers = new Map<string, MergedCellRangeResolver>();
+  const getResolver = (sheetId: string) => {
+    const cached = resolvers.get(sheetId);
+    if (cached) return cached;
+    const resolver = new MergedCellRangeResolver(getSheetOrThrow(workbook, sheetId).mergedCells);
+    resolvers.set(sheetId, resolver);
+    return resolver;
+  };
+  const addresses = new Set<string>();
   const normalizedChanges = command.changes.map((change, index) => {
     if (!change || typeof change !== "object") {
       throw invalidCommandPayload(`changes.${index}`, change);
@@ -208,9 +225,31 @@ export function applySetCellContentsCommand(
     }
     assertCellAddress(change.address);
     getSheetOrThrow(workbook, change.sheetId);
+    const key = `${change.sheetId}:${change.address.row}:${change.address.column}`;
+    if (addresses.has(key)) {
+      throw invalidCommandPayload(
+        `changes.${index}.address`,
+        change.address,
+        "Duplicate cell change.",
+      );
+    }
+    addresses.add(key);
+    const anchor = getResolver(change.sheetId).getAnchor(change.address);
+    if (
+      command.changes.length > 1 &&
+      anchor &&
+      (anchor.row !== change.address.row || anchor.column !== change.address.column)
+    ) {
+      throw invalidCommandPayload(
+        `changes.${index}.address`,
+        change.address,
+        "Batch cell updates cannot target a merged cell tail.",
+      );
+    }
     return {
       sheetId: change.sheetId,
-      address: { ...change.address },
+      // A direct edit of a displayed merge tail belongs to its sole anchor.
+      address: anchor ?? { ...change.address },
       content: normalizeCommandCellContent(change.content, `changes.${index}.content`),
       ...(Object.hasOwn(change, "style")
         ? {
@@ -303,10 +342,11 @@ export function applySetCellContentsCommand(
     for (const [sheetId, targets] of targetsBySheet) {
       const cleanupPatches = new Map<string, { address: CellAddress; patch: CellStylePatch }>();
       reconcileCellBorderTargets(targets, (address, patch) => {
-        const key = getCellBorderTargetKey(address);
+        const mergeAwareAddress = getResolver(sheetId).getAnchor(address) ?? address;
+        const key = getCellBorderTargetKey(mergeAwareAddress);
         const existing = cleanupPatches.get(key);
         if (existing) Object.assign(existing.patch, patch);
-        else cleanupPatches.set(key, { address: { ...address }, patch: { ...patch } });
+        else cleanupPatches.set(key, { address: { ...mergeAwareAddress }, patch: { ...patch } });
       });
       const sheet = getSheetOrThrow(workbook, sheetId);
       for (const { address, patch } of cleanupPatches.values()) {
@@ -328,9 +368,9 @@ export function applyClearCellRangeCommand(
   workbook: Workbook,
   command: ClearCellRangeCommand,
 ): SetCellContentsCommand | null {
-  const range = normalizeRange(command.range);
-  assertCellRange(range);
   const sheet = getSheetOrThrow(workbook, command.sheetId);
+  const range = expandSelectionToMergedCellRanges(normalizeRange(command.range), sheet.mergedCells);
+  assertCellRange(range);
   const reverseChanges: CellContentChange[] = [];
   for (const [key, cell] of sheet.cells) {
     const address = parseCellKey(key);
@@ -366,6 +406,20 @@ export function applyMoveCellRangeCommand(
   };
   assertCellAddress(end);
   const sheet = getSheetOrThrow(workbook, command.sheetId);
+  const destination = { start: { ...command.destination }, end };
+  if (
+    sheet.mergedCells.some(
+      (merged) =>
+        doMergedCellRangesIntersect(merged, source) ||
+        doMergedCellRangesIntersect(merged, destination),
+    )
+  ) {
+    throw invalidCommandPayload(
+      "source",
+      command.source,
+      "Moving merged cells is not supported until merged move semantics are defined.",
+    );
+  }
   if (
     source.start.row === command.destination.row &&
     source.start.column === command.destination.column
@@ -392,7 +446,6 @@ export function applyMoveCellRangeCommand(
     address.row <= range.end.row &&
     address.column >= range.start.column &&
     address.column <= range.end.column;
-  const destination = { start: { ...command.destination }, end };
   const affected = new Map<string, CellAddress>();
   for (const [key] of sheet.cells) {
     const address = parseCellKey(key);
