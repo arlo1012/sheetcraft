@@ -97,27 +97,38 @@ export function useSheetViewport(options: {
     width: `${viewportSize.width}px`,
     height: `${viewportSize.height}px`,
   }));
-  const rowHeaderItems = computed(() => {
-    const items = new Map<number, { index: number; offset: number; size: number }>();
-    for (const pane of [layout.value.panes.topLeft, layout.value.panes.left]) {
-      for (const row of pane.rows) {
+  const rowHeaderPanes = computed(() =>
+    (
+      [
+        { id: "frozen", pane: layout.value.panes.topLeft },
+        { id: "body", pane: layout.value.panes.left },
+      ] as const
+    ).map(({ id, pane }) => ({
+      id,
+      offset: pane.clip.y,
+      size: pane.clip.height,
+      items: pane.rows.flatMap((row) => {
         const rect = layout.value.getCellViewportRect({ row: row.index, column: 0 });
-        if (rect) items.set(row.index, { index: row.index, offset: rect.y, size: row.size });
-      }
-    }
-    return [...items.values()].sort((left, right) => left.offset - right.offset);
-  });
-  const columnHeaderItems = computed(() => {
-    const items = new Map<number, { index: number; offset: number; size: number }>();
-    for (const pane of [layout.value.panes.topLeft, layout.value.panes.top]) {
-      for (const column of pane.columns) {
+        return rect ? [{ index: row.index, offset: rect.y, size: row.size }] : [];
+      }),
+    })),
+  );
+  const columnHeaderPanes = computed(() =>
+    (
+      [
+        { id: "frozen", pane: layout.value.panes.topLeft },
+        { id: "body", pane: layout.value.panes.top },
+      ] as const
+    ).map(({ id, pane }) => ({
+      id,
+      offset: pane.clip.x,
+      size: pane.clip.width,
+      items: pane.columns.flatMap((column) => {
         const rect = layout.value.getCellViewportRect({ row: 0, column: column.index });
-        if (rect)
-          items.set(column.index, { index: column.index, offset: rect.x, size: column.size });
-      }
-    }
-    return [...items.values()].sort((left, right) => left.offset - right.offset);
-  });
+        return rect ? [{ index: column.index, offset: rect.x, size: column.size }] : [];
+      }),
+    })),
+  );
 
   function getCurrentViewState(): SheetGridViewState {
     return createSheetGridViewState({
@@ -270,7 +281,7 @@ export function useSheetViewport(options: {
   }
 
   return {
-    columnHeaderItems,
+    columnHeaderPanes,
     geometry,
     getCellAtClientPoint,
     getCurrentViewState,
@@ -285,7 +296,7 @@ export function useSheetViewport(options: {
     observe,
     onScroll,
     restore,
-    rowHeaderItems,
+    rowHeaderPanes,
     rowVisibility,
     scrollPosition,
     scrollerRef,

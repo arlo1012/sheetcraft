@@ -51,6 +51,48 @@ describe("SheetGrid frozen viewport", () => {
     expectGridcellsToHaveUniqueLogicalRows(wrapper);
   });
 
+  test("clips overscanned body headers below and after frozen headers", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    sheet.freezePanes = { rows: 3, columns: 1 };
+    await nextTick();
+
+    const scroller = wrapper.get(".sheet-grid__scroller");
+    const element = scroller.element as HTMLDivElement;
+    element.scrollTop = 500;
+    element.scrollLeft = 400;
+    await scroller.trigger("scroll");
+
+    const frozenRows = wrapper.get('.sheet-row-headers [data-header-pane="frozen"]');
+    const bodyRows = wrapper.get('.sheet-row-headers [data-header-pane="body"]');
+    const frozenColumns = wrapper.get('.sheet-column-headers [data-header-pane="frozen"]');
+    const bodyColumns = wrapper.get('.sheet-column-headers [data-header-pane="body"]');
+
+    expect(frozenRows.attributes("style")).toContain("top: 0px");
+    expect(frozenRows.attributes("style")).toContain("height: 72px");
+    expect(bodyRows.attributes("style")).toContain("top: 72px");
+    expect(bodyRows.attributes("style")).toContain("height: 528px");
+    expect(frozenColumns.attributes("style")).toContain("left: 0px");
+    expect(frozenColumns.attributes("style")).toContain("width: 96px");
+    expect(bodyColumns.attributes("style")).toContain("left: 96px");
+    expect(bodyColumns.attributes("style")).toContain("width: 864px");
+
+    expect(frozenRows.get('[data-row="0"]').attributes("style")).toContain("top: 0px");
+    expect(frozenColumns.get('[data-column="0"]').attributes("style")).toContain("left: 0px");
+    expect(
+      bodyRows
+        .findAll<HTMLElement>("[data-row]")
+        .some((item) => Number.parseFloat(item.element.style.top) < 0),
+    ).toBe(true);
+    expect(
+      bodyColumns
+        .findAll<HTMLElement>("[data-column]")
+        .some((item) => Number.parseFloat(item.element.style.left) < 0),
+    ).toBe(true);
+
+    await frozenRows.get('[data-select-row="0"]').trigger("mousedown", { button: 0 });
+    expect(frozenRows.get('[data-select-row="0"]').attributes("aria-pressed")).toBe("true");
+  });
+
   test("groups visible gridcells into their logical accessibility rows", () => {
     const { wrapper } = mountSheetGrid();
 

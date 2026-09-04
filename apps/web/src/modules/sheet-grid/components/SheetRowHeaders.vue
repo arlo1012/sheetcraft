@@ -7,7 +7,12 @@ import type { SheetGeometry } from "@idea10/sheet-engine/geometry";
 const { t } = useAppI18n();
 
 const props = defineProps<{
-  items: readonly { index: number; offset: number; size: number }[];
+  panes: readonly {
+    id: "frozen" | "body";
+    offset: number;
+    size: number;
+    items: readonly { index: number; offset: number; size: number }[];
+  }[];
   geometry: SheetGeometry;
   selectedStartRow: number;
   selectedEndRow: number;
@@ -25,9 +30,13 @@ const emit = defineEmits<{
 
 const KEYBOARD_RESIZE_STEP = 8;
 
-function getHeaderStyle(item: { offset: number; size: number }): CSSProperties {
+function getPaneStyle(pane: { offset: number; size: number }): CSSProperties {
+  return { top: `${pane.offset}px`, height: `${pane.size}px` };
+}
+
+function getHeaderStyle(item: { offset: number; size: number }, paneOffset: number): CSSProperties {
   return {
-    top: `${item.offset}px`,
+    top: `${item.offset - paneOffset}px`,
     height: `${item.size}px`,
   };
 }
@@ -84,41 +93,49 @@ function onHeaderContextMenu(row: number, event: MouseEvent): void {
 <template>
   <div class="sheet-row-headers" role="presentation">
     <div
-      v-for="item in items"
-      :key="item.index"
-      class="sheet-row-headers__item"
-      :class="{
-        'is-active': selected && item.index >= selectedStartRow && item.index <= selectedEndRow,
-      }"
-      :style="getHeaderStyle(item)"
-      :data-row="item.index"
+      v-for="pane in panes"
+      :key="pane.id"
+      class="sheet-row-headers__pane"
+      :style="getPaneStyle(pane)"
+      :data-header-pane="pane.id"
     >
-      <button
-        type="button"
-        class="sheet-row-headers__select-button"
-        :data-select-row="item.index"
-        :aria-label="t('grid.selectRow', { row: item.index + 1 })"
-        :aria-pressed="selected && item.index >= selectedStartRow && item.index <= selectedEndRow"
-        @mousedown.left.prevent="emit('select', { row: item.index, shiftKey: $event.shiftKey })"
-        @contextmenu.prevent="onHeaderContextMenu(item.index, $event)"
-        @keydown="onHeaderKeydown(item.index, $event)"
+      <div
+        v-for="item in pane.items"
+        :key="item.index"
+        class="sheet-row-headers__item"
+        :class="{
+          'is-active': selected && item.index >= selectedStartRow && item.index <= selectedEndRow,
+        }"
+        :style="getHeaderStyle(item, pane.offset)"
+        :data-row="item.index"
       >
-        <span aria-hidden="true">{{ item.index + 1 }}</span>
-      </button>
-      <span
-        class="sheet-row-headers__resize-handle"
-        :data-resize-row="item.index"
-        role="separator"
-        aria-orientation="horizontal"
-        :aria-label="t('grid.rowHeight', { row: item.index + 1 })"
-        :aria-valuemin="MIN_ROW_HEIGHT"
-        :aria-valuemax="MAX_ROW_HEIGHT"
-        :aria-valuenow="geometry.getRowHeight(item.index)"
-        tabindex="0"
-        @mousedown.stop
-        @pointerdown.left.prevent.stop="emit('resizeStart', { index: item.index, event: $event })"
-        @keydown.stop="onResizeHandleKeydown(item.index, $event)"
-      />
+        <button
+          type="button"
+          class="sheet-row-headers__select-button"
+          :data-select-row="item.index"
+          :aria-label="t('grid.selectRow', { row: item.index + 1 })"
+          :aria-pressed="selected && item.index >= selectedStartRow && item.index <= selectedEndRow"
+          @mousedown.left.prevent="emit('select', { row: item.index, shiftKey: $event.shiftKey })"
+          @contextmenu.prevent="onHeaderContextMenu(item.index, $event)"
+          @keydown="onHeaderKeydown(item.index, $event)"
+        >
+          <span aria-hidden="true">{{ item.index + 1 }}</span>
+        </button>
+        <span
+          class="sheet-row-headers__resize-handle"
+          :data-resize-row="item.index"
+          role="separator"
+          aria-orientation="horizontal"
+          :aria-label="t('grid.rowHeight', { row: item.index + 1 })"
+          :aria-valuemin="MIN_ROW_HEIGHT"
+          :aria-valuemax="MAX_ROW_HEIGHT"
+          :aria-valuenow="geometry.getRowHeight(item.index)"
+          tabindex="0"
+          @mousedown.stop
+          @pointerdown.left.prevent.stop="emit('resizeStart', { index: item.index, event: $event })"
+          @keydown.stop="onResizeHandleKeydown(item.index, $event)"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -150,6 +167,12 @@ function onHeaderContextMenu(row: number, event: MouseEvent): void {
       color: var(--idea-action-primary);
       font-weight: 600;
     }
+  }
+
+  &__pane {
+    position: absolute;
+    inset-inline: 0;
+    overflow: hidden;
   }
 
   &__select-button {

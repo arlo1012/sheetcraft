@@ -176,7 +176,7 @@ const {
   onCommit: (payload) => emit("resizeDimension", payload),
 });
 const {
-  columnHeaderItems,
+  columnHeaderPanes,
   geometry,
   getCellAtClientPoint,
   gridCanvasStyle,
@@ -190,7 +190,7 @@ const {
   observe: observeViewport,
   onScroll,
   restore: restoreViewport,
-  rowHeaderItems,
+  rowHeaderPanes,
   rowVisibility,
   scrollPosition,
   scrollerRef,
@@ -1048,7 +1048,7 @@ defineExpose({ clearClipboard, focusGrid: focusEditor, navigateToCell });
       @click="onCornerClick"
     />
     <SheetColumnHeaders
-      :items="columnHeaderItems"
+      :panes="columnHeaderPanes"
       :geometry="geometry"
       :selected-start-column="selectedRange.start.column"
       :selected-end-column="selectedRange.end.column"
@@ -1061,7 +1061,7 @@ defineExpose({ clearClipboard, focusGrid: focusEditor, navigateToCell });
       "
     />
     <SheetRowHeaders
-      :items="rowHeaderItems"
+      :panes="rowHeaderPanes"
       :geometry="geometry"
       :selected-start-row="selectedRange.start.row"
       :selected-end-row="selectedRange.end.row"
