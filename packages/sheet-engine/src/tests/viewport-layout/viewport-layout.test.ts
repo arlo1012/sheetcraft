@@ -160,6 +160,28 @@ describe("sheet viewport layout", () => {
     expect(layout.getCellAtViewportPoint({ x: 200, y: 50 })).toEqual({ row: 1, column: 1 });
   });
 
+  test("provides pane-aware rectangles a presenter can use without recalculating scroll", () => {
+    const layout = createLayout({
+      rowCount: 8,
+      columnCount: 6,
+      freeze: { rows: 1, columns: 1 },
+      bodyScrollPosition: { x: 40, y: 20 },
+      viewportSize: { width: 240, height: 80 },
+    });
+
+    const cells = [
+      { address: { row: 0, column: 0 }, paneId: "topLeft", rect: { x: 0, y: 0 } },
+      { address: { row: 0, column: 2 }, paneId: "top", rect: { x: 120, y: 0 } },
+      { address: { row: 2, column: 0 }, paneId: "left", rect: { x: 0, y: 20 } },
+      { address: { row: 2, column: 2 }, paneId: "body", rect: { x: 120, y: 20 } },
+    ] as const;
+
+    for (const cell of cells) {
+      expect(layout.getPaneForAddress(cell.address)).toBe(cell.paneId);
+      expect(layout.getCellViewportRect(cell.address)).toMatchObject(cell.rect);
+    }
+  });
+
   test("visits an offscreen merge anchor once when only its tail is visible", () => {
     const merge = {
       start: { row: 0, column: 0 },
@@ -184,6 +206,17 @@ describe("sheet viewport layout", () => {
 
     expect(calls).toEqual(["body:0:0", "body:3:0", "body:3:1"]);
     expect(calls.filter((call) => call === "body:0:0")).toHaveLength(1);
+
+    const anchor = { row: 0, column: 0 };
+    const range = layout.getMergedRangeAt(anchor);
+    expect(range).toEqual(merge);
+    expect(layout.getRangePaneRects(range!)).toEqual([
+      {
+        paneId: "body",
+        rect: { x: 0, y: -40, width: 160, height: 60 },
+        clippedRect: { x: 0, y: 0, width: 160, height: 20 },
+      },
+    ]);
   });
 
   test("normalizes and validates merged ranges supplied by a resolver", () => {

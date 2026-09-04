@@ -22,6 +22,16 @@ export type SheetViewportRangeFragment = {
 };
 
 /**
+ * A range positioned in a viewport pane. The full rect is useful when the
+ * presenter clips its pane; clippedRect is useful for a flat overlay layer.
+ */
+export type SheetViewportPaneRangeRect = {
+  paneId: FrozenPaneId;
+  rect: Rect;
+  clippedRect: Rect;
+};
+
+/**
  * Supplies merged ranges from the workbook domain. Implementations should index
  * ranges because layout consumers may query every visible cell. The layout
  * validates and normalizes each returned range in constant time.
@@ -46,6 +56,7 @@ export type SheetViewportLayout = {
   getMergedRangeAt: (address: CellAddress) => CellRange | null;
   getAnchorForAddress: (address: CellAddress) => CellAddress;
   getRangeRect: (range: CellRange) => Rect | null;
+  getRangePaneRects: (range: CellRange) => SheetViewportPaneRangeRect[];
   getRangeFragments: (range: CellRange) => SheetViewportRangeFragment[];
   getScrollPositionForAddress: (address: CellAddress) => Point;
   /**
@@ -424,9 +435,9 @@ export function createSheetViewportLayout(options: {
     return getRangeRectFromBounds(normalizeRange(range));
   }
 
-  function getRangeFragments(range: CellRange): SheetViewportRangeFragment[] {
+  function getRangePaneRects(range: CellRange): SheetViewportPaneRangeRect[] {
     const normalized = normalizeRange(range);
-    const fragments: SheetViewportRangeFragment[] = [];
+    const paneRects: SheetViewportPaneRangeRect[] = [];
     for (const paneId of ["topLeft", "top", "left", "body"] as const) {
       const rowBounds = paneRows[paneId];
       const columnBounds = paneColumns[paneId];
@@ -461,9 +472,16 @@ export function createSheetViewportLayout(options: {
         height: sheetRect.height,
       };
       const clipped = intersectRect(rect, clips[paneId]);
-      if (clipped) fragments.push({ paneId, rect: clipped });
+      if (clipped) paneRects.push({ paneId, rect, clippedRect: clipped });
     }
-    return fragments;
+    return paneRects;
+  }
+
+  function getRangeFragments(range: CellRange): SheetViewportRangeFragment[] {
+    return getRangePaneRects(range).map(({ paneId, clippedRect }) => ({
+      paneId,
+      rect: clippedRect,
+    }));
   }
 
   function getScrollPositionForAddress(address: CellAddress): Point {
@@ -527,6 +545,7 @@ export function createSheetViewportLayout(options: {
     getMergedRangeAt,
     getAnchorForAddress,
     getRangeRect,
+    getRangePaneRects,
     getRangeFragments,
     getScrollPositionForAddress,
     forEachVisibleCell,
