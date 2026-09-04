@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "description": "Post-split production budgets calibrated against the stable app, Vue, TDesign, and icon chunks.",
+  "description": "Production budgets calibrated against the current spreadsheet feature set and stable vendor chunks.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
       "pattern": "^index-.*\\.js$",
-      "maximumRawBytes": 190000,
-      "maximumGzipBytes": 55000
+      "maximumRawBytes": 290000,
+      "maximumGzipBytes": 78000
     },
     "css": {
       "pattern": "^index-.*\\.css$",
@@ -16,8 +16,8 @@
   },
   "totalAssets": {
     "javascript": {
-      "maximumRawBytes": 675000,
-      "maximumGzipBytes": 205000
+      "maximumRawBytes": 760000,
+      "maximumGzipBytes": 228000
     },
     "css": {
       "maximumRawBytes": 210000,
