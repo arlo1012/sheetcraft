@@ -7,6 +7,7 @@ import {
   applyRestoreCellStylesCommand,
 } from "./formatting.js";
 import { applyResizeSheetDimensionCommand } from "./dimensions.js";
+import { applySetSheetFilterCommand } from "./filter.js";
 import {
   applyMergeCellsCommand,
   applySetSheetFreezePanesCommand,
@@ -19,6 +20,7 @@ import {
   applyRenameSheetCommand,
 } from "./sheets.js";
 import { applyRestoreSheetStateCommand, applySheetAxisCommand } from "./structure.js";
+import { applySortSheetRangeCommand } from "./sort.js";
 import type { WorkbookCommand } from "./contracts.js";
 import {
   applyClearCellRangeCommand,
@@ -59,6 +61,10 @@ export function applyWorkbookCommand(
         return applyMergeCellsCommand(workbook, command);
       case "unmergeCells":
         return applyUnmergeCellsCommand(workbook, command);
+      case "setSheetFilter":
+        return applySetSheetFilterCommand(workbook, command);
+      case "sortSheetRange":
+        return applySortSheetRangeCommand(workbook, command);
       case "addSheet":
         return applyAddSheetCommand(workbook, command);
       case "deleteSheet":

@@ -6,6 +6,7 @@ import type {
   CellRange,
   FreezePanes,
   SheetDimensionAxis,
+  SheetFilter,
   SheetMetadata,
   SheetSparseCell,
   SheetSparseDimension,
@@ -89,6 +90,22 @@ export type UnmergeCellsCommand = {
   type: "unmergeCells";
   sheetId: string;
   range: CellRange;
+};
+
+export type SetSheetFilterCommand = {
+  type: "setSheetFilter";
+  sheetId: string;
+  filter: SheetFilter | null;
+};
+
+export type SortDirection = "ascending" | "descending";
+
+export type SortSheetRangeCommand = {
+  type: "sortSheetRange";
+  sheetId: string;
+  range: CellRange;
+  keyColumn: number;
+  direction: SortDirection;
 };
 
 export type AddSheetCommand = {
@@ -177,6 +194,8 @@ export type WorkbookCommand =
   | SetSheetFreezePanesCommand
   | MergeCellsCommand
   | UnmergeCellsCommand
+  | SetSheetFilterCommand
+  | SortSheetRangeCommand
   | AddSheetCommand
   | DeleteSheetCommand
   | RenameSheetCommand
@@ -196,6 +215,8 @@ export type WorkbookOperation =
   | "view.freeze"
   | "cells.merge"
   | "cells.unmerge"
+  | "data.filter"
+  | "data.sort"
   | "sheets.add"
   | "sheets.delete"
   | "sheets.rename"
@@ -228,6 +249,10 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "cells.merge";
     case "unmergeCells":
       return "cells.unmerge";
+    case "setSheetFilter":
+      return "data.filter";
+    case "sortSheetRange":
+      return "data.sort";
     case "addSheet":
       return "sheets.add";
     case "deleteSheet":
