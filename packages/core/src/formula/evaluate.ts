@@ -1,3 +1,8 @@
+import {
+  DEFAULT_FORMULA_FUNCTION_REGISTRY,
+  type FormulaFunctionArgument,
+  type FormulaFunctionRegistry,
+} from "./functions.js";
 import { parseFormula } from "./parser.js";
 import {
   createFormulaError,
@@ -9,30 +14,31 @@ import {
   type FormulaValue,
 } from "./types.js";
 
-function isFiniteNumber(value: FormulaValue): value is number {
+export type FormulaEvaluationOptions = Readonly<{ registry?: FormulaFunctionRegistry }>;
+
+function finite(value: FormulaValue): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function validateValue(value: FormulaValue): FormulaValue {
+function validate(value: FormulaValue): FormulaValue {
   return typeof value === "number" && !Number.isFinite(value) ? createFormulaError("VALUE") : value;
 }
 
-function coerceArithmetic(value: FormulaValue): number | ReturnType<typeof createFormulaError> {
-  const validated = validateValue(value);
-  if (isFormulaError(validated)) return validated;
-  if (validated === null) return 0;
-  return isFiniteNumber(validated) ? validated : createFormulaError("VALUE");
+function arithmetic(value: FormulaValue): number | ReturnType<typeof createFormulaError> {
+  value = validate(value);
+  if (isFormulaError(value)) return value;
+  if (value === null) return 0;
+  return finite(value) ? value : createFormulaError("VALUE");
 }
 
-function addFiniteNumber(
-  total: number,
-  value: number,
-): number | ReturnType<typeof createFormulaError> {
-  const nextTotal = total + value;
-  return Number.isFinite(nextTotal) ? nextTotal : createFormulaError("VALUE");
+function text(value: FormulaValue): string | ReturnType<typeof createFormulaError> {
+  value = validate(value);
+  if (isFormulaError(value)) return value;
+  if (value === null) return "";
+  return typeof value === "boolean" ? (value ? "TRUE" : "FALSE") : String(value);
 }
 
-function normalizeRangeBounds(range: FormulaRange) {
+function rangeBounds(range: FormulaRange) {
   return {
     start: {
       row: Math.min(range.start.row, range.end.row),
@@ -45,91 +51,158 @@ function normalizeRangeBounds(range: FormulaRange) {
   };
 }
 
-function addRangeValues(range: FormulaRange, resolver: FormulaEvaluationResolver): FormulaValue {
-  let total = 0;
-  for (const rangeValue of resolver.resolveRange(normalizeRangeBounds(range))) {
-    const value = validateValue(rangeValue);
-    if (isFormulaError(value)) return value;
-    if (!isFiniteNumber(value)) continue;
-    const nextTotal = addFiniteNumber(total, value);
-    if (isFormulaError(nextTotal)) return nextTotal;
-    total = nextTotal;
+function compare(
+  left: FormulaValue,
+  right: FormulaValue,
+): -1 | 0 | 1 | ReturnType<typeof createFormulaError> {
+  left = validate(left);
+  right = validate(right);
+  if (isFormulaError(left)) return left;
+  if (isFormulaError(right)) return right;
+  if (left === null && right === null) return 0;
+  if (left === null) return compare(blankFor(right as Exclude<FormulaValue, null>), right);
+  if (right === null) return compare(left, blankFor(left as Exclude<FormulaValue, null>));
+  if (typeof left === typeof right) {
+    if (typeof left === "string" && typeof right === "string") {
+      left = left.toLocaleUpperCase("en-US");
+      right = right.toLocaleUpperCase("en-US");
+    }
+    return left === right ? 0 : left < right ? -1 : 1;
   }
-  return total;
+  return rank(left) < rank(right) ? -1 : 1;
+}
+
+function blankFor(value: Exclude<FormulaValue, null>): FormulaValue {
+  return typeof value === "number" ? 0 : typeof value === "string" ? "" : false;
+}
+
+function rank(value: Exclude<FormulaValue, null>): number {
+  return typeof value === "number" ? 0 : typeof value === "string" ? 1 : 2;
+}
+
+function comparison(operator: string, value: -1 | 0 | 1): boolean {
+  if (operator === "=") return value === 0;
+  if (operator === "<>") return value !== 0;
+  if (operator === "<") return value < 0;
+  if (operator === "<=") return value <= 0;
+  if (operator === ">") return value > 0;
+  return value >= 0;
+}
+
+function isComparison(operator: string): boolean {
+  return ["=", "<>", "<", "<=", ">", ">="].includes(operator);
 }
 
 function evaluateExpression(
   expression: FormulaExpression,
   resolver: FormulaEvaluationResolver,
+  registry: FormulaFunctionRegistry,
 ): FormulaValue {
-  if (expression.kind === "number") return validateValue(expression.value);
-  if (expression.kind === "reference") {
-    return validateValue(
+  if (expression.kind === "number" || expression.kind === "string" || expression.kind === "boolean")
+    return validate(expression.value);
+  if (expression.kind === "reference")
+    return validate(
       resolver.resolveCell({ row: expression.reference.row, column: expression.reference.column }),
     );
-  }
   if (expression.kind === "range") return createFormulaError("VALUE");
   if (expression.kind === "error") return createFormulaError(expression.code);
   if (expression.kind === "identifier") return createFormulaError("NAME");
   if (expression.kind === "unary") {
-    const operand = coerceArithmetic(evaluateExpression(expression.operand, resolver));
+    const operand = arithmetic(evaluateExpression(expression.operand, resolver, registry));
     if (isFormulaError(operand)) return operand;
-    const result = expression.operator === "-" ? -operand : operand;
-    return Number.isFinite(result) ? result : createFormulaError("VALUE");
+    return result(expression.operator === "-" ? -operand : operand);
   }
   if (expression.kind === "binary") {
-    const left = coerceArithmetic(evaluateExpression(expression.left, resolver));
-    if (isFormulaError(left)) return left;
-    const right = coerceArithmetic(evaluateExpression(expression.right, resolver));
-    if (isFormulaError(right)) return right;
-    if (expression.operator === "+") {
-      const result = left + right;
-      return Number.isFinite(result) ? result : createFormulaError("VALUE");
+    const left = evaluateExpression(expression.left, resolver, registry);
+    const right = () => evaluateExpression(expression.right, resolver, registry);
+    if (expression.operator === "&") {
+      const first = text(left);
+      if (isFormulaError(first)) return first;
+      const second = text(right());
+      return isFormulaError(second) ? second : `${first}${second}`;
     }
-    if (expression.operator === "-") {
-      const result = left - right;
-      return Number.isFinite(result) ? result : createFormulaError("VALUE");
+    if (isComparison(expression.operator)) {
+      const value = compare(left, right());
+      return isFormulaError(value) ? value : comparison(expression.operator, value);
     }
-    if (expression.operator === "*") {
-      const result = left * right;
-      return Number.isFinite(result) ? result : createFormulaError("VALUE");
-    }
-    if (right === 0) return createFormulaError("DIV0");
-    const result = left / right;
-    return Number.isFinite(result) ? result : createFormulaError("VALUE");
+    const first = arithmetic(left);
+    if (isFormulaError(first)) return first;
+    const second = arithmetic(right());
+    if (isFormulaError(second)) return second;
+    if (expression.operator === "+") return result(first + second);
+    if (expression.operator === "-") return result(first - second);
+    if (expression.operator === "*") return result(first * second);
+    return second === 0 ? createFormulaError("DIV0") : result(first / second);
   }
+  const definition = registry.get(expression.name);
+  if (!definition) return createFormulaError("NAME");
+  const { minArgs, maxArgs } = definition.metadata;
+  if (expression.args.length < minArgs || (maxArgs !== null && expression.args.length > maxArgs))
+    return createFormulaError("VALUE");
+  const cache: ReturnType<typeof functionArgument>[] = [];
+  return definition.evaluate({
+    argumentCount: expression.args.length,
+    evaluateArgument(index) {
+      const cached = cache[index];
+      if (cached) return cached;
+      const argument = expression.args[index];
+      const next = argument
+        ? functionArgument(argument, resolver, registry)
+        : {
+            kind: "scalar" as const,
+            value: createFormulaError("VALUE"),
+            source: "expression" as const,
+          };
+      cache[index] = next;
+      return next;
+    },
+  });
+}
 
-  if (expression.name.toUpperCase() !== "SUM") return createFormulaError("NAME");
-  let total = 0;
-  for (const argument of expression.args) {
-    if (argument.kind === "range") {
-      const rangeTotal = addRangeValues(argument.range, resolver);
-      if (isFormulaError(rangeTotal)) return rangeTotal;
-      if (!isFiniteNumber(rangeTotal)) return createFormulaError("VALUE");
-      const nextTotal = addFiniteNumber(total, rangeTotal);
-      if (isFormulaError(nextTotal)) return nextTotal;
-      total = nextTotal;
-      continue;
-    }
+function functionArgument(
+  expression: FormulaExpression,
+  resolver: FormulaEvaluationResolver,
+  registry: FormulaFunctionRegistry,
+): FormulaFunctionArgument {
+  return expression.kind === "range"
+    ? { kind: "range" as const, values: resolver.resolveRange(rangeBounds(expression.range)) }
+    : {
+        kind: "scalar" as const,
+        value: evaluateExpression(expression, resolver, registry),
+        source:
+          expression.kind === "number" ||
+          expression.kind === "string" ||
+          expression.kind === "boolean"
+            ? "literal"
+            : expression.kind === "reference"
+              ? "reference"
+              : "expression",
+      };
+}
 
-    const value = evaluateExpression(argument, resolver);
-    if (isFormulaError(value)) return value;
-    if (!isFiniteNumber(value)) continue;
-    const nextTotal = addFiniteNumber(total, value);
-    if (isFormulaError(nextTotal)) return nextTotal;
-    total = nextTotal;
-  }
-  return total;
+function result(value: number): FormulaValue {
+  return Number.isFinite(value) ? value : createFormulaError("VALUE");
 }
 
 export function evaluateFormulaAst(
   ast: FormulaAst,
   resolver: FormulaEvaluationResolver,
+  options?: FormulaEvaluationOptions,
 ): FormulaValue {
-  return evaluateExpression(ast.expression, resolver);
+  return evaluateExpression(
+    ast.expression,
+    resolver,
+    options?.registry ?? DEFAULT_FORMULA_FUNCTION_REGISTRY,
+  );
 }
 
-export function evaluateFormula(source: string, resolver: FormulaEvaluationResolver): FormulaValue {
-  const result = parseFormula(source);
-  return result.ok ? evaluateFormulaAst(result.ast, resolver) : createFormulaError("PARSE");
+export function evaluateFormula(
+  source: string,
+  resolver: FormulaEvaluationResolver,
+  options?: FormulaEvaluationOptions,
+): FormulaValue {
+  const parsed = parseFormula(source);
+  return parsed.ok
+    ? evaluateFormulaAst(parsed.ast, resolver, options)
+    : createFormulaError("PARSE");
 }

@@ -71,6 +71,8 @@ export type FormulaRangeBounds = {
 
 export type FormulaExpression =
   | { kind: "number"; value: number; start: number; end: number }
+  | { kind: "string"; value: string; start: number; end: number }
+  | { kind: "boolean"; value: boolean; start: number; end: number }
   | {
       kind: "reference";
       reference: FormulaReference;
@@ -89,7 +91,7 @@ export type FormulaExpression =
     }
   | {
       kind: "binary";
-      operator: "+" | "-" | "*" | "/";
+      operator: "+" | "-" | "*" | "/" | "&" | "=" | "<>" | "<" | "<=" | ">" | ">=";
       left: FormulaExpression;
       right: FormulaExpression;
       start: number;

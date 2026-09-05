@@ -139,6 +139,45 @@ export function collectFormulaRanges(sourceOrAst: string | FormulaAst): FormulaR
   return ranges;
 }
 
+/** Collects references/ranges from an expression selected by the runtime scheduler. */
+export function collectFormulaEvaluationDependencies(sourceOrAst: string | FormulaAst): {
+  references: FormulaReference[];
+  ranges: FormulaRange[];
+} {
+  const ast = getAst(sourceOrAst);
+  const references: FormulaReference[] = [];
+  const ranges: FormulaRange[] = [];
+  if (!ast) return { references, ranges };
+  const visit = (expression: FormulaExpression): void => {
+    if (expression.kind === "reference") {
+      references.push({ ...expression.reference });
+      return;
+    }
+    if (expression.kind === "range") {
+      ranges.push({
+        start: { ...expression.range.start },
+        end: { ...expression.range.end },
+        startOffset: expression.range.startOffset,
+        endOffset: expression.range.endOffset,
+      });
+      return;
+    }
+    if (expression.kind === "unary") {
+      visit(expression.operand);
+      return;
+    }
+    if (expression.kind === "binary") {
+      visit(expression.left);
+      visit(expression.right);
+      return;
+    }
+    if (expression.kind !== "function") return;
+    for (const argument of expression.args) visit(argument);
+  };
+  visit(ast.expression);
+  return { references, ranges };
+}
+
 export function translateFormulaForCopy(source: string, offset: FormulaCopyOffset): string {
   const ast = getFormulaAst(source);
   if (!ast) return source;

@@ -23,7 +23,7 @@ class FormulaParser {
     if (!this.source.startsWith("=")) return this.failure(0);
     this.skipWhitespace();
     if (this.atEnd()) return this.failure(this.offset);
-    const expression = this.parseAdditive();
+    const expression = this.parseComparison();
     if (!expression) return this.failure(this.offset);
     this.skipWhitespace();
     if (!this.atEnd()) return this.failure(this.offset);
@@ -74,6 +74,60 @@ class FormulaParser {
     }
   }
 
+  private parseConcatenation(): FormulaExpression | null {
+    let expression = this.parseAdditive();
+    if (!expression) return null;
+    while (true) {
+      this.skipWhitespace();
+      if (this.peek() !== "&") return expression;
+      this.offset += 1;
+      const right = this.parseAdditive();
+      if (!right) return null;
+      expression = {
+        kind: "binary",
+        operator: "&",
+        left: expression,
+        right,
+        start: expression.start,
+        end: right.end,
+      };
+    }
+  }
+
+  private parseComparison(): FormulaExpression | null {
+    let expression = this.parseConcatenation();
+    if (!expression) return null;
+    while (true) {
+      this.skipWhitespace();
+      const operator = this.readComparisonOperator();
+      if (!operator) return expression;
+      const right = this.parseConcatenation();
+      if (!right) return null;
+      expression = {
+        kind: "binary",
+        operator,
+        left: expression,
+        right,
+        start: expression.start,
+        end: right.end,
+      };
+    }
+  }
+
+  private readComparisonOperator(): "=" | "<>" | "<" | "<=" | ">" | ">=" | null {
+    const next = this.source.slice(this.offset, this.offset + 2);
+    if (next === "<=" || next === ">=" || next === "<>") {
+      this.offset += 2;
+      return next;
+    }
+    const character = this.peek();
+    if (character === "=" || character === "<" || character === ">") {
+      this.offset += 1;
+      return character;
+    }
+    return null;
+  }
+
   private parseMultiplicative(): FormulaExpression | null {
     let expression = this.parseUnary();
     if (!expression) return null;
@@ -111,7 +165,7 @@ class FormulaParser {
     this.skipWhitespace();
     const start = this.offset;
     if (this.consume("(")) {
-      const expression = this.parseAdditive();
+      const expression = this.parseComparison();
       if (!expression || !this.consume(")")) return null;
       return { ...expression, start, end: this.offset };
     }
@@ -127,6 +181,9 @@ class FormulaParser {
     if (numeric) {
       this.offset += numeric.length;
       return { kind: "number", value: Number(numeric), start, end: this.offset };
+    }
+    if (this.peek() === '"') {
+      return this.parseString();
     }
 
     const referenceText = REFERENCE_PATTERN.exec(remainder)?.[0];
@@ -154,6 +211,15 @@ class FormulaParser {
     if (!identifier) return null;
     this.offset += identifier.length;
     const identifierEnd = this.offset;
+    const normalizedIdentifier = identifier.toUpperCase();
+    if (normalizedIdentifier === "TRUE" || normalizedIdentifier === "FALSE") {
+      return {
+        kind: "boolean",
+        value: normalizedIdentifier === "TRUE",
+        start,
+        end: identifierEnd,
+      };
+    }
     this.skipWhitespace();
     if (!this.consume("(")) {
       return { kind: "identifier", name: identifier, start, end: identifierEnd };
@@ -162,7 +228,7 @@ class FormulaParser {
     this.skipWhitespace();
     if (!this.consume(")")) {
       while (true) {
-        const argument = this.parseAdditive();
+        const argument = this.parseComparison();
         if (!argument) return null;
         args.push(argument);
         if (this.consume(")")) break;
@@ -170,6 +236,27 @@ class FormulaParser {
       }
     }
     return { kind: "function", name: identifier, args, start, end: this.offset };
+  }
+
+  private parseString(): FormulaExpression | null {
+    const start = this.offset;
+    this.offset += 1;
+    let value = "";
+    while (!this.atEnd()) {
+      const character = this.peek();
+      if (character === '"') {
+        if (this.source[this.offset + 1] === '"') {
+          value += '"';
+          this.offset += 2;
+          continue;
+        }
+        this.offset += 1;
+        return { kind: "string", value, start, end: this.offset };
+      }
+      value += character;
+      this.offset += 1;
+    }
+    return null;
   }
 
   private parseReference(): FormulaReference | null {

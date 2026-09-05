@@ -60,14 +60,129 @@ describe("sheet formula evaluation", () => {
     expect(isFormulaError(result) && result.code).toBe("PARSE");
   });
 
-  test("evaluates a 15k dependency chain without using the JavaScript call stack", () => {
+  test("does not schedule an unreachable literal IF branch as a cycle", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=IF(FALSE,A1,42)" } },
+    );
+
+    expect(getCellComputedValue(sheet, { row: 0, column: 0 })).toBe(42);
+  });
+
+  test("does not schedule an unreachable literal IFERROR fallback as a cycle", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=IFERROR(42,A1)" } },
+    );
+
+    expect(getCellComputedValue(sheet, { row: 0, column: 0 })).toBe(42);
+  });
+
+  test("selects nested lazy dependencies without scheduling unreachable cycles", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=1+IF(FALSE,A1,42)" } },
+    );
+    expect(getCellComputedValue(sheet, { row: 0, column: 0 })).toBe(43);
+
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=IF(IFERROR(42,A1),1,0)" } },
+    );
+    expect(getCellComputedValue(sheet, { row: 0, column: 0 })).toBe(1);
+
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=IF(TRUE,IF(FALSE,A1,42),0)" } },
+    );
+    expect(getCellComputedValue(sheet, { row: 0, column: 0 })).toBe(42);
+
+    setCellContent(sheet, { row: 0, column: 1 }, { kind: "formula", formula: { source: "=42" } });
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=IF(TRUE,IFERROR(B1,A1),0)" } },
+    );
+    expect(getCellComputedValue(sheet, { row: 0, column: 0 })).toBe(42);
+
+    const nestedSelector = Array.from({ length: 32 }).reduce(
+      (expression) => `IF(TRUE,${expression},0)`,
+      "B1",
+    );
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: `=IFERROR(${nestedSelector},A1)` } },
+    );
+    expect(getCellComputedValue(sheet, { row: 0, column: 0 })).toBe(42);
+
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=IFERROR(IF(TRUE,B1+B1,0),A1)" } },
+    );
+    expect(getCellComputedValue(sheet, { row: 0, column: 0 })).toBe(84);
+
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=IFERROR(IF(FALSE,A1,B1),0)" } },
+    );
+    expect(getCellComputedValue(sheet, { row: 0, column: 0 })).toBe(42);
+
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=IFERROR(IF(FALSE,B1,A1),0)" } },
+    );
+    const actualCycle = getCellComputedValue(sheet, { row: 0, column: 0 });
+    expect(isFormulaError(actualCycle) && actualCycle.code).toBe("CYCLE");
+  });
+
+  test("selects IF and IFERROR dependencies after evaluating nonliteral selector values", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellContent(sheet, { row: 0, column: 1 }, { kind: "literal", value: -1 });
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=IF(B1>0,A1,42)" } },
+    );
+    expect(getCellComputedValue(sheet, { row: 0, column: 0 })).toBe(42);
+
+    setCellContent(sheet, { row: 0, column: 1 }, { kind: "literal", value: 42 });
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=IFERROR(B1,A1)" } },
+    );
+    expect(getCellComputedValue(sheet, { row: 0, column: 0 })).toBe(42);
+
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=IF(B1>0,A1,42)" } },
+    );
+    setCellContent(sheet, { row: 0, column: 1 }, { kind: "literal", value: 1 });
+    const result = getCellComputedValue(sheet, { row: 0, column: 0 });
+    expect(isFormulaError(result) && result.code).toBe("CYCLE");
+  });
+
+  test("evaluates a 15k nested IF dependency chain without using the JavaScript call stack", () => {
     const sheet = getActiveSheet(createTestWorkbook());
     setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: 1 });
     for (let row = 1; row < 15_000; row += 1) {
       setCellContent(
         sheet,
         { row, column: 0 },
-        { kind: "formula", formula: { source: `=A${row}` } },
+        { kind: "formula", formula: { source: `=IF(TRUE,A${row},0)` } },
       );
     }
     expect(getCellComputedValue(sheet, { row: 14_999, column: 0 })).toBe(1);

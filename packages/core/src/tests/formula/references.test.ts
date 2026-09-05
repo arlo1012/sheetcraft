@@ -8,6 +8,16 @@ import {
 } from "../../formula/index.js";
 
 describe("formula references", () => {
+  test("does not collect or rewrite cell-like text literals", () => {
+    expect(collectFormulaReferences('=IF(A1="B2",C3,"D4")')).toEqual([
+      expect.objectContaining({ row: 0, column: 0 }),
+      expect.objectContaining({ row: 2, column: 2 }),
+    ]);
+    expect(translateFormulaForCopy('=IF(A1="B2",C3,"D4")', { row: 1, column: 1 })).toBe(
+      '=IF(B2="B2",D4,"D4")',
+    );
+  });
+
   test("collects references from ranges and scalar expressions in source order", () => {
     expect(collectFormulaReferences("=SUM(A1:B2) + C3")).toEqual([
       expect.objectContaining({ row: 0, column: 0 }),

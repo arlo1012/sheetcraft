@@ -1,12 +1,17 @@
-import { evaluateFormula } from "./formula/evaluate.js";
+import { evaluateFormula, evaluateFormulaAst } from "./formula/evaluate.js";
 import { normalizeExcelDateSystem, type ExcelDateSystem } from "./formula/date-system.js";
-import { collectFormulaRanges, collectFormulaReferences } from "./formula/references.js";
+import {
+  DEFAULT_FORMULA_FUNCTION_REGISTRY,
+  type FormulaFunctionArgument,
+} from "./formula/functions.js";
+import { getFormulaAst } from "./formula/parser.js";
 import {
   createFormulaError,
   isFormulaError,
   isFormulaErrorCode,
   type CellContent,
   type FormulaErrorCode,
+  type FormulaExpression,
   type FormulaValue,
 } from "./formula/types.js";
 import { doMergedCellRangesIntersect, validateMergedCellRanges } from "./merged-cells.js";
@@ -400,17 +405,105 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
     if (content.kind === "image") return createFormulaError("VALUE");
     return memo.get(key) ?? createFormulaError("CYCLE");
   };
-  const dependenciesFor = (address: CellAddress): CellAddress[] => {
+  const dependenciesFor = (address: CellAddress, stage: "prepare" | "select"): CellAddress[] => {
     const source = sheet.cells.get(createCellKey(address))?.content;
     if (source?.kind !== "formula") return [];
-    const dependencies = collectFormulaReferences(source.formula.source).map((reference) => ({
-      row: reference.row,
-      column: reference.column,
-    }));
-    for (const range of collectFormulaRanges(source.formula.source)) {
-      dependencies.push(...getSparseRangeAddresses(sparseIndex, range.start, range.end));
-    }
-    return dependencies;
+    const ast = getFormulaAst(source.formula.source);
+    if (!ast) return [];
+    const unresolvedFormula = (dependency: CellAddress): boolean => {
+      const key = createCellKey(dependency);
+      return sheet.cells.get(key)?.content?.kind === "formula" && !memo.has(key);
+    };
+    const collect = (expression: FormulaExpression, mode: "prepare" | "select"): CellAddress[] => {
+      const dependencies: CellAddress[] = [];
+      const visit = (current: FormulaExpression): void => {
+        if (current.kind === "reference") {
+          dependencies.push({ row: current.reference.row, column: current.reference.column });
+          return;
+        }
+        if (current.kind === "range") {
+          dependencies.push(
+            ...getSparseRangeAddresses(sparseIndex, current.range.start, current.range.end),
+          );
+          return;
+        }
+        if (current.kind === "unary") {
+          visit(current.operand);
+          return;
+        }
+        if (current.kind === "binary") {
+          visit(current.left);
+          visit(current.right);
+          return;
+        }
+        if (current.kind !== "function") return;
+        const definition = DEFAULT_FORMULA_FUNCTION_REGISTRY.get(current.name);
+        if (!definition?.selectDependencyArguments) {
+          for (const argument of current.args) visit(argument);
+          return;
+        }
+        const selector = current.args[0];
+        if (!selector) return;
+        if (mode === "prepare") {
+          for (const dependency of collect(selector, "prepare")) dependencies.push(dependency);
+          return;
+        }
+        // A selector can itself contain lazy functions. Select its currently reachable
+        // frontier so an unresolved dependency (for example IF(TRUE, B1, 0)) is
+        // scheduled before its enclosing IF/IFERROR decides a branch.
+        const selectorDependencies = collect(selector, "select");
+        if (selectorDependencies.some(unresolvedFormula)) {
+          dependencies.push(...selectorDependencies);
+          return;
+        }
+        const cache: FormulaFunctionArgument[] = [];
+        const selected = definition.selectDependencyArguments({
+          argumentCount: current.args.length,
+          evaluateArgument(index) {
+            const cached = cache[index];
+            if (cached) return cached;
+            const argument = current.args[index];
+            const next: FormulaFunctionArgument =
+              argument?.kind === "range"
+                ? {
+                    kind: "range",
+                    values: resolveSparseRange(
+                      sparseIndex,
+                      argument.range.start,
+                      argument.range.end,
+                      valueFor,
+                    ),
+                  }
+                : {
+                    kind: "scalar",
+                    value: argument
+                      ? evaluateFormulaAst(
+                          { source: source.formula.source, expression: argument },
+                          {
+                            resolveCell: valueFor,
+                            resolveRange: (bounds) =>
+                              resolveSparseRange(sparseIndex, bounds.start, bounds.end, valueFor),
+                          },
+                        )
+                      : createFormulaError("VALUE"),
+                    source: "expression",
+                  };
+            cache[index] = next;
+            return next;
+          },
+        });
+        for (const index of selected) {
+          const argument = current.args[index];
+          if (argument) visit(argument);
+        }
+      };
+      visit(expression);
+      const uniqueDependencies = new Map<string, CellAddress>();
+      for (const dependency of dependencies)
+        uniqueDependencies.set(createCellKey(dependency), dependency);
+      return [...uniqueDependencies.values()];
+    };
+    return collect(ast.expression, stage);
   };
   const resolve = (target: CellAddress): FormulaValue => {
     if (!isCellAddressInBounds(target)) return createFormulaError("REF");
@@ -418,8 +511,8 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
     if (memo.has(key)) return memo.get(key) ?? null;
     const content = sheet.cells.get(key)?.content;
     if (!content || content.kind !== "formula") return valueFor(target);
-    const stack: Array<{ address: CellAddress; entered: boolean }> = [
-      { address: target, entered: false },
+    const stack: Array<{ address: CellAddress; stage: "prepare" | "select" | "evaluate" }> = [
+      { address: target, stage: "prepare" },
     ];
     while (stack.length > 0) {
       const frame = stack.pop();
@@ -428,21 +521,40 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
       if (memo.has(frameKey)) continue;
       const frameContent = sheet.cells.get(frameKey)?.content;
       if (!frameContent || frameContent.kind !== "formula") continue;
-      if (!frame.entered) {
+      if (frame.stage === "prepare") {
         const current = state.get(frameKey);
         if (current === "visiting") {
           memo.set(frameKey, createFormulaError("CYCLE"));
           continue;
         }
         state.set(frameKey, "visiting");
-        stack.push({ address: frame.address, entered: true });
-        for (const dependency of dependenciesFor(frame.address).reverse()) {
+        stack.push({ address: frame.address, stage: "select" });
+        for (const dependency of dependenciesFor(frame.address, "prepare").reverse()) {
           const dependencyKey = createCellKey(dependency);
           const dependencyContent = sheet.cells.get(dependencyKey)?.content;
           if (dependencyContent?.kind !== "formula" || memo.has(dependencyKey)) continue;
           if (state.get(dependencyKey) === "visiting")
             memo.set(dependencyKey, createFormulaError("CYCLE"));
-          else stack.push({ address: dependency, entered: false });
+          else stack.push({ address: dependency, stage: "prepare" });
+        }
+        continue;
+      }
+      if (frame.stage === "select") {
+        const dependencies = dependenciesFor(frame.address, "select");
+        const hasPendingDependency = dependencies.some((dependency) => {
+          const dependencyKey = createCellKey(dependency);
+          return (
+            sheet.cells.get(dependencyKey)?.content?.kind === "formula" && !memo.has(dependencyKey)
+          );
+        });
+        stack.push({ address: frame.address, stage: hasPendingDependency ? "select" : "evaluate" });
+        for (const dependency of dependencies.reverse()) {
+          const dependencyKey = createCellKey(dependency);
+          const dependencyContent = sheet.cells.get(dependencyKey)?.content;
+          if (dependencyContent?.kind !== "formula" || memo.has(dependencyKey)) continue;
+          if (state.get(dependencyKey) === "visiting")
+            memo.set(dependencyKey, createFormulaError("CYCLE"));
+          else stack.push({ address: dependency, stage: "prepare" });
         }
         continue;
       }
