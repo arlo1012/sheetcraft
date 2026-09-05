@@ -1,6 +1,46 @@
 import type { MessageSchema } from "../schema";
 
 export const enUS = {
+  persistence: {
+    file: "File",
+    fileActions: "Workbook files",
+    save: "Save locally",
+    importJson: "Import JSON",
+    exportJson: "Export JSON",
+    reloadSaved: "Reload local copy",
+    loading: "Opening local copy…",
+    idle: "Local autosave",
+    pending: "Unsaved changes",
+    saving: "Saving…",
+    saved: "Saved locally",
+    saveError: "Not saved",
+    localOnly: "Saved in this browser. Export a JSON file to keep a separate backup.",
+    unavailable:
+      "Local storage is unavailable. Your edits are still here; export a JSON file to keep them.",
+    invalidSnapshot:
+      "The local copy could not be opened. It has been preserved, and automatic saving is paused. Import a valid JSON backup and confirm replacement to recover.",
+    conflict:
+      "Another tab saved a newer copy. Your edits are still here. Export them before reloading the local copy.",
+    quota: "There is not enough browser storage to save. Export a JSON file to keep your changes.",
+    invalidJson:
+      "This file is not a valid idea10 workbook or uses an unsupported version. The current workbook has not been replaced.",
+    readFailed: "The file could not be read. The current workbook has not been replaced.",
+    exportFailed: "The file could not be exported. Your workbook is still here.",
+    exportStarted: "JSON download started.",
+    imported: "Workbook imported. Undo history starts from this file.",
+    restored: "Local copy restored.",
+    reloadFailed: "No local copy could be restored. The current workbook has not been replaced.",
+    finishEditing: "Finish your current text composition before saving or opening a workbook.",
+    importTitle: "Import workbook?",
+    importDescription:
+      "This will replace the current workbook and the browser's local copy, including changes saved by other tabs, and clear undo history. Export a JSON file first if you want to keep a separate copy.",
+    importConfirm: "Replace and import",
+    reloadTitle: "Reload local copy?",
+    reloadDescription:
+      "This will replace the current workbook with its local copy and clear undo history. Export your current edits first if you want to keep them.",
+    reloadConfirm: "Reload local copy",
+    cancel: "Cancel",
+  },
   app: {
     workspace: "idea10 workspace",
     language: "Language",

@@ -1,6 +1,43 @@
 import type { MessageSchema } from "../schema";
 
 export const zhCN = {
+  persistence: {
+    file: "文件",
+    fileActions: "工作簿文件",
+    save: "保存到本地",
+    importJson: "导入 JSON",
+    exportJson: "导出 JSON",
+    reloadSaved: "重新加载本地副本",
+    loading: "正在打开本地副本…",
+    idle: "本地自动保存",
+    pending: "有未保存的更改",
+    saving: "正在保存…",
+    saved: "已保存到本地",
+    saveError: "尚未保存",
+    localOnly: "数据保存在当前浏览器中，可导出 JSON 文件另行备份。",
+    unavailable: "本地存储暂不可用，当前编辑仍保留在页面中，请导出 JSON 文件备份。",
+    invalidSnapshot:
+      "无法打开本地副本，原数据已保留，自动保存已暂停。可导入有效的 JSON 备份并确认替换以恢复。",
+    conflict: "其他标签页已保存了新副本，当前编辑仍保留在页面中。请先导出，再重新加载本地副本。",
+    quota: "浏览器存储空间不足，无法保存，请导出 JSON 文件保留更改。",
+    invalidJson: "文件不是有效的 idea10 工作簿，或使用了不支持的版本，当前工作簿未被替换。",
+    readFailed: "无法读取文件，当前工作簿未被替换。",
+    exportFailed: "无法导出文件，当前工作簿仍保留在页面中。",
+    exportStarted: "已开始下载 JSON 文件。",
+    imported: "已导入工作簿，撤销历史从此文件重新开始。",
+    restored: "已恢复本地副本。",
+    reloadFailed: "没有可恢复的本地副本，当前工作簿未被替换。",
+    finishEditing: "请先完成当前输入法组词，再保存或打开工作簿。",
+    importTitle: "导入工作簿？",
+    importDescription:
+      "导入将替换当前工作簿和浏览器中的本地副本（包括其他标签页已保存的内容），并清空撤销历史。如需保留当前内容，请先导出 JSON 文件备份。",
+    importConfirm: "替换并导入",
+    reloadTitle: "重新加载本地副本？",
+    reloadDescription:
+      "当前工作簿将被本地副本替换，撤销历史也会清空。如需保留当前编辑，请先导出文件。",
+    reloadConfirm: "重新加载",
+    cancel: "取消",
+  },
   app: {
     workspace: "idea10 工作区",
     language: "语言",

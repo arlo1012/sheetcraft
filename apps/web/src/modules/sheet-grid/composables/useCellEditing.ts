@@ -16,6 +16,7 @@ export function useCellEditing(options: {
 }) {
   const editorRef = ref<CellEditorHandle | null>(null);
   const editingValue = ref("");
+  const editingSourceValue = ref("");
   const isEditing = ref(false);
   const isComposing = ref(false);
   let compositionStartValue = "";
@@ -37,7 +38,8 @@ export function useCellEditing(options: {
   }
 
   function beginEdit(mode: "append" | "replace", initialValue = "", clientX?: number): void {
-    editingValue.value = mode === "append" ? options.getInputValue() : initialValue;
+    editingSourceValue.value = options.getInputValue();
+    editingValue.value = mode === "append" ? editingSourceValue.value : initialValue;
     isEditing.value = true;
     focusEditor(false, clientX);
   }
@@ -45,10 +47,12 @@ export function useCellEditing(options: {
   function finishEdit(destination?: CellSelection, restoreFocus = true): void {
     if (isEditing.value) {
       options.onClearClipboard();
-      options.onCommit({
-        address: { ...options.getActiveCell() },
-        input: editingValue.value,
-      });
+      if (editingValue.value !== editingSourceValue.value) {
+        options.onCommit({
+          address: { ...options.getActiveCell() },
+          input: editingValue.value,
+        });
+      }
     }
     isEditing.value = false;
     isComposing.value = false;
@@ -56,6 +60,7 @@ export function useCellEditing(options: {
     shouldFinishAfterComposition = false;
     pendingSelectionAfterComposition = undefined;
     editingValue.value = "";
+    editingSourceValue.value = "";
     if (destination) {
       options.onSelectionChange(destination);
     } else if (restoreFocus) {
@@ -70,6 +75,7 @@ export function useCellEditing(options: {
     shouldFinishAfterComposition = false;
     pendingSelectionAfterComposition = undefined;
     editingValue.value = "";
+    editingSourceValue.value = "";
     if (restoreFocus) {
       focusEditor();
     }
@@ -77,6 +83,7 @@ export function useCellEditing(options: {
 
   function onInput(value: string): void {
     if (!isEditing.value) {
+      editingSourceValue.value = options.getInputValue();
       isEditing.value = true;
     }
     editingValue.value = value;
@@ -88,6 +95,7 @@ export function useCellEditing(options: {
     shouldFinishAfterComposition = false;
     pendingSelectionAfterComposition = undefined;
     if (!isEditing.value) {
+      editingSourceValue.value = options.getInputValue();
       editingValue.value = "";
       isEditing.value = true;
     }

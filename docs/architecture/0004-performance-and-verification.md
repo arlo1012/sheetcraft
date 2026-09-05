@@ -35,6 +35,14 @@ measure both the app entry and all JavaScript and CSS assets in raw and gzip
 bytes. Budget changes require a production build and an intentional config
 update; generated asset hashes are not committed.
 
+The local-persistence feature deliberately recalibrates the bundle budgets for
+its storage/file coordination and TDesign's confirmation dialog. The measured
+production build is approximately 301 KB app JavaScript (82 KB gzip), 786 KB
+total JavaScript (232 KB gzip), and 214 KB total CSS (27 KB gzip). Limits retain
+small headroom at 315/86 KB app JavaScript, 815/242 KB total JavaScript, and
+220 KB total CSS; the existing CSS gzip limit stays unchanged. No dependency
+was added, and both entry and total-asset checks remain enabled.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

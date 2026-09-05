@@ -76,6 +76,16 @@ handling. It recognizes Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z, and Ctrl/Cmd+Y while
 preserving native editable-control history unless the owning surface explicitly
 opts in with `allowEditableTarget`.
 
+The Grid and workbook formula bar expose `flushPendingEdit(): boolean` and
+`hasPendingEdit(): boolean` for document save/export and unload handling.
+Flushing commits synchronously without moving focus or selection; it returns
+false during IME composition. Document replacement increments the workspace's
+generation key to reset both editors, including same-Sheet-ID imports.
+
+Use TDesign's public `Dialog` API directly for destructive file replacement
+confirmation. The persistence module owns its translated purpose and action
+text; it does not restyle TDesign internals.
+
 ## Translated And Accessible Controls
 
 Use the shared translator for labels and feedback:

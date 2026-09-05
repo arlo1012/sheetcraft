@@ -74,6 +74,18 @@ function commitFormulaDraft(): void {
   emit("commitCell", payload);
 }
 
+function flushPendingEdit(): boolean {
+  if (isComposing.value) {
+    return false;
+  }
+  commitFormulaDraft();
+  return true;
+}
+
+function hasPendingEdit(): boolean {
+  return isComposing.value || formulaDraft.value !== formulaSourceValue.value;
+}
+
 function insertFormulaLineBreak(): void {
   const input = formulaInput.value;
   if (!input) {
@@ -117,6 +129,8 @@ function onFormulaBlur(): void {
   formulaFocused.value = false;
   void nextTick(syncFormulaFromProps);
 }
+
+defineExpose({ flushPendingEdit, hasPendingEdit });
 </script>
 
 <template>

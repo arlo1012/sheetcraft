@@ -17,8 +17,13 @@ references, ranges, parentheses, arithmetic (`+`, `-`, `*`, `/`), and `SUM` with
 AutoSum. Copying, moving, and changing rows or columns transform references.
 Cross-Sheet formulas and additional functions are not implemented.
 
-Core writes V2 snapshots and accepts V1/V2 input. The Web application does not
-yet save or restore workbooks. Images, charts, conditional formatting, printing,
+Core writes V2 snapshots and accepts V1/V2 input. The Web application restores
+the current workbook from IndexedDB, automatically saves document edits, and
+offers JSON import/export with validation and replacement confirmation. See
+[Saving And Recovery](docs/workbook-persistence.md) for the local-only storage
+scope, multi-tab conflicts, and recovery guarantees.
+
+Images, charts, conditional formatting, printing,
 additional Ribbon categories, and view/zoom controls remain unimplemented;
 their existing disabled UI entries are placeholders.
 
@@ -77,6 +82,8 @@ component-specific layout and interaction states.
   formatting and data menus.
 - `apps/web/src/modules/workbook`: formula bar, Sheet tabs, status, and other
   workbook-facing Vue controls.
+- `apps/web/src/modules/workbook-persistence`: local storage adapter, save/load
+  coordination, file transfer, confirmation, and recovery feedback.
 - `apps/web/src/modules/sheet-grid`: concrete Grid components, clipboard
   adapter, editor lifecycle, viewport, resize, and drag interactions.
 - `apps/web/src/shared`: proven cross-module Web primitives, utilities, and

@@ -2,6 +2,7 @@ import {
   computed,
   onScopeDispose,
   reactive,
+  readonly,
   ref,
   shallowRef,
   type ComponentPublicInstance,
@@ -46,6 +47,7 @@ import {
 import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
 import {
   createWorkbookSession,
+  createWorkbookHistory,
   executeWorkbookCommand,
   redoWorkbookCommand,
   undoWorkbookCommand,
@@ -79,6 +81,7 @@ import {
   type SheetFilter,
   type SheetFilterValue,
   type SheetDimensionAxis,
+  type Workbook,
 } from "@idea10/core/workbook";
 import { getSelectionMode, getSelectionRange } from "@idea10/sheet-engine/selection";
 import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
@@ -107,6 +110,8 @@ type FormatPainterSource = {
 
 export type SheetGridNavigator = {
   clearClipboard?(): void;
+  flushPendingEdit?(): boolean;
+  hasPendingEdit?(): boolean;
   focusGrid(): void;
   navigateToCell(address: CellAddress): void;
 };
@@ -125,6 +130,7 @@ export function useSpreadsheetWorkspaceController(
   const viewStates = reactive(new Map<string, SheetGridViewState>());
   const gridRef = shallowRef<SheetGridNavigator>();
   const workbookVersion = ref(0);
+  const workbookGeneration = ref(0);
   const searchQuery = ref("");
   const formatPainterSource = ref<FormatPainterSource>();
   const workspaceStatus = ref<FeedbackState>();
@@ -803,6 +809,26 @@ export function useSpreadsheetWorkspaceController(
     viewStates.set(activeSheet.value.id, createSheetGridViewState(viewState));
   }
 
+  function replaceWorkbook(workbook: Workbook): void {
+    gridRef.value?.clearClipboard?.();
+    session.workbook = workbook;
+    session.history = createWorkbookHistory(session.history.maxEntries);
+    viewStates.clear();
+    searchQuery.value = "";
+    formatPainterSource.value = undefined;
+    clearWorkspaceStatus();
+    workbookGeneration.value += 1;
+    workbookVersion.value += 1;
+  }
+
+  function flushPendingGridEdit(): boolean {
+    return gridRef.value?.flushPendingEdit?.() ?? true;
+  }
+
+  function hasPendingGridEdit(): boolean {
+    return gridRef.value?.hasPendingEdit?.() ?? false;
+  }
+
   function navigateToAddress(input: string): void {
     const address = parseCellAddress(input);
     if (!address) {
@@ -877,6 +903,11 @@ export function useSpreadsheetWorkspaceController(
 
   return {
     session,
+    workbookRevision: readonly(workbookVersion),
+    workbookGeneration: readonly(workbookGeneration),
+    replaceWorkbook,
+    flushPendingGridEdit,
+    hasPendingGridEdit,
     viewStates,
     searchQuery,
     t,

@@ -976,6 +976,20 @@ function clearClipboard(): void {
   clipboardFeedbackKey.value = undefined;
 }
 
+function flushPendingEdit(): boolean {
+  if (isComposing.value) {
+    return false;
+  }
+  if (isEditing.value) {
+    finishEdit(undefined, false);
+  }
+  return true;
+}
+
+function hasPendingEdit(): boolean {
+  return isComposing.value || isEditing.value;
+}
+
 watch(
   () => props.sheet.id,
   () => {
@@ -1022,7 +1036,13 @@ onBeforeUnmount(() => {
   clearPendingClipboard();
 });
 
-defineExpose({ clearClipboard, focusGrid: focusEditor, navigateToCell });
+defineExpose({
+  clearClipboard,
+  flushPendingEdit,
+  focusGrid: focusEditor,
+  hasPendingEdit,
+  navigateToCell,
+});
 </script>
 
 <template>

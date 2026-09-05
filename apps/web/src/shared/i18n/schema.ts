@@ -1,6 +1,40 @@
 export type AppLocale = "zh-CN" | "en-US";
 
 export type MessageSchema = {
+  persistence: {
+    file: string;
+    fileActions: string;
+    save: string;
+    importJson: string;
+    exportJson: string;
+    reloadSaved: string;
+    loading: string;
+    idle: string;
+    pending: string;
+    saving: string;
+    saved: string;
+    saveError: string;
+    localOnly: string;
+    unavailable: string;
+    invalidSnapshot: string;
+    conflict: string;
+    quota: string;
+    invalidJson: string;
+    readFailed: string;
+    exportFailed: string;
+    exportStarted: string;
+    imported: string;
+    restored: string;
+    reloadFailed: string;
+    finishEditing: string;
+    importTitle: string;
+    importDescription: string;
+    importConfirm: string;
+    reloadTitle: string;
+    reloadDescription: string;
+    reloadConfirm: string;
+    cancel: string;
+  };
   app: {
     workspace: string;
     language: string;

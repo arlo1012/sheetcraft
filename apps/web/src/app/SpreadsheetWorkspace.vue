@@ -1,12 +1,27 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
 import WorkbookFormulaBar from "../modules/workbook/components/WorkbookFormulaBar.vue";
 import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.vue";
 import { useSpreadsheetWorkspaceController } from "./composables/useSpreadsheetWorkspaceController";
+import WorkbookFileActions from "../modules/workbook-persistence/components/WorkbookFileActions.vue";
+import WorkbookFileFeedback from "../modules/workbook-persistence/components/WorkbookFileFeedback.vue";
+import { createIndexedDbWorkbookStore } from "../modules/workbook-persistence/indexedDbWorkbookStore";
+import { useWorkbookPersistence } from "../modules/workbook-persistence/useWorkbookPersistence";
+import { useWorkbookFileActions } from "../modules/workbook-persistence/useWorkbookFileActions";
+import type { WorkbookStore } from "../modules/workbook-persistence/workbookStore";
+
+const props = defineProps<{ workbookStore?: WorkbookStore }>();
+const formulaBarRef = ref<InstanceType<typeof WorkbookFormulaBar> | null>(null);
 
 const {
   session,
+  workbookRevision,
+  workbookGeneration,
+  replaceWorkbook,
+  flushPendingGridEdit,
+  hasPendingGridEdit,
   searchQuery,
   t,
   activeSheet,
@@ -58,6 +73,22 @@ const {
   setGridNavigator,
 } = useSpreadsheetWorkspaceController();
 
+const persistence = useWorkbookPersistence({
+  store: props.workbookStore ?? createIndexedDbWorkbookStore(),
+  getWorkbook: () => session.workbook,
+  getRevision: () => workbookRevision.value,
+  replaceWorkbook,
+});
+const { loading, status: saveStatus, error: saveError } = persistence;
+const fileActions = useWorkbookFileActions({
+  persistence,
+  getWorkbook: () => session.workbook,
+  flushPendingEdits: () =>
+    flushPendingGridEdit() && (formulaBarRef.value?.flushPendingEdit() ?? true),
+  hasPendingEdits: () => hasPendingGridEdit() || (formulaBarRef.value?.hasPendingEdit() ?? false),
+});
+const { busy: fileBusy, confirmation, feedback } = fileActions;
+
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (event.key !== "Escape" || !formatPainterActive.value) {
     return;
@@ -72,6 +103,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
   <section
     class="spreadsheet-workspace"
     :aria-label="t('workspace.editor')"
+    :aria-busy="loading || fileBusy"
     @keydown.capture="onWorkspaceKeydown"
   >
     <SpreadsheetRibbon
@@ -80,6 +112,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :format-painter-active="formatPainterActive"
       :data-state="dataToolState"
       :merge-state="mergeState"
+      :inert="loading || fileBusy"
       @apply-borders="applyCellBorders"
       @apply-style="applyCellStyle"
       @adjust-decimals="adjustNumberFormatDecimals"
@@ -94,8 +127,32 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @unmerge="unmergeSelection"
       @undo="undo"
       @redo="redo"
-    />
+    >
+      <template #file-actions>
+        <WorkbookFileActions
+          :status="saveStatus"
+          :disabled="loading || fileBusy"
+          @save="fileActions.save"
+          @import-json="fileActions.importJson"
+          @export-json="fileActions.exportJson"
+          @reload="fileActions.requestReload"
+        />
+      </template>
+    </SpreadsheetRibbon>
+    <div class="spreadsheet-workspace__file-feedback">
+      <WorkbookFileFeedback
+        :error="saveError"
+        :feedback="feedback"
+        :confirmation="confirmation"
+        :busy="fileBusy"
+        @confirm="fileActions.confirm"
+        @cancel="fileActions.cancel"
+      />
+    </div>
     <WorkbookFormulaBar
+      :key="workbookGeneration"
+      ref="formulaBarRef"
+      :inert="loading || fileBusy"
       :address="activeAddress"
       :address-label="activeAddressLabel"
       :input-value="activeCellInput"
@@ -106,8 +163,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @update-search-query="updateSearchQuery"
       @find="findCell"
     />
-    <div class="spreadsheet-workspace__grid">
+    <div class="spreadsheet-workspace__grid" :inert="loading || fileBusy">
       <SheetGrid
+        :key="workbookGeneration"
         :ref="setGridNavigator"
         :sheet="activeSheet"
         :view-state="activeSheetViewState"
@@ -126,6 +184,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       />
     </div>
     <WorkbookStatusBar
+      :inert="loading || fileBusy"
       :sheets="sheets"
       :active-sheet-id="session.workbook.activeSheetId"
       :status-text="workspaceStatusText"
@@ -143,7 +202,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
 <style scoped lang="scss">
 .spreadsheet-workspace {
   display: grid;
-  grid-template-rows: auto 34px minmax(0, 1fr) 30px;
+  grid-template-rows: auto auto 34px minmax(0, 1fr) 30px;
   grid-template-columns: minmax(0, 1fr);
   width: 100%;
   height: 100dvh;

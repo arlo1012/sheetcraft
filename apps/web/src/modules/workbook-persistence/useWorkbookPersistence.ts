@@ -1,0 +1,392 @@
+import { computed, onScopeDispose, ref, watch, type ComputedRef, type Ref } from "vue";
+import { WorkbookDomainError } from "@idea10/core/errors";
+import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
+import type { Workbook } from "@idea10/core/workbook";
+import { WorkbookStoreError, type PersistedWorkbook, type WorkbookStore } from "./workbookStore";
+
+export type WorkbookPersistenceError =
+  | "unavailable"
+  | "invalid-snapshot"
+  | "invalid-record"
+  | "conflict"
+  | "quota";
+
+export type WorkbookPersistenceStatus =
+  | "loading"
+  | "idle"
+  | "pending"
+  | "saving"
+  | "saved"
+  | "error";
+
+export type UseWorkbookPersistenceOptions = {
+  store: WorkbookStore;
+  getWorkbook: () => Workbook;
+  getRevision: () => number;
+  replaceWorkbook: (workbook: Workbook) => void;
+  debounceMs?: number;
+};
+
+type SaveRequest = {
+  revision: number;
+  snapshot: ReturnType<typeof serializeWorkbook>;
+};
+
+type LoadResult = "loaded" | "empty" | "failed";
+
+const DEFAULT_DEBOUNCE_MS = 300;
+
+function isPersistedWorkbook(value: unknown): value is PersistedWorkbook {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as Partial<PersistedWorkbook>;
+  return (
+    Number.isSafeInteger(record.revision) &&
+    (record.revision ?? -1) >= 1 &&
+    typeof record.savedAt === "number" &&
+    Number.isFinite(record.savedAt) &&
+    "snapshot" in record
+  );
+}
+
+function toPersistenceError(
+  error: unknown,
+  fallback: WorkbookPersistenceError,
+): WorkbookPersistenceError {
+  if (error instanceof WorkbookStoreError) {
+    return error.code;
+  }
+  if (error instanceof WorkbookDomainError) {
+    return "invalid-snapshot";
+  }
+  if (error instanceof DOMException && error.name === "QuotaExceededError") {
+    return "quota";
+  }
+  return fallback;
+}
+
+export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): {
+  ready: Promise<void>;
+  loading: Ref<boolean>;
+  dirty: Ref<boolean>;
+  status: ComputedRef<WorkbookPersistenceStatus>;
+  error: Ref<WorkbookPersistenceError | undefined>;
+  savedAt: Ref<number | undefined>;
+  saveNow: () => Promise<boolean>;
+  reload: () => Promise<boolean>;
+  replaceDocument: (workbook: Workbook) => Promise<void>;
+} {
+  const loading = ref(true);
+  const dirty = ref(false);
+  const saving = ref(false);
+  const error = ref<WorkbookPersistenceError>();
+  const savedAt = ref<number>();
+  const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+  const status = computed<WorkbookPersistenceStatus>(() => {
+    if (loading.value) return "loading";
+    if (saving.value) return "saving";
+    if (error.value) return "error";
+    if (dirty.value) return "pending";
+    return savedAt.value === undefined ? "idle" : "saved";
+  });
+
+  let expectedRevision: number | undefined;
+  let saveRequest: SaveRequest | undefined;
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  let drainPromise: Promise<boolean> | undefined;
+  let suppressRevisionWatch = false;
+  let automaticSavingBlocked = false;
+  let disposed = false;
+  let documentOperationTail: Promise<void> = Promise.resolve();
+  const initialRevision = options.getRevision();
+
+  function queueDocumentOperation<T>(operation: () => Promise<T>): Promise<T> {
+    const task = documentOperationTail.then(operation, operation);
+    documentOperationTail = task.then(
+      () => undefined,
+      () => undefined,
+    );
+    return task;
+  }
+
+  function clearSaveTimer(): void {
+    if (saveTimer !== undefined) {
+      clearTimeout(saveTimer);
+      saveTimer = undefined;
+    }
+  }
+
+  function cancelQueuedSave(): void {
+    clearSaveTimer();
+    saveRequest = undefined;
+  }
+
+  function queueCurrentSnapshot(): void {
+    saveRequest = {
+      revision: options.getRevision(),
+      snapshot: serializeWorkbook(options.getWorkbook()),
+    };
+  }
+
+  function blockAutomaticSaving(nextError: WorkbookPersistenceError): void {
+    error.value = nextError;
+    automaticSavingBlocked = true;
+    cancelQueuedSave();
+  }
+
+  function scheduleSave(): void {
+    if (disposed || loading.value || automaticSavingBlocked) {
+      return;
+    }
+    clearSaveTimer();
+    saveTimer = setTimeout(() => {
+      saveTimer = undefined;
+      if (!dirty.value) {
+        return;
+      }
+      queueCurrentSnapshot();
+      void drainSaveQueue();
+    }, debounceMs);
+  }
+
+  async function drainSaveQueue(): Promise<boolean> {
+    if (drainPromise) {
+      return drainPromise;
+    }
+
+    drainPromise = (async () => {
+      let saved = true;
+      while (saveRequest && !automaticSavingBlocked && !disposed) {
+        const request = saveRequest;
+        saveRequest = undefined;
+        saving.value = true;
+        try {
+          const receipt = await options.store.save(request.snapshot, expectedRevision);
+          if (disposed) {
+            saved = false;
+            break;
+          }
+          expectedRevision = receipt.revision;
+          savedAt.value = receipt.savedAt;
+          error.value = undefined;
+          automaticSavingBlocked = false;
+          if (options.getRevision() === request.revision && !saveRequest) {
+            dirty.value = false;
+          } else {
+            dirty.value = true;
+            if (!saveRequest) {
+              queueCurrentSnapshot();
+            }
+          }
+        } catch (cause) {
+          saved = false;
+          if (!disposed) {
+            blockAutomaticSaving(toPersistenceError(cause, "unavailable"));
+          }
+        } finally {
+          saving.value = false;
+        }
+      }
+      return saved && !dirty.value && error.value === undefined;
+    })();
+
+    try {
+      return await drainPromise;
+    } finally {
+      drainPromise = undefined;
+    }
+  }
+
+  async function waitForActiveSave(): Promise<void> {
+    if (drainPromise) {
+      await drainPromise;
+    }
+  }
+
+  function replaceFromPersistence(workbook: Workbook): void {
+    if (disposed) {
+      return;
+    }
+    suppressRevisionWatch = true;
+    try {
+      options.replaceWorkbook(workbook);
+    } finally {
+      suppressRevisionWatch = false;
+    }
+  }
+
+  async function loadFromStore(revisionAtStart: number): Promise<LoadResult> {
+    try {
+      const record = await options.store.load();
+      if (disposed) {
+        return "failed";
+      }
+      if (options.getRevision() !== revisionAtStart) {
+        blockAutomaticSaving("conflict");
+        dirty.value = true;
+        return "failed";
+      }
+      if (record === undefined) {
+        expectedRevision = undefined;
+        savedAt.value = undefined;
+        error.value = undefined;
+        automaticSavingBlocked = false;
+        return "empty";
+      }
+      if (!isPersistedWorkbook(record)) {
+        blockAutomaticSaving("invalid-record");
+        return "failed";
+      }
+      expectedRevision = record.revision;
+      const workbook = deserializeWorkbook(record.snapshot);
+      replaceFromPersistence(workbook);
+      expectedRevision = record.revision;
+      savedAt.value = record.savedAt;
+      dirty.value = false;
+      error.value = undefined;
+      automaticSavingBlocked = false;
+      return "loaded";
+    } catch (cause) {
+      if (disposed) {
+        return "failed";
+      }
+      blockAutomaticSaving(toPersistenceError(cause, "unavailable"));
+      return "failed";
+    }
+  }
+
+  async function initialize(): Promise<void> {
+    await loadFromStore(initialRevision);
+    if (!disposed) {
+      loading.value = false;
+    }
+  }
+
+  const ready = queueDocumentOperation(initialize);
+
+  watch(
+    () => options.getRevision(),
+    (revision, previousRevision) => {
+      if (suppressRevisionWatch || revision === previousRevision) {
+        return;
+      }
+      dirty.value = true;
+      scheduleSave();
+    },
+    { flush: "sync" },
+  );
+
+  async function saveCurrentWorkbook(): Promise<boolean> {
+    if (disposed) {
+      return false;
+    }
+    if (
+      error.value === "conflict" ||
+      error.value === "invalid-record" ||
+      error.value === "invalid-snapshot"
+    ) {
+      return false;
+    }
+    automaticSavingBlocked = false;
+    clearSaveTimer();
+    if (
+      !dirty.value &&
+      !saveRequest &&
+      !drainPromise &&
+      error.value === undefined &&
+      (expectedRevision !== undefined || savedAt.value !== undefined)
+    ) {
+      return true;
+    }
+    queueCurrentSnapshot();
+    return drainSaveQueue();
+  }
+
+  async function saveNow(): Promise<boolean> {
+    await ready;
+    await documentOperationTail;
+    return saveCurrentWorkbook();
+  }
+
+  async function reload(): Promise<boolean> {
+    return queueDocumentOperation(async () => {
+      if (disposed) {
+        return false;
+      }
+      loading.value = true;
+      cancelQueuedSave();
+      await waitForActiveSave();
+      const result = await loadFromStore(options.getRevision());
+      if (!disposed) {
+        loading.value = false;
+      }
+      return result === "loaded";
+    });
+  }
+
+  async function replaceDocument(workbook: Workbook): Promise<void> {
+    await queueDocumentOperation(async () => {
+      if (disposed) {
+        return;
+      }
+      loading.value = true;
+      cancelQueuedSave();
+      await waitForActiveSave();
+      if (disposed) {
+        return;
+      }
+      replaceFromPersistence(workbook);
+      dirty.value = true;
+      savedAt.value = undefined;
+      try {
+        const request: SaveRequest = {
+          revision: options.getRevision(),
+          snapshot: serializeWorkbook(options.getWorkbook()),
+        };
+        const receipt = await options.store.replace(request.snapshot);
+        if (disposed) {
+          return;
+        }
+        expectedRevision = receipt.revision;
+        savedAt.value = receipt.savedAt;
+        error.value = undefined;
+        automaticSavingBlocked = false;
+        if (options.getRevision() === request.revision) {
+          dirty.value = false;
+        } else {
+          dirty.value = true;
+        }
+      } catch (cause) {
+        if (!disposed) {
+          blockAutomaticSaving(toPersistenceError(cause, "unavailable"));
+          dirty.value = true;
+        }
+      } finally {
+        if (!disposed) {
+          loading.value = false;
+          if (dirty.value && error.value === undefined) {
+            scheduleSave();
+          }
+        }
+      }
+    });
+  }
+
+  onScopeDispose(() => {
+    disposed = true;
+    cancelQueuedSave();
+  });
+
+  return {
+    ready,
+    loading,
+    dirty,
+    status,
+    error,
+    savedAt,
+    saveNow,
+    reload,
+    replaceDocument,
+  };
+}

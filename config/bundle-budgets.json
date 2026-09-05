@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "description": "Production budgets calibrated against the current spreadsheet feature set and stable vendor chunks.",
+  "description": "Production budgets include workbook persistence, JSON transfer, and the TDesign import/reload confirmation dialog; see ADR 0004.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
       "pattern": "^index-.*\\.js$",
-      "maximumRawBytes": 290000,
-      "maximumGzipBytes": 78000
+      "maximumRawBytes": 315000,
+      "maximumGzipBytes": 86000
     },
     "css": {
       "pattern": "^index-.*\\.css$",
@@ -16,11 +16,11 @@
   },
   "totalAssets": {
     "javascript": {
-      "maximumRawBytes": 760000,
-      "maximumGzipBytes": 228000
+      "maximumRawBytes": 815000,
+      "maximumGzipBytes": 242000
     },
     "css": {
-      "maximumRawBytes": 210000,
+      "maximumRawBytes": 220000,
       "maximumGzipBytes": 27000
     }
   }

@@ -36,6 +36,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
+
+defineSlots<{ "file-actions"?: () => unknown }>();
 </script>
 
 <template>
@@ -45,6 +47,7 @@ const { t } = useAppI18n();
         <span class="spreadsheet-ribbon__category" data-ribbon-category="home">
           {{ t("ribbon.home") }}
         </span>
+        <slot name="file-actions" />
       </nav>
       <LocaleSwitcher />
     </div>
