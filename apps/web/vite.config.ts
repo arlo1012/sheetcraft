@@ -3,6 +3,11 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [vue()],
+  optimizeDeps: {
+    // These workspace packages publish from dist. Keep them out of the dependency
+    // optimizer so Vite observes their rebuilt output during development.
+    exclude: ["@idea10/core", "@idea10/sheet-engine"],
+  },
   build: {
     rolldownOptions: {
       output: {
@@ -32,6 +37,7 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 7200,
+    strictPort: true,
   },
   preview: {
     host: "0.0.0.0",

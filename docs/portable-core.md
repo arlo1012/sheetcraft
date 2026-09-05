@@ -46,11 +46,21 @@ Use `tryApplyWorkbookCommand` when a transport boundary needs a data result
 instead of a thrown exception. Display strings remain in the consuming app;
 Core returns stable error and operation codes plus diagnostic details.
 
+Web user edits use commands through the workspace controller's session. The
+low-level model mutators exported by `workbook` are intended for Core
+implementation, initial construction, deserialization, and test fixtures;
+calling them for a user edit bypasses undo/redo and the Web change notification.
+Navigation with `setActiveSheet` is an intentional exception: switching Sheets
+does not create an undo entry.
+
 ## Snapshots
 
-Workbook persistence uses the versioned `WorkbookSnapshotV1` DTO. The snapshot
-contains arrays and plain records rather than internal Maps, so it can be
-serialized as JSON or transferred with structured clone.
+`serializeWorkbook` writes the versioned `WorkbookSnapshotV2` DTO.
+`deserializeWorkbook` accepts V1 and V2, upgrades V1 literal values to the V2
+content model, and validates formula sources, styles, dimensions, frozen panes,
+filters, and merged ranges. Computed formula caches are not persisted. The
+snapshot contains arrays and plain records rather than internal Maps, so it
+can be serialized as JSON or transferred with structured clone.
 
 ```ts
 import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
@@ -62,6 +72,14 @@ const restored = deserializeWorkbook(payload);
 `deserializeWorkbook` validates the complete payload and rejects unsupported
 versions with a stable domain error. Consumers must not persist internal
 Workbook, Sheet, Map, or history objects directly.
+
+Storage and file/network transports belong to the consuming application.
+Validate a complete incoming snapshot before replacing the current workbook;
+failed reads must not partially mutate the active document. Loading another
+workbook starts a fresh session history and clears document-specific transient
+view state. `activeSheetId` is retained in snapshots as a reopen preference;
+ordinary Sheet navigation remains outside undo history. See
+[ADR 0003](architecture/0003-state-and-history.md) for the state contract.
 
 ## Import Boundary
 

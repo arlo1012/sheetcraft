@@ -8,7 +8,7 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "bun run build:packages && bun run --filter @idea10/web dev",
+    "dev": "bun scripts/dev.mts",
     "build": "bun run build:packages && bun run build:web",
     "build:packages": "bun run build:core && bun run build:sheet-engine",
     "build:core": "bun run --filter @idea10/core build",

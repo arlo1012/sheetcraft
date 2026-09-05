@@ -1,15 +1,26 @@
 # idea10
 
-Clean-slate frontend initialized with Vue 3, TypeScript, Vite, Bun, SCSS, and
-product-owned CSS tokens. The current milestone provides a focused spreadsheet
-editing foundation: a sparse workbook model, command-based undo and redo,
-virtualized cells with independently resizable rows and columns, pinned headers,
-rectangular range selection, keyboard navigation, in-cell editing with IME-safe
-composition, atomic range clearing, TSV clipboard workflows, cell formatting, a
-compact Home Ribbon, and selection summaries in the workbook status bar.
+A spreadsheet editor built with Vue 3, TypeScript, TDesign, Vite, Bun, SCSS, and
+product-owned CSS tokens. Its runtime-neutral packages provide a sparse
+workbook model, reversible commands, versioned snapshots, and headless Sheet
+geometry and interaction state.
 
-Formulas, persistence, additional Ribbon categories, and sheet view or zoom
-controls are intentionally outside the current milestone.
+The Web application supports virtualized cells, range and axis selection,
+keyboard navigation, IME-safe editing, row and column resizing and insertion,
+TSV clipboard and selective paste, cell and number formatting, format painter,
+sorting and value filtering, frozen panes, merged cells, and multiple Sheet
+management. A compact Home Ribbon, formula bar, search, selection summaries,
+and Chinese/English localization complete the editing surface.
+
+Formulas currently support single-Sheet A1 references, absolute and relative
+references, ranges, parentheses, arithmetic (`+`, `-`, `*`, `/`), and `SUM` with
+AutoSum. Copying, moving, and changing rows or columns transform references.
+Cross-Sheet formulas and additional functions are not implemented.
+
+Core writes V2 snapshots and accepts V1/V2 input. The Web application does not
+yet save or restore workbooks. Images, charts, conditional formatting, printing,
+additional Ribbon categories, and view/zoom controls remain unimplemented;
+their existing disabled UI entries are placeholders.
 
 ## Commands
 
@@ -36,7 +47,15 @@ and Sheet Engine tests run in Node through `bun run test:core` and
 strict types, all unit tests, package boundaries and public imports, a
 browser-target Worker consumer, and production bundle budgets.
 
-The development server listens on `0.0.0.0:7200`.
+`bun run dev` builds Core and Sheet Engine first, watches both packages through
+TypeScript's dependency graph, and serves Web on `0.0.0.0:7200`. Rebuilt package
+exports update the browser through Vite. Use `bun run dev -- --port 7201` for
+another port. Occupied ports fail explicitly; Ctrl-C stops the watcher and Web
+server together.
+
+See [Development](docs/development.md) for the local edit/verify/commit workflow,
+[Web Component Contracts](docs/web-components.md) for shared interactions, and
+[Continuous Integration](docs/ci.md) for the Gitea workflow and runner setup.
 
 ## UI Composition
 
@@ -54,6 +73,8 @@ component-specific layout and interaction states.
 ## Source Modules
 
 - `apps/web/src/app`: Web application bootstrap and top-level composition.
+- `apps/web/src/modules/home-tools`: concrete Home Ribbon tool groups and their
+  formatting and data menus.
 - `apps/web/src/modules/workbook`: formula bar, Sheet tabs, status, and other
   workbook-facing Vue controls.
 - `apps/web/src/modules/sheet-grid`: concrete Grid components, clipboard
@@ -72,10 +93,10 @@ Do not create a shared abstraction for code used by only one module.
 Consumers import only the explicit package exports. Deep imports into `src` or
 `dist` are unsupported and rejected by the quality gates.
 
-| Package                | Public subpaths                                                                                                                                                     |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@idea10/core`         | `commands`, `history`, `serialization`, `workbook`, `errors`, `runtime`, `clipboard`, `coordinates`, `input`, `search`, `selection-summary`, `style`, `style-state` |
-| `@idea10/sheet-engine` | `extent`, `geometry`, `row-height`, `selection`, `view-state`                                                                                                       |
+| Package                | Public subpaths                                                                                                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@idea10/core`         | `commands`, `history`, `serialization`, `workbook`, `errors`, `runtime`, `clipboard`, `coordinates`, `formula`, `input`, `search`, `selection-summary`, `style`, `style-state` |
+| `@idea10/sheet-engine` | `extent`, `frozen-layout`, `geometry`, `row-height`, `selection`, `view-state`, `viewport-layout`, `visibility`                                                                |
 
 See [Portable Core Consumers](docs/portable-core.md) for deterministic runtime
 ports, serializable commands and snapshots, and Worker/server integration.

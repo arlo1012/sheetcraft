@@ -17,6 +17,13 @@ lint, strict type checks, Node and Web unit tests, architecture boundaries,
 built-package public import checks, a browser-target Worker bundle and message
 round trip, and production bundle budgets.
 
+The Worker smoke transfers a snapshot and command, evaluates a formula, checks
+undo/redo and Sheet geometry, and validates the returned snapshot in the host.
+It runs in Bun's Worker runtime after browser-target bundling; real-browser
+interaction checks remain separate. Gitea Actions runs the root gate on pushes
+and pull requests when repository Actions and a matching runner are enabled;
+see [Continuous Integration](../ci.md) for the deployment requirements.
+
 Core structural history stores sparse axis slices for row and column changes.
 An inverse records only deleted entries or entries truncated at the final axis
 boundary. It must not snapshot unrelated cells or dimensions. Full Sheet state

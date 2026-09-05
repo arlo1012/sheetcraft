@@ -58,6 +58,9 @@
   same stable contract or primitive.
 - Dependencies flow from apps to packages and from `sheet-engine` to `core`.
   Packages must never import application code.
+- Route user document edits through Core commands so history and change
+  notification stay consistent. Persist only versioned snapshots through Web
+  storage or transport adapters.
 - Avoid barrel files that hide ownership or accumulate implementation logic.
   Package entrypoints are allowed only as thin, explicit public API surfaces.
 

@@ -9,6 +9,15 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createSetCellContentCommand } from "@idea10/core/commands";
+import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
+import {
+  createWorkbook,
+  getActiveSheet,
+  getCellContent,
+  getCellValue,
+  setCellContent,
+} from "@idea10/core/workbook";
 
 type PackageManifest = {
   name: string;
@@ -17,30 +26,138 @@ type PackageManifest = {
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-async function verifyWorkerRoundTrip(outputPath: string): Promise<number> {
+type WorkerRoundTripPayload = {
+  snapshot: unknown;
+  command: unknown;
+};
+
+type WorkerRoundTripResult = {
+  exportedMemberCount: number;
+  commandValue: unknown;
+  undoneValue: unknown;
+  redoneValue: unknown;
+  formulaValue: unknown;
+  formulaSource: unknown;
+  snapshot: unknown;
+  geometryCell: unknown;
+  executed: unknown;
+  undone: unknown;
+  redone: unknown;
+};
+
+async function verifyWorkerRoundTrip(
+  outputPath: string,
+  payload: WorkerRoundTripPayload,
+): Promise<WorkerRoundTripResult> {
   const worker = new Worker(pathToFileURL(outputPath).href, { type: "module" });
   try {
-    return await new Promise<number>((resolveValue, reject) => {
+    return await new Promise<WorkerRoundTripResult>((resolveValue, reject) => {
       const timeout = setTimeout(
         () => reject(new Error("Worker message round trip timed out.")),
         5_000,
       );
       worker.onmessage = (event: MessageEvent<unknown>) => {
         clearTimeout(timeout);
-        if (typeof event.data !== "number" || !Number.isFinite(event.data) || event.data <= 0) {
-          reject(new Error(`Worker returned an invalid export count: ${String(event.data)}.`));
+        const result = event.data as Partial<WorkerRoundTripResult> | null;
+        if (
+          !result ||
+          typeof result.exportedMemberCount !== "number" ||
+          !Number.isFinite(result.exportedMemberCount) ||
+          result.exportedMemberCount <= 0
+        ) {
+          reject(new Error(`Worker returned an invalid round trip result: ${String(event.data)}.`));
           return;
         }
-        resolveValue(event.data);
+        resolveValue(result as WorkerRoundTripResult);
       };
       worker.onerror = (event) => {
         clearTimeout(timeout);
         reject(event.error ?? new Error(event.message));
       };
-      worker.postMessage(null);
+      worker.postMessage(payload);
     });
   } finally {
     worker.terminate();
+  }
+}
+
+function createWorkerPayload(): WorkerRoundTripPayload {
+  const workbook = createWorkbook({
+    id: "worker-workbook",
+    sheetId: "worker-sheet",
+  });
+  const sheet = getActiveSheet(workbook);
+  setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: 7 });
+  setCellContent(
+    sheet,
+    { row: 0, column: 1 },
+    {
+      kind: "formula",
+      formula: { source: "=A1*2" },
+    },
+  );
+  const snapshot = serializeWorkbook(workbook);
+  const command = createSetCellContentCommand(
+    sheet.id,
+    { row: 1, column: 0 },
+    { kind: "literal", value: 9 },
+  );
+
+  return {
+    snapshot: structuredClone(snapshot),
+    command: structuredClone(command),
+  };
+}
+
+function assertRoundTripResult(
+  result: WorkerRoundTripResult,
+  inputSnapshot: unknown,
+  inputCommand: unknown,
+  expectedSnapshot: string,
+  expectedCommand: string,
+  expectGeometry: boolean,
+): void {
+  if (
+    result.executed !== true ||
+    result.undone !== true ||
+    result.redone !== true ||
+    result.commandValue !== 9 ||
+    result.undoneValue !== null ||
+    result.redoneValue !== 9
+  ) {
+    throw new Error("Worker command history did not execute, undo, and redo the cell edit.");
+  }
+  if (result.formulaValue !== 14 || result.formulaSource !== "=A1*2") {
+    throw new Error("Worker did not preserve and evaluate the formula cell.");
+  }
+  const snapshot = result.snapshot as { version?: unknown } | null;
+  if (!snapshot || snapshot.version !== 2) {
+    throw new Error("Worker did not return a V2 workbook snapshot.");
+  }
+  const restoredWorkbook = deserializeWorkbook(result.snapshot);
+  const restoredSheet = getActiveSheet(restoredWorkbook);
+  const restoredFormula = getCellContent(restoredSheet, { row: 0, column: 1 });
+  if (
+    getCellValue(restoredSheet, { row: 1, column: 0 }) !== 9 ||
+    getCellValue(restoredSheet, { row: 0, column: 1 }) !== 14 ||
+    restoredFormula?.kind !== "formula" ||
+    restoredFormula.formula.source !== "=A1*2"
+  ) {
+    throw new Error(
+      "Worker returned a workbook snapshot with incorrect command or formula content.",
+    );
+  }
+  if (
+    expectGeometry &&
+    JSON.stringify(result.geometryCell) !== JSON.stringify({ row: 1, column: 1 })
+  ) {
+    throw new Error("Worker did not evaluate the Sheet Engine geometry check.");
+  }
+  if (JSON.stringify(inputSnapshot) !== expectedSnapshot) {
+    throw new Error("Worker changed the source workbook snapshot.");
+  }
+  if (JSON.stringify(inputCommand) !== expectedCommand) {
+    throw new Error("Worker changed the source workbook command.");
   }
 }
 
@@ -97,19 +214,53 @@ async function main(): Promise<void> {
     if (sheetEngine) {
       linkPackageForConsumer(temporaryDirectory, "packages/sheet-engine", sheetEngine);
     }
+    const payload = createWorkerPayload();
+    const inputSnapshot = JSON.stringify(payload.snapshot);
+    const inputCommand = JSON.stringify(payload.command);
     const entryPath = join(temporaryDirectory, "consumer.mjs");
     const imports = [`import * as core from ${JSON.stringify(core.name)};`];
     const values = ["Object.keys(core).length"];
+    const geometry = ["let geometryCell = null;"];
     if (sheetEngine) {
       imports.push(`import * as sheetEngine from ${JSON.stringify(sheetEngine.name)};`);
       values.push("Object.keys(sheetEngine).length");
+      geometry.push(
+        "geometryCell = sheetEngine.createSheetGeometry({ rowCount: 3, columnCount: 3, rowHeight: 20, columnWidth: 80 }).getCellAtPoint({ x: 90, y: 25 });",
+      );
     }
     writeFileSync(
       entryPath,
       `${imports.join("\n")}
 
-self.addEventListener("message", () => {
-  self.postMessage(${values.join(" + ")});
+self.addEventListener("message", (event) => {
+  const { snapshot, command } = event.data;
+  const workbook = core.deserializeWorkbook(snapshot);
+  const session = core.createWorkbookSession({
+    workbook,
+    idFactory: core.createSequentialIdFactory(),
+  });
+  const sheet = core.getActiveSheet(workbook);
+  const executed = core.executeWorkbookCommand(session, command);
+  const commandValue = core.getCellValue(sheet, { row: 1, column: 0 });
+  const undone = core.undoWorkbookCommand(session);
+  const undoneValue = core.getCellValue(sheet, { row: 1, column: 0 });
+  const redone = core.redoWorkbookCommand(session);
+  const redoneValue = core.getCellValue(sheet, { row: 1, column: 0 });
+  const formulaContent = core.getCellContent(sheet, { row: 0, column: 1 });
+  ${geometry.join("\n  ")}
+  self.postMessage({
+    exportedMemberCount: ${values.join(" + ")},
+    commandValue,
+    undoneValue,
+    redoneValue,
+    formulaValue: core.getCellValue(sheet, { row: 0, column: 1 }),
+    formulaSource: formulaContent?.kind === "formula" ? formulaContent.formula.source : null,
+    snapshot: core.serializeWorkbook(workbook),
+    geometryCell,
+    executed,
+    undone,
+    redone,
+  });
 });
 `,
     );
@@ -139,10 +290,18 @@ self.addEventListener("message", () => {
       throw new Error("Browser-target Worker bundle still references a Node builtin.");
     }
 
-    const exportedMemberCount = await verifyWorkerRoundTrip(result.outputs[0].path);
+    const roundTripResult = await verifyWorkerRoundTrip(result.outputs[0].path, payload);
+    assertRoundTripResult(
+      roundTripResult,
+      payload.snapshot,
+      payload.command,
+      inputSnapshot,
+      inputCommand,
+      Boolean(sheetEngine),
+    );
 
     console.log(
-      `Worker browser bundle and message round trip passed for ${[core.name, sheetEngine?.name].filter(Boolean).join(", ")} (${exportedMemberCount} exports).`,
+      `Worker browser bundle and workbook command round trip passed for ${[core.name, sheetEngine?.name].filter(Boolean).join(", ")} (${roundTripResult.exportedMemberCount} exports).`,
     );
   } finally {
     rmSync(temporaryDirectory, { recursive: true, force: true });
