@@ -102,6 +102,7 @@ describe("workspace persistence integration", () => {
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
     expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain("imported");
     expect(wrapper.get<HTMLTextAreaElement>("[data-formula-input]").element.value).toBe("imported");
+    expect(wrapper.find('[data-workbook-file="feedback"]').exists()).toBe(false);
   });
 
   test("invalid snapshots leave the current document and saved record untouched", async () => {

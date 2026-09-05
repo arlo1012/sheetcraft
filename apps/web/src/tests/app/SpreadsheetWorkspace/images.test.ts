@@ -189,6 +189,8 @@ describe("workspace cell image entry points", () => {
       width: 120,
       height: 80,
     });
+    expect(wrapper.find(".spreadsheet-workspace__image-feedback").exists()).toBe(false);
+    expect(wrapper.find(".workbook-status-bar__status").exists()).toBe(false);
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
     expect(sheet.floatingImages).toHaveLength(1);
     expect(getCellContent(sheet, { row: 0, column: 0 })?.kind).toBe("image");

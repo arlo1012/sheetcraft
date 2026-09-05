@@ -177,7 +177,6 @@ const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
 const selectedImageId = ref<string | null>(null);
 const selection = ref<CellSelection>(createCellSelection({ row: 0, column: 0 }));
-const clipboardFeedbackKey = ref<GridClipboardFeedback>();
 const imagePreview = shallowRef<{ assetId: string; altText: string; trigger?: HTMLElement }>();
 const previewUrl = computed(
   () => imagePreview.value && props.imageAssetUrls?.get(imagePreview.value.assetId),
@@ -409,9 +408,6 @@ const activeCellEditorFrameStyle = computed(() =>
 const activeCellWrapText = computed(() =>
   Boolean(getCellStyle(props.sheet, activeCell.value)?.wrapText),
 );
-const clipboardFeedback = computed(() =>
-  clipboardFeedbackKey.value ? t(CLIPBOARD_MESSAGE_KEYS[clipboardFeedbackKey.value]) : "",
-);
 const browserClipboard = createBrowserGridClipboardPort();
 const {
   canPasteFormats,
@@ -460,7 +456,6 @@ const {
     return result;
   },
   onFeedback: (message) => {
-    clipboardFeedbackKey.value = message;
     emit("clipboardFeedback", message);
   },
 });
@@ -787,7 +782,6 @@ function onGridKeydown(event: KeyboardEvent): void {
     event.preventDefault();
     event.stopPropagation();
     clearPendingClipboard();
-    clipboardFeedbackKey.value = undefined;
   }
 }
 
@@ -1039,7 +1033,6 @@ function requestCellClear(): void {
     return;
   }
   clearPendingClipboard();
-  clipboardFeedbackKey.value = undefined;
   emit("clearCells", getSelectionRange(selection.value));
   cellContextMenu.value = undefined;
   focusEditor();
@@ -1185,7 +1178,6 @@ function onEditorKeydown(event: KeyboardEvent): void {
   if (event.key === "Delete" || event.key === "Backspace") {
     event.preventDefault();
     clearPendingClipboard();
-    clipboardFeedbackKey.value = undefined;
     emit("clearCells", getSelectionRange(selection.value));
     return;
   }
@@ -1244,7 +1236,6 @@ function restoreViewState(viewState?: SheetGridViewState): void {
 
 function clearClipboard(): void {
   clearPendingClipboard();
-  clipboardFeedbackKey.value = undefined;
 }
 
 function flushPendingEdit(): boolean {
@@ -1499,7 +1490,6 @@ defineExpose({
       :alt-text="imagePreview.altText"
       @close="closeImagePreview"
     />
-    <span class="sheet-grid__assistive-status" aria-live="polite">{{ clipboardFeedback }}</span>
   </section>
 </template>
 
@@ -1565,17 +1555,6 @@ defineExpose({
     left: 0;
     overflow: hidden;
     background: var(--idea-surface-panel);
-  }
-
-  &__assistive-status {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
   }
 }
 </style>

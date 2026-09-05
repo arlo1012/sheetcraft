@@ -42,7 +42,6 @@ const {
   activeSelectionSummary,
   dataToolState,
   mergeState,
-  workspaceStatusText,
   commitCell,
   setCellImage,
   setFloatingImage,
@@ -50,7 +49,6 @@ const {
   convertFloatingImageToCell,
   convertCellImageToFloating,
   pasteCells,
-  showClipboardFeedback,
   clearCells,
   autoSum,
   sortSelection,
@@ -102,7 +100,7 @@ const imageActions = useSheetImageActions({
   setFloatingImage,
   convertCellImageToFloating,
 });
-const { busy: imageBusy, feedback: imageFeedback } = imageActions;
+const { busy: imageBusy } = imageActions;
 
 const persistence = useWorkbookPersistence({
   store: props.workbookStore ?? createIndexedDbWorkbookStore(),
@@ -181,13 +179,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       </template>
     </SpreadsheetRibbon>
     <div class="spreadsheet-workspace__file-feedback">
-      <div
-        v-if="imageBusy || imageFeedback"
-        class="spreadsheet-workspace__image-feedback"
-        role="status"
-      >
-        {{ t(imageBusy ? "image.loading" : imageFeedback!) }}
-      </div>
       <WorkbookFileFeedback
         :error="saveError"
         :feedback="feedback"
@@ -223,7 +214,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @delete-floating-image="deleteFloatingImage"
         @convert-floating-image-to-cell="convertFloatingImageToCell"
         @paste-image-file="imageActions.pasteImageFile"
-        @image-feedback="imageActions.reportFeedback"
         @convert-cell-image-to-floating="imageActions.convertCellImageToFloating"
         @paste-floating-image="imageActions.pasteFloatingImage"
         :workbook-revision="workbookRevision"
@@ -231,7 +221,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :view-state="activeSheetViewState"
         :format-painter-active="formatPainterActive"
         @clear-cells="clearCells"
-        @clipboard-feedback="showClipboardFeedback"
         @commit-cell="commitCell"
         @delete-axis="deleteAxis"
         @format-painter-target="applyFormatPainterTarget"
@@ -247,7 +236,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :inert="loading || fileBusy"
       :sheets="sheets"
       :active-sheet-id="session.workbook.activeSheetId"
-      :status-text="workspaceStatusText"
       :selection-summary="activeSelectionSummary"
       @select="selectSheet"
       @add="addSheet"
@@ -273,13 +261,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
 
   &__image-input {
     display: none;
-  }
-
-  &__image-feedback {
-    padding: 4px 12px;
-    color: var(--idea-text-secondary);
-    background: var(--idea-surface-secondary);
-    font-size: 12px;
   }
 
   &__grid {

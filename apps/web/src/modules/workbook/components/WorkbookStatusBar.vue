@@ -9,7 +9,6 @@ import WorkbookSheetTabs from "./WorkbookSheetTabs.vue";
 const props = defineProps<{
   sheets: readonly Sheet[];
   activeSheetId: string;
-  statusText: string;
   selectionSummary: SelectionSummary;
 }>();
 
@@ -49,13 +48,6 @@ function formatNumber(value: number): string {
         @delete="emit('delete', $event)"
       />
     </div>
-    <span
-      class="workbook-status-bar__status"
-      :class="{ 'is-empty': !statusText }"
-      aria-live="polite"
-    >
-      {{ statusText }}
-    </span>
     <dl
       v-if="shouldShowSummary"
       class="workbook-status-bar__summary"
@@ -155,24 +147,6 @@ function formatNumber(value: number): string {
     overflow: hidden;
   }
 
-  &__status {
-    display: inline-flex;
-    flex: 1 1 auto;
-    align-items: center;
-    min-width: 60px;
-    padding: 0 12px;
-    overflow: hidden;
-    color: var(--idea-text-muted);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-
-    &.is-empty {
-      flex-basis: 0;
-      min-width: 0;
-      padding: 0;
-    }
-  }
-
   &__summary {
     display: flex;
     flex: 0 0 auto;
@@ -240,17 +214,6 @@ function formatNumber(value: number): string {
   }
 
   @media (max-width: 720px) {
-    &__status {
-      position: absolute;
-      width: 1px;
-      min-width: 0;
-      height: 1px;
-      padding: 0;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-
     &__summary {
       gap: 8px;
       padding: 0 8px;

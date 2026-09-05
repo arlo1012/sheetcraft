@@ -183,6 +183,6 @@ describe("filtered clipboard workspace integration", () => {
 
     expect(grid.props("workbookRevision")).toBe(beforePasteRevision);
     expect(memory.store.save).not.toHaveBeenCalled();
-    expect(wrapper.get(".workbook-status-bar__status").text()).toContain("does not fit");
+    expect(wrapper.find(".workbook-status-bar__status").exists()).toBe(false);
   });
 });

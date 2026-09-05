@@ -56,7 +56,7 @@ describe("App", () => {
     expect(wrapper.get(".spreadsheet-ribbon").attributes("aria-label")).toBe("Workbook tools");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("Home");
     expect(wrapper.get(".workbook-status-bar").attributes("aria-label")).toBe("Workbook status");
-    expect(wrapper.get(".workbook-status-bar__status").text()).toBe("");
+    expect(wrapper.find(".workbook-status-bar__status").exists()).toBe(false);
     expect(wrapper.find("[data-selection-summary]").exists()).toBe(false);
   });
 
@@ -164,29 +164,16 @@ describe("App", () => {
     await wrapper.get('[aria-label="Find next"]').trigger("click");
 
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
-    expect(wrapper.get(".workbook-status-bar__status").text()).toBe("Found A1");
+    expect(wrapper.find(".workbook-status-bar__status").exists()).toBe(false);
   });
 
-  test("reports invalid addresses transiently without moving", async () => {
+  test("rejects invalid addresses without moving or showing an operation notice", async () => {
     const wrapper = mountApp();
 
     await getAddressInput(wrapper).setValue("XFE1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
-    expect(wrapper.get(".workbook-status-bar__status").text()).toBe("Invalid address");
-  });
-
-  test("clears transient feedback and returns to a quiet status", async () => {
-    vi.useFakeTimers();
-    const wrapper = mountApp();
-
-    await getAddressInput(wrapper).setValue("invalid");
-    await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
-    expect(wrapper.get(".workbook-status-bar__status").text()).toBe("Invalid address");
-
-    await vi.advanceTimersByTimeAsync(3_000);
-    await wrapper.vm.$nextTick();
-    expect(wrapper.get(".workbook-status-bar__status").text()).toBe("");
+    expect(wrapper.find(".workbook-status-bar__status").exists()).toBe(false);
   });
 
   test("defers address navigation until IME composition commits to its source cell", async () => {
@@ -207,7 +194,7 @@ describe("App", () => {
     expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain("中文");
   });
 
-  test("reports localized sheet-name validation without mutating the workbook", async () => {
+  test("rejects invalid sheet names without mutating the workbook or showing operation notices", async () => {
     const wrapper = mountApp();
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
 
@@ -215,22 +202,22 @@ describe("App", () => {
     const renameInput = wrapper.get('[aria-label="Rename Sheet2"]');
     await renameInput.setValue(" ");
     await renameInput.trigger("keydown", { key: "Enter" });
-    expect(wrapper.text()).toContain("Sheet name cannot be empty");
+    expect(wrapper.text()).not.toContain("Sheet name cannot be empty");
     expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet2");
 
     await wrapper.get('[title="Sheet2 (double-click to rename)"]').trigger("dblclick");
     await wrapper.get('[aria-label="Rename Sheet2"]').setValue("Sheet1");
     await wrapper.get('[aria-label="Rename Sheet2"]').trigger("keydown", { key: "Enter" });
-    expect(wrapper.text()).toContain("A sheet named Sheet1 already exists");
+    expect(wrapper.text()).not.toContain("A sheet named Sheet1 already exists");
     expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet2");
   });
 
-  test("switches visible, status, and assistive text between English and Chinese", async () => {
+  test("switches visible and assistive labels between English and Chinese", async () => {
     const wrapper = mountApp();
 
     await getAddressInput(wrapper).setValue("XFE1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
-    expect(wrapper.text()).toContain("Invalid address");
+    expect(wrapper.text()).not.toContain("Invalid address");
 
     const localeSelect = wrapper.findComponent(LocaleSwitcher).findComponent(TSelect);
     localeSelect.vm.$emit("change", "zh-CN");
@@ -244,7 +231,7 @@ describe("App", () => {
     expect(wrapper.get("[data-locale-select] input").element).toBeInstanceOf(HTMLInputElement);
     expect(wrapper.get(".home-format-toolbar").attributes("aria-label")).toBe("单元格格式");
     expect(wrapper.get("[data-formula-bar]").attributes("aria-label")).toBe("地址和公式栏");
-    expect(wrapper.text()).toContain("单元格地址无效");
+    expect(wrapper.text()).not.toContain("单元格地址无效");
     expect(wrapper.text()).not.toContain("就绪");
 
     await wrapper.get('[data-select-row="2"]').trigger("contextmenu", {
