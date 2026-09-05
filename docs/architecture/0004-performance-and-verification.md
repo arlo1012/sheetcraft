@@ -51,6 +51,19 @@ JavaScript, 78/12 KB app CSS, and 220/28 KB total CSS. Image asset validation,
 portable bundles, rendering and gestures add product code without new runtime
 dependencies; entry and total gates both remain active.
 
+Image clipboard/conversion and fullscreen preview require another inspected
+production build. `TImageViewer` is dynamically imported and its direct
+`image-viewer` and `image` modules are placed in higher-priority, non-recursive
+TDesign chunks. This keeps the viewer out of the entry's static imports and
+HTML preloads; shared TDesign dependencies stay in the regular vendor chunk.
+The measured build is 357,133 B app JavaScript (98,667 B gzip), 899,773 B total
+JavaScript (261,767 B gzip), 75,876 B app CSS (11,512 B gzip), and 232,804 B
+total CSS (30,040 B gzip). The deferred viewer assets are 17,216 B JavaScript
+(5,587 B gzip) and 10,844 B CSS (1,867 B gzip). Limits retain practical small
+headroom at 360/100 KB app JavaScript, 910/265 KB total JavaScript, 78/12 KB
+app CSS, and 240/31 KB total CSS. Total-asset budgets continue to account for
+deferred code so lazy loading cannot hide overall bundle growth.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

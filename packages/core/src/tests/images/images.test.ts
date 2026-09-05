@@ -5,6 +5,7 @@ import {
   createDeleteSheetCommand,
   createDuplicateSheetCommand,
   createConvertFloatingImageToCellCommand,
+  createConvertCellImageToFloatingCommand,
   createMergeCellsCommand,
   createSetCellContentCommand,
   createSetFloatingImageCommand,
@@ -12,6 +13,7 @@ import {
   createInsertSheetAxisCommand,
   createResizeSheetDimensionCommand,
   createSortSheetRangeCommand,
+  tryApplyWorkbookCommand,
 } from "../../commands/index.js";
 import { translateCellContentForCopy } from "../../clipboard.js";
 import { formatCellContentForInput } from "../../input.js";
@@ -177,6 +179,105 @@ describe("sheet images", () => {
       kind: "image",
       image: { assetId: mergedImage.assetId, altText: mergedImage.altText },
     });
+  });
+
+  test("converts a merged cell image into a floating image and restores its geometry on redo", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const target = { row: 4, column: 3 };
+    const innerAddress = { row: 5, column: 4 };
+    applyWorkbookCommand(
+      session.workbook,
+      createMergeCellsCommand(sheet.id, { start: target, end: innerAddress }),
+    );
+    setCellContent(sheet, target, {
+      kind: "image",
+      image: { assetId: "asset-cell", altText: "Cell chart" },
+    });
+    setCellStyle(sheet, target, { fillColor: "#ff00ff" });
+    applyWorkbookCommand(
+      session.workbook,
+      createSetFloatingImageCommand(sheet.id, { ...image, id: "front" }),
+    );
+
+    const undo = applyWorkbookCommand(
+      session.workbook,
+      createConvertCellImageToFloatingCommand(sheet.id, innerAddress, "from-cell", {
+        width: 240,
+        height: 120,
+      }),
+    );
+    expect(sheet.floatingImages).toEqual([
+      { ...image, id: "front" },
+      {
+        id: "from-cell",
+        assetId: "asset-cell",
+        altText: "Cell chart",
+        anchor: target,
+        offsetX: 0,
+        offsetY: 0,
+        width: 240,
+        height: 120,
+      },
+    ]);
+    expect(getCellContent(sheet, target)).toBeNull();
+    expect(getCellStyle(sheet, target)).toEqual({ fillColor: "#ff00ff" });
+
+    const redo = applyWorkbookCommand(session.workbook, undo!);
+    expect(sheet.floatingImages.map((item) => item.id)).toEqual(["front"]);
+    expect(getCellContent(sheet, target)).toEqual({
+      kind: "image",
+      image: { assetId: "asset-cell", altText: "Cell chart" },
+    });
+    expect(getCellStyle(sheet, target)).toEqual({ fillColor: "#ff00ff" });
+
+    applyWorkbookCommand(session.workbook, redo!);
+    expect(sheet.floatingImages).toEqual([
+      { ...image, id: "front" },
+      {
+        id: "from-cell",
+        assetId: "asset-cell",
+        altText: "Cell chart",
+        anchor: target,
+        offsetX: 0,
+        offsetY: 0,
+        width: 240,
+        height: 120,
+      },
+    ]);
+  });
+
+  test("rejects invalid floating geometry and leaves non-image cells unchanged", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const address = { row: 1, column: 1 };
+    setCellContent(sheet, address, {
+      kind: "image",
+      image: { assetId: "asset-cell", altText: "Cell chart" },
+    });
+    const before = createSheetSparseState(sheet);
+    const invalid = tryApplyWorkbookCommand(session.workbook, {
+      type: "convertCellImageToFloating",
+      sheetId: sheet.id,
+      address,
+      imageId: "from-cell",
+      size: { width: 0, height: 120 },
+    });
+    expect(invalid.ok).toBe(false);
+    expect(createSheetSparseState(sheet)).toEqual(before);
+
+    setCellContent(sheet, address, { kind: "literal", value: "not an image" });
+    const beforeNoImage = createSheetSparseState(sheet);
+    expect(
+      applyWorkbookCommand(
+        session.workbook,
+        createConvertCellImageToFloatingCommand(sheet.id, address, "from-cell", {
+          width: 120,
+          height: 120,
+        }),
+      ),
+    ).toBeNull();
+    expect(createSheetSparseState(sheet)).toEqual(beforeNoImage);
   });
 
   test("moves anchors for insert, removes deleted anchors, and restores the exact sparse state", () => {

@@ -9,6 +9,10 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 const props = defineProps<{ anchor: FloatingReference }>();
 const emit = defineEmits<{
   convertToCell: [];
+  preview: [];
+  copy: [];
+  cut: [];
+  paste: [];
   delete: [];
   close: [restoreFocus: boolean];
 }>();
@@ -24,6 +28,16 @@ const { floatingStyles } = useDismissibleFloatingPanel(menuAnchor, menuRef, menu
 });
 
 onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
+
+function onKeydown(event: KeyboardEvent): void {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+  const key = event.key.toLowerCase();
+  if (key !== "c" && key !== "x" && key !== "v") return;
+  event.preventDefault();
+  if (key === "c") emit("copy");
+  else if (key === "x") emit("cut");
+  else emit("paste");
+}
 </script>
 
 <template>
@@ -34,9 +48,24 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
       :style="floatingStyles"
       :label="t('image.contextMenuActions')"
       @click.stop
-      @keydown.stop
+      @keydown.stop="onKeydown"
       @contextmenu.prevent.stop
     >
+      <MenuItem data-floating-image-action="preview" @select="emit('preview')">
+        {{ t("image.preview") }}
+      </MenuItem>
+      <MenuItem data-floating-image-action="copy" @select="emit('copy')">
+        {{ t("cellMenu.copy") }}
+        <template #shortcut>{{ t("cellMenu.copyShortcut") }}</template>
+      </MenuItem>
+      <MenuItem data-floating-image-action="cut" @select="emit('cut')">
+        {{ t("cellMenu.cut") }}
+        <template #shortcut>{{ t("cellMenu.cutShortcut") }}</template>
+      </MenuItem>
+      <MenuItem data-floating-image-action="paste" @select="emit('paste')">
+        {{ t("cellMenu.paste") }}
+        <template #shortcut>{{ t("cellMenu.pasteShortcut") }}</template>
+      </MenuItem>
       <MenuItem data-floating-image-action="convert-to-cell" @select="emit('convertToCell')">
         {{ t("image.convertToCell") }}
       </MenuItem>

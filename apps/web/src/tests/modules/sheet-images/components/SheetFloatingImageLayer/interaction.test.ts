@@ -60,6 +60,19 @@ function floatingImageMenu(): HTMLElement | null {
 }
 
 describe("SheetFloatingImageLayer", () => {
+  test("previews double-clicks retargeted by pointer capture without recording a move", async () => {
+    const wrapper = mountLayer();
+    const fragment = wrapper.get('[data-floating-image-id="image-1"]');
+    const layer = wrapper.get("[data-floating-image-layer]");
+    await fragment.trigger("pointerdown", { button: 0, pointerId: 4, clientX: 100, clientY: 50 });
+    layer.element.dispatchEvent(
+      pointerEvent("pointerup", { pointerId: 4, clientX: 100, clientY: 50 }),
+    );
+    await layer.trigger("dblclick", { button: 0 });
+    expect(wrapper.emitted("update")).toBeUndefined();
+    expect(wrapper.emitted("preview")?.[0]?.[0]).toEqual(image);
+    wrapper.unmount();
+  });
   test("renders a positioned image and selects it from its viewport fragment", async () => {
     const wrapper = mountLayer({ selectedImageId: null });
     const fragment = wrapper.get('[data-floating-image-id="image-1"]');

@@ -48,6 +48,7 @@ const {
   setFloatingImage,
   deleteFloatingImage,
   convertFloatingImageToCell,
+  convertCellImageToFloating,
   pasteCells,
   showClipboardFeedback,
   clearCells,
@@ -99,6 +100,7 @@ const imageActions = useSheetImageActions({
     flushPendingGridEdit() && (formulaBarRef.value?.flushPendingEdit() ?? true),
   setCellImage,
   setFloatingImage,
+  convertCellImageToFloating,
 });
 const { busy: imageBusy, feedback: imageFeedback } = imageActions;
 
@@ -220,7 +222,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @update-floating-image="setFloatingImage"
         @delete-floating-image="deleteFloatingImage"
         @convert-floating-image-to-cell="convertFloatingImageToCell"
-        @paste-image-file="imageActions.insertFile"
+        @paste-image-file="imageActions.pasteImageFile"
+        @image-feedback="imageActions.reportFeedback"
+        @convert-cell-image-to-floating="imageActions.convertCellImageToFloating"
         @paste-floating-image="imageActions.pasteFloatingImage"
         :workbook-revision="workbookRevision"
         :apply-paste="pasteCells"

@@ -262,9 +262,12 @@ export type MessageSchema = {
     keyboardInstructions: string;
     contextMenuActions: string;
     convertToCell: string;
+    convertToFloating: string;
+    convertedToFloating: string;
     deleteImage: string;
     converted: string;
     convertFailed: string;
+    preview: string;
   };
   clipboard: {
     unavailable: string;

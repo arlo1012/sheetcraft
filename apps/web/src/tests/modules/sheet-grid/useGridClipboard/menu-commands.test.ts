@@ -93,6 +93,28 @@ function createFixture() {
 }
 
 describe("useGridClipboard menu commands", () => {
+  test("uses the guarded pending cut when menu clipboard reads are unavailable", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 0, column: 0 }, "move");
+    await fixture.clipboard.cutSelection();
+    fixture.setSelection(createCellSelection({ row: 2, column: 2 }));
+    vi.mocked(fixture.port.read).mockRejectedValueOnce(new Error("denied"));
+    await fixture.clipboard.pasteSelection();
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "all",
+      moveSource: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+    });
+  });
+
+  test("clears pending cut after an externally known menu paste", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 0, column: 0 }, "move");
+    await fixture.clipboard.cutSelection();
+    fixture.setTransfer({ text: "external" });
+    await fixture.clipboard.pasteSelection();
+    expect(fixture.pastes[0]).not.toHaveProperty("moveSource");
+    expect(fixture.clipboard.clipboardMode.value).toBeNull();
+  });
   test("retains raw local formula content and its source range for a copied paste", async () => {
     const fixture = createFixture();
     setCellContent(
@@ -155,6 +177,49 @@ describe("useGridClipboard menu commands", () => {
     });
     expect(fixture.pastes[0]).not.toHaveProperty("moveSource");
     expect(fixture.feedback).toEqual(["copied", "pasted"]);
+  });
+
+  test("uses an internal copy repeatedly when clipboard reads fail after document changes", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 0, column: 0 }, "copy");
+    await fixture.clipboard.copySelection();
+    fixture.setSelection(createCellSelection({ row: 1, column: 1 }));
+    vi.mocked(fixture.port.read).mockRejectedValueOnce(new Error("denied"));
+    await fixture.clipboard.pasteSelection();
+    fixture.setSelection(createCellSelection({ row: 2, column: 2 }));
+    vi.mocked(fixture.port.read).mockRejectedValueOnce(new Error("denied"));
+    await fixture.clipboard.pasteSelection();
+    expect(fixture.pastes).toHaveLength(2);
+    expect(fixture.pastes.every((paste) => !Object.hasOwn(paste, "moveSource"))).toBe(true);
+  });
+
+  test("does not run a rejected-read fallback after the captured document revision changes", async () => {
+    let revision = 0;
+    const sheet = getActiveSheet(createWorkbook({ id: "revision", sheetId: "sheet" }));
+    let selection = createCellSelection({ row: 0, column: 0 });
+    const port: GridClipboardPort = {
+      write: async () => ({ localTokenWritten: false }),
+      read: async () => Promise.reject(new Error("denied")),
+    };
+    const feedback: GridClipboardFeedback[] = [];
+    const clipboard = useGridClipboard({
+      getSheet: () => sheet,
+      getSelection: () => selection,
+      getRevision: () => revision,
+      isEditing: () => false,
+      isComposing: () => false,
+      onPaste: () => ({ ok: true }),
+      onFeedback: (message) => feedback.push(message),
+      clipboardPort: port,
+    });
+    setCellValue(sheet, { row: 0, column: 0 }, "cut");
+    await clipboard.cutSelection();
+    selection = createCellSelection({ row: 1, column: 1 });
+    const paste = clipboard.pasteSelection();
+    revision += 1;
+    await paste;
+    expect(feedback.at(-1)).toBe("documentChanged");
+    expect(clipboard.clipboardMode.value).toBe("cut");
   });
 
   test("keeps cut source data until a matching local paste moves it", async () => {
@@ -258,21 +323,19 @@ describe("useGridClipboard menu commands", () => {
     expect(fixture.feedback).toEqual(["readyToMove", "pasted"]);
   });
 
-  test("reports port failures without replacing pending clipboard state or pasting", async () => {
+  test("keeps a failed menu cut internally and moves it when menu reading is unavailable", async () => {
     const fixture = createFixture();
     setCellValue(fixture.sheet, { row: 0, column: 0 }, "keep pending");
     await fixture.clipboard.copySelection();
-    const pendingRange = fixture.clipboard.clipboardRange.value;
-
     fixture.setSelection(createCellSelection({ row: 1, column: 1 }));
     vi.mocked(fixture.port.write).mockRejectedValueOnce(new Error("denied"));
     await fixture.clipboard.cutSelection();
-    expect(fixture.clipboard.clipboardRange.value).toEqual(pendingRange);
+    expect(fixture.clipboard.clipboardMode.value).toBe("cut");
 
     vi.mocked(fixture.port.read).mockRejectedValueOnce(new Error("denied"));
     await fixture.clipboard.pasteSelection();
-    expect(fixture.pastes).toHaveLength(0);
-    expect(fixture.feedback.slice(-2)).toEqual(["unavailable", "unavailable"]);
+    expect(fixture.pastes[0]).toHaveProperty("moveSource");
+    expect(fixture.feedback.at(-1)).toBe("moved");
   });
 
   test("treats port text without the local token as external clipboard data", async () => {
@@ -288,18 +351,19 @@ describe("useGridClipboard menu commands", () => {
     expect(fixture.feedback.at(-1)).toBe("pasted");
   });
 
-  test("degrades a text-only cut to copy semantics", async () => {
+  test("keeps a text-only cut for a failed-read fallback but not a known external paste", async () => {
     const fixture = createFixture();
     setCellValue(fixture.sheet, { row: 0, column: 0 }, "safe source");
     fixture.setLocalTokenWritten(false);
 
     await fixture.clipboard.cutSelection();
-    expect(fixture.clipboard.clipboardMode.value).toBe("copy");
-    expect(fixture.feedback).toEqual(["copied"]);
+    expect(fixture.clipboard.clipboardMode.value).toBe("cut");
+    expect(fixture.feedback).toEqual(["readyToMove"]);
 
     fixture.setSelection(createCellSelection({ row: 1, column: 1 }));
     await fixture.clipboard.pasteSelection();
     expect(fixture.pastes[0]).not.toHaveProperty("moveSource");
+    expect(fixture.clipboard.clipboardMode.value).toBeNull();
   });
 
   test("pastes only values without forwarding local formatting", async () => {
@@ -453,7 +517,7 @@ describe("useGridClipboard menu commands", () => {
       styles: undefined,
     });
     expect(fixture.pastes[0]).not.toHaveProperty("moveSource");
-    expect(fixture.clipboard.clipboardMode.value).toBe("cut");
+    expect(fixture.clipboard.clipboardMode.value).toBeNull();
     expect(fixture.feedback).toEqual(["readyToMove", "pasted"]);
   });
 

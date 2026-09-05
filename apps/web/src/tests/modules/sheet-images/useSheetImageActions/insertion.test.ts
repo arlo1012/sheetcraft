@@ -16,6 +16,7 @@ function fixture() {
   const store = createMemoryImageAssetStore();
   const setCellImage = vi.fn();
   const setFloatingImage = vi.fn();
+  const convertCellImageToFloating = vi.fn();
   const actions = useSheetImageActions({
     assetStore: store,
     getWorkbook: () => workbook,
@@ -24,12 +25,14 @@ function fixture() {
     flushPendingEdits: () => true,
     setCellImage,
     setFloatingImage,
+    convertCellImageToFloating,
   });
   return {
     actions,
     store,
     setCellImage,
     setFloatingImage,
+    convertCellImageToFloating,
     getWorkbook: () => workbook,
     replace: () => {
       workbook = createWorkbook({ idFactory: createSequentialIdFactory() });

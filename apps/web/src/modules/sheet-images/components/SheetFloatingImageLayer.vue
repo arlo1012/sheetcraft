@@ -37,6 +37,10 @@ const emit = defineEmits<{
   update: [image: FloatingImage];
   delete: [id: string];
   convertToCell: [id: string];
+  preview: [image: FloatingImage, trigger?: HTMLElement];
+  copy: [id: string];
+  cut: [id: string];
+  paste: [id: string];
 }>();
 
 const { t } = useAppI18n();
@@ -186,7 +190,17 @@ function finishGesture(commit: boolean): void {
   previewImage.value = undefined;
   if (!activeGesture) return;
   releasePointerCapture(activeGesture.target, activeGesture.pointerId);
-  if (commit && preview) emit("update", preview);
+  if (
+    commit &&
+    preview &&
+    (preview.anchor.row !== activeGesture.image.anchor.row ||
+      preview.anchor.column !== activeGesture.image.anchor.column ||
+      preview.offsetX !== activeGesture.image.offsetX ||
+      preview.offsetY !== activeGesture.image.offsetY ||
+      preview.width !== activeGesture.image.width ||
+      preview.height !== activeGesture.image.height)
+  )
+    emit("update", preview);
 }
 
 function onPointerUp(event: PointerEvent): void {
@@ -259,6 +273,34 @@ function requestConvertToCell(): void {
   if (imageId) emit("convertToCell", imageId);
 }
 
+function requestPreview(): void {
+  const image = props.images.find((entry) => entry.id === contextMenu.value?.imageId);
+  const trigger = contextMenu.value?.trigger;
+  closeContextMenu(false);
+  if (image) emit("preview", image, trigger);
+}
+
+function requestClipboard(mode: "copy" | "cut" | "paste"): void {
+  const imageId = contextMenu.value?.imageId;
+  closeContextMenu(true);
+  if (!imageId) return;
+  if (mode === "copy") emit("copy", imageId);
+  else if (mode === "cut") emit("cut", imageId);
+  else emit("paste", imageId);
+}
+
+function onImageDoubleClick(image: FloatingImage, event: MouseEvent): void {
+  emit("preview", image, event.currentTarget as HTMLElement);
+}
+
+function onLayerDoubleClick(event: MouseEvent): void {
+  // Pointer capture keeps drags alive across frozen panes and retargets clicks to this layer.
+  if (event.target !== event.currentTarget || gesture.value) return;
+  const image = props.images.find((entry) => entry.id === props.selectedImageId);
+  if (image)
+    emit("preview", image, layerRef.value?.querySelector<HTMLElement>(".is-selected") ?? undefined);
+}
+
 function requestDelete(): void {
   const imageId = contextMenu.value?.imageId;
   closeContextMenu(false);
@@ -322,6 +364,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
     @lostpointercapture="onLostPointerCapture"
+    @dblclick.prevent.stop="onLayerDoubleClick"
   >
     <div
       v-for="fragment in fragments"
@@ -336,6 +379,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       :aria-label="getAccessibleLabel(fragment.image)"
       @pointerdown.stop="startGesture(fragment.image, 'move', $event)"
       @contextmenu="onImageContextMenu(fragment.image, $event)"
+      @dblclick.prevent.stop="onImageDoubleClick(fragment.image, $event)"
       @keydown="onImageKeydown(fragment.image, $event)"
     >
       <img
@@ -368,6 +412,10 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       v-if="contextMenu"
       :anchor="contextMenu.anchor"
       @convert-to-cell="requestConvertToCell"
+      @preview="requestPreview"
+      @copy="requestClipboard('copy')"
+      @cut="requestClipboard('cut')"
+      @paste="requestClipboard('paste')"
       @delete="requestDelete"
       @close="closeContextMenu"
     />

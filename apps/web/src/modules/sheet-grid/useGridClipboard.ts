@@ -131,6 +131,9 @@ export function useGridClipboard(options: {
   onPaste: (payload: GridPastePayload) => GridPasteResult;
   onFeedback: (feedback: GridClipboardFeedback) => void;
   clipboardPort?: GridClipboardPort;
+  onPasteImage?: (transfer: GridClipboardTransfer, selection: CellSelection) => void;
+  onReadUnavailable?: (selection: CellSelection) => boolean;
+  onReadTransfer?: (transfer: GridClipboardTransfer) => void;
 }) {
   const clipboardPort = options.clipboardPort ?? createBrowserGridClipboardPort();
   const pendingClipboard = shallowRef<PendingClipboard | null>(null);
@@ -276,7 +279,8 @@ export function useGridClipboard(options: {
       }));
     } catch {
       if (operation === clipboardOperation && options.getSheet().id === sheetId) {
-        options.onFeedback("unavailable");
+        // Browser clipboard denial must not discard the in-memory menu copy/cut.
+        commitPreparedSelection(prepared);
       }
       return;
     }
@@ -289,7 +293,7 @@ export function useGridClipboard(options: {
     }
     commitPreparedSelection({
       ...prepared,
-      mode: mode === "cut" && !localTokenWritten ? "copy" : mode,
+      mode,
       localTokenWritten,
     });
   }
@@ -327,6 +331,10 @@ export function useGridClipboard(options: {
     selection: CellSelection,
     kind: GridPasteKind,
   ): void {
+    if (kind === "all" && (transfer.imageFile || transfer.floatingImage) && options.onPasteImage) {
+      options.onPasteImage(transfer, selection);
+      return;
+    }
     const text = transfer.text;
     const localToken = transfer.localToken;
     const pending = pendingClipboard.value;
@@ -475,6 +483,10 @@ export function useGridClipboard(options: {
       options.onFeedback("documentChanged");
       return;
     }
+    if (pendingClipboard.value && transfer.localToken !== pendingClipboard.value.token) {
+      pendingClipboard.value = null;
+    }
+    options.onReadTransfer?.(transfer);
     pasteTransfer(transfer, selection, "all");
   }
 
@@ -500,11 +512,18 @@ export function useGridClipboard(options: {
     const transfer = {
       text: types.includes("text/plain") ? data.getData("text/plain") : undefined,
       localToken: readGridClipboardLocalToken(data),
+      imageFile: data.files
+        ? Array.from(data.files).find((file) => file.type.startsWith("image/"))
+        : undefined,
     };
     if (!transfer.localToken && pendingClipboard.value?.localTokenWritten) {
       void pasteClipboardEventTransfer(transfer, selection, operation, sheetId, revision);
       return;
     }
+    if (pendingClipboard.value && transfer.localToken !== pendingClipboard.value.token) {
+      pendingClipboard.value = null;
+    }
+    options.onReadTransfer?.(transfer);
     pasteTransfer(transfer, selection, "all");
   }
 
@@ -521,7 +540,19 @@ export function useGridClipboard(options: {
       if (nativeWrite) await nativeWrite;
       transfer = await clipboardPort.read();
     } catch {
-      if (operation === clipboardOperation && options.getSheet().id === sheetId) {
+      if (operation !== clipboardOperation || options.getSheet().id !== sheetId) return;
+      if (revision !== getRevision()) {
+        options.onFeedback("documentChanged");
+        return;
+      }
+      const pending = pendingClipboard.value;
+      if (
+        pending &&
+        pending.sheetId === sheetId &&
+        (pending.mode === "copy" || pending.revision === revision)
+      ) {
+        pasteTransfer({ text: pending.text, localToken: pending.token }, selection, kind);
+      } else if (!options.onReadUnavailable?.(selection)) {
         options.onFeedback("unavailable");
       }
       return;
@@ -533,6 +564,10 @@ export function useGridClipboard(options: {
       options.onFeedback("documentChanged");
       return;
     }
+    if (pendingClipboard.value && transfer.localToken !== pendingClipboard.value.token) {
+      pendingClipboard.value = null;
+    }
+    options.onReadTransfer?.(transfer);
     pasteTransfer(transfer, selection, kind);
   }
 
@@ -547,6 +582,7 @@ export function useGridClipboard(options: {
   );
 
   return {
+    hasPendingClipboard: computed(() => pendingClipboard.value?.sheetId === options.getSheet().id),
     canPasteFormats: computed(() => {
       const pending = pendingClipboard.value;
       return Boolean(
@@ -564,6 +600,12 @@ export function useGridClipboard(options: {
     onCopy,
     onCut,
     onPaste,
+    pasteCapturedText: (text: string) => {
+      if (!canPaste()) return;
+      clearPendingClipboard();
+      options.onReadTransfer?.({ text });
+      pasteTransfer({ text }, cloneSelection(options.getSelection()), "all");
+    },
     pasteSelection,
     pasteFormatsSelection: () => pasteSelection("formats"),
     pasteValuesSelection: () => pasteSelection("values"),

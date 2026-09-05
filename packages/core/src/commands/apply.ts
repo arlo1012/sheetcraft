@@ -23,6 +23,7 @@ import { applyRestoreSheetStateCommand, applySheetAxisCommand } from "./structur
 import { applySortSheetRangeCommand } from "./sort.js";
 import {
   applyConvertFloatingImageToCellCommand,
+  applyConvertCellImageToFloatingCommand,
   applyDeleteFloatingImageCommand,
   applyRestoreFloatingImageToCellCommand,
   applySetFloatingImageCommand,
@@ -80,6 +81,8 @@ export function applyWorkbookCommand(
         return applyDeleteFloatingImageCommand(workbook, command);
       case "convertFloatingImageToCell":
         return applyConvertFloatingImageToCellCommand(workbook, command);
+      case "convertCellImageToFloating":
+        return applyConvertCellImageToFloatingCommand(workbook, command);
       case "restoreFloatingImageToCell":
         return applyRestoreFloatingImageToCellCommand(workbook, command);
       case "addSheet":

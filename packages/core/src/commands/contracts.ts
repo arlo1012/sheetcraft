@@ -137,6 +137,19 @@ export type ConvertFloatingImageToCellCommand = {
   id: string;
 };
 
+export type FloatingImageSize = {
+  width: number;
+  height: number;
+};
+
+export type ConvertCellImageToFloatingCommand = {
+  type: "convertCellImageToFloating";
+  sheetId: string;
+  address: CellAddress;
+  imageId: string;
+  size: FloatingImageSize;
+};
+
 /** Internal inverse for converting a floating image into an in-cell image. */
 export type RestoreFloatingImageToCellCommand = {
   type: "restoreFloatingImageToCell";
@@ -239,6 +252,7 @@ export type WorkbookCommand =
   | SetFloatingImageCommand
   | DeleteFloatingImageCommand
   | ConvertFloatingImageToCellCommand
+  | ConvertCellImageToFloatingCommand
   | RestoreFloatingImageToCellCommand
   | AddSheetCommand
   | DeleteSheetCommand
@@ -265,6 +279,7 @@ export type WorkbookOperation =
   | "images.floating.set"
   | "images.floating.delete"
   | "images.floating.convert"
+  | "images.cell.convert"
   | "sheets.add"
   | "sheets.delete"
   | "sheets.rename"
@@ -309,6 +324,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "images.floating.delete";
     case "convertFloatingImageToCell":
       return "images.floating.convert";
+    case "convertCellImageToFloating":
+      return "images.cell.convert";
     case "restoreFloatingImageToCell":
       return "history.restore";
     case "addSheet":

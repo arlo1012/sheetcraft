@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "description": "Production budgets include workbook persistence, cell/floating images and portable asset bundles, plus the formula foundation; see ADR 0004.",
+  "description": "Production budgets include workbook persistence, image clipboard/conversion and lazy fullscreen preview support, plus the formula foundation; see ADR 0004.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
       "pattern": "^index-.*\\.js$",
-      "maximumRawBytes": 350000,
-      "maximumGzipBytes": 97000
+      "maximumRawBytes": 360000,
+      "maximumGzipBytes": 100000
     },
     "css": {
       "pattern": "^index-.*\\.css$",
@@ -16,12 +16,12 @@
   },
   "totalAssets": {
     "javascript": {
-      "maximumRawBytes": 850000,
-      "maximumGzipBytes": 252000
+      "maximumRawBytes": 910000,
+      "maximumGzipBytes": 265000
     },
     "css": {
-      "maximumRawBytes": 220000,
-      "maximumGzipBytes": 28000
+      "maximumRawBytes": 240000,
+      "maximumGzipBytes": 31000
     }
   }
 }

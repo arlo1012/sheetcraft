@@ -1,6 +1,7 @@
 import { readonly, ref } from "vue";
 import {
   MIN_FLOATING_IMAGE_SIZE,
+  getCellContent,
   type CellAddress,
   type FloatingImage,
   type Sheet,
@@ -28,6 +29,12 @@ export function useSheetImageActions(options: {
     altText: string;
   }) => void;
   setFloatingImage: (image: FloatingImage, sheetId: string) => void;
+  convertCellImageToFloating: (payload: {
+    sheetId: string;
+    address: CellAddress;
+    imageId: string;
+    size: { width: number; height: number };
+  }) => void;
 }) {
   const busy = ref(false);
   const feedback = ref<MessageKey>();
@@ -35,14 +42,14 @@ export function useSheetImageActions(options: {
   const fileInput = ref<HTMLInputElement | null>(null);
   let pending: { mode: ImageInsertMode; target: ImageTarget } | undefined;
 
-  function captureTarget(): ImageTarget | undefined {
+  function captureTarget(address = options.getAddress()): ImageTarget | undefined {
     if (!options.flushPendingEdits()) return;
     const sheet = options.getSheet();
     return {
       workbook: options.getWorkbook(),
       sheetId: sheet.id,
       address: {
-        ...(getMergedCellAnchor(sheet.mergedCells, options.getAddress()) ?? options.getAddress()),
+        ...(getMergedCellAnchor(sheet.mergedCells, address) ?? address),
       },
     };
   }
@@ -131,8 +138,9 @@ export function useSheetImageActions(options: {
   async function pasteFloatingImage(
     image: FloatingImage,
     mode: ImageInsertMode = "floating",
+    address = options.getAddress(),
   ): Promise<void> {
-    const target = captureTarget();
+    const target = captureTarget(address);
     if (!target || busy.value) return;
     busy.value = true;
     try {
@@ -162,13 +170,54 @@ export function useSheetImageActions(options: {
     }
   }
 
+  async function convertCellImageToFloating(address: CellAddress): Promise<void> {
+    const target = captureTarget(address);
+    if (!target || busy.value) return;
+    const sheet = options.getSheet();
+    const content = getCellContent(sheet, target.address);
+    if (content?.kind !== "image") return;
+    busy.value = true;
+    feedback.value = undefined;
+    try {
+      const asset = await options.assetStore.get(content.image.assetId);
+      if (!asset) {
+        feedback.value = "image.assetUnavailable";
+        return;
+      }
+      if (!isCurrent(target)) return;
+      const current = getCellContent(sheet, target.address);
+      if (current?.kind !== "image" || current.image.assetId !== content.image.assetId) return;
+      const scale = Math.max(
+        MIN_FLOATING_IMAGE_SIZE / Math.min(asset.width, asset.height),
+        Math.min(1, 400 / asset.width, 300 / asset.height),
+      );
+      options.convertCellImageToFloating({
+        sheetId: target.sheetId,
+        address: target.address,
+        imageId: idFactory("image"),
+        size: { width: asset.width * scale, height: asset.height * scale },
+      });
+      feedback.value = "image.convertedToFloating";
+    } catch {
+      feedback.value = "image.convertFailed";
+    } finally {
+      busy.value = false;
+    }
+  }
+
   return {
     busy: readonly(busy),
     feedback: readonly(feedback),
+    reportFeedback: (message: MessageKey) => {
+      feedback.value = message;
+    },
     fileInput,
     requestInsert,
     insertFile,
+    pasteImageFile: (file: File, mode: ImageInsertMode, address?: CellAddress) =>
+      insertFile(file, mode, captureTarget(address)),
     onFileChange,
     pasteFloatingImage,
+    convertCellImageToFloating,
   };
 }
