@@ -4,6 +4,7 @@ import {
   getCellStyle,
   getCellContent,
   type CellAddress,
+  type ImageTransform,
   type Sheet,
   type SheetEvaluator,
 } from "@idea10/core/workbook";
@@ -13,6 +14,7 @@ import { isCellSelected, type CellSelection } from "@idea10/sheet-engine/selecti
 import { useAppI18n } from "../../../shared/i18n";
 import { getCellContentStyle } from "../cell-presentation";
 import { formatCellValueForGrid } from "../cell-value-presentation";
+import SheetImageContent from "../../sheet-images/components/SheetImageContent.vue";
 
 type VisibleCell = {
   key: string;
@@ -22,7 +24,7 @@ type VisibleCell = {
   viewportTop: number;
   viewportHeight: number;
   text: string;
-  image?: { assetId: string; altText: string };
+  image?: { assetId: string; altText: string; transform?: ImageTransform };
   multiline: boolean;
   wrapped: boolean;
   style: CSSProperties;
@@ -281,12 +283,13 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
           @dblclick.left.prevent="emit('cellDoubleClick', cell.address, $event)"
           @contextmenu="emit('cellContextmenu', cell.address, $event)"
         >
-          <img
+          <SheetImageContent
             v-if="cell.image && imageAssetUrls?.get(cell.image.assetId)"
             class="sheet-cell-layer__image"
-            :src="imageAssetUrls.get(cell.image.assetId)"
-            :alt="cell.image.altText || t('image.cellAlt')"
-            draggable="false"
+            :src="imageAssetUrls.get(cell.image.assetId) ?? ''"
+            :alt-text="cell.image.altText || t('image.cellAlt')"
+            :transform="cell.image.transform"
+            fit="contain"
           />
           <span
             v-else-if="cell.image"
@@ -384,7 +387,6 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
     display: block;
     width: 100%;
     height: 100%;
-    object-fit: contain;
     pointer-events: none;
   }
 

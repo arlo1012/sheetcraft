@@ -47,7 +47,7 @@ describe("formula and image foundation snapshots", () => {
     });
     const snapshot = serializeWorkbook(workbook);
     const restored = deserializeWorkbook(JSON.parse(JSON.stringify(snapshot)));
-    expect(snapshot.version).toBe(4);
+    expect(snapshot.version).toBe(5);
     expect(snapshot.dateSystem).toBe("1904");
     expect(serializeWorkbook(restored)).toEqual(snapshot);
     expect(getCellContent(getActiveSheet(restored), { row: 0, column: 1 })).toEqual({
@@ -68,7 +68,12 @@ describe("formula and image foundation snapshots", () => {
       const cells =
         version === 1
           ? [{ address: { row: 0, column: 0 }, value: "#N/A" }]
-          : [{ address: { row: 0, column: 0 }, content: { kind: "literal", value: "#N/A" } }];
+          : [
+              {
+                address: { row: 0, column: 0 },
+                content: { kind: "literal", value: "#N/A" },
+              },
+            ];
       const restored = deserializeWorkbook({
         version,
         id: "old",
@@ -88,7 +93,10 @@ describe("formula and image foundation snapshots", () => {
         kind: "literal",
         value: "#N/A",
       });
-      expect(serializeWorkbook(restored)).toMatchObject({ version: 4, dateSystem: "1900" });
+      expect(serializeWorkbook(restored)).toMatchObject({
+        version: 5,
+        dateSystem: "1900",
+      });
     },
   );
 
@@ -128,7 +136,10 @@ describe("formula and image foundation snapshots", () => {
       { kind: "error", error: createFormulaError("NA") },
     ] as const) {
       const invalid = { ...structuredClone(current), version: 2 };
-      invalid.sheets[0]!.cells.push({ address: { row: 0, column: 0 }, content });
+      invalid.sheets[0]!.cells.push({
+        address: { row: 0, column: 0 },
+        content,
+      });
       expect(() => deserializeWorkbook(invalid)).toThrow();
     }
     const invalidFilter = { ...structuredClone(current), version: 2 };
@@ -160,7 +171,7 @@ describe("formula and image foundation snapshots", () => {
     };
     const restored = deserializeWorkbook(v3);
     expect(serializeWorkbook(restored)).toMatchObject({
-      version: 4,
+      version: 5,
       dateSystem: "1900",
       sheets: [{ floatingImages: [] }],
     });

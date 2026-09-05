@@ -147,7 +147,11 @@ export function applyConvertFloatingImageToCellCommand(
   sheet.floatingImages.splice(index, 1);
   setCellContent(sheet, address, {
     kind: "image",
-    image: { assetId: image.assetId, altText: image.altText },
+    image: {
+      assetId: image.assetId,
+      altText: image.altText,
+      ...(image.transform ? { transform: image.transform } : {}),
+    },
   });
   return {
     type: "restoreFloatingImageToCell",
@@ -178,6 +182,7 @@ export function applyConvertCellImageToFloatingCommand(
     id: command.imageId,
     assetId: content.image.assetId,
     altText: content.image.altText,
+    ...(content.image.transform ? { transform: content.image.transform } : {}),
     anchor: address,
     offsetX: 0,
     offsetY: 0,

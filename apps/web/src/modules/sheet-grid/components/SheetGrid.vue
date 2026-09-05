@@ -28,6 +28,7 @@ import {
   getCellStyle,
   type FloatingImage,
   type CellAddress,
+  type ImageTransform,
   type CellRange,
   type Sheet,
   type SheetEvaluator,
@@ -177,13 +178,18 @@ const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
 const selectedImageId = ref<string | null>(null);
 const selection = ref<CellSelection>(createCellSelection({ row: 0, column: 0 }));
-const imagePreview = shallowRef<{ assetId: string; altText: string; trigger?: HTMLElement }>();
+const imagePreview = shallowRef<{
+  assetId: string;
+  altText: string;
+  transform?: ImageTransform;
+  trigger?: HTMLElement;
+}>();
 const previewUrl = computed(
   () => imagePreview.value && props.imageAssetUrls?.get(imagePreview.value.assetId),
 );
 
 function openImagePreview(
-  image: { assetId: string; altText: string },
+  image: { assetId: string; altText: string; transform?: ImageTransform },
   trigger?: HTMLElement,
 ): void {
   if (!props.imageAssetUrls?.has(image.assetId)) return;
@@ -1488,6 +1494,7 @@ defineExpose({
       v-if="imagePreview && previewUrl"
       :src="previewUrl"
       :alt-text="imagePreview.altText"
+      :transform="imagePreview.transform"
       @close="closeImagePreview"
     />
   </section>

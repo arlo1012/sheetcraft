@@ -4,6 +4,7 @@ import {
   getCellContent,
   type CellAddress,
   type FloatingImage,
+  type ImageTransform,
   type Sheet,
   type Workbook,
 } from "@idea10/core/workbook";
@@ -27,6 +28,7 @@ export function useSheetImageActions(options: {
     address: CellAddress;
     assetId: string;
     altText: string;
+    transform?: ImageTransform;
   }) => void;
   setFloatingImage: (image: FloatingImage, sheetId: string) => void;
   convertCellImageToFloating: (payload: {
@@ -155,6 +157,7 @@ export function useSheetImageActions(options: {
           address: target.address,
           assetId: image.assetId,
           altText: image.altText,
+          ...(image.transform ? { transform: image.transform } : {}),
         });
       } else {
         options.setFloatingImage(
@@ -187,15 +190,21 @@ export function useSheetImageActions(options: {
       if (!isCurrent(target)) return;
       const current = getCellContent(sheet, target.address);
       if (current?.kind !== "image" || current.image.assetId !== content.image.assetId) return;
+      const crop = content.image.transform?.crop;
+      let width = asset.width * (crop?.width ?? 1);
+      let height = asset.height * (crop?.height ?? 1);
+      if (content.image.transform?.rotation === 90 || content.image.transform?.rotation === 270) {
+        [width, height] = [height, width];
+      }
       const scale = Math.max(
-        MIN_FLOATING_IMAGE_SIZE / Math.min(asset.width, asset.height),
-        Math.min(1, 400 / asset.width, 300 / asset.height),
+        MIN_FLOATING_IMAGE_SIZE / Math.min(width, height),
+        Math.min(1, 400 / width, 300 / height),
       );
       options.convertCellImageToFloating({
         sheetId: target.sheetId,
         address: target.address,
         imageId: idFactory("image"),
-        size: { width: asset.width * scale, height: asset.height * scale },
+        size: { width: width * scale, height: height * scale },
       });
       feedback.value = "image.convertedToFloating";
     } catch {

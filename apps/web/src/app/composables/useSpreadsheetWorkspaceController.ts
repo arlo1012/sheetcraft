@@ -71,6 +71,7 @@ import {
   MAX_SHEET_ROWS,
   setActiveSheet,
   type FloatingImage,
+  type ImageTransform,
   type CellAddress,
   type CellRange,
   type SheetFilter,
@@ -397,11 +398,16 @@ export function useSpreadsheetWorkspaceController(
     address: CellAddress;
     assetId: string;
     altText: string;
+    transform?: ImageTransform;
   }): void {
     execute(
       createSetCellContentCommand(payload.sheetId, payload.address, {
         kind: "image",
-        image: { assetId: payload.assetId, altText: payload.altText },
+        image: {
+          assetId: payload.assetId,
+          altText: payload.altText,
+          ...(payload.transform ? { transform: payload.transform } : {}),
+        },
       }),
       "cells.edit",
     );

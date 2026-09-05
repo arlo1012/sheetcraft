@@ -13,6 +13,20 @@ import { doMergedCellRangesIntersect, validateMergedCellRanges } from "./merged-
 import type { IdFactory } from "./runtime.js";
 import { isSheetAddressInBounds, MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheet-limits.js";
 import { areCellStylesEqual, cloneCellStyle, normalizeCellStyle, type CellStyle } from "./style.js";
+import {
+  areImageTransformsEqual,
+  cloneImageTransform,
+  normalizeImageTransform,
+  type ImageTransform,
+} from "./image-transform.js";
+
+export {
+  areImageTransformsEqual,
+  cloneImageTransform,
+  normalizeImageTransform,
+  type ImageCrop,
+  type ImageTransform,
+} from "./image-transform.js";
 
 export { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheet-limits.js";
 export const DEFAULT_ROW_HEIGHT = 24;
@@ -77,6 +91,7 @@ export type FloatingImage = {
   offsetY: number;
   width: number;
   height: number;
+  transform?: ImageTransform;
 };
 
 export type Cell = {
@@ -371,7 +386,10 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
     byRow.set(address.row, row);
   }
   for (const row of byRow.values()) row.sort((left, right) => left.column - right.column);
-  const sparseIndex: SparseRangeIndex = { rows: [...byRow.keys()].sort((a, b) => a - b), byRow };
+  const sparseIndex: SparseRangeIndex = {
+    rows: [...byRow.keys()].sort((a, b) => a - b),
+    byRow,
+  };
   const valueFor = (target: CellAddress): FormulaValue => {
     if (!isCellAddressInBounds(target)) return createFormulaError("REF");
     const key = createCellKey(target);
@@ -502,7 +520,10 @@ function getSparseRangeAddresses(
 
 function parseCellKey(key: string): CellAddress {
   const separator = key.indexOf(":");
-  return { row: Number(key.slice(0, separator)), column: Number(key.slice(separator + 1)) };
+  return {
+    row: Number(key.slice(0, separator)),
+    column: Number(key.slice(separator + 1)),
+  };
 }
 
 export function getCellStyle(sheet: Sheet, address: CellAddress): Readonly<CellStyle> | undefined {
@@ -581,7 +602,13 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
   ) {
     return {
       kind: "image",
-      image: { assetId: content.image.assetId, altText: content.image.altText },
+      image: {
+        assetId: content.image.assetId,
+        altText: content.image.altText,
+        ...(normalizeImageTransform(content.image.transform)
+          ? { transform: normalizeImageTransform(content.image.transform) }
+          : {}),
+      },
     };
   }
   if (
@@ -601,7 +628,16 @@ export function cloneCellContent(content: CellContent): CellContent {
   if (content.kind === "literal") return { kind: "literal", value: content.value };
   if (content.kind === "formula")
     return { kind: "formula", formula: { source: content.formula.source } };
-  return { kind: "image", image: { ...content.image } };
+  return {
+    kind: "image",
+    image: {
+      assetId: content.image.assetId,
+      altText: content.image.altText,
+      ...(cloneImageTransform(content.image.transform)
+        ? { transform: cloneImageTransform(content.image.transform) }
+        : {}),
+    },
+  };
 }
 
 function areCellContentsEqual(
@@ -622,7 +658,8 @@ function areCellContentsEqual(
           : left.kind === "image" &&
             right.kind === "image" &&
             left.image.assetId === right.image.assetId &&
-            left.image.altText === right.image.altText)
+            left.image.altText === right.image.altText &&
+            areImageTransformsEqual(left.image.transform, right.image.transform))
   );
 }
 
@@ -963,7 +1000,10 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
       };
     }),
     rowHeights: [...sheet.rowHeights].map(([index, size]) => ({ index, size })),
-    columnWidths: [...sheet.columnWidths].map(([index, size]) => ({ index, size })),
+    columnWidths: [...sheet.columnWidths].map(([index, size]) => ({
+      index,
+      size,
+    })),
     freezePanes: cloneFreezePanes(sheet.freezePanes),
     filter: sheet.filter ? cloneSheetFilter(sheet.filter) : null,
     mergedCells: sheet.mergedCells.map((range) => ({
@@ -1007,7 +1047,13 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
 }
 
 export function cloneFloatingImage(image: FloatingImage): FloatingImage {
-  return { ...image, anchor: { ...image.anchor } };
+  const { transform, ...fields } = image;
+  const normalizedTransform = cloneImageTransform(transform);
+  return {
+    ...fields,
+    anchor: { ...image.anchor },
+    ...(normalizedTransform ? { transform: normalizedTransform } : {}),
+  };
 }
 
 function normalizeFloatingImage(image: FloatingImage, ids?: Set<string>): FloatingImage {
@@ -1042,7 +1088,8 @@ function normalizeFloatingImage(image: FloatingImage, ids?: Set<string>): Floati
       `Floating image dimensions must be between ${MIN_FLOATING_IMAGE_SIZE} and ${MAX_FLOATING_IMAGE_SIZE}.`,
     );
   }
-  return cloneFloatingImage(image);
+  const transform = normalizeImageTransform(image.transform);
+  return { ...cloneFloatingImage(image), ...(transform ? { transform } : {}) };
 }
 
 export function normalizeFloatingImageForSheet(image: FloatingImage): FloatingImage {
@@ -1064,7 +1111,8 @@ function areFloatingImagesEqual(
     left.offsetX === right.offsetX &&
     left.offsetY === right.offsetY &&
     left.width === right.width &&
-    left.height === right.height
+    left.height === right.height &&
+    areImageTransformsEqual(left.transform, right.transform)
   );
 }
 

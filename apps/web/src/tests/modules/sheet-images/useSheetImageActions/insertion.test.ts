@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { createWorkbook, getActiveSheet } from "@idea10/core/workbook";
+import { createWorkbook, getActiveSheet, setCellContent } from "@idea10/core/workbook";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { useSheetImageActions } from "../../../../modules/sheet-images/useSheetImageActions";
 import { prepareImageAsset } from "../../../../modules/image-assets/prepareImageAsset";
@@ -94,6 +94,28 @@ describe("sheet image insertion", () => {
     expect(f.setCellImage).not.toHaveBeenCalled();
     expect(f.actions.feedback.value).toBe("image.insertionFailed");
   });
+  test("sizes a cropped and rotated cell image by its edited display aspect", async () => {
+    const f = fixture();
+    await f.store.put(asset);
+    const sheet = getActiveSheet(f.getWorkbook());
+    setCellContent(
+      sheet,
+      { row: 2, column: 3 },
+      {
+        kind: "image",
+        image: {
+          assetId: asset.id,
+          altText: "",
+          transform: { crop: { x: 0, y: 0, width: 0.5, height: 0.25 }, rotation: 90 },
+        },
+      },
+    );
+    await f.actions.convertCellImageToFloating({ row: 2, column: 3 });
+    expect(f.convertCellImageToFloating).toHaveBeenCalledWith(
+      expect.objectContaining({ size: { width: 75, height: 300 } }),
+    );
+  });
+
   test("pastes a copied floating image into the target cell without duplicating the object", async () => {
     const f = fixture();
     await f.store.put(asset);
@@ -107,6 +129,7 @@ describe("sheet image insertion", () => {
         offsetY: 0,
         width: 200,
         height: 100,
+        transform: { crop: { x: 0.1, y: 0.2, width: 0.5, height: 0.75 }, rotation: 90 },
       },
       "cell",
     );
@@ -115,6 +138,7 @@ describe("sheet image insertion", () => {
       address: { row: 2, column: 3 },
       assetId: asset.id,
       altText: "Diagram",
+      transform: { crop: { x: 0.1, y: 0.2, width: 0.5, height: 0.75 }, rotation: 90 },
     });
     expect(f.setFloatingImage).not.toHaveBeenCalled();
   });

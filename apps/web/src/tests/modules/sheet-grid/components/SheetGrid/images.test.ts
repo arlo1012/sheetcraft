@@ -11,11 +11,35 @@ describe("SheetGrid cell images", () => {
     });
     await wrapper.setProps({ imageAssetUrls: new Map([["asset", "blob:fixture"]]) });
     const cell = wrapper.get('[data-row="0"][data-column="0"]');
-    expect(cell.get("img").attributes("src")).toBe("blob:fixture");
+    expect(cell.get(".sheet-image-content").attributes("aria-label")).toBe("Diagram");
+    expect(cell.get(".sheet-image-content__probe").attributes("src")).toBe("blob:fixture");
     expect(cell.text()).not.toContain("#VALUE!");
     await cell.trigger("dblclick", { button: 0 });
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "F2" });
     expect(wrapper.get("textarea.cell-editor").classes()).not.toContain("is-editing");
+    wrapper.unmount();
+  });
+  test("passes cell image edits to the contained renderer", async () => {
+    const { wrapper } = mountSheetGrid({
+      beforeMount: (sheet) =>
+        setCellContent(
+          sheet,
+          { row: 0, column: 0 },
+          {
+            kind: "image",
+            image: {
+              assetId: "asset",
+              altText: "Diagram",
+              transform: { crop: { x: 0.25, y: 0, width: 0.5, height: 1 }, rotation: 90 },
+            },
+          },
+        ),
+    });
+    await wrapper.setProps({ imageAssetUrls: new Map([["asset", "blob:fixture"]]) });
+    const image = wrapper.get('[data-row="0"][data-column="0"] .sheet-image-content');
+    expect(image.attributes("preserveAspectRatio")).toBe("xMidYMid meet");
+    expect(image.get("image").attributes("x")).toBe("-0.25");
+    expect(image.get("g").attributes("transform")).toBe("translate(1 0) rotate(90)");
     wrapper.unmount();
   });
   test("copies image content locally with a blank text projection and undoable deletion", async () => {

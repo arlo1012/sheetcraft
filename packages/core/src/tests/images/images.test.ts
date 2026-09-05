@@ -89,11 +89,17 @@ describe("sheet images", () => {
     expect(sheet.floatingImages).toEqual([image]);
     applyWorkbookCommand(
       session.workbook,
-      createSetFloatingImageCommand(sheet.id, { ...image, id: "floating-image-2" }),
+      createSetFloatingImageCommand(sheet.id, {
+        ...image,
+        id: "floating-image-2",
+      }),
     );
     applyWorkbookCommand(
       session.workbook,
-      createSetFloatingImageCommand(sheet.id, { ...image, id: "floating-image-3" }),
+      createSetFloatingImageCommand(sheet.id, {
+        ...image,
+        id: "floating-image-3",
+      }),
     );
     const deleteInverse = applyWorkbookCommand(
       session.workbook,
@@ -137,16 +143,75 @@ describe("sheet images", () => {
     ).toBeNull();
   });
 
+  test("preserves normalized image transforms through copy, conversion, and V5 snapshots", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const transform = {
+      crop: { x: 0.1, y: 0.2, width: 0.7, height: 0.6 },
+      rotation: 90 as const,
+    };
+    const floating = { ...image, transform };
+    applyWorkbookCommand(session.workbook, createSetFloatingImageCommand(sheet.id, floating));
+    const copied = translateCellContentForCopy(
+      {
+        kind: "image",
+        image: { assetId: "asset-cell", altText: "Cell chart", transform },
+      },
+      { row: 0, column: 0 },
+      { row: 1, column: 1 },
+    );
+    expect(copied).toEqual({
+      kind: "image",
+      image: { assetId: "asset-cell", altText: "Cell chart", transform },
+    });
+    const undo = applyWorkbookCommand(
+      session.workbook,
+      createConvertFloatingImageToCellCommand(sheet.id, floating.id),
+    );
+    expect(getCellContent(sheet, floating.anchor)).toEqual({
+      kind: "image",
+      image: {
+        assetId: floating.assetId,
+        altText: floating.altText,
+        transform,
+      },
+    });
+    applyWorkbookCommand(session.workbook, undo!);
+    expect(sheet.floatingImages).toEqual([floating]);
+    expect(serializeWorkbook(deserializeWorkbook(serializeWorkbook(session.workbook)))).toEqual(
+      serializeWorkbook(session.workbook),
+    );
+    const legacyV4 = structuredClone(serializeWorkbook(session.workbook));
+    legacyV4.version = 4 as never;
+    delete legacyV4.sheets[0]?.floatingImages[0]?.transform;
+    const migrated = serializeWorkbook(deserializeWorkbook(legacyV4));
+    expect(migrated.version).toBe(5);
+    expect(migrated.sheets[0]?.floatingImages[0]?.transform).toBeUndefined();
+    expect(() =>
+      createSetFloatingImageCommand(sheet.id, {
+        ...image,
+        transform: { rotation: 45 as never },
+      }),
+    ).toThrow();
+  });
+
   test("restores occupied merged targets and floating-image z-order through undo and redo", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     const front = { ...image, id: "front", anchor: { row: 0, column: 0 } };
-    const mergedImage = { ...image, id: "merged", anchor: { row: 3, column: 2 } };
+    const mergedImage = {
+      ...image,
+      id: "merged",
+      anchor: { row: 3, column: 2 },
+    };
     const rear = { ...image, id: "rear", anchor: { row: 6, column: 6 } };
     const target = { row: 2, column: 1 };
     applyWorkbookCommand(
       session.workbook,
-      createMergeCellsCommand(sheet.id, { start: target, end: { row: 3, column: 2 } }),
+      createMergeCellsCommand(sheet.id, {
+        start: target,
+        end: { row: 3, column: 2 },
+      }),
     );
     setCellContent(sheet, target, { kind: "literal", value: "replace me" });
     setCellStyle(sheet, target, { fillColor: "#ff00ff" });
@@ -170,7 +235,10 @@ describe("sheet images", () => {
 
     const redo = applyWorkbookCommand(session.workbook, undo!);
     expect(sheet.floatingImages.map((item) => item.id)).toEqual(["front", "merged", "rear"]);
-    expect(getCellContent(sheet, target)).toEqual({ kind: "literal", value: "replace me" });
+    expect(getCellContent(sheet, target)).toEqual({
+      kind: "literal",
+      value: "replace me",
+    });
     expect(getCellStyle(sheet, target)).toEqual({ fillColor: "#ff00ff" });
 
     applyWorkbookCommand(session.workbook, redo!);
@@ -318,7 +386,7 @@ describe("sheet images", () => {
       ),
     );
     const snapshot = serializeWorkbook(session.workbook);
-    expect(snapshot.version).toBe(4);
+    expect(snapshot.version).toBe(5);
     expect(JSON.stringify(snapshot)).not.toContain("data:");
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
   });
@@ -367,7 +435,9 @@ describe("sheet images", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     applyWorkbookCommand(session.workbook, createSetFloatingImageCommand(sheet.id, image));
-    const duplicate = createDuplicateSheetCommand(session.workbook, sheet.id, { id: "sheet-copy" });
+    const duplicate = createDuplicateSheetCommand(session.workbook, sheet.id, {
+      id: "sheet-copy",
+    });
     applyWorkbookCommand(session.workbook, duplicate);
     expect(session.workbook.sheets.get("sheet-copy")?.floatingImages).toEqual([image]);
 
@@ -422,7 +492,7 @@ describe("sheet images", () => {
     applyWorkbookCommand(workbook, createSetFloatingImageCommand(sheet.id, image));
 
     expect(serializeWorkbook(workbook)).toMatchObject({
-      version: 4,
+      version: 5,
       dateSystem: "1904",
       sheets: [
         {
@@ -438,7 +508,10 @@ describe("sheet images", () => {
             },
             {
               address: { row: 1, column: 0 },
-              content: { kind: "image", image: { assetId: "asset-cell", altText: "Cell chart" } },
+              content: {
+                kind: "image",
+                image: { assetId: "asset-cell", altText: "Cell chart" },
+              },
             },
           ]),
         },

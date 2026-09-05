@@ -6,6 +6,11 @@ import { createAppI18n } from "../../../../../shared/i18n";
 
 const viewerVisibleValues: boolean[] = [];
 
+vi.mock("../../../../../modules/sheet-images/components/sheetImagePresentation", () => ({
+  createSheetImagePresentationBlobUrl: vi.fn(() => "blob:edited-presentation"),
+  readImageSourceAsDataUrl: vi.fn(async () => "data:image/png;base64,AA=="),
+}));
+
 vi.mock("tdesign-vue-next/es/image-viewer", () => ({
   ImageViewer: defineComponent({
     name: "TImageViewer",
@@ -45,7 +50,14 @@ vi.mock("tdesign-vue-next/es/image-viewer", () => ({
   }),
 }));
 
-function mountPreview(props?: Partial<{ src: string; altText: string; visible: boolean }>) {
+function mountPreview(
+  props?: Partial<{
+    src: string;
+    altText: string;
+    transform: { rotation?: 0 | 90 | 180 | 270 };
+    visible: boolean;
+  }>,
+) {
   return mount(SheetImagePreview, {
     props: { src: "blob:diagram", altText: "Diagram", ...props },
     global: { plugins: [createAppI18n("en-US")] },
@@ -90,5 +102,20 @@ describe("SheetImagePreview", () => {
     expect(viewer.text()).toBe("Image preview");
     await viewer.trigger("click");
     expect(wrapper.emitted("close")).toEqual([[]]);
+  });
+
+  test("keeps the viewer controls when it previews an edited image", async () => {
+    const wrapper = mountPreview({ transform: { rotation: 90 } });
+    await flushPromises();
+    expect(wrapper.find("[data-image-viewer]").exists()).toBe(false);
+    const probe = wrapper.get(".sheet-image-preview__probe");
+    Object.defineProperties(probe.element, {
+      naturalWidth: { value: 800 },
+      naturalHeight: { value: 400 },
+    });
+    await probe.trigger("load");
+    await flushPromises();
+    expect(wrapper.get("[data-image-viewer]").attributes("data-src")).not.toBe("blob:diagram");
+    expect(wrapper.get("[data-image-viewer]").attributes("data-visible")).toBe("true");
   });
 });

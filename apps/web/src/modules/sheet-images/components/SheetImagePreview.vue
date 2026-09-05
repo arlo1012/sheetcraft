@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { defineAsyncComponent, nextTick, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import type { ImageTransform } from "@idea10/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
+import {
+  createSheetImagePresentationBlobUrl,
+  readImageSourceAsDataUrl,
+} from "./sheetImagePresentation";
 
 const props = withDefaults(
   defineProps<{
     src: string;
     altText: string;
+    transform?: ImageTransform;
     visible?: boolean;
   }>(),
   { visible: true },
@@ -14,6 +20,10 @@ const props = withDefaults(
 const emit = defineEmits<{ close: [] }>();
 const { t } = useAppI18n();
 const viewerReady = ref(false);
+const presentationUrl = ref<string>();
+const hasTransform = computed(() => Boolean(props.transform?.crop || props.transform?.rotation));
+const viewerSource = computed(() => (hasTransform.value ? presentationUrl.value : props.src));
+const presentationGeneration = ref(0);
 
 // ImageViewer and its CSS are loaded only when a preview is visible.
 const AsyncImageViewer = defineAsyncComponent(async () => {
@@ -23,25 +33,66 @@ const AsyncImageViewer = defineAsyncComponent(async () => {
 
 function revealViewerAfterMount(): void {
   void nextTick(() => {
-    if (props.visible && props.src) viewerReady.value = true;
+    if (props.visible && viewerSource.value) viewerReady.value = true;
   });
 }
 
+function clearPresentationUrl(): void {
+  if (presentationUrl.value) URL.revokeObjectURL(presentationUrl.value);
+  presentationUrl.value = undefined;
+}
+
+async function onPresentationSourceLoad(event: Event): Promise<void> {
+  if (!hasTransform.value) return;
+  const image = event.currentTarget as HTMLImageElement;
+  if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return;
+  const generation = presentationGeneration.value;
+  try {
+    const source = await readImageSourceAsDataUrl(props.src);
+    if (generation !== presentationGeneration.value) return;
+    clearPresentationUrl();
+    presentationUrl.value = createSheetImagePresentationBlobUrl(
+      source,
+      props.transform,
+      image.naturalWidth,
+      image.naturalHeight,
+    );
+  } catch {
+    // The viewer stays closed when its local source cannot be read safely.
+  }
+}
+
 watch(
-  () => [props.visible, props.src] as const,
-  ([visible, src]) => {
-    if (!visible || !src) viewerReady.value = false;
+  () => [props.visible, props.src, props.transform] as const,
+  () => {
+    presentationGeneration.value += 1;
+    viewerReady.value = false;
+    clearPresentationUrl();
   },
 );
+
+onBeforeUnmount(() => {
+  presentationGeneration.value += 1;
+  clearPresentationUrl();
+});
 </script>
 
 <template>
+  <img
+    v-if="visible && src && hasTransform"
+    :key="presentationGeneration"
+    class="sheet-image-preview__probe"
+    :src="src"
+    alt=""
+    aria-hidden="true"
+    @load="onPresentationSourceLoad"
+  />
   <AsyncImageViewer
-    v-if="visible && src"
+    v-if="visible && viewerSource"
     :attach="'body'"
     :close-on-esc-keydown="true"
     :close-on-overlay="true"
-    :images="[{ mainImage: src, thumbnail: src }]"
+    :images="[{ mainImage: viewerSource, thumbnail: viewerSource }]"
     :title="altText || t('image.preview')"
     :visible="viewerReady"
     :z-index="1100"
@@ -51,3 +102,13 @@ watch(
     <template #trigger />
   </AsyncImageViewer>
 </template>
+
+<style scoped lang="scss">
+.sheet-image-preview__probe {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+</style>

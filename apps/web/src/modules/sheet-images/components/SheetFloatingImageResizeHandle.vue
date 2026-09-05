@@ -9,6 +9,7 @@ import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 const props = defineProps<{
   fragment: FloatingImageViewportFragment;
   direction: FloatingImageResizeDirection;
+  variant?: "crop";
 }>();
 const emit = defineEmits<{
   resize: [direction: FloatingImageResizeDirection, event: PointerEvent];
@@ -23,6 +24,16 @@ const labelKeys: Record<FloatingImageResizeDirection, MessageKey> = {
   ne: "image.resizeTopRight",
   sw: "image.resizeBottomLeft",
   se: "image.resizeBottomRight",
+};
+const cropLabelKeys: Record<FloatingImageResizeDirection, MessageKey> = {
+  n: "image.cropTop",
+  s: "image.cropBottom",
+  w: "image.cropLeft",
+  e: "image.cropRight",
+  nw: "image.cropTopLeft",
+  ne: "image.cropTopRight",
+  sw: "image.cropBottomLeft",
+  se: "image.cropBottomRight",
 };
 const point = computed(() => {
   const { rect } = props.fragment;
@@ -67,8 +78,11 @@ const handleStyle = computed<CSSProperties>(() => ({
     v-if="visible"
     class="sheet-floating-image-resize-handle"
     :style="handleStyle"
-    :aria-label="t(labelKeys[direction])"
-    :data-image-resize="direction"
+    :aria-label="t((variant === 'crop' ? cropLabelKeys : labelKeys)[direction])"
+    :data-image-resize="variant ? undefined : direction"
+    :data-image-crop-handle="variant ? direction : undefined"
+    :data-direction="direction"
+    :class="{ 'is-crop': variant === 'crop' }"
     type="button"
     tabindex="-1"
     @pointerdown.prevent.stop="emit('resize', direction, $event)"
@@ -98,23 +112,59 @@ const handleStyle = computed<CSSProperties>(() => ({
     content: "";
   }
 
-  &[data-image-resize="n"],
-  &[data-image-resize="s"] {
+  &.is-crop {
+    &::after {
+      inset: 2px;
+      background: #171717;
+      border: 0;
+      box-shadow: 0 0 0 1px white;
+    }
+    &[data-direction="n"]::after,
+    &[data-direction="s"]::after {
+      inset: 5px 0;
+    }
+    &[data-direction="w"]::after,
+    &[data-direction="e"]::after {
+      inset: 0 5px;
+    }
+    &[data-direction="nw"]::after,
+    &[data-direction="ne"]::after,
+    &[data-direction="sw"]::after,
+    &[data-direction="se"]::after {
+      background: transparent;
+      border: solid #171717;
+      border-width: 4px 0 0 4px;
+      box-shadow: none;
+      filter: drop-shadow(0 0 1px white);
+    }
+    &[data-direction="ne"]::after {
+      transform: rotate(90deg);
+    }
+    &[data-direction="se"]::after {
+      transform: rotate(180deg);
+    }
+    &[data-direction="sw"]::after {
+      transform: rotate(270deg);
+    }
+  }
+
+  &[data-direction="n"],
+  &[data-direction="s"] {
     cursor: ns-resize;
   }
 
-  &[data-image-resize="e"],
-  &[data-image-resize="w"] {
+  &[data-direction="e"],
+  &[data-direction="w"] {
     cursor: ew-resize;
   }
 
-  &[data-image-resize="nw"],
-  &[data-image-resize="se"] {
+  &[data-direction="nw"],
+  &[data-direction="se"] {
     cursor: nwse-resize;
   }
 
-  &[data-image-resize="ne"],
-  &[data-image-resize="sw"] {
+  &[data-direction="ne"],
+  &[data-direction="sw"] {
     cursor: nesw-resize;
   }
 }

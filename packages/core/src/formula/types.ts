@@ -36,6 +36,7 @@ export type CellFormula = {
 export type CellImage = {
   assetId: string;
   altText: string;
+  transform?: ImageTransform;
 };
 
 export type CellContent =
@@ -70,11 +71,22 @@ export type FormulaRangeBounds = {
 
 export type FormulaExpression =
   | { kind: "number"; value: number; start: number; end: number }
-  | { kind: "reference"; reference: FormulaReference; start: number; end: number }
+  | {
+      kind: "reference";
+      reference: FormulaReference;
+      start: number;
+      end: number;
+    }
   | { kind: "range"; range: FormulaRange; start: number; end: number }
   | { kind: "error"; code: FormulaErrorCode; start: number; end: number }
   | { kind: "identifier"; name: string; start: number; end: number }
-  | { kind: "unary"; operator: "+" | "-"; operand: FormulaExpression; start: number; end: number }
+  | {
+      kind: "unary";
+      operator: "+" | "-";
+      operand: FormulaExpression;
+      start: number;
+      end: number;
+    }
   | {
       kind: "binary";
       operator: "+" | "-" | "*" | "/";
@@ -170,3 +182,4 @@ export function isCellFormula(content: CellContent | null | undefined): content 
 export function createCellFormula(source: string): CellFormula {
   return { source };
 }
+import type { ImageTransform } from "../image-transform.js";

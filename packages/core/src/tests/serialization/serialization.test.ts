@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { WorkbookDomainError } from "../../errors.js";
-import { deserializeSheet, deserializeWorkbook, serializeWorkbook } from "../../serialization.js";
+import {
+  deserializeSheet,
+  deserializeWorkbook,
+  serializeSheet,
+  serializeWorkbook,
+} from "../../serialization.js";
 import {
   createSheet,
   createWorkbook,
@@ -64,8 +69,14 @@ describe("workbook snapshots", () => {
 
     expect(serializeWorkbook(workbook).sheets[0]).toMatchObject({
       cells: [
-        { address: { row: 1, column: 7 }, content: { kind: "literal", value: "earlier" } },
-        { address: { row: 9, column: 2 }, content: { kind: "literal", value: "later" } },
+        {
+          address: { row: 1, column: 7 },
+          content: { kind: "literal", value: "earlier" },
+        },
+        {
+          address: { row: 9, column: 2 },
+          content: { kind: "literal", value: "later" },
+        },
       ],
       rowHeights: [
         { index: 2, size: 31 },
@@ -100,7 +111,10 @@ describe("workbook snapshots", () => {
     delete legacyV2.sheets[0]?.filter;
     delete legacyV2.sheets[0]?.mergedCells;
     const restored = deserializeWorkbook(legacyV2);
-    expect(getActiveSheet(restored).freezePanes).toEqual({ rows: 0, columns: 0 });
+    expect(getActiveSheet(restored).freezePanes).toEqual({
+      rows: 0,
+      columns: 0,
+    });
     expect(getActiveSheet(restored).filter).toBeNull();
     expect(getActiveSheet(restored).mergedCells).toEqual([]);
   });
@@ -134,7 +148,7 @@ describe("workbook snapshots", () => {
       { kind: "formula", formula: { source: "=SUM(" } },
     );
     const snapshot = serializeWorkbook(migrated);
-    expect(snapshot.version).toBe(4);
+    expect(snapshot.version).toBe(5);
     expect(snapshot.dateSystem).toBe("1900");
     expect(snapshot.sheets[0]?.cells).toContainEqual({
       address: { row: 0, column: 1 },
@@ -157,17 +171,58 @@ describe("workbook snapshots", () => {
     });
   });
 
+  test("round trips standalone V5 sheet image transforms", () => {
+    const sheet = createSheet("Sheet1", "sheet-1");
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        kind: "image",
+        image: {
+          assetId: "cell",
+          altText: "Cell",
+          transform: { rotation: 90 },
+        },
+      },
+    );
+    sheet.floatingImages.push({
+      id: "floating",
+      assetId: "floating",
+      altText: "Floating",
+      anchor: { row: 1, column: 1 },
+      offsetX: 0,
+      offsetY: 0,
+      width: 120,
+      height: 60,
+      transform: { crop: { x: 0.1, y: 0.2, width: 0.7, height: 0.6 } },
+    });
+    expect(serializeSheet(deserializeSheet(serializeSheet(sheet)))).toEqual(serializeSheet(sheet));
+  });
+
   test("rejects V2 value fields and formula sources without an equals prefix", () => {
     const base = {
       version: 2,
       id: "workbook-1",
       activeSheetId: "sheet-1",
-      sheets: [{ id: "sheet-1", name: "Sheet1", rowHeights: [], columnWidths: [], cells: [] }],
+      sheets: [
+        {
+          id: "sheet-1",
+          name: "Sheet1",
+          rowHeights: [],
+          columnWidths: [],
+          cells: [],
+        },
+      ],
     };
     expect(() =>
       deserializeWorkbook({
         ...base,
-        sheets: [{ ...base.sheets[0], cells: [{ address: { row: 0, column: 0 }, value: 2 }] }],
+        sheets: [
+          {
+            ...base.sheets[0],
+            cells: [{ address: { row: 0, column: 0 }, value: 2 }],
+          },
+        ],
       }),
     ).toThrow("V2 cells use content");
     expect(() =>
@@ -206,9 +261,9 @@ describe("workbook snapshots", () => {
   });
 
   test("rejects unknown snapshot versions with a stable error code", () => {
-    expect(() => deserializeWorkbook({ version: 5 })).toThrowError(
+    expect(() => deserializeWorkbook({ version: 6 })).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
-        data: { code: "unsupported_snapshot_version", details: { version: 5 } },
+        data: { code: "unsupported_snapshot_version", details: { version: 6 } },
       }),
     );
   });
@@ -243,7 +298,9 @@ describe("workbook snapshots", () => {
         ],
       }),
     ).toThrowError(
-      expect.objectContaining({ data: expect.objectContaining({ code: "invalid_snapshot" }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ code: "invalid_snapshot" }),
+      }),
     );
   });
 
@@ -274,7 +331,9 @@ describe("workbook snapshots", () => {
       const snapshot = structuredClone(base);
       Object.assign(snapshot.sheets[0], invalidState);
       expect(() => deserializeWorkbook(snapshot)).toThrowError(
-        expect.objectContaining({ data: expect.objectContaining({ code: "invalid_snapshot" }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ code: "invalid_snapshot" }),
+        }),
       );
     }
   });

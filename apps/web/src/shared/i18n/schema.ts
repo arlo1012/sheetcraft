@@ -274,6 +274,23 @@ export type MessageSchema = {
     converted: string;
     convertFailed: string;
     preview: string;
+    crop: string;
+    rotate: string;
+    rotateLeft: string;
+    rotateRight: string;
+    rotateHalf: string;
+    restoreOriginal: string;
+    applyCrop: string;
+    cancelCrop: string;
+    cropSelection: string;
+    cropTop: string;
+    cropBottom: string;
+    cropLeft: string;
+    cropRight: string;
+    cropTopLeft: string;
+    cropTopRight: string;
+    cropBottomLeft: string;
+    cropBottomRight: string;
   };
   clipboard: {
     unavailable: string;

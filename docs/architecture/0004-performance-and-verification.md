@@ -64,6 +64,16 @@ headroom at 360/100 KB app JavaScript, 910/265 KB total JavaScript, 78/12 KB
 app CSS, and 240/31 KB total CSS. Total-asset budgets continue to account for
 deferred code so lazy loading cannot hide overall bundle growth.
 
+Non-destructive image crop, quarter-turn rotation, and original restoration add
+V5 snapshot metadata, shared image presentation, and interaction geometry without
+new dependencies. Crop controls and the image toolbar load on demand; transformed
+previews retain the deferred TDesign viewer and embed the original image bytes
+into a temporary SVG presentation. The inspected production build measures
+373,792 B app JavaScript (103,800 B gzip), 923,377 B total JavaScript
+(269,326 B gzip), and 77,549 B app CSS (11,699 B gzip). JavaScript limits become
+380/106 KB for the app entry and 940/275 KB across all assets. CSS budgets stay
+unchanged. Both entry and total checks remain enabled, including deferred tools.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

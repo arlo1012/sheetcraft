@@ -32,7 +32,11 @@ async function fixture(cellImage = false) {
       { row: 0, column: 0 },
       {
         kind: "image",
-        image: { assetId: "asset", altText: "Cell diagram" },
+        image: {
+          assetId: "asset",
+          altText: "Cell diagram",
+          transform: { crop: { x: 0, y: 0, width: 0.5, height: 0.75 }, rotation: 90 },
+        },
       },
     );
   setCellContent(sheet, { row: 2, column: 2 }, { kind: "literal", value: "original" });
@@ -45,6 +49,7 @@ async function fixture(cellImage = false) {
     offsetY: 0,
     width: 120,
     height: 80,
+    transform: { crop: { x: 0.1, y: 0, width: 0.8, height: 1 }, rotation: 180 },
   });
   const imageAssetStore = createMemoryImageAssetStore();
   const asset = {
@@ -121,7 +126,10 @@ describe("workspace cell image entry points", () => {
       wrapper.get("textarea.cell-editor").element.dispatchEvent(event);
       await flushPromises();
       if (editing) {
-        expect(getCellContent(sheet, { row: 0, column: 0 })?.kind).toBe("image");
+        expect(getCellContent(sheet, { row: 0, column: 0 })).toMatchObject({
+          kind: "image",
+          image: { transform: { crop: { x: 0.1, y: 0, width: 0.8, height: 1 }, rotation: 180 } },
+        });
         expect(sheet.floatingImages).toHaveLength(1);
       } else {
         expect(sheet.floatingImages).toHaveLength(2);
@@ -186,8 +194,9 @@ describe("workspace cell image entry points", () => {
       assetId: "asset",
       altText: "Cell diagram",
       anchor: { row: 0, column: 0 },
-      width: 120,
-      height: 80,
+      width: 60,
+      height: 60,
+      transform: { crop: { x: 0, y: 0, width: 0.5, height: 0.75 }, rotation: 90 },
     });
     expect(wrapper.find(".spreadsheet-workspace__image-feedback").exists()).toBe(false);
     expect(wrapper.find(".workbook-status-bar__status").exists()).toBe(false);
@@ -276,7 +285,11 @@ describe("workspace cell image entry points", () => {
     expect(sheet.floatingImages).toHaveLength(0);
     expect(getCellContent(sheet, { row: 2, column: 2 })).toEqual({
       kind: "image",
-      image: { assetId: "asset", altText: "Diagram" },
+      image: {
+        assetId: "asset",
+        altText: "Diagram",
+        transform: { crop: { x: 0.1, y: 0, width: 0.8, height: 1 }, rotation: 180 },
+      },
     });
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
     expect(sheet.floatingImages).toHaveLength(1);

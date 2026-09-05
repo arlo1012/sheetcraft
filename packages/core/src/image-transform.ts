@@ -1,0 +1,83 @@
+export type ImageCrop = { x: number; y: number; width: number; height: number };
+export type ImageTransform = {
+  crop?: ImageCrop;
+  rotation?: 0 | 90 | 180 | 270;
+};
+
+function isFullCrop(crop: ImageCrop): boolean {
+  return crop.x === 0 && crop.y === 0 && crop.width === 1 && crop.height === 1;
+}
+
+export function normalizeImageTransform(
+  transform: ImageTransform | null | undefined,
+): ImageTransform | undefined {
+  if (transform === null || transform === undefined) return undefined;
+  if (!transform || typeof transform !== "object") throw new TypeError("Invalid image transform.");
+  let crop: ImageCrop | undefined;
+  if (transform.crop !== undefined) {
+    const value = transform.crop;
+    if (
+      !value ||
+      typeof value !== "object" ||
+      !Number.isFinite(value.x) ||
+      !Number.isFinite(value.y) ||
+      !Number.isFinite(value.width) ||
+      !Number.isFinite(value.height) ||
+      value.x < 0 ||
+      value.y < 0 ||
+      value.width <= 0 ||
+      value.height <= 0 ||
+      value.x + value.width > 1 ||
+      value.y + value.height > 1
+    ) {
+      throw new TypeError("Image crop must be a finite normalized rectangle.");
+    }
+    const normalized = {
+      x: value.x,
+      y: value.y,
+      width: value.width,
+      height: value.height,
+    };
+    if (!isFullCrop(normalized)) crop = normalized;
+  }
+  const rotation = transform.rotation;
+  if (
+    rotation !== undefined &&
+    rotation !== 0 &&
+    rotation !== 90 &&
+    rotation !== 180 &&
+    rotation !== 270
+  ) {
+    throw new TypeError("Image rotation must be 0, 90, 180, or 270 degrees.");
+  }
+  return crop || rotation
+    ? { ...(crop ? { crop } : {}), ...(rotation ? { rotation } : {}) }
+    : undefined;
+}
+
+export function cloneImageTransform(
+  transform: ImageTransform | null | undefined,
+): ImageTransform | undefined {
+  const normalized = normalizeImageTransform(transform);
+  return normalized
+    ? {
+        ...normalized,
+        ...(normalized.crop ? { crop: { ...normalized.crop } } : {}),
+      }
+    : undefined;
+}
+
+export function areImageTransformsEqual(
+  left: ImageTransform | null | undefined,
+  right: ImageTransform | null | undefined,
+): boolean {
+  const a = normalizeImageTransform(left);
+  const b = normalizeImageTransform(right);
+  return (
+    a?.rotation === b?.rotation &&
+    a?.crop?.x === b?.crop?.x &&
+    a?.crop?.y === b?.crop?.y &&
+    a?.crop?.width === b?.crop?.width &&
+    a?.crop?.height === b?.crop?.height
+  );
+}

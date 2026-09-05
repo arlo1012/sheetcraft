@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "description": "Production budgets include workbook persistence, image clipboard/conversion and lazy fullscreen preview support, plus the formula foundation; see ADR 0004.",
+  "description": "Production budgets include workbook persistence, image clipboard/conversion, crop/rotation/original restoration, lazy image tools and fullscreen preview, plus the formula foundation; see ADR 0004.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
       "pattern": "^index-.*\\.js$",
-      "maximumRawBytes": 360000,
-      "maximumGzipBytes": 100000
+      "maximumRawBytes": 380000,
+      "maximumGzipBytes": 106000
     },
     "css": {
       "pattern": "^index-.*\\.css$",
@@ -16,8 +16,8 @@
   },
   "totalAssets": {
     "javascript": {
-      "maximumRawBytes": 910000,
-      "maximumGzipBytes": 265000
+      "maximumRawBytes": 940000,
+      "maximumGzipBytes": 275000
     },
     "css": {
       "maximumRawBytes": 240000,
