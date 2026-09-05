@@ -5,7 +5,9 @@ import {
   type WorkbookSnapshot,
 } from "@idea10/core/serialization";
 import type { Workbook } from "@idea10/core/workbook";
+import type { ImageAssetStore } from "../image-assets/imageAssetStore";
 import type { useWorkbookPersistence } from "../workbook-persistence/useWorkbookPersistence";
+import { prepareXlsxImages } from "./prepareXlsxImages";
 import type { XlsxCompatibilityReport } from "./xlsxWorkerProtocol";
 import {
   createWorkbookXlsxWorker,
@@ -59,6 +61,7 @@ export function useWorkbookXlsxActions(options: {
   getRevision: () => number;
   flushPendingEdits: () => boolean;
   hasPendingEdits: () => boolean;
+  assetStore?: ImageAssetStore;
   isBlocked?: () => boolean;
   workerFactory?: XlsxWorkerFactory;
   download?: (bytes: Uint8Array, filename: string) => void | Promise<void>;
@@ -166,13 +169,23 @@ export function useWorkbookXlsxActions(options: {
     const requestId = `xlsx-export-${++requestNumber}`;
     busy.value = true;
     feedback.value = undefined;
-    abortController = new AbortController();
+    const controller = new AbortController();
+    abortController = controller;
+    const startedAt = Date.now();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
     try {
+      const images = await prepareXlsxImages(snapshot, options.assetStore, controller.signal);
+      if (controller.signal.aborted) throw new XlsxWorkerAbortError();
       const response = await runXlsxWorker(
         workerFactory,
-        { id: requestId, type: "encode", snapshot },
-        { timeoutMs, signal: abortController.signal },
+        { id: requestId, type: "encode", snapshot, images },
+        { timeoutMs: Math.max(1, timeoutMs - (Date.now() - startedAt)), signal: controller.signal },
       );
+      clearTimeout(timeout);
       if (disposed || response.type !== "encode") return;
       if (hasBlockingIssue(response.report)) {
         feedback.value = { key: "xlsx.feedback.blocked", error: true };
@@ -180,10 +193,12 @@ export function useWorkbookXlsxActions(options: {
       }
       const bytes = new Uint8Array(response.bytes);
       await download(bytes, "workbook.xlsx");
-      feedback.value = { key: "xlsx.feedback.exported", error: false };
+      if (!disposed) feedback.value = { key: "xlsx.feedback.exported", error: false };
     } catch (error) {
-      setFailure(error);
+      if (timedOut) setFailure(new XlsxWorkerTimeoutError());
+      else if (!controller.signal.aborted) setFailure(error);
     } finally {
+      clearTimeout(timeout);
       abortController = undefined;
       busy.value = false;
     }

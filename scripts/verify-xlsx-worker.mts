@@ -1,6 +1,8 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { inflateRawSync } from "node:zlib";
+import type { XlsxWorkerRequest } from "../apps/web/src/modules/workbook-xlsx/xlsxWorkerProtocol";
 import {
   deserializeWorkbook,
   serializeWorkbook,
@@ -138,12 +140,7 @@ function assertFixture(snapshot: WorkbookSnapshot): void {
   }
 }
 
-async function postWorker(
-  worker: Worker,
-  request:
-    | { id: string; type: "encode"; snapshot: WorkbookSnapshot }
-    | { id: string; type: "decode"; bytes: ArrayBuffer },
-): Promise<WorkerResponse> {
+async function postWorker(worker: Worker, request: XlsxWorkerRequest): Promise<WorkerResponse> {
   return new Promise((resolveValue, reject) => {
     const timeout = setTimeout(
       () => reject(new Error(`Worker request ${request.id} timed out.`)),
@@ -169,7 +166,10 @@ async function postWorker(
       cleanup();
       reject(new Error("XLSX worker returned an unreadable message."));
     };
-    const transfer = request.type === "decode" ? [request.bytes] : [];
+    const transfer =
+      request.type === "decode"
+        ? [request.bytes]
+        : [...new Set(request.images?.map((image) => image.bytes) ?? [])];
     try {
       worker.postMessage(request, transfer);
     } catch (error) {
@@ -177,6 +177,46 @@ async function postWorker(
       reject(error);
     }
   });
+}
+
+function assertImageExport(bytes: ArrayBuffer, originalImage: Uint8Array): void {
+  const entries = new Map<string, Uint8Array>();
+  const view = new DataView(bytes);
+  let offset = 0;
+  while (offset + 30 <= bytes.byteLength && view.getUint32(offset, true) === 0x04034b50) {
+    const compression = view.getUint16(offset + 8, true);
+    const compressedSize = view.getUint32(offset + 18, true);
+    const nameLength = view.getUint16(offset + 26, true);
+    const extraLength = view.getUint16(offset + 28, true);
+    const name = new TextDecoder().decode(new Uint8Array(bytes, offset + 30, nameLength));
+    const start = offset + 30 + nameLength + extraLength;
+    const content = new Uint8Array(bytes, start, compressedSize);
+    entries.set(name, compression === 8 ? new Uint8Array(inflateRawSync(content)) : content);
+    offset = start + compressedSize;
+  }
+  const media = [...entries].filter(([name]) => /^xl\/media\/image\d+\.png$/u.test(name));
+  const image = media[0]?.[1];
+  if (
+    media.length !== 1 ||
+    !image ||
+    image.length !== originalImage.length ||
+    image.some((byte, index) => byte !== originalImage[index])
+  ) {
+    throw new Error("XLSX Worker did not preserve or deduplicate the transferred image bytes.");
+  }
+  const drawing = new TextDecoder().decode(entries.get("xl/drawings/drawing1.xml"));
+  const relations = new TextDecoder().decode(entries.get("xl/drawings/_rels/drawing1.xml.rels"));
+  if (
+    drawing.match(/<xdr:twoCellAnchor editAs="oneCell">/gu)?.length !== 2 ||
+    drawing.includes("<xdr:oneCellAnchor") ||
+    !drawing.includes("<xdr:colOff>76200</xdr:colOff>") ||
+    !drawing.includes(
+      "<xdr:to><xdr:col>3</xdr:col><xdr:colOff>76200</xdr:colOff><xdr:row>8</xdr:row><xdr:rowOff>57150</xdr:rowOff></xdr:to>",
+    ) ||
+    !relations.includes("../media/image1.png")
+  ) {
+    throw new Error("XLSX Worker did not write the cell and floating image drawing anchors.");
+  }
 }
 
 function requireSuccess<T extends WorkerResponse["type"]>(
@@ -248,6 +288,57 @@ async function main(): Promise<void> {
         throw new Error("XLSX Worker returned an unversioned snapshot.");
       assertFixture(decoded.snapshot);
 
+      const imageWorkbook = deserializeWorkbook(snapshot);
+      const imageSheet = getActiveSheet(imageWorkbook);
+      setCellContent(
+        imageSheet,
+        { row: 4, column: 0 },
+        {
+          kind: "image",
+          image: { assetId: "worker-image", altText: "Cell image" },
+        },
+      );
+      imageSheet.floatingImages.push({
+        id: "worker-floating",
+        assetId: "worker-image",
+        altText: "Floating image",
+        anchor: { row: 6, column: 2 },
+        offsetX: 8,
+        offsetY: 6,
+        width: 96,
+        height: 48,
+      });
+      const imageSnapshot = serializeWorkbook(imageWorkbook);
+      const originalImageSnapshot = JSON.stringify(imageSnapshot);
+      const imageBytes = new Uint8Array(
+        Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=",
+          "base64",
+        ),
+      );
+      const encodedImages = requireSuccess(
+        await postWorker(worker, {
+          id: "encode-images",
+          type: "encode",
+          snapshot: imageSnapshot,
+          images: [
+            {
+              assetId: "worker-image",
+              bytes: new Uint8Array(imageBytes).buffer,
+              extension: "png",
+              width: 1,
+              height: 1,
+            },
+          ],
+        }),
+        "encode",
+      );
+      if (encodedImages.report.issues.length !== 0)
+        throw new Error("Supported images must export without omissions.");
+      assertImageExport(encodedImages.bytes, imageBytes);
+      if (JSON.stringify(imageSnapshot) !== originalImageSnapshot)
+        throw new Error("Image export mutated the source snapshot.");
+
       const malformed = await postWorker(worker, {
         id: "malformed",
         type: "decode",
@@ -269,7 +360,7 @@ async function main(): Promise<void> {
     }
 
     console.log(
-      "Browser-target XLSX Worker bundle, codec round trip, and malformed-archive gate passed.",
+      "Browser-target XLSX Worker bundle, codec round trip, image media/anchors, and malformed-archive gate passed.",
     );
   } finally {
     rmSync(temporaryDirectory, { recursive: true, force: true });

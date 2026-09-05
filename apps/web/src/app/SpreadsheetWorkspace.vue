@@ -129,6 +129,7 @@ const fileActions = useWorkbookFileActions({
 });
 const { busy: fileBusy, confirmation, feedback } = fileActions;
 const xlsxActions = useWorkbookXlsxActions({
+  assetStore,
   persistence,
   getWorkbook: () => session.workbook,
   getRevision: () => workbookRevision.value,

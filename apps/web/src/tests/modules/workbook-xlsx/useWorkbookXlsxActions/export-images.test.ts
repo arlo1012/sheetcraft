@@ -1,0 +1,174 @@
+import { effectScope, ref } from "vue";
+import { describe, expect, test, vi } from "vitest";
+import { createWorkbook, getActiveSheet, setCellContent } from "@idea10/core/workbook";
+import { serializeWorkbook } from "@idea10/core/serialization";
+import type { ImageAsset, ImageAssetStore } from "../../../../modules/image-assets/imageAssetStore";
+import { useWorkbookXlsxActions } from "../../../../modules/workbook-xlsx/useWorkbookXlsxActions";
+import type { XlsxWorkerPort } from "../../../../modules/workbook-xlsx/workbookXlsxWorker";
+import type { XlsxWorkerRequest } from "../../../../modules/workbook-xlsx/xlsxWorkerProtocol";
+
+function imageAsset(): ImageAsset {
+  return {
+    id: "image-1",
+    mimeType: "image/png",
+    width: 2,
+    height: 1,
+    blob: new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }),
+  };
+}
+
+function mountActions(assetStore?: ImageAssetStore, timeoutMs?: number) {
+  const workbook = createWorkbook({ id: "image-export", sheetId: "images" });
+  setCellContent(
+    getActiveSheet(workbook),
+    { row: 0, column: 0 },
+    {
+      kind: "image",
+      image: { assetId: "image-1", altText: "Export me" },
+    },
+  );
+  const snapshot = serializeWorkbook(workbook);
+  const scope = effectScope();
+  const download = vi.fn();
+  const postMessage = vi.fn<(request: XlsxWorkerRequest) => void>((request) => {
+    queueMicrotask(() =>
+      port.onmessage?.({
+        data: {
+          id: request.id,
+          type: "encode",
+          ok: true,
+          bytes: new Uint8Array([1, 2, 3]).buffer,
+          report: { issues: [] },
+        },
+      } as MessageEvent),
+    );
+  });
+  const port: XlsxWorkerPort = {
+    onmessage: null,
+    onmessageerror: null,
+    onerror: null,
+    postMessage,
+    terminate: vi.fn(),
+  };
+  const workerFactory = vi.fn(() => port);
+  const actions = scope.run(() =>
+    useWorkbookXlsxActions({
+      persistence: { loading: ref(false), replaceDocument: vi.fn() } as never,
+      getWorkbook: () => workbook,
+      getRevision: () => 1,
+      flushPendingEdits: () => true,
+      hasPendingEdits: () => false,
+      assetStore,
+      timeoutMs,
+      workerFactory,
+      download,
+    }),
+  )!;
+  return { actions, workbook, snapshot, scope, download, postMessage, workerFactory };
+}
+
+describe("XLSX export image preparation", () => {
+  test("sends image bytes and the same point-in-time snapshot to the worker before downloading", async () => {
+    const asset = imageAsset();
+    let finishRead: (value: ImageAsset) => void = () => undefined;
+    const get = vi.fn(
+      () =>
+        new Promise<ImageAsset>((resolve) => {
+          finishRead = resolve;
+        }),
+    );
+    const fixture = mountActions({ get, put: vi.fn() });
+    const exporting = fixture.actions.exportXlsx();
+    expect(fixture.actions.busy.value).toBe(true);
+    expect(fixture.workerFactory).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(get).toHaveBeenCalledOnce());
+    setCellContent(
+      getActiveSheet(fixture.workbook),
+      { row: 0, column: 0 },
+      {
+        kind: "literal",
+        value: "Edited while preparing",
+      },
+    );
+    finishRead(asset);
+    await exporting;
+
+    const request = fixture.postMessage.mock.calls[0]?.[0];
+    expect(request?.type).toBe("encode");
+    if (request?.type !== "encode") throw new Error("Expected encode request.");
+    expect(request.snapshot).toEqual(fixture.snapshot);
+    expect(request.images).toHaveLength(1);
+    expect(request.images?.[0]).toMatchObject({
+      assetId: asset.id,
+      extension: "png",
+      width: 2,
+      height: 1,
+    });
+    expect(new Uint8Array(request.images![0]!.bytes)).toEqual(
+      new Uint8Array(await asset.blob.arrayBuffer()),
+    );
+    expect(fixture.download).toHaveBeenCalledOnce();
+    expect(fixture.actions.confirmation.value).toBeUndefined();
+    expect(fixture.actions.feedback.value).toEqual({ key: "xlsx.feedback.exported", error: false });
+    expect(fixture.actions.busy.value).toBe(false);
+    fixture.scope.stop();
+  });
+
+  test.each(["store", "asset", "read"] as const)(
+    "fails without downloading when image %s is unavailable",
+    async (missing) => {
+      const fixture = mountActions(
+        missing === "store"
+          ? undefined
+          : {
+              get: vi.fn(async () => {
+                if (missing === "read") throw new Error("storage unavailable");
+                return undefined;
+              }),
+              put: vi.fn(),
+            },
+      );
+      await fixture.actions.exportXlsx();
+      expect(fixture.workerFactory).not.toHaveBeenCalled();
+      expect(fixture.download).not.toHaveBeenCalled();
+      expect(fixture.actions.feedback.value).toEqual({ key: "xlsx.feedback.failed", error: true });
+      expect(fixture.actions.confirmation.value).toBeUndefined();
+      expect(fixture.actions.busy.value).toBe(false);
+      fixture.scope.stop();
+    },
+  );
+
+  test.each(["cancel", "dispose"] as const)(
+    "%s during an image read does not start a worker or download",
+    async (action) => {
+      const get = vi.fn(() => new Promise<ImageAsset>(() => undefined));
+      const fixture = mountActions({ get, put: vi.fn() });
+      const exporting = fixture.actions.exportXlsx();
+      await vi.waitFor(() => expect(get).toHaveBeenCalledOnce());
+      if (action === "cancel") fixture.actions.cancel();
+      else fixture.scope.stop();
+      await exporting;
+      expect(fixture.workerFactory).not.toHaveBeenCalled();
+      expect(fixture.download).not.toHaveBeenCalled();
+      expect(fixture.actions.feedback.value).toBeUndefined();
+      expect(fixture.actions.busy.value).toBe(false);
+      fixture.scope.stop();
+    },
+  );
+
+  test("times out an unresolved image read before creating a worker", async () => {
+    const fixture = mountActions(
+      {
+        get: vi.fn(() => new Promise<ImageAsset>(() => undefined)),
+        put: vi.fn(),
+      },
+      5,
+    );
+    await fixture.actions.exportXlsx();
+    expect(fixture.workerFactory).not.toHaveBeenCalled();
+    expect(fixture.download).not.toHaveBeenCalled();
+    expect(fixture.actions.feedback.value).toEqual({ key: "xlsx.feedback.timeout", error: true });
+    expect(fixture.actions.busy.value).toBe(false);
+    fixture.scope.stop();
+  });
+});

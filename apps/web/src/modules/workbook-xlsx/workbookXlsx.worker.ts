@@ -28,7 +28,12 @@ async function handleRequest(request: XlsxWorkerRequest): Promise<void> {
       });
       return;
     }
-    const result = await codec.encodeXlsx(deserializeWorkbook(request.snapshot));
+    const result = await codec.encodeXlsx(deserializeWorkbook(request.snapshot), {
+      images: request.images?.map((image) => ({
+        ...image,
+        bytes: new Uint8Array(image.bytes),
+      })),
+    });
     const bytes = new Uint8Array(result.bytes).buffer;
     respond(
       {

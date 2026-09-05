@@ -5,6 +5,7 @@ import {
   XlsxAbortError,
   type XlsxDecodeOptions,
   type XlsxDecodeResult,
+  type XlsxEncodeOptions,
   type XlsxEncodeResult,
 } from "./types.js";
 import { preflightXlsxArchive } from "./zip-preflight.js";
@@ -20,6 +21,8 @@ export {
   type XlsxDecodeOptions,
   type XlsxDecodeResult,
   type XlsxEncodeResult,
+  type XlsxEncodeOptions,
+  type XlsxImageAsset,
 } from "./types.js";
 
 function assertNotAborted(options: XlsxDecodeOptions | undefined): void {
@@ -37,6 +40,9 @@ export async function decodeXlsx(
   return { ...decoded, report: mergeCompatibilityReports(preflight, decoded.report) };
 }
 
-export async function encodeXlsx(workbook: Workbook): Promise<XlsxEncodeResult> {
-  return encodeWithExcelJs(workbook);
+export async function encodeXlsx(
+  workbook: Workbook,
+  options?: XlsxEncodeOptions,
+): Promise<XlsxEncodeResult> {
+  return encodeWithExcelJs(workbook, options);
 }

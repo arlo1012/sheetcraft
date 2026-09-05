@@ -1,0 +1,259 @@
+import { deserializeWorkbook, type WorkbookSnapshot } from "@idea10/core/serialization";
+import {
+  getWorkbookSheets,
+  normalizeImageTransform,
+  type ImageTransform,
+} from "@idea10/core/workbook";
+import type { ImageAsset, ImageAssetStore } from "../image-assets/imageAssetStore";
+import { getImagePresentation } from "../../shared/images/imagePresentation";
+import type { XlsxWorkerImage } from "./xlsxWorkerProtocol";
+
+const MAX_RENDER_SIDE = 4096;
+const MAX_RENDER_PIXELS = 16 * 1024 * 1024;
+
+type ImageReference = Readonly<{ assetId: string; transform?: ImageTransform }>;
+type EncodedImage = "png" | "jpeg" | "gif";
+
+function abortError(): Error {
+  const error = new Error("XLSX image preparation was cancelled.");
+  error.name = "AbortError";
+  return error;
+}
+
+function assertNotAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw abortError();
+}
+
+function abortable<T>(operation: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  assertNotAborted(signal);
+  if (!signal) return operation;
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      cleanup();
+      reject(abortError());
+    };
+    const cleanup = () => signal.removeEventListener("abort", onAbort);
+    signal.addEventListener("abort", onAbort, { once: true });
+    operation.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (cause) => {
+        cleanup();
+        reject(cause);
+      },
+    );
+  });
+}
+
+function imageKey(assetId: string, transform: ImageTransform | undefined): string {
+  return JSON.stringify([assetId, normalizeImageTransform(transform) ?? null]);
+}
+
+function extensionFor(mimeType: string): EncodedImage | undefined {
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/jpeg") return "jpeg";
+  if (mimeType === "image/gif") return "gif";
+  return undefined;
+}
+
+function collectImageReferences(snapshot: WorkbookSnapshot): readonly ImageReference[] {
+  const workbook = deserializeWorkbook(snapshot);
+  const references: ImageReference[] = [];
+  for (const sheet of getWorkbookSheets(workbook)) {
+    for (const cell of sheet.cells.values()) {
+      if (cell.content?.kind !== "image") continue;
+      references.push({
+        assetId: cell.content.image.assetId,
+        transform: normalizeImageTransform(cell.content.image.transform),
+      });
+    }
+    for (const image of sheet.floatingImages)
+      references.push({
+        assetId: image.assetId,
+        transform: normalizeImageTransform(image.transform),
+      });
+  }
+  return references;
+}
+
+function renderSize(width: number, height: number): { width: number; height: number } {
+  const scale = Math.min(
+    1,
+    MAX_RENDER_SIDE / width,
+    MAX_RENDER_SIDE / height,
+    Math.sqrt(MAX_RENDER_PIXELS / (width * height)),
+  );
+  return {
+    width: Math.max(1, Math.floor(width * scale)),
+    height: Math.max(1, Math.floor(height * scale)),
+  };
+}
+
+async function loadImage(blob: Blob, signal: AbortSignal | undefined): Promise<HTMLImageElement> {
+  assertNotAborted(signal);
+  const url = URL.createObjectURL(blob);
+  try {
+    return await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      let settled = false;
+      const cleanup = () => {
+        signal?.removeEventListener("abort", onAbort);
+        image.onload = null;
+        image.onerror = null;
+      };
+      const finish = (callback: () => void) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        callback();
+      };
+      const onAbort = () =>
+        finish(() => {
+          image.src = "";
+          reject(abortError());
+        });
+      image.onload = () => finish(() => resolve(image));
+      image.onerror = () => finish(() => reject(new Error("Could not decode XLSX image asset.")));
+      signal?.addEventListener("abort", onAbort, { once: true });
+      image.src = url;
+      if (signal?.aborted) onAbort();
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function canvasBlob(canvas: HTMLCanvasElement, signal: AbortSignal | undefined): Promise<Blob> {
+  assertNotAborted(signal);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      try {
+        assertNotAborted(signal);
+        if (!blob) throw new Error("Could not rasterize XLSX image asset.");
+        resolve(blob);
+      } catch (cause) {
+        reject(cause);
+      }
+    }, "image/png");
+  });
+}
+
+async function rasterize(
+  asset: ImageAsset,
+  transform: ImageTransform | undefined,
+  signal: AbortSignal | undefined,
+): Promise<Pick<XlsxWorkerImage, "bytes" | "extension" | "width" | "height">> {
+  const image = await loadImage(asset.blob, signal);
+  assertNotAborted(signal);
+  const sourceWidth = image.naturalWidth;
+  const sourceHeight = image.naturalHeight;
+  if (sourceWidth < 1 || sourceHeight < 1)
+    throw new Error("XLSX image asset has invalid dimensions.");
+  const normalized = normalizeImageTransform(transform);
+  const presentation = getImagePresentation(normalized, sourceWidth, sourceHeight);
+  const output = renderSize(presentation.width, presentation.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = output.width;
+  canvas.height = output.height;
+  try {
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas rendering is unavailable for XLSX image export.");
+    context.scale(output.width / presentation.width, output.height / presentation.height);
+    context.save();
+    if (normalized?.rotation === 90) {
+      context.translate(presentation.cropHeight, 0);
+      context.rotate(Math.PI / 2);
+    } else if (normalized?.rotation === 180) {
+      context.translate(presentation.cropWidth, presentation.cropHeight);
+      context.rotate(Math.PI);
+    } else if (normalized?.rotation === 270) {
+      context.translate(0, presentation.cropWidth);
+      context.rotate((Math.PI * 3) / 2);
+    }
+    if (normalized?.flipHorizontal) {
+      context.translate(presentation.cropWidth, 0);
+      context.scale(-1, 1);
+    }
+    if (normalized?.flipVertical) {
+      context.translate(0, presentation.cropHeight);
+      context.scale(1, -1);
+    }
+    context.drawImage(
+      image,
+      presentation.cropX,
+      presentation.cropY,
+      presentation.cropWidth,
+      presentation.cropHeight,
+      0,
+      0,
+      presentation.cropWidth,
+      presentation.cropHeight,
+    );
+    context.restore();
+    const blob = await abortable(canvasBlob(canvas, signal), signal);
+    return {
+      bytes: await abortable(blob.arrayBuffer(), signal),
+      extension: "png",
+      width: output.width,
+      height: output.height,
+    };
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
+  }
+}
+
+async function prepareVariant(
+  asset: ImageAsset,
+  transform: ImageTransform | undefined,
+  signal: AbortSignal | undefined,
+): Promise<Pick<XlsxWorkerImage, "bytes" | "extension" | "width" | "height">> {
+  const extension = extensionFor(asset.mimeType);
+  if (extension && !transform) {
+    assertNotAborted(signal);
+    return {
+      bytes: await abortable(asset.blob.arrayBuffer(), signal),
+      extension,
+      width: asset.width,
+      height: asset.height,
+    };
+  }
+  return rasterize(asset, transform, signal);
+}
+
+/** Prepares the immutable snapshot's image variants for transfer to the XLSX worker. */
+export async function prepareXlsxImages(
+  snapshot: WorkbookSnapshot,
+  assetStore: ImageAssetStore | undefined,
+  signal?: AbortSignal,
+): Promise<readonly XlsxWorkerImage[]> {
+  assertNotAborted(signal);
+  const references = collectImageReferences(snapshot);
+  if (references.length === 0) return [];
+  if (!assetStore) throw new Error("XLSX export cannot read image assets.");
+  const variants = new Map<string, ImageReference>();
+  for (const reference of references) {
+    const key = imageKey(reference.assetId, reference.transform);
+    if (!variants.has(key)) variants.set(key, reference);
+  }
+  const assets = new Map<string, ImageAsset>();
+  const result: XlsxWorkerImage[] = [];
+  for (const reference of variants.values()) {
+    assertNotAborted(signal);
+    let asset = assets.get(reference.assetId);
+    if (!asset) {
+      asset = await abortable(assetStore.get(reference.assetId), signal);
+      if (!asset) throw new Error(`XLSX export is missing image asset ${reference.assetId}.`);
+      assets.set(reference.assetId, asset);
+    }
+    const prepared = await prepareVariant(asset, reference.transform, signal);
+    result.push({
+      assetId: reference.assetId,
+      ...(reference.transform ? { transform: reference.transform } : {}),
+      ...prepared,
+    });
+  }
+  return result;
+}

@@ -359,6 +359,7 @@ describe("useWorkbookXlsxActions", () => {
     );
 
     const exportPromise = fixture.actions.exportXlsx();
+    await vi.waitFor(() => expect(worker).toBeDefined());
     fixture.scope.stop();
     await exportPromise;
     expect(worker?.terminate).toHaveBeenCalledOnce();

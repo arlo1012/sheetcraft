@@ -1,4 +1,5 @@
 import type { WorkbookSnapshot } from "@idea10/core/serialization";
+import type { ImageTransform } from "@idea10/core/workbook";
 
 export type XlsxCompatibilitySeverity = "warning" | "block";
 
@@ -13,9 +14,24 @@ export type XlsxCompatibilityReport = {
   issues: readonly XlsxCompatibilityIssue[];
 };
 
+/** Ready-to-embed bytes; transform identifies the already-rendered asset variant. */
+export type XlsxWorkerImage = {
+  assetId: string;
+  transform?: ImageTransform;
+  bytes: ArrayBuffer;
+  extension: "png" | "jpeg" | "gif";
+  width: number;
+  height: number;
+};
+
 export type XlsxWorkerRequest =
   | { id: string; type: "decode"; bytes: ArrayBuffer }
-  | { id: string; type: "encode"; snapshot: WorkbookSnapshot };
+  | {
+      id: string;
+      type: "encode";
+      snapshot: WorkbookSnapshot;
+      images?: readonly XlsxWorkerImage[];
+    };
 
 export type XlsxWorkerResponse =
   | {

@@ -16,6 +16,37 @@ function worker(postMessage: XlsxWorkerPort["postMessage"]): XlsxWorkerPort {
 }
 
 describe("runXlsxWorker", () => {
+  test("transfers each prepared image buffer once without detaching the snapshot", async () => {
+    const bytes = new ArrayBuffer(4);
+    const otherBytes = new ArrayBuffer(8);
+    const image = { assetId: "image", bytes, extension: "png" as const, width: 1, height: 1 };
+    const snapshot = { version: 6 } as never;
+    const postMessage = vi.fn<XlsxWorkerPort["postMessage"]>((request) => {
+      port.onmessage?.({
+        data: {
+          id: request.id,
+          ok: true,
+          type: "encode",
+          bytes: new ArrayBuffer(0),
+          report: { issues: [] },
+        },
+      } as MessageEvent);
+    });
+    const port = worker(postMessage);
+    const request = {
+      id: "images",
+      type: "encode" as const,
+      snapshot,
+      images: [image, { ...image, assetId: "shared" }, { ...image, bytes: otherBytes }],
+    };
+
+    await runXlsxWorker(() => port, request, { timeoutMs: 100 });
+
+    expect(postMessage).toHaveBeenCalledWith(request, [bytes, otherBytes]);
+    expect(request.snapshot).toBe(snapshot);
+    expect(port.terminate).toHaveBeenCalledOnce();
+  });
+
   test("cleans up when postMessage throws synchronously", async () => {
     const port = worker(() => {
       throw new Error("clone failed");

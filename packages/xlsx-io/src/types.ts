@@ -1,4 +1,5 @@
 import type { Workbook } from "@idea10/core/workbook";
+import type { ImageTransform } from "@idea10/core/workbook";
 
 export type AbortSignalLike = Readonly<{ aborted: boolean }>;
 
@@ -47,6 +48,21 @@ export type XlsxDecodeResult = Readonly<{
 export type XlsxEncodeResult = Readonly<{
   bytes: Uint8Array;
   report: XlsxCompatibilityReport;
+}>;
+
+/** A raster image prepared by the runtime adapter for XLSX export. */
+export type XlsxImageAsset = Readonly<{
+  assetId: string;
+  /** Identifies the already-baked crop/rotation/flip variant. */
+  transform?: ImageTransform;
+  bytes: Uint8Array;
+  extension: "png" | "jpeg" | "gif";
+  width: number;
+  height: number;
+}>;
+
+export type XlsxEncodeOptions = Readonly<{
+  images?: readonly XlsxImageAsset[];
 }>;
 
 export class XlsxCompatibilityError extends Error {

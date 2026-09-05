@@ -109,7 +109,10 @@ export function runXlsxWorker(
       }
       settle(undefined, response);
     };
-    const transfer = request.type === "decode" ? [request.bytes] : [];
+    const transfer =
+      request.type === "decode"
+        ? [request.bytes]
+        : [...new Set(request.images?.map((image) => image.bytes) ?? [])];
     try {
       worker.postMessage(request, transfer);
     } catch (cause) {

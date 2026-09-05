@@ -1,58 +1,12 @@
-import { normalizeImageTransform, type ImageTransform } from "@idea10/core/workbook";
+import type { ImageTransform } from "@idea10/core/workbook";
+import {
+  getImagePresentation,
+  type ImagePresentation as SheetImagePresentation,
+} from "../../../shared/images/imagePresentation";
 
-export type SheetImagePresentation = {
-  cropX: number;
-  cropY: number;
-  cropWidth: number;
-  cropHeight: number;
-  width: number;
-  height: number;
-  viewBox: string;
-  rotationTransform?: string;
-  flipTransform?: string;
-};
+export type { SheetImagePresentation };
 
-export function getSheetImagePresentation(
-  transform: ImageTransform | undefined,
-  naturalWidth: number,
-  naturalHeight: number,
-): SheetImagePresentation {
-  const normalized = normalizeImageTransform(transform);
-  const crop = normalized?.crop ?? { x: 0, y: 0, width: 1, height: 1 };
-  const rotation = normalized?.rotation ?? 0;
-  const flipHorizontal = Boolean(normalized?.flipHorizontal);
-  const flipVertical = Boolean(normalized?.flipVertical);
-  const cropWidth = naturalWidth * crop.width;
-  const cropHeight = naturalHeight * crop.height;
-  const rotated = rotation === 90 || rotation === 270;
-  const rotationTransform =
-    rotation === 90
-      ? `translate(${cropHeight} 0) rotate(90)`
-      : rotation === 180
-        ? `translate(${cropWidth} ${cropHeight}) rotate(180)`
-        : rotation === 270
-          ? `translate(0 ${cropWidth}) rotate(270)`
-          : undefined;
-  const flipTransform =
-    flipHorizontal && flipVertical
-      ? `translate(${cropWidth} ${cropHeight}) scale(-1 -1)`
-      : flipHorizontal
-        ? `translate(${cropWidth} 0) scale(-1 1)`
-        : flipVertical
-          ? `translate(0 ${cropHeight}) scale(1 -1)`
-          : undefined;
-  return {
-    cropX: naturalWidth * crop.x,
-    cropY: naturalHeight * crop.y,
-    cropWidth,
-    cropHeight,
-    width: rotated ? cropHeight : cropWidth,
-    height: rotated ? cropWidth : cropHeight,
-    viewBox: rotated ? `0 0 ${cropHeight} ${cropWidth}` : `0 0 ${cropWidth} ${cropHeight}`,
-    rotationTransform,
-    flipTransform,
-  };
-}
+export const getSheetImagePresentation = getImagePresentation;
 
 function escapeAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");

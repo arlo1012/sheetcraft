@@ -18,6 +18,7 @@ import {
 import type { CellStyle } from "@idea10/core/style";
 import {
   DEFAULT_COLUMN_WIDTH,
+  DEFAULT_ROW_HEIGHT,
   MAX_COLUMN_WIDTH,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
@@ -25,7 +26,16 @@ import {
   createSheet,
 } from "@idea10/core/workbook";
 import { CompatibilityReportBuilder } from "./report.js";
-import { XlsxCompatibilityError, type XlsxCompatibilityReport } from "./types.js";
+import {
+  createXlsxImageExporter,
+  type XlsxImageWorkbook,
+  type XlsxImageWorksheet,
+} from "./image-export.js";
+import {
+  XlsxCompatibilityError,
+  type XlsxCompatibilityReport,
+  type XlsxEncodeOptions,
+} from "./types.js";
 
 const MAX_SPARSE_CELLS = 200_000;
 
@@ -42,8 +52,9 @@ type BrowserRow = {
     callback: (cell: BrowserCell, column: number) => void,
   ) => void;
 };
-type BrowserWorksheet = {
+type BrowserWorksheet = XlsxImageWorksheet & {
   name: string;
+  properties: { defaultRowHeight?: number; defaultColWidth?: number };
   views?: Array<Record<string, unknown>> | null;
   columns?: Array<{ number?: number; width?: number }>;
   autoFilter?: unknown;
@@ -62,7 +73,7 @@ type BrowserWorksheet = {
     address: string,
   ) => BrowserCell & { value: unknown; style: Record<string, unknown>; numFmt?: string };
 };
-type BrowserWorkbook = {
+type BrowserWorkbook = XlsxImageWorkbook & {
   properties: { date1904?: boolean };
   calcProperties: { fullCalcOnLoad: boolean };
   views?: Array<Record<string, unknown>> | null;
@@ -89,6 +100,7 @@ function columnLabel(column: number): string {
 function address(row: number, column: number): string {
   return `${columnLabel(column)}${row + 1}`;
 }
+
 function workbookId(): string {
   const runtimeCrypto = (globalThis as unknown as { crypto?: { randomUUID?: () => string } })
     .crypto;
@@ -510,9 +522,11 @@ function writeStyle(
 
 export async function encodeWithExcelJs(
   workbook: Workbook,
+  options?: XlsxEncodeOptions,
 ): Promise<{ bytes: Uint8Array; report: XlsxCompatibilityReport }> {
   const report = new CompatibilityReportBuilder();
   const target = new ExcelJS.Workbook();
+  const imageExporter = createXlsxImageExporter(target, options);
   target.properties.date1904 = workbook.dateSystem === "1904";
   target.calcProperties.fullCalcOnLoad = true;
   let encodedCells = 0;
@@ -525,6 +539,8 @@ export async function encodeWithExcelJs(
           ? [{ state: "frozen", ySplit: sheet.freezePanes.rows, xSplit: sheet.freezePanes.columns }]
           : undefined,
     });
+    output.properties.defaultRowHeight = (DEFAULT_ROW_HEIGHT * 3) / 4;
+    output.properties.defaultColWidth = pixelsToExcelColumnWidth(DEFAULT_COLUMN_WIDTH);
     for (const [index, size] of sheet.rowHeights) {
       output.getRow(index + 1).height = (size * 3) / 4;
     }
@@ -536,12 +552,6 @@ export async function encodeWithExcelJs(
         `${address(range.start.row, range.start.column)}:${address(range.end.row, range.end.column)}`,
       );
     if (sheet.filter) add(report, "filter-omitted", sheet.name);
-    for (const image of sheet.floatingImages)
-      add(
-        report,
-        "image-omitted",
-        `${sheet.name}!${address(image.anchor.row, image.anchor.column)}`,
-      );
     for (const [key, cell] of sheet.cells) {
       encodedCells += 1;
       if (encodedCells > MAX_SPARSE_CELLS)
@@ -577,8 +587,19 @@ export async function encodeWithExcelJs(
             CYCLE: "#CYCLE!",
           }[cell.content.error.code],
         };
-      else if (cell.content?.kind === "image") add(report, "image-omitted", issueLocation);
+      else if (cell.content?.kind === "image")
+        imageExporter.addCellImage(
+          output,
+          sheet,
+          { row, column },
+          cell.content.image,
+          issueLocation,
+        );
       writeStyle(outputCell, cell.style, issueLocation, report);
+    }
+    for (const image of sheet.floatingImages) {
+      const issueLocation = `${sheet.name}!${address(image.anchor.row, image.anchor.column)}`;
+      imageExporter.addFloatingImage(output, sheet, image, issueLocation);
     }
   }
   const bytes = await target.xlsx.writeBuffer();
