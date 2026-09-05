@@ -1132,7 +1132,7 @@ defineExpose({
             @cell-double-click="onCellDoubleClick"
             @cell-contextmenu="openCellContextMenu"
           >
-            <template #active-cell>
+            <template #active-cell="{ cellRect }">
               <CellEditor
                 ref="editorRef"
                 :model-value="editingValue"
@@ -1140,7 +1140,7 @@ defineExpose({
                 :display-value="activeCellDisplayValue"
                 :editing="isEditing"
                 :wrap-text="activeCellWrapText"
-                :cell-rect="activeCellRect"
+                :cell-rect="cellRect"
                 :viewport-size="viewportSize"
                 :style="activeCellEditorStyle"
                 :frame-style="activeCellEditorFrameStyle"

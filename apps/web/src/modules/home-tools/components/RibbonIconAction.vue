@@ -57,7 +57,7 @@ function activate(): void {
     </span>
     <span v-if="text" class="ribbon-icon-action__text" aria-hidden="true">{{ text }}</span>
     <ChevronDown
-      v-if="disclosure && !disabled"
+      v-if="disclosure"
       class="ribbon-icon-action__disclosure"
       :size="11"
       aria-hidden="true"

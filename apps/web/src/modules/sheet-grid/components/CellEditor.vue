@@ -32,13 +32,13 @@ const emit = defineEmits<{
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 const measuredWidth = ref(0);
 const measuredHeight = ref(0);
-const EDITOR_FRAME_BORDER_SIZE = 4;
+const EDITOR_FRAME_BORDER_SIZE = 2;
 const EDITOR_TRAILING_SAFETY_SPACE = 6;
 let measurementSequence = 0;
 
 const minimumFrameSize = computed(() => ({
-  width: props.cellRect.width + 2,
-  height: props.cellRect.height + 2,
+  width: props.cellRect.width + 1,
+  height: props.cellRect.height + 1,
 }));
 const maximumFrameSize = computed(() => ({
   width: Math.max(minimumFrameSize.value.width, props.viewportSize.width - props.cellRect.x + 1),
@@ -76,9 +76,10 @@ async function measureEditor(): Promise<void> {
     return;
   }
 
-  const contentWidth = props.wrapText
-    ? minimumFrameSize.value.width
-    : input.scrollWidth + EDITOR_FRAME_BORDER_SIZE + EDITOR_TRAILING_SAFETY_SPACE;
+  const contentWidth =
+    !props.wrapText && input.scrollWidth > input.clientWidth
+      ? input.scrollWidth + EDITOR_FRAME_BORDER_SIZE + EDITOR_TRAILING_SAFETY_SPACE
+      : minimumFrameSize.value.width;
   const contentHeight = input.scrollHeight + EDITOR_FRAME_BORDER_SIZE;
   measuredWidth.value = Math.min(
     maximumFrameSize.value.width,
@@ -226,7 +227,7 @@ defineExpose({ focus, insertLineBreak });
   z-index: 3;
   display: flex;
   background: transparent;
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   pointer-events: none;
 
   &.is-editing {
@@ -234,7 +235,6 @@ defineExpose({ focus, insertLineBreak });
     background: var(--idea-surface-panel);
     border-color: var(--idea-action-primary);
     pointer-events: auto;
-    box-shadow: 0 1px 3px rgb(32 36 44 / 16%);
   }
 }
 

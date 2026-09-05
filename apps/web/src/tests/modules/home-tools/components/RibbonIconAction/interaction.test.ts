@@ -3,28 +3,31 @@ import { describe, expect, test } from "vitest";
 import RibbonIconAction from "../../../../../modules/home-tools/components/RibbonIconAction.vue";
 
 describe("RibbonIconAction interaction", () => {
-  test("shows disclosure only when the action is available", async () => {
-    const available = mount(RibbonIconAction, {
+  test("keeps a disclosure visible when availability changes", async () => {
+    const wrapper = mount(RibbonIconAction, {
       props: { label: "Available menu", disclosure: true },
     });
 
-    expect(available.element).toBeInstanceOf(HTMLButtonElement);
-    expect(available.attributes()).toMatchObject({ type: "button" });
-    expect((available.element as HTMLButtonElement).disabled).toBe(false);
-    expect(available.get(".ribbon-icon-action__disclosure")).toBeTruthy();
-    await available.trigger("click");
-    expect(available.emitted("activate")).toHaveLength(1);
+    expect(wrapper.element).toBeInstanceOf(HTMLButtonElement);
+    expect(wrapper.attributes()).toMatchObject({ type: "button" });
+    expect((wrapper.element as HTMLButtonElement).disabled).toBe(false);
+    expect(wrapper.get(".ribbon-icon-action__disclosure")).toBeTruthy();
+    await wrapper.trigger("click");
+    expect(wrapper.emitted("activate")).toHaveLength(1);
 
-    const unavailable = mount(RibbonIconAction, {
-      props: { label: "Unavailable menu", disclosure: true, disabled: true },
+    await wrapper.setProps({ disabled: true });
+    expect(wrapper.attributes()).toMatchObject({
+      type: "button",
+      disabled: "",
     });
+    expect((wrapper.element as HTMLButtonElement).disabled).toBe(true);
+    expect(wrapper.get(".ribbon-icon-action__disclosure")).toBeTruthy();
+    await wrapper.trigger("click");
+    expect(wrapper.emitted("activate")).toHaveLength(1);
 
-    expect(unavailable.element).toBeInstanceOf(HTMLButtonElement);
-    expect(unavailable.attributes()).toMatchObject({ type: "button", disabled: "" });
-    expect((unavailable.element as HTMLButtonElement).disabled).toBe(true);
-    expect(unavailable.find(".ribbon-icon-action__disclosure").exists()).toBe(false);
-    await unavailable.trigger("click");
-    expect(unavailable.emitted("activate")).toBeUndefined();
+    await wrapper.setProps({ disabled: false });
+    expect((wrapper.element as HTMLButtonElement).disabled).toBe(false);
+    expect(wrapper.get(".ribbon-icon-action__disclosure")).toBeTruthy();
   });
 
   test("exposes pressed state through the native button", () => {

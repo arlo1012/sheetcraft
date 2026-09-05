@@ -7,6 +7,7 @@ import {
   type SheetEvaluator,
 } from "@idea10/core/workbook";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { Rect } from "@idea10/sheet-engine/geometry";
 import { isCellSelected, type CellSelection } from "@idea10/sheet-engine/selection";
 import { getCellContentStyle } from "../cell-presentation";
 import { formatCellValueForGrid } from "../cell-value-presentation";
@@ -15,6 +16,7 @@ type VisibleCell = {
   key: string;
   paneId: "topLeft" | "top" | "left" | "body";
   address: CellAddress;
+  rect: Rect;
   viewportTop: number;
   viewportHeight: number;
   text: string;
@@ -59,6 +61,8 @@ const emit = defineEmits<{
   cellContextmenu: [address: CellAddress, event: MouseEvent];
 }>();
 
+defineSlots<{ "active-cell"?: (props: { cellRect: Rect }) => unknown }>();
+
 const visibleCells = computed<VisibleCell[]>(() => {
   const cells: VisibleCell[] = [];
   function addCell(address: CellAddress, paneId: VisibleCell["paneId"]): void {
@@ -79,6 +83,7 @@ const visibleCells = computed<VisibleCell[]>(() => {
       key: `${address.row}:${address.column}`,
       paneId,
       address,
+      rect,
       text,
       multiline: Boolean(cellStyle?.wrapText) || preservesLineBreaks,
       wrapped: Boolean(cellStyle?.wrapText),
@@ -151,8 +156,9 @@ const visibleRows = computed<VisibleRow[]>(() => {
             }));
           if (cells.length === 0) return null;
           const clip = props.layout.panes[paneId].clip;
-          const topInset = Math.max(0, clip.y - row.offset);
-          const bottomInset = Math.max(0, row.offset + row.height - clip.y - clip.height);
+          // Clip to the pane so the editor can extend beyond its owning row.
+          const topInset = clip.y - row.offset;
+          const bottomInset = row.offset + row.height - clip.y - clip.height;
           return {
             paneId,
             cells,
@@ -217,6 +223,7 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
       v-for="row in visibleRows"
       :key="row.key"
       class="sheet-cell-layer__row"
+      :class="{ 'is-editing': editing && row.index === activeCell.row }"
       :style="row.style"
       role="row"
       :aria-rowindex="row.index + 1"
@@ -259,6 +266,7 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
           <slot
             v-if="cell.address.row === activeCell.row && cell.address.column === activeCell.column"
             name="active-cell"
+            :cell-rect="cell.rect"
           />
         </div>
       </div>
@@ -280,11 +288,16 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
     position: absolute;
     left: 0;
     width: 100%;
+    pointer-events: none;
+
+    &.is-editing {
+      z-index: 5;
+    }
   }
 
   &__row-pane {
     position: absolute;
-    overflow: hidden;
+    pointer-events: none;
   }
 
   &__merge-fragment {
@@ -309,6 +322,7 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
     font-size: 13px;
     line-height: 1;
     white-space: nowrap;
+    pointer-events: auto;
     user-select: none;
 
     &.is-active {
