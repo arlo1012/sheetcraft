@@ -1,4 +1,5 @@
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import type { FloatingImage } from "@idea10/core/workbook";
 import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
@@ -52,6 +53,10 @@ function mountLayer(options?: {
     },
     global: { plugins: [createAppI18n("en-US")] },
   });
+}
+
+function floatingImageMenu(): HTMLElement | null {
+  return document.querySelector<HTMLElement>(".sheet-floating-image-context-menu");
 }
 
 describe("SheetFloatingImageLayer", () => {
@@ -137,6 +142,43 @@ describe("SheetFloatingImageLayer", () => {
     expect(wrapper.emitted("update")).toEqual([
       [{ ...frozenImage, anchor: { row: 3, column: 1 }, offsetX: 20, offsetY: 0 }],
     ]);
+  });
+
+  test("opens the image action menu on right-click and emits conversion", async () => {
+    const wrapper = mountLayer({ selectedImageId: null });
+    const fragment = wrapper.get('[data-floating-image-id="image-1"]');
+    await fragment.trigger("contextmenu", { clientX: 120, clientY: 80 });
+
+    expect(wrapper.emitted("select")).toEqual([["image-1"]]);
+    expect(floatingImageMenu()?.textContent).toContain("Convert to cell image");
+    expect(floatingImageMenu()?.style.position).toBe("fixed");
+    await document
+      .querySelector<HTMLElement>('[data-floating-image-action="convert-to-cell"]')!
+      .click();
+    await nextTick();
+    expect(wrapper.emitted("convertToCell")).toEqual([["image-1"]]);
+    expect(floatingImageMenu()).toBeNull();
+  });
+
+  test("opens from Shift+F10 and restores image focus when the menu closes", async () => {
+    const wrapper = mountLayer();
+    const fragment = wrapper.get('[data-floating-image-id="image-1"]');
+    await fragment.trigger("keydown", { key: "F10", shiftKey: true });
+    expect(floatingImageMenu()).not.toBeNull();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+    await nextTick();
+    expect(floatingImageMenu()).toBeNull();
+    expect(document.activeElement).toBe(fragment.element);
+  });
+
+  test("emits deletion from the image action menu", async () => {
+    const wrapper = mountLayer();
+    const fragment = wrapper.get('[data-floating-image-id="image-1"]');
+    await fragment.trigger("keydown", { key: "ContextMenu" });
+    document.querySelector<HTMLElement>('[data-floating-image-action="delete"]')!.click();
+    await nextTick();
+    expect(wrapper.emitted("delete")).toEqual([["image-1"]]);
   });
 
   test("emits keyboard movement and deletion for the focused image", async () => {

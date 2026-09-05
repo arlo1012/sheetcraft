@@ -128,7 +128,10 @@ export function useSheetImageActions(options: {
     if (file && request) void insertFile(file, request.mode, request.target);
   }
 
-  async function pasteFloatingImage(image: FloatingImage): Promise<void> {
+  async function pasteFloatingImage(
+    image: FloatingImage,
+    mode: ImageInsertMode = "floating",
+  ): Promise<void> {
     const target = captureTarget();
     if (!target || busy.value) return;
     busy.value = true;
@@ -138,10 +141,19 @@ export function useSheetImageActions(options: {
         return;
       }
       if (!isCurrent(target)) return;
-      options.setFloatingImage(
-        { ...image, id: idFactory("image"), anchor: target.address, offsetX: 12, offsetY: 12 },
-        target.sheetId,
-      );
+      if (mode === "cell") {
+        options.setCellImage({
+          sheetId: target.sheetId,
+          address: target.address,
+          assetId: image.assetId,
+          altText: image.altText,
+        });
+      } else {
+        options.setFloatingImage(
+          { ...image, id: idFactory("image"), anchor: target.address, offsetX: 12, offsetY: 12 },
+          target.sheetId,
+        );
+      }
       feedback.value = "image.inserted";
     } catch {
       feedback.value = "image.insertionFailed";

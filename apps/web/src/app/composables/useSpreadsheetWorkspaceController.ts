@@ -25,6 +25,7 @@ import {
   createSetCellContentCommand,
   createSetFloatingImageCommand,
   createDeleteFloatingImageCommand,
+  createConvertFloatingImageToCellCommand,
   createSetSheetFilterCriteriaCommand,
   createSetSheetFreezePanesCommand,
   createSortSheetRangeCommand,
@@ -411,6 +412,16 @@ export function useSpreadsheetWorkspaceController(
 
   function deleteFloatingImage(id: string): void {
     execute(createDeleteFloatingImageCommand(activeSheet.value.id, id));
+  }
+
+  function convertFloatingImageToCell(id: string): void {
+    try {
+      if (execute(createConvertFloatingImageToCellCommand(activeSheet.value.id, id))) {
+        showWorkspaceStatus({ key: "image.converted" });
+      }
+    } catch {
+      showWorkspaceStatus({ key: "image.convertFailed" });
+    }
   }
 
   function pasteCells(payload: GridPastePayload): GridPasteResult {
@@ -923,6 +934,7 @@ export function useSpreadsheetWorkspaceController(
     setCellImage,
     setFloatingImage,
     deleteFloatingImage,
+    convertFloatingImageToCell,
     pasteCells,
     showClipboardFeedback,
     clearCells,

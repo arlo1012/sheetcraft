@@ -267,6 +267,11 @@ export const enUS = {
     insertionFailed: "The image could not be inserted.",
     keyboardInstructions:
       "Use the arrow keys to move the image. Hold Shift with an arrow key to resize it.",
+    contextMenuActions: "Image actions",
+    convertToCell: "Convert to cell image",
+    deleteImage: "Delete image",
+    converted: "Image converted to a cell image.",
+    convertFailed: "This image could not be converted to a cell image.",
   },
   clipboard: {
     unavailable: "Clipboard is unavailable.",

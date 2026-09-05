@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, type CSSProperties } from "vue";
+import {
+  computed,
+  markRaw,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  shallowRef,
+  watch,
+  type CSSProperties,
+} from "vue";
 import { MAX_FLOATING_IMAGE_SIZE, type FloatingImage } from "@idea10/core/workbook";
 import {
   getFloatingImageViewportFragments,
@@ -7,7 +17,9 @@ import {
   type FloatingImageViewportFragment,
 } from "@idea10/sheet-engine/floating-image-layout";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
+import SheetFloatingImageContextMenu from "./SheetFloatingImageContextMenu.vue";
 
 const MINIMUM_IMAGE_SIZE = 24;
 
@@ -24,6 +36,7 @@ const emit = defineEmits<{
   select: [id: string | null];
   update: [image: FloatingImage];
   delete: [id: string];
+  convertToCell: [id: string];
 }>();
 
 const { t } = useAppI18n();
@@ -38,9 +51,16 @@ type Gesture = {
   startClientY: number;
 };
 
+type ContextMenuState = {
+  imageId: string;
+  anchor: FloatingReference;
+  trigger: HTMLElement;
+};
+
 const gesture = shallowRef<Gesture>();
 const previewImage = shallowRef<FloatingImage>();
 const layerRef = ref<HTMLElement | null>(null);
+const contextMenu = shallowRef<ContextMenuState>();
 
 const fragments = computed<ImageFragment[]>(() =>
   props.images.flatMap((image) =>
@@ -188,13 +208,86 @@ function onWindowKeydown(event: KeyboardEvent): void {
   }
 }
 
+function closeContextMenu(restoreFocus: boolean): void {
+  const trigger = contextMenu.value?.trigger;
+  contextMenu.value = undefined;
+  if (restoreFocus) {
+    void nextTick(() => {
+      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+    });
+  }
+}
+
+function openContextMenu(image: FloatingImage, trigger: HTMLElement, x: number, y: number): void {
+  if (gesture.value) return;
+  emit("select", image.id);
+  trigger.focus({ preventScroll: true });
+  contextMenu.value = {
+    imageId: image.id,
+    trigger,
+    anchor: markRaw({
+      contextElement: layerRef.value ?? trigger,
+      getBoundingClientRect: () => new DOMRect(x, y, 0, 0),
+    }),
+  };
+}
+
+function onImageContextMenu(image: FloatingImage, event: MouseEvent): void {
+  event.preventDefault();
+  event.stopPropagation();
+  openContextMenu(image, event.currentTarget as HTMLElement, event.clientX, event.clientY);
+}
+
+function openImageKeyboardContextMenu(image: FloatingImage, event: KeyboardEvent): boolean {
+  if (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey)) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  const trigger = event.currentTarget as HTMLElement;
+  const rect = trigger.getBoundingClientRect();
+  openContextMenu(
+    image,
+    trigger,
+    rect.left + Math.min(16, rect.width / 2),
+    rect.top + Math.min(16, rect.height / 2),
+  );
+  return true;
+}
+
+function requestConvertToCell(): void {
+  const imageId = contextMenu.value?.imageId;
+  closeContextMenu(false);
+  if (imageId) emit("convertToCell", imageId);
+}
+
+function requestDelete(): void {
+  const imageId = contextMenu.value?.imageId;
+  closeContextMenu(false);
+  if (imageId) emit("delete", imageId);
+}
+
+watch(
+  () => props.images.map((image) => image.id),
+  (ids) => {
+    if (contextMenu.value && !ids.includes(contextMenu.value.imageId)) closeContextMenu(false);
+  },
+);
+
+watch(
+  () => props.selectedImageId,
+  (selectedImageId) => {
+    if (contextMenu.value && selectedImageId !== contextMenu.value.imageId) closeContextMenu(false);
+  },
+);
+
 onMounted(() => window.addEventListener("keydown", onWindowKeydown));
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onWindowKeydown);
   finishGesture(false);
+  closeContextMenu(false);
 });
 
 function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
+  if (openImageKeyboardContextMenu(image, event)) return;
   if (event.key === "Escape") {
     if (gesture.value) finishGesture(false);
     else emit("select", null);
@@ -242,6 +335,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       role="img"
       :aria-label="getAccessibleLabel(fragment.image)"
       @pointerdown.stop="startGesture(fragment.image, 'move', $event)"
+      @contextmenu="onImageContextMenu(fragment.image, $event)"
       @keydown="onImageKeydown(fragment.image, $event)"
     >
       <img
@@ -270,6 +364,13 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
         @pointerdown.stop="startGesture(fragment.image, 'resize', $event)"
       />
     </div>
+    <SheetFloatingImageContextMenu
+      v-if="contextMenu"
+      :anchor="contextMenu.anchor"
+      @convert-to-cell="requestConvertToCell"
+      @delete="requestDelete"
+      @close="closeContextMenu"
+    />
   </div>
 </template>
 

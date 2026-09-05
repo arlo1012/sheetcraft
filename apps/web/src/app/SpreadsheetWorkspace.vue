@@ -47,6 +47,7 @@ const {
   setCellImage,
   setFloatingImage,
   deleteFloatingImage,
+  convertFloatingImageToCell,
   pasteCells,
   showClipboardFeedback,
   clearCells,
@@ -218,7 +219,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :missing-image-asset-ids="missingImageAssetIds"
         @update-floating-image="setFloatingImage"
         @delete-floating-image="deleteFloatingImage"
-        @paste-image-file="imageActions.insertFile($event)"
+        @convert-floating-image-to-cell="convertFloatingImageToCell"
+        @paste-image-file="imageActions.insertFile"
         @paste-floating-image="imageActions.pasteFloatingImage"
         :workbook-revision="workbookRevision"
         :apply-paste="pasteCells"

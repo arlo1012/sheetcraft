@@ -263,6 +263,11 @@ export const zhCN = {
     assetUnavailable: "图片文件不可用。",
     insertionFailed: "无法插入图片。",
     keyboardInstructions: "使用方向键移动图片；按住 Shift 再按方向键可调整大小。",
+    contextMenuActions: "图片操作",
+    convertToCell: "转为单元格图片",
+    deleteImage: "删除图片",
+    converted: "已转为单元格图片。",
+    convertFailed: "无法转为单元格图片。",
   },
   clipboard: {
     unavailable: "剪贴板不可用。",

@@ -4,6 +4,8 @@ import {
   createDeleteFloatingImageCommand,
   createDeleteSheetCommand,
   createDuplicateSheetCommand,
+  createConvertFloatingImageToCellCommand,
+  createMergeCellsCommand,
   createSetCellContentCommand,
   createSetFloatingImageCommand,
   createDeleteSheetAxisCommand,
@@ -20,6 +22,9 @@ import {
   getActiveSheet,
   getCellComputedValue,
   getCellContent,
+  getCellStyle,
+  setCellContent,
+  setCellStyle,
 } from "../../workbook.js";
 import { createTestWorkbookSession } from "../helpers.js";
 
@@ -104,6 +109,74 @@ describe("sheet images", () => {
     ]);
     expect(() => createSetFloatingImageCommand(sheet.id, { ...image, width: 0 })).toThrow();
     expect(() => createSetFloatingImageCommand(sheet.id, { ...image, offsetX: -1 })).toThrow();
+  });
+
+  test("converts a floating image into a blank cell and produces a transport-safe inverse", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    applyWorkbookCommand(session.workbook, createSetFloatingImageCommand(sheet.id, image));
+
+    const inverse = applyWorkbookCommand(
+      session.workbook,
+      createConvertFloatingImageToCellCommand(sheet.id, image.id),
+    );
+
+    expect(sheet.floatingImages).toEqual([]);
+    expect(getCellContent(sheet, image.anchor)).toEqual({
+      kind: "image",
+      image: { assetId: image.assetId, altText: image.altText },
+    });
+    expect(JSON.parse(JSON.stringify(inverse))).toEqual(inverse);
+    expect(
+      applyWorkbookCommand(
+        session.workbook,
+        createConvertFloatingImageToCellCommand(sheet.id, "missing-image"),
+      ),
+    ).toBeNull();
+  });
+
+  test("restores occupied merged targets and floating-image z-order through undo and redo", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const front = { ...image, id: "front", anchor: { row: 0, column: 0 } };
+    const mergedImage = { ...image, id: "merged", anchor: { row: 3, column: 2 } };
+    const rear = { ...image, id: "rear", anchor: { row: 6, column: 6 } };
+    const target = { row: 2, column: 1 };
+    applyWorkbookCommand(
+      session.workbook,
+      createMergeCellsCommand(sheet.id, { start: target, end: { row: 3, column: 2 } }),
+    );
+    setCellContent(sheet, target, { kind: "literal", value: "replace me" });
+    setCellStyle(sheet, target, { fillColor: "#ff00ff" });
+    for (const floatingImage of [front, mergedImage, rear]) {
+      applyWorkbookCommand(
+        session.workbook,
+        createSetFloatingImageCommand(sheet.id, floatingImage),
+      );
+    }
+
+    const undo = applyWorkbookCommand(
+      session.workbook,
+      createConvertFloatingImageToCellCommand(sheet.id, mergedImage.id),
+    );
+    expect(sheet.floatingImages.map((item) => item.id)).toEqual(["front", "rear"]);
+    expect(getCellContent(sheet, target)).toEqual({
+      kind: "image",
+      image: { assetId: mergedImage.assetId, altText: mergedImage.altText },
+    });
+    expect(getCellStyle(sheet, target)).toEqual({ fillColor: "#ff00ff" });
+
+    const redo = applyWorkbookCommand(session.workbook, undo!);
+    expect(sheet.floatingImages.map((item) => item.id)).toEqual(["front", "merged", "rear"]);
+    expect(getCellContent(sheet, target)).toEqual({ kind: "literal", value: "replace me" });
+    expect(getCellStyle(sheet, target)).toEqual({ fillColor: "#ff00ff" });
+
+    applyWorkbookCommand(session.workbook, redo!);
+    expect(sheet.floatingImages.map((item) => item.id)).toEqual(["front", "rear"]);
+    expect(getCellContent(sheet, target)).toEqual({
+      kind: "image",
+      image: { assetId: mergedImage.assetId, altText: mergedImage.altText },
+    });
   });
 
   test("moves anchors for insert, removes deleted anchors, and restores the exact sparse state", () => {

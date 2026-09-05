@@ -61,6 +61,7 @@ import { useDimensionResize } from "../composables/useDimensionResize";
 import { useCellEditing } from "../composables/useCellEditing";
 import { useDragSelection } from "../composables/useDragSelection";
 import { useSheetViewport } from "../composables/useSheetViewport";
+import type { ImageInsertMode } from "../../sheet-images/useSheetImageActions";
 import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloatingImageLayer.vue";
 import {
   readFloatingImageClipboard,
@@ -140,8 +141,9 @@ const props = withDefaults(
 const emit = defineEmits<{
   updateFloatingImage: [image: FloatingImage];
   deleteFloatingImage: [id: string];
-  pasteImageFile: [file: File];
-  pasteFloatingImage: [image: FloatingImage];
+  convertFloatingImageToCell: [id: string];
+  pasteImageFile: [file: File, mode: ImageInsertMode];
+  pasteFloatingImage: [image: FloatingImage, mode: ImageInsertMode];
   commitCell: [payload: { address: CellAddress; input: string }];
   clearCells: [range: CellRange];
   clipboardFeedback: [feedback: GridClipboardFeedback];
@@ -432,6 +434,15 @@ function deleteSelectedFloatingImage(id: string): void {
   focusEditor();
 }
 
+function convertSelectedFloatingImageToCell(id: string): void {
+  const image = props.sheet.floatingImages.find((entry) => entry.id === id);
+  if (!image) return;
+  emit("convertFloatingImageToCell", id);
+  if (!props.sheet.floatingImages.some((entry) => entry.id === id)) {
+    setActiveCell(layout.value.getAnchorForAddress(image.anchor));
+  }
+}
+
 function onImageCopy(event: ClipboardEvent): void {
   if (isEditing.value || !event.clipboardData) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
@@ -442,17 +453,26 @@ function onImageCopy(event: ClipboardEvent): void {
 }
 
 function onImagePaste(event: ClipboardEvent): void {
-  if (isEditing.value || isComposing.value || !event.clipboardData) return;
+  if (isComposing.value || !event.clipboardData) return;
   const image = readFloatingImageClipboard(event.clipboardData);
-  const file = Array.from(event.clipboardData.files ?? []).find((entry) =>
-    entry.type.startsWith("image/"),
-  );
+  const file =
+    Array.from(event.clipboardData.files ?? []).find((entry) => entry.type.startsWith("image/")) ??
+    Array.from(event.clipboardData.items ?? [])
+      .find((entry) => entry.kind === "file" && entry.type.startsWith("image/"))
+      ?.getAsFile();
   if (!image && !file) return;
   event.preventDefault();
   event.stopPropagation();
+  const mode: ImageInsertMode =
+    isEditing.value ||
+    (!selectedImageId.value && getCellContent(props.sheet, activeCell.value)?.kind === "image")
+      ? "cell"
+      : "floating";
+  // Commit any typed draft before the exclusive image content replaces this cell.
+  if (isEditing.value) finishEdit(undefined, false);
   clearPendingClipboard();
-  if (image) emit("pasteFloatingImage", image);
-  else if (file) emit("pasteImageFile", file);
+  if (image) emit("pasteFloatingImage", image, mode);
+  else if (file) emit("pasteImageFile", file, mode);
 }
 
 watch(
@@ -1249,6 +1269,7 @@ defineExpose({
             @select="selectFloatingImage"
             @update="emit('updateFloatingImage', $event)"
             @delete="deleteSelectedFloatingImage"
+            @convert-to-cell="convertSelectedFloatingImageToCell"
           />
           <SheetBorderLayer
             :sheet="sheet"

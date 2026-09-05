@@ -91,4 +91,28 @@ describe("sheet image insertion", () => {
     expect(f.setCellImage).not.toHaveBeenCalled();
     expect(f.actions.feedback.value).toBe("image.insertionFailed");
   });
+  test("pastes a copied floating image into the target cell without duplicating the object", async () => {
+    const f = fixture();
+    await f.store.put(asset);
+    await f.actions.pasteFloatingImage(
+      {
+        id: "floating-image",
+        assetId: asset.id,
+        altText: "Diagram",
+        anchor: { row: 0, column: 0 },
+        offsetX: 0,
+        offsetY: 0,
+        width: 200,
+        height: 100,
+      },
+      "cell",
+    );
+    expect(f.setCellImage).toHaveBeenCalledWith({
+      sheetId: getActiveSheet(f.getWorkbook()).id,
+      address: { row: 2, column: 3 },
+      assetId: asset.id,
+      altText: "Diagram",
+    });
+    expect(f.setFloatingImage).not.toHaveBeenCalled();
+  });
 });

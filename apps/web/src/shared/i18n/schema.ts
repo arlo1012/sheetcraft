@@ -260,6 +260,11 @@ export type MessageSchema = {
     assetUnavailable: string;
     insertionFailed: string;
     keyboardInstructions: string;
+    contextMenuActions: string;
+    convertToCell: string;
+    deleteImage: string;
+    converted: string;
+    convertFailed: string;
   };
   clipboard: {
     unavailable: string;

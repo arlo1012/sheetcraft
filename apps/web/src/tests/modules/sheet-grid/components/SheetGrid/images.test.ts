@@ -63,8 +63,28 @@ describe("SheetGrid cell images", () => {
     wrapper.get("textarea.cell-editor").element.dispatchEvent(event);
     await wrapper.vm.$nextTick();
     expect(event.defaultPrevented).toBe(true);
-    expect(wrapper.emitted("pasteImageFile")).toEqual([[file]]);
+    expect(wrapper.emitted("pasteImageFile")).toEqual([[file, "floating"]]);
     expect(getCellContent(sheet, { row: 0, column: 0 })).toBeNull();
+    wrapper.unmount();
+  });
+  test("pastes an image into the cell after double-clicking to edit", async () => {
+    const { wrapper } = mountSheetGrid();
+    await wrapper.get('[data-row="0"][data-column="0"]').trigger("dblclick", { button: 0 });
+    expect(wrapper.get("textarea.cell-editor").classes()).toContain("is-editing");
+    const file = new File(["image"], "pasted.png", { type: "image/png" });
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", {
+      value: {
+        files: [],
+        items: [{ kind: "file", type: "image/png", getAsFile: () => file }],
+        getData: () => "",
+      },
+    });
+    wrapper.get("textarea.cell-editor").element.dispatchEvent(event);
+    await wrapper.vm.$nextTick();
+    expect(event.defaultPrevented).toBe(true);
+    expect(wrapper.emitted("pasteImageFile")).toEqual([[file, "cell"]]);
+    expect(wrapper.get("textarea.cell-editor").classes()).not.toContain("is-editing");
     wrapper.unmount();
   });
 });
