@@ -8,7 +8,7 @@ geometry and interaction state.
 The Web application supports virtualized cells, range and axis selection,
 keyboard navigation, IME-safe editing, row and column resizing and insertion,
 TSV clipboard and selective paste, cell and number formatting, format painter,
-sorting and value filtering, frozen panes, merged cells, and multiple Sheet
+sorting and value filtering, frozen panes, merged cells, cell and floating images, and multiple Sheet
 management. A compact Home Ribbon, formula bar, search, selection summaries,
 and Chinese/English localization complete the editing surface.
 
@@ -30,13 +30,15 @@ reviewable function/feature inventories, typed error and empty-string content,
 per-workbook date systems, shared reference contracts, and an isolated library
 qualification lab. It does not add more formula functions or product XLSX IO.
 
-Core writes V3 snapshots and accepts V1/V2/V3 input. The Web application restores
+Core writes V4 snapshots and accepts V1/V2/V3/V4 input. The Web application restores
 the current workbook from IndexedDB, automatically saves document edits, and
 offers JSON import/export with validation and replacement confirmation. See
 [Saving And Recovery](docs/workbook-persistence.md) for the local-only storage
 scope, multi-tab conflicts, and recovery guarantees.
 
-Images, charts, conditional formatting, printing,
+See [Images](docs/images.md) for image insertion, movement, clipboard, and portable assets.
+
+Charts, conditional formatting, printing,
 additional Ribbon categories, and view/zoom controls remain unimplemented;
 their existing disabled UI entries are placeholders.
 

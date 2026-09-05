@@ -12,6 +12,7 @@ import type {
   SheetSparseCell,
   SheetSparseDimension,
   SheetSparseState,
+  FloatingImage,
 } from "../workbook.js";
 
 export type CellContentChange = {
@@ -116,6 +117,49 @@ export type AddSheetCommand = {
   activeSheetId: string;
 };
 
+export type SetFloatingImageCommand = {
+  type: "setFloatingImage";
+  sheetId: string;
+  image: FloatingImage;
+  /** Original z-order slot used only by a delete inverse. */
+  index?: number;
+};
+
+export type DeleteFloatingImageCommand = {
+  type: "deleteFloatingImage";
+  sheetId: string;
+  id: string;
+};
+
+export type ConvertFloatingImageToCellCommand = {
+  type: "convertFloatingImageToCell";
+  sheetId: string;
+  id: string;
+};
+
+export type FloatingImageSize = {
+  width: number;
+  height: number;
+};
+
+export type ConvertCellImageToFloatingCommand = {
+  type: "convertCellImageToFloating";
+  sheetId: string;
+  address: CellAddress;
+  imageId: string;
+  size: FloatingImageSize;
+};
+
+/** Internal inverse for converting a floating image into an in-cell image. */
+export type RestoreFloatingImageToCellCommand = {
+  type: "restoreFloatingImageToCell";
+  sheetId: string;
+  image: FloatingImage;
+  index: number;
+  address: CellAddress;
+  content: CellContent | null;
+};
+
 export type DeleteSheetCommand = {
   type: "deleteSheet";
   sheetId: string;
@@ -160,6 +204,8 @@ export type RestoreFullSheetStateCommand = {
 export type SheetAxisSparseSlice = {
   cells: SheetSparseCell[];
   dimensions: SheetSparseDimension[];
+  /** Images removed from the structural operation, preserving their sheet order. */
+  floatingImages: Array<{ image: FloatingImage; index: number }>;
   /** Exact raw formula sources before the structural change, for lossless undo. */
   formulaSources?: Array<{ address: CellAddress; source: string }>;
   /** Exact sheet metadata before the structural change. */
@@ -203,6 +249,11 @@ export type WorkbookCommand =
   | UnmergeCellsCommand
   | SetSheetFilterCommand
   | SortSheetRangeCommand
+  | SetFloatingImageCommand
+  | DeleteFloatingImageCommand
+  | ConvertFloatingImageToCellCommand
+  | ConvertCellImageToFloatingCommand
+  | RestoreFloatingImageToCellCommand
   | AddSheetCommand
   | DeleteSheetCommand
   | RenameSheetCommand
@@ -225,6 +276,10 @@ export type WorkbookOperation =
   | "cells.unmerge"
   | "data.filter"
   | "data.sort"
+  | "images.floating.set"
+  | "images.floating.delete"
+  | "images.floating.convert"
+  | "images.cell.convert"
   | "sheets.add"
   | "sheets.delete"
   | "sheets.rename"
@@ -263,6 +318,16 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "data.filter";
     case "sortSheetRange":
       return "data.sort";
+    case "setFloatingImage":
+      return "images.floating.set";
+    case "deleteFloatingImage":
+      return "images.floating.delete";
+    case "convertFloatingImageToCell":
+      return "images.floating.convert";
+    case "convertCellImageToFloating":
+      return "images.cell.convert";
+    case "restoreFloatingImageToCell":
+      return "history.restore";
     case "addSheet":
       return "sheets.add";
     case "deleteSheet":

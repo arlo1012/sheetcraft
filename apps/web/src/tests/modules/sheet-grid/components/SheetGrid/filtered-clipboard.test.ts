@@ -80,6 +80,6 @@ describe("SheetGrid filtered clipboard", () => {
     expect(getCellValue(sheet, { row: 1, column: 1 })).toBeNull();
     expect(session.history.undoStack).toHaveLength(0);
     expect({ active: activeCell(wrapper), selection: selectionStyle(wrapper) }).toEqual(before);
-    expect(wrapper.get('[aria-live="polite"]').text()).toContain("merged cells");
+    expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
   });
 });

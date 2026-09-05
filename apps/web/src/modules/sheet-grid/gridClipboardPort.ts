@@ -1,9 +1,17 @@
+import type { FloatingImage } from "@idea10/core/workbook";
+import {
+  FLOATING_IMAGE_CLIPBOARD_TYPE,
+  readFloatingImageClipboard,
+} from "../sheet-images/imageClipboard";
 export const IDEA10_CLIPBOARD_TYPE = "application/x-idea10-cells";
 export const WEB_IDEA10_CLIPBOARD_TYPE = `web ${IDEA10_CLIPBOARD_TYPE}`;
+export const WEB_FLOATING_IMAGE_CLIPBOARD_TYPE = `web ${FLOATING_IMAGE_CLIPBOARD_TYPE}`;
 
 export type GridClipboardTransfer = {
   text?: string;
   localToken?: string;
+  imageFile?: File;
+  floatingImage?: FloatingImage;
 };
 
 export type GridClipboardWriteResult = {
@@ -15,9 +23,17 @@ export type GridClipboardReadOptions = {
 };
 
 export type GridClipboardPort = {
-  write: (transfer: { text: string; localToken: string }) => Promise<GridClipboardWriteResult>;
+  write: (transfer: {
+    text: string;
+    localToken: string;
+    floatingImage?: FloatingImage;
+  }) => Promise<GridClipboardWriteResult>;
   /** Add an Async Clipboard custom format after a native copy/cut, without text-only fallback. */
-  writeNativeRich?: (transfer: { text: string; localToken: string }) => Promise<void>;
+  writeNativeRich?: (transfer: {
+    text: string;
+    localToken: string;
+    floatingImage?: FloatingImage;
+  }) => Promise<void>;
   read: (options?: GridClipboardReadOptions) => Promise<GridClipboardTransfer>;
 };
 
@@ -58,7 +74,11 @@ function createClipboardProxy(): HTMLTextAreaElement {
   return proxy;
 }
 
-function writeWithClipboardEvent(transfer: { text: string; localToken: string }): boolean {
+function writeWithClipboardEvent(transfer: {
+  text: string;
+  localToken: string;
+  floatingImage?: FloatingImage;
+}): boolean {
   if (typeof document === "undefined" || typeof document.execCommand !== "function") {
     return false;
   }
@@ -75,6 +95,11 @@ function writeWithClipboardEvent(transfer: { text: string; localToken: string })
     event.stopImmediatePropagation();
     event.clipboardData.setData("text/plain", transfer.text);
     event.clipboardData.setData(IDEA10_CLIPBOARD_TYPE, transfer.localToken);
+    if (transfer.floatingImage)
+      event.clipboardData.setData(
+        FLOATING_IMAGE_CLIPBOARD_TYPE,
+        JSON.stringify(transfer.floatingImage),
+      );
     handled = true;
   };
 
@@ -113,6 +138,10 @@ function readWithClipboardEvent(): GridClipboardTransfer | undefined {
     transfer = {
       text: types.includes("text/plain") ? event.clipboardData.getData("text/plain") : undefined,
       localToken: readGridClipboardLocalToken(event.clipboardData),
+      imageFile: event.clipboardData.files
+        ? Array.from(event.clipboardData.files).find((file) => file.type.startsWith("image/"))
+        : undefined,
+      floatingImage: readFloatingImageClipboard(event.clipboardData),
     };
   };
 
@@ -133,6 +162,7 @@ function readWithClipboardEvent(): GridClipboardTransfer | undefined {
 async function writeWithAsyncClipboard(transfer: {
   text: string;
   localToken: string;
+  floatingImage?: FloatingImage;
 }): Promise<void> {
   if (
     typeof navigator === "undefined" ||
@@ -144,9 +174,14 @@ async function writeWithAsyncClipboard(transfer: {
 
   const item = new ClipboardItem({
     "text/plain": new Blob([transfer.text], { type: "text/plain" }),
-    [WEB_IDEA10_CLIPBOARD_TYPE]: new Blob([transfer.localToken], {
-      type: IDEA10_CLIPBOARD_TYPE,
-    }),
+    [WEB_IDEA10_CLIPBOARD_TYPE]: new Blob([transfer.localToken], { type: IDEA10_CLIPBOARD_TYPE }),
+    ...(transfer.floatingImage
+      ? {
+          [WEB_FLOATING_IMAGE_CLIPBOARD_TYPE]: new Blob([JSON.stringify(transfer.floatingImage)], {
+            type: FLOATING_IMAGE_CLIPBOARD_TYPE,
+          }),
+        }
+      : {}),
   });
   await navigator.clipboard.write([item]);
 }
@@ -165,10 +200,33 @@ async function readWithAsyncClipboard(): Promise<GridClipboardTransfer> {
         : item.types.includes(IDEA10_CLIPBOARD_TYPE)
           ? IDEA10_CLIPBOARD_TYPE
           : undefined;
-      if (textType || tokenType) {
+      const imageType = item.types.find((type) => type.startsWith("image/"));
+      const floatingType = item.types.includes(WEB_FLOATING_IMAGE_CLIPBOARD_TYPE)
+        ? WEB_FLOATING_IMAGE_CLIPBOARD_TYPE
+        : item.types.includes(FLOATING_IMAGE_CLIPBOARD_TYPE)
+          ? FLOATING_IMAGE_CLIPBOARD_TYPE
+          : undefined;
+      if (textType || tokenType || imageType || floatingType) {
         const text = textType ? await (await item.getType(textType)).text() : undefined;
         const localToken = tokenType ? await (await item.getType(tokenType)).text() : undefined;
-        return { text, localToken: localToken || undefined };
+        const imageBlob = imageType ? await item.getType(imageType) : undefined;
+        const floatingText = floatingType
+          ? await (await item.getType(floatingType)).text()
+          : undefined;
+        return {
+          text,
+          localToken: localToken || undefined,
+          ...(imageBlob
+            ? {
+                imageFile: new File([imageBlob], "pasted-image", {
+                  type: imageBlob.type || imageType,
+                }),
+              }
+            : {}),
+          ...(floatingText
+            ? { floatingImage: readFloatingImageClipboard({ getData: () => floatingText }) }
+            : {}),
+        };
       }
     }
   } catch {
@@ -192,7 +250,12 @@ export function createBrowserGridClipboardPort(): GridClipboardPort {
         }
       }
 
-      if (asyncClipboard) {
+      // A floating image cannot be represented by text-only clipboard data.
+      // Prefer the legacy rich event before considering the plain-text fallback.
+      if (transfer.floatingImage && writeWithClipboardEvent(transfer)) {
+        return { localTokenWritten: true };
+      }
+      if (asyncClipboard && !transfer.floatingImage) {
         try {
           await asyncClipboard.writeText(transfer.text);
           return { localTokenWritten: false };
@@ -219,7 +282,7 @@ export function createBrowserGridClipboardPort(): GridClipboardPort {
           asyncTransfer.localToken &&
           areGridClipboardTextsEqual(nativeTransfer.text, asyncTransfer.text)
         ) {
-          return { text: nativeTransfer.text, localToken: asyncTransfer.localToken };
+          return { ...nativeTransfer, localToken: asyncTransfer.localToken };
         }
       } catch {
         // A successful native text read is still usable without async permission.

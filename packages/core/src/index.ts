@@ -4,6 +4,7 @@ export * from "./coordinates.js";
 export * from "./errors.js";
 export * from "./formula/index.js";
 export * from "./history.js";
+export * from "./image-transform.js";
 export * from "./input.js";
 export * from "./merged-cells.js";
 export * from "./runtime.js";

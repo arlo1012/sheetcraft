@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ChartNoAxesColumn, CirclePlus, Image as ImageIcon, Table2 } from "lucide-vue-next";
+import { ChartNoAxesColumn, CirclePlus, Table2 } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
+import ImageInsertMenu from "./ImageInsertMenu.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
 
+defineProps<{ disabled: boolean }>();
+const emit = defineEmits<{ insertImage: [mode: "cell" | "floating"] }>();
 const { t } = useAppI18n();
 </script>
 
@@ -26,19 +29,11 @@ const { t } = useAppI18n();
     >
       <CirclePlus :size="17" aria-hidden="true" />
     </RibbonIconAction>
-    <RibbonIconAction
+    <ImageInsertMenu
       class="home-insert-group__image"
-      variant="tall"
-      :label="t('app.unavailableFeature', { feature: t('ribbon.image') })"
-      :text="t('ribbon.image')"
-      disabled
-      disclosure
-      data-ribbon-layout="tall"
-      data-ribbon-placeholder="image"
-      data-ribbon-span="2"
-    >
-      <ImageIcon :size="17" aria-hidden="true" />
-    </RibbonIconAction>
+      :disabled="disabled"
+      @insert-image="emit('insertImage', $event)"
+    />
     <div class="home-insert-group__stack" data-ribbon-stack="chart-pivot">
       <RibbonIconAction
         :label="t('app.unavailableFeature', { feature: t('ribbon.chart') })"

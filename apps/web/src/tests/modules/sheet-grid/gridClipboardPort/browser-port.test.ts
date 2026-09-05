@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createBrowserGridClipboardPort } from "../../../../modules/sheet-grid/gridClipboardPort";
+import {
+  createBrowserGridClipboardPort,
+  WEB_FLOATING_IMAGE_CLIPBOARD_TYPE,
+} from "../../../../modules/sheet-grid/gridClipboardPort";
 
 const WEB_IDEA10_CLIPBOARD_TYPE = "web application/x-idea10-cells";
 
@@ -67,6 +70,28 @@ describe("browser grid clipboard port", () => {
     expect(writeText).not.toHaveBeenCalled();
   });
 
+  test("writes floating metadata through Chromium's web custom format", async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    stubClipboard({ write });
+    stubClipboardItem();
+    await createBrowserGridClipboardPort().write({
+      text: "logo",
+      localToken: "float-token",
+      floatingImage: {
+        id: "float",
+        assetId: "asset",
+        altText: "logo",
+        anchor: { row: 0, column: 0 },
+        offsetX: 0,
+        offsetY: 0,
+        width: 40,
+        height: 20,
+      },
+    });
+    const item = write.mock.calls[0]?.[0][0] as { data: Record<string, Blob> };
+    expect(item.data[WEB_FLOATING_IMAGE_CLIPBOARD_TYPE]).toBeInstanceOf(Blob);
+  });
+
   test("falls back to a text-only write when a custom format is rejected", async () => {
     const write = vi.fn().mockRejectedValue(new DOMException("unsupported", "NotSupportedError"));
     const writeText = vi.fn().mockResolvedValue(undefined);
@@ -132,6 +157,18 @@ describe("browser grid clipboard port", () => {
       text: "plain value",
     });
     expect(readText).toHaveBeenCalledOnce();
+  });
+
+  test("reads a bitmap clipboard item as an image file", async () => {
+    const image = new Blob(["png"], { type: "image/png" });
+    stubClipboard({
+      read: vi
+        .fn()
+        .mockResolvedValue([{ types: ["image/png"], getType: vi.fn(async () => image) }]),
+      readText: vi.fn(),
+    });
+    const transfer = await createBrowserGridClipboardPort().read({ preferAsync: true });
+    expect(transfer.imageFile).toMatchObject({ type: "image/png", name: "pasted-image" });
   });
 
   test("preserves text and the local token from a custom clipboard item", async () => {

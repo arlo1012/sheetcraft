@@ -23,6 +23,10 @@ import {
   createRenameSheetCommand,
   createResizeSheetDimensionCommand,
   createSetCellContentCommand,
+  createSetFloatingImageCommand,
+  createDeleteFloatingImageCommand,
+  createConvertFloatingImageToCellCommand,
+  createConvertCellImageToFloatingCommand,
   createSetSheetFilterCriteriaCommand,
   createSetSheetFreezePanesCommand,
   createSortSheetRangeCommand,
@@ -67,6 +71,8 @@ import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   setActiveSheet,
+  type FloatingImage,
+  type ImageTransform,
   type CellAddress,
   type CellRange,
   type SheetFilter,
@@ -384,6 +390,60 @@ export function useSpreadsheetWorkspaceController(
       "cells.edit",
     );
     clearWorkspaceStatus();
+  }
+
+  function setCellImage(payload: {
+    sheetId: string;
+    address: CellAddress;
+    assetId: string;
+    altText: string;
+    transform?: ImageTransform;
+  }): void {
+    execute(
+      createSetCellContentCommand(payload.sheetId, payload.address, {
+        kind: "image",
+        image: {
+          assetId: payload.assetId,
+          altText: payload.altText,
+          ...(payload.transform ? { transform: payload.transform } : {}),
+        },
+      }),
+      "cells.edit",
+    );
+  }
+
+  function setFloatingImage(image: FloatingImage, sheetId = activeSheet.value.id): void {
+    execute(createSetFloatingImageCommand(sheetId, image));
+  }
+
+  function deleteFloatingImage(id: string): void {
+    execute(createDeleteFloatingImageCommand(activeSheet.value.id, id));
+  }
+
+  function convertFloatingImageToCell(id: string): void {
+    try {
+      if (execute(createConvertFloatingImageToCellCommand(activeSheet.value.id, id))) {
+        showWorkspaceStatus({ key: "image.converted" });
+      }
+    } catch {
+      showWorkspaceStatus({ key: "image.convertFailed" });
+    }
+  }
+
+  function convertCellImageToFloating(payload: {
+    sheetId: string;
+    address: CellAddress;
+    imageId: string;
+    size: { width: number; height: number };
+  }): void {
+    execute(
+      createConvertCellImageToFloatingCommand(
+        payload.sheetId,
+        payload.address,
+        payload.imageId,
+        payload.size,
+      ),
+    );
   }
 
   function pasteCells(payload: GridPastePayload): GridPasteResult {
@@ -896,6 +956,11 @@ export function useSpreadsheetWorkspaceController(
     workspaceStatusText,
     formatPainterActive,
     commitCell,
+    setCellImage,
+    setFloatingImage,
+    deleteFloatingImage,
+    convertFloatingImageToCell,
+    convertCellImageToFloating,
     pasteCells,
     showClipboardFeedback,
     clearCells,

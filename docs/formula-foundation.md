@@ -61,14 +61,14 @@
 
 ```text
 V1 / V2 snapshot --validate + default 1900--> Workbook
-V3 snapshot ------validate explicit system--> Workbook
-Workbook ----------serialize raw state-----> V3 snapshot
+V3 / V4 snapshot --validate explicit system--> Workbook
+Workbook ----------serialize raw state-----> V4 snapshot
 Workbook ----------derive------------------> formula results (not persisted)
 ```
 
-V3 才接受新的错误常量和显式空字符串；V1/V2 仍按历史规则校验，不借旧版本声明混入新值类型。
+V3 起接受新的错误常量和显式空字符串；V1/V2 仍按历史规则校验，不借旧版本声明混入新值类型。
 Web 保存接口使用当前 `WorkbookSnapshot` 类型；旧版本类型仅用于迁移。独立 Sheet 快照仍由内容字段区分旧值格式和当前格式，支持复制 Sheet 与历史恢复。
-旧构建不能读取 V3 文件，升级时应保留原备份；本次不生成有损 V2 降级文件。
+图片功能在此基础上使用 V4 保存图片引用与浮动位置；V3 仍作为公式基础的迁移输入。旧构建不能读取 V4 文件，升级时应保留原备份；不生成有损降级文件。
 
 ## 验证与后续边界
 

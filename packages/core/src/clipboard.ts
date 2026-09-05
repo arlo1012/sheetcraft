@@ -93,8 +93,18 @@ export function getCellRangeComputedValues(
 
 /** Values-only clipboard projection. Formula errors become their display token text. */
 export function getCellRangeValues(sheet: Sheet, range: CellRange): CellValueMatrix {
-  return getCellRangeComputedValues(sheet, range).map((row) =>
-    row.map((value) => (isFormulaError(value) ? formatComputedValueForDisplay(value) : value)),
+  const normalized = normalizeRange(range);
+  return getCellRangeComputedValues(sheet, range).map((row, rowIndex) =>
+    row.map((value, columnIndex) =>
+      getCellContent(sheet, {
+        row: normalized.start.row + rowIndex,
+        column: normalized.start.column + columnIndex,
+      })?.kind === "image"
+        ? null
+        : isFormulaError(value)
+          ? formatComputedValueForDisplay(value)
+          : value,
+    ),
   );
 }
 

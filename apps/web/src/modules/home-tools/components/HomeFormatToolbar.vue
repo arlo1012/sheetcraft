@@ -42,6 +42,7 @@ const emit = defineEmits<{
   unfreeze: [];
   merge: [];
   unmerge: [];
+  insertImage: [mode: "cell" | "floating"];
   undo: [];
   redo: [];
 }>();
@@ -286,7 +287,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           @freeze="emit('freeze', $event)"
           @unfreeze="emit('unfreeze')"
         />
-        <HomeInsertGroup />
+        <HomeInsertGroup :disabled="disabled" @insert-image="emit('insertImage', $event)" />
         <HomeAutomationGroup />
         <HomeUtilityGroup />
       </div>

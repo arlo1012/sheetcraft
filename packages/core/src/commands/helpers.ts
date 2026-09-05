@@ -2,6 +2,7 @@ import { WorkbookDomainError, toWorkbookErrorDetail } from "../errors.js";
 import { cloneCellStyle, type CellStyle } from "../style.js";
 import {
   cloneCellContent,
+  cloneFloatingImage,
   isCellAddressInBounds,
   type CellAddress,
   type CellRange,
@@ -128,6 +129,7 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
       start: { ...range.start },
       end: { ...range.end },
     })),
+    floatingImages: state.floatingImages.map(cloneFloatingImage),
   };
 }
 

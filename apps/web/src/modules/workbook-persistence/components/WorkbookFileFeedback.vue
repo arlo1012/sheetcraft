@@ -23,18 +23,12 @@ const errorKeys: Record<WorkbookPersistenceError, MessageKey> = {
 const notice = computed(() => {
   if (props.feedback?.error) return props.feedback;
   if (props.error) return { key: errorKeys[props.error], error: true };
-  return props.feedback;
+  return undefined;
 });
 </script>
 
 <template>
-  <p
-    v-if="notice"
-    class="workbook-file-feedback"
-    :class="{ 'workbook-file-feedback--error': notice.error }"
-    :role="notice.error ? 'alert' : 'status'"
-    data-workbook-file="feedback"
-  >
+  <p v-if="notice" class="workbook-file-feedback" role="alert" data-workbook-file="feedback">
     {{ t(notice.key) }}
   </p>
   <Dialog
@@ -68,14 +62,10 @@ const notice = computed(() => {
 .workbook-file-feedback {
   padding: 6px 12px;
   margin: 0;
-  color: var(--idea-text-secondary);
+  color: var(--idea-status-error);
   font-size: 12px;
   line-height: 18px;
   background: var(--idea-surface-secondary);
   border-bottom: 1px solid var(--idea-border-subtle);
-
-  &--error {
-    color: var(--idea-status-error);
-  }
 }
 </style>

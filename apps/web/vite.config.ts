@@ -19,6 +19,18 @@ export default defineConfig({
               priority: 30,
             },
             {
+              name: "tdesign-image-viewer",
+              test: /node_modules[\\/]tdesign-vue-next[\\/](?:es|lib)[\\/]image-viewer[\\/]/,
+              priority: 25,
+              includeDependenciesRecursively: false,
+            },
+            {
+              name: "tdesign-image",
+              test: /node_modules[\\/]tdesign-vue-next[\\/](?:es|lib)[\\/]image[\\/]/,
+              priority: 24,
+              includeDependenciesRecursively: false,
+            },
+            {
               name: "tdesign",
               test: /node_modules[\\/]tdesign-vue-next[\\/]/,
               priority: 20,

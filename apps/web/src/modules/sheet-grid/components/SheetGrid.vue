@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, markRaw, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  markRaw,
+  ref,
+  shallowRef,
+  watch,
+} from "vue";
 import { formatCellContentForInput } from "@idea10/core/input";
 import { getCellAddressLabel } from "@idea10/core/coordinates";
 import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
@@ -9,6 +18,7 @@ import type { FormulaReferenceEditor } from "../../../shared/formula-editing/for
 import { completeFormulaForCommit } from "../../../shared/formula-editing/formula-commit";
 import type { FormulaReferenceToken } from "../../../shared/formula-editing/formula-reference-tokens";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
+import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import {
   MAX_COLUMN_WIDTH,
   MAX_ROW_HEIGHT,
@@ -19,7 +29,9 @@ import {
   createSheetEvaluator,
   getCellContent,
   getCellStyle,
+  type FloatingImage,
   type CellAddress,
+  type ImageTransform,
   type CellRange,
   type Sheet,
   type SheetEvaluator,
@@ -63,6 +75,12 @@ import { useDimensionResize } from "../composables/useDimensionResize";
 import { useCellEditing } from "../composables/useCellEditing";
 import { useDragSelection } from "../composables/useDragSelection";
 import { useSheetViewport } from "../composables/useSheetViewport";
+import type { ImageInsertMode } from "../../sheet-images/useSheetImageActions";
+import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloatingImageLayer.vue";
+import SheetImagePreview from "../../sheet-images/components/SheetImagePreview.vue";
+import { useFloatingImageClipboard } from "../../sheet-images/useFloatingImageClipboard";
+import { areGridClipboardTextsEqual, createBrowserGridClipboardPort } from "../gridClipboardPort";
+import { readFloatingImageClipboard } from "../../sheet-images/imageClipboard";
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
@@ -85,6 +103,7 @@ type AxisContextMenuState = {
 
 type CellContextMenuState = {
   anchor: FloatingReference;
+  imageAddress?: CellAddress;
 };
 
 const CLIPBOARD_MESSAGE_KEYS: Record<GridClipboardFeedback, MessageKey> = {
@@ -122,6 +141,9 @@ const props = withDefaults(
     viewState?: SheetGridViewState;
     formatPainterActive?: boolean;
     referenceEditor?: FormulaReferenceEditor | null;
+    imageAssetUrls?: ReadonlyMap<string, string>;
+    loadingImageAssetIds?: ReadonlySet<string>;
+    missingImageAssetIds?: ReadonlySet<string>;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -134,6 +156,13 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
+  updateFloatingImage: [image: FloatingImage];
+  deleteFloatingImage: [id: string];
+  convertFloatingImageToCell: [id: string];
+  convertCellImageToFloating: [address: CellAddress];
+  imageFeedback: [key: MessageKey];
+  pasteImageFile: [file: File, mode: ImageInsertMode, address?: CellAddress];
+  pasteFloatingImage: [image: FloatingImage, mode: ImageInsertMode, address?: CellAddress];
   commitCell: [payload: { address: CellAddress; input: string }];
   clearCells: [range: CellRange];
   clipboardFeedback: [feedback: GridClipboardFeedback];
@@ -152,8 +181,38 @@ const COLUMN_HEADER_HEIGHT = 28;
 
 const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
+const selectedImageId = ref<string | null>(null);
 const selection = ref<CellSelection>(createCellSelection({ row: 0, column: 0 }));
-const clipboardFeedbackKey = ref<GridClipboardFeedback>();
+const imagePreview = shallowRef<{
+  assetId: string;
+  altText: string;
+  transform?: ImageTransform;
+  trigger?: HTMLElement;
+}>();
+const previewUrl = computed(
+  () => imagePreview.value && props.imageAssetUrls?.get(imagePreview.value.assetId),
+);
+
+function openImagePreview(
+  image: { assetId: string; altText: string; transform?: ImageTransform },
+  trigger?: HTMLElement,
+): void {
+  if (!props.imageAssetUrls?.has(image.assetId)) return;
+  imagePreview.value = { ...image, trigger };
+}
+
+function closeImagePreview(): void {
+  const trigger = imagePreview.value?.trigger;
+  imagePreview.value = undefined;
+  void nextTick(() =>
+    trigger?.isConnected ? trigger.focus({ preventScroll: true }) : focusEditor(),
+  );
+}
+
+watch(() => props.sheet.id, closeImagePreview);
+watch(previewUrl, (url) => {
+  if (!url && imagePreview.value) closeImagePreview();
+});
 const axisContextMenu = ref<AxisContextMenuState>();
 const cellContextMenu = ref<CellContextMenuState>();
 let fontFaceSet: FontFaceSet | undefined;
@@ -413,11 +472,13 @@ const activeCellOutlineRects = computed(() =>
 );
 const activeCellLabel = computed(() => getCellAddressLabel(activeCell.value));
 const activeCellDisplayValue = computed(() =>
-  formatCellValueForGrid(
-    sheetEvaluator.value.getComputedValue(activeCell.value),
-    getCellStyle(props.sheet, activeCell.value),
-    locale.value,
-  ),
+  getCellContent(props.sheet, activeCell.value)?.kind === "image"
+    ? t("image.cellAlt")
+    : formatCellValueForGrid(
+        sheetEvaluator.value.getComputedValue(activeCell.value),
+        getCellStyle(props.sheet, activeCell.value),
+        locale.value,
+      ),
 );
 const activeCellEditorStyle = computed(() =>
   getCellEditorStyle(getCellStyle(props.sheet, activeCell.value)),
@@ -428,9 +489,7 @@ const activeCellEditorFrameStyle = computed(() =>
 const activeCellWrapText = computed(() =>
   Boolean(getCellStyle(props.sheet, activeCell.value)?.wrapText),
 );
-const clipboardFeedback = computed(() =>
-  clipboardFeedbackKey.value ? t(CLIPBOARD_MESSAGE_KEYS[clipboardFeedbackKey.value]) : "",
-);
+const browserClipboard = createBrowserGridClipboardPort();
 const {
   canPasteFormats,
   clipboardMode,
@@ -443,9 +502,20 @@ const {
   onCut,
   onPaste,
   pasteSelection,
+  pasteCapturedText,
   pasteFormatsSelection,
   pasteValuesSelection,
 } = useGridClipboard({
+  clipboardPort: browserClipboard,
+  onReadTransfer: (transfer) => floatingClipboard.observeTransfer(transfer),
+  onPasteImage: (transfer, targetSelection) => {
+    floatingClipboard.observeTransfer(transfer);
+    const address = targetSelection.active;
+    const mode = getCellContent(props.sheet, address)?.kind === "image" ? "cell" : "floating";
+    if (transfer.floatingImage) floatingClipboard.paste(transfer.floatingImage, mode, address);
+    else if (transfer.imageFile) emit("pasteImageFile", transfer.imageFile, mode, address);
+  },
+  onReadUnavailable: (targetSelection) => floatingClipboard.pastePending(targetSelection.active),
   getSheet: () => props.sheet,
   getSelection: () => selection.value,
   getRevision: () => props.workbookRevision ?? 0,
@@ -467,12 +537,167 @@ const {
     return result;
   },
   onFeedback: (message) => {
-    clipboardFeedbackKey.value = message;
     emit("clipboardFeedback", message);
   },
 });
+const floatingClipboard = useFloatingImageClipboard({
+  getSheet: () => props.sheet,
+  getRevision: () => props.workbookRevision ?? 0,
+  clipboardPort: browserClipboard,
+  onCopy: clearPendingClipboard,
+  onFeedback: (key) => emit("imageFeedback", key),
+  onPaste: (image, mode, address) => emit("pasteFloatingImage", image, mode, address),
+  onMove: (image) => emit("updateFloatingImage", image),
+});
 const clipboardRangeRects = computed(() =>
   clipboardRange.value ? layout.value.getRangeFragments(clipboardRange.value) : [],
+);
+
+function selectFloatingImage(id: string | null): void {
+  if (isComposing.value) return;
+  if (isEditing.value) finishEdit(undefined, false);
+  stopDragSelection();
+  axisContextMenu.value = undefined;
+  cellContextMenu.value = undefined;
+  selectedImageId.value = id;
+  if (!id) focusEditor();
+}
+
+function deleteSelectedFloatingImage(id: string): void {
+  emit("deleteFloatingImage", id);
+  selectedImageId.value = null;
+  focusEditor();
+}
+
+function convertSelectedFloatingImageToCell(id: string): void {
+  const image = props.sheet.floatingImages.find((entry) => entry.id === id);
+  if (!image) return;
+  emit("convertFloatingImageToCell", id);
+  if (!props.sheet.floatingImages.some((entry) => entry.id === id)) {
+    setActiveCell(layout.value.getAnchorForAddress(image.anchor));
+  }
+}
+
+function onImageCopy(event: ClipboardEvent): void {
+  const image = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
+  if (isEditing.value || !image) {
+    floatingClipboard.clear();
+    return;
+  }
+  event.stopPropagation();
+  void floatingClipboard.copy(image, "copy", event);
+}
+
+function onImageCut(event: ClipboardEvent): void {
+  const image = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
+  if (isEditing.value || !image) {
+    floatingClipboard.clear();
+    return;
+  }
+  event.stopPropagation();
+  void floatingClipboard.copy(image, "cut", event);
+}
+
+function requestFloatingImageCopy(id: string, mode: "copy" | "cut"): void {
+  const image = props.sheet.floatingImages.find((entry) => entry.id === id);
+  if (image) void floatingClipboard.copy(image, mode);
+}
+
+async function requestFloatingImagePaste(id: string): Promise<void> {
+  const image = props.sheet.floatingImages.find((entry) => entry.id === id);
+  if (!image) return;
+  setActiveCell(image.anchor);
+  await pasteSelection();
+  focusEditor();
+}
+
+function onImagePaste(event: ClipboardEvent): void {
+  if (isComposing.value || !event.clipboardData) return;
+  const image = readFloatingImageClipboard(event.clipboardData);
+  const file =
+    Array.from(event.clipboardData.files ?? []).find((entry) => entry.type.startsWith("image/")) ??
+    Array.from(event.clipboardData.items ?? [])
+      .find((entry) => entry.kind === "file" && entry.type.startsWith("image/"))
+      ?.getAsFile();
+  if (!image && !file) {
+    // Chromium exposes Async Clipboard custom formats only through read(), not paste events.
+    if (floatingClipboard.hasPending() && navigator.clipboard)
+      void pasteDeferredFloatingImage(event);
+    else floatingClipboard.clear();
+    return;
+  }
+  floatingClipboard.observeTransfer({ floatingImage: image });
+  event.preventDefault();
+  event.stopPropagation();
+  const mode: ImageInsertMode =
+    isEditing.value ||
+    (!selectedImageId.value && getCellContent(props.sheet, activeCell.value)?.kind === "image")
+      ? "cell"
+      : "floating";
+  // Commit any typed draft before the exclusive image content replaces this cell.
+  if (isEditing.value) finishEdit(undefined, false);
+  clearPendingClipboard();
+  if (image) floatingClipboard.paste(image, mode, activeCell.value);
+  else if (file) emit("pasteImageFile", file, mode);
+}
+
+async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> {
+  event.preventDefault();
+  event.stopPropagation();
+  const sheet = props.sheet;
+  const revision = props.workbookRevision;
+  const address = { ...activeCell.value };
+  const editing = isEditing.value;
+  const draft = editingValue.value;
+  const input = event.target instanceof HTMLTextAreaElement ? event.target : undefined;
+  const start = input?.selectionStart ?? null;
+  const end = input?.selectionEnd ?? null;
+  const text = event.clipboardData?.getData("text/plain") ?? "";
+  let image: FloatingImage | undefined;
+  try {
+    const transfer = await browserClipboard.read({ preferAsync: true });
+    if (areGridClipboardTextsEqual(text, transfer.text)) image = transfer.floatingImage;
+  } catch {
+    // Keep the captured native text when the browser denies the optional rich read.
+  }
+  if (
+    props.sheet !== sheet ||
+    props.workbookRevision !== revision ||
+    !areCellAddressesEqual(activeCell.value, address) ||
+    isEditing.value !== editing ||
+    (editing && editingValue.value !== draft)
+  ) {
+    emit("clipboardFeedback", "documentChanged");
+    return;
+  }
+  if (image) {
+    if (editing) finishEdit(undefined, false);
+    clearPendingClipboard();
+    floatingClipboard.observeTransfer({ floatingImage: image });
+    floatingClipboard.paste(
+      image,
+      editing || getCellContent(sheet, address)?.kind === "image" ? "cell" : "floating",
+      address,
+    );
+  } else {
+    floatingClipboard.clear();
+    if (editing && input) {
+      const insertion = insertTextAtSelection(draft, start, end, text);
+      onEditorInput(insertion.value);
+      void nextTick(() => input.setSelectionRange(insertion.caret, insertion.caret));
+    } else pasteCapturedText(text);
+  }
+}
+
+watch(
+  () => [props.sheet.id, ...props.sheet.floatingImages.map((image) => image.id)],
+  (current, previous) => {
+    if (
+      current[0] !== previous[0] ||
+      !props.sheet.floatingImages.some((image) => image.id === selectedImageId.value)
+    )
+      selectedImageId.value = null;
+  },
 );
 
 function normalizeSelectionForSheet(nextSelection: CellSelection): CellSelection {
@@ -510,6 +735,7 @@ function setSelection(
   visibleAddress: CellAddress = nextSelection.active,
   restoreFocus = true,
 ): void {
+  selectedImageId.value = null;
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
   selection.value = normalizeSelectionForSheet(nextSelection);
@@ -653,6 +879,10 @@ function onDimensionResizeStart(
 }
 
 function onGridKeydown(event: KeyboardEvent): void {
+  if (event.target instanceof Element && event.target.closest("[data-floating-image-id]")) {
+    handleHistoryShortcut(event);
+    return;
+  }
   if (event.key !== "Escape") {
     return;
   }
@@ -672,7 +902,6 @@ function onGridKeydown(event: KeyboardEvent): void {
     event.preventDefault();
     event.stopPropagation();
     clearPendingClipboard();
-    clipboardFeedbackKey.value = undefined;
   }
 }
 
@@ -850,6 +1079,10 @@ function openCellContextMenu(address: CellAddress, event: MouseEvent): void {
   axisContextMenu.value = undefined;
   const contextElement = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
   cellContextMenu.value = {
+    imageAddress:
+      getCellContent(props.sheet, layout.value.getAnchorForAddress(address))?.kind === "image"
+        ? layout.value.getAnchorForAddress(address)
+        : undefined,
     anchor: markRaw({
       contextElement: rootRef.value ?? contextElement ?? undefined,
       getBoundingClientRect: () => new DOMRect(event.clientX, event.clientY, 0, 0),
@@ -872,6 +1105,10 @@ function openActiveCellContextMenu(): void {
   const y = bounds.top + rect.y + rect.height;
   axisContextMenu.value = undefined;
   cellContextMenu.value = {
+    imageAddress:
+      getCellContent(props.sheet, activeCell.value)?.kind === "image"
+        ? { ...activeCell.value }
+        : undefined,
     anchor: markRaw({
       contextElement: scroller,
       getBoundingClientRect: () => new DOMRect(x, y, 0, 0),
@@ -887,8 +1124,10 @@ async function requestCellClipboard(
   }
   cellContextMenu.value = undefined;
   if (action === "cut") {
+    floatingClipboard.clear();
     await cutSelection();
   } else if (action === "copy") {
+    floatingClipboard.clear();
     await copySelection();
   } else if (action === "paste-values") {
     await pasteValuesSelection();
@@ -900,12 +1139,23 @@ async function requestCellClipboard(
   focusEditor();
 }
 
+function requestCellImageAction(action: "preview" | "float"): void {
+  const address = cellContextMenu.value?.imageAddress;
+  cellContextMenu.value = undefined;
+  if (!address) return;
+  setActiveCell(address);
+  if (action === "float") emit("convertCellImageToFloating", address);
+  else {
+    const content = getCellContent(props.sheet, address);
+    if (content?.kind === "image") openImagePreview(content.image);
+  }
+}
+
 function requestCellClear(): void {
   if (!cellContextMenu.value) {
     return;
   }
   clearPendingClipboard();
-  clipboardFeedbackKey.value = undefined;
   emit("clearCells", getSelectionRange(selection.value));
   cellContextMenu.value = undefined;
   focusEditor();
@@ -923,7 +1173,12 @@ function onCornerClick(): void {
 }
 
 function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
-  if (getReferenceEditor()) {
+  // Formula reference picking owns grid gestures while a formula editor is active.
+  if (getReferenceEditor()) return;
+  const content = getCellContent(props.sheet, address);
+  if (content?.kind === "image") {
+    event.preventDefault();
+    openImagePreview(content.image);
     return;
   }
   if (isComposing.value) {
@@ -1050,7 +1305,6 @@ function onEditorKeydown(event: KeyboardEvent): void {
   if (event.key === "Delete" || event.key === "Backspace") {
     event.preventDefault();
     clearPendingClipboard();
-    clipboardFeedbackKey.value = undefined;
     emit("clearCells", getSelectionRange(selection.value));
     return;
   }
@@ -1076,7 +1330,7 @@ function onEditorKeydown(event: KeyboardEvent): void {
 
   if (event.key === "F2") {
     event.preventDefault();
-    beginEdit("append");
+    if (getCellContent(props.sheet, activeCell.value)?.kind !== "image") beginEdit("append");
     return;
   }
 
@@ -1110,7 +1364,6 @@ function restoreViewState(viewState?: SheetGridViewState): void {
 
 function clearClipboard(): void {
   clearPendingClipboard();
-  clipboardFeedbackKey.value = undefined;
 }
 
 function flushPendingEdit(): boolean {
@@ -1197,6 +1450,9 @@ defineExpose({
     }"
     :aria-label="t('grid.worksheet', { name: sheet.name })"
     @keydown.capture="onGridKeydown"
+    @copy.capture="onImageCopy"
+    @cut.capture="onImageCut"
+    @paste.capture="onImagePaste"
   >
     <button
       type="button"
@@ -1246,6 +1502,8 @@ defineExpose({
         <div class="sheet-grid__viewport" :style="gridViewportStyle">
           <SheetCellLayer
             :sheet="sheet"
+            :image-asset-urls="imageAssetUrls"
+            :loading-image-asset-ids="loadingImageAssetIds"
             :evaluator="sheetEvaluator"
             :layout="layout"
             :active-cell="activeCell"
@@ -1289,6 +1547,22 @@ defineExpose({
             :clipboard-rects="clipboardRangeRects"
             :clipboard-mode="clipboardMode"
           />
+          <SheetFloatingImageLayer
+            :images="sheet.floatingImages"
+            :layout="layout"
+            :asset-urls="imageAssetUrls ?? new Map()"
+            :loading-asset-ids="loadingImageAssetIds"
+            :missing-asset-ids="missingImageAssetIds"
+            :selected-image-id="selectedImageId"
+            @select="selectFloatingImage"
+            @update="emit('updateFloatingImage', $event)"
+            @delete="deleteSelectedFloatingImage"
+            @convert-to-cell="convertSelectedFloatingImageToCell"
+            @preview="openImagePreview"
+            @copy="requestFloatingImageCopy($event, 'copy')"
+            @cut="requestFloatingImageCopy($event, 'cut')"
+            @paste="requestFloatingImagePaste"
+          />
           <SheetBorderLayer
             :sheet="sheet"
             :geometry="geometry"
@@ -1325,6 +1599,7 @@ defineExpose({
     <SheetCellContextMenu
       v-if="cellContextMenu"
       :anchor="cellContextMenu.anchor"
+      :has-image="Boolean(cellContextMenu.imageAddress)"
       :paste-special-disabled="clipboardMode === 'cut'"
       :paste-formats-disabled="!canPasteFormats"
       :cut-disabled-reason="
@@ -1335,10 +1610,18 @@ defineExpose({
       @paste="requestCellClipboard('paste')"
       @paste-values="requestCellClipboard('paste-values')"
       @paste-formats="requestCellClipboard('paste-formats')"
+      @convert-image-to-floating="requestCellImageAction('float')"
+      @preview-image="requestCellImageAction('preview')"
       @clear="requestCellClear"
       @close="closeCellContextMenu"
     />
-    <span class="sheet-grid__assistive-status" aria-live="polite">{{ clipboardFeedback }}</span>
+    <SheetImagePreview
+      v-if="imagePreview && previewUrl"
+      :src="previewUrl"
+      :alt-text="imagePreview.altText"
+      :transform="imagePreview.transform"
+      @close="closeImagePreview"
+    />
   </section>
 </template>
 
@@ -1404,17 +1687,6 @@ defineExpose({
     left: 0;
     overflow: hidden;
     background: var(--idea-surface-panel);
-  }
-
-  &__assistive-status {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
   }
 }
 </style>

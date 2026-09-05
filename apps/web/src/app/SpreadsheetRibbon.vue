@@ -31,6 +31,7 @@ const emit = defineEmits<{
   unfreeze: [];
   merge: [];
   unmerge: [];
+  insertImage: [mode: "cell" | "floating"];
   undo: [];
   redo: [];
 }>();
@@ -70,6 +71,7 @@ defineSlots<{ "file-actions"?: () => unknown }>();
         @unfreeze="emit('unfreeze')"
         @merge="emit('merge')"
         @unmerge="emit('unmerge')"
+        @insert-image="emit('insertImage', $event)"
         @undo="emit('undo')"
         @redo="emit('redo')"
       />

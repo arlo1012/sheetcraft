@@ -21,6 +21,13 @@ import {
 } from "./sheets.js";
 import { applyRestoreSheetStateCommand, applySheetAxisCommand } from "./structure.js";
 import { applySortSheetRangeCommand } from "./sort.js";
+import {
+  applyConvertFloatingImageToCellCommand,
+  applyConvertCellImageToFloatingCommand,
+  applyDeleteFloatingImageCommand,
+  applyRestoreFloatingImageToCellCommand,
+  applySetFloatingImageCommand,
+} from "./images.js";
 import type { WorkbookCommand } from "./contracts.js";
 import { applySetWorkbookDateSystemCommand } from "./workbook-settings.js";
 import {
@@ -68,6 +75,16 @@ export function applyWorkbookCommand(
         return applySetSheetFilterCommand(workbook, command);
       case "sortSheetRange":
         return applySortSheetRangeCommand(workbook, command);
+      case "setFloatingImage":
+        return applySetFloatingImageCommand(workbook, command);
+      case "deleteFloatingImage":
+        return applyDeleteFloatingImageCommand(workbook, command);
+      case "convertFloatingImageToCell":
+        return applyConvertFloatingImageToCellCommand(workbook, command);
+      case "convertCellImageToFloating":
+        return applyConvertCellImageToFloatingCommand(workbook, command);
+      case "restoreFloatingImageToCell":
+        return applyRestoreFloatingImageToCellCommand(workbook, command);
       case "addSheet":
         return applyAddSheetCommand(workbook, command);
       case "deleteSheet":

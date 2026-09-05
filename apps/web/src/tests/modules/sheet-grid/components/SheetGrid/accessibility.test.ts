@@ -41,7 +41,7 @@ describe("SheetGrid accessibility", () => {
       "false",
     );
     expect(wrapper.findAll("textarea.cell-editor")).toHaveLength(1);
-    expect(wrapper.find('[aria-live="polite"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
   });
 
   test("exposes keyboard-adjustable row and column resize separators", async () => {

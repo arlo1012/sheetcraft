@@ -65,6 +65,46 @@ Total JavaScript raw becomes 816,000 B, entry CSS raw 76,000 B, and total CSS gz
 27,500 B. Other limits remain unchanged. These measured adjustments keep both
 entry and total checks enabled with small headroom.
 
+Cell/floating images and the formula foundation recalibrate the same gates after
+an inspected production build: 340,150 B app JavaScript (93,695 B gzip),
+825,663 B total JavaScript (243,916 B gzip), 75,800 B app CSS and 216,937 B total
+CSS (27,073 B gzip). Limits are 350/97 KB app JavaScript, 850/252 KB total
+JavaScript, 78/12 KB app CSS, and 220/28 KB total CSS. Image asset validation,
+portable bundles, rendering and gestures add product code without new runtime
+dependencies; entry and total gates both remain active.
+
+Image clipboard/conversion and fullscreen preview require another inspected
+production build. `TImageViewer` is dynamically imported and its direct
+`image-viewer` and `image` modules are placed in higher-priority, non-recursive
+TDesign chunks. This keeps the viewer out of the entry's static imports and
+HTML preloads; shared TDesign dependencies stay in the regular vendor chunk.
+The measured build is 357,133 B app JavaScript (98,667 B gzip), 899,773 B total
+JavaScript (261,767 B gzip), 75,876 B app CSS (11,512 B gzip), and 232,804 B
+total CSS (30,040 B gzip). The deferred viewer assets are 17,216 B JavaScript
+(5,587 B gzip) and 10,844 B CSS (1,867 B gzip). Limits retain practical small
+headroom at 360/100 KB app JavaScript, 910/265 KB total JavaScript, 78/12 KB
+app CSS, and 240/31 KB total CSS. Total-asset budgets continue to account for
+deferred code so lazy loading cannot hide overall bundle growth.
+
+Non-destructive image crop, quarter-turn rotation, and original restoration add
+V5 snapshot metadata, shared image presentation, and interaction geometry without
+new dependencies. Crop controls and the image toolbar load on demand; transformed
+previews retain the deferred TDesign viewer and embed the original image bytes
+into a temporary SVG presentation. The inspected production build measures
+373,792 B app JavaScript (103,800 B gzip), 923,377 B total JavaScript
+(269,326 B gzip), and 77,549 B app CSS (11,699 B gzip). JavaScript limits become
+380/106 KB for the app entry and 940/275 KB across all assets. CSS budgets stay
+unchanged. Both entry and total checks remain enabled, including deferred tools.
+
+Integrating formula authoring and image editing adds horizontal/vertical flips
+with V6 snapshot metadata. The combined production build is 391,478 B entry
+JavaScript (109,408 B gzip), 941,398 B total JavaScript (275,000 B gzip),
+79,916 B entry CSS (12,091 B gzip), and 239,211 B total CSS (31,464 B gzip).
+The measured integration sets entry JavaScript limits to 400/112 KB and total
+JavaScript to 960/280 KB. Entry CSS becomes 82/12.5 KB; total CSS retains its
+240 KB raw limit and sets gzip to 32 KB. No dependency was added, and deferred
+image tools and previews remain included in the total gates.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

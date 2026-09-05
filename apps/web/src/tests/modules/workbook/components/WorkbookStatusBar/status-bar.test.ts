@@ -11,7 +11,6 @@ function mountStatusBar(locale: "en-US" | "zh-CN" = "en-US") {
     props: {
       sheets,
       activeSheetId: "sheet-2",
-      statusText: locale === "zh-CN" ? "就绪" : "Ready",
       selectionSummary: {
         average: 15,
         count: 3,
@@ -28,7 +27,7 @@ describe("WorkbookStatusBar", () => {
     const wrapper = mountStatusBar();
 
     expect(wrapper.get("footer").attributes("aria-label")).toBe("Workbook status");
-    expect(wrapper.get('[aria-live="polite"]').text()).toBe("Ready");
+    expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
     expect(wrapper.get("[data-selection-summary]").attributes("aria-label")).toBe(
       "Selection summary",
     );
@@ -69,7 +68,6 @@ describe("WorkbookStatusBar", () => {
       props: {
         sheets: [createSheet("Sheet1", "sheet-1")],
         activeSheetId: "sheet-1",
-        statusText: "",
         selectionSummary: {
           average: 0,
           count: 0,
@@ -81,7 +79,7 @@ describe("WorkbookStatusBar", () => {
     });
 
     expect(wrapper.find("[data-selection-summary]").exists()).toBe(false);
-    expect(wrapper.get('[aria-live="polite"]').classes()).toContain("is-empty");
+    expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
     expect(
       wrapper.get('[aria-label="Normal view, not available yet"]').attributes("disabled"),
     ).toBe("");
@@ -93,7 +91,6 @@ describe("WorkbookStatusBar", () => {
       props: {
         sheets: [createSheet("Sheet1", "sheet-1")],
         activeSheetId: "sheet-1",
-        statusText: "",
         selectionSummary: {
           average: 0,
           count: 2,

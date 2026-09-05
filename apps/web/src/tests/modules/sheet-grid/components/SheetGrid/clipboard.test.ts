@@ -277,7 +277,7 @@ describe("SheetGrid clipboard", () => {
 
     expect(sheet.cells.size).toBe(0);
     expect(session.history.undoStack).toHaveLength(0);
-    expect(wrapper.get('[aria-live="polite"]').text()).toContain("does not fit");
+    expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
   });
 
   test("ignores non-text clipboard content without clearing the selected cells", async () => {
@@ -296,7 +296,7 @@ describe("SheetGrid clipboard", () => {
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("keep A1");
     expect(getCellValue(sheet, { row: 0, column: 1 })).toBe("keep B1");
     expect(session.history.undoStack).toHaveLength(0);
-    expect(wrapper.get('[aria-live="polite"]').text()).toContain("does not contain text");
+    expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
   });
 
   test("leaves editing clipboard events to the native input", async () => {

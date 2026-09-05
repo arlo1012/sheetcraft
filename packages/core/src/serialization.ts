@@ -1,6 +1,7 @@
 import { WorkbookDomainError } from "./errors.js";
 import { normalizeExcelDateSystem, type ExcelDateSystem } from "./formula/date-system.js";
 import { normalizeCellStyle, type CellStyle } from "./style.js";
+import { normalizeImageTransform, type ImageTransform } from "./image-transform.js";
 import {
   createSheet,
   createSheetSparseState,
@@ -11,6 +12,7 @@ import {
   type CellRange,
   type CellValue,
   type FreezePanes,
+  type FloatingImage,
   type Sheet,
   type SheetFilter,
   type SheetFilterValue,
@@ -28,7 +30,7 @@ export type CellSnapshotV1 = {
 
 export type CellSnapshotV2 = {
   address: CellAddress;
-  content?: Exclude<CellContent, { kind: "error" }>;
+  content?: Exclude<CellContent, { kind: "error" } | { kind: "image" }>;
   style?: CellStyle;
 };
 
@@ -61,17 +63,46 @@ export type WorkbookSnapshotV2 = {
   sheets: SheetSnapshotV2[];
 };
 
-export type CellSnapshotV3 = Omit<CellSnapshotV2, "content"> & { content?: CellContent };
-export type SheetSnapshotV3 = Omit<SheetSnapshotV2, "cells"> & { cells: CellSnapshotV3[] };
+export type CellSnapshotV3 = Omit<CellSnapshotV2, "content"> & {
+  content?: Exclude<CellContent, { kind: "image" }>;
+};
+export type SheetSnapshotV3 = Omit<SheetSnapshotV2, "cells"> & {
+  cells: CellSnapshotV3[];
+};
 export type WorkbookSnapshotV3 = Omit<WorkbookSnapshotV2, "version" | "sheets"> & {
   version: 3;
   dateSystem: ExcelDateSystem;
   sheets: SheetSnapshotV3[];
 };
-/** Current write format. V1/V2 types remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV3;
-export type SheetSnapshot = SheetSnapshotV3;
-type SnapshotVersion = 1 | 2 | 3;
+export type CellSnapshotV4 = Omit<CellSnapshotV3, "content"> & {
+  content?: CellContent;
+};
+export type SheetSnapshotV4 = Omit<SheetSnapshotV3, "cells"> & {
+  cells: CellSnapshotV4[];
+  floatingImages: FloatingImage[];
+};
+export type WorkbookSnapshotV4 = Omit<WorkbookSnapshotV3, "version" | "sheets"> & {
+  version: 4;
+  sheets: SheetSnapshotV4[];
+};
+export type CellSnapshotV5 = CellSnapshotV4;
+export type SheetSnapshotV5 = Omit<SheetSnapshotV4, "cells"> & {
+  cells: CellSnapshotV5[];
+};
+export type WorkbookSnapshotV5 = Omit<WorkbookSnapshotV4, "version" | "sheets"> & {
+  version: 5;
+  sheets: SheetSnapshotV5[];
+};
+export type CellSnapshotV6 = CellSnapshotV5;
+export type SheetSnapshotV6 = Omit<SheetSnapshotV5, "cells"> & { cells: CellSnapshotV6[] };
+export type WorkbookSnapshotV6 = Omit<WorkbookSnapshotV5, "version" | "sheets"> & {
+  version: 6;
+  sheets: SheetSnapshotV6[];
+};
+/** Current write format. V1 through V5 types remain available for migration inputs. */
+export type WorkbookSnapshot = WorkbookSnapshotV6;
+export type SheetSnapshot = SheetSnapshotV6;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -149,9 +180,12 @@ function parseStyle(value: unknown, path: string): CellStyle {
 function parseCellContent(value: unknown, path: string, version: SnapshotVersion): CellContent {
   const record = asRecord(value, path);
   if (record.kind === "literal") {
-    return { kind: "literal", value: parseCellValue(record.value, `${path}.value`, version === 3) };
+    return {
+      kind: "literal",
+      value: parseCellValue(record.value, `${path}.value`, version >= 3),
+    };
   }
-  if (version === 3 && record.kind === "error") {
+  if (version >= 3 && record.kind === "error") {
     const error = asRecord(record.error, `${path}.error`);
     if (error.kind !== "formula-error" || !isFormulaErrorCode(error.code)) {
       return fail(`${path}.error`, "Expected a typed formula error with a supported code.");
@@ -165,10 +199,36 @@ function parseCellContent(value: unknown, path: string, version: SnapshotVersion
     }
     return { kind: "formula", formula: { source: formula.source } };
   }
+  if (version >= 4 && record.kind === "image") {
+    const image = asRecord(record.image, `${path}.image`);
+    if (typeof image.assetId !== "string" || !image.assetId.trim())
+      return fail(`${path}.image.assetId`, "Expected a non-empty string.");
+    if (typeof image.altText !== "string")
+      return fail(`${path}.image.altText`, "Expected a string.");
+    let transform: ImageTransform | undefined;
+    if (version >= 5 && Object.hasOwn(image, "transform")) {
+      try {
+        transform = normalizeImageTransform(image.transform as ImageTransform);
+      } catch (error) {
+        return fail(
+          `${path}.image.transform`,
+          error instanceof Error ? error.message : "Invalid image transform.",
+        );
+      }
+    }
+    return {
+      kind: "image",
+      image: {
+        assetId: image.assetId,
+        altText: image.altText,
+        ...(transform ? { transform } : {}),
+      },
+    };
+  }
   return fail(`${path}.kind`, "Invalid cell content kind for this snapshot version.");
 }
 
-function parseCell(value: unknown, path: string, version: SnapshotVersion): CellSnapshotV3 {
+function parseCell(value: unknown, path: string, version: SnapshotVersion): CellSnapshotV4 {
   const record = asRecord(value, path);
   const hasContent = Object.hasOwn(record, "content");
   const hasValue = Object.hasOwn(record, "value");
@@ -195,7 +255,9 @@ function parseCell(value: unknown, path: string, version: SnapshotVersion): Cell
           },
         }
       : hasContent
-        ? { content: parseCellContent(record.content, `${path}.content`, version) }
+        ? {
+            content: parseCellContent(record.content, `${path}.content`, version),
+          }
         : {}),
     ...(hasStyle ? { style: parseStyle(record.style, `${path}.style`) } : {}),
   };
@@ -241,7 +303,9 @@ function parseFilterValue(
   if (
     record.kind === "error" &&
     isFormulaErrorCode(record.code) &&
-    (version === 3 || ["PARSE", "REF", "CYCLE", "VALUE", "DIV0", "NAME"].includes(record.code))
+    (version === 3 ||
+      version >= 4 ||
+      ["PARSE", "REF", "CYCLE", "VALUE", "DIV0", "NAME"].includes(record.code))
   )
     return { kind: "error", code: record.code };
   return fail(path, "Invalid filter value.");
@@ -267,6 +331,42 @@ function parseFilter(value: unknown, path: string, version: SnapshotVersion): Sh
         ),
       };
     }),
+  };
+}
+
+function parseFloatingImage(value: unknown, path: string, version: SnapshotVersion): FloatingImage {
+  const record = asRecord(value, path);
+  if (typeof record.id !== "string" || !record.id.trim())
+    return fail(`${path}.id`, "Expected a non-empty string.");
+  if (typeof record.assetId !== "string" || !record.assetId.trim())
+    return fail(`${path}.assetId`, "Expected a non-empty string.");
+  if (typeof record.altText !== "string") return fail(`${path}.altText`, "Expected a string.");
+  const finite = (value: unknown, field: string): number => {
+    if (typeof value !== "number" || !Number.isFinite(value))
+      return fail(`${path}.${field}`, "Expected a finite number.");
+    return value;
+  };
+  let transform: ImageTransform | undefined;
+  if (version >= 5 && Object.hasOwn(record, "transform")) {
+    try {
+      transform = normalizeImageTransform(record.transform as ImageTransform);
+    } catch (error) {
+      return fail(
+        `${path}.transform`,
+        error instanceof Error ? error.message : "Invalid image transform.",
+      );
+    }
+  }
+  return {
+    id: record.id,
+    assetId: record.assetId,
+    altText: record.altText,
+    anchor: parseAddress(record.anchor, `${path}.anchor`),
+    offsetX: finite(record.offsetX, "offsetX"),
+    offsetY: finite(record.offsetY, "offsetY"),
+    width: finite(record.width, "width"),
+    height: finite(record.height, "height"),
+    ...(transform ? { transform } : {}),
   };
 }
 
@@ -301,6 +401,12 @@ function parseSparseState(
             parseRange(range, `${path}.mergedCells[${index}]`),
           )
         : [],
+    floatingImages:
+      version >= 4
+        ? asArray(record.floatingImages, `${path}.floatingImages`).map((image, index) =>
+            parseFloatingImage(image, `${path}.floatingImages[${index}]`, version),
+          )
+        : [],
   };
 }
 
@@ -314,7 +420,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     );
     if (hasValue && hasContent)
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
-    version = hasValue ? 1 : 3;
+    version = hasValue ? 1 : Object.hasOwn(record, "floatingImages") ? 6 : 3;
   }
   const id = asIdentifier(record.id, `${path}.id`);
   let name: string;
@@ -350,7 +456,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 3,
+    version: 6,
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
     activeSheetId: workbook.activeSheetId,
@@ -360,7 +466,14 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
 
 export function deserializeWorkbook(value: unknown): Workbook {
   const record = asRecord(value, "$.");
-  if (record.version !== 1 && record.version !== 2 && record.version !== 3) {
+  if (
+    record.version !== 1 &&
+    record.version !== 2 &&
+    record.version !== 3 &&
+    record.version !== 4 &&
+    record.version !== 5 &&
+    record.version !== 6
+  ) {
     throw new WorkbookDomainError(
       {
         code: "unsupported_snapshot_version",
@@ -375,8 +488,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     );
   }
 
-  if (record.version !== 3 && Object.hasOwn(record, "dateSystem")) {
-    return fail("$.dateSystem", "An explicit date system requires snapshot version 3.");
+  if (record.version < 3 && Object.hasOwn(record, "dateSystem")) {
+    return fail("$.dateSystem", "An explicit date system requires snapshot version 3 or newer.");
   }
   const id = asIdentifier(record.id, "$.id");
   const activeSheetId = asIdentifier(record.activeSheetId, "$.activeSheetId");
@@ -387,7 +500,7 @@ export function deserializeWorkbook(value: unknown): Workbook {
 
   const version = record.version;
   let dateSystem: ExcelDateSystem = "1900";
-  if (version === 3) {
+  if (version >= 3) {
     try {
       dateSystem = normalizeExcelDateSystem(record.dateSystem);
     } catch {

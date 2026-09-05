@@ -129,14 +129,14 @@ describe("SheetGrid axis selection", () => {
     await wrapper.vm.$nextTick();
     expect(copied.event.defaultPrevented).toBe(true);
     expect(copied.data.get("text/plain")).toBeUndefined();
-    expect(wrapper.get('[aria-live="polite"]').text()).toContain("whole rows and columns");
+    expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
 
     const pasted = createTestClipboardEvent("paste", new Map([["text/plain", "1"]]));
     wrapper.get("textarea.cell-editor").element.dispatchEvent(pasted.event);
     await wrapper.vm.$nextTick();
     expect(pasted.event.defaultPrevented).toBe(true);
     expect(sheet.cells.size).toBe(0);
-    expect(wrapper.get('[aria-live="polite"]').text()).toContain("Pasting into whole rows");
+    expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
   });
 
   test("clears a whole row through the sparse range command", async () => {

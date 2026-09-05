@@ -19,6 +19,7 @@ const props = withDefaults(
     pasteSpecialDisabled?: boolean;
     pasteFormatsDisabled?: boolean;
     cutDisabledReason?: string;
+    hasImage?: boolean;
   }>(),
   {
     pasteSpecialDisabled: false,
@@ -32,6 +33,8 @@ const emit = defineEmits<{
   paste: [];
   pasteValues: [];
   pasteFormats: [];
+  convertImageToFloating: [];
+  previewImage: [];
   clear: [];
   close: [restoreFocus: boolean];
 }>();
@@ -196,6 +199,18 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
         </template>
       </MenuItem>
       <MenuSeparator />
+      <template v-if="hasImage">
+        <MenuItem data-cell-action="preview-image" @select="emit('previewImage')">
+          {{ t("image.preview") }}
+        </MenuItem>
+        <MenuItem
+          data-cell-action="convert-image-to-floating"
+          @select="emit('convertImageToFloating')"
+        >
+          {{ t("image.convertToFloating") }}
+        </MenuItem>
+        <MenuSeparator />
+      </template>
       <MenuItem data-cell-action="clear" @select="emit('clear')">
         {{ t("cellMenu.clearContents") }}
       </MenuItem>

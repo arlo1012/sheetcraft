@@ -18,8 +18,8 @@ import {
 } from "../../workbook.js";
 import { createTestWorkbook } from "../helpers.js";
 
-describe("V3 formula foundation snapshots", () => {
-  test("round trips date system, all typed errors, empty text, raw sources and metadata", () => {
+describe("formula and image foundation snapshots", () => {
+  test("writes V4 with date system, typed errors, empty text, raw sources and metadata", () => {
     const workbook = createTestWorkbook();
     workbook.dateSystem = "1904";
     const sheet = getActiveSheet(workbook);
@@ -47,7 +47,7 @@ describe("V3 formula foundation snapshots", () => {
     });
     const snapshot = serializeWorkbook(workbook);
     const restored = deserializeWorkbook(JSON.parse(JSON.stringify(snapshot)));
-    expect(snapshot.version).toBe(3);
+    expect(snapshot.version).toBe(6);
     expect(snapshot.dateSystem).toBe("1904");
     expect(serializeWorkbook(restored)).toEqual(snapshot);
     expect(getCellContent(getActiveSheet(restored), { row: 0, column: 1 })).toEqual({
@@ -68,7 +68,12 @@ describe("V3 formula foundation snapshots", () => {
       const cells =
         version === 1
           ? [{ address: { row: 0, column: 0 }, value: "#N/A" }]
-          : [{ address: { row: 0, column: 0 }, content: { kind: "literal", value: "#N/A" } }];
+          : [
+              {
+                address: { row: 0, column: 0 },
+                content: { kind: "literal", value: "#N/A" },
+              },
+            ];
       const restored = deserializeWorkbook({
         version,
         id: "old",
@@ -88,7 +93,10 @@ describe("V3 formula foundation snapshots", () => {
         kind: "literal",
         value: "#N/A",
       });
-      expect(serializeWorkbook(restored)).toMatchObject({ version: 3, dateSystem: "1900" });
+      expect(serializeWorkbook(restored)).toMatchObject({
+        version: 6,
+        dateSystem: "1900",
+      });
     },
   );
 
@@ -128,7 +136,10 @@ describe("V3 formula foundation snapshots", () => {
       { kind: "error", error: createFormulaError("NA") },
     ] as const) {
       const invalid = { ...structuredClone(current), version: 2 };
-      invalid.sheets[0]!.cells.push({ address: { row: 0, column: 0 }, content });
+      invalid.sheets[0]!.cells.push({
+        address: { row: 0, column: 0 },
+        content,
+      });
       expect(() => deserializeWorkbook(invalid)).toThrow();
     }
     const invalidFilter = { ...structuredClone(current), version: 2 };
@@ -145,9 +156,24 @@ describe("V3 formula foundation snapshots", () => {
       const current = serializeWorkbook(createTestWorkbook());
       for (const dateSystem of ["1900", "1904", undefined]) {
         expect(() => deserializeWorkbook({ ...current, version, dateSystem })).toThrow(
-          "requires snapshot version 3",
+          "requires snapshot version 3 or newer",
         );
       }
     },
   );
+
+  test("loads the exact formula V3 protocol and migrates it to V4", () => {
+    const current = serializeWorkbook(createTestWorkbook());
+    const v3 = {
+      ...current,
+      version: 3 as const,
+      sheets: current.sheets.map(({ floatingImages: _floatingImages, ...sheet }) => sheet),
+    };
+    const restored = deserializeWorkbook(v3);
+    expect(serializeWorkbook(restored)).toMatchObject({
+      version: 6,
+      dateSystem: "1900",
+      sheets: [{ floatingImages: [] }],
+    });
+  });
 });

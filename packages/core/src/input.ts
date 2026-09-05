@@ -85,6 +85,7 @@ export function formatCellContentForInput(content: CellContent | null | undefine
   if (!content) return "";
   if (content.kind === "formula") return content.formula.source;
   if (content.kind === "error") return FORMULA_ERROR_TOKENS[content.error.code];
+  if (content.kind === "image") return "";
   if (
     typeof content.value === "string" &&
     (content.value.startsWith("=") ||

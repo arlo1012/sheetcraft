@@ -222,16 +222,13 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper)).toEqual([]);
   });
 
-  test("keeps declared menu disclosures visible even when their controls are disabled", () => {
+  test("shows an image menu disclosure for the available image control", () => {
     const wrapper = mountToolbar();
 
     expect(wrapper.findAll("[data-color-disclosure]")).toHaveLength(2);
-    const disabledMenu = wrapper.get<HTMLButtonElement>('[data-ribbon-placeholder="image"]');
-    expect(disabledMenu.element.disabled).toBe(true);
-    expect(disabledMenu.find(".ribbon-icon-action__disclosure").exists()).toBe(true);
     expect(
-      wrapper.get('[aria-label="Bold"]').find(".ribbon-icon-action__disclosure").exists(),
-    ).toBe(false);
+      wrapper.get('[data-ribbon-action="image"]').find(".ribbon-icon-action__disclosure").exists(),
+    ).toBe(true);
   });
 
   test("disables formatting controls while keeping history actions available", async () => {
@@ -391,7 +388,7 @@ describe("HomeFormatToolbar", () => {
       expect(control.element).toBeInstanceOf(HTMLButtonElement);
       expect(control.attributes()).toMatchObject({ type: "button", disabled: "" });
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(17);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(16);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({ type: "button", disabled: "" });

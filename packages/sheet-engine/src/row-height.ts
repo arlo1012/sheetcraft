@@ -235,6 +235,7 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
         ) {
           continue;
         }
+        if (cell.content?.kind === "image") continue;
         const text = formatComputedValueForDisplay(input.getComputedValue(address, cell));
         const wrapText = Boolean(cell.style?.wrapText);
         if (!text || (!wrapText && !/[\r\n]/u.test(text))) {

@@ -104,7 +104,7 @@ afterEach(() => {
 });
 
 describe("SpreadsheetWorkspace formula foundation", () => {
-  test("loads, displays, and saves V3 typed formula values without collapsing their meanings", async () => {
+  test("loads, displays, and saves V4 typed formula values without collapsing their meanings", async () => {
     const store = createStore(createFormulaFoundationSnapshot());
     const wrapper = await mountWorkspace(store);
 
@@ -119,7 +119,7 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     await flushPromises();
 
     const savedSnapshot = store.save.mock.calls[0]?.[0];
-    expect(savedSnapshot).toMatchObject({ version: 3, dateSystem: "1904" });
+    expect(savedSnapshot).toMatchObject({ version: 6, dateSystem: "1904" });
     const restored = deserializeWorkbook(savedSnapshot);
     const sheet = getActiveSheet(restored);
     expect(restored.dateSystem).toBe("1904");
@@ -166,7 +166,7 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     );
   });
 
-  test("rejects malformed V3 JSON before it replaces the loaded document", async () => {
+  test("rejects malformed V4 JSON before it replaces the loaded document", async () => {
     const safeSnapshot = createFormulaFoundationSnapshot();
     const store = createStore(safeSnapshot);
     const wrapper = await mountWorkspace(store);

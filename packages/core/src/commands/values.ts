@@ -60,6 +60,7 @@ function normalizeCommandCellContent(value: unknown, field: string): CellContent
       freezePanes: { rows: 0, columns: 0 },
       filter: null,
       mergedCells: [],
+      floatingImages: [],
     };
     setCellContent(temporary, { row: 0, column: 0 }, value as CellContent);
     return getCellContent(temporary, { row: 0, column: 0 });
