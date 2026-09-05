@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch, type CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import FormulaInputAssist from "../../../shared/formula-editing/FormulaInputAssist.vue";
+import FormulaTextOverlay from "../../../shared/formula-editing/FormulaTextOverlay.vue";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 import type { Rect, Size } from "@idea10/sheet-engine/geometry";
 
@@ -72,6 +73,9 @@ const accessibleLabel = computed(() => {
   });
 });
 const formulaInputAria = computed(() => formulaAssistRef.value?.inputAria ?? {});
+const showFormulaColors = computed(
+  () => props.editing && !props.composing && props.modelValue.startsWith("="),
+);
 
 async function measureEditor(): Promise<void> {
   const sequence = ++measurementSequence;
@@ -233,7 +237,11 @@ defineExpose({
     <textarea
       ref="inputRef"
       class="cell-editor"
-      :class="{ 'is-editing': editing, 'is-wrapped': wrapText }"
+      :class="{
+        'is-editing': editing,
+        'is-wrapped': wrapText,
+        'has-formula-colors': showFormulaColors,
+      }"
       :value="modelValue"
       rows="1"
       :wrap="wrapText ? 'soft' : 'off'"
@@ -254,6 +262,12 @@ defineExpose({
       @copy="emit('copy', $event)"
       @cut="emit('cut', $event)"
       @paste="emit('paste', $event)"
+    />
+    <FormulaTextOverlay
+      :input="inputRef"
+      :value="modelValue"
+      :references="formulaAssistRef?.references ?? []"
+      :active="showFormulaColors"
     />
     <FormulaInputAssist
       ref="formulaAssistRef"
@@ -324,6 +338,10 @@ defineExpose({
     overflow-x: hidden;
     overflow-wrap: anywhere;
     white-space: pre-wrap;
+  }
+
+  &.has-formula-colors {
+    -webkit-text-fill-color: transparent;
   }
 }
 </style>

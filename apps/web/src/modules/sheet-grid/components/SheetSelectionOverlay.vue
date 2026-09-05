@@ -3,13 +3,19 @@ import type { CSSProperties } from "vue";
 import type { Rect } from "@idea10/sheet-engine/geometry";
 import type { SheetViewportRangeFragment } from "@idea10/sheet-engine/viewport-layout";
 
+export type FormulaReferenceOverlayGroup = Readonly<{
+  key: string;
+  colorIndex: number;
+  rects: readonly SheetViewportRangeFragment[];
+  active: boolean;
+}>;
+
 const props = defineProps<{
   activeRects: readonly SheetViewportRangeFragment[];
   rangeRects: readonly SheetViewportRangeFragment[];
   addressLabel: string;
   editing: boolean;
-  referenceRects?: readonly SheetViewportRangeFragment[];
-  referenceActive?: boolean;
+  referenceGroups?: readonly FormulaReferenceOverlayGroup[];
   clipboardRects?: readonly SheetViewportRangeFragment[];
   clipboardMode?: "copy" | "cut" | null;
 }>();
@@ -35,6 +41,17 @@ function getOutlineStyle(rect: Rect): CSSProperties {
 
 function getClipboardStyle(rect: Rect): CSSProperties {
   return { ...getOutlineStyle(rect), borderWidth: "2px" };
+}
+
+function getFormulaReferenceStyle(
+  fragment: SheetViewportRangeFragment,
+  colorIndex: number,
+): CSSProperties {
+  return {
+    ...getOutlineStyle(fragment.rect),
+    borderWidth: "2px",
+    "--idea-formula-reference-color": `var(--idea-formula-reference-${colorIndex % 8})`,
+  } as CSSProperties;
 }
 
 function getRangeOutlineStyle(
@@ -94,15 +111,22 @@ function getFragmentKey(fragment: SheetViewportRangeFragment): string {
     :data-active-cell="addressLabel"
     aria-hidden="true"
   />
-  <div
-    v-for="fragment in referenceRects"
-    :key="`reference:${getFragmentKey(fragment)}`"
-    class="sheet-selection-overlay__formula-reference"
-    :class="{ 'is-active': referenceActive }"
-    :style="getRangeOutlineStyle(fragment, referenceRects ?? [])"
-    data-formula-reference-range
-    aria-hidden="true"
-  />
+  <template v-for="group in referenceGroups" :key="`reference-group:${group.key}`">
+    <div
+      v-for="fragment in group.rects"
+      :key="`reference:${group.key}:${getFragmentKey(fragment)}`"
+      class="sheet-selection-overlay__formula-reference"
+      :class="{ 'is-active': group.active }"
+      :style="{
+        ...getRangeOutlineStyle(fragment, group.rects),
+        ...getFormulaReferenceStyle(fragment, group.colorIndex),
+      }"
+      data-formula-reference-range
+      :data-reference-key="group.key"
+      :data-reference-color="group.colorIndex"
+      aria-hidden="true"
+    />
+  </template>
   <div
     v-for="fragment in clipboardRects"
     :key="`clipboard:${getFragmentKey(fragment)}`"
@@ -127,11 +151,11 @@ function getFragmentKey(fragment: SheetViewportRangeFragment): string {
   &__formula-reference {
     position: absolute;
     z-index: 5;
-    border: 2px solid var(--idea-status-success);
+    border: 2px solid var(--idea-formula-reference-color);
     pointer-events: none;
 
     &.is-active {
-      background: color-mix(in srgb, var(--idea-status-success) 8%, transparent);
+      background: color-mix(in srgb, var(--idea-formula-reference-color) 12%, transparent);
     }
   }
 

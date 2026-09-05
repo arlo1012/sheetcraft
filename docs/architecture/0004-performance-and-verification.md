@@ -54,6 +54,17 @@ Total JavaScript and all CSS limits remain unchanged; splitting code into anothe
 chunk must not be used to evade the total check. The editor is loaded with the
 workspace so immediate typing and reference picking have no asynchronous handoff.
 
+The colored-reference follow-up adds a shared native-textarea mirror, all-reference
+tokenization, theme-aware range colors, and validated closing-parenthesis completion.
+The measured entry is 329,676 B / 91,036 B gzip, with 815,002 B total JavaScript;
+entry CSS is 75,486 B and total CSS gzip is 27,063 B. Relative to the completed
+authoring baseline (324,502 B / 89,442 B entry JavaScript and 74,443 B entry CSS),
+the added behavior costs about 5.2 KB JavaScript and 1.0 KB CSS, without dependencies.
+The entry JavaScript raw limit stays 330,000 B; its gzip limit becomes 92,000 B.
+Total JavaScript raw becomes 816,000 B, entry CSS raw 76,000 B, and total CSS gzip
+27,500 B. Other limits remain unchanged. These measured adjustments keep both
+entry and total checks enabled with small headroom.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

@@ -37,7 +37,6 @@ describe("SheetGrid formula drafting", () => {
 
     await editor.trigger("keydown", { key: "F4" });
     expect(editor.element.value).toBe("=SUM($B$1:$C$2");
-    await editor.setValue("=SUM($B$1:$C$2)");
     await editor.trigger("keydown", { key: "Enter" });
     expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
       kind: "formula",
@@ -116,5 +115,27 @@ describe("SheetGrid formula drafting", () => {
       kind: "formula",
       formula: { source: "=SUM(A1)+42" },
     });
+  });
+
+  test("renders each formula reference geometry with a stable colored outline", async () => {
+    const { wrapper } = mountSheetGrid();
+    const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
+
+    await editor.trigger("keydown", { key: "=" });
+    await editor.setValue("=SUM(A1,B2,A1:C2)");
+    await nextTick();
+
+    const references = wrapper.findAll("[data-formula-reference-range]");
+    expect(references).toHaveLength(3);
+    expect(references.map((reference) => reference.attributes("data-reference-key"))).toEqual([
+      "0:0-0:0",
+      "1:1-1:1",
+      "0:0-1:2",
+    ]);
+    expect(references.map((reference) => reference.attributes("data-reference-color"))).toEqual([
+      "0",
+      "1",
+      "2",
+    ]);
   });
 });

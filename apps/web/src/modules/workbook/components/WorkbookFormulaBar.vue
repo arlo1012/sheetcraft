@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import type { CellAddress, CellRange } from "@idea10/core/workbook";
 import FormulaInputAssist from "../../../shared/formula-editing/FormulaInputAssist.vue";
+import FormulaTextOverlay from "../../../shared/formula-editing/FormulaTextOverlay.vue";
+import { completeFormulaForCommit } from "../../../shared/formula-editing/formula-commit";
 import WorkbookFormulaBarAddressInput from "./WorkbookFormulaBarAddressInput.vue";
 import WorkbookFormulaBarSearchControls from "./WorkbookFormulaBarSearchControls.vue";
 
@@ -39,6 +41,9 @@ const formulaTargetLabel = ref(props.addressLabel);
 const formulaTargetSheetId = ref(props.sheetId);
 const formulaFocused = ref(false);
 const isComposing = ref(false);
+const showFormulaColors = computed(
+  () => formulaFocused.value && !isComposing.value && formulaDraft.value.startsWith("="),
+);
 let finishAfterComposition = false;
 
 watch(
@@ -138,6 +143,7 @@ function onFormulaKeydown(event: KeyboardEvent): void {
     !isComposing.value
   ) {
     event.preventDefault();
+    formulaDraft.value = completeFormulaForCommit(formulaDraft.value);
     commitFormulaDraft();
     emit("traverse", {
       address: { ...formulaTarget.value },
@@ -184,6 +190,17 @@ function onFormulaCompositionEnd(event: CompositionEvent): void {
 defineExpose({
   flushPendingEdit,
   hasPendingEdit,
+  get references() {
+    return formulaTargetSheetId.value === props.sheetId
+      ? (formulaAssistRef.value?.references ?? [])
+      : [];
+  },
+  get editingFormula() {
+    return (
+      formulaTargetSheetId.value === props.sheetId &&
+      (formulaAssistRef.value?.editingFormula ?? false)
+    );
+  },
   canPickReference: () =>
     formulaTargetSheetId.value === props.sheetId &&
     (formulaAssistRef.value?.canPickReference() ?? false),
@@ -227,6 +244,7 @@ defineExpose({
         ref="formulaInput"
         v-bind="formulaAssistRef?.inputAria"
         class="workbook-formula-bar__formula-input"
+        :class="{ 'has-formula-colors': showFormulaColors }"
         :value="formulaDraft"
         rows="1"
         wrap="off"
@@ -244,6 +262,12 @@ defineExpose({
         @keydown="onFormulaKeydown"
         @compositionstart="onFormulaCompositionStart"
         @compositionend="onFormulaCompositionEnd"
+      />
+      <FormulaTextOverlay
+        :input="formulaInput"
+        :value="formulaDraft"
+        :references="formulaAssistRef?.references ?? []"
+        :active="showFormulaColors"
       />
       <FormulaInputAssist
         ref="formulaAssistRef"
@@ -300,6 +324,11 @@ defineExpose({
     &:focus {
       border-color: var(--idea-action-primary);
     }
+
+    &.has-formula-colors {
+      -webkit-text-fill-color: transparent;
+      caret-color: var(--idea-text-primary);
+    }
   }
 
   &__fx {
@@ -315,6 +344,7 @@ defineExpose({
   }
 
   &__formula {
+    position: relative;
     padding: 4px 6px;
   }
 

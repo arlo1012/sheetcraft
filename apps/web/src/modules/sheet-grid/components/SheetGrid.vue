@@ -6,6 +6,8 @@ import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
+import { completeFormulaForCommit } from "../../../shared/formula-editing/formula-commit";
+import type { FormulaReferenceToken } from "../../../shared/formula-editing/formula-reference-tokens";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
 import {
   MAX_COLUMN_WIDTH,
@@ -69,6 +71,7 @@ import SheetBorderLayer from "./SheetBorderLayer.vue";
 import SheetColumnHeaders from "./SheetColumnHeaders.vue";
 import SheetRowHeaders from "./SheetRowHeaders.vue";
 import SheetSelectionOverlay from "./SheetSelectionOverlay.vue";
+import type { FormulaReferenceOverlayGroup } from "./SheetSelectionOverlay.vue";
 import { getCellEditorFrameStyle, getCellEditorStyle } from "../cell-presentation";
 import { formatCellValueForGrid } from "../cell-value-presentation";
 
@@ -363,19 +366,43 @@ const activeCellRect = computed(
 );
 const selectedRangeRects = computed(() => layout.value.getRangeFragments(selectedRange.value));
 const referenceEditor = computed<FormulaReferenceEditor | null>(() => {
-  if (props.referenceEditor?.canPickReference()) return props.referenceEditor;
+  if (props.referenceEditor?.editingFormula) return props.referenceEditor;
   return editorRef.value?.formulaReferenceEditor ?? null;
 });
-const referenceActive = computed(() => {
+const formulaReferenceGroups = computed<readonly FormulaReferenceOverlayGroup[]>(() => {
   const editor = referenceEditor.value;
-  return Boolean(editor?.referenceActive) && (editor === props.referenceEditor || isEditing.value);
+  if (!editor?.editingFormula) return [];
+  const groups = new Map<string, { token: FormulaReferenceToken; active: boolean }>();
+  for (const token of editor.references) {
+    const existing = groups.get(token.key);
+    if (existing) continue;
+    groups.set(token.key, { token, active: isActiveFormulaReference(editor, token) });
+  }
+  return [...groups.values()].map(({ token, active }) => ({
+    key: token.key,
+    colorIndex: token.colorIndex,
+    rects: layout.value.getRangeFragments(token.range),
+    active,
+  }));
 });
-const referenceRange = computed(() =>
-  referenceActive.value ? (referenceEditor.value?.referenceRange ?? null) : null,
-);
-const referenceRangeRects = computed(() =>
-  referenceRange.value ? layout.value.getRangeFragments(referenceRange.value) : [],
-);
+
+function isActiveFormulaReference(
+  editor: FormulaReferenceEditor,
+  token: FormulaReferenceToken,
+): boolean {
+  const range = editor.referenceRange;
+  if (!editor.referenceActive || !range) return false;
+  return (
+    Math.min(range.start.row, range.end.row) ===
+      Math.min(token.range.start.row, token.range.end.row) &&
+    Math.max(range.start.row, range.end.row) ===
+      Math.max(token.range.start.row, token.range.end.row) &&
+    Math.min(range.start.column, range.end.column) ===
+      Math.min(token.range.start.column, token.range.end.column) &&
+    Math.max(range.start.column, range.end.column) ===
+      Math.max(token.range.start.column, token.range.end.column)
+  );
+}
 const activeCellOutlineRects = computed(() =>
   layout.value.getRangeFragments(
     layout.value.getMergedRangeAt(activeCell.value) ?? {
@@ -989,11 +1016,13 @@ function onEditorKeydown(event: KeyboardEvent): void {
         editorRef.value?.insertLineBreak();
         return;
       }
+      editingValue.value = completeFormulaForCommit(editingValue.value);
       traverseSelection("Enter", event.shiftKey, true);
       return;
     }
     if (event.key === "Tab") {
       event.preventDefault();
+      editingValue.value = completeFormulaForCommit(editingValue.value);
       traverseSelection("Tab", event.shiftKey, true);
     }
     return;
@@ -1256,8 +1285,7 @@ defineExpose({
             :range-rects="selectedRangeRects"
             :address-label="activeCellLabel"
             :editing="isEditing"
-            :reference-rects="referenceRangeRects"
-            :reference-active="referenceActive"
+            :reference-groups="formulaReferenceGroups"
             :clipboard-rects="clipboardRangeRects"
             :clipboard-mode="clipboardMode"
           />

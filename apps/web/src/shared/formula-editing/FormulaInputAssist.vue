@@ -14,6 +14,7 @@ import {
   type FormulaReferenceEditContext,
 } from "./formula-input-lexical";
 import type { FormulaReferenceEditor, FormulaReferencePickPhase } from "./formula-editor-contract";
+import { getFormulaReferenceTokens } from "./formula-reference-tokens";
 
 const props = defineProps<{
   value: string;
@@ -39,6 +40,10 @@ let expectedReferenceValue: string | null = null;
 let observedInput: HTMLTextAreaElement | null = null;
 
 const inputReference = computed(() => props.input ?? null);
+const editingFormula = computed(() => props.active && props.value.startsWith("="));
+const references = computed(() =>
+  editingFormula.value && !props.composing ? getFormulaReferenceTokens(props.value) : [],
+);
 const completionContext = computed(() => {
   void selectionVersion.value;
   return props.active && !props.composing && props.input
@@ -257,6 +262,12 @@ defineExpose<
   handleKeydown,
   canPickReference,
   pickReference,
+  get references() {
+    return references.value;
+  },
+  get editingFormula() {
+    return editingFormula.value;
+  },
   get referenceRange() {
     return referenceRangeState.value;
   },

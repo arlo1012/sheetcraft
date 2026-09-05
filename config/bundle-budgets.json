@@ -1,27 +1,27 @@
 {
   "version": 1,
-  "description": "Production budgets include workbook persistence, JSON transfer, confirmation dialogs, and shared formula authoring interactions; see ADR 0004.",
+  "description": "Production budgets include workbook persistence, JSON transfer, confirmation dialogs, and shared formula authoring with colored references; see ADR 0004.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
       "pattern": "^index-.*\\.js$",
       "maximumRawBytes": 330000,
-      "maximumGzipBytes": 91000
+      "maximumGzipBytes": 92000
     },
     "css": {
       "pattern": "^index-.*\\.css$",
-      "maximumRawBytes": 75000,
+      "maximumRawBytes": 76000,
       "maximumGzipBytes": 12000
     }
   },
   "totalAssets": {
     "javascript": {
-      "maximumRawBytes": 815000,
+      "maximumRawBytes": 816000,
       "maximumGzipBytes": 242000
     },
     "css": {
       "maximumRawBytes": 220000,
-      "maximumGzipBytes": 27000
+      "maximumGzipBytes": 27500
     }
   }
 }
