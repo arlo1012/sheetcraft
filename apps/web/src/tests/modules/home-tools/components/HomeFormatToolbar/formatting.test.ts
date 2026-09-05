@@ -222,11 +222,16 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper)).toEqual([]);
   });
 
-  test("shows disclosure icons only for controls with an available menu", () => {
+  test("keeps declared menu disclosures visible even when their controls are disabled", () => {
     const wrapper = mountToolbar();
 
     expect(wrapper.findAll("[data-color-disclosure]")).toHaveLength(2);
-    expect(wrapper.find(".is-disabled .ribbon-icon-action__disclosure").exists()).toBe(false);
+    const disabledMenu = wrapper.get<HTMLButtonElement>('[data-ribbon-placeholder="image"]');
+    expect(disabledMenu.element.disabled).toBe(true);
+    expect(disabledMenu.find(".ribbon-icon-action__disclosure").exists()).toBe(true);
+    expect(
+      wrapper.get('[aria-label="Bold"]').find(".ribbon-icon-action__disclosure").exists(),
+    ).toBe(false);
   });
 
   test("disables formatting controls while keeping history actions available", async () => {
