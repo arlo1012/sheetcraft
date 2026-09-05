@@ -29,6 +29,20 @@ function createTextPasteEvent(text: string): ClipboardEvent {
   return event;
 }
 
+function createNativeClipboardWriteEvent(type: "copy" | "cut"): {
+  event: ClipboardEvent;
+  data: Map<string, string>;
+} {
+  const data = new Map<string, string>();
+  const event = new Event(type, { bubbles: true, cancelable: true }) as ClipboardEvent;
+  Object.defineProperty(event, "clipboardData", {
+    value: {
+      setData: (format: string, value: string) => data.set(format, value),
+    },
+  });
+  return { event, data };
+}
+
 function createFixture() {
   const sheet = getActiveSheet(createWorkbook({ id: "workbook-1", sheetId: "sheet-1" }));
   const currentSheet = shallowRef(sheet);
@@ -49,7 +63,10 @@ function createFixture() {
     getSelection: () => selection,
     isEditing: () => false,
     isComposing: () => false,
-    onPaste: (payload) => pastes.push(payload),
+    onPaste: (payload) => {
+      pastes.push(payload);
+      return { ok: true };
+    },
     onFeedback: (message) => feedback.push(message),
     clipboardPort: port,
   });
@@ -162,6 +179,65 @@ describe("useGridClipboard menu commands", () => {
       },
     });
     expect(fixture.clipboard.clipboardRange.value).toBeNull();
+    expect(fixture.feedback).toEqual(["readyToMove", "moved"]);
+  });
+
+  test("waits for a native rich metadata upgrade before menu paste reads its token", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 0, column: 0 }, "move");
+    let resolveNativeWrite: (() => void) | undefined;
+    fixture.port.writeNativeRich = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveNativeWrite = resolve;
+        }),
+    );
+    const cut = createNativeClipboardWriteEvent("cut");
+
+    fixture.clipboard.onCut(cut.event);
+    fixture.setTransfer({
+      text: "move",
+      localToken: cut.data.get("application/x-idea10-cells"),
+    });
+    fixture.setSelection(createCellSelection({ row: 2, column: 2 }));
+    const paste = fixture.clipboard.pasteSelection();
+    await Promise.resolve();
+    expect(fixture.port.read).not.toHaveBeenCalled();
+
+    resolveNativeWrite?.();
+    await paste;
+
+    expect(fixture.port.writeNativeRich).toHaveBeenCalledOnce();
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "all",
+      moveSource: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+    });
+    expect(fixture.clipboard.clipboardMode.value).toBeNull();
+  });
+
+  test("keeps a native cut pending when its rich metadata upgrade fails", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 0, column: 0 }, "move");
+    fixture.port.writeNativeRich = vi.fn(async () => {
+      throw new DOMException("denied", "NotAllowedError");
+    });
+    const cut = createNativeClipboardWriteEvent("cut");
+
+    fixture.clipboard.onCut(cut.event);
+    await Promise.resolve();
+
+    expect(fixture.port.writeNativeRich).toHaveBeenCalledOnce();
+    expect(fixture.clipboard.clipboardMode.value).toBe("cut");
+    expect(fixture.feedback).toEqual(["readyToMove"]);
+
+    fixture.setTransfer({
+      text: "move",
+      localToken: cut.data.get("application/x-idea10-cells"),
+    });
+    fixture.setSelection(createCellSelection({ row: 2, column: 2 }));
+    await fixture.clipboard.pasteSelection();
+
+    expect(fixture.pastes[0]).toHaveProperty("moveSource");
     expect(fixture.feedback).toEqual(["readyToMove", "moved"]);
   });
 
@@ -359,6 +435,26 @@ describe("useGridClipboard menu commands", () => {
       plan: { anchor: { row: 3, column: 1 }, values: [["captured event text"]] },
       styles: undefined,
     });
+  });
+
+  test("does not turn a captured external paste into a delayed local cut move", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 0, column: 0 }, "local old");
+    setCellStyle(fixture.sheet, { row: 0, column: 0 }, { bold: true });
+    await fixture.clipboard.cutSelection();
+    fixture.setSelection(createCellSelection({ row: 3, column: 1 }));
+
+    fixture.clipboard.onPaste(createTextPasteEvent("external captured"));
+    await vi.waitFor(() => expect(fixture.pastes).toHaveLength(1));
+
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "all",
+      plan: { anchor: { row: 3, column: 1 }, values: [["external captured"]] },
+      styles: undefined,
+    });
+    expect(fixture.pastes[0]).not.toHaveProperty("moveSource");
+    expect(fixture.clipboard.clipboardMode.value).toBe("cut");
+    expect(fixture.feedback).toEqual(["readyToMove", "pasted"]);
   });
 
   test("does not apply a delayed native paste after clipboard state is cleared", async () => {

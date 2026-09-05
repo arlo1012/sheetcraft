@@ -46,6 +46,7 @@ import {
   useGridClipboard,
   type GridClipboardFeedback,
   type GridPastePayload,
+  type GridPasteResult,
 } from "../useGridClipboard";
 import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
 import {
@@ -95,11 +96,19 @@ const CLIPBOARD_MESSAGE_KEYS: Record<GridClipboardFeedback, MessageKey> = {
   valuesPasted: "clipboard.valuesPasted",
   formatsPasted: "clipboard.formatsPasted",
   formatsUnavailable: "clipboard.formatsUnavailable",
+  filteredCutUnsupported: "clipboard.filteredCutUnsupported",
+  mergedRangeUnsupported: "clipboard.mergedRangeUnsupported",
+  noVisibleCells: "clipboard.noVisibleCells",
+  rangeTooLarge: "clipboard.rangeTooLarge",
+  pasteRejected: "clipboard.pasteRejected",
+  documentChanged: "clipboard.documentChanged",
 };
 
 const props = withDefaults(
   defineProps<{
     sheet: Sheet;
+    workbookRevision?: number;
+    applyPaste?: (payload: GridPastePayload) => GridPasteResult;
     initialRowCount?: number;
     initialColumnCount?: number;
     rowExpansionStep?: number;
@@ -122,7 +131,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   commitCell: [payload: { address: CellAddress; input: string }];
   clearCells: [range: CellRange];
-  pasteCells: [payload: GridPastePayload];
+  clipboardFeedback: [feedback: GridClipboardFeedback];
   resizeDimension: [payload: { axis: SheetDimensionAxis; index: number; size: number }];
   insertAxis: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
   deleteAxis: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
@@ -351,6 +360,7 @@ const {
   canPasteFormats,
   clipboardMode,
   clipboardRange,
+  cutDisabledReason,
   clearPendingClipboard,
   copySelection,
   cutSelection,
@@ -363,10 +373,12 @@ const {
 } = useGridClipboard({
   getSheet: () => props.sheet,
   getSelection: () => selection.value,
+  getRevision: () => props.workbookRevision ?? 0,
   isEditing: () => isEditing.value,
   isComposing: () => isComposing.value,
   onPaste: (payload) => {
-    emit("pasteCells", payload);
+    const result = props.applyPaste?.(payload) ?? { ok: false, reason: "pasteRejected" as const };
+    if (!result.ok) return result;
     ensureGridExtentContains(payload.plan.range.end);
     setSelection(
       {
@@ -377,9 +389,11 @@ const {
       },
       payload.plan.range.end,
     );
+    return result;
   },
   onFeedback: (message) => {
     clipboardFeedbackKey.value = message;
+    emit("clipboardFeedback", message);
   },
 });
 const clipboardRangeRects = computed(() =>
@@ -1187,6 +1201,9 @@ defineExpose({
       :anchor="cellContextMenu.anchor"
       :paste-special-disabled="clipboardMode === 'cut'"
       :paste-formats-disabled="!canPasteFormats"
+      :cut-disabled-reason="
+        cutDisabledReason ? t(CLIPBOARD_MESSAGE_KEYS[cutDisabledReason]) : undefined
+      "
       @cut="requestCellClipboard('cut')"
       @copy="requestCellClipboard('copy')"
       @paste="requestCellClipboard('paste')"

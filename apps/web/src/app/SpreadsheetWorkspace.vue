@@ -39,6 +39,7 @@ const {
   workspaceStatusText,
   commitCell,
   pasteCells,
+  showClipboardFeedback,
   clearCells,
   autoSum,
   sortSelection,
@@ -168,14 +169,16 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :key="workbookGeneration"
         :ref="setGridNavigator"
         :sheet="activeSheet"
+        :workbook-revision="workbookRevision"
+        :apply-paste="pasteCells"
         :view-state="activeSheetViewState"
         :format-painter-active="formatPainterActive"
         @clear-cells="clearCells"
+        @clipboard-feedback="showClipboardFeedback"
         @commit-cell="commitCell"
         @delete-axis="deleteAxis"
         @format-painter-target="applyFormatPainterTarget"
         @insert-axis="insertAxis"
-        @paste-cells="pasteCells"
         @resize-dimension="resizeDimension"
         @cancel-format-painter="cancelFormatPainter"
         @undo="undo"

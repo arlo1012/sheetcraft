@@ -18,6 +18,7 @@ const props = withDefaults(
     anchor: FloatingReference;
     pasteSpecialDisabled?: boolean;
     pasteFormatsDisabled?: boolean;
+    cutDisabledReason?: string;
   }>(),
   {
     pasteSpecialDisabled: false,
@@ -89,7 +90,7 @@ function onShortcutKeydown(event: KeyboardEvent): boolean {
   event.preventDefault();
   event.stopPropagation();
   if (action === "x") {
-    emit("cut");
+    if (!props.cutDisabledReason) emit("cut");
   } else if (action === "c") {
     emit("copy");
   } else {
@@ -158,7 +159,14 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
       @focusin="onMenuFocusin"
       @keydown="onMenuKeydown"
     >
-      <MenuItem data-cell-action="cut" aria-keyshortcuts="Control+X Meta+X" @select="emit('cut')">
+      <MenuItem
+        data-cell-action="cut"
+        aria-keyshortcuts="Control+X Meta+X"
+        :disabled="Boolean(cutDisabledReason)"
+        :title="cutDisabledReason"
+        :aria-description="cutDisabledReason"
+        @select="emit('cut')"
+      >
         {{ t("cellMenu.cut") }}
         <template #shortcut>{{ t("cellMenu.cutShortcut") }}</template>
       </MenuItem>

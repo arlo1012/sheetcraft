@@ -135,7 +135,7 @@ describe("SheetGrid clipboard", () => {
       formula: { source: "=A1 + 1" },
     });
 
-    wrapper.vm.$emit("pasteCells", {
+    const result = wrapper.props("applyPaste")?.({
       kind: "formats",
       plan: {
         anchor: target,
@@ -144,6 +144,7 @@ describe("SheetGrid clipboard", () => {
       },
       styles: [[{ bold: true }]],
     });
+    expect(result).toEqual({ ok: true });
     await wrapper.vm.$nextTick();
 
     expect(getCellContent(sheet, target)).toEqual({

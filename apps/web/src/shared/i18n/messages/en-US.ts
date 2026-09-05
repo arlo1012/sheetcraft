@@ -261,6 +261,14 @@ export const enUS = {
     valuesPasted: "Values pasted.",
     formatsPasted: "Formatting pasted.",
     formatsUnavailable: "Clipboard does not contain cell formatting.",
+    filteredCutUnsupported: "This cut could affect filtered-out rows. Clear the filter first.",
+    mergedRangeUnsupported:
+      "Copying, cutting, or pasting merged cells is not supported. Unmerge them first.",
+    noVisibleCells: "The selected range has no visible cells.",
+    rangeTooLarge: "A clipboard action can contain up to 100,000 visible cells.",
+    pasteRejected: "Cells could not be pasted. No changes were made.",
+    documentChanged:
+      "The workbook changed during the clipboard operation. Select the cells and try again.",
   },
   cellMenu: {
     actions: "Cell actions",

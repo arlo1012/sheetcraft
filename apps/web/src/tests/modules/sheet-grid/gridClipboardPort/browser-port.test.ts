@@ -16,6 +16,35 @@ function stubClipboardItem(): void {
   );
 }
 
+function stubLegacyPaste(text: string): () => void {
+  Object.defineProperty(document, "execCommand", {
+    configurable: true,
+    value: vi.fn(() => {
+      const event = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "clipboardData", {
+        value: {
+          types: ["text/plain"],
+          getData: (format: string) => (format === "text/plain" ? text : ""),
+        },
+      });
+      document.dispatchEvent(event);
+      return true;
+    }),
+  });
+  return () => Reflect.deleteProperty(document, "execCommand");
+}
+
+function createRichClipboardItem(text: string, token: string) {
+  return {
+    types: ["text/plain", WEB_IDEA10_CLIPBOARD_TYPE],
+    getType: vi.fn(async (type: string) =>
+      type === "text/plain"
+        ? new Blob([text], { type: "text/plain" })
+        : new Blob([token], { type: "application/x-idea10-cells" }),
+    ),
+  };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -51,6 +80,22 @@ describe("browser grid clipboard port", () => {
 
     expect(result).toEqual({ localTokenWritten: false });
     expect(writeText).toHaveBeenCalledWith("plain fallback");
+  });
+
+  test("does not downgrade a failed native rich upgrade to text-only clipboard data", async () => {
+    const write = vi.fn().mockRejectedValue(new DOMException("unsupported", "NotSupportedError"));
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    stubClipboard({ write, writeText });
+    stubClipboardItem();
+
+    await expect(
+      createBrowserGridClipboardPort().writeNativeRich?.({
+        text: "native source",
+        localToken: "token-native",
+      }),
+    ).rejects.toThrow("unsupported");
+    expect(write).toHaveBeenCalledOnce();
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   test("reports a local token written by the legacy copy event", async () => {
@@ -107,6 +152,57 @@ describe("browser grid clipboard port", () => {
       localToken: "token-3",
     });
     expect(readText).not.toHaveBeenCalled();
+  });
+
+  test("hydrates a native text transfer with an async custom token only when the texts match", async () => {
+    const removeLegacyPaste = stubLegacyPaste("line one\r\nline two");
+    const read = vi
+      .fn()
+      .mockResolvedValue([createRichClipboardItem("line one\nline two", "token-4")]);
+    const readText = vi.fn().mockResolvedValue("unused");
+    stubClipboard({ read, readText });
+
+    try {
+      await expect(createBrowserGridClipboardPort().read()).resolves.toEqual({
+        text: "line one\r\nline two",
+        localToken: "token-4",
+      });
+      expect(read).toHaveBeenCalledOnce();
+    } finally {
+      removeLegacyPaste();
+    }
+  });
+
+  test("does not attach an async token from a different clipboard text", async () => {
+    const removeLegacyPaste = stubLegacyPaste("captured native text");
+    const read = vi
+      .fn()
+      .mockResolvedValue([createRichClipboardItem("later clipboard text", "token-5")]);
+    const readText = vi.fn().mockResolvedValue("unused");
+    stubClipboard({ read, readText });
+
+    try {
+      await expect(createBrowserGridClipboardPort().read()).resolves.toEqual({
+        text: "captured native text",
+      });
+    } finally {
+      removeLegacyPaste();
+    }
+  });
+
+  test("keeps native text when async revalidation is denied", async () => {
+    const removeLegacyPaste = stubLegacyPaste("native fallback");
+    const read = vi.fn().mockRejectedValue(new DOMException("denied", "NotAllowedError"));
+    const readText = vi.fn().mockRejectedValue(new DOMException("denied", "NotAllowedError"));
+    stubClipboard({ read, readText });
+
+    try {
+      await expect(createBrowserGridClipboardPort().read()).resolves.toEqual({
+        text: "native fallback",
+      });
+    } finally {
+      removeLegacyPaste();
+    }
   });
 
   test("continues to async read when the legacy paste command throws", async () => {

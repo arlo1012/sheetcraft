@@ -255,6 +255,12 @@ export type MessageSchema = {
     valuesPasted: string;
     formatsPasted: string;
     formatsUnavailable: string;
+    filteredCutUnsupported: string;
+    mergedRangeUnsupported: string;
+    noVisibleCells: string;
+    rangeTooLarge: string;
+    pasteRejected: string;
+    documentChanged: string;
   };
   cellMenu: {
     actions: string;

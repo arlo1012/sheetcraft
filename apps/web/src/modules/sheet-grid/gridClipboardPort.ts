@@ -16,8 +16,21 @@ export type GridClipboardReadOptions = {
 
 export type GridClipboardPort = {
   write: (transfer: { text: string; localToken: string }) => Promise<GridClipboardWriteResult>;
+  /** Add an Async Clipboard custom format after a native copy/cut, without text-only fallback. */
+  writeNativeRich?: (transfer: { text: string; localToken: string }) => Promise<void>;
   read: (options?: GridClipboardReadOptions) => Promise<GridClipboardTransfer>;
 };
+
+export function areGridClipboardTextsEqual(
+  left: string | undefined,
+  right: string | undefined,
+): boolean {
+  return (
+    left !== undefined &&
+    right !== undefined &&
+    left.replace(/\r\n?/g, "\n") === right.replace(/\r\n?/g, "\n")
+  );
+}
 
 export function readGridClipboardLocalToken(
   data: Pick<DataTransfer, "getData">,
@@ -167,6 +180,7 @@ async function readWithAsyncClipboard(): Promise<GridClipboardTransfer> {
 
 export function createBrowserGridClipboardPort(): GridClipboardPort {
   return {
+    writeNativeRich: writeWithAsyncClipboard,
     async write(transfer) {
       const asyncClipboard = typeof navigator === "undefined" ? undefined : navigator.clipboard;
       if (asyncClipboard && typeof ClipboardItem !== "undefined") {
@@ -196,7 +210,21 @@ export function createBrowserGridClipboardPort(): GridClipboardPort {
       if (options?.preferAsync) {
         return readWithAsyncClipboard();
       }
-      return readWithClipboardEvent() ?? readWithAsyncClipboard();
+      const nativeTransfer = readWithClipboardEvent();
+      if (!nativeTransfer) return readWithAsyncClipboard();
+      if (nativeTransfer.localToken) return nativeTransfer;
+      try {
+        const asyncTransfer = await readWithAsyncClipboard();
+        if (
+          asyncTransfer.localToken &&
+          areGridClipboardTextsEqual(nativeTransfer.text, asyncTransfer.text)
+        ) {
+          return { text: nativeTransfer.text, localToken: asyncTransfer.localToken };
+        }
+      } catch {
+        // A successful native text read is still usable without async permission.
+      }
+      return nativeTransfer;
     },
   };
 }

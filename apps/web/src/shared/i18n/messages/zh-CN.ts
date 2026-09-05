@@ -258,6 +258,12 @@ export const zhCN = {
     valuesPasted: "已仅粘贴值。",
     formatsPasted: "已仅粘贴格式。",
     formatsUnavailable: "剪贴板中没有可用的单元格格式。",
+    filteredCutUnsupported: "剪切可能影响筛选隐藏行，请先清除筛选。",
+    mergedRangeUnsupported: "暂不支持复制、剪切或粘贴合并单元格，请先取消合并。",
+    noVisibleCells: "所选区域中没有可见单元格。",
+    rangeTooLarge: "单次剪贴板操作最多支持 100,000 个可见单元格。",
+    pasteRejected: "粘贴失败，未更改工作簿。",
+    documentChanged: "剪贴板操作期间工作簿已更改，请重新选择单元格后重试。",
   },
   cellMenu: {
     actions: "单元格操作",

@@ -12,6 +12,10 @@ sorting and value filtering, frozen panes, merged cells, and multiple Sheet
 management. A compact Home Ribbon, formula bar, search, selection summaries,
 and Chinese/English localization complete the editing surface.
 
+Clipboard actions skip filtered-out rows and keep each paste atomic for undo.
+See [Filtered Clipboard](docs/filtered-clipboard.md) for formula/style handling,
+selection rules, and the explicit cut and merged-cell restrictions.
+
 Formulas currently support single-Sheet A1 references, absolute and relative
 references, ranges, parentheses, arithmetic (`+`, `-`, `*`, `/`), and `SUM` with
 AutoSum. Copying, moving, and changing rows or columns transform references.

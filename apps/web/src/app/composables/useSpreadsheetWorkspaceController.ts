@@ -19,9 +19,7 @@ import {
   createDuplicateSheetCommand,
   createInsertSheetAxisCommand,
   createMergeCellsCommand,
-  createMoveCellRangeCommand,
   createMoveSheetCommand,
-  createPasteCellContentsCommand,
   createRenameSheetCommand,
   createResizeSheetDimensionCommand,
   createSetCellContentCommand,
@@ -35,15 +33,7 @@ import {
   type WorkbookCommand,
   type WorkbookOperation,
 } from "@idea10/core/commands";
-import {
-  createPastePlan,
-  getCellMatrixSize,
-  getCellRangeContents,
-  getCellRangeValues,
-  tileCellMatrix,
-  translateCellContentForCopy,
-  type CellValueMatrix,
-} from "@idea10/core/clipboard";
+import { getCellMatrixSize, tileCellMatrix, type CellValueMatrix } from "@idea10/core/clipboard";
 import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
 import {
   createWorkbookSession,
@@ -58,7 +48,7 @@ import {
   formatComputedValueForDisplay,
   parseCellContent,
 } from "@idea10/core/input";
-import { createAutoSumFormula, createFormulaError, type CellContent } from "@idea10/core/formula";
+import { createAutoSumFormula, createFormulaError } from "@idea10/core/formula";
 import { doMergedCellRangesIntersect } from "@idea10/core";
 import type { IdFactory } from "@idea10/core/runtime";
 import { findCellByText, type SheetSearchDirection } from "@idea10/core/search";
@@ -88,8 +78,20 @@ import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet
 import {
   getCellRangeStyles,
   type CellStyleMatrix,
+  type GridClipboardFeedback,
   type GridPastePayload,
+  type GridPasteResult,
 } from "../../modules/sheet-grid/useGridClipboard";
+import {
+  createGridPasteCommand,
+  GridPasteError,
+} from "../../modules/sheet-grid/createGridPasteCommand";
+import {
+  createGridClipboardRowVisibility,
+  createVisibleGridPastePlan,
+  getVisibleClipboardRows,
+  rangeIntersectsMergedCells,
+} from "../../modules/sheet-grid/gridClipboardRows";
 import { useAppI18n, type MessageKey, type MessageParams } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import type {
@@ -385,81 +387,24 @@ export function useSpreadsheetWorkspaceController(
     clearWorkspaceStatus();
   }
 
-  function pasteCells(payload: GridPastePayload): void {
-    if (payload.kind === "formats") {
+  function pasteCells(payload: GridPastePayload): GridPasteResult {
+    try {
       execute(
-        createPasteCellContentsCommand(
-          activeSheet.value.id,
-          payload.plan.anchor,
-          getCellRangeContents(activeSheet.value, payload.plan.range),
-          { styles: payload.styles },
-        ),
-        "cells.paste",
+        createGridPasteCommand(activeSheet.value, payload),
+        payload.kind === "all" && payload.moveSource ? "cells.move" : "cells.paste",
       );
-      return;
+      clearWorkspaceStatus();
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: error instanceof GridPasteError ? error.reason : "pasteRejected",
+      };
     }
-    if (payload.kind === "values") {
-      execute(
-        createPasteCellContentsCommand(
-          activeSheet.value.id,
-          payload.plan.anchor,
-          toLiteralContents(payload.plan.values),
-        ),
-        "cells.paste",
-      );
-      return;
-    }
-    if (payload.moveSource) {
-      execute(
-        createMoveCellRangeCommand(activeSheet.value.id, payload.moveSource, payload.plan.anchor),
-        "cells.move",
-      );
-      return;
-    }
-    const contents = getAllPasteContents(payload);
-    execute(
-      createPasteCellContentsCommand(activeSheet.value.id, payload.plan.anchor, contents, {
-        styles: payload.styles,
-      }),
-      "cells.paste",
-    );
   }
 
-  function toLiteralContents(values: readonly (readonly (string | number | boolean | null)[])[]) {
-    return values.map((row) =>
-      row.map((value) =>
-        value === null ? null : ({ kind: "literal", value } satisfies CellContent),
-      ),
-    );
-  }
-
-  function getAllPasteContents(
-    payload: Extract<GridPastePayload, { kind: "all" }>,
-  ): Array<Array<CellContent | null>> {
-    if (!payload.contents || !payload.sourceRange) {
-      return toLiteralContents(payload.plan.values);
-    }
-
-    const sourceSize = getCellMatrixSize(payload.contents);
-    const targetSize = getCellMatrixSize(payload.plan.values);
-    return Array.from({ length: targetSize.rowCount }, (_, row) =>
-      Array.from({ length: targetSize.columnCount }, (_, column) => {
-        const sourceRow = row % sourceSize.rowCount;
-        const sourceColumn = column % sourceSize.columnCount;
-        const content = payload.contents?.[sourceRow]?.[sourceColumn] ?? null;
-        if (!content) {
-          return content;
-        }
-        return translateCellContentForCopy(
-          content,
-          {
-            row: payload.sourceRange!.start.row + sourceRow,
-            column: payload.sourceRange!.start.column + sourceColumn,
-          },
-          { row: payload.plan.anchor.row + row, column: payload.plan.anchor.column + column },
-        );
-      }),
-    );
+  function showClipboardFeedback(feedback: GridClipboardFeedback): void {
+    showWorkspaceStatus({ key: `clipboard.${feedback}` });
   }
 
   function clearCells(range: CellRange): void {
@@ -653,9 +598,23 @@ export function useSpreadsheetWorkspaceController(
       showWorkspaceStatus({ key: "format.selectionTooLarge" });
       return;
     }
+    const sheet = activeSheet.value;
+    const range = activeSelectionRange.value;
+    const rows = getVisibleClipboardRows(createGridClipboardRowVisibility(sheet), range);
+    if (!rows?.length || rangeIntersectsMergedCells(sheet, range)) {
+      showWorkspaceStatus({
+        key: rows?.length ? "clipboard.mergedRangeUnsupported" : "clipboard.noVisibleCells",
+      });
+      return;
+    }
+    const rowRanges = rows.map((row) => ({
+      start: { row, column: range.start.column },
+      end: { row, column: range.end.column },
+    }));
+    const styles = rowRanges.flatMap((rowRange) => getCellRangeStyles(sheet, rowRange));
     formatPainterSource.value = {
-      values: getCellRangeValues(activeSheet.value, activeSelectionRange.value),
-      styles: getCellRangeStyles(activeSheet.value, activeSelectionRange.value),
+      values: styles.map((row) => row.map(() => null)),
+      styles,
     };
     clearWorkspaceStatus();
     gridRef.value?.focusGrid();
@@ -675,16 +634,25 @@ export function useSpreadsheetWorkspaceController(
       showWorkspaceStatus({ key: "format.selectionTooLarge" });
       return;
     }
-    const plan = createPastePlan(source.values, range, range.start);
+    const plan = createVisibleGridPastePlan(
+      source.values,
+      range,
+      range.start,
+      createGridClipboardRowVisibility(activeSheet.value),
+    );
     if (!plan) {
       showWorkspaceStatus({ key: "workspace.formatPainterRangeMismatch" });
       return;
     }
-    pasteCells({
+    const result = pasteCells({
       kind: "formats",
       plan,
       styles: tileCellMatrix(source.styles, getCellMatrixSize(plan.values)),
     });
+    if (!result.ok) {
+      showWorkspaceStatus({ key: `clipboard.${result.reason}` });
+      return;
+    }
     formatPainterSource.value = undefined;
     clearWorkspaceStatus();
   }
@@ -927,6 +895,7 @@ export function useSpreadsheetWorkspaceController(
     formatPainterActive,
     commitCell,
     pasteCells,
+    showClipboardFeedback,
     clearCells,
     autoSum,
     sortSelection,

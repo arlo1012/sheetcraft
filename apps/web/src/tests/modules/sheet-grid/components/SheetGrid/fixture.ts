@@ -1,17 +1,17 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { reactive } from "vue";
-import type { GridPastePayload } from "../../../../../modules/sheet-grid/useGridClipboard";
+import type {
+  GridPastePayload,
+  GridPasteResult,
+} from "../../../../../modules/sheet-grid/useGridClipboard";
 import {
-  getCellMatrixSize,
-  getCellRangeContents,
-  translateCellContentForCopy,
-} from "@idea10/core/clipboard";
+  createGridPasteCommand,
+  GridPasteError,
+} from "../../../../../modules/sheet-grid/createGridPasteCommand";
 import {
   createClearCellRangeCommand,
   createDeleteSheetAxisCommand,
   createInsertSheetAxisCommand,
-  createMoveCellRangeCommand,
-  createPasteCellContentsCommand,
   createResizeSheetDimensionCommand,
   createSetCellContentCommand,
 } from "@idea10/core/commands";
@@ -23,7 +23,6 @@ import {
   type WorkbookSession,
 } from "@idea10/core/history";
 import { parseCellContent } from "@idea10/core/input";
-import type { CellContent } from "@idea10/core/formula";
 import { getActiveSheet, type CellRange, type SheetDimensionAxis } from "@idea10/core/workbook";
 import SheetGrid from "../../../../../modules/sheet-grid/components/SheetGrid.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
@@ -68,28 +67,16 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
           createSetCellContentCommand(sheet.id, payload.address, parseCellContent(payload.input)),
         );
       },
-      onPasteCells(payload: GridPastePayload) {
-        if (payload.kind === "all" && payload.moveSource) {
-          executeWorkbookCommand(
-            session,
-            createMoveCellRangeCommand(sheet.id, payload.moveSource, payload.plan.anchor),
-          );
-          return;
+      applyPaste(payload: GridPastePayload): GridPasteResult {
+        try {
+          executeWorkbookCommand(session, createGridPasteCommand(sheet, payload));
+          return { ok: true };
+        } catch (error) {
+          return {
+            ok: false,
+            reason: error instanceof GridPasteError ? error.reason : "pasteRejected",
+          };
         }
-        const contents = getPasteContents(sheet, payload);
-        executeWorkbookCommand(
-          session,
-          createPasteCellContentsCommand(
-            sheet.id,
-            payload.plan.anchor,
-            contents,
-            payload.kind === "all"
-              ? { styles: payload.styles }
-              : payload.kind === "formats"
-                ? { styles: payload.styles }
-                : undefined,
-          ),
-        );
       },
       onResizeDimension(payload: { axis: SheetDimensionAxis; index: number; size: number }) {
         executeWorkbookCommand(
@@ -119,50 +106,6 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
   });
 
   return { session, sheet, wrapper };
-}
-
-function getPasteContents(
-  sheet: ReturnType<typeof getActiveSheet>,
-  payload: GridPastePayload,
-): Array<Array<CellContent | null>> {
-  if (payload.kind === "formats") {
-    return getCellRangeContents(sheet, payload.plan.range);
-  }
-  if (payload.kind === "values") {
-    return toLiteralContents(payload.plan.values);
-  }
-  if (!payload.contents || !payload.sourceRange) {
-    return toLiteralContents(payload.plan.values);
-  }
-
-  const sourceSize = getCellMatrixSize(payload.contents);
-  const targetSize = getCellMatrixSize(payload.plan.values);
-  return Array.from({ length: targetSize.rowCount }, (_, row) =>
-    Array.from({ length: targetSize.columnCount }, (_, column) => {
-      const sourceRow = row % sourceSize.rowCount;
-      const sourceColumn = column % sourceSize.columnCount;
-      const content = payload.contents?.[sourceRow]?.[sourceColumn] ?? null;
-      if (!content) return null;
-      return translateCellContentForCopy(
-        content,
-        {
-          row: payload.sourceRange!.start.row + sourceRow,
-          column: payload.sourceRange!.start.column + sourceColumn,
-        },
-        { row: payload.plan.anchor.row + row, column: payload.plan.anchor.column + column },
-      );
-    }),
-  );
-}
-
-function toLiteralContents(
-  values: readonly (readonly (string | number | boolean | null)[])[],
-): Array<Array<CellContent | null>> {
-  return values.map((row) =>
-    row.map((value) =>
-      value === null ? null : ({ kind: "literal", value } satisfies CellContent),
-    ),
-  );
 }
 
 export function getFloatingMenu() {
