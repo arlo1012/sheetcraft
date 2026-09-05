@@ -238,6 +238,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :busy="xlsxBusy"
         @confirm="xlsxActions.confirm"
         @cancel="xlsxActions.cancel"
+        @dismiss="xlsxActions.dismissFeedback"
       />
     </div>
     <WorkbookFormulaBar

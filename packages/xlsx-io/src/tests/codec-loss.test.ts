@@ -1,5 +1,5 @@
 import ExcelJSImport from "exceljs/dist/exceljs.min.js";
-import { getCellContent, getCellStyle, getRowHeight } from "@idea10/core/workbook";
+import { getActiveSheet, getCellContent, getCellStyle, getRowHeight } from "@idea10/core/workbook";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx } from "../index.js";
 
@@ -33,7 +33,7 @@ describe("XLSX codec loss and sparse-state handling", () => {
         sheet.getCell("A1").value = 1;
         sheet.getCell("A1").font = { bold: true };
         sheet.getCell("A1").border = { top: { style: "thin" } };
-        sheet.getCell("B1").numFmt = "0.00";
+        sheet.getCell("B1").numFmt = "yyyy-mm-dd";
         sheet.fillFormula("C1:C3", "A1*2", [2, 2, 2], "shared");
       }),
     );
@@ -86,5 +86,34 @@ describe("XLSX codec loss and sparse-state handling", () => {
       }),
     );
     expect(result.workbook.sheets.get(result.workbook.activeSheetId)?.name).toBe("Second");
+  });
+
+  test("does not report invisible diagonal borders as a loss", async () => {
+    const result = await decodeXlsx(
+      await bytesFor((_workbook, sheet) => {
+        sheet.getCell("A1").value = "plain";
+        sheet.getCell("A1").border = {
+          diagonal: { style: "thin", color: { argb: "FF112233" }, up: false, down: false },
+        };
+      }),
+    );
+    expect(result.report.issues).toEqual([]);
+    const style = getCellStyle(getActiveSheet(result.workbook), { row: 0, column: 0 });
+    expect(style?.borderDiagonalUp).toBeUndefined();
+    expect(style?.borderDiagonalDown).toBeUndefined();
+  });
+
+  test("counts each cell with an unsupported visible border only once", async () => {
+    const result = await decodeXlsx(
+      await bytesFor((_workbook, sheet) => {
+        sheet.getCell("A1").value = "unsupported";
+        sheet.getCell("A1").border = {
+          diagonal: { style: "thick", color: { argb: "FF112233" }, up: true },
+        };
+      }),
+    );
+    expect(result.report.issues).toEqual([
+      { code: "style-omitted", severity: "warning", count: 1, locations: ["Data!A1"] },
+    ]);
   });
 });

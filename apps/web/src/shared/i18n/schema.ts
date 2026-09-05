@@ -4,6 +4,7 @@ export type MessageSchema = {
   xlsx: {
     actions: { import: string; export: string; selectFile: string };
     feedback: {
+      errorTitle: string;
       imported: string;
       exported: string;
       failed: string;
@@ -20,6 +21,7 @@ export type MessageSchema = {
       exportDescription: string;
       exportConfirm: string;
       cancel: string;
+      close: string;
     };
     report: {
       title: string;

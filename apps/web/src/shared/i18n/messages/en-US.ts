@@ -8,10 +8,11 @@ export const enUS = {
       selectFile: "Select an XLSX workbook",
     },
     feedback: {
+      errorTitle: "XLSX operation could not be completed",
       imported: "XLSX imported. Undo history starts from this file.",
       exported: "XLSX download started. The current document and original file are unchanged.",
       failed:
-        "XLSX processing failed. Check the compatibility report; your document is still here.",
+        "XLSX processing failed. Your document is still here. Review any details below and try again.",
       timeout: "XLSX processing timed out and was stopped. The current document was not replaced.",
       finishEditing: "Finish your current text composition before importing or exporting XLSX.",
       stale:
@@ -29,6 +30,7 @@ export const enUS = {
         "The items below may be converted or omitted. Export creates a new file without changing this document. Use JSON export for a complete backup.",
       exportConfirm: "Accept and download",
       cancel: "Cancel",
+      close: "Close",
     },
     report: {
       title: "XLSX compatibility report",
@@ -46,13 +48,13 @@ export const enUS = {
         externalContent: "External links or content are not supported",
         formulaCacheDiscarded: "Old formula calculation caches were discarded",
         formulaNotCalculated:
-          "Formula source is preserved; only implemented functions are calculated here, and export has no calculation cache",
+          "Formula source is preserved, but this version cannot provide a reliable result; open it in Excel to recalculate",
         filterOmitted: "Filter criteria were not preserved",
         imageOmitted: "Images are not included in the exported file",
         styleOmitted: "Some styles were not preserved",
         numberFormatOmitted: "Unsupported number formats were not preserved",
         dimensionApproximated:
-          "Row heights or column widths were converted and may display differently",
+          "Row heights or column widths were converted or adjusted and may display differently",
         dateNormalized: "Dates were converted to numbers using the workbook's date system",
         cellValueOmitted: "Unsupported cell content was not preserved",
         featureOmitted: "Workbook features not supported by this version were not preserved",

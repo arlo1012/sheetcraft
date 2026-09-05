@@ -1,11 +1,19 @@
 import ExcelJSImport from "exceljs/dist/exceljs.min.js";
+import { readExcelBorder, writeExcelBorder } from "./border.js";
+import { createFormulaCacheEligibility, formulaCacheValue } from "./formula-cache.js";
+import { fromExcelNumberFormat, toExcelNumberFormat } from "./number-format.js";
 import {
   createFormulaError,
   datePartsToExcelSerial,
   formulaErrorCodeFromToken,
   type CellContent,
 } from "@idea10/core/formula";
-import { replaceSheetSparseState, type CellRange, type Workbook } from "@idea10/core/workbook";
+import {
+  createSheetEvaluator,
+  replaceSheetSparseState,
+  type CellRange,
+  type Workbook,
+} from "@idea10/core/workbook";
 import type { CellStyle } from "@idea10/core/style";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, createSheet } from "@idea10/core/workbook";
 import { CompatibilityReportBuilder } from "./report.js";
@@ -48,6 +56,7 @@ type BrowserWorksheet = {
 };
 type BrowserWorkbook = {
   properties: { date1904?: boolean };
+  calcProperties: { fullCalcOnLoad: boolean };
   views?: Array<Record<string, unknown>> | null;
   worksheets: BrowserWorksheet[];
   addWorksheet: (name: string, options?: { views?: Record<string, unknown>[] }) => BrowserWorksheet;
@@ -120,6 +129,7 @@ function parseAddress(value: string): { row: number; column: number } | null {
 
 function readStyle(
   style: Record<string, unknown> | undefined,
+  rawNumberFormat: unknown,
   issueLocation: string,
   report: CompatibilityReportBuilder,
 ): CellStyle | undefined {
@@ -127,6 +137,7 @@ function readStyle(
   const font = style.font as Record<string, unknown> | undefined;
   const alignment = style.alignment as Record<string, unknown> | undefined;
   const fill = style.fill as Record<string, unknown> | undefined;
+  const border = style.border as Record<string, unknown> | undefined;
   const color = (value: unknown): string | undefined => {
     const argb = (value as Record<string, unknown> | undefined)?.argb;
     return typeof argb === "string" && /^ff[0-9a-f]{6}$/i.test(argb)
@@ -169,8 +180,39 @@ function readStyle(
   )
     result.verticalAlign = alignment.vertical;
   if (alignment?.wrapText === true) result.wrapText = true;
-  const hasBorder =
-    Object.keys((style.border as Record<string, unknown> | undefined) ?? {}).length > 0;
+  const numberFormat = fromExcelNumberFormat(rawNumberFormat ?? style.numFmt);
+  if (numberFormat) result.numberFormat = numberFormat;
+  const borderEntries: Array<
+    [keyof Pick<CellStyle, "borderTop" | "borderRight" | "borderBottom" | "borderLeft">, string]
+  > = [
+    ["borderTop", "top"],
+    ["borderRight", "right"],
+    ["borderBottom", "bottom"],
+    ["borderLeft", "left"],
+  ];
+  let hasUnsupportedBorder = false;
+  if (
+    Object.entries(border ?? {}).some(
+      ([key, value]) =>
+        !["top", "right", "bottom", "left", "diagonal"].includes(key) &&
+        (typeof value !== "object" || value === null || Object.keys(value).length > 0),
+    )
+  )
+    hasUnsupportedBorder = true;
+  for (const [styleKey, excelKey] of borderEntries) {
+    const source = border?.[excelKey];
+    if (source === undefined) continue;
+    const mapped = readExcelBorder(source);
+    if (mapped) result[styleKey] = mapped;
+    else if (Object.keys((source as Record<string, unknown>) ?? {}).length)
+      hasUnsupportedBorder = true;
+  }
+  const diagonal = readExcelBorder(border?.diagonal);
+  const diagonalUp = (border?.diagonal as Record<string, unknown> | undefined)?.up === true;
+  const diagonalDown = (border?.diagonal as Record<string, unknown> | undefined)?.down === true;
+  if (diagonal && diagonalUp) result.borderDiagonalUp = diagonal;
+  if (diagonal && diagonalDown) result.borderDiagonalDown = diagonal;
+  if ((diagonalUp || diagonalDown) && !diagonal) hasUnsupportedBorder = true;
   const hasSupportedNoopFill = fill?.type === "pattern" && fill.pattern === "none";
   const hasUnsupportedFill =
     fill !== undefined &&
@@ -190,14 +232,17 @@ function readStyle(
     ["indent", "readingOrder", "shrinkToFit", "textRotation", "justifyLastLine"].some(
       (key) => alignment[key] !== undefined,
     );
-  if (hasBorder || hasUnsupportedFill || hasUnsupportedFont || hasUnsupportedAlignment)
-    add(report, "style-omitted", issueLocation);
-  if (typeof style.numFmt === "string") add(report, "number-format-omitted", issueLocation);
+  const hasUnsupportedStyle =
+    hasUnsupportedBorder || hasUnsupportedFill || hasUnsupportedFont || hasUnsupportedAlignment;
+  if (hasUnsupportedStyle) add(report, "style-omitted", issueLocation);
+  if (typeof (rawNumberFormat ?? style.numFmt) === "string" && numberFormat === undefined)
+    add(report, "number-format-omitted", issueLocation);
   if (
     Object.keys(style).length &&
     Object.keys(result).length === 0 &&
-    !hasUnsupportedFill &&
-    !hasSupportedNoopFill
+    !hasUnsupportedStyle &&
+    !hasSupportedNoopFill &&
+    border === undefined
   )
     add(report, "style-omitted", issueLocation);
   return Object.keys(result).length ? result : undefined;
@@ -218,7 +263,6 @@ function readContent(
       (formulaValue?.result !== undefined && formulaValue.result !== null)
     )
       add(report, "formula-cache-discarded", issueLocation);
-    add(report, "formula-not-calculated", issueLocation);
     return {
       kind: "formula",
       formula: { source: formula.startsWith("=") ? formula : `=${formula}` },
@@ -249,7 +293,6 @@ function readContent(
   if (typeof record.formula === "string") {
     if (record.result !== undefined && record.result !== null)
       add(report, "formula-cache-discarded", issueLocation);
-    add(report, "formula-not-calculated", issueLocation);
     return {
       kind: "formula",
       formula: { source: record.formula.startsWith("=") ? record.formula : `=${record.formula}` },
@@ -289,11 +332,15 @@ export async function decodeWithExcelJs(
       if (typeof rowNumber !== "number" || !Number.isInteger(rowNumber) || rowNumber < 1) continue;
       const rowIndex = rowNumber - 1;
       if (typeof row.height === "number") {
+        const coreHeight = (row.height * 4) / 3;
+        const roundedHeight = Math.round(coreHeight);
+        const size = Math.max(16, Math.min(512, roundedHeight));
         rowHeights.push({
           index: rowIndex,
-          size: Math.max(16, Math.min(512, Math.round((row.height * 4) / 3))),
+          size,
         });
-        add(report, "dimension-approximated", `${sourceSheet.name}!${rowNumber}`);
+        if (!Number.isInteger(coreHeight) || size !== roundedHeight)
+          add(report, "dimension-approximated", `${sourceSheet.name}!${rowNumber}`);
       }
       for (const modelCell of row.cells ?? []) {
         if (!modelCell.address) continue;
@@ -312,7 +359,7 @@ export async function decodeWithExcelJs(
           issueLocation,
           report,
         );
-        const style = readStyle(cell.style, issueLocation, report);
+        const style = readStyle(cell.style, cell.numFmt, issueLocation, report);
         if (content || style) {
           importedCells += 1;
           if (importedCells > MAX_SPARSE_CELLS) {
@@ -423,17 +470,35 @@ function writeStyle(
       ...(style.verticalAlign ? { vertical: style.verticalAlign } : {}),
       ...(style.wrapText ? { wrapText: true } : {}),
     };
-  cell.style = next;
-  if (style.numberFormat) add(report, "number-format-omitted", issueLocation);
+  const diagonalConflict =
+    style.borderDiagonalUp &&
+    style.borderDiagonalDown &&
+    (style.borderDiagonalUp.style !== style.borderDiagonalDown.style ||
+      style.borderDiagonalUp.color !== style.borderDiagonalDown.color);
   if (
     style.borderTop ||
     style.borderRight ||
     style.borderBottom ||
     style.borderLeft ||
-    style.borderDiagonalUp ||
-    style.borderDiagonalDown
-  )
-    add(report, "style-omitted", issueLocation);
+    !diagonalConflict
+  ) {
+    const border: Record<string, unknown> = {};
+    if (style.borderTop) border.top = writeExcelBorder(style.borderTop);
+    if (style.borderRight) border.right = writeExcelBorder(style.borderRight);
+    if (style.borderBottom) border.bottom = writeExcelBorder(style.borderBottom);
+    if (style.borderLeft) border.left = writeExcelBorder(style.borderLeft);
+    if (!diagonalConflict && (style.borderDiagonalUp || style.borderDiagonalDown)) {
+      border.diagonal = {
+        ...writeExcelBorder(style.borderDiagonalUp ?? style.borderDiagonalDown!),
+        up: style.borderDiagonalUp !== undefined,
+        down: style.borderDiagonalDown !== undefined,
+      };
+    }
+    if (Object.keys(border).length) next.border = border;
+  }
+  cell.style = next;
+  if (style.numberFormat) cell.numFmt = toExcelNumberFormat(style.numberFormat);
+  if (diagonalConflict) add(report, "style-omitted", issueLocation);
 }
 
 export async function encodeWithExcelJs(
@@ -442,8 +507,11 @@ export async function encodeWithExcelJs(
   const report = new CompatibilityReportBuilder();
   const target = new ExcelJS.Workbook();
   target.properties.date1904 = workbook.dateSystem === "1904";
+  target.calcProperties.fullCalcOnLoad = true;
   let encodedCells = 0;
   for (const sheet of workbook.sheets.values()) {
+    const evaluator = createSheetEvaluator(sheet);
+    const isFormulaCacheEligible = createFormulaCacheEligibility(sheet);
     const output = target.addWorksheet(sheet.name, {
       views:
         sheet.freezePanes.rows || sheet.freezePanes.columns
@@ -452,7 +520,6 @@ export async function encodeWithExcelJs(
     });
     for (const [index, size] of sheet.rowHeights) {
       output.getRow(index + 1).height = (size * 3) / 4;
-      add(report, "dimension-approximated", `${sheet.name}!${index + 1}`);
     }
     for (const [index, size] of sheet.columnWidths) {
       output.getColumn(index + 1).width = Math.max(0, (size - 5) / 7);
@@ -479,8 +546,14 @@ export async function encodeWithExcelJs(
       const outputCell = output.getCell(address(row, column));
       if (cell.content?.kind === "literal") outputCell.value = cell.content.value;
       else if (cell.content?.kind === "formula") {
-        outputCell.value = { formula: cell.content.formula.source.slice(1) };
-        add(report, "formula-not-calculated", issueLocation);
+        const result = isFormulaCacheEligible(row, column)
+          ? formulaCacheValue(evaluator.getComputedValue({ row, column }))
+          : undefined;
+        outputCell.value = {
+          formula: cell.content.formula.source.slice(1),
+          ...(result !== undefined ? { result } : {}),
+        };
+        if (result === undefined) add(report, "formula-not-calculated", issueLocation);
       } else if (cell.content?.kind === "error")
         outputCell.value = {
           error: {

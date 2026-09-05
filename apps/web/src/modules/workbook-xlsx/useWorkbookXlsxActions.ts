@@ -107,6 +107,8 @@ export function useWorkbookXlsxActions(options: {
 
   function prepare(): boolean {
     if (isBlocked()) return false;
+    feedback.value = undefined;
+    report.value = undefined;
     if (options.flushPendingEdits()) return true;
     feedback.value = { key: "xlsx.feedback.finishEditing", error: true };
     return false;
@@ -240,7 +242,16 @@ export function useWorkbookXlsxActions(options: {
 
   function cancel(): void {
     abortController?.abort();
-    if (!busy.value) clearPending();
+    if (!busy.value) {
+      clearPending();
+      dismissFeedback();
+    }
+  }
+
+  function dismissFeedback(): void {
+    if (busy.value || confirmation.value) return;
+    feedback.value = undefined;
+    report.value = undefined;
   }
 
   onScopeDispose(() => {
@@ -258,5 +269,6 @@ export function useWorkbookXlsxActions(options: {
     exportXlsx,
     confirm,
     cancel,
+    dismissFeedback,
   };
 }

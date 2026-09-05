@@ -205,8 +205,48 @@ describe("useWorkbookXlsxActions", () => {
     await fixture.actions.exportXlsx();
     expect(fixture.actions.confirmation.value).toBe("export");
     expect(fixture.download).not.toHaveBeenCalled();
+    fixture.actions.dismissFeedback();
+    expect(fixture.actions.report.value?.issues).toHaveLength(1);
     await fixture.actions.confirm();
     expect(fixture.download).toHaveBeenCalledWith(new Uint8Array([1, 2]), "workbook.xlsx");
+    fixture.scope.stop();
+  });
+
+  test("discards compatibility details when an export confirmation is cancelled", async () => {
+    const fixture = mountActions(
+      createWorkerFactory((request, worker) =>
+        response(worker, {
+          id: request.id,
+          ok: true,
+          type: "encode",
+          bytes: new Uint8Array([1]).buffer,
+          report: {
+            issues: [{ code: "image-omitted", severity: "warning", count: 1, locations: ["A1"] }],
+          },
+        }),
+      ),
+    );
+
+    await fixture.actions.exportXlsx();
+    fixture.actions.cancel();
+    expect(fixture.actions.confirmation.value).toBeUndefined();
+    expect(fixture.actions.report.value).toBeUndefined();
+    expect(fixture.actions.feedback.value).toBeUndefined();
+    expect(fixture.download).not.toHaveBeenCalled();
+    fixture.scope.stop();
+  });
+
+  test("dismisses an error and its details without replacing or downloading the document", async () => {
+    const fixture = mountActions(createWorkerFactory(() => undefined));
+    await fixture.actions.importXlsx(file(25 * 1024 * 1024 + 1));
+    expect(fixture.actions.feedback.value?.error).toBe(true);
+    expect(fixture.actions.report.value?.issues).toHaveLength(1);
+
+    fixture.actions.dismissFeedback();
+    expect(fixture.actions.feedback.value).toBeUndefined();
+    expect(fixture.actions.report.value).toBeUndefined();
+    expect(fixture.replaceDocument).not.toHaveBeenCalled();
+    expect(fixture.download).not.toHaveBeenCalled();
     fixture.scope.stop();
   });
 

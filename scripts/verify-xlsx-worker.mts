@@ -72,6 +72,17 @@ function createFixtureSnapshot(): WorkbookSnapshot {
     },
   );
   setCellStyle(sheet, { row: 3, column: 3 }, { bold: true, fillColor: "#88CCEE" });
+  setCellStyle(
+    sheet,
+    { row: 0, column: 2 },
+    {
+      numberFormat: { kind: "currency", currency: "CNY", fractionDigits: 2 },
+      borderTop: { style: "thin", color: "#112233" },
+      borderRight: { style: "medium", color: "#223344" },
+      borderBottom: { style: "dashed", color: "#334455" },
+      borderLeft: { style: "double", color: "#445566" },
+    },
+  );
   setRowHeight(sheet, 8, 42);
   setSheetMetadata(sheet, {
     freezePanes: { rows: 1, columns: 0 },
@@ -104,6 +115,22 @@ function assertFixture(snapshot: WorkbookSnapshot): void {
     sheet.mergedCells.length !== 1
   ) {
     throw new Error("XLSX worker did not preserve the styled blank or sheet geometry metadata.");
+  }
+  const style = getCellStyle(sheet, { row: 0, column: 2 });
+  if (
+    style?.numberFormat?.kind !== "currency" ||
+    style.numberFormat.currency !== "CNY" ||
+    style.numberFormat.fractionDigits !== 2 ||
+    style.borderTop?.style !== "thin" ||
+    style.borderTop.color !== "#112233" ||
+    style.borderRight?.style !== "medium" ||
+    style.borderRight.color !== "#223344" ||
+    style.borderBottom?.style !== "dashed" ||
+    style.borderBottom.color !== "#334455" ||
+    style.borderLeft?.style !== "double" ||
+    style.borderLeft.color !== "#445566"
+  ) {
+    throw new Error("XLSX worker did not preserve currency formatting and four-sided borders.");
   }
 }
 
@@ -199,6 +226,9 @@ async function main(): Promise<void> {
         await postWorker(worker, { id: "encode", type: "encode", snapshot }),
         "encode",
       );
+      if (encoded.report.issues.length !== 0) {
+        throw new Error("Supported XLSX fixture must export without compatibility losses.");
+      }
       if (JSON.stringify(snapshot) !== originalSnapshot) {
         throw new Error("XLSX Worker mutated the source snapshot during encoding.");
       }

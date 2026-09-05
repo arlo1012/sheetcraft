@@ -4,9 +4,10 @@ export const zhCN = {
   xlsx: {
     actions: { import: "导入 XLSX", export: "导出 XLSX", selectFile: "选择 XLSX 工作簿" },
     feedback: {
+      errorTitle: "XLSX 操作未能完成",
       imported: "已导入 XLSX，撤销历史从此文件重新开始。",
       exported: "已开始下载 XLSX 文件，当前文档和原文件均未被修改。",
-      failed: "XLSX 操作失败，请查看兼容性报告；当前文档仍保留在页面中。",
+      failed: "XLSX 操作失败，当前文档仍保留在页面中。如有下列详细信息，请查看后重试。",
       timeout: "XLSX 处理超时，已停止处理，当前文档未被替换。",
       finishEditing: "请先完成当前输入法组词，再导入或导出 XLSX。",
       stale: "读取文件期间文档发生了变化，本次导入已取消，请重新选择文件。",
@@ -22,6 +23,7 @@ export const zhCN = {
         "下列内容可能被转换或省略。导出会创建新文件，不修改当前文档；如需完整备份，请使用 JSON 导出。",
       exportConfirm: "接受差异并下载",
       cancel: "取消",
+      close: "关闭",
     },
     report: {
       title: "XLSX 兼容性报告",
@@ -38,12 +40,13 @@ export const zhCN = {
         drawingOrMedia: "暂不支持导入含绘图或媒体的 XLSX",
         externalContent: "暂不支持外部链接或外部内容",
         formulaCacheDiscarded: "已舍弃文件中的旧公式计算缓存",
-        formulaNotCalculated: "公式原文保留；本版仅计算已实现的函数，导出不携带计算缓存",
+        formulaNotCalculated:
+          "公式原文保留，但本版无法提供可靠的计算结果，请用 Excel 打开后重新计算",
         filterOmitted: "筛选条件未保留",
         imageOmitted: "图片未包含在导出文件中",
         styleOmitted: "部分样式未保留",
         numberFormatOmitted: "不支持的数字格式未保留",
-        dimensionApproximated: "行高或列宽进行了单位换算，可能存在显示差异",
+        dimensionApproximated: "行高或列宽经过换算或调整，可能存在显示差异",
         dateNormalized: "日期已按工作簿日期系统转换为数值",
         cellValueOmitted: "不支持的单元格内容未保留",
         featureOmitted: "本版不支持的工作簿功能未保留",
