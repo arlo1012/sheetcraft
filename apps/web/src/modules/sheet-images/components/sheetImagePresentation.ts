@@ -9,6 +9,7 @@ export type SheetImagePresentation = {
   height: number;
   viewBox: string;
   rotationTransform?: string;
+  flipTransform?: string;
 };
 
 export function getSheetImagePresentation(
@@ -19,6 +20,8 @@ export function getSheetImagePresentation(
   const normalized = normalizeImageTransform(transform);
   const crop = normalized?.crop ?? { x: 0, y: 0, width: 1, height: 1 };
   const rotation = normalized?.rotation ?? 0;
+  const flipHorizontal = Boolean(normalized?.flipHorizontal);
+  const flipVertical = Boolean(normalized?.flipVertical);
   const cropWidth = naturalWidth * crop.width;
   const cropHeight = naturalHeight * crop.height;
   const rotated = rotation === 90 || rotation === 270;
@@ -30,6 +33,14 @@ export function getSheetImagePresentation(
         : rotation === 270
           ? `translate(0 ${cropWidth}) rotate(270)`
           : undefined;
+  const flipTransform =
+    flipHorizontal && flipVertical
+      ? `translate(${cropWidth} ${cropHeight}) scale(-1 -1)`
+      : flipHorizontal
+        ? `translate(${cropWidth} 0) scale(-1 1)`
+        : flipVertical
+          ? `translate(0 ${cropHeight}) scale(1 -1)`
+          : undefined;
   return {
     cropX: naturalWidth * crop.x,
     cropY: naturalHeight * crop.y,
@@ -39,6 +50,7 @@ export function getSheetImagePresentation(
     height: rotated ? cropWidth : cropHeight,
     viewBox: rotated ? `0 0 ${cropHeight} ${cropWidth}` : `0 0 ${cropWidth} ${cropHeight}`,
     rotationTransform,
+    flipTransform,
   };
 }
 
@@ -68,10 +80,13 @@ export function createSheetImagePresentationSvg(
   naturalHeight: number,
 ): string {
   const presentation = getSheetImagePresentation(transform, naturalWidth, naturalHeight);
-  const transformAttribute = presentation.rotationTransform
+  const rotationAttribute = presentation.rotationTransform
     ? ` transform="${presentation.rotationTransform}"`
     : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${presentation.width}" height="${presentation.height}" viewBox="${presentation.viewBox}"><defs><clipPath id="crop"><rect width="${presentation.cropWidth}" height="${presentation.cropHeight}"/></clipPath></defs><g${transformAttribute}><g clip-path="url(#crop)"><image href="${escapeAttribute(source)}" x="${-presentation.cropX}" y="${-presentation.cropY}" width="${naturalWidth}" height="${naturalHeight}" preserveAspectRatio="none"/></g></g></svg>`;
+  const flipAttribute = presentation.flipTransform
+    ? ` transform="${presentation.flipTransform}"`
+    : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${presentation.width}" height="${presentation.height}" viewBox="${presentation.viewBox}"><defs><clipPath id="crop"><rect width="${presentation.cropWidth}" height="${presentation.cropHeight}"/></clipPath></defs><g${rotationAttribute}><g${flipAttribute}><g clip-path="url(#crop)"><image href="${escapeAttribute(source)}" x="${-presentation.cropX}" y="${-presentation.cropY}" width="${naturalWidth}" height="${naturalHeight}" preserveAspectRatio="none"/></g></g></g></svg>`;
 }
 
 export function createSheetImagePresentationBlobUrl(

@@ -285,6 +285,8 @@ export const enUS = {
     rotateLeft: "Rotate left 90°",
     rotateRight: "Rotate right 90°",
     rotateHalf: "Rotate 180°",
+    flipVertical: "Flip vertical",
+    flipHorizontal: "Flip horizontal",
     restoreOriginal: "Restore original",
     applyCrop: "Apply crop",
     cancelCrop: "Cancel crop",

@@ -185,12 +185,17 @@ describe("sheet images", () => {
     legacyV4.version = 4 as never;
     delete legacyV4.sheets[0]?.floatingImages[0]?.transform;
     const migrated = serializeWorkbook(deserializeWorkbook(legacyV4));
-    expect(migrated.version).toBe(5);
+    expect(migrated.version).toBe(6);
     expect(migrated.sheets[0]?.floatingImages[0]?.transform).toBeUndefined();
+    const v5WithFlips = structuredClone(serializeWorkbook(session.workbook));
+    v5WithFlips.version = 5 as never;
+    expect(
+      serializeWorkbook(deserializeWorkbook(v5WithFlips)).sheets[0]?.floatingImages[0]?.transform,
+    ).toEqual(transform);
     expect(() =>
       createSetFloatingImageCommand(sheet.id, {
         ...image,
-        transform: { rotation: 45 as never },
+        transform: { flipHorizontal: "yes" as never },
       }),
     ).toThrow();
   });
@@ -386,7 +391,7 @@ describe("sheet images", () => {
       ),
     );
     const snapshot = serializeWorkbook(session.workbook);
-    expect(snapshot.version).toBe(5);
+    expect(snapshot.version).toBe(6);
     expect(JSON.stringify(snapshot)).not.toContain("data:");
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
   });
@@ -492,7 +497,7 @@ describe("sheet images", () => {
     applyWorkbookCommand(workbook, createSetFloatingImageCommand(sheet.id, image));
 
     expect(serializeWorkbook(workbook)).toMatchObject({
-      version: 5,
+      version: 6,
       dateSystem: "1904",
       sheets: [
         {

@@ -93,10 +93,16 @@ export type WorkbookSnapshotV5 = Omit<WorkbookSnapshotV4, "version" | "sheets"> 
   version: 5;
   sheets: SheetSnapshotV5[];
 };
-/** Current write format. V1 through V4 types remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV5;
-export type SheetSnapshot = SheetSnapshotV5;
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5;
+export type CellSnapshotV6 = CellSnapshotV5;
+export type SheetSnapshotV6 = Omit<SheetSnapshotV5, "cells"> & { cells: CellSnapshotV6[] };
+export type WorkbookSnapshotV6 = Omit<WorkbookSnapshotV5, "version" | "sheets"> & {
+  version: 6;
+  sheets: SheetSnapshotV6[];
+};
+/** Current write format. V1 through V5 types remain available for migration inputs. */
+export type WorkbookSnapshot = WorkbookSnapshotV6;
+export type SheetSnapshot = SheetSnapshotV6;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -414,7 +420,7 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     );
     if (hasValue && hasContent)
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
-    version = hasValue ? 1 : Object.hasOwn(record, "floatingImages") ? 5 : 3;
+    version = hasValue ? 1 : Object.hasOwn(record, "floatingImages") ? 6 : 3;
   }
   const id = asIdentifier(record.id, `${path}.id`);
   let name: string;
@@ -450,7 +456,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 5,
+    version: 6,
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
     activeSheetId: workbook.activeSheetId,
@@ -465,7 +471,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 2 &&
     record.version !== 3 &&
     record.version !== 4 &&
-    record.version !== 5
+    record.version !== 5 &&
+    record.version !== 6
   ) {
     throw new WorkbookDomainError(
       {

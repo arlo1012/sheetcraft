@@ -4,6 +4,7 @@ import {
   normalizeImageTransform,
   type FloatingImage,
   type ImageCrop,
+  type ImageTransform,
 } from "@idea10/core/workbook";
 import type { SheetViewportLayout } from "./viewport-layout.js";
 import {
@@ -100,13 +101,9 @@ function fitImageSize(width: number, height: number): FloatingImageOriginalSize 
 
 function withTransform(
   image: FloatingImage,
-  crop: ImageCrop | undefined,
-  rotation: number | undefined,
+  requestedTransform: ImageTransform | undefined,
 ): FloatingImage {
-  const transform = normalizeImageTransform({
-    ...(crop ? { crop } : {}),
-    ...(rotation ? { rotation: rotation as 90 | 180 | 270 } : {}),
-  });
+  const transform = normalizeImageTransform(requestedTransform);
   const { transform: _previousTransform, ...fields } = image;
   return { ...fields, ...(transform ? { transform } : {}) };
 }
@@ -120,7 +117,12 @@ export function cropFloatingImage(
   if (!rect) return null;
   const displayed = normalizeSelection(selection);
   const existing = image.transform?.crop ?? fullCrop();
-  const source = inverseRotateCrop(displayed, image.transform?.rotation);
+  const unrotated = inverseRotateCrop(displayed, image.transform?.rotation);
+  const source = {
+    ...unrotated,
+    x: image.transform?.flipHorizontal ? 1 - unrotated.x - unrotated.width : unrotated.x,
+    y: image.transform?.flipVertical ? 1 - unrotated.y - unrotated.height : unrotated.y,
+  };
   const crop = clampCrop({
     x: existing.x + source.x * existing.width,
     y: existing.y + source.y * existing.height,
@@ -128,7 +130,7 @@ export function cropFloatingImage(
     height: source.height * existing.height,
   });
   return reanchorFloatingImageAtSheetRect(
-    withTransform(image, crop, image.transform?.rotation),
+    withTransform(image, { ...image.transform, crop }),
     {
       x: rect.x + displayed.x * rect.width,
       y: rect.y + displayed.y * rect.height,
@@ -151,7 +153,7 @@ export function rotateFloatingImage(
   const width = swapsBounds ? rect.height : rect.width;
   const height = swapsBounds ? rect.width : rect.height;
   return reanchorFloatingImageAtSheetRect(
-    withTransform(image, image.transform?.crop, rotation),
+    withTransform(image, { ...image.transform, rotation: rotation as ImageTransform["rotation"] }),
     {
       x: rect.x + (rect.width - width) / 2,
       y: rect.y + (rect.height - height) / 2,
@@ -160,6 +162,17 @@ export function rotateFloatingImage(
     },
     layout,
   );
+}
+
+export type ImageFlipAxis = "horizontal" | "vertical";
+
+/** Mirrors the current displayed image while preserving its frame and original source. */
+export function flipFloatingImage(image: FloatingImage, axis: ImageFlipAxis): FloatingImage {
+  // Metadata describes source axes before rotation. A quarter-turn exchanges
+  // those axes relative to the horizontal and vertical directions on screen.
+  const horizontalSourceAxis = (axis === "horizontal") !== isQuarterTurn(image.transform?.rotation);
+  const field = horizontalSourceAxis ? "flipHorizontal" : "flipVertical";
+  return withTransform(image, { ...image.transform, [field]: !image.transform?.[field] });
 }
 
 export function restoreFloatingImage(
@@ -181,7 +194,7 @@ export function restoreFloatingImage(
   const width = fitted.width;
   const height = fitted.height;
   return reanchorFloatingImageAtSheetRect(
-    withTransform(image, undefined, undefined),
+    withTransform(image, undefined),
     {
       x: rect.x + (rect.width - width) / 2,
       y: rect.y + (rect.height - height) / 2,

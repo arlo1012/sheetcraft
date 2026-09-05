@@ -48,16 +48,18 @@ function onSourceLoad(event: Event): void {
       </clipPath>
     </defs>
     <g :transform="presentation.rotationTransform">
-      <g :clip-path="`url(#${clipPathId})`">
-        <image
-          :href="src"
-          :x="-presentation.cropX"
-          :y="-presentation.cropY"
-          :width="naturalWidth"
-          :height="naturalHeight"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        />
+      <g :transform="presentation.flipTransform">
+        <g :clip-path="`url(#${clipPathId})`">
+          <image
+            :href="src"
+            :x="-presentation.cropX"
+            :y="-presentation.cropY"
+            :width="naturalWidth"
+            :height="naturalHeight"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          />
+        </g>
       </g>
     </g>
   </svg>

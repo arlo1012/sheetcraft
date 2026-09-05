@@ -282,6 +282,8 @@ export const zhCN = {
     rotateLeft: "向左旋转 90°",
     rotateRight: "向右旋转 90°",
     rotateHalf: "旋转 180°",
+    flipVertical: "垂直翻转",
+    flipHorizontal: "水平翻转",
     restoreOriginal: "还原原图",
     applyCrop: "应用裁剪",
     cancelCrop: "取消裁剪",

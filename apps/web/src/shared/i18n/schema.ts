@@ -279,6 +279,8 @@ export type MessageSchema = {
     rotateLeft: string;
     rotateRight: string;
     rotateHalf: string;
+    flipVertical: string;
+    flipHorizontal: string;
     restoreOriginal: string;
     applyCrop: string;
     cancelCrop: string;

@@ -21,7 +21,14 @@ const emit = defineEmits<{ close: [] }>();
 const { t } = useAppI18n();
 const viewerReady = ref(false);
 const presentationUrl = ref<string>();
-const hasTransform = computed(() => Boolean(props.transform?.crop || props.transform?.rotation));
+const hasTransform = computed(() =>
+  Boolean(
+    props.transform?.crop ||
+    props.transform?.rotation ||
+    props.transform?.flipHorizontal ||
+    props.transform?.flipVertical,
+  ),
+);
 const viewerSource = computed(() => (hasTransform.value ? presentationUrl.value : props.src));
 const presentationGeneration = ref(0);
 

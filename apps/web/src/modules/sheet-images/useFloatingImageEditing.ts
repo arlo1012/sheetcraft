@@ -2,6 +2,8 @@ import { computed, nextTick, shallowRef, type Ref } from "vue";
 import type { FloatingImage, ImageCrop } from "@idea10/core/workbook";
 import {
   cropFloatingImage,
+  flipFloatingImage,
+  type ImageFlipAxis,
   rotateFloatingImage,
   restoreFloatingImage,
 } from "@idea10/sheet-engine/floating-image-transform";
@@ -84,6 +86,12 @@ export function useFloatingImageEditing(options: {
     if (next) options.update(next);
     focusSelectedImage();
   }
+  function flipImage(axis: ImageFlipAxis): void {
+    const image = options.getImage();
+    if (!image) return;
+    options.update(flipFloatingImage(image, axis));
+    focusSelectedImage();
+  }
   function restoreImage(): void {
     const image = options.getImage();
     if (!image) return;
@@ -137,6 +145,7 @@ export function useFloatingImageEditing(options: {
     cancelCrop,
     applyCrop,
     rotateImage,
+    flipImage,
     restoreImage,
     startCropGesture,
     moveCropGesture,

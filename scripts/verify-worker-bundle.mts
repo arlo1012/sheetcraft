@@ -131,8 +131,8 @@ function assertRoundTripResult(
     throw new Error("Worker did not preserve and evaluate the formula cell.");
   }
   const snapshot = result.snapshot as { version?: unknown; dateSystem?: unknown } | null;
-  if (!snapshot || snapshot.version !== 5 || snapshot.dateSystem !== "1900") {
-    throw new Error("Worker did not return a V5 workbook snapshot with an explicit date system.");
+  if (!snapshot || snapshot.version !== 6 || snapshot.dateSystem !== "1900") {
+    throw new Error("Worker did not return a V6 workbook snapshot with an explicit date system.");
   }
   const restoredWorkbook = deserializeWorkbook(result.snapshot);
   const restoredSheet = getActiveSheet(restoredWorkbook);

@@ -2,6 +2,10 @@ export type ImageCrop = { x: number; y: number; width: number; height: number };
 export type ImageTransform = {
   crop?: ImageCrop;
   rotation?: 0 | 90 | 180 | 270;
+  /** Mirror the cropped source horizontally before applying rotation. */
+  flipHorizontal?: boolean;
+  /** Mirror the cropped source vertically before applying rotation. */
+  flipVertical?: boolean;
 };
 
 function isFullCrop(crop: ImageCrop): boolean {
@@ -50,8 +54,19 @@ export function normalizeImageTransform(
   ) {
     throw new TypeError("Image rotation must be 0, 90, 180, or 270 degrees.");
   }
-  return crop || rotation
-    ? { ...(crop ? { crop } : {}), ...(rotation ? { rotation } : {}) }
+  if (transform.flipHorizontal !== undefined && typeof transform.flipHorizontal !== "boolean") {
+    throw new TypeError("Image horizontal flip must be a boolean.");
+  }
+  if (transform.flipVertical !== undefined && typeof transform.flipVertical !== "boolean") {
+    throw new TypeError("Image vertical flip must be a boolean.");
+  }
+  return crop || rotation || transform.flipHorizontal || transform.flipVertical
+    ? {
+        ...(crop ? { crop } : {}),
+        ...(rotation ? { rotation } : {}),
+        ...(transform.flipHorizontal ? { flipHorizontal: true } : {}),
+        ...(transform.flipVertical ? { flipVertical: true } : {}),
+      }
     : undefined;
 }
 
@@ -75,6 +90,8 @@ export function areImageTransformsEqual(
   const b = normalizeImageTransform(right);
   return (
     a?.rotation === b?.rotation &&
+    a?.flipHorizontal === b?.flipHorizontal &&
+    a?.flipVertical === b?.flipVertical &&
     a?.crop?.x === b?.crop?.x &&
     a?.crop?.y === b?.crop?.y &&
     a?.crop?.width === b?.crop?.width &&

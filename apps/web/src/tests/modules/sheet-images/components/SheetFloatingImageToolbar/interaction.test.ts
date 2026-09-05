@@ -55,7 +55,7 @@ describe("SheetFloatingImageToolbar", () => {
     expect((controls[2]!.element as HTMLButtonElement).disabled).toBe(true);
   });
 
-  test("opens keyboard-accessible rotation choices and restores focus after selection", async () => {
+  test("orders rotation then flip choices and restores focus after keyboard selection", async () => {
     const wrapper = mountToolbar({ canRestore: true });
     const trigger = toolbar().get('[data-floating-image-toolbar-action="rotate"]');
     (trigger.element as HTMLElement).focus();
@@ -66,9 +66,32 @@ describe("SheetFloatingImageToolbar", () => {
     expect(document.activeElement).toBe(
       rotateMenu().get('[data-floating-image-rotate="left"]').element,
     );
-    await rotateMenu().get('[data-floating-image-rotate="half"]').trigger("click");
+    expect(
+      rotateMenu()
+        .findAll("[role=menuitem]")
+        .map(
+          (item) =>
+            item.attributes("data-floating-image-rotate") ??
+            item.attributes("data-floating-image-flip"),
+        ),
+    ).toEqual(["left", "right", "half", "vertical", "horizontal"]);
+    await rotateMenu().get('[data-floating-image-flip="vertical"]').trigger("keydown", {
+      key: "Enter",
+    });
+    await nextTick();
 
-    expect(wrapper.emitted("rotate")).toEqual([[2]]);
+    expect(wrapper.emitted("flip")).toEqual([["vertical"]]);
+    expect(document.body.querySelector(".sheet-floating-image-toolbar__rotate-menu")).toBeNull();
+    expect(document.activeElement).toBe(trigger.element);
+
+    await trigger.trigger("keydown", { key: "ArrowUp" });
+    await nextTick();
+    const horizontal = rotateMenu().get('[data-floating-image-flip="horizontal"]');
+    expect(document.activeElement).toBe(horizontal.element);
+    await horizontal.trigger("keydown", { key: "Enter" });
+    await nextTick();
+    expect(wrapper.emitted("flip")).toEqual([["vertical"], ["horizontal"]]);
+    expect(document.body.querySelector(".sheet-floating-image-toolbar__rotate-menu")).toBeNull();
     expect(document.activeElement).toBe(trigger.element);
   });
 

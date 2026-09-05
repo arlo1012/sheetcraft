@@ -54,7 +54,11 @@ function mountPreview(
   props?: Partial<{
     src: string;
     altText: string;
-    transform: { rotation?: 0 | 90 | 180 | 270 };
+    transform: {
+      rotation?: 0 | 90 | 180 | 270;
+      flipHorizontal?: boolean;
+      flipVertical?: boolean;
+    };
     visible: boolean;
   }>,
 ) {
@@ -105,7 +109,7 @@ describe("SheetImagePreview", () => {
   });
 
   test("keeps the viewer controls when it previews an edited image", async () => {
-    const wrapper = mountPreview({ transform: { rotation: 90 } });
+    const wrapper = mountPreview({ transform: { flipHorizontal: true } });
     await flushPromises();
     expect(wrapper.find("[data-image-viewer]").exists()).toBe(false);
     const probe = wrapper.get(".sheet-image-preview__probe");

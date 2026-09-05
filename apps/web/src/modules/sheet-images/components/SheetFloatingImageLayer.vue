@@ -105,6 +105,7 @@ const {
   cancelCrop,
   applyCrop,
   rotateImage,
+  flipImage,
   restoreImage,
   startCropGesture,
   moveCropGesture,
@@ -534,6 +535,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       :disabled="!assetUrls.has(selectedImage.assetId)"
       @crop="startCrop"
       @rotate="rotateImage"
+      @flip="flipImage"
       @restore="restoreImage"
       @apply-crop="applyCrop"
       @cancel-crop="cancelCrop"

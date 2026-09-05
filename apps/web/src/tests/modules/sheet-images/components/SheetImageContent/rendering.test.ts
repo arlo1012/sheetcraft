@@ -86,4 +86,45 @@ describe("SheetImageContent", () => {
       ),
     ).toContain('width="80" height="240" viewBox="0 0 80 240"');
   });
+
+  test.each([
+    [{ flipHorizontal: true }, "translate(500 0) scale(-1 1)"],
+    [{ flipVertical: true }, "translate(0 400) scale(1 -1)"],
+    [{ flipHorizontal: true, flipVertical: true }, "translate(500 400) scale(-1 -1)"],
+  ] as const)("mirrors the cropped source before rotation for %o", async (flip, expected) => {
+    const wrapper = mount(SheetImageContent, {
+      props: {
+        src: "blob:source",
+        altText: "Diagram",
+        transform: { crop: { x: 0.1, y: 0.2, width: 0.5, height: 0.5 }, rotation: 90, ...flip },
+      },
+    });
+    const probe = wrapper.get(".sheet-image-content__probe");
+    Object.defineProperties(probe.element, {
+      naturalWidth: { value: 1000 },
+      naturalHeight: { value: 800 },
+    });
+    await probe.trigger("load");
+
+    expect(wrapper.get("svg > g").attributes("transform")).toBe("translate(400 0) rotate(90)");
+    expect(wrapper.get("svg > g > g").attributes("transform")).toBe(expected);
+  });
+
+  test("writes the same flip-then-rotate order for the preview SVG", () => {
+    expect(
+      createSheetImagePresentationSvg(
+        "data:image/png;base64,AA==",
+        {
+          crop: { x: 0.1, y: 0.2, width: 0.5, height: 0.5 },
+          rotation: 270,
+          flipHorizontal: true,
+          flipVertical: true,
+        },
+        1000,
+        800,
+      ),
+    ).toContain(
+      '<g transform="translate(0 500) rotate(270)"><g transform="translate(500 400) scale(-1 -1)">',
+    );
+  });
 });

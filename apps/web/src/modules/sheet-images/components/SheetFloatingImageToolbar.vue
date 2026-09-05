@@ -22,6 +22,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   crop: [];
   rotate: [quarterTurns: -1 | 1 | 2];
+  flip: [axis: "vertical" | "horizontal"];
   restore: [];
   applyCrop: [];
   cancelCrop: [];
@@ -86,6 +87,11 @@ function onRotateTriggerKeydown(event: KeyboardEvent): void {
 function rotate(quarterTurns: -1 | 1 | 2): void {
   dismissRotateMenu("programmatic", true);
   emit("rotate", quarterTurns);
+}
+
+function flip(axis: "vertical" | "horizontal"): void {
+  dismissRotateMenu("programmatic", true);
+  emit("flip", axis);
 }
 
 function onRotateMenuKeydown(event: KeyboardEvent): void {
@@ -204,6 +210,12 @@ watch(
       </MenuItem>
       <MenuItem data-floating-image-rotate="half" @select="rotate(2)">
         {{ t("image.rotateHalf") }}
+      </MenuItem>
+      <MenuItem data-floating-image-flip="vertical" @select="flip('vertical')">
+        {{ t("image.flipVertical") }}
+      </MenuItem>
+      <MenuItem data-floating-image-flip="horizontal" @select="flip('horizontal')">
+        {{ t("image.flipHorizontal") }}
       </MenuItem>
     </MenuSurface>
   </Teleport>
