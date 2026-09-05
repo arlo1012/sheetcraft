@@ -156,8 +156,18 @@ const visibleRows = computed<VisibleRow[]>(() => {
             }));
           if (cells.length === 0) return null;
           const clip = props.layout.panes[paneId].clip;
+          const editorCell = props.editing
+            ? cells.find(
+                ({ address }) =>
+                  address.row === props.activeCell.row &&
+                  address.column === props.activeCell.column,
+              )
+            : undefined;
+          // Preserve the outward editor border when it meets a frozen pane edge.
+          const leftInset = editorCell?.rect.x === clip.x ? -1 : 0;
+          const borderTopInset = editorCell?.rect.y === clip.y ? -1 : 0;
           // Clip to the pane so the editor can extend beyond its owning row.
-          const topInset = clip.y - row.offset;
+          const topInset = clip.y - row.offset + borderTopInset;
           const bottomInset = row.offset + row.height - clip.y - clip.height;
           return {
             paneId,
@@ -167,7 +177,7 @@ const visibleRows = computed<VisibleRow[]>(() => {
               top: "0px",
               width: `${clip.width}px`,
               height: `${row.height}px`,
-              clipPath: `inset(${topInset}px 0 ${bottomInset}px)`,
+              clipPath: `inset(${topInset}px 0 ${bottomInset}px ${leftInset}px)`,
             },
           };
         })

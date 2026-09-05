@@ -4,6 +4,44 @@ import { getCellValue } from "@idea10/core/workbook";
 import { mountSheetGrid } from "./fixture";
 
 describe("cell editor geometry", () => {
+  test.each([
+    { edge: "column", freeze: { rows: 0, columns: 2 }, row: 3, column: 2 },
+    { edge: "row", freeze: { rows: 2, columns: 0 }, row: 2, column: 3 },
+    { edge: "row and column", freeze: { rows: 2, columns: 2 }, row: 2, column: 2 },
+  ])(
+    "keeps the editor border inside its clip at a frozen $edge edge",
+    async ({ freeze, row, column }) => {
+      const { wrapper } = mountSheetGrid({
+        beforeMount(sheet) {
+          sheet.freezePanes = freeze;
+        },
+      });
+      const cell = wrapper.get<HTMLElement>(`[data-row="${row}"][data-column="${column}"]`);
+      const pane = cell.element.parentElement as HTMLElement;
+      const initialClip = pane.style.clipPath;
+
+      await cell.trigger("dblclick", { button: 0 });
+      await nextTick();
+      const frame = wrapper.get<HTMLElement>("[data-cell-editor-frame]").element;
+      const insets = pane.style.clipPath
+        .replace(/^inset\(|\)$/gu, "")
+        .split(/\s+/u)
+        .map(Number.parseFloat);
+      const clipTop = insets[0] ?? 0;
+      const clipLeft = insets[3] ?? insets[1] ?? 0;
+      const frameTop =
+        Number.parseFloat(cell.element.style.top) + Number.parseFloat(frame.style.top);
+      const frameLeft =
+        Number.parseFloat(cell.element.style.left) + Number.parseFloat(frame.style.left);
+
+      expect(frameTop).toBeGreaterThanOrEqual(clipTop);
+      expect(frameLeft).toBeGreaterThanOrEqual(clipLeft);
+
+      await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Escape" });
+      expect(pane.style.clipPath).toBe(initialClip);
+    },
+  );
+
   test("keeps a fitting editor aligned with the selected cell without extra trailing width", async () => {
     const { wrapper } = mountSheetGrid();
     await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
