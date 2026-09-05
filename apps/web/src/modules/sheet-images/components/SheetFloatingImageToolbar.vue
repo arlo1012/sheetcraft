@@ -215,6 +215,7 @@ watch(
   z-index: 90;
   display: inline-flex;
   align-items: center;
+  gap: 8px;
   min-height: 30px;
   padding: 2px;
   background: var(--idea-surface-panel);
@@ -223,6 +224,7 @@ watch(
   box-shadow: var(--idea-shadow-menu);
 
   &__action {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -234,6 +236,18 @@ watch(
     border-radius: 2px;
     color: var(--idea-text-primary);
     cursor: pointer;
+
+    &:not(:last-child)::after {
+      position: absolute;
+      top: 50%;
+      right: -5px;
+      width: 1px;
+      height: 14px;
+      background: var(--idea-border-strong);
+      transform: translateY(-50%);
+      pointer-events: none;
+      content: "";
+    }
 
     &:hover:not(:disabled) {
       background: var(--idea-surface-hover);
