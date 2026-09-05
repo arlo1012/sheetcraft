@@ -91,7 +91,7 @@ function canResize(fragment: ImageFragment): boolean {
 }
 
 function getAccessibleLabel(image: FloatingImage): string {
-  if (props.assetUrls.has(image.assetId)) return image.altText;
+  if (props.assetUrls.has(image.assetId)) return image.altText || t("image.floatingAlt");
   return props.loadingAssetIds?.has(image.assetId)
     ? t("image.loading")
     : t("image.assetUnavailable");
@@ -248,7 +248,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
         v-if="assetUrls.get(fragment.image.assetId)"
         class="sheet-floating-image-layer__image"
         :src="assetUrls.get(fragment.image.assetId)"
-        :alt="fragment.image.altText"
+        :alt="fragment.image.altText || t('image.floatingAlt')"
         :style="getImageStyle(fragment)"
         draggable="false"
       />
@@ -327,15 +327,15 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
 
   &__placeholder {
     border: 1px solid color-mix(in srgb, var(--idea-text-secondary) 50%, transparent);
-    background: color-mix(in srgb, var(--idea-surface-base) 80%, var(--idea-text-secondary));
+    background: color-mix(in srgb, var(--idea-surface-panel) 80%, var(--idea-text-secondary));
 
     &.is-loading {
       background: repeating-linear-gradient(
         -45deg,
-        color-mix(in srgb, var(--idea-surface-base) 84%, var(--idea-text-secondary)),
-        color-mix(in srgb, var(--idea-surface-base) 84%, var(--idea-text-secondary)) 8px,
-        color-mix(in srgb, var(--idea-surface-base) 94%, var(--idea-text-secondary)) 8px,
-        color-mix(in srgb, var(--idea-surface-base) 94%, var(--idea-text-secondary)) 16px
+        color-mix(in srgb, var(--idea-surface-panel) 84%, var(--idea-text-secondary)),
+        color-mix(in srgb, var(--idea-surface-panel) 84%, var(--idea-text-secondary)) 8px,
+        color-mix(in srgb, var(--idea-surface-panel) 94%, var(--idea-text-secondary)) 8px,
+        color-mix(in srgb, var(--idea-surface-panel) 94%, var(--idea-text-secondary)) 16px
       );
     }
 

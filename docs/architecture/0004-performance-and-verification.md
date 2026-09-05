@@ -43,6 +43,14 @@ small headroom at 315/86 KB app JavaScript, 815/242 KB total JavaScript, and
 220 KB total CSS; the existing CSS gzip limit stays unchanged. No dependency
 was added, and both entry and total-asset checks remain enabled.
 
+Cell/floating images and the formula foundation recalibrate the same gates after
+an inspected production build: 340,150 B app JavaScript (93,695 B gzip),
+825,663 B total JavaScript (243,916 B gzip), 75,800 B app CSS and 216,937 B total
+CSS (27,073 B gzip). Limits are 350/97 KB app JavaScript, 850/252 KB total
+JavaScript, 78/12 KB app CSS, and 220/28 KB total CSS. Image asset validation,
+portable bundles, rendering and gestures add product code without new runtime
+dependencies; entry and total gates both remain active.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

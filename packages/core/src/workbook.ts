@@ -1,7 +1,10 @@
 import { evaluateFormula } from "./formula/evaluate.js";
+import { normalizeExcelDateSystem, type ExcelDateSystem } from "./formula/date-system.js";
 import { collectFormulaRanges, collectFormulaReferences } from "./formula/references.js";
 import {
   createFormulaError,
+  isFormulaError,
+  isFormulaErrorCode,
   type CellContent,
   type FormulaErrorCode,
   type FormulaValue,
@@ -116,6 +119,8 @@ export type SheetSparseState = {
 
 export type Workbook = {
   id: string;
+  /** Interpretation of date serials; cell numbers are not converted when this changes. */
+  dateSystem: ExcelDateSystem;
   sheets: Map<string, Sheet>;
   activeSheetId: string;
 };
@@ -156,6 +161,7 @@ export function createWorkbook(options?: {
   sheetId?: string;
   sheetName?: string;
   idFactory?: IdFactory;
+  dateSystem?: ExcelDateSystem;
 }): Workbook {
   const idFactory = options?.idFactory;
   if (!options?.id && !idFactory) {
@@ -165,6 +171,7 @@ export function createWorkbook(options?: {
 
   return {
     id: options?.id ?? createRequiredId("workbook", idFactory),
+    dateSystem: normalizeExcelDateSystem(options?.dateSystem ?? "1900"),
     sheets: new Map([[sheet.id, sheet]]),
     activeSheetId: sheet.id,
   };
@@ -371,6 +378,7 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
     const content = sheet.cells.get(key)?.content;
     if (!content) return null;
     if (content.kind === "literal") return content.value;
+    if (content.kind === "error") return createFormulaError(content.error.code);
     if (content.kind === "image") return createFormulaError("VALUE");
     return memo.get(key) ?? createFormulaError("CYCLE");
   };
@@ -554,25 +562,16 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
   if (content === null || content === undefined) return undefined;
   if (content.kind === "literal") {
     const value = content.value;
-    if (
-      value === "" ||
-      (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
-    ) {
-      throw new TypeError(
-        "Literal cell content must be a non-empty string, finite number, or boolean.",
-      );
+    if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+      throw new TypeError("Literal cell content must be a string, finite number, or boolean.");
     }
     if (typeof value === "number" && !Number.isFinite(value)) {
       throw new TypeError("Literal cell content numbers must be finite.");
     }
     return { kind: "literal", value };
   }
-  if (
-    content.kind === "formula" &&
-    typeof content.formula?.source === "string" &&
-    content.formula.source.startsWith("=")
-  ) {
-    return { kind: "formula", formula: { source: content.formula.source } };
+  if (content.kind === "error" && isFormulaError(content.error)) {
+    return { kind: "error", error: createFormulaError(content.error.code) };
   }
   if (
     content.kind === "image" &&
@@ -585,10 +584,20 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
       image: { assetId: content.image.assetId, altText: content.image.altText },
     };
   }
-  throw new TypeError("Cell content must be a valid literal, formula, or image.");
+  if (
+    content.kind === "formula" &&
+    typeof content.formula?.source === "string" &&
+    content.formula.source.startsWith("=")
+  ) {
+    return { kind: "formula", formula: { source: content.formula.source } };
+  }
+  throw new TypeError("Invalid cell content or formula source.");
 }
 
 export function cloneCellContent(content: CellContent): CellContent {
+  if (content.kind === "error") {
+    return { kind: "error", error: createFormulaError(content.error.code) };
+  }
   if (content.kind === "literal") return { kind: "literal", value: content.value };
   if (content.kind === "formula")
     return { kind: "formula", formula: { source: content.formula.source } };
@@ -604,14 +613,16 @@ function areCellContentsEqual(
     left.kind === right.kind &&
     (left.kind === "literal" && right.kind === "literal"
       ? Object.is(left.value, right.value)
-      : left.kind === "formula" &&
-          right.kind === "formula" &&
-          left.formula.source === right.formula.source
-        ? true
-        : left.kind === "image" &&
-          right.kind === "image" &&
-          left.image.assetId === right.image.assetId &&
-          left.image.altText === right.image.altText)
+      : left.kind === "error" && right.kind === "error"
+        ? left.error.code === right.error.code
+        : left.kind === "formula" &&
+            right.kind === "formula" &&
+            left.formula.source === right.formula.source
+          ? true
+          : left.kind === "image" &&
+            right.kind === "image" &&
+            left.image.assetId === right.image.assetId &&
+            left.image.altText === right.image.altText)
   );
 }
 
@@ -713,11 +724,7 @@ function normalizeFilterValue(value: SheetFilterValue): SheetFilterValue {
   if (value.kind === "number" && typeof value.value === "number" && Number.isFinite(value.value))
     return { ...value };
   if (value.kind === "string" && typeof value.value === "string") return { ...value };
-  if (
-    value.kind === "error" &&
-    ["PARSE", "REF", "CYCLE", "VALUE", "DIV0", "NAME"].includes(value.code)
-  )
-    return { ...value };
+  if (value.kind === "error" && isFormulaErrorCode(value.code)) return { ...value };
   throw new TypeError("Invalid filter value.");
 }
 
@@ -1020,8 +1027,9 @@ function normalizeFloatingImage(image: FloatingImage, ids?: Set<string>): Floati
     image.offsetX < 0 ||
     !Number.isFinite(image.offsetY) ||
     image.offsetY < 0
-  )
+  ) {
     throw new RangeError("Floating image offsets must be finite and non-negative.");
+  }
   if (
     !Number.isFinite(image.width) ||
     image.width < MIN_FLOATING_IMAGE_SIZE ||
@@ -1029,10 +1037,11 @@ function normalizeFloatingImage(image: FloatingImage, ids?: Set<string>): Floati
     !Number.isFinite(image.height) ||
     image.height < MIN_FLOATING_IMAGE_SIZE ||
     image.height > MAX_FLOATING_IMAGE_SIZE
-  )
+  ) {
     throw new RangeError(
       `Floating image dimensions must be between ${MIN_FLOATING_IMAGE_SIZE} and ${MAX_FLOATING_IMAGE_SIZE}.`,
     );
+  }
   return cloneFloatingImage(image);
 }
 

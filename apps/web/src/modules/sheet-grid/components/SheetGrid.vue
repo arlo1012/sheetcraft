@@ -457,8 +457,11 @@ function onImagePaste(event: ClipboardEvent): void {
 
 watch(
   () => [props.sheet.id, ...props.sheet.floatingImages.map((image) => image.id)],
-  () => {
-    if (!props.sheet.floatingImages.some((image) => image.id === selectedImageId.value))
+  (current, previous) => {
+    if (
+      current[0] !== previous[0] ||
+      !props.sheet.floatingImages.some((image) => image.id === selectedImageId.value)
+    )
       selectedImageId.value = null;
   },
 );

@@ -1,27 +1,27 @@
 {
   "version": 1,
-  "description": "Production budgets include workbook persistence, JSON transfer, and the TDesign import/reload confirmation dialog; see ADR 0004.",
+  "description": "Production budgets include workbook persistence, cell/floating images and portable asset bundles, plus the formula foundation; see ADR 0004.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
       "pattern": "^index-.*\\.js$",
-      "maximumRawBytes": 315000,
-      "maximumGzipBytes": 86000
+      "maximumRawBytes": 350000,
+      "maximumGzipBytes": 97000
     },
     "css": {
       "pattern": "^index-.*\\.css$",
-      "maximumRawBytes": 75000,
+      "maximumRawBytes": 78000,
       "maximumGzipBytes": 12000
     }
   },
   "totalAssets": {
     "javascript": {
-      "maximumRawBytes": 815000,
-      "maximumGzipBytes": 242000
+      "maximumRawBytes": 850000,
+      "maximumGzipBytes": 252000
     },
     "css": {
       "maximumRawBytes": 220000,
-      "maximumGzipBytes": 27000
+      "maximumGzipBytes": 28000
     }
   }
 }

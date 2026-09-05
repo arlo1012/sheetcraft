@@ -21,6 +21,7 @@ timestamp, and Core snapshot. Core remains independent of browser APIs.
 | Cell values, formulas and images, styles, borders, dimensions | Selection, scrolling, editor drafts                |
 | Sheet identities, names, order, active Sheet                  | Undo/redo history, clipboard, format painter       |
 | Freeze settings, filters, merged ranges, floating images      | Search, floating panels, focus, transient feedback |
+| Workbook date system, explicit errors and empty text          | Formula runtime/dependency caches                  |
 
 Formula results and derived visibility are rebuilt on load. Both the Grid and
 formula bar are remounted on document replacement, even when Sheet IDs match.
@@ -44,15 +45,21 @@ only the displayed "Saved locally" state confirms that a transaction finished.
 
 ## Files And Failures
 
-Export downloads `idea10-workbook.json`: an image-free V3 snapshot, or a versioned
+Export downloads `idea10-workbook.json`: an image-free V4 snapshot, or a versioned
 portable envelope containing that snapshot and every referenced image as base64.
 Image blobs are stored separately in the `idea10-image-assets` IndexedDB database.
 Blobs are saved before document references and retained through undoable deletion.
-Import accepts image-free V1/V2/V3 snapshots and portable image envelopes. It
+Import accepts image-free V1/V2/V3/V4 snapshots and portable image envelopes. It
 validates and decodes all images, derives asset metadata from the bytes, and
 remaps their IDs before storing them. It then asks for
 confirmation. Invalid or unsupported files never replace the open workbook.
 Canceling a valid import leaves both the document and saved copy unchanged.
+
+V1/V2 documents default to the 1900 date system on read. V3/V4 require an explicit
+`dateSystem` (`1900` or `1904`) and preserves error content separately from
+error-looking text and explicit empty strings. Formula source remains raw text;
+computed values are not saved. Older builds cannot open newer snapshot versions, so keep original backups when upgrading. See
+[Formula Foundation](formula-foundation.md) for the model and migration contract.
 
 Confirmed import explicitly replaces both the current document and the local
 record, including another tab's saved changes, and starts empty undo/redo history.

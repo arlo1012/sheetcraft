@@ -1,0 +1,6 @@
+node_modules/
+reports/*.json
+reports/*.md
+reports/*.js
+reports/test-results.json
+reports/node-worker-smoke.json

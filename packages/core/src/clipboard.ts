@@ -9,6 +9,7 @@ import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   createSheetEvaluator,
+  cloneCellContent,
   getCellContent,
   type CellAddress,
   type CellRange,
@@ -92,8 +93,18 @@ export function getCellRangeComputedValues(
 
 /** Values-only clipboard projection. Formula errors become their display token text. */
 export function getCellRangeValues(sheet: Sheet, range: CellRange): CellValueMatrix {
-  return getCellRangeComputedValues(sheet, range).map((row) =>
-    row.map((value) => (isFormulaError(value) ? formatComputedValueForDisplay(value) : value)),
+  const normalized = normalizeRange(range);
+  return getCellRangeComputedValues(sheet, range).map((row, rowIndex) =>
+    row.map((value, columnIndex) =>
+      getCellContent(sheet, {
+        row: normalized.start.row + rowIndex,
+        column: normalized.start.column + columnIndex,
+      })?.kind === "image"
+        ? null
+        : isFormulaError(value)
+          ? formatComputedValueForDisplay(value)
+          : value,
+    ),
   );
 }
 
@@ -103,8 +114,7 @@ export function translateCellContentForCopy(
   destination: CellAddress,
 ): CellContent | null {
   if (!content) return null;
-  if (content.kind === "literal") return { kind: "literal", value: content.value };
-  if (content.kind === "image") return { kind: "image", image: { ...content.image } };
+  if (content.kind !== "formula") return cloneCellContent(content);
   return {
     kind: "formula",
     formula: {

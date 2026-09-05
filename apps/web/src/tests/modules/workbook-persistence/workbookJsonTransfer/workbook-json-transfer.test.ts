@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 describe("workbook JSON transfer", () => {
-  test("parses a version 2 workbook snapshot through Core", () => {
+  test("parses a current workbook snapshot through Core", () => {
     const workbook = createTestWorkbook();
 
     const parsed = parseWorkbookJson(JSON.stringify(serializeWorkbook(workbook)));

@@ -49,4 +49,22 @@ describe("SheetGrid cell images", () => {
     expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual(content);
     wrapper.unmount();
   });
+  test("routes a native bitmap paste to floating image insertion without pasting its text", async () => {
+    const { wrapper, sheet } = mountSheetGrid();
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    const file = new File(["image"], "pasted.png", { type: "image/png" });
+    Object.defineProperty(event, "clipboardData", {
+      value: {
+        files: [file],
+        types: ["Files", "text/plain"],
+        getData: (type: string) => (type === "text/plain" ? "do not paste" : ""),
+      },
+    });
+    wrapper.get("textarea.cell-editor").element.dispatchEvent(event);
+    await wrapper.vm.$nextTick();
+    expect(event.defaultPrevented).toBe(true);
+    expect(wrapper.emitted("pasteImageFile")).toEqual([[file]]);
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toBeNull();
+    wrapper.unmount();
+  });
 });

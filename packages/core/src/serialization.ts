@@ -1,4 +1,5 @@
 import { WorkbookDomainError } from "./errors.js";
+import { normalizeExcelDateSystem, type ExcelDateSystem } from "./formula/date-system.js";
 import { normalizeCellStyle, type CellStyle } from "./style.js";
 import {
   createSheet,
@@ -10,15 +11,15 @@ import {
   type CellRange,
   type CellValue,
   type FreezePanes,
+  type FloatingImage,
   type Sheet,
   type SheetFilter,
   type SheetFilterValue,
-  type FloatingImage,
   type SheetSparseDimension,
   type SheetSparseState,
   type Workbook,
 } from "./workbook.js";
-import type { CellContent, FormulaErrorCode } from "./formula/types.js";
+import { createFormulaError, isFormulaErrorCode, type CellContent } from "./formula/types.js";
 
 export type CellSnapshotV1 = {
   address: CellAddress;
@@ -28,7 +29,7 @@ export type CellSnapshotV1 = {
 
 export type CellSnapshotV2 = {
   address: CellAddress;
-  content?: CellContent;
+  content?: Exclude<CellContent, { kind: "error" } | { kind: "image" }>;
   style?: CellStyle;
 };
 
@@ -47,10 +48,6 @@ export type SheetSnapshotV2 = Omit<SheetSnapshotV1, "cells"> & {
   mergedCells?: CellRange[];
 };
 
-export type SheetSnapshotV3 = SheetSnapshotV2 & {
-  floatingImages: FloatingImage[];
-};
-
 export type WorkbookSnapshotV1 = {
   version: 1;
   id: string;
@@ -65,17 +62,28 @@ export type WorkbookSnapshotV2 = {
   sheets: SheetSnapshotV2[];
 };
 
-export type WorkbookSnapshotV3 = {
+export type CellSnapshotV3 = Omit<CellSnapshotV2, "content"> & {
+  content?: Exclude<CellContent, { kind: "image" }>;
+};
+export type SheetSnapshotV3 = Omit<SheetSnapshotV2, "cells"> & { cells: CellSnapshotV3[] };
+export type WorkbookSnapshotV3 = Omit<WorkbookSnapshotV2, "version" | "sheets"> & {
   version: 3;
-  id: string;
-  activeSheetId: string;
+  dateSystem: ExcelDateSystem;
   sheets: SheetSnapshotV3[];
 };
-
-/** The current snapshot contract emitted by Core. */
-export type SheetSnapshot = SheetSnapshotV3;
-/** The current snapshot contract emitted by Core. */
-export type WorkbookSnapshot = WorkbookSnapshotV3;
+export type CellSnapshotV4 = Omit<CellSnapshotV3, "content"> & { content?: CellContent };
+export type SheetSnapshotV4 = Omit<SheetSnapshotV3, "cells"> & {
+  cells: CellSnapshotV4[];
+  floatingImages: FloatingImage[];
+};
+export type WorkbookSnapshotV4 = Omit<WorkbookSnapshotV3, "version" | "sheets"> & {
+  version: 4;
+  sheets: SheetSnapshotV4[];
+};
+/** Current write format. V1 through V3 types remain available for migration inputs. */
+export type WorkbookSnapshot = WorkbookSnapshotV4;
+export type SheetSnapshot = SheetSnapshotV4;
+type SnapshotVersion = 1 | 2 | 3 | 4;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -122,15 +130,19 @@ function parseAddress(value: unknown, path: string): CellAddress {
   };
 }
 
-function parseCellValue(value: unknown, path: string): Exclude<CellValue, null> {
+function parseCellValue(
+  value: unknown,
+  path: string,
+  allowEmptyString = false,
+): Exclude<CellValue, null> {
   if (
     (typeof value === "number" && Number.isFinite(value)) ||
     typeof value === "boolean" ||
-    (typeof value === "string" && value.length > 0)
+    (typeof value === "string" && (allowEmptyString || value.length > 0))
   ) {
     return value;
   }
-  return fail(path, "Expected a non-empty string, finite number, or boolean.");
+  return fail(path, "Invalid literal value for this snapshot version.");
 }
 
 function parseStyle(value: unknown, path: string): CellStyle {
@@ -146,10 +158,20 @@ function parseStyle(value: unknown, path: string): CellStyle {
   }
 }
 
-function parseCellContent(value: unknown, path: string): CellContent {
+function parseCellContent(value: unknown, path: string, version: SnapshotVersion): CellContent {
   const record = asRecord(value, path);
   if (record.kind === "literal") {
-    return { kind: "literal", value: parseCellValue(record.value, `${path}.value`) };
+    return {
+      kind: "literal",
+      value: parseCellValue(record.value, `${path}.value`, version === 3 || version === 4),
+    };
+  }
+  if ((version === 3 || version === 4) && record.kind === "error") {
+    const error = asRecord(record.error, `${path}.error`);
+    if (error.kind !== "formula-error" || !isFormulaErrorCode(error.code)) {
+      return fail(`${path}.error`, "Expected a typed formula error with a supported code.");
+    }
+    return { kind: "error", error: createFormulaError(error.code) };
   }
   if (record.kind === "formula") {
     const formula = asRecord(record.formula, `${path}.formula`);
@@ -158,7 +180,7 @@ function parseCellContent(value: unknown, path: string): CellContent {
     }
     return { kind: "formula", formula: { source: formula.source } };
   }
-  if (record.kind === "image") {
+  if (version === 4 && record.kind === "image") {
     const image = asRecord(record.image, `${path}.image`);
     if (typeof image.assetId !== "string" || !image.assetId.trim())
       return fail(`${path}.image.assetId`, "Expected a non-empty string.");
@@ -166,21 +188,23 @@ function parseCellContent(value: unknown, path: string): CellContent {
       return fail(`${path}.image.altText`, "Expected a string.");
     return { kind: "image", image: { assetId: image.assetId, altText: image.altText } };
   }
-  return fail(`${path}.kind`, "Expected 'literal', 'formula', or 'image'.");
+  return fail(`${path}.kind`, "Invalid cell content kind for this snapshot version.");
 }
 
-function parseCell(value: unknown, path: string, version: 1 | 2 | 3): CellSnapshotV2 {
+function parseCell(value: unknown, path: string, version: SnapshotVersion): CellSnapshotV4 {
   const record = asRecord(value, path);
   const hasContent = Object.hasOwn(record, "content");
   const hasValue = Object.hasOwn(record, "value");
   const hasStyle = Object.hasOwn(record, "style");
-  if ((version >= 2 && hasValue) || (version === 1 && hasContent)) {
+  if ((version !== 1 && hasValue) || (version === 1 && hasContent)) {
     return fail(
       path,
-      version >= 2 ? "V2+ cells use content, not value." : "V1 cells use value, not content.",
+      version !== 1
+        ? `V${version} cells use content, not value.`
+        : "V1 cells use value, not content.",
     );
   }
-  if ((version === 1 && !hasValue && !hasStyle) || (version >= 2 && !hasContent && !hasStyle)) {
+  if ((version === 1 && !hasValue && !hasStyle) || (version !== 1 && !hasContent && !hasStyle)) {
     return fail(path, "Expected content or style.");
   }
 
@@ -194,7 +218,7 @@ function parseCell(value: unknown, path: string, version: 1 | 2 | 3): CellSnapsh
           },
         }
       : hasContent
-        ? { content: parseCellContent(record.content, `${path}.content`) }
+        ? { content: parseCellContent(record.content, `${path}.content`, version) }
         : {}),
     ...(hasStyle ? { style: parseStyle(record.style, `${path}.style`) } : {}),
   };
@@ -224,7 +248,11 @@ function parseFreezePanes(value: unknown, path: string): FreezePanes {
   };
 }
 
-function parseFilterValue(value: unknown, path: string): SheetFilterValue {
+function parseFilterValue(
+  value: unknown,
+  path: string,
+  version: SnapshotVersion,
+): SheetFilterValue {
   const record = asRecord(value, path);
   if (record.kind === "blank") return { kind: "blank" };
   if (record.kind === "boolean" && typeof record.value === "boolean")
@@ -235,14 +263,16 @@ function parseFilterValue(value: unknown, path: string): SheetFilterValue {
     return { kind: "string", value: record.value };
   if (
     record.kind === "error" &&
-    typeof record.code === "string" &&
-    ["PARSE", "REF", "CYCLE", "VALUE", "DIV0", "NAME"].includes(record.code)
+    isFormulaErrorCode(record.code) &&
+    (version === 3 ||
+      version === 4 ||
+      ["PARSE", "REF", "CYCLE", "VALUE", "DIV0", "NAME"].includes(record.code))
   )
-    return { kind: "error", code: record.code as FormulaErrorCode };
+    return { kind: "error", code: record.code };
   return fail(path, "Invalid filter value.");
 }
 
-function parseFilter(value: unknown, path: string): SheetFilter {
+function parseFilter(value: unknown, path: string, version: SnapshotVersion): SheetFilter {
   const record = asRecord(value, path);
   return {
     range: parseRange(record.range, `${path}.range`),
@@ -254,7 +284,11 @@ function parseFilter(value: unknown, path: string): SheetFilter {
           columnRecord.allowedValues,
           `${path}.columns[${index}].allowedValues`,
         ).map((filterValue, valueIndex) =>
-          parseFilterValue(filterValue, `${path}.columns[${index}].allowedValues[${valueIndex}]`),
+          parseFilterValue(
+            filterValue,
+            `${path}.columns[${index}].allowedValues[${valueIndex}]`,
+            version,
+          ),
         ),
       };
     }),
@@ -288,7 +322,7 @@ function parseFloatingImage(value: unknown, path: string): FloatingImage {
 function parseSparseState(
   record: UnknownRecord,
   path: string,
-  version: 1 | 2 | 3,
+  version: SnapshotVersion,
 ): SheetSparseState {
   return {
     cells: asArray(record.cells, `${path}.cells`).map((cell, index) =>
@@ -301,23 +335,23 @@ function parseSparseState(
       parseDimension(dimension, `${path}.columnWidths[${index}]`),
     ),
     freezePanes:
-      version >= 2 && Object.hasOwn(record, "freezePanes")
+      version !== 1 && Object.hasOwn(record, "freezePanes")
         ? parseFreezePanes(record.freezePanes, `${path}.freezePanes`)
         : { rows: 0, columns: 0 },
     filter:
-      version >= 2 && Object.hasOwn(record, "filter")
+      version !== 1 && Object.hasOwn(record, "filter")
         ? record.filter === null
           ? null
-          : parseFilter(record.filter, `${path}.filter`)
+          : parseFilter(record.filter, `${path}.filter`, version)
         : null,
     mergedCells:
-      version >= 2 && Object.hasOwn(record, "mergedCells")
+      version !== 1 && Object.hasOwn(record, "mergedCells")
         ? asArray(record.mergedCells, `${path}.mergedCells`).map((range, index) =>
             parseRange(range, `${path}.mergedCells[${index}]`),
           )
         : [],
     floatingImages:
-      version === 3
+      version === 4
         ? asArray(record.floatingImages, `${path}.floatingImages`).map((image, index) =>
             parseFloatingImage(image, `${path}.floatingImages[${index}]`),
           )
@@ -325,7 +359,7 @@ function parseSparseState(
   };
 }
 
-function parseSheet(value: unknown, path: string, version?: 1 | 2 | 3): Sheet {
+function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sheet {
   const record = asRecord(value, path);
   if (version === undefined) {
     const cells = asArray(record.cells, `${path}.cells`);
@@ -335,7 +369,7 @@ function parseSheet(value: unknown, path: string, version?: 1 | 2 | 3): Sheet {
     );
     if (hasValue && hasContent)
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
-    version = hasValue ? 1 : Object.hasOwn(record, "floatingImages") ? 3 : 2;
+    version = hasValue ? 1 : Object.hasOwn(record, "floatingImages") ? 4 : 3;
   }
   const id = asIdentifier(record.id, `${path}.id`);
   let name: string;
@@ -357,7 +391,7 @@ function parseSheet(value: unknown, path: string, version?: 1 | 2 | 3): Sheet {
   return sheet;
 }
 
-export function serializeSheet(sheet: Sheet): SheetSnapshotV3 {
+export function serializeSheet(sheet: Sheet): SheetSnapshot {
   return {
     id: sheet.id,
     name: sheet.name,
@@ -369,9 +403,10 @@ export function deserializeSheet(value: unknown): Sheet {
   return parseSheet(value, "$");
 }
 
-export function serializeWorkbook(workbook: Workbook): WorkbookSnapshotV3 {
+export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 3,
+    version: 4,
+    dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
     activeSheetId: workbook.activeSheetId,
     sheets: getWorkbookSheets(workbook).map(serializeSheet),
@@ -380,7 +415,12 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshotV3 {
 
 export function deserializeWorkbook(value: unknown): Workbook {
   const record = asRecord(value, "$.");
-  if (record.version !== 1 && record.version !== 2 && record.version !== 3) {
+  if (
+    record.version !== 1 &&
+    record.version !== 2 &&
+    record.version !== 3 &&
+    record.version !== 4
+  ) {
     throw new WorkbookDomainError(
       {
         code: "unsupported_snapshot_version",
@@ -395,6 +435,9 @@ export function deserializeWorkbook(value: unknown): Workbook {
     );
   }
 
+  if (record.version !== 3 && record.version !== 4 && Object.hasOwn(record, "dateSystem")) {
+    return fail("$.dateSystem", "An explicit date system requires snapshot version 3 or 4.");
+  }
   const id = asIdentifier(record.id, "$.id");
   const activeSheetId = asIdentifier(record.activeSheetId, "$.activeSheetId");
   const sheetValues = asArray(record.sheets, "$.sheets");
@@ -403,6 +446,14 @@ export function deserializeWorkbook(value: unknown): Workbook {
   }
 
   const version = record.version;
+  let dateSystem: ExcelDateSystem = "1900";
+  if (version === 3 || version === 4) {
+    try {
+      dateSystem = normalizeExcelDateSystem(record.dateSystem);
+    } catch {
+      return fail("$.dateSystem", "Expected '1900' or '1904'.");
+    }
+  }
   const sheets = sheetValues.map((sheet, index) =>
     parseSheet(sheet, `$.sheets[${index}]`, version),
   );
@@ -425,6 +476,7 @@ export function deserializeWorkbook(value: unknown): Workbook {
 
   return {
     id,
+    dateSystem,
     activeSheetId,
     sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
   };

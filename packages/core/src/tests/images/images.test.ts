@@ -13,6 +13,7 @@ import {
 } from "../../commands/index.js";
 import { translateCellContentForCopy } from "../../clipboard.js";
 import { formatCellContentForInput } from "../../input.js";
+import { createFormulaError } from "../../formula/types.js";
 import { deserializeWorkbook, serializeWorkbook } from "../../serialization.js";
 import {
   createSheetSparseState,
@@ -127,7 +128,7 @@ describe("sheet images", () => {
     expect(createSheetSparseState(sheet)).toEqual(before);
   });
 
-  test("round trips V3 image references without binary data", () => {
+  test("round trips V4 image references without binary data", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     applyWorkbookCommand(session.workbook, createSetFloatingImageCommand(sheet.id, image));
@@ -143,7 +144,7 @@ describe("sheet images", () => {
       ),
     );
     const snapshot = serializeWorkbook(session.workbook);
-    expect(snapshot.version).toBe(3);
+    expect(snapshot.version).toBe(4);
     expect(JSON.stringify(snapshot)).not.toContain("data:");
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
   });
@@ -202,5 +203,72 @@ describe("sheet images", () => {
     );
     applyWorkbookCommand(session.workbook, deleteInverse!);
     expect(session.workbook.sheets.get(sheet.id)?.floatingImages).toEqual([image]);
+  });
+
+  test("migrates a V3 formula snapshot to V4 while retaining formula semantics and image references", () => {
+    const workbook = deserializeWorkbook({
+      version: 3,
+      id: "formula-v3",
+      activeSheetId: "sheet-1",
+      dateSystem: "1904",
+      sheets: [
+        {
+          id: "sheet-1",
+          name: "Sheet1",
+          cells: [
+            {
+              address: { row: 0, column: 0 },
+              content: { kind: "error", error: createFormulaError("NA") },
+            },
+            {
+              address: { row: 0, column: 1 },
+              content: { kind: "formula", formula: { source: "=A1" } },
+            },
+          ],
+          rowHeights: [],
+          columnWidths: [],
+          freezePanes: { rows: 0, columns: 0 },
+          filter: null,
+          mergedCells: [],
+        },
+      ],
+    });
+    const sheet = getActiveSheet(workbook);
+    applyWorkbookCommand(
+      workbook,
+      createSetCellContentCommand(
+        sheet.id,
+        { row: 1, column: 0 },
+        {
+          kind: "image",
+          image: { assetId: "asset-cell", altText: "Cell chart" },
+        },
+      ),
+    );
+    applyWorkbookCommand(workbook, createSetFloatingImageCommand(sheet.id, image));
+
+    expect(serializeWorkbook(workbook)).toMatchObject({
+      version: 4,
+      dateSystem: "1904",
+      sheets: [
+        {
+          floatingImages: [image],
+          cells: expect.arrayContaining([
+            {
+              address: { row: 0, column: 0 },
+              content: { kind: "error", error: createFormulaError("NA") },
+            },
+            {
+              address: { row: 0, column: 1 },
+              content: { kind: "formula", formula: { source: "=A1" } },
+            },
+            {
+              address: { row: 1, column: 0 },
+              content: { kind: "image", image: { assetId: "asset-cell", altText: "Cell chart" } },
+            },
+          ]),
+        },
+      ],
+    });
   });
 });

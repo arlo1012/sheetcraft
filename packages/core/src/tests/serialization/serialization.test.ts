@@ -94,11 +94,8 @@ describe("workbook snapshots", () => {
     });
     expect(serializeWorkbook(deserializeWorkbook(snapshot))).toEqual(snapshot);
 
-    const legacyV2 = {
-      ...structuredClone(snapshot),
-      version: 2 as const,
-      sheets: snapshot.sheets.map(({ floatingImages: _floatingImages, ...sheet }) => sheet),
-    };
+    const { dateSystem: _dateSystem, ...current } = structuredClone(snapshot);
+    const legacyV2 = { ...current, version: 2 };
     delete legacyV2.sheets[0]?.freezePanes;
     delete legacyV2.sheets[0]?.filter;
     delete legacyV2.sheets[0]?.mergedCells;
@@ -108,7 +105,7 @@ describe("workbook snapshots", () => {
     expect(getActiveSheet(restored).mergedCells).toEqual([]);
   });
 
-  test("migrates V1 values and writes V3 raw formula content without a computed cache", () => {
+  test("migrates V1 values and writes current raw formula content without a computed cache", () => {
     const v1 = {
       version: 1,
       id: "workbook-1",
@@ -137,7 +134,8 @@ describe("workbook snapshots", () => {
       { kind: "formula", formula: { source: "=SUM(" } },
     );
     const snapshot = serializeWorkbook(migrated);
-    expect(snapshot.version).toBe(3);
+    expect(snapshot.version).toBe(4);
+    expect(snapshot.dateSystem).toBe("1900");
     expect(snapshot.sheets[0]?.cells).toContainEqual({
       address: { row: 0, column: 1 },
       content: { kind: "formula", formula: { source: "=SUM(" } },
@@ -171,7 +169,7 @@ describe("workbook snapshots", () => {
         ...base,
         sheets: [{ ...base.sheets[0], cells: [{ address: { row: 0, column: 0 }, value: 2 }] }],
       }),
-    ).toThrow("V2+ cells use content");
+    ).toThrow("V2 cells use content");
     expect(() =>
       deserializeWorkbook({
         ...base,
@@ -208,9 +206,9 @@ describe("workbook snapshots", () => {
   });
 
   test("rejects unknown snapshot versions with a stable error code", () => {
-    expect(() => deserializeWorkbook({ version: 4 })).toThrowError(
+    expect(() => deserializeWorkbook({ version: 5 })).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
-        data: { code: "unsupported_snapshot_version", details: { version: 4 } },
+        data: { code: "unsupported_snapshot_version", details: { version: 5 } },
       }),
     );
   });

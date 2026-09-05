@@ -31,7 +31,7 @@ filtered out.
 
 ## Saving
 
-Local autosave stores image references in a V3 workbook snapshot and retains
+Local autosave stores image references in a V4 workbook snapshot and retains
 image blobs in IndexedDB. JSON export includes every referenced blob so the file
 can be imported in another browser. Import validates image bytes and creates
 safe local asset references before replacing the document. Missing local assets

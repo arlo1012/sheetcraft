@@ -3,7 +3,23 @@ export const MAX_FORMULA_COLUMNS = 16_384;
 
 export type FormulaScalar = string | number | boolean | null;
 
-export type FormulaErrorCode = "PARSE" | "REF" | "CYCLE" | "VALUE" | "DIV0" | "NAME";
+/** Canonical, locale-independent tokens. PARSE/CYCLE are product diagnostics. */
+export const FORMULA_ERROR_TOKENS = {
+  NULL: "#NULL!",
+  DIV0: "#DIV/0!",
+  VALUE: "#VALUE!",
+  REF: "#REF!",
+  NAME: "#NAME?",
+  NUM: "#NUM!",
+  NA: "#N/A",
+  SPILL: "#SPILL!",
+  CALC: "#CALC!",
+  GETTING_DATA: "#GETTING_DATA",
+  PARSE: "#PARSE!",
+  CYCLE: "#CYCLE!",
+} as const;
+
+export type FormulaErrorCode = keyof typeof FORMULA_ERROR_TOKENS;
 
 export type FormulaError = {
   kind: "formula-error";
@@ -24,6 +40,7 @@ export type CellImage = {
 
 export type CellContent =
   | { kind: "literal"; value: Exclude<FormulaScalar, null> }
+  | { kind: "error"; error: FormulaError }
   | { kind: "formula"; formula: CellFormula }
   | { kind: "image"; image: CellImage };
 
@@ -115,11 +132,32 @@ export type FormulaCopyOffset = {
 };
 
 export function createFormulaError(code: FormulaErrorCode): FormulaError {
+  if (!isFormulaErrorCode(code)) throw new TypeError("Invalid formula error code.");
   return { kind: "formula-error", code };
 }
 
-export function isFormulaError(value: FormulaValue): value is FormulaError {
-  return typeof value === "object" && value !== null && value.kind === "formula-error";
+export function isFormulaErrorCode(value: unknown): value is FormulaErrorCode {
+  return typeof value === "string" && Object.hasOwn(FORMULA_ERROR_TOKENS, value);
+}
+
+export function isFormulaError(value: unknown): value is FormulaError {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "kind" in value &&
+    value.kind === "formula-error" &&
+    "code" in value &&
+    isFormulaErrorCode(value.code)
+  );
+}
+
+export function formulaErrorCodeFromToken(token: string): FormulaErrorCode | null {
+  const normalized = token.toUpperCase();
+  return (
+    (Object.keys(FORMULA_ERROR_TOKENS) as FormulaErrorCode[]).find(
+      (code) => FORMULA_ERROR_TOKENS[code] === normalized,
+    ) ?? null
+  );
 }
 
 export function isCellFormula(content: CellContent | null | undefined): content is {

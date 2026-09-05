@@ -1,4 +1,5 @@
 import type { SheetSnapshot } from "../serialization.js";
+import type { ExcelDateSystem } from "../formula/date-system.js";
 import type { CellContent } from "../formula/types.js";
 import type { CellBorderAction, CellStyle, CellStylePatch } from "../style.js";
 import type {
@@ -199,7 +200,13 @@ export type RestoreSheetAxisSliceCommand = {
 
 export type RestoreSheetStateCommand = RestoreFullSheetStateCommand | RestoreSheetAxisSliceCommand;
 
+export type SetWorkbookDateSystemCommand = {
+  type: "setWorkbookDateSystem";
+  dateSystem: ExcelDateSystem;
+};
+
 export type WorkbookCommand =
+  | SetWorkbookDateSystemCommand
   | SetCellContentsCommand
   | ClearCellRangeCommand
   | MoveCellRangeCommand
@@ -224,6 +231,7 @@ export type WorkbookCommand =
   | RestoreSheetStateCommand;
 
 export type WorkbookOperation =
+  | "workbook.dateSystem"
   | "cells.edit"
   | "cells.paste"
   | "cells.move"
@@ -248,6 +256,8 @@ export type WorkbookOperation =
 
 export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperation {
   switch (command.type) {
+    case "setWorkbookDateSystem":
+      return "workbook.dateSystem";
     case "setCellContents":
       return "cells.edit";
     case "clearCellRange":

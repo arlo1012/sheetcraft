@@ -1,4 +1,11 @@
-import { isFormulaError, type CellContent, type FormulaValue } from "./formula/types.js";
+import {
+  createFormulaError,
+  FORMULA_ERROR_TOKENS,
+  formulaErrorCodeFromToken,
+  isFormulaError,
+  type CellContent,
+  type FormulaValue,
+} from "./formula/types.js";
 import type { CellValue } from "./workbook.js";
 
 const NUMBER_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
@@ -43,6 +50,8 @@ export function parseCellContent(input: string): CellContent | null {
   if (input === "") return null;
   if (input.startsWith("'")) return { kind: "literal", value: input.slice(1) };
   if (input.startsWith("=")) return { kind: "formula", formula: { source: input } };
+  const errorCode = formulaErrorCodeFromToken(input);
+  if (errorCode) return { kind: "error", error: createFormulaError(errorCode) };
   const value = parseCellInput(input);
   return value === null ? null : { kind: "literal", value };
 }
@@ -60,7 +69,7 @@ export function formatCellValueForDisplay(value: CellValue): string {
 
 /** Converts a computed result to display text, including stable formula error tokens. */
 export function formatComputedValueForDisplay(value: FormulaValue): string {
-  if (isFormulaError(value)) return `#${value.code === "DIV0" ? "DIV/0" : value.code}!`;
+  if (isFormulaError(value)) return FORMULA_ERROR_TOKENS[value.code];
   return formatCellValueForDisplay(value);
 }
 
@@ -75,10 +84,13 @@ export function formatCellValueForInput(value: CellValue): string {
 export function formatCellContentForInput(content: CellContent | null | undefined): string {
   if (!content) return "";
   if (content.kind === "formula") return content.formula.source;
+  if (content.kind === "error") return FORMULA_ERROR_TOKENS[content.error.code];
   if (content.kind === "image") return "";
   if (
     typeof content.value === "string" &&
-    (content.value.startsWith("=") || content.value.startsWith("'"))
+    (content.value.startsWith("=") ||
+      content.value.startsWith("'") ||
+      formulaErrorCodeFromToken(content.value) !== null)
   ) {
     return `'${content.value}`;
   }
