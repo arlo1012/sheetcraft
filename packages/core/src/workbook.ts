@@ -18,6 +18,8 @@ export const MIN_ROW_HEIGHT = 16;
 export const MAX_ROW_HEIGHT = 512;
 export const MIN_COLUMN_WIDTH = 32;
 export const MAX_COLUMN_WIDTH = 640;
+export const MIN_FLOATING_IMAGE_SIZE = 1;
+export const MAX_FLOATING_IMAGE_SIZE = 10_000;
 
 export type CellValue = string | number | boolean | null;
 
@@ -62,6 +64,18 @@ export type SheetMetadata = {
   mergedCells: CellRange[];
 };
 
+/** A positioned image that is anchored to a sheet cell without owning its binary data. */
+export type FloatingImage = {
+  id: string;
+  assetId: string;
+  altText: string;
+  anchor: CellAddress;
+  offsetX: number;
+  offsetY: number;
+  width: number;
+  height: number;
+};
+
 export type Cell = {
   content?: CellContent;
   style?: CellStyle;
@@ -76,6 +90,7 @@ export type Sheet = {
   freezePanes: FreezePanes;
   filter: SheetFilter | null;
   mergedCells: CellRange[];
+  floatingImages: FloatingImage[];
 };
 
 export type SheetSparseCell = {
@@ -96,6 +111,7 @@ export type SheetSparseState = {
   freezePanes: FreezePanes;
   filter: SheetFilter | null;
   mergedCells: CellRange[];
+  floatingImages: FloatingImage[];
 };
 
 export type Workbook = {
@@ -123,6 +139,7 @@ export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory)
     freezePanes: { rows: 0, columns: 0 },
     filter: null,
     mergedCells: [],
+    floatingImages: [],
   };
 }
 
@@ -354,6 +371,7 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
     const content = sheet.cells.get(key)?.content;
     if (!content) return null;
     if (content.kind === "literal") return content.value;
+    if (content.kind === "image") return createFormulaError("VALUE");
     return memo.get(key) ?? createFormulaError("CYCLE");
   };
   const dependenciesFor = (address: CellAddress): CellAddress[] => {
@@ -373,7 +391,7 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
     const key = createCellKey(target);
     if (memo.has(key)) return memo.get(key) ?? null;
     const content = sheet.cells.get(key)?.content;
-    if (!content || content.kind === "literal") return valueFor(target);
+    if (!content || content.kind !== "formula") return valueFor(target);
     const stack: Array<{ address: CellAddress; entered: boolean }> = [
       { address: target, entered: false },
     ];
@@ -383,7 +401,7 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
       const frameKey = createCellKey(frame.address);
       if (memo.has(frameKey)) continue;
       const frameContent = sheet.cells.get(frameKey)?.content;
-      if (!frameContent || frameContent.kind === "literal") continue;
+      if (!frameContent || frameContent.kind !== "formula") continue;
       if (!frame.entered) {
         const current = state.get(frameKey);
         if (current === "visiting") {
@@ -556,13 +574,25 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
   ) {
     return { kind: "formula", formula: { source: content.formula.source } };
   }
-  throw new TypeError("Formula cell content must have a source beginning with '='.");
+  if (
+    content.kind === "image" &&
+    typeof content.image?.assetId === "string" &&
+    content.image.assetId.trim() &&
+    typeof content.image.altText === "string"
+  ) {
+    return {
+      kind: "image",
+      image: { assetId: content.image.assetId, altText: content.image.altText },
+    };
+  }
+  throw new TypeError("Cell content must be a valid literal, formula, or image.");
 }
 
 export function cloneCellContent(content: CellContent): CellContent {
-  return content.kind === "literal"
-    ? { kind: "literal", value: content.value }
-    : { kind: "formula", formula: { source: content.formula.source } };
+  if (content.kind === "literal") return { kind: "literal", value: content.value };
+  if (content.kind === "formula")
+    return { kind: "formula", formula: { source: content.formula.source } };
+  return { kind: "image", image: { ...content.image } };
 }
 
 function areCellContentsEqual(
@@ -575,8 +605,13 @@ function areCellContentsEqual(
     (left.kind === "literal" && right.kind === "literal"
       ? Object.is(left.value, right.value)
       : left.kind === "formula" &&
-        right.kind === "formula" &&
-        left.formula.source === right.formula.source)
+          right.kind === "formula" &&
+          left.formula.source === right.formula.source
+        ? true
+        : left.kind === "image" &&
+          right.kind === "image" &&
+          left.image.assetId === right.image.assetId &&
+          left.image.altText === right.image.altText)
   );
 }
 
@@ -800,6 +835,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
   const cellKeys = new Set<string>();
   const rowIndexes = new Set<number>();
   const columnIndexes = new Set<number>();
+  const floatingImageIds = new Set<string>();
 
   const cells = state.cells.map((cell) => {
     if (!isCellAddressInBounds(cell.address)) {
@@ -855,6 +891,9 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
   rowHeights.sort((left, right) => left.index - right.index);
   columnWidths.sort((left, right) => left.index - right.index);
   const metadata = normalizeSheetMetadata(state);
+  const floatingImages = state.floatingImages.map((image) =>
+    normalizeFloatingImage(image, floatingImageIds),
+  );
   return {
     cells,
     rowHeights,
@@ -865,6 +904,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
       start: { ...range.start },
       end: { ...range.end },
     })),
+    floatingImages,
   };
 }
 
@@ -873,7 +913,8 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
     left.cells.length !== right.cells.length ||
     left.rowHeights.length !== right.rowHeights.length ||
     left.columnWidths.length !== right.columnWidths.length ||
-    !areSheetMetadataEqual(left, right)
+    !areSheetMetadataEqual(left, right) ||
+    left.floatingImages.length !== right.floatingImages.length
   ) {
     return false;
   }
@@ -894,6 +935,9 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
       (dimension, index) =>
         dimension.index === right.columnWidths[index]?.index &&
         dimension.size === right.columnWidths[index]?.size,
+    ) &&
+    left.floatingImages.every((image, index) =>
+      areFloatingImagesEqual(image, right.floatingImages[index]),
     )
   );
 }
@@ -919,6 +963,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
       start: { ...range.start },
       end: { ...range.end },
     })),
+    floatingImages: sheet.floatingImages.map(cloneFloatingImage),
   });
 }
 
@@ -950,7 +995,68 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
     start: { ...range.start },
     end: { ...range.end },
   }));
+  sheet.floatingImages = nextState.floatingImages.map(cloneFloatingImage);
   return true;
+}
+
+export function cloneFloatingImage(image: FloatingImage): FloatingImage {
+  return { ...image, anchor: { ...image.anchor } };
+}
+
+function normalizeFloatingImage(image: FloatingImage, ids?: Set<string>): FloatingImage {
+  if (!image || typeof image !== "object") throw new TypeError("Invalid floating image.");
+  if (typeof image.id !== "string" || !image.id.trim())
+    throw new TypeError("Floating image ID must be non-empty.");
+  if (ids?.has(image.id)) throw new Error(`Duplicate floating image ${image.id}.`);
+  ids?.add(image.id);
+  if (typeof image.assetId !== "string" || !image.assetId.trim())
+    throw new TypeError("Floating image asset ID must be non-empty.");
+  if (typeof image.altText !== "string")
+    throw new TypeError("Floating image alt text must be a string.");
+  if (!isCellAddressInBounds(image.anchor))
+    throw new RangeError("Floating image anchor is outside the sheet.");
+  if (
+    !Number.isFinite(image.offsetX) ||
+    image.offsetX < 0 ||
+    !Number.isFinite(image.offsetY) ||
+    image.offsetY < 0
+  )
+    throw new RangeError("Floating image offsets must be finite and non-negative.");
+  if (
+    !Number.isFinite(image.width) ||
+    image.width < MIN_FLOATING_IMAGE_SIZE ||
+    image.width > MAX_FLOATING_IMAGE_SIZE ||
+    !Number.isFinite(image.height) ||
+    image.height < MIN_FLOATING_IMAGE_SIZE ||
+    image.height > MAX_FLOATING_IMAGE_SIZE
+  )
+    throw new RangeError(
+      `Floating image dimensions must be between ${MIN_FLOATING_IMAGE_SIZE} and ${MAX_FLOATING_IMAGE_SIZE}.`,
+    );
+  return cloneFloatingImage(image);
+}
+
+export function normalizeFloatingImageForSheet(image: FloatingImage): FloatingImage {
+  return normalizeFloatingImage(image);
+}
+
+function areFloatingImagesEqual(
+  left: FloatingImage | undefined,
+  right: FloatingImage | undefined,
+): boolean {
+  return (
+    !!left &&
+    !!right &&
+    left.id === right.id &&
+    left.assetId === right.assetId &&
+    left.altText === right.altText &&
+    left.anchor.row === right.anchor.row &&
+    left.anchor.column === right.anchor.column &&
+    left.offsetX === right.offsetX &&
+    left.offsetY === right.offsetY &&
+    left.width === right.width &&
+    left.height === right.height
+  );
 }
 
 export function isCellAddressInBounds(address: CellAddress): boolean {

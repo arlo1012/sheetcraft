@@ -1,4 +1,4 @@
-import type { WorkbookSnapshotV2 } from "@idea10/core/serialization";
+import type { WorkbookSnapshot } from "@idea10/core/serialization";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createIndexedDbWorkbookStore } from "../../../../modules/workbook-persistence/indexedDbWorkbookStore";
 
@@ -87,7 +87,7 @@ describe("IndexedDB workbook store", () => {
     const { abort, put } = installDatabase(validRecord(Number.MAX_SAFE_INTEGER));
 
     await expect(
-      createIndexedDbWorkbookStore().save({} as WorkbookSnapshotV2, Number.MAX_SAFE_INTEGER),
+      createIndexedDbWorkbookStore().save({} as WorkbookSnapshot, Number.MAX_SAFE_INTEGER),
     ).rejects.toMatchObject({ code: "invalid-record" });
 
     expect(abort).toHaveBeenCalledOnce();
@@ -97,7 +97,7 @@ describe("IndexedDB workbook store", () => {
   test("recovers a maximum revision through an explicit replacement", async () => {
     const { put } = installDatabase(validRecord(Number.MAX_SAFE_INTEGER));
 
-    const receipt = await createIndexedDbWorkbookStore().replace({} as WorkbookSnapshotV2);
+    const receipt = await createIndexedDbWorkbookStore().replace({} as WorkbookSnapshot);
 
     expect(receipt.revision).toBe(1);
     expect(put).toHaveBeenCalledWith(expect.objectContaining({ revision: 1 }), "current");

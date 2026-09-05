@@ -88,7 +88,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
       "false",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(17);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(16);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({
@@ -148,6 +148,10 @@ describe("SpreadsheetRibbon", () => {
     await wrapper.get('[data-ribbon-action="merge-cells"]').trigger("click");
     await new DOMWrapper(document.body).get('[data-merge-action="merge"]').trigger("click");
     expect(wrapper.emitted("merge")).toEqual([[]]);
+
+    await wrapper.get('[data-ribbon-action="image"]').trigger("click");
+    await new DOMWrapper(document.body).get('[data-image-insert-mode="floating"]').trigger("click");
+    expect(wrapper.emitted("insertImage")).toEqual([["floating"]]);
   });
 
   test("localizes the category, surface, and concrete data tool labels", () => {

@@ -16,9 +16,16 @@ export type CellFormula = {
   source: string;
 };
 
+/** A binary image resource owned by the Web storage adapter. */
+export type CellImage = {
+  assetId: string;
+  altText: string;
+};
+
 export type CellContent =
   | { kind: "literal"; value: Exclude<FormulaScalar, null> }
-  | { kind: "formula"; formula: CellFormula };
+  | { kind: "formula"; formula: CellFormula }
+  | { kind: "image"; image: CellImage };
 
 export type FormulaAddress = {
   row: number;

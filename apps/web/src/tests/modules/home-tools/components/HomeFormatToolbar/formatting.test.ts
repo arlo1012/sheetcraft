@@ -222,11 +222,13 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper)).toEqual([]);
   });
 
-  test("shows disclosure icons only for controls with an available menu", () => {
+  test("shows an image menu disclosure for the available image control", () => {
     const wrapper = mountToolbar();
 
     expect(wrapper.findAll("[data-color-disclosure]")).toHaveLength(2);
-    expect(wrapper.find(".is-disabled .ribbon-icon-action__disclosure").exists()).toBe(false);
+    expect(
+      wrapper.get('[data-ribbon-action="image"]').find(".ribbon-icon-action__disclosure").exists(),
+    ).toBe(true);
   });
 
   test("disables formatting controls while keeping history actions available", async () => {
@@ -386,7 +388,7 @@ describe("HomeFormatToolbar", () => {
       expect(control.element).toBeInstanceOf(HTMLButtonElement);
       expect(control.attributes()).toMatchObject({ type: "button", disabled: "" });
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(17);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(16);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({ type: "button", disabled: "" });

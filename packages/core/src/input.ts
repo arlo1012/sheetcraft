@@ -75,6 +75,7 @@ export function formatCellValueForInput(value: CellValue): string {
 export function formatCellContentForInput(content: CellContent | null | undefined): string {
   if (!content) return "";
   if (content.kind === "formula") return content.formula.source;
+  if (content.kind === "image") return "";
   if (
     typeof content.value === "string" &&
     (content.value.startsWith("=") || content.value.startsWith("'"))

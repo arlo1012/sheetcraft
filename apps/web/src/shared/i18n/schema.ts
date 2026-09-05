@@ -242,6 +242,25 @@ export type MessageSchema = {
     applyColor: string;
     selectionTooLarge: string;
   };
+  image: {
+    insertMenu: string;
+    insertInCell: string;
+    insertFloating: string;
+    cellAlt: string;
+    floatingAlt: string;
+    resize: string;
+    copied: string;
+    copyFailed: string;
+    inserted: string;
+    loading: string;
+    invalidType: string;
+    tooLarge: string;
+    invalidFile: string;
+    decodeFailed: string;
+    assetUnavailable: string;
+    insertionFailed: string;
+    keyboardInstructions: string;
+  };
   clipboard: {
     unavailable: string;
     axisCopyUnsupported: string;

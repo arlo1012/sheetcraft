@@ -52,6 +52,8 @@ export type SheetViewportLayout = {
   getCellRect: (address: CellAddress) => Rect | null;
   getCellViewportRect: (address: CellAddress) => Rect | null;
   getCellAtViewportPoint: (point: Point) => CellAddress | null;
+  /** Resolves a continuous sheet point to an anchor cell, clamping beyond sheet edges. */
+  getCellAtSheetPoint: (point: Point) => CellAddress | null;
   getPaneForAddress: (address: CellAddress) => FrozenPaneId;
   getMergedRangeAt: (address: CellAddress) => CellRange | null;
   getAnchorForAddress: (address: CellAddress) => CellAddress;
@@ -402,6 +404,24 @@ export function createSheetViewportLayout(options: {
     return getAnchorForAddress({ row, column });
   }
 
+  function getCellAtSheetPoint(point: Point): CellAddress | null {
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+    const x = clamp(
+      point.x,
+      0,
+      Math.max(0, totalSize.width - Math.min(0.000001, totalSize.width / 2)),
+    );
+    const y = clamp(
+      point.y,
+      0,
+      Math.max(0, totalSize.height - Math.min(0.000001, totalSize.height / 2)),
+    );
+    const column = geometry.getCellAtPoint({ x, y: 0 })?.column;
+    const row = rows.getLogicalRowAtOffset(y);
+    if (row === null || column === undefined) return null;
+    return getAnchorForAddress({ row, column });
+  }
+
   function getFirstVisibleRow(bounds: AxisBounds): VisibleRow | null {
     if (bounds.start >= bounds.end) return null;
     const row = rows.getVisibleRow(bounds.start);
@@ -541,6 +561,7 @@ export function createSheetViewportLayout(options: {
     getCellRect,
     getCellViewportRect,
     getCellAtViewportPoint,
+    getCellAtSheetPoint,
     getPaneForAddress,
     getMergedRangeAt,
     getAnchorForAddress,

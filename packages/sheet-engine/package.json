@@ -15,6 +15,10 @@
       "types": "./dist/geometry.d.ts",
       "import": "./dist/geometry.js"
     },
+    "./floating-image-layout": {
+      "types": "./dist/floating-image-layout.d.ts",
+      "import": "./dist/floating-image-layout.js"
+    },
     "./frozen-layout": {
       "types": "./dist/frozen-layout.d.ts",
       "import": "./dist/frozen-layout.js"

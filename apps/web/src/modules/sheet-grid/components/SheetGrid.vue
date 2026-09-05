@@ -16,6 +16,7 @@ import {
   createSheetEvaluator,
   getCellContent,
   getCellStyle,
+  type FloatingImage,
   type CellAddress,
   type CellRange,
   type Sheet,
@@ -60,6 +61,11 @@ import { useDimensionResize } from "../composables/useDimensionResize";
 import { useCellEditing } from "../composables/useCellEditing";
 import { useDragSelection } from "../composables/useDragSelection";
 import { useSheetViewport } from "../composables/useSheetViewport";
+import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloatingImageLayer.vue";
+import {
+  readFloatingImageClipboard,
+  writeFloatingImageClipboard,
+} from "../../sheet-images/imageClipboard";
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
@@ -117,6 +123,9 @@ const props = withDefaults(
     columnExpansionTail?: number;
     viewState?: SheetGridViewState;
     formatPainterActive?: boolean;
+    imageAssetUrls?: ReadonlyMap<string, string>;
+    loadingImageAssetIds?: ReadonlySet<string>;
+    missingImageAssetIds?: ReadonlySet<string>;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -129,6 +138,10 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
+  updateFloatingImage: [image: FloatingImage];
+  deleteFloatingImage: [id: string];
+  pasteImageFile: [file: File];
+  pasteFloatingImage: [image: FloatingImage];
   commitCell: [payload: { address: CellAddress; input: string }];
   clearCells: [range: CellRange];
   clipboardFeedback: [feedback: GridClipboardFeedback];
@@ -147,6 +160,7 @@ const COLUMN_HEADER_HEIGHT = 28;
 
 const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
+const selectedImageId = ref<string | null>(null);
 const selection = ref<CellSelection>(createCellSelection({ row: 0, column: 0 }));
 const clipboardFeedbackKey = ref<GridClipboardFeedback>();
 const axisContextMenu = ref<AxisContextMenuState>();
@@ -338,11 +352,13 @@ const activeCellOutlineRects = computed(() =>
 );
 const activeCellLabel = computed(() => getCellAddressLabel(activeCell.value));
 const activeCellDisplayValue = computed(() =>
-  formatCellValueForGrid(
-    sheetEvaluator.value.getComputedValue(activeCell.value),
-    getCellStyle(props.sheet, activeCell.value),
-    locale.value,
-  ),
+  getCellContent(props.sheet, activeCell.value)?.kind === "image"
+    ? t("image.cellAlt")
+    : formatCellValueForGrid(
+        sheetEvaluator.value.getComputedValue(activeCell.value),
+        getCellStyle(props.sheet, activeCell.value),
+        locale.value,
+      ),
 );
 const activeCellEditorStyle = computed(() =>
   getCellEditorStyle(getCellStyle(props.sheet, activeCell.value)),
@@ -400,6 +416,53 @@ const clipboardRangeRects = computed(() =>
   clipboardRange.value ? layout.value.getRangeFragments(clipboardRange.value) : [],
 );
 
+function selectFloatingImage(id: string | null): void {
+  if (isComposing.value) return;
+  if (isEditing.value) finishEdit(undefined, false);
+  stopDragSelection();
+  axisContextMenu.value = undefined;
+  cellContextMenu.value = undefined;
+  selectedImageId.value = id;
+  if (!id) focusEditor();
+}
+
+function deleteSelectedFloatingImage(id: string): void {
+  emit("deleteFloatingImage", id);
+  selectedImageId.value = null;
+  focusEditor();
+}
+
+function onImageCopy(event: ClipboardEvent): void {
+  if (isEditing.value || !event.clipboardData) return;
+  const image = props.sheet.floatingImages.find((entry) => entry.id === selectedImageId.value);
+  if (!image) return;
+  event.preventDefault();
+  event.stopPropagation();
+  writeFloatingImageClipboard(event.clipboardData, image);
+}
+
+function onImagePaste(event: ClipboardEvent): void {
+  if (isEditing.value || isComposing.value || !event.clipboardData) return;
+  const image = readFloatingImageClipboard(event.clipboardData);
+  const file = Array.from(event.clipboardData.files ?? []).find((entry) =>
+    entry.type.startsWith("image/"),
+  );
+  if (!image && !file) return;
+  event.preventDefault();
+  event.stopPropagation();
+  clearPendingClipboard();
+  if (image) emit("pasteFloatingImage", image);
+  else if (file) emit("pasteImageFile", file);
+}
+
+watch(
+  () => [props.sheet.id, ...props.sheet.floatingImages.map((image) => image.id)],
+  () => {
+    if (!props.sheet.floatingImages.some((image) => image.id === selectedImageId.value))
+      selectedImageId.value = null;
+  },
+);
+
 function normalizeSelectionForSheet(nextSelection: CellSelection): CellSelection {
   if (nextSelection.mode !== "cells") {
     return {
@@ -435,6 +498,7 @@ function setSelection(
   visibleAddress: CellAddress = nextSelection.active,
   restoreFocus = true,
 ): void {
+  selectedImageId.value = null;
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
   selection.value = normalizeSelectionForSheet(nextSelection);
@@ -539,6 +603,10 @@ function onDimensionResizeStart(
 }
 
 function onGridKeydown(event: KeyboardEvent): void {
+  if (event.target instanceof Element && event.target.closest("[data-floating-image-id]")) {
+    handleHistoryShortcut(event);
+    return;
+  }
   if (event.key !== "Escape") {
     return;
   }
@@ -806,6 +874,7 @@ function onCornerClick(): void {
 }
 
 function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
+  if (getCellContent(props.sheet, address)?.kind === "image") return;
   if (isComposing.value) {
     return;
   }
@@ -954,7 +1023,7 @@ function onEditorKeydown(event: KeyboardEvent): void {
 
   if (event.key === "F2") {
     event.preventDefault();
-    beginEdit("append");
+    if (getCellContent(props.sheet, activeCell.value)?.kind !== "image") beginEdit("append");
     return;
   }
 
@@ -1073,6 +1142,8 @@ defineExpose({
     }"
     :aria-label="t('grid.worksheet', { name: sheet.name })"
     @keydown.capture="onGridKeydown"
+    @copy.capture="onImageCopy"
+    @paste.capture="onImagePaste"
   >
     <button
       type="button"
@@ -1122,6 +1193,8 @@ defineExpose({
         <div class="sheet-grid__viewport" :style="gridViewportStyle">
           <SheetCellLayer
             :sheet="sheet"
+            :image-asset-urls="imageAssetUrls"
+            :loading-image-asset-ids="loadingImageAssetIds"
             :evaluator="sheetEvaluator"
             :layout="layout"
             :active-cell="activeCell"
@@ -1162,6 +1235,17 @@ defineExpose({
             :editing="isEditing"
             :clipboard-rects="clipboardRangeRects"
             :clipboard-mode="clipboardMode"
+          />
+          <SheetFloatingImageLayer
+            :images="sheet.floatingImages"
+            :layout="layout"
+            :asset-urls="imageAssetUrls ?? new Map()"
+            :loading-asset-ids="loadingImageAssetIds"
+            :missing-asset-ids="missingImageAssetIds"
+            :selected-image-id="selectedImageId"
+            @select="selectFloatingImage"
+            @update="emit('updateFloatingImage', $event)"
+            @delete="deleteSelectedFloatingImage"
           />
           <SheetBorderLayer
             :sheet="sheet"

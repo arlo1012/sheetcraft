@@ -107,6 +107,7 @@ function getTranslatedContent(
 ): CellContent | undefined {
   if (!content) return undefined;
   if (content.kind === "literal") return cloneCellContent(content);
+  if (content.kind === "image") return cloneCellContent(content);
   return {
     kind: "formula",
     formula: {

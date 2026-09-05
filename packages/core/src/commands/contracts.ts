@@ -1,4 +1,4 @@
-import type { SheetSnapshotV2 } from "../serialization.js";
+import type { SheetSnapshot } from "../serialization.js";
 import type { CellContent } from "../formula/types.js";
 import type { CellBorderAction, CellStyle, CellStylePatch } from "../style.js";
 import type {
@@ -11,6 +11,7 @@ import type {
   SheetSparseCell,
   SheetSparseDimension,
   SheetSparseState,
+  FloatingImage,
 } from "../workbook.js";
 
 export type CellContentChange = {
@@ -110,9 +111,23 @@ export type SortSheetRangeCommand = {
 
 export type AddSheetCommand = {
   type: "addSheet";
-  sheet: SheetSnapshotV2;
+  sheet: SheetSnapshot;
   index: number;
   activeSheetId: string;
+};
+
+export type SetFloatingImageCommand = {
+  type: "setFloatingImage";
+  sheetId: string;
+  image: FloatingImage;
+  /** Original z-order slot used only by a delete inverse. */
+  index?: number;
+};
+
+export type DeleteFloatingImageCommand = {
+  type: "deleteFloatingImage";
+  sheetId: string;
+  id: string;
 };
 
 export type DeleteSheetCommand = {
@@ -159,6 +174,8 @@ export type RestoreFullSheetStateCommand = {
 export type SheetAxisSparseSlice = {
   cells: SheetSparseCell[];
   dimensions: SheetSparseDimension[];
+  /** Images removed from the structural operation, preserving their sheet order. */
+  floatingImages: Array<{ image: FloatingImage; index: number }>;
   /** Exact raw formula sources before the structural change, for lossless undo. */
   formulaSources?: Array<{ address: CellAddress; source: string }>;
   /** Exact sheet metadata before the structural change. */
@@ -196,6 +213,8 @@ export type WorkbookCommand =
   | UnmergeCellsCommand
   | SetSheetFilterCommand
   | SortSheetRangeCommand
+  | SetFloatingImageCommand
+  | DeleteFloatingImageCommand
   | AddSheetCommand
   | DeleteSheetCommand
   | RenameSheetCommand
@@ -217,6 +236,8 @@ export type WorkbookOperation =
   | "cells.unmerge"
   | "data.filter"
   | "data.sort"
+  | "images.floating.set"
+  | "images.floating.delete"
   | "sheets.add"
   | "sheets.delete"
   | "sheets.rename"
@@ -253,6 +274,10 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "data.filter";
     case "sortSheetRange":
       return "data.sort";
+    case "setFloatingImage":
+      return "images.floating.set";
+    case "deleteFloatingImage":
+      return "images.floating.delete";
     case "addSheet":
       return "sheets.add";
     case "deleteSheet":

@@ -1,4 +1,4 @@
-import type { WorkbookSnapshotV2 } from "@idea10/core/serialization";
+import type { WorkbookSnapshot } from "@idea10/core/serialization";
 
 export type PersistedWorkbook = {
   revision: number;
@@ -14,14 +14,14 @@ export type WorkbookSaveReceipt = {
 export type WorkbookStore = {
   load: () => Promise<PersistedWorkbook | undefined>;
   save: (
-    snapshot: WorkbookSnapshotV2,
+    snapshot: WorkbookSnapshot,
     expectedRevision: number | undefined,
   ) => Promise<WorkbookSaveReceipt>;
   /**
    * Replaces the browser recovery record after the UI has explicitly confirmed
    * importing a document. Normal automatic and manual saves must use `save`.
    */
-  replace: (snapshot: WorkbookSnapshotV2) => Promise<WorkbookSaveReceipt>;
+  replace: (snapshot: WorkbookSnapshot) => Promise<WorkbookSaveReceipt>;
 };
 
 export type WorkbookStoreErrorCode = "unavailable" | "invalid-record" | "conflict" | "quota";

@@ -2,12 +2,14 @@ import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   cloneCellContent,
+  cloneFloatingImage,
   createCellKey,
   createSheetSparseState,
   getSheetMetadata,
   replaceSheetSparseState,
   setSheetMetadata,
   type Sheet,
+  type FloatingImage,
   type SheetDimensionAxis,
   type SheetFilter,
   type SheetMetadata,
@@ -84,6 +86,10 @@ function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
     })),
     dimensions: slice.dimensions.map((dimension) => ({ ...dimension })),
+    floatingImages: slice.floatingImages.map(({ image, index }) => ({
+      image: cloneFloatingImage(image),
+      index,
+    })),
     ...(slice.formulaSources
       ? {
           formulaSources: slice.formulaSources.map((formula) => ({
@@ -372,6 +378,27 @@ function transformSheetAxis(
     sheet.cells.set(key, { ...cell, content: { kind: "formula", formula: { source } } });
     changed = true;
   }
+  const transformedFloatingImages: FloatingImage[] = [];
+  for (const image of sheet.floatingImages) {
+    const sourceIndex = axis === "row" ? image.anchor.row : image.anchor.column;
+    const targetIndex = transformAxisIndex(sourceIndex, index, count, maximum, operation);
+    if (targetIndex === null) {
+      changed = true;
+      continue;
+    }
+    if (targetIndex === sourceIndex) transformedFloatingImages.push(image);
+    else {
+      transformedFloatingImages.push({
+        ...image,
+        anchor:
+          axis === "row"
+            ? { row: targetIndex, column: image.anchor.column }
+            : { row: image.anchor.row, column: targetIndex },
+      });
+      changed = true;
+    }
+  }
+  sheet.floatingImages = transformedFloatingImages;
   return changed;
 }
 
@@ -409,6 +436,12 @@ function captureSheetAxisSlice(
     if (cell.content?.kind !== "formula") return [];
     return [{ address: parseCellKey(key), source: cell.content.formula.source }];
   });
+  const floatingImages = sheet.floatingImages.flatMap((image, imageIndex) => {
+    const axisIndex = axis === "row" ? image.anchor.row : image.anchor.column;
+    return axisIndex >= start && axisIndex < end
+      ? [{ image: cloneFloatingImage(image), index: imageIndex }]
+      : [];
+  });
   formulaSources.sort(
     (left, right) =>
       left.address.row - right.address.row || left.address.column - right.address.column,
@@ -416,6 +449,7 @@ function captureSheetAxisSlice(
   return {
     cells,
     dimensions: capturedDimensions,
+    floatingImages,
     formulaSources,
     metadata: getSheetMetadata(sheet),
   };
@@ -445,6 +479,15 @@ function restoreSheetAxisSlice(
       continue;
     }
     dimensions.set(dimension.index, dimension.size);
+    changed = true;
+  }
+  for (const { image, index } of slice.floatingImages) {
+    if (sheet.floatingImages.some((current) => current.id === image.id)) continue;
+    sheet.floatingImages.splice(
+      Math.min(index, sheet.floatingImages.length),
+      0,
+      cloneFloatingImage(image),
+    );
     changed = true;
   }
   for (const formula of slice.formulaSources ?? []) {
@@ -504,6 +547,29 @@ function validateSheetAxisSlice(
       );
     }
   }
+  for (const entry of command.slice.floatingImages) {
+    if (!Number.isInteger(entry.index) || entry.index < 0) {
+      throw invalidCommandPayload("slice.floatingImages", entry);
+    }
+    validateCommandPayload("slice.floatingImages", entry.image, () => {
+      const validationSheet: Sheet = {
+        id: "floating-image-validation",
+        name: "Floating image validation",
+        cells: new Map(),
+        rowHeights: new Map(),
+        columnWidths: new Map(),
+        freezePanes: { rows: 0, columns: 0 },
+        filter: null,
+        mergedCells: [],
+        floatingImages: [entry.image],
+      };
+      createSheetSparseState(validationSheet);
+    });
+    const axisIndex = command.axis === "row" ? entry.image.anchor.row : entry.image.anchor.column;
+    if (axisIndex < start || axisIndex >= end) {
+      throw invalidCommandPayload("slice.floatingImages", entry);
+    }
+  }
 
   // Reuse the sparse-state validator without copying the target Sheet.
   const validationSheet: Sheet = {
@@ -515,6 +581,7 @@ function validateSheetAxisSlice(
     freezePanes: { rows: 0, columns: 0 },
     filter: null,
     mergedCells: [],
+    floatingImages: [],
   };
   validateCommandPayload("slice", command.slice, () =>
     replaceSheetSparseState(validationSheet, {
@@ -524,6 +591,7 @@ function validateSheetAxisSlice(
       freezePanes: command.slice.metadata.freezePanes,
       filter: command.slice.metadata.filter,
       mergedCells: command.slice.metadata.mergedCells,
+      floatingImages: [],
     }),
   );
   for (const formula of command.slice.formulaSources ?? []) {

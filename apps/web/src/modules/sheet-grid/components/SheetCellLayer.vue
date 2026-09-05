@@ -2,6 +2,7 @@
 import { computed, type CSSProperties } from "vue";
 import {
   getCellStyle,
+  getCellContent,
   type CellAddress,
   type Sheet,
   type SheetEvaluator,
@@ -9,6 +10,7 @@ import {
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import type { Rect } from "@idea10/sheet-engine/geometry";
 import { isCellSelected, type CellSelection } from "@idea10/sheet-engine/selection";
+import { useAppI18n } from "../../../shared/i18n";
 import { getCellContentStyle } from "../cell-presentation";
 import { formatCellValueForGrid } from "../cell-value-presentation";
 
@@ -20,6 +22,7 @@ type VisibleCell = {
   viewportTop: number;
   viewportHeight: number;
   text: string;
+  image?: { assetId: string; altText: string };
   multiline: boolean;
   wrapped: boolean;
   style: CSSProperties;
@@ -51,9 +54,13 @@ const props = withDefaults(
     selection: CellSelection;
     editing: boolean;
     locale?: string;
+    imageAssetUrls?: ReadonlyMap<string, string>;
+    loadingImageAssetIds?: ReadonlySet<string>;
   }>(),
   { locale: "en-US" },
 );
+
+const { t } = useAppI18n();
 
 const emit = defineEmits<{
   cellMousedown: [address: CellAddress, event: MouseEvent];
@@ -73,11 +80,11 @@ const visibleCells = computed<VisibleCell[]>(() => {
       : props.layout.getCellViewportRect(address);
     if (!rect) return;
     const cellStyle = getCellStyle(props.sheet, address);
-    const text = formatCellValueForGrid(
-      props.evaluator.getComputedValue(address),
-      cellStyle,
-      props.locale,
-    );
+    const content = getCellContent(props.sheet, address);
+    const cellImage = content?.kind === "image" ? content.image : undefined;
+    const text = cellImage
+      ? ""
+      : formatCellValueForGrid(props.evaluator.getComputedValue(address), cellStyle, props.locale);
     const preservesLineBreaks = /[\r\n]/u.test(text);
     cells.push({
       key: `${address.row}:${address.column}`,
@@ -85,6 +92,7 @@ const visibleCells = computed<VisibleCell[]>(() => {
       address,
       rect,
       text,
+      ...(cellImage ? { image: cellImage } : {}),
       multiline: Boolean(cellStyle?.wrapText) || preservesLineBreaks,
       wrapped: Boolean(cellStyle?.wrapText),
       style: {
@@ -251,6 +259,7 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
           class="sheet-cell-layer__cell"
           :class="{
             'has-value': cell.text.length > 0,
+            'has-image': Boolean(cell.image),
             'is-multiline': cell.multiline,
             'is-wrapped': cell.wrapped,
             'is-active':
@@ -272,7 +281,30 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
           @dblclick.left.prevent="emit('cellDoubleClick', cell.address, $event)"
           @contextmenu="emit('cellContextmenu', cell.address, $event)"
         >
-          <span v-if="cell.text" class="sheet-cell-layer__value">{{ cell.text }}</span>
+          <img
+            v-if="cell.image && imageAssetUrls?.get(cell.image.assetId)"
+            class="sheet-cell-layer__image"
+            :src="imageAssetUrls.get(cell.image.assetId)"
+            :alt="cell.image.altText || t('image.cellAlt')"
+            draggable="false"
+          />
+          <span
+            v-else-if="cell.image"
+            class="sheet-cell-layer__image-placeholder"
+            role="img"
+            :aria-label="
+              loadingImageAssetIds?.has(cell.image.assetId)
+                ? t('image.loading')
+                : t('image.assetUnavailable')
+            "
+          >
+            {{
+              loadingImageAssetIds?.has(cell.image.assetId)
+                ? t("image.loading")
+                : t("image.assetUnavailable")
+            }}
+          </span>
+          <span v-else-if="cell.text" class="sheet-cell-layer__value">{{ cell.text }}</span>
           <slot
             v-if="cell.address.row === activeCell.row && cell.address.column === activeCell.column"
             name="active-cell"
@@ -341,6 +373,26 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
     &.is-multiline.is-active:not(.is-editing) {
       overflow: hidden;
     }
+  }
+
+  &__cell.has-image {
+    padding: 2px;
+    overflow: hidden;
+  }
+
+  &__image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+
+  &__image-placeholder {
+    overflow: hidden;
+    color: var(--idea-text-secondary);
+    font-size: 11px;
+    text-overflow: ellipsis;
   }
 
   &__value {

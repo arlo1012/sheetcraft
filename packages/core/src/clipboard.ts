@@ -104,6 +104,7 @@ export function translateCellContentForCopy(
 ): CellContent | null {
   if (!content) return null;
   if (content.kind === "literal") return { kind: "literal", value: content.value };
+  if (content.kind === "image") return { kind: "image", image: { ...content.image } };
   return {
     kind: "formula",
     formula: {

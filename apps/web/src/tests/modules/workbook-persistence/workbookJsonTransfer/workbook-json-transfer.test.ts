@@ -1,12 +1,20 @@
-import { createWorkbook, getActiveSheet, getCellValue, setCellValue } from "@idea10/core/workbook";
+import {
+  createWorkbook,
+  getActiveSheet,
+  getCellValue,
+  setCellContent,
+  setCellValue,
+} from "@idea10/core/workbook";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   WorkbookFileError,
   downloadWorkbookJson,
   parseWorkbookJson,
   readWorkbookFile,
+  readWorkbookBundleFile,
 } from "../../../../modules/workbook-persistence/workbookJsonTransfer";
 import { serializeWorkbook } from "@idea10/core/serialization";
+import { createMemoryImageAssetStore } from "../../../../modules/image-assets/imageAssetStore";
 
 function createTestWorkbook() {
   const workbook = createWorkbook({ id: "workbook", sheetId: "sheet", sheetName: "Budget" });
@@ -76,6 +84,69 @@ describe("workbook JSON transfer", () => {
     });
 
     expect(parsed.id).toBe(workbook.id);
+  });
+
+  test("derives imported image identity and dimensions from real PNG bytes", async () => {
+    const workbook = createTestWorkbook();
+    setCellContent(
+      getActiveSheet(workbook),
+      { row: 1, column: 1 },
+      { kind: "image", image: { assetId: "untrusted-id", altText: "logo" } },
+    );
+    const snapshot = serializeWorkbook(workbook);
+    const png =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9JZ4sAAAAASUVORK5CYII=";
+    const url = { createObjectURL: vi.fn(() => "blob:png"), revokeObjectURL: vi.fn() };
+    vi.stubGlobal("URL", url);
+    vi.stubGlobal(
+      "Image",
+      class {
+        naturalWidth = 1;
+        naturalHeight = 1;
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        set src(_value: string) {
+          queueMicrotask(() => this.onload?.());
+        }
+      },
+    );
+    const imported = await readWorkbookBundleFile(
+      {
+        text: async () =>
+          JSON.stringify({
+            format: "idea10-workbook",
+            version: 1,
+            snapshot,
+            images: [
+              { id: "untrusted-id", mimeType: "image/jpeg", width: 999, height: 999, data: png },
+            ],
+          }),
+      },
+      createMemoryImageAssetStore(),
+    );
+    const content = getActiveSheet(imported).cells.get("1:1")?.content;
+    expect(content).toMatchObject({
+      kind: "image",
+      image: { assetId: expect.stringMatching(/^image-/) },
+    });
+    expect((content as { kind: "image"; image: { assetId: string } }).image.assetId).not.toBe(
+      "untrusted-id",
+    );
+  });
+
+  test("rejects a plain image snapshot without bundled image bytes", async () => {
+    const workbook = createTestWorkbook();
+    setCellContent(
+      getActiveSheet(workbook),
+      { row: 0, column: 1 },
+      { kind: "image", image: { assetId: "missing", altText: "" } },
+    );
+    await expect(
+      readWorkbookBundleFile(
+        { text: async () => JSON.stringify(serializeWorkbook(workbook)) },
+        createMemoryImageAssetStore(),
+      ),
+    ).rejects.toMatchObject({ code: "missing-image" });
   });
 
   test("downloads a fixed JSON filename and revokes its object URL", () => {

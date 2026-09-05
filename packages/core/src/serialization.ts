@@ -13,6 +13,7 @@ import {
   type Sheet,
   type SheetFilter,
   type SheetFilterValue,
+  type FloatingImage,
   type SheetSparseDimension,
   type SheetSparseState,
   type Workbook,
@@ -46,6 +47,10 @@ export type SheetSnapshotV2 = Omit<SheetSnapshotV1, "cells"> & {
   mergedCells?: CellRange[];
 };
 
+export type SheetSnapshotV3 = SheetSnapshotV2 & {
+  floatingImages: FloatingImage[];
+};
+
 export type WorkbookSnapshotV1 = {
   version: 1;
   id: string;
@@ -59,6 +64,18 @@ export type WorkbookSnapshotV2 = {
   activeSheetId: string;
   sheets: SheetSnapshotV2[];
 };
+
+export type WorkbookSnapshotV3 = {
+  version: 3;
+  id: string;
+  activeSheetId: string;
+  sheets: SheetSnapshotV3[];
+};
+
+/** The current snapshot contract emitted by Core. */
+export type SheetSnapshot = SheetSnapshotV3;
+/** The current snapshot contract emitted by Core. */
+export type WorkbookSnapshot = WorkbookSnapshotV3;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -141,21 +158,29 @@ function parseCellContent(value: unknown, path: string): CellContent {
     }
     return { kind: "formula", formula: { source: formula.source } };
   }
-  return fail(`${path}.kind`, "Expected 'literal' or 'formula'.");
+  if (record.kind === "image") {
+    const image = asRecord(record.image, `${path}.image`);
+    if (typeof image.assetId !== "string" || !image.assetId.trim())
+      return fail(`${path}.image.assetId`, "Expected a non-empty string.");
+    if (typeof image.altText !== "string")
+      return fail(`${path}.image.altText`, "Expected a string.");
+    return { kind: "image", image: { assetId: image.assetId, altText: image.altText } };
+  }
+  return fail(`${path}.kind`, "Expected 'literal', 'formula', or 'image'.");
 }
 
-function parseCell(value: unknown, path: string, version: 1 | 2): CellSnapshotV2 {
+function parseCell(value: unknown, path: string, version: 1 | 2 | 3): CellSnapshotV2 {
   const record = asRecord(value, path);
   const hasContent = Object.hasOwn(record, "content");
   const hasValue = Object.hasOwn(record, "value");
   const hasStyle = Object.hasOwn(record, "style");
-  if ((version === 2 && hasValue) || (version === 1 && hasContent)) {
+  if ((version >= 2 && hasValue) || (version === 1 && hasContent)) {
     return fail(
       path,
-      version === 2 ? "V2 cells use content, not value." : "V1 cells use value, not content.",
+      version >= 2 ? "V2+ cells use content, not value." : "V1 cells use value, not content.",
     );
   }
-  if ((version === 1 && !hasValue && !hasStyle) || (version === 2 && !hasContent && !hasStyle)) {
+  if ((version === 1 && !hasValue && !hasStyle) || (version >= 2 && !hasContent && !hasStyle)) {
     return fail(path, "Expected content or style.");
   }
 
@@ -236,7 +261,35 @@ function parseFilter(value: unknown, path: string): SheetFilter {
   };
 }
 
-function parseSparseState(record: UnknownRecord, path: string, version: 1 | 2): SheetSparseState {
+function parseFloatingImage(value: unknown, path: string): FloatingImage {
+  const record = asRecord(value, path);
+  if (typeof record.id !== "string" || !record.id.trim())
+    return fail(`${path}.id`, "Expected a non-empty string.");
+  if (typeof record.assetId !== "string" || !record.assetId.trim())
+    return fail(`${path}.assetId`, "Expected a non-empty string.");
+  if (typeof record.altText !== "string") return fail(`${path}.altText`, "Expected a string.");
+  const finite = (value: unknown, field: string): number => {
+    if (typeof value !== "number" || !Number.isFinite(value))
+      return fail(`${path}.${field}`, "Expected a finite number.");
+    return value;
+  };
+  return {
+    id: record.id,
+    assetId: record.assetId,
+    altText: record.altText,
+    anchor: parseAddress(record.anchor, `${path}.anchor`),
+    offsetX: finite(record.offsetX, "offsetX"),
+    offsetY: finite(record.offsetY, "offsetY"),
+    width: finite(record.width, "width"),
+    height: finite(record.height, "height"),
+  };
+}
+
+function parseSparseState(
+  record: UnknownRecord,
+  path: string,
+  version: 1 | 2 | 3,
+): SheetSparseState {
   return {
     cells: asArray(record.cells, `${path}.cells`).map((cell, index) =>
       parseCell(cell, `${path}.cells[${index}]`, version),
@@ -248,25 +301,31 @@ function parseSparseState(record: UnknownRecord, path: string, version: 1 | 2): 
       parseDimension(dimension, `${path}.columnWidths[${index}]`),
     ),
     freezePanes:
-      version === 2 && Object.hasOwn(record, "freezePanes")
+      version >= 2 && Object.hasOwn(record, "freezePanes")
         ? parseFreezePanes(record.freezePanes, `${path}.freezePanes`)
         : { rows: 0, columns: 0 },
     filter:
-      version === 2 && Object.hasOwn(record, "filter")
+      version >= 2 && Object.hasOwn(record, "filter")
         ? record.filter === null
           ? null
           : parseFilter(record.filter, `${path}.filter`)
         : null,
     mergedCells:
-      version === 2 && Object.hasOwn(record, "mergedCells")
+      version >= 2 && Object.hasOwn(record, "mergedCells")
         ? asArray(record.mergedCells, `${path}.mergedCells`).map((range, index) =>
             parseRange(range, `${path}.mergedCells[${index}]`),
+          )
+        : [],
+    floatingImages:
+      version === 3
+        ? asArray(record.floatingImages, `${path}.floatingImages`).map((image, index) =>
+            parseFloatingImage(image, `${path}.floatingImages[${index}]`),
           )
         : [],
   };
 }
 
-function parseSheet(value: unknown, path: string, version?: 1 | 2): Sheet {
+function parseSheet(value: unknown, path: string, version?: 1 | 2 | 3): Sheet {
   const record = asRecord(value, path);
   if (version === undefined) {
     const cells = asArray(record.cells, `${path}.cells`);
@@ -276,7 +335,7 @@ function parseSheet(value: unknown, path: string, version?: 1 | 2): Sheet {
     );
     if (hasValue && hasContent)
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
-    version = hasValue ? 1 : 2;
+    version = hasValue ? 1 : Object.hasOwn(record, "floatingImages") ? 3 : 2;
   }
   const id = asIdentifier(record.id, `${path}.id`);
   let name: string;
@@ -298,7 +357,7 @@ function parseSheet(value: unknown, path: string, version?: 1 | 2): Sheet {
   return sheet;
 }
 
-export function serializeSheet(sheet: Sheet): SheetSnapshotV2 {
+export function serializeSheet(sheet: Sheet): SheetSnapshotV3 {
   return {
     id: sheet.id,
     name: sheet.name,
@@ -310,9 +369,9 @@ export function deserializeSheet(value: unknown): Sheet {
   return parseSheet(value, "$");
 }
 
-export function serializeWorkbook(workbook: Workbook): WorkbookSnapshotV2 {
+export function serializeWorkbook(workbook: Workbook): WorkbookSnapshotV3 {
   return {
-    version: 2,
+    version: 3,
     id: workbook.id,
     activeSheetId: workbook.activeSheetId,
     sheets: getWorkbookSheets(workbook).map(serializeSheet),
@@ -321,7 +380,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshotV2 {
 
 export function deserializeWorkbook(value: unknown): Workbook {
   const record = asRecord(value, "$.");
-  if (record.version !== 1 && record.version !== 2) {
+  if (record.version !== 1 && record.version !== 2 && record.version !== 3) {
     throw new WorkbookDomainError(
       {
         code: "unsupported_snapshot_version",

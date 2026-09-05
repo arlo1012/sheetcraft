@@ -16,11 +16,11 @@ The Web adapter uses IndexedDB database `idea10-workbook`, object store
 `workbooks`, and key `current`. The envelope contains a storage revision, save
 timestamp, and Core snapshot. Core remains independent of browser APIs.
 
-| Stored document state                                 | Session-only state                                 |
-| ----------------------------------------------------- | -------------------------------------------------- |
-| Cell values and formulas, styles, borders, dimensions | Selection, scrolling, editor drafts                |
-| Sheet identities, names, order, active Sheet          | Undo/redo history, clipboard, format painter       |
-| Freeze settings, filters, merged ranges               | Search, floating panels, focus, transient feedback |
+| Stored document state                                         | Session-only state                                 |
+| ------------------------------------------------------------- | -------------------------------------------------- |
+| Cell values, formulas and images, styles, borders, dimensions | Selection, scrolling, editor drafts                |
+| Sheet identities, names, order, active Sheet                  | Undo/redo history, clipboard, format painter       |
+| Freeze settings, filters, merged ranges, floating images      | Search, floating panels, focus, transient feedback |
 
 Formula results and derived visibility are rebuilt on load. Both the Grid and
 formula bar are remounted on document replacement, even when Sheet IDs match.
@@ -44,8 +44,13 @@ only the displayed "Saved locally" state confirms that a transaction finished.
 
 ## Files And Failures
 
-Export downloads a V2 snapshot as `idea10-workbook.json`. Import accepts Core's
-V1/V2 snapshots, validates JSON and the entire snapshot first, then asks for
+Export downloads `idea10-workbook.json`: an image-free V3 snapshot, or a versioned
+portable envelope containing that snapshot and every referenced image as base64.
+Image blobs are stored separately in the `idea10-image-assets` IndexedDB database.
+Blobs are saved before document references and retained through undoable deletion.
+Import accepts image-free V1/V2/V3 snapshots and portable image envelopes. It
+validates and decodes all images, derives asset metadata from the bytes, and
+remaps their IDs before storing them. It then asks for
 confirmation. Invalid or unsupported files never replace the open workbook.
 Canceling a valid import leaves both the document and saved copy unchanged.
 

@@ -1,4 +1,5 @@
 export * from "./extent.js";
+export * from "./floating-image-layout.js";
 export * from "./frozen-layout.js";
 export * from "./geometry.js";
 export * from "./row-height.js";

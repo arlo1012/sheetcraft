@@ -2,6 +2,7 @@ export * from "./apply.js";
 export * from "./contracts.js";
 export * from "./dimensions.js";
 export * from "./formatting.js";
+export * from "./images.js";
 export * from "./filter.js";
 export * from "./metadata.js";
 export * from "./sheets.js";

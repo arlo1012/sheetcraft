@@ -23,6 +23,8 @@ import {
   createRenameSheetCommand,
   createResizeSheetDimensionCommand,
   createSetCellContentCommand,
+  createSetFloatingImageCommand,
+  createDeleteFloatingImageCommand,
   createSetSheetFilterCriteriaCommand,
   createSetSheetFreezePanesCommand,
   createSortSheetRangeCommand,
@@ -66,6 +68,7 @@ import {
   getWorkbookSheets,
   MAX_SHEET_ROWS,
   setActiveSheet,
+  type FloatingImage,
   type CellAddress,
   type CellRange,
   type SheetFilter,
@@ -385,6 +388,29 @@ export function useSpreadsheetWorkspaceController(
       "cells.edit",
     );
     clearWorkspaceStatus();
+  }
+
+  function setCellImage(payload: {
+    sheetId: string;
+    address: CellAddress;
+    assetId: string;
+    altText: string;
+  }): void {
+    execute(
+      createSetCellContentCommand(payload.sheetId, payload.address, {
+        kind: "image",
+        image: { assetId: payload.assetId, altText: payload.altText },
+      }),
+      "cells.edit",
+    );
+  }
+
+  function setFloatingImage(image: FloatingImage, sheetId = activeSheet.value.id): void {
+    execute(createSetFloatingImageCommand(sheetId, image));
+  }
+
+  function deleteFloatingImage(id: string): void {
+    execute(createDeleteFloatingImageCommand(activeSheet.value.id, id));
   }
 
   function pasteCells(payload: GridPastePayload): GridPasteResult {
@@ -894,6 +920,9 @@ export function useSpreadsheetWorkspaceController(
     workspaceStatusText,
     formatPainterActive,
     commitCell,
+    setCellImage,
+    setFloatingImage,
+    deleteFloatingImage,
     pasteCells,
     showClipboardFeedback,
     clearCells,

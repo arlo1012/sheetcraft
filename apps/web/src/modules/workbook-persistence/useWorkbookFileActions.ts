@@ -1,8 +1,15 @@
 import { onBeforeUnmount, onMounted, readonly, ref, shallowRef } from "vue";
 import type { Workbook } from "@idea10/core/workbook";
+import type { ImageAssetStore } from "../image-assets/imageAssetStore";
 import type { MessageKey } from "../../shared/i18n";
 import type { useWorkbookPersistence } from "./useWorkbookPersistence";
-import { downloadWorkbookJson, readWorkbookFile, WorkbookFileError } from "./workbookJsonTransfer";
+import {
+  downloadWorkbookBundle,
+  downloadWorkbookJson,
+  readWorkbookBundleFile,
+  readWorkbookFile,
+  WorkbookFileError,
+} from "./workbookJsonTransfer";
 
 export type WorkbookFileConfirmation = "import" | "reload";
 export type WorkbookFileFeedback = { key: MessageKey; error: boolean };
@@ -12,6 +19,7 @@ export function useWorkbookFileActions(options: {
   getWorkbook: () => Workbook;
   flushPendingEdits: () => boolean;
   hasPendingEdits: () => boolean;
+  assetStore?: ImageAssetStore;
 }) {
   const { persistence } = options;
   const busy = ref(false);
@@ -32,10 +40,12 @@ export function useWorkbookFileActions(options: {
     await persistence.saveNow();
   }
 
-  function exportJson(): void {
+  async function exportJson(): Promise<void> {
     if (busy.value || persistence.loading.value || confirmation.value || !flushEdits()) return;
     try {
-      downloadWorkbookJson(options.getWorkbook());
+      if (options.assetStore)
+        await downloadWorkbookBundle(options.getWorkbook(), options.assetStore);
+      else downloadWorkbookJson(options.getWorkbook());
       feedback.value = { key: "persistence.exportStarted", error: false };
     } catch {
       feedback.value = { key: "persistence.exportFailed", error: true };
@@ -47,7 +57,9 @@ export function useWorkbookFileActions(options: {
     busy.value = true;
     feedback.value = undefined;
     try {
-      const workbook = await readWorkbookFile(file);
+      const workbook = options.assetStore
+        ? await readWorkbookBundleFile(file, options.assetStore)
+        : await readWorkbookFile(file);
       if (disposed) return;
       pendingImport.value = workbook;
       confirmation.value = "import";

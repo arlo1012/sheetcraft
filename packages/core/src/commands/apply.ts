@@ -21,6 +21,7 @@ import {
 } from "./sheets.js";
 import { applyRestoreSheetStateCommand, applySheetAxisCommand } from "./structure.js";
 import { applySortSheetRangeCommand } from "./sort.js";
+import { applyDeleteFloatingImageCommand, applySetFloatingImageCommand } from "./images.js";
 import type { WorkbookCommand } from "./contracts.js";
 import {
   applyClearCellRangeCommand,
@@ -65,6 +66,10 @@ export function applyWorkbookCommand(
         return applySetSheetFilterCommand(workbook, command);
       case "sortSheetRange":
         return applySortSheetRangeCommand(workbook, command);
+      case "setFloatingImage":
+        return applySetFloatingImageCommand(workbook, command);
+      case "deleteFloatingImage":
+        return applyDeleteFloatingImageCommand(workbook, command);
       case "addSheet":
         return applyAddSheetCommand(workbook, command);
       case "deleteSheet":

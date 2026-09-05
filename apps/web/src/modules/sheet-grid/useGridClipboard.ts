@@ -12,6 +12,7 @@ import {
 import {
   createSheetEvaluator,
   getCellStyle,
+  getCellContent,
   type CellRange,
   type Sheet,
 } from "@idea10/core/workbook";
@@ -202,7 +203,9 @@ export function useGridClipboard(options: {
       contents.push(getCellRangeContents(sheet, rowRange)[0]!);
       values.push(
         Array.from({ length: range.end.column - range.start.column + 1 }, (_, offset) => {
-          const value = evaluator.getComputedValue({ row, column: range.start.column + offset });
+          const address = { row, column: range.start.column + offset };
+          if (getCellContent(sheet, address)?.kind === "image") return null;
+          const value = evaluator.getComputedValue(address);
           return isFormulaError(value) ? formatComputedValueForDisplay(value) : value;
         }),
       );
