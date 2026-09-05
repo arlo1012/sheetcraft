@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   deserializeWorkbook,
   serializeWorkbook,
-  type WorkbookSnapshotV2,
+  type WorkbookSnapshot,
 } from "@idea10/core/serialization";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import {
@@ -23,7 +23,7 @@ import { createTestClipboardEvent } from "../../modules/sheet-grid/components/Sh
 
 const mounted: Array<{ unmount(): void }> = [];
 
-function createFilteredClipboardSnapshot(): WorkbookSnapshotV2 {
+function createFilteredClipboardSnapshot(): WorkbookSnapshot {
   const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
   const sheet = getActiveSheet(workbook);
   sheet.freezePanes = { rows: 1, columns: 1 };
@@ -58,16 +58,16 @@ function createFilteredClipboardSnapshot(): WorkbookSnapshotV2 {
   return serializeWorkbook(workbook);
 }
 
-function createMemoryStore(initialSnapshot: WorkbookSnapshotV2) {
+function createMemoryStore(initialSnapshot: WorkbookSnapshot) {
   let record = { revision: 1, savedAt: 1, snapshot: initialSnapshot };
   const store = {
     load: vi.fn(async () => record),
-    save: vi.fn(async (snapshot: WorkbookSnapshotV2, expectedRevision: number | undefined) => {
+    save: vi.fn(async (snapshot: WorkbookSnapshot, expectedRevision: number | undefined) => {
       const revision = (expectedRevision ?? 0) + 1;
       record = { revision, savedAt: revision * 10, snapshot };
       return { revision, savedAt: record.savedAt };
     }),
-    replace: vi.fn(async (snapshot: WorkbookSnapshotV2) => {
+    replace: vi.fn(async (snapshot: WorkbookSnapshot) => {
       record = { revision: record.revision + 1, savedAt: record.savedAt + 1, snapshot };
       return { revision: record.revision, savedAt: record.savedAt };
     }),

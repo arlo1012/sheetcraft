@@ -9,6 +9,7 @@ import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   createSheetEvaluator,
+  cloneCellContent,
   getCellContent,
   type CellAddress,
   type CellRange,
@@ -103,7 +104,7 @@ export function translateCellContentForCopy(
   destination: CellAddress,
 ): CellContent | null {
   if (!content) return null;
-  if (content.kind === "literal") return { kind: "literal", value: content.value };
+  if (content.kind !== "formula") return cloneCellContent(content);
   return {
     kind: "formula",
     formula: {

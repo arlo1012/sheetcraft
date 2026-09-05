@@ -1,7 +1,10 @@
 import { evaluateFormula } from "./formula/evaluate.js";
+import { normalizeExcelDateSystem, type ExcelDateSystem } from "./formula/date-system.js";
 import { collectFormulaRanges, collectFormulaReferences } from "./formula/references.js";
 import {
   createFormulaError,
+  isFormulaError,
+  isFormulaErrorCode,
   type CellContent,
   type FormulaErrorCode,
   type FormulaValue,
@@ -100,6 +103,8 @@ export type SheetSparseState = {
 
 export type Workbook = {
   id: string;
+  /** Interpretation of date serials; cell numbers are not converted when this changes. */
+  dateSystem: ExcelDateSystem;
   sheets: Map<string, Sheet>;
   activeSheetId: string;
 };
@@ -139,6 +144,7 @@ export function createWorkbook(options?: {
   sheetId?: string;
   sheetName?: string;
   idFactory?: IdFactory;
+  dateSystem?: ExcelDateSystem;
 }): Workbook {
   const idFactory = options?.idFactory;
   if (!options?.id && !idFactory) {
@@ -148,6 +154,7 @@ export function createWorkbook(options?: {
 
   return {
     id: options?.id ?? createRequiredId("workbook", idFactory),
+    dateSystem: normalizeExcelDateSystem(options?.dateSystem ?? "1900"),
     sheets: new Map([[sheet.id, sheet]]),
     activeSheetId: sheet.id,
   };
@@ -354,6 +361,7 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
     const content = sheet.cells.get(key)?.content;
     if (!content) return null;
     if (content.kind === "literal") return content.value;
+    if (content.kind === "error") return createFormulaError(content.error.code);
     return memo.get(key) ?? createFormulaError("CYCLE");
   };
   const dependenciesFor = (address: CellAddress): CellAddress[] => {
@@ -373,7 +381,7 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
     const key = createCellKey(target);
     if (memo.has(key)) return memo.get(key) ?? null;
     const content = sheet.cells.get(key)?.content;
-    if (!content || content.kind === "literal") return valueFor(target);
+    if (!content || content.kind !== "formula") return valueFor(target);
     const stack: Array<{ address: CellAddress; entered: boolean }> = [
       { address: target, entered: false },
     ];
@@ -383,7 +391,7 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
       const frameKey = createCellKey(frame.address);
       if (memo.has(frameKey)) continue;
       const frameContent = sheet.cells.get(frameKey)?.content;
-      if (!frameContent || frameContent.kind === "literal") continue;
+      if (!frameContent || frameContent.kind !== "formula") continue;
       if (!frame.entered) {
         const current = state.get(frameKey);
         if (current === "visiting") {
@@ -536,18 +544,16 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
   if (content === null || content === undefined) return undefined;
   if (content.kind === "literal") {
     const value = content.value;
-    if (
-      value === "" ||
-      (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
-    ) {
-      throw new TypeError(
-        "Literal cell content must be a non-empty string, finite number, or boolean.",
-      );
+    if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+      throw new TypeError("Literal cell content must be a string, finite number, or boolean.");
     }
     if (typeof value === "number" && !Number.isFinite(value)) {
       throw new TypeError("Literal cell content numbers must be finite.");
     }
     return { kind: "literal", value };
+  }
+  if (content.kind === "error" && isFormulaError(content.error)) {
+    return { kind: "error", error: createFormulaError(content.error.code) };
   }
   if (
     content.kind === "formula" &&
@@ -556,10 +562,13 @@ function normalizeCellContent(content: CellContent | null | undefined): CellCont
   ) {
     return { kind: "formula", formula: { source: content.formula.source } };
   }
-  throw new TypeError("Formula cell content must have a source beginning with '='.");
+  throw new TypeError("Invalid cell content or formula source.");
 }
 
 export function cloneCellContent(content: CellContent): CellContent {
+  if (content.kind === "error") {
+    return { kind: "error", error: createFormulaError(content.error.code) };
+  }
   return content.kind === "literal"
     ? { kind: "literal", value: content.value }
     : { kind: "formula", formula: { source: content.formula.source } };
@@ -574,9 +583,11 @@ function areCellContentsEqual(
     left.kind === right.kind &&
     (left.kind === "literal" && right.kind === "literal"
       ? Object.is(left.value, right.value)
-      : left.kind === "formula" &&
-        right.kind === "formula" &&
-        left.formula.source === right.formula.source)
+      : left.kind === "error" && right.kind === "error"
+        ? left.error.code === right.error.code
+        : left.kind === "formula" &&
+          right.kind === "formula" &&
+          left.formula.source === right.formula.source)
   );
 }
 
@@ -678,11 +689,7 @@ function normalizeFilterValue(value: SheetFilterValue): SheetFilterValue {
   if (value.kind === "number" && typeof value.value === "number" && Number.isFinite(value.value))
     return { ...value };
   if (value.kind === "string" && typeof value.value === "string") return { ...value };
-  if (
-    value.kind === "error" &&
-    ["PARSE", "REF", "CYCLE", "VALUE", "DIV0", "NAME"].includes(value.code)
-  )
-    return { ...value };
+  if (value.kind === "error" && isFormulaErrorCode(value.code)) return { ...value };
   throw new TypeError("Invalid filter value.");
 }
 

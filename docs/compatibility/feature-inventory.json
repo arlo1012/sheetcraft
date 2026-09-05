@@ -1,0 +1,617 @@
+{
+  "schemaVersion": 1,
+  "directionScope": "These six directions describe target Excel and exchange-file compatibility, not the separately supported native JSON snapshot.",
+  "capturedAt": "2026-09-05T09:30:00.000Z",
+  "source": {
+    "capturedAt": "2026-09-05T09:30:00.000Z",
+    "primaryUrls": [
+      "https://support.microsoft.com/en-us/excel/excel-functions-alphabetical",
+      "https://support.microsoft.com/en-us/excel/excel-functions-by-category",
+      "https://support.microsoft.com/en-us/excel/date-systems-in-excel",
+      "https://support.microsoft.com/en-us/excel/dynamic-array-formulas-and-spilled-array-behavior",
+      "https://support.microsoft.com/en-us/excel/subtotal-function"
+    ]
+  },
+  "features": [
+    {
+      "id": "formula.literals",
+      "title": "Formula literals and omitted arguments",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "limited",
+        "recalc": "limited",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.operators",
+      "title": "Operators, precedence, union and intersection",
+      "scope": "local",
+      "sourceUrls": [
+        "https://support.microsoft.com/en-us/office/calculation-operators-and-precedence-in-excel-48be406d-4975-4d31-b2b8-7af9e0e2878a"
+      ],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "limited",
+        "recalc": "limited",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.a1-references",
+      "title": "A1 relative, absolute, mixed and range references",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "limited",
+        "recalc": "limited",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.sheet-references",
+      "title": "Quoted sheet, cross-sheet and 3D references",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.external-workbook-references",
+      "title": "External workbook references and resolver boundary",
+      "scope": "external",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "blocked",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.names",
+      "title": "Workbook and worksheet names, scopes and named formulas",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.table-references",
+      "title": "Structured table references and calculated columns",
+      "scope": "local",
+      "sourceUrls": [
+        "https://support.microsoft.com/en-us/office/using-structured-references-with-excel-tables-f5ed2452-2337-4f71-bed3-c8ae6d2b276e"
+      ],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.array-constants",
+      "title": "Array constants and array values",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.dynamic-arrays",
+      "title": "Dynamic arrays, spill ranges and spill references",
+      "scope": "local",
+      "sourceUrls": [
+        "https://support.microsoft.com/en-us/excel/dynamic-array-formulas-and-spilled-array-behavior"
+      ],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.implicit-intersection",
+      "title": "Implicit intersection operator",
+      "scope": "review",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.let",
+      "title": "LET lexical bindings",
+      "scope": "local",
+      "sourceUrls": [
+        "https://support.microsoft.com/en-us/office/let-function-34842dd8-b92b-4d3f-b325-b8b8f9908999"
+      ],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.lambda",
+      "title": "LAMBDA functions, parameters and recursion policy",
+      "scope": "local",
+      "sourceUrls": [
+        "https://support.microsoft.com/en-us/office/lambda-function-bd212d27-1cd1-4321-a34a-ccbf254b8b67"
+      ],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.localized-input",
+      "title": "Localized input separated from invariant storage syntax",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-alphabetical"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.value-model",
+      "title": "Blank, empty text, number, boolean, text, reference and array values",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      },
+      "evidence": "Core persists empty text and has explicit error-token foundations.",
+      "limitations": "Reference and array value variants are not implemented; no Excel IO compatibility is claimed."
+    },
+    {
+      "id": "formula.error-values",
+      "title": "Excel error values and internal diagnostic mapping",
+      "scope": "local",
+      "sourceUrls": [
+        "https://support.microsoft.com/en-us/office/how-to-correct-a-value-error-in-excel-15e1b616-fbf2-4147-9c0b-0a11a20e409e"
+      ],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      },
+      "evidence": "Core stores typed error constants and propagates them through the current A1, arithmetic and SUM evaluator; tests cover canonical display tokens, rich copy, history and V3 snapshots.",
+      "limitations": "Complete per-function error/coercion semantics and Excel import/export mappings are not implemented."
+    },
+    {
+      "id": "formula.dates",
+      "title": "1900 and 1904 date systems, serial values and time fractions",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/date-systems-in-excel"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      },
+      "evidence": "Core persists workbook dateSystem and uses a strict serial converter in the V3 snapshot path.",
+      "limitations": "Date/time worksheet functions, array date values and Excel IO are not implemented."
+    },
+    {
+      "id": "formula.coercion-and-criteria",
+      "title": "Type coercion, criteria, wildcards, Unicode and rounding",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.conditional-evaluation",
+      "title": "Per-function conditional and error evaluation semantics",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.volatile-functions",
+      "title": "Volatile functions and deterministic recalc epochs",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.subtotal-and-aggregate",
+      "title": "SUBTOTAL and AGGREGATE with filter and hidden-row metadata",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/subtotal-function"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.calculation-mode",
+      "title": "Automatic and manual calculation modes",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.circular-calculation",
+      "title": "Circular-reference diagnosis and optional iteration",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.dependency-graph",
+      "title": "Dependency graph for cells, ranges, names, tables and spills",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.dynamic-dependencies",
+      "title": "INDIRECT and OFFSET dynamic dependency tracking",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.sparse-performance",
+      "title": "Sparse storage, whole-axis references and incremental recalculation",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.reference-rewrite",
+      "title": "Copy, move, fill, sort and row-column reference rewrites",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "blocked",
+        "recalc": "limited",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "formula.history",
+      "title": "Undo and redo of formula source and structural state",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "n/a",
+        "render": "n/a",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "n/a",
+        "roundtrip": "n/a"
+      }
+    },
+    {
+      "id": "formula.editor-experience",
+      "title": "Autocomplete, argument help, reference highlighting and error location",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "n/a",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "n/a",
+        "write": "n/a",
+        "roundtrip": "n/a"
+      }
+    },
+    {
+      "id": "excel.x1-core-roundtrip",
+      "title": "X1 scalar, formula, format, dimension, merge, freeze and filter roundtrip",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-alphabetical"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "excel.x2-names-tables-validation",
+      "title": "X2 names, tables, validation, conditional format, comments and links",
+      "scope": "local",
+      "sourceUrls": [
+        "https://support.microsoft.com/en-us/office/using-structured-references-with-excel-tables-f5ed2452-2337-4f71-bed3-c8ae6d2b276e"
+      ],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "excel.x3-objects",
+      "title": "X3 images, charts, pivots, print setup and protection",
+      "scope": "review",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "excel.formula-cache",
+      "title": "Imported formula cache provenance and invalidation",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-alphabetical"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "excel.formula-kinds",
+      "title": "Shared, legacy array and data-table formula preservation",
+      "scope": "review",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-alphabetical"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "excel.import-transaction",
+      "title": "Transactional import, cancellation and stale-job safety",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "n/a",
+        "edit": "n/a",
+        "recalc": "n/a",
+        "write": "n/a",
+        "roundtrip": "n/a"
+      }
+    },
+    {
+      "id": "excel.loss-report",
+      "title": "Strict or lossy conversion with a compatibility report",
+      "scope": "local",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-alphabetical"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "n/a",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "excel.resource-security",
+      "title": "File resource limits, malformed and encrypted file handling",
+      "scope": "review",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "n/a",
+        "edit": "n/a",
+        "recalc": "n/a",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "excel.csv-tsv",
+      "title": "CSV and TSV encoding, separator and type interpretation",
+      "scope": "local",
+      "sourceUrls": [
+        "https://support.microsoft.com/en-us/office/import-or-export-text-txt-or-csv-files-5250ac4c-663c-47ce-937b-339e391393ba"
+      ],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "limited"
+      }
+    },
+    {
+      "id": "excel.legacy-and-alternative-formats",
+      "title": "XLS, XLSB and ODS format decisions",
+      "scope": "review",
+      "sourceUrls": [
+        "https://support.microsoft.com/en-us/office/file-formats-that-are-supported-in-excel-0943ff2c-6014-4e8d-aaea-b83d51d46247"
+      ],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "planned",
+        "recalc": "planned",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "excel.macros-and-vba",
+      "title": "XLSM, VBA and macro execution boundary",
+      "scope": "platform",
+      "sourceUrls": [
+        "https://support.microsoft.com/en-us/office/enable-or-disable-macros-in-microsoft-365-files-12b036fd-d140-4e74-b45e-16fed1a7e5c6"
+      ],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "blocked",
+        "recalc": "blocked",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "excel.external-data",
+      "title": "External data, connections, queries and embedded active content",
+      "scope": "external",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "blocked",
+        "recalc": "blocked",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    },
+    {
+      "id": "excel.service-functions",
+      "title": "Service, add-in, RTD, cube and data-type functions",
+      "scope": "external",
+      "sourceUrls": ["https://support.microsoft.com/en-us/excel/excel-functions-by-category"],
+      "statuses": {
+        "read": "planned",
+        "render": "planned",
+        "edit": "blocked",
+        "recalc": "blocked",
+        "write": "planned",
+        "roundtrip": "planned"
+      }
+    }
+  ]
+}

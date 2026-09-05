@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { serializeWorkbook, type WorkbookSnapshotV2 } from "@idea10/core/serialization";
+import { serializeWorkbook, type WorkbookSnapshot } from "@idea10/core/serialization";
 import { createWorkbook, getActiveSheet, setCellValue } from "@idea10/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import WorkbookFileActions from "../../../modules/workbook-persistence/components/WorkbookFileActions.vue";
@@ -11,20 +11,20 @@ import { createAppI18n } from "../../../shared/i18n";
 
 const mounted: Array<{ unmount(): void }> = [];
 
-function snapshotWithValue(value: string): WorkbookSnapshotV2 {
+function snapshotWithValue(value: string): WorkbookSnapshot {
   const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
   setCellValue(getActiveSheet(workbook), { row: 0, column: 0 }, value);
   return serializeWorkbook(workbook);
 }
 
-function createStore(snapshot?: WorkbookSnapshotV2) {
+function createStore(snapshot?: WorkbookSnapshot) {
   return {
     load: vi.fn(async () => (snapshot ? { revision: 1, savedAt: 1, snapshot } : undefined)),
-    save: vi.fn(async (_snapshot: WorkbookSnapshotV2, revision: number | undefined) => ({
+    save: vi.fn(async (_snapshot: WorkbookSnapshot, revision: number | undefined) => ({
       revision: (revision ?? 0) + 1,
       savedAt: 2,
     })),
-    replace: vi.fn(async (_snapshot: WorkbookSnapshotV2) => ({ revision: 2, savedAt: 2 })),
+    replace: vi.fn(async (_snapshot: WorkbookSnapshot) => ({ revision: 2, savedAt: 2 })),
   } satisfies WorkbookStore;
 }
 

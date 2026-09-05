@@ -1,6 +1,6 @@
 import { defineComponent, h, ref } from "vue";
 import { mount } from "@vue/test-utils";
-import { serializeWorkbook, type WorkbookSnapshotV2 } from "@idea10/core/serialization";
+import { serializeWorkbook, type WorkbookSnapshot } from "@idea10/core/serialization";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import {
   createWorkbook,
@@ -118,7 +118,7 @@ export function asReceipt(revision: number, savedAt = 1_700_000_000_000): Workbo
 }
 
 export function savedCellValue(save: { mock: { calls: unknown[][] } }, callIndex: number): string {
-  const snapshot = save.mock.calls[callIndex]?.[0] as WorkbookSnapshotV2 | undefined;
+  const snapshot = save.mock.calls[callIndex]?.[0] as WorkbookSnapshot | undefined;
   const content = snapshot?.sheets[0]?.cells[0]?.content;
   if (!content || content.kind !== "literal" || typeof content.value !== "string") {
     throw new Error("Expected a saved literal cell value.");

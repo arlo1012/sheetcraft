@@ -106,7 +106,7 @@ function getTranslatedContent(
   destination: CellAddress,
 ): CellContent | undefined {
   if (!content) return undefined;
-  if (content.kind === "literal") return cloneCellContent(content);
+  if (content.kind !== "formula") return cloneCellContent(content);
   return {
     kind: "formula",
     formula: {

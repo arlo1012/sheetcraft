@@ -1,0 +1,27 @@
+{
+  "name": "@idea10/compatibility-lab",
+  "version": "0.0.0-private",
+  "private": true,
+  "description": "Isolated Formula.js and ExcelJS qualification probes; not a product dependency.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --reporter=default --reporter=json --outputFile=reports/test-results.json",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "report": "node scripts/export-report.mjs",
+    "bundle:browser-worker": "bun build src/probes/browser-worker-entry.mjs --target=browser --format=esm --outfile=reports/browser-worker.bundle.js",
+    "smoke:node-worker": "node scripts/smoke-node-worker.mjs",
+    "qualify": "bun run typecheck && bun run test && bun run bundle:browser-worker && bun run smoke:node-worker && bun run report"
+  },
+  "devDependencies": {
+    "@formulajs/formulajs": "4.6.1",
+    "@types/node": "26.3.0",
+    "exceljs": "4.4.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "packageManager": "bun@1.3.11"
+}

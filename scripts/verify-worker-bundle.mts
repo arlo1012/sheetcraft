@@ -130,9 +130,9 @@ function assertRoundTripResult(
   if (result.formulaValue !== 14 || result.formulaSource !== "=A1*2") {
     throw new Error("Worker did not preserve and evaluate the formula cell.");
   }
-  const snapshot = result.snapshot as { version?: unknown } | null;
-  if (!snapshot || snapshot.version !== 2) {
-    throw new Error("Worker did not return a V2 workbook snapshot.");
+  const snapshot = result.snapshot as { version?: unknown; dateSystem?: unknown } | null;
+  if (!snapshot || snapshot.version !== 3 || snapshot.dateSystem !== "1900") {
+    throw new Error("Worker did not return a V3 workbook snapshot with an explicit date system.");
   }
   const restoredWorkbook = deserializeWorkbook(result.snapshot);
   const restoredSheet = getActiveSheet(restoredWorkbook);

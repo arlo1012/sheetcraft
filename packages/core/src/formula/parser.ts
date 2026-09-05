@@ -1,48 +1,18 @@
 import {
-  MAX_FORMULA_COLUMNS,
-  MAX_FORMULA_ROWS,
   createFormulaError,
+  formulaErrorCodeFromToken,
   type FormulaAst,
-  type FormulaErrorCode,
   type FormulaExpression,
   type FormulaParseResult,
   type FormulaRange,
   type FormulaReference,
 } from "./types.js";
+import { parseA1FormulaReference } from "./reference-model.js";
 
 const NUMBER_PATTERN = /^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i;
 const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*/;
 const REFERENCE_PATTERN = /^\$?[A-Za-z]+\$?[1-9]\d*/;
 const CELL_LIKE_PATTERN = /^\$?[A-Za-z]+\$?\d+/;
-
-function columnLabelToIndex(label: string): number | null {
-  let value = 0;
-  for (const character of label.toUpperCase()) {
-    const digit = character.charCodeAt(0) - 64;
-    if (digit < 1 || digit > 26) return null;
-    value = value * 26 + digit;
-    if (value > MAX_FORMULA_COLUMNS) return null;
-  }
-  return value - 1;
-}
-
-function parseReferenceText(text: string, start: number): FormulaReference | null {
-  const match = /^(\$?)([A-Za-z]+)(\$?)([1-9]\d*)$/.exec(text);
-  if (!match) return null;
-  const [, columnMarker, columnLabel, rowMarker, rowLabel] = match;
-  if (!columnLabel || !rowLabel) return null;
-  const column = columnLabelToIndex(columnLabel);
-  const row = Number(rowLabel) - 1;
-  if (column === null || !Number.isSafeInteger(row) || row >= MAX_FORMULA_ROWS) return null;
-  return {
-    row,
-    column,
-    rowAbsolute: rowMarker === "$",
-    columnAbsolute: columnMarker === "$",
-    start,
-    end: start + text.length,
-  };
-}
 
 class FormulaParser {
   private offset = 1;
@@ -145,12 +115,14 @@ class FormulaParser {
       if (!expression || !this.consume(")")) return null;
       return { ...expression, start, end: this.offset };
     }
-    if (this.source.startsWith("#REF!", this.offset)) {
-      this.offset += "#REF!".length;
-      return { kind: "error", code: "REF", start, end: this.offset };
-    }
-
     const remainder = this.source.slice(this.offset);
+    const errorToken = /^#[A-Za-z0-9_/?]+[!?]?/.exec(remainder)?.[0];
+    if (errorToken) {
+      const code = formulaErrorCodeFromToken(errorToken);
+      if (!code) return null;
+      this.offset += errorToken.length;
+      return { kind: "error", code, start, end: this.offset };
+    }
     const numeric = NUMBER_PATTERN.exec(remainder)?.[0];
     if (numeric) {
       this.offset += numeric.length;
@@ -159,7 +131,7 @@ class FormulaParser {
 
     const referenceText = REFERENCE_PATTERN.exec(remainder)?.[0];
     if (referenceText) {
-      const reference = parseReferenceText(referenceText, this.offset);
+      const reference = parseA1FormulaReference(referenceText, this.offset);
       if (!reference) return null;
       this.offset += referenceText.length;
       this.skipWhitespace();
@@ -204,7 +176,7 @@ class FormulaParser {
     this.skipWhitespace();
     const text = REFERENCE_PATTERN.exec(this.source.slice(this.offset))?.[0];
     if (!text) return null;
-    const reference = parseReferenceText(text, this.offset);
+    const reference = parseA1FormulaReference(text, this.offset);
     if (!reference) return null;
     this.offset += text.length;
     return reference;
@@ -220,6 +192,4 @@ export function getFormulaAst(source: string): FormulaAst | null {
   return result.ok ? result.ast : null;
 }
 
-export function formulaErrorCodeFromToken(token: string): FormulaErrorCode | null {
-  return token === "#REF!" ? "REF" : null;
-}
+export { formulaErrorCodeFromToken } from "./types.js";

@@ -8,3 +8,4 @@ export * from "./sheets.js";
 export * from "./structure.js";
 export * from "./sort.js";
 export * from "./values.js";
+export * from "./workbook-settings.js";

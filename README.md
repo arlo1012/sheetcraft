@@ -25,7 +25,12 @@ The proposed [Formula and Excel Compatibility Plan](docs/formula-excel-compatibi
 defines target scope, ownership, library qualification, and acceptance gates.
 It is a design draft, not a list of currently supported features.
 
-Core writes V2 snapshots and accepts V1/V2 input. The Web application restores
+The first [Formula Foundation](docs/formula-foundation.md) implementation adds
+reviewable function/feature inventories, typed error and empty-string content,
+per-workbook date systems, shared reference contracts, and an isolated library
+qualification lab. It does not add more formula functions or product XLSX IO.
+
+Core writes V3 snapshots and accepts V1/V2/V3 input. The Web application restores
 the current workbook from IndexedDB, automatically saves document edits, and
 offers JSON import/export with validation and replacement confirmation. See
 [Saving And Recovery](docs/workbook-persistence.md) for the local-only storage
@@ -59,6 +64,8 @@ and Sheet Engine tests run in Node through `bun run test:core` and
 `bun run ci` is the complete non-browser gate. It checks formatting, lint,
 strict types, all unit tests, package boundaries and public imports, a
 browser-target Worker consumer, and production bundle budgets.
+It also validates the compatibility catalogs and their offline tests; the
+isolated library lab is verified separately without adding product dependencies.
 
 `bun run dev` builds Core and Sheet Engine first, watches both packages through
 TypeScript's dependency graph, and serves Web on `0.0.0.0:7200`. Rebuilt package

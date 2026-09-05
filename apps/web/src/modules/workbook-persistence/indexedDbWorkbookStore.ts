@@ -1,4 +1,4 @@
-import type { WorkbookSnapshotV2 } from "@idea10/core/serialization";
+import type { WorkbookSnapshot } from "@idea10/core/serialization";
 import {
   WorkbookStoreError,
   type PersistedWorkbook,
@@ -133,7 +133,7 @@ export function createIndexedDbWorkbookStore(): WorkbookStore {
   }
 
   async function save(
-    snapshot: WorkbookSnapshotV2,
+    snapshot: WorkbookSnapshot,
     expectedRevision: number | undefined,
   ): Promise<WorkbookSaveReceipt> {
     const database = await getDatabase();
@@ -193,7 +193,7 @@ export function createIndexedDbWorkbookStore(): WorkbookStore {
     });
   }
 
-  async function replace(snapshot: WorkbookSnapshotV2): Promise<WorkbookSaveReceipt> {
+  async function replace(snapshot: WorkbookSnapshot): Promise<WorkbookSaveReceipt> {
     const database = await getDatabase();
     return new Promise((resolve, reject) => {
       let receipt: WorkbookSaveReceipt | undefined;

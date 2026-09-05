@@ -35,7 +35,7 @@ function createFilteredSheet(): Sheet {
 
 function execute(sheet: Sheet, payload: GridPastePayload) {
   const workbook = {
-    id: "workbook",
+    ...createWorkbook({ id: "workbook", sheetId: sheet.id }),
     activeSheetId: sheet.id,
     sheets: new Map([[sheet.id, sheet]]),
   };
@@ -152,7 +152,7 @@ describe("createGridPasteCommand", () => {
       { borderRight: { style: "thin", color: "#123456" } },
     );
     const before = serializeWorkbook({
-      id: "workbook",
+      ...createWorkbook({ id: "workbook", sheetId: sheet.id }),
       activeSheetId: sheet.id,
       sheets: new Map([[sheet.id, sheet]]),
     });
@@ -242,7 +242,7 @@ describe("createGridPasteCommand", () => {
     setCellContent(sheet, { row: 6, column: 1 }, { kind: "formula", formula: { source: "=A7" } });
     setCellStyle(sheet, { row: 6, column: 1 }, { borderTop: { style: "thin", color: "#123456" } });
     const workbook = {
-      id: "workbook",
+      ...createWorkbook({ id: "workbook", sheetId: sheet.id }),
       activeSheetId: sheet.id,
       sheets: new Map([[sheet.id, sheet]]),
     };

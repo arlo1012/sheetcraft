@@ -22,6 +22,7 @@ import {
 import { applyRestoreSheetStateCommand, applySheetAxisCommand } from "./structure.js";
 import { applySortSheetRangeCommand } from "./sort.js";
 import type { WorkbookCommand } from "./contracts.js";
+import { applySetWorkbookDateSystemCommand } from "./workbook-settings.js";
 import {
   applyClearCellRangeCommand,
   applyMoveCellRangeCommand,
@@ -39,6 +40,8 @@ export function applyWorkbookCommand(
 ): WorkbookCommand | null {
   try {
     switch (command.type) {
+      case "setWorkbookDateSystem":
+        return applySetWorkbookDateSystemCommand(workbook, command);
       case "setCellContents":
         return applySetCellContentsCommand(workbook, command);
       case "clearCellRange":
