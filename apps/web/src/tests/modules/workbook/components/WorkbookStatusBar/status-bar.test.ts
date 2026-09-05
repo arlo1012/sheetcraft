@@ -80,9 +80,8 @@ describe("WorkbookStatusBar", () => {
 
     expect(wrapper.find("[data-selection-summary]").exists()).toBe(false);
     expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
-    expect(
-      wrapper.get('[aria-label="Normal view, not available yet"]').attributes("disabled"),
-    ).toBe("");
+    expect(wrapper.get('[aria-label="Zoom 100%"]').text()).toBe("100%");
+    expect(wrapper.find("button:disabled").exists()).toBe(false);
   });
 
   test("shows count alone for a multi-cell text selection", () => {

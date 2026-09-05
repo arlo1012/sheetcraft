@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { FileSpreadsheet, LayoutDashboard, ZoomIn, ZoomOut } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import type { SelectionSummary } from "@idea10/core/selection-summary";
 import type { Sheet } from "@idea10/core/workbook";
@@ -24,6 +23,9 @@ const emit = defineEmits<{
 const { locale, t } = useAppI18n();
 const numberFormatter = computed(
   () => new Intl.NumberFormat(locale.value, { maximumFractionDigits: 6 }),
+);
+const zoomValue = computed(() =>
+  new Intl.NumberFormat(locale.value, { style: "percent" }).format(1),
 );
 const shouldShowSummary = computed(
   () => props.selectionSummary.selectedCellCount > 1 && props.selectionSummary.count > 0,
@@ -56,76 +58,30 @@ function formatNumber(value: number): string {
     >
       <div class="workbook-status-bar__stat">
         <dt>{{ t("statusBar.count") }}</dt>
-        <dd>{{ formatNumber(selectionSummary.count) }}</dd>
+        <dd :title="formatNumber(selectionSummary.count)">
+          {{ formatNumber(selectionSummary.count) }}
+        </dd>
       </div>
       <div v-if="selectionSummary.numericCount > 0" class="workbook-status-bar__stat">
         <dt>{{ t("statusBar.average") }}</dt>
-        <dd>{{ formatNumber(selectionSummary.average) }}</dd>
+        <dd :title="formatNumber(selectionSummary.average)">
+          {{ formatNumber(selectionSummary.average) }}
+        </dd>
       </div>
       <div v-if="selectionSummary.numericCount > 0" class="workbook-status-bar__stat">
         <dt>{{ t("statusBar.sum") }}</dt>
-        <dd>{{ formatNumber(selectionSummary.sum) }}</dd>
+        <dd :title="formatNumber(selectionSummary.sum)">
+          {{ formatNumber(selectionSummary.sum) }}
+        </dd>
       </div>
     </dl>
-    <div
-      class="workbook-status-bar__view-zoom"
-      role="group"
-      :aria-label="t('statusBar.viewAndZoom')"
+    <span
+      class="workbook-status-bar__scale"
+      :aria-label="t('statusBar.zoomLevel', { value: 100 })"
+      :title="t('statusBar.zoomLevel', { value: 100 })"
     >
-      <button
-        class="workbook-status-bar__placeholder"
-        type="button"
-        role="button"
-        disabled
-        :aria-label="t('app.unavailableFeature', { feature: t('statusBar.normalView') })"
-        :title="t('app.unavailableFeature', { feature: t('statusBar.normalView') })"
-      >
-        <LayoutDashboard :size="14" aria-hidden="true" />
-      </button>
-      <button
-        class="workbook-status-bar__placeholder"
-        type="button"
-        role="button"
-        disabled
-        :aria-label="t('app.unavailableFeature', { feature: t('statusBar.pageLayoutView') })"
-        :title="t('app.unavailableFeature', { feature: t('statusBar.pageLayoutView') })"
-      >
-        <FileSpreadsheet :size="14" aria-hidden="true" />
-      </button>
-      <span class="workbook-status-bar__view-zoom-separator" aria-hidden="true" />
-      <button
-        class="workbook-status-bar__placeholder"
-        type="button"
-        role="button"
-        disabled
-        :aria-label="t('app.unavailableFeature', { feature: t('statusBar.zoomOut') })"
-        :title="t('app.unavailableFeature', { feature: t('statusBar.zoomOut') })"
-      >
-        <ZoomOut :size="14" aria-hidden="true" />
-      </button>
-      <button
-        class="workbook-status-bar__zoom-level"
-        type="button"
-        role="button"
-        disabled
-        :aria-label="
-          t('app.unavailableFeature', { feature: t('statusBar.zoomLevel', { value: 100 }) })
-        "
-        :title="t('app.unavailableFeature', { feature: t('statusBar.zoomLevel', { value: 100 }) })"
-      >
-        {{ t("statusBar.zoomLevel", { value: 100 }) }}
-      </button>
-      <button
-        class="workbook-status-bar__placeholder"
-        type="button"
-        role="button"
-        disabled
-        :aria-label="t('app.unavailableFeature', { feature: t('statusBar.zoomIn') })"
-        :title="t('app.unavailableFeature', { feature: t('statusBar.zoomIn') })"
-      >
-        <ZoomIn :size="14" aria-hidden="true" />
-      </button>
-    </div>
+      {{ zoomValue }}
+    </span>
   </footer>
 </template>
 
@@ -136,26 +92,26 @@ function formatNumber(value: number): string {
   min-width: 0;
   height: 30px;
   background: var(--idea-surface-panel);
-  border-top: 1px solid var(--idea-border-control);
+  border-top: 1px solid var(--idea-border-subtle);
   color: var(--idea-text-secondary);
   font-size: 12px;
 
   &__sheets {
     display: flex;
-    flex: 1 1 360px;
-    min-width: 90px;
+    flex: 1 1 0;
+    min-width: 0;
     overflow: hidden;
   }
 
   &__summary {
     display: flex;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
     min-width: 0;
+    max-width: 44%;
     margin: 0;
-    padding: 0 12px;
-    border-left: 1px solid var(--idea-border-subtle);
+    padding: 0 16px;
     font-variant-numeric: tabular-nums;
   }
 
@@ -163,79 +119,62 @@ function formatNumber(value: number): string {
     display: inline-flex;
     align-items: baseline;
     gap: 4px;
+    min-width: 0;
     white-space: nowrap;
 
+    dt {
+      flex: 0 0 auto;
+    }
+
     dd {
+      min-width: 0;
       margin: 0;
+      overflow: hidden;
       color: var(--idea-text-primary);
+      text-overflow: ellipsis;
     }
   }
 
-  &__view-zoom {
-    display: inline-flex;
+  &__scale {
+    display: flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: 2px;
-    padding: 0 8px;
-    border-left: 1px solid var(--idea-border-subtle);
-  }
-
-  &__placeholder,
-  &__zoom-level {
-    display: inline-grid;
-    width: 24px;
-    height: 24px;
-    place-items: center;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    border-radius: 3px;
-    color: var(--idea-status-warning-strong, #d68a00);
-
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.72;
-    }
-  }
-
-  &__zoom-level {
-    width: auto;
-    min-width: 42px;
-    padding: 0 4px;
-    font: inherit;
-    font-variant-numeric: tabular-nums;
-  }
-
-  &__view-zoom-separator {
-    width: 1px;
+    align-self: center;
+    justify-content: center;
+    min-width: 56px;
     height: 14px;
-    margin: 0 3px;
-    background: var(--idea-border-subtle);
+    padding: 0 12px;
+    border-left: 1px solid var(--idea-border-subtle);
+    color: var(--idea-text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   @media (max-width: 720px) {
     &__summary {
-      gap: 8px;
-      padding: 0 8px;
+      gap: 10px;
+      padding: 0 10px;
+      max-width: 38%;
+    }
+
+    &__stat:nth-child(2) {
+      display: none;
     }
   }
 
   @media (max-width: 480px) {
     &__summary {
-      gap: 0;
+      max-width: 26%;
+      padding: 0 8px;
     }
 
     &__stat:not(:first-child) {
       display: none;
     }
 
-    &__view-zoom {
-      padding: 0 4px;
-    }
-
-    &__view-zoom-separator,
-    &__zoom-level {
-      display: none;
+    &__scale {
+      min-width: 48px;
+      padding: 0 8px;
     }
   }
 }

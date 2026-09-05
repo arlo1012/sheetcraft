@@ -158,6 +158,11 @@ export const enUS = {
   },
   sheetTabs: {
     list: "Workbook sheets",
+    allSheets: "All sheets",
+    search: "Search sheets",
+    noResults: "No matching sheets",
+    scrollLeft: "Scroll sheet tabs left",
+    scrollRight: "Scroll sheet tabs right",
     rename: "Rename {name}",
     renameHint: "{name} (double-click to rename)",
     menu: "Actions for {name}",

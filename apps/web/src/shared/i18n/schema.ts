@@ -152,6 +152,11 @@ export type MessageSchema = {
   };
   sheetTabs: {
     list: string;
+    allSheets: string;
+    search: string;
+    noResults: string;
+    scrollLeft: string;
+    scrollRight: string;
     rename: string;
     renameHint: string;
     menu: string;

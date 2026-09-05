@@ -155,6 +155,11 @@ export const zhCN = {
   },
   sheetTabs: {
     list: "工作表列表",
+    allSheets: "全部工作表",
+    search: "搜索工作表",
+    noResults: "没有匹配的工作表",
+    scrollLeft: "向左滚动工作表标签",
+    scrollRight: "向右滚动工作表标签",
     rename: "重命名 {name}",
     renameHint: "{name}（双击重命名）",
     menu: "{name} 的工作表操作",

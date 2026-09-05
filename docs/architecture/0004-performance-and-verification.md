@@ -105,6 +105,15 @@ JavaScript to 960/280 KB. Entry CSS becomes 82/12.5 KB; total CSS retains its
 240 KB raw limit and sets gzip to 32 KB. No dependency was added, and deferred
 image tools and previews remain included in the total gates.
 
+The compact workbook footer adds searchable sheet navigation, overflow controls,
+and active-tab visibility while removing unavailable view/zoom buttons. Its
+inspected production build measures 395,019 B entry JavaScript (110,460 B gzip),
+83,082 B entry CSS (12,473 B gzip), and 242,377 B total CSS (31,846 B gzip).
+The additional 3,166 B of CSS covers the navigation popup, responsive tabs, and
+focus states. Raw CSS limits intentionally become 84 KB for the entry and
+244 KB for all assets. JavaScript and gzip budgets remain unchanged; the feature
+reuses the existing menu/floating primitives and adds no runtime dependency.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

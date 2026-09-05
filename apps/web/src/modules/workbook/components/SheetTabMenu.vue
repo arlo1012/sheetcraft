@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MoreHorizontal } from "lucide-vue-next";
+import { ChevronDown } from "lucide-vue-next";
 import { computed, nextTick, ref, toRef, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
@@ -75,7 +75,7 @@ defineExpose({ dismiss, focusTrigger, getTriggerRect });
     :aria-expanded="isOpen"
     @click="emit('toggle')"
   >
-    <MoreHorizontal :size="15" aria-hidden="true" />
+    <ChevronDown :size="12" aria-hidden="true" />
   </button>
   <Teleport to="body">
     <MenuSurface
@@ -109,8 +109,9 @@ defineExpose({ dismiss, focusTrigger, getTriggerRect });
 .workbook-sheet-tabs {
   &__menu-trigger {
     display: grid;
-    width: 24px;
-    min-width: 24px;
+    flex: 0 0 22px;
+    width: 22px;
+    min-width: 22px;
     place-items: center;
     padding: 0;
     overflow: hidden;
@@ -127,6 +128,11 @@ defineExpose({ dismiss, focusTrigger, getTriggerRect });
     &:focus-visible {
       background: var(--idea-surface-hover);
       outline: none;
+    }
+
+    &:focus-visible {
+      outline: 1px solid var(--idea-action-primary);
+      outline-offset: -2px;
     }
   }
 

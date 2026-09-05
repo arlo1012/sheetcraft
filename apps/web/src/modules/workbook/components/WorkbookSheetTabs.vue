@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import { Plus } from "lucide-vue-next";
-import { nextTick, onBeforeUnmount, ref, type ComponentPublicInstance } from "vue";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-vue-next";
+import {
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+  type ComponentPublicInstance,
+} from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { Sheet } from "@idea10/core/workbook";
 import SheetTabMenu from "./SheetTabMenu.vue";
+import WorkbookSheetNavigator from "./WorkbookSheetNavigator.vue";
 
 const { t } = useAppI18n();
 
@@ -25,6 +33,11 @@ const renamingSheetId = ref<string>();
 const renameValue = ref("");
 const renameInput = ref<HTMLInputElement>();
 const tabButtons = new Map<string, HTMLButtonElement>();
+const tabList = ref<HTMLDivElement>();
+const hasOverflow = ref(false);
+const canScrollLeft = ref(false);
+const canScrollRight = ref(false);
+let resizeObserver: ResizeObserver | undefined;
 type SheetTabMenuInstance = ComponentPublicInstance & {
   focusTrigger: () => void;
   getTriggerRect: () => DOMRect | undefined;
@@ -62,6 +75,7 @@ function setSheetTabMenu(
 }
 
 function startRename(sheet: Sheet): void {
+  closeMenu();
   renamingSheetId.value = sheet.id;
   renameValue.value = sheet.name;
   void nextTick(() => renameInput.value?.focus());
@@ -146,6 +160,63 @@ function selectSheet(sheetId: string): void {
   closeMenu();
   emit("select", sheetId);
 }
+
+function updateScrollState(): void {
+  const list = tabList.value;
+  if (!list) return;
+  hasOverflow.value = list.scrollWidth > list.clientWidth + 1;
+  canScrollLeft.value = list.scrollLeft > 1;
+  canScrollRight.value = list.scrollLeft + list.clientWidth < list.scrollWidth - 1;
+}
+
+function revealActiveSheet(): void {
+  const list = tabList.value;
+  const item = tabButtons.get(props.activeSheetId)?.parentElement;
+  if (!list || !item) return;
+  const viewport = list.getBoundingClientRect();
+  const tab = item.getBoundingClientRect();
+  if (tab.left < viewport.left) {
+    list.scrollLeft += tab.left - viewport.left;
+  } else if (tab.right > viewport.right) {
+    list.scrollLeft += tab.right - viewport.right;
+  }
+  updateScrollState();
+}
+
+function scrollTabs(direction: -1 | 1): void {
+  const list = tabList.value;
+  if (!list) return;
+  closeMenu();
+  list.scrollLeft += direction * Math.max(80, list.clientWidth * 0.7);
+  updateScrollState();
+}
+
+function onTabWheel(event: WheelEvent): void {
+  const list = tabList.value;
+  if (!list || !hasOverflow.value || event.ctrlKey || event.deltaX !== 0) return;
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? list.clientWidth : 1;
+  const previous = list.scrollLeft;
+  list.scrollLeft += event.deltaY * unit;
+  if (list.scrollLeft !== previous) {
+    event.preventDefault();
+    closeMenu();
+    updateScrollState();
+  }
+}
+
+watch(
+  () => [props.activeSheetId, ...props.sheets.map((sheet) => `${sheet.id}:${sheet.name}`)],
+  () => void nextTick(revealActiveSheet),
+  { flush: "post" },
+);
+
+onMounted(() => {
+  if (typeof ResizeObserver !== "undefined" && tabList.value) {
+    resizeObserver = new ResizeObserver(revealActiveSheet);
+    resizeObserver.observe(tabList.value);
+  }
+  revealActiveSheet();
+});
 
 function onTabClick(sheetId: string): void {
   if (suppressNextTabClick) {
@@ -252,6 +323,7 @@ function onTabDragEnd(): void {
 }
 
 onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
   if (suppressClickTimer !== undefined) {
     clearTimeout(suppressClickTimer);
   }
@@ -296,12 +368,52 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
 <template>
   <div class="workbook-sheet-tabs">
-    <div class="workbook-sheet-tabs__list" role="tablist" :aria-label="t('sheetTabs.list')">
+    <div class="workbook-sheet-tabs__navigation">
+      <button
+        class="workbook-sheet-tabs__add"
+        type="button"
+        :aria-label="t('sheetTabs.add')"
+        :title="t('sheetTabs.add')"
+        @click="
+          closeMenu();
+          emit('add');
+        "
+      >
+        <Plus :size="16" aria-hidden="true" />
+      </button>
+      <WorkbookSheetNavigator
+        :sheets="sheets"
+        :active-sheet-id="activeSheetId"
+        @select="selectSheet"
+        @open="closeMenu()"
+      />
+    </div>
+    <button
+      v-if="hasOverflow"
+      class="workbook-sheet-tabs__scroll"
+      type="button"
+      :disabled="!canScrollLeft"
+      :aria-label="t('sheetTabs.scrollLeft')"
+      :title="t('sheetTabs.scrollLeft')"
+      @click="scrollTabs(-1)"
+    >
+      <ChevronLeft :size="14" aria-hidden="true" />
+    </button>
+    <div
+      ref="tabList"
+      class="workbook-sheet-tabs__list"
+      role="tablist"
+      :aria-label="t('sheetTabs.list')"
+      @scroll="updateScrollState"
+      @wheel="onTabWheel"
+    >
       <div
         v-for="sheet in props.sheets"
         :key="sheet.id"
         class="workbook-sheet-tabs__item"
         :class="{
+          'is-active': sheet.id === props.activeSheetId,
+          'is-menu-open': openMenuSheetId === sheet.id,
           'is-dragging': draggedSheetId === sheet.id,
           'is-drop-before': dropTarget?.sheetId === sheet.id && dropTarget.side === 'before',
           'is-drop-after': dropTarget?.sheetId === sheet.id && dropTarget.side === 'after',
@@ -338,13 +450,13 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
           @dragend="onTabDragEnd"
           @keydown="onTabKeydown(sheet.id, $event)"
         >
-          {{ sheet.name }}
+          <span class="workbook-sheet-tabs__name">{{ sheet.name }}</span>
         </button>
         <SheetTabMenu
           :ref="(instance) => setSheetTabMenu(sheet.id, instance)"
           :sheet="sheet"
           :sheet-count="props.sheets.length"
-          :sheet-index="props.sheets.findIndex((entry) => entry.id === sheet.id)"
+          :sheet-index="props.sheets.indexOf(sheet)"
           :is-open="openMenuSheetId === sheet.id"
           :position="menuPosition"
           @toggle="toggleMenu(sheet)"
@@ -358,13 +470,15 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
       </div>
     </div>
     <button
-      class="workbook-sheet-tabs__add"
+      v-if="hasOverflow"
+      class="workbook-sheet-tabs__scroll"
       type="button"
-      :aria-label="t('sheetTabs.add')"
-      :title="t('sheetTabs.add')"
-      @click="emit('add')"
+      :disabled="!canScrollRight"
+      :aria-label="t('sheetTabs.scrollRight')"
+      :title="t('sheetTabs.scrollRight')"
+      @click="scrollTabs(1)"
     >
-      <Plus :size="16" aria-hidden="true" />
+      <ChevronRight :size="14" aria-hidden="true" />
     </button>
   </div>
 </template>
@@ -372,12 +486,31 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 <style scoped lang="scss">
 .workbook-sheet-tabs {
   display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
   min-width: 0;
+
+  &__navigation {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
+    margin-right: 4px;
+    border-right: 1px solid var(--idea-border-subtle);
+  }
 
   &__list {
     display: flex;
+    flex: 0 1 auto;
     min-width: 0;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 
   &__item {
@@ -385,6 +518,19 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     display: flex;
     flex: 0 0 auto;
     align-items: stretch;
+    max-width: min(204px, 100%);
+    border-bottom: 2px solid transparent;
+
+    &:hover,
+    &:focus-within,
+    &.is-menu-open {
+      background: var(--idea-surface-secondary);
+    }
+
+    &.is-active {
+      background: var(--idea-action-primary-subtle);
+      border-bottom-color: var(--idea-action-primary);
+    }
 
     &.is-dragging {
       opacity: 0.48;
@@ -413,64 +559,82 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
   &__tab,
   &__rename-input {
-    width: 112px;
-    min-width: 72px;
-    padding: 0 10px;
+    min-width: 44px;
+    max-width: 180px;
+    padding: 0 4px 0 12px;
     overflow: hidden;
     background: transparent;
     border: 0;
     color: var(--idea-text-secondary);
+    font: inherit;
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   &__tab {
+    display: flex;
+    align-items: center;
     cursor: pointer;
 
     &.is-active {
-      position: relative;
-      background: var(--idea-surface-panel);
-      color: var(--idea-text-primary);
-      font-weight: 600;
-
-      &::after {
-        position: absolute;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        height: 2px;
-        background: var(--idea-action-primary);
-        content: "";
-      }
+      color: var(--idea-action-primary);
+      font-weight: 500;
     }
+
+    &:focus-visible {
+      outline: 1px solid var(--idea-action-primary);
+      outline-offset: -2px;
+    }
+  }
+
+  &__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__rename-input {
-    outline: 2px solid var(--idea-action-primary);
+    width: 132px;
+    background: var(--idea-surface-panel);
+    outline: 1px solid var(--idea-action-primary);
     outline-offset: -2px;
   }
 
-  &__add {
+  &__add,
+  &__scroll {
     display: inline-grid;
-    flex: 0 0 30px;
-    width: 30px;
-    height: 100%;
+    flex: 0 0 auto;
+    align-self: center;
+    width: 26px;
+    height: 26px;
     place-items: center;
-    border-left: 1px solid var(--idea-border-control);
     padding: 0;
     background: transparent;
-    border-top: 0;
-    border-right: 0;
-    border-bottom: 0;
-    cursor: pointer;
+    border: 0;
+    border-radius: 3px;
     color: var(--idea-text-secondary);
+    cursor: pointer;
 
-    &:hover,
+    &:hover:not(:disabled) {
+      background: var(--idea-surface-hover);
+      color: var(--idea-text-primary);
+    }
+
     &:focus-visible {
       background: var(--idea-surface-hover);
-      outline: none;
+      outline: 1px solid var(--idea-action-primary);
+      outline-offset: -1px;
     }
+
+    &:disabled {
+      color: var(--idea-text-disabled);
+      cursor: default;
+    }
+  }
+
+  &__scroll {
+    width: 20px;
   }
 }
 </style>
