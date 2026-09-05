@@ -43,6 +43,17 @@ small headroom at 315/86 KB app JavaScript, 815/242 KB total JavaScript, and
 220 KB total CSS; the existing CSS gzip limit stays unchanged. No dependency
 was added, and both entry and total-asset checks remain enabled.
 
+The formula-authoring interaction adds one shared completion/reference editor
+used by both the grid and formula bar: caret scanning, a localized floating
+listbox with argument help, reference drag state, and absolute-reference cycling.
+The first measured production entry is 324,042 B raw / 89,258 B gzip versus the
+preceding 313,274 B / 85,997 B baseline. This is product behavior, with no new
+dependency or formula-library runtime. The entry limit is deliberately adjusted
+to 330,000 B / 91,000 B to include that capability and a small integration margin.
+Total JavaScript and all CSS limits remain unchanged; splitting code into another
+chunk must not be used to evade the total check. The editor is loaded with the
+workspace so immediate typing and reference picking have no asynchronous handoff.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

@@ -1,10 +1,12 @@
 import { nextTick, ref } from "vue";
 import type { CellAddress } from "@idea10/core/workbook";
 import type { CellSelection } from "@idea10/sheet-engine/selection";
+import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 
 export type CellEditorHandle = {
   focus: (options?: { selectAll?: boolean; clientX?: number }) => void;
   insertLineBreak: () => void;
+  formulaReferenceEditor: FormulaReferenceEditor | null;
 };
 
 export function useCellEditing(options: {
@@ -17,6 +19,7 @@ export function useCellEditing(options: {
   const editorRef = ref<CellEditorHandle | null>(null);
   const editingValue = ref("");
   const editingSourceValue = ref("");
+  const editingAddress = ref<CellAddress>();
   const isEditing = ref(false);
   const isComposing = ref(false);
   let compositionStartValue = "";
@@ -38,6 +41,7 @@ export function useCellEditing(options: {
   }
 
   function beginEdit(mode: "append" | "replace", initialValue = "", clientX?: number): void {
+    editingAddress.value = { ...options.getActiveCell() };
     editingSourceValue.value = options.getInputValue();
     editingValue.value = mode === "append" ? editingSourceValue.value : initialValue;
     isEditing.value = true;
@@ -49,7 +53,7 @@ export function useCellEditing(options: {
       options.onClearClipboard();
       if (editingValue.value !== editingSourceValue.value) {
         options.onCommit({
-          address: { ...options.getActiveCell() },
+          address: { ...(editingAddress.value ?? options.getActiveCell()) },
           input: editingValue.value,
         });
       }
@@ -61,6 +65,7 @@ export function useCellEditing(options: {
     pendingSelectionAfterComposition = undefined;
     editingValue.value = "";
     editingSourceValue.value = "";
+    editingAddress.value = undefined;
     if (destination) {
       options.onSelectionChange(destination);
     } else if (restoreFocus) {
@@ -76,6 +81,7 @@ export function useCellEditing(options: {
     pendingSelectionAfterComposition = undefined;
     editingValue.value = "";
     editingSourceValue.value = "";
+    editingAddress.value = undefined;
     if (restoreFocus) {
       focusEditor();
     }
@@ -83,6 +89,7 @@ export function useCellEditing(options: {
 
   function onInput(value: string): void {
     if (!isEditing.value) {
+      editingAddress.value = { ...options.getActiveCell() };
       editingSourceValue.value = options.getInputValue();
       isEditing.value = true;
     }
@@ -95,6 +102,7 @@ export function useCellEditing(options: {
     shouldFinishAfterComposition = false;
     pendingSelectionAfterComposition = undefined;
     if (!isEditing.value) {
+      editingAddress.value = { ...options.getActiveCell() };
       editingSourceValue.value = options.getInputValue();
       editingValue.value = "";
       isEditing.value = true;
@@ -149,6 +157,7 @@ export function useCellEditing(options: {
     cancelEdit,
     deferSelectionWhileComposing,
     editingValue,
+    editingAddress,
     editorRef,
     finishEdit,
     focusEditor,

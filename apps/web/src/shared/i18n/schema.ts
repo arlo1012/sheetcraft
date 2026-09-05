@@ -144,6 +144,12 @@ export type MessageSchema = {
     editor: string;
     placeholder: string;
   };
+  formulaAssist: {
+    listLabel: string;
+    sumDescription: string;
+    sumSignature: string;
+    argument: string;
+  };
   sheetTabs: {
     list: string;
     rename: string;

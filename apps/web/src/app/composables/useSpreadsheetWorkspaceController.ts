@@ -64,6 +64,7 @@ import {
   createSheetEvaluator,
   getCellContent,
   getWorkbookSheets,
+  MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   setActiveSheet,
   type CellAddress,
@@ -375,13 +376,11 @@ export function useSpreadsheetWorkspaceController(
     }
   }
 
-  function commitCell(payload: { address: CellAddress; input: string }): void {
+  function commitCell(payload: { address: CellAddress; input: string; sheetId?: string }): void {
+    const sheetId = payload.sheetId ?? activeSheet.value.id;
+    if (!session.workbook.sheets.has(sheetId)) return;
     execute(
-      createSetCellContentCommand(
-        activeSheet.value.id,
-        payload.address,
-        parseCellContent(payload.input),
-      ),
+      createSetCellContentCommand(sheetId, payload.address, parseCellContent(payload.input)),
       "cells.edit",
     );
     clearWorkspaceStatus();
@@ -809,12 +808,15 @@ export function useSpreadsheetWorkspaceController(
 
   function traverseFromFormulaBar(payload: {
     address: CellAddress;
-    direction: "up" | "down";
+    direction: "up" | "down" | "left" | "right";
+    sheetId?: string;
   }): void {
-    const rowOffset = payload.direction === "up" ? -1 : 1;
+    if (payload.sheetId && payload.sheetId !== activeSheet.value.id) return;
+    const rowOffset = payload.direction === "up" ? -1 : payload.direction === "down" ? 1 : 0;
+    const columnOffset = payload.direction === "left" ? -1 : payload.direction === "right" ? 1 : 0;
     gridRef.value?.navigateToCell({
       row: Math.max(0, Math.min(payload.address.row + rowOffset, MAX_SHEET_ROWS - 1)),
-      column: payload.address.column,
+      column: Math.max(0, Math.min(payload.address.column + columnOffset, MAX_SHEET_COLUMNS - 1)),
     });
   }
 

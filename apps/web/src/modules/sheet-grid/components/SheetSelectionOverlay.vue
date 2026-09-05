@@ -8,6 +8,8 @@ const props = defineProps<{
   rangeRects: readonly SheetViewportRangeFragment[];
   addressLabel: string;
   editing: boolean;
+  referenceRects?: readonly SheetViewportRangeFragment[];
+  referenceActive?: boolean;
   clipboardRects?: readonly SheetViewportRangeFragment[];
   clipboardMode?: "copy" | "cut" | null;
 }>();
@@ -93,6 +95,15 @@ function getFragmentKey(fragment: SheetViewportRangeFragment): string {
     aria-hidden="true"
   />
   <div
+    v-for="fragment in referenceRects"
+    :key="`reference:${getFragmentKey(fragment)}`"
+    class="sheet-selection-overlay__formula-reference"
+    :class="{ 'is-active': referenceActive }"
+    :style="getRangeOutlineStyle(fragment, referenceRects ?? [])"
+    data-formula-reference-range
+    aria-hidden="true"
+  />
+  <div
     v-for="fragment in clipboardRects"
     :key="`clipboard:${getFragmentKey(fragment)}`"
     class="sheet-selection-overlay__clipboard"
@@ -111,6 +122,17 @@ function getFragmentKey(fragment: SheetViewportRangeFragment): string {
   &__clipboard {
     position: absolute;
     pointer-events: none;
+  }
+
+  &__formula-reference {
+    position: absolute;
+    z-index: 5;
+    border: 2px solid var(--idea-status-success);
+    pointer-events: none;
+
+    &.is-active {
+      background: color-mix(in srgb, var(--idea-status-success) 8%, transparent);
+    }
   }
 
   &__range-fill {

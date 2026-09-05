@@ -2,6 +2,8 @@
 import { computed, nextTick, ref, watch, type CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
+import FormulaInputAssist from "../../../shared/formula-editing/FormulaInputAssist.vue";
+import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 import type { Rect, Size } from "@idea10/sheet-engine/geometry";
 
 const { t } = useAppI18n();
@@ -11,6 +13,7 @@ const props = defineProps<{
   addressLabel: string;
   displayValue: string;
   editing: boolean;
+  composing: boolean;
   wrapText: boolean;
   cellRect: Rect;
   viewportSize: Size;
@@ -30,6 +33,13 @@ const emit = defineEmits<{
 }>();
 
 const inputRef = ref<HTMLTextAreaElement | null>(null);
+const formulaAssistRef = ref<
+  | (FormulaReferenceEditor & {
+      handleKeydown: (event: KeyboardEvent) => boolean;
+      inputAria: Readonly<Record<string, string | boolean | undefined>>;
+    })
+  | null
+>(null);
 const measuredWidth = ref(0);
 const measuredHeight = ref(0);
 const EDITOR_FRAME_BORDER_SIZE = 2;
@@ -61,6 +71,7 @@ const accessibleLabel = computed(() => {
     value: props.displayValue || t("cell.blank"),
   });
 });
+const formulaInputAria = computed(() => formulaAssistRef.value?.inputAria ?? {});
 
 async function measureEditor(): Promise<void> {
   const sequence = ++measurementSequence;
@@ -182,7 +193,32 @@ function onFrameMousedown(event: MouseEvent): void {
   focus({ clientX: event.clientX });
 }
 
-defineExpose({ focus, insertLineBreak });
+function onFormulaTextEdit(payload: { value: string; caret: number }): void {
+  emit("update:modelValue", payload.value);
+  void nextTick(() => {
+    const input = inputRef.value;
+    if (input) {
+      input.setSelectionRange(payload.caret, payload.caret);
+    }
+  });
+}
+
+function onKeydown(event: KeyboardEvent): void {
+  if (formulaAssistRef.value?.handleKeydown(event)) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+  emit("keydown", event);
+}
+
+defineExpose({
+  focus,
+  insertLineBreak,
+  get formulaReferenceEditor() {
+    return formulaAssistRef.value;
+  },
+});
 </script>
 
 <template>
@@ -204,19 +240,28 @@ defineExpose({ focus, insertLineBreak });
       autocomplete="off"
       :spellcheck="false"
       :aria-label="accessibleLabel"
+      v-bind="formulaInputAria"
       aria-keyshortcuts="Alt+Enter"
       :data-cell-editor="addressLabel"
       :style="editing ? style : undefined"
       @input="emit('update:modelValue', readInputValue($event))"
       @mousedown.stop
       @dblclick.stop
-      @keydown="emit('keydown', $event)"
+      @keydown="onKeydown"
       @blur="emit('blur', $event)"
       @compositionstart="emit('compositionStart', $event)"
       @compositionend="emit('compositionEnd', readInputValue($event), $event)"
       @copy="emit('copy', $event)"
       @cut="emit('cut', $event)"
       @paste="emit('paste', $event)"
+    />
+    <FormulaInputAssist
+      ref="formulaAssistRef"
+      :value="modelValue"
+      :input="inputRef"
+      :active="editing"
+      :composing="composing"
+      @text-edit="onFormulaTextEdit"
     />
   </div>
 </template>

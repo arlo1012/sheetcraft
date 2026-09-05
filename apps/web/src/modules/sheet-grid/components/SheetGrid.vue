@@ -5,6 +5,7 @@ import { getCellAddressLabel } from "@idea10/core/coordinates";
 import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
+import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
 import {
   MAX_COLUMN_WIDTH,
@@ -117,6 +118,7 @@ const props = withDefaults(
     columnExpansionTail?: number;
     viewState?: SheetGridViewState;
     formatPainterActive?: boolean;
+    referenceEditor?: FormulaReferenceEditor | null;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -256,6 +258,38 @@ const { start: startDragSelection, stop: stopDragSelection } = useDragSelection(
   onSelectionChange: (nextSelection, visibleAddress) =>
     setSelection(nextSelection, visibleAddress, false),
 });
+const formulaReferenceRange = ref<CellRange>();
+let formulaReferenceDragEditor: FormulaReferenceEditor | undefined;
+const { start: startFormulaReferenceDrag, stop: stopFormulaReferenceDragInternal } =
+  useDragSelection({
+    getCellAtClientPoint,
+    getScroller: () => scrollerRef.value,
+    getViewportSize: () => viewportSize,
+    onComplete: () => {
+      const editor = formulaReferenceDragEditor;
+      const range = formulaReferenceRange.value;
+      formulaReferenceDragEditor = undefined;
+      if (editor?.canPickReference() && range) {
+        editor.pickReference(range, "end");
+      }
+    },
+    onEnsureGridExtentContains: ensureGridExtentContains,
+    onEnsureGridExtentCoversViewport: ensureGridExtentCoversViewport,
+    onScrollPositionChange: (position) => {
+      scrollPosition.x = position.x;
+      scrollPosition.y = position.y;
+    },
+    onSelectionChange: (nextSelection) => {
+      const editor = formulaReferenceDragEditor;
+      if (!editor?.canPickReference()) {
+        stopFormulaReferenceDrag();
+        return;
+      }
+      const range = getSelectionRange(nextSelection);
+      formulaReferenceRange.value = range;
+      editor.pickReference(range, "update");
+    },
+  });
 
 const effectiveColumnWidths = computed(() => {
   const columnWidths = new Map(props.sheet.columnWidths);
@@ -299,15 +333,15 @@ startGeometryWatch();
 const activeCell = computed(() => selection.value.active);
 const {
   beginEdit,
-  cancelEdit,
+  cancelEdit: cancelCellEdit,
   deferSelectionWhileComposing,
   editingValue,
   editorRef,
-  finishEdit,
+  finishEdit: finishCellEdit,
   focusEditor,
   isComposing,
   isEditing,
-  onBlur: onEditorBlur,
+  onBlur: onCellEditorBlur,
   onCompositionEnd,
   onCompositionStart,
   onInput: onEditorInput,
@@ -328,6 +362,20 @@ const activeCellRect = computed(
   () => layout.value.getCellViewportRect(activeCell.value) ?? { x: 0, y: 0, width: 0, height: 0 },
 );
 const selectedRangeRects = computed(() => layout.value.getRangeFragments(selectedRange.value));
+const referenceEditor = computed<FormulaReferenceEditor | null>(() => {
+  if (props.referenceEditor?.canPickReference()) return props.referenceEditor;
+  return editorRef.value?.formulaReferenceEditor ?? null;
+});
+const referenceActive = computed(() => {
+  const editor = referenceEditor.value;
+  return Boolean(editor?.referenceActive) && (editor === props.referenceEditor || isEditing.value);
+});
+const referenceRange = computed(() =>
+  referenceActive.value ? (referenceEditor.value?.referenceRange ?? null) : null,
+);
+const referenceRangeRects = computed(() =>
+  referenceRange.value ? layout.value.getRangeFragments(referenceRange.value) : [],
+);
 const activeCellOutlineRects = computed(() =>
   layout.value.getRangeFragments(
     layout.value.getMergedRangeAt(activeCell.value) ?? {
@@ -450,6 +498,45 @@ function setActiveCell(address: CellAddress, restoreFocus = true): void {
   setSelection(createCellSelection(address), address, restoreFocus);
 }
 
+function getReferenceEditor(): FormulaReferenceEditor | null {
+  return referenceEditor.value?.canPickReference() ? referenceEditor.value : null;
+}
+
+function stopFormulaReferenceDrag(): void {
+  stopFormulaReferenceDragInternal();
+  formulaReferenceDragEditor = undefined;
+}
+
+function finishEdit(destination?: CellSelection, restoreFocus = true): void {
+  stopFormulaReferenceDrag();
+  finishCellEdit(destination, restoreFocus);
+}
+
+function cancelEdit(restoreFocus = true): void {
+  stopFormulaReferenceDrag();
+  cancelCellEdit(restoreFocus);
+}
+
+function onEditorBlur(): void {
+  stopFormulaReferenceDrag();
+  onCellEditorBlur();
+}
+
+function startReferencePick(address: CellAddress, event: MouseEvent): boolean {
+  const editor = getReferenceEditor();
+  if (!editor || isComposing.value) return false;
+  const range = { start: { ...address }, end: { ...address } };
+  if (!editor.pickReference(range, "start")) return false;
+  axisContextMenu.value = undefined;
+  cellContextMenu.value = undefined;
+  formulaReferenceRange.value = range;
+  stopDragSelection();
+  stopFormulaReferenceDrag();
+  formulaReferenceDragEditor = editor;
+  startFormulaReferenceDrag(createCellSelection(address), event);
+  return true;
+}
+
 watch(rowVisibility, () => {
   if (rowVisibility.value.isRowVisible(selection.value.active.row)) return;
   const column = selection.value.active.column;
@@ -563,6 +650,9 @@ function onGridKeydown(event: KeyboardEvent): void {
 }
 
 function onCellMouseDown(address: CellAddress, event: MouseEvent): void {
+  if (startReferencePick(address, event)) {
+    return;
+  }
   const previousSelection = selection.value;
   const nextSelection = event.shiftKey
     ? extendCellSelection(previousSelection, address)
@@ -806,6 +896,9 @@ function onCornerClick(): void {
 }
 
 function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
+  if (getReferenceEditor()) {
+    return;
+  }
   if (isComposing.value) {
     return;
   }
@@ -974,6 +1067,7 @@ function restoreViewState(viewState?: SheetGridViewState): void {
         },
       });
   stopDragSelection();
+  stopFormulaReferenceDrag();
   stopDimensionResize();
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
@@ -1046,6 +1140,7 @@ onBeforeUnmount(() => {
   stopObservingViewport();
   stopGeometryWatching();
   stopDragSelection();
+  stopFormulaReferenceDrag();
   stopDimensionResize();
   clearPendingClipboard();
 });
@@ -1139,6 +1234,7 @@ defineExpose({
                 :address-label="activeCellLabel"
                 :display-value="activeCellDisplayValue"
                 :editing="isEditing"
+                :composing="isComposing"
                 :wrap-text="activeCellWrapText"
                 :cell-rect="cellRect"
                 :viewport-size="viewportSize"
@@ -1160,6 +1256,8 @@ defineExpose({
             :range-rects="selectedRangeRects"
             :address-label="activeCellLabel"
             :editing="isEditing"
+            :reference-rects="referenceRangeRects"
+            :reference-active="referenceActive"
             :clipboard-rects="clipboardRangeRects"
             :clipboard-mode="clipboardMode"
           />

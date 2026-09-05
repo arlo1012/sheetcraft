@@ -2,7 +2,8 @@
 import { nextTick, ref, watch } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
-import type { CellAddress } from "@idea10/core/workbook";
+import type { CellAddress, CellRange } from "@idea10/core/workbook";
+import FormulaInputAssist from "../../../shared/formula-editing/FormulaInputAssist.vue";
 import WorkbookFormulaBarAddressInput from "./WorkbookFormulaBarAddressInput.vue";
 import WorkbookFormulaBarSearchControls from "./WorkbookFormulaBarSearchControls.vue";
 
@@ -11,27 +12,37 @@ const props = defineProps<{
   addressLabel: string;
   inputValue: string;
   searchQuery: string;
+  sheetId?: string;
 }>();
 
 const emit = defineEmits<{
   navigate: [address: string];
-  commitCell: [payload: { address: CellAddress; input: string }];
-  traverse: [payload: { address: CellAddress; direction: "up" | "down" }];
+  commitCell: [payload: { address: CellAddress; input: string; sheetId?: string }];
+  traverse: [
+    payload: {
+      address: CellAddress;
+      direction: "up" | "down" | "left" | "right";
+      sheetId?: string;
+    },
+  ];
   updateSearchQuery: [query: string];
   find: [direction: "forward" | "backward"];
 }>();
 
 const { t } = useAppI18n();
 const formulaInput = ref<HTMLTextAreaElement>();
+const formulaAssistRef = ref<InstanceType<typeof FormulaInputAssist> | null>(null);
 const formulaDraft = ref(props.inputValue);
 const formulaSourceValue = ref(props.inputValue);
 const formulaTarget = ref<CellAddress>({ ...props.address });
 const formulaTargetLabel = ref(props.addressLabel);
+const formulaTargetSheetId = ref(props.sheetId);
 const formulaFocused = ref(false);
 const isComposing = ref(false);
+let finishAfterComposition = false;
 
 watch(
-  () => [props.address.row, props.address.column, props.inputValue] as const,
+  () => [props.sheetId, props.address.row, props.address.column, props.inputValue] as const,
   () => {
     if (!formulaFocused.value) {
       syncFormulaFromProps();
@@ -46,16 +57,16 @@ function readInputValue(event: Event): string {
 function syncFormulaFromProps(): void {
   formulaTarget.value = { ...props.address };
   formulaTargetLabel.value = props.addressLabel;
+  formulaTargetSheetId.value = props.sheetId;
   formulaSourceValue.value = props.inputValue;
   formulaDraft.value = props.inputValue;
 }
 
 function onFormulaFocus(): void {
+  if (formulaFocused.value) return;
   formulaFocused.value = true;
-  formulaTarget.value = { ...props.address };
-  formulaTargetLabel.value = props.addressLabel;
-  formulaSourceValue.value = props.inputValue;
-  formulaDraft.value = props.inputValue;
+  finishAfterComposition = false;
+  syncFormulaFromProps();
 }
 
 function onFormulaInput(event: Event): void {
@@ -69,6 +80,7 @@ function commitFormulaDraft(): void {
   const payload = {
     address: { ...formulaTarget.value },
     input: formulaDraft.value,
+    ...(formulaTargetSheetId.value ? { sheetId: formulaTargetSheetId.value } : {}),
   };
   formulaSourceValue.value = formulaDraft.value;
   emit("commitCell", payload);
@@ -97,40 +109,98 @@ function insertFormulaLineBreak(): void {
     input.selectionEnd,
     "\n",
   );
-  formulaDraft.value = insertion.value;
+  applyFormulaTextEdit(insertion);
+}
+
+function applyFormulaTextEdit(edit: { value: string; caret: number }): void {
+  const input = formulaInput.value;
+  formulaDraft.value = edit.value;
+  if (!input) return;
+  input.value = edit.value;
+  input.setSelectionRange(edit.caret, edit.caret);
   void nextTick(() => {
-    input.setSelectionRange(insertion.caret, insertion.caret);
+    input.setSelectionRange(edit.caret, edit.caret);
   });
 }
 
 function onFormulaKeydown(event: KeyboardEvent): void {
+  if (formulaAssistRef.value?.handleKeydown(event)) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   if (event.key === "Enter" && event.altKey && !event.isComposing && !isComposing.value) {
     event.preventDefault();
     insertFormulaLineBreak();
-  } else if (event.key === "Enter" && !event.isComposing && !isComposing.value) {
+  } else if (
+    (event.key === "Enter" || event.key === "Tab") &&
+    !event.isComposing &&
+    !isComposing.value
+  ) {
     event.preventDefault();
     commitFormulaDraft();
     emit("traverse", {
       address: { ...formulaTarget.value },
-      direction: event.shiftKey ? "up" : "down",
+      ...(formulaTargetSheetId.value ? { sheetId: formulaTargetSheetId.value } : {}),
+      direction:
+        event.key === "Tab" ? (event.shiftKey ? "left" : "right") : event.shiftKey ? "up" : "down",
     });
+    formulaFocused.value = false;
     formulaInput.value?.blur();
   } else if (event.key === "Escape") {
     event.preventDefault();
     formulaDraft.value = formulaSourceValue.value;
+    isComposing.value = false;
+    finishAfterComposition = false;
+    formulaFocused.value = false;
     formulaInput.value?.blur();
   }
 }
 
 function onFormulaBlur(): void {
-  if (!isComposing.value) {
-    commitFormulaDraft();
+  if (isComposing.value) {
+    finishAfterComposition = true;
+    return;
   }
+  commitFormulaDraft();
   formulaFocused.value = false;
   void nextTick(syncFormulaFromProps);
 }
 
-defineExpose({ flushPendingEdit, hasPendingEdit });
+function onFormulaCompositionStart(): void {
+  isComposing.value = true;
+  finishAfterComposition = false;
+}
+
+function onFormulaCompositionEnd(event: CompositionEvent): void {
+  formulaDraft.value = readInputValue(event);
+  isComposing.value = false;
+  if (finishAfterComposition) {
+    finishAfterComposition = false;
+    onFormulaBlur();
+  }
+}
+
+defineExpose({
+  flushPendingEdit,
+  hasPendingEdit,
+  canPickReference: () =>
+    formulaTargetSheetId.value === props.sheetId &&
+    (formulaAssistRef.value?.canPickReference() ?? false),
+  pickReference: (range: CellRange, phase: "start" | "update" | "end") =>
+    formulaTargetSheetId.value === props.sheetId &&
+    (formulaAssistRef.value?.pickReference(range, phase) ?? false),
+  get referenceActive() {
+    return (
+      formulaFocused.value &&
+      formulaTargetSheetId.value === props.sheetId &&
+      (formulaAssistRef.value?.referenceActive ?? false)
+    );
+  },
+  get referenceRange() {
+    return formulaAssistRef.value?.referenceRange ?? null;
+  },
+});
 </script>
 
 <template>
@@ -155,6 +225,7 @@ defineExpose({ flushPendingEdit, hasPendingEdit });
       </span>
       <textarea
         ref="formulaInput"
+        v-bind="formulaAssistRef?.inputAria"
         class="workbook-formula-bar__formula-input"
         :value="formulaDraft"
         rows="1"
@@ -171,8 +242,16 @@ defineExpose({ flushPendingEdit, hasPendingEdit });
         @focus="onFormulaFocus"
         @blur="onFormulaBlur"
         @keydown="onFormulaKeydown"
-        @compositionstart="isComposing = true"
-        @compositionend="isComposing = false"
+        @compositionstart="onFormulaCompositionStart"
+        @compositionend="onFormulaCompositionEnd"
+      />
+      <FormulaInputAssist
+        ref="formulaAssistRef"
+        :value="formulaDraft"
+        :input="formulaInput"
+        :active="formulaFocused"
+        :composing="isComposing"
+        @text-edit="applyFormulaTextEdit"
       />
     </label>
 

@@ -150,6 +150,12 @@ export const enUS = {
     editor: "Cell input for {address}",
     placeholder: "Enter a value or formula",
   },
+  formulaAssist: {
+    listLabel: "Formula suggestions",
+    sumDescription: "Adds numbers and ranges",
+    sumSignature: "SUM(number1, [number2], ...)",
+    argument: "SUM argument {index}",
+  },
   sheetTabs: {
     list: "Workbook sheets",
     rename: "Rename {name}",

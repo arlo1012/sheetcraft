@@ -147,6 +147,12 @@ export const zhCN = {
     editor: "编辑单元格 {address}",
     placeholder: "输入值或公式",
   },
+  formulaAssist: {
+    listLabel: "公式建议",
+    sumDescription: "对数值和范围求和",
+    sumSignature: "SUM(数值1, [数值2], ...)",
+    argument: "SUM 第 {index} 个参数",
+  },
   sheetTabs: {
     list: "工作表列表",
     rename: "重命名 {name}",
