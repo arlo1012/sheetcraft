@@ -1,9 +1,11 @@
 import type { CellRange } from "@idea10/core/workbook";
 import { formatCellAddress } from "@idea10/core/coordinates";
+import { getFormulaFunctionMetadata, type FormulaFunctionMetadata } from "@idea10/core/formula";
 
-export const SUPPORTED_FORMULA_FUNCTIONS = [
-  { id: "SUM", minArguments: 0, maxArguments: null, acceptsRanges: true },
-] as const;
+export type FormulaFunctionCandidate = FormulaFunctionMetadata & Readonly<{ id: string }>;
+
+const SUPPORTED_FORMULA_FUNCTIONS: readonly FormulaFunctionCandidate[] =
+  getFormulaFunctionMetadata().map((metadata) => ({ ...metadata, id: metadata.name }));
 
 export type FormulaCompletionContext = {
   replaceStart: number;
@@ -57,6 +59,10 @@ export function getSupportedFormulaCandidates(context: FormulaCompletionContext 
   return SUPPORTED_FORMULA_FUNCTIONS.filter((candidate) => candidate.id.startsWith(prefix));
 }
 
+export function getSupportedFormulaFunction(name: string): FormulaFunctionCandidate | undefined {
+  return SUPPORTED_FORMULA_FUNCTIONS.find((candidate) => candidate.name === name.toUpperCase());
+}
+
 export function applyFunctionCompletion(
   value: string,
   context: FormulaCompletionContext,
@@ -85,14 +91,24 @@ export function getFormulaReferenceEditContext(
     previous === "+" ||
     previous === "-" ||
     previous === "*" ||
-    previous === "/"
+    previous === "/" ||
+    previous === "<" ||
+    previous === ">" ||
+    previous === "=" ||
+    previous === "&"
     ? { replaceStart: selection.start, replaceEnd: selection.end }
     : null;
 }
 
 export function formatFormulaReferenceRange(range: CellRange): string {
-  const start = formatCellAddress(range.start);
-  const end = formatCellAddress(range.end);
+  const start = formatCellAddress({
+    row: Math.min(range.start.row, range.end.row),
+    column: Math.min(range.start.column, range.end.column),
+  });
+  const end = formatCellAddress({
+    row: Math.max(range.start.row, range.end.row),
+    column: Math.max(range.start.column, range.end.column),
+  });
   return start === end ? start : `${start}:${end}`;
 }
 
@@ -199,7 +215,11 @@ function isFunctionPosition(value: string, start: number): boolean {
     previous === "+" ||
     previous === "-" ||
     previous === "*" ||
-    previous === "/"
+    previous === "/" ||
+    previous === "<" ||
+    previous === ">" ||
+    previous === "=" ||
+    previous === "&"
   );
 }
 

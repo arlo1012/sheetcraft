@@ -1,6 +1,53 @@
 export type AppLocale = "zh-CN" | "en-US";
 
 export type MessageSchema = {
+  xlsx: {
+    actions: { import: string; export: string; selectFile: string };
+    feedback: {
+      imported: string;
+      exported: string;
+      failed: string;
+      timeout: string;
+      finishEditing: string;
+      stale: string;
+      blocked: string;
+    };
+    confirm: {
+      importTitle: string;
+      importDescription: string;
+      importConfirm: string;
+      exportTitle: string;
+      exportDescription: string;
+      exportConfirm: string;
+      cancel: string;
+    };
+    report: {
+      title: string;
+      warning: string;
+      block: string;
+      issue: string;
+      codes: {
+        archiveInvalid: string;
+        archiveLimit: string;
+        archiveEncrypted: string;
+        archiveUnsupportedCompression: string;
+        archiveUnsafePath: string;
+        macroContent: string;
+        drawingOrMedia: string;
+        externalContent: string;
+        formulaCacheDiscarded: string;
+        formulaNotCalculated: string;
+        filterOmitted: string;
+        imageOmitted: string;
+        styleOmitted: string;
+        numberFormatOmitted: string;
+        dimensionApproximated: string;
+        dateNormalized: string;
+        cellValueOmitted: string;
+        featureOmitted: string;
+      };
+    };
+  };
   persistence: {
     file: string;
     fileActions: string;
@@ -146,9 +193,34 @@ export type MessageSchema = {
   };
   formulaAssist: {
     listLabel: string;
+    argument: string;
     sumDescription: string;
     sumSignature: string;
-    argument: string;
+    ifDescription: string;
+    ifSignature: string;
+    iferrorDescription: string;
+    iferrorSignature: string;
+    averageDescription: string;
+    averageSignature: string;
+    countDescription: string;
+    countSignature: string;
+    minDescription: string;
+    minSignature: string;
+    maxDescription: string;
+    maxSignature: string;
+    roundDescription: string;
+    roundSignature: string;
+    argLogicalTest: string;
+    argValueIfTrue: string;
+    argValueIfFalse: string;
+    argValue: string;
+    argValueIfError: string;
+    argNumber: string;
+    argNumber1: string;
+    argNumber2: string;
+    argValue1: string;
+    argValue2: string;
+    argNumDigits: string;
   };
   sheetTabs: {
     list: string;

@@ -19,6 +19,7 @@ type BundleBudgetConfig = {
     javascript: AssetBudget;
     css: AssetBudget;
   };
+  deferredWorkers?: AssetBudget;
 };
 
 type AssetSize = {
@@ -110,6 +111,15 @@ function main(): void {
     ...checkBudget("total JavaScript", javascriptAssets, config.totalAssets.javascript),
     ...checkBudget("total CSS", cssAssets, config.totalAssets.css),
   ];
+  if (config.deferredWorkers) {
+    const pattern = new RegExp(config.deferredWorkers.pattern ?? "");
+    const workers = javascriptAssets.filter((asset) => pattern.test(asset.name));
+    if (workers.length === 0) throw new Error("Expected deferred Worker assets, found none.");
+    errors.push(...checkBudget("deferred Workers", workers, config.deferredWorkers));
+    const html = readFileSync(resolve(workspaceRoot, config.distDirectory, "index.html"), "utf8");
+    if (workers.some((asset) => html.includes(asset.name)))
+      errors.push("Deferred Worker code must not appear in HTML startup scripts or preloads");
+  }
 
   console.log("Web bundle sizes:");
   for (const asset of [...javascriptAssets, ...cssAssets]) {

@@ -74,6 +74,26 @@ describe("useWorkbookFileActions save and leave", () => {
     });
   });
 
+  test("does not overlap another file operation or its confirmation", async () => {
+    let blocked = true;
+    const fixture = mountActions({ isBlocked: () => blocked });
+    const file = createWorkbookFile(vi.fn(async () => "{}"));
+    await fixture.actions.save();
+    await fixture.actions.exportJson();
+    await fixture.actions.importJson(file);
+    fixture.actions.requestReload();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "s", ctrlKey: true }));
+    window.dispatchEvent(new Event("pagehide"));
+    expect(fixture.flushPendingEdits).not.toHaveBeenCalled();
+    expect(fixture.persistence.saveNow).not.toHaveBeenCalled();
+    expect(mocks.downloadWorkbookJson).not.toHaveBeenCalled();
+    expect(file.text).not.toHaveBeenCalled();
+    expect(fixture.actions.confirmation.value).toBeUndefined();
+    blocked = false;
+    await fixture.actions.save();
+    expect(fixture.persistence.saveNow).toHaveBeenCalledOnce();
+  });
+
   test("warns before unload only for a dirty document or pending editor draft", () => {
     const fixture = mountActions();
 

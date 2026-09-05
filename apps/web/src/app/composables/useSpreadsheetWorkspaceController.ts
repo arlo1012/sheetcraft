@@ -122,6 +122,7 @@ export type SheetGridNavigator = {
   flushPendingEdit?(): boolean;
   hasPendingEdit?(): boolean;
   focusGrid(): void;
+  handleReferenceKeydown?(event: KeyboardEvent): boolean;
   navigateToCell(address: CellAddress): void;
 };
 
@@ -856,6 +857,14 @@ export function useSpreadsheetWorkspaceController(
     return gridRef.value?.hasPendingEdit?.() ?? false;
   }
 
+  function focusCellEditor(): void {
+    gridRef.value?.focusGrid();
+  }
+
+  function handleFormulaReferenceKeydown(event: KeyboardEvent): boolean {
+    return gridRef.value?.handleReferenceKeydown?.(event) ?? false;
+  }
+
   function navigateToAddress(input: string): void {
     const address = parseCellAddress(input);
     if (!address) {
@@ -938,6 +947,8 @@ export function useSpreadsheetWorkspaceController(
     replaceWorkbook,
     flushPendingGridEdit,
     hasPendingGridEdit,
+    focusCellEditor,
+    handleFormulaReferenceKeydown,
     viewStates,
     searchQuery,
     t,

@@ -9,7 +9,7 @@ type PackageManifest = {
 };
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const packageDirectories = ["packages/core", "packages/sheet-engine"];
+const packageDirectories = ["packages/core", "packages/sheet-engine", "packages/xlsx-io"];
 
 function collectExportTargets(value: unknown): string[] {
   if (typeof value === "string") {

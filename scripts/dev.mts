@@ -8,6 +8,7 @@ const tscExecutable = fileURLToPath(new URL("../node_modules/typescript/bin/tsc"
 const viteExecutable = fileURLToPath(new URL("../node_modules/vite/bin/vite.js", import.meta.url));
 const coreProject = "packages/core/tsconfig.build.json";
 const sheetEngineProject = "packages/sheet-engine/tsconfig.build.json";
+const xlsxIoProject = "packages/xlsx-io/tsconfig.build.json";
 const viteArguments = process.argv.slice(2);
 const children = new Map<string, ChildProcess>();
 let activeBuild: ChildProcess | undefined;
@@ -82,6 +83,8 @@ async function main(): Promise<void> {
   if (stopping) return;
   await runInitialBuild(sheetEngineProject);
   if (stopping) return;
+  await runInitialBuild(xlsxIoProject);
+  if (stopping) return;
 
   startChild("package watcher", [
     bunExecutable,
@@ -89,6 +92,7 @@ async function main(): Promise<void> {
     "-b",
     coreProject,
     sheetEngineProject,
+    xlsxIoProject,
     "--watch",
     "--preserveWatchOutput",
   ]);

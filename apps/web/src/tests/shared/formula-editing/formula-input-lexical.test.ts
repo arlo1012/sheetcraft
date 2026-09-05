@@ -15,10 +15,14 @@ function completion(value: string, start = value.length, end = start) {
 }
 
 describe("formula input lexical assistance", () => {
-  test("offers only implemented SUM and applies a parenthesis", () => {
+  test("offers Core-supported functions and applies a parenthesis", () => {
     const context = completion("=s");
     expect(getSupportedFormulaCandidates(context).map((item) => item.id)).toEqual(["SUM"]);
     expect(applyFunctionCompletion("=s", context, "SUM")).toEqual({ value: "=SUM(", caret: 5 });
+    expect(getSupportedFormulaCandidates(completion("=i")).map((item) => item.id)).toEqual([
+      "IF",
+      "IFERROR",
+    ]);
   });
 
   test("replaces a prefix in the middle or a whole selected identifier without duplicate parentheses", () => {
@@ -53,6 +57,33 @@ describe("formula input lexical assistance", () => {
       end: { row: 1, column: 1 },
     });
     expect(updated.value).toBe("=SUM(A1:B2");
+  });
+
+  test("allows reference insertion after supported comparison and concatenation operators", () => {
+    for (const operator of ["<", ">", "=", "&"]) {
+      const value = `=A1${operator}`;
+      expect(getFormulaReferenceEditContext(value, value.length, value.length)).toEqual({
+        replaceStart: value.length,
+        replaceEnd: value.length,
+      });
+    }
+    expect(getFormulaReferenceEditContext('="A1"&', 6, 6)).toEqual({
+      replaceStart: 6,
+      replaceEnd: 6,
+    });
+  });
+
+  test("formats reverse keyboard ranges in top-left to bottom-right order", () => {
+    expect(
+      replaceFormulaReference(
+        "=SUM(",
+        { replaceStart: 5, replaceEnd: 5 },
+        {
+          start: { row: 4, column: 2 },
+          end: { row: 3, column: 1 },
+        },
+      ).value,
+    ).toBe("=SUM(B4:C5");
   });
 
   test("allows an existing A1 range but rejects quoted text and closed-call insertion", () => {

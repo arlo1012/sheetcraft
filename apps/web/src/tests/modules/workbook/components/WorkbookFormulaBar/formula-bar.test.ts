@@ -24,7 +24,9 @@ describe("WorkbookFormulaBar", () => {
     expect(wrapper.get("form").attributes("aria-label")).toBe("转到单元格");
     expect(wrapper.get("[data-address-input]").attributes("aria-label")).toBe("单元格地址");
     expect(wrapper.get("[data-formula-input]").attributes("aria-label")).toBe("编辑单元格 A1");
-    expect(wrapper.get("[data-formula-input]").attributes("aria-keyshortcuts")).toBe("Alt+Enter");
+    expect(wrapper.get("[data-formula-input]").attributes("aria-keyshortcuts")).toBe(
+      "Alt+Enter Control+F2 F2 F4",
+    );
     expect(wrapper.get("[data-formula-input]").element).toBeInstanceOf(HTMLTextAreaElement);
     expect(wrapper.get("[data-search-input]").attributes("aria-label")).toBe("在工作表中查找");
     expect(wrapper.get(".workbook-formula-bar__fx").attributes("aria-hidden")).toBe("true");

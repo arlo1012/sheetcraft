@@ -17,9 +17,14 @@ See [Filtered Clipboard](docs/filtered-clipboard.md) for formula/style handling,
 selection rules, and the explicit cut and merged-cell restrictions.
 
 Formulas currently support single-Sheet A1 references, absolute and relative
-references, ranges, parentheses, arithmetic (`+`, `-`, `*`, `/`), and `SUM` with
-AutoSum. Copying, moving, and changing rows or columns transform references.
-Cross-Sheet formulas and additional functions are not implemented.
+references, ranges, parentheses, arithmetic (`+`, `-`, `*`, `/`), text, booleans,
+comparison and concatenation. The first registry contains `SUM`, `IF`, `IFERROR`,
+`AVERAGE`, `COUNT`, `MIN`, `MAX`, and `ROUND`; AutoSum remains available.
+The formula bar and in-cell editor share one draft and caret session, including
+F2 Point/Edit modes, arrow-reference selection, and Ctrl+F2 surface transfer.
+Copying, moving, and changing rows or columns transform references. Cross-Sheet
+formulas and functions beyond this first set are not implemented. See
+[Formula Editing](docs/formula-editing.md) and [Formula Runtime](docs/formula-runtime.md).
 
 The proposed [Formula and Excel Compatibility Plan](docs/formula-excel-compatibility-plan.md)
 defines target scope, ownership, library qualification, and acceptance gates.
@@ -28,13 +33,18 @@ It is a design draft, not a list of currently supported features.
 The first [Formula Foundation](docs/formula-foundation.md) implementation adds
 reviewable function/feature inventories, typed error and empty-string content,
 per-workbook date systems, shared reference contracts, and an isolated library
-qualification lab. It does not add more formula functions or product XLSX IO.
+qualification lab. Product runtime progress and XLSX IO are documented separately.
 
-Core writes V4 snapshots and accepts V1/V2/V3/V4 input. The Web application restores
+Core writes V6 snapshots and accepts V1 through V6 input. The Web application restores
 the current workbook from IndexedDB, automatically saves document edits, and
 offers JSON import/export with validation and replacement confirmation. See
 [Saving And Recovery](docs/workbook-persistence.md) for the local-only storage
 scope, multi-tab conflicts, and recovery guarantees.
+
+[XLSX IO v1](docs/xlsx-io.md) adds browser-Worker import/export with overwrite
+confirmation, explicit compatibility reports, and bounded archive checks.
+XLSX is a supported-subset interchange format; JSON bundles remain the complete
+backup format for images and product-specific metadata.
 
 See [Images](docs/images.md) for image insertion, movement, clipboard, and portable assets.
 
@@ -69,7 +79,7 @@ browser-target Worker consumer, and production bundle budgets.
 It also validates the compatibility catalogs and their offline tests; the
 isolated library lab is verified separately without adding product dependencies.
 
-`bun run dev` builds Core and Sheet Engine first, watches both packages through
+`bun run dev` builds Core, Sheet Engine and XLSX IO first, watches the packages through
 TypeScript's dependency graph, and serves Web on `0.0.0.0:7200`. Rebuilt package
 exports update the browser through Vite. Use `bun run dev -- --port 7201` for
 another port. Occupied ports fail explicitly; Ctrl-C stops the watcher and Web
@@ -101,6 +111,8 @@ component-specific layout and interaction states.
   workbook-facing Vue controls.
 - `apps/web/src/modules/workbook-persistence`: local storage adapter, save/load
   coordination, file transfer, confirmation, and recovery feedback.
+- `apps/web/src/modules/workbook-xlsx`: browser Worker lifecycle, XLSX file
+  actions and compatibility-report confirmation.
 - `apps/web/src/modules/sheet-grid`: concrete Grid components, clipboard
   adapter, editor lifecycle, viewport, resize, and drag interactions.
 - `apps/web/src/shared`: proven cross-module Web primitives, utilities, and
@@ -109,6 +121,8 @@ component-specific layout and interaction states.
   serialization, styles, input rules, queries, and domain errors.
 - `packages/sheet-engine`: runtime-neutral geometry, selection, extent,
   viewport state, and automatic row-height calculations.
+- `packages/xlsx-io`: runtime-neutral XLSX byte conversion and compatibility
+  reporting, using a pinned browser artifact behind the Web Worker.
 
 Do not create a shared abstraction for code used by only one module.
 
@@ -121,6 +135,7 @@ Consumers import only the explicit package exports. Deep imports into `src` or
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `@idea10/core`         | `commands`, `history`, `serialization`, `workbook`, `errors`, `runtime`, `clipboard`, `coordinates`, `formula`, `input`, `search`, `selection-summary`, `style`, `style-state` |
 | `@idea10/sheet-engine` | `extent`, `frozen-layout`, `geometry`, `row-height`, `selection`, `view-state`, `viewport-layout`, `visibility`                                                                |
+| `@idea10/xlsx-io`      | root export: `decodeXlsx`, `encodeXlsx`, typed compatibility reports and errors                                                                                                |
 
 See [Portable Core Consumers](docs/portable-core.md) for deterministic runtime
 ports, serializable commands and snapshots, and Worker/server integration.

@@ -4,7 +4,9 @@ import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import FormulaInputAssist from "../../../shared/formula-editing/FormulaInputAssist.vue";
 import FormulaTextOverlay from "../../../shared/formula-editing/FormulaTextOverlay.vue";
+import { getFormulaReferenceTokens } from "../../../shared/formula-editing/formula-reference-tokens";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
+import type { CellEditSession } from "../../../shared/cell-editing/useCellEditSession";
 import type { Rect, Size } from "@idea10/sheet-engine/geometry";
 
 const { t } = useAppI18n();
@@ -20,6 +22,7 @@ const props = defineProps<{
   viewportSize: Size;
   style?: CSSProperties;
   frameStyle?: CSSProperties;
+  editSession?: CellEditSession;
 }>();
 
 const emit = defineEmits<{
@@ -75,6 +78,12 @@ const accessibleLabel = computed(() => {
 const formulaInputAria = computed(() => formulaAssistRef.value?.inputAria ?? {});
 const showFormulaColors = computed(
   () => props.editing && !props.composing && props.modelValue.startsWith("="),
+);
+const coloredReferences = computed(() =>
+  showFormulaColors.value ? getFormulaReferenceTokens(props.modelValue) : [],
+);
+const formulaAssistActive = computed(
+  () => props.editing && (!props.editSession || props.editSession.state.surface === "grid"),
 );
 
 async function measureEditor(): Promise<void> {
@@ -155,7 +164,15 @@ function getCaretIndex(clientX: number): number {
   return input.value.length;
 }
 
-function focus(options?: { selectAll?: boolean; clientX?: number }): void {
+function focus(options?: {
+  selectAll?: boolean;
+  clientX?: number;
+  selection?: {
+    start: number;
+    end: number;
+    direction: "none" | "forward" | "backward";
+  };
+}): void {
   const input = inputRef.value;
   if (!input) {
     return;
@@ -164,6 +181,14 @@ function focus(options?: { selectAll?: boolean; clientX?: number }): void {
   input.focus({ preventScroll: true });
   if (options?.selectAll) {
     input.select();
+    return;
+  }
+  if (options?.selection) {
+    input.setSelectionRange(
+      options.selection.start,
+      options.selection.end,
+      options.selection.direction,
+    );
     return;
   }
 
@@ -199,12 +224,39 @@ function onFrameMousedown(event: MouseEvent): void {
 
 function onFormulaTextEdit(payload: { value: string; caret: number }): void {
   emit("update:modelValue", payload.value);
+  props.editSession?.setSelection(payload.caret, payload.caret);
   void nextTick(() => {
     const input = inputRef.value;
     if (input) {
       input.setSelectionRange(payload.caret, payload.caret);
+      captureSelection();
     }
   });
+}
+
+function captureSelection(): void {
+  const input = inputRef.value;
+  if (!input || !props.editSession?.state.active || props.editSession.state.surface !== "grid")
+    return;
+  props.editSession.setSelection(
+    input.selectionStart,
+    input.selectionEnd,
+    input.selectionDirection ?? "none",
+  );
+}
+
+function onFocus(): void {
+  if (props.editSession?.state.active) props.editSession.activateSurface("grid");
+}
+
+function onInput(event: Event): void {
+  emit("update:modelValue", readInputValue(event));
+  void nextTick(captureSelection);
+}
+
+function onBlur(event: FocusEvent): void {
+  captureSelection();
+  emit("blur", event);
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -249,14 +301,20 @@ defineExpose({
       :spellcheck="false"
       :aria-label="accessibleLabel"
       v-bind="formulaInputAria"
-      aria-keyshortcuts="Alt+Enter"
+      aria-keyshortcuts="Alt+Enter Control+F2 F2 F4"
       :data-cell-editor="addressLabel"
+      :data-cell-edit-session="editSession?.id"
+      data-cell-edit-surface="grid"
       :style="editing ? style : undefined"
-      @input="emit('update:modelValue', readInputValue($event))"
+      @input="onInput"
+      @focus="onFocus"
       @mousedown.stop
       @dblclick.stop
+      @select="captureSelection"
+      @keyup="captureSelection"
+      @click="captureSelection"
       @keydown="onKeydown"
-      @blur="emit('blur', $event)"
+      @blur="onBlur"
       @compositionstart="emit('compositionStart', $event)"
       @compositionend="emit('compositionEnd', readInputValue($event), $event)"
       @copy="emit('copy', $event)"
@@ -266,14 +324,14 @@ defineExpose({
     <FormulaTextOverlay
       :input="inputRef"
       :value="modelValue"
-      :references="formulaAssistRef?.references ?? []"
+      :references="coloredReferences"
       :active="showFormulaColors"
     />
     <FormulaInputAssist
       ref="formulaAssistRef"
       :value="modelValue"
       :input="inputRef"
-      :active="editing"
+      :active="formulaAssistActive"
       :composing="composing"
       @text-edit="onFormulaTextEdit"
     />

@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import type { CellAddress, CellRange } from "@idea10/core/workbook";
+import { getCellAddressLabel } from "@idea10/core/coordinates";
 import FormulaInputAssist from "../../../shared/formula-editing/FormulaInputAssist.vue";
 import FormulaTextOverlay from "../../../shared/formula-editing/FormulaTextOverlay.vue";
-import { completeFormulaForCommit } from "../../../shared/formula-editing/formula-commit";
+import { getFormulaReferenceTokens } from "../../../shared/formula-editing/formula-reference-tokens";
+import {
+  useCellEditSession,
+  type CellEditSession,
+} from "../../../shared/cell-editing/useCellEditSession";
 import WorkbookFormulaBarAddressInput from "./WorkbookFormulaBarAddressInput.vue";
 import WorkbookFormulaBarSearchControls from "./WorkbookFormulaBarSearchControls.vue";
 
@@ -15,6 +20,8 @@ const props = defineProps<{
   inputValue: string;
   searchQuery: string;
   sheetId?: string;
+  editSession?: CellEditSession;
+  handleReferenceKeydown?: (event: KeyboardEvent) => boolean;
 }>();
 
 const emit = defineEmits<{
@@ -34,76 +41,99 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 const formulaInput = ref<HTMLTextAreaElement>();
 const formulaAssistRef = ref<InstanceType<typeof FormulaInputAssist> | null>(null);
-const formulaDraft = ref(props.inputValue);
-const formulaSourceValue = ref(props.inputValue);
-const formulaTarget = ref<CellAddress>({ ...props.address });
-const formulaTargetLabel = ref(props.addressLabel);
-const formulaTargetSheetId = ref(props.sheetId);
 const formulaFocused = ref(false);
-const isComposing = ref(false);
+const editSession =
+  props.editSession ?? useCellEditSession({ onCommit: (payload) => emit("commitCell", payload) });
+const editingThisSheet = computed(
+  () => editSession.state.active && editSession.state.owner?.sheetId === props.sheetId,
+);
+const editingThisCell = computed(
+  () =>
+    editingThisSheet.value &&
+    editSession.state.owner?.address.row === props.address.row &&
+    editSession.state.owner?.address.column === props.address.column,
+);
+const formulaOwnsSession = computed(
+  () =>
+    formulaFocused.value && editSession.state.active && editSession.state.surface === "formula-bar",
+);
+const formulaDraft = computed(() =>
+  editingThisSheet.value ? editSession.state.draft : props.inputValue,
+);
+const formulaTarget = computed(() => editSession.state.owner?.address ?? props.address);
+const formulaTargetSheetId = computed(() => editSession.state.owner?.sheetId);
+const formulaTargetLabel = computed(() =>
+  editingThisSheet.value ? getCellAddressLabel(formulaTarget.value) : props.addressLabel,
+);
+const isComposing = computed(() => editingThisSheet.value && editSession.state.composing);
 const showFormulaColors = computed(
-  () => formulaFocused.value && !isComposing.value && formulaDraft.value.startsWith("="),
+  () => editingThisSheet.value && !isComposing.value && formulaDraft.value.startsWith("="),
+);
+const coloredReferences = computed(() =>
+  showFormulaColors.value ? getFormulaReferenceTokens(formulaDraft.value) : [],
 );
 let finishAfterComposition = false;
-
-watch(
-  () => [props.sheetId, props.address.row, props.address.column, props.inputValue] as const,
-  () => {
-    if (!formulaFocused.value) {
-      syncFormulaFromProps();
-    }
-  },
-);
+let compositionStartedHere = false;
 
 function readInputValue(event: Event): string {
   return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
 }
 
-function syncFormulaFromProps(): void {
-  formulaTarget.value = { ...props.address };
-  formulaTargetLabel.value = props.addressLabel;
-  formulaTargetSheetId.value = props.sheetId;
-  formulaSourceValue.value = props.inputValue;
-  formulaDraft.value = props.inputValue;
+function context() {
+  return {
+    address: { ...props.address },
+    input: props.inputValue,
+    ...(props.sheetId === undefined ? {} : { sheetId: props.sheetId }),
+  };
 }
 
 function onFormulaFocus(): void {
-  if (formulaFocused.value) return;
   formulaFocused.value = true;
   finishAfterComposition = false;
-  syncFormulaFromProps();
+  if (!formulaOwnsSession.value && !editingThisCell.value) {
+    editSession.begin(context(), { surface: "formula-bar", mode: "append" });
+  }
+  if (editingThisCell.value) editSession.activateSurface("formula-bar");
 }
 
 function onFormulaInput(event: Event): void {
-  formulaDraft.value = readInputValue(event);
-}
-
-function commitFormulaDraft(): void {
-  if (formulaDraft.value === formulaSourceValue.value) {
+  const value = readInputValue(event);
+  const startsFormula = editSession.state.draft === "" && value.startsWith("=");
+  if (
+    !formulaOwnsSession.value &&
+    !editSession.begin(context(), {
+      surface: "formula-bar",
+      mode: "replace",
+      initialValue: value,
+    })
+  )
     return;
-  }
-  const payload = {
-    address: { ...formulaTarget.value },
-    input: formulaDraft.value,
-    ...(formulaTargetSheetId.value ? { sheetId: formulaTargetSheetId.value } : {}),
-  };
-  formulaSourceValue.value = formulaDraft.value;
-  emit("commitCell", payload);
+  editSession.activateSurface("formula-bar");
+  editSession.setDraft(value);
+  if (startsFormula) editSession.setMode("point");
+  void nextTick(captureSelection);
 }
 
 function flushPendingEdit(): boolean {
-  if (isComposing.value) {
-    return false;
-  }
-  commitFormulaDraft();
-  return true;
+  return editSession.flush();
 }
 
 function hasPendingEdit(): boolean {
-  return isComposing.value || formulaDraft.value !== formulaSourceValue.value;
+  return editSession.hasPendingEdit();
+}
+
+function captureSelection(): void {
+  const input = formulaInput.value;
+  if (!input || !formulaOwnsSession.value) return;
+  editSession.setSelection(
+    input.selectionStart,
+    input.selectionEnd,
+    input.selectionDirection ?? "none",
+  );
 }
 
 function insertFormulaLineBreak(): void {
+  if (!formulaOwnsSession.value) return;
   const input = formulaInput.value;
   if (!input) {
     return;
@@ -118,11 +148,13 @@ function insertFormulaLineBreak(): void {
 }
 
 function applyFormulaTextEdit(edit: { value: string; caret: number }): void {
+  if (!formulaOwnsSession.value) return;
   const input = formulaInput.value;
-  formulaDraft.value = edit.value;
+  editSession.setDraft(edit.value);
   if (!input) return;
   input.value = edit.value;
   input.setSelectionRange(edit.caret, edit.caret);
+  editSession.setSelection(edit.caret, edit.caret);
   void nextTick(() => {
     input.setSelectionRange(edit.caret, edit.caret);
   });
@@ -134,6 +166,12 @@ function onFormulaKeydown(event: KeyboardEvent): void {
     event.stopPropagation();
     return;
   }
+  if (props.handleReferenceKeydown?.(event)) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+  if (!formulaOwnsSession.value) return;
   if (event.key === "Enter" && event.altKey && !event.isComposing && !isComposing.value) {
     event.preventDefault();
     insertFormulaLineBreak();
@@ -143,11 +181,11 @@ function onFormulaKeydown(event: KeyboardEvent): void {
     !isComposing.value
   ) {
     event.preventDefault();
-    formulaDraft.value = completeFormulaForCommit(formulaDraft.value);
-    commitFormulaDraft();
+    const owner = editSession.state.owner;
+    if (!owner || !editSession.finish({ complete: true })) return;
     emit("traverse", {
-      address: { ...formulaTarget.value },
-      ...(formulaTargetSheetId.value ? { sheetId: formulaTargetSheetId.value } : {}),
+      address: { ...owner.address },
+      ...(owner.sheetId === undefined ? {} : { sheetId: owner.sheetId }),
       direction:
         event.key === "Tab" ? (event.shiftKey ? "left" : "right") : event.shiftKey ? "up" : "down",
     });
@@ -155,41 +193,76 @@ function onFormulaKeydown(event: KeyboardEvent): void {
     formulaInput.value?.blur();
   } else if (event.key === "Escape") {
     event.preventDefault();
-    formulaDraft.value = formulaSourceValue.value;
-    isComposing.value = false;
+    editSession.cancel();
+    compositionStartedHere = false;
     finishAfterComposition = false;
     formulaFocused.value = false;
     formulaInput.value?.blur();
   }
 }
 
-function onFormulaBlur(): void {
+function onFormulaBlur(event: FocusEvent): void {
+  captureSelection();
+  const ownedBeforeBlur = formulaOwnsSession.value;
+  formulaFocused.value = false;
+  const next = event.relatedTarget;
+  if (next instanceof HTMLElement && next.dataset.cellEditSession === editSession.id) return;
+  if (!ownedBeforeBlur) return;
   if (isComposing.value) {
     finishAfterComposition = true;
     return;
   }
-  commitFormulaDraft();
-  formulaFocused.value = false;
-  void nextTick(syncFormulaFromProps);
+  editSession.finish();
 }
 
 function onFormulaCompositionStart(): void {
-  isComposing.value = true;
+  if (
+    !formulaOwnsSession.value &&
+    !editSession.begin(context(), {
+      surface: "formula-bar",
+      mode: "replace",
+      initialValue: "",
+    })
+  ) {
+    compositionStartedHere = false;
+    return;
+  }
+  compositionStartedHere = formulaOwnsSession.value;
+  if (!compositionStartedHere) return;
+  editSession.activateSurface("formula-bar");
+  editSession.startComposition();
   finishAfterComposition = false;
 }
 
 function onFormulaCompositionEnd(event: CompositionEvent): void {
-  formulaDraft.value = readInputValue(event);
-  isComposing.value = false;
+  if (!compositionStartedHere) return;
+  compositionStartedHere = false;
+  editSession.endComposition(readInputValue(event));
   if (finishAfterComposition) {
     finishAfterComposition = false;
-    onFormulaBlur();
+    editSession.finish();
   }
+}
+
+function focus(options: { preserveSelection?: boolean } = {}): void {
+  const input = formulaInput.value;
+  if (!input) return;
+  input.focus({ preventScroll: true });
+  const selection =
+    options.preserveSelection && editingThisSheet.value
+      ? editSession.state.selection
+      : {
+          start: input.value.length,
+          end: input.value.length,
+          direction: "none" as const,
+        };
+  input.setSelectionRange(selection.start, selection.end, selection.direction);
 }
 
 defineExpose({
   flushPendingEdit,
   hasPendingEdit,
+  focus,
   get references() {
     return formulaTargetSheetId.value === props.sheetId
       ? (formulaAssistRef.value?.references ?? [])
@@ -237,7 +310,9 @@ defineExpose({
     <label class="workbook-formula-bar__field workbook-formula-bar__formula">
       <span class="ui-visually-hidden">
         {{
-          t("formulaBar.editor", { address: formulaFocused ? formulaTargetLabel : addressLabel })
+          t("formulaBar.editor", {
+            address: formulaFocused ? formulaTargetLabel : addressLabel,
+          })
         }}
       </span>
       <textarea
@@ -251,29 +326,38 @@ defineExpose({
         autocomplete="off"
         :spellcheck="false"
         :aria-label="
-          t('formulaBar.editor', { address: formulaFocused ? formulaTargetLabel : addressLabel })
+          t('formulaBar.editor', {
+            address: formulaFocused ? formulaTargetLabel : addressLabel,
+          })
         "
-        aria-keyshortcuts="Alt+Enter"
+        aria-keyshortcuts="Alt+Enter Control+F2 F2 F4"
         :placeholder="t('formulaBar.placeholder')"
         data-formula-input
+        :data-cell-edit-session="editSession.id"
+        data-cell-edit-surface="formula-bar"
         @input="onFormulaInput"
         @focus="onFormulaFocus"
         @blur="onFormulaBlur"
         @keydown="onFormulaKeydown"
+        @select="captureSelection"
+        @keyup="captureSelection"
+        @click="captureSelection"
         @compositionstart="onFormulaCompositionStart"
         @compositionend="onFormulaCompositionEnd"
       />
       <FormulaTextOverlay
         :input="formulaInput"
         :value="formulaDraft"
-        :references="formulaAssistRef?.references ?? []"
+        :references="coloredReferences"
         :active="showFormulaColors"
       />
       <FormulaInputAssist
         ref="formulaAssistRef"
         :value="formulaDraft"
         :input="formulaInput"
-        :active="formulaFocused"
+        :active="
+          formulaFocused && formulaOwnsSession && editSession.state.surface === 'formula-bar'
+        "
         :composing="isComposing"
         @text-edit="applyFormulaTextEdit"
       />

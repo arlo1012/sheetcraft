@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
+import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import {
   createIndexedDbImageAssetStore,
   type ImageAssetStore,
@@ -17,6 +18,9 @@ import { createIndexedDbWorkbookStore } from "../modules/workbook-persistence/in
 import { useWorkbookPersistence } from "../modules/workbook-persistence/useWorkbookPersistence";
 import { useWorkbookFileActions } from "../modules/workbook-persistence/useWorkbookFileActions";
 import type { WorkbookStore } from "../modules/workbook-persistence/workbookStore";
+import XlsxFileActions from "../modules/workbook-xlsx/components/XlsxFileActions.vue";
+import XlsxFileFeedback from "../modules/workbook-xlsx/components/XlsxFileFeedback.vue";
+import { useWorkbookXlsxActions } from "../modules/workbook-xlsx/useWorkbookXlsxActions";
 
 const props = defineProps<{ workbookStore?: WorkbookStore; imageAssetStore?: ImageAssetStore }>();
 const formulaBarRef = ref<InstanceType<typeof WorkbookFormulaBar> | null>(null);
@@ -26,8 +30,8 @@ const {
   workbookRevision,
   workbookGeneration,
   replaceWorkbook,
-  flushPendingGridEdit,
-  hasPendingGridEdit,
+  focusCellEditor,
+  handleFormulaReferenceKeydown,
   searchQuery,
   t,
   activeSheet,
@@ -83,6 +87,13 @@ const {
   setGridNavigator,
 } = useSpreadsheetWorkspaceController();
 
+const cellEditSession = useCellEditSession({ onCommit: commitCell });
+watch(workbookGeneration, () => cellEditSession.cancel(), { flush: "sync" });
+
+function onSelectSheet(sheetId: string): void {
+  if (cellEditSession.finish()) selectSheet(sheetId);
+}
+
 const assetStore = props.imageAssetStore ?? createIndexedDbImageAssetStore();
 const {
   urls: imageAssetUrls,
@@ -94,8 +105,7 @@ const imageActions = useSheetImageActions({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
   getAddress: () => activeAddress.value,
-  flushPendingEdits: () =>
-    flushPendingGridEdit() && (formulaBarRef.value?.flushPendingEdit() ?? true),
+  flushPendingEdits: () => cellEditSession.finish(),
   setCellImage,
   setFloatingImage,
   convertCellImageToFloating,
@@ -113,13 +123,41 @@ const fileActions = useWorkbookFileActions({
   persistence,
   assetStore,
   getWorkbook: () => session.workbook,
-  flushPendingEdits: () =>
-    flushPendingGridEdit() && (formulaBarRef.value?.flushPendingEdit() ?? true),
-  hasPendingEdits: () => hasPendingGridEdit() || (formulaBarRef.value?.hasPendingEdit() ?? false),
+  flushPendingEdits: () => cellEditSession.finish(),
+  hasPendingEdits: cellEditSession.hasPendingEdit,
+  isBlocked: () => xlsxActions.busy.value || xlsxActions.confirmation.value !== undefined,
 });
 const { busy: fileBusy, confirmation, feedback } = fileActions;
+const xlsxActions = useWorkbookXlsxActions({
+  persistence,
+  getWorkbook: () => session.workbook,
+  getRevision: () => workbookRevision.value,
+  flushPendingEdits: () => cellEditSession.finish(),
+  hasPendingEdits: cellEditSession.hasPendingEdit,
+  isBlocked: () => fileBusy.value || confirmation.value !== undefined || imageBusy.value,
+});
+const {
+  busy: xlsxBusy,
+  confirmation: xlsxConfirmation,
+  feedback: xlsxFeedback,
+  report: xlsxReport,
+} = xlsxActions;
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
+  if (
+    event.key === "F2" &&
+    event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey &&
+    !event.isComposing &&
+    !cellEditSession.state.composing
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (cellEditSession.state.surface === "formula-bar") focusCellEditor();
+    else formulaBarRef.value?.focus({ preserveSelection: true });
+    return;
+  }
   if (event.key !== "Escape" || !formatPainterActive.value) {
     return;
   }
@@ -133,7 +171,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
   <section
     class="spreadsheet-workspace"
     :aria-label="t('workspace.editor')"
-    :aria-busy="loading || fileBusy || imageBusy"
+    :aria-busy="loading || fileBusy || imageBusy || xlsxBusy"
     @keydown.capture="onWorkspaceKeydown"
   >
     <input
@@ -150,7 +188,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :format-painter-active="formatPainterActive"
       :data-state="dataToolState"
       :merge-state="mergeState"
-      :inert="loading || fileBusy"
+      :inert="loading || fileBusy || xlsxBusy"
       @insert-image="imageActions.requestInsert"
       @apply-borders="applyCellBorders"
       @apply-style="applyCellStyle"
@@ -170,11 +208,17 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       <template #file-actions>
         <WorkbookFileActions
           :status="saveStatus"
-          :disabled="loading || fileBusy"
+          :disabled="loading || fileBusy || xlsxBusy || !!xlsxConfirmation"
           @save="fileActions.save"
           @import-json="fileActions.importJson"
           @export-json="fileActions.exportJson"
           @reload="fileActions.requestReload"
+        />
+        <XlsxFileActions
+          :disabled="loading || fileBusy || imageBusy || !!confirmation || !!xlsxConfirmation"
+          :busy="xlsxBusy"
+          @import-xlsx="xlsxActions.importXlsx"
+          @export-xlsx="xlsxActions.exportXlsx"
         />
       </template>
     </SpreadsheetRibbon>
@@ -187,15 +231,25 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @confirm="fileActions.confirm"
         @cancel="fileActions.cancel"
       />
+      <XlsxFileFeedback
+        :feedback="xlsxFeedback"
+        :report="xlsxReport"
+        :confirmation="xlsxConfirmation"
+        :busy="xlsxBusy"
+        @confirm="xlsxActions.confirm"
+        @cancel="xlsxActions.cancel"
+      />
     </div>
     <WorkbookFormulaBar
       :key="workbookGeneration"
       ref="formulaBarRef"
-      :inert="loading || fileBusy"
+      :inert="loading || fileBusy || xlsxBusy"
       :address="activeAddress"
       :sheet-id="activeSheet.id"
       :address-label="activeAddressLabel"
       :input-value="activeCellInput"
+      :edit-session="cellEditSession"
+      :handle-reference-keydown="handleFormulaReferenceKeydown"
       :search-query="searchQuery"
       @navigate="navigateToAddress"
       @commit-cell="commitCell"
@@ -203,12 +257,13 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @update-search-query="updateSearchQuery"
       @find="findCell"
     />
-    <div class="spreadsheet-workspace__grid" :inert="loading || fileBusy">
+    <div class="spreadsheet-workspace__grid" :inert="loading || fileBusy || xlsxBusy">
       <SheetGrid
         :key="workbookGeneration"
         :ref="setGridNavigator"
         :sheet="activeSheet"
         :reference-editor="formulaBarRef"
+        :edit-session="cellEditSession"
         :image-asset-urls="imageAssetUrls"
         :loading-image-asset-ids="loadingImageAssetIds"
         :missing-image-asset-ids="missingImageAssetIds"
@@ -235,15 +290,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       />
     </div>
     <WorkbookStatusBar
-      :inert="loading || fileBusy"
+      :inert="loading || fileBusy || xlsxBusy"
       :sheets="sheets"
       :active-sheet-id="session.workbook.activeSheetId"
       :selection-summary="activeSelectionSummary"
-      @select="selectSheet"
-      @add="addSheet"
-      @duplicate="duplicateSheet"
+      @select="onSelectSheet"
+      @add="cellEditSession.finish() && addSheet()"
+      @duplicate="cellEditSession.finish() && duplicateSheet($event)"
       @rename="renameSheet"
-      @delete="deleteSheet"
+      @delete="cellEditSession.finish() && deleteSheet($event)"
       @move="moveSheet"
     />
   </section>

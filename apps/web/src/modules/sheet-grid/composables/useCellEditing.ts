@@ -1,15 +1,25 @@
-import { nextTick, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import type { CellAddress } from "@idea10/core/workbook";
 import type { CellSelection } from "@idea10/sheet-engine/selection";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
+import {
+  useCellEditSession,
+  type CellEditSession,
+} from "../../../shared/cell-editing/useCellEditSession";
 
 export type CellEditorHandle = {
-  focus: (options?: { selectAll?: boolean; clientX?: number }) => void;
+  focus: (options?: {
+    selectAll?: boolean;
+    clientX?: number;
+    selection?: { start: number; end: number; direction: "none" | "forward" | "backward" };
+  }) => void;
   insertLineBreak: () => void;
   formulaReferenceEditor: FormulaReferenceEditor | null;
 };
 
 export function useCellEditing(options: {
+  session?: CellEditSession;
+  getSheetId?: () => string;
   getActiveCell: () => CellAddress;
   getInputValue: () => string;
   onClearClipboard: () => void;
@@ -17,83 +27,99 @@ export function useCellEditing(options: {
   onSelectionChange: (selection: CellSelection) => void;
 }) {
   const editorRef = ref<CellEditorHandle | null>(null);
-  const editingValue = ref("");
-  const editingSourceValue = ref("");
-  const editingAddress = ref<CellAddress>();
-  const isEditing = ref(false);
-  const isComposing = ref(false);
+  const editSession =
+    options.session ??
+    useCellEditSession({
+      onCommit: ({ address, input }) => options.onCommit({ address, input }),
+    });
+  const isEditing = computed(
+    () => editSession.state.active && editSession.state.owner?.sheetId === options.getSheetId?.(),
+  );
+  const isComposing = computed(() => isEditing.value && editSession.state.composing);
+  const editingAddress = computed(() =>
+    isEditing.value ? editSession.state.owner?.address : undefined,
+  );
+  const editingValue = computed({
+    get: () => (isEditing.value ? editSession.state.draft : ""),
+    set: (value: string) => editSession.setDraft(value),
+  });
   let compositionStartValue = "";
   let wasEditingBeforeComposition = false;
   let shouldFinishAfterComposition = false;
   let pendingSelectionAfterComposition: CellSelection | undefined;
 
+  function context() {
+    const sheetId = options.getSheetId?.();
+    return {
+      address: { ...options.getActiveCell() },
+      input: options.getInputValue(),
+      ...(sheetId === undefined ? {} : { sheetId }),
+    };
+  }
+
   function focusEditor(selectAll = false, clientX?: number): void {
-    void nextTick(() => editorRef.value?.focus({ selectAll, clientX }));
+    void nextTick(() =>
+      editorRef.value?.focus({
+        selectAll,
+        clientX,
+        ...(isEditing.value && clientX === undefined
+          ? { selection: editSession.state.selection }
+          : {}),
+      }),
+    );
   }
 
   function deferSelectionWhileComposing(selection: CellSelection): boolean {
-    if (!isComposing.value) {
-      return false;
-    }
+    if (!isComposing.value) return false;
     pendingSelectionAfterComposition = selection;
     shouldFinishAfterComposition = true;
     return true;
   }
 
   function beginEdit(mode: "append" | "replace", initialValue = "", clientX?: number): void {
-    editingAddress.value = { ...options.getActiveCell() };
-    editingSourceValue.value = options.getInputValue();
-    editingValue.value = mode === "append" ? editingSourceValue.value : initialValue;
-    isEditing.value = true;
+    if (!editSession.begin(context(), { surface: "grid", mode, initialValue })) return;
     focusEditor(false, clientX);
+  }
+
+  function clearDeferredComposition(): void {
+    wasEditingBeforeComposition = false;
+    shouldFinishAfterComposition = false;
+    pendingSelectionAfterComposition = undefined;
   }
 
   function finishEdit(destination?: CellSelection, restoreFocus = true): void {
     if (isEditing.value) {
-      options.onClearClipboard();
-      if (editingValue.value !== editingSourceValue.value) {
-        options.onCommit({
-          address: { ...(editingAddress.value ?? options.getActiveCell()) },
-          input: editingValue.value,
-        });
+      if (isComposing.value) {
+        shouldFinishAfterComposition = true;
+        pendingSelectionAfterComposition = destination;
+        return;
       }
+      options.onClearClipboard();
+      editSession.finish();
     }
-    isEditing.value = false;
-    isComposing.value = false;
-    wasEditingBeforeComposition = false;
-    shouldFinishAfterComposition = false;
-    pendingSelectionAfterComposition = undefined;
-    editingValue.value = "";
-    editingSourceValue.value = "";
-    editingAddress.value = undefined;
-    if (destination) {
-      options.onSelectionChange(destination);
-    } else if (restoreFocus) {
-      focusEditor();
-    }
+    clearDeferredComposition();
+    if (destination) options.onSelectionChange(destination);
+    else if (restoreFocus) focusEditor();
   }
 
   function cancelEdit(restoreFocus = true): void {
-    isEditing.value = false;
-    isComposing.value = false;
-    wasEditingBeforeComposition = false;
-    shouldFinishAfterComposition = false;
-    pendingSelectionAfterComposition = undefined;
-    editingValue.value = "";
-    editingSourceValue.value = "";
-    editingAddress.value = undefined;
-    if (restoreFocus) {
-      focusEditor();
-    }
+    if (isEditing.value) editSession.cancel();
+    clearDeferredComposition();
+    if (restoreFocus) focusEditor();
   }
 
   function onInput(value: string): void {
-    if (!isEditing.value) {
-      editingAddress.value = { ...options.getActiveCell() };
-      editingSourceValue.value = options.getInputValue();
-      isEditing.value = true;
-    }
-    editingValue.value = value;
+    if (
+      !isEditing.value &&
+      !editSession.begin(context(), {
+        surface: "grid",
+        mode: "replace",
+        initialValue: value,
+      })
+    )
+      return;
+    editSession.activateSurface("grid");
+    editSession.setDraft(value);
   }
 
   function onCompositionStart(): void {
@@ -101,50 +127,38 @@ export function useCellEditing(options: {
     wasEditingBeforeComposition = isEditing.value;
     shouldFinishAfterComposition = false;
     pendingSelectionAfterComposition = undefined;
-    if (!isEditing.value) {
-      editingAddress.value = { ...options.getActiveCell() };
-      editingSourceValue.value = options.getInputValue();
-      editingValue.value = "";
-      isEditing.value = true;
-    }
-    isComposing.value = true;
+    if (
+      !isEditing.value &&
+      !editSession.begin(context(), {
+        surface: "grid",
+        mode: "replace",
+        initialValue: "",
+      })
+    )
+      return;
+    editSession.activateSurface("grid");
+    editSession.startComposition();
   }
 
   function onCompositionEnd(value: string, event: CompositionEvent): void {
-    isComposing.value = false;
-    const shouldPreserveExistingEdit = wasEditingBeforeComposition;
+    const preserveExisting = wasEditingBeforeComposition;
     wasEditingBeforeComposition = false;
-    if (event.data === "" && value === compositionStartValue) {
-      if (shouldPreserveExistingEdit) {
-        editingValue.value = compositionStartValue;
-        if (shouldFinishAfterComposition) {
-          finishEdit(pendingSelectionAfterComposition, !pendingSelectionAfterComposition);
-        } else {
-          shouldFinishAfterComposition = false;
-          pendingSelectionAfterComposition = undefined;
-        }
-        return;
-      }
+    editSession.endComposition(value);
+    if (event.data === "" && value === compositionStartValue && !preserveExisting) {
       const destination = pendingSelectionAfterComposition;
       const restoreFocus = !shouldFinishAfterComposition;
       cancelEdit(restoreFocus);
-      if (destination) {
-        options.onSelectionChange(destination);
-      }
+      if (destination) options.onSelectionChange(destination);
       return;
     }
-    if (isEditing.value) {
-      editingValue.value = value;
-    }
-    if (shouldFinishAfterComposition) {
+    if (shouldFinishAfterComposition)
       finishEdit(pendingSelectionAfterComposition, !pendingSelectionAfterComposition);
-    }
   }
 
-  function onBlur(): void {
-    if (!isEditing.value) {
-      return;
-    }
+  function onBlur(event?: FocusEvent): void {
+    if (!isEditing.value) return;
+    const next = event?.relatedTarget;
+    if (next instanceof HTMLElement && next.dataset.cellEditSession === editSession.id) return;
     if (isComposing.value) {
       shouldFinishAfterComposition = true;
       return;
@@ -156,6 +170,7 @@ export function useCellEditing(options: {
     beginEdit,
     cancelEdit,
     deferSelectionWhileComposing,
+    editSession,
     editingValue,
     editingAddress,
     editorRef,

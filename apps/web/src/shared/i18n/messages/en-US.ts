@@ -1,6 +1,64 @@
 import type { MessageSchema } from "../schema";
 
 export const enUS = {
+  xlsx: {
+    actions: {
+      import: "Import XLSX",
+      export: "Export XLSX",
+      selectFile: "Select an XLSX workbook",
+    },
+    feedback: {
+      imported: "XLSX imported. Undo history starts from this file.",
+      exported: "XLSX download started. The current document and original file are unchanged.",
+      failed:
+        "XLSX processing failed. Check the compatibility report; your document is still here.",
+      timeout: "XLSX processing timed out and was stopped. The current document was not replaced.",
+      finishEditing: "Finish your current text composition before importing or exporting XLSX.",
+      stale:
+        "The document changed while the file was being read. Import was cancelled; select the file again.",
+      blocked:
+        "This file contains content this version cannot safely process. The operation was stopped.",
+    },
+    confirm: {
+      importTitle: "Import XLSX workbook?",
+      importDescription:
+        "Review the compatibility report first. Confirmation replaces this document and the browser's local copy, including changes saved by other tabs, and clears undo history. Export JSON first to preserve all current images and styles.",
+      importConfirm: "Replace and import",
+      exportTitle: "Accept compatibility differences and export?",
+      exportDescription:
+        "The items below may be converted or omitted. Export creates a new file without changing this document. Use JSON export for a complete backup.",
+      exportConfirm: "Accept and download",
+      cancel: "Cancel",
+    },
+    report: {
+      title: "XLSX compatibility report",
+      warning: "Warning",
+      block: "Blocked",
+      issue: "{code} ({count} items) {locations}",
+      codes: {
+        archiveInvalid: "Invalid or unsupported XLSX archive",
+        archiveLimit: "File size, entry count, or cell count exceeds this version's limits",
+        archiveEncrypted: "Encrypted files are not supported",
+        archiveUnsupportedCompression: "This compression method is not supported",
+        archiveUnsafePath: "The archive contains an unsafe internal path",
+        macroContent: "Macros or embedded executable content are not supported",
+        drawingOrMedia: "XLSX import with drawings or media is not supported yet",
+        externalContent: "External links or content are not supported",
+        formulaCacheDiscarded: "Old formula calculation caches were discarded",
+        formulaNotCalculated:
+          "Formula source is preserved; only implemented functions are calculated here, and export has no calculation cache",
+        filterOmitted: "Filter criteria were not preserved",
+        imageOmitted: "Images are not included in the exported file",
+        styleOmitted: "Some styles were not preserved",
+        numberFormatOmitted: "Unsupported number formats were not preserved",
+        dimensionApproximated:
+          "Row heights or column widths were converted and may display differently",
+        dateNormalized: "Dates were converted to numbers using the workbook's date system",
+        cellValueOmitted: "Unsupported cell content was not preserved",
+        featureOmitted: "Workbook features not supported by this version were not preserved",
+      },
+    },
+  },
   persistence: {
     file: "File",
     fileActions: "Workbook files",
@@ -152,9 +210,34 @@ export const enUS = {
   },
   formulaAssist: {
     listLabel: "Formula suggestions",
+    argument: "{function} argument {index}: {name}",
     sumDescription: "Adds numbers and ranges",
     sumSignature: "SUM(number1, [number2], ...)",
-    argument: "SUM argument {index}",
+    ifDescription: "Returns one value when a condition is true, another when false",
+    ifSignature: "IF(logical_test, value_if_true, [value_if_false])",
+    iferrorDescription: "Returns a fallback when a value evaluates to an error",
+    iferrorSignature: "IFERROR(value, value_if_error)",
+    averageDescription: "Returns the arithmetic mean of numbers",
+    averageSignature: "AVERAGE(number1, [number2], ...)",
+    countDescription: "Counts numeric values",
+    countSignature: "COUNT(value1, [value2], ...)",
+    minDescription: "Returns the smallest number",
+    minSignature: "MIN(number1, [number2], ...)",
+    maxDescription: "Returns the largest number",
+    maxSignature: "MAX(number1, [number2], ...)",
+    roundDescription: "Rounds a number to a specified number of digits",
+    roundSignature: "ROUND(number, num_digits)",
+    argLogicalTest: "logical test",
+    argValueIfTrue: "value if true",
+    argValueIfFalse: "value if false",
+    argValue: "value",
+    argValueIfError: "value if error",
+    argNumber: "number",
+    argNumber1: "number 1",
+    argNumber2: "number 2",
+    argValue1: "value 1",
+    argValue2: "value 2",
+    argNumDigits: "number of digits",
   },
   sheetTabs: {
     list: "Workbook sheets",

@@ -80,19 +80,24 @@ function expectMatchingReferencePresentation(
 ) {
   const tokens = wrapper.findAll("[data-formula-text-overlay] [data-formula-reference-token]");
   const outlines = wrapper.findAll("[data-formula-reference-range]");
-  expect(tokens).toHaveLength(count);
+  const overlays = wrapper.findAll("[data-formula-text-overlay]");
+  expect(overlays).toHaveLength(2);
+  expect(tokens).toHaveLength(count * 2);
   expect(outlines).toHaveLength(count);
-  expect(
-    tokens.map((token) => [
-      token.attributes("data-reference-key"),
-      token.attributes("data-reference-color"),
-    ]),
-  ).toEqual(
-    outlines.map((outline) => [
-      outline.attributes("data-reference-key"),
-      outline.attributes("data-reference-color"),
-    ]),
-  );
+  const expected = outlines.map((outline) => [
+    outline.attributes("data-reference-key"),
+    outline.attributes("data-reference-color"),
+  ]);
+  for (const overlay of overlays) {
+    expect(
+      overlay
+        .findAll("[data-formula-reference-token]")
+        .map((token) => [
+          token.attributes("data-reference-key"),
+          token.attributes("data-reference-color"),
+        ]),
+    ).toEqual(expected);
+  }
 }
 
 afterEach(() => {

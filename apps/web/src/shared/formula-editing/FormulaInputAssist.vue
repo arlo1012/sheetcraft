@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useFloatingPanel } from "../floating/useFloatingPanel";
-import { useAppI18n } from "../i18n";
+import { useAppI18n, type MessageKey } from "../i18n";
 import type { CellRange } from "@idea10/core/workbook";
 import {
   applyFunctionCompletion,
@@ -9,8 +9,10 @@ import {
   getFormulaCompletionContext,
   getFormulaArgumentContext,
   getFormulaReferenceEditContext,
+  getSupportedFormulaFunction,
   getSupportedFormulaCandidates,
   replaceFormulaReference,
+  type FormulaFunctionCandidate,
   type FormulaReferenceEditContext,
 } from "./formula-input-lexical";
 import type { FormulaReferenceEditor, FormulaReferencePickPhase } from "./formula-editor-contract";
@@ -28,6 +30,41 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
+const FUNCTION_COPY: Record<string, { description: MessageKey; signature: MessageKey }> = {
+  SUM: { description: "formulaAssist.sumDescription", signature: "formulaAssist.sumSignature" },
+  IF: { description: "formulaAssist.ifDescription", signature: "formulaAssist.ifSignature" },
+  IFERROR: {
+    description: "formulaAssist.iferrorDescription",
+    signature: "formulaAssist.iferrorSignature",
+  },
+  AVERAGE: {
+    description: "formulaAssist.averageDescription",
+    signature: "formulaAssist.averageSignature",
+  },
+  COUNT: {
+    description: "formulaAssist.countDescription",
+    signature: "formulaAssist.countSignature",
+  },
+  MIN: { description: "formulaAssist.minDescription", signature: "formulaAssist.minSignature" },
+  MAX: { description: "formulaAssist.maxDescription", signature: "formulaAssist.maxSignature" },
+  ROUND: {
+    description: "formulaAssist.roundDescription",
+    signature: "formulaAssist.roundSignature",
+  },
+};
+const ARGUMENT_COPY: Record<string, MessageKey> = {
+  logical_test: "formulaAssist.argLogicalTest",
+  value_if_true: "formulaAssist.argValueIfTrue",
+  value_if_false: "formulaAssist.argValueIfFalse",
+  value: "formulaAssist.argValue",
+  value_if_error: "formulaAssist.argValueIfError",
+  number: "formulaAssist.argNumber",
+  number1: "formulaAssist.argNumber1",
+  number2: "formulaAssist.argNumber2",
+  value1: "formulaAssist.argValue1",
+  value2: "formulaAssist.argValue2",
+  num_digits: "formulaAssist.argNumDigits",
+};
 const listboxRef = ref<HTMLElement | null>(null);
 const listId = `formula-suggestions-${Math.random().toString(36).slice(2)}`;
 const activeIndex = ref(0);
@@ -62,6 +99,10 @@ const isOpen = computed(
     dismissedKey.value !== completionKey.value,
 );
 const activeCandidate = computed(() => candidates.value[activeIndex.value] ?? null);
+const helpCandidate = computed(() => {
+  const argument = completionContext.value?.argument;
+  return argument ? getSupportedFormulaFunction(argument.functionName) : activeCandidate.value;
+});
 const activeId = computed(() =>
   activeCandidate.value ? `${listId}-${activeCandidate.value.id}` : undefined,
 );
@@ -79,9 +120,17 @@ const argumentHint = computed(() => {
   const argument = props.input
     ? getFormulaArgumentContext(props.value, props.input.selectionStart ?? props.value.length)
     : null;
-  return argument?.functionName === "SUM"
-    ? t("formulaAssist.argument", { index: argument.index + 1 })
-    : "";
+  if (!argument) return "";
+  const candidate = getSupportedFormulaFunction(argument.functionName);
+  const metadata =
+    candidate?.arguments[Math.min(argument.index, (candidate.arguments.length || 1) - 1)] ??
+    (candidate ? { name: candidate.name === "SUM" ? "number" : "value" } : undefined);
+  if (!candidate || !metadata) return "";
+  return t("formulaAssist.argument", {
+    function: candidate.name,
+    index: argument.index + 1,
+    name: t(ARGUMENT_COPY[metadata.name] ?? "formulaAssist.argValue"),
+  });
 });
 const visible = computed(() => isOpen.value || Boolean(argumentHint.value));
 const { floatingStyles } = useFloatingPanel(inputReference, listboxRef, visible, { offset: 4 });
@@ -152,8 +201,10 @@ function emitTextEdit(value: string, caret: number, keepReference = false): void
   });
 }
 
-function chooseCandidate(context = completionContext.value): boolean {
-  const candidate = activeCandidate.value;
+function chooseCandidate(
+  candidate = activeCandidate.value,
+  context = completionContext.value,
+): boolean {
   if (!context || !candidate || props.composing) return false;
   const edit = applyFunctionCompletion(props.value, context, candidate.id);
   dismissedKey.value = completionKey.value;
@@ -243,9 +294,9 @@ function clearReferenceCapture(): void {
   referenceActiveState.value = false;
 }
 
-function onOptionPointerDown(event: PointerEvent): void {
+function onOptionPointerDown(event: PointerEvent, candidate: FormulaFunctionCandidate): void {
   event.preventDefault();
-  chooseCandidate();
+  chooseCandidate(candidate);
   props.input?.focus({ preventScroll: true });
 }
 
@@ -307,13 +358,13 @@ defineExpose<
         role="option"
         :aria-selected="index === activeIndex"
         :data-formula-suggestion="candidate.id"
-        @pointerdown="onOptionPointerDown"
+        @pointerdown="onOptionPointerDown($event, candidate)"
       >
         <strong>{{ candidate.id }}</strong>
-        <span>{{ t("formulaAssist.sumDescription") }}</span>
+        <span>{{ t(FUNCTION_COPY[candidate.name]!.description) }}</span>
       </button>
       <p :id="`${listId}-help`" class="formula-input-assist__help" data-formula-help>
-        <code>{{ t("formulaAssist.sumSignature") }}</code>
+        <code v-if="helpCandidate">{{ t(FUNCTION_COPY[helpCandidate.name]!.signature) }}</code>
         <span v-if="argumentHint">{{ argumentHint }}</span>
       </p>
     </section>

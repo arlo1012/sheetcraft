@@ -1,0 +1,9 @@
+# XLSX IO v1
+
+`@idea10/xlsx-io` is a runtime-neutral byte adapter. It accepts `Uint8Array`, returns Core `Workbook` values, and never reads files, creates browser blobs, or replaces a document. Web owns the Worker, file chooser, confirmation and persistence transaction.
+
+V1 maps worksheets, literal values, raw formula source, supported basic styles, approximate dimensions, merges, frozen panes and the 1900/1904 date system. Formula result caches are discarded: the adapter does not calculate formulas and never presents cached results as fresh truth.
+
+Decode performs finite ZIP preflight before ExcelJS loads a document: central/local headers, path safety, encryption, compression, entry counts, declared and actual inflated sizes, and unsupported parts. It bounds ordinary ZIP bombs but is not a claim that malformed compression is harmless; Web must still use worker isolation and timeout. Preflight only inspects UTF-8 XML; DTDs, entities defined by DTDs, UTF-16, and other declared encodings are rejected. Standard XML character entities are decoded before relationship attributes are evaluated, so encoded `TargetMode="External"` cannot bypass the external-content block.
+
+Warnings are returned in `XlsxCompatibilityReport`; Web must show them before replacement. Macros, drawings/media, external links, encryption, malformed archives and resource limits block import. Filters, images, custom number formats, unsupported style fields and formula caches are reported as losses. The bounded workbook and worksheet XML inspection also reports omitted defined names, data validation, conditional formatting, protection, hidden sheets/rows/columns, hyperlinks, manual breaks, headers/footers, and custom print settings. Default page margins and ExcelJS's default page setup attributes do not create a loss warning. Export always creates a new file.

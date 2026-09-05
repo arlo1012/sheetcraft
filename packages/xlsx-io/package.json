@@ -1,0 +1,32 @@
+{
+  "name": "@idea10/xlsx-io",
+  "version": "0.1.0",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@idea10/core": "workspace:*",
+    "exceljs": "4.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.3.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}

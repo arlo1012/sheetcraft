@@ -6,7 +6,13 @@ export default defineConfig({
   optimizeDeps: {
     // These workspace packages publish from dist. Keep them out of the dependency
     // optimizer so Vite observes their rebuilt output during development.
-    exclude: ["@idea10/core", "@idea10/sheet-engine"],
+    exclude: ["@idea10/core", "@idea10/sheet-engine", "@idea10/xlsx-io"],
+  },
+  worker: {
+    format: "es",
+    rolldownOptions: {
+      output: { chunkFileNames: "assets/worker-[name]-[hash].js" },
+    },
   },
   build: {
     rolldownOptions: {

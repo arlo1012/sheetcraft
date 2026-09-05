@@ -132,7 +132,7 @@ describe("workspace formula authoring", () => {
   });
 
   test("cycles the last picked relative reference with F4 without committing the draft", async () => {
-    const memory = createMemoryStore();
+    const memory = createMemoryStore(createFormulaFixture());
     const wrapper = await mountWorkspace(memory.store);
     const formula = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
 
@@ -150,7 +150,40 @@ describe("workspace formula authoring", () => {
     await formula.trigger("keydown", { key: "F4" });
 
     expect(formula.element.value).toBe("=SUM($B$1");
-    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toBe("");
+    expect(
+      getCellContent(getActiveSheet(deserializeWorkbook(memory.getRecord()!.snapshot)), {
+        row: 0,
+        column: 0,
+      }),
+    ).toBeNull();
+  });
+
+  test("shares one draft between the formula bar and grid editor without committing on Ctrl+F2", async () => {
+    const memory = createMemoryStore(createFormulaFixture());
+    const wrapper = await mountWorkspace(memory.store);
+    const formula = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
+    const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
+
+    await formula.trigger("focus");
+    await formula.setValue("draft");
+    formula.element.setSelectionRange(2, 4, "forward");
+    await formula.trigger("select");
+    await formula.trigger("keydown", { key: "F2", ctrlKey: true });
+    await nextTick();
+
+    expect(editor.element.value).toBe("draft");
+    expect(editor.element.selectionStart).toBe(2);
+    expect(editor.element.selectionEnd).toBe(4);
+    expect(memory.store.save).not.toHaveBeenCalled();
+
+    await editor.trigger("keydown", { key: "Escape" });
+    expect(formula.element.value).toBe("");
+    expect(
+      getCellContent(getActiveSheet(deserializeWorkbook(memory.getRecord()!.snapshot)), {
+        row: 0,
+        column: 0,
+      }),
+    ).toBeNull();
   });
 
   test("will not save or commit a formula-bar IME draft until its composition completes", async () => {

@@ -19,6 +19,7 @@ export function useWorkbookFileActions(options: {
   getWorkbook: () => Workbook;
   flushPendingEdits: () => boolean;
   hasPendingEdits: () => boolean;
+  isBlocked?: () => boolean;
   assetStore?: ImageAssetStore;
 }) {
   const { persistence } = options;
@@ -35,12 +36,14 @@ export function useWorkbookFileActions(options: {
   }
 
   async function save(): Promise<void> {
+    if (options.isBlocked?.()) return;
     if (busy.value || persistence.loading.value || confirmation.value || !flushEdits()) return;
     feedback.value = undefined;
     await persistence.saveNow();
   }
 
   async function exportJson(): Promise<void> {
+    if (options.isBlocked?.()) return;
     if (busy.value || persistence.loading.value || confirmation.value || !flushEdits()) return;
     try {
       if (options.assetStore)
@@ -53,6 +56,7 @@ export function useWorkbookFileActions(options: {
   }
 
   async function importJson(file: Pick<File, "text">): Promise<void> {
+    if (options.isBlocked?.()) return;
     if (busy.value || persistence.loading.value || confirmation.value || !flushEdits()) return;
     busy.value = true;
     feedback.value = undefined;
@@ -78,6 +82,7 @@ export function useWorkbookFileActions(options: {
   }
 
   function requestReload(): void {
+    if (options.isBlocked?.()) return;
     if (busy.value || persistence.loading.value || confirmation.value || !flushEdits()) return;
     feedback.value = undefined;
     confirmation.value = "reload";
@@ -90,6 +95,7 @@ export function useWorkbookFileActions(options: {
   }
 
   async function confirm(): Promise<void> {
+    if (options.isBlocked?.()) return;
     if (busy.value || !confirmation.value || !flushEdits()) return;
     busy.value = true;
     try {
@@ -111,6 +117,7 @@ export function useWorkbookFileActions(options: {
   }
 
   function saveBeforeLeaving(): void {
+    if (options.isBlocked?.()) return;
     if (!persistence.loading.value && !busy.value && options.flushPendingEdits()) {
       void persistence.saveNow();
     }

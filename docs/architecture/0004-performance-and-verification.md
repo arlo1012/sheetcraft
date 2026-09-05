@@ -105,6 +105,18 @@ JavaScript to 960/280 KB. Entry CSS becomes 82/12.5 KB; total CSS retains its
 240 KB raw limit and sets gzip to 32 KB. No dependency was added, and deferred
 image tools and previews remain included in the total gates.
 
+Shared cell-edit sessions, eight runtime functions and XLSX IO v1 add a pinned
+ExcelJS browser artifact behind a dedicated, dynamically loaded Worker. The
+first measured production build is 423,082 B entry JavaScript (118,674 B gzip),
+1,947,418 B total JavaScript (553,267 B gzip), and 240,094 B total CSS. Of this,
+the deferred codec is 944,989 B / 260,266 B gzip and its Worker bootstrap is
+29,430 B / 8,750 B gzip. Neither appears in HTML startup scripts or preloads.
+Entry limits become 435/122 KB and total JavaScript 2,000/570 KB; a separate
+1,020/280 KB deferred-Worker cap also applies. Total CSS becomes 242/32.5 KB;
+entry CSS limits remain unchanged. All Worker chunks remain included in totals.
+The gate now also browser-bundles the actual XLSX Worker, round-trips a workbook,
+and checks malformed-file rejection, in addition to the existing Core consumer.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

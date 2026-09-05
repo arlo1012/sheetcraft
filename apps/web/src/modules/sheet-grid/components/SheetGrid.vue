@@ -15,6 +15,7 @@ import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
+import type { CellEditSession } from "../../../shared/cell-editing/useCellEditSession";
 import { completeFormulaForCommit } from "../../../shared/formula-editing/formula-commit";
 import type { FormulaReferenceToken } from "../../../shared/formula-editing/formula-reference-tokens";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
@@ -73,6 +74,7 @@ import {
 } from "@idea10/sheet-engine/row-height";
 import { useDimensionResize } from "../composables/useDimensionResize";
 import { useCellEditing } from "../composables/useCellEditing";
+import { useFormulaReferenceNavigation } from "../composables/useFormulaReferenceNavigation";
 import { useDragSelection } from "../composables/useDragSelection";
 import { useSheetViewport } from "../composables/useSheetViewport";
 import type { ImageInsertMode } from "../../sheet-images/useSheetImageActions";
@@ -141,6 +143,7 @@ const props = withDefaults(
     viewState?: SheetGridViewState;
     formatPainterActive?: boolean;
     referenceEditor?: FormulaReferenceEditor | null;
+    editSession?: CellEditSession;
     imageAssetUrls?: ReadonlyMap<string, string>;
     loadingImageAssetIds?: ReadonlySet<string>;
     missingImageAssetIds?: ReadonlySet<string>;
@@ -397,6 +400,7 @@ const {
   beginEdit,
   cancelEdit: cancelCellEdit,
   deferSelectionWhileComposing,
+  editSession,
   editingValue,
   editorRef,
   finishEdit: finishCellEdit,
@@ -408,6 +412,8 @@ const {
   onCompositionStart,
   onInput: onEditorInput,
 } = useCellEditing({
+  session: props.editSession,
+  getSheetId: () => props.sheet.id,
   getActiveCell: () => activeCell.value,
   getInputValue: () => formatCellContentForInput(getCellContent(props.sheet, activeCell.value)),
   onClearClipboard: () => clearPendingClipboard(),
@@ -770,10 +776,24 @@ function cancelEdit(restoreFocus = true): void {
   cancelCellEdit(restoreFocus);
 }
 
-function onEditorBlur(): void {
+function onEditorBlur(event: FocusEvent): void {
   stopFormulaReferenceDrag();
-  onCellEditorBlur();
+  onCellEditorBlur(event);
 }
+
+const { handleReferenceKeydown } = useFormulaReferenceNavigation({
+  session: editSession,
+  getEditor: getReferenceEditor,
+  getActiveAddress: () => activeCell.value,
+  getVisibleRow: (row, direction) =>
+    direction > 0
+      ? rowVisibility.value.getNextVisibleRow(row)
+      : rowVisibility.value.getPreviousVisibleRow(row),
+  ensureVisible: (address) => {
+    ensureGridExtentContains(address);
+    ensureSelectionVisible(address, "cells");
+  },
+});
 
 function startReferencePick(address: CellAddress, event: MouseEvent): boolean {
   const editor = getReferenceEditor();
@@ -1260,6 +1280,7 @@ function onEditorKeydown(event: KeyboardEvent): void {
   }
 
   if (isEditing.value) {
+    if (handleReferenceKeydown(event)) return;
     if (event.key === "Escape") {
       event.preventDefault();
       cancelEdit();
@@ -1431,6 +1452,7 @@ defineExpose({
   clearClipboard,
   flushPendingEdit,
   focusGrid: focusEditor,
+  handleReferenceKeydown,
   hasPendingEdit,
   navigateToCell,
 });
@@ -1518,6 +1540,7 @@ defineExpose({
               <CellEditor
                 ref="editorRef"
                 :model-value="editingValue"
+                :edit-session="editSession"
                 :address-label="activeCellLabel"
                 :display-value="activeCellDisplayValue"
                 :editing="isEditing"

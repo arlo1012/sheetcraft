@@ -52,7 +52,12 @@ describe("formula commit completion", () => {
   test("does not correct invalid formula parts or quoted parentheses", () => {
     expect(completeFormulaForCommit("=SUM(A1,")).toBe("=SUM(A1,");
     expect(completeFormulaForCommit("=SUM(A1)+")).toBe("=SUM(A1)+");
-    expect(completeFormulaForCommit('=SUM("("')).toBe('=SUM("("');
+    expect(completeFormulaForCommit('=SUM("(')).toBe('=SUM("(');
     expect(completeFormulaForCommit("=SUM(A1))")).toBe("=SUM(A1))");
+  });
+
+  test("completes the outer call after a supported string literal without counting its parentheses", () => {
+    expect(completeFormulaForCommit('=SUM("("')).toBe('=SUM("(")');
+    expect(completeFormulaForCommit('=IF(TRUE,"text(","ok"')).toBe('=IF(TRUE,"text(","ok")');
   });
 });

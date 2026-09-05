@@ -99,6 +99,26 @@ describe("FormulaInputAssist", () => {
     fixture.dispose();
   });
 
+  test("cycles multiple Core candidates and lets a pointer choose its own candidate", async () => {
+    const fixture = mountAssist("=i");
+    await nextTick();
+    const assist = fixture.wrapper.vm as unknown as AssistHandle;
+    expect(assist.handleKeydown(new KeyboardEvent("keydown", { key: "ArrowDown" }))).toBe(true);
+    expect(assist.handleKeydown(new KeyboardEvent("keydown", { key: "Enter" }))).toBe(true);
+    expect(fixture.wrapper.emitted("textEdit")?.at(-1)).toEqual([{ value: "=IFERROR(", caret: 9 }]);
+    fixture.dispose();
+
+    const pointerFixture = mountAssist("=i");
+    await nextTick();
+    const option = document.querySelector<HTMLButtonElement>("[data-formula-suggestion='IFERROR']");
+    option?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+    await nextTick();
+    expect(pointerFixture.wrapper.emitted("textEdit")?.at(-1)).toEqual([
+      { value: "=IFERROR(", caret: 9 },
+    ]);
+    pointerFixture.dispose();
+  });
+
   test("keeps one replacement span across dragged references and cycles F4", async () => {
     const fixture = mountAssist("=SUM(");
     const assist = fixture.wrapper.vm as unknown as AssistHandle;

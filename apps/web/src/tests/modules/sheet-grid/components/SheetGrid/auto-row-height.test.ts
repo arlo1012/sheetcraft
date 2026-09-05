@@ -77,7 +77,7 @@ describe("SheetGrid automatic row height", () => {
 
     expect(renderedRowHeight(wrapper, 0)).toBe(DEFAULT_ROW_HEIGHT);
     expect(editor.attributes("wrap")).toBe("soft");
-    expect(editor.attributes("aria-keyshortcuts")).toBe("Alt+Enter");
+    expect(editor.attributes("aria-keyshortcuts")).toBe("Alt+Enter Control+F2 F2 F4");
     expect(session.history.undoStack).toHaveLength(0);
 
     await editor.trigger("keydown", { key: "Enter" });

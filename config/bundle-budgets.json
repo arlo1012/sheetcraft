@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "description": "Production budgets include workbook persistence, shared formula authoring and colored references, image clipboard/conversion, crop/rotation/flips/original restoration, and lazy image tools/fullscreen preview; see ADR 0004.",
+  "description": "Production budgets include shared editing sessions, eight runtime functions, XLSX compatibility UI and lazy browser codec Worker, plus existing image tools. Deferred Workers remain included in total assets and have a separate cap; see ADR 0004.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
       "pattern": "^index-.*\\.js$",
-      "maximumRawBytes": 400000,
-      "maximumGzipBytes": 112000
+      "maximumRawBytes": 435000,
+      "maximumGzipBytes": 122000
     },
     "css": {
       "pattern": "^index-.*\\.css$",
@@ -16,12 +16,17 @@
   },
   "totalAssets": {
     "javascript": {
-      "maximumRawBytes": 960000,
-      "maximumGzipBytes": 280000
+      "maximumRawBytes": 2000000,
+      "maximumGzipBytes": 570000
     },
     "css": {
-      "maximumRawBytes": 240000,
-      "maximumGzipBytes": 32000
+      "maximumRawBytes": 242000,
+      "maximumGzipBytes": 32500
     }
+  },
+  "deferredWorkers": {
+    "pattern": "^(?:workbookXlsx\\.worker|worker-).*\\.js$",
+    "maximumRawBytes": 1020000,
+    "maximumGzipBytes": 280000
   }
 }

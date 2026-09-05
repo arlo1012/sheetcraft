@@ -1,0 +1,322 @@
+{
+  "schema": "idea10-bounded-bundle-sbom-v1",
+  "generatedFrom": "ExcelJS 4.4.0 published browser UMD source map",
+  "scope": "Embedded source-map package groups only; this is not the workspace dependency tree.",
+  "artifact": {
+    "package": "exceljs",
+    "version": "4.4.0",
+    "entry": "exceljs/dist/exceljs.min.js",
+    "sha256": "7e49da68588e250dbb8bba190d2caa8ab3787cc0284bda1d8b2f805c4df742c9",
+    "bytes": 947702,
+    "sourceMapSha256": "b65fb09908a8e2a3aaa6c751465c1662fc11fdfd59ae970b8b2d544fc18f6ac7",
+    "sourceMapBytes": 3249905,
+    "sourceRecords": 534
+  },
+  "components": [
+    {
+      "name": "exceljs",
+      "version": "4.4.0",
+      "license": "MIT",
+      "sourceRecords": 145,
+      "provenance": "published package manifest and reviewed artifact"
+    },
+    {
+      "name": "browser-pack prelude",
+      "version": "UNKNOWN",
+      "license": "MIT",
+      "sourceRecords": 1,
+      "provenance": "source-map path; mapped to browser-pack owner"
+    },
+    {
+      "name": "jszip",
+      "version": "3.10.1",
+      "license": "MIT (selected from MIT OR GPL-3.0-or-later)",
+      "sourceRecords": 1,
+      "provenance": "embedded JSZip source banner"
+    },
+    {
+      "name": "pako",
+      "version": "UNKNOWN",
+      "license": "MIT",
+      "sourceRecords": 0,
+      "provenance": "identified by embedded JSZip source banner; code is nested in JSZip source"
+    },
+    {
+      "name": "@fast-csv/format",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 7
+    },
+    {
+      "name": "@fast-csv/parse",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 17
+    },
+    { "name": "asn1.js", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 15 },
+    { "name": "base64-js", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "bn.js", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "brorand", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "browserify", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 2 },
+    {
+      "name": "browserify-aes",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 17
+    },
+    {
+      "name": "browserify-cipher",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    {
+      "name": "browserify-des",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 2
+    },
+    {
+      "name": "browserify-rsa",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    {
+      "name": "browserify-sign",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 6
+    },
+    { "name": "buffer", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "buffer-xor", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "cipher-base", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    {
+      "name": "core-js",
+      "version": "3.33.0",
+      "license": "MIT",
+      "sourceRecords": 160,
+      "provenance": "embedded core-js versions record"
+    },
+    { "name": "core-util-is", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "create-ecdh", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "create-hash", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 2 },
+    { "name": "create-hmac", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 2 },
+    {
+      "name": "crypto-browserify",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    { "name": "dayjs", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 3 },
+    { "name": "des.js", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 6 },
+    {
+      "name": "diffie-hellman",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 4
+    },
+    {
+      "name": "elliptic",
+      "version": "6.5.4",
+      "license": "MIT",
+      "sourceRecords": 16,
+      "provenance": "embedded elliptic package manifest"
+    },
+    { "name": "events", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    {
+      "name": "evp_bytestokey",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    { "name": "fast-csv", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "hash-base", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "hash.js", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 12 },
+    { "name": "hmac-drbg", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "ieee754", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "inherits", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    {
+      "name": "lodash.escaperegexp",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    {
+      "name": "lodash.groupby",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    {
+      "name": "lodash.isboolean",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    {
+      "name": "lodash.isequal",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    {
+      "name": "lodash.isfunction",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    { "name": "lodash.isnil", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    {
+      "name": "lodash.isundefined",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    { "name": "lodash.uniq", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "md5.js", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "miller-rabin", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    {
+      "name": "minimalistic-assert",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    {
+      "name": "minimalistic-crypto-utils",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    { "name": "parse-asn1", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 5 },
+    { "name": "pbkdf2", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 6 },
+    { "name": "process", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    {
+      "name": "process-nextick-args",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    {
+      "name": "public-encrypt",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 6
+    },
+    { "name": "randombytes", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "randomfill", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    {
+      "name": "readable-stream",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 15
+    },
+    {
+      "name": "regenerator-runtime",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    { "name": "ripemd160", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "safe-buffer", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "safer-buffer", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "saxes", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 1 },
+    { "name": "sha.js", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 8 },
+    {
+      "name": "stream-browserify",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 14
+    },
+    {
+      "name": "timers-browserify",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    { "name": "util", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 3 },
+    {
+      "name": "util-deprecate",
+      "version": "UNKNOWN",
+      "license": "NOASSERTION",
+      "sourceRecords": 1
+    },
+    { "name": "uuid", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 15 },
+    { "name": "xmlchars", "version": "UNKNOWN", "license": "NOASSERTION", "sourceRecords": 3 }
+  ],
+  "licenseEvidence": {
+    "method": "Each group is present in the reviewed source map. License-family terms were checked against the upstream npm registry project metadata or an embedded source header; exact UMD build versions remain UNKNOWN unless component provenance says otherwise.",
+    "MIT": [
+      "@fast-csv/format",
+      "@fast-csv/parse",
+      "asn1.js",
+      "base64-js",
+      "bn.js",
+      "brorand",
+      "browser-pack prelude",
+      "browserify",
+      "browserify-aes",
+      "browserify-cipher",
+      "browserify-des",
+      "browserify-rsa",
+      "buffer",
+      "buffer-xor",
+      "cipher-base",
+      "core-js",
+      "core-util-is",
+      "create-ecdh",
+      "create-hash",
+      "create-hmac",
+      "crypto-browserify",
+      "dayjs",
+      "des.js",
+      "diffie-hellman",
+      "elliptic",
+      "events",
+      "evp_bytestokey",
+      "exceljs",
+      "fast-csv",
+      "hash-base",
+      "hash.js",
+      "hmac-drbg",
+      "jszip",
+      "lodash.escaperegexp",
+      "lodash.groupby",
+      "lodash.isboolean",
+      "lodash.isequal",
+      "lodash.isfunction",
+      "lodash.isnil",
+      "lodash.isundefined",
+      "lodash.uniq",
+      "md5.js",
+      "miller-rabin",
+      "minimalistic-crypto-utils",
+      "pako",
+      "pbkdf2",
+      "process",
+      "process-nextick-args",
+      "public-encrypt",
+      "randombytes",
+      "randomfill",
+      "readable-stream",
+      "regenerator-runtime",
+      "ripemd160",
+      "safe-buffer",
+      "safer-buffer",
+      "stream-browserify",
+      "timers-browserify",
+      "util",
+      "util-deprecate",
+      "uuid",
+      "xmlchars"
+    ],
+    "ISC": ["browserify-sign", "inherits", "minimalistic-assert", "parse-asn1", "saxes"],
+    "BSD-3-Clause": ["ieee754", "sha.js"],
+    "MIT AND BSD-3-Clause": ["sha.js"]
+  },
+  "knownGaps": [
+    "Source-map paths prove embedded package groups but do not contain each package manifest or license file.",
+    "Current workspace or lockfile versions are not evidence of the versions used by this prebuilt 2023 UMD.",
+    "Obtain release-build provenance and upstream notices before representing this record as complete redistribution clearance."
+  ]
+}

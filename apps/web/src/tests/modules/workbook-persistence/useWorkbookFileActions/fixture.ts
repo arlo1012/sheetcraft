@@ -26,6 +26,7 @@ export function mountFileActions(options?: {
   workbook?: Workbook;
   flushPendingEdits?: () => boolean;
   hasPendingEdits?: () => boolean;
+  isBlocked?: () => boolean;
 }) {
   const workbook = options?.workbook ?? createWorkbook({ idFactory: createSequentialIdFactory() });
   const loading = ref(false);
@@ -51,6 +52,7 @@ export function mountFileActions(options?: {
           getWorkbook: () => workbook,
           flushPendingEdits,
           hasPendingEdits,
+          isBlocked: options?.isBlocked,
         });
         return () => h("div");
       },

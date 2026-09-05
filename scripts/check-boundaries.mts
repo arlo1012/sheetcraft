@@ -28,6 +28,11 @@ const runtimePackages = [
     sourceDirectory: "packages/sheet-engine/src",
     manifest: "packages/sheet-engine/package.json",
   },
+  {
+    name: "@idea10/xlsx-io",
+    sourceDirectory: "packages/xlsx-io/src",
+    manifest: "packages/xlsx-io/package.json",
+  },
 ] as const;
 const forbiddenRuntimeImports = [
   /^vue(?:\/|$)/u,
@@ -322,7 +327,7 @@ function getDependencyDirectionViolation(
   specifier: string,
 ): string | undefined {
   if (packageName === "@idea10/core") {
-    if (/^@idea10\/(?:sheet-engine|web)(?:\/|$)/u.test(specifier)) {
+    if (/^@idea10\/(?:sheet-engine|xlsx-io|web)(?:\/|$)/u.test(specifier)) {
       return `@idea10/core must not depend on ${specifier}`;
     }
     return undefined;
@@ -335,6 +340,14 @@ function getDependencyDirectionViolation(
       return undefined;
     }
     return `@idea10/sheet-engine may only depend on @idea10/core, not ${specifier}`;
+  }
+  if (packageName === "@idea10/xlsx-io") {
+    if (/^@idea10\/(?:sheet-engine|web)(?:\/|$)/u.test(specifier)) {
+      return `@idea10/xlsx-io must not depend on ${specifier}`;
+    }
+    if (specifier.startsWith("exceljs/") && specifier !== "exceljs/dist/exceljs.min.js") {
+      return "@idea10/xlsx-io must use the audited ExcelJS browser artifact, never the Node entry";
+    }
   }
   return undefined;
 }
@@ -387,6 +400,15 @@ function checkRuntimeNeutralPackage(
       continue;
     }
     const moduleName = specifier.replace(/^node:/u, "").split("/")[0] ?? specifier;
+    if (packageName === "@idea10/xlsx-io" && specifier === "exceljs") {
+      addViolation(
+        violations,
+        path,
+        source,
+        match.index ?? 0,
+        "XLSX IO must import the audited browser artifact, not the ExcelJS Node entry",
+      );
+    }
     if (forbiddenRuntimeImports.some((pattern) => pattern.test(specifier))) {
       addViolation(
         violations,
@@ -475,7 +497,7 @@ function checkWebSource(path: string, violations: Violation[]): void {
     if (!specifier) {
       continue;
     }
-    if (/^@idea10\/(?:core|sheet-engine)\/src(?:\/|$)/u.test(specifier)) {
+    if (/^@idea10\/(?:core|sheet-engine|xlsx-io)\/src(?:\/|$)/u.test(specifier)) {
       addViolation(
         violations,
         path,
