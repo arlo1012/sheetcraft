@@ -109,9 +109,6 @@ watch(open, (isOpen) => {
       :label="t('sheetTabs.allSheets')"
     >
       <li class="workbook-sheet-navigator__controls" role="presentation">
-        <div class="workbook-sheet-navigator__header">
-          {{ t("sheetTabs.allSheets") }} ({{ sheets.length }})
-        </div>
         <div class="workbook-sheet-navigator__search">
           <input
             ref="searchInputRef"
@@ -220,14 +217,6 @@ watch(open, (isOpen) => {
     flex: 0 0 auto;
     background: var(--idea-surface-panel);
     list-style: none;
-  }
-
-  &__header {
-    padding: 4px 14px 6px;
-    color: var(--idea-text-primary);
-    font-size: var(--idea-font-size-body-small);
-    font-weight: 600;
-    line-height: var(--idea-line-height-body-small);
   }
 
   &__search {

@@ -581,7 +581,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     flex: 0 0 auto;
     align-items: stretch;
     max-width: min(204px, 100%);
-    border-bottom: 2px solid transparent;
+    border-top: 2px solid transparent;
 
     &:hover,
     &:focus-within,
@@ -591,11 +591,11 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
     &.is-active {
       background: var(--idea-action-primary-subtle);
-      border-bottom-color: var(--idea-action-primary);
+      border-top-color: var(--idea-action-primary);
     }
 
     &.has-tab-color {
-      border-bottom-color: var(--sheet-tab-color);
+      border-top-color: var(--sheet-tab-color);
     }
 
     &.is-pinned-boundary {

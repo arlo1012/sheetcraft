@@ -40,19 +40,19 @@ describe("WorkbookSheetNavigator", () => {
 
     expect(trigger.attributes("aria-label")).toBe("全部工作表");
     await trigger.trigger("click");
-    expect(menu().text()).toContain("全部工作表 (3)");
+    expect(menu().text()).not.toContain("全部工作表");
     expect(menu().get('[data-workbook-sheet-navigator="search"]').attributes("placeholder")).toBe(
       "搜索工作表",
     );
   });
 
-  test("opens an upward sheet list with a count, search, and active checkmark", async () => {
+  test("opens an upward sheet list with search and an active checkmark", async () => {
     const wrapper = mountNavigator();
     const trigger = wrapper.get('[data-workbook-sheet-navigator="trigger"]');
 
     await trigger.trigger("click");
     expect(wrapper.emitted("open")).toEqual([[]]);
-    expect(menu().text()).toContain("All sheets (3)");
+    expect(menu().text()).not.toContain("All sheets");
     expect(menu().get('[data-workbook-sheet-navigator="search"]').attributes("placeholder")).toBe(
       "Search sheets",
     );
