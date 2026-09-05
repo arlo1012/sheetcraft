@@ -248,7 +248,14 @@ export type MessageSchema = {
     insertFloating: string;
     cellAlt: string;
     floatingAlt: string;
-    resize: string;
+    resizeTop: string;
+    resizeBottom: string;
+    resizeLeft: string;
+    resizeRight: string;
+    resizeTopLeft: string;
+    resizeTopRight: string;
+    resizeBottomLeft: string;
+    resizeBottomRight: string;
     copied: string;
     copyFailed: string;
     inserted: string;
@@ -259,7 +266,6 @@ export type MessageSchema = {
     decodeFailed: string;
     assetUnavailable: string;
     insertionFailed: string;
-    keyboardInstructions: string;
     contextMenuActions: string;
     convertToCell: string;
     convertToFloating: string;

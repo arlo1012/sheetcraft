@@ -14,12 +14,15 @@ import { MAX_FLOATING_IMAGE_SIZE, type FloatingImage } from "@idea10/core/workbo
 import {
   getFloatingImageViewportFragments,
   moveFloatingImageBy,
+  resizeFloatingImageBy,
+  type FloatingImageResizeDirection,
   type FloatingImageViewportFragment,
 } from "@idea10/sheet-engine/floating-image-layout";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import SheetFloatingImageContextMenu from "./SheetFloatingImageContextMenu.vue";
+import SheetFloatingImageSelection from "./SheetFloatingImageSelection.vue";
 
 const MINIMUM_IMAGE_SIZE = 24;
 
@@ -48,9 +51,10 @@ const { t } = useAppI18n();
 type ImageFragment = FloatingImageViewportFragment & { image: FloatingImage };
 type Gesture = {
   image: FloatingImage;
-  mode: "move" | "resize";
+  mode: "move" | FloatingImageResizeDirection;
   pointerId: number;
   target: HTMLElement;
+  focusTarget: HTMLElement;
   startClientX: number;
   startClientY: number;
 };
@@ -65,6 +69,7 @@ const gesture = shallowRef<Gesture>();
 const previewImage = shallowRef<FloatingImage>();
 const layerRef = ref<HTMLElement | null>(null);
 const contextMenu = shallowRef<ContextMenuState>();
+let lastGestureMode: Gesture["mode"] = "move";
 
 const fragments = computed<ImageFragment[]>(() =>
   props.images.flatMap((image) =>
@@ -106,14 +111,6 @@ function getFragmentKey(fragment: ImageFragment): string {
   return `${fragment.image.id}:${fragment.paneId}`;
 }
 
-function canResize(fragment: ImageFragment): boolean {
-  const { rect, clippedRect } = fragment;
-  return (
-    clippedRect.x + clippedRect.width >= rect.x + rect.width &&
-    clippedRect.y + clippedRect.height >= rect.y + rect.height
-  );
-}
-
 function getAccessibleLabel(image: FloatingImage): string {
   if (props.assetUrls.has(image.assetId)) return image.altText || t("image.floatingAlt");
   return props.loadingAssetIds?.has(image.assetId)
@@ -136,6 +133,7 @@ function startGesture(image: FloatingImage, mode: Gesture["mode"], event: Pointe
     (event.currentTarget as HTMLElement);
   const target = layerRef.value;
   if (!target) return;
+  lastGestureMode = mode;
   emit("select", image.id);
   focusTarget.focus({ preventScroll: true });
   setPointerCapture(target, event.pointerId);
@@ -145,6 +143,7 @@ function startGesture(image: FloatingImage, mode: Gesture["mode"], event: Pointe
     mode,
     pointerId: event.pointerId,
     target,
+    focusTarget,
     startClientX: event.clientX,
     startClientY: event.clientY,
   };
@@ -166,21 +165,14 @@ function onPointerMove(event: PointerEvent): void {
       activeGesture.image;
     return;
   }
-  const horizontalScale = (activeGesture.image.width + deltaX) / activeGesture.image.width;
-  const verticalScale = (activeGesture.image.height + deltaY) / activeGesture.image.height;
-  const scale = Math.min(
-    MAX_FLOATING_IMAGE_SIZE / Math.max(activeGesture.image.width, activeGesture.image.height),
-    Math.max(
-      MINIMUM_IMAGE_SIZE / Math.min(activeGesture.image.width, activeGesture.image.height),
-      horizontalScale,
-      verticalScale,
-    ),
-  );
-  previewImage.value = {
-    ...activeGesture.image,
-    width: activeGesture.image.width * scale,
-    height: activeGesture.image.height * scale,
-  };
+  previewImage.value =
+    resizeFloatingImageBy(
+      activeGesture.image,
+      activeGesture.mode,
+      { x: deltaX, y: deltaY },
+      props.layout,
+      { minSize: MINIMUM_IMAGE_SIZE, maxSize: MAX_FLOATING_IMAGE_SIZE },
+    ) ?? activeGesture.image;
 }
 
 function finishGesture(commit: boolean): void {
@@ -190,6 +182,13 @@ function finishGesture(commit: boolean): void {
   previewImage.value = undefined;
   if (!activeGesture) return;
   releasePointerCapture(activeGesture.target, activeGesture.pointerId);
+  if (!activeGesture.focusTarget.isConnected) {
+    void nextTick(() => {
+      if (props.selectedImageId === activeGesture.image.id) {
+        layerRef.value?.querySelector<HTMLElement>(".is-selected")?.focus({ preventScroll: true });
+      }
+    });
+  }
   if (
     commit &&
     preview &&
@@ -295,7 +294,7 @@ function onImageDoubleClick(image: FloatingImage, event: MouseEvent): void {
 
 function onLayerDoubleClick(event: MouseEvent): void {
   // Pointer capture keeps drags alive across frozen panes and retargets clicks to this layer.
-  if (event.target !== event.currentTarget || gesture.value) return;
+  if (event.target !== event.currentTarget || gesture.value || lastGestureMode !== "move") return;
   const image = props.images.find((entry) => entry.id === props.selectedImageId);
   if (image)
     emit("preview", image, layerRef.value?.querySelector<HTMLElement>(".is-selected") ?? undefined);
@@ -375,37 +374,37 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       :data-floating-image-id="fragment.image.id"
       :data-floating-image-pane="fragment.paneId"
       :tabindex="fragment.image.id === selectedImageId ? 0 : -1"
-      role="img"
+      role="group"
       :aria-label="getAccessibleLabel(fragment.image)"
       @pointerdown.stop="startGesture(fragment.image, 'move', $event)"
       @contextmenu="onImageContextMenu(fragment.image, $event)"
       @dblclick.prevent.stop="onImageDoubleClick(fragment.image, $event)"
       @keydown="onImageKeydown(fragment.image, $event)"
     >
-      <img
-        v-if="assetUrls.get(fragment.image.assetId)"
-        class="sheet-floating-image-layer__image"
-        :src="assetUrls.get(fragment.image.assetId)"
-        :alt="fragment.image.altText || t('image.floatingAlt')"
-        :style="getImageStyle(fragment)"
-        draggable="false"
-      />
-      <span
-        v-else
-        class="sheet-floating-image-layer__placeholder"
-        :class="{
-          'is-loading': loadingAssetIds?.has(fragment.image.assetId),
-          'is-missing': missingAssetIds?.has(fragment.image.assetId),
-        }"
-        :style="getImageStyle(fragment)"
-        aria-hidden="true"
-      />
-      <button
-        v-if="fragment.image.id === selectedImageId && canResize(fragment)"
-        class="sheet-floating-image-layer__resize-handle"
-        type="button"
-        :aria-label="t('image.resize')"
-        @pointerdown.stop="startGesture(fragment.image, 'resize', $event)"
+      <div class="sheet-floating-image-layer__content">
+        <img
+          v-if="assetUrls.get(fragment.image.assetId)"
+          class="sheet-floating-image-layer__image"
+          :src="assetUrls.get(fragment.image.assetId)"
+          :alt="fragment.image.altText || t('image.floatingAlt')"
+          :style="getImageStyle(fragment)"
+          draggable="false"
+        />
+        <span
+          v-else
+          class="sheet-floating-image-layer__placeholder"
+          :class="{
+            'is-loading': loadingAssetIds?.has(fragment.image.assetId),
+            'is-missing': missingAssetIds?.has(fragment.image.assetId),
+          }"
+          :style="getImageStyle(fragment)"
+          aria-hidden="true"
+        />
+      </div>
+      <SheetFloatingImageSelection
+        v-if="fragment.image.id === selectedImageId"
+        :fragment="fragment"
+        @resize="(direction, event) => startGesture(fragment.image, direction, event)"
       />
     </div>
     <SheetFloatingImageContextMenu
@@ -431,32 +430,21 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
 
   &__fragment {
     position: absolute;
-    overflow: hidden;
     box-sizing: border-box;
     pointer-events: auto;
     touch-action: none;
     cursor: move;
     outline: none;
 
-    &::after {
-      position: absolute;
-      z-index: 2;
-      inset: 0;
-      box-sizing: border-box;
-      border: 2px solid transparent;
-      content: "";
-      pointer-events: none;
+    &:focus-visible {
+      --image-selection-style: dashed;
     }
+  }
 
-    &.is-selected::after {
-      border-color: var(--idea-action-primary);
-    }
-
-    &:focus-visible::after {
-      border-color: white;
-      outline: 2px solid var(--idea-action-primary);
-      outline-offset: -2px;
-    }
+  &__content {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
   }
 
   &__image,
@@ -491,20 +479,6 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     &.is-missing {
       border-style: dashed;
     }
-  }
-
-  &__resize-handle {
-    position: absolute;
-    right: 1px;
-    bottom: 1px;
-    width: 10px;
-    height: 10px;
-    padding: 0;
-    border: 1px solid white;
-    border-radius: 1px;
-    background: var(--idea-action-primary);
-    cursor: nwse-resize;
-    z-index: 3;
   }
 }
 </style>

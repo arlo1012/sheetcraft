@@ -102,7 +102,7 @@ describe("SheetFloatingImageLayer", () => {
 
   test("keeps the image aspect ratio while resizing", async () => {
     const wrapper = mountLayer();
-    const handle = wrapper.get(".sheet-floating-image-layer__resize-handle");
+    const handle = wrapper.get('[data-image-resize="se"]');
     await handle.trigger("pointerdown", { button: 0, pointerId: 4, clientX: 100, clientY: 50 });
     const fragment = wrapper.get('[data-floating-image-id="image-1"]');
     fragment.element.dispatchEvent(
