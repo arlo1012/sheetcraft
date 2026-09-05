@@ -4,38 +4,23 @@ import {
   getCellStyle,
   getCellContent,
   type CellAddress,
-  type ImageTransform,
   type Sheet,
   type SheetEvaluator,
 } from "@idea10/core/workbook";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import type { Rect } from "@idea10/sheet-engine/geometry";
 import { isCellSelected, type CellSelection } from "@idea10/sheet-engine/selection";
-import { useAppI18n } from "../../../shared/i18n";
 import { getCellContentStyle } from "../cell-presentation";
 import { formatCellValueForGrid } from "../cell-value-presentation";
-import SheetImageContent from "../../sheet-images/components/SheetImageContent.vue";
-
-type VisibleCell = {
-  key: string;
-  paneId: "topLeft" | "top" | "left" | "body";
-  address: CellAddress;
-  rect: Rect;
-  viewportTop: number;
-  viewportHeight: number;
-  text: string;
-  image?: { assetId: string; altText: string; transform?: ImageTransform };
-  multiline: boolean;
-  wrapped: boolean;
-  style: CSSProperties;
-};
+import SheetCellRowPane from "./SheetCellRowPane.vue";
+import type { VisibleCell, VisibleCellPaneId } from "./sheet-cell-view";
 
 type VisibleRow = {
   key: string;
   index: number;
   style: CSSProperties;
   panes: Array<{
-    paneId: VisibleCell["paneId"];
+    paneId: VisibleCellPaneId;
     cells: VisibleCell[];
     style: CSSProperties;
   }>;
@@ -62,8 +47,6 @@ const props = withDefaults(
   { locale: "en-US" },
 );
 
-const { t } = useAppI18n();
-
 const emit = defineEmits<{
   cellMousedown: [address: CellAddress, event: MouseEvent];
   cellDoubleClick: [address: CellAddress, event: MouseEvent];
@@ -74,32 +57,41 @@ defineSlots<{ "active-cell"?: (props: { cellRect: Rect }) => unknown }>();
 
 const visibleCells = computed<VisibleCell[]>(() => {
   const cells: VisibleCell[] = [];
-  function addCell(address: CellAddress, paneId: VisibleCell["paneId"]): void {
-    if (cells.some((cell) => cell.key === `${address.row}:${address.column}`)) return;
-    const mergedRange = props.layout.getMergedRangeAt(address);
+  const visited = new Set<string>();
+  const layout = props.layout;
+  const sheet = props.sheet;
+  const evaluator = props.evaluator;
+  const locale = props.locale;
+  function addCell(address: CellAddress, paneId: VisibleCellPaneId): void {
+    const key = `${address.row}:${address.column}`;
+    if (visited.has(key)) return;
+    visited.add(key);
+    const mergedRange = layout.getMergedRangeAt(address);
     const rect = mergedRange
-      ? props.layout.getRangePaneRects(mergedRange).find((pane) => pane.paneId === paneId)?.rect
-      : props.layout.getCellViewportRect(address);
+      ? layout.getRangePaneRects(mergedRange).find((pane) => pane.paneId === paneId)?.rect
+      : layout.getCellViewportRect(address);
     if (!rect) return;
-    const cellStyle = getCellStyle(props.sheet, address);
-    const content = getCellContent(props.sheet, address);
+    const cellStyle = getCellStyle(sheet, address);
+    const content = getCellContent(sheet, address);
     const cellImage = content?.kind === "image" ? content.image : undefined;
     const text = cellImage
       ? ""
-      : formatCellValueForGrid(props.evaluator.getComputedValue(address), cellStyle, props.locale);
+      : formatCellValueForGrid(evaluator.getComputedValue(address), cellStyle, locale);
     const preservesLineBreaks = /[\r\n]/u.test(text);
     cells.push({
-      key: `${address.row}:${address.column}`,
+      key,
       paneId,
       address,
       rect,
       text,
-      ...(cellImage ? { image: cellImage } : {}),
+      ...(cellImage
+        ? { image: cellImage, imageTransformKey: getImageTransformKey(cellImage) }
+        : { imageTransformKey: "" }),
       multiline: Boolean(cellStyle?.wrapText) || preservesLineBreaks,
       wrapped: Boolean(cellStyle?.wrapText),
       style: {
-        left: `${rect.x - props.layout.panes[paneId].clip.x}px`,
-        top: `${rect.y - props.layout.panes[paneId].clip.y}px`,
+        left: `${rect.x - layout.panes[paneId].clip.x + (paneId === "body" || paneId === "top" ? layout.bodyScrollPosition.x : 0)}px`,
+        top: `${rect.y - layout.panes[paneId].clip.y}px`,
         width: `${rect.width}px`,
         height: `${rect.height}px`,
         ...getCellContentStyle(cellStyle, preservesLineBreaks),
@@ -108,15 +100,27 @@ const visibleCells = computed<VisibleCell[]>(() => {
       viewportHeight: rect.height,
     });
   }
-  props.layout.forEachVisibleCell((address, paneId) => {
+  layout.forEachVisibleCell((address, paneId) => {
     addCell(address, paneId);
   });
-  addCell(
-    props.layout.getAnchorForAddress(props.activeCell),
-    props.layout.getPaneForAddress(props.activeCell),
-  );
+  addCell(layout.getAnchorForAddress(props.activeCell), layout.getPaneForAddress(props.activeCell));
   return cells;
 });
+
+function getImageTransformKey(image: NonNullable<VisibleCell["image"]>): string {
+  const transform = image.transform;
+  return [
+    image.assetId,
+    image.altText,
+    transform?.crop?.x,
+    transform?.crop?.y,
+    transform?.crop?.width,
+    transform?.crop?.height,
+    transform?.rotation,
+    transform?.flipHorizontal,
+    transform?.flipVertical,
+  ].join(":");
+}
 
 const paneClips = computed(() =>
   (["topLeft", "top", "left", "body"] as const).map((paneId) => {
@@ -133,7 +137,20 @@ const paneClips = computed(() =>
   }),
 );
 
+let cellStyles = new Map<string, CSSProperties>();
+
+function reuseCellStyle(key: string, style: CSSProperties): CSSProperties {
+  const previous = cellStyles.get(key);
+  const keys = Object.keys(style) as Array<keyof CSSProperties>;
+  return previous &&
+    keys.length === Object.keys(previous).length &&
+    keys.every((property) => previous[property] === style[property])
+    ? previous
+    : style;
+}
+
 const visibleRows = computed<VisibleRow[]>(() => {
+  const nextCellStyles = new Map<string, CSSProperties>();
   const rows = new Map<number, { offset: number; height: number; cells: VisibleCell[] }>();
   for (const cell of visibleCells.value) {
     const row = rows.get(cell.address.row);
@@ -151,7 +168,7 @@ const visibleRows = computed<VisibleRow[]>(() => {
     }
   }
 
-  return [...rows.entries()]
+  const result = [...rows.entries()]
     .map(([index, row]) => ({
       key: String(index),
       index,
@@ -160,25 +177,34 @@ const visibleRows = computed<VisibleRow[]>(() => {
         .map(({ paneId }) => {
           const cells = row.cells
             .filter((cell) => cell.paneId === paneId)
-            .map((cell) => ({
-              ...cell,
-              style: { ...cell.style, top: `${cell.viewportTop - row.offset}px` },
-            }));
+            .map((cell) => {
+              const style = reuseCellStyle(cell.key, {
+                ...cell.style,
+                top: `${cell.viewportTop - row.offset}px`,
+              });
+              nextCellStyles.set(cell.key, style);
+              const active =
+                cell.address.row === props.activeCell.row &&
+                cell.address.column === props.activeCell.column;
+              return {
+                ...cell,
+                style,
+                selected: isCellSelected(cell.address, props.selection),
+                active,
+                editing: props.editing && active,
+              };
+            });
           if (cells.length === 0) return null;
           const clip = props.layout.panes[paneId].clip;
-          const editorCell = props.editing
-            ? cells.find(
-                ({ address }) =>
-                  address.row === props.activeCell.row &&
-                  address.column === props.activeCell.column,
-              )
-            : undefined;
+          const editorCell = cells.find((cell) => cell.editing);
           // Preserve the outward editor border when it meets a frozen pane edge.
           const leftInset = editorCell?.rect.x === clip.x ? -1 : 0;
           const borderTopInset = editorCell?.rect.y === clip.y ? -1 : 0;
           // Clip to the pane so the editor can extend beyond its owning row.
           const topInset = clip.y - row.offset + borderTopInset;
           const bottomInset = row.offset + row.height - clip.y - clip.height;
+          const scrollX =
+            paneId === "body" || paneId === "top" ? props.layout.bodyScrollPosition.x : 0;
           return {
             paneId,
             cells,
@@ -187,13 +213,16 @@ const visibleRows = computed<VisibleRow[]>(() => {
               top: "0px",
               width: `${clip.width}px`,
               height: `${row.height}px`,
-              clipPath: `inset(${topInset}px 0 ${bottomInset}px ${leftInset}px)`,
+              transform: `translateX(${-scrollX}px)`,
+              clipPath: `inset(${topInset}px ${-scrollX}px ${bottomInset}px ${scrollX + leftInset}px)`,
             },
           };
         })
         .filter((pane): pane is NonNullable<typeof pane> => pane !== null),
     }))
     .sort((left, right) => left.index - right.index);
+  cellStyles = nextCellStyles;
+  return result;
 });
 
 const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
@@ -248,73 +277,24 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
       role="row"
       :aria-rowindex="row.index + 1"
     >
-      <div
+      <SheetCellRowPane
         v-for="pane in row.panes"
         :key="pane.paneId"
         class="sheet-cell-layer__row-pane"
         :style="pane.style"
         :data-pane="pane.paneId"
+        :cells="pane.cells"
+        :locale="locale"
+        :image-asset-urls="imageAssetUrls"
+        :loading-image-asset-ids="loadingImageAssetIds"
+        @cell-mousedown="(address, event) => emit('cellMousedown', address, event)"
+        @cell-double-click="(address, event) => emit('cellDoubleClick', address, event)"
+        @cell-contextmenu="(address, event) => emit('cellContextmenu', address, event)"
       >
-        <div
-          v-for="cell in pane.cells"
-          :key="cell.key"
-          class="sheet-cell-layer__cell"
-          :class="{
-            'has-value': cell.text.length > 0,
-            'has-image': Boolean(cell.image),
-            'is-multiline': cell.multiline,
-            'is-wrapped': cell.wrapped,
-            'is-active':
-              cell.address.row === activeCell.row && cell.address.column === activeCell.column,
-            'is-editing':
-              editing &&
-              cell.address.row === activeCell.row &&
-              cell.address.column === activeCell.column,
-            'is-selected': isCellSelected(cell.address, selection),
-          }"
-          :style="cell.style"
-          :data-row="cell.address.row"
-          :data-column="cell.address.column"
-          role="gridcell"
-          :aria-rowindex="cell.address.row + 1"
-          :aria-colindex="cell.address.column + 1"
-          :aria-selected="isCellSelected(cell.address, selection)"
-          @mousedown.left.prevent="emit('cellMousedown', cell.address, $event)"
-          @dblclick.left.prevent="emit('cellDoubleClick', cell.address, $event)"
-          @contextmenu="emit('cellContextmenu', cell.address, $event)"
-        >
-          <SheetImageContent
-            v-if="cell.image && imageAssetUrls?.get(cell.image.assetId)"
-            class="sheet-cell-layer__image"
-            :src="imageAssetUrls.get(cell.image.assetId) ?? ''"
-            :alt-text="cell.image.altText || t('image.cellAlt')"
-            :transform="cell.image.transform"
-            fit="contain"
-          />
-          <span
-            v-else-if="cell.image"
-            class="sheet-cell-layer__image-placeholder"
-            role="img"
-            :aria-label="
-              loadingImageAssetIds?.has(cell.image.assetId)
-                ? t('image.loading')
-                : t('image.assetUnavailable')
-            "
-          >
-            {{
-              loadingImageAssetIds?.has(cell.image.assetId)
-                ? t("image.loading")
-                : t("image.assetUnavailable")
-            }}
-          </span>
-          <span v-else-if="cell.text" class="sheet-cell-layer__value">{{ cell.text }}</span>
-          <slot
-            v-if="cell.address.row === activeCell.row && cell.address.column === activeCell.column"
-            name="active-cell"
-            :cell-rect="cell.rect"
-          />
-        </div>
-      </div>
+        <template #active-cell="slotProps">
+          <slot name="active-cell" v-bind="slotProps" />
+        </template>
+      </SheetCellRowPane>
     </div>
   </div>
 </template>
@@ -352,59 +332,6 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
     border-right: 1px solid var(--idea-border-subtle);
     border-bottom: 1px solid var(--idea-border-subtle);
     pointer-events: none;
-  }
-
-  &__cell {
-    position: absolute;
-    display: flex;
-    align-items: center;
-    overflow: hidden;
-    padding: 0 5px;
-    background: var(--idea-surface-panel);
-    border-right: 1px solid var(--idea-border-subtle);
-    border-bottom: 1px solid var(--idea-border-subtle);
-    color: var(--idea-text-primary);
-    font-size: 13px;
-    line-height: 1;
-    white-space: nowrap;
-    pointer-events: auto;
-    user-select: none;
-
-    &.is-active {
-      overflow: visible;
-    }
-    &.is-multiline.is-active:not(.is-editing) {
-      overflow: hidden;
-    }
-  }
-
-  &__cell.has-image {
-    padding: 2px;
-    overflow: hidden;
-  }
-
-  &__image {
-    display: block;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-  }
-
-  &__image-placeholder {
-    overflow: hidden;
-    color: var(--idea-text-secondary);
-    font-size: 11px;
-    text-overflow: ellipsis;
-  }
-
-  &__value {
-    overflow: hidden;
-    text-overflow: clip;
-  }
-  &__cell.is-multiline &__value {
-    min-width: 0;
-    max-width: 100%;
-    overflow: visible;
   }
 }
 </style>

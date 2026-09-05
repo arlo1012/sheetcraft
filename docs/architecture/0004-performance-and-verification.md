@@ -131,6 +131,26 @@ contrast. The inspected build has 84,290 B entry CSS (12,656 B gzip) and 32,029 
 total CSS gzip. The total CSS gzip limit becomes 32,500 B; all other
 limits stay unchanged.
 
+The two-row footer adds a synchronized horizontal scrollbar, persisted statistics
+preferences, six numeric summaries and selectable digit grouping. Its inspected
+production entry measures 424,982 B JavaScript (118,159 B gzip) and 86,576 B CSS
+(12,981 B gzip); total JavaScript is 976,338 B (284,270 B gzip) and total CSS is
+245,871 B (32,354 B gzip). Limits become 430/120 KB entry JavaScript, 88/13.4 KB
+entry CSS, 985/288 KB total JavaScript and 248/33.5 KB total CSS. No dependency
+was added, and both entry and total gates remain active.
+
+Scrolling preserves the selection identity in stored view state, so summary,
+style and filter computations remain cached. The cell layer uses constant-time
+visible-cell deduplication, skips empty merge lookups, moves row panes together,
+and reuses unchanged cell styles and render results. Active editor slots always
+refresh. In a local Chromium development-build capture at 1617 by 1290 pixels,
+60 frame-aligned scroll updates had a median interval of 74.3 ms before these
+changes and 30.0 ms afterwards; a 60-step drag-selection capture improved from
+45.8 to 16.8 ms. These are comparative diagnostics on an empty worksheet, not a
+cross-device timing gate. Regression tests protect unchanged selection-derived
+results during scrolling, live editing, image updates, frozen panes and extent
+growth.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

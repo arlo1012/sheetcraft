@@ -183,7 +183,23 @@ export type MessageSchema = {
     selectionSummary: string;
     average: string;
     count: string;
+    maximum: string;
+    minimum: string;
+    numericCount: string;
     sum: string;
+    statisticsSettings: string;
+    statisticsOptions: string;
+    useChineseUnitGrouping: string;
+    useThousandsSeparator: string;
+    useTenThousandsGrouping: string;
+    settings: {
+      average: string;
+      count: string;
+      maximum: string;
+      minimum: string;
+      numericCount: string;
+      sum: string;
+    };
     viewAndZoom: string;
     normalView: string;
     pageLayoutView: string;
@@ -197,6 +213,7 @@ export type MessageSchema = {
     blank: string;
   };
   grid: {
+    horizontalScroll: string;
     worksheet: string;
     selectAll: string;
     selectRow: string;

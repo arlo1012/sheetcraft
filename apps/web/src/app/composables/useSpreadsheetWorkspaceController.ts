@@ -126,6 +126,7 @@ export type SheetGridNavigator = {
   hasPendingEdit?(): boolean;
   focusGrid(): void;
   navigateToCell(address: CellAddress): void;
+  scrollHorizontally?(position: number): void;
 };
 
 export type SpreadsheetWorkspaceControllerOptions = {
@@ -859,8 +860,45 @@ export function useSpreadsheetWorkspaceController(
     clearWorkspaceStatus();
   }
 
+  function areViewSelectionsEqual(
+    left: SheetGridViewState["selection"],
+    right: SheetGridViewState["selection"],
+  ): boolean {
+    return (
+      left.mode === right.mode &&
+      left.active.row === right.active.row &&
+      left.active.column === right.active.column &&
+      left.anchor.row === right.anchor.row &&
+      left.anchor.column === right.anchor.column &&
+      left.focus.row === right.focus.row &&
+      left.focus.column === right.focus.column
+    );
+  }
+
   function updateActiveSheetViewState(viewState: SheetGridViewState): void {
-    viewStates.set(activeSheet.value.id, createSheetGridViewState(viewState));
+    const next = createSheetGridViewState(viewState);
+    const sheetId = activeSheet.value.id;
+    const current = viewStates.get(sheetId);
+    if (!current) {
+      viewStates.set(sheetId, next);
+      return;
+    }
+
+    if (!areViewSelectionsEqual(current.selection, next.selection)) {
+      current.selection = next.selection;
+    }
+    if (current.scrollPosition.x !== next.scrollPosition.x) {
+      current.scrollPosition.x = next.scrollPosition.x;
+    }
+    if (current.scrollPosition.y !== next.scrollPosition.y) {
+      current.scrollPosition.y = next.scrollPosition.y;
+    }
+    if (current.gridExtent.rowCount !== next.gridExtent.rowCount) {
+      current.gridExtent.rowCount = next.gridExtent.rowCount;
+    }
+    if (current.gridExtent.columnCount !== next.gridExtent.columnCount) {
+      current.gridExtent.columnCount = next.gridExtent.columnCount;
+    }
   }
 
   function replaceWorkbook(workbook: Workbook): void {
@@ -956,6 +994,10 @@ export function useSpreadsheetWorkspaceController(
         : undefined;
   }
 
+  function scrollGridHorizontally(position: number): void {
+    gridRef.value?.scrollHorizontally?.(position);
+  }
+
   onScopeDispose(clearWorkspaceStatus);
 
   return {
@@ -1024,5 +1066,6 @@ export function useSpreadsheetWorkspaceController(
     undo,
     redo,
     setGridNavigator,
+    scrollGridHorizontally,
   };
 }

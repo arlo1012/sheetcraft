@@ -206,7 +206,7 @@ watch(open, (isOpen) => {
     z-index: 80;
     display: flex;
     flex-direction: column;
-    width: min(260px, calc(100vw - var(--idea-space-4) - var(--idea-space-4)));
+    width: min(180px, calc(100vw - var(--idea-space-4) - var(--idea-space-4)));
     max-height: min(320px, calc(100vh - var(--idea-space-4) - var(--idea-space-4)));
   }
 
@@ -245,6 +245,11 @@ watch(open, (isOpen) => {
   &__item {
     flex: 0 0 auto;
     min-width: 0;
+
+    :deep(.idea-menu-item__label) {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
 
     &.is-active {
       background: var(--idea-action-primary-subtle);

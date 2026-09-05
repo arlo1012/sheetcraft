@@ -3,6 +3,9 @@ import { computed } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { SelectionSummary } from "@idea10/core/selection-summary";
 import type { Sheet, SheetProperties } from "@idea10/core/workbook";
+import { useStatusBarSettings } from "../composables/useStatusBarSettings";
+import { formatStatusBarNumber } from "../status-bar-number-format";
+import WorkbookStatusBarSettings from "./WorkbookStatusBarSettings.vue";
 import WorkbookSheetTabs from "./WorkbookSheetTabs.vue";
 
 const props = defineProps<{
@@ -23,88 +26,172 @@ const emit = defineEmits<{
 }>();
 
 const { locale, t } = useAppI18n();
-const numberFormatter = computed(
-  () => new Intl.NumberFormat(locale.value, { maximumFractionDigits: 6 }),
-);
-const zoomValue = computed(() =>
+const settings = useStatusBarSettings();
+const currentScale = computed(() =>
   new Intl.NumberFormat(locale.value, { style: "percent" }).format(1),
 );
 const shouldShowSummary = computed(
-  () => props.selectionSummary.selectedCellCount > 1 && props.selectionSummary.count > 0,
+  () =>
+    props.selectionSummary.selectedCellCount > 1 &&
+    props.selectionSummary.count > 0 &&
+    (settings.value.count ||
+      settings.value.numericCount ||
+      (props.selectionSummary.numericCount > 0 &&
+        (settings.value.average ||
+          settings.value.minimum ||
+          settings.value.maximum ||
+          settings.value.sum))),
 );
 
 function formatNumber(value: number): string {
-  return numberFormatter.value.format(Object.is(value, -0) ? 0 : value);
+  return formatStatusBarNumber(value, locale.value, settings.value.numberFormat);
 }
 </script>
 
 <template>
   <footer class="workbook-status-bar" :aria-label="t('statusBar.label')">
-    <div class="workbook-status-bar__sheets">
-      <WorkbookSheetTabs
-        :sheets="sheets"
-        :active-sheet-id="activeSheetId"
-        @select="emit('select', $event)"
-        @add="emit('add')"
-        @duplicate="emit('duplicate', $event)"
-        @rename="emit('rename', $event)"
-        @move="emit('move', $event)"
-        @delete="emit('delete', $event)"
-        @update-properties="emit('updateProperties', $event)"
-        @restore="emit('restore', $event)"
-      />
+    <div class="workbook-status-bar__top-row">
+      <div class="workbook-status-bar__sheets">
+        <WorkbookSheetTabs
+          :sheets="sheets"
+          :active-sheet-id="activeSheetId"
+          @select="emit('select', $event)"
+          @add="emit('add')"
+          @duplicate="emit('duplicate', $event)"
+          @rename="emit('rename', $event)"
+          @move="emit('move', $event)"
+          @delete="emit('delete', $event)"
+          @update-properties="emit('updateProperties', $event)"
+          @restore="emit('restore', $event)"
+        />
+      </div>
+      <div class="workbook-status-bar__horizontal-scrollbar">
+        <slot name="horizontal-scrollbar" />
+      </div>
     </div>
-    <dl
-      v-if="shouldShowSummary"
-      class="workbook-status-bar__summary"
-      :aria-label="t('statusBar.selectionSummary')"
-      data-selection-summary
-    >
-      <div class="workbook-status-bar__stat">
-        <dt>{{ t("statusBar.count") }}</dt>
-        <dd :title="formatNumber(selectionSummary.count)">
-          {{ formatNumber(selectionSummary.count) }}
-        </dd>
+    <div class="workbook-status-bar__bottom-row">
+      <WorkbookStatusBarSettings v-model="settings" />
+      <div class="workbook-status-bar__metrics">
+        <dl
+          v-if="shouldShowSummary"
+          class="workbook-status-bar__summary"
+          :aria-label="t('statusBar.selectionSummary')"
+          data-selection-summary
+        >
+          <div v-if="settings.count" class="workbook-status-bar__stat">
+            <dt>{{ t("statusBar.count") }}</dt>
+            <dd :title="formatNumber(selectionSummary.count)">
+              {{ formatNumber(selectionSummary.count) }}
+            </dd>
+          </div>
+          <div
+            v-if="settings.average && selectionSummary.numericCount > 0"
+            class="workbook-status-bar__stat"
+          >
+            <dt>{{ t("statusBar.average") }}</dt>
+            <dd :title="formatNumber(selectionSummary.average)">
+              {{ formatNumber(selectionSummary.average) }}
+            </dd>
+          </div>
+          <div v-if="settings.numericCount" class="workbook-status-bar__stat">
+            <dt>{{ t("statusBar.numericCount") }}</dt>
+            <dd :title="formatNumber(selectionSummary.numericCount)">
+              {{ formatNumber(selectionSummary.numericCount) }}
+            </dd>
+          </div>
+          <div
+            v-if="settings.minimum && selectionSummary.numericCount > 0"
+            class="workbook-status-bar__stat"
+          >
+            <dt>{{ t("statusBar.minimum") }}</dt>
+            <dd :title="formatNumber(selectionSummary.minimum)">
+              {{ formatNumber(selectionSummary.minimum) }}
+            </dd>
+          </div>
+          <div
+            v-if="settings.maximum && selectionSummary.numericCount > 0"
+            class="workbook-status-bar__stat"
+          >
+            <dt>{{ t("statusBar.maximum") }}</dt>
+            <dd :title="formatNumber(selectionSummary.maximum)">
+              {{ formatNumber(selectionSummary.maximum) }}
+            </dd>
+          </div>
+          <div
+            v-if="settings.sum && selectionSummary.numericCount > 0"
+            class="workbook-status-bar__stat"
+          >
+            <dt>{{ t("statusBar.sum") }}</dt>
+            <dd :title="formatNumber(selectionSummary.sum)">
+              {{ formatNumber(selectionSummary.sum) }}
+            </dd>
+          </div>
+        </dl>
+        <span
+          class="workbook-status-bar__scale"
+          :aria-label="t('statusBar.zoomLevel', { value: 100 })"
+          :title="t('statusBar.zoomLevel', { value: 100 })"
+        >
+          {{ currentScale }}
+        </span>
       </div>
-      <div v-if="selectionSummary.numericCount > 0" class="workbook-status-bar__stat">
-        <dt>{{ t("statusBar.average") }}</dt>
-        <dd :title="formatNumber(selectionSummary.average)">
-          {{ formatNumber(selectionSummary.average) }}
-        </dd>
-      </div>
-      <div v-if="selectionSummary.numericCount > 0" class="workbook-status-bar__stat">
-        <dt>{{ t("statusBar.sum") }}</dt>
-        <dd :title="formatNumber(selectionSummary.sum)">
-          {{ formatNumber(selectionSummary.sum) }}
-        </dd>
-      </div>
-    </dl>
-    <span
-      class="workbook-status-bar__scale"
-      :aria-label="t('statusBar.zoomLevel', { value: 100 })"
-      :title="t('statusBar.zoomLevel', { value: 100 })"
-    >
-      {{ zoomValue }}
-    </span>
+    </div>
   </footer>
 </template>
 
 <style scoped lang="scss">
 .workbook-status-bar {
-  display: flex;
-  align-items: stretch;
+  display: grid;
+  grid-template-rows: 26px 22px;
   min-width: 0;
-  height: 30px;
+  min-height: 49px;
   background: var(--idea-surface-secondary);
   border-top: 1px solid var(--idea-border-subtle);
   color: var(--idea-text-secondary);
   font-size: 12px;
 
+  &__top-row,
+  &__bottom-row {
+    display: flex;
+    min-width: 0;
+  }
+
+  &__top-row {
+    align-items: stretch;
+    overflow: hidden;
+  }
+
   &__sheets {
     display: flex;
-    flex: 1 1 0;
+    flex: 0 1 clamp(200px, 25%, 480px);
     min-width: 0;
+    max-width: 480px;
     overflow: hidden;
+  }
+
+  &__horizontal-scrollbar {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    min-width: 0;
+    padding: 0 10px;
+    overflow: hidden;
+  }
+
+  &__bottom-row {
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  &__metrics {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    min-width: 0;
+    max-width: calc(100% - 30px);
+    height: 100%;
+    margin-left: auto;
   }
 
   &__summary {
@@ -113,9 +200,10 @@ function formatNumber(value: number): string {
     align-items: center;
     gap: 16px;
     min-width: 0;
-    max-width: 44%;
+    max-width: calc(100% - 52px);
+    overflow: hidden;
     margin: 0;
-    padding: 0 16px;
+    padding: 0 12px;
     font-variant-numeric: tabular-nums;
   }
 
@@ -143,37 +231,24 @@ function formatNumber(value: number): string {
     display: flex;
     flex: 0 0 auto;
     align-items: center;
-    align-self: center;
     justify-content: center;
-    min-width: 56px;
-    height: 14px;
-    padding: 0 12px;
+    min-width: 52px;
+    height: 100%;
+    padding: 0 10px;
     border-left: 1px solid var(--idea-border-subtle);
     color: var(--idea-text-secondary);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 
-  @media (max-width: 720px) {
+  @media (max-width: 480px) {
+    &__sheets {
+      flex-basis: 170px;
+    }
+
     &__summary {
       gap: 10px;
-      padding: 0 10px;
-      max-width: 38%;
-    }
-
-    &__stat:nth-child(2) {
-      display: none;
-    }
-  }
-
-  @media (max-width: 480px) {
-    &__summary {
-      max-width: 26%;
       padding: 0 8px;
-    }
-
-    &__stat:not(:first-child) {
-      display: none;
     }
 
     &__scale {

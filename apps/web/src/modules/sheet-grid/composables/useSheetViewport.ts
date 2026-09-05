@@ -13,6 +13,7 @@ import { getSelectionMode, type CellSelection } from "@idea10/sheet-engine/selec
 import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
 import { MergedCellRangeResolver } from "@idea10/core";
 import { DEFAULT_ROW_HEIGHT, type CellAddress, type CellRange } from "@idea10/core/workbook";
+import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 
 const DEFAULT_VIEWPORT_SIZE: Size = { width: 960, height: 600 };
 
@@ -75,8 +76,12 @@ export function useSheetViewport(options: {
       hiddenIntervals: options.getHiddenRowIntervals(),
     }),
   );
-  const mergeResolver = computed(() => new MergedCellRangeResolver(options.getMergedCells()));
+  const mergeResolver = computed(() => {
+    const ranges = options.getMergedCells();
+    return ranges.length > 0 ? new MergedCellRangeResolver(ranges) : undefined;
+  });
   const layout = computed(() => {
+    const resolver = mergeResolver.value;
     return createSheetViewportLayout({
       geometry: geometry.value,
       rows: rowVisibility.value,
@@ -84,14 +89,19 @@ export function useSheetViewport(options: {
       bodyScrollPosition: scrollPosition,
       viewportSize,
       overscan: 2,
-      mergeResolver: {
-        getRangeAt: (address) => mergeResolver.value.getRangeAtAddress(address),
-      },
+      mergeResolver: resolver
+        ? { getRangeAt: (address) => resolver.getRangeAtAddress(address) }
+        : undefined,
     });
   });
   const gridCanvasStyle = computed<CSSProperties>(() => ({
     width: `${layout.value.nativeScrollSize.width}px`,
     height: `${layout.value.nativeScrollSize.height}px`,
+  }));
+  const horizontalScrollState = computed<SheetHorizontalScrollState>(() => ({
+    position: layout.value.bodyScrollPosition.x,
+    viewportSize: layout.value.panes.body.clip.width,
+    contentSize: Math.max(0, layout.value.getTotalSize().width - layout.value.frozenSize.width),
   }));
   const gridViewportStyle = computed<CSSProperties>(() => ({
     width: `${viewportSize.width}px`,
@@ -143,7 +153,6 @@ export function useSheetViewport(options: {
   }
 
   function ensureGridExtentCoversViewport(): void {
-    ensureGridExtentContainsMetadata();
     applyGridExtent(
       expandGridExtentForViewport(
         gridExtent,
@@ -176,6 +185,7 @@ export function useSheetViewport(options: {
   watch(
     [options.getFreezePanes, options.getMergedCells],
     () => {
+      ensureGridExtentContainsMetadata();
       ensureGridExtentCoversViewport();
       setNativeScrollPosition(layout.value.bodyScrollPosition);
     },
@@ -212,6 +222,37 @@ export function useSheetViewport(options: {
     scrollPosition.y = scroller.scrollTop;
     ensureGridExtentCoversViewport();
     emitViewState();
+  }
+
+  function scrollHorizontally(position: number): void {
+    if (!Number.isFinite(position)) return;
+    const maximum = Math.max(
+      0,
+      horizontalScrollState.value.contentSize - horizontalScrollState.value.viewportSize,
+    );
+    options.onScrollStart();
+    setNativeScrollPosition({ x: Math.min(maximum, Math.max(0, position)), y: scrollPosition.y });
+    ensureGridExtentCoversViewport();
+    emitViewState();
+  }
+
+  function onHorizontalWheel(event: WheelEvent): void {
+    if (event.ctrlKey || event.metaKey) return;
+    const horizontalDelta = event.deltaX || (event.shiftKey ? event.deltaY : 0);
+    if (!horizontalDelta) return;
+    event.preventDefault();
+    const horizontalUnit =
+      event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportSize.width : 1;
+    scrollHorizontally(scrollPosition.x + horizontalDelta * horizontalUnit);
+    const scroller = scrollerRef.value;
+    if (scroller && !event.shiftKey && event.deltaY) {
+      const verticalUnit =
+        event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportSize.height : 1;
+      scroller.scrollTop += event.deltaY * verticalUnit;
+      scrollPosition.y = scroller.scrollTop;
+      ensureGridExtentCoversViewport();
+      emitViewState();
+    }
   }
 
   function restore(viewState?: SheetGridViewState): SheetGridViewState {
@@ -288,6 +329,7 @@ export function useSheetViewport(options: {
     gridCanvasStyle,
     gridExtent,
     gridViewportStyle,
+    horizontalScrollState,
     ensureGridExtentContains,
     ensureGridExtentCoversViewport,
     ensureSelectionVisible,
@@ -295,10 +337,12 @@ export function useSheetViewport(options: {
     layout,
     observe,
     onScroll,
+    onHorizontalWheel,
     restore,
     rowHeaderPanes,
     rowVisibility,
     scrollPosition,
+    scrollHorizontally,
     scrollerRef,
     startGeometryWatch,
     stopGeometryWatching,

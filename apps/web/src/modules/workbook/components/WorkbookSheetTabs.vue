@@ -543,6 +543,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
   display: flex;
   flex: 1 1 auto;
   align-items: stretch;
+  height: 26px;
   min-width: 0;
 
   &__navigation {
@@ -558,6 +559,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
   &__viewport {
     display: flex;
     flex: 0 1 auto;
+    height: 26px;
     min-width: 0;
     overflow-x: auto;
     overscroll-behavior-x: contain;
@@ -572,6 +574,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     display: flex;
     flex: 0 0 auto;
     align-items: stretch;
+    height: 26px;
     gap: 1px;
   }
 
@@ -580,6 +583,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     display: flex;
     flex: 0 0 auto;
     align-items: stretch;
+    height: 24px;
     max-width: min(204px, 100%);
     margin-bottom: 2px;
     overflow: hidden;
@@ -647,6 +651,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
   &__tab,
   &__rename-input {
+    height: 22px;
     min-width: 60px;
     max-width: 180px;
     padding: 0 12px;
@@ -731,7 +736,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     flex: 0 0 32px;
     align-self: stretch;
     width: 32px;
-    height: auto;
+    height: 26px;
     border-radius: 0;
   }
 

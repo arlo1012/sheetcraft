@@ -17,8 +17,11 @@ describe("SheetGrid viewport", () => {
       "0px",
     );
     expect(wrapper.get('[data-row="50"][data-column="8"]').attributes("style")).toContain(
-      "left: -32px",
+      "left: 768px",
     );
+    expect(
+      wrapper.get('[data-row="50"][data-column="8"]').element.parentElement?.style.transform,
+    ).toBe("translateX(-800px)");
     expect(wrapper.findAll(".sheet-cell-layer__cell").length).toBeLessThan(1_000);
   });
 

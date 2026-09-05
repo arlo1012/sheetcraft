@@ -75,6 +75,7 @@ import { useDimensionResize } from "../composables/useDimensionResize";
 import { useCellEditing } from "../composables/useCellEditing";
 import { useDragSelection } from "../composables/useDragSelection";
 import { useSheetViewport } from "../composables/useSheetViewport";
+import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 import type { ImageInsertMode } from "../../sheet-images/useSheetImageActions";
 import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloatingImageLayer.vue";
 import SheetImagePreview from "../../sheet-images/components/SheetImagePreview.vue";
@@ -145,6 +146,8 @@ const props = withDefaults(
     loadingImageAssetIds?: ReadonlySet<string>;
     missingImageAssetIds?: ReadonlySet<string>;
     readOnly?: boolean;
+    gridId?: string;
+    externalHorizontalScrollbar?: boolean;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -154,6 +157,7 @@ const props = withDefaults(
     rowExpansionTail: DEFAULT_GRID_EXTENT_POLICY.tail.rowCount,
     columnExpansionTail: DEFAULT_GRID_EXTENT_POLICY.tail.columnCount,
     readOnly: false,
+    externalHorizontalScrollbar: false,
   },
 );
 
@@ -176,6 +180,7 @@ const emit = defineEmits<{
   undo: [];
   redo: [];
   viewStateChange: [viewState: SheetGridViewState];
+  horizontalScrollChange: [state: SheetHorizontalScrollState];
 }>();
 
 const ROW_HEADER_WIDTH = 48;
@@ -184,7 +189,7 @@ const COLUMN_HEADER_HEIGHT = 28;
 const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
 const selectedImageId = ref<string | null>(null);
-const selection = ref<CellSelection>(createCellSelection({ row: 0, column: 0 }));
+const selection = shallowRef<CellSelection>(createCellSelection({ row: 0, column: 0 }));
 const imagePreview = shallowRef<{
   assetId: string;
   altText: string;
@@ -257,6 +262,7 @@ const {
   gridCanvasStyle,
   gridExtent,
   gridViewportStyle,
+  horizontalScrollState,
   ensureGridExtentContains,
   ensureGridExtentCoversViewport,
   ensureSelectionVisible,
@@ -264,10 +270,12 @@ const {
   layout,
   observe: observeViewport,
   onScroll,
+  onHorizontalWheel,
   restore: restoreViewport,
   rowHeaderPanes,
   rowVisibility,
   scrollPosition,
+  scrollHorizontally,
   scrollerRef,
   startGeometryWatch,
   stopObserving: stopObservingViewport,
@@ -753,7 +761,14 @@ function setSelection(
   selectedImageId.value = null;
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
-  selection.value = normalizeSelectionForSheet(nextSelection);
+  const normalized = normalizeSelectionForSheet(nextSelection);
+  if (!areSelectionsEqual(selection.value, normalized)) {
+    // Extending a range does not change its active cell or the cell content layer.
+    if (areCellAddressesEqual(selection.value.active, normalized.active)) {
+      normalized.active = selection.value.active;
+    }
+    selection.value = normalized;
+  }
   ensureGridExtentContains(visibleAddress);
   ensureSelectionVisible(visibleAddress, nextSelection.mode);
   emitViewState();
@@ -1462,6 +1477,11 @@ onMounted(() => {
   focusEditor();
 });
 
+watch(horizontalScrollState, (state) => emit("horizontalScrollChange", state), {
+  immediate: true,
+  flush: "post",
+});
+
 onBeforeUnmount(() => {
   if (fontFaceSet && fontLoadingDoneListener) {
     fontFaceSet.removeEventListener("loadingdone", fontLoadingDoneListener);
@@ -1480,6 +1500,7 @@ defineExpose({
   focusGrid: focusEditor,
   hasPendingEdit,
   navigateToCell,
+  scrollHorizontally,
 });
 </script>
 
@@ -1537,7 +1558,9 @@ defineExpose({
 
     <div
       ref="scrollerRef"
+      :id="gridId"
       class="sheet-grid__scroller"
+      :class="{ 'has-external-horizontal-scrollbar': externalHorizontalScrollbar }"
       role="grid"
       :aria-label="sheet.name"
       :aria-readonly="readOnly"
@@ -1545,6 +1568,7 @@ defineExpose({
       :aria-colcount="gridExtent.columnCount"
       aria-multiselectable="true"
       @scroll="onScroll"
+      @wheel="externalHorizontalScrollbar && onHorizontalWheel($event)"
     >
       <div class="sheet-grid__canvas" :style="gridCanvasStyle">
         <div class="sheet-grid__viewport" :style="gridViewportStyle">
@@ -1726,6 +1750,10 @@ defineExpose({
     outline: none;
     scrollbar-color: var(--idea-border-control) var(--idea-surface-secondary);
     scrollbar-width: thin;
+
+    &.has-external-horizontal-scrollbar {
+      overflow-x: hidden;
+    }
   }
 
   &__canvas {
