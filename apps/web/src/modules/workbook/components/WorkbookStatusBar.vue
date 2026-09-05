@@ -95,7 +95,7 @@ function formatNumber(value: number): string {
   align-items: stretch;
   min-width: 0;
   height: 30px;
-  background: var(--idea-surface-panel);
+  background: var(--idea-surface-secondary);
   border-top: 1px solid var(--idea-border-subtle);
   color: var(--idea-text-secondary);
   font-size: 12px;

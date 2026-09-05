@@ -20,7 +20,7 @@ function mountOverflowingTabs() {
     },
   });
   wrappers.push(wrapper);
-  const list = wrapper.get<HTMLDivElement>('[role="tablist"]');
+  const list = wrapper.get<HTMLDivElement>(".workbook-sheet-tabs__viewport");
   let scrollLeft = 0;
   Object.defineProperties(list.element, {
     clientWidth: { configurable: true, value: 120 },
@@ -65,7 +65,7 @@ describe("sheet tab overflow navigation", () => {
     expect(wrapper.emitted("select")).toBeUndefined();
   });
 
-  test("reveals an externally selected tab, including its menu, while leaving focus in place", async () => {
+  test("reveals an externally selected tab, and its trailing add button, while leaving focus in place", async () => {
     const { wrapper, list } = mountOverflowingTabs();
     vi.spyOn(list.element, "getBoundingClientRect").mockReturnValue(new DOMRect(60, 690, 120, 28));
     const target = wrapper.get('[role="tab"][title="Detailed budget (double-click to rename)"]');

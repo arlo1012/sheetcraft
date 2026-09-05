@@ -42,7 +42,9 @@ describe("sheet property navigation", () => {
 
   test("hides targeted tabs through a command event and restores them from the all-sheets list", async () => {
     const { wrapper } = fixture();
-    await wrapper.get('[aria-label="Actions for First"]').trigger("click");
+    await wrapper
+      .get('[role="tab"][title="First (double-click to rename)"]')
+      .trigger("contextmenu");
     await new DOMWrapper(document.body).get('[data-sheet-tab-action="hide"]').trigger("click");
     expect(wrapper.emitted("updateProperties")).toEqual([
       [{ sheetId: "First", patch: { hidden: true } }],
@@ -59,7 +61,9 @@ describe("sheet property navigation", () => {
     sheets[2]!.properties.hidden = true;
     sheets[3]!.properties.hidden = true;
     await wrapper.setProps({ sheets: [...sheets] });
-    await wrapper.get('[aria-label="Actions for First"]').trigger("click");
+    await wrapper
+      .get('[role="tab"][title="First (double-click to rename)"]')
+      .trigger("contextmenu");
     for (const action of ["hide", "delete"]) {
       const item = new DOMWrapper(document.body).get(`[data-sheet-tab-action="${action}"]`);
       expect(item.attributes("aria-disabled")).toBe("true");

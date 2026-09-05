@@ -47,7 +47,9 @@ async function action(
   sheetName: string,
   command: string,
 ) {
-  await wrapper.get(`[aria-label="Actions for ${sheetName}"]`).trigger("click");
+  await wrapper
+    .get(`[role="tab"][title="${sheetName} (double-click to rename)"]`)
+    .trigger("contextmenu");
   await new DOMWrapper(document.body).get(`[data-sheet-tab-action="${command}"]`).trigger("click");
 }
 

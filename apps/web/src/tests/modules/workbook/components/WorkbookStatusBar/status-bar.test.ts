@@ -37,9 +37,13 @@ describe("WorkbookStatusBar", () => {
 
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
     await wrapper.get('[title="Sheet1 (double-click to rename)"]').trigger("click");
-    await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
+    await wrapper
+      .get('[role="tab"][title="Sheet1 (double-click to rename)"]')
+      .trigger("contextmenu");
     await new DOMWrapper(document.body).get('[data-sheet-tab-action="delete"]').trigger("click");
-    await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
+    await wrapper
+      .get('[role="tab"][title="Sheet1 (double-click to rename)"]')
+      .trigger("contextmenu");
     await new DOMWrapper(document.body).get('[data-sheet-tab-action="duplicate"]').trigger("click");
     await wrapper
       .get('[title="Sheet1 (double-click to rename)"]')

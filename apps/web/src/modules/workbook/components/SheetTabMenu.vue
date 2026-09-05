@@ -2,7 +2,6 @@
 import {
   ArrowLeft,
   ArrowRight,
-  ChevronDown,
   Copy,
   EyeOff,
   LockKeyhole,
@@ -11,7 +10,7 @@ import {
   Pin,
   Trash2,
 } from "lucide-vue-next";
-import { computed, nextTick, ref, toRef, watch, type ComponentPublicInstance } from "vue";
+import { computed, nextTick, ref, watch, type ComponentPublicInstance } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -23,6 +22,7 @@ import SheetTabColorPanel from "./SheetTabColorPanel.vue";
 const { t } = useAppI18n();
 const props = defineProps<{
   sheet: Sheet;
+  anchor: HTMLElement | null;
   sheetCount: number;
   sheetIndex: number;
   isOpen: boolean;
@@ -33,7 +33,6 @@ const props = defineProps<{
   canDelete?: boolean;
 }>();
 const emit = defineEmits<{
-  toggle: [];
   duplicate: [];
   rename: [];
   moveLeft: [];
@@ -45,12 +44,11 @@ const emit = defineEmits<{
   tabColor: [value: string | null];
   close: [restoreFocus: boolean];
 }>();
-const trigger = ref<HTMLButtonElement | null>(null);
+const anchor = computed(() => props.anchor);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const colorActionRef = ref<HTMLElement | null>(null);
 const colorPanelOpen = ref(false);
 const menuRoot = computed<HTMLElement | null>(() => menuSurfaceRef.value?.rootElement ?? null);
-const isOpen = toRef(props, "isOpen");
 const dismissibleOpen = computed(() => props.isOpen && !colorPanelOpen.value);
 const canMoveLeft = computed(() => props.canMoveLeft ?? props.sheetIndex > 0);
 const canMoveRight = computed(() => props.canMoveRight ?? props.sheetIndex < props.sheetCount - 1);
@@ -61,18 +59,12 @@ const menuStyle = computed(() => ({
   bottom: `${props.position.bottom}px`,
   maxHeight: `min(360px, calc(100vh - ${props.position.bottom + 8}px))`,
 }));
-const { dismiss } = useDismissibleFloatingPanel(trigger, menuRoot, dismissibleOpen, {
+useDismissibleFloatingPanel(anchor, menuRoot, dismissibleOpen, {
   onDismiss: ({ restoreFocus }) => emit("close", restoreFocus),
 });
 
 function menuId(): string {
   return `workbook-sheet-menu-${props.sheet.id}`;
-}
-function focusTrigger(): void {
-  trigger.value?.focus();
-}
-function getTriggerRect(): DOMRect | undefined {
-  return trigger.value?.getBoundingClientRect();
 }
 function focusFirstMenuItem(): void {
   menuSurfaceRef.value?.focusFirstItem();
@@ -86,8 +78,8 @@ function setColorAction(instance: Element | ComponentPublicInstance | null): voi
     instance && "$el" in instance && instance.$el instanceof HTMLElement ? instance.$el : null;
 }
 function closeAfter(action: () => void): void {
-  emit("close", true);
   action();
+  emit("close", true);
 }
 function openColorPanel(): void {
   colorPanelOpen.value = true;
@@ -116,24 +108,11 @@ watch(
       void nextTick(focusFirstMenuItem);
     }
   },
-  { flush: "post" },
+  { flush: "post", immediate: true },
 );
-defineExpose({ dismiss, focusTrigger, getTriggerRect });
 </script>
 
 <template>
-  <button
-    ref="trigger"
-    class="workbook-sheet-tabs__menu-trigger"
-    type="button"
-    :aria-label="t('sheetTabs.menu', { name: sheet.name })"
-    aria-haspopup="menu"
-    :aria-controls="isOpen ? menuId() : undefined"
-    :aria-expanded="isOpen"
-    @click="emit('toggle')"
-  >
-    <ChevronDown :size="12" aria-hidden="true" />
-  </button>
   <Teleport to="body"
     ><MenuSurface
       v-if="isOpen"
@@ -215,28 +194,6 @@ defineExpose({ dismiss, focusTrigger, getTriggerRect });
 
 <style scoped lang="scss">
 .workbook-sheet-tabs {
-  &__menu-trigger {
-    display: grid;
-    flex: 0 0 22px;
-    width: 22px;
-    min-width: 22px;
-    place-items: center;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    color: var(--idea-text-secondary);
-    cursor: pointer;
-    &[aria-expanded="true"],
-    &:hover,
-    &:focus-visible {
-      background: var(--idea-surface-hover);
-      outline: none;
-    }
-    &:focus-visible {
-      outline: 1px solid var(--idea-action-primary);
-      outline-offset: -2px;
-    }
-  }
   &__menu {
     position: fixed;
     z-index: 80;

@@ -21,7 +21,7 @@
     },
     "css": {
       "maximumRawBytes": 244000,
-      "maximumGzipBytes": 32000
+      "maximumGzipBytes": 32500
     }
   }
 }

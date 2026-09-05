@@ -12,6 +12,7 @@ import {
 import { useAppI18n } from "../../../shared/i18n";
 import type { Sheet, SheetProperties } from "@idea10/core/workbook";
 import { getVisibleSheets } from "../sheet-navigation";
+import { getSheetTabColorStyles } from "../sheet-tab-color";
 import SheetTabMenu from "./SheetTabMenu.vue";
 import WorkbookSheetNavigator from "./WorkbookSheetNavigator.vue";
 
@@ -57,17 +58,16 @@ const renameValue = ref("");
 const renameInput = ref<HTMLInputElement>();
 const tabButtons = new Map<string, HTMLButtonElement>();
 const tabList = ref<HTMLDivElement>();
+const addButton = ref<HTMLButtonElement>();
 const hasOverflow = ref(false);
 const canScrollLeft = ref(false);
 const canScrollRight = ref(false);
 let resizeObserver: ResizeObserver | undefined;
-type SheetTabMenuInstance = ComponentPublicInstance & {
-  focusTrigger: () => void;
-  getTriggerRect: () => DOMRect | undefined;
-};
-
-const sheetTabMenus = new Map<string, SheetTabMenuInstance>();
 const openMenuSheetId = ref<string>();
+const menuSheet = computed(() => props.sheets.find((sheet) => sheet.id === openMenuSheetId.value));
+const menuAnchor = computed(() =>
+  openMenuSheetId.value ? (tabButtons.get(openMenuSheetId.value) ?? null) : null,
+);
 const menuPosition = ref({ left: 4, bottom: 34 });
 const draggedSheetId = ref<string>();
 const dropTarget = ref<{ sheetId: string; side: "before" | "after" }>();
@@ -83,17 +83,6 @@ function setTabButton(sheetId: string, element: Element | ComponentPublicInstanc
     tabButtons.set(sheetId, element);
   } else {
     tabButtons.delete(sheetId);
-  }
-}
-
-function setSheetTabMenu(
-  sheetId: string,
-  instance: Element | ComponentPublicInstance | null,
-): void {
-  if (instance && "focusTrigger" in instance && "getTriggerRect" in instance) {
-    sheetTabMenus.set(sheetId, instance as SheetTabMenuInstance);
-  } else {
-    sheetTabMenus.delete(sheetId);
   }
 }
 
@@ -120,7 +109,7 @@ function closeMenu(restoreFocus = false): void {
   const sheetId = openMenuSheetId.value;
   openMenuSheetId.value = undefined;
   if (restoreFocus && sheetId) {
-    void nextTick(() => sheetTabMenus.get(sheetId)?.focusTrigger());
+    void nextTick(() => tabButtons.get(sheetId)?.focus());
   }
 }
 
@@ -135,18 +124,10 @@ function openMenu(sheet: Sheet, pointer?: { clientX: number; clientY: number }):
   if (pointer) {
     setMenuPosition(pointer.clientX, pointer.clientY);
   } else {
-    const rect = sheetTabMenus.get(sheet.id)?.getTriggerRect();
+    const rect = tabButtons.get(sheet.id)?.getBoundingClientRect();
     setMenuPosition(rect?.left ?? 4, rect?.top ?? window.innerHeight - 30);
   }
   openMenuSheetId.value = sheet.id;
-}
-
-function toggleMenu(sheet: Sheet): void {
-  if (openMenuSheetId.value === sheet.id) {
-    closeMenu(true);
-    return;
-  }
-  openMenu(sheet);
 }
 
 function renameFromMenu(sheet: Sheet): void {
@@ -196,10 +177,14 @@ function revealActiveSheet(): void {
   if (!list || !item) return;
   const viewport = list.getBoundingClientRect();
   const tab = item.getBoundingClientRect();
+  const right =
+    visibleSheets.value.at(-1)?.id === props.activeSheetId
+      ? Math.max(tab.right, addButton.value?.getBoundingClientRect().right ?? tab.right)
+      : tab.right;
   if (tab.left < viewport.left) {
     list.scrollLeft += tab.left - viewport.left;
-  } else if (tab.right > viewport.right) {
-    list.scrollLeft += tab.right - viewport.right;
+  } else if (right > viewport.right) {
+    list.scrollLeft += right - viewport.right;
   }
   updateScrollState();
 }
@@ -371,6 +356,12 @@ onBeforeUnmount(() => {
 
 function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
   const index = visibleSheets.value.findIndex((sheet) => sheet.id === sheetId);
+  if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+    event.preventDefault();
+    const sheet = visibleSheets.value[index];
+    if (sheet) openMenu(sheet);
+    return;
+  }
   if (event.altKey && event.shiftKey && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
     event.preventDefault();
     const sheet = visibleSheets.value[index];
@@ -404,18 +395,6 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 <template>
   <div class="workbook-sheet-tabs">
     <div class="workbook-sheet-tabs__navigation">
-      <button
-        class="workbook-sheet-tabs__add"
-        type="button"
-        :aria-label="t('sheetTabs.add')"
-        :title="t('sheetTabs.add')"
-        @click="
-          closeMenu();
-          emit('add');
-        "
-      >
-        <Plus :size="16" aria-hidden="true" />
-      </button>
       <WorkbookSheetNavigator
         :sheets="sheets"
         :active-sheet-id="activeSheetId"
@@ -437,99 +416,90 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     </button>
     <div
       ref="tabList"
-      class="workbook-sheet-tabs__list"
-      role="tablist"
-      :aria-label="t('sheetTabs.list')"
+      class="workbook-sheet-tabs__viewport"
       @scroll="updateScrollState"
       @wheel="onTabWheel"
     >
-      <div
-        v-for="(sheet, sheetIndex) in visibleSheets"
-        :key="sheet.id"
-        class="workbook-sheet-tabs__item"
-        :class="{
-          'is-active': sheet.id === props.activeSheetId,
-          'has-tab-color': !!sheet.properties.tabColor,
-          'is-pinned-boundary':
-            sheet.properties.pinned && !visibleSheets[sheetIndex + 1]?.properties.pinned,
-          'is-menu-open': openMenuSheetId === sheet.id,
-          'is-dragging': draggedSheetId === sheet.id,
-          'is-drop-before': dropTarget?.sheetId === sheet.id && dropTarget.side === 'before',
-          'is-drop-after': dropTarget?.sheetId === sheet.id && dropTarget.side === 'after',
-        }"
-        :style="
-          sheet.properties.tabColor ? { '--sheet-tab-color': sheet.properties.tabColor } : undefined
-        "
-        @contextmenu="onSheetContextMenu(sheet, $event)"
-        @dragover="onTabDragOver(sheet, $event)"
-        @drop="onTabDrop(sheet, $event)"
-      >
-        <input
-          v-if="renamingSheetId === sheet.id"
-          :ref="setRenameInput"
-          v-model="renameValue"
-          class="workbook-sheet-tabs__rename-input"
-          :aria-label="t('sheetTabs.rename', { name: sheet.name })"
-          @blur="commitRename(sheet)"
-          @keydown.enter.prevent="commitRename(sheet)"
-          @keydown.escape.prevent="cancelRename"
-        />
-        <button
-          v-else
-          :ref="(element) => setTabButton(sheet.id, element)"
-          class="workbook-sheet-tabs__tab"
-          :class="{ 'is-active': sheet.id === props.activeSheetId }"
-          type="button"
-          role="tab"
-          :aria-selected="sheet.id === props.activeSheetId"
-          aria-keyshortcuts="Alt+Shift+ArrowLeft Alt+Shift+ArrowRight"
-          :tabindex="sheet.id === props.activeSheetId ? 0 : -1"
-          :title="t('sheetTabs.renameHint', { name: sheet.name })"
-          :draggable="renamingSheetId !== sheet.id"
-          @click="onTabClick(sheet.id)"
-          @dblclick="startRename(sheet)"
-          @dragstart="onTabDragStart(sheet.id, $event)"
-          @dragend="onTabDragEnd"
-          @keydown="onTabKeydown(sheet.id, $event)"
+      <div class="workbook-sheet-tabs__list" role="tablist" :aria-label="t('sheetTabs.list')">
+        <div
+          v-for="sheet in visibleSheets"
+          :key="sheet.id"
+          class="workbook-sheet-tabs__item"
+          :class="{
+            'is-active': sheet.id === props.activeSheetId,
+            'has-tab-color': !!sheet.properties.tabColor,
+            'is-menu-open': openMenuSheetId === sheet.id,
+            'is-dragging': draggedSheetId === sheet.id,
+            'is-drop-before': dropTarget?.sheetId === sheet.id && dropTarget.side === 'before',
+            'is-drop-after': dropTarget?.sheetId === sheet.id && dropTarget.side === 'after',
+          }"
+          :style="getSheetTabColorStyles(sheet.properties.tabColor)"
+          @contextmenu="onSheetContextMenu(sheet, $event)"
+          @dragover="onTabDragOver(sheet, $event)"
+          @drop="onTabDrop(sheet, $event)"
         >
-          <Pin
-            v-if="sheet.properties.pinned"
-            class="workbook-sheet-tabs__state-icon"
-            :size="12"
-            :aria-label="t('sheetTabs.pinnedHint')"
+          <input
+            v-if="renamingSheetId === sheet.id"
+            :ref="setRenameInput"
+            v-model="renameValue"
+            class="workbook-sheet-tabs__rename-input"
+            :aria-label="t('sheetTabs.rename', { name: sheet.name })"
+            @blur="commitRename(sheet)"
+            @keydown.enter.prevent="commitRename(sheet)"
+            @keydown.escape.prevent="cancelRename"
           />
-          <LockKeyhole
-            v-if="sheet.properties.protected"
-            class="workbook-sheet-tabs__state-icon"
-            :size="12"
-            :aria-label="t('sheetTabs.protectedHint')"
-          />
-          <span class="workbook-sheet-tabs__name">{{ sheet.name }}</span>
-        </button>
-        <SheetTabMenu
-          :ref="(instance) => setSheetTabMenu(sheet.id, instance)"
-          :sheet="sheet"
-          :sheet-count="visibleSheets.length"
-          :sheet-index="sheetIndex"
-          :can-move-left="!!moveTarget(sheet, -1)"
-          :can-move-right="!!moveTarget(sheet, 1)"
-          :can-hide="visibleSheets.length > 1"
-          :can-delete="visibleSheets.length > 1"
-          :is-open="openMenuSheetId === sheet.id"
-          :position="menuPosition"
-          @toggle="toggleMenu(sheet)"
-          @duplicate="duplicateFromMenu(sheet)"
-          @rename="renameFromMenu(sheet)"
-          @move-left="moveFromMenu(sheet, -1)"
-          @move-right="moveFromMenu(sheet, 1)"
-          @delete="deleteFromMenu(sheet)"
-          @protect="updatePropertiesFromMenu(sheet, { protected: $event })"
-          @pin="updatePropertiesFromMenu(sheet, { pinned: $event })"
-          @hide="updatePropertiesFromMenu(sheet, { hidden: true })"
-          @tab-color="setTabColor(sheet, $event)"
-          @close="closeMenu"
-        />
+          <button
+            v-else
+            :ref="(element) => setTabButton(sheet.id, element)"
+            class="workbook-sheet-tabs__tab"
+            :class="{ 'is-active': sheet.id === props.activeSheetId }"
+            type="button"
+            role="tab"
+            :aria-selected="sheet.id === props.activeSheetId"
+            aria-haspopup="menu"
+            :aria-expanded="openMenuSheetId === sheet.id"
+            :aria-controls="
+              openMenuSheetId === sheet.id ? `workbook-sheet-menu-${sheet.id}` : undefined
+            "
+            aria-keyshortcuts="Shift+F10 Alt+Shift+ArrowLeft Alt+Shift+ArrowRight"
+            :tabindex="sheet.id === props.activeSheetId ? 0 : -1"
+            :title="t('sheetTabs.renameHint', { name: sheet.name })"
+            :draggable="renamingSheetId !== sheet.id"
+            @click="onTabClick(sheet.id)"
+            @dblclick="startRename(sheet)"
+            @dragstart="onTabDragStart(sheet.id, $event)"
+            @dragend="onTabDragEnd"
+            @keydown="onTabKeydown(sheet.id, $event)"
+          >
+            <Pin
+              v-if="sheet.properties.pinned"
+              class="workbook-sheet-tabs__state-icon"
+              :size="12"
+              :aria-label="t('sheetTabs.pinnedHint')"
+            />
+            <LockKeyhole
+              v-if="sheet.properties.protected"
+              class="workbook-sheet-tabs__state-icon"
+              :size="12"
+              :aria-label="t('sheetTabs.protectedHint')"
+            />
+            <span class="workbook-sheet-tabs__name">{{ sheet.name }}</span>
+          </button>
+        </div>
       </div>
+      <button
+        ref="addButton"
+        class="workbook-sheet-tabs__add"
+        type="button"
+        :aria-label="t('sheetTabs.add')"
+        :title="t('sheetTabs.add')"
+        @click="
+          closeMenu();
+          emit('add');
+        "
+      >
+        <Plus :size="16" aria-hidden="true" />
+      </button>
     </div>
     <button
       v-if="hasOverflow"
@@ -542,6 +512,29 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     >
       <ChevronRight :size="14" aria-hidden="true" />
     </button>
+    <SheetTabMenu
+      v-if="menuSheet"
+      :sheet="menuSheet"
+      :anchor="menuAnchor"
+      :sheet-count="visibleSheets.length"
+      :sheet-index="visibleSheets.indexOf(menuSheet)"
+      :can-move-left="!!moveTarget(menuSheet, -1)"
+      :can-move-right="!!moveTarget(menuSheet, 1)"
+      :can-hide="visibleSheets.length > 1"
+      :can-delete="visibleSheets.length > 1"
+      :is-open="true"
+      :position="menuPosition"
+      @duplicate="duplicateFromMenu(menuSheet)"
+      @rename="renameFromMenu(menuSheet)"
+      @move-left="moveFromMenu(menuSheet, -1)"
+      @move-right="moveFromMenu(menuSheet, 1)"
+      @delete="deleteFromMenu(menuSheet)"
+      @protect="updatePropertiesFromMenu(menuSheet, { protected: $event })"
+      @pin="updatePropertiesFromMenu(menuSheet, { pinned: $event })"
+      @hide="updatePropertiesFromMenu(menuSheet, { hidden: true })"
+      @tab-color="setTabColor(menuSheet, $event)"
+      @close="closeMenu"
+    />
   </div>
 </template>
 
@@ -562,7 +555,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     border-right: 1px solid var(--idea-border-subtle);
   }
 
-  &__list {
+  &__viewport {
     display: flex;
     flex: 0 1 auto;
     min-width: 0;
@@ -575,32 +568,56 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     }
   }
 
+  &__list {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
+    gap: 1px;
+  }
+
   &__item {
     position: relative;
     display: flex;
     flex: 0 0 auto;
     align-items: stretch;
     max-width: min(204px, 100%);
+    margin-bottom: 2px;
+    overflow: hidden;
+    background: var(--idea-surface-secondary);
     border-top: 2px solid transparent;
+    border-radius: 0 0 6px 6px;
+    color: var(--idea-text-secondary);
 
     &:hover,
     &:focus-within,
     &.is-menu-open {
-      background: var(--idea-surface-secondary);
+      background: var(--idea-surface-secondary-active);
     }
 
     &.is-active {
-      background: var(--idea-action-primary-subtle);
-      border-top-color: var(--idea-action-primary);
+      background: var(--idea-surface-panel);
+      color: var(--idea-action-primary);
+
+      &:hover {
+        background: var(--idea-surface-hover);
+      }
     }
 
     &.has-tab-color {
       border-top-color: var(--sheet-tab-color);
-    }
 
-    &.is-pinned-boundary {
-      margin-right: 4px;
-      border-right: 1px solid var(--idea-border-subtle);
+      &:not(.is-active) {
+        background: var(--sheet-tab-color);
+        color: var(--sheet-tab-contrast-color);
+
+        &:hover,
+        &:focus-within,
+        &.is-menu-open {
+          background: var(--sheet-tab-hover-color);
+          border-top-color: var(--sheet-tab-hover-color);
+          color: var(--sheet-tab-hover-contrast-color);
+        }
+      }
     }
 
     &.is-dragging {
@@ -630,13 +647,13 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
   &__tab,
   &__rename-input {
-    min-width: 44px;
+    min-width: 60px;
     max-width: 180px;
-    padding: 0 4px 0 12px;
+    padding: 0 12px;
     overflow: hidden;
     background: transparent;
     border: 0;
-    color: var(--idea-text-secondary);
+    color: inherit;
     font: inherit;
     text-align: left;
     text-overflow: ellipsis;
@@ -650,12 +667,11 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     cursor: pointer;
 
     &.is-active {
-      color: var(--idea-action-primary);
-      font-weight: 500;
+      font-weight: 600;
     }
 
     &:focus-visible {
-      outline: 1px solid var(--idea-action-primary);
+      outline: 1px solid currentColor;
       outline-offset: -2px;
     }
   }
@@ -668,12 +684,13 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
   &__state-icon {
     flex: 0 0 auto;
-    color: var(--idea-text-muted);
+    color: inherit;
   }
 
   &__rename-input {
     width: 132px;
     background: var(--idea-surface-panel);
+    color: var(--idea-text-primary);
     outline: 1px solid var(--idea-action-primary);
     outline-offset: -2px;
   }
@@ -708,6 +725,14 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
       color: var(--idea-text-disabled);
       cursor: default;
     }
+  }
+
+  &__add {
+    flex: 0 0 32px;
+    align-self: stretch;
+    width: 32px;
+    height: auto;
+    border-radius: 0;
   }
 
   &__scroll {

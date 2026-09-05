@@ -18,6 +18,7 @@ function mountMenu() {
     global: { plugins: [createAppI18n("en-US")] },
     props: {
       sheet,
+      anchor: null,
       sheetCount: 2,
       sheetIndex: 0,
       isOpen: true,

@@ -20,10 +20,28 @@ function mountSheetTabs(sheetCount = 2) {
 }
 
 describe("WorkbookSheetTabs", () => {
+  test("keeps the add button after the tabs and opens a tab menu without a dropdown trigger", async () => {
+    const wrapper = mountSheetTabs();
+    const list = wrapper.get('[role="tablist"]');
+    const add = wrapper.get('[aria-label="Add sheet"]');
+    expect(list.element.nextElementSibling).toBe(add.element);
+    expect(wrapper.find(".workbook-sheet-tabs__menu-trigger").exists()).toBe(false);
+    await add.trigger("click");
+    expect(wrapper.emitted("add")).toEqual([[]]);
+    const tab = wrapper.get('[role="tab"][aria-selected="true"]');
+    await tab.trigger("keydown", { key: "ContextMenu" });
+    expect(new DOMWrapper(document.body).get('[role="menu"]').attributes("aria-label")).toBe(
+      "Actions for Sheet1",
+    );
+    wrapper.unmount();
+  });
+
   test("opens a menu for the targeted sheet and deletes that sheet", async () => {
     const wrapper = mountSheetTabs();
 
-    await wrapper.get('[aria-label="Actions for Sheet2"]').trigger("contextmenu");
+    await wrapper
+      .get('[role="tab"][title="Sheet2 (double-click to rename)"]')
+      .trigger("contextmenu");
 
     const menu = new DOMWrapper(document.body).get('[role="menu"]');
     expect(menu.attributes("aria-label")).toBe("Actions for Sheet2");
@@ -54,9 +72,9 @@ describe("WorkbookSheetTabs", () => {
 
   test("keeps the last sheet deletion disabled and restores trigger focus on Escape", async () => {
     const wrapper = mountSheetTabs(1);
-    const trigger = wrapper.get('[aria-label="Actions for Sheet1"]');
+    const trigger = wrapper.get('[role="tab"][title="Sheet1 (double-click to rename)"]');
 
-    await trigger.trigger("click");
+    await trigger.trigger("keydown", { key: "F10", shiftKey: true });
     const menu = new DOMWrapper(document.body).get('[role="menu"]');
     const deleteAction = menu.get('[data-sheet-tab-action="delete"]');
     expect(menu.get('[data-sheet-tab-action="move-left"]').attributes("aria-disabled")).toBe(
@@ -81,7 +99,9 @@ describe("WorkbookSheetTabs", () => {
     const wrapper = mountSheetTabs(3);
     const firstTab = wrapper.get('[title="Sheet1 (double-click to rename)"]');
 
-    await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
+    await wrapper
+      .get('[role="tab"][title="Sheet1 (double-click to rename)"]')
+      .trigger("contextmenu");
     let menu = new DOMWrapper(document.body).get('[role="menu"]');
     expect(menu.get('[data-sheet-tab-action="move-left"]').attributes("aria-disabled")).toBe(
       "true",
@@ -89,7 +109,9 @@ describe("WorkbookSheetTabs", () => {
     await menu.get('[data-sheet-tab-action="duplicate"]').trigger("click");
     expect(wrapper.emitted("duplicate")).toEqual([["sheet-1"]]);
 
-    await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
+    await wrapper
+      .get('[role="tab"][title="Sheet1 (double-click to rename)"]')
+      .trigger("contextmenu");
     menu = new DOMWrapper(document.body).get('[role="menu"]');
     await menu.get('[data-sheet-tab-action="move-right"]').trigger("click");
     expect(wrapper.emitted("move")).toEqual([[{ sheetId: "sheet-1", toIndex: 1 }]]);
@@ -101,7 +123,9 @@ describe("WorkbookSheetTabs", () => {
   test("closes a stale sheet menu when another sheet is selected", async () => {
     const wrapper = mountSheetTabs();
 
-    await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
+    await wrapper
+      .get('[role="tab"][title="Sheet1 (double-click to rename)"]')
+      .trigger("contextmenu");
     expect(document.body.querySelector('[role="menu"]')).not.toBeNull();
 
     await wrapper.get('[title="Sheet2 (double-click to rename)"]').trigger("click");
@@ -140,7 +164,7 @@ describe("WorkbookSheetTabs", () => {
     expect(wrapper.emitted("move")).toEqual([[{ sheetId: "sheet-2", toIndex: 0 }]]);
     expect(wrapper.emitted("select")).toBeUndefined();
     expect(secondTab.attributes("aria-keyshortcuts")).toBe(
-      "Alt+Shift+ArrowLeft Alt+Shift+ArrowRight",
+      "Shift+F10 Alt+Shift+ArrowLeft Alt+Shift+ArrowRight",
     );
     expect(document.activeElement).toBe(secondTab.element);
 

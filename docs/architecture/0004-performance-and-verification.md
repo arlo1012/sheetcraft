@@ -123,6 +123,14 @@ the tab color panel uses the existing TDesign color picker. Entry limits become
 415/116 KB JavaScript and 86/13 KB CSS; total JavaScript becomes 970/284 KB.
 Total CSS budgets remain unchanged, with both entry and total gates enabled.
 
+The compact tab refinement fills inactive tabs and chooses contrasting text and
+icons, while active tabs use a neutral background with a colored top edge. Tabs
+open their menu directly through right-click or keyboard, and the add button
+follows the final tab. Hover darkens custom colors and recalculates foreground
+contrast. The inspected build has 84,290 B entry CSS (12,656 B gzip) and 32,029 B
+total CSS gzip. The total CSS gzip limit becomes 32,500 B; all other
+limits stay unchanged.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,
