@@ -54,6 +54,7 @@ function normalizeCommandCellContent(value: unknown, field: string): CellContent
     const temporary = {
       id: "validation",
       name: "Validation",
+      properties: { pinned: false, hidden: false, protected: false },
       cells: new Map(),
       rowHeights: new Map(),
       columnWidths: new Map(),
@@ -131,7 +132,12 @@ export function createMoveCellRangeCommand(
   };
   assertCellAddress(destination);
   assertCellAddress(end);
-  return { type: "moveCellRange", sheetId, source: range, destination: { ...destination } };
+  return {
+    type: "moveCellRange",
+    sheetId,
+    source: range,
+    destination: { ...destination },
+  };
 }
 
 export function createPasteCellContentsCommand(
@@ -347,7 +353,11 @@ export function applySetCellContentsCommand(
         const key = getCellBorderTargetKey(mergeAwareAddress);
         const existing = cleanupPatches.get(key);
         if (existing) Object.assign(existing.patch, patch);
-        else cleanupPatches.set(key, { address: { ...mergeAwareAddress }, patch: { ...patch } });
+        else
+          cleanupPatches.set(key, {
+            address: { ...mergeAwareAddress },
+            patch: { ...patch },
+          });
       });
       const sheet = getSheetOrThrow(workbook, sheetId);
       for (const { address, patch } of cleanupPatches.values()) {
@@ -474,7 +484,10 @@ export function applyMoveCellRangeCommand(
         command.destination,
       );
       if (next !== cell.content.formula.source)
-        sheet.cells.set(key, { ...cell, content: { kind: "formula", formula: { source: next } } });
+        sheet.cells.set(key, {
+          ...cell,
+          content: { kind: "formula", formula: { source: next } },
+        });
     }
   const targets = new Map<string, { address: CellAddress; patch: CellBorderPatch }>();
   for (const address of affected.values())
@@ -487,5 +500,9 @@ export function applyMoveCellRangeCommand(
   );
   const current = createSheetSparseState(sheet);
   if (JSON.stringify(current) === JSON.stringify(previous)) return null;
-  return { type: "restoreSheetState", sheetId: command.sheetId, state: previous };
+  return {
+    type: "restoreSheetState",
+    sheetId: command.sheetId,
+    state: previous,
+  };
 }

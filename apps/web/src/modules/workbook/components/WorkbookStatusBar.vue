@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { SelectionSummary } from "@idea10/core/selection-summary";
-import type { Sheet } from "@idea10/core/workbook";
+import type { Sheet, SheetProperties } from "@idea10/core/workbook";
 import WorkbookSheetTabs from "./WorkbookSheetTabs.vue";
 
 const props = defineProps<{
@@ -18,6 +18,8 @@ const emit = defineEmits<{
   rename: [payload: { sheetId: string; name: string }];
   move: [payload: { sheetId: string; toIndex: number }];
   delete: [sheetId: string];
+  updateProperties: [payload: { sheetId: string; patch: Partial<SheetProperties> }];
+  restore: [sheetId: string];
 }>();
 
 const { locale, t } = useAppI18n();
@@ -48,6 +50,8 @@ function formatNumber(value: number): string {
         @rename="emit('rename', $event)"
         @move="emit('move', $event)"
         @delete="emit('delete', $event)"
+        @update-properties="emit('updateProperties', $event)"
+        @restore="emit('restore', $event)"
       />
     </div>
     <dl

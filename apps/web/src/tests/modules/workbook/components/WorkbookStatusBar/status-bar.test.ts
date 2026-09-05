@@ -38,9 +38,9 @@ describe("WorkbookStatusBar", () => {
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
     await wrapper.get('[title="Sheet1 (double-click to rename)"]').trigger("click");
     await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
-    await new DOMWrapper(document.body).findAll('[role="menuitem"]')[4]?.trigger("click");
+    await new DOMWrapper(document.body).get('[data-sheet-tab-action="delete"]').trigger("click");
     await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
-    await new DOMWrapper(document.body).findAll('[role="menuitem"]')[0]?.trigger("click");
+    await new DOMWrapper(document.body).get('[data-sheet-tab-action="duplicate"]').trigger("click");
     await wrapper
       .get('[title="Sheet1 (double-click to rename)"]')
       .trigger("keydown", { key: "ArrowRight", altKey: true, shiftKey: true });

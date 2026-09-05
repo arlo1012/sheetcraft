@@ -166,6 +166,17 @@ export type MessageSchema = {
     moveRightAction: string;
     deleteAction: string;
     add: string;
+    protectAction: string;
+    unprotectAction: string;
+    tabColorAction: string;
+    pinAction: string;
+    unpinAction: string;
+    hideAction: string;
+    restoreAction: string;
+    hiddenSheets: string;
+    restoreSheet: string;
+    protectedHint: string;
+    pinnedHint: string;
   };
   statusBar: {
     label: string;

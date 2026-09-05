@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { Check, Layers } from "lucide-vue-next";
+import { Check, EyeOff, Layers, Pin } from "lucide-vue-next";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import type { Sheet } from "@idea10/core/workbook";
+import { getVisibleSheets } from "../sheet-navigation";
 
 const props = defineProps<{
   sheets: readonly Sheet[];
   activeSheetId: string;
 }>();
-const emit = defineEmits<{ select: [sheetId: string]; open: [] }>();
+const emit = defineEmits<{ select: [sheetId: string]; restore: [sheetId: string]; open: [] }>();
 const { t } = useAppI18n();
 const triggerRef = ref<HTMLButtonElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
@@ -25,6 +27,10 @@ const matchingSheets = computed(() => {
   if (!normalizedQuery) return props.sheets;
   return props.sheets.filter((sheet) => sheet.name.toLocaleLowerCase().includes(normalizedQuery));
 });
+const visibleSheets = computed(() => getVisibleSheets(matchingSheets.value));
+const hiddenSheets = computed(() =>
+  matchingSheets.value.filter((sheet) => sheet.properties.hidden),
+);
 const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, menuRef, open, {
   placement: "top-start",
   offset: 4,
@@ -48,6 +54,11 @@ function toggleMenu(): void {
 function selectSheet(sheetId: string): void {
   dismiss("programmatic", true);
   emit("select", sheetId);
+}
+
+function restoreSheet(sheetId: string): void {
+  dismiss("programmatic", true);
+  emit("restore", sheetId);
 }
 
 function onTriggerKeydown(event: KeyboardEvent): void {
@@ -114,7 +125,7 @@ watch(open, (isOpen) => {
         </div>
       </li>
       <MenuItem
-        v-for="sheet in matchingSheets"
+        v-for="sheet in visibleSheets"
         :key="sheet.id"
         class="workbook-sheet-navigator__item"
         :class="{ 'is-active': sheet.id === activeSheetId }"
@@ -126,9 +137,35 @@ watch(open, (isOpen) => {
       >
         <template #icon>
           <Check v-if="sheet.id === activeSheetId" :size="15" />
+          <Pin v-else-if="sheet.properties.pinned" :size="13" />
         </template>
         {{ sheet.name }}
+        <template v-if="sheet.properties.tabColor" #shortcut>
+          <span
+            class="workbook-sheet-navigator__color"
+            :style="{ background: sheet.properties.tabColor }"
+          />
+        </template>
       </MenuItem>
+      <template v-if="hiddenSheets.length">
+        <MenuSeparator v-if="visibleSheets.length" />
+        <li class="workbook-sheet-navigator__hidden-heading" role="presentation">
+          {{ t("sheetTabs.hiddenSheets") }}
+        </li>
+        <MenuItem
+          v-for="sheet in hiddenSheets"
+          :key="sheet.id"
+          class="workbook-sheet-navigator__item"
+          :aria-label="t('sheetTabs.restoreSheet', { name: sheet.name })"
+          :title="sheet.name"
+          :data-workbook-hidden-sheet-id="sheet.id"
+          @select="restoreSheet(sheet.id)"
+        >
+          <template #icon><EyeOff :size="14" /></template>
+          {{ sheet.name }}
+          <template #shortcut>{{ t("sheetTabs.restoreAction") }}</template>
+        </MenuItem>
+      </template>
       <li
         v-if="matchingSheets.length === 0"
         class="workbook-sheet-navigator__empty"
@@ -232,6 +269,21 @@ watch(open, (isOpen) => {
     font-size: var(--idea-font-size-body-small);
     line-height: var(--idea-line-height-body-small);
     list-style: none;
+  }
+
+  &__hidden-heading {
+    flex: 0 0 auto;
+    padding: 6px 14px;
+    list-style: none;
+    color: var(--idea-text-muted);
+    font-size: var(--idea-font-size-body-small);
+  }
+
+  &__color {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid var(--idea-border-subtle);
   }
 }
 </style>

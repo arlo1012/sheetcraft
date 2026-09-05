@@ -15,6 +15,7 @@ const props = defineProps<{
   inputValue: string;
   searchQuery: string;
   sheetId?: string;
+  readOnly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -42,9 +43,24 @@ const formulaTargetSheetId = ref(props.sheetId);
 const formulaFocused = ref(false);
 const isComposing = ref(false);
 const showFormulaColors = computed(
-  () => formulaFocused.value && !isComposing.value && formulaDraft.value.startsWith("="),
+  () =>
+    !props.readOnly &&
+    formulaFocused.value &&
+    !isComposing.value &&
+    formulaDraft.value.startsWith("="),
 );
 let finishAfterComposition = false;
+
+watch(
+  () => props.readOnly,
+  (readOnly) => {
+    if (!readOnly) return;
+    formulaFocused.value = false;
+    isComposing.value = false;
+    finishAfterComposition = false;
+    syncFormulaFromProps();
+  },
+);
 
 watch(
   () => [props.sheetId, props.address.row, props.address.column, props.inputValue] as const,
@@ -68,6 +84,10 @@ function syncFormulaFromProps(): void {
 }
 
 function onFormulaFocus(): void {
+  if (props.readOnly) {
+    syncFormulaFromProps();
+    return;
+  }
   if (formulaFocused.value) return;
   formulaFocused.value = true;
   finishAfterComposition = false;
@@ -75,10 +95,16 @@ function onFormulaFocus(): void {
 }
 
 function onFormulaInput(event: Event): void {
+  if (props.readOnly) {
+    syncFormulaFromProps();
+    if (formulaInput.value) formulaInput.value.value = props.inputValue;
+    return;
+  }
   formulaDraft.value = readInputValue(event);
 }
 
 function commitFormulaDraft(): void {
+  if (props.readOnly) return;
   if (formulaDraft.value === formulaSourceValue.value) {
     return;
   }
@@ -100,7 +126,7 @@ function flushPendingEdit(): boolean {
 }
 
 function hasPendingEdit(): boolean {
-  return isComposing.value || formulaDraft.value !== formulaSourceValue.value;
+  return !props.readOnly && (isComposing.value || formulaDraft.value !== formulaSourceValue.value);
 }
 
 function insertFormulaLineBreak(): void {
@@ -118,6 +144,7 @@ function insertFormulaLineBreak(): void {
 }
 
 function applyFormulaTextEdit(edit: { value: string; caret: number }): void {
+  if (props.readOnly) return;
   const input = formulaInput.value;
   formulaDraft.value = edit.value;
   if (!input) return;
@@ -129,6 +156,7 @@ function applyFormulaTextEdit(edit: { value: string; caret: number }): void {
 }
 
 function onFormulaKeydown(event: KeyboardEvent): void {
+  if (props.readOnly) return;
   if (formulaAssistRef.value?.handleKeydown(event)) {
     event.preventDefault();
     event.stopPropagation();
@@ -174,11 +202,13 @@ function onFormulaBlur(): void {
 }
 
 function onFormulaCompositionStart(): void {
+  if (props.readOnly) return;
   isComposing.value = true;
   finishAfterComposition = false;
 }
 
 function onFormulaCompositionEnd(event: CompositionEvent): void {
+  if (props.readOnly) return;
   formulaDraft.value = readInputValue(event);
   isComposing.value = false;
   if (finishAfterComposition) {
@@ -246,6 +276,8 @@ defineExpose({
         class="workbook-formula-bar__formula-input"
         :class="{ 'has-formula-colors': showFormulaColors }"
         :value="formulaDraft"
+        :readonly="readOnly"
+        :aria-readonly="readOnly ? true : undefined"
         rows="1"
         wrap="off"
         autocomplete="off"
@@ -273,7 +305,7 @@ defineExpose({
         ref="formulaAssistRef"
         :value="formulaDraft"
         :input="formulaInput"
-        :active="formulaFocused"
+        :active="formulaFocused && !readOnly"
         :composing="isComposing"
         @text-edit="applyFormulaTextEdit"
       />

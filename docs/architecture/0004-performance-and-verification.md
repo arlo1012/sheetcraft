@@ -114,6 +114,15 @@ focus states. Raw CSS limits intentionally become 84 KB for the entry and
 244 KB for all assets. JavaScript and gzip budgets remain unchanged; the feature
 reuses the existing menu/floating primitives and adds no runtime dependency.
 
+Sheet management adds V7 properties, undoable visibility/pinning/tab colors,
+and protection enforced by Core commands and Web editing entry points. The
+inspected production entry is 409,705 B JavaScript (114,223 B gzip), an increase
+of 14,686 B raw over the footer baseline. Total JavaScript is 960,722 B
+(280,231 B gzip); entry CSS is 84,318 B (12,627 B gzip). No dependency was added:
+the tab color panel uses the existing TDesign color picker. Entry limits become
+415/116 KB JavaScript and 86/13 KB CSS; total JavaScript becomes 970/284 KB.
+Total CSS budgets remain unchanged, with both entry and total gates enabled.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

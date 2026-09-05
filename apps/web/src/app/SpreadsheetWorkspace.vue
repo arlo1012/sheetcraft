@@ -17,6 +17,7 @@ import { createIndexedDbWorkbookStore } from "../modules/workbook-persistence/in
 import { useWorkbookPersistence } from "../modules/workbook-persistence/useWorkbookPersistence";
 import { useWorkbookFileActions } from "../modules/workbook-persistence/useWorkbookFileActions";
 import type { WorkbookStore } from "../modules/workbook-persistence/workbookStore";
+import type { SheetProperties } from "@idea10/core/workbook";
 
 const props = defineProps<{ workbookStore?: WorkbookStore; imageAssetStore?: ImageAssetStore }>();
 const formulaBarRef = ref<InstanceType<typeof WorkbookFormulaBar> | null>(null);
@@ -68,6 +69,8 @@ const {
   insertAxis,
   deleteAxis,
   selectSheet,
+  updateSheetProperties,
+  restoreSheet,
   addSheet,
   duplicateSheet,
   renameSheet,
@@ -119,6 +122,14 @@ const fileActions = useWorkbookFileActions({
 });
 const { busy: fileBusy, confirmation, feedback } = fileActions;
 
+function changeSheetProperties(payload: {
+  sheetId: string;
+  patch: Partial<SheetProperties>;
+}): void {
+  if (!flushPendingGridEdit() || !(formulaBarRef.value?.flushPendingEdit() ?? true)) return;
+  updateSheetProperties(payload);
+}
+
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (event.key !== "Escape" || !formatPainterActive.value) {
     return;
@@ -146,7 +157,14 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     />
     <SpreadsheetRibbon
       :state="activeSelectionStyle"
-      :disabled="!isFormattingSupported"
+      :disabled="!isFormattingSupported || activeSheet.properties.protected"
+      :read-only="activeSheet.properties.protected"
+      @toggle-protection="
+        changeSheetProperties({
+          sheetId: activeSheet.id,
+          patch: { protected: !activeSheet.properties.protected },
+        })
+      "
       :format-painter-active="formatPainterActive"
       :data-state="dataToolState"
       :merge-state="mergeState"
@@ -189,6 +207,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       />
     </div>
     <WorkbookFormulaBar
+      :read-only="activeSheet.properties.protected"
       :key="workbookGeneration"
       ref="formulaBarRef"
       :inert="loading || fileBusy"
@@ -205,6 +224,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     />
     <div class="spreadsheet-workspace__grid" :inert="loading || fileBusy">
       <SheetGrid
+        :read-only="activeSheet.properties.protected"
         :key="workbookGeneration"
         :ref="setGridNavigator"
         :sheet="activeSheet"
@@ -245,6 +265,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @rename="renameSheet"
       @delete="deleteSheet"
       @move="moveSheet"
+      @update-properties="changeSheetProperties"
+      @restore="restoreSheet"
     />
   </section>
 </template>

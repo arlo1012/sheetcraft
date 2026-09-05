@@ -19,12 +19,24 @@ timestamp, and Core snapshot. Core remains independent of browser APIs.
 | Stored document state                                         | Session-only state                                 |
 | ------------------------------------------------------------- | -------------------------------------------------- |
 | Cell values, formulas and images, styles, borders, dimensions | Selection, scrolling, editor drafts                |
-| Sheet identities, names, order, active Sheet                  | Undo/redo history, clipboard, format painter       |
+| Sheet identities, names, order, active Sheet, tab properties  | Undo/redo history, clipboard, format painter       |
 | Freeze settings, filters, merged ranges, floating images      | Search, floating panels, focus, transient feedback |
 | Workbook date system, explicit errors and empty text          | Formula runtime/dependency caches                  |
 
 Formula results and derived visibility are rebuilt on load. Both the Grid and
 formula bar are remounted on document replacement, even when Sheet IDs match.
+
+V7 snapshots persist each sheet's tab color, pinned, hidden, and protected state.
+Older snapshots default to visible, unpinned, unprotected sheets without a tab
+color. The footer groups pinned sheets first; hidden sheets can be restored from
+All sheets. At least one sheet must remain visible. These property changes use
+Core commands and participate in undo/redo and autosave. Creating a copy retains
+cell/image contents and tab color, with protection, pinning, and hiding reset.
+
+Protection prevents content, formatting, structure, filter, freeze, and image
+edits through Core commands. Selection, navigation, copying, image preview,
+sheet management, and undo/redo remain available. It is a local editing guard;
+it does not implement accounts, passwords, or access control.
 
 ## Save And Restore
 
@@ -45,18 +57,18 @@ only the displayed "Saved locally" state confirms that a transaction finished.
 
 ## Files And Failures
 
-Export downloads `idea10-workbook.json`: an image-free V4 snapshot, or a versioned
+Export downloads `idea10-workbook.json`: an image-free V7 snapshot, or a versioned
 portable envelope containing that snapshot and every referenced image as base64.
 Image blobs are stored separately in the `idea10-image-assets` IndexedDB database.
 Blobs are saved before document references and retained through undoable deletion.
-Import accepts image-free V1/V2/V3/V4 snapshots and portable image envelopes. It
+Import accepts image-free V1–V7 snapshots and portable image envelopes. It
 validates and decodes all images, derives asset metadata from the bytes, and
 remaps their IDs before storing them. It then asks for
 confirmation. Invalid or unsupported files never replace the open workbook.
 Canceling a valid import leaves both the document and saved copy unchanged.
 
-V1/V2 documents default to the 1900 date system on read. V3/V4 require an explicit
-`dateSystem` (`1900` or `1904`) and preserves error content separately from
+V1/V2 documents default to the 1900 date system on read. V3–V7 require an explicit
+`dateSystem` (`1900` or `1904`) and preserve error content separately from
 error-looking text and explicit empty strings. Formula source remains raw text;
 computed values are not saved. Older builds cannot open newer snapshot versions, so keep original backups when upgrading. See
 [Formula Foundation](formula-foundation.md) for the model and migration contract.

@@ -41,6 +41,23 @@ function fixture() {
 }
 beforeEach(() => vi.mocked(prepareImageAsset).mockReset());
 describe("sheet image insertion", () => {
+  test("does not finish an image insertion after its target becomes protected", async () => {
+    let resolve!: (value: typeof asset) => void;
+    vi.mocked(prepareImageAsset).mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    const f = fixture();
+    const inserting = f.actions.insertFile(file, "cell");
+    getActiveSheet(f.getWorkbook()).properties.protected = true;
+    resolve(asset);
+    await inserting;
+    expect(f.setCellImage).not.toHaveBeenCalled();
+    expect(await f.store.get(asset.id)).toBeUndefined();
+    expect(f.actions.busy.value).toBe(false);
+  });
+
   test("saves the asset before dispatching a cell-image edit", async () => {
     vi.mocked(prepareImageAsset).mockResolvedValue(asset);
     const f = fixture();

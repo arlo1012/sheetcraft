@@ -24,6 +24,7 @@ import {
 const props = defineProps<{
   state: SelectionCellStyleState;
   disabled: boolean;
+  readOnly?: boolean;
   formatPainterActive?: boolean;
   dataState?: HomeDataToolState;
   mergeState?: MergeCellsState;
@@ -45,6 +46,7 @@ const emit = defineEmits<{
   insertImage: [mode: "cell" | "floating"];
   undo: [];
   redo: [];
+  toggleProtection: [];
 }>();
 
 const { t } = useAppI18n();
@@ -280,6 +282,8 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
         />
         <HomeDataGroup
           :state="dataState"
+          :read-only="readOnly"
+          @toggle-protection="emit('toggleProtection')"
           @auto-sum="emit('autoSum')"
           @sort="emit('sort', $event)"
           @apply-filter="emit('applyFilter', $event)"

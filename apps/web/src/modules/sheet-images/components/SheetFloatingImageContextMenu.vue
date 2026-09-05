@@ -6,7 +6,9 @@ import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 
-const props = defineProps<{ anchor: FloatingReference }>();
+const props = withDefaults(defineProps<{ anchor: FloatingReference; readOnly?: boolean }>(), {
+  readOnly: false,
+});
 const emit = defineEmits<{
   convertToCell: [];
   preview: [];
@@ -35,8 +37,8 @@ function onKeydown(event: KeyboardEvent): void {
   if (key !== "c" && key !== "x" && key !== "v") return;
   event.preventDefault();
   if (key === "c") emit("copy");
-  else if (key === "x") emit("cut");
-  else emit("paste");
+  else if (key === "x" && !props.readOnly) emit("cut");
+  else if (key === "v" && !props.readOnly) emit("paste");
 }
 </script>
 
@@ -58,18 +60,27 @@ function onKeydown(event: KeyboardEvent): void {
         {{ t("cellMenu.copy") }}
         <template #shortcut>{{ t("cellMenu.copyShortcut") }}</template>
       </MenuItem>
-      <MenuItem data-floating-image-action="cut" @select="emit('cut')">
+      <MenuItem data-floating-image-action="cut" :disabled="readOnly" @select="emit('cut')">
         {{ t("cellMenu.cut") }}
         <template #shortcut>{{ t("cellMenu.cutShortcut") }}</template>
       </MenuItem>
-      <MenuItem data-floating-image-action="paste" @select="emit('paste')">
+      <MenuItem data-floating-image-action="paste" :disabled="readOnly" @select="emit('paste')">
         {{ t("cellMenu.paste") }}
         <template #shortcut>{{ t("cellMenu.pasteShortcut") }}</template>
       </MenuItem>
-      <MenuItem data-floating-image-action="convert-to-cell" @select="emit('convertToCell')">
+      <MenuItem
+        data-floating-image-action="convert-to-cell"
+        :disabled="readOnly"
+        @select="emit('convertToCell')"
+      >
         {{ t("image.convertToCell") }}
       </MenuItem>
-      <MenuItem danger data-floating-image-action="delete" @select="emit('delete')">
+      <MenuItem
+        danger
+        data-floating-image-action="delete"
+        :disabled="readOnly"
+        @select="emit('delete')"
+      >
         {{ t("image.deleteImage") }}
       </MenuItem>
     </MenuSurface>

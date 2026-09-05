@@ -19,12 +19,16 @@ import type {
   DeleteSheetCommand,
   MoveSheetCommand,
   RenameSheetCommand,
+  SetSheetPropertiesCommand,
 } from "./contracts.js";
 import { invalidCommandPayload } from "./helpers.js";
 
 function sheetNotFound(sheetId: unknown): WorkbookDomainError {
   return new WorkbookDomainError(
-    { code: "sheet_not_found", details: { sheetId: toWorkbookErrorDetail(sheetId) } },
+    {
+      code: "sheet_not_found",
+      details: { sheetId: toWorkbookErrorDetail(sheetId) },
+    },
     `Sheet ${String(sheetId)} does not exist.`,
   );
 }
@@ -50,6 +54,28 @@ function normalizeCommandSheetName(name: unknown): string {
     throw invalidCommandPayload("name", name);
   }
   return normalizedName;
+}
+
+function normalizeSheetProperties(
+  properties: import("../workbook.js").SheetProperties,
+): import("../workbook.js").SheetProperties {
+  const tabColor = properties.tabColor;
+  if (
+    tabColor !== undefined &&
+    (typeof tabColor !== "string" || !/^#[0-9A-Fa-f]{6}$/.test(tabColor))
+  ) {
+    throw invalidCommandPayload("properties.tabColor", tabColor);
+  }
+  for (const key of ["pinned", "hidden", "protected"] as const) {
+    if (typeof properties[key] !== "boolean")
+      throw invalidCommandPayload(`properties.${key}`, properties[key]);
+  }
+  return {
+    ...(tabColor === undefined ? {} : { tabColor: tabColor.toUpperCase() }),
+    pinned: properties.pinned,
+    hidden: properties.hidden,
+    protected: properties.protected,
+  };
 }
 
 function resolveSheetId(
@@ -84,7 +110,12 @@ function resolveSheetId(
 
 export function createAddSheetCommand(
   workbook: Workbook,
-  options?: { id?: string; name?: string; index?: number; idFactory?: IdFactory },
+  options?: {
+    id?: string;
+    name?: string;
+    index?: number;
+    idFactory?: IdFactory;
+  },
 ): AddSheetCommand {
   const name =
     options?.name === undefined
@@ -122,6 +153,12 @@ export function createDuplicateSheetCommand(
   const sheet = serializeSheet(source);
   sheet.id = sheetId;
   sheet.name = name;
+  sheet.properties = {
+    ...(source.properties.tabColor === undefined ? {} : { tabColor: source.properties.tabColor }),
+    pinned: false,
+    hidden: false,
+    protected: false,
+  };
 
   return {
     type: "addSheet",
@@ -134,28 +171,64 @@ export function createDuplicateSheetCommand(
 export function createDeleteSheetCommand(workbook: Workbook, sheetId: string): DeleteSheetCommand {
   const index = getSheetIndex(workbook, sheetId);
   if (index < 0) throw sheetNotFound(sheetId);
-  if (workbook.sheets.size <= 1) {
+  if (
+    getWorkbookSheets(workbook).filter((sheet) => !sheet.properties.hidden).length <=
+    (workbook.sheets.get(sheetId)?.properties.hidden ? 0 : 1)
+  ) {
     throw new WorkbookDomainError(
-      { code: "last_sheet_removal", details: { sheetId: toWorkbookErrorDetail(sheetId) } },
+      {
+        code: "last_sheet_removal",
+        details: { sheetId: toWorkbookErrorDetail(sheetId) },
+      },
       "A workbook must contain at least one sheet.",
     );
   }
   const sheets = getWorkbookSheets(workbook);
   const activeSheetId =
     workbook.activeSheetId === sheetId
-      ? (sheets[index + 1] ?? sheets[index - 1])?.id
+      ? sheets
+          .slice(index + 1)
+          .concat(sheets.slice(0, index))
+          .find((sheet) => !sheet.properties.hidden)?.id
       : workbook.activeSheetId;
   if (!activeSheetId) {
     throw new WorkbookDomainError(
-      { code: "workbook_operation_failed", details: { reason: "No remaining active sheet." } },
+      {
+        code: "workbook_operation_failed",
+        details: { reason: "No remaining active sheet." },
+      },
       "Unable to select a sheet after deletion.",
     );
   }
   return { type: "deleteSheet", sheetId, activeSheetId };
 }
 
+export function createSetSheetPropertiesCommand(
+  workbook: Workbook,
+  sheetId: string,
+  patch: Partial<import("../workbook.js").SheetProperties>,
+): SetSheetPropertiesCommand {
+  const sheet = workbook.sheets.get(sheetId);
+  if (!sheet) throw sheetNotFound(sheetId);
+  const properties = normalizeSheetProperties({ ...sheet.properties, ...patch });
+  if (
+    properties.hidden &&
+    !sheet.properties.hidden &&
+    getWorkbookSheets(workbook).every((item) => item.id === sheetId || item.properties.hidden)
+  )
+    throw new WorkbookDomainError(
+      { code: "last_visible_sheet", details: { sheetId } },
+      "A workbook must contain a visible sheet.",
+    );
+  return { type: "setSheetProperties", sheetId, properties };
+}
+
 export function createRenameSheetCommand(sheetId: string, name: string): RenameSheetCommand {
-  return { type: "renameSheet", sheetId, name: normalizeCommandSheetName(name) };
+  return {
+    type: "renameSheet",
+    sheetId,
+    name: normalizeCommandSheetName(name),
+  };
 }
 
 export function createMoveSheetCommand(
@@ -186,13 +259,19 @@ export function applyAddSheetCommand(
   ) {
     throw invalidCommandPayload("index", command.index);
   }
-  if (command.activeSheetId !== sheet.id && !workbook.sheets.has(command.activeSheetId)) {
-    throw sheetNotFound(command.activeSheetId);
-  }
+  const activeSheet =
+    command.activeSheetId === sheet.id ? sheet : workbook.sheets.get(command.activeSheetId);
+  if (!activeSheet) throw sheetNotFound(command.activeSheetId);
+  if (activeSheet.properties.hidden)
+    throw invalidCommandPayload("activeSheetId", command.activeSheetId);
   const previousActiveSheetId = workbook.activeSheetId;
   insertSheet(workbook, sheet, command.index);
-  setActiveSheet(workbook, command.activeSheetId);
-  return { type: "deleteSheet", sheetId: sheet.id, activeSheetId: previousActiveSheetId };
+  workbook.activeSheetId = command.activeSheetId;
+  return {
+    type: "deleteSheet",
+    sheetId: sheet.id,
+    activeSheetId: previousActiveSheetId,
+  };
 }
 
 export function applyDeleteSheetCommand(
@@ -202,18 +281,25 @@ export function applyDeleteSheetCommand(
   if (!workbook.sheets.has(command.sheetId)) {
     throw sheetNotFound(command.sheetId);
   }
-  if (workbook.sheets.size <= 1) {
+  if (
+    getWorkbookSheets(workbook).filter((sheet) => !sheet.properties.hidden).length <=
+    (workbook.sheets.get(command.sheetId)?.properties.hidden ? 0 : 1)
+  ) {
     throw new WorkbookDomainError(
-      { code: "last_sheet_removal", details: { sheetId: toWorkbookErrorDetail(command.sheetId) } },
+      {
+        code: "last_sheet_removal",
+        details: { sheetId: toWorkbookErrorDetail(command.sheetId) },
+      },
       "A workbook must contain at least one sheet.",
     );
   }
   if (command.activeSheetId === command.sheetId) {
     throw invalidCommandPayload("activeSheetId", command.activeSheetId);
   }
-  if (!workbook.sheets.has(command.activeSheetId)) {
-    throw sheetNotFound(command.activeSheetId);
-  }
+  const nextActiveSheet = workbook.sheets.get(command.activeSheetId);
+  if (!nextActiveSheet) throw sheetNotFound(command.activeSheetId);
+  if (nextActiveSheet.properties.hidden)
+    throw invalidCommandPayload("activeSheetId", command.activeSheetId);
   const previousActiveSheetId = workbook.activeSheetId;
   const { sheet, index } = removeSheet(workbook, command.sheetId);
   setActiveSheet(workbook, command.activeSheetId);
@@ -221,6 +307,59 @@ export function applyDeleteSheetCommand(
     type: "addSheet",
     sheet: serializeSheet(sheet),
     index,
+    activeSheetId: previousActiveSheetId,
+  };
+}
+
+export function applySetSheetPropertiesCommand(
+  workbook: Workbook,
+  command: SetSheetPropertiesCommand,
+): SetSheetPropertiesCommand | null {
+  const sheet = workbook.sheets.get(command.sheetId);
+  if (!sheet) throw sheetNotFound(command.sheetId);
+  const next = normalizeSheetProperties(command.properties);
+  if (
+    next.hidden &&
+    !sheet.properties.hidden &&
+    getWorkbookSheets(workbook).every((item) => item.id === sheet.id || item.properties.hidden)
+  ) {
+    throw new WorkbookDomainError(
+      { code: "last_visible_sheet", details: { sheetId: sheet.id } },
+      "A workbook must contain a visible sheet.",
+    );
+  }
+  const previous = { ...sheet.properties };
+  const previousActiveSheetId = workbook.activeSheetId;
+  let nextActiveSheetId = command.activeSheetId;
+  if (nextActiveSheetId !== undefined) {
+    const requestedActive =
+      nextActiveSheetId === sheet.id
+        ? { ...sheet, properties: next }
+        : workbook.sheets.get(nextActiveSheetId);
+    if (!requestedActive) throw sheetNotFound(nextActiveSheetId);
+    if (requestedActive.properties.hidden)
+      throw invalidCommandPayload("activeSheetId", nextActiveSheetId);
+  } else if (next.hidden && workbook.activeSheetId === sheet.id) {
+    const sheets = getWorkbookSheets(workbook);
+    const index = sheets.indexOf(sheet);
+    nextActiveSheetId = sheets
+      .slice(index + 1)
+      .concat(sheets.slice(0, index))
+      .find((item) => !item.properties.hidden)?.id;
+    if (!nextActiveSheetId)
+      throw new WorkbookDomainError(
+        { code: "last_visible_sheet", details: { sheetId: sheet.id } },
+        "A workbook must contain a visible sheet.",
+      );
+  }
+  if (JSON.stringify(previous) === JSON.stringify(next) && nextActiveSheetId === undefined)
+    return null;
+  sheet.properties = { ...next };
+  if (nextActiveSheetId !== undefined) workbook.activeSheetId = nextActiveSheetId;
+  return {
+    type: "setSheetProperties",
+    sheetId: sheet.id,
+    properties: previous,
     activeSheetId: previousActiveSheetId,
   };
 }

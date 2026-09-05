@@ -30,11 +30,15 @@ describe("WorkbookSheetTabs", () => {
     expect(menu.element.tagName).toBe("UL");
     expect(menu.find("button").exists()).toBe(false);
     expect(menu.findAll('[role="menuitem"]').map((item) => item.text())).toEqual([
-      "Duplicate sheet",
-      "Rename sheet",
-      "Move sheet left",
-      "Move sheet right",
-      "Delete sheet",
+      "Create a copy",
+      "Rename",
+      "Protect this sheet",
+      "Tab color",
+      "Pin",
+      "Move left",
+      "Move right",
+      "Hide",
+      "Delete",
     ]);
     expect(menu.findAll('[role="menuitem"]').every((item) => item.element.tagName === "LI")).toBe(
       true,
@@ -42,7 +46,7 @@ describe("WorkbookSheetTabs", () => {
     await menu.trigger("keydown", { key: "ArrowDown" });
     expect(document.activeElement).toBe(menu.findAll('[role="menuitem"]')[1]?.element);
 
-    await menu.findAll('[role="menuitem"]')[4]?.trigger("click");
+    await menu.get('[data-sheet-tab-action="delete"]').trigger("click");
 
     expect(wrapper.emitted("delete")).toEqual([["sheet-2"]]);
     wrapper.unmount();
@@ -54,10 +58,13 @@ describe("WorkbookSheetTabs", () => {
 
     await trigger.trigger("click");
     const menu = new DOMWrapper(document.body).get('[role="menu"]');
-    const menuItems = menu.findAll('[role="menuitem"]');
-    const deleteAction = menuItems[4];
-    expect(menuItems[2]?.attributes("aria-disabled")).toBe("true");
-    expect(menuItems[3]?.attributes("aria-disabled")).toBe("true");
+    const deleteAction = menu.get('[data-sheet-tab-action="delete"]');
+    expect(menu.get('[data-sheet-tab-action="move-left"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
+    expect(menu.get('[data-sheet-tab-action="move-right"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
     expect(deleteAction?.attributes("aria-disabled")).toBe("true");
     expect(deleteAction?.attributes("tabindex")).toBe("-1");
     await deleteAction?.trigger("click");
@@ -76,13 +83,15 @@ describe("WorkbookSheetTabs", () => {
 
     await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
     let menu = new DOMWrapper(document.body).get('[role="menu"]');
-    expect(menu.findAll('[role="menuitem"]')[2]?.attributes("aria-disabled")).toBe("true");
-    await menu.findAll('[role="menuitem"]')[0]?.trigger("click");
+    expect(menu.get('[data-sheet-tab-action="move-left"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
+    await menu.get('[data-sheet-tab-action="duplicate"]').trigger("click");
     expect(wrapper.emitted("duplicate")).toEqual([["sheet-1"]]);
 
     await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
     menu = new DOMWrapper(document.body).get('[role="menu"]');
-    await menu.findAll('[role="menuitem"]')[3]?.trigger("click");
+    await menu.get('[data-sheet-tab-action="move-right"]').trigger("click");
     expect(wrapper.emitted("move")).toEqual([[{ sheetId: "sheet-1", toIndex: 1 }]]);
     expect(wrapper.emitted("select")).toBeUndefined();
     expect(document.activeElement).toBe(firstTab.element);

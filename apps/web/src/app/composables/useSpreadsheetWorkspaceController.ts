@@ -29,6 +29,7 @@ import {
   createConvertCellImageToFloatingCommand,
   createSetSheetFilterCriteriaCommand,
   createSetSheetFreezePanesCommand,
+  createSetSheetPropertiesCommand,
   createSortSheetRangeCommand,
   createUnmergeCellsCommand,
   getSheetFilterColumnDistinctValues,
@@ -54,6 +55,7 @@ import {
 } from "@idea10/core/input";
 import { createAutoSumFormula, createFormulaError } from "@idea10/core/formula";
 import { doMergedCellRangesIntersect } from "@idea10/core";
+import { WorkbookDomainError } from "@idea10/core/errors";
 import type { IdFactory } from "@idea10/core/runtime";
 import { findCellByText, type SheetSearchDirection } from "@idea10/core/search";
 import { getSelectionSummary } from "@idea10/core/selection-summary";
@@ -78,6 +80,7 @@ import {
   type SheetFilter,
   type SheetFilterValue,
   type SheetDimensionAxis,
+  type SheetProperties,
   type Workbook,
 } from "@idea10/core/workbook";
 import { getSelectionMode, getSelectionRange } from "@idea10/sheet-engine/selection";
@@ -282,7 +285,15 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function execute(command: WorkbookCommand, operation?: WorkbookOperation): boolean {
-    const changed = executeWorkbookCommand(session, command, operation);
+    let changed: boolean;
+    try {
+      changed = executeWorkbookCommand(session, command, operation);
+    } catch (error) {
+      if (error instanceof WorkbookDomainError && error.data.code === "sheet_protected") {
+        return false;
+      }
+      throw error;
+    }
     if (changed) {
       workbookVersion.value += 1;
       pruneViewStates();
@@ -447,6 +458,7 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function pasteCells(payload: GridPastePayload): GridPasteResult {
+    if (activeSheet.value.properties.protected) return { ok: false, reason: "pasteRejected" };
     try {
       execute(
         createGridPasteCommand(activeSheet.value, payload),
@@ -763,6 +775,21 @@ export function useSpreadsheetWorkspaceController(
     clearWorkspaceStatus();
   }
 
+  function updateSheetProperties(payload: {
+    sheetId: string;
+    patch: Partial<SheetProperties>;
+  }): void {
+    if (!session.workbook.sheets.has(payload.sheetId)) return;
+    execute(createSetSheetPropertiesCommand(session.workbook, payload.sheetId, payload.patch));
+    if (activeSheet.value.properties.protected) cancelFormatPainter();
+    clearWorkspaceStatus();
+  }
+
+  function restoreSheet(sheetId: string): void {
+    updateSheetProperties({ sheetId, patch: { hidden: false } });
+    selectSheet(sheetId);
+  }
+
   function addSheet(): void {
     execute(
       createAddSheetCommand(session.workbook, { idFactory: session.idFactory }),
@@ -982,6 +1009,8 @@ export function useSpreadsheetWorkspaceController(
     insertAxis,
     deleteAxis,
     selectSheet,
+    updateSheetProperties,
+    restoreSheet,
     addSheet,
     duplicateSheet,
     renameSheet,

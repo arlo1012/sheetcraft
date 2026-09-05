@@ -9,6 +9,7 @@ import type {
   SheetDimensionAxis,
   SheetFilter,
   SheetMetadata,
+  SheetProperties,
   SheetSparseCell,
   SheetSparseDimension,
   SheetSparseState,
@@ -166,6 +167,14 @@ export type DeleteSheetCommand = {
   activeSheetId: string;
 };
 
+export type SetSheetPropertiesCommand = {
+  type: "setSheetProperties";
+  sheetId: string;
+  properties: SheetProperties;
+  /** Active sheet to restore when this command is used as an inverse. */
+  activeSheetId?: string;
+};
+
 export type RenameSheetCommand = {
   type: "renameSheet";
   sheetId: string;
@@ -256,6 +265,7 @@ export type WorkbookCommand =
   | RestoreFloatingImageToCellCommand
   | AddSheetCommand
   | DeleteSheetCommand
+  | SetSheetPropertiesCommand
   | RenameSheetCommand
   | MoveSheetCommand
   | InsertSheetAxisCommand
@@ -282,6 +292,7 @@ export type WorkbookOperation =
   | "images.cell.convert"
   | "sheets.add"
   | "sheets.delete"
+  | "sheets.properties"
   | "sheets.rename"
   | "sheets.move"
   | "structure.insert"
@@ -332,6 +343,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "sheets.add";
     case "deleteSheet":
       return "sheets.delete";
+    case "setSheetProperties":
+      return "sheets.properties";
     case "renameSheet":
       return "sheets.rename";
     case "moveSheet":

@@ -1,23 +1,23 @@
 {
   "version": 1,
-  "description": "Production budgets include workbook persistence, shared formula authoring and colored references, image clipboard/conversion, crop/rotation/flips/original restoration, lazy image tools/fullscreen preview, and searchable sheet navigation; see ADR 0004.",
+  "description": "Production budgets include workbook persistence, shared formula authoring and colored references, image editing/preview, searchable sheet navigation, and persisted sheet protection/color/pinning/visibility; see ADR 0004.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
       "pattern": "^index-.*\\.js$",
-      "maximumRawBytes": 400000,
-      "maximumGzipBytes": 112000
+      "maximumRawBytes": 415000,
+      "maximumGzipBytes": 116000
     },
     "css": {
       "pattern": "^index-.*\\.css$",
-      "maximumRawBytes": 84000,
-      "maximumGzipBytes": 12500
+      "maximumRawBytes": 86000,
+      "maximumGzipBytes": 13000
     }
   },
   "totalAssets": {
     "javascript": {
-      "maximumRawBytes": 960000,
-      "maximumGzipBytes": 280000
+      "maximumRawBytes": 970000,
+      "maximumGzipBytes": 284000
     },
     "css": {
       "maximumRawBytes": 244000,

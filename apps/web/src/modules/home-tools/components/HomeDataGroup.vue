@@ -7,7 +7,7 @@ import FreezeMenu from "./FreezeMenu.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
 import SortMenu from "./SortMenu.vue";
 
-defineProps<{ state: HomeDataToolState }>();
+defineProps<{ state: HomeDataToolState; readOnly?: boolean }>();
 
 const { t } = useAppI18n();
 
@@ -18,6 +18,7 @@ const emit = defineEmits<{
   clearFilter: [];
   freeze: [mode: "panes" | "top-row" | "first-column"];
   unfreeze: [];
+  toggleProtection: [];
 }>();
 </script>
 
@@ -30,7 +31,7 @@ const emit = defineEmits<{
   >
     <FilterValueMenu
       class="home-data-group__filter"
-      :disabled="!state.filterEnabled"
+      :disabled="readOnly || !state.filterEnabled"
       :active="state.filter.active"
       :options="state.filter.options"
       :applied-keys="state.filter.appliedKeys"
@@ -45,14 +46,18 @@ const emit = defineEmits<{
       data-ribbon-stack="freeze-sort"
     >
       <FreezeMenu
-        :disabled="!state.freezeEnabled"
+        :disabled="readOnly || !state.freezeEnabled"
         :active-cell="state.activeCell"
         :freeze="state.freeze"
         data-ribbon-row="1"
         @freeze="emit('freeze', $event)"
         @unfreeze="emit('unfreeze')"
       />
-      <SortMenu :disabled="!state.sortEnabled" data-ribbon-row="2" @sort="emit('sort', $event)" />
+      <SortMenu
+        :disabled="readOnly || !state.sortEnabled"
+        data-ribbon-row="2"
+        @sort="emit('sort', $event)"
+      />
     </div>
 
     <div class="home-data-group__stack home-data-group__sum-stack" data-ribbon-stack="sum-data">
@@ -60,6 +65,7 @@ const emit = defineEmits<{
         :label="t('ribbon.autoSum')"
         :text="t('ribbon.autoSum')"
         data-ribbon-action="auto-sum"
+        :disabled="readOnly"
         data-ribbon-row="1"
         @activate="emit('autoSum')"
       >
@@ -80,13 +86,13 @@ const emit = defineEmits<{
     <RibbonIconAction
       class="home-data-group__protect"
       variant="tall"
-      :label="t('app.unavailableFeature', { feature: t('ribbon.protect') })"
-      :text="t('ribbon.protect')"
-      disabled
-      disclosure
+      :label="readOnly ? t('sheetTabs.unprotectAction') : t('sheetTabs.protectAction')"
+      :text="readOnly ? t('sheetTabs.unprotectAction') : t('ribbon.protect')"
+      :pressed="readOnly"
       data-ribbon-layout="tall"
-      data-ribbon-placeholder="protect"
+      data-ribbon-action="protect"
       data-ribbon-span="2"
+      @activate="emit('toggleProtection')"
     >
       <LockKeyhole :size="17" aria-hidden="true" />
     </RibbonIconAction>

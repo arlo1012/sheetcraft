@@ -181,7 +181,10 @@ function transformAxisIndex(
 }
 
 function transformRangeForAxis(
-  range: { start: { row: number; column: number }; end: { row: number; column: number } },
+  range: {
+    start: { row: number; column: number };
+    end: { row: number; column: number };
+  },
   axis: SheetDimensionAxis,
   index: number,
   count: number,
@@ -253,7 +256,9 @@ function transformFilterForAxis(
             : [
                 {
                   column: next,
-                  allowedValues: column.allowedValues.map((value) => ({ ...value })),
+                  allowedValues: column.allowedValues.map((value) => ({
+                    ...value,
+                  })),
                 },
               ];
         });
@@ -375,7 +380,10 @@ function transformSheetAxis(
       count,
     });
     if (source === cell.content.formula.source) continue;
-    sheet.cells.set(key, { ...cell, content: { kind: "formula", formula: { source } } });
+    sheet.cells.set(key, {
+      ...cell,
+      content: { kind: "formula", formula: { source } },
+    });
     changed = true;
   }
   const transformedFloatingImages: FloatingImage[] = [];
@@ -555,6 +563,7 @@ function validateSheetAxisSlice(
       const validationSheet: Sheet = {
         id: "floating-image-validation",
         name: "Floating image validation",
+        properties: { pinned: false, hidden: false, protected: false },
         cells: new Map(),
         rowHeights: new Map(),
         columnWidths: new Map(),
@@ -575,6 +584,7 @@ function validateSheetAxisSlice(
   const validationSheet: Sheet = {
     id: "axis-slice-validation",
     name: "Axis slice validation",
+    properties: { pinned: false, hidden: false, protected: false },
     cells: new Map(),
     rowHeights: new Map(),
     columnWidths: new Map(),

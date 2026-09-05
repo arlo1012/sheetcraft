@@ -99,9 +99,17 @@ export type Cell = {
   style?: CellStyle;
 };
 
+export type SheetProperties = {
+  tabColor?: string;
+  pinned: boolean;
+  hidden: boolean;
+  protected: boolean;
+};
+
 export type Sheet = {
   id: string;
   name: string;
+  properties: SheetProperties;
   cells: Map<string, Cell>;
   rowHeights: Map<number, number>;
   columnWidths: Map<number, number>;
@@ -153,6 +161,7 @@ export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory)
   return {
     id: id ?? createRequiredId("sheet", idFactory),
     name: normalizeSheetName(name),
+    properties: { pinned: false, hidden: false, protected: false },
     cells: new Map(),
     rowHeights: new Map(),
     columnWidths: new Map(),
@@ -340,8 +349,12 @@ export function renameSheet(workbook: Workbook, sheetId: string, name: string): 
 }
 
 export function setActiveSheet(workbook: Workbook, sheetId: string): boolean {
-  if (!workbook.sheets.has(sheetId)) {
+  const sheet = workbook.sheets.get(sheetId);
+  if (!sheet) {
     throw new Error(`Sheet ${sheetId} does not exist.`);
+  }
+  if (sheet.properties.hidden) {
+    throw new Error(`Sheet ${sheetId} is hidden.`);
   }
   if (workbook.activeSheetId === sheetId) {
     return false;

@@ -47,6 +47,7 @@ describe("workbook command transport", () => {
     expect(command.sheet).toEqual({
       id: "sheet-2",
       name: "Sheet2",
+      properties: { pinned: false, hidden: false, protected: false },
       cells: [],
       rowHeights: [],
       columnWidths: [],
