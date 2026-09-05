@@ -5,9 +5,11 @@ import {
   getActiveSheet,
   getCellContent,
   getCellStyle,
+  getColumnWidth,
   getRowHeight,
   setCellContent,
   setCellStyle,
+  setColumnWidth,
   type Workbook,
 } from "@idea10/core/workbook";
 import { describe, expect, test } from "vitest";
@@ -124,7 +126,7 @@ describe("XLSX IO", () => {
       formula: { source: "=A1+1" },
     });
     expect(getRowHeight(sheet, 0)).toBe(40);
-    expect(sheet.columnWidths.get(0)).toBe(131);
+    expect(sheet.columnWidths.get(0)).toBe(126);
     expect(sheet.mergedCells).toHaveLength(1);
     expect(result.report.issues).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: "formula-cache-discarded" })]),
@@ -317,5 +319,24 @@ describe("XLSX IO", () => {
     await expect(decodeXlsx(new Uint8Array(25 * 1024 * 1024 + 1))).rejects.toBeInstanceOf(
       XlsxCompatibilityError,
     );
+  });
+
+  test("preserves all supported pixel column widths with the exported Normal font baseline", async () => {
+    const workbook = createWorkbook({ id: "widths", sheetId: "widths-sheet" });
+    const sheet = getActiveSheet(workbook);
+    for (let pixels = 32; pixels <= 640; pixels += 1) setColumnWidth(sheet, pixels - 32, pixels);
+    const encoded = await encodeXlsx(workbook);
+    expect(encoded.report.issues).toEqual([]);
+    const styles = xlsxEntryText(encoded.bytes, "xl/styles.xml");
+    const normalFont = /<fonts[^>]*><font>(.*?)<\/font>/s.exec(styles)?.[1];
+    expect(normalFont).toContain('<sz val="11"/>');
+    expect(normalFont).toContain('<name val="Calibri"/>');
+    expect(styles).toContain('<cellStyle name="Normal" xfId="0" builtinId="0"/>');
+    expect(styles).toMatch(/<cellStyleXfs[^>]*><xf[^>]*fontId="0"/);
+    const restored = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook);
+    for (let pixels = 32; pixels <= 640; pixels += 1)
+      expect(getColumnWidth(restored, pixels - 32)).toBe(pixels);
+    expect(restored.columnWidths.has(96 - 32)).toBe(false);
+    expect(sheet.columnWidths.size).toBe(restored.columnWidths.size);
   });
 });

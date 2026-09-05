@@ -2,6 +2,7 @@ import ExcelJSImport from "exceljs/dist/exceljs.min.js";
 import { readExcelBorder, writeExcelBorder } from "./border.js";
 import { createFormulaCacheEligibility, formulaCacheValue } from "./formula-cache.js";
 import { fromExcelNumberFormat, toExcelNumberFormat } from "./number-format.js";
+import { excelColumnWidthToPixels, pixelsToExcelColumnWidth } from "./column-width.js";
 import {
   createFormulaError,
   datePartsToExcelSerial,
@@ -15,7 +16,14 @@ import {
   type Workbook,
 } from "@idea10/core/workbook";
 import type { CellStyle } from "@idea10/core/style";
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, createSheet } from "@idea10/core/workbook";
+import {
+  DEFAULT_COLUMN_WIDTH,
+  MAX_COLUMN_WIDTH,
+  MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
+  MIN_COLUMN_WIDTH,
+  createSheet,
+} from "@idea10/core/workbook";
 import { CompatibilityReportBuilder } from "./report.js";
 import { XlsxCompatibilityError, type XlsxCompatibilityReport } from "./types.js";
 
@@ -383,10 +391,9 @@ export async function decodeWithExcelJs(
       if (typeof index !== "number" || !Number.isInteger(index) || index < 1 || width === undefined)
         continue;
       const columnIndex = index;
-      columnWidths.push({
-        index: columnIndex - 1,
-        size: Math.max(32, Math.min(640, Math.round(width * 7 + 5))),
-      });
+      const pixels = excelColumnWidthToPixels(width);
+      const size = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, pixels));
+      if (size !== DEFAULT_COLUMN_WIDTH) columnWidths.push({ index: columnIndex - 1, size });
       add(report, "dimension-approximated", `${sourceSheet.name}!${columnLabel(columnIndex - 1)}`);
     }
     const view = (sourceSheet.views ?? []).find((candidate) => candidate.state === "frozen");
@@ -522,8 +529,7 @@ export async function encodeWithExcelJs(
       output.getRow(index + 1).height = (size * 3) / 4;
     }
     for (const [index, size] of sheet.columnWidths) {
-      output.getColumn(index + 1).width = Math.max(0, (size - 5) / 7);
-      add(report, "dimension-approximated", `${sheet.name}!${columnLabel(index)}`);
+      output.getColumn(index + 1).width = pixelsToExcelColumnWidth(size);
     }
     for (const range of sheet.mergedCells)
       output.mergeCells(

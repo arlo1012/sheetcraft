@@ -11,7 +11,6 @@ import {
   createWorkbookXlsxWorker,
   runXlsxWorker,
   XlsxWorkerAbortError,
-  XlsxWorkerFailure,
   XlsxWorkerTimeoutError,
   type XlsxWorkerFactory,
 } from "./workbookXlsxWorker";
@@ -26,15 +25,13 @@ export type XlsxFeedbackKey =
   | "xlsx.feedback.timeout";
 
 export type XlsxFeedback = { key: XlsxFeedbackKey; error: boolean };
-export type XlsxConfirmation = "import" | "export";
+export type XlsxConfirmation = "import";
 
 type PendingImport = {
   workbook: Workbook;
   workbookAtStart: Workbook;
   revisionAtStart: number;
 };
-
-type PendingExport = { bytes: Uint8Array };
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_XLSX_FILE_BYTES = 25 * 1024 * 1024;
@@ -70,9 +67,7 @@ export function useWorkbookXlsxActions(options: {
   const busy = ref(false);
   const confirmation = ref<XlsxConfirmation>();
   const feedback = ref<XlsxFeedback>();
-  const report = ref<XlsxCompatibilityReport>();
   const pendingImport = shallowRef<PendingImport>();
-  const pendingExport = shallowRef<PendingExport>();
   const workerFactory = options.workerFactory ?? createWorkbookXlsxWorker;
   const download = options.download ?? downloadXlsx;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -92,7 +87,6 @@ export function useWorkbookXlsxActions(options: {
   function clearPending(): void {
     confirmation.value = undefined;
     pendingImport.value = undefined;
-    pendingExport.value = undefined;
   }
 
   function canApplyImport(pending: PendingImport): boolean {
@@ -108,7 +102,6 @@ export function useWorkbookXlsxActions(options: {
   function prepare(): boolean {
     if (isBlocked()) return false;
     feedback.value = undefined;
-    report.value = undefined;
     if (options.flushPendingEdits()) return true;
     feedback.value = { key: "xlsx.feedback.finishEditing", error: true };
     return false;
@@ -116,7 +109,6 @@ export function useWorkbookXlsxActions(options: {
 
   function setFailure(error: unknown): void {
     if (error instanceof XlsxWorkerAbortError || disposed) return;
-    if (error instanceof XlsxWorkerFailure && error.report) report.value = error.report;
     feedback.value = {
       key:
         error instanceof XlsxWorkerTimeoutError ? "xlsx.feedback.timeout" : "xlsx.feedback.failed",
@@ -131,20 +123,9 @@ export function useWorkbookXlsxActions(options: {
     const requestId = `xlsx-import-${++requestNumber}`;
     busy.value = true;
     feedback.value = undefined;
-    report.value = undefined;
     abortController = new AbortController();
     try {
       if (file.size > MAX_XLSX_FILE_BYTES) {
-        report.value = {
-          issues: [
-            {
-              code: "archive-limit",
-              severity: "block",
-              count: 1,
-              locations: [],
-            },
-          ],
-        };
         feedback.value = { key: "xlsx.feedback.blocked", error: true };
         return;
       }
@@ -156,7 +137,6 @@ export function useWorkbookXlsxActions(options: {
         { timeoutMs, signal: abortController.signal },
       );
       if (disposed || response.type !== "decode") return;
-      report.value = response.report;
       if (hasBlockingIssue(response.report)) {
         feedback.value = { key: "xlsx.feedback.blocked", error: true };
         return;
@@ -186,7 +166,6 @@ export function useWorkbookXlsxActions(options: {
     const requestId = `xlsx-export-${++requestNumber}`;
     busy.value = true;
     feedback.value = undefined;
-    report.value = undefined;
     abortController = new AbortController();
     try {
       const response = await runXlsxWorker(
@@ -195,17 +174,11 @@ export function useWorkbookXlsxActions(options: {
         { timeoutMs, signal: abortController.signal },
       );
       if (disposed || response.type !== "encode") return;
-      report.value = response.report;
       if (hasBlockingIssue(response.report)) {
         feedback.value = { key: "xlsx.feedback.blocked", error: true };
         return;
       }
       const bytes = new Uint8Array(response.bytes);
-      if (response.report.issues.length > 0) {
-        pendingExport.value = { bytes };
-        confirmation.value = "export";
-        return;
-      }
       await download(bytes, "workbook.xlsx");
       feedback.value = { key: "xlsx.feedback.exported", error: false };
     } catch (error) {
@@ -217,21 +190,15 @@ export function useWorkbookXlsxActions(options: {
   }
 
   async function confirm(): Promise<void> {
-    if (busy.value || !confirmation.value) return;
-    const nextConfirmation = confirmation.value;
+    if (busy.value || !pendingImport.value) return;
     busy.value = true;
     try {
-      if (nextConfirmation === "import" && pendingImport.value) {
-        if (!canApplyImport(pendingImport.value)) {
-          feedback.value = { key: "xlsx.feedback.stale", error: true };
-          return;
-        }
-        await options.persistence.replaceDocument(pendingImport.value.workbook);
-        if (!disposed) feedback.value = { key: "xlsx.feedback.imported", error: false };
-      } else if (nextConfirmation === "export" && pendingExport.value) {
-        await download(pendingExport.value.bytes, "workbook.xlsx");
-        feedback.value = { key: "xlsx.feedback.exported", error: false };
+      if (!canApplyImport(pendingImport.value)) {
+        feedback.value = { key: "xlsx.feedback.stale", error: true };
+        return;
       }
+      await options.persistence.replaceDocument(pendingImport.value.workbook);
+      if (!disposed) feedback.value = { key: "xlsx.feedback.imported", error: false };
     } catch (error) {
       setFailure(error);
     } finally {
@@ -251,7 +218,6 @@ export function useWorkbookXlsxActions(options: {
   function dismissFeedback(): void {
     if (busy.value || confirmation.value) return;
     feedback.value = undefined;
-    report.value = undefined;
   }
 
   onScopeDispose(() => {
@@ -264,7 +230,6 @@ export function useWorkbookXlsxActions(options: {
     busy: readonly(busy),
     confirmation: readonly(confirmation),
     feedback: readonly(feedback),
-    report: readonly(report),
     importXlsx,
     exportXlsx,
     confirm,

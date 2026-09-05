@@ -17,37 +17,8 @@ export type MessageSchema = {
       importTitle: string;
       importDescription: string;
       importConfirm: string;
-      exportTitle: string;
-      exportDescription: string;
-      exportConfirm: string;
       cancel: string;
       close: string;
-    };
-    report: {
-      title: string;
-      warning: string;
-      block: string;
-      issue: string;
-      codes: {
-        archiveInvalid: string;
-        archiveLimit: string;
-        archiveEncrypted: string;
-        archiveUnsupportedCompression: string;
-        archiveUnsafePath: string;
-        macroContent: string;
-        drawingOrMedia: string;
-        externalContent: string;
-        formulaCacheDiscarded: string;
-        formulaNotCalculated: string;
-        filterOmitted: string;
-        imageOmitted: string;
-        styleOmitted: string;
-        numberFormatOmitted: string;
-        dimensionApproximated: string;
-        dateNormalized: string;
-        cellValueOmitted: string;
-        featureOmitted: string;
-      };
     };
   };
   persistence: {

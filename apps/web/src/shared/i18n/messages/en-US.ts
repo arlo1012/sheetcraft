@@ -11,54 +11,20 @@ export const enUS = {
       errorTitle: "XLSX operation could not be completed",
       imported: "XLSX imported. Undo history starts from this file.",
       exported: "XLSX download started. The current document and original file are unchanged.",
-      failed:
-        "XLSX processing failed. Your document is still here. Review any details below and try again.",
+      failed: "XLSX processing failed. Please try again; your document was not replaced.",
       timeout: "XLSX processing timed out and was stopped. The current document was not replaced.",
       finishEditing: "Finish your current text composition before importing or exporting XLSX.",
       stale:
         "The document changed while the file was being read. Import was cancelled; select the file again.",
-      blocked:
-        "This file contains content this version cannot safely process. The operation was stopped.",
+      blocked: "This file could not be processed. Check its format and size.",
     },
     confirm: {
       importTitle: "Import XLSX workbook?",
       importDescription:
-        "Review the compatibility report first. Confirmation replaces this document and the browser's local copy, including changes saved by other tabs, and clears undo history. Export JSON first to preserve all current images and styles.",
+        "Import will replace the current document and its saved local copy, and clear undo history. Continue?",
       importConfirm: "Replace and import",
-      exportTitle: "Accept compatibility differences and export?",
-      exportDescription:
-        "The items below may be converted or omitted. Export creates a new file without changing this document. Use JSON export for a complete backup.",
-      exportConfirm: "Accept and download",
       cancel: "Cancel",
       close: "Close",
-    },
-    report: {
-      title: "XLSX compatibility report",
-      warning: "Warning",
-      block: "Blocked",
-      issue: "{code} ({count} items) {locations}",
-      codes: {
-        archiveInvalid: "Invalid or unsupported XLSX archive",
-        archiveLimit: "File size, entry count, or cell count exceeds this version's limits",
-        archiveEncrypted: "Encrypted files are not supported",
-        archiveUnsupportedCompression: "This compression method is not supported",
-        archiveUnsafePath: "The archive contains an unsafe internal path",
-        macroContent: "Macros or embedded executable content are not supported",
-        drawingOrMedia: "XLSX import with drawings or media is not supported yet",
-        externalContent: "External links or content are not supported",
-        formulaCacheDiscarded: "Old formula calculation caches were discarded",
-        formulaNotCalculated:
-          "Formula source is preserved, but this version cannot provide a reliable result; open it in Excel to recalculate",
-        filterOmitted: "Filter criteria were not preserved",
-        imageOmitted: "Images are not included in the exported file",
-        styleOmitted: "Some styles were not preserved",
-        numberFormatOmitted: "Unsupported number formats were not preserved",
-        dimensionApproximated:
-          "Row heights or column widths were converted or adjusted and may display differently",
-        dateNormalized: "Dates were converted to numbers using the workbook's date system",
-        cellValueOmitted: "Unsupported cell content was not preserved",
-        featureOmitted: "Workbook features not supported by this version were not preserved",
-      },
     },
   },
   persistence: {

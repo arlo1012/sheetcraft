@@ -143,9 +143,7 @@ describe("useWorkbookXlsxActions", () => {
       key: "xlsx.feedback.blocked",
       error: true,
     });
-    expect(fixture.actions.report.value).toEqual({
-      issues: [{ code: "archive-limit", severity: "block", count: 1, locations: [] }],
-    });
+    expect(fixture.replaceDocument).not.toHaveBeenCalled();
     fixture.scope.stop();
   });
 
@@ -180,7 +178,7 @@ describe("useWorkbookXlsxActions", () => {
     cancelled.scope.stop();
   });
 
-  test("holds a warning-bearing export until explicit confirmation", async () => {
+  test("downloads an export directly even when internal compatibility diagnostics exist", async () => {
     const fixture = mountActions(
       createWorkerFactory((request, worker) =>
         response(worker, {
@@ -203,23 +201,24 @@ describe("useWorkbookXlsxActions", () => {
     );
 
     await fixture.actions.exportXlsx();
-    expect(fixture.actions.confirmation.value).toBe("export");
-    expect(fixture.download).not.toHaveBeenCalled();
-    fixture.actions.dismissFeedback();
-    expect(fixture.actions.report.value?.issues).toHaveLength(1);
-    await fixture.actions.confirm();
+    expect(fixture.actions.confirmation.value).toBeUndefined();
     expect(fixture.download).toHaveBeenCalledWith(new Uint8Array([1, 2]), "workbook.xlsx");
+    expect(fixture.download).toHaveBeenCalledOnce();
+    expect(fixture.replaceDocument).not.toHaveBeenCalled();
+    expect(fixture.getRevision()).toBe(1);
+    expect("report" in fixture.actions).toBe(false);
     fixture.scope.stop();
   });
 
-  test("discards compatibility details when an export confirmation is cancelled", async () => {
+  test("keeps a warning-bearing import pending until replacement is confirmed", async () => {
+    const snapshot = serializeWorkbook(createTestWorkbook());
     const fixture = mountActions(
       createWorkerFactory((request, worker) =>
         response(worker, {
           id: request.id,
           ok: true,
-          type: "encode",
-          bytes: new Uint8Array([1]).buffer,
+          type: "decode",
+          snapshot,
           report: {
             issues: [{ code: "image-omitted", severity: "warning", count: 1, locations: ["A1"] }],
           },
@@ -227,26 +226,51 @@ describe("useWorkbookXlsxActions", () => {
       ),
     );
 
-    await fixture.actions.exportXlsx();
-    fixture.actions.cancel();
+    await fixture.actions.importXlsx(file());
+    expect(fixture.actions.confirmation.value).toBe("import");
+    expect(fixture.replaceDocument).not.toHaveBeenCalled();
+    fixture.actions.dismissFeedback();
+    expect(fixture.actions.confirmation.value).toBe("import");
+    await fixture.actions.confirm();
     expect(fixture.actions.confirmation.value).toBeUndefined();
-    expect(fixture.actions.report.value).toBeUndefined();
-    expect(fixture.actions.feedback.value).toBeUndefined();
+    expect(fixture.replaceDocument).toHaveBeenCalledOnce();
     expect(fixture.download).not.toHaveBeenCalled();
     fixture.scope.stop();
   });
 
-  test("dismisses an error and its details without replacing or downloading the document", async () => {
+  test("dismisses an error without replacing or downloading the document", async () => {
     const fixture = mountActions(createWorkerFactory(() => undefined));
     await fixture.actions.importXlsx(file(25 * 1024 * 1024 + 1));
     expect(fixture.actions.feedback.value?.error).toBe(true);
-    expect(fixture.actions.report.value?.issues).toHaveLength(1);
 
     fixture.actions.dismissFeedback();
     expect(fixture.actions.feedback.value).toBeUndefined();
-    expect(fixture.actions.report.value).toBeUndefined();
     expect(fixture.replaceDocument).not.toHaveBeenCalled();
     expect(fixture.download).not.toHaveBeenCalled();
+    fixture.scope.stop();
+  });
+
+  test.each(["encode", "decode"] as const)("still rejects a blocking %s result", async (type) => {
+    const fixture = mountActions(
+      createWorkerFactory((request, worker) =>
+        response(worker, {
+          id: request.id,
+          ok: true,
+          type,
+          bytes: new Uint8Array([1]).buffer,
+          snapshot: serializeWorkbook(createTestWorkbook()),
+          report: {
+            issues: [{ code: "archive-limit", severity: "block", count: 1, locations: [] }],
+          },
+        }),
+      ),
+    );
+    if (type === "encode") await fixture.actions.exportXlsx();
+    else await fixture.actions.importXlsx(file());
+    expect(fixture.actions.feedback.value).toEqual({ key: "xlsx.feedback.blocked", error: true });
+    expect(fixture.actions.confirmation.value).toBeUndefined();
+    expect(fixture.download).not.toHaveBeenCalled();
+    expect(fixture.replaceDocument).not.toHaveBeenCalled();
     fixture.scope.stop();
   });
 

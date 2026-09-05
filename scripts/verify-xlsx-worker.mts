@@ -12,9 +12,11 @@ import {
   getCellComputedValue,
   getCellContent,
   getCellStyle,
+  getColumnWidth,
   getCellValue,
   setCellContent,
   setCellStyle,
+  setColumnWidth,
   setRowHeight,
   setSheetMetadata,
 } from "@idea10/core/workbook";
@@ -84,6 +86,7 @@ function createFixtureSnapshot(): WorkbookSnapshot {
     },
   );
   setRowHeight(sheet, 8, 42);
+  setColumnWidth(sheet, 0, 200);
   setSheetMetadata(sheet, {
     freezePanes: { rows: 1, columns: 0 },
     mergedCells: [{ start: { row: 5, column: 0 }, end: { row: 5, column: 1 } }],
@@ -111,6 +114,7 @@ function assertFixture(snapshot: WorkbookSnapshot): void {
   if (
     getCellStyle(sheet, { row: 3, column: 3 })?.fillColor !== "#88ccee" ||
     sheet.rowHeights.get(8) !== 42 ||
+    getColumnWidth(sheet, 0) !== 200 ||
     sheet.freezePanes.rows !== 1 ||
     sheet.mergedCells.length !== 1
   ) {

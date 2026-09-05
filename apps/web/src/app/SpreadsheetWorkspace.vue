@@ -136,12 +136,7 @@ const xlsxActions = useWorkbookXlsxActions({
   hasPendingEdits: cellEditSession.hasPendingEdit,
   isBlocked: () => fileBusy.value || confirmation.value !== undefined || imageBusy.value,
 });
-const {
-  busy: xlsxBusy,
-  confirmation: xlsxConfirmation,
-  feedback: xlsxFeedback,
-  report: xlsxReport,
-} = xlsxActions;
+const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback } = xlsxActions;
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (
@@ -233,7 +228,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       />
       <XlsxFileFeedback
         :feedback="xlsxFeedback"
-        :report="xlsxReport"
         :confirmation="xlsxConfirmation"
         :busy="xlsxBusy"
         @confirm="xlsxActions.confirm"

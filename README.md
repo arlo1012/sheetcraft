@@ -41,8 +41,8 @@ offers JSON import/export with validation and replacement confirmation. See
 [Saving And Recovery](docs/workbook-persistence.md) for the local-only storage
 scope, multi-tab conflicts, and recovery guarantees.
 
-[XLSX IO v1](docs/xlsx-io.md) adds browser-Worker import/export with overwrite
-confirmation, explicit compatibility reports, and bounded archive checks.
+[XLSX IO v1](docs/xlsx-io.md) adds browser-Worker import/export with import overwrite
+confirmation, direct export downloads, internal compatibility diagnostics, and bounded archive checks.
 XLSX is a supported-subset interchange format; JSON bundles remain the complete
 backup format for images and product-specific metadata.
 
