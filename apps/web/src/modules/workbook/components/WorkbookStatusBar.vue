@@ -182,6 +182,7 @@ function formatNumber(value: number): string {
     display: grid;
     grid-template-columns: 30px minmax(0, 1fr);
     align-items: center;
+    border-top: 1px solid var(--idea-border-subtle);
   }
 
   &__metrics {
