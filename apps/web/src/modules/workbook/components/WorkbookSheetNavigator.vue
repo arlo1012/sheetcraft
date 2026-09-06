@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, Ellipsis, EyeOff, Pin } from "lucide-vue-next";
+import { Check, EyeOff, Layers, Pin } from "lucide-vue-next";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
@@ -96,7 +96,7 @@ watch(open, (isOpen) => {
     @click="toggleMenu"
     @keydown="onTriggerKeydown"
   >
-    <Ellipsis :size="16" aria-hidden="true" />
+    <Layers :size="16" aria-hidden="true" />
   </button>
 
   <Teleport to="body">
