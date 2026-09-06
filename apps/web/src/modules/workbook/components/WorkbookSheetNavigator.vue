@@ -178,26 +178,27 @@ watch(open, (isOpen) => {
 .workbook-sheet-navigator {
   &__trigger {
     display: inline-grid;
-    flex: 0 0 26px;
-    width: 26px;
-    height: 26px;
+    flex: 0 0 30px;
+    width: 30px;
+    height: 100%;
     place-items: center;
     padding: 0;
     background: transparent;
-    border: 1px solid transparent;
-    border-radius: 3px;
+    border: 0;
+    border-right: 1px solid var(--idea-sheet-bar-border);
+    border-radius: 0;
     color: var(--idea-text-secondary);
     cursor: pointer;
 
     &:hover,
     &[aria-expanded="true"] {
       background: var(--idea-surface-hover);
+      color: var(--idea-text-primary);
     }
 
     &:focus-visible {
-      border-color: var(--idea-action-primary);
-      box-shadow: 0 0 0 2px var(--idea-action-focus);
-      outline: none;
+      outline: 1px solid var(--idea-action-primary);
+      outline-offset: -1px;
     }
   }
 

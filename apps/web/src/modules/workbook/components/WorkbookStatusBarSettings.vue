@@ -186,7 +186,7 @@ function selectNumberFormat(numberFormat: StatusBarNumberFormat): void {
     padding: 0;
     place-items: center;
     border: 0;
-    border-right: 1px solid var(--idea-border-subtle);
+    border-right: 1px solid var(--idea-sheet-bar-border);
     background: transparent;
     color: var(--idea-text-secondary);
     cursor: pointer;
