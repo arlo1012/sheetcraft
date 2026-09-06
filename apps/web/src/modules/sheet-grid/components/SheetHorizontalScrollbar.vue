@@ -228,10 +228,10 @@ function onWheel(event: WheelEvent): void {
 
     &::after {
       position: absolute;
-      top: 3px;
+      top: 4px;
       right: 0;
       left: 0;
-      height: 10px;
+      height: 8px;
       border-radius: 999px;
       background: var(--idea-sheet-bar-thumb);
       content: "";

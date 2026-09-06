@@ -1768,7 +1768,7 @@ defineExpose({
     }
 
     &::-webkit-scrollbar-thumb {
-      border: 3px solid var(--idea-surface-secondary);
+      border: 4px solid var(--idea-surface-secondary);
       border-radius: 999px;
       background: var(--idea-sheet-bar-thumb);
 
