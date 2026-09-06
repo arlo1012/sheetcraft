@@ -75,6 +75,19 @@ function emittedPatches(wrapper: ReturnType<typeof mountToolbar>) {
 }
 
 describe("HomeFormatToolbar", () => {
+  test("keeps history and unprotect available while protecting all data tools", async () => {
+    const wrapper = mountToolbar(createStyleState(), true);
+    await wrapper.setProps({ readOnly: true });
+    expect(wrapper.get('[data-ribbon-action="auto-sum"]').attributes("disabled")).toBe("");
+    const protection = wrapper.get('[data-ribbon-action="protect"]');
+    expect(protection.attributes("aria-label")).toBe("Unprotect");
+    expect(protection.attributes("disabled")).toBeUndefined();
+    await protection.trigger("click");
+    await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
+    expect(wrapper.emitted("toggleProtection")).toEqual([[]]);
+    expect(wrapper.emitted("undo")).toEqual([[]]);
+  });
+
   test("represents toggle and mixed selection states", async () => {
     const wrapper = mountToolbar(
       createStyleState({ bold: "on", italic: "mixed", underline: "off" }),
@@ -252,7 +265,8 @@ describe("HomeFormatToolbar", () => {
     for (const control of wrapper.findAll(
       '[data-ribbon-group]:not([data-ribbon-group="history"]) button, input',
     )) {
-      if (control.attributes("data-ribbon-action") === "auto-sum") continue;
+      if (["auto-sum", "protect"].includes(control.attributes("data-ribbon-action") ?? ""))
+        continue;
       expect((control.element as HTMLButtonElement | HTMLInputElement).disabled).toBe(true);
     }
     for (const control of wrapper.findAll(
@@ -388,7 +402,7 @@ describe("HomeFormatToolbar", () => {
       expect(control.element).toBeInstanceOf(HTMLButtonElement);
       expect(control.attributes()).toMatchObject({ type: "button", disabled: "" });
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(16);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(15);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({ type: "button", disabled: "" });

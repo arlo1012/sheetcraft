@@ -41,6 +41,7 @@ function mountLayer(options?: {
   image?: FloatingImage;
   layout?: ReturnType<typeof createLayout>;
   selectedImageId?: string | null;
+  readOnly?: boolean;
 }) {
   const currentImage = options?.image ?? image;
   return mount(SheetFloatingImageLayer, {
@@ -50,6 +51,7 @@ function mountLayer(options?: {
       layout: options?.layout ?? createLayout(),
       assetUrls: new Map([["asset-1", "blob:asset-1"]]),
       selectedImageId: options?.selectedImageId ?? "image-1",
+      readOnly: options?.readOnly ?? false,
     },
     global: { plugins: [createAppI18n("en-US")] },
   });
@@ -60,6 +62,28 @@ function floatingImageMenu(): HTMLElement | null {
 }
 
 describe("SheetFloatingImageLayer", () => {
+  test("keeps selection and preview available while preventing image edits", async () => {
+    const wrapper = mountLayer({ readOnly: true });
+    const fragment = wrapper.get('[data-floating-image-id="image-1"]');
+    await fragment.trigger("pointerdown", { button: 0, pointerId: 4, clientX: 10, clientY: 10 });
+    expect(wrapper.emitted("select")).toEqual([["image-1"]]);
+    expect(wrapper.findAll("[data-image-resize]")).toHaveLength(0);
+    await fragment.trigger("dblclick", { button: 0 });
+    expect(wrapper.emitted("preview")?.[0]?.[0]).toEqual(image);
+    await fragment.trigger("contextmenu", { clientX: 10, clientY: 10 });
+    const menu = floatingImageMenu()!;
+    expect(
+      menu
+        .querySelector<HTMLElement>('[data-floating-image-action="copy"]')
+        ?.getAttribute("aria-disabled"),
+    ).not.toBe("true");
+    expect(
+      menu
+        .querySelector<HTMLElement>('[data-floating-image-action="delete"]')
+        ?.getAttribute("aria-disabled"),
+    ).toBe("true");
+    wrapper.unmount();
+  });
   test("previews double-clicks retargeted by pointer capture without recording a move", async () => {
     const wrapper = mountLayer();
     const fragment = wrapper.get('[data-floating-image-id="image-1"]');

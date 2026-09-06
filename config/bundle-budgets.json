@@ -1,27 +1,27 @@
 {
   "version": 1,
-  "description": "Production budgets include shared editing sessions, eight runtime functions, the lazy XLSX codec Worker with native cell-image export, plus existing image tools. Deferred Workers remain included in total assets and have a separate cap; see ADR 0004.",
+  "description": "Production budgets combine shared formula editing, the lazy XLSX codec Worker and image tools with sheet management and the configurable two-row footer. Worker assets remain included in totals and their separate cap; see ADR 0004.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
       "pattern": "^index-.*\\.js$",
-      "maximumRawBytes": 435000,
-      "maximumGzipBytes": 122000
+      "maximumRawBytes": 465000,
+      "maximumGzipBytes": 130000
     },
     "css": {
       "pattern": "^index-.*\\.css$",
-      "maximumRawBytes": 82000,
-      "maximumGzipBytes": 12500
+      "maximumRawBytes": 90000,
+      "maximumGzipBytes": 13400
     }
   },
   "totalAssets": {
     "javascript": {
-      "maximumRawBytes": 2000000,
-      "maximumGzipBytes": 570000
+      "maximumRawBytes": 2035000,
+      "maximumGzipBytes": 580000
     },
     "css": {
-      "maximumRawBytes": 242000,
-      "maximumGzipBytes": 32500
+      "maximumRawBytes": 250000,
+      "maximumGzipBytes": 34000
     }
   },
   "deferredWorkers": {

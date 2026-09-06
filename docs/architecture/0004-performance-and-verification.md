@@ -126,6 +126,69 @@ deferred gzip limit changes to 288,000 B; its raw cap, entry budgets and total
 JavaScript budgets remain unchanged. The exact dependency license accompanies
 the deployed XLSX notices; generated media is stored without recompression.
 
+The compact workbook footer adds searchable sheet navigation, overflow controls,
+and active-tab visibility while removing unavailable view/zoom buttons. Its
+inspected production build measures 395,019 B entry JavaScript (110,460 B gzip),
+83,082 B entry CSS (12,473 B gzip), and 242,377 B total CSS (31,846 B gzip).
+The additional 3,166 B of CSS covers the navigation popup, responsive tabs, and
+focus states. Raw CSS limits intentionally become 84 KB for the entry and
+244 KB for all assets. JavaScript and gzip budgets remain unchanged; the feature
+reuses the existing menu/floating primitives and adds no runtime dependency.
+
+Sheet management adds V7 properties, undoable visibility/pinning/tab colors,
+and protection enforced by Core commands and Web editing entry points. The
+inspected production entry is 409,705 B JavaScript (114,223 B gzip), an increase
+of 14,686 B raw over the footer baseline. Total JavaScript is 960,722 B
+(280,231 B gzip); entry CSS is 84,318 B (12,627 B gzip). No dependency was added:
+the tab color panel uses the existing TDesign color picker. Entry limits become
+415/116 KB JavaScript and 86/13 KB CSS; total JavaScript becomes 970/284 KB.
+Total CSS budgets remain unchanged, with both entry and total gates enabled.
+
+The compact tab refinement fills inactive tabs and chooses contrasting text and
+icons, while active tabs use a neutral background with a colored top edge. Tabs
+open their menu directly through right-click or keyboard, and the add button
+follows the final tab. Hover darkens custom colors and recalculates foreground
+contrast. The inspected build has 84,290 B entry CSS (12,656 B gzip) and 32,029 B
+total CSS gzip. The total CSS gzip limit becomes 32,500 B; all other
+limits stay unchanged.
+
+The two-row footer adds a synchronized horizontal scrollbar, persisted statistics
+preferences, six numeric summaries and selectable digit grouping. Its inspected
+production entry measures 424,982 B JavaScript (118,159 B gzip) and 86,576 B CSS
+(12,981 B gzip); total JavaScript is 976,338 B (284,270 B gzip) and total CSS is
+245,871 B (32,354 B gzip). Limits become 430/120 KB entry JavaScript, 88/13.4 KB
+entry CSS, 985/288 KB total JavaScript and 248/33.5 KB total CSS. No dependency
+was added, and both entry and total gates remain active.
+
+The draggable sheet-tab divider and compact scrollbar end buttons share neutral
+footer colors in both themes. The inspected build measures 428,732 B entry
+JavaScript (119,158 B gzip), 88,534 B entry CSS (13,255 B gzip), and 247,829 B
+total CSS (32,628 B gzip). The entry CSS raw limit becomes 89 KB to include these
+controls and their focus states; all other limits remain unchanged.
+
+Scrolling preserves the selection identity in stored view state, so summary,
+style and filter computations remain cached. The cell layer uses constant-time
+visible-cell deduplication, skips empty merge lookups, moves row panes together,
+and reuses unchanged cell styles and render results. Active editor slots always
+refresh. In a local Chromium development-build capture at 1617 by 1290 pixels,
+60 frame-aligned scroll updates had a median interval of 74.3 ms before these
+changes and 30.0 ms afterwards; a 60-step drag-selection capture improved from
+45.8 to 16.8 ms. These are comparative diagnostics on an empty worksheet, not a
+cross-device timing gate. Regression tests protect unchanged selection-derived
+results during scrolling, live editing, image updates, frozen panes and extent
+growth.
+
+The combined formula/XLSX and sheet-management implementation retains the shared
+editing session, protected-sheet entry points, compact grid extents and the
+configurable footer. Its production build measures 461,549 B entry JavaScript
+(128,711 B gzip), 89,393 B entry CSS (13,383 B gzip), 2,028,413 B total JavaScript
+(578,634 B gzip), and 248,688 B total CSS (32,756 B gzip). Budgets combine both
+branches' additions: 465/130 KB entry JavaScript, 90/13.4 KB entry CSS,
+2,035/580 KB total JavaScript and 250/34 KB total CSS. The separate deferred-Worker
+cap stays at 1,020/288 KB; no runtime dependency is added by the integration.
+Worker verification checks the current serializer version when round-tripping
+XLSX so the V7 sheet-property migration cannot leave it expecting a V6 snapshot.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

@@ -45,6 +45,7 @@ export function useSheetImageActions(options: {
   let pending: { mode: ImageInsertMode; target: ImageTarget } | undefined;
 
   function captureTarget(address = options.getAddress()): ImageTarget | undefined {
+    if (options.getSheet().properties.protected) return;
     if (!options.flushPendingEdits()) return;
     const sheet = options.getSheet();
     return {
@@ -57,7 +58,8 @@ export function useSheetImageActions(options: {
   }
 
   function isCurrent(target: ImageTarget): boolean {
-    return options.getWorkbook() === target.workbook && target.workbook.sheets.has(target.sheetId);
+    const sheet = target.workbook.sheets.get(target.sheetId);
+    return options.getWorkbook() === target.workbook && !!sheet && !sheet.properties.protected;
   }
 
   function requestInsert(mode: ImageInsertMode): void {
@@ -76,11 +78,12 @@ export function useSheetImageActions(options: {
     mode: ImageInsertMode = "floating",
     target = captureTarget(),
   ): Promise<void> {
-    if (!target || busy.value) return;
+    if (!target || !isCurrent(target) || busy.value) return;
     busy.value = true;
     feedback.value = undefined;
     try {
       const asset = await prepareImageAsset(file);
+      if (!isCurrent(target)) return;
       await options.assetStore.put(asset);
       if (!isCurrent(target)) return;
       const altText = file.name || "";

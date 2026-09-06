@@ -5,6 +5,41 @@ import SheetAxisContextMenu from "../../../../../modules/sheet-grid/components/S
 import { createAppI18n } from "../../../../../shared/i18n";
 
 describe("SheetAxisContextMenu", () => {
+  test("disables all structural and dimension writes in read-only mode", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const wrapper = mount(SheetAxisContextMenu, {
+      attachTo: host,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: {
+        axis: "column",
+        selectionCount: 1,
+        maxBeforeCount: 3,
+        maxAfterCount: 3,
+        currentSize: 80,
+        minimumSize: 24,
+        maximumSize: 320,
+        readOnly: true,
+        anchor: { contextElement: host, getBoundingClientRect: () => new DOMRect(16, 16, 0, 0) },
+      },
+    });
+    try {
+      await nextTick();
+      const menu = new DOMWrapper(document.body).get('ul[role="menu"]');
+      for (const action of ["insert-before", "insert-after", "delete", "clear"]) {
+        expect(menu.get(`[data-axis-action="${action}"]`).attributes("aria-disabled")).toBe("true");
+      }
+      expect(
+        menu
+          .get<HTMLInputElement>(".sheet-axis-context-menu__number-input--size")
+          .attributes("disabled"),
+      ).toBe("");
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
+  });
+
   test("keeps disabled insert controls inert and outside menuitem semantics", async () => {
     const host = document.createElement("div");
     document.body.append(host);

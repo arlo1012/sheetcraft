@@ -4,6 +4,8 @@ import { isFormulaError, type FormulaValue } from "./formula/types.js";
 export type SelectionSummary = {
   average: number;
   count: number;
+  maximum: number;
+  minimum: number;
   numericCount: number;
   selectedCellCount: number;
   sum: number;
@@ -35,6 +37,8 @@ export function getSelectionSummary(sheet: Sheet, range: CellRange): SelectionSu
   let count = 0;
   let numericCount = 0;
   let sum = 0;
+  let minimum = 0;
+  let maximum = 0;
   const evaluator = createSheetEvaluator(sheet);
 
   const addValue = (value: FormulaValue): void => {
@@ -43,6 +47,13 @@ export function getSelectionSummary(sheet: Sheet, range: CellRange): SelectionSu
     }
     count += 1;
     if (typeof value === "number" && Number.isFinite(value)) {
+      if (numericCount === 0) {
+        minimum = value;
+        maximum = value;
+      } else {
+        minimum = Math.min(minimum, value);
+        maximum = Math.max(maximum, value);
+      }
       numericCount += 1;
       sum += value;
     }
@@ -68,6 +79,8 @@ export function getSelectionSummary(sheet: Sheet, range: CellRange): SelectionSu
   return {
     average: numericCount === 0 ? 0 : sum / numericCount,
     count,
+    maximum: Object.is(maximum, -0) ? 0 : maximum,
+    minimum: Object.is(minimum, -0) ? 0 : minimum,
     numericCount,
     selectedCellCount: rangeSize,
     sum: Object.is(sum, -0) ? 0 : sum,

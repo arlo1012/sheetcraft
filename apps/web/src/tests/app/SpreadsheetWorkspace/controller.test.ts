@@ -170,6 +170,73 @@ describe("spreadsheet workspace controller", () => {
     expect(controller.viewStates.size).toBe(1);
   });
 
+  test("keeps selection-derived state stable for scroll-only view updates", () => {
+    const controller = mountController();
+    const selection = {
+      active: { row: 3, column: 2 },
+      anchor: { row: 1, column: 1 },
+      focus: { row: 4, column: 5 },
+      mode: "cells" as const,
+    };
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection,
+        scrollPosition: { x: 120, y: 240 },
+        gridExtent: { rowCount: 120, columnCount: 40 },
+      }),
+    );
+
+    const initialSelection = controller.activeSheetViewState.value?.selection;
+    const initialAddress = controller.activeAddress.value;
+    const initialSummary = controller.activeSelectionSummary.value;
+    const initialStyle = controller.activeSelectionStyle.value;
+    const initialDataToolState = controller.dataToolState.value;
+
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection: {
+          ...selection,
+          active: { ...selection.active },
+          anchor: { ...selection.anchor },
+          focus: { ...selection.focus },
+        },
+        scrollPosition: { x: 480, y: 720 },
+        gridExtent: { rowCount: 240, columnCount: 80 },
+      }),
+    );
+
+    expect(controller.activeSheetViewState.value?.selection).toBe(initialSelection);
+    expect(controller.activeSheetViewState.value?.scrollPosition).toEqual({ x: 480, y: 720 });
+    expect(controller.activeSheetViewState.value?.gridExtent).toEqual({
+      rowCount: 240,
+      columnCount: 80,
+    });
+    expect(controller.activeAddress.value).toBe(initialAddress);
+    expect(controller.activeSelectionSummary.value).toBe(initialSummary);
+    expect(controller.activeSelectionStyle.value).toBe(initialStyle);
+    expect(controller.dataToolState.value).toBe(initialDataToolState);
+
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection: {
+          active: { row: 8, column: 6 },
+          anchor: { row: 8, column: 6 },
+          focus: { row: 9, column: 7 },
+          mode: "cells",
+        },
+        scrollPosition: { x: 480, y: 720 },
+        gridExtent: { rowCount: 240, columnCount: 80 },
+      }),
+    );
+
+    expect(controller.activeSheetViewState.value?.selection).not.toBe(initialSelection);
+    expect(controller.activeAddress.value).toEqual({ row: 8, column: 6 });
+    expect(controller.activeAddress.value).not.toBe(initialAddress);
+    expect(controller.activeSelectionSummary.value).not.toBe(initialSummary);
+    expect(controller.activeSelectionStyle.value).not.toBe(initialStyle);
+    expect(controller.dataToolState.value).not.toBe(initialDataToolState);
+  });
+
   test("preserves deleted sheet view state so undo restores the same viewport", () => {
     const controller = mountController();
     const firstSheetId = controller.activeSheet.value.id;

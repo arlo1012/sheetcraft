@@ -17,6 +17,7 @@ const props = defineProps<{
   minimumSize: number;
   maximumSize: number;
   anchor: FloatingReference;
+  readOnly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -81,10 +82,12 @@ function normalizeInsertCount(): number {
 }
 
 function requestInsert(direction: "before" | "after"): void {
+  if (props.readOnly) return;
   emit("insert", { direction, count: normalizeInsertCount() });
 }
 
 function requestResize(): void {
+  if (props.readOnly) return;
   if (sizeDraft.value === "") {
     return;
   }
@@ -181,7 +184,7 @@ onMounted(() => {
     >
       <MenuItem
         data-axis-action="insert-before"
-        :disabled="insertCount > maxBeforeCount"
+        :disabled="readOnly || insertCount > maxBeforeCount"
         :aria-label="getInsertLabel('before')"
         @select="requestInsert('before')"
       >
@@ -192,7 +195,7 @@ onMounted(() => {
             data-axis-insert-count="before"
             type="number"
             inputmode="numeric"
-            :disabled="insertCount > maxBeforeCount"
+            :disabled="readOnly || insertCount > maxBeforeCount"
             :value="countDraft"
             :min="1"
             :max="Math.max(1, maximumInsertCount)"
@@ -207,7 +210,7 @@ onMounted(() => {
       </MenuItem>
       <MenuItem
         data-axis-action="insert-after"
-        :disabled="insertCount > maxAfterCount"
+        :disabled="readOnly || insertCount > maxAfterCount"
         :aria-label="getInsertLabel('after')"
         @select="requestInsert('after')"
       >
@@ -218,7 +221,7 @@ onMounted(() => {
             data-axis-insert-count="after"
             type="number"
             inputmode="numeric"
-            :disabled="insertCount > maxAfterCount"
+            :disabled="readOnly || insertCount > maxAfterCount"
             :value="countDraft"
             :min="1"
             :max="Math.max(1, maximumInsertCount)"
@@ -243,6 +246,7 @@ onMounted(() => {
             :min="minimumSize"
             :max="maximumSize"
             step="1"
+            :disabled="readOnly"
             :aria-label="t(axis === 'row' ? 'axisMenu.rowHeight' : 'axisMenu.columnWidth')"
             @input="updateSizeDraft"
             @blur="requestResize"
@@ -253,10 +257,10 @@ onMounted(() => {
       </li>
 
       <MenuSeparator />
-      <MenuItem danger data-axis-action="delete" @select="emit('delete')">
+      <MenuItem danger data-axis-action="delete" :disabled="readOnly" @select="emit('delete')">
         {{ getSelectionActionLabel("delete") }}
       </MenuItem>
-      <MenuItem data-axis-action="clear" @select="emit('clear')">
+      <MenuItem data-axis-action="clear" :disabled="readOnly" @select="emit('clear')">
         {{ getSelectionActionLabel("clear") }}
       </MenuItem>
     </MenuSurface>

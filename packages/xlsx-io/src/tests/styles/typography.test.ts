@@ -96,9 +96,9 @@ describe("XLSX typography", () => {
       expect(format).toContain('horizontal="center"');
       expect(format).toContain('wrapText="1"');
       const restored = getActiveSheet((await decodeXlsx(result.bytes)).workbook);
-      expect(getCellStyle(restored, { row: 0, column: 0 })).toMatchObject(
-        getCellStyle(sheet, { row: 0, column: 0 }),
-      );
+      const expectedStyle = getCellStyle(sheet, { row: 0, column: 0 });
+      expect(expectedStyle).toBeDefined();
+      expect(getCellStyle(restored, { row: 0, column: 0 })).toMatchObject(expectedStyle!);
     },
   );
 

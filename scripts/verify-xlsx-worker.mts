@@ -292,8 +292,8 @@ async function main(): Promise<void> {
         }),
         "decode",
       );
-      if (decoded.snapshot.version !== 6)
-        throw new Error("XLSX Worker returned an unversioned snapshot.");
+      if (decoded.snapshot.version !== snapshot.version)
+        throw new Error("XLSX Worker did not return the current snapshot version.");
       assertFixture(decoded.snapshot);
 
       const imageWorkbook = deserializeWorkbook(snapshot);

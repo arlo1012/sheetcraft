@@ -20,10 +20,12 @@ const props = withDefaults(
     pasteFormatsDisabled?: boolean;
     cutDisabledReason?: string;
     hasImage?: boolean;
+    readOnly?: boolean;
   }>(),
   {
     pasteSpecialDisabled: false,
     pasteFormatsDisabled: false,
+    readOnly: false,
   },
 );
 
@@ -93,17 +95,17 @@ function onShortcutKeydown(event: KeyboardEvent): boolean {
   event.preventDefault();
   event.stopPropagation();
   if (action === "x") {
-    if (!props.cutDisabledReason) emit("cut");
+    if (!props.cutDisabledReason && !props.readOnly) emit("cut");
   } else if (action === "c") {
     emit("copy");
-  } else {
+  } else if (!props.readOnly) {
     emit("paste");
   }
   return true;
 }
 
 function openPasteSpecial(): void {
-  if (props.pasteSpecialDisabled) {
+  if (props.pasteSpecialDisabled || props.readOnly) {
     return;
   }
   submenuOpen.value = true;
@@ -165,7 +167,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
       <MenuItem
         data-cell-action="cut"
         aria-keyshortcuts="Control+X Meta+X"
-        :disabled="Boolean(cutDisabledReason)"
+        :disabled="Boolean(cutDisabledReason) || readOnly"
         :title="cutDisabledReason"
         :aria-description="cutDisabledReason"
         @select="emit('cut')"
@@ -180,6 +182,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
       <MenuItem
         data-cell-action="paste"
         aria-keyshortcuts="Control+V Meta+V"
+        :disabled="readOnly"
         @select="emit('paste')"
       >
         {{ t("cellMenu.paste") }}
@@ -190,7 +193,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
         aria-haspopup="menu"
         :aria-expanded="submenuOpen"
         :aria-controls="submenuOpen ? submenuId : undefined"
-        :disabled="pasteSpecialDisabled"
+        :disabled="pasteSpecialDisabled || readOnly"
         @select="openPasteSpecial"
       >
         {{ t("cellMenu.pasteSpecial") }}
@@ -205,13 +208,14 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
         </MenuItem>
         <MenuItem
           data-cell-action="convert-image-to-floating"
+          :disabled="readOnly"
           @select="emit('convertImageToFloating')"
         >
           {{ t("image.convertToFloating") }}
         </MenuItem>
         <MenuSeparator />
       </template>
-      <MenuItem data-cell-action="clear" @select="emit('clear')">
+      <MenuItem data-cell-action="clear" :disabled="readOnly" @select="emit('clear')">
         {{ t("cellMenu.clearContents") }}
       </MenuItem>
     </MenuSurface>
@@ -225,12 +229,12 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
       :data-paste-special-layout="stackedSubmenu ? 'stacked' : 'side'"
       @keydown="onSubmenuKeydown"
     >
-      <MenuItem data-cell-action="paste-values" @select="emit('pasteValues')">
+      <MenuItem data-cell-action="paste-values" :disabled="readOnly" @select="emit('pasteValues')">
         {{ t("cellMenu.pasteValues") }}
       </MenuItem>
       <MenuItem
         data-cell-action="paste-formats"
-        :disabled="pasteFormatsDisabled"
+        :disabled="pasteFormatsDisabled || readOnly"
         @select="emit('pasteFormats')"
       >
         {{ t("cellMenu.pasteFormats") }}

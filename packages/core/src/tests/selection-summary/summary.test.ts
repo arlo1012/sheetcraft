@@ -16,7 +16,15 @@ describe("selection summary", () => {
         start: { row: 0, column: 2 },
         end: { row: 0, column: 0 },
       }),
-    ).toEqual({ average: 15, count: 3, numericCount: 2, selectedCellCount: 3, sum: 30 });
+    ).toEqual({
+      average: 15,
+      count: 3,
+      maximum: 20,
+      minimum: 10,
+      numericCount: 2,
+      selectedCellCount: 3,
+      sum: 30,
+    });
   });
 
   test("ignores style-only cells and avoids scanning empty whole-axis ranges", () => {
@@ -33,6 +41,8 @@ describe("selection summary", () => {
     ).toEqual({
       average: 0,
       count: 1,
+      maximum: 0,
+      minimum: 0,
       numericCount: 1,
       selectedCellCount: MAX_SHEET_ROWS,
       sum: 0,
@@ -52,7 +62,15 @@ describe("selection summary", () => {
         start: { row: 0, column: 0 },
         end: { row: 0, column: 0 },
       }),
-    ).toEqual({ average: 7, count: 1, numericCount: 1, selectedCellCount: 1, sum: 7 });
+    ).toEqual({
+      average: 7,
+      count: 1,
+      maximum: 7,
+      minimum: 7,
+      numericCount: 1,
+      selectedCellCount: 1,
+      sum: 7,
+    });
     expect(iteratorSpy).toHaveBeenCalledOnce();
   });
 });

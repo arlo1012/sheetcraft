@@ -19,7 +19,10 @@ import {
   type FloatingImageResizeDirection,
   type FloatingImageViewportFragment,
 } from "@idea10/sheet-engine/floating-image-layout";
-import { adjustImageCropSelection } from "@idea10/sheet-engine/image-crop-selection";
+import {
+  adjustImageCropSelection,
+  type ImageCropGesture,
+} from "@idea10/sheet-engine/image-crop-selection";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
@@ -36,14 +39,18 @@ const SheetFloatingImageCropOverlay = defineAsyncComponent(
 );
 const MINIMUM_IMAGE_SIZE = 24;
 
-const props = defineProps<{
-  images: readonly FloatingImage[];
-  layout: SheetViewportLayout;
-  assetUrls: ReadonlyMap<string, string>;
-  loadingAssetIds?: ReadonlySet<string>;
-  missingAssetIds?: ReadonlySet<string>;
-  selectedImageId?: string | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    images: readonly FloatingImage[];
+    layout: SheetViewportLayout;
+    assetUrls: ReadonlyMap<string, string>;
+    loadingAssetIds?: ReadonlySet<string>;
+    missingAssetIds?: ReadonlySet<string>;
+    selectedImageId?: string | null;
+    readOnly?: boolean;
+  }>(),
+  { readOnly: false },
+);
 
 const emit = defineEmits<{
   select: [id: string | null];
@@ -100,14 +107,14 @@ const {
   cropGesture,
   canRestore,
   cacheImageSize,
-  startCrop,
+  startCrop: startCropEdit,
   endCropGesture,
-  cancelCrop,
-  applyCrop,
-  rotateImage,
-  flipImage,
-  restoreImage,
-  startCropGesture,
+  cancelCrop: cancelCropEdit,
+  applyCrop: applyCropEdit,
+  rotateImage: rotateImageEdit,
+  flipImage: flipImageEdit,
+  restoreImage: restoreImageEdit,
+  startCropGesture: startCropGestureEdit,
   moveCropGesture,
 } = useFloatingImageEditing({
   layer: layerRef,
@@ -181,9 +188,10 @@ function startGesture(image: FloatingImage, mode: Gesture["mode"], event: Pointe
     (event.currentTarget as HTMLElement);
   const target = layerRef.value;
   if (!target) return;
-  lastGestureMode = mode;
   emit("select", image.id);
   focusTarget.focus({ preventScroll: true });
+  if (props.readOnly) return;
+  lastGestureMode = mode;
   setPointerCapture(target, event.pointerId);
   previewImage.value = cloneImage(image);
   gesture.value = {
@@ -225,6 +233,34 @@ function onPointerMove(event: PointerEvent): void {
       props.layout,
       { minSize: MINIMUM_IMAGE_SIZE, maxSize: MAX_FLOATING_IMAGE_SIZE },
     ) ?? activeGesture.image;
+}
+
+function startCrop(): void {
+  if (!props.readOnly) startCropEdit();
+}
+
+function cancelCrop(restoreFocus = true): void {
+  cancelCropEdit(restoreFocus);
+}
+
+function applyCrop(): void {
+  if (!props.readOnly) applyCropEdit();
+}
+
+function rotateImage(turns: -1 | 1 | 2): void {
+  if (!props.readOnly) rotateImageEdit(turns);
+}
+
+function flipImage(axis: "horizontal" | "vertical"): void {
+  if (!props.readOnly) flipImageEdit(axis);
+}
+
+function restoreImage(): void {
+  if (!props.readOnly) restoreImageEdit();
+}
+
+function startCropGesture(direction: ImageCropGesture, event: PointerEvent): void {
+  if (!props.readOnly) startCropGestureEdit(direction, event);
 }
 
 function finishGesture(commit: boolean): void {
@@ -329,7 +365,7 @@ function openImageKeyboardContextMenu(image: FloatingImage, event: KeyboardEvent
 function requestConvertToCell(): void {
   const imageId = contextMenu.value?.imageId;
   closeContextMenu(false);
-  if (imageId) emit("convertToCell", imageId);
+  if (imageId && !props.readOnly) emit("convertToCell", imageId);
 }
 
 function requestPreview(): void {
@@ -344,8 +380,8 @@ function requestClipboard(mode: "copy" | "cut" | "paste"): void {
   closeContextMenu(true);
   if (!imageId) return;
   if (mode === "copy") emit("copy", imageId);
-  else if (mode === "cut") emit("cut", imageId);
-  else emit("paste", imageId);
+  else if (mode === "cut" && !props.readOnly) emit("cut", imageId);
+  else if (mode === "paste" && !props.readOnly) emit("paste", imageId);
 }
 
 function onImageDoubleClick(image: FloatingImage, event: MouseEvent): void {
@@ -373,7 +409,7 @@ function onLayerDoubleClick(event: MouseEvent): void {
 function requestDelete(): void {
   const imageId = contextMenu.value?.imageId;
   closeContextMenu(false);
-  if (imageId) emit("delete", imageId);
+  if (imageId && !props.readOnly) emit("delete", imageId);
 }
 
 watch(
@@ -389,6 +425,15 @@ watch(
   (selectedImageId) => {
     if (crop.value && selectedImageId !== crop.value.image.id) cancelCrop(false);
     if (contextMenu.value && selectedImageId !== contextMenu.value.imageId) closeContextMenu(false);
+  },
+);
+
+watch(
+  () => props.readOnly,
+  (readOnly) => {
+    if (!readOnly) return;
+    finishGesture(false);
+    cancelCrop(false);
   },
 );
 
@@ -446,11 +491,12 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     event.preventDefault();
     return;
   }
-  if (event.key === "Delete" || event.key === "Backspace") {
+  if (!props.readOnly && (event.key === "Delete" || event.key === "Backspace")) {
     emit("delete", image.id);
     event.preventDefault();
     return;
   }
+  if (props.readOnly) return;
   const distance = event.shiftKey ? 10 : 1;
   const offset = {
     ArrowLeft: { x: -distance, y: 0 },
@@ -522,7 +568,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
         @start="startCropGesture"
       />
       <SheetFloatingImageSelection
-        v-if="fragment.image.id === selectedImageId && !crop"
+        v-if="fragment.image.id === selectedImageId && !crop && !readOnly"
         :fragment="fragment"
         @resize="(direction, event) => startGesture(fragment.image, direction, event)"
       />
@@ -532,7 +578,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       :anchor="toolbarAnchor"
       :cropping="Boolean(crop)"
       :can-restore="canRestore"
-      :disabled="!assetUrls.has(selectedImage.assetId)"
+      :disabled="readOnly || !assetUrls.has(selectedImage.assetId)"
       @crop="startCrop"
       @rotate="rotateImage"
       @flip="flipImage"
@@ -543,6 +589,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     <SheetFloatingImageContextMenu
       v-if="contextMenu"
       :anchor="contextMenu.anchor"
+      :read-only="readOnly"
       @convert-to-cell="requestConvertToCell"
       @preview="requestPreview"
       @copy="requestClipboard('copy')"

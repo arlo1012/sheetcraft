@@ -6,6 +6,9 @@ import {
   createDuplicateSheetCommand,
   createMoveSheetCommand,
   createRenameSheetCommand,
+  createSetSheetPropertiesCommand,
+  applyWorkbookCommand,
+  createBatchSetCellContentsCommand,
 } from "../../commands/index.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import { WorkbookDomainError } from "../../errors.js";
@@ -84,10 +87,13 @@ describe("sheet commands", () => {
     );
     setRowHeight(source, 1, 40);
     setColumnWidth(source, 2, 144);
+    source.properties = { tabColor: "#123abc", pinned: true, hidden: false, protected: true };
 
     executeWorkbookCommand(
       session,
-      createDuplicateSheetCommand(session.workbook, source.id, { id: "sheet-2" }),
+      createDuplicateSheetCommand(session.workbook, source.id, {
+        id: "sheet-2",
+      }),
     );
 
     const copy = session.workbook.sheets.get("sheet-2")!;
@@ -104,15 +110,24 @@ describe("sheet commands", () => {
     });
     expect(copy.rowHeights.get(1)).toBe(40);
     expect(copy.columnWidths.get(2)).toBe(144);
+    expect(copy.properties).toEqual({
+      tabColor: "#123ABC",
+      pinned: false,
+      hidden: false,
+      protected: false,
+    });
 
     expect(undoWorkbookCommand(session)).toBe(true);
     expect(getWorkbookSheets(session.workbook).map((sheet) => sheet.id)).toEqual([source.id]);
     expect(session.workbook.activeSheetId).toBe(source.id);
     expect(redoWorkbookCommand(session)).toBe(true);
     expect(session.workbook.activeSheetId).toBe("sheet-2");
-    expect(getCellValue(session.workbook.sheets.get("sheet-2")!, { row: 1, column: 2 })).toBe(
-      "Budget",
-    );
+    expect(
+      getCellValue(session.workbook.sheets.get("sheet-2")!, {
+        row: 1,
+        column: 2,
+      }),
+    ).toBe("Budget");
 
     const restoredCopy = session.workbook.sheets.get("sheet-2")!;
     setCellValue(restoredCopy, { row: 1, column: 2 }, "Copy only");
@@ -170,7 +185,10 @@ describe("sheet commands", () => {
       createDeleteSheetCommand(session.workbook, session.workbook.activeSheetId),
     ).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
-        data: { code: "last_sheet_removal", details: { sheetId: session.workbook.activeSheetId } },
+        data: {
+          code: "last_sheet_removal",
+          details: { sheetId: session.workbook.activeSheetId },
+        },
       }),
     );
   });
@@ -180,7 +198,10 @@ describe("sheet commands", () => {
 
     expect(() => createDeleteSheetCommand(session.workbook, "missing-sheet")).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
-        data: { code: "sheet_not_found", details: { sheetId: "missing-sheet" } },
+        data: {
+          code: "sheet_not_found",
+          details: { sheetId: "missing-sheet" },
+        },
       }),
     );
   });
@@ -190,16 +211,24 @@ describe("sheet commands", () => {
 
     expect(() => createAddSheetCommand(session.workbook)).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
-        data: { code: "invalid_command_payload", details: { field: "idFactory", value: null } },
+        data: {
+          code: "invalid_command_payload",
+          details: { field: "idFactory", value: null },
+        },
       }),
     );
     expect(() => createRenameSheetCommand(session.workbook.activeSheetId, "   ")).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
-        data: { code: "invalid_command_payload", details: { field: "name", value: "   " } },
+        data: {
+          code: "invalid_command_payload",
+          details: { field: "name", value: "   " },
+        },
       }),
     );
     expect(() =>
-      createDuplicateSheetCommand(session.workbook, "missing", { id: "sheet-2" }),
+      createDuplicateSheetCommand(session.workbook, "missing", {
+        id: "sheet-2",
+      }),
     ).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
         data: { code: "sheet_not_found", details: { sheetId: "missing" } },
@@ -209,7 +238,10 @@ describe("sheet commands", () => {
       createMoveSheetCommand(session.workbook, session.workbook.activeSheetId, 1),
     ).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
-        data: { code: "invalid_command_payload", details: { field: "toIndex", value: 1 } },
+        data: {
+          code: "invalid_command_payload",
+          details: { field: "toIndex", value: 1 },
+        },
       }),
     );
     expect(() =>
@@ -226,5 +258,97 @@ describe("sheet commands", () => {
         },
       }),
     );
+  });
+
+  test("hides the active sheet reversibly and keeps a visible active sheet", () => {
+    const session = createTestWorkbookSession();
+    const first = session.workbook.activeSheetId;
+    executeWorkbookCommand(session, createAddSheetCommand(session.workbook, { id: "sheet-2" }));
+    executeWorkbookCommand(
+      session,
+      createSetSheetPropertiesCommand(session.workbook, "sheet-2", {
+        hidden: true,
+      }),
+    );
+    expect(session.workbook.activeSheetId).toBe(first);
+    expect(session.workbook.sheets.get("sheet-2")?.properties.hidden).toBe(true);
+    expect(() => setActiveSheet(session.workbook, "sheet-2")).toThrow("hidden");
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(session.workbook.activeSheetId).toBe("sheet-2");
+    expect(session.workbook.sheets.get("sheet-2")?.properties.hidden).toBe(false);
+  });
+
+  test("cannot hide or delete the only visible sheet", () => {
+    const session = createTestWorkbookSession();
+    const first = session.workbook.activeSheetId;
+    executeWorkbookCommand(session, createAddSheetCommand(session.workbook, { id: "sheet-2" }));
+    executeWorkbookCommand(
+      session,
+      createSetSheetPropertiesCommand(session.workbook, "sheet-2", {
+        hidden: true,
+      }),
+    );
+    expect(() =>
+      createSetSheetPropertiesCommand(session.workbook, first, {
+        hidden: true,
+      }),
+    ).toThrow("visible");
+    expect(() => createDeleteSheetCommand(session.workbook, first)).toThrow(
+      "contain at least one sheet",
+    );
+  });
+
+  test("validates an explicit active sheet before changing sheet properties", () => {
+    const session = createTestWorkbookSession();
+    executeWorkbookCommand(session, createAddSheetCommand(session.workbook, { id: "sheet-2" }));
+    const before = structuredClone(session.workbook.sheets.get("sheet-2")?.properties);
+    const activeBefore = session.workbook.activeSheetId;
+    expect(() =>
+      applyWorkbookCommand(session.workbook, {
+        type: "setSheetProperties",
+        sheetId: "sheet-2",
+        properties: { pinned: false, hidden: true, protected: false },
+        activeSheetId: "sheet-2",
+      }),
+    ).toThrow("activeSheetId");
+    expect(session.workbook.sheets.get("sheet-2")?.properties).toEqual(before);
+    expect(session.workbook.activeSheetId).toBe(activeBefore);
+    expect(() =>
+      applyWorkbookCommand(session.workbook, {
+        type: "setSheetProperties",
+        sheetId: "sheet-2",
+        properties: { pinned: false, hidden: true, protected: false },
+        activeSheetId: "missing",
+      }),
+    ).toThrow("does not exist");
+    expect(session.workbook.sheets.get("sheet-2")?.properties).toEqual(before);
+  });
+
+  test("rejects protected sheets atomically across a cell batch", () => {
+    const session = createTestWorkbookSession();
+    const first = session.workbook.activeSheetId;
+    executeWorkbookCommand(session, createAddSheetCommand(session.workbook, { id: "sheet-2" }));
+    executeWorkbookCommand(
+      session,
+      createSetSheetPropertiesCommand(session.workbook, "sheet-2", { protected: true }),
+    );
+    expect(() =>
+      applyWorkbookCommand(
+        session.workbook,
+        createBatchSetCellContentsCommand([
+          {
+            sheetId: first,
+            address: { row: 0, column: 0 },
+            content: { kind: "literal", value: "ok" },
+          },
+          {
+            sheetId: "sheet-2",
+            address: { row: 0, column: 0 },
+            content: { kind: "literal", value: "blocked" },
+          },
+        ]),
+      ),
+    ).toThrow("protected");
+    expect(getCellValue(session.workbook.sheets.get(first)!, { row: 0, column: 0 })).toBeNull();
   });
 });

@@ -50,8 +50,8 @@ describe("App", () => {
 
     expect(wrapper.get("[data-app-root]").attributes("aria-label")).toBe("idea10 workspace");
     expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet1");
-    expect(wrapper.get('[role="grid"]').attributes("aria-rowcount")).toBe("1000");
-    expect(wrapper.get('[role="grid"]').attributes("aria-colcount")).toBe("100");
+    expect(wrapper.get('[role="grid"]').attributes("aria-rowcount")).toBe("100");
+    expect(wrapper.get('[role="grid"]').attributes("aria-colcount")).toBe("26");
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
     expect(wrapper.get(".spreadsheet-ribbon").attributes("aria-label")).toBe("Workbook tools");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("Home");
@@ -63,9 +63,13 @@ describe("App", () => {
   test("creates, renames, and deletes sheets from the sheet tabs", async () => {
     const wrapper = mountApp();
 
-    await wrapper.get('[aria-label="Actions for Sheet1"]').trigger("click");
+    await wrapper
+      .get('[role="tab"][title="Sheet1 (double-click to rename)"]')
+      .trigger("contextmenu");
     let sheetMenu = new DOMWrapper(document.body).get('[role="menu"]');
-    expect(sheetMenu.get('[role="menuitem"]:last-child').attributes("aria-disabled")).toBe("true");
+    expect(sheetMenu.get('[data-sheet-tab-action="delete"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
     await sheetMenu.trigger("keydown", { key: "Escape" });
 
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
@@ -79,12 +83,11 @@ describe("App", () => {
     await renameInput.trigger("keydown", { key: "Enter" });
     expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Budget");
 
-    await wrapper.get('[aria-label="Actions for Budget"]').trigger("click");
+    await wrapper
+      .get('[role="tab"][title="Budget (double-click to rename)"]')
+      .trigger("contextmenu");
     sheetMenu = new DOMWrapper(document.body).get('[role="menu"]');
-    await sheetMenu
-      .findAll('[role="menuitem"]')
-      .find((item) => item.text() === "Delete sheet")
-      ?.trigger("click");
+    await sheetMenu.get('[data-sheet-tab-action="delete"]').trigger("click");
     expect(wrapper.findAll('[role="tab"]')).toHaveLength(1);
     expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet1");
   });
@@ -267,9 +270,9 @@ describe("App", () => {
     });
 
     const summary = wrapper.get("[data-selection-summary]").text();
-    expect(summary).toContain("Average:15");
-    expect(summary).toContain("Count:2");
-    expect(summary).toContain("Sum:30");
+    expect(summary).toContain("Average=15");
+    expect(summary).toContain("Count=2");
+    expect(summary).toContain("Sum=30");
   });
 
   test("summarizes whole rows, columns, and the full sheet", async () => {
@@ -287,19 +290,19 @@ describe("App", () => {
     await enterValue("20");
 
     await wrapper.get('[aria-label="Select row 1"]').trigger("mousedown", { button: 0 });
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:15");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count:2");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum:30");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=15");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=2");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum=30");
 
     await wrapper.get('[aria-label="Select column A"]').trigger("mousedown", { button: 0 });
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:54.5");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count:2");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum:109");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=54.5");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=2");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum=109");
 
     await wrapper.get('[aria-label="Select all cells"]').trigger("click");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:43");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count:3");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum:129");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=43");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=3");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum=129");
   });
 
   test("formats and clears the current selection as reversible workbook actions", async () => {

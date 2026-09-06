@@ -13,6 +13,7 @@ import type {
 defineProps<{
   state: SelectionCellStyleState;
   disabled: boolean;
+  readOnly?: boolean;
   formatPainterActive?: boolean;
   dataState?: HomeDataToolState;
   mergeState?: MergeCellsState;
@@ -34,6 +35,7 @@ const emit = defineEmits<{
   insertImage: [mode: "cell" | "floating"];
   undo: [];
   redo: [];
+  toggleProtection: [];
 }>();
 
 const { t } = useAppI18n();
@@ -56,6 +58,7 @@ defineSlots<{ "file-actions"?: () => unknown }>();
       <HomeFormatToolbar
         :state="state"
         :disabled="disabled"
+        :read-only="readOnly"
         :format-painter-active="formatPainterActive"
         :data-state="dataState"
         :merge-state="mergeState"
@@ -74,6 +77,7 @@ defineSlots<{ "file-actions"?: () => unknown }>();
         @insert-image="emit('insertImage', $event)"
         @undo="emit('undo')"
         @redo="emit('redo')"
+        @toggle-protection="emit('toggleProtection')"
       />
     </section>
   </header>

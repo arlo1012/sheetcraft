@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import type { CellAddress, CellRange } from "@idea10/core/workbook";
@@ -22,6 +22,7 @@ const props = defineProps<{
   sheetId?: string;
   editSession?: CellEditSession;
   handleReferenceKeydown?: (event: KeyboardEvent) => boolean;
+  readOnly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -75,6 +76,17 @@ const coloredReferences = computed(() =>
 let finishAfterComposition = false;
 let compositionStartedHere = false;
 
+watch(
+  () => props.readOnly,
+  (readOnly) => {
+    if (!readOnly) return;
+    editSession.cancel();
+    formulaFocused.value = false;
+    finishAfterComposition = false;
+    compositionStartedHere = false;
+  },
+);
+
 function readInputValue(event: Event): string {
   return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
 }
@@ -88,6 +100,7 @@ function context() {
 }
 
 function onFormulaFocus(): void {
+  if (props.readOnly) return;
   formulaFocused.value = true;
   finishAfterComposition = false;
   if (!formulaOwnsSession.value && !editingThisCell.value) {
@@ -97,6 +110,10 @@ function onFormulaFocus(): void {
 }
 
 function onFormulaInput(event: Event): void {
+  if (props.readOnly) {
+    if (formulaInput.value) formulaInput.value.value = props.inputValue;
+    return;
+  }
   const value = readInputValue(event);
   const startsFormula = editSession.state.draft === "" && value.startsWith("=");
   if (
@@ -115,11 +132,12 @@ function onFormulaInput(event: Event): void {
 }
 
 function flushPendingEdit(): boolean {
+  if (props.readOnly) return true;
   return editSession.flush();
 }
 
 function hasPendingEdit(): boolean {
-  return editSession.hasPendingEdit();
+  return !props.readOnly && editSession.hasPendingEdit();
 }
 
 function captureSelection(): void {
@@ -133,7 +151,7 @@ function captureSelection(): void {
 }
 
 function insertFormulaLineBreak(): void {
-  if (!formulaOwnsSession.value) return;
+  if (props.readOnly || !formulaOwnsSession.value) return;
   const input = formulaInput.value;
   if (!input) {
     return;
@@ -148,7 +166,7 @@ function insertFormulaLineBreak(): void {
 }
 
 function applyFormulaTextEdit(edit: { value: string; caret: number }): void {
-  if (!formulaOwnsSession.value) return;
+  if (props.readOnly || !formulaOwnsSession.value) return;
   const input = formulaInput.value;
   editSession.setDraft(edit.value);
   if (!input) return;
@@ -161,6 +179,7 @@ function applyFormulaTextEdit(edit: { value: string; caret: number }): void {
 }
 
 function onFormulaKeydown(event: KeyboardEvent): void {
+  if (props.readOnly) return;
   if (formulaAssistRef.value?.handleKeydown(event)) {
     event.preventDefault();
     event.stopPropagation();
@@ -202,6 +221,10 @@ function onFormulaKeydown(event: KeyboardEvent): void {
 }
 
 function onFormulaBlur(event: FocusEvent): void {
+  if (props.readOnly) {
+    formulaFocused.value = false;
+    return;
+  }
   captureSelection();
   const ownedBeforeBlur = formulaOwnsSession.value;
   formulaFocused.value = false;
@@ -216,6 +239,7 @@ function onFormulaBlur(event: FocusEvent): void {
 }
 
 function onFormulaCompositionStart(): void {
+  if (props.readOnly) return;
   if (
     !formulaOwnsSession.value &&
     !editSession.begin(context(), {
@@ -235,6 +259,7 @@ function onFormulaCompositionStart(): void {
 }
 
 function onFormulaCompositionEnd(event: CompositionEvent): void {
+  if (props.readOnly) return;
   if (!compositionStartedHere) return;
   compositionStartedHere = false;
   editSession.endComposition(readInputValue(event));
@@ -321,6 +346,8 @@ defineExpose({
         class="workbook-formula-bar__formula-input"
         :class="{ 'has-formula-colors': showFormulaColors }"
         :value="formulaDraft"
+        :readonly="readOnly"
+        :aria-readonly="readOnly ? true : undefined"
         rows="1"
         wrap="off"
         autocomplete="off"
@@ -356,7 +383,10 @@ defineExpose({
         :value="formulaDraft"
         :input="formulaInput"
         :active="
-          formulaFocused && formulaOwnsSession && editSession.state.surface === 'formula-bar'
+          !readOnly &&
+          formulaFocused &&
+          formulaOwnsSession &&
+          editSession.state.surface === 'formula-bar'
         "
         :composing="isComposing"
         @text-edit="applyFormulaTextEdit"

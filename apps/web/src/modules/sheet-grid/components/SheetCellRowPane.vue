@@ -1,0 +1,145 @@
+<script setup lang="ts">
+import { useAppI18n } from "../../../shared/i18n";
+import SheetImageContent from "../../sheet-images/components/SheetImageContent.vue";
+import type { CellAddress } from "@idea10/core/workbook";
+import type { Rect } from "@idea10/sheet-engine/geometry";
+import type { VisibleCell } from "./sheet-cell-view";
+
+const props = defineProps<{
+  cells: readonly VisibleCell[];
+  locale: string;
+  imageAssetUrls?: ReadonlyMap<string, string>;
+  loadingImageAssetIds?: ReadonlySet<string>;
+}>();
+const emit = defineEmits<{
+  cellMousedown: [address: CellAddress, event: MouseEvent];
+  cellDoubleClick: [address: CellAddress, event: MouseEvent];
+  cellContextmenu: [address: CellAddress, event: MouseEvent];
+}>();
+defineSlots<{ "active-cell"?: (props: { cellRect: Rect }) => unknown }>();
+const { t } = useAppI18n();
+
+function imageSource(cell: VisibleCell): string | undefined {
+  return cell.image ? props.imageAssetUrls?.get(cell.image.assetId) : undefined;
+}
+
+function imageLoading(cell: VisibleCell): boolean {
+  return Boolean(cell.image && props.loadingImageAssetIds?.has(cell.image.assetId));
+}
+
+function memoDependencies(cell: VisibleCell): readonly unknown[] {
+  return [
+    cell.style,
+    cell.text,
+    cell.image?.assetId,
+    cell.image?.altText,
+    cell.imageTransformKey,
+    cell.multiline,
+    cell.wrapped,
+    cell.selected,
+    cell.editing,
+    imageSource(cell),
+    imageLoading(cell),
+    props.locale,
+    cell.active ? {} : null,
+  ];
+}
+</script>
+
+<template>
+  <div>
+    <div
+      v-for="cell in cells"
+      :key="cell.key"
+      v-memo="memoDependencies(cell)"
+      class="sheet-cell-layer__cell"
+      :class="{
+        'has-value': cell.text.length > 0,
+        'has-image': Boolean(cell.image),
+        'is-multiline': cell.multiline,
+        'is-wrapped': cell.wrapped,
+        'is-active': cell.active,
+        'is-editing': cell.editing,
+        'is-selected': cell.selected,
+      }"
+      :style="cell.style"
+      :data-row="cell.address.row"
+      :data-column="cell.address.column"
+      role="gridcell"
+      :aria-rowindex="cell.address.row + 1"
+      :aria-colindex="cell.address.column + 1"
+      :aria-selected="cell.selected"
+      @mousedown.left.prevent="emit('cellMousedown', cell.address, $event)"
+      @dblclick.left.prevent="emit('cellDoubleClick', cell.address, $event)"
+      @contextmenu="emit('cellContextmenu', cell.address, $event)"
+    >
+      <SheetImageContent
+        v-if="cell.image && imageSource(cell)"
+        class="sheet-cell-layer__image"
+        :src="imageSource(cell) ?? ''"
+        :alt-text="cell.image.altText || t('image.cellAlt')"
+        :transform="cell.image.transform"
+        fit="contain"
+      />
+      <span
+        v-else-if="cell.image"
+        class="sheet-cell-layer__image-placeholder"
+        role="img"
+        :aria-label="imageLoading(cell) ? t('image.loading') : t('image.assetUnavailable')"
+        >{{ imageLoading(cell) ? t("image.loading") : t("image.assetUnavailable") }}</span
+      >
+      <span v-else-if="cell.text" class="sheet-cell-layer__value">{{ cell.text }}</span>
+      <slot v-if="cell.active" name="active-cell" :cell-rect="cell.rect" />
+    </div>
+  </div>
+</template>
+
+<style scoped lang="scss">
+.sheet-cell-layer__cell {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 5px;
+  background: var(--idea-surface-panel);
+  border-right: 1px solid var(--idea-border-subtle);
+  border-bottom: 1px solid var(--idea-border-subtle);
+  color: var(--idea-text-primary);
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: auto;
+  user-select: none;
+  &.is-active {
+    overflow: visible;
+  }
+  &.is-multiline.is-active:not(.is-editing) {
+    overflow: hidden;
+  }
+  &.has-image {
+    padding: 2px;
+    overflow: hidden;
+  }
+}
+.sheet-cell-layer__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.sheet-cell-layer__image-placeholder {
+  overflow: hidden;
+  color: var(--idea-text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+}
+.sheet-cell-layer__value {
+  overflow: hidden;
+  text-overflow: clip;
+}
+.sheet-cell-layer__cell.is-multiline .sheet-cell-layer__value {
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+</style>

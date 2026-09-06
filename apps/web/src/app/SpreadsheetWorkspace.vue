@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, shallowReactive, useId, watch } from "vue";
 import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import {
   createIndexedDbImageAssetStore,
@@ -9,6 +9,8 @@ import { useImageAssetUrls } from "../modules/image-assets/useImageAssetUrls";
 import { useSheetImageActions } from "../modules/sheet-images/useSheetImageActions";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
+import SheetHorizontalScrollbar from "../modules/sheet-grid/components/SheetHorizontalScrollbar.vue";
+import type { SheetHorizontalScrollState } from "../modules/sheet-grid/horizontal-scroll";
 import WorkbookFormulaBar from "../modules/workbook/components/WorkbookFormulaBar.vue";
 import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.vue";
 import { useSpreadsheetWorkspaceController } from "./composables/useSpreadsheetWorkspaceController";
@@ -21,9 +23,20 @@ import type { WorkbookStore } from "../modules/workbook-persistence/workbookStor
 import XlsxFileActions from "../modules/workbook-xlsx/components/XlsxFileActions.vue";
 import XlsxFileFeedback from "../modules/workbook-xlsx/components/XlsxFileFeedback.vue";
 import { useWorkbookXlsxActions } from "../modules/workbook-xlsx/useWorkbookXlsxActions";
+import type { SheetProperties } from "@idea10/core/workbook";
 
 const props = defineProps<{ workbookStore?: WorkbookStore; imageAssetStore?: ImageAssetStore }>();
 const formulaBarRef = ref<InstanceType<typeof WorkbookFormulaBar> | null>(null);
+const gridId = `workbook-grid-${useId()}`;
+const horizontalScrollState = shallowReactive<SheetHorizontalScrollState>({
+  position: 0,
+  viewportSize: 0,
+  contentSize: 0,
+});
+
+function updateHorizontalScrollState(state: SheetHorizontalScrollState): void {
+  Object.assign(horizontalScrollState, state);
+}
 
 const {
   session,
@@ -72,6 +85,8 @@ const {
   insertAxis,
   deleteAxis,
   selectSheet,
+  updateSheetProperties,
+  restoreSheet,
   addSheet,
   duplicateSheet,
   renameSheet,
@@ -85,6 +100,7 @@ const {
   undo,
   redo,
   setGridNavigator,
+  scrollGridHorizontally,
 } = useSpreadsheetWorkspaceController();
 
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
@@ -139,6 +155,14 @@ const xlsxActions = useWorkbookXlsxActions({
 });
 const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback } = xlsxActions;
 
+function changeSheetProperties(payload: {
+  sheetId: string;
+  patch: Partial<SheetProperties>;
+}): void {
+  if (!cellEditSession.finish()) return;
+  updateSheetProperties(payload);
+}
+
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (
     event.key === "F2" &&
@@ -180,7 +204,14 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     />
     <SpreadsheetRibbon
       :state="activeSelectionStyle"
-      :disabled="!isFormattingSupported"
+      :disabled="!isFormattingSupported || activeSheet.properties.protected"
+      :read-only="activeSheet.properties.protected"
+      @toggle-protection="
+        changeSheetProperties({
+          sheetId: activeSheet.id,
+          patch: { protected: !activeSheet.properties.protected },
+        })
+      "
       :format-painter-active="formatPainterActive"
       :data-state="dataToolState"
       :merge-state="mergeState"
@@ -237,6 +268,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       />
     </div>
     <WorkbookFormulaBar
+      :read-only="activeSheet.properties.protected"
       :key="workbookGeneration"
       ref="formulaBarRef"
       :inert="loading || fileBusy || xlsxBusy"
@@ -255,6 +287,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     />
     <div class="spreadsheet-workspace__grid" :inert="loading || fileBusy || xlsxBusy">
       <SheetGrid
+        :grid-id="gridId"
+        external-horizontal-scrollbar
+        :read-only="activeSheet.properties.protected"
         :key="workbookGeneration"
         :ref="setGridNavigator"
         :sheet="activeSheet"
@@ -283,6 +318,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @undo="undo"
         @redo="redo"
         @view-state-change="updateActiveSheetViewState"
+        @horizontal-scroll-change="updateHorizontalScrollState"
       />
     </div>
     <WorkbookStatusBar
@@ -296,14 +332,25 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @rename="renameSheet"
       @delete="cellEditSession.finish() && deleteSheet($event)"
       @move="moveSheet"
-    />
+      @update-properties="changeSheetProperties"
+      @restore="cellEditSession.finish() && restoreSheet($event)"
+    >
+      <template #horizontal-scrollbar>
+        <SheetHorizontalScrollbar
+          :key="activeSheet.id"
+          :state="horizontalScrollState"
+          :controls="gridId"
+          @scroll="scrollGridHorizontally"
+        />
+      </template>
+    </WorkbookStatusBar>
   </section>
 </template>
 
 <style scoped lang="scss">
 .spreadsheet-workspace {
   display: grid;
-  grid-template-rows: auto auto 34px minmax(0, 1fr) 30px;
+  grid-template-rows: auto auto 34px minmax(0, 1fr) 49px;
   grid-template-columns: minmax(0, 1fr);
   width: 100%;
   height: 100dvh;

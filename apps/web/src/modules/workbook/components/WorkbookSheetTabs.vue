@@ -1,9 +1,28 @@
 <script setup lang="ts">
-import { Plus } from "lucide-vue-next";
-import { nextTick, onBeforeUnmount, ref, type ComponentPublicInstance } from "vue";
+import {
+  ChevronFirst,
+  ChevronLast,
+  ChevronLeft,
+  ChevronRight,
+  LockKeyhole,
+  Pin,
+  Plus,
+} from "lucide-vue-next";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+  type ComponentPublicInstance,
+} from "vue";
 import { useAppI18n } from "../../../shared/i18n";
-import type { Sheet } from "@idea10/core/workbook";
+import type { Sheet, SheetProperties } from "@idea10/core/workbook";
+import { getVisibleSheets } from "../sheet-navigation";
+import { getSheetTabColorStyles } from "../sheet-tab-color";
 import SheetTabMenu from "./SheetTabMenu.vue";
+import WorkbookSheetNavigator from "./WorkbookSheetNavigator.vue";
 
 const { t } = useAppI18n();
 
@@ -19,19 +38,43 @@ const emit = defineEmits<{
   rename: [payload: { sheetId: string; name: string }];
   move: [payload: { sheetId: string; toIndex: number }];
   delete: [sheetId: string];
+  updateProperties: [payload: { sheetId: string; patch: Partial<SheetProperties> }];
+  restore: [sheetId: string];
 }>();
+
+const visibleSheets = computed(() => getVisibleSheets(props.sheets));
+
+function moveTarget(sheet: Sheet, direction: -1 | 1): Sheet | undefined {
+  const group = visibleSheets.value.filter(
+    (entry) => entry.properties.pinned === sheet.properties.pinned,
+  );
+  return group[group.findIndex((entry) => entry.id === sheet.id) + direction];
+}
+
+function updatePropertiesFromMenu(sheet: Sheet, patch: Partial<SheetProperties>): void {
+  closeMenu();
+  emit("updateProperties", { sheetId: sheet.id, patch });
+  void nextTick(() => tabButtons.get(patch.hidden ? props.activeSheetId : sheet.id)?.focus());
+}
+
+function setTabColor(sheet: Sheet, color: string | null): void {
+  updatePropertiesFromMenu(sheet, { tabColor: color?.toUpperCase() ?? undefined });
+}
 
 const renamingSheetId = ref<string>();
 const renameValue = ref("");
 const renameInput = ref<HTMLInputElement>();
 const tabButtons = new Map<string, HTMLButtonElement>();
-type SheetTabMenuInstance = ComponentPublicInstance & {
-  focusTrigger: () => void;
-  getTriggerRect: () => DOMRect | undefined;
-};
-
-const sheetTabMenus = new Map<string, SheetTabMenuInstance>();
+const tabList = ref<HTMLDivElement>();
+const hasOverflow = ref(false);
+const canScrollLeft = ref(false);
+const canScrollRight = ref(false);
+let resizeObserver: ResizeObserver | undefined;
 const openMenuSheetId = ref<string>();
+const menuSheet = computed(() => props.sheets.find((sheet) => sheet.id === openMenuSheetId.value));
+const menuAnchor = computed(() =>
+  openMenuSheetId.value ? (tabButtons.get(openMenuSheetId.value) ?? null) : null,
+);
 const menuPosition = ref({ left: 4, bottom: 34 });
 const draggedSheetId = ref<string>();
 const dropTarget = ref<{ sheetId: string; side: "before" | "after" }>();
@@ -50,18 +93,8 @@ function setTabButton(sheetId: string, element: Element | ComponentPublicInstanc
   }
 }
 
-function setSheetTabMenu(
-  sheetId: string,
-  instance: Element | ComponentPublicInstance | null,
-): void {
-  if (instance && "focusTrigger" in instance && "getTriggerRect" in instance) {
-    sheetTabMenus.set(sheetId, instance as SheetTabMenuInstance);
-  } else {
-    sheetTabMenus.delete(sheetId);
-  }
-}
-
 function startRename(sheet: Sheet): void {
+  closeMenu();
   renamingSheetId.value = sheet.id;
   renameValue.value = sheet.name;
   void nextTick(() => renameInput.value?.focus());
@@ -83,13 +116,13 @@ function closeMenu(restoreFocus = false): void {
   const sheetId = openMenuSheetId.value;
   openMenuSheetId.value = undefined;
   if (restoreFocus && sheetId) {
-    void nextTick(() => sheetTabMenus.get(sheetId)?.focusTrigger());
+    void nextTick(() => tabButtons.get(sheetId)?.focus());
   }
 }
 
 function setMenuPosition(clientX: number, clientY: number): void {
   menuPosition.value = {
-    left: Math.max(4, Math.min(clientX, window.innerWidth - 140)),
+    left: Math.max(8, Math.min(clientX, window.innerWidth - 184)),
     bottom: Math.max(4, Math.min(window.innerHeight - clientY + 4, window.innerHeight - 76)),
   };
 }
@@ -98,18 +131,10 @@ function openMenu(sheet: Sheet, pointer?: { clientX: number; clientY: number }):
   if (pointer) {
     setMenuPosition(pointer.clientX, pointer.clientY);
   } else {
-    const rect = sheetTabMenus.get(sheet.id)?.getTriggerRect();
+    const rect = tabButtons.get(sheet.id)?.getBoundingClientRect();
     setMenuPosition(rect?.left ?? 4, rect?.top ?? window.innerHeight - 30);
   }
   openMenuSheetId.value = sheet.id;
-}
-
-function toggleMenu(sheet: Sheet): void {
-  if (openMenuSheetId.value === sheet.id) {
-    closeMenu(true);
-    return;
-  }
-  openMenu(sheet);
 }
 
 function renameFromMenu(sheet: Sheet): void {
@@ -124,18 +149,16 @@ function duplicateFromMenu(sheet: Sheet): void {
 }
 
 function moveFromMenu(sheet: Sheet, direction: -1 | 1): void {
-  const index = props.sheets.findIndex((entry) => entry.id === sheet.id);
-  const toIndex = index + direction;
-  if (index < 0 || toIndex < 0 || toIndex >= props.sheets.length) {
-    return;
-  }
+  const target = moveTarget(sheet, direction);
+  if (!target) return;
+  const toIndex = props.sheets.indexOf(target);
   closeMenu();
   emit("move", { sheetId: sheet.id, toIndex });
   void nextTick(() => tabButtons.get(sheet.id)?.focus());
 }
 
 function deleteFromMenu(sheet: Sheet): void {
-  if (props.sheets.length <= 1) {
+  if (visibleSheets.value.length <= 1) {
     return;
   }
   closeMenu();
@@ -146,6 +169,84 @@ function selectSheet(sheetId: string): void {
   closeMenu();
   emit("select", sheetId);
 }
+
+function updateScrollState(): void {
+  const list = tabList.value;
+  if (!list) return;
+  hasOverflow.value = list.scrollWidth > list.clientWidth + 1;
+  canScrollLeft.value = list.scrollLeft > 1;
+  canScrollRight.value = list.scrollLeft + list.clientWidth < list.scrollWidth - 1;
+}
+
+function revealActiveSheet(): void {
+  const list = tabList.value;
+  const item = tabButtons.get(props.activeSheetId)?.parentElement;
+  if (!list || !item) return;
+  const viewport = list.getBoundingClientRect();
+  const tab = item.getBoundingClientRect();
+  if (tab.left < viewport.left) {
+    list.scrollLeft += tab.left - viewport.left;
+  } else if (tab.right > viewport.right) {
+    list.scrollLeft += tab.right - viewport.right;
+  }
+  updateScrollState();
+}
+
+function scrollTabs(direction: -1 | 1): void {
+  const list = tabList.value;
+  if (!list) return;
+  closeMenu();
+  list.scrollLeft += direction * Math.max(80, list.clientWidth * 0.7);
+  updateScrollState();
+}
+
+function scrollTabsToEdge(direction: -1 | 1): void {
+  const list = tabList.value;
+  if (!list) return;
+  closeMenu();
+  list.scrollLeft = direction === -1 ? 0 : Math.max(0, list.scrollWidth - list.clientWidth);
+  updateScrollState();
+}
+
+function onTabWheel(event: WheelEvent): void {
+  const list = tabList.value;
+  if (!list || !hasOverflow.value || event.ctrlKey || event.deltaX !== 0) return;
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? list.clientWidth : 1;
+  const previous = list.scrollLeft;
+  list.scrollLeft += event.deltaY * unit;
+  if (list.scrollLeft !== previous) {
+    event.preventDefault();
+    closeMenu();
+    updateScrollState();
+  }
+}
+
+watch(
+  () => [
+    props.activeSheetId,
+    ...visibleSheets.value.map(
+      (sheet) =>
+        `${sheet.id}:${sheet.name}:${sheet.properties.pinned}:${sheet.properties.protected}`,
+    ),
+  ],
+  () => {
+    if (
+      openMenuSheetId.value &&
+      !visibleSheets.value.some((sheet) => sheet.id === openMenuSheetId.value)
+    )
+      closeMenu();
+    void nextTick(revealActiveSheet);
+  },
+  { flush: "post" },
+);
+
+onMounted(() => {
+  if (typeof ResizeObserver !== "undefined" && tabList.value) {
+    resizeObserver = new ResizeObserver(revealActiveSheet);
+    resizeObserver.observe(tabList.value);
+  }
+  revealActiveSheet();
+});
 
 function onTabClick(sheetId: string): void {
   if (suppressNextTabClick) {
@@ -182,6 +283,8 @@ function getDropIndex(targetSheetId: string, side: "before" | "after"): number |
   if (sourceIndex < 0 || targetIndex < 0) {
     return undefined;
   }
+  if (props.sheets[sourceIndex]?.properties.pinned !== props.sheets[targetIndex]?.properties.pinned)
+    return undefined;
   const insertionIndex = targetIndex + (side === "after" ? 1 : 0);
   return Math.max(
     0,
@@ -219,7 +322,11 @@ function onTabDragStart(sheetId: string, event: DragEvent): void {
 }
 
 function onTabDragOver(sheet: Sheet, event: DragEvent): void {
-  if (!draggedSheetId.value || sheet.id === draggedSheetId.value) {
+  if (
+    !draggedSheetId.value ||
+    sheet.id === draggedSheetId.value ||
+    getDropIndex(sheet.id, getDragSide(event)) === undefined
+  ) {
     dropTarget.value = undefined;
     return;
   }
@@ -252,38 +359,40 @@ function onTabDragEnd(): void {
 }
 
 onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
   if (suppressClickTimer !== undefined) {
     clearTimeout(suppressClickTimer);
   }
 });
 
 function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
-  const index = props.sheets.findIndex((sheet) => sheet.id === sheetId);
-  if (event.altKey && event.shiftKey && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
-    const toIndex = index + (event.key === "ArrowLeft" ? -1 : 1);
+  const index = visibleSheets.value.findIndex((sheet) => sheet.id === sheetId);
+  if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
     event.preventDefault();
-    if (index < 0 || toIndex < 0 || toIndex >= props.sheets.length) {
-      return;
-    }
-    closeMenu();
-    emit("move", { sheetId, toIndex });
-    void nextTick(() => tabButtons.get(sheetId)?.focus());
+    const sheet = visibleSheets.value[index];
+    if (sheet) openMenu(sheet);
+    return;
+  }
+  if (event.altKey && event.shiftKey && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+    event.preventDefault();
+    const sheet = visibleSheets.value[index];
+    if (sheet) moveFromMenu(sheet, event.key === "ArrowLeft" ? -1 : 1);
     return;
   }
   let nextIndex: number;
   if (event.key === "ArrowLeft") {
-    nextIndex = (index - 1 + props.sheets.length) % props.sheets.length;
+    nextIndex = (index - 1 + visibleSheets.value.length) % visibleSheets.value.length;
   } else if (event.key === "ArrowRight") {
-    nextIndex = (index + 1) % props.sheets.length;
+    nextIndex = (index + 1) % visibleSheets.value.length;
   } else if (event.key === "Home") {
     nextIndex = 0;
   } else if (event.key === "End") {
-    nextIndex = props.sheets.length - 1;
+    nextIndex = visibleSheets.value.length - 1;
   } else {
     return;
   }
 
-  const sheet = props.sheets[nextIndex];
+  const sheet = visibleSheets.value[nextIndex];
   if (!sheet) {
     return;
   }
@@ -296,65 +405,127 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
 <template>
   <div class="workbook-sheet-tabs">
-    <div class="workbook-sheet-tabs__list" role="tablist" :aria-label="t('sheetTabs.list')">
-      <div
-        v-for="sheet in props.sheets"
-        :key="sheet.id"
-        class="workbook-sheet-tabs__item"
-        :class="{
-          'is-dragging': draggedSheetId === sheet.id,
-          'is-drop-before': dropTarget?.sheetId === sheet.id && dropTarget.side === 'before',
-          'is-drop-after': dropTarget?.sheetId === sheet.id && dropTarget.side === 'after',
-        }"
-        @contextmenu="onSheetContextMenu(sheet, $event)"
-        @dragover="onTabDragOver(sheet, $event)"
-        @drop="onTabDrop(sheet, $event)"
+    <div class="workbook-sheet-tabs__navigation">
+      <WorkbookSheetNavigator
+        :sheets="sheets"
+        :active-sheet-id="activeSheetId"
+        @select="selectSheet"
+        @restore="emit('restore', $event)"
+        @open="closeMenu()"
+      />
+      <button
+        class="workbook-sheet-tabs__scroll"
+        type="button"
+        :disabled="!canScrollLeft"
+        :aria-label="t('sheetTabs.scrollFirst')"
+        :title="t('sheetTabs.scrollFirst')"
+        @click="scrollTabsToEdge(-1)"
       >
-        <input
-          v-if="renamingSheetId === sheet.id"
-          :ref="setRenameInput"
-          v-model="renameValue"
-          class="workbook-sheet-tabs__rename-input"
-          :aria-label="t('sheetTabs.rename', { name: sheet.name })"
-          @blur="commitRename(sheet)"
-          @keydown.enter.prevent="commitRename(sheet)"
-          @keydown.escape.prevent="cancelRename"
-        />
-        <button
-          v-else
-          :ref="(element) => setTabButton(sheet.id, element)"
-          class="workbook-sheet-tabs__tab"
-          :class="{ 'is-active': sheet.id === props.activeSheetId }"
-          type="button"
-          role="tab"
-          :aria-selected="sheet.id === props.activeSheetId"
-          aria-keyshortcuts="Alt+Shift+ArrowLeft Alt+Shift+ArrowRight"
-          :tabindex="sheet.id === props.activeSheetId ? 0 : -1"
-          :title="t('sheetTabs.renameHint', { name: sheet.name })"
-          :draggable="renamingSheetId !== sheet.id"
-          @click="onTabClick(sheet.id)"
-          @dblclick="startRename(sheet)"
-          @dragstart="onTabDragStart(sheet.id, $event)"
-          @dragend="onTabDragEnd"
-          @keydown="onTabKeydown(sheet.id, $event)"
+        <ChevronFirst :size="12" aria-hidden="true" />
+      </button>
+      <button
+        class="workbook-sheet-tabs__scroll"
+        type="button"
+        :disabled="!canScrollLeft"
+        :aria-label="t('sheetTabs.scrollLeft')"
+        :title="t('sheetTabs.scrollLeft')"
+        @click="scrollTabs(-1)"
+      >
+        <ChevronLeft :size="12" aria-hidden="true" />
+      </button>
+      <button
+        class="workbook-sheet-tabs__scroll"
+        type="button"
+        :disabled="!canScrollRight"
+        :aria-label="t('sheetTabs.scrollRight')"
+        :title="t('sheetTabs.scrollRight')"
+        @click="scrollTabs(1)"
+      >
+        <ChevronRight :size="12" aria-hidden="true" />
+      </button>
+      <button
+        class="workbook-sheet-tabs__scroll"
+        type="button"
+        :disabled="!canScrollRight"
+        :aria-label="t('sheetTabs.scrollLast')"
+        :title="t('sheetTabs.scrollLast')"
+        @click="scrollTabsToEdge(1)"
+      >
+        <ChevronLast :size="12" aria-hidden="true" />
+      </button>
+    </div>
+    <div
+      ref="tabList"
+      class="workbook-sheet-tabs__viewport"
+      @scroll="updateScrollState"
+      @wheel="onTabWheel"
+    >
+      <div class="workbook-sheet-tabs__list" role="tablist" :aria-label="t('sheetTabs.list')">
+        <div
+          v-for="sheet in visibleSheets"
+          :key="sheet.id"
+          class="workbook-sheet-tabs__item"
+          :class="{
+            'is-active': sheet.id === props.activeSheetId,
+            'has-tab-color': !!sheet.properties.tabColor,
+            'is-menu-open': openMenuSheetId === sheet.id,
+            'is-dragging': draggedSheetId === sheet.id,
+            'is-drop-before': dropTarget?.sheetId === sheet.id && dropTarget.side === 'before',
+            'is-drop-after': dropTarget?.sheetId === sheet.id && dropTarget.side === 'after',
+          }"
+          :style="getSheetTabColorStyles(sheet.properties.tabColor)"
+          @contextmenu="onSheetContextMenu(sheet, $event)"
+          @dragover="onTabDragOver(sheet, $event)"
+          @drop="onTabDrop(sheet, $event)"
         >
-          {{ sheet.name }}
-        </button>
-        <SheetTabMenu
-          :ref="(instance) => setSheetTabMenu(sheet.id, instance)"
-          :sheet="sheet"
-          :sheet-count="props.sheets.length"
-          :sheet-index="props.sheets.findIndex((entry) => entry.id === sheet.id)"
-          :is-open="openMenuSheetId === sheet.id"
-          :position="menuPosition"
-          @toggle="toggleMenu(sheet)"
-          @duplicate="duplicateFromMenu(sheet)"
-          @rename="renameFromMenu(sheet)"
-          @move-left="moveFromMenu(sheet, -1)"
-          @move-right="moveFromMenu(sheet, 1)"
-          @delete="deleteFromMenu(sheet)"
-          @close="closeMenu"
-        />
+          <input
+            v-if="renamingSheetId === sheet.id"
+            :ref="setRenameInput"
+            v-model="renameValue"
+            class="workbook-sheet-tabs__rename-input"
+            :aria-label="t('sheetTabs.rename', { name: sheet.name })"
+            @blur="commitRename(sheet)"
+            @keydown.enter.prevent="commitRename(sheet)"
+            @keydown.escape.prevent="cancelRename"
+          />
+          <button
+            v-else
+            :ref="(element) => setTabButton(sheet.id, element)"
+            class="workbook-sheet-tabs__tab"
+            :class="{ 'is-active': sheet.id === props.activeSheetId }"
+            type="button"
+            role="tab"
+            :aria-selected="sheet.id === props.activeSheetId"
+            aria-haspopup="menu"
+            :aria-expanded="openMenuSheetId === sheet.id"
+            :aria-controls="
+              openMenuSheetId === sheet.id ? `workbook-sheet-menu-${sheet.id}` : undefined
+            "
+            aria-keyshortcuts="Shift+F10 Alt+Shift+ArrowLeft Alt+Shift+ArrowRight"
+            :tabindex="sheet.id === props.activeSheetId ? 0 : -1"
+            :title="t('sheetTabs.renameHint', { name: sheet.name })"
+            :draggable="renamingSheetId !== sheet.id"
+            @click="onTabClick(sheet.id)"
+            @dblclick="startRename(sheet)"
+            @dragstart="onTabDragStart(sheet.id, $event)"
+            @dragend="onTabDragEnd"
+            @keydown="onTabKeydown(sheet.id, $event)"
+          >
+            <Pin
+              v-if="sheet.properties.pinned"
+              class="workbook-sheet-tabs__state-icon"
+              :size="12"
+              :aria-label="t('sheetTabs.pinnedHint')"
+            />
+            <LockKeyhole
+              v-if="sheet.properties.protected"
+              class="workbook-sheet-tabs__state-icon"
+              :size="12"
+              :aria-label="t('sheetTabs.protectedHint')"
+            />
+            <span class="workbook-sheet-tabs__name">{{ sheet.name }}</span>
+          </button>
+        </div>
       </div>
     </div>
     <button
@@ -362,22 +533,75 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
       type="button"
       :aria-label="t('sheetTabs.add')"
       :title="t('sheetTabs.add')"
-      @click="emit('add')"
+      @click="
+        closeMenu();
+        emit('add');
+      "
     >
       <Plus :size="16" aria-hidden="true" />
     </button>
+    <SheetTabMenu
+      v-if="menuSheet"
+      :sheet="menuSheet"
+      :anchor="menuAnchor"
+      :sheet-count="visibleSheets.length"
+      :sheet-index="visibleSheets.indexOf(menuSheet)"
+      :can-move-left="!!moveTarget(menuSheet, -1)"
+      :can-move-right="!!moveTarget(menuSheet, 1)"
+      :can-hide="visibleSheets.length > 1"
+      :can-delete="visibleSheets.length > 1"
+      :is-open="true"
+      :position="menuPosition"
+      @duplicate="duplicateFromMenu(menuSheet)"
+      @rename="renameFromMenu(menuSheet)"
+      @move-left="moveFromMenu(menuSheet, -1)"
+      @move-right="moveFromMenu(menuSheet, 1)"
+      @delete="deleteFromMenu(menuSheet)"
+      @protect="updatePropertiesFromMenu(menuSheet, { protected: $event })"
+      @pin="updatePropertiesFromMenu(menuSheet, { pinned: $event })"
+      @hide="updatePropertiesFromMenu(menuSheet, { hidden: true })"
+      @tab-color="setTabColor(menuSheet, $event)"
+      @close="closeMenu"
+    />
   </div>
 </template>
 
 <style scoped lang="scss">
 .workbook-sheet-tabs {
   display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  height: 26px;
   min-width: 0;
+
+  &__navigation {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    margin-right: 2px;
+    border-right: 1px solid var(--idea-sheet-bar-border);
+  }
+
+  &__viewport {
+    display: flex;
+    flex: 0 1 auto;
+    height: 26px;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
 
   &__list {
     display: flex;
-    min-width: 0;
-    overflow-x: auto;
+    flex: 0 0 auto;
+    align-items: stretch;
+    height: 26px;
+    gap: 1px;
   }
 
   &__item {
@@ -385,6 +609,46 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     display: flex;
     flex: 0 0 auto;
     align-items: stretch;
+    height: 24px;
+    max-width: min(204px, 100%);
+    margin-bottom: 2px;
+    overflow: hidden;
+    background: transparent;
+    border-top: 2px solid transparent;
+    border-radius: 0 0 6px 6px;
+    color: var(--idea-text-secondary);
+
+    &:hover,
+    &:focus-within,
+    &.is-menu-open {
+      background: color-mix(in srgb, var(--idea-sheet-bar-surface), var(--idea-text-primary) 8%);
+    }
+
+    &.is-active {
+      background: var(--idea-surface-panel);
+      color: var(--idea-action-primary);
+
+      &:hover {
+        background: var(--idea-surface-hover);
+      }
+    }
+
+    &.has-tab-color {
+      border-top-color: var(--sheet-tab-color);
+
+      &:not(.is-active) {
+        background: var(--sheet-tab-color);
+        color: var(--sheet-tab-contrast-color);
+
+        &:hover,
+        &:focus-within,
+        &.is-menu-open {
+          background: var(--sheet-tab-hover-color);
+          border-top-color: var(--sheet-tab-hover-color);
+          color: var(--sheet-tab-hover-contrast-color);
+        }
+      }
+    }
 
     &.is-dragging {
       opacity: 0.48;
@@ -413,64 +677,98 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
   &__tab,
   &__rename-input {
-    width: 112px;
-    min-width: 72px;
-    padding: 0 10px;
+    height: 22px;
+    min-width: 60px;
+    max-width: 180px;
+    padding: 0 12px;
     overflow: hidden;
     background: transparent;
     border: 0;
-    color: var(--idea-text-secondary);
+    color: inherit;
+    font: inherit;
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   &__tab {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     cursor: pointer;
 
     &.is-active {
-      position: relative;
-      background: var(--idea-surface-panel);
-      color: var(--idea-text-primary);
       font-weight: 600;
-
-      &::after {
-        position: absolute;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        height: 2px;
-        background: var(--idea-action-primary);
-        content: "";
-      }
     }
+
+    &:focus-visible {
+      outline: 1px solid currentColor;
+      outline-offset: -2px;
+    }
+  }
+
+  &__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__state-icon {
+    flex: 0 0 auto;
+    color: inherit;
   }
 
   &__rename-input {
-    outline: 2px solid var(--idea-action-primary);
+    width: 132px;
+    background: var(--idea-surface-panel);
+    color: var(--idea-text-primary);
+    outline: 1px solid var(--idea-action-primary);
     outline-offset: -2px;
   }
 
-  &__add {
+  &__add,
+  &__scroll {
     display: inline-grid;
-    flex: 0 0 30px;
-    width: 30px;
-    height: 100%;
+    flex: 0 0 auto;
+    align-self: center;
+    width: 26px;
+    height: 26px;
     place-items: center;
-    border-left: 1px solid var(--idea-border-control);
     padding: 0;
     background: transparent;
-    border-top: 0;
-    border-right: 0;
-    border-bottom: 0;
-    cursor: pointer;
+    border: 0;
+    border-radius: 3px;
     color: var(--idea-text-secondary);
+    cursor: pointer;
 
-    &:hover,
+    &:hover:not(:disabled) {
+      background: var(--idea-surface-hover);
+      color: var(--idea-text-primary);
+    }
+
     &:focus-visible {
       background: var(--idea-surface-hover);
-      outline: none;
+      outline: 1px solid var(--idea-action-primary);
+      outline-offset: -1px;
     }
+
+    &:disabled {
+      color: var(--idea-text-disabled);
+      cursor: default;
+    }
+  }
+
+  &__add {
+    flex: 0 0 26px;
+    align-self: stretch;
+    width: 26px;
+    height: 26px;
+    border-radius: 0;
+  }
+
+  &__scroll {
+    width: 18px;
+    color: var(--idea-text-muted);
   }
 }
 </style>

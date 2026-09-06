@@ -43,6 +43,7 @@ import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import {
   DEFAULT_GRID_EXTENT_POLICY,
   DEFAULT_INITIAL_GRID_EXTENT,
+  getSheetContentExtent,
 } from "@idea10/sheet-engine/extent";
 import {
   areCellAddressesEqual,
@@ -77,6 +78,7 @@ import { useCellEditing } from "../composables/useCellEditing";
 import { useFormulaReferenceNavigation } from "../composables/useFormulaReferenceNavigation";
 import { useDragSelection } from "../composables/useDragSelection";
 import { useSheetViewport } from "../composables/useSheetViewport";
+import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 import type { ImageInsertMode } from "../../sheet-images/useSheetImageActions";
 import SheetFloatingImageLayer from "../../sheet-images/components/SheetFloatingImageLayer.vue";
 import SheetImagePreview from "../../sheet-images/components/SheetImagePreview.vue";
@@ -147,6 +149,9 @@ const props = withDefaults(
     imageAssetUrls?: ReadonlyMap<string, string>;
     loadingImageAssetIds?: ReadonlySet<string>;
     missingImageAssetIds?: ReadonlySet<string>;
+    readOnly?: boolean;
+    gridId?: string;
+    externalHorizontalScrollbar?: boolean;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -155,6 +160,8 @@ const props = withDefaults(
     columnExpansionStep: DEFAULT_GRID_EXTENT_POLICY.growth.columnCount,
     rowExpansionTail: DEFAULT_GRID_EXTENT_POLICY.tail.rowCount,
     columnExpansionTail: DEFAULT_GRID_EXTENT_POLICY.tail.columnCount,
+    readOnly: false,
+    externalHorizontalScrollbar: false,
   },
 );
 
@@ -177,6 +184,7 @@ const emit = defineEmits<{
   undo: [];
   redo: [];
   viewStateChange: [viewState: SheetGridViewState];
+  horizontalScrollChange: [state: SheetHorizontalScrollState];
 }>();
 
 const ROW_HEADER_WIDTH = 48;
@@ -185,7 +193,7 @@ const COLUMN_HEADER_HEIGHT = 28;
 const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
 const selectedImageId = ref<string | null>(null);
-const selection = ref<CellSelection>(createCellSelection({ row: 0, column: 0 }));
+const selection = shallowRef<CellSelection>(createCellSelection({ row: 0, column: 0 }));
 const imagePreview = shallowRef<{
   assetId: string;
   altText: string;
@@ -242,6 +250,7 @@ const textMeasurer = markRaw<TextMeasurer>({
 const autoRowHeightCalculator = markRaw(createAutoRowHeightCalculator(textMeasurer));
 const defaultFontFamily = ref(DEFAULT_CELL_FONT_FAMILY);
 const fontMetricsVersion = ref(0);
+const contentExtent = computed(() => getSheetContentExtent(props.sheet));
 const {
   dimensionResize,
   request: requestDimensionResize,
@@ -258,6 +267,7 @@ const {
   gridCanvasStyle,
   gridExtent,
   gridViewportStyle,
+  horizontalScrollState,
   ensureGridExtentContains,
   ensureGridExtentCoversViewport,
   ensureSelectionVisible,
@@ -265,10 +275,12 @@ const {
   layout,
   observe: observeViewport,
   onScroll,
+  onWheel,
   restore: restoreViewport,
   rowHeaderPanes,
   rowVisibility,
   scrollPosition,
+  scrollHorizontally,
   scrollerRef,
   startGeometryWatch,
   stopObserving: stopObservingViewport,
@@ -291,6 +303,7 @@ const {
     },
   }),
   getColumnWidths: () => effectiveColumnWidths.value,
+  getContentExtent: () => contentExtent.value,
   getRowHeights: () => effectiveRowHeights.value,
   getFreezePanes: () => props.sheet.freezePanes,
   getMergedCells: () => props.sheet.mergedCells,
@@ -308,7 +321,7 @@ const { start: startDragSelection, stop: stopDragSelection } = useDragSelection(
   getScroller: () => scrollerRef.value,
   getViewportSize: () => viewportSize,
   onComplete: () => {
-    if (props.formatPainterActive) {
+    if (props.formatPainterActive && !props.readOnly) {
       emit("formatPainterTarget", getSelectionRange(selection.value));
       return;
     }
@@ -570,12 +583,14 @@ function selectFloatingImage(id: string | null): void {
 }
 
 function deleteSelectedFloatingImage(id: string): void {
+  if (props.readOnly) return;
   emit("deleteFloatingImage", id);
   selectedImageId.value = null;
   focusEditor();
 }
 
 function convertSelectedFloatingImageToCell(id: string): void {
+  if (props.readOnly) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === id);
   if (!image) return;
   emit("convertFloatingImageToCell", id);
@@ -600,6 +615,10 @@ function onImageCut(event: ClipboardEvent): void {
     floatingClipboard.clear();
     return;
   }
+  if (props.readOnly) {
+    event.preventDefault();
+    return;
+  }
   event.stopPropagation();
   void floatingClipboard.copy(image, "cut", event);
 }
@@ -610,6 +629,7 @@ function requestFloatingImageCopy(id: string, mode: "copy" | "cut"): void {
 }
 
 async function requestFloatingImagePaste(id: string): Promise<void> {
+  if (props.readOnly) return;
   const image = props.sheet.floatingImages.find((entry) => entry.id === id);
   if (!image) return;
   setActiveCell(image.anchor);
@@ -618,6 +638,10 @@ async function requestFloatingImagePaste(id: string): Promise<void> {
 }
 
 function onImagePaste(event: ClipboardEvent): void {
+  if (props.readOnly) {
+    event.preventDefault();
+    return;
+  }
   if (isComposing.value || !event.clipboardData) return;
   const image = readFloatingImageClipboard(event.clipboardData);
   const file =
@@ -648,6 +672,7 @@ function onImagePaste(event: ClipboardEvent): void {
 }
 
 async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> {
+  if (props.readOnly) return;
   event.preventDefault();
   event.stopPropagation();
   const sheet = props.sheet;
@@ -667,6 +692,7 @@ async function pasteDeferredFloatingImage(event: ClipboardEvent): Promise<void> 
     // Keep the captured native text when the browser denies the optional rich read.
   }
   if (
+    props.readOnly ||
     props.sheet !== sheet ||
     props.workbookRevision !== revision ||
     !areCellAddressesEqual(activeCell.value, address) ||
@@ -744,7 +770,14 @@ function setSelection(
   selectedImageId.value = null;
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
-  selection.value = normalizeSelectionForSheet(nextSelection);
+  const normalized = normalizeSelectionForSheet(nextSelection);
+  if (!areSelectionsEqual(selection.value, normalized)) {
+    // Extending a range does not change its active cell or the cell content layer.
+    if (areCellAddressesEqual(selection.value.active, normalized.active)) {
+      normalized.active = selection.value.active;
+    }
+    selection.value = normalized;
+  }
   ensureGridExtentContains(visibleAddress);
   ensureSelectionVisible(visibleAddress, nextSelection.mode);
   emitViewState();
@@ -884,6 +917,7 @@ function onDimensionResizeRequest(
   axis: SheetDimensionAxis,
   payload: { index: number; size: number },
 ): void {
+  if (props.readOnly) return;
   requestDimensionResize(axis, payload);
 }
 
@@ -891,6 +925,7 @@ function onDimensionResizeStart(
   axis: SheetDimensionAxis,
   payload: { index: number; event: PointerEvent },
 ): void {
+  if (props.readOnly) return;
   const startSize =
     axis === "row"
       ? geometry.value.getRowHeight(payload.index)
@@ -1022,6 +1057,7 @@ function getAxisMaximum(axis: SheetDimensionAxis): number {
 }
 
 function requestAxisInsert(payload: { direction: "before" | "after"; count: number }): void {
+  if (props.readOnly) return;
   const menu = axisContextMenu.value;
   if (!menu) {
     return;
@@ -1041,6 +1077,7 @@ function requestAxisInsert(payload: { direction: "before" | "after"; count: numb
 }
 
 function requestAxisDelete(): void {
+  if (props.readOnly) return;
   const menu = axisContextMenu.value;
   if (!menu) {
     return;
@@ -1052,6 +1089,7 @@ function requestAxisDelete(): void {
 }
 
 function requestAxisResize(size: number): void {
+  if (props.readOnly) return;
   const menu = axisContextMenu.value;
   if (!menu || menu.count !== 1) {
     return;
@@ -1060,6 +1098,7 @@ function requestAxisResize(size: number): void {
 }
 
 function requestAxisClear(): void {
+  if (props.readOnly) return;
   if (!axisContextMenu.value) {
     return;
   }
@@ -1139,6 +1178,7 @@ function openActiveCellContextMenu(): void {
 async function requestCellClipboard(
   action: "cut" | "copy" | "paste" | "paste-values" | "paste-formats",
 ): Promise<void> {
+  if (props.readOnly && action !== "copy") return;
   if (!cellContextMenu.value) {
     return;
   }
@@ -1160,6 +1200,7 @@ async function requestCellClipboard(
 }
 
 function requestCellImageAction(action: "preview" | "float"): void {
+  if (props.readOnly && action === "float") return;
   const address = cellContextMenu.value?.imageAddress;
   cellContextMenu.value = undefined;
   if (!address) return;
@@ -1172,6 +1213,7 @@ function requestCellImageAction(action: "preview" | "float"): void {
 }
 
 function requestCellClear(): void {
+  if (props.readOnly) return;
   if (!cellContextMenu.value) {
     return;
   }
@@ -1201,6 +1243,7 @@ function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
     openImagePreview(content.image);
     return;
   }
+  if (props.readOnly) return;
   if (isComposing.value) {
     return;
   }
@@ -1257,7 +1300,7 @@ function onEditorKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  if (props.formatPainterActive && event.key === "Enter") {
+  if (props.formatPainterActive && !props.readOnly && event.key === "Enter") {
     event.preventDefault();
     event.stopPropagation();
     emit("formatPainterTarget", getSelectionRange(selection.value));
@@ -1277,6 +1320,18 @@ function onEditorKeydown(event: KeyboardEvent): void {
 
   if (handleHistoryShortcut(event)) {
     return;
+  }
+
+  if (props.readOnly) {
+    if (
+      event.key === "Delete" ||
+      event.key === "Backspace" ||
+      event.key === "F2" ||
+      event.key.length === 1
+    ) {
+      event.preventDefault();
+      return;
+    }
   }
 
   if (isEditing.value) {
@@ -1377,9 +1432,9 @@ function restoreViewState(viewState?: SheetGridViewState): void {
   cellContextMenu.value = undefined;
   clearPendingClipboard();
   cancelEdit(false);
-  restoreViewport(nextViewState);
   const normalized = normalizeSelectionForSheet(nextViewState.selection);
   selection.value = normalized;
+  restoreViewport({ ...nextViewState, selection: normalized });
   if (!areSelectionsEqual(normalized, nextViewState.selection)) emitViewState();
 }
 
@@ -1410,6 +1465,16 @@ watch(
   },
 );
 
+watch(
+  () => props.readOnly,
+  (readOnly) => {
+    if (!readOnly) return;
+    stopDimensionResize();
+    cancelCellEdit(false);
+    clearPendingClipboard();
+  },
+);
+
 onMounted(() => {
   const root = rootRef.value;
   const resolvedFontFamily = root ? getComputedStyle(root).fontFamily.trim() : "";
@@ -1436,6 +1501,11 @@ onMounted(() => {
   focusEditor();
 });
 
+watch(horizontalScrollState, (state) => emit("horizontalScrollChange", state), {
+  immediate: true,
+  flush: "post",
+});
+
 onBeforeUnmount(() => {
   if (fontFaceSet && fontLoadingDoneListener) {
     fontFaceSet.removeEventListener("loadingdone", fontLoadingDoneListener);
@@ -1455,6 +1525,7 @@ defineExpose({
   handleReferenceKeydown,
   hasPendingEdit,
   navigateToCell,
+  scrollHorizontally,
 });
 </script>
 
@@ -1512,13 +1583,17 @@ defineExpose({
 
     <div
       ref="scrollerRef"
+      :id="gridId"
       class="sheet-grid__scroller"
+      :class="{ 'has-external-horizontal-scrollbar': externalHorizontalScrollbar }"
       role="grid"
       :aria-label="sheet.name"
+      :aria-readonly="readOnly"
       :aria-rowcount="gridExtent.rowCount"
       :aria-colcount="gridExtent.columnCount"
       aria-multiselectable="true"
       @scroll="onScroll"
+      @wheel="onWheel"
     >
       <div class="sheet-grid__canvas" :style="gridCanvasStyle">
         <div class="sheet-grid__viewport" :style="gridViewportStyle">
@@ -1577,6 +1652,7 @@ defineExpose({
             :loading-asset-ids="loadingImageAssetIds"
             :missing-asset-ids="missingImageAssetIds"
             :selected-image-id="selectedImageId"
+            :read-only="readOnly"
             @select="selectFloatingImage"
             @update="emit('updateFloatingImage', $event)"
             @delete="deleteSelectedFloatingImage"
@@ -1613,6 +1689,7 @@ defineExpose({
       :minimum-size="axisContextMenu.axis === 'row' ? MIN_ROW_HEIGHT : MIN_COLUMN_WIDTH"
       :maximum-size="axisContextMenu.axis === 'row' ? MAX_ROW_HEIGHT : MAX_COLUMN_WIDTH"
       :anchor="axisContextMenu.anchor"
+      :read-only="readOnly"
       @insert="requestAxisInsert"
       @resize="requestAxisResize"
       @delete="requestAxisDelete"
@@ -1623,6 +1700,7 @@ defineExpose({
       v-if="cellContextMenu"
       :anchor="cellContextMenu.anchor"
       :has-image="Boolean(cellContextMenu.imageAddress)"
+      :read-only="readOnly"
       :paste-special-disabled="clipboardMode === 'cut'"
       :paste-formats-disabled="!canPasteFormats"
       :cut-disabled-reason="
@@ -1696,8 +1774,35 @@ defineExpose({
     overflow: auto;
     background: var(--idea-surface-panel);
     outline: none;
-    scrollbar-color: var(--idea-border-control) var(--idea-surface-secondary);
-    scrollbar-width: thin;
+    scrollbar-color: var(--idea-border-control) var(--idea-sheet-bar-surface);
+    scrollbar-width: auto;
+
+    @supports selector(::-webkit-scrollbar) {
+      scrollbar-color: auto;
+    }
+
+    &::-webkit-scrollbar {
+      width: 16px;
+      height: 16px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: var(--idea-sheet-bar-surface);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      border: 4px solid var(--idea-sheet-bar-surface);
+      border-radius: 999px;
+      background: var(--idea-sheet-bar-thumb);
+
+      &:hover {
+        background: var(--idea-sheet-bar-thumb-hover);
+      }
+    }
+
+    &.has-external-horizontal-scrollbar {
+      overflow-x: hidden;
+    }
   }
 
   &__canvas {

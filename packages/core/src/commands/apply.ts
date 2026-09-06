@@ -1,4 +1,9 @@
-import { WorkbookDomainError, toWorkbookErrorData, type WorkbookErrorData } from "../errors.js";
+import {
+  WorkbookDomainError,
+  toWorkbookErrorData,
+  toWorkbookErrorDetail,
+  type WorkbookErrorData,
+} from "../errors.js";
 import type { Workbook } from "../workbook.js";
 import {
   applyCellBordersCommand,
@@ -18,6 +23,7 @@ import {
   applyDeleteSheetCommand,
   applyMoveSheetCommand,
   applyRenameSheetCommand,
+  applySetSheetPropertiesCommand,
 } from "./sheets.js";
 import { applyRestoreSheetStateCommand, applySheetAxisCommand } from "./structure.js";
 import { applySortSheetRangeCommand } from "./sort.js";
@@ -41,11 +47,56 @@ export type ApplyWorkbookCommandResult =
   | { ok: true; changed: true; inverse: WorkbookCommand }
   | { ok: false; error: WorkbookErrorData };
 
+function assertCommandDoesNotModifyProtectedSheet(
+  workbook: Workbook,
+  command: WorkbookCommand,
+): void {
+  const sheetIds =
+    command.type === "setCellContents"
+      ? command.changes.map((change) => change.sheetId)
+      : "sheetId" in command
+        ? [command.sheetId]
+        : [];
+  const blocked = sheetIds.find((sheetId) => workbook.sheets.get(sheetId)?.properties.protected);
+  if (!blocked) return;
+  switch (command.type) {
+    case "setCellContents":
+    case "clearCellRange":
+    case "moveCellRange":
+    case "applyCellStyle":
+    case "applyCellBorders":
+    case "adjustCellNumberFormatDecimals":
+    case "restoreCellStyles":
+    case "resizeSheetDimension":
+    case "setSheetFreezePanes":
+    case "mergeCells":
+    case "unmergeCells":
+    case "setSheetFilter":
+    case "sortSheetRange":
+    case "setFloatingImage":
+    case "deleteFloatingImage":
+    case "convertFloatingImageToCell":
+    case "convertCellImageToFloating":
+    case "restoreFloatingImageToCell":
+    case "insertSheetAxis":
+    case "deleteSheetAxis":
+    case "restoreSheetState":
+      throw new WorkbookDomainError(
+        {
+          code: "sheet_protected",
+          details: { sheetId: toWorkbookErrorDetail(blocked) },
+        },
+        `Sheet ${blocked} is protected.`,
+      );
+  }
+}
+
 export function applyWorkbookCommand(
   workbook: Workbook,
   command: WorkbookCommand,
 ): WorkbookCommand | null {
   try {
+    assertCommandDoesNotModifyProtectedSheet(workbook, command);
     switch (command.type) {
       case "setWorkbookDateSystem":
         return applySetWorkbookDateSystemCommand(workbook, command);
@@ -89,6 +140,8 @@ export function applyWorkbookCommand(
         return applyAddSheetCommand(workbook, command);
       case "deleteSheet":
         return applyDeleteSheetCommand(workbook, command);
+      case "setSheetProperties":
+        return applySetSheetPropertiesCommand(workbook, command);
       case "renameSheet":
         return applyRenameSheetCommand(workbook, command);
       case "moveSheet":
@@ -103,7 +156,9 @@ export function applyWorkbookCommand(
         throw new WorkbookDomainError(
           {
             code: "invalid_command",
-            details: { type: typeof unknownCommand.type === "string" ? unknownCommand.type : null },
+            details: {
+              type: typeof unknownCommand.type === "string" ? unknownCommand.type : null,
+            },
           },
           "Unknown workbook command.",
         );

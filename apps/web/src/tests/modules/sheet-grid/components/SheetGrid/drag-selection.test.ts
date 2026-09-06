@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { activeCell, mountSheetGrid } from "./fixture";
+import SheetCellLayer from "../../../../../modules/sheet-grid/components/SheetCellLayer.vue";
 
 function dispatchMouse(type: string, options: MouseEventInit): void {
   window.dispatchEvent(new MouseEvent(type, options));
@@ -65,5 +66,25 @@ describe("SheetGrid drag selection", () => {
     expect((scroller.element as HTMLDivElement).scrollLeft).toBeGreaterThan(0);
     expect((scroller.element as HTMLDivElement).scrollTop).toBeGreaterThan(0);
     expect(wrapper.get("[data-selection-range]").attributes("style")).not.toContain("width: 96px");
+  });
+
+  test("keeps displayed cell values cached while a drag only extends the selection", async () => {
+    const { wrapper } = mountSheetGrid();
+    await wrapper.get('[data-row="2"][data-column="1"]').trigger("mousedown", {
+      button: 0,
+      buttons: 1,
+      clientX: 110,
+      clientY: 58,
+    });
+    const layer = wrapper.findComponent(SheetCellLayer);
+    const evaluate = vi.spyOn(layer.props("evaluator"), "getComputedValue");
+    dispatchMouse("mousemove", { buttons: 1, clientX: 420, clientY: 180 });
+    await wrapper.vm.$nextTick();
+    expect(activeCell(wrapper)).toBe("B3");
+    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 384px");
+    expect(evaluate).not.toHaveBeenCalled();
+    dispatchMouse("mouseup", { button: 0 });
+    evaluate.mockRestore();
+    wrapper.unmount();
   });
 });

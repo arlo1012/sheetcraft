@@ -17,20 +17,23 @@ describe("SheetGrid viewport", () => {
       "0px",
     );
     expect(wrapper.get('[data-row="50"][data-column="8"]').attributes("style")).toContain(
-      "left: -32px",
+      "left: 768px",
     );
+    expect(
+      wrapper.get('[data-row="50"][data-column="8"]').element.parentElement?.style.transform,
+    ).toBe("translateX(-800px)");
     expect(wrapper.findAll(".sheet-cell-layer__cell").length).toBeLessThan(1_000);
   });
 
-  test("expands the allocated extent when scrolling reaches its tail", async () => {
+  test("keeps the allocated extent stable when native scrolling reaches its tail", async () => {
     const { wrapper } = mountSheetGrid();
     const scroller = wrapper.get(".sheet-grid__scroller");
     (scroller.element as HTMLDivElement).scrollTop = 1_800;
     (scroller.element as HTMLDivElement).scrollLeft = 3_840;
     await scroller.trigger("scroll");
 
-    expect(scroller.attributes("aria-rowcount")).toBe("125");
-    expect(scroller.attributes("aria-colcount")).toBe("60");
+    expect(scroller.attributes("aria-rowcount")).toBe("100");
+    expect(scroller.attributes("aria-colcount")).toBe("50");
     expect((scroller.element as HTMLDivElement).scrollTop).toBe(1_800);
     expect((scroller.element as HTMLDivElement).scrollLeft).toBe(3_840);
   });

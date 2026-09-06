@@ -58,6 +58,10 @@
     --idea-scrollbar-thumb: rgb(0 0 0 / 10%);
     --idea-scrollbar-thumb-hover: rgb(0 0 0 / 30%);
     --idea-scrollbar-track: #fff;
+    --idea-sheet-bar-surface: #e9e8e6;
+    --idea-sheet-bar-border: #d1d2d2;
+    --idea-sheet-bar-thumb: #aeb2b3;
+    --idea-sheet-bar-thumb-hover: #858b8d;
   }
 
   :root.dark,
@@ -119,5 +123,9 @@
     --idea-scrollbar-thumb: rgb(255 255 255 / 10%);
     --idea-scrollbar-thumb-hover: rgb(255 255 255 / 30%);
     --idea-scrollbar-track: #333;
+    --idea-sheet-bar-surface: #282c30;
+    --idea-sheet-bar-border: #40454a;
+    --idea-sheet-bar-thumb: #697279;
+    --idea-sheet-bar-thumb-hover: #939ca3;
   }
 }

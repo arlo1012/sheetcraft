@@ -148,7 +148,7 @@ describe("workbook snapshots", () => {
       { kind: "formula", formula: { source: "=SUM(" } },
     );
     const snapshot = serializeWorkbook(migrated);
-    expect(snapshot.version).toBe(6);
+    expect(snapshot.version).toBe(7);
     expect(snapshot.dateSystem).toBe("1900");
     expect(snapshot.sheets[0]?.cells).toContainEqual({
       address: { row: 0, column: 1 },
@@ -261,9 +261,9 @@ describe("workbook snapshots", () => {
   });
 
   test("rejects unknown snapshot versions with a stable error code", () => {
-    expect(() => deserializeWorkbook({ version: 7 })).toThrowError(
+    expect(() => deserializeWorkbook({ version: 8 })).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
-        data: { code: "unsupported_snapshot_version", details: { version: 7 } },
+        data: { code: "unsupported_snapshot_version", details: { version: 8 } },
       }),
     );
   });
@@ -336,5 +336,25 @@ describe("workbook snapshots", () => {
         }),
       );
     }
+  });
+
+  test("rejects malformed V7 properties and hidden workbook visibility states", () => {
+    const workbook = createWorkbook({ id: "workbook-1", sheetId: "sheet-1" });
+    insertSheet(workbook, createSheet("Sheet2", "sheet-2"));
+    const base = serializeWorkbook(workbook);
+    const malformed = structuredClone(base);
+    malformed.sheets[0]!.properties = {
+      pinned: false,
+      hidden: false,
+      protected: false,
+      tabColor: "blue",
+    } as never;
+    expect(() => deserializeWorkbook(malformed)).toThrow("tabColor");
+    const activeHidden = structuredClone(base);
+    activeHidden.sheets[0]!.properties.hidden = true;
+    expect(() => deserializeWorkbook(activeHidden)).toThrow("active sheet");
+    const allHidden = structuredClone(base);
+    for (const sheet of allHidden.sheets) sheet.properties.hidden = true;
+    expect(() => deserializeWorkbook(allHidden)).toThrow("visible sheet");
   });
 });

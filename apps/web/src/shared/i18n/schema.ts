@@ -197,6 +197,13 @@ export type MessageSchema = {
   };
   sheetTabs: {
     list: string;
+    allSheets: string;
+    search: string;
+    noResults: string;
+    scrollFirst: string;
+    scrollLast: string;
+    scrollLeft: string;
+    scrollRight: string;
     rename: string;
     renameHint: string;
     menu: string;
@@ -206,13 +213,41 @@ export type MessageSchema = {
     moveRightAction: string;
     deleteAction: string;
     add: string;
+    protectAction: string;
+    unprotectAction: string;
+    tabColorAction: string;
+    pinAction: string;
+    unpinAction: string;
+    hideAction: string;
+    restoreAction: string;
+    hiddenSheets: string;
+    restoreSheet: string;
+    protectedHint: string;
+    pinnedHint: string;
   };
   statusBar: {
     label: string;
     selectionSummary: string;
+    resizeSheetTabs: string;
     average: string;
     count: string;
+    maximum: string;
+    minimum: string;
+    numericCount: string;
     sum: string;
+    statisticsSettings: string;
+    statisticsOptions: string;
+    useChineseUnitGrouping: string;
+    useThousandsSeparator: string;
+    useTenThousandsGrouping: string;
+    settings: {
+      average: string;
+      count: string;
+      maximum: string;
+      minimum: string;
+      numericCount: string;
+      sum: string;
+    };
     viewAndZoom: string;
     normalView: string;
     pageLayoutView: string;
@@ -226,6 +261,9 @@ export type MessageSchema = {
     blank: string;
   };
   grid: {
+    horizontalScroll: string;
+    scrollLeft: string;
+    scrollRight: string;
     worksheet: string;
     selectAll: string;
     selectRow: string;

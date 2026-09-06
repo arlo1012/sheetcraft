@@ -16,6 +16,7 @@ import {
   type Sheet,
   type SheetFilter,
   type SheetFilterValue,
+  type SheetProperties,
   type SheetSparseDimension,
   type SheetSparseState,
   type Workbook,
@@ -94,15 +95,25 @@ export type WorkbookSnapshotV5 = Omit<WorkbookSnapshotV4, "version" | "sheets"> 
   sheets: SheetSnapshotV5[];
 };
 export type CellSnapshotV6 = CellSnapshotV5;
-export type SheetSnapshotV6 = Omit<SheetSnapshotV5, "cells"> & { cells: CellSnapshotV6[] };
+export type SheetSnapshotV6 = Omit<SheetSnapshotV5, "cells"> & {
+  cells: CellSnapshotV6[];
+};
+export type SheetSnapshotV7 = Omit<SheetSnapshotV6, "cells"> & {
+  cells: CellSnapshotV6[];
+  properties: SheetProperties;
+};
 export type WorkbookSnapshotV6 = Omit<WorkbookSnapshotV5, "version" | "sheets"> & {
   version: 6;
   sheets: SheetSnapshotV6[];
 };
-/** Current write format. V1 through V5 types remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV6;
-export type SheetSnapshot = SheetSnapshotV6;
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6;
+export type WorkbookSnapshotV7 = Omit<WorkbookSnapshotV6, "version" | "sheets"> & {
+  version: 7;
+  sheets: SheetSnapshotV7[];
+};
+/** Current write format. V1 through V6 types remain available for migration inputs. */
+export type WorkbookSnapshot = WorkbookSnapshotV7;
+export type SheetSnapshot = SheetSnapshotV7;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -370,6 +381,25 @@ function parseFloatingImage(value: unknown, path: string, version: SnapshotVersi
   };
 }
 
+function parseSheetProperties(value: unknown, path: string): SheetProperties {
+  const record = asRecord(value, path);
+  const tabColor = record.tabColor;
+  if (
+    tabColor !== undefined &&
+    (typeof tabColor !== "string" || !/^#[0-9A-Fa-f]{6}$/.test(tabColor))
+  )
+    return fail(`${path}.tabColor`, "Expected #RRGGBB.");
+  for (const key of ["pinned", "hidden", "protected"] as const) {
+    if (typeof record[key] !== "boolean") return fail(`${path}.${key}`, "Expected a boolean.");
+  }
+  return {
+    ...(tabColor === undefined ? {} : { tabColor: tabColor.toUpperCase() }),
+    pinned: record.pinned as boolean,
+    hidden: record.hidden as boolean,
+    protected: record.protected as boolean,
+  };
+}
+
 function parseSparseState(
   record: UnknownRecord,
   path: string,
@@ -420,7 +450,13 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
     );
     if (hasValue && hasContent)
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
-    version = hasValue ? 1 : Object.hasOwn(record, "floatingImages") ? 6 : 3;
+    version = hasValue
+      ? 1
+      : Object.hasOwn(record, "properties")
+        ? 7
+        : Object.hasOwn(record, "floatingImages")
+          ? 6
+          : 3;
   }
   const id = asIdentifier(record.id, `${path}.id`);
   let name: string;
@@ -433,6 +469,8 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
   const sheet = createSheet(name, id);
   try {
     replaceSheetSparseState(sheet, parseSparseState(record, path, version));
+    if (version >= 7)
+      sheet.properties = parseSheetProperties(record.properties, `${path}.properties`);
   } catch (error) {
     if (error instanceof WorkbookDomainError) {
       throw error;
@@ -446,6 +484,7 @@ export function serializeSheet(sheet: Sheet): SheetSnapshot {
   return {
     id: sheet.id,
     name: sheet.name,
+    properties: { ...sheet.properties },
     ...createSheetSparseState(sheet),
   };
 }
@@ -456,7 +495,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 6,
+    version: 7,
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
     activeSheetId: workbook.activeSheetId,
@@ -472,7 +511,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 3 &&
     record.version !== 4 &&
     record.version !== 5 &&
-    record.version !== 6
+    record.version !== 6 &&
+    record.version !== 7
   ) {
     throw new WorkbookDomainError(
       {
@@ -523,9 +563,12 @@ export function deserializeWorkbook(value: unknown): Workbook {
     }
     sheetNames.add(normalizedName);
   }
-  if (!sheetIds.has(activeSheetId)) {
+  if (!sheetIds.has(activeSheetId))
     return fail("$.activeSheetId", `Sheet ${activeSheetId} does not exist.`);
-  }
+  if (sheets.every((sheet) => sheet.properties.hidden))
+    return fail("$.sheets", "A workbook must contain a visible sheet.");
+  if (sheets.find((sheet) => sheet.id === activeSheetId)?.properties.hidden)
+    return fail("$.activeSheetId", "The active sheet cannot be hidden.");
 
   return {
     id,
