@@ -62,7 +62,7 @@ describe("horizontal worksheet scrollbar", () => {
     wrapper.unmount();
   });
 
-  test("pages on the track, scrolls a wheel, and disables an empty range", async () => {
+  test("pages on the track, clamps ordinary wheel input, and disables an empty range", async () => {
     const wrapper = fixture();
     const track = wrapper.get('[role="scrollbar"]');
     vi.spyOn(
@@ -80,6 +80,21 @@ describe("horizontal worksheet scrollbar", () => {
     expect(wrapper.emitted("scroll")).toHaveLength(2);
     await track.trigger("keydown", { key: "ArrowRight" });
     expect(wrapper.emitted("scroll")).toHaveLength(2);
+    wrapper.unmount();
+  });
+
+  test("uses Shift-wheel requests to expand past the current range", async () => {
+    const wrapper = fixture();
+    const track = wrapper.get('[role="scrollbar"]');
+    await track.trigger("wheel", { deltaX: 3_000 });
+    expect(wrapper.emitted("scroll")?.at(-1)).toEqual([2000]);
+    await track.trigger("wheel", { deltaX: 3_000, shiftKey: true });
+    expect(wrapper.emitted("scroll")?.at(-1)).toEqual([3400, true]);
+    await track.trigger("keydown", { key: "End" });
+    expect(wrapper.emitted("scroll")?.at(-1)).toEqual([2000]);
+    await wrapper.setProps({ state: { position: 0, viewportSize: 500, contentSize: 400 } });
+    await track.trigger("wheel", { deltaY: 48, shiftKey: true });
+    expect(wrapper.emitted("scroll")?.at(-1)).toEqual([48, true]);
     wrapper.unmount();
   });
 

@@ -42,6 +42,7 @@ import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import {
   DEFAULT_GRID_EXTENT_POLICY,
   DEFAULT_INITIAL_GRID_EXTENT,
+  getSheetContentExtent,
 } from "@idea10/sheet-engine/extent";
 import {
   areCellAddressesEqual,
@@ -246,6 +247,7 @@ const textMeasurer = markRaw<TextMeasurer>({
 const autoRowHeightCalculator = markRaw(createAutoRowHeightCalculator(textMeasurer));
 const defaultFontFamily = ref(DEFAULT_CELL_FONT_FAMILY);
 const fontMetricsVersion = ref(0);
+const contentExtent = computed(() => getSheetContentExtent(props.sheet));
 const {
   dimensionResize,
   request: requestDimensionResize,
@@ -270,7 +272,7 @@ const {
   layout,
   observe: observeViewport,
   onScroll,
-  onHorizontalWheel,
+  onWheel,
   restore: restoreViewport,
   rowHeaderPanes,
   rowVisibility,
@@ -298,6 +300,7 @@ const {
     },
   }),
   getColumnWidths: () => effectiveColumnWidths.value,
+  getContentExtent: () => contentExtent.value,
   getRowHeights: () => effectiveRowHeights.value,
   getFreezePanes: () => props.sheet.freezePanes,
   getMergedCells: () => props.sheet.mergedCells,
@@ -1408,9 +1411,9 @@ function restoreViewState(viewState?: SheetGridViewState): void {
   cellContextMenu.value = undefined;
   clearPendingClipboard();
   cancelEdit(false);
-  restoreViewport(nextViewState);
   const normalized = normalizeSelectionForSheet(nextViewState.selection);
   selection.value = normalized;
+  restoreViewport({ ...nextViewState, selection: normalized });
   if (!areSelectionsEqual(normalized, nextViewState.selection)) emitViewState();
 }
 
@@ -1568,7 +1571,7 @@ defineExpose({
       :aria-colcount="gridExtent.columnCount"
       aria-multiselectable="true"
       @scroll="onScroll"
-      @wheel="externalHorizontalScrollbar && onHorizontalWheel($event)"
+      @wheel="onWheel"
     >
       <div class="sheet-grid__canvas" :style="gridCanvasStyle">
         <div class="sheet-grid__viewport" :style="gridViewportStyle">
@@ -1749,7 +1752,30 @@ defineExpose({
     background: var(--idea-surface-panel);
     outline: none;
     scrollbar-color: var(--idea-border-control) var(--idea-surface-secondary);
-    scrollbar-width: thin;
+    scrollbar-width: auto;
+
+    @supports selector(::-webkit-scrollbar) {
+      scrollbar-color: auto;
+    }
+
+    &::-webkit-scrollbar {
+      width: 16px;
+      height: 16px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: var(--idea-surface-secondary);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      border: 3px solid var(--idea-surface-secondary);
+      border-radius: 999px;
+      background: var(--idea-sheet-bar-thumb);
+
+      &:hover {
+        background: var(--idea-sheet-bar-thumb-hover);
+      }
+    }
 
     &.has-external-horizontal-scrollbar {
       overflow-x: hidden;

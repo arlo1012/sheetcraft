@@ -38,6 +38,18 @@ describe("workspace footer horizontal scrollbar", () => {
       expect(grid.element.scrollLeft).toBe(748);
       expect(grid.element.scrollTop).toBe(240);
       expect(scrollbar().attributes("aria-valuenow")).toBe("748");
+
+      await scrollbar().trigger("keydown", { key: "End" });
+      const previousMaximum = Number(scrollbar().attributes("aria-valuemax"));
+      expect(grid.attributes("aria-colcount")).toBe("26");
+      await scrollbar().trigger("wheel", { deltaY: 48 });
+      expect(grid.attributes("aria-colcount")).toBe("26");
+      await scrollbar().trigger("wheel", { deltaY: 48, shiftKey: true });
+      expect(grid.attributes("aria-colcount")).toBe("34");
+      expect(grid.element.scrollLeft).toBe(previousMaximum + 48);
+      expect(grid.element.scrollTop).toBe(240);
+      await scrollbar().trigger("keydown", { key: "Home" });
+      expect(grid.attributes("aria-colcount")).toBe("26");
     } finally {
       wrapper.unmount();
     }

@@ -1,8 +1,16 @@
-import { computed, reactive, ref, watch, type CSSProperties, type WatchStopHandle } from "vue";
+import {
+  computed,
+  nextTick,
+  reactive,
+  ref,
+  watch,
+  type CSSProperties,
+  type WatchStopHandle,
+} from "vue";
 import {
   createGridExtent,
+  expandGridExtent,
   expandGridExtentForAddress,
-  expandGridExtentForViewport,
   type GridExtent,
   type GridExtentPolicy,
 } from "@idea10/sheet-engine/extent";
@@ -12,7 +20,12 @@ import { createRowVisibilityIndex, type HiddenRowInterval } from "@idea10/sheet-
 import { getSelectionMode, type CellSelection } from "@idea10/sheet-engine/selection";
 import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
 import { MergedCellRangeResolver } from "@idea10/core";
-import { DEFAULT_ROW_HEIGHT, type CellAddress, type CellRange } from "@idea10/core/workbook";
+import {
+  DEFAULT_ROW_HEIGHT,
+  MAX_SHEET_ROWS,
+  type CellAddress,
+  type CellRange,
+} from "@idea10/core/workbook";
 import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 
 const DEFAULT_VIEWPORT_SIZE: Size = { width: 960, height: 600 };
@@ -21,6 +34,7 @@ export function useSheetViewport(options: {
   initialExtent: GridExtent;
   getGridExtentPolicy: () => GridExtentPolicy;
   getColumnWidths: () => ReadonlyMap<number, number>;
+  getContentExtent: () => GridExtent;
   getRowHeights: () => ReadonlyMap<number, number>;
   getFreezePanes: () => { rows: number; columns: number };
   getMergedCells: () => readonly CellRange[];
@@ -35,6 +49,7 @@ export function useSheetViewport(options: {
   const gridExtent = reactive<GridExtent>(createGridExtent(options.initialExtent));
   let resizeObserver: ResizeObserver | null = null;
   let stopGeometryWatch: WatchStopHandle | undefined;
+  let nativeScrollVersion = 0;
 
   function applyGridExtent(nextExtent: GridExtent): void {
     gridExtent.rowCount = nextExtent.rowCount;
@@ -48,13 +63,13 @@ export function useSheetViewport(options: {
   }
 
   function ensureGridExtentContainsMetadata(): void {
-    const freeze = options.getFreezePanes();
-    if (freeze.rows > 0) ensureGridExtentContains({ row: freeze.rows - 1, column: 0 });
-    if (freeze.columns > 0) ensureGridExtentContains({ row: 0, column: freeze.columns - 1 });
-    for (const range of options.getMergedCells()) {
-      ensureGridExtentContains(range.start);
-      ensureGridExtentContains(range.end);
-    }
+    applyGridExtent(
+      expandGridExtent(
+        gridExtent,
+        options.getContentExtent(),
+        options.getGridExtentPolicy().growth,
+      ),
+    );
   }
 
   // Metadata may reference cells beyond the initial blank-grid allocation.
@@ -71,6 +86,22 @@ export function useSheetViewport(options: {
   const rowVisibility = computed(() =>
     createRowVisibilityIndex({
       rowCount: gridExtent.rowCount,
+      defaultRowHeight: DEFAULT_ROW_HEIGHT,
+      rowHeights: options.getRowHeights(),
+      hiddenIntervals: options.getHiddenRowIntervals(),
+    }),
+  );
+  // Sparse full-sheet metrics resolve a viewport past the current allocation without
+  // adding a render tail or materializing the intervening empty rows and columns.
+  const extentGeometry = computed(() =>
+    createSheetGeometry({
+      rowHeights: options.getRowHeights(),
+      columnWidths: options.getColumnWidths(),
+    }),
+  );
+  const extentRows = computed(() =>
+    createRowVisibilityIndex({
+      rowCount: MAX_SHEET_ROWS,
       defaultRowHeight: DEFAULT_ROW_HEIGHT,
       rowHeights: options.getRowHeights(),
       hiddenIntervals: options.getHiddenRowIntervals(),
@@ -152,16 +183,73 @@ export function useSheetViewport(options: {
     options.onViewStateChange(getCurrentViewState());
   }
 
-  function ensureGridExtentCoversViewport(): void {
-    applyGridExtent(
-      expandGridExtentForViewport(
-        gridExtent,
-        scrollPosition,
-        viewportSize,
-        geometry.value,
-        options.getGridExtentPolicy(),
-      ),
+  function getViewportExtent(): GridExtent {
+    const metrics = extentGeometry.value;
+    const rows = extentRows.value;
+    const freeze = options.getFreezePanes();
+    const frozenWidth =
+      freeze.columns === metrics.columnCount
+        ? metrics.getTotalSize().width
+        : metrics.getColumnOffset(freeze.columns);
+    const frozenHeight = rows.getBoundaryOffset(freeze.rows) ?? 0;
+    const right = frozenWidth + scrollPosition.x + Math.max(0, viewportSize.width - frozenWidth);
+    const bottom =
+      frozenHeight + scrollPosition.y + Math.max(0, viewportSize.height - frozenHeight);
+    const range = metrics.getVisibleRange(
+      { x: Math.max(0, right - 1), y: 0 },
+      { width: 1, height: 1 },
+      0,
     );
+    const lastRow = rows.getLogicalRowAtOffset(
+      Math.max(0, Math.min(bottom - 1, rows.getTotalHeight() - 1)),
+    );
+    return {
+      rowCount: Math.max(freeze.rows, (lastRow ?? 0) + 1),
+      columnCount: Math.max(freeze.columns, range.endColumn + 1),
+    };
+  }
+
+  function ensureGridExtentCoversViewport(includeTail = true): void {
+    const minimum = getViewportExtent();
+    const policy = options.getGridExtentPolicy();
+    if (includeTail) {
+      minimum.rowCount += policy.tail.rowCount;
+      minimum.columnCount += policy.tail.columnCount;
+    }
+    applyGridExtent(expandGridExtent(gridExtent, minimum, policy.growth));
+  }
+
+  function compactUnusedExtent(axes = { x: true, y: true }): void {
+    if (!axes.x && !axes.y) return;
+    const viewport = getViewportExtent();
+    const content = options.getContentExtent();
+    const selection = options.getSelection();
+    const required = expandGridExtent(
+      options.initialExtent,
+      {
+        rowCount: Math.max(
+          viewport.rowCount,
+          content.rowCount,
+          selection.active.row + 1,
+          selection.anchor.row + 1,
+          selection.focus.row + 1,
+        ),
+        columnCount: Math.max(
+          viewport.columnCount,
+          content.columnCount,
+          selection.active.column + 1,
+          selection.anchor.column + 1,
+          selection.focus.column + 1,
+        ),
+      },
+      options.getGridExtentPolicy().growth,
+    );
+    applyGridExtent({
+      rowCount: axes.y ? Math.min(gridExtent.rowCount, required.rowCount) : gridExtent.rowCount,
+      columnCount: axes.x
+        ? Math.min(gridExtent.columnCount, required.columnCount)
+        : gridExtent.columnCount,
+    });
   }
 
   function updateViewportSize(): void {
@@ -169,24 +257,34 @@ export function useSheetViewport(options: {
     if (!scroller) return;
     viewportSize.width = scroller.clientWidth || DEFAULT_VIEWPORT_SIZE.width;
     viewportSize.height = scroller.clientHeight || DEFAULT_VIEWPORT_SIZE.height;
-    ensureGridExtentCoversViewport();
+    ensureGridExtentCoversViewport(false);
+    compactUnusedExtent();
   }
 
   function setNativeScrollPosition(position: Point): void {
     const scroller = scrollerRef.value;
+    const version = ++nativeScrollVersion;
     if (scroller) {
       scroller.scrollLeft = position.x;
       scroller.scrollTop = position.y;
     }
     scrollPosition.x = position.x;
     scrollPosition.y = position.y;
+    // An extent change reaches the DOM on the next Vue flush. Reapply then so a
+    // native scrollbar cannot clamp a newly revealed cell to the old edge.
+    void nextTick(() => {
+      if (version !== nativeScrollVersion || scroller !== scrollerRef.value || !scroller) return;
+      scroller.scrollLeft = scrollPosition.x;
+      scroller.scrollTop = scrollPosition.y;
+    });
   }
 
   watch(
-    [options.getFreezePanes, options.getMergedCells],
+    [options.getFreezePanes, options.getMergedCells, options.getContentExtent],
     () => {
       ensureGridExtentContainsMetadata();
-      ensureGridExtentCoversViewport();
+      ensureGridExtentCoversViewport(false);
+      compactUnusedExtent();
       setNativeScrollPosition(layout.value.bodyScrollPosition);
     },
     { deep: true },
@@ -200,7 +298,9 @@ export function useSheetViewport(options: {
     const position = { ...scrollPosition };
     if (mode !== "rows" && mode !== "all") position.x = next.x;
     if (mode !== "columns" && mode !== "all") position.y = next.y;
+    const returning = { x: position.x < scrollPosition.x, y: position.y < scrollPosition.y };
     setNativeScrollPosition(position);
+    compactUnusedExtent(returning);
   }
 
   function getCellAtClientPoint(clientX: number, clientY: number): CellAddress | null {
@@ -218,41 +318,77 @@ export function useSheetViewport(options: {
   function onScroll(event: Event): void {
     const scroller = event.currentTarget as HTMLDivElement;
     options.onScrollStart();
+    const returning = {
+      x: scroller.scrollLeft < scrollPosition.x,
+      y: scroller.scrollTop < scrollPosition.y,
+    };
     scrollPosition.x = scroller.scrollLeft;
     scrollPosition.y = scroller.scrollTop;
-    ensureGridExtentCoversViewport();
+    compactUnusedExtent(returning);
     emitViewState();
   }
 
-  function scrollHorizontally(position: number): void {
-    if (!Number.isFinite(position)) return;
-    const maximum = Math.max(
-      0,
-      horizontalScrollState.value.contentSize - horizontalScrollState.value.viewportSize,
+  function getScrollMaximum(): Point {
+    const current = layout.value;
+    return {
+      x: Math.max(0, current.nativeScrollSize.width - viewportSize.width),
+      y: Math.max(0, current.nativeScrollSize.height - viewportSize.height),
+    };
+  }
+
+  function expandAtWheelEdge(delta: Point, horizontal: boolean, vertical: boolean): void {
+    const maximum = getScrollMaximum();
+    const growth = options.getGridExtentPolicy().growth;
+    applyGridExtent(
+      expandGridExtent(
+        gridExtent,
+        {
+          rowCount:
+            gridExtent.rowCount +
+            (vertical && delta.y > 0 && scrollPosition.y >= maximum.y - 1 ? growth.rowCount : 0),
+          columnCount:
+            gridExtent.columnCount +
+            (horizontal && delta.x > 0 && scrollPosition.x >= maximum.x - 1
+              ? growth.columnCount
+              : 0),
+        },
+        growth,
+      ),
     );
+  }
+
+  function scrollHorizontally(position: number, allowExpansion = false): void {
+    if (!Number.isFinite(position)) return;
+    if (allowExpansion) expandAtWheelEdge({ x: position - scrollPosition.x, y: 0 }, true, false);
+    const maximum = getScrollMaximum().x;
+    const returning = position < scrollPosition.x;
     options.onScrollStart();
     setNativeScrollPosition({ x: Math.min(maximum, Math.max(0, position)), y: scrollPosition.y });
-    ensureGridExtentCoversViewport();
+    compactUnusedExtent({ x: returning, y: false });
     emitViewState();
   }
 
-  function onHorizontalWheel(event: WheelEvent): void {
+  function onWheel(event: WheelEvent): void {
     if (event.ctrlKey || event.metaKey) return;
     const horizontalDelta = event.deltaX || (event.shiftKey ? event.deltaY : 0);
-    if (!horizontalDelta) return;
+    const verticalDelta = event.shiftKey ? 0 : event.deltaY;
+    if (!horizontalDelta && !verticalDelta) return;
     event.preventDefault();
     const horizontalUnit =
       event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportSize.width : 1;
-    scrollHorizontally(scrollPosition.x + horizontalDelta * horizontalUnit);
-    const scroller = scrollerRef.value;
-    if (scroller && !event.shiftKey && event.deltaY) {
-      const verticalUnit =
-        event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportSize.height : 1;
-      scroller.scrollTop += event.deltaY * verticalUnit;
-      scrollPosition.y = scroller.scrollTop;
-      ensureGridExtentCoversViewport();
-      emitViewState();
-    }
+    const verticalUnit =
+      event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportSize.height : 1;
+    const delta = { x: horizontalDelta * horizontalUnit, y: verticalDelta * verticalUnit };
+    // Shift is the explicit horizontal extension gesture; plain deltaX remains bounded.
+    expandAtWheelEdge(delta, event.shiftKey, !event.shiftKey);
+    const maximum = getScrollMaximum();
+    options.onScrollStart();
+    setNativeScrollPosition({
+      x: Math.min(maximum.x, Math.max(0, scrollPosition.x + delta.x)),
+      y: Math.min(maximum.y, Math.max(0, scrollPosition.y + delta.y)),
+    });
+    compactUnusedExtent({ x: delta.x < 0, y: delta.y < 0 });
+    emitViewState();
   }
 
   function restore(viewState?: SheetGridViewState): SheetGridViewState {
@@ -261,6 +397,8 @@ export function useSheetViewport(options: {
       : createSheetGridViewState({ gridExtent: options.initialExtent });
     applyGridExtent(next.gridExtent);
     ensureGridExtentContains(next.selection.focus);
+    ensureGridExtentContains(next.selection.anchor);
+    ensureGridExtentContains(next.selection.active);
     ensureGridExtentContainsMetadata();
     const restored = createSheetViewportLayout({
       geometry: geometry.value,
@@ -270,7 +408,8 @@ export function useSheetViewport(options: {
       viewportSize,
     }).bodyScrollPosition;
     setNativeScrollPosition(restored);
-    ensureGridExtentCoversViewport();
+    ensureGridExtentCoversViewport(false);
+    compactUnusedExtent();
     return next;
   }
 
@@ -337,7 +476,7 @@ export function useSheetViewport(options: {
     layout,
     observe,
     onScroll,
-    onHorizontalWheel,
+    onWheel,
     restore,
     rowHeaderPanes,
     rowVisibility,

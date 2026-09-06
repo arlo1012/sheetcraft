@@ -1,5 +1,10 @@
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellAddress } from "@idea10/core/workbook";
-import type { Point, SheetGeometry, Size } from "./geometry.js";
+import {
+  MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
+  type CellAddress,
+  type Sheet,
+} from "@idea10/core/workbook";
+import { createSheetGeometry, type Point, type SheetGeometry, type Size } from "./geometry.js";
 
 export type GridExtent = {
   rowCount: number;
@@ -12,20 +17,58 @@ export type GridExtentPolicy = {
 };
 
 export const DEFAULT_INITIAL_GRID_EXTENT: GridExtent = {
-  rowCount: 1_000,
-  columnCount: 100,
+  rowCount: 100,
+  columnCount: 26,
 };
 
 export const DEFAULT_GRID_EXTENT_POLICY: GridExtentPolicy = {
   growth: {
-    rowCount: 1_000,
-    columnCount: 26,
-  },
-  tail: {
-    rowCount: 100,
+    rowCount: 50,
     columnCount: 8,
   },
+  tail: {
+    rowCount: 10,
+    columnCount: 2,
+  },
 };
+
+/** The allocated surface may shrink, but document content and metadata must remain reachable. */
+export function getSheetContentExtent(sheet: Sheet): GridExtent {
+  let rowCount = Math.max(1, sheet.freezePanes.rows);
+  let columnCount = Math.max(1, sheet.freezePanes.columns);
+  const include = (address: CellAddress): void => {
+    rowCount = Math.max(rowCount, address.row + 1);
+    columnCount = Math.max(columnCount, address.column + 1);
+  };
+  for (const key of sheet.cells.keys()) {
+    const separator = key.indexOf(":");
+    include({ row: Number(key.slice(0, separator)), column: Number(key.slice(separator + 1)) });
+  }
+  for (const row of sheet.rowHeights.keys()) rowCount = Math.max(rowCount, row + 1);
+  for (const column of sheet.columnWidths.keys()) columnCount = Math.max(columnCount, column + 1);
+  for (const range of sheet.mergedCells) {
+    include(range.start);
+    include(range.end);
+  }
+  if (sheet.filter) include(sheet.filter.range.end);
+  if (sheet.floatingImages.length > 0) {
+    const geometry = createSheetGeometry({
+      rowHeights: sheet.rowHeights,
+      columnWidths: sheet.columnWidths,
+    });
+    const total = geometry.getTotalSize();
+    for (const image of sheet.floatingImages) {
+      include(image.anchor);
+      const anchor = geometry.getCellRect(image.anchor);
+      const end = geometry.getCellAtPoint({
+        x: Math.min(total.width - 1, anchor.x + image.offsetX + image.width - 1),
+        y: Math.min(total.height - 1, anchor.y + image.offsetY + image.height - 1),
+      });
+      if (end) include(end);
+    }
+  }
+  return { rowCount, columnCount };
+}
 
 function assertPositiveInteger(value: number, name: string): void {
   if (!Number.isInteger(value) || value <= 0) {

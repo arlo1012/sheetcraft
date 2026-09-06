@@ -126,7 +126,7 @@ export type SheetGridNavigator = {
   hasPendingEdit?(): boolean;
   focusGrid(): void;
   navigateToCell(address: CellAddress): void;
-  scrollHorizontally?(position: number): void;
+  scrollHorizontally?(position: number, allowExpansion?: boolean): void;
 };
 
 export type SpreadsheetWorkspaceControllerOptions = {
@@ -994,8 +994,8 @@ export function useSpreadsheetWorkspaceController(
         : undefined;
   }
 
-  function scrollGridHorizontally(position: number): void {
-    gridRef.value?.scrollHorizontally?.(position);
+  function scrollGridHorizontally(position: number, allowExpansion = false): void {
+    gridRef.value?.scrollHorizontally?.(position, allowExpansion);
   }
 
   onScopeDispose(clearWorkspaceStatus);

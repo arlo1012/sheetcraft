@@ -8,7 +8,7 @@ const props = defineProps<{
   state: SheetHorizontalScrollState;
   controls: string;
 }>();
-const emit = defineEmits<{ scroll: [position: number] }>();
+const emit = defineEmits<{ scroll: [position: number, allowExpansion?: boolean] }>();
 const { t } = useAppI18n();
 const trackRef = ref<HTMLDivElement | null>(null);
 const thumbRef = ref<HTMLDivElement | null>(null);
@@ -41,7 +41,7 @@ function onPointerDown(event: PointerEvent): void {
   event.preventDefault();
   track.focus({ preventScroll: true });
   const thumbBounds = thumb.getBoundingClientRect();
-  if (event.target !== thumb) {
+  if (!(event.target instanceof Node) || !thumb.contains(event.target)) {
     scrollTo(
       position.value + (event.clientX < thumbBounds.left ? -1 : 1) * props.state.viewportSize,
     );
@@ -103,12 +103,17 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 function onWheel(event: WheelEvent): void {
-  if (event.ctrlKey || event.metaKey || maximum.value <= 0) return;
+  if (event.ctrlKey || event.metaKey || (maximum.value <= 0 && !event.shiftKey)) return;
   const delta = event.deltaX || event.deltaY;
   if (!delta) return;
   event.preventDefault();
   const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? props.state.viewportSize : 1;
-  scrollTo(position.value + delta * unit);
+  const requestedPosition = position.value + delta * unit;
+  if (event.shiftKey) {
+    emit("scroll", requestedPosition, true);
+    return;
+  }
+  scrollTo(requestedPosition);
 }
 </script>
 
@@ -210,26 +215,35 @@ function onWheel(event: WheelEvent): void {
       outline: none;
     }
 
-    &:focus-visible .sheet-horizontal-scrollbar__thumb {
+    &:focus-visible .sheet-horizontal-scrollbar__thumb::after {
       background: var(--idea-sheet-bar-thumb-hover);
     }
   }
 
   &__thumb {
     position: absolute;
-    top: 5px;
-    height: 6px;
+    top: 0;
+    height: 16px;
     min-width: min(24px, 100%);
-    border-radius: 999px;
-    background: var(--idea-sheet-bar-thumb);
+
+    &::after {
+      position: absolute;
+      top: 3px;
+      right: 0;
+      left: 0;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--idea-sheet-bar-thumb);
+      content: "";
+    }
   }
 
-  &__thumb:hover,
-  &__track.is-dragging &__thumb {
+  &__thumb:hover::after,
+  &__track.is-dragging &__thumb::after {
     background: var(--idea-sheet-bar-thumb-hover);
   }
 
-  &__track.is-disabled &__thumb {
+  &__track.is-disabled &__thumb::after {
     background: var(--idea-text-disabled);
   }
 }
