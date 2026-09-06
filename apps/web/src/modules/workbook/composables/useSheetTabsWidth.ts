@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, type Ref } from "vue";
 
-const MINIMUM_TABS_WIDTH = 140;
+const MINIMUM_TABS_WIDTH = 200;
 const MINIMUM_SCROLLBAR_WIDTH = 100;
 const SEPARATOR_WIDTH = 8;
 

@@ -158,6 +158,8 @@ export const zhCN = {
     allSheets: "全部工作表",
     search: "搜索工作表",
     noResults: "没有匹配的工作表",
+    scrollFirst: "滚动到第一个工作表标签",
+    scrollLast: "滚动到最后一个工作表标签",
     scrollLeft: "向左滚动工作表标签",
     scrollRight: "向右滚动工作表标签",
     rename: "重命名 {name}",

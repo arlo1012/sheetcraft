@@ -155,6 +155,8 @@ export type MessageSchema = {
     allSheets: string;
     search: string;
     noResults: string;
+    scrollFirst: string;
+    scrollLast: string;
     scrollLeft: string;
     scrollRight: string;
     rename: string;

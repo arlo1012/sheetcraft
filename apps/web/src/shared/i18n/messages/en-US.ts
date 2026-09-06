@@ -161,6 +161,8 @@ export const enUS = {
     allSheets: "All sheets",
     search: "Search sheets",
     noResults: "No matching sheets",
+    scrollFirst: "Scroll to first sheet tab",
+    scrollLast: "Scroll to last sheet tab",
     scrollLeft: "Scroll sheet tabs left",
     scrollRight: "Scroll sheet tabs right",
     rename: "Rename {name}",

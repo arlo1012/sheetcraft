@@ -151,7 +151,8 @@ describe("WorkbookStatusBar", () => {
     expect(wrapper.find("[data-selection-summary]").exists()).toBe(false);
     expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
     expect(wrapper.get('[aria-label="Zoom 100%"]').text()).toBe("100%");
-    expect(wrapper.find("button:disabled").exists()).toBe(false);
+    expect(wrapper.get('[aria-label="Add sheet"]').attributes("disabled")).toBeUndefined();
+    expect(wrapper.findAll(".workbook-sheet-tabs__scroll:disabled")).toHaveLength(4);
   });
 
   test("shows count alone for a multi-cell text selection", () => {

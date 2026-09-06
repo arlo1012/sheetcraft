@@ -88,7 +88,7 @@ describe("WorkbookStatusBar sheet tabs resize", () => {
     expect(control.getAttribute("aria-orientation")).toBe("vertical");
     expect(control.getAttribute("aria-label")).toBe("Resize sheet tabs area");
     expect(sheets.element.id).toBe(control.getAttribute("aria-controls"));
-    expect(control.getAttribute("aria-valuemin")).toBe("140");
+    expect(control.getAttribute("aria-valuemin")).toBe("200");
     expect(control.getAttribute("aria-valuemax")).toBe("692");
     expect(control.getAttribute("aria-valuenow")).toBe("200");
     expect(topRow.element.style.getPropertyValue("--sheet-tabs-width")).toBe("200px");
@@ -150,7 +150,7 @@ describe("WorkbookStatusBar sheet tabs resize", () => {
 
     control.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
     await nextTick();
-    expect(control.getAttribute("aria-valuenow")).toBe("140");
+    expect(control.getAttribute("aria-valuenow")).toBe("200");
   });
 
   test("clamps for container changes, restores the preferred width, and cleans up observers", async () => {

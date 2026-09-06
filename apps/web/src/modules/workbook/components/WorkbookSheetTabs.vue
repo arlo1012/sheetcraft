@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, LockKeyhole, Pin, Plus } from "lucide-vue-next";
+import {
+  ChevronFirst,
+  ChevronLast,
+  ChevronLeft,
+  ChevronRight,
+  LockKeyhole,
+  Pin,
+  Plus,
+} from "lucide-vue-next";
 import {
   computed,
   nextTick,
@@ -194,6 +202,14 @@ function scrollTabs(direction: -1 | 1): void {
   if (!list) return;
   closeMenu();
   list.scrollLeft += direction * Math.max(80, list.clientWidth * 0.7);
+  updateScrollState();
+}
+
+function scrollTabsToEdge(direction: -1 | 1): void {
+  const list = tabList.value;
+  if (!list) return;
+  closeMenu();
+  list.scrollLeft = direction === -1 ? 0 : Math.max(0, list.scrollWidth - list.clientWidth);
   updateScrollState();
 }
 
@@ -395,6 +411,46 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 <template>
   <div class="workbook-sheet-tabs">
     <div class="workbook-sheet-tabs__navigation">
+      <button
+        class="workbook-sheet-tabs__scroll"
+        type="button"
+        :disabled="!canScrollLeft"
+        :aria-label="t('sheetTabs.scrollFirst')"
+        :title="t('sheetTabs.scrollFirst')"
+        @click="scrollTabsToEdge(-1)"
+      >
+        <ChevronFirst :size="12" aria-hidden="true" />
+      </button>
+      <button
+        class="workbook-sheet-tabs__scroll"
+        type="button"
+        :disabled="!canScrollLeft"
+        :aria-label="t('sheetTabs.scrollLeft')"
+        :title="t('sheetTabs.scrollLeft')"
+        @click="scrollTabs(-1)"
+      >
+        <ChevronLeft :size="12" aria-hidden="true" />
+      </button>
+      <button
+        class="workbook-sheet-tabs__scroll"
+        type="button"
+        :disabled="!canScrollRight"
+        :aria-label="t('sheetTabs.scrollRight')"
+        :title="t('sheetTabs.scrollRight')"
+        @click="scrollTabs(1)"
+      >
+        <ChevronRight :size="12" aria-hidden="true" />
+      </button>
+      <button
+        class="workbook-sheet-tabs__scroll"
+        type="button"
+        :disabled="!canScrollRight"
+        :aria-label="t('sheetTabs.scrollLast')"
+        :title="t('sheetTabs.scrollLast')"
+        @click="scrollTabsToEdge(1)"
+      >
+        <ChevronLast :size="12" aria-hidden="true" />
+      </button>
       <WorkbookSheetNavigator
         :sheets="sheets"
         :active-sheet-id="activeSheetId"
@@ -403,17 +459,6 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
         @open="closeMenu()"
       />
     </div>
-    <button
-      v-if="hasOverflow"
-      class="workbook-sheet-tabs__scroll"
-      type="button"
-      :disabled="!canScrollLeft"
-      :aria-label="t('sheetTabs.scrollLeft')"
-      :title="t('sheetTabs.scrollLeft')"
-      @click="scrollTabs(-1)"
-    >
-      <ChevronLeft :size="14" aria-hidden="true" />
-    </button>
     <div
       ref="tabList"
       class="workbook-sheet-tabs__viewport"
@@ -501,17 +546,6 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
         <Plus :size="16" aria-hidden="true" />
       </button>
     </div>
-    <button
-      v-if="hasOverflow"
-      class="workbook-sheet-tabs__scroll"
-      type="button"
-      :disabled="!canScrollRight"
-      :aria-label="t('sheetTabs.scrollRight')"
-      :title="t('sheetTabs.scrollRight')"
-      @click="scrollTabs(1)"
-    >
-      <ChevronRight :size="14" aria-hidden="true" />
-    </button>
     <SheetTabMenu
       v-if="menuSheet"
       :sheet="menuSheet"
@@ -550,9 +584,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     display: flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: 2px;
-    padding: 0 6px;
-    margin-right: 4px;
+    margin-right: 2px;
     border-right: 1px solid var(--idea-sheet-bar-border);
   }
 
@@ -741,7 +773,8 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
   }
 
   &__scroll {
-    width: 20px;
+    width: 18px;
+    color: var(--idea-text-muted);
   }
 }
 </style>

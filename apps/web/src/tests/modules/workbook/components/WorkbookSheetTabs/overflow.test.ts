@@ -37,6 +37,40 @@ function mountOverflowingTabs() {
 }
 
 describe("sheet tab overflow navigation", () => {
+  test("keeps all four navigation controls visible and disabled when every tab fits", async () => {
+    const { wrapper, list } = mountOverflowingTabs();
+    Object.defineProperty(list.element, "clientWidth", { configurable: true, value: 300 });
+    await list.trigger("scroll");
+    const buttons = wrapper.findAll(
+      ".workbook-sheet-tabs__navigation .workbook-sheet-tabs__scroll",
+    );
+    expect(buttons.map((button) => button.attributes("aria-label"))).toEqual([
+      "Scroll to first sheet tab",
+      "Scroll sheet tabs left",
+      "Scroll sheet tabs right",
+      "Scroll to last sheet tab",
+    ]);
+    expect(buttons.every((button) => button.attributes("disabled") === "")).toBe(true);
+    expect(wrapper.find('[aria-label="All sheets"]').exists()).toBe(true);
+  });
+
+  test("jumps to either end of the tab strip without switching the active sheet", async () => {
+    const { wrapper, list } = mountOverflowingTabs();
+    await list.trigger("scroll");
+    const first = wrapper.get('[aria-label="Scroll to first sheet tab"]');
+    const last = wrapper.get('[aria-label="Scroll to last sheet tab"]');
+    expect(first.attributes("disabled")).toBe("");
+    expect(last.attributes("disabled")).toBeUndefined();
+    await last.trigger("click");
+    expect(list.element.scrollLeft).toBe(160);
+    expect(last.attributes("disabled")).toBe("");
+    expect(first.attributes("disabled")).toBeUndefined();
+    await first.trigger("click");
+    expect(list.element.scrollLeft).toBe(0);
+    expect(first.attributes("disabled")).toBe("");
+    expect(wrapper.emitted("select")).toBeUndefined();
+  });
+
   test("pages through hidden tabs and translates a vertical wheel without intercepting browser zoom", async () => {
     const { wrapper, list } = mountOverflowingTabs();
     await list.trigger("scroll");
