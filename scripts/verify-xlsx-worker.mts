@@ -80,6 +80,7 @@ function createFixtureSnapshot(): WorkbookSnapshot {
     sheet,
     { row: 0, column: 2 },
     {
+      fontSize: 12,
       numberFormat: { kind: "currency", currency: "CNY", fractionDigits: 2 },
       borderTop: { style: "thin", color: "#112233" },
       borderRight: { style: "medium", color: "#223344" },
@@ -124,7 +125,9 @@ function assertFixture(snapshot: WorkbookSnapshot): void {
   }
   const style = getCellStyle(sheet, { row: 0, column: 2 });
   if (
-    style?.numberFormat?.kind !== "currency" ||
+    style?.fontSize !== 12 ||
+    (style.verticalAlign ?? "middle") !== "middle" ||
+    style.numberFormat?.kind !== "currency" ||
     style.numberFormat.currency !== "CNY" ||
     style.numberFormat.fractionDigits !== 2 ||
     style.borderTop?.style !== "thin" ||

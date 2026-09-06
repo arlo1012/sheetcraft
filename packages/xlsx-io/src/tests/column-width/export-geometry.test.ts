@@ -2,7 +2,6 @@ import { strFromU8, unzipSync } from "fflate/browser";
 import {
   createWorkbook,
   getActiveSheet,
-  getCellStyle,
   setCellContent,
   setCellStyle,
   setColumnWidth,
@@ -50,29 +49,4 @@ describe("XLSX export geometry", () => {
     const restored = getActiveSheet((await decodeXlsx(result.bytes)).workbook);
     expect([...restored.rowHeights]).toEqual([[16, 86]]);
   });
-
-  test.each([8, 12, 13, 17, 72])(
-    "writes %i CSS pixels as exact point sizes with a complete font",
-    async (size) => {
-      const workbook = createWorkbook({ id: "fonts", sheetId: "sheet" });
-      const sheet = getActiveSheet(workbook);
-      setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "text" });
-      setCellStyle(sheet, { row: 0, column: 0 }, { fontSize: size, bold: true });
-      const result = await encodeXlsx(workbook);
-      const fonts = [
-        ...strFromU8(unzipSync(result.bytes)["xl/styles.xml"]!).matchAll(/<font>(.*?)<\/font>/g),
-      ];
-      expect(fonts).toHaveLength(2);
-      expect(fonts[1]![1]).toContain(`<sz val="${(size * 3) / 4}"/>`);
-      expect(fonts[1]![1]).toContain('<name val="Calibri"/>');
-      expect(fonts[1]![1]).not.toContain("<scheme");
-      if (Number.isInteger((size * 3) / 4)) {
-        const restored = getActiveSheet((await decodeXlsx(result.bytes)).workbook);
-        expect(getCellStyle(restored, { row: 0, column: 0 })).toMatchObject({
-          fontSize: size,
-          bold: true,
-        });
-      }
-    },
-  );
 });

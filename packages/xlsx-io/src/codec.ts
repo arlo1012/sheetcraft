@@ -176,13 +176,12 @@ function readStyle(
     typeof font?.name === "string" && font.name.length >= 1 && font.name.length <= 80
       ? font.name
       : undefined;
-  const fontPixels = typeof font?.size === "number" ? Math.round((font.size * 4) / 3) : undefined;
   const fontSize =
-    fontPixels !== undefined &&
-    Number.isFinite(fontPixels) &&
-    fontPixels >= MIN_CELL_FONT_SIZE &&
-    fontPixels <= MAX_CELL_FONT_SIZE
-      ? fontPixels
+    typeof font?.size === "number" &&
+    Number.isInteger(font.size) &&
+    font.size >= MIN_CELL_FONT_SIZE &&
+    font.size <= MAX_CELL_FONT_SIZE
+      ? font.size
       : undefined;
   if (fontName) result.fontFamily = fontName;
   if (fontSize) result.fontSize = fontSize;
@@ -473,11 +472,12 @@ function writeStyle(
   report: CompatibilityReportBuilder,
 ): void {
   style ??= {};
-  // Core typography uses CSS pixels; XLSX font sizes use points. A partial font
-  // record replaces the font, rather than merging missing fields with Normal.
+  // Preserve the font-size control's number across applications. Excel stores
+  // points, but the product contract is numeric parity, not CSS-pixel conversion.
+  // A partial font replaces the font rather than inheriting fields from Normal.
   const font: Record<string, unknown> = {
     name: style.fontFamily ?? "Calibri",
-    size: ((style.fontSize ?? DEFAULT_CELL_FONT_SIZE) * 3) / 4,
+    size: style.fontSize ?? DEFAULT_CELL_FONT_SIZE,
   };
   if (style.bold) font.bold = true;
   if (style.italic) font.italic = true;
@@ -491,12 +491,12 @@ function writeStyle(
       pattern: "solid",
       fgColor: { argb: `FF${style.fillColor.slice(1).toUpperCase()}` },
     };
-  if (style.horizontalAlign || style.verticalAlign || style.wrapText)
-    next.alignment = {
-      ...(style.horizontalAlign ? { horizontal: style.horizontalAlign } : {}),
-      ...(style.verticalAlign ? { vertical: style.verticalAlign } : {}),
-      ...(style.wrapText ? { wrapText: true } : {}),
-    };
+  // Core's implicit middle alignment differs from XLSX's implicit bottom.
+  next.alignment = {
+    ...(style.horizontalAlign ? { horizontal: style.horizontalAlign } : {}),
+    vertical: style.verticalAlign ?? "middle",
+    ...(style.wrapText ? { wrapText: true } : {}),
+  };
   const diagonalConflict =
     style.borderDiagonalUp &&
     style.borderDiagonalDown &&
