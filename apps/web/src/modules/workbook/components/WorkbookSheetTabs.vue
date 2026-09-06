@@ -66,7 +66,6 @@ const renameValue = ref("");
 const renameInput = ref<HTMLInputElement>();
 const tabButtons = new Map<string, HTMLButtonElement>();
 const tabList = ref<HTMLDivElement>();
-const addButton = ref<HTMLButtonElement>();
 const hasOverflow = ref(false);
 const canScrollLeft = ref(false);
 const canScrollRight = ref(false);
@@ -185,14 +184,10 @@ function revealActiveSheet(): void {
   if (!list || !item) return;
   const viewport = list.getBoundingClientRect();
   const tab = item.getBoundingClientRect();
-  const right =
-    visibleSheets.value.at(-1)?.id === props.activeSheetId
-      ? Math.max(tab.right, addButton.value?.getBoundingClientRect().right ?? tab.right)
-      : tab.right;
   if (tab.left < viewport.left) {
     list.scrollLeft += tab.left - viewport.left;
-  } else if (right > viewport.right) {
-    list.scrollLeft += right - viewport.right;
+  } else if (tab.right > viewport.right) {
+    list.scrollLeft += tab.right - viewport.right;
   }
   updateScrollState();
 }
@@ -451,13 +446,6 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
       >
         <ChevronLast :size="12" aria-hidden="true" />
       </button>
-      <WorkbookSheetNavigator
-        :sheets="sheets"
-        :active-sheet-id="activeSheetId"
-        @select="selectSheet"
-        @restore="emit('restore', $event)"
-        @open="closeMenu()"
-      />
     </div>
     <div
       ref="tabList"
@@ -532,20 +520,26 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
           </button>
         </div>
       </div>
-      <button
-        ref="addButton"
-        class="workbook-sheet-tabs__add"
-        type="button"
-        :aria-label="t('sheetTabs.add')"
-        :title="t('sheetTabs.add')"
-        @click="
-          closeMenu();
-          emit('add');
-        "
-      >
-        <Plus :size="16" aria-hidden="true" />
-      </button>
     </div>
+    <WorkbookSheetNavigator
+      :sheets="sheets"
+      :active-sheet-id="activeSheetId"
+      @select="selectSheet"
+      @restore="emit('restore', $event)"
+      @open="closeMenu()"
+    />
+    <button
+      class="workbook-sheet-tabs__add"
+      type="button"
+      :aria-label="t('sheetTabs.add')"
+      :title="t('sheetTabs.add')"
+      @click="
+        closeMenu();
+        emit('add');
+      "
+    >
+      <Plus :size="16" aria-hidden="true" />
+    </button>
     <SheetTabMenu
       v-if="menuSheet"
       :sheet="menuSheet"
@@ -765,9 +759,9 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
   }
 
   &__add {
-    flex: 0 0 32px;
+    flex: 0 0 26px;
     align-self: stretch;
-    width: 32px;
+    width: 26px;
     height: 26px;
     border-radius: 0;
   }

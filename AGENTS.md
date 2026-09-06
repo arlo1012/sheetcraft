@@ -77,16 +77,16 @@
   directory as the aggregate test entry for its source capability.
 - Test `core` and `sheet-engine` in a Node environment. Browser and DOM test
   environments belong to the Web application only.
-- Run only the unit tests for the changed feature or module by default. Do not
-  run the full unit-test suite for a small change unless the user asks for it or
-  the change affects shared contracts or multiple modules.
-- Expand verification only when the change risk or affected boundary requires
-  it. Keep typecheck, lint, formatting, and build checks scoped when the tooling
-  supports it.
-- Reserve real-browser debugging and verification for substantial or high-risk
-  visible interaction changes, uncertain browser-specific behavior, or an
-  explicit user request. Prefer focused component and unit tests for small,
-  localized UI changes.
+- For small, localized UI or styling changes, prioritize direct implementation
+  and run only a minimal formatting or static check. Do not add or run unit
+  tests, full typechecks, builds, bundle checks, or browser/screenshot
+  verification by default.
+- Use user feedback for visual acceptance. Avoid repeated inspections and
+  verification loops; expand checks only when explicitly requested, needed to
+  investigate an observed failure, or justified by a substantial correctness risk.
+- For changes affecting shared contracts or workbook correctness, run focused
+  tests for the affected feature or module. Keep other checks scoped, and do not
+  run the full suite unless the affected boundary requires it or the user asks.
 - After completing and verifying a small, self-contained requirement, commit it
   promptly with a conventional commit message. Keep unrelated changes out of
   that commit.
