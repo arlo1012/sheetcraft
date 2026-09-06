@@ -152,11 +152,11 @@ function formatNumber(value: number): string {
 
   &__top-row,
   &__bottom-row {
-    display: flex;
     min-width: 0;
   }
 
   &__top-row {
+    display: flex;
     align-items: stretch;
     overflow: hidden;
   }
@@ -179,19 +179,16 @@ function formatNumber(value: number): string {
   }
 
   &__bottom-row {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
     align-items: center;
-    justify-content: flex-start;
-    min-width: 0;
   }
 
   &__metrics {
     display: flex;
-    flex: 0 1 auto;
     align-items: center;
     min-width: 0;
-    max-width: calc(100% - 30px);
     height: 100%;
-    margin-left: auto;
   }
 
   &__summary {
@@ -234,6 +231,7 @@ function formatNumber(value: number): string {
     justify-content: center;
     min-width: 52px;
     height: 100%;
+    margin-left: auto;
     padding: 0 10px;
     border-left: 1px solid var(--idea-border-subtle);
     color: var(--idea-text-secondary);
