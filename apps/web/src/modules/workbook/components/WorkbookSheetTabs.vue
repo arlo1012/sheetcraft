@@ -406,6 +406,13 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 <template>
   <div class="workbook-sheet-tabs">
     <div class="workbook-sheet-tabs__navigation">
+      <WorkbookSheetNavigator
+        :sheets="sheets"
+        :active-sheet-id="activeSheetId"
+        @select="selectSheet"
+        @restore="emit('restore', $event)"
+        @open="closeMenu()"
+      />
       <button
         class="workbook-sheet-tabs__scroll"
         type="button"
@@ -446,13 +453,6 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
       >
         <ChevronLast :size="12" aria-hidden="true" />
       </button>
-      <WorkbookSheetNavigator
-        :sheets="sheets"
-        :active-sheet-id="activeSheetId"
-        @select="selectSheet"
-        @restore="emit('restore', $event)"
-        @open="closeMenu()"
-      />
     </div>
     <div
       ref="tabList"
