@@ -117,6 +117,15 @@ entry CSS limits remain unchanged. All Worker chunks remain included in totals.
 The gate now also browser-bundles the actual XLSX Worker, round-trips a workbook,
 and checks malformed-file rejection, in addition to the existing Core consumer.
 
+Native in-cell XLSX images add `fflate@0.8.3` through its tree-shakeable browser
+entry because the pinned ExcelJS API exposes drawings, not rich-data cell images.
+It finalizes the freshly generated ZIP without changing the import gate or
+adding codec code to startup imports. The measured deferred assets together are
+1,014,638 B raw / 283,540 B gzip, versus the 1,020,000 / 280,000 B cap. Only the
+deferred gzip limit changes to 288,000 B; its raw cap, entry budgets and total
+JavaScript budgets remain unchanged. The exact dependency license accompanies
+the deployed XLSX notices; generated media is stored without recompression.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

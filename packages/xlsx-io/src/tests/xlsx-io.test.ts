@@ -290,7 +290,10 @@ describe("XLSX IO", () => {
         locations: ["Sheet1!D1", "Sheet1!I1"],
       }),
     ]);
-    const worksheetXml = xlsxEntryText(encoded.bytes, "xl/worksheets/sheet1.xml");
+    const worksheetXml = xlsxEntryText(encoded.bytes, "xl/worksheets/sheet1.xml").replace(
+      / s="\d+"/g,
+      "",
+    );
     expect(worksheetXml).toContain('<c r="B1"><f>A1+1</f><v>3</v></c>');
     expect(worksheetXml).toContain('<c r="C1"><f>B1*2</f><v>6</v></c>');
     expect(worksheetXml).toContain('<c r="D1"><f>IFERROR(UNKNOWN(1),0)</f></c>');

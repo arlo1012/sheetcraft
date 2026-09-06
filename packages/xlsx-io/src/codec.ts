@@ -15,7 +15,12 @@ import {
   type CellRange,
   type Workbook,
 } from "@idea10/core/workbook";
-import type { CellStyle } from "@idea10/core/style";
+import {
+  DEFAULT_CELL_FONT_SIZE,
+  MAX_CELL_FONT_SIZE,
+  MIN_CELL_FONT_SIZE,
+  type CellStyle,
+} from "@idea10/core/style";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
@@ -26,6 +31,8 @@ import {
   createSheet,
 } from "@idea10/core/workbook";
 import { CompatibilityReportBuilder } from "./report.js";
+import { finalizeXlsxExport } from "./export-finalizer.js";
+import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
   type XlsxImageWorkbook,
@@ -169,12 +176,13 @@ function readStyle(
     typeof font?.name === "string" && font.name.length >= 1 && font.name.length <= 80
       ? font.name
       : undefined;
+  const fontPixels = typeof font?.size === "number" ? Math.round((font.size * 4) / 3) : undefined;
   const fontSize =
-    typeof font?.size === "number" &&
-    Number.isInteger(font.size) &&
-    font.size >= 8 &&
-    font.size <= 72
-      ? font.size
+    fontPixels !== undefined &&
+    Number.isFinite(fontPixels) &&
+    fontPixels >= MIN_CELL_FONT_SIZE &&
+    fontPixels <= MAX_CELL_FONT_SIZE
+      ? fontPixels
       : undefined;
   if (fontName) result.fontFamily = fontName;
   if (fontSize) result.fontSize = fontSize;
@@ -355,10 +363,7 @@ export async function decodeWithExcelJs(
         const coreHeight = (row.height * 4) / 3;
         const roundedHeight = Math.round(coreHeight);
         const size = Math.max(16, Math.min(512, roundedHeight));
-        rowHeights.push({
-          index: rowIndex,
-          size,
-        });
+        if (size !== DEFAULT_ROW_HEIGHT) rowHeights.push({ index: rowIndex, size });
         if (!Number.isInteger(coreHeight) || size !== roundedHeight)
           add(report, "dimension-approximated", `${sourceSheet.name}!${rowNumber}`);
       }
@@ -467,10 +472,13 @@ function writeStyle(
   issueLocation: string,
   report: CompatibilityReportBuilder,
 ): void {
-  if (!style) return;
-  const font: Record<string, unknown> = {};
-  if (style.fontFamily) font.name = style.fontFamily;
-  if (style.fontSize) font.size = style.fontSize;
+  style ??= {};
+  // Core typography uses CSS pixels; XLSX font sizes use points. A partial font
+  // record replaces the font, rather than merging missing fields with Normal.
+  const font: Record<string, unknown> = {
+    name: style.fontFamily ?? "Calibri",
+    size: ((style.fontSize ?? DEFAULT_CELL_FONT_SIZE) * 3) / 4,
+  };
   if (style.bold) font.bold = true;
   if (style.italic) font.italic = true;
   if (style.underline) font.underline = true;
@@ -527,10 +535,11 @@ export async function encodeWithExcelJs(
   const report = new CompatibilityReportBuilder();
   const target = new ExcelJS.Workbook();
   const imageExporter = createXlsxImageExporter(target, options);
+  const cellImages: NativeCellImage[] = [];
   target.properties.date1904 = workbook.dateSystem === "1904";
   target.calcProperties.fullCalcOnLoad = true;
   let encodedCells = 0;
-  for (const sheet of workbook.sheets.values()) {
+  for (const [sheetIndex, sheet] of [...workbook.sheets.values()].entries()) {
     const evaluator = createSheetEvaluator(sheet);
     const isFormulaCacheEligible = createFormulaCacheEligibility(sheet);
     const output = target.addWorksheet(sheet.name, {
@@ -587,24 +596,31 @@ export async function encodeWithExcelJs(
             CYCLE: "#CYCLE!",
           }[cell.content.error.code],
         };
-      else if (cell.content?.kind === "image")
-        imageExporter.addCellImage(
-          output,
-          sheet,
-          { row, column },
-          cell.content.image,
-          issueLocation,
-        );
+      else if (cell.content?.kind === "image") {
+        // Keep a real cell in sheetData. The finalizer attaches its rich value.
+        outputCell.value = { error: "#VALUE!" };
+        cellImages.push({
+          sheetIndex,
+          address: address(row, column),
+          ...imageExporter.registerCellImage(cell.content.image, issueLocation),
+        });
+      }
       writeStyle(outputCell, cell.style, issueLocation, report);
     }
     for (const image of sheet.floatingImages) {
       const issueLocation = `${sheet.name}!${address(image.anchor.row, image.anchor.column)}`;
       imageExporter.addFloatingImage(output, sheet, image, issueLocation);
     }
+    // Existing row records without ht are auto-sized by spreadsheet viewers.
+    // Pin only materialized rows, including merged/styled blanks; keep gaps sparse.
+    for (const row of output.model?.rows ?? []) {
+      if (row.number !== undefined && row.height === undefined)
+        output.getRow(row.number).height = (DEFAULT_ROW_HEIGHT * 3) / 4;
+    }
   }
   const bytes = await target.xlsx.writeBuffer();
   return {
-    bytes: bytes instanceof Uint8Array ? new Uint8Array(bytes) : new Uint8Array(bytes),
+    bytes: finalizeXlsxExport(new Uint8Array(bytes), cellImages),
     report: report.build(),
   };
 }

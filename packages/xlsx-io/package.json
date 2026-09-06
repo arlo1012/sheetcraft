@@ -19,7 +19,8 @@
   },
   "dependencies": {
     "@idea10/core": "workspace:*",
-    "exceljs": "4.4.0"
+    "exceljs": "4.4.0",
+    "fflate": "0.8.3"
   },
   "devDependencies": {
     "@types/node": "26.3.0",

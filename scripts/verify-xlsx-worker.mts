@@ -207,16 +207,21 @@ function assertImageExport(bytes: ArrayBuffer, originalImage: Uint8Array): void 
   const drawing = new TextDecoder().decode(entries.get("xl/drawings/drawing1.xml"));
   const relations = new TextDecoder().decode(entries.get("xl/drawings/_rels/drawing1.xml.rels"));
   if (
-    drawing.match(/<xdr:twoCellAnchor editAs="oneCell">/gu)?.length !== 2 ||
-    drawing.includes("<xdr:oneCellAnchor") ||
+    drawing.match(/<xdr:oneCellAnchor>/gu)?.length !== 1 ||
+    drawing.includes("<xdr:twoCellAnchor") ||
+    drawing.includes("editAs=") ||
     !drawing.includes("<xdr:colOff>76200</xdr:colOff>") ||
-    !drawing.includes(
-      "<xdr:to><xdr:col>3</xdr:col><xdr:colOff>76200</xdr:colOff><xdr:row>8</xdr:row><xdr:rowOff>57150</xdr:rowOff></xdr:to>",
-    ) ||
+    !drawing.includes('<xdr:ext cx="914400" cy="457200"/>') ||
     !relations.includes("../media/image1.png")
   ) {
-    throw new Error("XLSX Worker did not write the cell and floating image drawing anchors.");
+    throw new Error("XLSX Worker did not write a valid fixed-size floating image anchor.");
   }
+  const sheet = new TextDecoder().decode(entries.get("xl/worksheets/sheet1.xml"));
+  const richRelations = new TextDecoder().decode(
+    entries.get("xl/richData/_rels/richValueRel.xml.rels"),
+  );
+  if (!sheet.includes('t="e" vm="1"') || !richRelations.includes("../media/image1.png"))
+    throw new Error("XLSX Worker did not write the native in-cell image rich value.");
 }
 
 function requireSuccess<T extends WorkerResponse["type"]>(

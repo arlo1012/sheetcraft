@@ -5,14 +5,12 @@ import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   normalizeImageTransform,
-  type CellAddress,
   type FloatingImage,
   type Sheet,
 } from "@idea10/core/workbook";
 import type { XlsxEncodeOptions, XlsxImageAsset } from "./types.js";
 
 const EMU_PER_PIXEL = 9525;
-const CELL_IMAGE_INSET = 2;
 
 type XlsxImageCellPosition = {
   nativeCol: number;
@@ -23,8 +21,7 @@ type XlsxImageCellPosition = {
 
 export type XlsxImageAnchor = {
   tl: XlsxImageCellPosition;
-  br: XlsxImageCellPosition;
-  editAs: "oneCell";
+  ext: { width: number; height: number };
 };
 
 export type XlsxImageWorksheet = {
@@ -73,21 +70,8 @@ function imageAnchor(
     (index) => sheet.rowHeights.get(index) ?? DEFAULT_ROW_HEIGHT,
     MAX_SHEET_ROWS,
   );
-  const endColumn = advanceAxis(
-    startColumn.index,
-    startColumn.offset,
-    width,
-    (index) => sheet.columnWidths.get(index) ?? DEFAULT_COLUMN_WIDTH,
-    MAX_SHEET_COLUMNS,
-  );
-  const endRow = advanceAxis(
-    startRow.index,
-    startRow.offset,
-    height,
-    (index) => sheet.rowHeights.get(index) ?? DEFAULT_ROW_HEIGHT,
-    MAX_SHEET_ROWS,
-  );
-  // tl/br produces a standard twoCellAnchor; editAs keeps pictures moving without resizing.
+  // Store physical size, not a second grid-dependent endpoint. The finalizer
+  // removes ExcelJS 4.4's invalid editAs attribute from this oneCellAnchor.
   return {
     tl: {
       nativeCol: startColumn.index,
@@ -95,13 +79,7 @@ function imageAnchor(
       nativeRow: startRow.index,
       nativeRowOff: Math.round(startRow.offset * EMU_PER_PIXEL),
     },
-    br: {
-      nativeCol: endColumn.index,
-      nativeColOff: Math.round(endColumn.offset * EMU_PER_PIXEL),
-      nativeRow: endRow.index,
-      nativeRowOff: Math.round(endRow.offset * EMU_PER_PIXEL),
-    },
-    editAs: "oneCell",
+    ext: { width, height },
   };
 }
 
@@ -122,45 +100,6 @@ function advanceAxis(
     if (nextIndex >= limit) throw new RangeError("The XLSX image exceeds sheet bounds.");
   }
   return { index: nextIndex, offset: nextOffset };
-}
-
-function containingMerge(sheet: Sheet, address: CellAddress) {
-  return sheet.mergedCells.find(
-    (range) =>
-      address.row >= range.start.row &&
-      address.row <= range.end.row &&
-      address.column >= range.start.column &&
-      address.column <= range.end.column,
-  );
-}
-
-function dimensionSize(
-  sizes: ReadonlyMap<number, number>,
-  start: number,
-  end: number,
-  defaultSize: number,
-): number {
-  let total = 0;
-  for (let index = start; index <= end; index += 1) total += sizes.get(index) ?? defaultSize;
-  return total;
-}
-
-function containedImageSize(
-  asset: XlsxImageAsset,
-  boxWidth: number,
-  boxHeight: number,
-): { width: number; height: number; offsetX: number; offsetY: number } {
-  const availableWidth = Math.max(1, boxWidth - CELL_IMAGE_INSET * 2);
-  const availableHeight = Math.max(1, boxHeight - CELL_IMAGE_INSET * 2);
-  const scale = Math.min(availableWidth / asset.width, availableHeight / asset.height);
-  const width = asset.width * scale;
-  const height = asset.height * scale;
-  return {
-    width,
-    height,
-    offsetX: CELL_IMAGE_INSET + (availableWidth - width) / 2,
-    offsetY: CELL_IMAGE_INSET + (availableHeight - height) / 2,
-  };
 }
 
 export function createXlsxImageExporter(
@@ -197,37 +136,15 @@ export function createXlsxImageExporter(
   }
 
   return {
-    addCellImage(
-      output: XlsxImageWorksheet,
-      sheet: Sheet,
-      address: CellAddress,
+    registerCellImage(
       image: CellImage,
       issueLocation: string,
-    ): void {
+    ): { mediaFilename: string; altText: string } {
       const asset = requireAsset(image.assetId, image.transform, issueLocation);
-      const merge = containingMerge(sheet, address);
-      const start = merge?.start ?? address;
-      const end = merge?.end ?? start;
-      const boxWidth = dimensionSize(
-        sheet.columnWidths,
-        start.column,
-        end.column,
-        DEFAULT_COLUMN_WIDTH,
-      );
-      const boxHeight = dimensionSize(sheet.rowHeights, start.row, end.row, DEFAULT_ROW_HEIGHT);
-      const size = containedImageSize(asset, boxWidth, boxHeight);
-      output.addImage(
-        addAsset(asset),
-        imageAnchor(
-          sheet,
-          start.row,
-          start.column,
-          size.offsetX,
-          size.offsetY,
-          size.width,
-          size.height,
-        ),
-      );
+      return {
+        mediaFilename: `xl/media/image${addAsset(asset) + 1}.${asset.extension}`,
+        altText: image.altText,
+      };
     },
 
     addFloatingImage(

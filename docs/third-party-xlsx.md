@@ -56,7 +56,11 @@ tree contains no npm, Yarn, or pnpm lockfile, so exact release-build transitive
 versions cannot be reconstructed from that release. This remains a release
 provenance gap, not a reason to claim complete legal clearance.
 
-V1 uses bounded central-directory plus actual-inflation preflight rather than
-a second bundled ZIP implementation.
+Import uses bounded central-directory plus actual-inflation preflight. Export
+also imports the tree-shakeable `fflate/browser` ESM entry from `fflate@0.8.3`
+to finalize only the freshly generated archive with native cell-image parts
+and canonical drawing/font declarations. This does not replace or bypass the
+import gate. Its separately installed, pinned MIT package and license are
+recorded in `NOTICE.txt`; it is not part of the historical ExcelJS UMD SBOM.
 
 Primary sources: [ExcelJS v4.4.0 package manifest](https://raw.githubusercontent.com/exceljs/exceljs/v4.4.0/package.json), [ExcelJS v4.4.0 build configuration](https://raw.githubusercontent.com/exceljs/exceljs/v4.4.0/gruntfile.js), [ExcelJS v4.4.0 license](https://raw.githubusercontent.com/exceljs/exceljs/v4.4.0/LICENSE), [pako MIT license](https://raw.githubusercontent.com/nodeca/pako/1.0.11/LICENSE), the public npm registry metadata used for the SBOM license-family lookup, and the reviewed package's UMD plus source map recorded above.

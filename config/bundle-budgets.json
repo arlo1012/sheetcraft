@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Production budgets include shared editing sessions, eight runtime functions, XLSX compatibility UI and lazy browser codec Worker, plus existing image tools. Deferred Workers remain included in total assets and have a separate cap; see ADR 0004.",
+  "description": "Production budgets include shared editing sessions, eight runtime functions, the lazy XLSX codec Worker with native cell-image export, plus existing image tools. Deferred Workers remain included in total assets and have a separate cap; see ADR 0004.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
@@ -27,6 +27,6 @@
   "deferredWorkers": {
     "pattern": "^(?:workbookXlsx\\.worker|worker-).*\\.js$",
     "maximumRawBytes": 1020000,
-    "maximumGzipBytes": 280000
+    "maximumGzipBytes": 288000
   }
 }

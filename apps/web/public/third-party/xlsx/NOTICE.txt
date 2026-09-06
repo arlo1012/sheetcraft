@@ -1,13 +1,42 @@
 XLSX browser bundle notices
 ===========================
 
-This directory accompanies the XLSX browser feature. It applies only to the
-reviewed ExcelJS browser UMD identified by SHA-256:
+This directory accompanies the XLSX browser feature. Its ExcelJS notices
+apply to the reviewed browser UMD identified by SHA-256:
 7e49da68588e250dbb8bba190d2caa8ab3787cc0284bda1d8b2f805c4df742c9
 
 The accompanying bundle-sbom.json is the authoritative bounded inventory and
 records the source-map groups whose versions or license terms could not be
 verified from this prebuilt artifact. It must remain with this notice.
+
+The feature also uses fflate 0.8.3 (fflate/browser, MIT) as a separate ESM
+dependency for export finalization. It is not embedded in the above UMD and
+is not included in that artifact's bounded source-map inventory.
+
+fflate 0.8.3
+-------------
+
+MIT License
+
+Copyright (c) 2026 Arjun Barrett
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ExcelJS 4.4.0
 -------------

@@ -48,7 +48,7 @@ function text(entries: ReadonlyMap<string, Uint8Array>, name: string): string {
 }
 
 describe("XLSX image export", () => {
-  test("writes actual media, drawing relationships, cell containment and floating offsets", async () => {
+  test("writes native cell media and fixed-size floating anchors without changing Core state", async () => {
     const workbook = createWorkbook({ id: "workbook", sheetId: "sheet" });
     const sheet = getActiveSheet(workbook);
     sheet.mergedCells.push({ start: { row: 0, column: 0 }, end: { row: 1, column: 1 } });
@@ -83,20 +83,25 @@ describe("XLSX image export", () => {
     const archive = entries(result.bytes);
     expect(archive.get("xl/media/image1.png")).toEqual(PNG_A);
     expect(archive.get("xl/media/image2.png")).toEqual(PNG_B);
-    expect(text(archive, "xl/drawings/_rels/drawing1.xml.rels")).toContain("../media/image1.png");
+    expect(text(archive, "xl/richData/_rels/richValueRel.xml.rels")).toContain(
+      "../media/image1.png",
+    );
+    expect(text(archive, "xl/drawings/_rels/drawing1.xml.rels")).not.toContain(
+      "../media/image1.png",
+    );
     expect(text(archive, "xl/drawings/_rels/drawing1.xml.rels")).toContain("../media/image2.png");
     const drawing = text(archive, "xl/drawings/drawing1.xml");
-    expect(drawing.match(/<xdr:twoCellAnchor editAs="oneCell">/g)).toHaveLength(2);
-    expect(drawing).not.toContain("<xdr:oneCellAnchor");
-    expect(drawing).not.toContain("<xdr:ext");
+    expect(drawing.match(/<xdr:oneCellAnchor>/g)).toHaveLength(1);
+    expect(drawing).not.toContain("<xdr:twoCellAnchor");
+    expect(drawing).not.toContain("editAs=");
     expect(drawing).toContain(
-      "<xdr:from><xdr:col>0</xdr:col><xdr:colOff>19050</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>266700</xdr:rowOff></xdr:from><xdr:to><xdr:col>1</xdr:col><xdr:colOff>742950</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>304800</xdr:rowOff></xdr:to>",
-    );
-    expect(drawing).toContain(
-      "<xdr:from><xdr:col>1</xdr:col><xdr:colOff>28575</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>38100</xdr:rowOff></xdr:from><xdr:to><xdr:col>1</xdr:col><xdr:colOff>695325</xdr:colOff><xdr:row>3</xdr:row><xdr:rowOff>142875</xdr:rowOff></xdr:to>",
+      '<xdr:from><xdr:col>1</xdr:col><xdr:colOff>28575</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>38100</xdr:rowOff></xdr:from><xdr:ext cx="666750" cy="333375"/>',
     );
     expect(text(archive, "xl/worksheets/sheet1.xml")).toContain('defaultRowHeight="18"');
     expect(text(archive, "xl/worksheets/sheet1.xml")).toContain('defaultColWidth="13.7109375"');
+    expect(text(archive, "xl/worksheets/sheet1.xml")).toMatch(
+      /<c r="A1"[^>]* t="e" vm="1"><v>#VALUE!<\/v><\/c>/,
+    );
   });
 
   test("deduplicates shared normalized variants while keeping distinct baked variants", async () => {
@@ -145,10 +150,10 @@ describe("XLSX image export", () => {
     expect(
       [...archive.keys()].filter((name) => /^xl\/media\/image\d+\.png$/.test(name)),
     ).toHaveLength(2);
-    expect(text(archive, "xl/drawings/drawing1.xml").match(/<xdr:twoCellAnchor/g)).toHaveLength(3);
+    expect(text(archive, "xl/drawings/drawing1.xml").match(/<xdr:oneCellAnchor>/g)).toHaveLength(2);
   });
 
-  test("normalizes two-cell endpoints across custom and default dimensions", async () => {
+  test("keeps physical size independent of custom and default dimensions", async () => {
     const workbook = createWorkbook({ id: "workbook", sheetId: "sheet" });
     const sheet = getActiveSheet(workbook);
     setColumnWidth(sheet, 0, 100);
@@ -168,7 +173,7 @@ describe("XLSX image export", () => {
 
     const result = await encodeXlsx(workbook, { images: [asset("boundary", PNG_A, 20, 20)] });
     expect(text(entries(result.bytes), "xl/drawings/drawing1.xml")).toContain(
-      "<xdr:from><xdr:col>0</xdr:col><xdr:colOff>857250</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>333375</xdr:rowOff></xdr:from><xdr:to><xdr:col>3</xdr:col><xdr:colOff>133350</xdr:colOff><xdr:row>3</xdr:row><xdr:rowOff>104775</xdr:rowOff></xdr:to>",
+      '<xdr:from><xdr:col>0</xdr:col><xdr:colOff>857250</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>333375</xdr:rowOff></xdr:from><xdr:ext cx="1905000" cy="952500"/>',
     );
   });
 
