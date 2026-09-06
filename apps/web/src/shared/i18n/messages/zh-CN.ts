@@ -184,6 +184,7 @@ export const zhCN = {
   statusBar: {
     label: "工作簿状态",
     selectionSummary: "选区统计",
+    resizeSheetTabs: "调整工作表页签区宽度",
     average: "均值:",
     count: "计数:",
     maximum: "最大值:",

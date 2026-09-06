@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, useId } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { SelectionSummary } from "@idea10/core/selection-summary";
 import type { Sheet, SheetProperties } from "@idea10/core/workbook";
 import { useStatusBarSettings } from "../composables/useStatusBarSettings";
+import { useSheetTabsWidth } from "../composables/useSheetTabsWidth";
 import { formatStatusBarNumber } from "../status-bar-number-format";
 import WorkbookStatusBarSettings from "./WorkbookStatusBarSettings.vue";
 import WorkbookSheetTabs from "./WorkbookSheetTabs.vue";
@@ -27,6 +28,19 @@ const emit = defineEmits<{
 
 const { locale, t } = useAppI18n();
 const settings = useStatusBarSettings();
+const topRowRef = ref<HTMLDivElement | null>(null);
+const sheetsRegionId = `workbook-sheet-tabs-${useId().replaceAll(":", "")}`;
+const {
+  width: sheetsWidth,
+  minimum: minimumSheetsWidth,
+  maximum: maximumSheetsWidth,
+  resizing,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  onKeydown,
+} = useSheetTabsWidth(topRowRef);
 const currentScale = computed(() =>
   new Intl.NumberFormat(locale.value, { style: "percent" }).format(1),
 );
@@ -50,8 +64,12 @@ function formatNumber(value: number): string {
 
 <template>
   <footer class="workbook-status-bar" :aria-label="t('statusBar.label')">
-    <div class="workbook-status-bar__top-row">
-      <div class="workbook-status-bar__sheets">
+    <div
+      ref="topRowRef"
+      class="workbook-status-bar__top-row"
+      :style="{ '--sheet-tabs-width': `${sheetsWidth}px` }"
+    >
+      <div :id="sheetsRegionId" class="workbook-status-bar__sheets">
         <WorkbookSheetTabs
           :sheets="sheets"
           :active-sheet-id="activeSheetId"
@@ -65,6 +83,26 @@ function formatNumber(value: number): string {
           @restore="emit('restore', $event)"
         />
       </div>
+      <div
+        class="workbook-status-bar__splitter"
+        :class="{ 'is-resizing': resizing }"
+        role="separator"
+        aria-orientation="vertical"
+        :aria-label="t('statusBar.resizeSheetTabs')"
+        :title="t('statusBar.resizeSheetTabs')"
+        :aria-controls="sheetsRegionId"
+        :aria-valuemin="minimumSheetsWidth"
+        :aria-valuemax="maximumSheetsWidth"
+        :aria-valuenow="sheetsWidth"
+        :aria-disabled="maximumSheetsWidth <= minimumSheetsWidth"
+        :tabindex="maximumSheetsWidth > minimumSheetsWidth ? 0 : -1"
+        @pointerdown="onPointerDown"
+        @pointermove="onPointerMove"
+        @pointerup="onPointerUp"
+        @pointercancel="onPointerCancel"
+        @lostpointercapture="onPointerUp"
+        @keydown="onKeydown"
+      />
       <div class="workbook-status-bar__horizontal-scrollbar">
         <slot name="horizontal-scrollbar" />
       </div>
@@ -163,10 +201,36 @@ function formatNumber(value: number): string {
 
   &__sheets {
     display: flex;
-    flex: 0 1 clamp(200px, 25%, 480px);
+    flex: 0 0 var(--sheet-tabs-width);
     min-width: 0;
-    max-width: 480px;
     overflow: hidden;
+  }
+
+  &__splitter {
+    position: relative;
+    flex: 0 0 8px;
+    cursor: col-resize;
+    touch-action: none;
+    user-select: none;
+
+    &::after {
+      position: absolute;
+      inset: 0 auto 0 3px;
+      width: 1px;
+      background: var(--idea-border-subtle);
+      content: "";
+    }
+
+    &:hover,
+    &:focus-visible,
+    &.is-resizing {
+      outline: none;
+      background: var(--idea-surface-hover);
+
+      &::after {
+        background: var(--idea-action-primary);
+      }
+    }
   }
 
   &__horizontal-scrollbar {
@@ -241,10 +305,6 @@ function formatNumber(value: number): string {
   }
 
   @media (max-width: 480px) {
-    &__sheets {
-      flex-basis: 170px;
-    }
-
     &__summary {
       gap: 10px;
       padding: 0 8px;

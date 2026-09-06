@@ -187,6 +187,7 @@ export const enUS = {
   statusBar: {
     label: "Workbook status",
     selectionSummary: "Selection summary",
+    resizeSheetTabs: "Resize sheet tabs area",
     average: "Average:",
     count: "Count:",
     maximum: "Maximum:",

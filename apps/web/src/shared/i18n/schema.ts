@@ -181,6 +181,7 @@ export type MessageSchema = {
   statusBar: {
     label: string;
     selectionSummary: string;
+    resizeSheetTabs: string;
     average: string;
     count: string;
     maximum: string;
