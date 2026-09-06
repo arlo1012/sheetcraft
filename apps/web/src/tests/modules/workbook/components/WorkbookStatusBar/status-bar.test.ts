@@ -51,7 +51,7 @@ describe("WorkbookStatusBar", () => {
         maximum: 0,
       },
     });
-    expect(wrapper.get("[data-selection-summary]").text()).toBe("Numeric count:0");
+    expect(wrapper.get("[data-selection-summary]").text()).toBe("Numeric count=0");
     wrapper.unmount();
   });
   test("keeps sheet tabs and the supplied horizontal scrollbar in the top row", () => {
@@ -95,9 +95,9 @@ describe("WorkbookStatusBar", () => {
     expect(wrapper.get("[data-selection-summary]").attributes("aria-label")).toBe(
       "Selection summary",
     );
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count:3");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:15");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum:30");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=3");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=15");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum=30");
 
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
     await wrapper.get('[title="Sheet1 (double-click to rename)"]').trigger("click");
@@ -124,9 +124,9 @@ describe("WorkbookStatusBar", () => {
     const wrapper = mountStatusBar("zh-CN");
 
     expect(wrapper.get("footer").attributes("aria-label")).toBe("工作簿状态");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("均值:15");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("计数:3");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("求和:30");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("均值=15");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("计数=3");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("求和=30");
     expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe("Sheet2");
   });
 
@@ -174,9 +174,9 @@ describe("WorkbookStatusBar", () => {
     });
 
     const summary = wrapper.get("[data-selection-summary]").text();
-    expect(summary).toContain("Count:2");
-    expect(summary).not.toContain("Average:");
-    expect(summary).not.toContain("Sum:");
+    expect(summary).toContain("Count=2");
+    expect(summary).not.toContain("Average=");
+    expect(summary).not.toContain("Sum=");
   });
 
   test("configures displayed statistics and persists the selection", async () => {
@@ -196,8 +196,8 @@ describe("WorkbookStatusBar", () => {
     await menu.get('[data-status-bar-number-format="thousands"]').trigger("click");
 
     const summary = wrapper.get("[data-selection-summary]").text();
-    expect(summary).toContain("Minimum:10");
-    expect(summary).not.toContain("Average:");
+    expect(summary).toContain("Minimum=10");
+    expect(summary).not.toContain("Average=");
     expect(localStorage.getItem(STATUS_BAR_SETTINGS_STORAGE_KEY)).toContain('"minimum":true');
     expect(localStorage.getItem(STATUS_BAR_SETTINGS_STORAGE_KEY)).toContain(
       '"numberFormat":"thousands"',

@@ -267,9 +267,9 @@ describe("App", () => {
     });
 
     const summary = wrapper.get("[data-selection-summary]").text();
-    expect(summary).toContain("Average:15");
-    expect(summary).toContain("Count:2");
-    expect(summary).toContain("Sum:30");
+    expect(summary).toContain("Average=15");
+    expect(summary).toContain("Count=2");
+    expect(summary).toContain("Sum=30");
   });
 
   test("summarizes whole rows, columns, and the full sheet", async () => {
@@ -287,19 +287,19 @@ describe("App", () => {
     await enterValue("20");
 
     await wrapper.get('[aria-label="Select row 1"]').trigger("mousedown", { button: 0 });
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:15");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count:2");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum:30");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=15");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=2");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum=30");
 
     await wrapper.get('[aria-label="Select column A"]').trigger("mousedown", { button: 0 });
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:54.5");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count:2");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum:109");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=54.5");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=2");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum=109");
 
     await wrapper.get('[aria-label="Select all cells"]').trigger("click");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average:43");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count:3");
-    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum:129");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=43");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=3");
+    expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum=129");
   });
 
   test("formats and clears the current selection as reversible workbook actions", async () => {
