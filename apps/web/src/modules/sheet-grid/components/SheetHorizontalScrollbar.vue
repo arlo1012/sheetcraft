@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 
@@ -15,6 +16,8 @@ const dragging = ref(false);
 const maximum = computed(() => Math.max(0, props.state.contentSize - props.state.viewportSize));
 const position = computed(() => Math.min(maximum.value, Math.max(0, props.state.position)));
 const progress = computed(() => (maximum.value > 0 ? position.value / maximum.value : 0));
+const canScrollLeft = computed(() => position.value > 0);
+const canScrollRight = computed(() => position.value < maximum.value);
 const thumbStyle = computed(() => ({
   width: `${props.state.contentSize > 0 ? Math.min(1, props.state.viewportSize / props.state.contentSize) * 100 : 100}%`,
   left: `${progress.value * 100}%`,
@@ -24,6 +27,10 @@ let drag: { pointerId: number; x: number; position: number; scale: number } | un
 
 function scrollTo(value: number): void {
   emit("scroll", Math.min(maximum.value, Math.max(0, value)));
+}
+
+function scrollByStep(direction: -1 | 1): void {
+  scrollTo(position.value + direction * 48);
 }
 
 function onPointerDown(event: PointerEvent): void {
@@ -106,65 +113,124 @@ function onWheel(event: WheelEvent): void {
 </script>
 
 <template>
-  <div
-    ref="trackRef"
-    class="sheet-horizontal-scrollbar"
-    :class="{ 'is-dragging': dragging, 'is-disabled': maximum <= 0 }"
-    role="scrollbar"
-    aria-orientation="horizontal"
-    :aria-label="t('grid.horizontalScroll')"
-    :aria-controls="controls"
-    :aria-valuemin="0"
-    :aria-valuemax="Math.round(maximum)"
-    :aria-valuenow="Math.round(position)"
-    :aria-disabled="maximum <= 0"
-    :tabindex="maximum > 0 ? 0 : -1"
-    @pointerdown="onPointerDown"
-    @pointermove="onPointerMove"
-    @pointerup="stopDrag"
-    @pointercancel="stopDrag"
-    @lostpointercapture="stopDrag"
-    @keydown="onKeydown"
-    @wheel="onWheel"
-  >
-    <div ref="thumbRef" class="sheet-horizontal-scrollbar__thumb" :style="thumbStyle" />
+  <div class="sheet-horizontal-scrollbar">
+    <button
+      class="sheet-horizontal-scrollbar__button"
+      type="button"
+      :disabled="!canScrollLeft"
+      :aria-label="t('grid.scrollLeft')"
+      :title="t('grid.scrollLeft')"
+      @click="scrollByStep(-1)"
+    >
+      <ChevronLeft :size="10" aria-hidden="true" />
+    </button>
+    <div
+      ref="trackRef"
+      class="sheet-horizontal-scrollbar__track"
+      :class="{ 'is-dragging': dragging, 'is-disabled': maximum <= 0 }"
+      role="scrollbar"
+      aria-orientation="horizontal"
+      :aria-label="t('grid.horizontalScroll')"
+      :aria-controls="controls"
+      :aria-valuemin="0"
+      :aria-valuemax="Math.round(maximum)"
+      :aria-valuenow="Math.round(position)"
+      :aria-disabled="maximum <= 0"
+      :tabindex="maximum > 0 ? 0 : -1"
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
+      @pointerup="stopDrag"
+      @pointercancel="stopDrag"
+      @lostpointercapture="stopDrag"
+      @keydown="onKeydown"
+      @wheel="onWheel"
+    >
+      <div ref="thumbRef" class="sheet-horizontal-scrollbar__thumb" :style="thumbStyle" />
+    </div>
+    <button
+      class="sheet-horizontal-scrollbar__button"
+      type="button"
+      :disabled="!canScrollRight"
+      :aria-label="t('grid.scrollRight')"
+      :title="t('grid.scrollRight')"
+      @click="scrollByStep(1)"
+    >
+      <ChevronRight :size="10" aria-hidden="true" />
+    </button>
   </div>
 </template>
 
 <style scoped lang="scss">
 .sheet-horizontal-scrollbar {
-  position: relative;
+  display: flex;
+  align-items: center;
   width: 100%;
   min-width: 0;
   height: 16px;
-  touch-action: none;
-  user-select: none;
-  border-radius: 3px;
 
-  &:focus-visible {
-    outline: none;
+  &__button {
+    display: grid;
+    flex: 0 0 14px;
+    width: 14px;
+    height: 16px;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 2px;
+    color: var(--idea-text-muted);
+    background: transparent;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      color: var(--idea-text-secondary);
+    }
+
+    &:focus-visible {
+      outline: 1px solid var(--idea-action-primary);
+      outline-offset: -1px;
+      background: var(--idea-surface-hover);
+    }
+
+    &:disabled {
+      color: var(--idea-text-disabled);
+      cursor: default;
+    }
   }
 
-  &:focus-visible &__thumb {
-    background: var(--idea-action-primary);
+  &__track {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 16px;
+    touch-action: none;
+    user-select: none;
+    border-radius: 3px;
+
+    &:focus-visible {
+      outline: none;
+    }
+
+    &:focus-visible .sheet-horizontal-scrollbar__thumb {
+      background: var(--idea-sheet-bar-thumb-hover);
+    }
   }
 
   &__thumb {
     position: absolute;
-    top: 4px;
-    height: 8px;
+    top: 5px;
+    height: 6px;
     min-width: min(24px, 100%);
-    border-radius: 4px;
-    background: var(--idea-text-muted);
+    border-radius: 999px;
+    background: var(--idea-sheet-bar-thumb);
   }
 
   &__thumb:hover,
-  &.is-dragging &__thumb {
-    background: var(--idea-text-secondary);
+  &__track.is-dragging &__thumb {
+    background: var(--idea-sheet-bar-thumb-hover);
   }
 
-  &.is-disabled &__thumb {
-    background: var(--idea-border-subtle);
+  &__track.is-disabled &__thumb {
+    background: var(--idea-text-disabled);
   }
 }
 </style>

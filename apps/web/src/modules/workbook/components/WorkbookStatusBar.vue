@@ -197,6 +197,7 @@ function formatNumber(value: number): string {
     display: flex;
     align-items: stretch;
     overflow: hidden;
+    background: var(--idea-sheet-bar-surface);
   }
 
   &__sheets {
@@ -215,9 +216,13 @@ function formatNumber(value: number): string {
 
     &::after {
       position: absolute;
-      inset: 0 auto 0 3px;
-      width: 1px;
-      background: var(--idea-border-subtle);
+      top: 50%;
+      left: 3px;
+      width: 2px;
+      height: 8px;
+      border-radius: 1px;
+      background: var(--idea-sheet-bar-thumb);
+      transform: translateY(-50%);
       content: "";
     }
 
@@ -225,11 +230,15 @@ function formatNumber(value: number): string {
     &:focus-visible,
     &.is-resizing {
       outline: none;
-      background: var(--idea-surface-hover);
 
       &::after {
-        background: var(--idea-action-primary);
+        height: 12px;
+        background: var(--idea-sheet-bar-thumb-hover);
       }
+    }
+
+    &:focus-visible::after {
+      background: var(--idea-action-primary);
     }
   }
 
@@ -238,7 +247,7 @@ function formatNumber(value: number): string {
     flex: 1 1 auto;
     align-items: center;
     min-width: 0;
-    padding: 0 10px;
+    padding: 0 5px 0 2px;
     overflow: hidden;
   }
 
@@ -246,7 +255,7 @@ function formatNumber(value: number): string {
     display: grid;
     grid-template-columns: 30px minmax(0, 1fr);
     align-items: center;
-    border-top: 1px solid var(--idea-border-subtle);
+    border-top: 1px solid var(--idea-sheet-bar-border);
   }
 
   &__metrics {

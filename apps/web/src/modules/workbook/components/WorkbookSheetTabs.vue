@@ -553,7 +553,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     gap: 2px;
     padding: 0 6px;
     margin-right: 4px;
-    border-right: 1px solid var(--idea-border-subtle);
+    border-right: 1px solid var(--idea-sheet-bar-border);
   }
 
   &__viewport {
@@ -587,7 +587,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     max-width: min(204px, 100%);
     margin-bottom: 2px;
     overflow: hidden;
-    background: var(--idea-surface-secondary);
+    background: transparent;
     border-top: 2px solid transparent;
     border-radius: 0 0 6px 6px;
     color: var(--idea-text-secondary);
@@ -595,7 +595,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     &:hover,
     &:focus-within,
     &.is-menu-open {
-      background: var(--idea-surface-secondary-active);
+      background: color-mix(in srgb, var(--idea-sheet-bar-surface), var(--idea-text-primary) 8%);
     }
 
     &.is-active {

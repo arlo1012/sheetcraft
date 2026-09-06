@@ -218,6 +218,8 @@ export const zhCN = {
   },
   grid: {
     horizontalScroll: "横向滚动工作表",
+    scrollLeft: "向左滚动工作表",
+    scrollRight: "向右滚动工作表",
     worksheet: "{name} 工作表",
     selectAll: "选择全部单元格",
     selectRow: "选择第 {row} 行",

@@ -10,7 +10,7 @@
     },
     "css": {
       "pattern": "^index-.*\\.css$",
-      "maximumRawBytes": 88000,
+      "maximumRawBytes": 89000,
       "maximumGzipBytes": 13400
     }
   },

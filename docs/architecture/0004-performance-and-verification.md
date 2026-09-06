@@ -139,6 +139,12 @@ production entry measures 424,982 B JavaScript (118,159 B gzip) and 86,576 B CSS
 entry CSS, 985/288 KB total JavaScript and 248/33.5 KB total CSS. No dependency
 was added, and both entry and total gates remain active.
 
+The draggable sheet-tab divider and compact scrollbar end buttons share neutral
+footer colors in both themes. The inspected build measures 428,732 B entry
+JavaScript (119,158 B gzip), 88,534 B entry CSS (13,255 B gzip), and 247,829 B
+total CSS (32,628 B gzip). The entry CSS raw limit becomes 89 KB to include these
+controls and their focus states; all other limits remain unchanged.
+
 Scrolling preserves the selection identity in stored view state, so summary,
 style and filter computations remain cached. The cell layer uses constant-time
 visible-cell deduplication, skips empty merge lookups, moves row panes together,

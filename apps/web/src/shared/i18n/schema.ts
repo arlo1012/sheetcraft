@@ -215,6 +215,8 @@ export type MessageSchema = {
   };
   grid: {
     horizontalScroll: string;
+    scrollLeft: string;
+    scrollRight: string;
     worksheet: string;
     selectAll: string;
     selectRow: string;

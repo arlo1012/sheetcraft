@@ -221,6 +221,8 @@ export const enUS = {
   },
   grid: {
     horizontalScroll: "Scroll worksheet horizontally",
+    scrollLeft: "Scroll worksheet left",
+    scrollRight: "Scroll worksheet right",
     worksheet: "{name} worksheet",
     selectAll: "Select all cells",
     selectRow: "Select row {row}",
