@@ -281,7 +281,7 @@ function formatNumber(value: number): string {
   &__stat {
     display: inline-flex;
     align-items: baseline;
-    gap: 4px;
+    gap: 0;
     min-width: 0;
     white-space: nowrap;
 
