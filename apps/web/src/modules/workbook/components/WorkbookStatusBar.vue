@@ -182,9 +182,8 @@ function formatNumber(value: number): string {
   display: grid;
   grid-template-rows: 26px 22px;
   min-width: 0;
-  min-height: 49px;
+  min-height: 48px;
   background: var(--idea-sheet-bar-surface);
-  border-top: 1px solid var(--idea-border-subtle);
   color: var(--idea-text-secondary);
   font-size: 12px;
 

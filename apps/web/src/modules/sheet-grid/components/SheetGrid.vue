@@ -1751,7 +1751,7 @@ defineExpose({
     overflow: auto;
     background: var(--idea-surface-panel);
     outline: none;
-    scrollbar-color: var(--idea-border-control) var(--idea-surface-secondary);
+    scrollbar-color: var(--idea-border-control) var(--idea-sheet-bar-surface);
     scrollbar-width: auto;
 
     @supports selector(::-webkit-scrollbar) {
@@ -1764,11 +1764,11 @@ defineExpose({
     }
 
     &::-webkit-scrollbar-track {
-      background: var(--idea-surface-secondary);
+      background: var(--idea-sheet-bar-surface);
     }
 
     &::-webkit-scrollbar-thumb {
-      border: 4px solid var(--idea-surface-secondary);
+      border: 4px solid var(--idea-sheet-bar-surface);
       border-radius: 999px;
       background: var(--idea-sheet-bar-thumb);
 
