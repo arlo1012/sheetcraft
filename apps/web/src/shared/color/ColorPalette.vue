@@ -255,6 +255,7 @@ function getPanelAttach(): HTMLElement {
         format="HEX"
         :enable-alpha="false"
         :recent-colors="disabledRecentColors"
+        :swatch-colors="[]"
         :show-primary-color-preview="false"
         :select-input-props="{ popupProps: { attach: getPanelAttach } }"
         @change="updateDraft"
