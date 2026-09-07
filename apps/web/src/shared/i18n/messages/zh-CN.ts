@@ -344,7 +344,7 @@ export const zhCN = {
   },
   colorPalette: {
     label: "颜色选择",
-    default: "默认",
+    default: "无填充",
     theme: "预设颜色",
     standard: "标准色",
     recent: "最近使用",

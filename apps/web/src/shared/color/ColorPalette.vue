@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronRight } from "lucide-vue-next";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useAppI18n } from "../i18n";
@@ -242,7 +243,8 @@ function getPanelAttach(): HTMLElement {
         data-color-action="more"
         @click="openMore"
       >
-        {{ t("colorPalette.more") }}
+        <span>{{ t("colorPalette.more") }}</span>
+        <ChevronRight :size="14" aria-hidden="true" />
       </button>
     </template>
 
@@ -345,6 +347,10 @@ function getPanelAttach(): HTMLElement {
     background: var(--idea-surface-panel);
   }
   &__more {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
     margin-top: 9px;
     border-width: 0;
     text-align: left;

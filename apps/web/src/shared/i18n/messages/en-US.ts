@@ -353,7 +353,7 @@ export const enUS = {
   },
   colorPalette: {
     label: "Color picker",
-    default: "Default",
+    default: "No fill",
     theme: "Theme colors",
     standard: "Standard colors",
     recent: "Recent colors",
