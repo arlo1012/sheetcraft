@@ -154,7 +154,7 @@ function fitSelection(): void {
         >{{ t("statusBar.fitSelection") }}</MenuItem
       >
       <li class="workbook-zoom-menu__custom" role="none">
-        <label>
+        <div role="group" :aria-label="t('statusBar.customZoom')">
           <span>{{ t("statusBar.customZoom") }}</span>
           <TInputNumber
             class="workbook-zoom-menu__custom-input idea-input-number--persistent-controls"
@@ -163,6 +163,7 @@ function fitSelection(): void {
             :max="MAX_SHEET_ZOOM"
             :decimal-places="0"
             :step="1"
+            :placeholder="t('statusBar.customZoom')"
             size="small"
             theme="column"
             suffix="%"
@@ -170,7 +171,7 @@ function fitSelection(): void {
             @enter="commitCustom($event, true)"
             @blur="commitCustom($event, false)"
           />
-        </label>
+        </div>
       </li>
     </MenuSurface>
   </Teleport>
@@ -236,7 +237,7 @@ function fitSelection(): void {
     font-size: var(--idea-font-size-body-small);
     list-style: none;
 
-    > label {
+    > [role="group"] {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       gap: 6px;
