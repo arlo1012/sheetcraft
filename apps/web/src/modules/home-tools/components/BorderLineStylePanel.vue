@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Check } from "lucide-vue-next";
 import type { CellBorderLineStyle } from "@idea10/core/style";
 import BorderLinePreview from "../../../shared/borders/BorderLinePreview.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -25,12 +24,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'hair'"
       @click="emit('select', 'hair')"
     >
-      <BorderLinePreview line-style="hair" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'hair' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="hair" />
     </button>
     <button
       type="button"
@@ -40,12 +34,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'dashDot'"
       @click="emit('select', 'dashDot')"
     >
-      <BorderLinePreview line-style="dashDot" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'dashDot' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="dashDot" />
     </button>
     <button
       type="button"
@@ -55,12 +44,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'dashDotDot'"
       @click="emit('select', 'dashDotDot')"
     >
-      <BorderLinePreview line-style="dashDotDot" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'dashDotDot' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="dashDotDot" />
     </button>
     <button
       type="button"
@@ -70,12 +54,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'dotted'"
       @click="emit('select', 'dotted')"
     >
-      <BorderLinePreview line-style="dotted" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'dotted' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="dotted" />
     </button>
     <button
       type="button"
@@ -85,12 +64,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'dashed'"
       @click="emit('select', 'dashed')"
     >
-      <BorderLinePreview line-style="dashed" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'dashed' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="dashed" />
     </button>
     <button
       type="button"
@@ -100,12 +74,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'thin'"
       @click="emit('select', 'thin')"
     >
-      <BorderLinePreview line-style="thin" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'thin' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="thin" />
     </button>
     <button
       type="button"
@@ -115,12 +84,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'mediumDashDotDot'"
       @click="emit('select', 'mediumDashDotDot')"
     >
-      <BorderLinePreview line-style="mediumDashDotDot" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'mediumDashDotDot' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="mediumDashDotDot" />
     </button>
     <button
       type="button"
@@ -130,12 +94,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'mediumDashDot'"
       @click="emit('select', 'mediumDashDot')"
     >
-      <BorderLinePreview line-style="mediumDashDot" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'mediumDashDot' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="mediumDashDot" />
     </button>
     <button
       type="button"
@@ -145,12 +104,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'mediumDashed'"
       @click="emit('select', 'mediumDashed')"
     >
-      <BorderLinePreview line-style="mediumDashed" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'mediumDashed' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="mediumDashed" />
     </button>
     <button
       type="button"
@@ -160,12 +114,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'medium'"
       @click="emit('select', 'medium')"
     >
-      <BorderLinePreview line-style="medium" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'medium' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="medium" />
     </button>
     <button
       type="button"
@@ -175,12 +124,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'double'"
       @click="emit('select', 'double')"
     >
-      <BorderLinePreview line-style="double" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'double' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="double" />
     </button>
     <button
       type="button"
@@ -190,12 +134,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'thick'"
       @click="emit('select', 'thick')"
     >
-      <BorderLinePreview line-style="thick" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'thick' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="thick" />
     </button>
     <button
       type="button"
@@ -205,12 +144,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'slantDashDot'"
       @click="emit('select', 'slantDashDot')"
     >
-      <BorderLinePreview line-style="slantDashDot" /><Check
-        class="border-line-style-panel__check"
-        :size="15"
-        :class="{ 'is-visible': modelValue === 'slantDashDot' }"
-        aria-hidden="true"
-      />
+      <BorderLinePreview line-style="slantDashDot" />
     </button>
   </div>
 </template>
@@ -218,35 +152,26 @@ const { t } = useAppI18n();
 <style scoped lang="scss">
 .border-line-style-panel {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2px;
 
   > button {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 18px;
-    align-items: center;
+    place-items: center;
     width: 100%;
     height: 29px;
-    padding: 0 15px;
+    padding: 0 12px;
     background: transparent;
     color: var(--idea-text-primary);
-    border: 1px solid transparent;
+    border: 0;
     border-radius: 2px;
     cursor: pointer;
 
     &:hover,
-    &:focus-visible {
+    &:focus-visible,
+    &[aria-checked="true"] {
       background: var(--idea-surface-hover);
-      border-color: var(--idea-action-primary);
       outline: none;
-    }
-
-    > .border-line-style-panel__check {
-      opacity: 0;
-      color: var(--idea-action-primary);
-
-      &.is-visible {
-        opacity: 1;
-      }
     }
   }
 }
