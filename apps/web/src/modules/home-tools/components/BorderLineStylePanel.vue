@@ -26,6 +26,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'hair')"
     >
       <BorderLinePreview line-style="hair" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'hair' }"
         aria-hidden="true"
@@ -40,6 +41,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'dashDot')"
     >
       <BorderLinePreview line-style="dashDot" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'dashDot' }"
         aria-hidden="true"
@@ -54,6 +56,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'dashDotDot')"
     >
       <BorderLinePreview line-style="dashDotDot" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'dashDotDot' }"
         aria-hidden="true"
@@ -68,6 +71,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'dotted')"
     >
       <BorderLinePreview line-style="dotted" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'dotted' }"
         aria-hidden="true"
@@ -82,6 +86,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'dashed')"
     >
       <BorderLinePreview line-style="dashed" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'dashed' }"
         aria-hidden="true"
@@ -96,6 +101,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'thin')"
     >
       <BorderLinePreview line-style="thin" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'thin' }"
         aria-hidden="true"
@@ -110,6 +116,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'mediumDashDotDot')"
     >
       <BorderLinePreview line-style="mediumDashDotDot" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'mediumDashDotDot' }"
         aria-hidden="true"
@@ -124,6 +131,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'mediumDashDot')"
     >
       <BorderLinePreview line-style="mediumDashDot" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'mediumDashDot' }"
         aria-hidden="true"
@@ -138,6 +146,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'mediumDashed')"
     >
       <BorderLinePreview line-style="mediumDashed" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'mediumDashed' }"
         aria-hidden="true"
@@ -152,6 +161,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'medium')"
     >
       <BorderLinePreview line-style="medium" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'medium' }"
         aria-hidden="true"
@@ -166,6 +176,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'double')"
     >
       <BorderLinePreview line-style="double" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'double' }"
         aria-hidden="true"
@@ -180,6 +191,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'thick')"
     >
       <BorderLinePreview line-style="thick" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'thick' }"
         aria-hidden="true"
@@ -194,6 +206,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'slantDashDot')"
     >
       <BorderLinePreview line-style="slantDashDot" /><Check
+        class="border-line-style-panel__check"
         :size="15"
         :class="{ 'is-visible': modelValue === 'slantDashDot' }"
         aria-hidden="true"
@@ -215,6 +228,7 @@ const { t } = useAppI18n();
     height: 29px;
     padding: 0 15px;
     background: transparent;
+    color: var(--idea-text-primary);
     border: 1px solid transparent;
     border-radius: 2px;
     cursor: pointer;
@@ -226,7 +240,7 @@ const { t } = useAppI18n();
       outline: none;
     }
 
-    > svg {
+    > .border-line-style-panel__check {
       opacity: 0;
       color: var(--idea-action-primary);
 
