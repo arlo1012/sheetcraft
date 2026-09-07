@@ -99,7 +99,7 @@ function onKeydown(event: KeyboardEvent): void {
   align-items: center;
   min-height: 30px;
   gap: 8px;
-  padding: 0 6px;
+  padding: 0 14px;
   color: var(--idea-text-primary);
   font: inherit;
   font-size: var(--idea-font-size-body-small);

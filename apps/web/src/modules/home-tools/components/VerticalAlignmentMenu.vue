@@ -323,7 +323,7 @@ watch(
     z-index: 100;
     display: grid;
     min-width: 156px;
-    padding: var(--idea-tool-panel-padding);
+    padding: var(--idea-menu-padding);
     background: var(--idea-surface-panel);
     border: 1px solid var(--idea-border-control);
     border-radius: var(--idea-radius-medium);
@@ -336,7 +336,7 @@ watch(
       width: 100%;
       height: 30px;
       gap: 8px;
-      padding: 0 6px;
+      padding: 0 14px;
       background: transparent;
       border: 0;
       border-radius: 2px;

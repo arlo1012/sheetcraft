@@ -454,6 +454,9 @@ onBeforeUnmount(() => {
     width: 178px;
     padding: var(--idea-tool-panel-padding);
   }
+  &__submenu.is-style {
+    padding: var(--idea-menu-padding);
+  }
   &__submenu.is-color {
     width: max-content;
     min-width: 208px;

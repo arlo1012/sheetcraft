@@ -119,7 +119,7 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
   display: grid;
   max-width: calc(100vw - var(--idea-space-4) - var(--idea-space-4));
   max-height: calc(100vh - var(--idea-space-4) - var(--idea-space-4));
-  padding: var(--idea-tool-panel-padding);
+  padding: var(--idea-menu-padding);
   margin: 0;
   overflow-y: auto;
   overscroll-behavior: contain;

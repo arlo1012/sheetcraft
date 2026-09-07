@@ -167,7 +167,7 @@ const { t } = useAppI18n();
       align-items: center;
       width: 100%;
       height: 29px;
-      padding: 0 7px;
+      padding: 0 15px;
       background: transparent;
       border: 1px solid transparent;
       border-radius: 2px;

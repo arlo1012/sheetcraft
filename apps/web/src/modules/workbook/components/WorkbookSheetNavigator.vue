@@ -222,7 +222,7 @@ watch(open, (isOpen) => {
 
   &__search {
     flex: 0 0 auto;
-    padding: 0 0 6px;
+    padding: 0 8px 6px;
     input {
       box-sizing: border-box;
       width: 100%;
@@ -259,7 +259,7 @@ watch(open, (isOpen) => {
   }
 
   &__empty {
-    padding: 6px;
+    padding: 6px 14px;
     color: var(--idea-text-secondary);
     font-size: var(--idea-font-size-body-small);
     line-height: var(--idea-line-height-body-small);
@@ -268,7 +268,7 @@ watch(open, (isOpen) => {
 
   &__hidden-heading {
     flex: 0 0 auto;
-    padding: 6px;
+    padding: 6px 14px;
     list-style: none;
     color: var(--idea-text-muted);
     font-size: var(--idea-font-size-body-small);
