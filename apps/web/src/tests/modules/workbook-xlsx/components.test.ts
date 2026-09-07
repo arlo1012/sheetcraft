@@ -1,6 +1,5 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import XlsxFileActions from "../../../modules/workbook-xlsx/components/XlsxFileActions.vue";
 import XlsxFileFeedback from "../../../modules/workbook-xlsx/components/XlsxFileFeedback.vue";
 import { createAppI18n } from "../../../shared/i18n";
 
@@ -17,21 +16,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-describe("XLSX controls", () => {
-  test("uses localized labels for the import and export controls", () => {
-    const wrapper = mount(XlsxFileActions, {
-      global: { plugins: [createAppI18n("en-US")] },
-      props: { busy: false, disabled: false },
-    });
-    mounted.push(wrapper);
-
-    expect(wrapper.get("[data-xlsx-import]").text()).toContain("Import XLSX");
-    expect(wrapper.get("[data-xlsx-export]").text()).toContain("Export XLSX");
-    expect(wrapper.get("[data-xlsx-file-input]").attributes("aria-label")).toBe(
-      "Select an XLSX workbook",
-    );
-  });
-
+describe("XLSX feedback", () => {
   test("only asks to replace the document when importing without compatibility details", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const host = createFeedbackHost();

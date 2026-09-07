@@ -304,13 +304,17 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @import-json="fileActions.importJson"
           @export-json="fileActions.exportJson"
           @reload="fileActions.requestReload"
-        />
-        <XlsxFileActions
-          :disabled="loading || fileBusy || imageBusy || !!confirmation || !!xlsxConfirmation"
-          :busy="xlsxBusy"
-          @import-xlsx="xlsxActions.importXlsx"
-          @export-xlsx="xlsxActions.exportXlsx"
-        />
+        >
+          <template #extra-menu-actions="{ close }">
+            <XlsxFileActions
+              :disabled="loading || fileBusy || imageBusy || !!confirmation || !!xlsxConfirmation"
+              :busy="xlsxBusy"
+              @close="close"
+              @import-xlsx="xlsxActions.importXlsx"
+              @export-xlsx="xlsxActions.exportXlsx"
+            />
+          </template>
+        </WorkbookFileActions>
       </template>
     </SpreadsheetRibbon>
     <CellFormatDialog

@@ -15,12 +15,16 @@ const emit = defineEmits<{
   exportJson: [];
   reload: [];
 }>();
+defineSlots<{
+  "extra-menu-actions"?: (props: { close: () => void }) => unknown;
+}>();
 const { t } = useAppI18n();
 const triggerRef = ref<HTMLButtonElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuRef = computed(() => menuSurfaceRef.value?.rootElement ?? null);
 const open = ref(false);
+const opened = ref(false);
 const menuId = `workbook-file-menu-${useId().replaceAll(":", "")}`;
 const statusKeys: Record<WorkbookPersistenceStatus, MessageKey> = {
   loading: "persistence.loading",
@@ -39,6 +43,7 @@ const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, menu
 
 function openMenu(focus: "first" | "last" = "first"): void {
   if (props.disabled) return;
+  opened.value = true;
   open.value = true;
   void nextTick(() =>
     focus === "last"
@@ -59,15 +64,19 @@ function onTriggerKeydown(event: KeyboardEvent): void {
 }
 
 function select(action: "save" | "exportJson" | "reload"): void {
-  dismiss("programmatic", true);
+  closeMenu();
   if (action === "save") emit("save");
   else if (action === "exportJson") emit("exportJson");
   else emit("reload");
 }
 
 function chooseFile(): void {
-  dismiss("programmatic", true);
+  closeMenu();
   fileInputRef.value?.click();
+}
+
+function closeMenu(): void {
+  dismiss("programmatic", true);
 }
 
 function onFileChange(event: Event): void {
@@ -125,12 +134,14 @@ watch(
   </div>
   <Teleport to="body">
     <MenuSurface
-      v-if="open"
+      v-if="opened"
+      v-show="open"
       :id="menuId"
       ref="menuSurfaceRef"
       class="workbook-file-menu"
       :style="floatingStyles"
       :label="t('persistence.fileActions')"
+      :aria-hidden="!open"
     >
       <MenuItem data-workbook-file="save" @select="select('save')">
         <template #icon><Save :size="15" /></template>
@@ -145,6 +156,7 @@ watch(
         <template #icon><Download :size="15" /></template>
         {{ t("persistence.exportJson") }}
       </MenuItem>
+      <slot name="extra-menu-actions" :close="closeMenu" />
       <MenuSeparator />
       <MenuItem data-workbook-file="reload" @select="select('reload')">
         <template #icon><RotateCcw :size="15" /></template>

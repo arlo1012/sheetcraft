@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { Download, Upload } from "lucide-vue-next";
-import { Button } from "tdesign-vue-next";
 import { ref } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
+import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 
 const props = defineProps<{ busy: boolean; disabled: boolean }>();
-const emit = defineEmits<{ importXlsx: [file: File]; exportXlsx: [] }>();
+const emit = defineEmits<{
+  close: [];
+  importXlsx: [file: File];
+  exportXlsx: [];
+}>();
 const { t } = useAppI18n();
 const input = ref<HTMLInputElement>();
 
@@ -15,10 +20,22 @@ function onFileChange(event: Event): void {
   target.value = "";
   if (file) emit("importXlsx", file);
 }
+
+function chooseFile(): void {
+  if (props.disabled || props.busy) return;
+  emit("close");
+  input.value?.click();
+}
+
+function exportFile(): void {
+  if (props.disabled || props.busy) return;
+  emit("close");
+  emit("exportXlsx");
+}
 </script>
 
 <template>
-  <div class="xlsx-file-actions" data-xlsx-actions>
+  <li hidden role="none">
     <input
       ref="input"
       type="file"
@@ -29,34 +46,14 @@ function onFileChange(event: Event): void {
       data-xlsx-file-input
       @change="onFileChange"
     />
-    <Button
-      size="small"
-      variant="outline"
-      :disabled="disabled || busy"
-      :loading="busy"
-      data-xlsx-import
-      @click="input?.click()"
-    >
-      <template #icon><Upload :size="14" /></template>
-      {{ t("xlsx.actions.import") }}
-    </Button>
-    <Button
-      size="small"
-      variant="outline"
-      :disabled="disabled || busy"
-      data-xlsx-export
-      @click="emit('exportXlsx')"
-    >
-      <template #icon><Download :size="14" /></template>
-      {{ t("xlsx.actions.export") }}
-    </Button>
-  </div>
+  </li>
+  <MenuSeparator data-xlsx-actions />
+  <MenuItem :disabled="disabled || busy" data-xlsx-import @select="chooseFile">
+    <template #icon><Upload :size="15" /></template>
+    {{ t("xlsx.actions.import") }}
+  </MenuItem>
+  <MenuItem :disabled="disabled || busy" data-xlsx-export @select="exportFile">
+    <template #icon><Download :size="15" /></template>
+    {{ t("xlsx.actions.export") }}
+  </MenuItem>
 </template>
-
-<style scoped lang="scss">
-.xlsx-file-actions {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-}
-</style>
