@@ -456,7 +456,7 @@ onBeforeUnmount(() => {
   }
   &__submenu.is-color {
     width: max-content;
-    min-width: 228px;
+    min-width: 208px;
     padding: 0;
   }
   &__settings-color {

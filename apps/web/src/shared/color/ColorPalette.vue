@@ -276,7 +276,7 @@ function getPanelAttach(): HTMLElement {
 
 <style scoped lang="scss">
 .color-palette {
-  width: 228px;
+  width: 208px;
   padding: 8px;
   background: var(--idea-surface-panel);
   color: var(--idea-text-primary);
@@ -314,21 +314,23 @@ function getPanelAttach(): HTMLElement {
   }
   &__grid {
     display: grid;
-    grid-template-columns: repeat(10, 18px);
+    grid-template-columns: repeat(10, 16px);
     gap: 3px;
   }
   &__grid--single {
-    min-height: 18px;
+    min-height: 16px;
   }
   &__swatch {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     box-sizing: border-box;
     border: 1px solid rgb(0 0 0 / 12%);
     border-radius: 1px;
     cursor: pointer;
 
-    &:hover,
+    &:hover {
+      border-color: rgb(0 0 0 / 32%);
+    }
     &.is-selected {
       outline: 2px solid var(--idea-text-primary);
       outline-offset: 1px;
