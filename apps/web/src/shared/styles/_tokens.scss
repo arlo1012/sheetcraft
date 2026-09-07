@@ -1,5 +1,6 @@
 @layer theme {
   :root {
+    --idea-tool-panel-padding: var(--idea-space-4);
     font-family: var(--idea-font-sans);
     font-synthesis: none;
     text-rendering: optimizeLegibility;

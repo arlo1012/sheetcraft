@@ -194,6 +194,8 @@
 // Embedded color panels share their owner's floating surface and reserve most
 // of the format row for color values.
 .idea-color-palette-panel {
+  --td-pop-padding-xl: var(--idea-tool-panel-padding);
+
   &.t-color-picker__panel {
     box-shadow: none;
   }

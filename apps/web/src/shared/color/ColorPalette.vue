@@ -283,7 +283,7 @@ function getPanelAttach(): HTMLElement {
 <style scoped lang="scss">
 .color-palette {
   width: 208px;
-  padding: 8px;
+  padding: var(--idea-tool-panel-padding);
   background: var(--idea-surface-panel);
   color: var(--idea-text-primary);
 
@@ -363,7 +363,7 @@ function getPanelAttach(): HTMLElement {
   &__actions {
     display: flex;
     gap: 6px;
-    padding: 0 var(--idea-space-5) var(--idea-space-5);
+    padding: var(--idea-space-2) var(--idea-tool-panel-padding) var(--idea-tool-panel-padding);
   }
   &__actions button {
     width: auto;

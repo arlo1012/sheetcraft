@@ -322,8 +322,8 @@ watch(
   &__panel {
     z-index: 100;
     display: grid;
-    min-width: 148px;
-    padding: 4px;
+    min-width: 156px;
+    padding: var(--idea-tool-panel-padding);
     background: var(--idea-surface-panel);
     border: 1px solid var(--idea-border-control);
     border-radius: var(--idea-radius-medium);

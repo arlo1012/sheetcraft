@@ -405,8 +405,8 @@ onBeforeUnmount(() => {
     box-shadow: var(--idea-shadow-floating);
   }
   &__panel {
-    width: 168px;
-    padding: 5px;
+    width: 174px;
+    padding: var(--idea-tool-panel-padding);
   }
   &__rows {
     display: grid;
@@ -451,8 +451,8 @@ onBeforeUnmount(() => {
     }
   }
   &__submenu {
-    width: 174px;
-    padding: 6px;
+    width: 178px;
+    padding: var(--idea-tool-panel-padding);
   }
   &__submenu.is-color {
     width: max-content;
@@ -479,7 +479,8 @@ onBeforeUnmount(() => {
   &__submenu.is-settings {
     display: grid;
     gap: 9px;
-    padding: 9px;
+    width: 172px;
+    padding: var(--idea-tool-panel-padding);
   }
   &__settings-heading {
     color: var(--idea-text-primary);

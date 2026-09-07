@@ -50,6 +50,8 @@ contract only after another consumer needs the same special interaction.
 
 ## Floating Panels And Focus
 
+Follow the [Web UI standards](standards/web-ui.md) for operation-popover spacing.
+
 Use `useDismissibleFloatingPanel(reference, floating, open, options)` for a
 teleported popover, menu, or non-modal dialog. It applies fixed floating
 placement and handles Escape, outside pointer, outside focus, and trigger

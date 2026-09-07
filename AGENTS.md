@@ -23,6 +23,8 @@
   TDesign adapter layer. Feature components must not override TDesign internals.
 - Lucide Vue is the primary icon set. Add Iconify only when a confirmed domain
   icon cannot be expressed by Lucide.
+- Follow the concise [Web UI standards](docs/standards/web-ui.md) for operation
+  popovers, spacing ownership, and component-library integration.
 
 ## Tool Composition
 
