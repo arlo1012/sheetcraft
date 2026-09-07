@@ -13,6 +13,7 @@ import {
   type FreezePanes,
   type Workbook,
 } from "../workbook.js";
+import type { CellStyle } from "../style.js";
 import type {
   MergeCellsCommand,
   RestoreFullSheetStateCommand,
@@ -60,6 +61,62 @@ function createRestore(
   state: ReturnType<typeof createSheetSparseState>,
 ): RestoreFullSheetStateCommand {
   return { type: "restoreSheetState", sheetId, state };
+}
+
+function preserveMergedPerimeterBorders(
+  state: ReturnType<typeof createSheetSparseState>,
+  range: CellRange,
+): void {
+  let anchorCell: (typeof state.cells)[number] | undefined;
+  const perimeter: Pick<CellStyle, "borderTop" | "borderRight" | "borderBottom" | "borderLeft"> =
+    {};
+  let topColumn = Number.POSITIVE_INFINITY;
+  let rightRow = Number.POSITIVE_INFINITY;
+  let bottomColumn = Number.POSITIVE_INFINITY;
+  let leftRow = Number.POSITIVE_INFINITY;
+  for (const cell of state.cells) {
+    const { row, column } = cell.address;
+    if (
+      row < range.start.row ||
+      row > range.end.row ||
+      column < range.start.column ||
+      column > range.end.column
+    ) {
+      continue;
+    }
+    if (row === range.start.row && column === range.start.column) anchorCell = cell;
+    const style = cell.style;
+    if (row === range.start.row && column < topColumn && style?.borderTop) {
+      perimeter.borderTop = { ...style.borderTop };
+      topColumn = column;
+    }
+    if (column === range.end.column && row < rightRow && style?.borderRight) {
+      perimeter.borderRight = { ...style.borderRight };
+      rightRow = row;
+    }
+    if (row === range.end.row && column < bottomColumn && style?.borderBottom) {
+      perimeter.borderBottom = { ...style.borderBottom };
+      bottomColumn = column;
+    }
+    if (column === range.start.column && row < leftRow && style?.borderLeft) {
+      perimeter.borderLeft = { ...style.borderLeft };
+      leftRow = row;
+    }
+  }
+  const anchorStyle = anchorCell?.style;
+  const {
+    borderTop: _top,
+    borderRight: _right,
+    borderBottom: _bottom,
+    borderLeft: _left,
+    ...rest
+  } = anchorStyle ?? {};
+  const nextStyle: CellStyle = { ...rest, ...perimeter };
+  if (anchorCell) {
+    anchorCell.style = Object.keys(nextStyle).length > 0 ? nextStyle : undefined;
+  } else if (Object.keys(nextStyle).length > 0) {
+    state.cells.push({ address: cloneAddress(range.start), style: nextStyle });
+  }
 }
 
 export function createSetSheetFreezePanesCommand(
@@ -118,6 +175,7 @@ export function applyMergeCellsCommand(
     throw invalidCommandPayload("range", command.range, "Merged cell ranges must not overlap.");
   }
   const state = createSheetSparseState(sheet);
+  preserveMergedPerimeterBorders(state, normalized);
   state.cells = state.cells.filter((cell) =>
     cell.address.row === normalized.start.row && cell.address.column === normalized.start.column
       ? true

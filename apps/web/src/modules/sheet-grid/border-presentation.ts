@@ -1,11 +1,19 @@
-import type { CellBorder, CellStyle } from "@idea10/core/style";
-import { getCellStyle, type Sheet } from "@idea10/core/workbook";
+import { MergedCellRangeResolver } from "@idea10/core";
+import type { CellBorder } from "@idea10/core/style";
+import { getCellStyle, type CellAddress, type CellRange, type Sheet } from "@idea10/core/workbook";
 import type { Point, SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
 import type { RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
 import { getBorderLinePresentation } from "../../shared/borders/borderPresentation";
 
 export type SheetBorderOrientation = "horizontal" | "vertical";
 export type SheetBorderPlacement = "before" | "after";
+type MergedRangeLookup = (address: CellAddress) => CellRange | null | undefined;
+
+function createMergedRangeLookup(sheet: Sheet): MergedRangeLookup {
+  if (sheet.mergedCells.length === 0) return () => undefined;
+  const resolver = new MergedCellRangeResolver(sheet.mergedCells);
+  return (address) => resolver.getRangeAtAddress(address);
+}
 
 export type SheetBorderSegment = {
   key: string;
@@ -77,12 +85,25 @@ function getHorizontalBorder(
   upperRow: number | undefined,
   lowerRow: number | undefined,
   column: number,
+  getMergedRangeAt: MergedRangeLookup,
+  rows?: RowVisibilityIndex,
 ): CellBorder | undefined {
-  const upperStyle: Readonly<CellStyle> | undefined =
-    upperRow === undefined ? undefined : getCellStyle(sheet, { row: upperRow, column });
-  const lowerStyle: Readonly<CellStyle> | undefined =
-    lowerRow === undefined ? undefined : getCellStyle(sheet, { row: lowerRow, column });
-  return upperStyle?.borderBottom ?? lowerStyle?.borderTop;
+  const borderAt = (row: number | undefined, side: "top" | "bottom") => {
+    if (row === undefined) return undefined;
+    const address = { row, column };
+    const range = getMergedRangeAt(address);
+    if (range) {
+      const boundary = side === "top" ? row : row + 1;
+      const outerBoundary = side === "top" ? range.start.row : range.end.row + 1;
+      const isOuterEdge = rows
+        ? rows.getBoundaryOffset(boundary) === rows.getBoundaryOffset(outerBoundary)
+        : boundary === outerBoundary;
+      if (!isOuterEdge) return undefined;
+    }
+    const style = getCellStyle(sheet, range?.start ?? address);
+    return side === "top" ? style?.borderTop : style?.borderBottom;
+  };
+  return borderAt(upperRow, "bottom") ?? borderAt(lowerRow, "top");
 }
 
 function getVerticalBorder(
@@ -90,12 +111,19 @@ function getVerticalBorder(
   row: number,
   columnEdge: number,
   columnCount: number,
+  getMergedRangeAt: MergedRangeLookup,
 ): CellBorder | undefined {
-  const leftStyle: Readonly<CellStyle> | undefined =
-    columnEdge > 0 ? getCellStyle(sheet, { row, column: columnEdge - 1 }) : undefined;
-  const rightStyle: Readonly<CellStyle> | undefined =
-    columnEdge < columnCount ? getCellStyle(sheet, { row, column: columnEdge }) : undefined;
-  return leftStyle?.borderRight ?? rightStyle?.borderLeft;
+  const borderAt = (column: number, side: "left" | "right") => {
+    if (column < 0 || column >= columnCount) return undefined;
+    const address = { row, column };
+    const range = getMergedRangeAt(address);
+    if (range && column !== (side === "left" ? range.start.column : range.end.column)) {
+      return undefined;
+    }
+    const style = getCellStyle(sheet, range?.start ?? address);
+    return side === "left" ? style?.borderLeft : style?.borderRight;
+  };
+  return borderAt(columnEdge - 1, "right") ?? borderAt(columnEdge, "left");
 }
 
 function getRowEdgeOffset(
@@ -132,6 +160,7 @@ export function resolveVisibleBorderSegments(
   rows?: RowVisibilityIndex,
   visibleRows?: readonly number[],
   visibleColumns?: readonly number[],
+  getMergedRangeAt: MergedRangeLookup = createMergedRangeLookup(sheet),
 ): SheetBorderSegment[] {
   const segments: SheetBorderSegment[] = [];
   const rowIndexes =
@@ -207,7 +236,7 @@ export function resolveVisibleBorderSegments(
     };
 
     for (const column of columnIndexes) {
-      const border = getHorizontalBorder(sheet, upperRow, lowerRow, column);
+      const border = getHorizontalBorder(sheet, upperRow, lowerRow, column, getMergedRangeAt, rows);
       if (areBordersEqual(border, runBorder)) continue;
       flushRun(column - 1);
       runStart = column;
@@ -252,7 +281,13 @@ export function resolveVisibleBorderSegments(
     };
 
     for (const row of rowIndexes) {
-      const border = getVerticalBorder(sheet, row, columnEdge, geometry.columnCount);
+      const border = getVerticalBorder(
+        sheet,
+        row,
+        columnEdge,
+        geometry.columnCount,
+        getMergedRangeAt,
+      );
       if (areBordersEqual(border, runBorder)) continue;
       flushRun(row - 1);
       runStart = row;
@@ -272,8 +307,10 @@ export function resolveVisibleDiagonalBorderSegments(
   rows?: RowVisibilityIndex,
   visibleRows?: readonly number[],
   visibleColumns?: readonly number[],
+  getMergedRangeAt: MergedRangeLookup = createMergedRangeLookup(sheet),
 ): SheetDiagonalBorderSegment[] {
   const segments: SheetDiagonalBorderSegment[] = [];
+  const visitedAnchors = new Set<string>();
 
   const rowIndexes =
     visibleRows ??
@@ -289,15 +326,23 @@ export function resolveVisibleDiagonalBorderSegments(
     );
   for (const row of rowIndexes) {
     for (const column of columnIndexes) {
-      const style = getCellStyle(sheet, { row, column });
-      const rect = rows?.getVisibleRow(row)
-        ? {
-            x: geometry.getColumnOffset(column) - scrollPosition.x,
-            y: rows.getVisibleRow(row)!.offset - scrollPosition.y,
-            width: geometry.getColumnWidth(column),
-            height: rows.getVisibleRow(row)!.height,
-          }
-        : geometry.getCellViewportRect({ row, column }, scrollPosition);
+      const address = { row, column };
+      const range = getMergedRangeAt(address) ?? { start: address, end: address };
+      const anchor = range.start;
+      const key = `${anchor.row}:${anchor.column}`;
+      if (visitedAnchors.has(key)) continue;
+      visitedAnchors.add(key);
+      const style = getCellStyle(sheet, anchor);
+      if (!style?.borderDiagonalUp && !style?.borderDiagonalDown) continue;
+      const x = getColumnEdgeOffset(geometry, range.start.column);
+      const y = getRowEdgeOffset(geometry, range.start.row, rows);
+      const rect = {
+        x: x - scrollPosition.x,
+        y: y - scrollPosition.y,
+        width: getColumnEdgeOffset(geometry, range.end.column + 1) - x,
+        height: getRowEdgeOffset(geometry, range.end.row + 1, rows) - y,
+      };
+      if (rect.width <= 0 || rect.height <= 0) continue;
       const length = Math.hypot(rect.width, rect.height);
       const angle = (Math.atan2(rect.height, rect.width) * 180) / Math.PI;
       const addSegment = (
@@ -306,10 +351,10 @@ export function resolveVisibleDiagonalBorderSegments(
       ) => {
         if (!border) return;
         segments.push({
-          key: `diagonal-${direction}:${row}:${column}`,
+          key: `diagonal-${direction}:${key}`,
           direction,
-          row,
-          column,
+          row: anchor.row,
+          column: anchor.column,
           ...rect,
           length,
           angle: direction === "up" ? -angle : angle,

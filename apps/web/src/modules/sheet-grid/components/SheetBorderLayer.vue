@@ -80,6 +80,7 @@ const panes = computed<BorderPane[]>(() =>
         props.rows,
         rowIndexes,
         columnIndexes,
+        props.layout.getMergedRangeAt,
       );
       return {
         id,
@@ -97,6 +98,7 @@ const panes = computed<BorderPane[]>(() =>
             props.rows,
             rowIndexes,
             columnIndexes,
+            props.layout.getMergedRangeAt,
           ),
         ),
       };

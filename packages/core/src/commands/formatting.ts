@@ -197,6 +197,33 @@ function getMergeAwareAddress(
   return resolver.getAnchor(address) ?? address;
 }
 
+function isInternalMergedBorderSide(
+  resolver: MergedCellRangeResolver,
+  address: CellAddress,
+  side: CellBorderSide,
+): boolean {
+  const range = resolver.getRangeAtAddress(address);
+  if (!range) return false;
+  if (side === "borderTop") return address.row > range.start.row;
+  if (side === "borderRight") return address.column < range.end.column;
+  if (side === "borderBottom") return address.row < range.end.row;
+  return address.column > range.start.column;
+}
+
+function excludeInternalMergedBorderSides(
+  patch: CellStylePatch,
+  resolver: MergedCellRangeResolver,
+  address: CellAddress,
+): CellStylePatch {
+  const filtered = { ...patch };
+  for (const side of ["borderTop", "borderRight", "borderBottom", "borderLeft"] as const) {
+    if (side in filtered && isInternalMergedBorderSide(resolver, address, side)) {
+      delete filtered[side];
+    }
+  }
+  return filtered;
+}
+
 export function applyCellStyleCommand(
   workbook: Workbook,
   command: ApplyCellStyleCommand,
@@ -209,25 +236,24 @@ export function applyCellStyleCommand(
   const normalizedPatch = validateCommandPayload("patch", command.patch, () =>
     normalizeCellStylePatch(command.patch),
   );
-  const patches = new Map<string, { address: CellAddress; patch: CellStylePatch }>();
-  const targetBorderPatches = new Map<string, { address: CellAddress; patch: CellBorderPatch }>();
-  const borderPatch = getExplicitCellBorderPatch(normalizedPatch);
+  const patches: StylePatchMap = new Map();
+  const targets: BorderPatchMap = new Map();
   for (let row = range.start.row; row <= range.end.row; row += 1) {
     for (let column = range.start.column; column <= range.end.column; column += 1) {
-      const address = getMergeAwareAddress(mergeResolver, { row, column });
-      addPatch(patches, address, normalizedPatch);
-      if (Object.keys(borderPatch).length > 0) {
-        targetBorderPatches.set(getCellBorderTargetKey(address), {
-          address,
-          patch: { ...borderPatch },
-        });
-      }
+      const physicalAddress = { row, column };
+      const address = getMergeAwareAddress(mergeResolver, physicalAddress);
+      const visiblePatch = excludeInternalMergedBorderSides(
+        normalizedPatch,
+        mergeResolver,
+        physicalAddress,
+      );
+      addPatch(patches, address, visiblePatch);
+      const visibleBorderPatch = getExplicitCellBorderPatch(visiblePatch);
+      if (Object.keys(visibleBorderPatch).length > 0)
+        addTargetBorderPatch(targets, physicalAddress, visibleBorderPatch);
     }
   }
-  reconcileCellBorderTargets(targetBorderPatches, (address, patch) =>
-    addPatch(patches, getMergeAwareAddress(mergeResolver, address), patch),
-  );
-  return applyStylePatches(workbook, command.sheetId, patches);
+  return reconcileAndApply(workbook, command.sheetId, mergeResolver, patches, targets);
 }
 
 function adjustNumberFormat(
@@ -348,15 +374,17 @@ function addBorderActionPatches(
   for (let row = range.start.row; row <= range.end.row; row += 1) {
     for (let column = range.start.column; column <= range.end.column; column += 1) {
       const patch = getCellBorderPatch(range, action, row, column);
-      if (Object.keys(patch).length === 0) continue;
-      const address = getMergeAwareAddress(resolver, { row, column });
-      addPatch(patches, address, patch);
-      const sharedPatch = getExplicitCellBorderPatch(patch);
+      const physicalAddress = { row, column };
+      const visiblePatch = excludeInternalMergedBorderSides(patch, resolver, physicalAddress);
+      if (Object.keys(visiblePatch).length === 0) continue;
+      const address = getMergeAwareAddress(resolver, physicalAddress);
+      addPatch(patches, address, visiblePatch);
+      const sharedPatch = getExplicitCellBorderPatch(visiblePatch);
       // Keep the physical coordinate for ownership reconciliation. The style
       // itself is stored at a merged range's anchor, but its perimeter may
       // meet a different neighboring cell at every row or column.
       if (Object.keys(sharedPatch).length > 0)
-        addTargetBorderPatch(targets, { row, column }, sharedPatch);
+        addTargetBorderPatch(targets, physicalAddress, sharedPatch);
     }
   }
 }
@@ -388,10 +416,20 @@ function addExistingVisibleBorderPatches(
       | "borderDiagonalDown"
     >,
   ): CellBorder | undefined => {
-    const patched = patches.get(getCellBorderTargetKey(address))?.patch[side];
+    if (
+      (side === "borderTop" ||
+        side === "borderRight" ||
+        side === "borderBottom" ||
+        side === "borderLeft") &&
+      isInternalMergedBorderSide(resolver, address, side)
+    ) {
+      return undefined;
+    }
+    const mergeAwareAddress = getMergeAwareAddress(resolver, address);
+    const patched = patches.get(getCellBorderTargetKey(mergeAwareAddress))?.patch[side];
     if (patched === null || patched === false) return undefined;
     if (patched && typeof patched === "object") return patched as CellBorder;
-    return getCellStyle(sheet, address)?.[side] as CellBorder | undefined;
+    return getCellStyle(sheet, mergeAwareAddress)?.[side] as CellBorder | undefined;
   };
   const getPatchedBorder = (
     address: CellAddress,
@@ -405,7 +443,18 @@ function addExistingVisibleBorderPatches(
       | "borderDiagonalDown"
     >,
   ): { present: boolean; border: CellBorder | undefined } => {
-    const patch = patches.get(getCellBorderTargetKey(address))?.patch;
+    if (
+      (side === "borderTop" ||
+        side === "borderRight" ||
+        side === "borderBottom" ||
+        side === "borderLeft") &&
+      isInternalMergedBorderSide(resolver, address, side)
+    ) {
+      return { present: false, border: undefined };
+    }
+    const patch = patches.get(
+      getCellBorderTargetKey(getMergeAwareAddress(resolver, address)),
+    )?.patch;
     if (!patch || !(side in patch)) return { present: false, border: undefined };
     const value = patch[side];
     return {
@@ -419,8 +468,8 @@ function addExistingVisibleBorderPatches(
     fallback: CellAddress | undefined,
     fallbackSide: CellBorderSide,
   ) => {
-    const primaryAddress = primary && getMergeAwareAddress(resolver, primary);
-    const fallbackAddress = fallback && getMergeAwareAddress(resolver, fallback);
+    const primaryAddress = primary;
+    const fallbackAddress = fallback;
     const primaryPatched = primaryAddress
       ? getPatchedBorder(primaryAddress, primarySide)
       : { present: false, border: undefined };
@@ -457,7 +506,7 @@ function addExistingVisibleBorderPatches(
       : (primaryBorder ?? fallbackBorder);
     if (!address || !side || !border) return;
     const patch = { [side]: updateBorder(border, format) } as CellBorderPatch;
-    addPatch(patches, address, patch);
+    addPatch(patches, getMergeAwareAddress(resolver, address), patch);
     addTargetBorderPatch(targets, address, patch);
   };
 
@@ -501,18 +550,10 @@ function reconcileAndApply(
   targets: BorderPatchMap,
 ): RestoreCellStylesCommand | null {
   reconcileCellBorderTargets(targets, (address, patch) => {
+    const visiblePatch = excludeInternalMergedBorderSides(patch, resolver, address);
+    if (Object.keys(visiblePatch).length === 0) return;
     const mergeAwareAddress = getMergeAwareAddress(resolver, address);
-    // A merged range stores its perimeter on its anchor. Reconciliation can
-    // visit an internal constituent as the opposite side of that same anchor;
-    // applying its clearing patch back to the anchor would erase another
-    // perimeter side of the very border action being reconciled.
-    if (
-      getCellBorderTargetKey(mergeAwareAddress) !== getCellBorderTargetKey(address) &&
-      targets.has(getCellBorderTargetKey(mergeAwareAddress))
-    ) {
-      return;
-    }
-    addPatch(patches, mergeAwareAddress, patch);
+    addPatch(patches, mergeAwareAddress, visiblePatch);
   });
   return applyStylePatches(workbook, sheetId, patches);
 }
@@ -533,13 +574,19 @@ export function applyCellFormatCommand(
   const targets: BorderPatchMap = new Map();
 
   if (change.style) {
-    const borderPatch = getExplicitCellBorderPatch(change.style);
     for (let row = range.start.row; row <= range.end.row; row += 1) {
       for (let column = range.start.column; column <= range.end.column; column += 1) {
-        const address = getMergeAwareAddress(resolver, { row, column });
-        addPatch(patches, address, change.style);
-        if (Object.keys(borderPatch).length > 0)
-          addTargetBorderPatch(targets, { row, column }, borderPatch);
+        const physicalAddress = { row, column };
+        const address = getMergeAwareAddress(resolver, physicalAddress);
+        const visiblePatch = excludeInternalMergedBorderSides(
+          change.style,
+          resolver,
+          physicalAddress,
+        );
+        addPatch(patches, address, visiblePatch);
+        const visibleBorderPatch = getExplicitCellBorderPatch(visiblePatch);
+        if (Object.keys(visibleBorderPatch).length > 0)
+          addTargetBorderPatch(targets, physicalAddress, visibleBorderPatch);
       }
     }
   }
@@ -563,28 +610,11 @@ export function applyCellBordersCommand(
     normalizeCellBorderAction(command.action),
   );
   const sheet = getSheetOrThrow(workbook, command.sheetId);
-  const mergeResolver = new MergedCellRangeResolver(sheet.mergedCells);
-  const patches = new Map<string, { address: CellAddress; patch: CellStylePatch }>();
-  const targetBorderPatches = new Map<string, { address: CellAddress; patch: CellBorderPatch }>();
-  for (let row = range.start.row; row <= range.end.row; row += 1) {
-    for (let column = range.start.column; column <= range.end.column; column += 1) {
-      const patch = getCellBorderPatch(range, action, row, column);
-      if (Object.keys(patch).length === 0) continue;
-      const address = getMergeAwareAddress(mergeResolver, { row, column });
-      addPatch(patches, address, patch);
-      const sharedBorderPatch = getExplicitCellBorderPatch(patch);
-      if (Object.keys(sharedBorderPatch).length > 0) {
-        targetBorderPatches.set(getCellBorderTargetKey(address), {
-          address,
-          patch: sharedBorderPatch,
-        });
-      }
-    }
-  }
-  reconcileCellBorderTargets(targetBorderPatches, (address, patch) =>
-    addPatch(patches, getMergeAwareAddress(mergeResolver, address), patch),
-  );
-  return applyStylePatches(workbook, command.sheetId, patches);
+  const resolver = new MergedCellRangeResolver(sheet.mergedCells);
+  const patches: StylePatchMap = new Map();
+  const targets: BorderPatchMap = new Map();
+  addBorderActionPatches(range, action, resolver, patches, targets);
+  return reconcileAndApply(workbook, command.sheetId, resolver, patches, targets);
 }
 
 export function applyRestoreCellStylesCommand(
