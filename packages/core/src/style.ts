@@ -10,7 +10,23 @@ export const MAX_NUMBER_FORMAT_FRACTION_DIGITS = 20;
 
 export type HorizontalCellAlignment = "left" | "center" | "right";
 export type VerticalCellAlignment = "top" | "middle" | "bottom";
-export type CellBorderLineStyle = "thin" | "medium" | "dashed" | "dotted" | "double";
+export const CELL_BORDER_LINE_STYLES = [
+  "hair",
+  "thin",
+  "medium",
+  "thick",
+  "dotted",
+  "dashed",
+  "mediumDashed",
+  "dashDot",
+  "mediumDashDot",
+  "dashDotDot",
+  "mediumDashDotDot",
+  "slantDashDot",
+  "double",
+] as const;
+
+export type CellBorderLineStyle = (typeof CELL_BORDER_LINE_STYLES)[number];
 
 export type CellBorder = {
   style: CellBorderLineStyle;
@@ -37,7 +53,13 @@ export type CellBorderPreset =
 
 export type CellBorderAction = {
   preset: CellBorderPreset;
-  border?: CellBorder;
+  /** Omit to apply the default thin border; pass null to clear this preset's edges. */
+  border?: CellBorder | null;
+};
+
+export type CellBorderFormatPatch = {
+  style?: CellBorderLineStyle;
+  color?: string;
 };
 
 export type CellStyle = {
@@ -95,13 +117,7 @@ export function createClearCellStylePatch(): CellStylePatch {
 const CELL_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const HORIZONTAL_ALIGNMENTS = new Set<HorizontalCellAlignment>(["left", "center", "right"]);
 const VERTICAL_ALIGNMENTS = new Set<VerticalCellAlignment>(["top", "middle", "bottom"]);
-const BORDER_LINE_STYLES = new Set<CellBorderLineStyle>([
-  "thin",
-  "medium",
-  "dashed",
-  "dotted",
-  "double",
-]);
+const BORDER_LINE_STYLES = new Set<CellBorderLineStyle>(CELL_BORDER_LINE_STYLES);
 const BORDER_PRESETS = new Set<CellBorderPreset>([
   "none",
   "all",
@@ -205,12 +221,37 @@ export function normalizeCellBorder(border: CellBorder): CellBorder {
     typeof border.style !== "string" ||
     !BORDER_LINE_STYLES.has(border.style as CellBorderLineStyle)
   ) {
-    throw new TypeError("Cell border style must be thin, medium, dashed, dotted, or double.");
+    throw new TypeError(`Cell border style must be one of: ${CELL_BORDER_LINE_STYLES.join(", ")}.`);
   }
   return {
     style: border.style as CellBorderLineStyle,
     color: normalizeColor(border.color, "Cell border color"),
   };
+}
+
+export function normalizeCellBorderFormatPatch(
+  patch: CellBorderFormatPatch,
+): CellBorderFormatPatch {
+  if (!patch || typeof patch !== "object") {
+    throw new TypeError("Cell border format must be an object.");
+  }
+  const normalized: CellBorderFormatPatch = {};
+  if ("style" in patch) {
+    if (
+      typeof patch.style !== "string" ||
+      !BORDER_LINE_STYLES.has(patch.style as CellBorderLineStyle)
+    ) {
+      throw new TypeError(
+        `Cell border style must be one of: ${CELL_BORDER_LINE_STYLES.join(", ")}.`,
+      );
+    }
+    normalized.style = patch.style as CellBorderLineStyle;
+  }
+  if ("color" in patch) normalized.color = normalizeColor(patch.color, "Cell border color");
+  if (!normalized.style && !normalized.color) {
+    throw new TypeError("Cell border format must set a style or color.");
+  }
+  return normalized;
 }
 
 export function normalizeCellBorderAction(action: CellBorderAction): CellBorderAction {
@@ -220,8 +261,14 @@ export function normalizeCellBorderAction(action: CellBorderAction): CellBorderA
   if (action.preset === "none") {
     return { preset: "none" };
   }
-  if (!action.border) {
-    throw new TypeError("A cell border is required for this preset.");
+  if (action.border === null) {
+    return { preset: action.preset, border: null };
+  }
+  if (action.border === undefined) {
+    return {
+      preset: action.preset,
+      border: { style: "thin", color: DEFAULT_CELL_TEXT_COLOR },
+    };
   }
   return { preset: action.preset, border: normalizeCellBorder(action.border) };
 }

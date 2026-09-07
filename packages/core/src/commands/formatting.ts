@@ -3,11 +3,14 @@ import {
   MAX_NUMBER_FORMAT_FRACTION_DIGITS,
   MIN_NUMBER_FORMAT_FRACTION_DIGITS,
   cloneCellStyle,
+  normalizeCellBorderFormatPatch,
   mergeCellStyle,
   normalizeCellBorderAction,
   normalizeCellStyle,
   normalizeCellStylePatch,
   type CellBorderAction,
+  type CellBorder,
+  type CellBorderFormatPatch,
   type CellStyle,
   type CellStylePatch,
   type CellNumberFormat,
@@ -18,6 +21,7 @@ import {
   type CellAddress,
   type CellRange,
   type Workbook,
+  type Sheet,
 } from "../workbook.js";
 import { MergedCellRangeResolver } from "../merged-cells.js";
 import {
@@ -29,8 +33,10 @@ import {
 } from "./borders.js";
 import type {
   ApplyCellBordersCommand,
+  ApplyCellFormatCommand,
   AdjustCellNumberFormatDecimalsCommand,
   ApplyCellStyleCommand,
+  CellFormatChange,
   RestoreCellStylesCommand,
 } from "./contracts.js";
 import {
@@ -83,6 +89,45 @@ export function createApplyCellBordersCommand(
     sheetId,
     range: normalizedRange,
     action: validateCommandPayload("action", action, () => normalizeCellBorderAction(action)),
+  };
+}
+
+function normalizeCellFormatChange(change: CellFormatChange): CellFormatChange {
+  if (!change || typeof change !== "object") {
+    throw new TypeError("Cell format change must be an object.");
+  }
+  const normalized: CellFormatChange = {};
+  if ("style" in change && change.style !== undefined) {
+    normalized.style = normalizeCellStylePatch(change.style);
+  }
+  if ("borders" in change && change.borders !== undefined) {
+    if (!Array.isArray(change.borders)) {
+      throw new TypeError("Cell format borders must be an array.");
+    }
+    normalized.borders = change.borders.map((action) => normalizeCellBorderAction(action));
+  }
+  if ("borderFormat" in change && change.borderFormat !== undefined) {
+    normalized.borderFormat = normalizeCellBorderFormatPatch(change.borderFormat);
+  }
+  if (!normalized.style && !normalized.borders && !normalized.borderFormat) {
+    throw new TypeError("Cell format change must contain a style, borders, or border format.");
+  }
+  return normalized;
+}
+
+export function createApplyCellFormatCommand(
+  sheetId: string,
+  range: CellRange,
+  change: CellFormatChange,
+): ApplyCellFormatCommand {
+  const normalizedRange = normalizeRange(range);
+  assertCellRange(normalizedRange);
+  assertSupportedRange(normalizedRange);
+  return {
+    type: "applyCellFormat",
+    sheetId,
+    range: normalizedRange,
+    change: validateCommandPayload("change", change, () => normalizeCellFormatChange(change)),
   };
 }
 
@@ -245,7 +290,9 @@ function getCellBorderPatch(
       borderDiagonalDown: null,
     };
   }
-  const border = action.border;
+  // Actions are normalized before reaching this helper. The only absent border
+  // belongs to the `none` preset handled above; null intentionally clears sides.
+  const border = action.border ?? null;
   const isTop = row === range.start.row;
   const isRight = column === range.end.column;
   const isBottom = row === range.end.row;
@@ -275,6 +322,234 @@ function getCellBorderPatch(
   else if (action.preset === "diagonalUp") patch.borderDiagonalUp = border;
   else if (action.preset === "diagonalDown") patch.borderDiagonalDown = border;
   return patch;
+}
+
+type StylePatchMap = Map<string, { address: CellAddress; patch: CellStylePatch }>;
+type BorderPatchMap = Map<string, { address: CellAddress; patch: CellBorderPatch }>;
+
+function addTargetBorderPatch(
+  targets: BorderPatchMap,
+  address: CellAddress,
+  patch: CellBorderPatch,
+): void {
+  const key = getCellBorderTargetKey(address);
+  const current = targets.get(key);
+  if (current) Object.assign(current.patch, patch);
+  else targets.set(key, { address: { ...address }, patch: { ...patch } });
+}
+
+function addBorderActionPatches(
+  range: CellRange,
+  action: CellBorderAction,
+  resolver: MergedCellRangeResolver,
+  patches: StylePatchMap,
+  targets: BorderPatchMap,
+): void {
+  for (let row = range.start.row; row <= range.end.row; row += 1) {
+    for (let column = range.start.column; column <= range.end.column; column += 1) {
+      const patch = getCellBorderPatch(range, action, row, column);
+      if (Object.keys(patch).length === 0) continue;
+      const address = getMergeAwareAddress(resolver, { row, column });
+      addPatch(patches, address, patch);
+      const sharedPatch = getExplicitCellBorderPatch(patch);
+      // Keep the physical coordinate for ownership reconciliation. The style
+      // itself is stored at a merged range's anchor, but its perimeter may
+      // meet a different neighboring cell at every row or column.
+      if (Object.keys(sharedPatch).length > 0)
+        addTargetBorderPatch(targets, { row, column }, sharedPatch);
+    }
+  }
+}
+
+function updateBorder(border: CellBorder, format: CellBorderFormatPatch): CellBorder {
+  return {
+    style: format.style ?? border.style,
+    color: format.color ?? border.color,
+  };
+}
+
+function addExistingVisibleBorderPatches(
+  sheet: Sheet,
+  range: CellRange,
+  format: CellBorderFormatPatch,
+  resolver: MergedCellRangeResolver,
+  patches: StylePatchMap,
+  targets: BorderPatchMap,
+): void {
+  const getBorder = (
+    address: CellAddress,
+    side: keyof Pick<
+      CellStyle,
+      | "borderTop"
+      | "borderRight"
+      | "borderBottom"
+      | "borderLeft"
+      | "borderDiagonalUp"
+      | "borderDiagonalDown"
+    >,
+  ): CellBorder | undefined => {
+    const patched = patches.get(getCellBorderTargetKey(address))?.patch[side];
+    if (patched === null || patched === false) return undefined;
+    if (patched && typeof patched === "object") return patched as CellBorder;
+    return getCellStyle(sheet, address)?.[side] as CellBorder | undefined;
+  };
+  const getPatchedBorder = (
+    address: CellAddress,
+    side: keyof Pick<
+      CellStyle,
+      | "borderTop"
+      | "borderRight"
+      | "borderBottom"
+      | "borderLeft"
+      | "borderDiagonalUp"
+      | "borderDiagonalDown"
+    >,
+  ): { present: boolean; border: CellBorder | undefined } => {
+    const patch = patches.get(getCellBorderTargetKey(address))?.patch;
+    if (!patch || !(side in patch)) return { present: false, border: undefined };
+    const value = patch[side];
+    return {
+      present: true,
+      border: value && typeof value === "object" ? (value as CellBorder) : undefined,
+    };
+  };
+  const applyShared = (
+    primary: CellAddress | undefined,
+    primarySide: CellBorderSide,
+    fallback: CellAddress | undefined,
+    fallbackSide: CellBorderSide,
+  ) => {
+    const primaryAddress = primary && getMergeAwareAddress(resolver, primary);
+    const fallbackAddress = fallback && getMergeAwareAddress(resolver, fallback);
+    const primaryPatched = primaryAddress
+      ? getPatchedBorder(primaryAddress, primarySide)
+      : { present: false, border: undefined };
+    const fallbackPatched = fallbackAddress
+      ? getPatchedBorder(fallbackAddress, fallbackSide)
+      : { present: false, border: undefined };
+    const primaryBorder = primaryAddress ? getBorder(primaryAddress, primarySide) : undefined;
+    const fallbackBorder = fallbackAddress ? getBorder(fallbackAddress, fallbackSide) : undefined;
+    const usePatchedBorder = primaryPatched.present || fallbackPatched.present;
+    const address = usePatchedBorder
+      ? primaryPatched.border
+        ? primaryAddress
+        : fallbackPatched.border
+          ? fallbackAddress
+          : undefined
+      : primaryBorder
+        ? primaryAddress
+        : fallbackBorder
+          ? fallbackAddress
+          : undefined;
+    const side = usePatchedBorder
+      ? primaryPatched.border
+        ? primarySide
+        : fallbackPatched.border
+          ? fallbackSide
+          : undefined
+      : primaryBorder
+        ? primarySide
+        : fallbackBorder
+          ? fallbackSide
+          : undefined;
+    const border = usePatchedBorder
+      ? (primaryPatched.border ?? fallbackPatched.border)
+      : (primaryBorder ?? fallbackBorder);
+    if (!address || !side || !border) return;
+    const patch = { [side]: updateBorder(border, format) } as CellBorderPatch;
+    addPatch(patches, address, patch);
+    addTargetBorderPatch(targets, address, patch);
+  };
+
+  for (let row = range.start.row; row <= range.end.row + 1; row += 1) {
+    for (let column = range.start.column; column <= range.end.column; column += 1) {
+      applyShared(
+        row > 0 ? { row: row - 1, column } : undefined,
+        "borderBottom",
+        row <= range.end.row + 1 ? { row, column } : undefined,
+        "borderTop",
+      );
+    }
+  }
+  for (let row = range.start.row; row <= range.end.row; row += 1) {
+    for (let column = range.start.column; column <= range.end.column + 1; column += 1) {
+      applyShared(
+        column > 0 ? { row, column: column - 1 } : undefined,
+        "borderRight",
+        column <= range.end.column + 1 ? { row, column } : undefined,
+        "borderLeft",
+      );
+    }
+  }
+  for (let row = range.start.row; row <= range.end.row; row += 1) {
+    for (let column = range.start.column; column <= range.end.column; column += 1) {
+      const address = getMergeAwareAddress(resolver, { row, column });
+      for (const side of ["borderDiagonalUp", "borderDiagonalDown"] as const) {
+        const border = getBorder(address, side);
+        if (!border) continue;
+        addPatch(patches, address, { [side]: updateBorder(border, format) });
+      }
+    }
+  }
+}
+
+function reconcileAndApply(
+  workbook: Workbook,
+  sheetId: string,
+  resolver: MergedCellRangeResolver,
+  patches: StylePatchMap,
+  targets: BorderPatchMap,
+): RestoreCellStylesCommand | null {
+  reconcileCellBorderTargets(targets, (address, patch) => {
+    const mergeAwareAddress = getMergeAwareAddress(resolver, address);
+    // A merged range stores its perimeter on its anchor. Reconciliation can
+    // visit an internal constituent as the opposite side of that same anchor;
+    // applying its clearing patch back to the anchor would erase another
+    // perimeter side of the very border action being reconciled.
+    if (
+      getCellBorderTargetKey(mergeAwareAddress) !== getCellBorderTargetKey(address) &&
+      targets.has(getCellBorderTargetKey(mergeAwareAddress))
+    ) {
+      return;
+    }
+    addPatch(patches, mergeAwareAddress, patch);
+  });
+  return applyStylePatches(workbook, sheetId, patches);
+}
+
+export function applyCellFormatCommand(
+  workbook: Workbook,
+  command: ApplyCellFormatCommand,
+): RestoreCellStylesCommand | null {
+  const range = normalizeRange(command.range);
+  assertCellRange(range);
+  assertSupportedRange(range);
+  const change = validateCommandPayload("change", command.change, () =>
+    normalizeCellFormatChange(command.change),
+  );
+  const sheet = getSheetOrThrow(workbook, command.sheetId);
+  const resolver = new MergedCellRangeResolver(sheet.mergedCells);
+  const patches: StylePatchMap = new Map();
+  const targets: BorderPatchMap = new Map();
+
+  if (change.style) {
+    const borderPatch = getExplicitCellBorderPatch(change.style);
+    for (let row = range.start.row; row <= range.end.row; row += 1) {
+      for (let column = range.start.column; column <= range.end.column; column += 1) {
+        const address = getMergeAwareAddress(resolver, { row, column });
+        addPatch(patches, address, change.style);
+        if (Object.keys(borderPatch).length > 0)
+          addTargetBorderPatch(targets, { row, column }, borderPatch);
+      }
+    }
+  }
+  for (const action of change.borders ?? []) {
+    addBorderActionPatches(range, action, resolver, patches, targets);
+  }
+  if (change.borderFormat) {
+    addExistingVisibleBorderPatches(sheet, range, change.borderFormat, resolver, patches, targets);
+  }
+  return reconcileAndApply(workbook, command.sheetId, resolver, patches, targets);
 }
 
 export function applyCellBordersCommand(

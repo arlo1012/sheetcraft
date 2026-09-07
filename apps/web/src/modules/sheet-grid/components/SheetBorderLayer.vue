@@ -12,6 +12,7 @@ import {
 import type { SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import type { RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+import { getBorderLinePresentation } from "../../../shared/borders/borderPresentation";
 
 const props = defineProps<{
   sheet: Sheet;
@@ -102,7 +103,7 @@ const panes = computed<BorderPane[]>(() =>
     }),
 );
 
-type DiagonalLinePart = {
+type BorderLinePart = {
   key: string;
   offset: number;
   x1: number;
@@ -111,29 +112,28 @@ type DiagonalLinePart = {
   y2: number;
 };
 
-const DIAGONAL_STROKE_DASH_ARRAY: Partial<Record<SheetDiagonalBorderSegment["style"], string>> = {
-  dashed: "6 3",
-  dotted: "0 2",
-};
 const DIAGONAL_PIXEL_ALIGNMENT_OFFSET = -0.5;
 
-function getSegmentStyle(segment: SheetBorderSegment): CSSProperties {
+function getOrthogonalLineParts(segment: SheetBorderSegment): BorderLinePart[] {
+  const { offsets, thickness } = getBorderLinePresentation(segment.style);
   if (segment.orientation === "horizontal") {
-    return {
-      left: `${segment.x}px`,
-      top: `${segment.y}px`,
-      width: `${segment.length}px`,
-      borderTop: segment.css,
-      zIndex: segment.thickness,
-    };
+    return offsets.map((offset) => ({
+      key: `${segment.key}:${offset}`,
+      offset,
+      x1: segment.x,
+      y1: segment.y + thickness / 2 + offset,
+      x2: segment.x + segment.length,
+      y2: segment.y + thickness / 2 + offset,
+    }));
   }
-  return {
-    left: `${segment.x}px`,
-    top: `${segment.y}px`,
-    height: `${segment.length}px`,
-    borderLeft: segment.css,
-    zIndex: segment.thickness,
-  };
+  return offsets.map((offset) => ({
+    key: `${segment.key}:${offset}`,
+    offset,
+    x1: segment.x + thickness / 2 + offset,
+    y1: segment.y,
+    x2: segment.x + thickness / 2 + offset,
+    y2: segment.y + segment.length,
+  }));
 }
 
 function getJunctionStyle(junction: SheetBorderJunction): CSSProperties {
@@ -144,7 +144,7 @@ function getJunctionStyle(junction: SheetBorderJunction): CSSProperties {
   };
 }
 
-function getDiagonalLineParts(segment: SheetDiagonalBorderSegment): DiagonalLinePart[] {
+function getDiagonalLineParts(segment: SheetDiagonalBorderSegment): BorderLinePart[] {
   const x1 = segment.x + DIAGONAL_PIXEL_ALIGNMENT_OFFSET;
   const x2 = segment.x + segment.width + DIAGONAL_PIXEL_ALIGNMENT_OFFSET;
   const y1 =
@@ -155,7 +155,7 @@ function getDiagonalLineParts(segment: SheetDiagonalBorderSegment): DiagonalLine
     DIAGONAL_PIXEL_ALIGNMENT_OFFSET;
   const normalX = -(y2 - y1) / segment.length;
   const normalY = (x2 - x1) / segment.length;
-  const offsets = segment.style === "double" ? [-1, 1] : [0];
+  const { offsets } = getBorderLinePresentation(segment.style);
 
   return offsets.map((offset) => ({
     key: `${segment.key}:${offset}`,
@@ -177,19 +177,38 @@ function getDiagonalLineParts(segment: SheetDiagonalBorderSegment): DiagonalLine
       :style="pane.clipStyle"
       :data-pane="pane.id"
     >
-      <span
+      <svg
         v-for="segment in pane.segments"
         :key="segment.key"
-        class="sheet-border-layer__segment"
-        :class="`is-${segment.orientation}`"
-        :style="getSegmentStyle(segment)"
-        data-sheet-border-segment
-        :data-border-orientation="segment.orientation"
-        :data-border-placement="segment.placement"
-        :data-border-edge="segment.edge"
-        :data-border-start="segment.start"
-        :data-border-end="segment.end"
-      />
+        class="sheet-border-layer__orthogonal"
+        :style="{ zIndex: segment.thickness }"
+        focusable="false"
+      >
+        <g
+          data-sheet-border-segment
+          :data-border-orientation="segment.orientation"
+          :data-border-placement="segment.placement"
+          :data-border-edge="segment.edge"
+          :data-border-start="segment.start"
+          :data-border-end="segment.end"
+          :data-border-style="segment.style"
+        >
+          <line
+            v-for="part in getOrthogonalLineParts(segment)"
+            :key="part.key"
+            class="sheet-border-layer__orthogonal-line"
+            :x1="part.x1"
+            :y1="part.y1"
+            :x2="part.x2"
+            :y2="part.y2"
+            :stroke="segment.color"
+            :stroke-width="getBorderLinePresentation(segment.style).strokeWidth"
+            :stroke-dasharray="getBorderLinePresentation(segment.style).dashArray"
+            :stroke-linecap="getBorderLinePresentation(segment.style).lineCap"
+            :data-border-line-offset="part.offset"
+          />
+        </g>
+      </svg>
       <svg
         v-for="layer in pane.diagonalLayers"
         :key="`diagonal-layer:${layer.thickness}`"
@@ -217,9 +236,9 @@ function getDiagonalLineParts(segment: SheetDiagonalBorderSegment): DiagonalLine
             :x2="part.x2"
             :y2="part.y2"
             :stroke="segment.color"
-            :stroke-width="segment.style === 'double' ? 1 : segment.thickness"
-            :stroke-dasharray="DIAGONAL_STROKE_DASH_ARRAY[segment.style]"
-            :stroke-linecap="segment.style === 'dotted' ? 'round' : 'butt'"
+            :stroke-width="getBorderLinePresentation(segment.style).strokeWidth"
+            :stroke-dasharray="getBorderLinePresentation(segment.style).dashArray"
+            :stroke-linecap="getBorderLinePresentation(segment.style).lineCap"
             :data-diagonal-line-offset="part.offset"
           />
         </g>
@@ -249,12 +268,19 @@ function getDiagonalLineParts(segment: SheetDiagonalBorderSegment): DiagonalLine
     inset: 0;
   }
 
-  &__segment {
+  &__orthogonal {
     position: absolute;
     display: block;
     box-sizing: content-box;
-    width: 0;
-    height: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    inset: 0;
+  }
+
+  &__orthogonal-line,
+  &__diagonal-line {
+    fill: none;
   }
 
   &__diagonals {
@@ -264,10 +290,6 @@ function getDiagonalLineParts(segment: SheetDiagonalBorderSegment): DiagonalLine
     display: block;
     overflow: visible;
     inset: 0;
-  }
-
-  &__diagonal-line {
-    fill: none;
   }
 
   &__junction {

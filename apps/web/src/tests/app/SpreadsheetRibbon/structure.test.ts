@@ -58,7 +58,10 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.emitted("applyStyle")?.[0]).toEqual([{ bold: true }]);
 
     const autoSum = wrapper.get('[data-ribbon-action="auto-sum"]');
-    expect(autoSum.attributes()).toMatchObject({ type: "button", "aria-label": "AutoSum" });
+    expect(autoSum.attributes()).toMatchObject({
+      type: "button",
+      "aria-label": "AutoSum",
+    });
     expect((autoSum.element as HTMLButtonElement).disabled).toBe(false);
     await autoSum.trigger("click");
     expect(wrapper.emitted("autoSum")).toEqual([[]]);
@@ -68,6 +71,20 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.emitted("applyBorders")?.[0]).toEqual([
       { preset: "outer", border: { style: "thin", color: "#20242c" } },
     ]);
+
+    await wrapper.get("[data-cell-border-trigger]").trigger("click");
+    await new DOMWrapper(document.body).get('[data-border-menu-row="style"]').trigger("click");
+    await new DOMWrapper(document.body)
+      .get('[data-border-line-option="mediumDashDot"]')
+      .trigger("click");
+    expect(wrapper.emitted("updateBorderFormat")?.[0]).toEqual([{ style: "mediumDashDot" }]);
+
+    await new DOMWrapper(document.body).get('[data-border-menu-row="color"]').trigger("click");
+    await new DOMWrapper(document.body).get('[data-color-swatch="#4472c4"]').trigger("click");
+    expect(wrapper.emitted("updateBorderFormat")?.[1]).toEqual([{ color: "#4472c4" }]);
+
+    await new DOMWrapper(document.body).get('[data-border-menu-row="settings"]').trigger("click");
+    expect(wrapper.emitted("openCellFormat")).toEqual([[]]);
   });
 
   test("keeps concrete history actions and unavailable placeholders in the ribbon", async () => {
@@ -88,7 +105,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
       "false",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(16);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(15);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({

@@ -24,7 +24,7 @@ function getMenu() {
   return new DOMWrapper(document.body).get("[data-cell-border-panel]");
 }
 
-function getSubmenu(kind: "color" | "style" | "settings") {
+function getSubmenu(kind: "color" | "style") {
   return new DOMWrapper(document.body).get(`[data-border-submenu="${kind}"]`);
 }
 
@@ -151,12 +151,13 @@ describe("CellBorderMenu interaction", () => {
     const styleRow = menu.get('[data-border-menu-row="style"]');
     await styleRow.trigger("click");
     const style = getSubmenu("style");
-    expect(style.findAll('[role="menuitemradio"]')).toHaveLength(5);
+    expect(style.findAll('[role="menuitemradio"]')).toHaveLength(13);
     expect(style.get('[data-border-line-option="thin"]').attributes("aria-checked")).toBe("true");
-    expect(style.findAll(".cell-border-menu__line-sample")).toHaveLength(5);
+    expect(style.findAll("button")).toHaveLength(13);
     await style.get('[data-border-line-option="double"]').trigger("click");
     expect(document.body.querySelector('[data-border-submenu="style"]')).toBeNull();
     expect(document.activeElement).toBe(styleRow.element);
+    expect(wrapper.emitted("updateBorderFormat")).toEqual([[{ style: "double" }]]);
 
     await menu.get('[data-border-menu-row="color"]').trigger("click");
     const color = getSubmenu("color");
@@ -164,32 +165,25 @@ describe("CellBorderMenu interaction", () => {
     expect(color.findAll("[data-color-swatch]").length).toBeGreaterThan(60);
     await color.get('[data-color-swatch="#4472c4"]').trigger("click");
     expect(document.body.querySelector('[data-border-submenu="color"]')).toBeNull();
+    expect(wrapper.emitted("updateBorderFormat")).toEqual([
+      [{ style: "double" }],
+      [{ color: "#4472c4" }],
+    ]);
     await menu.get('[data-border-preset="outer"]').trigger("click");
     expect(wrapper.emitted("applyBorders")?.[0]).toEqual([
       { preset: "outer", border: { style: "double", color: "#4472c4" } },
     ]);
   });
 
-  test("keeps more settings functional and closes its submenu before the parent", async () => {
+  test("opens the cell format dialog from more settings", async () => {
     const wrapper = mountMenu();
     const trigger = wrapper.get<HTMLButtonElement>("[data-cell-border-trigger]");
     await trigger.trigger("click");
     const menu = getMenu();
     const settingsRow = menu.get('[data-border-menu-row="settings"]');
     await settingsRow.trigger("click");
-    const settings = getSubmenu("settings");
-    await settings.get('[data-border-settings-style="dashed"]').trigger("click");
-    const color = settings.get<HTMLInputElement>("[data-border-settings-color]");
-    color.element.value = "#ef4444";
-    await color.trigger("input");
-    await settings.trigger("keydown", { key: "Escape" });
-    expect(document.body.querySelector('[data-border-submenu="settings"]')).toBeNull();
-    expect(document.body.querySelector("[data-cell-border-panel]")).not.toBeNull();
-    expect(document.activeElement).toBe(settingsRow.element);
-    await menu.get('[data-border-preset="bottom"]').trigger("click");
-    expect(wrapper.emitted("applyBorders")).toEqual([
-      [{ preset: "bottom", border: { style: "dashed", color: "#ef4444" } }],
-    ]);
+    expect(wrapper.emitted("openCellFormat")).toEqual([[]]);
+    expect(document.body.querySelector("[data-cell-border-panel]")).toBeNull();
     expect(document.activeElement).toBe(trigger.element);
   });
 
@@ -225,9 +219,9 @@ describe("CellBorderMenu interaction", () => {
     });
     const wrapper = mountMenu();
     await wrapper.get<HTMLButtonElement>("[data-cell-border-trigger]").trigger("click");
-    await getMenu().get('[data-border-menu-row="settings"]').trigger("click");
+    await getMenu().get('[data-border-menu-row="style"]').trigger("click");
 
-    expect(getSubmenu("settings").attributes("data-border-submenu-layout")).toBe("stacked");
+    expect(getSubmenu("style").attributes("data-border-submenu-layout")).toBe("stacked");
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       value: previousWidth,

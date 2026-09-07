@@ -3,11 +3,13 @@ import {
   areCellNumberFormatsEqual,
   cloneCellNumberFormat,
   type CellNumberFormat,
+  type CellBorder,
   type CellStyle,
   type HorizontalCellAlignment,
   type VerticalCellAlignment,
 } from "./style.js";
-import { getCellStyle, type CellRange, type Sheet } from "./workbook.js";
+import { MergedCellRangeResolver } from "./merged-cells.js";
+import { getCellStyle, isCellAddressInBounds, type CellRange, type Sheet } from "./workbook.js";
 
 export type ToggleStyleState = "on" | "off" | "mixed";
 
@@ -28,6 +30,17 @@ export type SelectionCellStyleState = {
   verticalAlign: StyleValueState<VerticalCellAlignment>;
   wrapText: ToggleStyleState;
   numberFormat: StyleValueState<CellNumberFormat>;
+};
+
+export type SelectionBorderState = {
+  top: StyleValueState<CellBorder>;
+  right: StyleValueState<CellBorder>;
+  bottom: StyleValueState<CellBorder>;
+  left: StyleValueState<CellBorder>;
+  innerHorizontal: StyleValueState<CellBorder>;
+  innerVertical: StyleValueState<CellBorder>;
+  diagonalUp: StyleValueState<CellBorder>;
+  diagonalDown: StyleValueState<CellBorder>;
 };
 
 type ValueAccumulator<Value> = {
@@ -64,6 +77,14 @@ function addValue<Value>(
 
 function createAccumulator<Value>(): ValueAccumulator<Value> {
   return { initialized: false, value: undefined, mixed: false };
+}
+
+function areBordersEqual(left: CellBorder | undefined, right: CellBorder | undefined): boolean {
+  return left?.style === right?.style && left?.color === right?.color;
+}
+
+function cloneBorder(border: CellBorder | undefined): CellBorder | undefined {
+  return border && { ...border };
 }
 
 function toValueState<Value>(accumulator: ValueAccumulator<Value>): StyleValueState<Value> {
@@ -184,5 +205,99 @@ export function getSelectionCellStyleState(
     verticalAlign: toValueState(verticalAlign),
     wrapText: toToggleState(wrapText),
     numberFormat: toValueState(numberFormat),
+  };
+}
+
+export function getSelectionBorderState(sheet: Sheet, range: CellRange): SelectionBorderState {
+  const normalized = normalizeRange(range);
+  const mergeResolver = new MergedCellRangeResolver(sheet.mergedCells);
+  const top = createAccumulator<CellBorder>();
+  const right = createAccumulator<CellBorder>();
+  const bottom = createAccumulator<CellBorder>();
+  const left = createAccumulator<CellBorder>();
+  const innerHorizontal = createAccumulator<CellBorder>();
+  const innerVertical = createAccumulator<CellBorder>();
+  const diagonalUp = createAccumulator<CellBorder>();
+  const diagonalDown = createAccumulator<CellBorder>();
+  const styleAt = (row: number, column: number) => {
+    const address = { row, column };
+    if (!isCellAddressInBounds(address)) return undefined;
+    return getCellStyle(sheet, mergeResolver.getAnchor(address) ?? address);
+  };
+  const horizontal = (rowEdge: number, column: number) => {
+    const upperAddress = { row: rowEdge - 1, column };
+    const lowerAddress = { row: rowEdge, column };
+    const upperRange = mergeResolver.getRangeAtAddress(upperAddress);
+    const lowerRange = mergeResolver.getRangeAtAddress(lowerAddress);
+    const upper =
+      isCellAddressInBounds(upperAddress) &&
+      (!upperRange || upperRange.end.row === upperAddress.row)
+        ? styleAt(upperAddress.row, upperAddress.column)?.borderBottom
+        : undefined;
+    const lower =
+      isCellAddressInBounds(lowerAddress) &&
+      (!lowerRange || lowerRange.start.row === lowerAddress.row)
+        ? styleAt(lowerAddress.row, lowerAddress.column)?.borderTop
+        : undefined;
+    return upper ?? lower;
+  };
+  const vertical = (row: number, columnEdge: number) => {
+    const leftAddress = { row, column: columnEdge - 1 };
+    const rightAddress = { row, column: columnEdge };
+    const leftRange = mergeResolver.getRangeAtAddress(leftAddress);
+    const rightRange = mergeResolver.getRangeAtAddress(rightAddress);
+    const left =
+      isCellAddressInBounds(leftAddress) &&
+      (!leftRange || leftRange.end.column === leftAddress.column)
+        ? styleAt(leftAddress.row, leftAddress.column)?.borderRight
+        : undefined;
+    const right =
+      isCellAddressInBounds(rightAddress) &&
+      (!rightRange || rightRange.start.column === rightAddress.column)
+        ? styleAt(rightAddress.row, rightAddress.column)?.borderLeft
+        : undefined;
+    return left ?? right;
+  };
+  const add = (accumulator: ValueAccumulator<CellBorder>, border: CellBorder | undefined) =>
+    addValue(accumulator, cloneBorder(border), areBordersEqual);
+
+  for (let column = normalized.start.column; column <= normalized.end.column; column += 1) {
+    add(top, horizontal(normalized.start.row, column));
+    add(bottom, horizontal(normalized.end.row + 1, column));
+  }
+  const diagonalAnchors = new Set<string>();
+  for (let row = normalized.start.row; row <= normalized.end.row; row += 1) {
+    add(left, vertical(row, normalized.start.column));
+    add(right, vertical(row, normalized.end.column + 1));
+    for (let column = normalized.start.column; column <= normalized.end.column; column += 1) {
+      const address = { row, column };
+      const anchor = mergeResolver.getAnchor(address) ?? address;
+      const key = `${anchor.row}:${anchor.column}`;
+      if (diagonalAnchors.has(key)) continue;
+      diagonalAnchors.add(key);
+      const style = styleAt(anchor.row, anchor.column);
+      add(diagonalUp, style?.borderDiagonalUp);
+      add(diagonalDown, style?.borderDiagonalDown);
+    }
+  }
+  for (let row = normalized.start.row + 1; row <= normalized.end.row; row += 1) {
+    for (let column = normalized.start.column; column <= normalized.end.column; column += 1) {
+      add(innerHorizontal, horizontal(row, column));
+    }
+  }
+  for (let row = normalized.start.row; row <= normalized.end.row; row += 1) {
+    for (let column = normalized.start.column + 1; column <= normalized.end.column; column += 1) {
+      add(innerVertical, vertical(row, column));
+    }
+  }
+  return {
+    top: toValueState(top),
+    right: toValueState(right),
+    bottom: toValueState(bottom),
+    left: toValueState(left),
+    innerHorizontal: toValueState(innerHorizontal),
+    innerVertical: toValueState(innerVertical),
+    diagonalUp: toValueState(diagonalUp),
+    diagonalDown: toValueState(diagonalDown),
   };
 }

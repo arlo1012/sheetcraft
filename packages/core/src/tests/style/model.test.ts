@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { createTestWorkbook } from "../helpers.js";
 import {
   CELL_STYLE_KEYS,
+  CELL_BORDER_LINE_STYLES,
   MAX_NUMBER_FORMAT_FRACTION_DIGITS,
   areCellStylesEqual,
   areCellNumberFormatsEqual,
@@ -150,7 +151,7 @@ describe("cell style model", () => {
     expect(areCellStylesEqual(original, clone)).toBe(false);
   });
 
-  test("normalizes border actions and requires a border except for none", () => {
+  test("normalizes border actions with default and clear semantics", () => {
     expect(
       normalizeCellBorderAction({
         preset: "outer",
@@ -164,12 +165,42 @@ describe("cell style model", () => {
         border: { style: "thin", color: "#ABCDEF" },
       }),
     ).toEqual({ preset: "diagonalUp", border: { style: "thin", color: "#abcdef" } });
-    expect(() => normalizeCellBorderAction({ preset: "inner" } as never)).toThrow(TypeError);
+    expect(normalizeCellBorderAction({ preset: "inner" })).toEqual({
+      preset: "inner",
+      border: { style: "thin", color: "#20242c" },
+    });
+    expect(normalizeCellBorderAction({ preset: "top", border: null })).toEqual({
+      preset: "top",
+      border: null,
+    });
     expect(
       normalizeCellBorderAction({
         preset: "none",
         border: { style: "thin", color: "#112233" },
       }),
     ).toEqual({ preset: "none" });
+  });
+
+  test("accepts every stable Excel border line style", () => {
+    expect(CELL_BORDER_LINE_STYLES).toEqual([
+      "hair",
+      "thin",
+      "medium",
+      "thick",
+      "dotted",
+      "dashed",
+      "mediumDashed",
+      "dashDot",
+      "mediumDashDot",
+      "dashDotDot",
+      "mediumDashDotDot",
+      "slantDashDot",
+      "double",
+    ]);
+    for (const style of CELL_BORDER_LINE_STYLES) {
+      expect(normalizeCellStyle({ borderTop: { style, color: "#112233" } })).toEqual({
+        borderTop: { style, color: "#112233" },
+      });
+    }
   });
 });

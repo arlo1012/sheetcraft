@@ -338,7 +338,7 @@ function getPanelAttach(): HTMLElement {
       border-color: rgb(0 0 0 / 32%);
     }
     &.is-selected {
-      outline: 2px solid var(--idea-text-primary);
+      outline: 1px solid var(--idea-text-primary);
       outline-offset: 1px;
     }
     &:focus-visible {

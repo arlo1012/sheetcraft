@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Sparkles, TableProperties } from "lucide-vue-next";
-import type { CellBorderAction, CellStylePatch } from "@idea10/core/style";
+import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import CellColorControl from "./CellColorControl.vue";
@@ -17,6 +17,8 @@ defineProps<{
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
   applyBorders: [action: CellBorderAction];
+  updateBorderFormat: [patch: CellBorderFormatPatch];
+  openCellFormat: [];
   undo: [];
   redo: [];
 }>();
@@ -69,6 +71,8 @@ const { t } = useAppI18n();
       <CellBorderMenu
         :disabled="disabled"
         @apply-borders="emit('applyBorders', $event)"
+        @update-border-format="emit('updateBorderFormat', $event)"
+        @open-cell-format="emit('openCellFormat')"
         @undo="emit('undo')"
         @redo="emit('redo')"
       />
@@ -98,7 +102,11 @@ const { t } = useAppI18n();
       </RibbonIconAction>
       <RibbonIconAction
         class="home-cell-format-group__style-action"
-        :label="t('app.unavailableFeature', { feature: t('ribbon.conditionalFormatting') })"
+        :label="
+          t('app.unavailableFeature', {
+            feature: t('ribbon.conditionalFormatting'),
+          })
+        "
         :text="t('ribbon.conditionalFormatting')"
         disabled
         disclosure

@@ -36,20 +36,16 @@ describe("border panel contracts", () => {
     expect(wrapper.emitted("update")).toEqual([["#4472c4"], ["#20242c"]]);
   });
 
-  test("emits line style selections for menu and settings presentations", async () => {
-    const menu = mount(BorderLineStylePanel, {
+  test("emits all supported line style selections", async () => {
+    const wrapper = mount(BorderLineStylePanel, {
       global,
       props: { modelValue: "thin" },
     });
-    const settings = mount(BorderLineStylePanel, {
-      global,
-      props: { modelValue: "thin", variant: "settings" },
-    });
 
-    await menu.get('[data-border-line-option="double"]').trigger("click");
-    await settings.get('[data-border-settings-style="dotted"]').trigger("click");
+    expect(wrapper.findAll('[role="menuitemradio"]')).toHaveLength(13);
+    await wrapper.get('[data-border-line-option="mediumDashDotDot"]').trigger("click");
+    await wrapper.get('[data-border-line-option="slantDashDot"]').trigger("click");
 
-    expect(menu.emitted("select")).toEqual([["double"]]);
-    expect(settings.emitted("select")).toEqual([["dotted"]]);
+    expect(wrapper.emitted("select")).toEqual([["mediumDashDotDot"], ["slantDashDot"]]);
   });
 });

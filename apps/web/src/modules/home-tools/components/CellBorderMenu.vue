@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronRight, Grid2X2, List, PencilLine, Settings2 } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
-import type { CellBorder, CellBorderAction, CellBorderLineStyle } from "@idea10/core/style";
+import type {
+  CellBorder,
+  CellBorderAction,
+  CellBorderFormatPatch,
+  CellBorderLineStyle,
+} from "@idea10/core/style";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import { useRovingFocus } from "../../../shared/focus/useRovingFocus";
@@ -11,13 +16,15 @@ import BorderColorPanel from "./BorderColorPanel.vue";
 import BorderLineStylePanel from "./BorderLineStylePanel.vue";
 import BorderPresetGrid from "./BorderPresetGrid.vue";
 
-type BorderSubmenu = "color" | "style" | "settings";
+type BorderSubmenu = "color" | "style";
 
 const DEFAULT_BORDER: CellBorder = { style: "thin", color: "#20242c" };
 const STACKED_SUBMENU_BREAKPOINT = 480;
 const props = defineProps<{ disabled: boolean }>();
 const emit = defineEmits<{
   applyBorders: [action: CellBorderAction];
+  updateBorderFormat: [patch: CellBorderFormatPatch];
+  openCellFormat: [];
   undo: [];
   redo: [];
 }>();
@@ -27,7 +34,6 @@ const menuRef = ref<HTMLDivElement | null>(null);
 const submenuRef = ref<HTMLDivElement | null>(null);
 const colorRowRef = ref<HTMLButtonElement | null>(null);
 const styleRowRef = ref<HTMLButtonElement | null>(null);
-const settingsRowRef = ref<HTMLButtonElement | null>(null);
 const open = ref(false);
 const activeSubmenu = ref<BorderSubmenu | null>(null);
 const stackedSubmenu = ref(false);
@@ -40,7 +46,7 @@ const submenuAnchorRef = computed(() => {
   if (stackedSubmenu.value) return menuRef.value;
   if (activeSubmenu.value === "color") return colorRowRef.value;
   if (activeSubmenu.value === "style") return styleRowRef.value;
-  return settingsRowRef.value;
+  return styleRowRef.value;
 });
 const submenuPlacement = computed(() =>
   stackedSubmenu.value ? ("bottom-end" as const) : ("right-start" as const),
@@ -99,7 +105,7 @@ function closeSubmenu(restoreFocus: boolean): void {
       ? colorRowRef.value
       : activeSubmenu.value === "style"
         ? styleRowRef.value
-        : settingsRowRef.value;
+        : styleRowRef.value;
   activeSubmenu.value = null;
   if (restoreFocus) void nextTick(() => row?.focus());
 }
@@ -122,21 +128,26 @@ function selectPreset(action: CellBorderAction): void {
   emit("applyBorders", action);
   closeAll(true);
 }
-function setColor(value: string): void {
+function setColor(value: string): string | undefined {
   const normalizedColor = normalizeColor(value);
   if (normalizedColor) color.value = normalizedColor;
+  return normalizedColor;
 }
 function selectPaletteColor(value: string): void {
-  setColor(value);
+  const selectedColor = setColor(value);
+  if (!selectedColor) return;
+  emit("updateBorderFormat", { color: selectedColor });
   closeSubmenu(true);
 }
 
-function updateColor(event: Event): void {
-  setColor((event.target as HTMLInputElement).value);
-}
 function selectLineStyle(style: CellBorderLineStyle): void {
   lineStyle.value = style;
+  emit("updateBorderFormat", { style });
   closeSubmenu(true);
+}
+function openCellFormat(): void {
+  closeAll(true);
+  emit("openCellFormat");
 }
 function onTriggerKeydown(event: KeyboardEvent): void {
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -177,7 +188,6 @@ function onMenuKeydown(event: KeyboardEvent): void {
   if (event.key === "ArrowRight") {
     if (document.activeElement === colorRowRef.value) openSubmenu("color");
     else if (document.activeElement === styleRowRef.value) openSubmenu("style");
-    else if (document.activeElement === settingsRowRef.value) openSubmenu("settings");
     return;
   }
   moveRovingFocus(event, menuItems());
@@ -288,19 +298,14 @@ onBeforeUnmount(() => {
           <ChevronRight :size="15" aria-hidden="true" />
         </button>
         <button
-          ref="settingsRowRef"
           type="button"
           role="menuitem"
           data-border-menu-item
           data-border-menu-row="settings"
-          aria-haspopup="dialog"
-          :aria-expanded="activeSubmenu === 'settings'"
-          :aria-controls="activeSubmenu === 'settings' ? submenuId : undefined"
-          @click="openSubmenu('settings')"
+          @click="openCellFormat"
         >
           <Settings2 :size="16" aria-hidden="true" />
           <span>{{ t("format.borderMoreSettings") }}</span>
-          <ChevronRight :size="15" aria-hidden="true" />
         </button>
       </div>
     </div>
@@ -318,7 +323,7 @@ onBeforeUnmount(() => {
           ? t('format.borderColor')
           : activeSubmenu === 'style'
             ? t('format.borderLineStyle')
-            : t('format.borderMoreSettings')
+            : t('format.borderLineStyle')
       "
       :data-border-submenu="activeSubmenu"
       :data-border-submenu-layout="stackedSubmenu ? 'stacked' : 'side'"
@@ -334,26 +339,6 @@ onBeforeUnmount(() => {
         :model-value="lineStyle"
         @select="selectLineStyle"
       />
-      <template v-else>
-        <div class="cell-border-menu__settings-heading">
-          {{ t("format.borderMoreSettings") }}
-        </div>
-        <label class="cell-border-menu__settings-color">
-          <span>{{ t("format.borderColor") }}</span>
-          <input
-            :value="color"
-            type="color"
-            data-border-settings-color
-            :aria-label="t('format.borderColor')"
-            @input="updateColor"
-          />
-        </label>
-        <BorderLineStylePanel
-          variant="settings"
-          :model-value="lineStyle"
-          @select="lineStyle = $event"
-        />
-      </template>
     </div>
   </Teleport>
 </template>
@@ -461,34 +446,6 @@ onBeforeUnmount(() => {
     width: max-content;
     min-width: 208px;
     padding: 0;
-  }
-  &__settings-color {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    min-width: 0;
-    color: var(--idea-text-primary);
-    font-size: 13px;
-    input {
-      width: 28px;
-      height: 22px;
-      padding: 1px;
-      border: 1px solid var(--idea-border-control);
-      border-radius: 2px;
-      cursor: pointer;
-    }
-  }
-  &__submenu.is-settings {
-    display: grid;
-    gap: 9px;
-    width: 172px;
-    padding: var(--idea-tool-panel-padding);
-  }
-  &__settings-heading {
-    color: var(--idea-text-primary);
-    font-size: 13px;
-    font-weight: 600;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -1,5 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
+import type { CellBorderLineStyle } from "@idea10/core/style";
 import { setCellStyle, setCellValue } from "@idea10/core/workbook";
 import { mountSheetGrid } from "./fixture";
 
@@ -179,22 +180,24 @@ describe("SheetGrid cell style rendering", () => {
     );
     await nextTick();
 
-    const getSegmentStyle = (orientation: string, edge: number) =>
-      wrapper.get<HTMLElement>(
-        `[data-border-orientation="${orientation}"][data-border-edge="${edge}"]`,
-      ).element.style;
-    const topBorder = getSegmentStyle("horizontal", 0);
-    const rightBorder = getSegmentStyle("vertical", 1);
-    const bottomBorder = getSegmentStyle("horizontal", 1);
-    const leftBorder = getSegmentStyle("vertical", 0);
-    expect(topBorder.borderTop).toBe("2px solid #112233");
-    expect(topBorder.width).toBe("96px");
-    expect(rightBorder.borderLeft).toBe("2px solid #445566");
-    expect(rightBorder.left).toBe("94px");
-    expect(rightBorder.height).toBe("24px");
-    expect(bottomBorder.borderTop).toBe("3px double #778899");
-    expect(bottomBorder.top).toBe("21px");
-    expect(leftBorder.borderLeft).toBe("3px double #aabbcc");
+    const getSegment = (orientation: string, edge: number) =>
+      wrapper.get(
+        `[data-sheet-border-segment][data-border-orientation="${orientation}"][data-border-edge="${edge}"]`,
+      );
+    expect(getSegment("horizontal", 0).get("line").attributes()).toMatchObject({
+      stroke: "#112233",
+      "stroke-width": "2",
+      y1: "1",
+      x2: "96",
+    });
+    expect(getSegment("vertical", 1).get("line").attributes()).toMatchObject({
+      stroke: "#445566",
+      "stroke-width": "2",
+      x1: "95",
+      y2: "24",
+    });
+    expect(getSegment("horizontal", 1).findAll("line")).toHaveLength(2);
+    expect(getSegment("vertical", 0).findAll("line")).toHaveLength(2);
     expect(
       wrapper.get<HTMLElement>('[data-border-row-edge="1"][data-border-column-edge="1"]').element
         .style.backgroundColor,
@@ -338,13 +341,19 @@ describe("SheetGrid cell style rendering", () => {
     expect(cell.classes()).toContain("is-active");
     expect(cell.classes()).toContain("is-multiline");
     expect(
-      wrapper.get<HTMLElement>('[data-border-orientation="vertical"][data-border-edge="1"]').element
-        .style.borderLeft,
-    ).toBe("1px solid #112233");
+      wrapper
+        .get(
+          '[data-sheet-border-segment][data-border-orientation="vertical"][data-border-edge="1"] line',
+        )
+        .attributes("stroke"),
+    ).toBe("#112233");
     expect(
-      wrapper.get<HTMLElement>('[data-border-orientation="horizontal"][data-border-edge="1"]')
-        .element.style.borderTop,
-    ).toBe("1px solid #445566");
+      wrapper
+        .get(
+          '[data-sheet-border-segment][data-border-orientation="horizontal"][data-border-edge="1"] line',
+        )
+        .attributes("stroke"),
+    ).toBe("#445566");
   });
 
   test("keeps top and left borders at the virtual range boundary", async () => {
@@ -417,12 +426,69 @@ describe("SheetGrid cell style rendering", () => {
     expect(wrapper.find('[data-row="1"][data-column="0"]').exists()).toBe(false);
 
     expect(
-      wrapper.get<HTMLElement>('[data-border-orientation="horizontal"][data-border-edge="1"]')
-        .element.style.borderTop,
-    ).toBe("2px solid #112233");
+      wrapper
+        .get(
+          '[data-sheet-border-segment][data-border-orientation="horizontal"][data-border-edge="1"] line',
+        )
+        .attributes("stroke-width"),
+    ).toBe("2");
     expect(
-      wrapper.get<HTMLElement>('[data-border-orientation="vertical"][data-border-edge="1"]').element
-        .style.borderLeft,
-    ).toBe("3px double #445566");
+      wrapper
+        .get(
+          '[data-sheet-border-segment][data-border-orientation="vertical"][data-border-edge="1"]',
+        )
+        .findAll("line"),
+    ).toHaveLength(2);
+  });
+
+  test("renders every supported line style as matching orthogonal and diagonal SVG strokes", async () => {
+    const styles = [
+      "hair",
+      "thin",
+      "medium",
+      "thick",
+      "dotted",
+      "dashed",
+      "mediumDashed",
+      "dashDot",
+      "mediumDashDot",
+      "dashDotDot",
+      "mediumDashDotDot",
+      "slantDashDot",
+      "double",
+    ] as const satisfies readonly CellBorderLineStyle[];
+    const { sheet, wrapper } = mountSheetGrid();
+    for (const [row, style] of styles.entries()) {
+      setCellStyle(
+        sheet,
+        { row, column: 0 },
+        {
+          borderRight: { style, color: "#123456" },
+          borderDiagonalDown: { style, color: "#654321" },
+        },
+      );
+    }
+    await nextTick();
+
+    for (const style of styles) {
+      const orthogonal = wrapper.get(`[data-sheet-border-segment][data-border-style="${style}"]`);
+      const diagonal = wrapper.get(
+        `[data-sheet-diagonal-border-segment][data-border-style="${style}"]`,
+      );
+      expect(orthogonal.findAll("line")).toHaveLength(style === "double" ? 2 : 1);
+      expect(diagonal.findAll("line")).toHaveLength(style === "double" ? 2 : 1);
+      expect(orthogonal.get("line").attributes("stroke")).toBe("#123456");
+      expect(diagonal.get("line").attributes("stroke")).toBe("#654321");
+    }
+    expect(
+      wrapper
+        .get('[data-sheet-border-segment][data-border-style="dashDot"] line')
+        .attributes("stroke-dasharray"),
+    ).toBe("6 3 1 3");
+    expect(
+      wrapper
+        .get('[data-sheet-diagonal-border-segment][data-border-style="dashDotDot"] line')
+        .attributes("stroke-dasharray"),
+    ).toBe("6 2 1 2 1 2");
   });
 });

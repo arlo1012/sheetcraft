@@ -2,9 +2,11 @@ import { describe, expect, test } from "vitest";
 import { createTestWorkbookSession } from "../helpers.js";
 import {
   createApplyCellBordersCommand,
+  createApplyCellFormatCommand,
   createApplyCellStyleCommand,
   createAdjustCellNumberFormatDecimalsCommand,
   createClearCellRangeCommand,
+  createMergeCellsCommand,
 } from "../../commands/index.js";
 import { WorkbookDomainError } from "../../errors.js";
 import { createClearCellStylePatch } from "../../style.js";
@@ -603,5 +605,183 @@ describe("cell style commands", () => {
     expect(getCellStyle(sheet, { row: 1, column: 0 })).toEqual({ borderRight: oldBorder });
     expect(getCellStyle(sheet, { row: 2, column: 1 })).toEqual({ borderTop: oldBorder });
     expect(getCellStyle(sheet, { row: 1, column: 2 })).toEqual({ borderLeft: oldBorder });
+  });
+
+  test("applies a combined format as one reversible history entry", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const range = { start: { row: 1, column: 1 }, end: { row: 1, column: 1 } };
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellFormatCommand(sheet.id, range, {
+          style: { bold: true, fillColor: "#FDE68A" },
+          borders: [{ preset: "outer", border: { style: "mediumDashed", color: "#112233" } }],
+          borderFormat: { color: "#445566" },
+        }),
+      ),
+    ).toBe(true);
+    expect(session.history.undoStack).toHaveLength(1);
+    expect(getCellStyle(sheet, range.start)).toEqual({
+      bold: true,
+      fillColor: "#fde68a",
+      borderTop: { style: "mediumDashed", color: "#445566" },
+      borderRight: { style: "mediumDashed", color: "#445566" },
+      borderBottom: { style: "mediumDashed", color: "#445566" },
+      borderLeft: { style: "mediumDashed", color: "#445566" },
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, range.start)).toBeUndefined();
+  });
+
+  test("uses the default border and clears only the chosen border preset", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const range = { start: { row: 2, column: 2 }, end: { row: 2, column: 2 } };
+    setCellStyle(sheet, range.start, {
+      borderTop: { style: "medium", color: "#112233" },
+      borderLeft: { style: "dashed", color: "#445566" },
+    });
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellFormatCommand(sheet.id, range, { borders: [{ preset: "right" }] }),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, range.start)).toEqual({
+      borderTop: { style: "medium", color: "#112233" },
+      borderRight: { style: "thin", color: "#20242c" },
+      borderLeft: { style: "dashed", color: "#445566" },
+    });
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellFormatCommand(sheet.id, range, {
+          borders: [{ preset: "top", border: null }],
+        }),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, range.start)).toEqual({
+      borderRight: { style: "thin", color: "#20242c" },
+      borderLeft: { style: "dashed", color: "#445566" },
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, range.start)?.borderTop).toEqual({
+      style: "medium",
+      color: "#112233",
+    });
+  });
+
+  test("formats the border created by an action before a neighboring prior owner", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const range = { start: { row: 2, column: 2 }, end: { row: 2, column: 2 } };
+    setCellStyle(
+      sheet,
+      { row: 1, column: 2 },
+      {
+        borderBottom: { style: "double", color: "#112233" },
+      },
+    );
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellFormatCommand(sheet.id, range, {
+          borders: [{ preset: "top", border: { style: "dashed", color: "#445566" } }],
+          borderFormat: { color: "#abcdef" },
+        }),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, range.start)?.borderTop).toEqual({
+      style: "dashed",
+      color: "#abcdef",
+    });
+    expect(getCellStyle(sheet, { row: 1, column: 2 })).toBeUndefined();
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 1, column: 2 })?.borderBottom).toEqual({
+      style: "double",
+      color: "#112233",
+    });
+    expect(getCellStyle(sheet, range.start)).toBeUndefined();
+  });
+
+  test("keeps every perimeter side when formatting a merged range", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const range = { start: { row: 2, column: 2 }, end: { row: 3, column: 3 } };
+    const oldBorder = { style: "double" as const, color: "#abcdef" };
+    expect(executeWorkbookCommand(session, createMergeCellsCommand(sheet.id, range))).toBe(true);
+    setCellStyle(sheet, { row: 1, column: 2 }, { borderBottom: oldBorder });
+    setCellStyle(sheet, { row: 2, column: 4 }, { borderLeft: oldBorder });
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellFormatCommand(sheet.id, range, {
+          borders: [{ preset: "outer", border: { style: "medium", color: "#112233" } }],
+        }),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, range.start)).toMatchObject({
+      borderTop: { style: "medium", color: "#112233" },
+      borderRight: { style: "medium", color: "#112233" },
+      borderBottom: { style: "medium", color: "#112233" },
+      borderLeft: { style: "medium", color: "#112233" },
+    });
+    expect(getCellStyle(sheet, { row: 1, column: 2 })).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 2, column: 4 })).toBeUndefined();
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, range.start)).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 1, column: 2 })?.borderBottom).toEqual(oldBorder);
+    expect(getCellStyle(sheet, { row: 2, column: 4 })?.borderLeft).toEqual(oldBorder);
+  });
+
+  test("updates visible neighboring borders without creating missing borders", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const range = { start: { row: 2, column: 2 }, end: { row: 2, column: 2 } };
+    setCellStyle(
+      sheet,
+      { row: 2, column: 3 },
+      {
+        borderLeft: { style: "thin", color: "#112233" },
+      },
+    );
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellFormatCommand(sheet.id, range, { borderFormat: { color: "#abcdef" } }),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, range.start)).toBeUndefined();
+    expect(getCellStyle(sheet, { row: 2, column: 3 })).toEqual({
+      borderLeft: { style: "thin", color: "#abcdef" },
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 2, column: 3 })).toEqual({
+      borderLeft: { style: "thin", color: "#112233" },
+    });
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellFormatCommand(sheet.id, range, { borderFormat: { style: "thick" } }),
+      ),
+    ).toBe(true);
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellFormatCommand(
+          sheet.id,
+          { start: { row: 5, column: 5 }, end: { row: 5, column: 5 } },
+          { borderFormat: { color: "#abcdef" } },
+        ),
+      ),
+    ).toBe(false);
   });
 });

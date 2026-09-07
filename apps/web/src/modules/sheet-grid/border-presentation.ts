@@ -2,6 +2,7 @@ import type { CellBorder, CellStyle } from "@idea10/core/style";
 import { getCellStyle, type Sheet } from "@idea10/core/workbook";
 import type { Point, SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
 import type { RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
+import { getBorderLinePresentation } from "../../shared/borders/borderPresentation";
 
 export type SheetBorderOrientation = "horizontal" | "vertical";
 export type SheetBorderPlacement = "before" | "after";
@@ -50,28 +51,21 @@ export type SheetDiagonalBorderSegment = {
   color: string;
 };
 
-const BORDER_LINE_STYLE_CSS: Record<CellBorder["style"], string> = {
-  thin: "1px solid",
-  medium: "2px solid",
-  dashed: "1px dashed",
-  dotted: "1px dotted",
-  double: "3px double",
-};
-
-const BORDER_LINE_THICKNESS: Record<CellBorder["style"], number> = {
-  thin: 1,
-  medium: 2,
-  dashed: 1,
-  dotted: 1,
-  double: 3,
-};
-
 export function getCellBorderCss(border: CellBorder): string {
-  return `${BORDER_LINE_STYLE_CSS[border.style]} ${border.color}`;
+  const { thickness } = getBorderLinePresentation(border.style);
+  const lineStyle =
+    border.style === "double"
+      ? "double"
+      : border.style === "dotted"
+        ? "dotted"
+        : border.style === "dashed" || border.style === "mediumDashed"
+          ? "dashed"
+          : "solid";
+  return `${thickness}px ${lineStyle} ${border.color}`;
 }
 
 function getCellBorderThickness(border: CellBorder): number {
-  return BORDER_LINE_THICKNESS[border.style];
+  return getBorderLinePresentation(border.style).thickness;
 }
 
 function areBordersEqual(left: CellBorder | undefined, right: CellBorder | undefined): boolean {

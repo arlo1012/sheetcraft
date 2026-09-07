@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import type { CellBorderAction, CellStylePatch } from "@idea10/core/style";
+import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
@@ -33,6 +33,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
   applyBorders: [action: CellBorderAction];
+  updateBorderFormat: [patch: CellBorderFormatPatch];
+  openCellFormat: [];
   adjustDecimals: [delta: -1 | 1];
   activateFormatPainter: [];
   autoSum: [];
@@ -263,6 +265,8 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           :disabled="disabled"
           @apply-style="emit('applyStyle', $event)"
           @apply-borders="emit('applyBorders', $event)"
+          @update-border-format="emit('updateBorderFormat', $event)"
+          @open-cell-format="emit('openCellFormat')"
           @undo="emit('undo')"
           @redo="emit('redo')"
         />

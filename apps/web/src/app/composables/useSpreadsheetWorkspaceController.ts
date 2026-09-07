@@ -11,6 +11,7 @@ import {
   createAddSheetCommand,
   createAdjustCellNumberFormatDecimalsCommand,
   createApplyCellBordersCommand,
+  createApplyCellFormatCommand,
   createApplyCellStyleCommand,
   createClearCellRangeCommand,
   createClearSheetFilterCommand,
@@ -35,6 +36,7 @@ import {
   getSheetFilterColumnDistinctValues,
   getSheetFilterValueKey,
   type SortDirection,
+  type CellFormatChange,
   type WorkbookCommand,
   type WorkbookOperation,
 } from "@idea10/core/commands";
@@ -59,16 +61,20 @@ import { WorkbookDomainError } from "@idea10/core/errors";
 import type { IdFactory } from "@idea10/core/runtime";
 import { findCellByText, type SheetSearchDirection } from "@idea10/core/search";
 import { getSelectionSummary } from "@idea10/core/selection-summary";
-import type { CellBorderAction, CellStylePatch } from "@idea10/core/style";
+import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import {
   createDefaultSelectionCellStyleState,
   getSelectionCellStyleState,
+  getSelectionBorderState,
   isCellStyleRangeSupported,
+  type SelectionCellStyleState,
+  type SelectionBorderState,
 } from "@idea10/core/style-state";
 import {
   getActiveSheet,
   createSheetEvaluator,
   getCellContent,
+  getCellComputedValue,
   getWorkbookSheets,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
@@ -133,6 +139,15 @@ export type SheetGridNavigator = {
 export type SpreadsheetWorkspaceControllerOptions = {
   idFactory?: IdFactory;
   statusDuration?: number;
+};
+
+export type CellFormatSelection = {
+  sheetId: string;
+  range: CellRange;
+  generation: number;
+  state: SelectionCellStyleState;
+  borderState: SelectionBorderState;
+  sampleValue: string | number | boolean | null;
 };
 
 export function useSpreadsheetWorkspaceController(
@@ -646,6 +661,56 @@ export function useSpreadsheetWorkspaceController(
     clearWorkspaceStatus();
   }
 
+  function captureCellFormatSelection(): CellFormatSelection | undefined {
+    if (!isFormattingSupported.value || activeSheet.value.properties.protected) return;
+    const sheet = activeSheet.value;
+    const range = activeSelectionRange.value;
+    const value = getCellComputedValue(sheet, activeAddress.value);
+    return {
+      sheetId: sheet.id,
+      range: { start: { ...range.start }, end: { ...range.end } },
+      generation: workbookGeneration.value,
+      state: getSelectionCellStyleState(sheet, range),
+      borderState: getSelectionBorderState(sheet, range),
+      sampleValue:
+        typeof value === "object" && value !== null ? formatComputedValueForDisplay(value) : value,
+    };
+  }
+
+  function applyCellFormat(change: CellFormatChange, target: CellFormatSelection): boolean {
+    const sheet = session.workbook.sheets.get(target.sheetId);
+    if (target.generation !== workbookGeneration.value || !sheet || sheet.properties.protected) {
+      return false;
+    }
+    if (!isCellStyleRangeSupported(target.range)) {
+      showWorkspaceStatus({ key: "format.selectionTooLarge" });
+      return false;
+    }
+    if (
+      Object.keys(change.style ?? {}).length === 0 &&
+      (change.borders?.length ?? 0) === 0 &&
+      Object.keys(change.borderFormat ?? {}).length === 0
+    )
+      return true;
+    execute(createApplyCellFormatCommand(target.sheetId, target.range, change), "format.cells");
+    clearWorkspaceStatus();
+    return true;
+  }
+
+  function updateBorderFormat(patch: CellBorderFormatPatch): void {
+    if (!isFormattingSupported.value) {
+      showWorkspaceStatus({ key: "format.selectionTooLarge" });
+      return;
+    }
+    execute(
+      createApplyCellFormatCommand(activeSheet.value.id, activeSelectionRange.value, {
+        borderFormat: patch,
+      }),
+      "format.borders",
+    );
+    clearWorkspaceStatus();
+  }
+
   function adjustNumberFormatDecimals(delta: -1 | 1): void {
     if (!isFormattingSupported.value) {
       showWorkspaceStatus({ key: "format.selectionTooLarge" });
@@ -1054,6 +1119,9 @@ export function useSpreadsheetWorkspaceController(
     unmergeSelection,
     applyCellStyle,
     applyCellBorders,
+    captureCellFormatSelection,
+    applyCellFormat,
+    updateBorderFormat,
     adjustNumberFormatDecimals,
     activateFormatPainter,
     applyFormatPainterTarget,

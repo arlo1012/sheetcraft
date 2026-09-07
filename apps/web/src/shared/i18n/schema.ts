@@ -311,6 +311,14 @@ export type MessageSchema = {
     borderDiagonalUp: string;
     borderDiagonalDown: string;
     borderLineStyle: string;
+    borderLineHair: string;
+    borderLineThick: string;
+    borderLineMediumDashed: string;
+    borderLineDashDot: string;
+    borderLineMediumDashDot: string;
+    borderLineDashDotDot: string;
+    borderLineMediumDashDotDot: string;
+    borderLineSlantDashDot: string;
     borderLineThin: string;
     borderLineMedium: string;
     borderLineDashed: string;
@@ -338,6 +346,32 @@ export type MessageSchema = {
     cancelColor: string;
     applyColor: string;
     selectionTooLarge: string;
+  };
+  cellFormat: {
+    title: string;
+    confirm: string;
+    cancel: string;
+    number: string;
+    alignment: string;
+    font: string;
+    border: string;
+    fill: string;
+    category: string;
+    general: string;
+    numeric: string;
+    percent: string;
+    currency: string;
+    currencyCode: string;
+    decimalPlaces: string;
+    preview: string;
+    horizontal: string;
+    vertical: string;
+    wrapText: string;
+    noFill: string;
+    automatic: string;
+    previewText: string;
+    borderPreview: string;
+    borderHint: string;
   };
   colorPalette: {
     label: string;

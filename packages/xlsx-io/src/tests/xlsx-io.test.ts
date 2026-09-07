@@ -245,6 +245,46 @@ describe("XLSX IO", () => {
     });
   });
 
+  test("roundtrips every supported Excel border line style", async () => {
+    const styles = [
+      "hair",
+      "thin",
+      "medium",
+      "thick",
+      "dotted",
+      "dashed",
+      "mediumDashed",
+      "dashDot",
+      "mediumDashDot",
+      "dashDotDot",
+      "mediumDashDotDot",
+      "slantDashDot",
+      "double",
+    ] as const;
+    const workbook = createWorkbook({ id: "workbook", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    for (const [column, style] of styles.entries()) {
+      setCellStyle(
+        sheet,
+        { row: 0, column },
+        {
+          borderTop: { style, color: "#123456" },
+          borderDiagonalDown: { style, color: "#654321" },
+        },
+      );
+    }
+
+    const encoded = await encodeXlsx(workbook);
+    expect(encoded.report.issues).toEqual([]);
+    const restored = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook);
+    for (const [column, style] of styles.entries()) {
+      expect(getCellStyle(restored, { row: 0, column })).toMatchObject({
+        borderTop: { style, color: "#123456" },
+        borderDiagonalDown: { style, color: "#654321" },
+      });
+    }
+  });
+
   test("warns when independent diagonal borders cannot be represented by XLSX", async () => {
     const workbook = createWorkbook({ id: "workbook", sheetId: "sheet" });
     setCellStyle(

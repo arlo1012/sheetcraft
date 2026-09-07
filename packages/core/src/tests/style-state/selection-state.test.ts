@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createTestWorkbook } from "../helpers.js";
-import { getSelectionCellStyleState } from "../../style-state.js";
+import { getSelectionBorderState, getSelectionCellStyleState } from "../../style-state.js";
 import { getActiveSheet, setCellStyle } from "../../workbook.js";
 
 describe("selection cell style state", () => {
@@ -68,5 +68,73 @@ describe("selection cell style state", () => {
 
     expect(state.bold).toBe("on");
     expect(state.italic).toBe("off");
+  });
+
+  test("summarizes visible outer, inner, and diagonal borders", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    const border = { style: "dashDot" as const, color: "#112233" };
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        borderTop: border,
+        borderLeft: border,
+        borderRight: border,
+        borderBottom: border,
+        borderDiagonalUp: border,
+      },
+    );
+    setCellStyle(
+      sheet,
+      { row: 0, column: 1 },
+      {
+        borderTop: border,
+        borderRight: border,
+        borderBottom: border,
+        borderDiagonalUp: border,
+        borderDiagonalDown: { style: "double", color: "#445566" },
+      },
+    );
+    const state = getSelectionBorderState(sheet, {
+      start: { row: 0, column: 0 },
+      end: { row: 0, column: 1 },
+    });
+
+    expect(state.top).toEqual({ value: border, mixed: false });
+    expect(state.innerVertical).toEqual({ value: border, mixed: false });
+    expect(state.diagonalUp).toEqual({ value: border, mixed: false });
+    expect(state.diagonalDown).toEqual({ value: undefined, mixed: true });
+  });
+
+  test("reads a merged range's perimeter from its anchor without internal edges", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    const border = { style: "medium" as const, color: "#112233" };
+    sheet.mergedCells.push({
+      start: { row: 1, column: 1 },
+      end: { row: 2, column: 2 },
+    });
+    setCellStyle(
+      sheet,
+      { row: 1, column: 1 },
+      {
+        borderTop: border,
+        borderRight: border,
+        borderBottom: border,
+        borderLeft: border,
+        borderDiagonalUp: border,
+      },
+    );
+
+    const state = getSelectionBorderState(sheet, {
+      start: { row: 1, column: 1 },
+      end: { row: 2, column: 2 },
+    });
+    expect(state.top).toEqual({ value: border, mixed: false });
+    expect(state.right).toEqual({ value: border, mixed: false });
+    expect(state.bottom).toEqual({ value: border, mixed: false });
+    expect(state.left).toEqual({ value: border, mixed: false });
+    expect(state.innerHorizontal).toEqual({ value: undefined, mixed: false });
+    expect(state.innerVertical).toEqual({ value: undefined, mixed: false });
+    expect(state.diagonalUp).toEqual({ value: border, mixed: false });
   });
 });

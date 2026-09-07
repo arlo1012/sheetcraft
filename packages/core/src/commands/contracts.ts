@@ -1,7 +1,12 @@
 import type { SheetSnapshot } from "../serialization.js";
 import type { ExcelDateSystem } from "../formula/date-system.js";
 import type { CellContent } from "../formula/types.js";
-import type { CellBorderAction, CellStyle, CellStylePatch } from "../style.js";
+import type {
+  CellBorderAction,
+  CellBorderFormatPatch,
+  CellStyle,
+  CellStylePatch,
+} from "../style.js";
 import type {
   CellAddress,
   CellRange,
@@ -54,6 +59,19 @@ export type ApplyCellBordersCommand = {
   sheetId: string;
   range: CellRange;
   action: CellBorderAction;
+};
+
+export type CellFormatChange = {
+  style?: CellStylePatch;
+  borders?: CellBorderAction[];
+  borderFormat?: CellBorderFormatPatch;
+};
+
+export type ApplyCellFormatCommand = {
+  type: "applyCellFormat";
+  sheetId: string;
+  range: CellRange;
+  change: CellFormatChange;
 };
 
 export type AdjustCellNumberFormatDecimalsCommand = {
@@ -250,6 +268,7 @@ export type WorkbookCommand =
   | MoveCellRangeCommand
   | ApplyCellStyleCommand
   | ApplyCellBordersCommand
+  | ApplyCellFormatCommand
   | AdjustCellNumberFormatDecimalsCommand
   | RestoreCellStylesCommand
   | ResizeSheetDimensionCommand
@@ -314,6 +333,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "format.cells";
     case "applyCellBorders":
       return "format.borders";
+    case "applyCellFormat":
+      return "format.cells";
     case "restoreCellStyles":
     case "restoreSheetState":
       return "history.restore";

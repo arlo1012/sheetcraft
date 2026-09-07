@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, shallowReactive, useId, watch } from "vue";
+import { nextTick, ref, shallowRef, shallowReactive, useId, watch } from "vue";
+import type { CellFormatChange } from "@idea10/core/commands";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { useWorkbookFullscreen } from "../modules/workbook/composables/useWorkbookFullscreen";
 import { normalizeSheetZoom, SHEET_ZOOM_STEP } from "../shared/sheet-view/zoom";
@@ -16,7 +17,11 @@ import SheetHorizontalScrollbar from "../modules/sheet-grid/components/SheetHori
 import type { SheetHorizontalScrollState } from "../modules/sheet-grid/horizontal-scroll";
 import WorkbookFormulaBar from "../modules/workbook/components/WorkbookFormulaBar.vue";
 import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.vue";
-import { useSpreadsheetWorkspaceController } from "./composables/useSpreadsheetWorkspaceController";
+import {
+  useSpreadsheetWorkspaceController,
+  type CellFormatSelection,
+} from "./composables/useSpreadsheetWorkspaceController";
+import CellFormatDialog from "../modules/cell-format/components/CellFormatDialog.vue";
 import WorkbookFileActions from "../modules/workbook-persistence/components/WorkbookFileActions.vue";
 import WorkbookFileFeedback from "../modules/workbook-persistence/components/WorkbookFileFeedback.vue";
 import { createIndexedDbWorkbookStore } from "../modules/workbook-persistence/indexedDbWorkbookStore";
@@ -86,6 +91,9 @@ const {
   unmergeSelection,
   applyCellStyle,
   applyCellBorders,
+  captureCellFormatSelection,
+  applyCellFormat,
+  updateBorderFormat,
   adjustNumberFormatDecimals,
   activateFormatPainter,
   applyFormatPainterTarget,
@@ -114,6 +122,27 @@ const {
 
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
 watch(workbookGeneration, () => cellEditSession.cancel(), { flush: "sync" });
+const cellFormatSelection = shallowRef<CellFormatSelection>();
+watch(workbookGeneration, () => {
+  cellFormatSelection.value = undefined;
+});
+
+function openCellFormat(): void {
+  if (loading.value || fileBusy.value || xlsxBusy.value || !cellEditSession.finish()) return;
+  cellFormatSelection.value = captureCellFormatSelection();
+}
+
+function closeCellFormat(): void {
+  cellFormatSelection.value = undefined;
+  void nextTick(focusCellEditor);
+}
+
+function confirmCellFormat(change: CellFormatChange): void {
+  const target = cellFormatSelection.value;
+  if (!target) return;
+  applyCellFormat(change, target);
+  closeCellFormat();
+}
 
 function onSelectSheet(sheetId: string): void {
   if (cellEditSession.finish()) selectSheet(sheetId);
@@ -183,6 +212,19 @@ function onWorkspaceWheel(event: WheelEvent): void {
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (
+    event.key === "1" &&
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    !event.isComposing &&
+    !cellEditSession.state.composing
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!cellFormatSelection.value) openCellFormat();
+    return;
+  }
+  if (
     event.key === "F2" &&
     event.ctrlKey &&
     !event.altKey &&
@@ -234,9 +276,11 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :format-painter-active="formatPainterActive"
       :data-state="dataToolState"
       :merge-state="mergeState"
-      :inert="loading || fileBusy || xlsxBusy"
+      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection"
       @insert-image="imageActions.requestInsert"
       @apply-borders="applyCellBorders"
+      @update-border-format="updateBorderFormat"
+      @open-cell-format="openCellFormat"
       @apply-style="applyCellStyle"
       @adjust-decimals="adjustNumberFormatDecimals"
       @activate-format-painter="activateFormatPainter"
@@ -268,6 +312,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         />
       </template>
     </SpreadsheetRibbon>
+    <CellFormatDialog
+      v-if="cellFormatSelection"
+      :state="cellFormatSelection.state"
+      :border-state="cellFormatSelection.borderState"
+      :sample-value="cellFormatSelection.sampleValue"
+      initial-tab="border"
+      @confirm="confirmCellFormat"
+      @cancel="closeCellFormat"
+    />
     <div class="spreadsheet-workspace__file-feedback">
       <WorkbookFileFeedback
         :error="saveError"
@@ -290,7 +343,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :read-only="activeSheet.properties.protected"
       :key="workbookGeneration"
       ref="formulaBarRef"
-      :inert="loading || fileBusy || xlsxBusy"
+      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection"
       :address="activeAddress"
       :sheet-id="activeSheet.id"
       :address-label="activeAddressLabel"
@@ -304,7 +357,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @update-search-query="updateSearchQuery"
       @find="findCell"
     />
-    <div class="spreadsheet-workspace__grid" :inert="loading || fileBusy || xlsxBusy">
+    <div
+      class="spreadsheet-workspace__grid"
+      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection"
+    >
       <SheetGrid
         :zoom="zoom"
         :highlight-enabled="highlightEnabled"
@@ -350,7 +406,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :fullscreen="fullscreen"
       :fullscreen-available="fullscreenAvailable"
       @toggle-fullscreen="toggleFullscreen"
-      :inert="loading || fileBusy || xlsxBusy"
+      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection"
       :sheets="sheets"
       :active-sheet-id="session.workbook.activeSheetId"
       :selection-summary="activeSelectionSummary"

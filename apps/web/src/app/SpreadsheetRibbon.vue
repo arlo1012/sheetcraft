@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
-import type { CellBorderAction, CellStylePatch } from "@idea10/core/style";
+import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../shared/i18n";
 import LocaleSwitcher from "./LocaleSwitcher.vue";
@@ -21,6 +21,8 @@ defineProps<{
 
 const emit = defineEmits<{
   applyBorders: [action: CellBorderAction];
+  updateBorderFormat: [patch: CellBorderFormatPatch];
+  openCellFormat: [];
   applyStyle: [patch: CellStylePatch];
   adjustDecimals: [delta: -1 | 1];
   activateFormatPainter: [];
@@ -63,6 +65,8 @@ defineSlots<{ "file-actions"?: () => unknown }>();
         :data-state="dataState"
         :merge-state="mergeState"
         @apply-borders="emit('applyBorders', $event)"
+        @update-border-format="emit('updateBorderFormat', $event)"
+        @open-cell-format="emit('openCellFormat')"
         @apply-style="emit('applyStyle', $event)"
         @adjust-decimals="emit('adjustDecimals', $event)"
         @activate-format-painter="emit('activateFormatPainter')"

@@ -85,6 +85,23 @@ describe("workbook snapshots", () => {
     });
   });
 
+  test("round trips extended border line styles", () => {
+    const workbook = createWorkbook({ id: "borders", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        borderTop: { style: "mediumDashDotDot", color: "#112233" },
+      },
+    );
+
+    const restored = deserializeWorkbook(serializeWorkbook(workbook));
+    expect(getCellStyle(getActiveSheet(restored), { row: 0, column: 0 })).toEqual({
+      borderTop: { style: "mediumDashDotDot", color: "#112233" },
+    });
+  });
+
   test("persists sheet metadata and accepts V2 snapshots without metadata fields", () => {
     const workbook = createWorkbook({ id: "workbook-1", sheetId: "sheet-1" });
     const sheet = getActiveSheet(workbook);

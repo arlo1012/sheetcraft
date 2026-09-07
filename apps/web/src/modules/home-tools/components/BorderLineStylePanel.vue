@@ -1,15 +1,12 @@
 <script setup lang="ts">
 import { Check } from "lucide-vue-next";
 import type { CellBorderLineStyle } from "@idea10/core/style";
+import BorderLinePreview from "../../../shared/borders/BorderLinePreview.vue";
 import { useAppI18n } from "../../../shared/i18n";
 
-withDefaults(
-  defineProps<{
-    modelValue: CellBorderLineStyle;
-    variant?: "menu" | "settings";
-  }>(),
-  { variant: "menu" },
-);
+defineProps<{
+  modelValue: CellBorderLineStyle;
+}>();
 
 const emit = defineEmits<{
   select: [style: CellBorderLineStyle];
@@ -19,45 +16,48 @@ const { t } = useAppI18n();
 </script>
 
 <template>
-  <div v-if="variant === 'menu'" class="border-line-style-panel border-line-style-panel--menu">
+  <div class="border-line-style-panel" role="menu" :aria-label="t('format.borderLineStyle')">
     <button
       type="button"
       role="menuitemradio"
-      data-border-line-option="thin"
-      :aria-label="t('format.borderLineThin')"
-      :aria-checked="modelValue === 'thin'"
-      @click="emit('select', 'thin')"
+      data-border-line-option="hair"
+      :aria-label="t('format.borderLineHair')"
+      :aria-checked="modelValue === 'hair'"
+      @click="emit('select', 'hair')"
     >
-      <span
-        class="cell-border-menu__line-sample cell-border-menu__line-sample--thin"
+      <BorderLinePreview line-style="hair" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'hair' }"
         aria-hidden="true"
-      /><Check :size="15" :class="{ 'is-visible': modelValue === 'thin' }" aria-hidden="true" />
+      />
     </button>
     <button
       type="button"
       role="menuitemradio"
-      data-border-line-option="medium"
-      :aria-label="t('format.borderLineMedium')"
-      :aria-checked="modelValue === 'medium'"
-      @click="emit('select', 'medium')"
+      data-border-line-option="dashDot"
+      :aria-label="t('format.borderLineDashDot')"
+      :aria-checked="modelValue === 'dashDot'"
+      @click="emit('select', 'dashDot')"
     >
-      <span
-        class="cell-border-menu__line-sample cell-border-menu__line-sample--medium"
+      <BorderLinePreview line-style="dashDot" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'dashDot' }"
         aria-hidden="true"
-      /><Check :size="15" :class="{ 'is-visible': modelValue === 'medium' }" aria-hidden="true" />
+      />
     </button>
     <button
       type="button"
       role="menuitemradio"
-      data-border-line-option="dashed"
-      :aria-label="t('format.borderLineDashed')"
-      :aria-checked="modelValue === 'dashed'"
-      @click="emit('select', 'dashed')"
+      data-border-line-option="dashDotDot"
+      :aria-label="t('format.borderLineDashDotDot')"
+      :aria-checked="modelValue === 'dashDotDot'"
+      @click="emit('select', 'dashDotDot')"
     >
-      <span
-        class="cell-border-menu__line-sample cell-border-menu__line-sample--dashed"
+      <BorderLinePreview line-style="dashDotDot" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'dashDotDot' }"
         aria-hidden="true"
-      /><Check :size="15" :class="{ 'is-visible': modelValue === 'dashed' }" aria-hidden="true" />
+      />
     </button>
     <button
       type="button"
@@ -67,10 +67,95 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'dotted'"
       @click="emit('select', 'dotted')"
     >
-      <span
-        class="cell-border-menu__line-sample cell-border-menu__line-sample--dotted"
+      <BorderLinePreview line-style="dotted" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'dotted' }"
         aria-hidden="true"
-      /><Check :size="15" :class="{ 'is-visible': modelValue === 'dotted' }" aria-hidden="true" />
+      />
+    </button>
+    <button
+      type="button"
+      role="menuitemradio"
+      data-border-line-option="dashed"
+      :aria-label="t('format.borderLineDashed')"
+      :aria-checked="modelValue === 'dashed'"
+      @click="emit('select', 'dashed')"
+    >
+      <BorderLinePreview line-style="dashed" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'dashed' }"
+        aria-hidden="true"
+      />
+    </button>
+    <button
+      type="button"
+      role="menuitemradio"
+      data-border-line-option="thin"
+      :aria-label="t('format.borderLineThin')"
+      :aria-checked="modelValue === 'thin'"
+      @click="emit('select', 'thin')"
+    >
+      <BorderLinePreview line-style="thin" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'thin' }"
+        aria-hidden="true"
+      />
+    </button>
+    <button
+      type="button"
+      role="menuitemradio"
+      data-border-line-option="mediumDashDotDot"
+      :aria-label="t('format.borderLineMediumDashDotDot')"
+      :aria-checked="modelValue === 'mediumDashDotDot'"
+      @click="emit('select', 'mediumDashDotDot')"
+    >
+      <BorderLinePreview line-style="mediumDashDotDot" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'mediumDashDotDot' }"
+        aria-hidden="true"
+      />
+    </button>
+    <button
+      type="button"
+      role="menuitemradio"
+      data-border-line-option="mediumDashDot"
+      :aria-label="t('format.borderLineMediumDashDot')"
+      :aria-checked="modelValue === 'mediumDashDot'"
+      @click="emit('select', 'mediumDashDot')"
+    >
+      <BorderLinePreview line-style="mediumDashDot" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'mediumDashDot' }"
+        aria-hidden="true"
+      />
+    </button>
+    <button
+      type="button"
+      role="menuitemradio"
+      data-border-line-option="mediumDashed"
+      :aria-label="t('format.borderLineMediumDashed')"
+      :aria-checked="modelValue === 'mediumDashed'"
+      @click="emit('select', 'mediumDashed')"
+    >
+      <BorderLinePreview line-style="mediumDashed" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'mediumDashed' }"
+        aria-hidden="true"
+      />
+    </button>
+    <button
+      type="button"
+      role="menuitemradio"
+      data-border-line-option="medium"
+      :aria-label="t('format.borderLineMedium')"
+      :aria-checked="modelValue === 'medium'"
+      @click="emit('select', 'medium')"
+    >
+      <BorderLinePreview line-style="medium" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'medium' }"
+        aria-hidden="true"
+      />
     </button>
     <button
       type="button"
@@ -80,75 +165,37 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'double'"
       @click="emit('select', 'double')"
     >
-      <span
-        class="cell-border-menu__line-sample cell-border-menu__line-sample--double"
-        aria-hidden="true"
-      /><Check :size="15" :class="{ 'is-visible': modelValue === 'double' }" aria-hidden="true" />
-    </button>
-  </div>
-
-  <div
-    v-else
-    class="cell-border-menu__settings-styles border-line-style-panel"
-    :aria-label="t('format.borderLineStyle')"
-  >
-    <button
-      type="button"
-      data-border-settings-style="thin"
-      :aria-label="t('format.borderLineThin')"
-      :aria-pressed="modelValue === 'thin'"
-      @click="emit('select', 'thin')"
-    >
-      <span
-        class="cell-border-menu__line-sample cell-border-menu__line-sample--thin"
+      <BorderLinePreview line-style="double" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'double' }"
         aria-hidden="true"
       />
     </button>
     <button
       type="button"
-      data-border-settings-style="medium"
-      :aria-label="t('format.borderLineMedium')"
-      :aria-pressed="modelValue === 'medium'"
-      @click="emit('select', 'medium')"
+      role="menuitemradio"
+      data-border-line-option="thick"
+      :aria-label="t('format.borderLineThick')"
+      :aria-checked="modelValue === 'thick'"
+      @click="emit('select', 'thick')"
     >
-      <span
-        class="cell-border-menu__line-sample cell-border-menu__line-sample--medium"
+      <BorderLinePreview line-style="thick" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'thick' }"
         aria-hidden="true"
       />
     </button>
     <button
       type="button"
-      data-border-settings-style="dashed"
-      :aria-label="t('format.borderLineDashed')"
-      :aria-pressed="modelValue === 'dashed'"
-      @click="emit('select', 'dashed')"
+      role="menuitemradio"
+      data-border-line-option="slantDashDot"
+      :aria-label="t('format.borderLineSlantDashDot')"
+      :aria-checked="modelValue === 'slantDashDot'"
+      @click="emit('select', 'slantDashDot')"
     >
-      <span
-        class="cell-border-menu__line-sample cell-border-menu__line-sample--dashed"
-        aria-hidden="true"
-      />
-    </button>
-    <button
-      type="button"
-      data-border-settings-style="dotted"
-      :aria-label="t('format.borderLineDotted')"
-      :aria-pressed="modelValue === 'dotted'"
-      @click="emit('select', 'dotted')"
-    >
-      <span
-        class="cell-border-menu__line-sample cell-border-menu__line-sample--dotted"
-        aria-hidden="true"
-      />
-    </button>
-    <button
-      type="button"
-      data-border-settings-style="double"
-      :aria-label="t('format.borderLineDouble')"
-      :aria-pressed="modelValue === 'double'"
-      @click="emit('select', 'double')"
-    >
-      <span
-        class="cell-border-menu__line-sample cell-border-menu__line-sample--double"
+      <BorderLinePreview line-style="slantDashDot" /><Check
+        :size="15"
+        :class="{ 'is-visible': modelValue === 'slantDashDot' }"
         aria-hidden="true"
       />
     </button>
@@ -157,87 +204,35 @@ const { t } = useAppI18n();
 
 <style scoped lang="scss">
 .border-line-style-panel {
-  &--menu {
-    display: grid;
-    gap: 2px;
-
-    > button {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 18px;
-      align-items: center;
-      width: 100%;
-      height: 29px;
-      padding: 0 15px;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 2px;
-      cursor: pointer;
-
-      &:hover,
-      &:focus-visible {
-        background: var(--idea-surface-hover);
-        border-color: var(--idea-action-primary);
-        outline: none;
-      }
-
-      > svg {
-        opacity: 0;
-        color: var(--idea-action-primary);
-
-        &.is-visible {
-          opacity: 1;
-        }
-      }
-    }
-  }
-
-  .cell-border-menu__line-sample {
-    display: block;
-    width: 100%;
-    height: 0;
-    border-top: 1px solid var(--idea-text-primary);
-  }
-
-  .cell-border-menu__line-sample--medium {
-    border-top-width: 2px;
-  }
-
-  .cell-border-menu__line-sample--dashed {
-    border-top-style: dashed;
-  }
-
-  .cell-border-menu__line-sample--dotted {
-    border-top-style: dotted;
-  }
-
-  .cell-border-menu__line-sample--double {
-    height: 3px;
-    border-top: 3px double var(--idea-text-primary);
-  }
-}
-
-.cell-border-menu__settings-styles {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 3px;
+  gap: 2px;
 
   > button {
-    display: inline-flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 18px;
     align-items: center;
-    justify-content: center;
-    height: 26px;
-    padding: 0 3px;
+    width: 100%;
+    height: 29px;
+    padding: 0 15px;
     background: transparent;
     border: 1px solid transparent;
     border-radius: 2px;
     cursor: pointer;
 
     &:hover,
-    &:focus-visible,
-    &[aria-pressed="true"] {
+    &:focus-visible {
       background: var(--idea-surface-hover);
       border-color: var(--idea-action-primary);
       outline: none;
+    }
+
+    > svg {
+      opacity: 0;
+      color: var(--idea-action-primary);
+
+      &.is-visible {
+        opacity: 1;
+      }
     }
   }
 }
