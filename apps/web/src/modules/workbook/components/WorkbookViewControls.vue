@@ -133,11 +133,10 @@ function selectHighlightColor(value: string): void {
 
 <template>
   <div class="workbook-view-controls" :aria-label="t('statusBar.viewAndZoom')" role="group">
-    <div class="workbook-view-controls__highlight">
+    <div class="workbook-view-controls__highlight" :class="{ 'is-active': highlightEnabled }">
       <button
         type="button"
         class="workbook-view-controls__button workbook-view-controls__highlight-toggle"
-        :class="{ 'is-active': highlightEnabled }"
         :aria-label="t('statusBar.highlightRowColumn')"
         :aria-pressed="highlightEnabled"
         :title="t('statusBar.highlightRowColumnDescription')"
@@ -164,11 +163,6 @@ function selectHighlightColor(value: string): void {
         @click="toggleColorPicker"
         @keydown="onColorTriggerKeydown"
       >
-        <span
-          class="workbook-view-controls__color-indicator"
-          :style="{ backgroundColor: selectedColor }"
-          aria-hidden="true"
-        />
         <ChevronDown :size="12" aria-hidden="true" />
       </button>
     </div>
@@ -280,6 +274,18 @@ function selectHighlightColor(value: string): void {
   &__highlight {
     margin-right: 4px;
     border-right: 1px solid var(--idea-sheet-bar-border);
+    border-radius: 2px;
+
+    &.is-active {
+      background: var(--idea-action-primary-subtle);
+      color: var(--idea-action-primary);
+
+      .workbook-view-controls__button:hover,
+      .workbook-view-controls__button[aria-expanded="true"] {
+        background: transparent;
+        color: inherit;
+      }
+    }
   }
 
   &__button,
@@ -296,8 +302,7 @@ function selectHighlightColor(value: string): void {
     cursor: pointer;
 
     &:hover:not(:disabled),
-    &[aria-expanded="true"],
-    &.is-active {
+    &[aria-expanded="true"] {
       background: var(--idea-surface-hover);
       color: var(--idea-text-primary);
     }
@@ -322,16 +327,8 @@ function selectHighlightColor(value: string): void {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 29px;
-    gap: 2px;
+    width: 16px;
     border-radius: 0 2px 2px 0;
-  }
-
-  &__color-indicator {
-    width: 9px;
-    height: 9px;
-    border: 1px solid color-mix(in srgb, var(--idea-text-primary), transparent 65%);
-    border-radius: 50%;
   }
 
   &__zoom {
