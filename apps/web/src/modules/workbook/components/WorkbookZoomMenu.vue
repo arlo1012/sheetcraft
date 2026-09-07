@@ -247,7 +247,7 @@ function fitSelection(): void {
       }
 
       > .workbook-zoom-menu__custom-input {
-        width: 108px;
+        width: 100px;
         max-width: 100%;
         min-width: 0;
       }
