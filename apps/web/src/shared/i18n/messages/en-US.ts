@@ -351,6 +351,16 @@ export const enUS = {
     applyColor: "Apply",
     selectionTooLarge: "This selection is too large to format in one action.",
   },
+  colorPalette: {
+    label: "Color picker",
+    default: "Default",
+    theme: "Theme colors",
+    standard: "Standard colors",
+    recent: "Recent colors",
+    more: "More colors",
+    back: "Back",
+    colorValue: "Color {value}",
+  },
   image: {
     insertMenu: "Insert image",
     insertInCell: "Image in cell",

@@ -29,8 +29,11 @@ describe("border panel contracts", () => {
       props: { modelValue: "#20242c" },
     });
 
-    await wrapper.get('[data-border-color="#3b82f6"]').trigger("click");
-    expect(wrapper.emitted("update")).toEqual([["#3b82f6"]]);
+    await wrapper.get('[data-color-swatch="#4472c4"]').trigger("click");
+    expect(wrapper.emitted("update")).toEqual([["#4472c4"]]);
+
+    await wrapper.get('[data-color-action="default"]').trigger("click");
+    expect(wrapper.emitted("update")).toEqual([["#4472c4"], ["#20242c"]]);
   });
 
   test("emits line style selections for menu and settings presentations", async () => {

@@ -17,10 +17,10 @@ function mountPanel() {
     global: {
       plugins: [createAppI18n("en-US")],
       stubs: {
-        TColorPickerPanel: {
-          name: "TColorPickerPanel",
-          emits: ["change"],
-          template: "<button data-picker @click=\"$emit('change', '#a1b2c3')\" />",
+        ColorPalette: {
+          name: "ColorPalette",
+          emits: ["select"],
+          template: `<div><button data-picker @click="$emit('select', '#a1b2c3')" /><button data-reset @click="$emit('select', null)" /></div>`,
         },
       },
     },
@@ -35,9 +35,8 @@ describe("SheetTabColorPanel", () => {
     const wrapper = mountPanel();
     const panel = new DOMWrapper(document.body).get(".sheet-tab-color-panel");
     await panel.get("[data-picker]").trigger("click");
-    await panel.get('[data-tab-color-action="apply"]').trigger("click");
     expect(wrapper.emitted("apply")).toEqual([["#A1B2C3"]]);
-    await panel.get('[data-tab-color-action="reset"]').trigger("click");
+    await panel.get("[data-reset]").trigger("click");
     expect(wrapper.emitted("apply")).toEqual([["#A1B2C3"], [null]]);
   });
 });

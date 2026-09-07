@@ -1,45 +1,8 @@
 <script setup lang="ts">
 import { ChevronDown } from "lucide-vue-next";
-import { Button as TButton } from "tdesign-vue-next/es/button";
-import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
-import { computed, nextTick, ref, useId, watch } from "vue";
+import { nextTick, ref, useId, watch } from "vue";
+import ColorPalette from "../../../shared/color/ColorPalette.vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
-import { useAppI18n } from "../../../shared/i18n";
-
-const SWATCH_COLORS = [
-  "#ffffff",
-  "#f3f4f6",
-  "#d1d5db",
-  "#6b7280",
-  "#20242c",
-  "#fee2e2",
-  "#fecaca",
-  "#ef4444",
-  "#991b1b",
-  "#ffedd5",
-  "#fed7aa",
-  "#f97316",
-  "#9a3412",
-  "#fef3c7",
-  "#fde68a",
-  "#eab308",
-  "#854d0e",
-  "#dcfce7",
-  "#bbf7d0",
-  "#22c55e",
-  "#166534",
-  "#dbeafe",
-  "#bfdbfe",
-  "#3b82f6",
-  "#1e40af",
-  "#ede9fe",
-  "#ddd6fe",
-  "#8b5cf6",
-  "#5b21b6",
-] as const;
-
-// TDesign handles null as disabled, but its Vue runtime prop narrows the public type to arrays.
-const DISABLED_RECENT_COLORS = null as unknown as string[];
 
 const props = defineProps<{
   label: string;
@@ -53,23 +16,15 @@ const emit = defineEmits<{
   change: [color: string | null];
 }>();
 
-const { t } = useAppI18n();
 const triggerRef = ref<HTMLButtonElement | null>(null);
 const panelRef = ref<HTMLDivElement | null>(null);
 const open = ref(false);
-const draftColor = ref(props.value ?? props.defaultColor);
 const panelId = `cell-color-picker-${useId().replaceAll(":", "")}`;
-const currentColor = computed(() => props.value ?? props.defaultColor);
 const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, panelRef, open, {
   onDismiss: () => {
     open.value = false;
   },
 });
-
-function normalizeColor(color: string): string | undefined {
-  const normalized = color.trim().toLowerCase();
-  return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : undefined;
-}
 
 function closePanel(restoreFocus: boolean): void {
   dismiss("programmatic", restoreFocus);
@@ -79,7 +34,6 @@ function openPanel(): void {
   if (props.disabled) {
     return;
   }
-  draftColor.value = currentColor.value;
   open.value = true;
   void nextTick(() => panelRef.value?.focus());
 }
@@ -92,32 +46,11 @@ function togglePanel(): void {
   }
 }
 
-function updateDraft(color: string): void {
-  const normalized = normalizeColor(color);
-  if (normalized) {
-    draftColor.value = normalized;
-  }
-}
-
-function applyColor(): void {
-  const color = normalizeColor(draftColor.value);
-  if (!color) {
-    return;
-  }
-  emit("change", color === props.defaultColor.toLowerCase() ? null : color);
+function selectColor(color: string | null): void {
+  const defaultColor = props.defaultColor.toLowerCase();
+  emit("change", color?.toLowerCase() === defaultColor ? null : color);
   closePanel(true);
 }
-
-function resetColor(): void {
-  emit("change", null);
-  closePanel(true);
-}
-
-watch(currentColor, (color) => {
-  if (!open.value) {
-    draftColor.value = color;
-  }
-});
 
 watch(
   () => props.disabled,
@@ -167,46 +100,12 @@ watch(
       :aria-label="label"
       tabindex="-1"
     >
-      <ColorPickerPanel
-        :model-value="draftColor"
-        :color-modes="['monochrome']"
-        format="HEX"
-        :enable-alpha="false"
-        :recent-colors="DISABLED_RECENT_COLORS"
-        :show-primary-color-preview="false"
-        :swatch-colors="[...SWATCH_COLORS]"
-        @change="updateDraft"
+      <ColorPalette
+        :model-value="value ?? null"
+        :default-color="defaultColor"
+        :mixed="mixed"
+        @select="selectColor"
       />
-      <div class="cell-color-picker__actions">
-        <TButton
-          type="button"
-          variant="text"
-          size="small"
-          data-color-action="reset"
-          @click="resetColor"
-        >
-          {{ t("format.resetColor") }}
-        </TButton>
-        <span aria-hidden="true" />
-        <TButton
-          type="button"
-          variant="outline"
-          size="small"
-          data-color-action="cancel"
-          @click="closePanel(true)"
-        >
-          {{ t("format.cancelColor") }}
-        </TButton>
-        <TButton
-          type="button"
-          theme="primary"
-          size="small"
-          data-color-action="apply"
-          @click="applyColor"
-        >
-          {{ t("format.applyColor") }}
-        </TButton>
-      </div>
     </div>
   </Teleport>
 </template>
@@ -289,15 +188,6 @@ watch(
       outline: 2px solid var(--idea-action-primary);
       outline-offset: 2px;
     }
-  }
-
-  &__actions {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: 6px;
-    padding: 8px;
-    border-top: 1px solid var(--idea-border-subtle);
   }
 }
 </style>

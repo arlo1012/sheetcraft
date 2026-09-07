@@ -74,9 +74,11 @@ describe("SheetTabMenu", () => {
 
     await colorAction.trigger("click");
     const panel = new DOMWrapper(document.body).get(".sheet-tab-color-panel");
+    await panel.get('[data-color-action="more"]').trigger("click");
     const picker = wrapper.findComponent({ name: "TColorPickerPanel" });
     picker.vm.$emit("change", "#12ab34");
-    await panel.get('[data-tab-color-action="apply"]').trigger("click");
+    expect(wrapper.emitted("tabColor")).toBeUndefined();
+    await panel.get('[data-color-action="apply"]').trigger("click");
     expect(wrapper.emitted("tabColor")).toEqual([["#12AB34"]]);
     expect(wrapper.emitted("close")?.at(-1)).toEqual([true]);
   });

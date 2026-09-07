@@ -126,6 +126,10 @@ function setColor(value: string): void {
   const normalizedColor = normalizeColor(value);
   if (normalizedColor) color.value = normalizedColor;
 }
+function selectPaletteColor(value: string): void {
+  setColor(value);
+  closeSubmenu(true);
+}
 
 function updateColor(event: Event): void {
   setColor((event.target as HTMLInputElement).value);
@@ -180,6 +184,9 @@ function onMenuKeydown(event: KeyboardEvent): void {
 }
 function onSubmenuKeydown(event: KeyboardEvent): void {
   if (handleHistoryShortcut(event)) return;
+  const isColorPaletteEvent =
+    event.target instanceof HTMLElement && event.target.closest(".color-palette");
+  if (event.defaultPrevented || (isColorPaletteEvent && event.key !== "Escape")) return;
   if (event.key === "Escape" || event.key === "ArrowLeft") {
     event.preventDefault();
     event.stopPropagation();
@@ -317,7 +324,11 @@ onBeforeUnmount(() => {
       :data-border-submenu-layout="stackedSubmenu ? 'stacked' : 'side'"
       @keydown="onSubmenuKeydown"
     >
-      <BorderColorPanel v-if="activeSubmenu === 'color'" :model-value="color" @update="setColor" />
+      <BorderColorPanel
+        v-if="activeSubmenu === 'color'"
+        :model-value="color"
+        @update="selectPaletteColor"
+      />
       <BorderLineStylePanel
         v-else-if="activeSubmenu === 'style'"
         :model-value="lineStyle"
@@ -442,6 +453,11 @@ onBeforeUnmount(() => {
   &__submenu {
     width: 174px;
     padding: 6px;
+  }
+  &__submenu.is-color {
+    width: max-content;
+    min-width: 228px;
+    padding: 0;
   }
   &__settings-color {
     display: flex;

@@ -37,15 +37,6 @@ function mountToolbar(state = createStyleState(), disabled = false) {
           props: ["globalConfig"],
           template: "<div><slot /></div>",
         },
-        TColorPickerPanel: {
-          emits: ["change"],
-          template: `
-            <div data-color-picker-panel>
-              <button data-color="#123456" @click="$emit('change', '#123456')">#123456</button>
-              <button data-color="#abcdef" @click="$emit('change', '#abcdef')">#abcdef</button>
-            </div>
-          `,
-        },
       },
     },
     props: { state, disabled },
@@ -201,7 +192,7 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper).at(-1)).toEqual({ fontSize: 20 });
   });
 
-  test("applies each drafted color as one formatting patch", async () => {
+  test("applies a selected palette color as one formatting patch", async () => {
     const wrapper = mountToolbar();
     const textColor = wrapper.get('[aria-label="Text color"]');
     const textColorDisclosure = textColor.get("[data-color-disclosure]");
@@ -211,15 +202,12 @@ describe("HomeFormatToolbar", () => {
     await textColor.trigger("click");
     expect(textColor.attributes("aria-expanded")).toBe("true");
     expect(textColorDisclosure.classes()).toContain("is-expanded");
-    await new DOMWrapper(document.body).get('[data-color="#123456"]').trigger("click");
-    expect(emittedPatches(wrapper)).toEqual([]);
-    await getTeleportedDialog().get('[data-color-action="apply"]').trigger("click");
+    await new DOMWrapper(document.body).get('[data-color-swatch="#4472c4"]').trigger("click");
 
     await wrapper.get('[aria-label="Fill color"]').trigger("click");
-    await new DOMWrapper(document.body).get('[data-color="#abcdef"]').trigger("click");
-    await getTeleportedDialog().get('[data-color-action="apply"]').trigger("click");
+    await new DOMWrapper(document.body).get('[data-color-swatch="#c00000"]').trigger("click");
 
-    expect(emittedPatches(wrapper)).toEqual([{ textColor: "#123456" }, { fillColor: "#abcdef" }]);
+    expect(emittedPatches(wrapper)).toEqual([{ textColor: "#4472c4" }, { fillColor: "#c00000" }]);
   });
 
   test("forwards border presets without converting them into style patches", async () => {
@@ -230,7 +218,12 @@ describe("HomeFormatToolbar", () => {
       .trigger("click");
 
     expect(wrapper.emitted("applyBorders")).toEqual([
-      [{ preset: "innerVertical", border: { style: "thin", color: "#20242c" } }],
+      [
+        {
+          preset: "innerVertical",
+          border: { style: "thin", color: "#20242c" },
+        },
+      ],
     ]);
     expect(emittedPatches(wrapper)).toEqual([]);
   });
@@ -273,7 +266,10 @@ describe("HomeFormatToolbar", () => {
       '[aria-label="Bold"], [aria-label="Italic"], [aria-label="Underline"], [aria-label="Clear formatting"], [aria-label="Wrap text"], [aria-label="Align left"], [aria-label="Align center"], [aria-label="Align right"]',
     )) {
       expect(control.element).toBeInstanceOf(HTMLButtonElement);
-      expect(control.attributes()).toMatchObject({ type: "button", disabled: "" });
+      expect(control.attributes()).toMatchObject({
+        type: "button",
+        disabled: "",
+      });
       await control.trigger("click");
     }
     await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
@@ -400,12 +396,18 @@ describe("HomeFormatToolbar", () => {
       const control = wrapper.get(`[data-ribbon-placeholder="${action}"]`);
       expect(control.find(".ribbon-icon-action__text").exists()).toBe(false);
       expect(control.element).toBeInstanceOf(HTMLButtonElement);
-      expect(control.attributes()).toMatchObject({ type: "button", disabled: "" });
+      expect(control.attributes()).toMatchObject({
+        type: "button",
+        disabled: "",
+      });
     }
     expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(15);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
-      expect(placeholder.attributes()).toMatchObject({ type: "button", disabled: "" });
+      expect(placeholder.attributes()).toMatchObject({
+        type: "button",
+        disabled: "",
+      });
     }
   });
 
@@ -492,18 +494,21 @@ describe("HomeFormatToolbar", () => {
     await panel.trigger("keydown", { key: "z", ctrlKey: true });
     await panel.get('[data-border-menu-row="style"]').trigger("click");
     const submenu = new DOMWrapper(document.body).get('[data-border-submenu="style"]');
-    await submenu.trigger("keydown", { key: "z", metaKey: true, shiftKey: true });
+    await submenu.trigger("keydown", {
+      key: "z",
+      metaKey: true,
+      shiftKey: true,
+    });
 
     expect(wrapper.emitted("undo")).toHaveLength(1);
     expect(wrapper.emitted("redo")).toHaveLength(1);
   });
 
-  test("cancels a drafted color with Escape and restores trigger focus", async () => {
+  test("dismisses a color palette with Escape and restores trigger focus", async () => {
     const wrapper = mountToolbar();
     const trigger = wrapper.get('[aria-label="Text color"]');
     await trigger.trigger("click");
     expect(document.activeElement).toBe(getTeleportedDialog().element);
-    await new DOMWrapper(document.body).get('[data-color="#123456"]').trigger("click");
     await getTeleportedDialog().trigger("keydown", { key: "Escape" });
 
     expect(document.body.querySelector('[role="dialog"]')).toBeNull();

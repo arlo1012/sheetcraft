@@ -8,7 +8,7 @@ import {
   Plus,
 } from "lucide-vue-next";
 import type { IconNode } from "lucide-vue-next";
-import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
+import ColorPalette from "../../../shared/color/ColorPalette.vue";
 import { computed, nextTick, ref, useId } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
@@ -19,15 +19,6 @@ import {
   SHEET_ZOOM_STEP,
 } from "../../../shared/sheet-view/zoom";
 
-const HIGHLIGHT_COLORS = [
-  "#22a06b",
-  "#3b82f6",
-  "#8b5cf6",
-  "#f59e0b",
-  "#ef4444",
-  "#ec4899",
-] as const;
-const DISABLED_RECENT_COLORS = null as unknown as string[];
 const HIGHLIGHT_ICON_NODE: IconNode = [
   ["rect", { x: "9", y: "3", width: "6", height: "18", rx: "1" }],
   ["rect", { x: "3", y: "9", width: "18", height: "6", rx: "1" }],
@@ -121,8 +112,8 @@ function onColorTriggerKeydown(event: KeyboardEvent): void {
   openColorPicker();
 }
 
-function selectHighlightColor(value: string): void {
-  const color = normalizeColor(value);
+function selectHighlightColor(value: string | null): void {
+  const color = value === null ? "#22a06b" : normalizeColor(value);
   if (color) {
     emit("update:highlightColor", color);
     emit("update:highlightEnabled", true);
@@ -144,6 +135,7 @@ function selectHighlightColor(value: string): void {
         @click="toggleHighlight"
       >
         <LucideIcon
+          name="HighlightRowColumn"
           :iconNode="HIGHLIGHT_ICON_NODE"
           :size="15"
           :stroke-width="1.8"
@@ -241,15 +233,10 @@ function selectHighlightColor(value: string): void {
         :aria-label="t('statusBar.highlightColor')"
         tabindex="-1"
       >
-        <ColorPickerPanel
+        <ColorPalette
           :model-value="selectedColor"
-          :color-modes="['monochrome']"
-          format="HEX"
-          :enable-alpha="false"
-          :recent-colors="DISABLED_RECENT_COLORS"
-          :show-primary-color-preview="false"
-          :swatch-colors="[...HIGHLIGHT_COLORS]"
-          @change="selectHighlightColor"
+          default-color="#22a06b"
+          @select="selectHighlightColor"
         />
       </div>
     </Teleport>

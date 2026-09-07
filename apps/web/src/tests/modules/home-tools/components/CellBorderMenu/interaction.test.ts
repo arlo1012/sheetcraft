@@ -161,13 +161,12 @@ describe("CellBorderMenu interaction", () => {
     await menu.get('[data-border-menu-row="color"]').trigger("click");
     const color = getSubmenu("color");
     expect(color.attributes("role")).toBe("dialog");
-    expect(color.findAll("[data-border-color]")).toHaveLength(8);
-    expect(color.get('[data-border-color="#20242c"]').attributes("aria-checked")).toBe("true");
-    await color.get('[data-border-color="#3b82f6"]').trigger("click");
-    expect(color.get('[data-border-color="#3b82f6"]').attributes("aria-checked")).toBe("true");
+    expect(color.findAll("[data-color-swatch]").length).toBeGreaterThan(60);
+    await color.get('[data-color-swatch="#4472c4"]').trigger("click");
+    expect(document.body.querySelector('[data-border-submenu="color"]')).toBeNull();
     await menu.get('[data-border-preset="outer"]').trigger("click");
     expect(wrapper.emitted("applyBorders")?.[0]).toEqual([
-      { preset: "outer", border: { style: "double", color: "#3b82f6" } },
+      { preset: "outer", border: { style: "double", color: "#4472c4" } },
     ]);
   });
 

@@ -339,6 +339,16 @@ export type MessageSchema = {
     applyColor: string;
     selectionTooLarge: string;
   };
+  colorPalette: {
+    label: string;
+    default: string;
+    theme: string;
+    standard: string;
+    recent: string;
+    more: string;
+    back: string;
+    colorValue: string;
+  };
   image: {
     insertMenu: string;
     insertInCell: string;

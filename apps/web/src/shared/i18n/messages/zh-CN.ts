@@ -342,6 +342,16 @@ export const zhCN = {
     applyColor: "应用",
     selectionTooLarge: "所选区域过大，无法一次设置格式。",
   },
+  colorPalette: {
+    label: "颜色选择",
+    default: "默认",
+    theme: "预设颜色",
+    standard: "标准色",
+    recent: "最近使用",
+    more: "更多颜色",
+    back: "返回",
+    colorValue: "颜色 {value}",
+  },
   image: {
     insertMenu: "插入图片",
     insertInCell: "单元格内图片",
