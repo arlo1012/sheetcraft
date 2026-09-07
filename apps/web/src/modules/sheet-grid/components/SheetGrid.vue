@@ -14,6 +14,7 @@ import { getCellAddressLabel } from "@idea10/core/coordinates";
 import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
+import { getSelectionFitZoom } from "../selection-zoom";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 import type { CellEditSession } from "../../../shared/cell-editing/useCellEditSession";
@@ -193,6 +194,7 @@ const emit = defineEmits<{
   redo: [];
   viewStateChange: [viewState: SheetGridViewState];
   horizontalScrollChange: [state: SheetHorizontalScrollState];
+  "update:zoom": [zoom: number];
 }>();
 
 const ROW_HEADER_WIDTH = 48;
@@ -456,6 +458,39 @@ const activeCellRect = computed(
   () => layout.value.getCellViewportRect(activeCell.value) ?? { x: 0, y: 0, width: 0, height: 0 },
 );
 const selectedRangeRects = computed(() => layout.value.getRangeFragments(selectedRange.value));
+
+function fitSelectionToViewport(): void {
+  const range = selectedRange.value;
+  const rect = layout.value.getRangeRect(range);
+  if (!rect) return;
+  const nextZoom = getSelectionFitZoom({
+    selectionRect: rect,
+    viewportSize: {
+      width: (viewportSize.width + ROW_HEADER_WIDTH) * scale.value,
+      height: (viewportSize.height + COLUMN_HEADER_HEIGHT) * scale.value,
+    },
+    frozenSize: layout.value.frozenSize,
+    headerSize: { width: ROW_HEADER_WIDTH, height: COLUMN_HEADER_HEIGHT },
+  });
+  if (nextZoom === undefined) return;
+  const sheetId = props.sheet.id;
+  emit("update:zoom", nextZoom);
+  void nextTick(() => {
+    if (props.sheet.id !== sheetId) return;
+    updateViewportSize();
+    const rows = rowVisibility.value;
+    const firstRow = rows.isRowVisible(range.start.row)
+      ? range.start.row
+      : rows.getNextVisibleRow(range.start.row);
+    const lastRow = rows.isRowVisible(range.end.row)
+      ? range.end.row
+      : rows.getPreviousVisibleRow(range.end.row);
+    if (firstRow === null || lastRow === null || firstRow > lastRow) return;
+    ensureSelectionVisible({ row: lastRow, column: range.end.column }, "cells");
+    ensureSelectionVisible({ row: firstRow, column: range.start.column }, "cells");
+    emitViewState();
+  });
+}
 const referenceEditor = computed<FormulaReferenceEditor | null>(() => {
   if (props.referenceEditor?.editingFormula) return props.referenceEditor;
   return editorRef.value?.formulaReferenceEditor ?? null;
@@ -1554,6 +1589,7 @@ defineExpose({
   hasPendingEdit,
   navigateToCell,
   scrollHorizontally,
+  fitSelectionToViewport,
 });
 </script>
 

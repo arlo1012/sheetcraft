@@ -273,7 +273,9 @@ export const enUS = {
     zoomIn: "Zoom in",
     zoomLevel: "Zoom {value}%",
     zoomSlider: "Zoom slider",
-    zoomReset: "Reset zoom to 100%",
+    zoomMenu: "Zoom",
+    fitSelection: "Fit selection",
+    customZoom: "Custom zoom",
   },
   cell: {
     edit: "Edit cell {address}",

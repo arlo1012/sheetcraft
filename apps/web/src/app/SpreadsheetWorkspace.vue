@@ -58,6 +58,7 @@ const {
   workbookGeneration,
   replaceWorkbook,
   focusCellEditor,
+  fitSelectionToViewport,
   handleFormulaReferenceKeydown,
   searchQuery,
   t,
@@ -362,7 +363,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection"
     >
       <SheetGrid
-        :zoom="zoom"
+        v-model:zoom="zoom"
         :highlight-enabled="highlightEnabled"
         :highlight-color="highlightColor"
         :grid-id="gridId"
@@ -401,6 +402,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     </div>
     <WorkbookStatusBar
       v-model:zoom="zoom"
+      @fit-selection="fitSelectionToViewport"
       v-model:highlight-enabled="highlightEnabled"
       v-model:highlight-color="highlightColor"
       :fullscreen="fullscreen"

@@ -134,6 +134,7 @@ export type SheetGridNavigator = {
   handleReferenceKeydown?(event: KeyboardEvent): boolean;
   navigateToCell(address: CellAddress): void;
   scrollHorizontally?(position: number, allowExpansion?: boolean): void;
+  fitSelectionToViewport?(): void;
 };
 
 export type SpreadsheetWorkspaceControllerOptions = {
@@ -1072,6 +1073,10 @@ export function useSpreadsheetWorkspaceController(
     gridRef.value?.scrollHorizontally?.(position, allowExpansion);
   }
 
+  function fitSelectionToViewport(): void {
+    gridRef.value?.fitSelectionToViewport?.();
+  }
+
   onScopeDispose(clearWorkspaceStatus);
 
   return {
@@ -1145,6 +1150,7 @@ export function useSpreadsheetWorkspaceController(
     undo,
     redo,
     setGridNavigator,
+    fitSelectionToViewport,
     scrollGridHorizontally,
   };
 }

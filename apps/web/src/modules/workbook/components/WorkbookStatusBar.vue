@@ -43,6 +43,7 @@ const emit = defineEmits<{
   "update:highlightEnabled": [value: boolean];
   "update:highlightColor": [value: string];
   toggleFullscreen: [];
+  fitSelection: [];
 }>();
 
 const { locale, t } = useAppI18n();
@@ -189,6 +190,7 @@ function formatNumber(value: number): string {
           :fullscreen="fullscreen"
           :fullscreen-available="fullscreenAvailable"
           @update:zoom="emit('update:zoom', $event)"
+          @fit-selection="emit('fitSelection')"
           @update:highlight-enabled="emit('update:highlightEnabled', $event)"
           @update:highlight-color="emit('update:highlightColor', $event)"
           @toggle-fullscreen="emit('toggleFullscreen')"

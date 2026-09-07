@@ -9,6 +9,7 @@ import {
 } from "lucide-vue-next";
 import type { IconNode } from "lucide-vue-next";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
+import WorkbookZoomMenu from "./WorkbookZoomMenu.vue";
 import { computed, nextTick, ref, useId } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
@@ -46,6 +47,7 @@ const emit = defineEmits<{
   "update:highlightEnabled": [enabled: boolean];
   "update:highlightColor": [color: string];
   toggleFullscreen: [];
+  fitSelection: [];
 }>();
 
 const { t } = useAppI18n();
@@ -192,23 +194,18 @@ function selectHighlightColor(value: string | null): void {
           :value="normalizeSheetZoom(zoom)"
           :min="MIN_SHEET_ZOOM"
           :max="MAX_SHEET_ZOOM"
-          :step="SHEET_ZOOM_STEP"
+          :step="1"
           :aria-label="t('statusBar.zoomSlider')"
           :aria-valuetext="t('statusBar.zoomLevel', { value: normalizeSheetZoom(zoom) })"
           :style="{ '--zoom-progress': zoomProgress }"
           @input="onNativeSliderInput"
         />
       </div>
-      <button
-        type="button"
-        class="workbook-view-controls__zoom-value"
-        :aria-label="t('statusBar.zoomLevel', { value: normalizeSheetZoom(zoom) })"
-        :title="t('statusBar.zoomReset')"
-        data-view-control="zoom-reset"
-        @click="updateZoom(100)"
-      >
-        {{ normalizeSheetZoom(zoom) }}%
-      </button>
+      <WorkbookZoomMenu
+        :zoom="normalizeSheetZoom(zoom)"
+        @select="updateZoom"
+        @fit-selection="emit('fitSelection')"
+      />
       <button
         type="button"
         class="workbook-view-controls__button"
@@ -275,8 +272,7 @@ function selectHighlightColor(value: string | null): void {
     }
   }
 
-  &__button,
-  &__zoom-value {
+  &__button {
     display: inline-grid;
     flex: 0 0 auto;
     width: 24px;
@@ -394,14 +390,6 @@ function selectHighlightColor(value: string | null): void {
     }
   }
 
-  &__zoom-value {
-    width: 42px;
-    border-radius: 2px;
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
   &__color-panel {
     z-index: 90;
     max-width: calc(100vw - var(--idea-space-4) - var(--idea-space-4));
@@ -427,10 +415,6 @@ function selectHighlightColor(value: string | null): void {
       width: 58px;
       min-width: 36px;
       margin: 0 1px;
-    }
-
-    &__zoom-value {
-      width: 38px;
     }
   }
 

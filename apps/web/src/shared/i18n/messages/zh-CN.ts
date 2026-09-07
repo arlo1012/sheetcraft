@@ -264,7 +264,9 @@ export const zhCN = {
     zoomIn: "放大",
     zoomLevel: "缩放 {value}%",
     zoomSlider: "缩放滑块",
-    zoomReset: "重置缩放为 100%",
+    zoomMenu: "缩放",
+    fitSelection: "恰好容纳选定区域",
+    customZoom: "自定义缩放",
   },
   cell: {
     edit: "编辑单元格 {address}",

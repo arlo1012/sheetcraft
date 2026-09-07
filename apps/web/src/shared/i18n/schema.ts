@@ -261,7 +261,9 @@ export type MessageSchema = {
     zoomIn: string;
     zoomLevel: string;
     zoomSlider: string;
-    zoomReset: string;
+    zoomMenu: string;
+    fitSelection: string;
+    customZoom: string;
   };
   cell: {
     edit: string;

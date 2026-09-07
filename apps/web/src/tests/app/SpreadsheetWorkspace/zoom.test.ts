@@ -1,4 +1,4 @@
-import { flushPromises, mount } from "@vue/test-utils";
+import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
@@ -6,6 +6,49 @@ import { createMemoryImageAssetStore } from "../../../modules/image-assets/image
 import { createAppI18n } from "../../../shared/i18n";
 
 describe("workspace zoom gestures", () => {
+  test("fits a selection and applies exact preset and custom percentages from the menu", async () => {
+    const wrapper = mount(SpreadsheetWorkspace, {
+      attachTo: document.body,
+      props: {
+        workbookStore: {
+          load: async () => undefined,
+          save: async () => ({ revision: 1, savedAt: 1 }),
+          replace: async () => ({ revision: 1, savedAt: 1 }),
+        },
+        imageAssetStore: createMemoryImageAssetStore(),
+      },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
+    try {
+      await flushPromises();
+      const revision = wrapper.findComponent({ name: "SheetGrid" }).props("workbookRevision");
+      await wrapper.get('[data-row="19"][data-column="4"]').trigger("mousedown", {
+        button: 0,
+        shiftKey: true,
+      });
+      await wrapper.get('[data-view-control="zoom-menu"]').trigger("click");
+      await new DOMWrapper(document.body).get("[data-zoom-fit-selection]").trigger("click");
+      expect(wrapper.get<HTMLElement>(".sheet-grid").element.style.zoom).toBe("1.22");
+
+      await wrapper.get('[data-view-control="zoom-menu"]').trigger("click");
+      await new DOMWrapper(document.body).get('[data-zoom-preset="75"]').trigger("click");
+      expect(wrapper.get<HTMLElement>(".sheet-grid").element.style.zoom).toBe("0.75");
+      expect(wrapper.get<HTMLInputElement>('input[type="range"]').element.value).toBe("75");
+
+      await wrapper.get('[data-view-control="zoom-menu"]').trigger("click");
+      const input = new DOMWrapper(document.body).get<HTMLInputElement>(
+        ".workbook-zoom-menu input",
+      );
+      await input.setValue("73");
+      await input.trigger("keydown", { key: "Enter", code: "Enter" });
+      expect(wrapper.get<HTMLElement>(".sheet-grid").element.style.zoom).toBe("0.73");
+      expect(wrapper.get<HTMLInputElement>('input[type="range"]').element.value).toBe("73");
+      expect(wrapper.findComponent({ name: "SheetGrid" }).props("workbookRevision")).toBe(revision);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   test("uses Ctrl+wheel for bounded sheet zoom without browser zoom or grid scrolling", async () => {
     const wrapper = mount(SpreadsheetWorkspace, {
       attachTo: document.body,
