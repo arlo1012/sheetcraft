@@ -200,8 +200,7 @@ function fitSelection(): void {
 
     &:hover,
     &[aria-expanded="true"] {
-      color: var(--idea-text-primary);
-      background: var(--idea-surface-hover);
+      background: var(--idea-icon-button-hover-bg);
     }
 
     &:focus-visible {

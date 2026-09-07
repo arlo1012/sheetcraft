@@ -16,3 +16,5 @@
   prefer public props and local theme variables; preserve component defaults
   when forwarding nested configuration. Keep necessary adaptations in the
   shared TDesign adapter, not feature-level `.t-*` overrides.
+- Icon-button hover feedback uses `--idea-icon-button-hover-bg` across ribbon
+  and status-bar controls. Keep the icon's foreground color stable on hover.

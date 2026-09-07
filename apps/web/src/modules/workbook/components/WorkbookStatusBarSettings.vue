@@ -193,8 +193,7 @@ function selectNumberFormat(numberFormat: StatusBarNumberFormat): void {
 
     &:hover,
     &[aria-expanded="true"] {
-      background: var(--idea-surface-hover);
-      color: var(--idea-text-primary);
+      background: var(--idea-icon-button-hover-bg);
     }
 
     &:focus-visible {

@@ -85,7 +85,7 @@ function activate(): void {
   outline: none;
 
   &:hover:not(:disabled) {
-    background: var(--idea-surface-hover);
+    background: var(--idea-icon-button-hover-bg);
   }
 
   &:focus-visible {

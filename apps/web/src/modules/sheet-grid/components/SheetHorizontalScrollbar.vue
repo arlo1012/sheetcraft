@@ -187,13 +187,13 @@ function onWheel(event: WheelEvent): void {
     cursor: pointer;
 
     &:hover:not(:disabled) {
-      color: var(--idea-text-secondary);
+      background: var(--idea-icon-button-hover-bg);
     }
 
     &:focus-visible {
       outline: 1px solid var(--idea-action-primary);
       outline-offset: -1px;
-      background: var(--idea-surface-hover);
+      background: var(--idea-icon-button-hover-bg);
     }
 
     &:disabled {

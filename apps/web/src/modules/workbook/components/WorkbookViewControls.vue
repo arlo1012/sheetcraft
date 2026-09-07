@@ -263,12 +263,6 @@ function selectHighlightColor(value: string | null): void {
     &.is-active {
       background: var(--idea-action-primary-subtle);
       color: var(--idea-action-primary);
-
-      .workbook-view-controls__button:hover,
-      .workbook-view-controls__button[aria-expanded="true"] {
-        background: transparent;
-        color: inherit;
-      }
     }
   }
 
@@ -286,8 +280,7 @@ function selectHighlightColor(value: string | null): void {
 
     &:hover:not(:disabled),
     &[aria-expanded="true"] {
-      background: var(--idea-surface-hover);
-      color: var(--idea-text-primary);
+      background: var(--idea-icon-button-hover-bg);
     }
 
     &:focus-visible {

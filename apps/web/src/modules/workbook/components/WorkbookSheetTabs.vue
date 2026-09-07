@@ -742,12 +742,11 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     cursor: pointer;
 
     &:hover:not(:disabled) {
-      background: var(--idea-surface-hover);
-      color: var(--idea-text-primary);
+      background: var(--idea-icon-button-hover-bg);
     }
 
     &:focus-visible {
-      background: var(--idea-surface-hover);
+      background: var(--idea-icon-button-hover-bg);
       outline: 1px solid var(--idea-action-primary);
       outline-offset: -1px;
     }
