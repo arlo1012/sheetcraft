@@ -16,6 +16,9 @@ const props = withDefaults(
     activeSheetId: string;
     selectionSummary: SelectionSummary;
     zoom?: number;
+    showHeaders?: boolean;
+    showGridLines?: boolean;
+    showAxisQuickTools?: boolean;
     highlightEnabled?: boolean;
     highlightColor?: string;
     fullscreen?: boolean;
@@ -23,6 +26,9 @@ const props = withDefaults(
   }>(),
   {
     zoom: 100,
+    showHeaders: true,
+    showGridLines: true,
+    showAxisQuickTools: false,
     highlightEnabled: false,
     highlightColor: "#22a06b",
     fullscreen: false,
@@ -40,6 +46,9 @@ const emit = defineEmits<{
   updateProperties: [payload: { sheetId: string; patch: Partial<SheetProperties> }];
   restore: [sheetId: string];
   "update:zoom": [value: number];
+  "update:showHeaders": [value: boolean];
+  "update:showGridLines": [value: boolean];
+  "update:showAxisQuickTools": [value: boolean];
   "update:highlightEnabled": [value: boolean];
   "update:highlightColor": [value: string];
   toggleFullscreen: [];
@@ -185,6 +194,12 @@ function formatNumber(value: number): string {
         <WorkbookViewControls
           class="workbook-status-bar__view-controls"
           :zoom="zoom"
+          :show-headers="showHeaders"
+          :show-grid-lines="showGridLines"
+          :show-axis-quick-tools="showAxisQuickTools"
+          @update:show-headers="emit('update:showHeaders', $event)"
+          @update:show-grid-lines="emit('update:showGridLines', $event)"
+          @update:show-axis-quick-tools="emit('update:showAxisQuickTools', $event)"
           :highlight-enabled="highlightEnabled"
           :highlight-color="highlightColor"
           :fullscreen="fullscreen"

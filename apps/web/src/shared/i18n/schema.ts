@@ -249,6 +249,10 @@ export type MessageSchema = {
       sum: string;
     };
     viewAndZoom: string;
+    displaySettings: string;
+    showHeaders: string;
+    showGridLines: string;
+    axisQuickTools: string;
     highlightRowColumn: string;
     highlightRowColumnDescription: string;
     highlightColor: string;

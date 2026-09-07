@@ -12,6 +12,7 @@ import ColorPalette from "../../../shared/color/ColorPalette.vue";
 import { getContrastingForeground, mixHexColors } from "../../../shared/color/contrast";
 import { normalizeColor } from "../../../shared/color/palette";
 import WorkbookZoomMenu from "./WorkbookZoomMenu.vue";
+import WorkbookDisplaySettings from "./WorkbookDisplaySettings.vue";
 import { computed, nextTick, ref, useId } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
@@ -43,6 +44,9 @@ const DEFAULT_PALE_HIGHLIGHT_COLOR = "#d3eee1";
 const props = withDefaults(
   defineProps<{
     zoom?: number;
+    showHeaders?: boolean;
+    showGridLines?: boolean;
+    showAxisQuickTools?: boolean;
     highlightEnabled?: boolean;
     highlightColor?: string;
     fullscreen?: boolean;
@@ -50,6 +54,9 @@ const props = withDefaults(
   }>(),
   {
     zoom: 100,
+    showHeaders: true,
+    showGridLines: true,
+    showAxisQuickTools: false,
     highlightEnabled: false,
     highlightColor: "#22a06b",
     fullscreen: false,
@@ -59,6 +66,9 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   "update:zoom": [zoom: number];
+  "update:showHeaders": [value: boolean];
+  "update:showGridLines": [value: boolean];
+  "update:showAxisQuickTools": [value: boolean];
   "update:highlightEnabled": [enabled: boolean];
   "update:highlightColor": [color: string];
   toggleFullscreen: [];
@@ -145,6 +155,14 @@ function selectHighlightColor(value: string | null): void {
 
 <template>
   <div class="workbook-view-controls" :aria-label="t('statusBar.viewAndZoom')" role="group">
+    <WorkbookDisplaySettings
+      :show-headers="showHeaders"
+      :show-grid-lines="showGridLines"
+      :show-axis-quick-tools="showAxisQuickTools"
+      @update:show-headers="emit('update:showHeaders', $event)"
+      @update:show-grid-lines="emit('update:showGridLines', $event)"
+      @update:show-axis-quick-tools="emit('update:showAxisQuickTools', $event)"
+    />
     <div
       class="workbook-view-controls__highlight"
       :class="{ 'is-active': highlightEnabled }"

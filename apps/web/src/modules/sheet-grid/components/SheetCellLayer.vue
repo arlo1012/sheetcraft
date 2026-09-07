@@ -40,11 +40,12 @@ const props = withDefaults(
     activeCell: CellAddress;
     selection: CellSelection;
     editing: boolean;
+    showGridLines?: boolean;
     locale?: string;
     imageAssetUrls?: ReadonlyMap<string, string>;
     loadingImageAssetIds?: ReadonlySet<string>;
   }>(),
-  { locale: "en-US" },
+  { locale: "en-US", showGridLines: true },
 );
 
 const emit = defineEmits<{
@@ -252,7 +253,10 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
 </script>
 
 <template>
-  <div class="sheet-cell-layer">
+  <div
+    class="sheet-cell-layer"
+    :style="{ '--sheet-gridline-width': showGridLines ? '1px' : '0px' }"
+  >
     <div
       v-for="pane in paneClips"
       :key="pane.paneId"
@@ -329,8 +333,8 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
     position: absolute;
     box-sizing: border-box;
     background: var(--idea-surface-panel);
-    border-right: 1px solid var(--idea-border-subtle);
-    border-bottom: 1px solid var(--idea-border-subtle);
+    border-right: var(--sheet-gridline-width) solid var(--idea-border-subtle);
+    border-bottom: var(--sheet-gridline-width) solid var(--idea-border-subtle);
     pointer-events: none;
   }
 }

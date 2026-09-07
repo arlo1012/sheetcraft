@@ -89,6 +89,7 @@ import { areGridClipboardTextsEqual, createBrowserGridClipboardPort } from "../g
 import { readFloatingImageClipboard } from "../../sheet-images/imageClipboard";
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
+import SheetAxisQuickTools from "./SheetAxisQuickTools.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
 import SheetCellContextMenu from "./SheetCellContextMenu.vue";
 import SheetBorderLayer from "./SheetBorderLayer.vue";
@@ -158,6 +159,9 @@ const props = withDefaults(
     zoom?: number;
     highlightEnabled?: boolean;
     highlightColor?: string;
+    showHeaders?: boolean;
+    showGridLines?: boolean;
+    showAxisQuickTools?: boolean;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -171,6 +175,9 @@ const props = withDefaults(
     zoom: 100,
     highlightEnabled: false,
     highlightColor: "#22a06b",
+    showHeaders: true,
+    showGridLines: true,
+    showAxisQuickTools: false,
   },
 );
 
@@ -199,6 +206,14 @@ const emit = defineEmits<{
 
 const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 28;
+const AXIS_QUICK_TOOL_BUTTON_SIZE = 24;
+const AXIS_QUICK_TOOL_SHORT_SIZE = AXIS_QUICK_TOOL_BUTTON_SIZE + 2;
+const AXIS_QUICK_TOOL_LONG_SIZE = AXIS_QUICK_TOOL_BUTTON_SIZE * 3 + 2;
+
+const headerSize = computed(() => ({
+  width: props.showHeaders ? ROW_HEADER_WIDTH : 0,
+  height: props.showHeaders ? COLUMN_HEADER_HEIGHT : 0,
+}));
 
 const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
@@ -454,6 +469,76 @@ const selectedRange = computed(() =>
     columnCount: gridExtent.columnCount,
   }),
 );
+const axisQuickTool = computed(() => {
+  if (
+    !props.showAxisQuickTools ||
+    !props.showHeaders ||
+    props.readOnly ||
+    isEditing.value ||
+    isComposing.value
+  ) {
+    return undefined;
+  }
+  const mode = getSelectionMode(selection.value);
+  if (mode !== "rows" && mode !== "columns") return undefined;
+
+  const axis: SheetDimensionAxis = mode === "rows" ? "row" : "column";
+  const range = selectedRange.value;
+  const start = axis === "row" ? range.start.row : range.start.column;
+  const end = axis === "row" ? range.end.row : range.end.column;
+  const panes = axis === "row" ? rowHeaderPanes.value : columnHeaderPanes.value;
+  const visibleItem = panes
+    .flatMap((pane) =>
+      pane.items.map((item) => ({
+        item,
+        pane,
+        start: Math.max(item.offset, pane.offset),
+        end: Math.min(item.offset + item.size, pane.offset + pane.size),
+      })),
+    )
+    .find(
+      (candidate) =>
+        candidate.item.index >= start &&
+        candidate.item.index <= end &&
+        candidate.end > candidate.start,
+    );
+  if (!visibleItem) return undefined;
+
+  const center = (visibleItem.start + visibleItem.end - AXIS_QUICK_TOOL_SHORT_SIZE) / 2;
+  const itemPosition = clamp(
+    center,
+    visibleItem.pane.offset,
+    visibleItem.pane.offset + visibleItem.pane.size - AXIS_QUICK_TOOL_SHORT_SIZE,
+  );
+
+  return {
+    axis,
+    index: start,
+    count: end - start + 1,
+    position:
+      axis === "row"
+        ? {
+            x: clamp(
+              headerSize.value.width + 2,
+              headerSize.value.width,
+              headerSize.value.width + viewportSize.width - AXIS_QUICK_TOOL_LONG_SIZE,
+            ),
+            y: headerSize.value.height + itemPosition,
+          }
+        : {
+            x: headerSize.value.width + itemPosition,
+            y: clamp(
+              headerSize.value.height + 2,
+              headerSize.value.height,
+              headerSize.value.height + viewportSize.height - AXIS_QUICK_TOOL_LONG_SIZE,
+            ),
+          },
+  };
+});
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(minimum, maximum), Math.max(minimum, value));
+}
 const activeCellRect = computed(
   () => layout.value.getCellViewportRect(activeCell.value) ?? { x: 0, y: 0, width: 0, height: 0 },
 );
@@ -466,11 +551,11 @@ function fitSelectionToViewport(): void {
   const nextZoom = getSelectionFitZoom({
     selectionRect: rect,
     viewportSize: {
-      width: (viewportSize.width + ROW_HEADER_WIDTH) * scale.value,
-      height: (viewportSize.height + COLUMN_HEADER_HEIGHT) * scale.value,
+      width: (viewportSize.width + headerSize.value.width) * scale.value,
+      height: (viewportSize.height + headerSize.value.height) * scale.value,
     },
     frozenSize: layout.value.frozenSize,
-    headerSize: { width: ROW_HEADER_WIDTH, height: COLUMN_HEADER_HEIGHT },
+    headerSize: headerSize.value,
   });
   if (nextZoom === undefined) return;
   const sheetId = props.sheet.id;
@@ -1110,18 +1195,32 @@ function requestAxisInsert(payload: { direction: "before" | "after"; count: numb
   if (!menu) {
     return;
   }
-  const index = payload.direction === "before" ? menu.index : menu.index + menu.count;
-  if (payload.count > getAxisMaximum(menu.axis) - index) {
+  if (!requestAxisInsertion(menu.axis, menu.index, menu.count, payload.direction, payload.count))
     return;
-  }
-  clearPendingClipboard();
-  emit("insertAxis", {
-    axis: menu.axis,
-    index,
-    count: payload.count,
-  });
   axisContextMenu.value = undefined;
   focusEditor();
+}
+
+function requestAxisInsertion(
+  axis: SheetDimensionAxis,
+  index: number,
+  selectionCount: number,
+  direction: "before" | "after",
+  count = selectionCount,
+): boolean {
+  if (props.readOnly) return false;
+  const insertIndex = direction === "before" ? index : index + selectionCount;
+  if (count > getAxisMaximum(axis) - insertIndex) return false;
+  clearPendingClipboard();
+  emit("insertAxis", { axis, index: insertIndex, count });
+  return true;
+}
+
+function openAxisQuickToolsMenu(trigger: HTMLButtonElement): void {
+  const tool = axisQuickTool.value;
+  if (!tool) return;
+  const bounds = trigger.getBoundingClientRect();
+  openAxisContextMenu(tool.axis, tool.index, bounds.left, bounds.bottom, trigger);
 }
 
 function requestAxisDelete(): void {
@@ -1604,8 +1703,8 @@ defineExpose({
     :style="{
       zoom: scale,
       '--sheet-scale': scale,
-      '--sheet-row-header-width': `${ROW_HEADER_WIDTH}px`,
-      '--sheet-column-header-height': `${COLUMN_HEADER_HEIGHT}px`,
+      '--sheet-row-header-width': `${headerSize.width}px`,
+      '--sheet-column-header-height': `${headerSize.height}px`,
     }"
     :aria-label="t('grid.worksheet', { name: sheet.name })"
     @keydown.capture="onGridKeydown"
@@ -1614,6 +1713,7 @@ defineExpose({
     @paste.capture="onImagePaste"
   >
     <button
+      v-if="showHeaders"
       type="button"
       class="sheet-grid__corner"
       :class="{ 'is-active': getSelectionMode(selection) === 'all' }"
@@ -1621,6 +1721,7 @@ defineExpose({
       @click="onCornerClick"
     />
     <SheetColumnHeaders
+      v-if="showHeaders"
       :panes="columnHeaderPanes"
       :geometry="geometry"
       :selected-start-column="selectedRange.start.column"
@@ -1634,6 +1735,7 @@ defineExpose({
       "
     />
     <SheetRowHeaders
+      v-if="showHeaders"
       :panes="rowHeaderPanes"
       :geometry="geometry"
       :selected-start-row="selectedRange.start.row"
@@ -1645,6 +1747,22 @@ defineExpose({
       @open-context-menu="
         openAxisContextMenu('row', $event.row, $event.clientX, $event.clientY, $event.trigger)
       "
+    />
+    <SheetAxisQuickTools
+      v-if="axisQuickTool"
+      :axis="axisQuickTool.axis"
+      :position="axisQuickTool.position"
+      :insert-before-disabled="
+        axisQuickTool.count > getAxisMaximum(axisQuickTool.axis) - axisQuickTool.index
+      "
+      :insert-after-disabled="
+        axisQuickTool.count >
+        getAxisMaximum(axisQuickTool.axis) - axisQuickTool.index - axisQuickTool.count
+      "
+      @insert="
+        requestAxisInsertion(axisQuickTool.axis, axisQuickTool.index, axisQuickTool.count, $event)
+      "
+      @more="openAxisQuickToolsMenu"
     />
 
     <div
@@ -1672,6 +1790,7 @@ defineExpose({
             :active-cell="activeCell"
             :selection="selection"
             :editing="isEditing"
+            :show-grid-lines="showGridLines"
             :locale="locale"
             @cell-mousedown="onCellMouseDown"
             @cell-double-click="onCellDoubleClick"

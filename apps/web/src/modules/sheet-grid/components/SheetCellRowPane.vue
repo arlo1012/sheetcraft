@@ -102,8 +102,8 @@ function memoDependencies(cell: VisibleCell): readonly unknown[] {
   overflow: hidden;
   padding: 0 5px;
   background: var(--idea-surface-panel);
-  border-right: 1px solid var(--idea-border-subtle);
-  border-bottom: 1px solid var(--idea-border-subtle);
+  border-right: var(--sheet-gridline-width, 1px) solid var(--idea-border-subtle);
+  border-bottom: var(--sheet-gridline-width, 1px) solid var(--idea-border-subtle);
   color: var(--idea-text-primary);
   font-size: 13px;
   line-height: 1;

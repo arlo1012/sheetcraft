@@ -37,6 +37,9 @@ const props = defineProps<{ workbookStore?: WorkbookStore; imageAssetStore?: Ima
 const formulaBarRef = ref<InstanceType<typeof WorkbookFormulaBar> | null>(null);
 const gridId = `workbook-grid-${useId()}`;
 const zoom = ref(100);
+const showHeaders = ref(true);
+const showGridLines = ref(true);
+const showAxisQuickTools = ref(false);
 const highlightEnabled = ref(false);
 const highlightColor = ref("#22a06b");
 const { fullscreen, fullscreenAvailable, toggleFullscreen } = useWorkbookFullscreen(() => {
@@ -368,6 +371,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     >
       <SheetGrid
         v-model:zoom="zoom"
+        :show-headers="showHeaders"
+        :show-grid-lines="showGridLines"
+        :show-axis-quick-tools="showAxisQuickTools"
         :highlight-enabled="highlightEnabled"
         :highlight-color="highlightColor"
         :grid-id="gridId"
@@ -407,6 +413,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     <WorkbookStatusBar
       v-model:zoom="zoom"
       @fit-selection="fitSelectionToViewport"
+      v-model:show-headers="showHeaders"
+      v-model:show-grid-lines="showGridLines"
+      v-model:show-axis-quick-tools="showAxisQuickTools"
       v-model:highlight-enabled="highlightEnabled"
       v-model:highlight-color="highlightColor"
       :fullscreen="fullscreen"

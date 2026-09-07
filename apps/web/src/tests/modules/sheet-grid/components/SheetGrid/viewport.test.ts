@@ -3,6 +3,36 @@ import { setCellStyle, setCellValue } from "@idea10/core/workbook";
 import { activeCell, mountSheetGrid } from "./fixture";
 
 describe("SheetGrid viewport", () => {
+  test("can hide headers without reserving their grid space", () => {
+    const { wrapper } = mountSheetGrid({ showHeaders: false });
+
+    expect(wrapper.find(".sheet-grid__corner").exists()).toBe(false);
+    expect(wrapper.find(".sheet-column-headers").exists()).toBe(false);
+    expect(wrapper.find(".sheet-row-headers").exists()).toBe(false);
+    expect(wrapper.get(".sheet-grid").attributes("style")).toContain(
+      "--sheet-row-header-width: 0px",
+    );
+    expect(wrapper.get(".sheet-grid").attributes("style")).toContain(
+      "--sheet-column-header-height: 0px",
+    );
+  });
+
+  test("hides default grid lines while retaining explicit borders", () => {
+    const { wrapper } = mountSheetGrid({
+      showGridLines: false,
+      beforeMount(sheet) {
+        setCellStyle(sheet, { row: 0, column: 0 }, { borderRight: { style: "thin", color: "#123456" } });
+      },
+    });
+
+    expect(wrapper.get(".sheet-cell-layer").attributes("style")).toContain(
+      "--sheet-gridline-width: 0px",
+    );
+    expect(
+      wrapper.find('[data-sheet-border-segment][data-border-style="thin"]').exists(),
+    ).toBe(true);
+  });
+
   test("renders only the viewport and overscan cells while scrolling", async () => {
     const { wrapper } = mountSheetGrid();
     const scroller = wrapper.get(".sheet-grid__scroller");

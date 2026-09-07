@@ -36,6 +36,9 @@ export type SheetGridFixtureOptions = {
   columnExpansionStep?: number;
   rowExpansionTail?: number;
   columnExpansionTail?: number;
+  showHeaders?: boolean;
+  showGridLines?: boolean;
+  showAxisQuickTools?: boolean;
   beforeMount?: (sheet: ReturnType<typeof getActiveSheet>) => void;
 };
 
@@ -58,6 +61,9 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
       columnExpansionStep: options?.columnExpansionStep ?? 10,
       rowExpansionTail: options?.rowExpansionTail ?? 5,
       columnExpansionTail: options?.columnExpansionTail ?? 2,
+      showHeaders: options?.showHeaders,
+      showGridLines: options?.showGridLines,
+      showAxisQuickTools: options?.showAxisQuickTools,
       onClearCells(range: CellRange) {
         executeWorkbookCommand(session, createClearCellRangeCommand(sheet.id, range));
       },
