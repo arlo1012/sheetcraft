@@ -45,7 +45,7 @@ function onLocaleChange(value: SelectValue): void {
   color: var(--idea-text-muted);
 
   &__select {
-    width: 82px;
+    width: 112px;
   }
 }
 </style>
