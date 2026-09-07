@@ -361,7 +361,7 @@ function getPanelAttach(): HTMLElement {
   &__actions {
     display: flex;
     gap: 6px;
-    margin-top: 8px;
+    padding: 0 var(--idea-space-5) var(--idea-space-5);
   }
   &__actions button {
     width: auto;
@@ -370,6 +370,7 @@ function getPanelAttach(): HTMLElement {
   &.is-more {
     width: max-content;
     max-width: min(360px, calc(100vw - 32px));
+    padding: 0;
 
     .color-palette__apply {
       border-color: var(--idea-action-primary);
