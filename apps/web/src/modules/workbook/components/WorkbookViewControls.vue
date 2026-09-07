@@ -9,6 +9,8 @@ import {
 } from "lucide-vue-next";
 import type { IconNode } from "lucide-vue-next";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
+import { getContrastingForeground, mixHexColors } from "../../../shared/color/contrast";
+import { normalizeColor } from "../../../shared/color/palette";
 import WorkbookZoomMenu from "./WorkbookZoomMenu.vue";
 import { computed, nextTick, ref, useId } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
@@ -24,6 +26,19 @@ const HIGHLIGHT_ICON_NODE: IconNode = [
   ["rect", { x: "9", y: "3", width: "6", height: "18", rx: "1" }],
   ["rect", { x: "3", y: "9", width: "18", height: "6", rx: "1" }],
 ];
+const PALE_HIGHLIGHT_COLORS = [
+  "#f2f2f2",
+  "#d9d9d9",
+  "#d9e2f3",
+  "#dae3f3",
+  "#cceeff",
+  "#d3eee1",
+  "#fbd8d6",
+  "#ffe1cf",
+  "#fff2cc",
+  "#f2d5fb",
+];
+const DEFAULT_PALE_HIGHLIGHT_COLOR = "#d3eee1";
 
 const props = withDefaults(
   defineProps<{
@@ -57,6 +72,15 @@ const colorPickerOpen = ref(false);
 const colorPanelId = `workbook-highlight-color-${useId().replaceAll(":", "")}`;
 const colorTriggerRefValue = computed(() => colorTriggerRef.value);
 const selectedColor = computed(() => normalizeColor(props.highlightColor) ?? "#22a06b");
+const highlightStyles = computed(() => {
+  const background = PALE_HIGHLIGHT_COLORS.includes(selectedColor.value)
+    ? selectedColor.value
+    : mixHexColors(selectedColor.value, "#FFFFFF", 0.2);
+  return {
+    "--highlight-background": background,
+    "--highlight-foreground": getContrastingForeground(background),
+  };
+});
 const zoomProgress = computed(
   () =>
     `${((normalizeSheetZoom(props.zoom) - MIN_SHEET_ZOOM) / (MAX_SHEET_ZOOM - MIN_SHEET_ZOOM)) * 100}%`,
@@ -73,11 +97,6 @@ const { floatingStyles, dismiss } = useDismissibleFloatingPanel(
     },
   },
 );
-
-function normalizeColor(value: string): string | undefined {
-  const normalized = value.trim().toLowerCase();
-  return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : undefined;
-}
 
 function updateZoom(value: number): void {
   emit("update:zoom", normalizeSheetZoom(value));
@@ -115,7 +134,7 @@ function onColorTriggerKeydown(event: KeyboardEvent): void {
 }
 
 function selectHighlightColor(value: string | null): void {
-  const color = value === null ? "#22a06b" : normalizeColor(value);
+  const color = value === null ? DEFAULT_PALE_HIGHLIGHT_COLOR : normalizeColor(value);
   if (color) {
     emit("update:highlightColor", color);
     emit("update:highlightEnabled", true);
@@ -129,7 +148,7 @@ function selectHighlightColor(value: string | null): void {
     <div
       class="workbook-view-controls__highlight"
       :class="{ 'is-active': highlightEnabled }"
-      :style="{ '--highlight-color': selectedColor }"
+      :style="highlightStyles"
     >
       <button
         type="button"
@@ -236,7 +255,8 @@ function selectHighlightColor(value: string | null): void {
       >
         <ColorPalette
           :model-value="selectedColor"
-          default-color="#22a06b"
+          :default-color="DEFAULT_PALE_HIGHLIGHT_COLOR"
+          :allowed-colors="PALE_HIGHLIGHT_COLORS"
           @select="selectHighlightColor"
         />
       </div>
@@ -265,7 +285,8 @@ function selectHighlightColor(value: string | null): void {
     border-radius: 2px;
 
     &.is-active {
-      background: color-mix(in srgb, var(--highlight-color) 20%, transparent);
+      background: var(--highlight-background);
+      color: var(--highlight-foreground);
     }
   }
 

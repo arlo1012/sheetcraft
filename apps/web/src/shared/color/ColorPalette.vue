@@ -19,6 +19,7 @@ const props = withDefaults(
     defaultLabel?: string;
     showDefault?: boolean;
     mixed?: boolean;
+    allowedColors?: readonly string[];
   }>(),
   { defaultColor: "#20242c", showDefault: true, mixed: false },
 );
@@ -36,12 +37,32 @@ const disabledRecentColors = null as unknown as string[];
 const rootRef = ref<HTMLElement | null>(null);
 const moreButtonRef = ref<HTMLButtonElement | null>(null);
 const selectInputProps = createColorPickerSelectInputProps(getPanelAttach);
-const allSwatches = computed(() => [...PRESET_COLORS, ...STANDARD_COLORS, ...recentColors.value]);
+const allowedColorSet = computed(() => {
+  if (props.allowedColors === undefined) return undefined;
+  return new Set(
+    props.allowedColors
+      .map((color) => normalizeColor(color))
+      .filter((color): color is string => Boolean(color)),
+  );
+});
+const allowedColors = computed(() => [...(allowedColorSet.value ?? [])]);
+const isRestricted = computed(() => allowedColorSet.value !== undefined);
+const themeColors = computed(() => (isRestricted.value ? allowedColors.value : PRESET_COLORS));
+const standardColors = computed(() => (isRestricted.value ? [] : STANDARD_COLORS));
+const paletteRecentColors = computed(() => (isRestricted.value ? [] : recentColors.value));
+const allSwatches = computed(() => [
+  ...themeColors.value,
+  ...standardColors.value,
+  ...paletteRecentColors.value,
+]);
 const selectedColor = computed(() => normalizeColor(props.modelValue));
+const normalizedDefaultColor = computed(() => normalizeColor(props.defaultColor));
+const showDefaultAction = computed(
+  () => props.showDefault && canChooseColor(normalizedDefaultColor.value),
+);
 const isDefaultSelected = computed(
   () =>
-    !props.mixed &&
-    (!selectedColor.value || selectedColor.value === normalizeColor(props.defaultColor)),
+    !props.mixed && (!selectedColor.value || selectedColor.value === normalizedDefaultColor.value),
 );
 const defaultLabel = computed(() => props.defaultLabel ?? t("colorPalette.default"));
 
@@ -58,9 +79,26 @@ watch(
   },
 );
 
+watch(
+  () => allSwatches.value.length,
+  (length) => {
+    if (focusedSwatch.value >= length) focusedSwatch.value = 0;
+  },
+);
+
+watch(isRestricted, (restricted) => {
+  if (restricted) showingMore.value = false;
+});
+
+function canChooseColor(color: string | undefined): color is string {
+  return (
+    color !== undefined && (allowedColorSet.value === undefined || allowedColorSet.value.has(color))
+  );
+}
+
 function chooseColor(color: string): void {
   const normalized = normalizeColor(color);
-  if (!normalized) return;
+  if (!canChooseColor(normalized)) return;
   recentColors.value = recordRecentColor(normalized);
   emit("select", normalized);
 }
@@ -70,10 +108,12 @@ function isColorSelected(color: string): boolean {
 }
 
 function selectDefault(): void {
+  if (!canChooseColor(normalizedDefaultColor.value)) return;
   emit("select", null);
 }
 
 function openMore(): void {
+  if (isRestricted.value) return;
   draftColor.value = selectedColor.value ?? normalizeColor(props.defaultColor) ?? "#20242c";
   showingMore.value = true;
   void nextTick(() =>
@@ -141,7 +181,7 @@ function getPanelAttach(): HTMLElement {
   >
     <template v-if="!showingMore">
       <button
-        v-if="showDefault"
+        v-if="showDefaultAction"
         type="button"
         class="color-palette__default"
         data-color-action="default"
@@ -151,11 +191,11 @@ function getPanelAttach(): HTMLElement {
         {{ defaultLabel }}
       </button>
 
-      <div class="color-palette__section">
+      <div v-if="themeColors.length" class="color-palette__section">
         <p class="color-palette__heading">{{ t("colorPalette.theme") }}</p>
         <div class="color-palette__grid" role="radiogroup" :aria-label="t('colorPalette.theme')">
           <button
-            v-for="(color, index) in PRESET_COLORS"
+            v-for="(color, index) in themeColors"
             :key="color + index"
             :ref="setSwatchRef(index)"
             type="button"
@@ -174,7 +214,7 @@ function getPanelAttach(): HTMLElement {
         </div>
       </div>
 
-      <div class="color-palette__section">
+      <div v-if="standardColors.length" class="color-palette__section">
         <p class="color-palette__heading">{{ t("colorPalette.standard") }}</p>
         <div
           class="color-palette__grid color-palette__grid--single"
@@ -182,9 +222,9 @@ function getPanelAttach(): HTMLElement {
           :aria-label="t('colorPalette.standard')"
         >
           <button
-            v-for="(color, index) in STANDARD_COLORS"
+            v-for="(color, index) in standardColors"
             :key="color"
-            :ref="setSwatchRef(PRESET_COLORS.length + index)"
+            :ref="setSwatchRef(themeColors.length + index)"
             type="button"
             class="color-palette__swatch"
             :class="{ 'is-selected': isColorSelected(color) }"
@@ -194,14 +234,14 @@ function getPanelAttach(): HTMLElement {
             :aria-checked="isColorSelected(color)"
             :aria-label="t('colorPalette.colorValue', { value: color.toUpperCase() })"
             :title="t('colorPalette.colorValue', { value: color.toUpperCase() })"
-            :tabindex="focusedSwatch === PRESET_COLORS.length + index ? 0 : -1"
+            :tabindex="focusedSwatch === themeColors.length + index ? 0 : -1"
             @click="chooseColor(color)"
-            @keydown="onSwatchKeydown($event, PRESET_COLORS.length + index, 10)"
+            @keydown="onSwatchKeydown($event, themeColors.length + index, 10)"
           />
         </div>
       </div>
 
-      <div class="color-palette__section">
+      <div v-if="!isRestricted || paletteRecentColors.length" class="color-palette__section">
         <p class="color-palette__heading">{{ t("colorPalette.recent") }}</p>
         <div
           class="color-palette__grid color-palette__grid--single"
@@ -209,9 +249,9 @@ function getPanelAttach(): HTMLElement {
           :aria-label="t('colorPalette.recent')"
         >
           <button
-            v-for="(color, index) in recentColors"
+            v-for="(color, index) in paletteRecentColors"
             :key="color"
-            :ref="setSwatchRef(PRESET_COLORS.length + STANDARD_COLORS.length + index)"
+            :ref="setSwatchRef(themeColors.length + standardColors.length + index)"
             type="button"
             class="color-palette__swatch"
             :class="{ 'is-selected': isColorSelected(color) }"
@@ -222,15 +262,15 @@ function getPanelAttach(): HTMLElement {
             :aria-label="t('colorPalette.colorValue', { value: color.toUpperCase() })"
             :title="t('colorPalette.colorValue', { value: color.toUpperCase() })"
             :tabindex="
-              focusedSwatch === PRESET_COLORS.length + STANDARD_COLORS.length + index ? 0 : -1
+              focusedSwatch === themeColors.length + standardColors.length + index ? 0 : -1
             "
             @click="chooseColor(color)"
             @keydown="
-              onSwatchKeydown($event, PRESET_COLORS.length + STANDARD_COLORS.length + index, 10)
+              onSwatchKeydown($event, themeColors.length + standardColors.length + index, 10)
             "
           />
           <span
-            v-for="index in 10 - recentColors.length"
+            v-for="index in 10 - paletteRecentColors.length"
             :key="`empty-${index}`"
             class="color-palette__swatch color-palette__swatch--empty"
             aria-hidden="true"
@@ -239,6 +279,7 @@ function getPanelAttach(): HTMLElement {
       </div>
 
       <button
+        v-if="!isRestricted"
         ref="moreButtonRef"
         type="button"
         class="color-palette__more"
