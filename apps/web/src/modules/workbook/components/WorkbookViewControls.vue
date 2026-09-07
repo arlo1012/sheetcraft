@@ -265,8 +265,7 @@ function selectHighlightColor(value: string | null): void {
     border-radius: 2px;
 
     &.is-active {
-      background: var(--idea-action-primary-subtle);
-      color: var(--highlight-color);
+      background: color-mix(in srgb, var(--highlight-color) 20%, transparent);
     }
   }
 
