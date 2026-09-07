@@ -13,6 +13,7 @@ import { formatCellContentForInput } from "@idea10/core/input";
 import { getCellAddressLabel } from "@idea10/core/coordinates";
 import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
+import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
 import type { CellEditSession } from "../../../shared/cell-editing/useCellEditSession";
@@ -199,9 +200,7 @@ const COLUMN_HEADER_HEIGHT = 28;
 
 const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
-const scale = computed(() =>
-  Number.isFinite(props.zoom) ? Math.min(200, Math.max(50, props.zoom)) / 100 : 1,
-);
+const scale = computed(() => normalizeSheetZoom(props.zoom) / 100);
 const selectedImageId = ref<string | null>(null);
 const selection = shallowRef<CellSelection>(createCellSelection({ row: 0, column: 0 }));
 const imagePreview = shallowRef<{

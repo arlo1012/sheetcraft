@@ -1,13 +1,24 @@
 <script setup lang="ts">
-import { ChevronDown, Crosshair, Maximize2, Minimize2, Minus, Plus } from "lucide-vue-next";
+import {
+  ChevronDown,
+  Icon as LucideIcon,
+  Maximize2,
+  Minimize2,
+  Minus,
+  Plus,
+} from "lucide-vue-next";
+import type { IconNode } from "lucide-vue-next";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
 import { computed, nextTick, ref, useId } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
+import {
+  MAX_SHEET_ZOOM,
+  MIN_SHEET_ZOOM,
+  normalizeSheetZoom,
+  SHEET_ZOOM_STEP,
+} from "../../../shared/sheet-view/zoom";
 
-const MIN_ZOOM = 50;
-const MAX_ZOOM = 200;
-const ZOOM_STEP = 10;
 const HIGHLIGHT_COLORS = [
   "#22a06b",
   "#3b82f6",
@@ -17,6 +28,10 @@ const HIGHLIGHT_COLORS = [
   "#ec4899",
 ] as const;
 const DISABLED_RECENT_COLORS = null as unknown as string[];
+const HIGHLIGHT_ICON_NODE: IconNode = [
+  ["rect", { x: "9", y: "3", width: "6", height: "18", rx: "1" }],
+  ["rect", { x: "3", y: "9", width: "18", height: "6", rx: "1" }],
+];
 
 const props = withDefaults(
   defineProps<{
@@ -50,7 +65,8 @@ const colorPanelId = `workbook-highlight-color-${useId().replaceAll(":", "")}`;
 const colorTriggerRefValue = computed(() => colorTriggerRef.value);
 const selectedColor = computed(() => normalizeColor(props.highlightColor) ?? "#22a06b");
 const zoomProgress = computed(
-  () => `${((constrainZoom(props.zoom) - MIN_ZOOM) / (MAX_ZOOM - MIN_ZOOM)) * 100}%`,
+  () =>
+    `${((normalizeSheetZoom(props.zoom) - MIN_SHEET_ZOOM) / (MAX_SHEET_ZOOM - MIN_SHEET_ZOOM)) * 100}%`,
 );
 const { floatingStyles, dismiss } = useDismissibleFloatingPanel(
   colorTriggerRefValue,
@@ -70,12 +86,8 @@ function normalizeColor(value: string): string | undefined {
   return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : undefined;
 }
 
-function constrainZoom(value: number): number {
-  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(value / ZOOM_STEP) * ZOOM_STEP));
-}
-
 function updateZoom(value: number): void {
-  emit("update:zoom", constrainZoom(value));
+  emit("update:zoom", normalizeSheetZoom(value));
 }
 
 function onNativeSliderInput(event: Event): void {
@@ -132,7 +144,12 @@ function selectHighlightColor(value: string): void {
         data-view-control="highlight-toggle"
         @click="toggleHighlight"
       >
-        <Crosshair :size="15" aria-hidden="true" />
+        <LucideIcon
+          :iconNode="HIGHLIGHT_ICON_NODE"
+          :size="15"
+          :stroke-width="1.8"
+          aria-hidden="true"
+        />
       </button>
       <button
         ref="colorTriggerRef"
@@ -174,11 +191,11 @@ function selectHighlightColor(value: string): void {
       <button
         type="button"
         class="workbook-view-controls__button"
-        :disabled="zoom <= MIN_ZOOM"
+        :disabled="normalizeSheetZoom(zoom) <= MIN_SHEET_ZOOM"
         :aria-label="t('statusBar.zoomOut')"
         :title="t('statusBar.zoomOut')"
         data-view-control="zoom-out"
-        @click="updateZoom(zoom - ZOOM_STEP)"
+        @click="updateZoom(zoom - SHEET_ZOOM_STEP)"
       >
         <Minus :size="15" aria-hidden="true" />
       </button>
@@ -186,12 +203,12 @@ function selectHighlightColor(value: string): void {
         <input
           class="workbook-view-controls__slider-input"
           type="range"
-          :value="constrainZoom(zoom)"
-          :min="MIN_ZOOM"
-          :max="MAX_ZOOM"
-          :step="ZOOM_STEP"
+          :value="normalizeSheetZoom(zoom)"
+          :min="MIN_SHEET_ZOOM"
+          :max="MAX_SHEET_ZOOM"
+          :step="SHEET_ZOOM_STEP"
           :aria-label="t('statusBar.zoomSlider')"
-          :aria-valuetext="t('statusBar.zoomLevel', { value: constrainZoom(zoom) })"
+          :aria-valuetext="t('statusBar.zoomLevel', { value: normalizeSheetZoom(zoom) })"
           :style="{ '--zoom-progress': zoomProgress }"
           @input="onNativeSliderInput"
         />
@@ -199,21 +216,21 @@ function selectHighlightColor(value: string): void {
       <button
         type="button"
         class="workbook-view-controls__zoom-value"
-        :aria-label="t('statusBar.zoomLevel', { value: constrainZoom(zoom) })"
+        :aria-label="t('statusBar.zoomLevel', { value: normalizeSheetZoom(zoom) })"
         :title="t('statusBar.zoomReset')"
         data-view-control="zoom-reset"
         @click="updateZoom(100)"
       >
-        {{ constrainZoom(zoom) }}%
+        {{ normalizeSheetZoom(zoom) }}%
       </button>
       <button
         type="button"
         class="workbook-view-controls__button"
-        :disabled="zoom >= MAX_ZOOM"
+        :disabled="normalizeSheetZoom(zoom) >= MAX_SHEET_ZOOM"
         :aria-label="t('statusBar.zoomIn')"
         :title="t('statusBar.zoomIn')"
         data-view-control="zoom-in"
-        @click="updateZoom(zoom + ZOOM_STEP)"
+        @click="updateZoom(zoom + SHEET_ZOOM_STEP)"
       >
         <Plus :size="15" aria-hidden="true" />
       </button>
@@ -326,11 +343,6 @@ function selectHighlightColor(value: string): void {
     width: 104px;
     height: 22px;
     margin: 0 3px;
-
-    &:focus-within {
-      outline: 1px solid var(--idea-action-primary);
-      outline-offset: -1px;
-    }
   }
 
   &__slider-input {
@@ -340,6 +352,7 @@ function selectHighlightColor(value: string): void {
     padding: 0;
     margin: 0;
     appearance: none;
+    outline: none;
     background: transparent;
     cursor: pointer;
 

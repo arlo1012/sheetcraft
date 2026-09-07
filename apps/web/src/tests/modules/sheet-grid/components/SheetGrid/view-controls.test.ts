@@ -24,7 +24,7 @@ function dispatchPointer(
 }
 
 describe("SheetGrid view controls", () => {
-  test.each([200, 50])(
+  test.each([400, 200, 50, 10])(
     "maps a drag selection to the same logical range at %i%% zoom",
     async (zoom) => {
       const { session, wrapper } = mountSheetGrid();

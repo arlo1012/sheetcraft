@@ -2,6 +2,7 @@
 import { ref, shallowReactive, useId, watch } from "vue";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { useWorkbookFullscreen } from "../modules/workbook/composables/useWorkbookFullscreen";
+import { normalizeSheetZoom, SHEET_ZOOM_STEP } from "../shared/sheet-view/zoom";
 import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import {
   createIndexedDbImageAssetStore,
@@ -171,6 +172,15 @@ function changeSheetProperties(payload: {
   updateSheetProperties(payload);
 }
 
+function onWorkspaceWheel(event: WheelEvent): void {
+  if (!event.ctrlKey || event.deltaY === 0) return;
+  event.preventDefault();
+  event.stopPropagation();
+  zoom.value = normalizeSheetZoom(
+    zoom.value + (event.deltaY < 0 ? SHEET_ZOOM_STEP : -SHEET_ZOOM_STEP),
+  );
+}
+
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (
     event.key === "F2" &&
@@ -201,6 +211,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     :aria-label="t('workspace.editor')"
     :aria-busy="loading || fileBusy || imageBusy || xlsxBusy"
     @keydown.capture="onWorkspaceKeydown"
+    @wheel.capture="onWorkspaceWheel"
   >
     <input
       :ref="imageActions.fileInput"
