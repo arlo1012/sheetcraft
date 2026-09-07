@@ -249,11 +249,19 @@ export type MessageSchema = {
       sum: string;
     };
     viewAndZoom: string;
+    highlightRowColumn: string;
+    highlightRowColumnDescription: string;
+    highlightColor: string;
+    fullscreen: string;
+    exitFullscreen: string;
+    fullscreenFailed: string;
     normalView: string;
     pageLayoutView: string;
     zoomOut: string;
     zoomIn: string;
     zoomLevel: string;
+    zoomSlider: string;
+    zoomReset: string;
   };
   cell: {
     edit: string;

@@ -93,6 +93,7 @@ import SheetBorderLayer from "./SheetBorderLayer.vue";
 import SheetColumnHeaders from "./SheetColumnHeaders.vue";
 import SheetRowHeaders from "./SheetRowHeaders.vue";
 import SheetSelectionOverlay from "./SheetSelectionOverlay.vue";
+import SheetReadingHighlight from "./SheetReadingHighlight.vue";
 import type { FormulaReferenceOverlayGroup } from "./SheetSelectionOverlay.vue";
 import { getCellEditorFrameStyle, getCellEditorStyle } from "../cell-presentation";
 import { formatCellValueForGrid } from "../cell-value-presentation";
@@ -152,6 +153,9 @@ const props = withDefaults(
     readOnly?: boolean;
     gridId?: string;
     externalHorizontalScrollbar?: boolean;
+    zoom?: number;
+    highlightEnabled?: boolean;
+    highlightColor?: string;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -162,6 +166,9 @@ const props = withDefaults(
     columnExpansionTail: DEFAULT_GRID_EXTENT_POLICY.tail.columnCount,
     readOnly: false,
     externalHorizontalScrollbar: false,
+    zoom: 100,
+    highlightEnabled: false,
+    highlightColor: "#22a06b",
   },
 );
 
@@ -192,6 +199,9 @@ const COLUMN_HEADER_HEIGHT = 28;
 
 const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
+const scale = computed(() =>
+  Number.isFinite(props.zoom) ? Math.min(200, Math.max(50, props.zoom)) / 100 : 1,
+);
 const selectedImageId = ref<string | null>(null);
 const selection = shallowRef<CellSelection>(createCellSelection({ row: 0, column: 0 }));
 const imagePreview = shallowRef<{
@@ -257,6 +267,7 @@ const {
   start: startDimensionResize,
   stop: stopDimensionResize,
 } = useDimensionResize({
+  getScale: () => scale.value,
   onBeforeStart: () => stopDragSelection(),
   onCommit: (payload) => emit("resizeDimension", payload),
 });
@@ -288,6 +299,7 @@ const {
   updateViewportSize,
   viewportSize,
 } = useSheetViewport({
+  getScale: () => scale.value,
   initialExtent: {
     rowCount: props.initialRowCount,
     columnCount: props.initialColumnCount,
@@ -317,6 +329,7 @@ const {
   onViewStateChange: (viewState) => emit("viewStateChange", viewState),
 });
 const { start: startDragSelection, stop: stopDragSelection } = useDragSelection({
+  getScale: () => scale.value,
   getCellAtClientPoint,
   getScroller: () => scrollerRef.value,
   getViewportSize: () => viewportSize,
@@ -340,6 +353,7 @@ const formulaReferenceRange = ref<CellRange>();
 let formulaReferenceDragEditor: FormulaReferenceEditor | undefined;
 const { start: startFormulaReferenceDrag, stop: stopFormulaReferenceDragInternal } =
   useDragSelection({
+    getScale: () => scale.value,
     getCellAtClientPoint,
     getScroller: () => scrollerRef.value,
     getViewportSize: () => viewportSize,
@@ -1160,8 +1174,8 @@ function openActiveCellContextMenu(): void {
   const bounds = scroller.getBoundingClientRect();
   const rect = activeCellRect.value;
   if (!rect) return;
-  const x = bounds.left + rect.x + Math.min(16, rect.width / 2);
-  const y = bounds.top + rect.y + rect.height;
+  const x = bounds.left + (rect.x + Math.min(16, rect.width / 2)) * scale.value;
+  const y = bounds.top + (rect.y + rect.height) * scale.value;
   axisContextMenu.value = undefined;
   cellContextMenu.value = {
     imageAddress:
@@ -1475,6 +1489,21 @@ watch(
   },
 );
 
+watch(
+  scale,
+  () => {
+    stopDragSelection();
+    stopFormulaReferenceDrag();
+    stopDimensionResize();
+    axisContextMenu.value = undefined;
+    cellContextMenu.value = undefined;
+    updateViewportSize();
+    ensureSelectionVisible(activeCell.value);
+    emitViewState();
+  },
+  { flush: "post" },
+);
+
 onMounted(() => {
   const root = rootRef.value;
   const resolvedFontFamily = root ? getComputedStyle(root).fontFamily.trim() : "";
@@ -1538,6 +1567,8 @@ defineExpose({
       'is-resizing-row': dimensionResize?.axis === 'row',
     }"
     :style="{
+      zoom: scale,
+      '--sheet-scale': scale,
       '--sheet-row-header-width': `${ROW_HEADER_WIDTH}px`,
       '--sheet-column-header-height': `${COLUMN_HEADER_HEIGHT}px`,
     }"
@@ -1613,6 +1644,7 @@ defineExpose({
           >
             <template #active-cell="{ cellRect }">
               <CellEditor
+                :scale="scale"
                 ref="editorRef"
                 :model-value="editingValue"
                 :edit-session="editSession"
@@ -1636,6 +1668,13 @@ defineExpose({
               />
             </template>
           </SheetCellLayer>
+          <SheetReadingHighlight
+            v-if="highlightEnabled"
+            :layout="layout"
+            :extent="gridExtent"
+            :active-cell="activeCell"
+            :color="highlightColor"
+          />
           <SheetSelectionOverlay
             :active-rects="activeCellOutlineRects"
             :range-rects="selectedRangeRects"
@@ -1646,6 +1685,7 @@ defineExpose({
             :clipboard-mode="clipboardMode"
           />
           <SheetFloatingImageLayer
+            :scale="scale"
             :images="sheet.floatingImages"
             :layout="layout"
             :asset-urls="imageAssetUrls ?? new Map()"
@@ -1782,8 +1822,8 @@ defineExpose({
     }
 
     &::-webkit-scrollbar {
-      width: 16px;
-      height: 16px;
+      width: calc(16px / var(--sheet-scale, 1));
+      height: calc(16px / var(--sheet-scale, 1));
     }
 
     &::-webkit-scrollbar-track {
@@ -1791,7 +1831,7 @@ defineExpose({
     }
 
     &::-webkit-scrollbar-thumb {
-      border: 4px solid var(--idea-sheet-bar-surface);
+      border: calc(4px / var(--sheet-scale, 1)) solid var(--idea-sheet-bar-surface);
       border-radius: 999px;
       background: var(--idea-sheet-bar-thumb);
 

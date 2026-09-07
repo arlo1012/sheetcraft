@@ -8,12 +8,27 @@ import { useSheetTabsWidth } from "../composables/useSheetTabsWidth";
 import { formatStatusBarNumber } from "../status-bar-number-format";
 import WorkbookStatusBarSettings from "./WorkbookStatusBarSettings.vue";
 import WorkbookSheetTabs from "./WorkbookSheetTabs.vue";
+import WorkbookViewControls from "./WorkbookViewControls.vue";
 
-const props = defineProps<{
-  sheets: readonly Sheet[];
-  activeSheetId: string;
-  selectionSummary: SelectionSummary;
-}>();
+const props = withDefaults(
+  defineProps<{
+    sheets: readonly Sheet[];
+    activeSheetId: string;
+    selectionSummary: SelectionSummary;
+    zoom?: number;
+    highlightEnabled?: boolean;
+    highlightColor?: string;
+    fullscreen?: boolean;
+    fullscreenAvailable?: boolean;
+  }>(),
+  {
+    zoom: 100,
+    highlightEnabled: false,
+    highlightColor: "#22a06b",
+    fullscreen: false,
+    fullscreenAvailable: false,
+  },
+);
 
 const emit = defineEmits<{
   select: [sheetId: string];
@@ -24,6 +39,10 @@ const emit = defineEmits<{
   delete: [sheetId: string];
   updateProperties: [payload: { sheetId: string; patch: Partial<SheetProperties> }];
   restore: [sheetId: string];
+  "update:zoom": [value: number];
+  "update:highlightEnabled": [value: boolean];
+  "update:highlightColor": [value: string];
+  toggleFullscreen: [];
 }>();
 
 const { locale, t } = useAppI18n();
@@ -41,9 +60,6 @@ const {
   onPointerCancel,
   onKeydown,
 } = useSheetTabsWidth(topRowRef);
-const currentScale = computed(() =>
-  new Intl.NumberFormat(locale.value, { style: "percent" }).format(1),
-);
 const shouldShowSummary = computed(
   () =>
     props.selectionSummary.selectedCellCount > 1 &&
@@ -165,13 +181,18 @@ function formatNumber(value: number): string {
             </dd>
           </div>
         </dl>
-        <span
-          class="workbook-status-bar__scale"
-          :aria-label="t('statusBar.zoomLevel', { value: 100 })"
-          :title="t('statusBar.zoomLevel', { value: 100 })"
-        >
-          {{ currentScale }}
-        </span>
+        <WorkbookViewControls
+          class="workbook-status-bar__view-controls"
+          :zoom="zoom"
+          :highlight-enabled="highlightEnabled"
+          :highlight-color="highlightColor"
+          :fullscreen="fullscreen"
+          :fullscreen-available="fullscreenAvailable"
+          @update:zoom="emit('update:zoom', $event)"
+          @update:highlight-enabled="emit('update:highlightEnabled', $event)"
+          @update:highlight-color="emit('update:highlightColor', $event)"
+          @toggle-fullscreen="emit('toggleFullscreen')"
+        />
       </div>
     </div>
   </footer>
@@ -270,7 +291,6 @@ function formatNumber(value: number): string {
     align-items: center;
     gap: 16px;
     min-width: 0;
-    max-width: calc(100% - 52px);
     overflow: hidden;
     margin: 0;
     padding: 0 12px;
@@ -297,29 +317,15 @@ function formatNumber(value: number): string {
     }
   }
 
-  &__scale {
-    display: flex;
+  &__view-controls {
     flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    min-width: 52px;
-    height: 100%;
     margin-left: auto;
-    padding: 0 10px;
     border-left: 1px solid var(--idea-border-subtle);
-    color: var(--idea-text-secondary);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
   }
 
   @media (max-width: 480px) {
     &__summary {
       gap: 10px;
-      padding: 0 8px;
-    }
-
-    &__scale {
-      min-width: 48px;
       padding: 0 8px;
     }
   }

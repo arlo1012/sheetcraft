@@ -24,6 +24,7 @@ type DimensionResizeStart = {
 };
 
 export function useDimensionResize(options: {
+  getScale?: () => number;
   onBeforeStart: () => void;
   onCommit: (payload: { axis: SheetDimensionAxis; index: number; size: number }) => void;
 }) {
@@ -84,7 +85,8 @@ export function useDimensionResize(options: {
     const clientPosition = resize.axis === "row" ? event.clientY : event.clientX;
     resize.previewSize = clampSize(
       resize.axis,
-      resize.startSize + clientPosition - resize.startClientPosition,
+      resize.startSize +
+        (clientPosition - resize.startClientPosition) / (options.getScale?.() ?? 1),
     );
   }
 

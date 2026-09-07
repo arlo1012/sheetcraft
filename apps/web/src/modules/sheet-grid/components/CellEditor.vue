@@ -23,6 +23,7 @@ const props = defineProps<{
   style?: CSSProperties;
   frameStyle?: CSSProperties;
   editSession?: CellEditSession;
+  scale?: number;
 }>();
 
 const emit = defineEmits<{
@@ -150,7 +151,9 @@ function getCaretIndex(clientX: number): number {
   const style = getComputedStyle(input);
   context.font = style.font || `${style.fontSize} ${style.fontFamily}`;
   const contentX =
-    clientX - input.getBoundingClientRect().left - input.clientLeft - parseFloat(style.paddingLeft);
+    (clientX - input.getBoundingClientRect().left) / (props.scale ?? 1) -
+    input.clientLeft -
+    parseFloat(style.paddingLeft);
   let previousWidth = 0;
 
   for (let index = 1; index <= input.value.length; index += 1) {

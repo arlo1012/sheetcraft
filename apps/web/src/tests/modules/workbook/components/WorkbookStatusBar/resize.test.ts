@@ -8,6 +8,7 @@ import { createAppI18n } from "../../../../../shared/i18n";
 class MockResizeObserver {
   static instances: MockResizeObserver[] = [];
   readonly observe = vi.fn();
+  readonly unobserve = vi.fn();
   readonly disconnect = vi.fn();
 
   constructor(readonly callback: ResizeObserverCallback) {
@@ -62,7 +63,13 @@ function separator(wrapper: VueWrapper): HTMLElement {
 }
 
 function notifyContainerWidth(width: number): void {
-  MockResizeObserver.instances.at(-1)?.notify(width);
+  MockResizeObserver.instances
+    .find((observer) =>
+      observer.observe.mock.calls.some(([target]) =>
+        (target as Element).classList.contains("workbook-status-bar__top-row"),
+      ),
+    )
+    ?.notify(width);
 }
 
 afterEach(() => {

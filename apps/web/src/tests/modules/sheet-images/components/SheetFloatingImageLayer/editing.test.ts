@@ -15,6 +15,7 @@ afterEach(() => {
 async function fixture(
   imageFields?: Partial<FloatingImage>,
   freeze?: { rows: number; columns: number },
+  scale?: number,
 ) {
   const image: FloatingImage = {
     id: "image",
@@ -45,6 +46,7 @@ async function fixture(
       layout,
       assetUrls: new Map([["asset", "blob:asset"]]),
       selectedImageId: image.id,
+      scale,
     },
     global: { plugins: [createAppI18n("en-US")] },
   });
@@ -103,6 +105,21 @@ describe("floating image editing", () => {
     expect((wrapper.emitted("update")![0]![0] as FloatingImage).transform).toEqual({
       crop: { x: 0, y: 0.5, width: 1, height: 0.5 },
       rotation: 90,
+    });
+  });
+  test("converts scaled crop pointer movement to the image crop selection", async () => {
+    const { wrapper } = await fixture(undefined, undefined, 2);
+    await toolbarAction("crop");
+    const layer = wrapper.get("[data-floating-image-layer]");
+    await wrapper
+      .get('[data-image-crop-handle="e"]')
+      .trigger("pointerdown", { button: 0, pointerId: 15, clientX: 220, clientY: 100 });
+    await layer.trigger("pointermove", { pointerId: 15, clientX: 100, clientY: 100 });
+    await layer.trigger("pointerup", { pointerId: 15 });
+    await toolbarAction("apply-crop");
+
+    expect((wrapper.emitted("update")![0]![0] as FloatingImage).transform).toEqual({
+      crop: { x: 0, y: 0, width: 0.5, height: 1 },
     });
   });
   test("Escape and selection changes cancel an uncommitted crop", async () => {

@@ -42,6 +42,7 @@ function mountLayer(options?: {
   layout?: ReturnType<typeof createLayout>;
   selectedImageId?: string | null;
   readOnly?: boolean;
+  scale?: number;
 }) {
   const currentImage = options?.image ?? image;
   return mount(SheetFloatingImageLayer, {
@@ -52,6 +53,7 @@ function mountLayer(options?: {
       assetUrls: new Map([["asset-1", "blob:asset-1"]]),
       selectedImageId: options?.selectedImageId ?? "image-1",
       readOnly: options?.readOnly ?? false,
+      scale: options?.scale,
     },
     global: { plugins: [createAppI18n("en-US")] },
   });
@@ -121,6 +123,22 @@ describe("SheetFloatingImageLayer", () => {
     );
     expect(wrapper.emitted("update")).toEqual([
       [{ ...image, anchor: { row: 2, column: 1 }, offsetX: 24, offsetY: 1 }],
+    ]);
+  });
+
+  test("converts scaled pointer movement to the logical image displacement", async () => {
+    const wrapper = mountLayer({ scale: 2 });
+    const fragment = wrapper.get('[data-floating-image-id="image-1"]');
+    await fragment.trigger("pointerdown", { button: 0, pointerId: 13, clientX: 20, clientY: 40 });
+    fragment.element.dispatchEvent(
+      pointerEvent("pointermove", { pointerId: 13, clientX: 60, clientY: 80 }),
+    );
+    fragment.element.dispatchEvent(
+      pointerEvent("pointerup", { pointerId: 13, clientX: 60, clientY: 80 }),
+    );
+
+    expect(wrapper.emitted("update")).toEqual([
+      [{ ...image, anchor: { row: 2, column: 1 }, offsetX: 24, offsetY: 6 }],
     ]);
   });
 

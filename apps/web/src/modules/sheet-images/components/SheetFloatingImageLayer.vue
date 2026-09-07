@@ -48,8 +48,9 @@ const props = withDefaults(
     missingAssetIds?: ReadonlySet<string>;
     selectedImageId?: string | null;
     readOnly?: boolean;
+    scale?: number;
   }>(),
-  { readOnly: false },
+  { readOnly: false, scale: 1 },
 );
 
 const emit = defineEmits<{
@@ -98,7 +99,12 @@ const toolbarAnchor = computed<FloatingReference | null>(() => {
     contextElement: layer,
     getBoundingClientRect: () => {
       const bounds = layer.getBoundingClientRect();
-      return new DOMRect(bounds.x + rect.x, bounds.y + rect.y, rect.width, rect.height);
+      return new DOMRect(
+        bounds.x + rect.x * props.scale,
+        bounds.y + rect.y * props.scale,
+        rect.width * props.scale,
+        rect.height * props.scale,
+      );
     },
   });
 });
@@ -120,6 +126,7 @@ const {
   layer: layerRef,
   getImage: () => selectedImage.value,
   getLayout: () => props.layout,
+  getScale: () => props.scale,
   isDragging: () => Boolean(gesture.value),
   closeContextMenu: () => closeContextMenu(false),
   update: (image) => emit("update", image),
@@ -217,8 +224,8 @@ function onPointerMove(event: PointerEvent): void {
     activeGesture.target !== event.currentTarget
   )
     return;
-  const deltaX = event.clientX - activeGesture.startClientX;
-  const deltaY = event.clientY - activeGesture.startClientY;
+  const deltaX = (event.clientX - activeGesture.startClientX) / props.scale;
+  const deltaY = (event.clientY - activeGesture.startClientY) / props.scale;
   if (activeGesture.mode === "move") {
     previewImage.value =
       moveFloatingImageBy(activeGesture.image, { x: deltaX, y: deltaY }, props.layout) ??

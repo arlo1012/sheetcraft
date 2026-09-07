@@ -18,6 +18,7 @@ export function useFloatingImageEditing(options: {
   layer: Ref<HTMLElement | null>;
   getImage: () => FloatingImage | undefined;
   getLayout: () => SheetViewportLayout;
+  getScale: () => number;
   isDragging: () => boolean;
   closeContextMenu: () => void;
   update: (image: FloatingImage) => void;
@@ -125,8 +126,8 @@ export function useFloatingImageEditing(options: {
         active.selection,
         active.direction,
         {
-          x: (event.clientX - active.x) / current.image.width,
-          y: (event.clientY - active.y) / current.image.height,
+          x: (event.clientX - active.x) / options.getScale() / current.image.width,
+          y: (event.clientY - active.y) / options.getScale() / current.image.height,
         },
         {
           width: Math.min(1, MINIMUM_IMAGE_SIZE / current.image.width),

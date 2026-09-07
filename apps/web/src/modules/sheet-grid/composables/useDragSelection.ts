@@ -13,6 +13,7 @@ type DragSelectionState = {
 };
 
 export function useDragSelection(options: {
+  getScale?: () => number;
   getCellAtClientPoint: (clientX: number, clientY: number) => CellAddress | null;
   getScroller: () => HTMLDivElement | null;
   getViewportSize: () => Size;
@@ -70,20 +71,21 @@ export function useDragSelection(options: {
     }
     const bounds = scroller.getBoundingClientRect();
     const viewportSize = options.getViewportSize();
+    const scale = options.getScale?.() ?? 1;
     const delta = getSelectionAutoScrollDelta(
       { x: dragSelection.pointerX, y: dragSelection.pointerY },
       {
         left: bounds.left,
         top: bounds.top,
-        right: bounds.right || bounds.left + viewportSize.width,
-        bottom: bounds.bottom || bounds.top + viewportSize.height,
+        right: bounds.right || bounds.left + viewportSize.width * scale,
+        bottom: bounds.bottom || bounds.top + viewportSize.height * scale,
       },
     );
     if (delta.x === 0 && delta.y === 0) {
       return;
     }
-    scroller.scrollLeft = Math.max(0, scroller.scrollLeft + delta.x);
-    scroller.scrollTop = Math.max(0, scroller.scrollTop + delta.y);
+    scroller.scrollLeft = Math.max(0, scroller.scrollLeft + delta.x / scale);
+    scroller.scrollTop = Math.max(0, scroller.scrollTop + delta.y / scale);
     options.onScrollPositionChange({ x: scroller.scrollLeft, y: scroller.scrollTop });
     options.onEnsureGridExtentCoversViewport();
     updateSelectionAddress();

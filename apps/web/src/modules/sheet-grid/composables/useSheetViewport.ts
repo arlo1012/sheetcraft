@@ -31,6 +31,7 @@ import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 const DEFAULT_VIEWPORT_SIZE: Size = { width: 960, height: 600 };
 
 export function useSheetViewport(options: {
+  getScale?: () => number;
   initialExtent: GridExtent;
   getGridExtentPolicy: () => GridExtentPolicy;
   getColumnWidths: () => ReadonlyMap<number, number>;
@@ -307,11 +308,16 @@ export function useSheetViewport(options: {
     const scroller = scrollerRef.value;
     if (!scroller) return null;
     const bounds = scroller.getBoundingClientRect();
-    const width = bounds.width || viewportSize.width;
-    const height = bounds.height || viewportSize.height;
+    const scale = options.getScale?.() ?? 1;
     return layout.value.getCellAtViewportPoint({
-      x: Math.min(Math.max(clientX - bounds.left, 0), Math.max(0, width - 1)),
-      y: Math.min(Math.max(clientY - bounds.top, 0), Math.max(0, height - 1)),
+      x: Math.min(
+        Math.max((clientX - bounds.left) / scale, 0),
+        Math.max(0, viewportSize.width - 1),
+      ),
+      y: Math.min(
+        Math.max((clientY - bounds.top) / scale, 0),
+        Math.max(0, viewportSize.height - 1),
+      ),
     });
   }
 
@@ -375,9 +381,17 @@ export function useSheetViewport(options: {
     if (!horizontalDelta && !verticalDelta) return;
     event.preventDefault();
     const horizontalUnit =
-      event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportSize.width : 1;
+      event.deltaMode === 1
+        ? 16
+        : event.deltaMode === 2
+          ? viewportSize.width
+          : 1 / (options.getScale?.() ?? 1);
     const verticalUnit =
-      event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportSize.height : 1;
+      event.deltaMode === 1
+        ? 16
+        : event.deltaMode === 2
+          ? viewportSize.height
+          : 1 / (options.getScale?.() ?? 1);
     const delta = { x: horizontalDelta * horizontalUnit, y: verticalDelta * verticalUnit };
     // Shift is the explicit horizontal extension gesture; plain deltaX remains bounded.
     expandAtWheelEdge(delta, event.shiftKey, !event.shiftKey);

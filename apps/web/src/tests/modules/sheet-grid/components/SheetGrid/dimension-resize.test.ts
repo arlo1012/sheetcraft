@@ -266,7 +266,11 @@ describe("SheetGrid dimension resizing", () => {
       wrapper.get('[data-column="1"].sheet-column-headers__item').attributes("style"),
     ).toContain("left: 40px");
     expect(wrapper.get('[data-row="0"][data-column="1"]').attributes("style")).toContain(
-      "left: 40px",
+      "left: 140px",
     );
+    // Cells retain sheet coordinates; their owning row pane applies the scroll offset.
+    expect(
+      wrapper.get('[data-row="0"][data-column="1"]').element.parentElement?.style.transform,
+    ).toBe("translateX(-100px)");
   });
 });

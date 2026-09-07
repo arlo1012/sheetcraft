@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, shallowReactive, useId, watch } from "vue";
+import { MessagePlugin } from "tdesign-vue-next/es/message";
+import { useWorkbookFullscreen } from "../modules/workbook/composables/useWorkbookFullscreen";
 import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import {
   createIndexedDbImageAssetStore,
@@ -28,6 +30,12 @@ import type { SheetProperties } from "@idea10/core/workbook";
 const props = defineProps<{ workbookStore?: WorkbookStore; imageAssetStore?: ImageAssetStore }>();
 const formulaBarRef = ref<InstanceType<typeof WorkbookFormulaBar> | null>(null);
 const gridId = `workbook-grid-${useId()}`;
+const zoom = ref(100);
+const highlightEnabled = ref(false);
+const highlightColor = ref("#22a06b");
+const { fullscreen, fullscreenAvailable, toggleFullscreen } = useWorkbookFullscreen(() => {
+  void MessagePlugin.warning(t("statusBar.fullscreenFailed"));
+});
 const horizontalScrollState = shallowReactive<SheetHorizontalScrollState>({
   position: 0,
   viewportSize: 0,
@@ -287,6 +295,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     />
     <div class="spreadsheet-workspace__grid" :inert="loading || fileBusy || xlsxBusy">
       <SheetGrid
+        :zoom="zoom"
+        :highlight-enabled="highlightEnabled"
+        :highlight-color="highlightColor"
         :grid-id="gridId"
         external-horizontal-scrollbar
         :read-only="activeSheet.properties.protected"
@@ -322,6 +333,12 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       />
     </div>
     <WorkbookStatusBar
+      v-model:zoom="zoom"
+      v-model:highlight-enabled="highlightEnabled"
+      v-model:highlight-color="highlightColor"
+      :fullscreen="fullscreen"
+      :fullscreen-available="fullscreenAvailable"
+      @toggle-fullscreen="toggleFullscreen"
       :inert="loading || fileBusy || xlsxBusy"
       :sheets="sheets"
       :active-sheet-id="session.workbook.activeSheetId"
