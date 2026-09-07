@@ -157,7 +157,7 @@ function fitSelection(): void {
         <label>
           <span>{{ t("statusBar.customZoom") }}</span>
           <TInputNumber
-            class="workbook-zoom-menu__custom-input"
+            class="workbook-zoom-menu__custom-input idea-input-number--persistent-controls"
             :model-value="customZoom"
             :min="MIN_SHEET_ZOOM"
             :max="MAX_SHEET_ZOOM"
@@ -246,7 +246,8 @@ function fitSelection(): void {
       }
 
       > .workbook-zoom-menu__custom-input {
-        width: 100%;
+        width: 108px;
+        max-width: 100%;
         min-width: 0;
       }
     }

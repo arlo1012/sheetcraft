@@ -215,6 +215,15 @@
   }
 }
 
+// TDesign has no public prop to keep column stepper controls visible.
+.idea-input-number--persistent-controls.t-input-number.t-is-controls-right {
+  .t-input-number__decrease,
+  .t-input-number__increase {
+    visibility: visible;
+    opacity: 1;
+  }
+}
+
 // The ribbon requires a compact select density that TDesign does not expose as
 // a public prop. Scope this internal override to the explicit product variant.
 .idea-ribbon-select {
