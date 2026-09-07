@@ -1824,17 +1824,34 @@ defineExpose({
     position: absolute;
     inset: 0 auto auto 0;
     z-index: 5;
+    display: grid;
+    place-items: center;
     width: var(--sheet-row-header-width);
     height: var(--sheet-column-header-height);
     background: var(--idea-surface-secondary);
+    border: 0;
     border-right: 1px solid var(--idea-border-control);
     border-bottom: 1px solid var(--idea-border-control);
+    color: var(--idea-text-muted);
     padding: 0;
     appearance: none;
     cursor: pointer;
 
+    &::after {
+      width: 8px;
+      height: 8px;
+      background: currentColor;
+      clip-path: polygon(100% 0, 100% 100%, 0 100%);
+      content: "";
+    }
+
+    &:hover {
+      background: var(--idea-surface-hover);
+    }
+
     &.is-active {
       background: var(--idea-action-focus);
+      color: var(--idea-action-primary);
     }
 
     &:focus-visible {
