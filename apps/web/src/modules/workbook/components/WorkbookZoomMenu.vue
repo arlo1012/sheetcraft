@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown, Maximize2 } from "lucide-vue-next";
+import { ChevronDown, ChevronUp, Maximize2 } from "lucide-vue-next";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { computed, nextTick, ref, useId } from "vue";
@@ -81,7 +81,9 @@ function fitSelection(): void {
     @click="toggleMenu"
     @keydown="onTriggerKeydown"
   >
-    <span>{{ zoom }}%</span><ChevronDown :size="12" aria-hidden="true" />
+    <span>{{ zoom }}%</span>
+    <ChevronUp v-if="open" :size="12" aria-hidden="true" />
+    <ChevronDown v-else :size="12" aria-hidden="true" />
   </button>
   <Teleport to="body">
     <MenuSurface
@@ -92,7 +94,6 @@ function fitSelection(): void {
       :style="floatingStyles"
       :label="t('statusBar.zoomMenu')"
     >
-      <li class="workbook-zoom-menu__heading" role="presentation">{{ t("statusBar.zoomMenu") }}</li>
       <MenuItem
         role="menuitemradio"
         :aria-checked="isSelected(200)"
@@ -156,6 +157,7 @@ function fitSelection(): void {
         <label>
           <span>{{ t("statusBar.customZoom") }}</span>
           <TInputNumber
+            class="workbook-zoom-menu__custom-input"
             :model-value="customZoom"
             :min="MIN_SHEET_ZOOM"
             :max="MAX_SHEET_ZOOM"
@@ -208,13 +210,6 @@ function fitSelection(): void {
     }
   }
 
-  &__heading {
-    padding: 2px 14px 4px;
-    color: var(--idea-text-primary);
-    font-size: var(--idea-font-size-body-small);
-    font-weight: 600;
-  }
-
   &__radio {
     display: grid;
     place-items: center;
@@ -244,11 +239,16 @@ function fitSelection(): void {
 
     > label {
       display: grid;
-      justify-items: start;
+      grid-template-columns: minmax(0, 1fr);
       gap: 6px;
 
       > span {
         font-weight: 600;
+      }
+
+      > .workbook-zoom-menu__custom-input {
+        width: 100%;
+        min-width: 0;
       }
     }
   }
