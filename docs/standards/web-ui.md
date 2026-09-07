@@ -1,9 +1,9 @@
 # Web UI Standards
 
-- Content panels (color palettes, custom colors, border configuration) use
+- Content panels (color palettes, custom colors, border configuration, line-style grids) use
   **8px on all four sides**, measured from the inside of the border to content.
   Use `--idea-tool-panel-padding`.
-- List menus (statistics, alignment, line styles, commands, right-click menus)
+- List menus (statistics, alignment, commands, right-click menus)
   use **8px vertically and 0 horizontally**, via `--idea-menu-padding`. Rows own
   text/icon insets; hover and selection backgrounds span the menu width.
 - Select suggestions, tooltips, dialogs, input assists, and compact floating

@@ -37,7 +37,7 @@ const styleRowRef = ref<HTMLButtonElement | null>(null);
 const open = ref(false);
 const activeSubmenu = ref<BorderSubmenu | null>(null);
 const stackedSubmenu = ref(false);
-const lineStyle = ref<CellBorderLineStyle>(DEFAULT_BORDER.style);
+const lineStyle = ref<CellBorderLineStyle | null>(null);
 const color = ref(DEFAULT_BORDER.color);
 const menuId = `cell-border-menu-${useId().replaceAll(":", "")}`;
 const submenuId = `cell-border-submenu-${useId().replaceAll(":", "")}`;
@@ -125,6 +125,8 @@ function openSubmenu(submenu: BorderSubmenu): void {
   void nextTick(() => submenuItems()[0]?.focus());
 }
 function selectPreset(action: CellBorderAction): void {
+  lineStyle.value =
+    action.preset === "none" ? null : (action.border?.style ?? DEFAULT_BORDER.style);
   emit("applyBorders", action);
   closeAll(true);
 }
@@ -140,9 +142,10 @@ function selectPaletteColor(value: string): void {
   closeSubmenu(true);
 }
 
-function selectLineStyle(style: CellBorderLineStyle): void {
+function selectLineStyle(style: CellBorderLineStyle | null): void {
   lineStyle.value = style;
-  emit("updateBorderFormat", { style });
+  if (style === null) emit("applyBorders", { preset: "none" });
+  else emit("updateBorderFormat", { style });
   closeSubmenu(true);
 }
 function openCellFormat(): void {
@@ -265,7 +268,10 @@ onBeforeUnmount(() => {
       data-cell-border-panel
       @keydown="onMenuKeydown"
     >
-      <BorderPresetGrid :border="{ style: lineStyle, color }" @select="selectPreset" />
+      <BorderPresetGrid
+        :border="{ style: lineStyle ?? DEFAULT_BORDER.style, color }"
+        @select="selectPreset"
+      />
       <div class="cell-border-menu__rows">
         <button
           ref="colorRowRef"
@@ -438,9 +444,6 @@ onBeforeUnmount(() => {
   &__submenu {
     width: 178px;
     padding: var(--idea-tool-panel-padding);
-  }
-  &__submenu.is-style {
-    padding: var(--idea-menu-padding);
   }
   &__submenu.is-color {
     width: max-content;

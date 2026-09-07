@@ -42,10 +42,11 @@ describe("border panel contracts", () => {
       props: { modelValue: "thin" },
     });
 
-    expect(wrapper.findAll('[role="menuitemradio"]')).toHaveLength(13);
+    expect(wrapper.findAll('[role="menuitemradio"]')).toHaveLength(14);
     await wrapper.get('[data-border-line-option="mediumDashDotDot"]').trigger("click");
     await wrapper.get('[data-border-line-option="slantDashDot"]').trigger("click");
+    await wrapper.get('[data-border-line-option="none"]').trigger("click");
 
-    expect(wrapper.emitted("select")).toEqual([["mediumDashDotDot"], ["slantDashDot"]]);
+    expect(wrapper.emitted("select")).toEqual([["mediumDashDotDot"], ["slantDashDot"], [null]]);
   });
 });

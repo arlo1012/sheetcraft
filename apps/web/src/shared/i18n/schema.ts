@@ -311,6 +311,7 @@ export type MessageSchema = {
     borderDiagonalUp: string;
     borderDiagonalDown: string;
     borderLineStyle: string;
+    borderLineNone: string;
     borderLineHair: string;
     borderLineThick: string;
     borderLineMediumDashed: string;

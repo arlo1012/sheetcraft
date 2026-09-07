@@ -323,6 +323,7 @@ export const enUS = {
     borderDiagonalUp: "Diagonal up border",
     borderDiagonalDown: "Diagonal down border",
     borderLineStyle: "Border style",
+    borderLineNone: "None",
     borderLineHair: "Hairline",
     borderLineThick: "Thick solid line",
     borderLineMediumDashed: "Medium dashed line",

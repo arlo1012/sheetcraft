@@ -4,11 +4,11 @@ import BorderLinePreview from "../../../shared/borders/BorderLinePreview.vue";
 import { useAppI18n } from "../../../shared/i18n";
 
 defineProps<{
-  modelValue: CellBorderLineStyle;
+  modelValue: CellBorderLineStyle | null;
 }>();
 
 const emit = defineEmits<{
-  select: [style: CellBorderLineStyle];
+  select: [style: CellBorderLineStyle | null];
 }>();
 
 const { t } = useAppI18n();
@@ -19,12 +19,32 @@ const { t } = useAppI18n();
     <button
       type="button"
       role="menuitemradio"
+      data-border-line-option="none"
+      :aria-label="t('format.borderNone')"
+      :aria-checked="modelValue === null"
+      @click="emit('select', null)"
+    >
+      {{ t("format.borderLineNone") }}
+    </button>
+    <button
+      type="button"
+      role="menuitemradio"
       data-border-line-option="hair"
       :aria-label="t('format.borderLineHair')"
       :aria-checked="modelValue === 'hair'"
       @click="emit('select', 'hair')"
     >
       <BorderLinePreview line-style="hair" />
+    </button>
+    <button
+      type="button"
+      role="menuitemradio"
+      data-border-line-option="dotted"
+      :aria-label="t('format.borderLineDotted')"
+      :aria-checked="modelValue === 'dotted'"
+      @click="emit('select', 'dotted')"
+    >
+      <BorderLinePreview line-style="dotted" />
     </button>
     <button
       type="button"
@@ -49,16 +69,6 @@ const { t } = useAppI18n();
     <button
       type="button"
       role="menuitemradio"
-      data-border-line-option="dotted"
-      :aria-label="t('format.borderLineDotted')"
-      :aria-checked="modelValue === 'dotted'"
-      @click="emit('select', 'dotted')"
-    >
-      <BorderLinePreview line-style="dotted" />
-    </button>
-    <button
-      type="button"
-      role="menuitemradio"
       data-border-line-option="dashed"
       :aria-label="t('format.borderLineDashed')"
       :aria-checked="modelValue === 'dashed'"
@@ -75,6 +85,16 @@ const { t } = useAppI18n();
       @click="emit('select', 'thin')"
     >
       <BorderLinePreview line-style="thin" />
+    </button>
+    <button
+      type="button"
+      role="menuitemradio"
+      data-border-line-option="slantDashDot"
+      :aria-label="t('format.borderLineSlantDashDot')"
+      :aria-checked="modelValue === 'slantDashDot'"
+      @click="emit('select', 'slantDashDot')"
+    >
+      <BorderLinePreview line-style="slantDashDot" />
     </button>
     <button
       type="button"
@@ -119,16 +139,6 @@ const { t } = useAppI18n();
     <button
       type="button"
       role="menuitemradio"
-      data-border-line-option="double"
-      :aria-label="t('format.borderLineDouble')"
-      :aria-checked="modelValue === 'double'"
-      @click="emit('select', 'double')"
-    >
-      <BorderLinePreview line-style="double" />
-    </button>
-    <button
-      type="button"
-      role="menuitemradio"
       data-border-line-option="thick"
       :aria-label="t('format.borderLineThick')"
       :aria-checked="modelValue === 'thick'"
@@ -139,12 +149,12 @@ const { t } = useAppI18n();
     <button
       type="button"
       role="menuitemradio"
-      data-border-line-option="slantDashDot"
-      :aria-label="t('format.borderLineSlantDashDot')"
-      :aria-checked="modelValue === 'slantDashDot'"
-      @click="emit('select', 'slantDashDot')"
+      data-border-line-option="double"
+      :aria-label="t('format.borderLineDouble')"
+      :aria-checked="modelValue === 'double'"
+      @click="emit('select', 'double')"
     >
-      <BorderLinePreview line-style="slantDashDot" />
+      <BorderLinePreview line-style="double" />
     </button>
   </div>
 </template>
@@ -153,7 +163,9 @@ const { t } = useAppI18n();
 .border-line-style-panel {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px;
+  grid-template-rows: repeat(7, 29px);
+  grid-auto-flow: column;
+  gap: 4px;
 
   > button {
     display: grid;
@@ -164,8 +176,10 @@ const { t } = useAppI18n();
     background: transparent;
     color: var(--idea-text-primary);
     border: 0;
-    border-radius: 2px;
+    border-radius: 3px;
     cursor: pointer;
+    font: inherit;
+    font-size: 13px;
 
     &:hover,
     &:focus-visible,

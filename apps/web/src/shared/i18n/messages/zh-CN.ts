@@ -314,6 +314,7 @@ export const zhCN = {
     borderDiagonalUp: "左下到右上斜线边框",
     borderDiagonalDown: "左上到右下斜线边框",
     borderLineStyle: "边框样式",
+    borderLineNone: "无",
     borderLineHair: "极细线",
     borderLineThick: "粗实线",
     borderLineMediumDashed: "中虚线",

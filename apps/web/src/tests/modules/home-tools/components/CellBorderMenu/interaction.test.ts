@@ -151,9 +151,10 @@ describe("CellBorderMenu interaction", () => {
     const styleRow = menu.get('[data-border-menu-row="style"]');
     await styleRow.trigger("click");
     const style = getSubmenu("style");
-    expect(style.findAll('[role="menuitemradio"]')).toHaveLength(13);
-    expect(style.get('[data-border-line-option="thin"]').attributes("aria-checked")).toBe("true");
-    expect(style.findAll("button")).toHaveLength(13);
+    expect(style.findAll('[role="menuitemradio"]')).toHaveLength(14);
+    expect(style.get('[data-border-line-option="none"]').attributes("aria-checked")).toBe("true");
+    expect(style.get('[data-border-line-option="none"]').text()).toBe("无");
+    expect(style.findAll("button")).toHaveLength(14);
     await style.get('[data-border-line-option="double"]').trigger("click");
     expect(document.body.querySelector('[data-border-submenu="style"]')).toBeNull();
     expect(document.activeElement).toBe(styleRow.element);
@@ -173,6 +174,36 @@ describe("CellBorderMenu interaction", () => {
     expect(wrapper.emitted("applyBorders")?.[0]).toEqual([
       { preset: "outer", border: { style: "double", color: "#4472c4" } },
     ]);
+  });
+
+  test("clears borders with the none line option and restores a thin border for a preset", async () => {
+    const wrapper = mountMenu();
+    const trigger = wrapper.get("[data-cell-border-trigger]");
+    await trigger.trigger("click");
+    const menu = getMenu();
+    const styleRow = menu.get('[data-border-menu-row="style"]');
+    await styleRow.trigger("click");
+    await getSubmenu("style").get('[data-border-line-option="double"]').trigger("click");
+    await styleRow.trigger("click");
+    await getSubmenu("style").get('[data-border-line-option="none"]').trigger("click");
+
+    expect(wrapper.emitted("applyBorders")).toEqual([[{ preset: "none" }]]);
+    expect(wrapper.emitted("updateBorderFormat")).toEqual([[{ style: "double" }]]);
+    expect(document.activeElement).toBe(styleRow.element);
+    await styleRow.trigger("click");
+    expect(
+      getSubmenu("style").get('[data-border-line-option="none"]').attributes("aria-checked"),
+    ).toBe("true");
+    await getSubmenu("style").trigger("keydown", { key: "Escape" });
+    await menu.get('[data-border-preset="outer"]').trigger("click");
+    expect(wrapper.emitted("applyBorders")?.[1]).toEqual([
+      { preset: "outer", border: { style: "thin", color: "#20242c" } },
+    ]);
+    await trigger.trigger("click");
+    await getMenu().get('[data-border-menu-row="style"]').trigger("click");
+    expect(
+      getSubmenu("style").get('[data-border-line-option="thin"]').attributes("aria-checked"),
+    ).toBe("true");
   });
 
   test("opens the cell format dialog from more settings", async () => {
