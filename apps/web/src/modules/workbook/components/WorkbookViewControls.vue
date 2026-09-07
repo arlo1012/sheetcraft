@@ -126,7 +126,11 @@ function selectHighlightColor(value: string | null): void {
 
 <template>
   <div class="workbook-view-controls" :aria-label="t('statusBar.viewAndZoom')" role="group">
-    <div class="workbook-view-controls__highlight" :class="{ 'is-active': highlightEnabled }">
+    <div
+      class="workbook-view-controls__highlight"
+      :class="{ 'is-active': highlightEnabled }"
+      :style="{ '--highlight-color': selectedColor }"
+    >
       <button
         type="button"
         class="workbook-view-controls__button workbook-view-controls__highlight-toggle"
@@ -262,7 +266,7 @@ function selectHighlightColor(value: string | null): void {
 
     &.is-active {
       background: var(--idea-action-primary-subtle);
-      color: var(--idea-action-primary);
+      color: var(--highlight-color);
     }
   }
 
