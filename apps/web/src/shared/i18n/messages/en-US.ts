@@ -262,7 +262,7 @@ export const enUS = {
     },
     viewAndZoom: "View and zoom",
     highlightRowColumn: "Highlight row and column",
-    highlightRowColumnDescription: "Highlight data in the same row and column as the active cell.",
+    highlightRowColumnDescription: "Highlight the rows and columns of the selected cells.",
     highlightColor: "Highlight color",
     fullscreen: "Enter full screen",
     exitFullscreen: "Exit full screen",

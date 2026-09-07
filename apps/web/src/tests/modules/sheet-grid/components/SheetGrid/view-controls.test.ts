@@ -99,4 +99,58 @@ describe("SheetGrid view controls", () => {
     expect(movedBands.map((band) => band.attributes("style"))).not.toEqual(mergedBandStyles);
     expect(session.history.undoStack).toHaveLength(0);
   });
+
+  test("highlights every row and column in a cell range", async () => {
+    const { wrapper } = mountSheetGrid();
+    await wrapper.setProps({ highlightEnabled: true });
+
+    await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", {
+      button: 0,
+      buttons: 1,
+      clientX: 10,
+      clientY: 10,
+    });
+    dispatchMouse("mousemove", {
+      buttons: 1,
+      clientX: DEFAULT_COLUMN_WIDTH * 2 + 10,
+      clientY: 24 * 2 + 10,
+    });
+    dispatchMouse("mouseup", { button: 0 });
+    await nextTick();
+
+    const bandStyles = wrapper
+      .findAll<HTMLElement>(".sheet-reading-highlight__band")
+      .map((band) => band.attributes("style"));
+    expect(bandStyles).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("width: 960px; height: 72px"),
+        expect.stringContaining("width: 288px; height: 600px"),
+      ]),
+    );
+    expect(bandStyles).toHaveLength(2);
+  });
+
+  test("keeps whole-row and whole-column highlights on their selected axes", async () => {
+    const { wrapper } = mountSheetGrid();
+    await wrapper.setProps({ highlightEnabled: true });
+
+    await wrapper.get('[data-select-row="2"]').trigger("mousedown", { button: 0 });
+    await wrapper.get('[data-select-row="4"]').trigger("mousedown", { button: 0, shiftKey: true });
+    await nextTick();
+    const rowBands = wrapper.findAll<HTMLElement>(".sheet-reading-highlight__band");
+    expect(rowBands).toHaveLength(1);
+    expect(rowBands[0]?.attributes("style")).toContain("height: 72px");
+    expect(rowBands[0]?.attributes("style")).toContain("width: 960px");
+
+    await wrapper.get('[data-select-column="2"]').trigger("mousedown", { button: 0 });
+    await wrapper.get('[data-select-column="4"]').trigger("mousedown", {
+      button: 0,
+      shiftKey: true,
+    });
+    await nextTick();
+    const columnBands = wrapper.findAll<HTMLElement>(".sheet-reading-highlight__band");
+    expect(columnBands).toHaveLength(1);
+    expect(columnBands[0]?.attributes("style")).toContain("height: 600px");
+    expect(columnBands[0]?.attributes("style")).toContain("width: 288px");
+  });
 });

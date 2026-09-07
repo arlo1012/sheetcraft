@@ -253,7 +253,7 @@ export const zhCN = {
     },
     viewAndZoom: "视图和缩放",
     highlightRowColumn: "高亮行列",
-    highlightRowColumnDescription: "高亮与当前单元格处于同一行和列的相关数据。",
+    highlightRowColumnDescription: "高亮所选单元格对应的行和列。",
     highlightColor: "高亮颜色",
     fullscreen: "全屏",
     exitFullscreen: "退出全屏",

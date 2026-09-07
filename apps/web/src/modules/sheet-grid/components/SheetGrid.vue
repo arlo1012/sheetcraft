@@ -1707,7 +1707,8 @@ defineExpose({
             v-if="highlightEnabled"
             :layout="layout"
             :extent="gridExtent"
-            :active-cell="activeCell"
+            :range="selectedRange"
+            :mode="selection.mode"
             :color="highlightColor"
           />
           <SheetSelectionOverlay

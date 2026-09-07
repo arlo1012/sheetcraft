@@ -1,26 +1,34 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { CellAddress } from "@idea10/core/workbook";
+import type { CellRange } from "@idea10/core/workbook";
+import type { SelectionMode } from "@idea10/sheet-engine/selection";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import type { GridExtent } from "@idea10/sheet-engine/extent";
 
 const props = defineProps<{
   layout: SheetViewportLayout;
-  activeCell: CellAddress;
+  range: CellRange;
+  mode: SelectionMode;
   color: string;
   extent: GridExtent;
 }>();
 
+function getFragments(range: CellRange) {
+  return props.layout.getRangeFragments(range);
+}
+
 const fragments = computed(() => {
-  const { layout, activeCell } = props;
-  const activeRange = layout.getMergedRangeAt(activeCell) ?? { start: activeCell, end: activeCell };
-  const rows = layout.getRangeFragments({
-    start: { row: activeRange.start.row, column: 0 },
-    end: { row: activeRange.end.row, column: props.extent.columnCount - 1 },
+  const { range, mode } = props;
+
+  if (mode !== "cells") return getFragments(range);
+
+  const rows = getFragments({
+    start: { row: range.start.row, column: 0 },
+    end: { row: range.end.row, column: props.extent.columnCount - 1 },
   });
-  const columns = layout.getRangeFragments({
-    start: { row: 0, column: activeRange.start.column },
-    end: { row: props.extent.rowCount - 1, column: activeRange.end.column },
+  const columns = getFragments({
+    start: { row: 0, column: range.start.column },
+    end: { row: props.extent.rowCount - 1, column: range.end.column },
   });
   return [...rows, ...columns];
 });
