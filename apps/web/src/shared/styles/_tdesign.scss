@@ -191,6 +191,28 @@
   --td-size-16: var(--idea-space-16);
 }
 
+// Embedded color panels share their owner's floating surface and reserve most
+// of the format row for color values.
+.idea-color-palette-panel {
+  &.t-color-picker__panel {
+    box-shadow: none;
+  }
+
+  .t-color-picker__format--item:first-child {
+    flex: 0 0 68px;
+    width: 68px;
+  }
+
+  .t-color-picker__format-mode-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .t-color-picker__format--item:last-child {
+    min-width: 0;
+  }
+}
+
 // The ribbon requires a compact select density that TDesign does not expose as
 // a public prop. Scope this internal override to the explicit product variant.
 .idea-ribbon-select {

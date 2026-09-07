@@ -250,6 +250,7 @@ function getPanelAttach(): HTMLElement {
 
     <template v-else>
       <ColorPickerPanel
+        class="idea-color-palette-panel"
         :model-value="draftColor"
         :color-modes="['monochrome']"
         format="HEX"
