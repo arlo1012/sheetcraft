@@ -104,6 +104,7 @@ function onHeaderContextMenu(row: number, event: MouseEvent): void {
         :key="item.index"
         class="sheet-row-headers__item"
         :class="{
+          'is-in-selection': item.index >= selectedStartRow && item.index <= selectedEndRow,
           'is-active': selected && item.index >= selectedStartRow && item.index <= selectedEndRow,
         }"
         :style="getHeaderStyle(item, pane.offset)"
@@ -162,6 +163,13 @@ function onHeaderContextMenu(row: number, event: MouseEvent): void {
     border-bottom: 1px solid var(--idea-border-subtle);
     color: var(--idea-text-secondary);
     font-size: 12px;
+
+    &.is-in-selection {
+      background: var(--idea-action-primary-subtle);
+      box-shadow: inset -2px 0 0 var(--idea-action-primary);
+      color: var(--idea-action-primary);
+    }
+
     &.is-active {
       background: var(--idea-action-focus);
       color: var(--idea-action-primary);
@@ -176,9 +184,11 @@ function onHeaderContextMenu(row: number, event: MouseEvent): void {
   }
 
   &__select-button {
+    display: grid;
+    place-items: center;
     width: 100%;
     height: 100%;
-    padding: 0 0 6px;
+    padding: 0;
     background: transparent;
     border: 0;
     color: inherit;
