@@ -395,6 +395,7 @@ export const enUS = {
   colorPalette: {
     label: "Color picker",
     default: "No fill",
+    clear: "Clear",
     theme: "Theme colors",
     standard: "Standard colors",
     recent: "Recent colors",

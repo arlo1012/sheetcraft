@@ -28,18 +28,25 @@ const HIGHLIGHT_ICON_NODE: IconNode = [
   ["rect", { x: "3", y: "9", width: "18", height: "6", rx: "1" }],
 ];
 const PALE_HIGHLIGHT_COLORS = [
-  "#f2f2f2",
-  "#d9d9d9",
-  "#d9e2f3",
-  "#dae3f3",
-  "#cceeff",
-  "#d3eee1",
-  "#fbd8d6",
-  "#ffe1cf",
-  "#fff2cc",
-  "#f2d5fb",
+  "#f3f5f7",
+  "#d6e5ff",
+  "#d6f1ff",
+  "#d3f3e2",
+  "#ffdcdb",
+  "#ffecdb",
+  "#fff5cc",
+  "#fbdbff",
+  "#ffdbea",
+  "#c5cad3",
+  "#adcbff",
+  "#ade4ff",
+  "#ace2c5",
+  "#ffb5b2",
+  "#ffcea3",
+  "#ffea99",
+  "#e7b4ff",
+  "#ffb2dc",
 ];
-const DEFAULT_PALE_HIGHLIGHT_COLOR = "#d3eee1";
 
 const props = withDefaults(
   defineProps<{
@@ -144,10 +151,14 @@ function onColorTriggerKeydown(event: KeyboardEvent): void {
 }
 
 function selectHighlightColor(value: string | null): void {
-  const color = value === null ? DEFAULT_PALE_HIGHLIGHT_COLOR : normalizeColor(value);
-  if (color) {
-    emit("update:highlightColor", color);
-    emit("update:highlightEnabled", true);
+  if (value === null) {
+    emit("update:highlightEnabled", false);
+  } else {
+    const color = normalizeColor(value);
+    if (color) {
+      emit("update:highlightColor", color);
+      emit("update:highlightEnabled", true);
+    }
   }
   dismiss("programmatic", true);
 }
@@ -272,9 +283,12 @@ function selectHighlightColor(value: string | null): void {
         tabindex="-1"
       >
         <ColorPalette
-          :model-value="selectedColor"
-          :default-color="DEFAULT_PALE_HIGHLIGHT_COLOR"
+          :model-value="highlightEnabled ? selectedColor : null"
           :allowed-colors="PALE_HIGHLIGHT_COLORS"
+          :show-default="false"
+          :columns="9"
+          compact
+          clearable
           @select="selectHighlightColor"
         />
       </div>

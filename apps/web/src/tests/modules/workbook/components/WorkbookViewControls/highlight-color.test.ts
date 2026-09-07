@@ -25,28 +25,46 @@ describe("WorkbookViewControls highlight color", () => {
     expect(highlight.element.style.getPropertyValue("--highlight-background")).toBe("#CCCCFF");
     expect(highlight.element.style.getPropertyValue("--highlight-foreground")).toBe("#000000");
 
-    await wrapper.setProps({ highlightColor: "#fbd8d6" });
-    expect(highlight.element.style.getPropertyValue("--highlight-background")).toBe("#fbd8d6");
+    await wrapper.setProps({ highlightColor: "#ffdcdb" });
+    expect(highlight.element.style.getPropertyValue("--highlight-background")).toBe("#ffdcdb");
     expect(highlight.element.style.getPropertyValue("--highlight-foreground")).toBe("#000000");
   });
 
-  test("offers only pale highlight colors and a pale default", async () => {
+  test("offers the two pale shades per hue and enables highlighting on selection", async () => {
     const wrapper = mountControls("#22a06b");
     await wrapper.get('[data-view-control="highlight-color"]').trigger("click");
     const panel = new DOMWrapper(document.body).get(".workbook-view-controls__color-panel");
     const colors = panel
       .findAll("[data-color-swatch]")
       .map((swatch) => swatch.attributes("data-color-swatch")!);
-    expect(colors).toHaveLength(10);
+    expect(colors).toHaveLength(18);
     expect(
       colors.every((color) =>
-        [1, 3, 5].every((start) => Number.parseInt(color.slice(start, start + 2), 16) >= 204),
+        [1, 3, 5].every((start) => Number.parseInt(color.slice(start, start + 2), 16) >= 153),
       ),
     ).toBe(true);
     expect(panel.find('[data-color-action="more"]').exists()).toBe(false);
+    expect(panel.find('[data-color-action="default"]').exists()).toBe(false);
+    expect(panel.find(".color-palette__heading").exists()).toBe(false);
 
-    await panel.get('[data-color-action="default"]').trigger("click");
-    expect(wrapper.emitted("update:highlightColor")).toEqual([["#d3eee1"]]);
+    await panel.get('[data-color-swatch="#ace2c5"]').trigger("click");
+    expect(wrapper.emitted("update:highlightColor")).toEqual([["#ace2c5"]]);
     expect(wrapper.emitted("update:highlightEnabled")).toEqual([[true]]);
+  });
+
+  test("clears highlighting without replacing the remembered color", async () => {
+    const wrapper = mountControls("#ace2c5");
+    const trigger = wrapper.get('[data-view-control="highlight-color"]');
+    await trigger.trigger("click");
+    const panel = new DOMWrapper(document.body).get(".workbook-view-controls__color-panel");
+    await panel.get('[data-color-action="clear"]').trigger("click");
+
+    expect(wrapper.emitted("update:highlightEnabled")).toEqual([[false]]);
+    expect(wrapper.emitted("update:highlightColor")).toBeUndefined();
+    expect(document.body.querySelector(".workbook-view-controls__color-panel")).toBeNull();
+
+    await wrapper.setProps({ highlightEnabled: false });
+    await trigger.trigger("click");
+    expect(document.body.querySelector('[data-color-swatch][aria-checked="true"]')).toBeNull();
   });
 });

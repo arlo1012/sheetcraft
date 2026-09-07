@@ -94,4 +94,34 @@ describe("ColorPalette", () => {
     await wrapper.get('[data-color-swatch="#d3eee1"]').trigger("click");
     expect(wrapper.emitted("select")).toEqual([["#d3eee1"]]);
   });
+
+  test("navigates compact rows using their column count and can clear restricted colors", async () => {
+    const colors = [
+      "#f3f5f7",
+      "#d6e5ff",
+      "#d6f1ff",
+      "#d3f3e2",
+      "#ffdcdb",
+      "#ffecdb",
+      "#fff5cc",
+      "#fbdbff",
+      "#ffdbea",
+      "#c5cad3",
+      "#adcbff",
+    ];
+    const wrapper = mountPalette({
+      allowedColors: colors,
+      showDefault: false,
+      compact: true,
+      columns: 9,
+      clearable: true,
+    });
+    const first = wrapper.get<HTMLButtonElement>('[data-color-swatch="#f3f5f7"]');
+    await first.trigger("keydown", { key: "ArrowDown" });
+    expect(wrapper.get('[data-color-swatch="#c5cad3"]').attributes("tabindex")).toBe("0");
+    await wrapper.get('[data-color-swatch="#c5cad3"]').trigger("keydown", { key: "ArrowUp" });
+    expect(first.attributes("tabindex")).toBe("0");
+    await wrapper.get('[data-color-action="clear"]').trigger("click");
+    expect(wrapper.emitted("select")).toEqual([[null]]);
+  });
 });

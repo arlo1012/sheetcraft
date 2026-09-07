@@ -20,8 +20,18 @@ const props = withDefaults(
     showDefault?: boolean;
     mixed?: boolean;
     allowedColors?: readonly string[];
+    compact?: boolean;
+    columns?: number;
+    clearable?: boolean;
   }>(),
-  { defaultColor: "#20242c", showDefault: true, mixed: false },
+  {
+    defaultColor: "#20242c",
+    showDefault: true,
+    mixed: false,
+    compact: false,
+    columns: 10,
+    clearable: false,
+  },
 );
 
 const emit = defineEmits<{ select: [color: string | null] }>();
@@ -65,6 +75,7 @@ const isDefaultSelected = computed(
     !props.mixed && (!selectedColor.value || selectedColor.value === normalizedDefaultColor.value),
 );
 const defaultLabel = computed(() => props.defaultLabel ?? t("colorPalette.default"));
+const gridColumns = computed(() => Math.max(1, Math.min(10, Math.trunc(props.columns) || 10)));
 
 onMounted(() => {
   recentColors.value = readRecentColors();
@@ -175,7 +186,8 @@ function getPanelAttach(): HTMLElement {
   <section
     ref="rootRef"
     class="color-palette"
-    :class="{ 'is-more': showingMore }"
+    :class="{ 'is-more': showingMore, 'is-compact': compact }"
+    :style="{ '--color-palette-columns': gridColumns }"
     :aria-label="t('colorPalette.label')"
     @keydown="onPanelKeydown"
   >
@@ -192,7 +204,7 @@ function getPanelAttach(): HTMLElement {
       </button>
 
       <div v-if="themeColors.length" class="color-palette__section">
-        <p class="color-palette__heading">{{ t("colorPalette.theme") }}</p>
+        <p v-if="!compact" class="color-palette__heading">{{ t("colorPalette.theme") }}</p>
         <div class="color-palette__grid" role="radiogroup" :aria-label="t('colorPalette.theme')">
           <button
             v-for="(color, index) in themeColors"
@@ -209,13 +221,13 @@ function getPanelAttach(): HTMLElement {
             :title="t('colorPalette.colorValue', { value: color.toUpperCase() })"
             :tabindex="focusedSwatch === index ? 0 : -1"
             @click="chooseColor(color)"
-            @keydown="onSwatchKeydown($event, index, 10)"
+            @keydown="onSwatchKeydown($event, index, gridColumns)"
           />
         </div>
       </div>
 
       <div v-if="standardColors.length" class="color-palette__section">
-        <p class="color-palette__heading">{{ t("colorPalette.standard") }}</p>
+        <p v-if="!compact" class="color-palette__heading">{{ t("colorPalette.standard") }}</p>
         <div
           class="color-palette__grid color-palette__grid--single"
           role="radiogroup"
@@ -236,13 +248,13 @@ function getPanelAttach(): HTMLElement {
             :title="t('colorPalette.colorValue', { value: color.toUpperCase() })"
             :tabindex="focusedSwatch === themeColors.length + index ? 0 : -1"
             @click="chooseColor(color)"
-            @keydown="onSwatchKeydown($event, themeColors.length + index, 10)"
+            @keydown="onSwatchKeydown($event, themeColors.length + index, gridColumns)"
           />
         </div>
       </div>
 
       <div v-if="!isRestricted || paletteRecentColors.length" class="color-palette__section">
-        <p class="color-palette__heading">{{ t("colorPalette.recent") }}</p>
+        <p v-if="!compact" class="color-palette__heading">{{ t("colorPalette.recent") }}</p>
         <div
           class="color-palette__grid color-palette__grid--single"
           role="radiogroup"
@@ -266,7 +278,11 @@ function getPanelAttach(): HTMLElement {
             "
             @click="chooseColor(color)"
             @keydown="
-              onSwatchKeydown($event, themeColors.length + standardColors.length + index, 10)
+              onSwatchKeydown(
+                $event,
+                themeColors.length + standardColors.length + index,
+                gridColumns,
+              )
             "
           />
           <span
@@ -288,6 +304,15 @@ function getPanelAttach(): HTMLElement {
       >
         <span>{{ t("colorPalette.more") }}</span>
         <ChevronRight :size="14" aria-hidden="true" />
+      </button>
+      <button
+        v-if="clearable"
+        type="button"
+        class="color-palette__clear"
+        data-color-action="clear"
+        @click="emit('select', null)"
+      >
+        {{ t("colorPalette.clear") }}
       </button>
     </template>
 
@@ -330,6 +355,7 @@ function getPanelAttach(): HTMLElement {
 
   &__default,
   &__more,
+  &__clear,
   &__actions button {
     width: 100%;
     min-height: 25px;
@@ -361,7 +387,7 @@ function getPanelAttach(): HTMLElement {
   }
   &__grid {
     display: grid;
-    grid-template-columns: repeat(10, 16px);
+    grid-template-columns: repeat(var(--color-palette-columns), 16px);
     gap: 3px;
   }
   &__grid--single {
@@ -400,6 +426,23 @@ function getPanelAttach(): HTMLElement {
     border-width: 0;
     text-align: left;
     color: var(--idea-text-primary);
+  }
+  &__clear {
+    margin-top: 8px;
+  }
+  &.is-compact {
+    width: max-content;
+
+    .color-palette__section:first-of-type {
+      margin-top: 0;
+    }
+    .color-palette__grid {
+      grid-template-columns: repeat(var(--color-palette-columns), 20px);
+    }
+    .color-palette__swatch {
+      width: 20px;
+      height: 20px;
+    }
   }
   &__actions {
     display: flex;

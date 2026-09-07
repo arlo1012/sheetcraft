@@ -383,6 +383,7 @@ export type MessageSchema = {
   colorPalette: {
     label: string;
     default: string;
+    clear: string;
     theme: string;
     standard: string;
     recent: string;
