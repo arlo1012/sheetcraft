@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-vue-next";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useAppI18n } from "../i18n";
+import { createColorPickerSelectInputProps } from "../tdesign/colorPickerPopup";
 import {
   PRESET_COLORS,
   STANDARD_COLORS,
@@ -34,6 +35,7 @@ const swatchButtons = new Map<number, HTMLButtonElement>();
 const disabledRecentColors = null as unknown as string[];
 const rootRef = ref<HTMLElement | null>(null);
 const moreButtonRef = ref<HTMLButtonElement | null>(null);
+const selectInputProps = createColorPickerSelectInputProps(getPanelAttach);
 const allSwatches = computed(() => [...PRESET_COLORS, ...STANDARD_COLORS, ...recentColors.value]);
 const selectedColor = computed(() => normalizeColor(props.modelValue));
 const isDefaultSelected = computed(
@@ -258,7 +260,7 @@ function getPanelAttach(): HTMLElement {
         :recent-colors="disabledRecentColors"
         :swatch-colors="[]"
         :show-primary-color-preview="false"
-        :select-input-props="{ popupProps: { attach: getPanelAttach } }"
+        :select-input-props="selectInputProps"
         @change="updateDraft"
       />
       <div class="color-palette__actions">
