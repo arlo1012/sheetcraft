@@ -2,11 +2,11 @@
 import { useAppI18n } from "../../../shared/i18n";
 import SheetImageContent from "../../sheet-images/components/SheetImageContent.vue";
 import type { CellAddress } from "@idea10/core/workbook";
-import type { Rect } from "@idea10/sheet-engine/geometry";
 import type { VisibleCell } from "./sheet-cell-view";
 
 const props = defineProps<{
   cells: readonly VisibleCell[];
+  activeEditorId: string;
   locale: string;
   imageAssetUrls?: ReadonlyMap<string, string>;
   loadingImageAssetIds?: ReadonlySet<string>;
@@ -16,7 +16,6 @@ const emit = defineEmits<{
   cellDoubleClick: [address: CellAddress, event: MouseEvent];
   cellContextmenu: [address: CellAddress, event: MouseEvent];
 }>();
-defineSlots<{ "active-cell"?: (props: { cellRect: Rect }) => unknown }>();
 const { t } = useAppI18n();
 
 function imageSource(cell: VisibleCell): string | undefined {
@@ -41,7 +40,7 @@ function memoDependencies(cell: VisibleCell): readonly unknown[] {
     imageSource(cell),
     imageLoading(cell),
     props.locale,
-    cell.active ? {} : null,
+    cell.active,
   ];
 }
 </script>
@@ -69,6 +68,7 @@ function memoDependencies(cell: VisibleCell): readonly unknown[] {
       :aria-rowindex="cell.address.row + 1"
       :aria-colindex="cell.address.column + 1"
       :aria-selected="cell.selected"
+      :aria-owns="cell.active ? activeEditorId : undefined"
       @mousedown.left.prevent="emit('cellMousedown', cell.address, $event)"
       @dblclick.left.prevent="emit('cellDoubleClick', cell.address, $event)"
       @contextmenu="emit('cellContextmenu', cell.address, $event)"
@@ -89,7 +89,6 @@ function memoDependencies(cell: VisibleCell): readonly unknown[] {
         >{{ imageLoading(cell) ? t("image.loading") : t("image.assetUnavailable") }}</span
       >
       <span v-else-if="cell.text" class="sheet-cell-layer__value">{{ cell.text }}</span>
-      <slot v-if="cell.active" name="active-cell" :cell-rect="cell.rect" />
     </div>
   </div>
 </template>

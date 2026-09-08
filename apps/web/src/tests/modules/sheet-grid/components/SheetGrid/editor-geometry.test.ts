@@ -5,42 +5,111 @@ import { mountSheetGrid } from "./fixture";
 
 describe("cell editor geometry", () => {
   test.each([
-    { edge: "column", freeze: { rows: 0, columns: 2 }, row: 3, column: 2 },
-    { edge: "row", freeze: { rows: 2, columns: 0 }, row: 2, column: 3 },
-    { edge: "row and column", freeze: { rows: 2, columns: 2 }, row: 2, column: 2 },
+    {
+      edge: "column",
+      freeze: { rows: 0, columns: 2 },
+      row: 3,
+      column: 2,
+      paneId: "body",
+    },
+    {
+      edge: "row",
+      freeze: { rows: 2, columns: 0 },
+      row: 2,
+      column: 3,
+      paneId: "body",
+    },
+    {
+      edge: "row and column",
+      freeze: { rows: 2, columns: 2 },
+      row: 2,
+      column: 2,
+      paneId: "body",
+    },
+    {
+      edge: "top-left frozen pane",
+      freeze: { rows: 2, columns: 2 },
+      row: 1,
+      column: 1,
+      paneId: "topLeft",
+    },
   ])(
     "keeps the editor border inside its clip at a frozen $edge edge",
-    async ({ freeze, row, column }) => {
+    async ({ freeze, row, column, paneId }) => {
       const { wrapper } = mountSheetGrid({
         beforeMount(sheet) {
           sheet.freezePanes = freeze;
         },
       });
       const cell = wrapper.get<HTMLElement>(`[data-row="${row}"][data-column="${column}"]`);
-      const pane = cell.element.parentElement as HTMLElement;
-      const initialClip = pane.style.clipPath;
 
       await cell.trigger("dblclick", { button: 0 });
       await nextTick();
+      const editorPane = wrapper.get<HTMLElement>(`[data-editor-pane="${paneId}"]`).element;
+      const anchor = wrapper.get<HTMLElement>("[data-cell-editor-anchor]").element;
       const frame = wrapper.get<HTMLElement>("[data-cell-editor-frame]").element;
-      const insets = pane.style.clipPath
+      const outline = wrapper.get<HTMLElement>("[data-active-cell]").element;
+      const insets = editorPane.style.clipPath
         .replace(/^inset\(|\)$/gu, "")
         .split(/\s+/u)
         .map(Number.parseFloat);
       const clipTop = insets[0] ?? 0;
       const clipLeft = insets[3] ?? insets[1] ?? 0;
-      const frameTop =
-        Number.parseFloat(cell.element.style.top) + Number.parseFloat(frame.style.top);
-      const frameLeft =
-        Number.parseFloat(cell.element.style.left) + Number.parseFloat(frame.style.left);
+      const frameTop = Number.parseFloat(anchor.style.top) + Number.parseFloat(frame.style.top);
+      const frameLeft = Number.parseFloat(anchor.style.left) + Number.parseFloat(frame.style.left);
 
+      expect(anchor.parentElement).toBe(editorPane);
+      expect(frame.parentElement).toBe(anchor);
       expect(frameTop).toBeGreaterThanOrEqual(clipTop);
       expect(frameLeft).toBeGreaterThanOrEqual(clipLeft);
+      expect(Number.parseFloat(editorPane.style.left) + frameLeft).toBe(
+        Number.parseFloat(outline.style.left),
+      );
+      expect(Number.parseFloat(editorPane.style.top) + frameTop).toBe(
+        Number.parseFloat(outline.style.top),
+      );
 
       await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Escape" });
-      expect(pane.style.clipPath).toBe(initialClip);
+      expect(wrapper.find("[data-cell-editor-anchor]").exists()).toBe(true);
     },
   );
+
+  test("keeps a scrolled body editor in its pane-local viewport coordinates", async () => {
+    const { wrapper } = mountSheetGrid({
+      beforeMount(sheet) {
+        sheet.freezePanes = { rows: 2, columns: 2 };
+      },
+    });
+    const scroller = wrapper.get<HTMLDivElement>(".sheet-grid__scroller");
+    scroller.element.scrollTop = 500;
+    scroller.element.scrollLeft = 400;
+    await scroller.trigger("scroll");
+    await nextTick();
+
+    const cell = wrapper
+      .findAll<HTMLElement>("[data-row][data-column]")
+      .find(
+        (candidate) =>
+          Number(candidate.attributes("data-row")) >= 2 &&
+          Number(candidate.attributes("data-column")) >= 2,
+      );
+    expect(cell).toBeDefined();
+    await cell?.trigger("dblclick", { button: 0 });
+    await nextTick();
+
+    const pane = wrapper.get<HTMLElement>('[data-editor-pane="body"]').element;
+    const anchor = wrapper.get<HTMLElement>("[data-cell-editor-anchor]").element;
+    const frame = wrapper.get<HTMLElement>("[data-cell-editor-frame]").element;
+    const outline = wrapper.get<HTMLElement>("[data-active-cell]").element;
+
+    expect(Number.parseFloat(pane.style.left) + Number.parseFloat(anchor.style.left)).toBe(
+      Number.parseFloat(outline.style.left) + 1,
+    );
+    expect(Number.parseFloat(pane.style.top) + Number.parseFloat(anchor.style.top)).toBe(
+      Number.parseFloat(outline.style.top) + 1,
+    );
+    expect(frame.closest('[role="row"]')).toBeNull();
+  });
 
   test("keeps a fitting editor aligned with the selected cell without extra trailing width", async () => {
     const { wrapper } = mountSheetGrid();

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, useId, type CSSProperties } from "vue";
 import {
   getCellStyle,
   getCellContent,
@@ -56,6 +56,7 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{ "active-cell"?: (props: { cellRect: Rect }) => unknown }>();
+const activeEditorId = `sheet-cell-editor-${useId().replaceAll(":", "")}`;
 
 const visibleCells = computed<VisibleCell[]>(() => {
   const cells: VisibleCell[] = [];
@@ -107,6 +108,33 @@ const visibleCells = computed<VisibleCell[]>(() => {
   });
   addCell(layout.getAnchorForAddress(props.activeCell), layout.getPaneForAddress(props.activeCell));
   return cells;
+});
+
+const activeEditor = computed(() => {
+  const anchor = props.layout.getAnchorForAddress(props.activeCell);
+  const cell = visibleCells.value.find(
+    ({ address }) => address.row === anchor.row && address.column === anchor.column,
+  );
+  if (!cell) return undefined;
+  const clip = props.layout.panes[cell.paneId].clip;
+  // Keep the editor's outward border visible where its pane begins.
+  const leftInset = props.editing && cell.rect.x === clip.x ? -1 : 0;
+  const topInset = props.editing && cell.rect.y === clip.y ? -1 : 0;
+  return {
+    paneId: cell.paneId,
+    cellRect: cell.rect,
+    paneStyle: {
+      left: `${clip.x}px`,
+      top: `${clip.y}px`,
+      width: `${clip.width}px`,
+      height: `${clip.height}px`,
+      clipPath: `inset(${topInset}px 0px 0px ${leftInset}px)`,
+    },
+    anchorStyle: {
+      left: `${cell.rect.x - clip.x}px`,
+      top: `${cell.rect.y - clip.y}px`,
+    },
+  };
 });
 
 function getImageTransformKey(image: NonNullable<VisibleCell["image"]>): string {
@@ -198,12 +226,7 @@ const visibleRows = computed<VisibleRow[]>(() => {
             });
           if (cells.length === 0) return null;
           const clip = props.layout.panes[paneId].clip;
-          const editorCell = cells.find((cell) => cell.editing);
-          // Preserve the outward editor border when it meets a frozen pane edge.
-          const leftInset = editorCell?.rect.x === clip.x ? -1 : 0;
-          const borderTopInset = editorCell?.rect.y === clip.y ? -1 : 0;
-          // Clip to the pane so the editor can extend beyond its owning row.
-          const topInset = clip.y - row.offset + borderTopInset;
+          const topInset = clip.y - row.offset;
           const bottomInset = row.offset + row.height - clip.y - clip.height;
           const scrollX =
             paneId === "body" || paneId === "top" ? props.layout.bodyScrollPosition.x : 0;
@@ -216,7 +239,7 @@ const visibleRows = computed<VisibleRow[]>(() => {
               width: `${clip.width}px`,
               height: `${row.height}px`,
               transform: `translateX(${-scrollX}px)`,
-              clipPath: `inset(${topInset}px ${-scrollX}px ${bottomInset}px ${scrollX + leftInset}px)`,
+              clipPath: `inset(${topInset}px ${-scrollX}px ${bottomInset}px ${scrollX}px)`,
             },
           };
         })
@@ -298,7 +321,6 @@ const gridLinePanes = computed(() => {
       v-for="row in visibleRows"
       :key="row.key"
       class="sheet-cell-layer__row"
-      :class="{ 'is-editing': editing && row.index === activeCell.row }"
       :style="row.style"
       role="row"
       :aria-rowindex="row.index + 1"
@@ -310,17 +332,14 @@ const gridLinePanes = computed(() => {
         :style="pane.style"
         :data-pane="pane.paneId"
         :cells="pane.cells"
+        :active-editor-id="activeEditorId"
         :locale="locale"
         :image-asset-urls="imageAssetUrls"
         :loading-image-asset-ids="loadingImageAssetIds"
         @cell-mousedown="(address, event) => emit('cellMousedown', address, event)"
         @cell-double-click="(address, event) => emit('cellDoubleClick', address, event)"
         @cell-contextmenu="(address, event) => emit('cellContextmenu', address, event)"
-      >
-        <template #active-cell="slotProps">
-          <slot name="active-cell" v-bind="slotProps" />
-        </template>
-      </SheetCellRowPane>
+      />
     </div>
     <!-- Paint above all cell backgrounds so fractional zoom cannot cover adjacent grid lines. -->
     <svg
@@ -335,6 +354,21 @@ const gridLinePanes = computed(() => {
     >
       <path :d="pane.path" />
     </svg>
+    <div
+      v-if="activeEditor"
+      class="sheet-cell-layer__editor-pane"
+      :style="activeEditor.paneStyle"
+      :data-editor-pane="activeEditor.paneId"
+    >
+      <div
+        :id="activeEditorId"
+        class="sheet-cell-layer__editor-anchor"
+        :style="activeEditor.anchorStyle"
+        data-cell-editor-anchor
+      >
+        <slot name="active-cell" :cell-rect="activeEditor.cellRect" />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -353,10 +387,6 @@ const gridLinePanes = computed(() => {
     left: 0;
     width: 100%;
     pointer-events: none;
-
-    &.is-editing {
-      z-index: 5;
-    }
   }
 
   &__row-pane {
@@ -372,6 +402,16 @@ const gridLinePanes = computed(() => {
     stroke: var(--idea-border-subtle);
     stroke-width: 1px;
     pointer-events: none;
+  }
+
+  &__editor-pane {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  &__editor-anchor {
+    position: absolute;
   }
 
   &__merge-fragment {

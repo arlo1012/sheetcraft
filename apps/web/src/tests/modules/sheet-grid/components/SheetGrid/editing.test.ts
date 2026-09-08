@@ -173,8 +173,11 @@ describe("cell editor", () => {
     expect(Number.parseFloat(frame.element.style.width)).toBeGreaterThan(initialWidth);
     expect(Number.parseFloat(frame.element.style.height)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
     expect(Number.parseFloat(firstRow.style.height)).toBe(DEFAULT_ROW_HEIGHT);
-    expect(frame.element.parentElement).toBe(
-      wrapper.get('[role="gridcell"][aria-selected="true"]').element,
-    );
+    const anchor = wrapper.get<HTMLElement>("[data-cell-editor-anchor]");
+    const activeCell = wrapper.get<HTMLElement>('[role="gridcell"][aria-selected="true"]');
+    expect(frame.element.parentElement).toBe(anchor.element);
+    expect(frame.element.closest('[role="row"]')).toBeNull();
+    expect(activeCell.attributes("aria-owns")).toBe(anchor.attributes("id"));
+    expect(activeCell.element.closest('[role="row"]')?.classList).not.toContain("is-editing");
   });
 });
