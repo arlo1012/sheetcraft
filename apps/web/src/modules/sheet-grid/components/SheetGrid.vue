@@ -93,6 +93,7 @@ import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetAxisOperationPreview from "./SheetAxisOperationPreview.vue";
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
+import SheetFreezeLines from "./SheetFreezeLines.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
 import SheetCellContextMenu from "./SheetCellContextMenu.vue";
 import SheetBorderLayer from "./SheetBorderLayer.vue";
@@ -1818,6 +1819,7 @@ defineExpose({
         openAxisContextMenu('row', $event.row, $event.clientX, $event.clientY, $event.trigger)
       "
     />
+    <SheetFreezeLines :layout="layout" :header-size="headerSize" />
     <SheetFreezeHandles
       v-if="quickToolsAvailable"
       :key="`${sheet.id}:${scale}`"

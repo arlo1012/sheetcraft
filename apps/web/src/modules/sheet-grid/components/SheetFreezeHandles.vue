@@ -172,7 +172,7 @@ watch(
   &::after {
     content: "";
     position: absolute;
-    background: var(--idea-text-muted);
+    background: transparent;
     pointer-events: none;
   }
   &:hover:not(:disabled),
