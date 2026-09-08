@@ -156,7 +156,8 @@ export function useAxisMoveDrag(options: {
   ): void {
     stop();
     options.onBeforeStart();
-    const target = event.currentTarget as HTMLElement | null;
+    // The hover handle can disappear once dragging starts; capture on the stable grid root.
+    const target = options.getRoot() ?? (event.currentTarget as HTMLElement | null);
     if (!target) return;
     drag.value = {
       axis,

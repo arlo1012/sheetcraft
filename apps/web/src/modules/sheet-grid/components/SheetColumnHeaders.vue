@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
+import { GripHorizontal } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import { columnIndexToLabel } from "@idea10/core/coordinates";
 import { MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } from "@idea10/core/workbook";
@@ -20,6 +21,7 @@ const props = defineProps<{
   selected: boolean;
   axisSelected?: boolean;
   quickToolsEnabled?: boolean;
+  quickToolsGutter?: number;
 }>();
 
 const emit = defineEmits<{
@@ -129,10 +131,35 @@ function onHeaderPointerDown(column: number, event: PointerEvent): void {
     emit("axisDragStart", { index: column, event });
   }
 }
+
+function getQuickInsertCount(boundary: number): number {
+  return (props.axisSelected ?? props.selected) &&
+    (boundary === props.selectedStartColumn || boundary === props.selectedEndColumn + 1)
+    ? props.selectedEndColumn - props.selectedStartColumn + 1
+    : 1;
+}
+
+function getInsertLabel(boundary: number): string {
+  return t("grid.insertAtColumn", {
+    column: columnIndexToLabel(boundary),
+    count: getQuickInsertCount(boundary),
+  });
+}
+
+function onGripPointerDown(column: number, event: PointerEvent): void {
+  if (!isSelectedColumn(column)) {
+    emit("select", { column, shiftKey: false });
+  }
+  emit("axisDragStart", { index: column, event });
+}
 </script>
 
 <template>
-  <div class="sheet-column-headers" role="presentation">
+  <div
+    class="sheet-column-headers"
+    :style="{ '--sheet-axis-tools-size': `${quickToolsGutter ?? 0}px` }"
+    role="presentation"
+  >
     <div
       v-for="pane in panes"
       :key="pane.id"
@@ -170,11 +197,23 @@ function onHeaderPointerDown(column: number, event: PointerEvent): void {
           <span aria-hidden="true">{{ columnIndexToLabel(item.index) }}</span>
         </button>
         <button
+          v-if="quickToolsEnabled"
+          type="button"
+          class="sheet-column-headers__drag-grip"
+          :data-axis-drag-column="item.index"
+          :aria-label="t('grid.dragColumn', { column: columnIndexToLabel(item.index) })"
+          :title="t('grid.dragColumn', { column: columnIndexToLabel(item.index) })"
+          @pointerdown.left.prevent.stop="onGripPointerDown(item.index, $event)"
+          @mousedown.left.prevent.stop
+        >
+          <GripHorizontal :size="12" aria-hidden="true" />
+        </button>
+        <button
           v-if="quickToolsEnabled && shouldShowInsertBefore(item.index)"
           type="button"
           class="sheet-column-headers__insert-handle is-before"
-          :aria-label="t('axisMenu.insertBefore')"
-          :title="t('axisMenu.insertBefore')"
+          :aria-label="getInsertLabel(item.index)"
+          :title="getInsertLabel(item.index)"
           :data-quick-insert-column="item.index"
           @pointerdown.stop
           @mouseenter="emit('quickInsertHover', { index: item.index })"
@@ -189,8 +228,8 @@ function onHeaderPointerDown(column: number, event: PointerEvent): void {
           v-if="quickToolsEnabled && shouldShowInsertAfter(item.index)"
           type="button"
           class="sheet-column-headers__insert-handle is-after"
-          :aria-label="t('axisMenu.insertAfter')"
-          :title="t('axisMenu.insertAfter')"
+          :aria-label="getInsertLabel(item.index + 1)"
+          :title="getInsertLabel(item.index + 1)"
           :data-quick-insert-column="item.index + 1"
           @pointerdown.stop
           @mouseenter="emit('quickInsertHover', { index: item.index + 1 })"
@@ -239,7 +278,6 @@ function onHeaderPointerDown(column: number, event: PointerEvent): void {
     align-items: center;
     justify-content: center;
     overflow: visible;
-    border-right: 1px solid var(--idea-border-subtle);
     color: var(--idea-text-secondary);
     font-size: 12px;
 
@@ -249,13 +287,10 @@ function onHeaderPointerDown(column: number, event: PointerEvent): void {
     }
 
     &.is-in-selection {
-      background: var(--idea-action-primary-subtle);
-      box-shadow: inset 0 -2px 0 var(--idea-action-primary);
       color: var(--idea-action-primary);
     }
 
     &.is-active {
-      background: var(--idea-action-focus);
       color: var(--idea-action-primary);
       font-weight: 600;
     }
@@ -268,14 +303,18 @@ function onHeaderPointerDown(column: number, event: PointerEvent): void {
   }
 
   &__select-button {
+    position: absolute;
+    top: var(--sheet-axis-tools-size);
+    left: 0;
     display: grid;
     overflow: hidden;
     place-items: center;
     width: 100%;
-    height: 100%;
+    height: calc(100% - var(--sheet-axis-tools-size));
     padding: 0;
     background: transparent;
     border: 0;
+    border-right: 1px solid var(--idea-border-subtle);
     color: inherit;
     cursor: pointer;
 
@@ -287,12 +326,48 @@ function onHeaderPointerDown(column: number, event: PointerEvent): void {
       outline: 2px solid var(--idea-action-primary);
       outline-offset: -2px;
     }
+
+    .is-in-selection & {
+      background: var(--idea-action-primary-subtle);
+      box-shadow: inset 0 -2px 0 var(--idea-action-primary);
+    }
+
+    .is-active & {
+      background: var(--idea-action-focus);
+    }
+  }
+
+  &__drag-grip {
+    position: absolute;
+    z-index: 2;
+    top: calc(var(--sheet-axis-tools-size) / 2);
+    left: 50%;
+    display: grid;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    place-items: center;
+    opacity: 0;
+    pointer-events: none;
+    background: transparent;
+    border: 0;
+    border-radius: var(--idea-radius-small);
+    cursor: grab;
+    transform: translate(-50%, -50%);
+
+    &:focus-visible {
+      opacity: 1;
+      pointer-events: auto;
+      color: var(--idea-action-primary);
+      outline: 2px solid var(--idea-action-primary);
+      outline-offset: -1px;
+    }
   }
 
   &__insert-handle {
     position: absolute;
     z-index: 2;
-    top: 2px;
+    top: calc(var(--sheet-axis-tools-size) / 2);
     display: grid;
     width: 14px;
     height: 14px;
@@ -307,7 +382,7 @@ function onHeaderPointerDown(column: number, event: PointerEvent): void {
     background: transparent;
     border: 0;
     border-radius: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -50%);
     transition:
       opacity 120ms ease,
       background 120ms ease,
@@ -357,14 +432,16 @@ function onHeaderPointerDown(column: number, event: PointerEvent): void {
   }
 
   &__item.has-quick-tools:hover &__insert-handle,
-  &__item.has-quick-tools:focus-within &__insert-handle {
+  &__item.has-quick-tools:focus-within &__insert-handle,
+  &__item.has-quick-tools:hover &__drag-grip,
+  &__item.has-quick-tools:focus-within &__drag-grip {
     opacity: 1;
     pointer-events: auto;
   }
 
   &__resize-handle {
     position: absolute;
-    inset: 0 0 0 auto;
+    inset: var(--sheet-axis-tools-size) 0 0 auto;
     z-index: 1;
     width: 6px;
     cursor: col-resize;

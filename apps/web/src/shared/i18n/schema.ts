@@ -290,10 +290,12 @@ export type MessageSchema = {
     freezeColumnCount: string;
     unfreezeRows: string;
     unfreezeColumns: string;
-    insertRowCount: string;
-    insertColumnCount: string;
-    moveRowCount: string;
-    moveColumnCount: string;
+    insertAtRow: string;
+    insertAtColumn: string;
+    moveToRow: string;
+    moveToColumn: string;
+    dragRow: string;
+    dragColumn: string;
     axisMoveUnavailable: string;
   };
   format: {

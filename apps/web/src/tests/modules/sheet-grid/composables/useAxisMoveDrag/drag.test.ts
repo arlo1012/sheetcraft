@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
 import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
@@ -107,6 +107,20 @@ describe("useAxisMoveDrag", () => {
     startDrag(drag, "row", 1, 1, createPointerEvent("pointerdown", { clientY: 116 }));
     window.dispatchEvent(createPointerEvent("pointerup", { clientY: 276 }));
 
+    expect(commits).toEqual([{ axis: "row", index: 1, count: 1, toIndex: 4 }]);
+  });
+
+  test("captures on the stable root after the source handle is removed", () => {
+    const root = createRoot();
+    const capture = vi.fn();
+    Object.defineProperty(root, "setPointerCapture", { value: capture });
+    const { drag, commits } = createDrag(root);
+
+    const handle = startDrag(drag, "row", 1, 1, createPointerEvent("pointerdown", { clientY: 68 }));
+    handle.remove();
+    window.dispatchEvent(createPointerEvent("pointerup", { clientY: 148 }));
+
+    expect(capture).toHaveBeenCalledWith(1);
     expect(commits).toEqual([{ axis: "row", index: 1, count: 1, toIndex: 4 }]);
   });
 

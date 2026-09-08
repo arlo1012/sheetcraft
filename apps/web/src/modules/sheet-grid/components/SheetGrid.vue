@@ -10,7 +10,7 @@ import {
   watch,
 } from "vue";
 import { formatCellContentForInput } from "@idea10/core/input";
-import { getCellAddressLabel } from "@idea10/core/coordinates";
+import { columnIndexToLabel, getCellAddressLabel } from "@idea10/core/coordinates";
 import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
@@ -211,10 +211,14 @@ const emit = defineEmits<{
 
 const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 28;
+const AXIS_TOOL_GUTTER = 20;
+const quickToolsGutter = computed(() =>
+  props.showHeaders && props.showAxisQuickTools ? AXIS_TOOL_GUTTER : 0,
+);
 
 const headerSize = computed(() => ({
-  width: props.showHeaders ? ROW_HEADER_WIDTH : 0,
-  height: props.showHeaders ? COLUMN_HEADER_HEIGHT : 0,
+  width: props.showHeaders ? ROW_HEADER_WIDTH + quickToolsGutter.value : 0,
+  height: props.showHeaders ? COLUMN_HEADER_HEIGHT + quickToolsGutter.value : 0,
 }));
 
 const { locale, t } = useAppI18n();
@@ -545,8 +549,10 @@ const axisOperationPreview = computed(() => {
     return {
       axis: drag.axis,
       offset: drag.offset,
-      label: t(drag.axis === "row" ? "grid.moveRowCount" : "grid.moveColumnCount", {
+      label: t(drag.axis === "row" ? "grid.moveToRow" : "grid.moveToColumn", {
         count: drag.count,
+        row: drag.boundary + 1,
+        column: columnIndexToLabel(drag.boundary),
       }),
     };
   }
@@ -557,8 +563,10 @@ const axisOperationPreview = computed(() => {
   return {
     axis: hover.axis,
     offset,
-    label: t(hover.axis === "row" ? "grid.insertRowCount" : "grid.insertColumnCount", {
+    label: t(hover.axis === "row" ? "grid.insertAtRow" : "grid.insertAtColumn", {
       count: getQuickInsertCount(hover.axis, hover.index),
+      row: hover.index + 1,
+      column: columnIndexToLabel(hover.index),
     }),
   };
 });
@@ -1754,6 +1762,7 @@ defineExpose({
       '--sheet-scale': scale,
       '--sheet-row-header-width': `${headerSize.width}px`,
       '--sheet-column-header-height': `${headerSize.height}px`,
+      '--sheet-axis-tools-size': `${quickToolsGutter}px`,
     }"
     :aria-label="t('grid.worksheet', { name: sheet.name })"
     @keydown.capture="onGridKeydown"
@@ -1778,6 +1787,7 @@ defineExpose({
       :selected="getSelectionMode(selection) === 'columns' || getSelectionMode(selection) === 'all'"
       :axis-selected="getSelectionMode(selection) === 'columns'"
       :quick-tools-enabled="headerQuickToolsEnabled"
+      :quick-tools-gutter="quickToolsGutter"
       @quick-insert="onQuickInsert('column', $event)"
       @quick-insert-hover="onQuickInsertHover('column', $event)"
       @axis-drag-start="onAxisDragStart('column', $event)"
@@ -1797,6 +1807,7 @@ defineExpose({
       :selected="getSelectionMode(selection) === 'rows' || getSelectionMode(selection) === 'all'"
       :axis-selected="getSelectionMode(selection) === 'rows'"
       :quick-tools-enabled="headerQuickToolsEnabled"
+      :quick-tools-gutter="quickToolsGutter"
       @quick-insert="onQuickInsert('row', $event)"
       @quick-insert-hover="onQuickInsertHover('row', $event)"
       @axis-drag-start="onAxisDragStart('row', $event)"
@@ -1993,6 +2004,18 @@ defineExpose({
   overflow: hidden;
   background: var(--idea-surface-panel);
 
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 4;
+    width: var(--sheet-row-header-width);
+    height: var(--sheet-column-header-height);
+    background: var(--idea-surface-secondary);
+    pointer-events: none;
+  }
+
   &.is-resizing-column {
     cursor: col-resize;
   }
@@ -2009,12 +2032,12 @@ defineExpose({
 
   &__corner {
     position: absolute;
-    inset: 0 auto auto 0;
+    inset: var(--sheet-axis-tools-size) auto auto var(--sheet-axis-tools-size);
     z-index: 5;
     display: grid;
     place-items: center;
-    width: var(--sheet-row-header-width);
-    height: var(--sheet-column-header-height);
+    width: calc(var(--sheet-row-header-width) - var(--sheet-axis-tools-size));
+    height: calc(var(--sheet-column-header-height) - var(--sheet-axis-tools-size));
     background: var(--idea-surface-secondary);
     border: 0;
     border-right: 1px solid var(--idea-border-control);

@@ -302,10 +302,13 @@ export const enUS = {
     freezeColumnCount: "Freeze {count} column | Freeze {count} columns",
     unfreezeRows: "Unfreeze rows",
     unfreezeColumns: "Unfreeze columns",
-    insertRowCount: "Insert {count} row here | Insert {count} rows here",
-    insertColumnCount: "Insert {count} column here | Insert {count} columns here",
-    moveRowCount: "Move {count} row here | Move {count} rows here",
-    moveColumnCount: "Move {count} column here | Move {count} columns here",
+    insertAtRow: "Insert {count} row before row {row} | Insert {count} rows before row {row}",
+    insertAtColumn:
+      "Insert {count} column before {column} | Insert {count} columns before {column}",
+    moveToRow: "Move {count} row before row {row} | Move {count} rows before row {row}",
+    moveToColumn: "Move {count} column before {column} | Move {count} columns before {column}",
+    dragRow: "Drag row {row}",
+    dragColumn: "Drag column {column}",
     axisMoveUnavailable:
       "Cannot move these rows or columns. Check merged cells, filters, or frozen boundaries.",
   },

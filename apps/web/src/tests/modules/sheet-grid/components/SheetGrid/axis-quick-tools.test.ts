@@ -41,6 +41,16 @@ describe("SheetGrid axis quick tools", () => {
     expect(document.body.querySelector(".sheet-axis-context-menu")).not.toBeNull();
   });
 
+  test("names the hovered column and row insertion boundaries precisely", async () => {
+    const { wrapper } = mountSheetGrid({ showAxisQuickTools: true });
+
+    await wrapper.get('[data-quick-insert-column="10"]').trigger("mouseenter");
+    expect(wrapper.get('[data-axis-operation="insert"]').text()).toContain("K");
+
+    await wrapper.get('[data-quick-insert-row="11"]').trigger("mouseenter");
+    expect(wrapper.get('[data-axis-operation="insert"]').text()).toContain("12");
+  });
+
   test("hides header insertion points when unavailable", async () => {
     const { wrapper } = mountSheetGrid({ showAxisQuickTools: true });
 
@@ -61,24 +71,43 @@ describe("SheetGrid axis quick tools", () => {
     expect(wrapper.find('[data-quick-insert-row="0"]').exists()).toBe(false);
   });
 
-  test("does not collapse an existing multi-row selection when a drag starts", async () => {
+  test("does not collapse an existing multi-row selection when its grip starts a drag", async () => {
     const { wrapper } = mountSheetGrid({ showAxisQuickTools: true });
 
     await wrapper.get('[data-select-row="0"]').trigger("mousedown", { button: 0 });
     await wrapper.get('[data-select-row="1"]').trigger("mousedown", { button: 0, shiftKey: true });
 
-    const selectedHeader = wrapper.get('[data-select-row="0"]');
-    await selectedHeader.trigger("pointerdown", {
+    const selectedGrip = wrapper.get('[data-axis-drag-row="0"]');
+    await selectedGrip.trigger("pointerdown", {
       button: 0,
       pointerId: 1,
       clientX: 8,
       clientY: 8,
     });
-    await selectedHeader.trigger("mousedown", { button: 0 });
 
     expect(wrapper.get('[data-select-row="0"]').attributes("aria-pressed")).toBe("true");
     expect(wrapper.get('[data-select-row="1"]').attributes("aria-pressed")).toBe("true");
-    await selectedHeader.trigger("pointerup", { button: 0, pointerId: 1, clientX: 8, clientY: 8 });
+    await selectedGrip.trigger("pointerup", { button: 0, pointerId: 1, clientX: 8, clientY: 8 });
+  });
+
+  test("selects an unselected axis before starting a drag from its grip", async () => {
+    const { wrapper } = mountSheetGrid({ showAxisQuickTools: true });
+
+    await wrapper.get('[data-axis-drag-row="2"]').trigger("pointerdown", {
+      button: 0,
+      pointerId: 1,
+      clientX: 8,
+      clientY: 68,
+    });
+    expect(wrapper.get('[data-select-row="2"]').attributes("aria-pressed")).toBe("true");
+
+    await wrapper.get('[data-axis-drag-column="3"]').trigger("pointerdown", {
+      button: 0,
+      pointerId: 2,
+      clientX: 160,
+      clientY: 8,
+    });
+    expect(wrapper.get('[data-select-column="3"]').attributes("aria-pressed")).toBe("true");
   });
 
   test("changes an all-cell selection into the clicked row or column selection", async () => {
