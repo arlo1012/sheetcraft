@@ -142,7 +142,11 @@ function confirm(): void {
           >
             {{ t("cellFormat.alignment") }}
           </button></template
-        ><CellFormatAlignmentPanel :state="state" :patch="stylePatch" @update:patch="updateStyle"
+        ><CellFormatAlignmentPanel
+          :state="state"
+          :patch="stylePatch"
+          :sample-value="sampleValue"
+          @update:patch="updateStyle"
       /></TabPanel>
       <TabPanel value="font">
         <template #label

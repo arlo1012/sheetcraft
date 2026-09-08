@@ -384,6 +384,12 @@ export type MessageSchema = {
     currency: string;
     currencyCode: string;
     decimalPlaces: string;
+    generalDescription: string;
+    numericDescription: string;
+    percentDescription: string;
+    currencyDescription: string;
+    mixedNumberDescription: string;
+    alignmentPreviewText: string;
     preview: string;
     horizontal: string;
     vertical: string;

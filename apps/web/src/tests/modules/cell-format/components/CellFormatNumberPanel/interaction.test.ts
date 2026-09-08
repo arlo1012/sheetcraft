@@ -16,10 +16,10 @@ describe("CellFormatNumberPanel", () => {
       props: { state, patch: {}, sampleValue: 12.3 },
     });
     expect(wrapper.emitted("update:patch")).toBeUndefined();
-    wrapper
-      .get("[data-cell-format-number-kind]")
-      .findComponent({ name: "TSelect" })
-      .vm.$emit("change", "percent");
+    expect(wrapper.find('[data-cell-format-number-kind] [aria-pressed="true"]').exists()).toBe(
+      false,
+    );
+    await wrapper.get('[data-cell-format-number-category="percent"]').trigger("click");
     await wrapper.vm.$nextTick();
     expect(wrapper.emitted("update:patch")).toEqual([
       [{ numberFormat: { kind: "percent", fractionDigits: 2 } }],

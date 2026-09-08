@@ -398,6 +398,13 @@ export const enUS = {
     currency: "Currency",
     currencyCode: "Currency",
     decimalPlaces: "Decimal places",
+    generalDescription: "Display the original value without a specific number format.",
+    numericDescription: "Display a number with the decimal places you choose.",
+    percentDescription: "Multiply the value by 100 and add a percent sign.",
+    currencyDescription: "Display an amount with a currency symbol and decimal places.",
+    mixedNumberDescription:
+      "The selected cells use different formats. Choose a category to apply one format.",
+    alignmentPreviewText: "Sample text to preview cell alignment and automatic text wrapping.",
     preview: "Preview",
     horizontal: "Horizontal",
     vertical: "Vertical",

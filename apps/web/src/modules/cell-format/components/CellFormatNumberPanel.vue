@@ -54,9 +54,8 @@ function emitPatch(): void {
         : { numberFormat: { kind: kind.value, fractionDigits: fractionDigits.value } };
   emit("update:patch", next);
 }
-function updateKind(value: SelectValue): void {
-  if (typeof value !== "string") return;
-  kind.value = value as NumberKind;
+function updateKind(value: NumberKind): void {
+  kind.value = value;
   emitPatch();
 }
 function updateDigits(value: InputNumberValue): void {
@@ -69,12 +68,18 @@ function updateCurrency(value: SelectValue): void {
   currency.value = value;
   emitPatch();
 }
-const kindOptions = computed(() => [
-  { label: t("cellFormat.general"), value: "general" },
-  { label: t("cellFormat.numeric"), value: "number" },
-  { label: t("cellFormat.percent"), value: "percent" },
-  { label: t("cellFormat.currency"), value: "currency" },
-]);
+const kindLabels = computed<Record<NumberKind, string>>(() => ({
+  general: t("cellFormat.general"),
+  number: t("cellFormat.numeric"),
+  percent: t("cellFormat.percent"),
+  currency: t("cellFormat.currency"),
+}));
+const kindDescriptions = computed<Record<NumberKind, string>>(() => ({
+  general: t("cellFormat.generalDescription"),
+  number: t("cellFormat.numericDescription"),
+  percent: t("cellFormat.percentDescription"),
+  currency: t("cellFormat.currencyDescription"),
+}));
 const currencyOptions = computed(() =>
   [...new Set(["CNY", "USD", "EUR", "JPY", currency.value])].map((value) => ({
     label:
@@ -100,7 +105,7 @@ const preview = computed(() => {
     kind.value === "general" ||
     (props.sampleValue !== null && typeof props.sampleValue !== "number")
   )
-    return formatComputedValueForDisplay(props.sampleValue);
+    return formatComputedValueForDisplay(props.sampleValue ?? 1234.567);
   const value = typeof props.sampleValue === "number" ? props.sampleValue : 1234.567;
   if (kind.value === "percent")
     return new Intl.NumberFormat(locale.value, {
@@ -133,90 +138,241 @@ watch(
 
 <template>
   <section class="cell-format-number" :aria-label="t('cellFormat.number')">
-    <label class="cell-format-number__field"
-      ><span>{{ t("cellFormat.category") }}</span
-      ><TSelect
-        :model-value="kindValue"
-        :options="kindOptions"
-        :placeholder="
-          state.numberFormat.mixed && !Object.hasOwn(patch, 'numberFormat')
-            ? t('format.mixed')
-            : undefined
-        "
-        class="cell-format-number__control"
+    <div class="cell-format-number__categories">
+      <p class="cell-format-number__caption">{{ t("cellFormat.category") }}</p>
+      <div
+        role="group"
+        :aria-label="t('cellFormat.category')"
+        class="cell-format-number__choices"
         data-cell-format-number-kind
-        @change="updateKind"
-    /></label>
-    <label v-if="kind !== 'general'" class="cell-format-number__field"
-      ><span>{{ t("cellFormat.decimalPlaces") }}</span
-      ><TInputNumber
-        :model-value="fractionDigits"
-        class="cell-format-number__control"
-        :min="0"
-        :max="20"
-        :decimal-places="0"
-        data-cell-format-decimals
-        @change="updateDigits"
-    /></label>
-    <label v-if="kind === 'currency'" class="cell-format-number__field"
-      ><span>{{ t("cellFormat.currencyCode") }}</span
-      ><TSelect
-        :model-value="currency"
-        :options="currencyOptions"
-        class="cell-format-number__control"
-        data-cell-format-currency
-        @change="updateCurrency"
-    /></label>
-    <div class="cell-format-number__preview">
-      <span>{{ t("cellFormat.preview") }}</span
-      ><output data-cell-format-number-preview>{{ preview }}</output>
+      >
+        <button
+          type="button"
+          :aria-pressed="kindValue === 'general'"
+          data-cell-format-number-category="general"
+          @click="updateKind('general')"
+        >
+          {{ t("cellFormat.general") }}
+        </button>
+        <button
+          type="button"
+          :aria-pressed="kindValue === 'number'"
+          data-cell-format-number-category="number"
+          @click="updateKind('number')"
+        >
+          {{ t("cellFormat.numeric") }}
+        </button>
+        <button
+          type="button"
+          :aria-pressed="kindValue === 'percent'"
+          data-cell-format-number-category="percent"
+          @click="updateKind('percent')"
+        >
+          {{ t("cellFormat.percent") }}
+        </button>
+        <button
+          type="button"
+          :aria-pressed="kindValue === 'currency'"
+          data-cell-format-number-category="currency"
+          @click="updateKind('currency')"
+        >
+          {{ t("cellFormat.currency") }}
+        </button>
+      </div>
+    </div>
+    <div class="cell-format-number__details">
+      <div class="cell-format-number__settings">
+        <div class="cell-format-number__intro">
+          <h3>{{ kindValue ? kindLabels[kindValue] : t("format.mixed") }}</h3>
+          <p>
+            {{ kindValue ? kindDescriptions[kindValue] : t("cellFormat.mixedNumberDescription") }}
+          </p>
+        </div>
+        <label v-if="kindValue && kind !== 'general'" class="cell-format-number__field">
+          <span>{{ t("cellFormat.decimalPlaces") }}</span>
+          <TInputNumber
+            :model-value="fractionDigits"
+            class="cell-format-number__control cell-format-number__control--digits"
+            :min="0"
+            :max="20"
+            :decimal-places="0"
+            data-cell-format-decimals
+            @change="updateDigits"
+          />
+        </label>
+        <label v-if="kindValue && kind === 'currency'" class="cell-format-number__field">
+          <span>{{ t("cellFormat.currencyCode") }}</span>
+          <TSelect
+            :model-value="currency"
+            :options="currencyOptions"
+            class="cell-format-number__control"
+            data-cell-format-currency
+            @change="updateCurrency"
+          />
+        </label>
+      </div>
+      <div class="cell-format-number__preview">
+        <span class="cell-format-number__caption">{{ t("cellFormat.preview") }}</span>
+        <div class="cell-format-preview">
+          <output data-cell-format-number-preview>{{
+            kindValue ? preview : t("format.mixed")
+          }}</output>
+        </div>
+      </div>
     </div>
   </section>
 </template>
 
 <style scoped lang="scss">
+@use "../styles/format-panel";
+
 .cell-format-number {
   display: grid;
-  gap: 16px;
-  padding: 8px 4px;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 16px;
+  font-size: 13px;
+
+  &__categories {
+    padding-right: 16px;
+    border-right: 1px solid var(--idea-border-subtle);
+  }
+
+  &__caption {
+    margin: 0;
+    color: var(--idea-text-secondary);
+    font-size: 12px;
+    line-height: 20px;
+  }
+
+  &__categories > &__caption {
+    padding: 0 10px;
+    margin-bottom: 8px;
+  }
+
+  &__choices {
+    display: grid;
+    gap: 4px;
+
+    button {
+      min-height: 36px;
+      padding: 8px 10px;
+      font: inherit;
+      text-align: left;
+      color: var(--idea-text-primary);
+      background: transparent;
+      border: 0;
+      border-radius: var(--idea-radius-default);
+      cursor: pointer;
+
+      &:hover {
+        background: var(--idea-surface-hover);
+      }
+
+      &[aria-pressed="true"] {
+        color: var(--idea-action-primary);
+        background: var(--idea-action-primary-subtle);
+        font-weight: 600;
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--idea-action-primary);
+        outline-offset: 2px;
+      }
+    }
+  }
+
+  &__details {
+    display: grid;
+    gap: 20px;
+    min-width: 0;
+  }
+
+  &__settings {
+    display: grid;
+    align-content: start;
+    gap: 16px;
+    min-height: 160px;
+  }
+
+  &__intro {
+    h3 {
+      margin: 0 0 8px;
+      color: var(--idea-text-primary);
+      font-size: 14px;
+      line-height: 20px;
+      font-weight: 600;
+    }
+
+    p {
+      margin: 0;
+      color: var(--idea-text-secondary);
+      font-size: 12px;
+      line-height: 20px;
+    }
+  }
+
   &__field {
     display: grid;
-    grid-template-columns: 120px minmax(0, 1fr);
+    grid-template-columns: 88px minmax(0, 1fr);
     gap: 12px;
     align-items: center;
     color: var(--idea-text-secondary);
-    font-size: 13px;
   }
+
   &__control {
     box-sizing: border-box;
     min-width: 0;
+    width: 100%;
+
+    &--digits {
+      max-width: 144px;
+    }
   }
+
   &__preview {
     display: grid;
-    grid-template-columns: 120px minmax(0, 1fr);
-    gap: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--idea-border-subtle);
-    color: var(--idea-text-secondary);
-    font-size: 13px;
-  }
-  output {
-    color: var(--idea-text-primary);
+    gap: 8px;
+
+    .cell-format-preview {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      min-height: 88px;
+    }
+
+    output {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-size: 22px;
+      line-height: 1.4;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
   }
 }
 
 @media (max-width: 480px) {
   .cell-format-number {
-    > label,
-    &__field,
-    &__color,
-    &__palette,
-    &__preview {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+
+    &__categories {
+      padding-right: 0;
+      border-right: 0;
+    }
+
+    &__choices {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    &__settings {
+      min-height: 0;
+    }
+
+    &__field {
       grid-template-columns: minmax(0, 1fr);
       gap: 8px;
-    }
-    &__emphasis {
-      padding-left: 0;
     }
   }
 }
