@@ -21,6 +21,7 @@ import {
   createInsertSheetAxisCommand,
   createMergeCellsCommand,
   createMoveSheetCommand,
+  createMoveSheetAxisCommand,
   createRenameSheetCommand,
   createResizeSheetDimensionCommand,
   createSetCellContentCommand,
@@ -91,6 +92,7 @@ import {
 } from "@idea10/core/workbook";
 import { getSelectionMode, getSelectionRange } from "@idea10/sheet-engine/selection";
 import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
+import type { AxisMovePayload } from "../../modules/sheet-grid/composables/useAxisMoveDrag";
 import {
   getCellRangeStyles,
   type CellStyleMatrix,
@@ -606,6 +608,14 @@ export function useSpreadsheetWorkspaceController(
     );
   }
 
+  function setFreezePanes(freezePanes: { rows: number; columns: number }): void {
+    executeFeature(
+      () => createSetSheetFreezePanesCommand(activeSheet.value.id, freezePanes),
+      "view.freeze",
+      "workspace.freezeUnavailable",
+    );
+  }
+
   function mergeSelection(): void {
     if (!mergeState.value.canMerge) {
       showWorkspaceStatus({ key: "workspace.mergeUnavailable" });
@@ -833,6 +843,21 @@ export function useSpreadsheetWorkspaceController(
         payload.count,
       ),
       "structure.delete",
+    );
+  }
+
+  function moveAxis(payload: AxisMovePayload): boolean {
+    return executeFeature(
+      () =>
+        createMoveSheetAxisCommand(
+          activeSheet.value.id,
+          payload.axis,
+          payload.index,
+          payload.count,
+          payload.toIndex,
+        ),
+      "structure.move",
+      "grid.axisMoveUnavailable",
     );
   }
 
@@ -1120,6 +1145,7 @@ export function useSpreadsheetWorkspaceController(
     clearFilter,
     freeze,
     unfreeze,
+    setFreezePanes,
     mergeSelection,
     unmergeSelection,
     applyCellStyle,
@@ -1134,6 +1160,7 @@ export function useSpreadsheetWorkspaceController(
     resizeDimension,
     insertAxis,
     deleteAxis,
+    moveAxis,
     selectSheet,
     updateSheetProperties,
     restoreSheet,

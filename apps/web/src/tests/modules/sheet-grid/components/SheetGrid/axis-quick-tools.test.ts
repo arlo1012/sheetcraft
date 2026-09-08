@@ -2,75 +2,98 @@ import { describe, expect, test } from "vitest";
 import { mountSheetGrid } from "./fixture";
 
 describe("SheetGrid axis quick tools", () => {
-  test("shows row actions for a selected row and inserts on either side", async () => {
+  test("inserts a row from a hovered header boundary without selecting that row", async () => {
     const { wrapper } = mountSheetGrid({ showAxisQuickTools: true });
 
-    await wrapper.get('[data-select-row="2"]').trigger("mousedown", { button: 0 });
+    const header = wrapper.get('[data-select-row="2"]');
+    await header.trigger("mouseenter");
+    const insert = wrapper.get('[data-quick-insert-row="2"].is-before');
+    await insert.trigger("mouseenter");
+    await insert.trigger("click");
 
-    const tools = wrapper.get(".sheet-axis-quick-tools.is-row");
-    expect(tools.findAll("button")).toHaveLength(3);
-    await tools.get('[data-axis-quick-action="insert-before"]').trigger("click");
-    await tools.get('[data-axis-quick-action="insert-after"]').trigger("click");
+    expect(wrapper.emitted("insertAxis")).toEqual([[{ axis: "row", index: 2, count: 1 }]]);
+    expect(header.attributes("aria-pressed")).toBe("false");
+  });
+
+  test("uses the selected axis range for an insertion at either selection boundary", async () => {
+    const { wrapper } = mountSheetGrid({ showAxisQuickTools: true });
+
+    await wrapper.get('[data-select-row="0"]').trigger("mousedown", { button: 0 });
+    await wrapper.get('[data-select-row="1"]').trigger("mousedown", { button: 0, shiftKey: true });
+
+    await wrapper.get('[data-quick-insert-row="0"].is-before').trigger("click");
+    await wrapper.get('[data-quick-insert-row="2"].is-after').trigger("click");
 
     expect(wrapper.emitted("insertAxis")).toEqual([
-      [{ axis: "row", index: 2, count: 1 }],
-      [{ axis: "row", index: 3, count: 1 }],
+      [{ axis: "row", index: 0, count: 2 }],
+      [{ axis: "row", index: 2, count: 2 }],
     ]);
   });
 
-  test("opens the existing axis menu for more actions", async () => {
+  test("keeps more axis actions in the existing context menu", async () => {
     const { wrapper } = mountSheetGrid({ showAxisQuickTools: true });
 
-    await wrapper.get('[data-select-column="1"]').trigger("mousedown", { button: 0 });
-    await wrapper.get('.sheet-axis-quick-tools [data-axis-quick-action="more"]').trigger("click");
+    await wrapper.get('[data-select-column="1"]').trigger("contextmenu", {
+      clientX: 100,
+      clientY: 100,
+    });
 
     expect(document.body.querySelector(".sheet-axis-context-menu")).not.toBeNull();
   });
 
-  test("hides when its selected header is only retained in overscan", async () => {
+  test("hides header insertion points when unavailable", async () => {
     const { wrapper } = mountSheetGrid({ showAxisQuickTools: true });
 
-    await wrapper.get('[data-select-row="0"]').trigger("mousedown", { button: 0 });
-    expect(wrapper.find(".sheet-axis-quick-tools").exists()).toBe(true);
+    expect(wrapper.find('[data-quick-insert-row="0"]').exists()).toBe(true);
 
-    const scroller = wrapper.get(".sheet-grid__scroller");
-    (scroller.element as HTMLDivElement).scrollTop = 24;
-    await scroller.trigger("scroll");
-    expect(wrapper.find('[data-select-row="0"]').exists()).toBe(true);
-    expect(wrapper.find(".sheet-axis-quick-tools").exists()).toBe(false);
+    await wrapper.setProps({ showAxisQuickTools: false });
+    expect(wrapper.find('[data-quick-insert-row="0"]').exists()).toBe(false);
+
+    await wrapper.setProps({ showAxisQuickTools: true, showHeaders: false });
+    expect(wrapper.find('[data-quick-insert-row="0"]').exists()).toBe(false);
+
+    await wrapper.setProps({ showHeaders: true, readOnly: true });
+    expect(wrapper.find('[data-quick-insert-row="0"]').exists()).toBe(false);
+
+    await wrapper.setProps({ readOnly: false });
+    expect(wrapper.find('[data-quick-insert-row="0"]').exists()).toBe(true);
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "x" });
+    expect(wrapper.find('[data-quick-insert-row="0"]').exists()).toBe(false);
   });
 
-  test("uses the full frozen multi-row selection count", async () => {
-    const { sheet, wrapper } = mountSheetGrid({ showAxisQuickTools: true });
-    sheet.freezePanes = { rows: 2, columns: 1 };
-    await wrapper.vm.$nextTick();
+  test("does not collapse an existing multi-row selection when a drag starts", async () => {
+    const { wrapper } = mountSheetGrid({ showAxisQuickTools: true });
 
     await wrapper.get('[data-select-row="0"]').trigger("mousedown", { button: 0 });
     await wrapper.get('[data-select-row="1"]').trigger("mousedown", { button: 0, shiftKey: true });
-    await wrapper
-      .get('.sheet-axis-quick-tools [data-axis-quick-action="insert-after"]')
-      .trigger("click");
 
-    expect(wrapper.emitted("insertAxis")).toEqual([[{ axis: "row", index: 2, count: 2 }]]);
+    const selectedHeader = wrapper.get('[data-select-row="0"]');
+    await selectedHeader.trigger("pointerdown", {
+      button: 0,
+      pointerId: 1,
+      clientX: 8,
+      clientY: 8,
+    });
+    await selectedHeader.trigger("mousedown", { button: 0 });
+
+    expect(wrapper.get('[data-select-row="0"]').attributes("aria-pressed")).toBe("true");
+    expect(wrapper.get('[data-select-row="1"]').attributes("aria-pressed")).toBe("true");
+    await selectedHeader.trigger("pointerup", { button: 0, pointerId: 1, clientX: 8, clientY: 8 });
   });
 
-  test("hides with headers, read-only mode, and cell editing", async () => {
+  test("changes an all-cell selection into the clicked row or column selection", async () => {
     const { wrapper } = mountSheetGrid({ showAxisQuickTools: true });
 
-    await wrapper.get('[data-select-row="0"]').trigger("mousedown", { button: 0 });
-    expect(wrapper.find(".sheet-axis-quick-tools").exists()).toBe(true);
+    await wrapper.get(".sheet-grid__corner").trigger("click");
+    await wrapper.get('[data-select-row="2"]').trigger("mousedown", { button: 0 });
 
-    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "x" });
-    expect(wrapper.find(".sheet-axis-quick-tools").exists()).toBe(false);
-    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Escape" });
-    expect(wrapper.find(".sheet-axis-quick-tools").exists()).toBe(true);
+    expect(wrapper.get('[data-select-row="2"]').attributes("aria-pressed")).toBe("true");
+    expect(wrapper.get('[data-select-column="2"]').attributes("aria-pressed")).toBe("false");
 
-    await wrapper.setProps({ showHeaders: false });
-    expect(wrapper.find(".sheet-axis-quick-tools").exists()).toBe(false);
+    await wrapper.get(".sheet-grid__corner").trigger("click");
+    await wrapper.get('[data-select-column="2"]').trigger("mousedown", { button: 0 });
 
-    await wrapper.setProps({ showHeaders: true });
-    expect(wrapper.find(".sheet-axis-quick-tools").exists()).toBe(true);
-    await wrapper.setProps({ readOnly: true });
-    expect(wrapper.find(".sheet-axis-quick-tools").exists()).toBe(false);
+    expect(wrapper.get('[data-select-column="2"]').attributes("aria-pressed")).toBe("true");
+    expect(wrapper.get('[data-select-row="2"]').attributes("aria-pressed")).toBe("false");
   });
 });

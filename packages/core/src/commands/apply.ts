@@ -26,7 +26,11 @@ import {
   applyRenameSheetCommand,
   applySetSheetPropertiesCommand,
 } from "./sheets.js";
-import { applyRestoreSheetStateCommand, applySheetAxisCommand } from "./structure.js";
+import {
+  applyMoveSheetAxisCommand,
+  applyRestoreSheetStateCommand,
+  applySheetAxisCommand,
+} from "./structure.js";
 import { applySortSheetRangeCommand } from "./sort.js";
 import {
   applyConvertFloatingImageToCellCommand,
@@ -82,6 +86,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "restoreFloatingImageToCell":
     case "insertSheetAxis":
     case "deleteSheetAxis":
+    case "moveSheetAxis":
     case "restoreSheetState":
       throw new WorkbookDomainError(
         {
@@ -153,6 +158,8 @@ export function applyWorkbookCommand(
       case "insertSheetAxis":
       case "deleteSheetAxis":
         return applySheetAxisCommand(workbook, command);
+      case "moveSheetAxis":
+        return applyMoveSheetAxisCommand(workbook, command);
       case "restoreSheetState":
         return applyRestoreSheetStateCommand(workbook, command);
       default: {

@@ -222,6 +222,19 @@ export type DeleteSheetAxisCommand = {
   count: number;
 };
 
+export type MoveSheetAxisCommand = {
+  type: "moveSheetAxis";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  /** First source row or column. */
+  index: number;
+  count: number;
+  /** Final first row or column after the move. */
+  toIndex: number;
+  /** `overwrite` is reserved for a future Shift-drag contract. */
+  mode?: "insert" | "overwrite";
+};
+
 export type RestoreFullSheetStateCommand = {
   type: "restoreSheetState";
   sheetId: string;
@@ -289,6 +302,7 @@ export type WorkbookCommand =
   | MoveSheetCommand
   | InsertSheetAxisCommand
   | DeleteSheetAxisCommand
+  | MoveSheetAxisCommand
   | RestoreSheetStateCommand;
 
 export type WorkbookOperation =
@@ -316,6 +330,7 @@ export type WorkbookOperation =
   | "sheets.move"
   | "structure.insert"
   | "structure.delete"
+  | "structure.move"
   | "history.restore";
 
 export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperation {
@@ -374,5 +389,7 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "structure.insert";
     case "deleteSheetAxis":
       return "structure.delete";
+    case "moveSheetAxis":
+      return "structure.move";
   }
 }

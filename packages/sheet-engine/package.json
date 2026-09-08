@@ -15,6 +15,10 @@
       "types": "./dist/geometry.d.ts",
       "import": "./dist/geometry.js"
     },
+    "./axis-interactions": {
+      "types": "./dist/axis-interactions.d.ts",
+      "import": "./dist/axis-interactions.js"
+    },
     "./floating-image-layout": {
       "types": "./dist/floating-image-layout.d.ts",
       "import": "./dist/floating-image-layout.js"

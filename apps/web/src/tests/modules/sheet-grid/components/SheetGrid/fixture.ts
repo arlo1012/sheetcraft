@@ -12,7 +12,9 @@ import {
   createClearCellRangeCommand,
   createDeleteSheetAxisCommand,
   createInsertSheetAxisCommand,
+  createMoveSheetAxisCommand,
   createResizeSheetDimensionCommand,
+  createSetSheetFreezePanesCommand,
   createSetCellContentCommand,
 } from "@idea10/core/commands";
 import {
@@ -25,6 +27,7 @@ import {
 import { parseCellContent } from "@idea10/core/input";
 import { getActiveSheet, type CellRange, type SheetDimensionAxis } from "@idea10/core/workbook";
 import SheetGrid from "../../../../../modules/sheet-grid/components/SheetGrid.vue";
+import type { AxisMovePayload } from "../../../../../modules/sheet-grid/composables/useAxisMoveDrag";
 import { createAppI18n } from "../../../../../shared/i18n";
 import { createBrowserIdFactory } from "../../../../../shared/runtime/browser-id-factory";
 
@@ -84,6 +87,18 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
           };
         }
       },
+      applyAxisMove(payload: AxisMovePayload): boolean {
+        return executeWorkbookCommand(
+          session,
+          createMoveSheetAxisCommand(
+            sheet.id,
+            payload.axis,
+            payload.index,
+            payload.count,
+            payload.toIndex,
+          ),
+        );
+      },
       onResizeDimension(payload: { axis: SheetDimensionAxis; index: number; size: number }) {
         executeWorkbookCommand(
           session,
@@ -101,6 +116,9 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
           session,
           createDeleteSheetAxisCommand(sheet.id, payload.axis, payload.index, payload.count),
         );
+      },
+      onFreezeChange(freezePanes: { rows: number; columns: number }) {
+        executeWorkbookCommand(session, createSetSheetFreezePanesCommand(sheet.id, freezePanes));
       },
       onUndo() {
         undoWorkbookCommand(session);

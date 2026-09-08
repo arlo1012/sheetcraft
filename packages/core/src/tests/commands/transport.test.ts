@@ -10,6 +10,7 @@ import {
   createDeleteSheetCommand,
   createDuplicateSheetCommand,
   createInsertSheetAxisCommand,
+  createMoveSheetAxisCommand,
   createMoveSheetCommand,
   createMoveCellRangeCommand,
   createRenameSheetCommand,
@@ -374,6 +375,7 @@ describe("workbook command transport", () => {
       createMoveSheetCommand(session.workbook, "sheet-2", 0),
       createInsertSheetAxisCommand(sheet.id, "row", 0),
       createDeleteSheetAxisCommand(sheet.id, "column", 0),
+      createMoveSheetAxisCommand(sheet.id, "row", 0, 1, 1),
       createRestoreSheetStateCommand(sheet.id, createSheetSparseState(sheet)),
     ];
     commands.forEach(expectTransportSafe);

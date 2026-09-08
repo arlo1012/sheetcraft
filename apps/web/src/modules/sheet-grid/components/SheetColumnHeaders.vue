@@ -18,12 +18,17 @@ const props = defineProps<{
   selectedStartColumn: number;
   selectedEndColumn: number;
   selected: boolean;
+  axisSelected?: boolean;
+  quickToolsEnabled?: boolean;
 }>();
 
 const emit = defineEmits<{
   resizeStart: [payload: { index: number; event: PointerEvent }];
   resize: [payload: { index: number; size: number }];
   select: [payload: { column: number; shiftKey: boolean }];
+  quickInsert: [payload: { index: number }];
+  quickInsertHover: [payload: { index: number } | null];
+  axisDragStart: [payload: { index: number; event: PointerEvent }];
   openContextMenu: [
     payload: {
       column: number;
@@ -94,6 +99,36 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
     trigger: event.currentTarget as HTMLButtonElement,
   });
 }
+
+function isSelectedColumn(column: number): boolean {
+  return (
+    (props.axisSelected ?? props.selected) &&
+    column >= props.selectedStartColumn &&
+    column <= props.selectedEndColumn
+  );
+}
+
+function shouldShowInsertBefore(column: number): boolean {
+  return !isSelectedColumn(column) || column === props.selectedStartColumn;
+}
+
+function shouldShowInsertAfter(column: number): boolean {
+  return !isSelectedColumn(column) || column === props.selectedEndColumn;
+}
+
+function onHeaderMouseDown(column: number, event: MouseEvent): void {
+  // Preserve an existing column selection for a potential drag operation.
+  if (props.quickToolsEnabled && isSelectedColumn(column) && !event.shiftKey) {
+    return;
+  }
+  emit("select", { column, shiftKey: event.shiftKey });
+}
+
+function onHeaderPointerDown(column: number, event: PointerEvent): void {
+  if (props.quickToolsEnabled && isSelectedColumn(column) && !event.shiftKey) {
+    emit("axisDragStart", { index: column, event });
+  }
+}
 </script>
 
 <template>
@@ -113,6 +148,8 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
           'is-in-selection': item.index >= selectedStartColumn && item.index <= selectedEndColumn,
           'is-active':
             selected && item.index >= selectedStartColumn && item.index <= selectedEndColumn,
+          'has-quick-tools': quickToolsEnabled,
+          'is-axis-selection': isSelectedColumn(item.index),
         }"
         :style="getHeaderStyle(item, pane.offset)"
         :data-column="item.index"
@@ -125,13 +162,44 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
           :aria-pressed="
             selected && item.index >= selectedStartColumn && item.index <= selectedEndColumn
           "
-          @mousedown.left.prevent="
-            emit('select', { column: item.index, shiftKey: $event.shiftKey })
-          "
+          @pointerdown.left="onHeaderPointerDown(item.index, $event)"
+          @mousedown.left.prevent="onHeaderMouseDown(item.index, $event)"
           @contextmenu.prevent="onHeaderContextMenu(item.index, $event)"
           @keydown="onHeaderKeydown(item.index, $event)"
         >
           <span aria-hidden="true">{{ columnIndexToLabel(item.index) }}</span>
+        </button>
+        <button
+          v-if="quickToolsEnabled && shouldShowInsertBefore(item.index)"
+          type="button"
+          class="sheet-column-headers__insert-handle is-before"
+          :aria-label="t('axisMenu.insertBefore')"
+          :title="t('axisMenu.insertBefore')"
+          :data-quick-insert-column="item.index"
+          @pointerdown.stop
+          @mouseenter="emit('quickInsertHover', { index: item.index })"
+          @mouseleave="emit('quickInsertHover', null)"
+          @focus="emit('quickInsertHover', { index: item.index })"
+          @blur="emit('quickInsertHover', null)"
+          @click.stop="emit('quickInsert', { index: item.index })"
+        >
+          <span aria-hidden="true">+</span>
+        </button>
+        <button
+          v-if="quickToolsEnabled && shouldShowInsertAfter(item.index)"
+          type="button"
+          class="sheet-column-headers__insert-handle is-after"
+          :aria-label="t('axisMenu.insertAfter')"
+          :title="t('axisMenu.insertAfter')"
+          :data-quick-insert-column="item.index + 1"
+          @pointerdown.stop
+          @mouseenter="emit('quickInsertHover', { index: item.index + 1 })"
+          @mouseleave="emit('quickInsertHover', null)"
+          @focus="emit('quickInsertHover', { index: item.index + 1 })"
+          @blur="emit('quickInsertHover', null)"
+          @click.stop="emit('quickInsert', { index: item.index + 1 })"
+        >
+          <span aria-hidden="true">+</span>
         </button>
         <span
           class="sheet-column-headers__resize-handle"
@@ -170,10 +238,15 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    overflow: visible;
     border-right: 1px solid var(--idea-border-subtle);
     color: var(--idea-text-secondary);
     font-size: 12px;
+
+    &:hover,
+    &:focus-within {
+      z-index: 2;
+    }
 
     &.is-in-selection {
       background: var(--idea-action-primary-subtle);
@@ -196,6 +269,7 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
 
   &__select-button {
     display: grid;
+    overflow: hidden;
     place-items: center;
     width: 100%;
     height: 100%;
@@ -205,10 +279,87 @@ function onHeaderContextMenu(column: number, event: MouseEvent): void {
     color: inherit;
     cursor: pointer;
 
+    .is-axis-selection.has-quick-tools & {
+      cursor: grab;
+    }
+
     &:focus-visible {
       outline: 2px solid var(--idea-action-primary);
       outline-offset: -2px;
     }
+  }
+
+  &__insert-handle {
+    position: absolute;
+    z-index: 2;
+    top: 2px;
+    display: grid;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    place-items: center;
+    color: var(--idea-action-primary);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
+    opacity: 0;
+    pointer-events: none;
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+    transform: translateX(-50%);
+    transition:
+      opacity 120ms ease,
+      background 120ms ease,
+      color 120ms ease;
+
+    &.is-before {
+      left: 0;
+    }
+
+    &.is-after {
+      left: 100%;
+    }
+
+    &::before {
+      content: "";
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: var(--idea-surface-panel);
+      border: 1px solid var(--idea-border-control);
+      border-radius: 50%;
+    }
+
+    span {
+      position: relative;
+      opacity: 0;
+      transition: opacity 120ms ease;
+    }
+
+    &:hover,
+    &:focus-visible {
+      color: var(--idea-surface-panel);
+      background: var(--idea-action-primary);
+      outline: none;
+
+      &::before {
+        width: 14px;
+        height: 14px;
+        background: var(--idea-action-primary);
+        border-color: var(--idea-action-primary);
+      }
+
+      span {
+        opacity: 1;
+      }
+    }
+  }
+
+  &__item.has-quick-tools:hover &__insert-handle,
+  &__item.has-quick-tools:focus-within &__insert-handle {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   &__resize-handle {

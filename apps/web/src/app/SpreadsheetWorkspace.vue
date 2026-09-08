@@ -91,6 +91,7 @@ const {
   clearFilter,
   freeze,
   unfreeze,
+  setFreezePanes,
   mergeSelection,
   unmergeSelection,
   applyCellStyle,
@@ -105,6 +106,7 @@ const {
   resizeDimension,
   insertAxis,
   deleteAxis,
+  moveAxis,
   selectSheet,
   updateSheetProperties,
   restoreSheet,
@@ -395,6 +397,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @paste-floating-image="imageActions.pasteFloatingImage"
         :workbook-revision="workbookRevision"
         :apply-paste="pasteCells"
+        :apply-axis-move="moveAxis"
         :view-state="activeSheetViewState"
         :format-painter-active="formatPainterActive"
         @clear-cells="clearCells"
@@ -402,6 +405,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @delete-axis="deleteAxis"
         @format-painter-target="applyFormatPainterTarget"
         @insert-axis="insertAxis"
+        @freeze-change="setFreezePanes"
         @resize-dimension="resizeDimension"
         @cancel-format-painter="cancelFormatPainter"
         @undo="undo"

@@ -17,12 +17,17 @@ const props = defineProps<{
   selectedStartRow: number;
   selectedEndRow: number;
   selected: boolean;
+  axisSelected?: boolean;
+  quickToolsEnabled?: boolean;
 }>();
 
 const emit = defineEmits<{
   resizeStart: [payload: { index: number; event: PointerEvent }];
   resize: [payload: { index: number; size: number }];
   select: [payload: { row: number; shiftKey: boolean }];
+  quickInsert: [payload: { index: number }];
+  quickInsertHover: [payload: { index: number } | null];
+  axisDragStart: [payload: { index: number; event: PointerEvent }];
   openContextMenu: [
     payload: { row: number; clientX: number; clientY: number; trigger: HTMLButtonElement },
   ];
@@ -88,6 +93,37 @@ function onHeaderContextMenu(row: number, event: MouseEvent): void {
     trigger: event.currentTarget as HTMLButtonElement,
   });
 }
+
+function isSelectedRow(row: number): boolean {
+  return (
+    (props.axisSelected ?? props.selected) &&
+    row >= props.selectedStartRow &&
+    row <= props.selectedEndRow
+  );
+}
+
+function shouldShowInsertBefore(row: number): boolean {
+  return !isSelectedRow(row) || row === props.selectedStartRow;
+}
+
+function shouldShowInsertAfter(row: number): boolean {
+  return !isSelectedRow(row) || row === props.selectedEndRow;
+}
+
+function onHeaderMouseDown(row: number, event: MouseEvent): void {
+  // Keep an existing multi-row selection intact so the parent can turn this
+  // pointer sequence into a drag after its movement threshold is reached.
+  if (props.quickToolsEnabled && isSelectedRow(row) && !event.shiftKey) {
+    return;
+  }
+  emit("select", { row, shiftKey: event.shiftKey });
+}
+
+function onHeaderPointerDown(row: number, event: PointerEvent): void {
+  if (props.quickToolsEnabled && isSelectedRow(row) && !event.shiftKey) {
+    emit("axisDragStart", { index: row, event });
+  }
+}
 </script>
 
 <template>
@@ -106,6 +142,8 @@ function onHeaderContextMenu(row: number, event: MouseEvent): void {
         :class="{
           'is-in-selection': item.index >= selectedStartRow && item.index <= selectedEndRow,
           'is-active': selected && item.index >= selectedStartRow && item.index <= selectedEndRow,
+          'has-quick-tools': quickToolsEnabled,
+          'is-axis-selection': isSelectedRow(item.index),
         }"
         :style="getHeaderStyle(item, pane.offset)"
         :data-row="item.index"
@@ -116,11 +154,44 @@ function onHeaderContextMenu(row: number, event: MouseEvent): void {
           :data-select-row="item.index"
           :aria-label="t('grid.selectRow', { row: item.index + 1 })"
           :aria-pressed="selected && item.index >= selectedStartRow && item.index <= selectedEndRow"
-          @mousedown.left.prevent="emit('select', { row: item.index, shiftKey: $event.shiftKey })"
+          @pointerdown.left="onHeaderPointerDown(item.index, $event)"
+          @mousedown.left.prevent="onHeaderMouseDown(item.index, $event)"
           @contextmenu.prevent="onHeaderContextMenu(item.index, $event)"
           @keydown="onHeaderKeydown(item.index, $event)"
         >
           <span aria-hidden="true">{{ item.index + 1 }}</span>
+        </button>
+        <button
+          v-if="quickToolsEnabled && shouldShowInsertBefore(item.index)"
+          type="button"
+          class="sheet-row-headers__insert-handle is-before"
+          :aria-label="t('axisMenu.insertAbove')"
+          :title="t('axisMenu.insertAbove')"
+          :data-quick-insert-row="item.index"
+          @pointerdown.stop
+          @mouseenter="emit('quickInsertHover', { index: item.index })"
+          @mouseleave="emit('quickInsertHover', null)"
+          @focus="emit('quickInsertHover', { index: item.index })"
+          @blur="emit('quickInsertHover', null)"
+          @click.stop="emit('quickInsert', { index: item.index })"
+        >
+          <span aria-hidden="true">+</span>
+        </button>
+        <button
+          v-if="quickToolsEnabled && shouldShowInsertAfter(item.index)"
+          type="button"
+          class="sheet-row-headers__insert-handle is-after"
+          :aria-label="t('axisMenu.insertBelow')"
+          :title="t('axisMenu.insertBelow')"
+          :data-quick-insert-row="item.index + 1"
+          @pointerdown.stop
+          @mouseenter="emit('quickInsertHover', { index: item.index + 1 })"
+          @mouseleave="emit('quickInsertHover', null)"
+          @focus="emit('quickInsertHover', { index: item.index + 1 })"
+          @blur="emit('quickInsertHover', null)"
+          @click.stop="emit('quickInsert', { index: item.index + 1 })"
+        >
+          <span aria-hidden="true">+</span>
         </button>
         <span
           class="sheet-row-headers__resize-handle"
@@ -159,10 +230,15 @@ function onHeaderContextMenu(row: number, event: MouseEvent): void {
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    overflow: visible;
     border-bottom: 1px solid var(--idea-border-subtle);
     color: var(--idea-text-secondary);
     font-size: 12px;
+
+    &:hover,
+    &:focus-within {
+      z-index: 2;
+    }
 
     &.is-in-selection {
       background: var(--idea-action-primary-subtle);
@@ -185,6 +261,7 @@ function onHeaderContextMenu(row: number, event: MouseEvent): void {
 
   &__select-button {
     display: grid;
+    overflow: hidden;
     place-items: center;
     width: 100%;
     height: 100%;
@@ -194,10 +271,87 @@ function onHeaderContextMenu(row: number, event: MouseEvent): void {
     color: inherit;
     cursor: pointer;
 
+    .is-axis-selection.has-quick-tools & {
+      cursor: grab;
+    }
+
     &:focus-visible {
       outline: 2px solid var(--idea-action-primary);
       outline-offset: -2px;
     }
+  }
+
+  &__insert-handle {
+    position: absolute;
+    z-index: 2;
+    left: 2px;
+    display: grid;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    place-items: center;
+    color: var(--idea-action-primary);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
+    opacity: 0;
+    pointer-events: none;
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+    transform: translateY(-50%);
+    transition:
+      opacity 120ms ease,
+      background 120ms ease,
+      color 120ms ease;
+
+    &.is-before {
+      top: 0;
+    }
+
+    &.is-after {
+      top: 100%;
+    }
+
+    &::before {
+      content: "";
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: var(--idea-surface-panel);
+      border: 1px solid var(--idea-border-control);
+      border-radius: 50%;
+    }
+
+    span {
+      position: relative;
+      opacity: 0;
+      transition: opacity 120ms ease;
+    }
+
+    &:hover,
+    &:focus-visible {
+      color: var(--idea-surface-panel);
+      background: var(--idea-action-primary);
+      outline: none;
+
+      &::before {
+        width: 14px;
+        height: 14px;
+        background: var(--idea-action-primary);
+        border-color: var(--idea-action-primary);
+      }
+
+      span {
+        opacity: 1;
+      }
+    }
+  }
+
+  &__item.has-quick-tools:hover &__insert-handle,
+  &__item.has-quick-tools:focus-within &__insert-handle {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   &__resize-handle {

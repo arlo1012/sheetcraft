@@ -360,6 +360,73 @@ export function transformFormulaForAxis(source: string, transform: FormulaAxisTr
   return applyReplacements(parsed.ast.source, replacements);
 }
 
+/**
+ * Rewrites references after an entire row or column band is repositioned.
+ * `toIndex` is the band's final start index, rather than an insertion cursor.
+ */
+export function transformFormulaForAxisMove(
+  source: string,
+  transform: { axis: "row" | "column"; index: number; count: number; toIndex: number },
+): string {
+  const maximum = transform.axis === "row" ? MAX_FORMULA_ROWS : MAX_FORMULA_COLUMNS;
+  if (
+    !Number.isSafeInteger(transform.index) ||
+    !Number.isSafeInteger(transform.count) ||
+    !Number.isSafeInteger(transform.toIndex) ||
+    transform.index < 0 ||
+    transform.count <= 0 ||
+    transform.index > maximum - transform.count ||
+    transform.toIndex < 0 ||
+    transform.toIndex > maximum - transform.count
+  ) {
+    throw new RangeError("Formula axis moves require in-bounds indices.");
+  }
+  if (transform.index === transform.toIndex) return source;
+  const mapAxis = (value: number): number => {
+    const sourceEnd = transform.index + transform.count;
+    if (value >= transform.index && value < sourceEnd)
+      return transform.toIndex + value - transform.index;
+    if (transform.toIndex < transform.index) {
+      return value >= transform.toIndex && value < transform.index
+        ? value + transform.count
+        : value;
+    }
+    return value >= sourceEnd && value < transform.toIndex + transform.count
+      ? value - transform.count
+      : value;
+  };
+  const parsed = parseFormula(source);
+  if (!parsed.ok) return source;
+  const mapReference = (reference: FormulaReference): FormulaAddress =>
+    transform.axis === "row"
+      ? { row: mapAxis(reference.row), column: reference.column }
+      : { row: reference.row, column: mapAxis(reference.column) };
+  const replacements: Replacement[] = [];
+  walkExpression(parsed.ast.expression, (expression) => {
+    if (expression.kind === "reference") {
+      replacements.push({
+        start: expression.reference.start,
+        end: expression.reference.end,
+        text: formatReference(expression.reference, mapReference(expression.reference)),
+      });
+    } else if (expression.kind === "range") {
+      const start = mapReference(expression.range.start);
+      const end = mapReference(expression.range.end);
+      replacements.push({
+        start: expression.range.start.start,
+        end: expression.range.start.end,
+        text: formatReference(expression.range.start, start),
+      });
+      replacements.push({
+        start: expression.range.end.start,
+        end: expression.range.end.end,
+        text: formatReference(expression.range.end, end),
+      });
+    }
+  });
+  return applyReplacements(parsed.ast.source, replacements);
+}
+
 export function formatFormulaAddress(address: FormulaAddress): string {
   if (!isAddressInBounds(address)) {
     throw new RangeError("Formula address is outside the worksheet.");

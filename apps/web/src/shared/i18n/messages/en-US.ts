@@ -296,6 +296,18 @@ export const enUS = {
     selectColumn: "Select column {column}",
     rowHeight: "Row {row} height",
     columnWidth: "Column {column} width",
+    freezeRows: "Drag to freeze rows",
+    freezeColumns: "Drag to freeze columns",
+    freezeRowCount: "Freeze {count} row | Freeze {count} rows",
+    freezeColumnCount: "Freeze {count} column | Freeze {count} columns",
+    unfreezeRows: "Unfreeze rows",
+    unfreezeColumns: "Unfreeze columns",
+    insertRowCount: "Insert {count} row here | Insert {count} rows here",
+    insertColumnCount: "Insert {count} column here | Insert {count} columns here",
+    moveRowCount: "Move {count} row here | Move {count} rows here",
+    moveColumnCount: "Move {count} column here | Move {count} columns here",
+    axisMoveUnavailable:
+      "Cannot move these rows or columns. Check merged cells, filters, or frozen boundaries.",
   },
   format: {
     toolbar: "Cell formatting",

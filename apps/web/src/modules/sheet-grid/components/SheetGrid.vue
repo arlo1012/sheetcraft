@@ -76,6 +76,8 @@ import {
   type TextMeasurer,
 } from "@idea10/sheet-engine/row-height";
 import { useDimensionResize } from "../composables/useDimensionResize";
+import { useAxisMoveDrag, type AxisMovePayload } from "../composables/useAxisMoveDrag";
+import { getViewportAxisBoundaryOffset } from "@idea10/sheet-engine/axis-interactions";
 import { useCellEditing } from "../composables/useCellEditing";
 import { useFormulaReferenceNavigation } from "../composables/useFormulaReferenceNavigation";
 import { useDragSelection } from "../composables/useDragSelection";
@@ -89,7 +91,8 @@ import { areGridClipboardTextsEqual, createBrowserGridClipboardPort } from "../g
 import { readFloatingImageClipboard } from "../../sheet-images/imageClipboard";
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
-import SheetAxisQuickTools from "./SheetAxisQuickTools.vue";
+import SheetAxisOperationPreview from "./SheetAxisOperationPreview.vue";
+import SheetFreezeHandles from "./SheetFreezeHandles.vue";
 import SheetCellLayer from "./SheetCellLayer.vue";
 import SheetCellContextMenu from "./SheetCellContextMenu.vue";
 import SheetBorderLayer from "./SheetBorderLayer.vue";
@@ -140,6 +143,7 @@ const props = withDefaults(
     sheet: Sheet;
     workbookRevision?: number;
     applyPaste?: (payload: GridPastePayload) => GridPasteResult;
+    applyAxisMove?: (payload: AxisMovePayload) => boolean;
     initialRowCount?: number;
     initialColumnCount?: number;
     rowExpansionStep?: number;
@@ -195,6 +199,7 @@ const emit = defineEmits<{
   resizeDimension: [payload: { axis: SheetDimensionAxis; index: number; size: number }];
   insertAxis: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
   deleteAxis: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
+  freezeChange: [freezePanes: { rows: number; columns: number }];
   formatPainterTarget: [range: CellRange];
   cancelFormatPainter: [];
   undo: [];
@@ -206,9 +211,6 @@ const emit = defineEmits<{
 
 const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 28;
-const AXIS_QUICK_TOOL_BUTTON_SIZE = 24;
-const AXIS_QUICK_TOOL_SHORT_SIZE = AXIS_QUICK_TOOL_BUTTON_SIZE + 2;
-const AXIS_QUICK_TOOL_LONG_SIZE = AXIS_QUICK_TOOL_BUTTON_SIZE * 3 + 2;
 
 const headerSize = computed(() => ({
   width: props.showHeaders ? ROW_HEADER_WIDTH : 0,
@@ -341,6 +343,7 @@ const {
   onScrollStart: () => {
     axisContextMenu.value = undefined;
     cellContextMenu.value = undefined;
+    quickInsertHover.value = undefined;
   },
   onViewStateChange: (viewState) => emit("viewStateChange", viewState),
 });
@@ -469,76 +472,126 @@ const selectedRange = computed(() =>
     columnCount: gridExtent.columnCount,
   }),
 );
-const axisQuickTool = computed(() => {
-  if (
-    !props.showAxisQuickTools ||
-    !props.showHeaders ||
-    props.readOnly ||
-    isEditing.value ||
-    isComposing.value
-  ) {
-    return undefined;
-  }
-  const mode = getSelectionMode(selection.value);
-  if (mode !== "rows" && mode !== "columns") return undefined;
+const quickToolsAvailable = computed(
+  () =>
+    props.showAxisQuickTools &&
+    props.showHeaders &&
+    !props.readOnly &&
+    !isEditing.value &&
+    !isComposing.value &&
+    !dimensionResize.value,
+);
+const freezeDragging = ref(false);
+const quickInsertHover = shallowRef<{ axis: SheetDimensionAxis; index: number }>();
+const {
+  drag: axisMoveDrag,
+  start: startAxisMoveDrag,
+  stop: stopAxisMoveDrag,
+} = useAxisMoveDrag({
+  getRoot: () => rootRef.value,
+  getLayout: () => layout.value,
+  getHeaderSize: () => headerSize.value,
+  getScroller: () => scrollerRef.value,
+  onScroll: (position) => {
+    scrollPosition.x = position.x;
+    scrollPosition.y = position.y;
+    emitViewState();
+  },
+  onBeforeStart: () => {
+    stopDragSelection();
+    stopFormulaReferenceDrag();
+    quickInsertHover.value = undefined;
+    axisContextMenu.value = undefined;
+    cellContextMenu.value = undefined;
+  },
+  onCommit: (payload) => {
+    if (!quickToolsAvailable.value || !props.applyAxisMove?.(payload)) return;
+    clearPendingClipboard();
+    const address =
+      payload.axis === "row"
+        ? { row: payload.toIndex, column: 0 }
+        : { row: 0, column: payload.toIndex };
+    const last =
+      payload.axis === "row"
+        ? { row: payload.toIndex + payload.count - 1, column: 0 }
+        : { row: 0, column: payload.toIndex + payload.count - 1 };
+    const next = extendAxisSelection(
+      createAxisSelection(payload.axis === "row" ? "rows" : "columns", address),
+      payload.axis === "row" ? "rows" : "columns",
+      last,
+    );
+    setSelection(next, address);
+  },
+});
+const headerQuickToolsEnabled = computed(
+  () => quickToolsAvailable.value && !freezeDragging.value && !axisMoveDrag.value?.active,
+);
 
-  const axis: SheetDimensionAxis = mode === "rows" ? "row" : "column";
+function getQuickInsertCount(axis: SheetDimensionAxis, boundary: number): number {
+  const expectedMode = axis === "row" ? "rows" : "columns";
   const range = selectedRange.value;
   const start = axis === "row" ? range.start.row : range.start.column;
   const end = axis === "row" ? range.end.row : range.end.column;
-  const panes = axis === "row" ? rowHeaderPanes.value : columnHeaderPanes.value;
-  const visibleItem = panes
-    .flatMap((pane) =>
-      pane.items.map((item) => ({
-        item,
-        pane,
-        start: Math.max(item.offset, pane.offset),
-        end: Math.min(item.offset + item.size, pane.offset + pane.size),
-      })),
-    )
-    .find(
-      (candidate) =>
-        candidate.item.index >= start &&
-        candidate.item.index <= end &&
-        candidate.end > candidate.start,
-    );
-  if (!visibleItem) return undefined;
+  return getSelectionMode(selection.value) === expectedMode &&
+    (boundary === start || boundary === end + 1)
+    ? end - start + 1
+    : 1;
+}
 
-  const center = (visibleItem.start + visibleItem.end - AXIS_QUICK_TOOL_SHORT_SIZE) / 2;
-  const itemPosition = clamp(
-    center,
-    visibleItem.pane.offset,
-    visibleItem.pane.offset + visibleItem.pane.size - AXIS_QUICK_TOOL_SHORT_SIZE,
-  );
-
+const axisOperationPreview = computed(() => {
+  if (!quickToolsAvailable.value || freezeDragging.value) return undefined;
+  const drag = axisMoveDrag.value;
+  if (drag?.active) {
+    return {
+      axis: drag.axis,
+      offset: drag.offset,
+      label: t(drag.axis === "row" ? "grid.moveRowCount" : "grid.moveColumnCount", {
+        count: drag.count,
+      }),
+    };
+  }
+  const hover = quickInsertHover.value;
+  if (!hover) return undefined;
+  const offset = getViewportAxisBoundaryOffset(layout.value, hover.axis, hover.index);
+  if (offset === null) return undefined;
   return {
-    axis,
-    index: start,
-    count: end - start + 1,
-    position:
-      axis === "row"
-        ? {
-            x: clamp(
-              headerSize.value.width + 2,
-              headerSize.value.width,
-              headerSize.value.width + viewportSize.width - AXIS_QUICK_TOOL_LONG_SIZE,
-            ),
-            y: headerSize.value.height + itemPosition,
-          }
-        : {
-            x: headerSize.value.width + itemPosition,
-            y: clamp(
-              headerSize.value.height + 2,
-              headerSize.value.height,
-              headerSize.value.height + viewportSize.height - AXIS_QUICK_TOOL_LONG_SIZE,
-            ),
-          },
+    axis: hover.axis,
+    offset,
+    label: t(hover.axis === "row" ? "grid.insertRowCount" : "grid.insertColumnCount", {
+      count: getQuickInsertCount(hover.axis, hover.index),
+    }),
   };
 });
 
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(Math.max(minimum, maximum), Math.max(minimum, value));
+function onQuickInsertHover(axis: SheetDimensionAxis, payload: { index: number } | null): void {
+  quickInsertHover.value = payload ? { axis, index: payload.index } : undefined;
 }
+
+function onQuickInsert(axis: SheetDimensionAxis, payload: { index: number }): void {
+  if (!headerQuickToolsEnabled.value) return;
+  requestAxisInsertion(axis, payload.index, getQuickInsertCount(axis, payload.index), "before");
+  quickInsertHover.value = undefined;
+  focusEditor();
+}
+
+function onAxisDragStart(
+  axis: SheetDimensionAxis,
+  payload: { index: number; event: PointerEvent },
+): void {
+  if (!headerQuickToolsEnabled.value || !isAxisIndexSelected(axis, payload.index)) return;
+  const range = selectedRange.value;
+  const start = axis === "row" ? range.start.row : range.start.column;
+  const end = axis === "row" ? range.end.row : range.end.column;
+  startAxisMoveDrag(axis, start, end - start + 1, payload.event);
+}
+
+watch(quickToolsAvailable, (available) => {
+  if (!available) {
+    stopAxisMoveDrag();
+    quickInsertHover.value = undefined;
+  }
+});
+
 const activeCellRect = computed(
   () => layout.value.getCellViewportRect(activeCell.value) ?? { x: 0, y: 0, width: 0, height: 0 },
 );
@@ -1216,13 +1269,6 @@ function requestAxisInsertion(
   return true;
 }
 
-function openAxisQuickToolsMenu(trigger: HTMLButtonElement): void {
-  const tool = axisQuickTool.value;
-  if (!tool) return;
-  const bounds = trigger.getBoundingClientRect();
-  openAxisContextMenu(tool.axis, tool.index, bounds.left, bounds.bottom, trigger);
-}
-
 function requestAxisDelete(): void {
   if (props.readOnly) return;
   const menu = axisContextMenu.value;
@@ -1575,6 +1621,7 @@ function restoreViewState(viewState?: SheetGridViewState): void {
   stopDragSelection();
   stopFormulaReferenceDrag();
   stopDimensionResize();
+  stopAxisMoveDrag();
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
   clearPendingClipboard();
@@ -1628,6 +1675,7 @@ watch(
     stopDragSelection();
     stopFormulaReferenceDrag();
     stopDimensionResize();
+    stopAxisMoveDrag();
     axisContextMenu.value = undefined;
     cellContextMenu.value = undefined;
     updateViewportSize();
@@ -1699,6 +1747,7 @@ defineExpose({
     :class="{
       'is-resizing-column': dimensionResize?.axis === 'column',
       'is-resizing-row': dimensionResize?.axis === 'row',
+      'is-moving-axis': axisMoveDrag?.active,
     }"
     :style="{
       zoom: scale,
@@ -1727,6 +1776,11 @@ defineExpose({
       :selected-start-column="selectedRange.start.column"
       :selected-end-column="selectedRange.end.column"
       :selected="getSelectionMode(selection) === 'columns' || getSelectionMode(selection) === 'all'"
+      :axis-selected="getSelectionMode(selection) === 'columns'"
+      :quick-tools-enabled="headerQuickToolsEnabled"
+      @quick-insert="onQuickInsert('column', $event)"
+      @quick-insert-hover="onQuickInsertHover('column', $event)"
+      @axis-drag-start="onAxisDragStart('column', $event)"
       @resize="onDimensionResizeRequest('column', $event)"
       @resize-start="onDimensionResizeStart('column', $event)"
       @select="onColumnHeaderSelect"
@@ -1741,6 +1795,11 @@ defineExpose({
       :selected-start-row="selectedRange.start.row"
       :selected-end-row="selectedRange.end.row"
       :selected="getSelectionMode(selection) === 'rows' || getSelectionMode(selection) === 'all'"
+      :axis-selected="getSelectionMode(selection) === 'rows'"
+      :quick-tools-enabled="headerQuickToolsEnabled"
+      @quick-insert="onQuickInsert('row', $event)"
+      @quick-insert-hover="onQuickInsertHover('row', $event)"
+      @axis-drag-start="onAxisDragStart('row', $event)"
       @resize="onDimensionResizeRequest('row', $event)"
       @resize-start="onDimensionResizeStart('row', $event)"
       @select="onRowHeaderSelect"
@@ -1748,21 +1807,24 @@ defineExpose({
         openAxisContextMenu('row', $event.row, $event.clientX, $event.clientY, $event.trigger)
       "
     />
-    <SheetAxisQuickTools
-      v-if="axisQuickTool"
-      :axis="axisQuickTool.axis"
-      :position="axisQuickTool.position"
-      :insert-before-disabled="
-        axisQuickTool.count > getAxisMaximum(axisQuickTool.axis) - axisQuickTool.index
-      "
-      :insert-after-disabled="
-        axisQuickTool.count >
-        getAxisMaximum(axisQuickTool.axis) - axisQuickTool.index - axisQuickTool.count
-      "
-      @insert="
-        requestAxisInsertion(axisQuickTool.axis, axisQuickTool.index, axisQuickTool.count, $event)
-      "
-      @more="openAxisQuickToolsMenu"
+    <SheetFreezeHandles
+      v-if="quickToolsAvailable"
+      :key="`${sheet.id}:${scale}`"
+      :layout="layout"
+      :header-size="headerSize"
+      :root-element="rootRef"
+      :disabled="Boolean(axisMoveDrag)"
+      @freeze-change="emit('freezeChange', $event)"
+      @drag-change="freezeDragging = $event"
+    />
+    <SheetAxisOperationPreview
+      v-if="axisOperationPreview"
+      :axis="axisOperationPreview.axis"
+      :offset="axisOperationPreview.offset"
+      :label="axisOperationPreview.label"
+      :header-size="headerSize"
+      :viewport-size="viewportSize"
+      :data-axis-operation="axisMoveDrag?.active ? 'move' : 'insert'"
     />
 
     <div
@@ -1937,6 +1999,12 @@ defineExpose({
 
   &.is-resizing-row {
     cursor: row-resize;
+  }
+
+  &.is-moving-axis,
+  &.is-moving-axis :deep(.sheet-row-headers__select-button),
+  &.is-moving-axis :deep(.sheet-column-headers__select-button) {
+    cursor: grabbing;
   }
 
   &__corner {

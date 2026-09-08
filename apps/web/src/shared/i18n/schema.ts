@@ -284,6 +284,17 @@ export type MessageSchema = {
     selectColumn: string;
     rowHeight: string;
     columnWidth: string;
+    freezeRows: string;
+    freezeColumns: string;
+    freezeRowCount: string;
+    freezeColumnCount: string;
+    unfreezeRows: string;
+    unfreezeColumns: string;
+    insertRowCount: string;
+    insertColumnCount: string;
+    moveRowCount: string;
+    moveColumnCount: string;
+    axisMoveUnavailable: string;
   };
   format: {
     toolbar: string;

@@ -17,7 +17,11 @@ import {
   type SheetSparseState,
   type Workbook,
 } from "../workbook.js";
-import { transformFormulaForAxis } from "../formula/references.js";
+import {
+  collectFormulaRanges,
+  transformFormulaForAxis,
+  transformFormulaForAxisMove,
+} from "../formula/references.js";
 import {
   transformMergedCellRangesForAxisDelete,
   transformMergedCellRangesForAxisInsert,
@@ -26,6 +30,7 @@ import { cloneCellStyle } from "../style.js";
 import type {
   DeleteSheetAxisCommand,
   InsertSheetAxisCommand,
+  MoveSheetAxisCommand,
   RestoreFullSheetStateCommand,
   RestoreSheetAxisSliceCommand,
   RestoreSheetStateCommand,
@@ -55,6 +60,17 @@ export function createDeleteSheetAxisCommand(
   count = 1,
 ): DeleteSheetAxisCommand {
   return { type: "deleteSheetAxis", sheetId, axis, index, count };
+}
+
+export function createMoveSheetAxisCommand(
+  sheetId: string,
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  toIndex: number,
+  mode: MoveSheetAxisCommand["mode"] = "insert",
+): MoveSheetAxisCommand {
+  return { type: "moveSheetAxis", sheetId, axis, index, count, toIndex, mode };
 }
 
 export function createRestoreSheetStateCommand(
@@ -163,6 +179,70 @@ function assertSheetAxisRange(axis: SheetDimensionAxis, index: number, count: nu
     );
   }
   return maximum;
+}
+
+function assertSheetAxisMove(command: MoveSheetAxisCommand): number {
+  const maximum = assertSheetAxisRange(command.axis, command.index, command.count);
+  if (
+    !Number.isInteger(command.toIndex) ||
+    command.toIndex < 0 ||
+    command.toIndex > maximum - command.count
+  ) {
+    throw invalidCommandPayload(
+      "toIndex",
+      command.toIndex,
+      `Moved ${command.axis}s must remain inside the sheet.`,
+    );
+  }
+  if (command.mode !== undefined && command.mode !== "insert" && command.mode !== "overwrite") {
+    throw invalidCommandPayload("mode", command.mode);
+  }
+  if (command.mode === "overwrite") {
+    throw invalidCommandPayload(
+      "mode",
+      command.mode,
+      "Overwriting rows or columns during a move is not supported yet.",
+    );
+  }
+  return maximum;
+}
+
+function transformAxisIndexForMove(
+  value: number,
+  index: number,
+  count: number,
+  toIndex: number,
+): number {
+  if (index === toIndex) return value;
+  const sourceEnd = index + count;
+  if (value >= index && value < sourceEnd) return toIndex + value - index;
+  if (toIndex < index) return value >= toIndex && value < index ? value + count : value;
+  return value >= sourceEnd && value < toIndex + count ? value - count : value;
+}
+
+function transformRangeForAxisMove(
+  range: { start: { row: number; column: number }; end: { row: number; column: number } },
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  toIndex: number,
+): typeof range | null {
+  const start = axis === "row" ? range.start.row : range.start.column;
+  const end = axis === "row" ? range.end.row : range.end.column;
+  const nextStart = transformAxisIndexForMove(start, index, count, toIndex);
+  const nextEnd = transformAxisIndexForMove(end, index, count, toIndex);
+  // A merged/filter/formula range can only survive a move when it remains one
+  // contiguous physical range. Rejecting before mutation keeps the command atomic.
+  if (nextStart > nextEnd || nextEnd - nextStart !== end - start) return null;
+  return axis === "row"
+    ? {
+        start: { row: nextStart, column: range.start.column },
+        end: { row: nextEnd, column: range.end.column },
+      }
+    : {
+        start: { row: range.start.row, column: nextStart },
+        end: { row: range.end.row, column: nextEnd },
+      };
 }
 
 function transformAxisIndex(
@@ -747,5 +827,150 @@ export function applySheetAxisCommand(
         operation,
         slice,
       )
+    : null;
+}
+
+function transformSheetMetadataForAxisMove(
+  metadata: SheetMetadata,
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  toIndex: number,
+): SheetMetadata {
+  const mergedCells = metadata.mergedCells.map((range) => {
+    const transformed = transformRangeForAxisMove(range, axis, index, count, toIndex);
+    if (!transformed) {
+      throw invalidCommandPayload(
+        "axis",
+        axis,
+        "Moving this row or column band would split a merged range.",
+      );
+    }
+    return transformed;
+  });
+  const filter = metadata.filter
+    ? (() => {
+        const range = transformRangeForAxisMove(metadata.filter.range, axis, index, count, toIndex);
+        if (!range) {
+          throw invalidCommandPayload(
+            "axis",
+            axis,
+            "Moving this row or column band would split the active filter range.",
+          );
+        }
+        return {
+          range,
+          columns: metadata.filter.columns.map((column) => ({
+            column:
+              axis === "column"
+                ? transformAxisIndexForMove(column.column, index, count, toIndex)
+                : column.column,
+            allowedValues: column.allowedValues.map((value) => ({ ...value })),
+          })),
+        };
+      })()
+    : null;
+  return { freezePanes: { ...metadata.freezePanes }, filter, mergedCells };
+}
+
+function assertFormulaRangesCanMove(
+  sheet: Sheet,
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  toIndex: number,
+): void {
+  for (const cell of sheet.cells.values()) {
+    if (cell.content?.kind !== "formula") continue;
+    for (const range of collectFormulaRanges(cell.content.formula.source)) {
+      if (
+        !transformRangeForAxisMove(
+          { start: range.start, end: range.end },
+          axis,
+          index,
+          count,
+          toIndex,
+        )
+      ) {
+        throw invalidCommandPayload(
+          "axis",
+          axis,
+          "Moving this row or column band would split a formula range.",
+        );
+      }
+    }
+  }
+}
+
+/** Reorders whole rows or columns while retaining every sparse sheet resource. */
+export function applyMoveSheetAxisCommand(
+  workbook: Workbook,
+  command: MoveSheetAxisCommand,
+): RestoreFullSheetStateCommand | null {
+  assertSheetAxisMove(command);
+  const sheet = getSheetOrThrow(workbook, command.sheetId);
+  if (command.index === command.toIndex) return null;
+
+  // Validate every non-cell resource before changing the sheet, so an unsupported
+  // merge, filter, or formula range leaves the workbook untouched.
+  const metadata = transformSheetMetadataForAxisMove(
+    getSheetMetadata(sheet),
+    command.axis,
+    command.index,
+    command.count,
+    command.toIndex,
+  );
+  assertFormulaRangesCanMove(sheet, command.axis, command.index, command.count, command.toIndex);
+  const previousState = createSheetSparseState(sheet);
+  const mapIndex = (value: number) =>
+    transformAxisIndexForMove(value, command.index, command.count, command.toIndex);
+  const mapAddress = (address: SheetSparseCell["address"]): SheetSparseCell["address"] =>
+    command.axis === "row"
+      ? { row: mapIndex(address.row), column: address.column }
+      : { row: address.row, column: mapIndex(address.column) };
+  const state: SheetSparseState = {
+    cells: previousState.cells.map((cell) => {
+      const content = cell.content;
+      return {
+        ...cell,
+        address: mapAddress(cell.address),
+        ...(content?.kind === "formula"
+          ? {
+              content: {
+                kind: "formula" as const,
+                formula: {
+                  source: transformFormulaForAxisMove(content.formula.source, {
+                    axis: command.axis,
+                    index: command.index,
+                    count: command.count,
+                    toIndex: command.toIndex,
+                  }),
+                },
+              },
+            }
+          : {}),
+      };
+    }),
+    rowHeights: previousState.rowHeights.map((dimension) => ({
+      ...dimension,
+      ...(command.axis === "row" ? { index: mapIndex(dimension.index) } : {}),
+    })),
+    columnWidths: previousState.columnWidths.map((dimension) => ({
+      ...dimension,
+      ...(command.axis === "column" ? { index: mapIndex(dimension.index) } : {}),
+    })),
+    freezePanes: metadata.freezePanes,
+    filter: metadata.filter,
+    mergedCells: metadata.mergedCells,
+    floatingImages: previousState.floatingImages.map((image) => ({
+      ...image,
+      anchor:
+        command.axis === "row"
+          ? { row: mapIndex(image.anchor.row), column: image.anchor.column }
+          : { row: image.anchor.row, column: mapIndex(image.anchor.column) },
+    })),
+  };
+  return replaceSheetSparseState(sheet, state)
+    ? createRestoreSheetStateCommand(command.sheetId, previousState)
     : null;
 }

@@ -4,6 +4,9 @@ import {
   applyWorkbookCommand,
   createDeleteSheetAxisCommand,
   createInsertSheetAxisCommand,
+  createMoveSheetAxisCommand,
+  createSetFloatingImageCommand,
+  tryApplyWorkbookCommand,
   type WorkbookCommand,
 } from "../../commands/index.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
@@ -28,6 +31,96 @@ import {
 } from "../../workbook.js";
 
 describe("sheet axis structure commands", () => {
+  test("reorders complete rows with styles, dimensions, images, metadata, formulas, and history", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellValue(sheet, { row: 1, column: 0 }, "move");
+    setCellStyle(sheet, { row: 1, column: 0 }, { bold: true });
+    setCellValue(sheet, { row: 2, column: 0 }, "between");
+    setCellContent(sheet, { row: 4, column: 2 }, { kind: "formula", formula: { source: "=A2" } });
+    setRowHeight(sheet, 1, 44);
+    applyWorkbookCommand(
+      session.workbook,
+      createSetFloatingImageCommand(sheet.id, {
+        id: "move-image",
+        assetId: "asset",
+        altText: "Moved image",
+        anchor: { row: 1, column: 3 },
+        offsetX: 0,
+        offsetY: 0,
+        width: 100,
+        height: 60,
+      }),
+    );
+    setSheetMetadata(sheet, {
+      freezePanes: { rows: 1, columns: 0 },
+      filter: null,
+      mergedCells: [{ start: { row: 1, column: 4 }, end: { row: 1, column: 5 } }],
+    });
+    const before = createSheetSparseState(sheet);
+
+    expect(
+      executeWorkbookCommand(session, createMoveSheetAxisCommand(sheet.id, "row", 1, 1, 3)),
+    ).toBe(true);
+    expect(getCellValue(sheet, { row: 1, column: 0 })).toBe("between");
+    expect(getCellValue(sheet, { row: 3, column: 0 })).toBe("move");
+    expect(getCellStyle(sheet, { row: 3, column: 0 })).toEqual({ bold: true });
+    expect(getRowHeight(sheet, 3)).toBe(44);
+    expect(sheet.floatingImages[0]?.anchor).toEqual({ row: 3, column: 3 });
+    expect(sheet.mergedCells).toEqual([
+      { start: { row: 3, column: 4 }, end: { row: 3, column: 5 } },
+    ]);
+    expect(getCellContent(sheet, { row: 4, column: 2 })).toEqual({
+      kind: "formula",
+      formula: { source: "=A4" },
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(before);
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getCellValue(sheet, { row: 3, column: 0 })).toBe("move");
+  });
+
+  test("reorders columns and rejects moves that would split merged or formula ranges atomically", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellValue(sheet, { row: 0, column: 1 }, "move");
+    setColumnWidth(sheet, 1, 180);
+    expect(
+      executeWorkbookCommand(session, createMoveSheetAxisCommand(sheet.id, "column", 1, 1, 3)),
+    ).toBe(true);
+    expect(getCellValue(sheet, { row: 0, column: 3 })).toBe("move");
+    expect(getColumnWidth(sheet, 3)).toBe(180);
+
+    setSheetMetadata(sheet, {
+      freezePanes: { rows: 0, columns: 0 },
+      filter: null,
+      mergedCells: [{ start: { row: 2, column: 1 }, end: { row: 2, column: 2 } }],
+    });
+    const beforeMergeReject = createSheetSparseState(sheet);
+    expect(
+      tryApplyWorkbookCommand(
+        session.workbook,
+        createMoveSheetAxisCommand(sheet.id, "column", 1, 1, 4),
+      ),
+    ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
+    expect(createSheetSparseState(sheet)).toEqual(beforeMergeReject);
+
+    sheet.mergedCells = [];
+    setCellContent(
+      sheet,
+      { row: 5, column: 5 },
+      { kind: "formula", formula: { source: "=B1:C1" } },
+    );
+    const beforeFormulaReject = createSheetSparseState(sheet);
+    expect(
+      tryApplyWorkbookCommand(
+        session.workbook,
+        createMoveSheetAxisCommand(sheet.id, "column", 1, 1, 4),
+      ),
+    ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
+    expect(createSheetSparseState(sheet)).toEqual(beforeFormulaReject);
+  });
+
   test("transforms metadata-only sheets and restores exact frozen, merged, and filter state", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);

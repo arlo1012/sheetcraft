@@ -1,4 +1,5 @@
 export { adjustImageCropSelection, type ImageCropGesture } from "./image-crop-selection.js";
+export * from "./axis-interactions.js";
 export * from "./extent.js";
 export * from "./floating-image-layout.js";
 export * from "./floating-image-transform.js";
