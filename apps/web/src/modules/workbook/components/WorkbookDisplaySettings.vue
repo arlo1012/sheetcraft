@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, Eye } from "lucide-vue-next";
+import { Check, Settings, Table2 } from "lucide-vue-next";
 import { computed, nextTick, ref, useId } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
@@ -66,7 +66,10 @@ function onTriggerKeydown(event: KeyboardEvent): void {
     @click="toggleMenu"
     @keydown="onTriggerKeydown"
   >
-    <Eye :size="15" aria-hidden="true" />
+    <span class="workbook-display-settings__icon" aria-hidden="true">
+      <Table2 :size="15" :stroke-width="1.7" />
+      <Settings class="workbook-display-settings__icon-cog" :size="7" :stroke-width="2" />
+    </span>
   </button>
 
   <Teleport to="body">
@@ -135,6 +138,23 @@ function onTriggerKeydown(event: KeyboardEvent): void {
       outline: 2px solid var(--idea-action-primary);
       outline-offset: -2px;
     }
+  }
+
+  &__icon {
+    position: relative;
+    display: grid;
+    width: 15px;
+    height: 15px;
+  }
+
+  &__icon-cog {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    box-sizing: content-box;
+    padding: 1px;
+    border-radius: 2px;
+    background: var(--idea-sheet-bar-surface);
   }
 
   &__menu {
