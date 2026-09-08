@@ -19,6 +19,7 @@ const props = withDefaults(
     showHeaders?: boolean;
     showGridLines?: boolean;
     showAxisQuickTools?: boolean;
+    eyeComfortEnabled?: boolean;
     highlightEnabled?: boolean;
     highlightColor?: string;
     fullscreen?: boolean;
@@ -29,6 +30,7 @@ const props = withDefaults(
     showHeaders: true,
     showGridLines: true,
     showAxisQuickTools: false,
+    eyeComfortEnabled: false,
     highlightEnabled: false,
     highlightColor: "#22a06b",
     fullscreen: false,
@@ -49,6 +51,7 @@ const emit = defineEmits<{
   "update:showHeaders": [value: boolean];
   "update:showGridLines": [value: boolean];
   "update:showAxisQuickTools": [value: boolean];
+  "update:eyeComfortEnabled": [value: boolean];
   "update:highlightEnabled": [value: boolean];
   "update:highlightColor": [value: string];
   toggleFullscreen: [];
@@ -197,9 +200,11 @@ function formatNumber(value: number): string {
           :show-headers="showHeaders"
           :show-grid-lines="showGridLines"
           :show-axis-quick-tools="showAxisQuickTools"
+          :eye-comfort-enabled="eyeComfortEnabled"
           @update:show-headers="emit('update:showHeaders', $event)"
           @update:show-grid-lines="emit('update:showGridLines', $event)"
           @update:show-axis-quick-tools="emit('update:showAxisQuickTools', $event)"
+          @update:eye-comfort-enabled="emit('update:eyeComfortEnabled', $event)"
           :highlight-enabled="highlightEnabled"
           :highlight-color="highlightColor"
           :fullscreen="fullscreen"

@@ -262,6 +262,7 @@ export const enUS = {
     },
     viewAndZoom: "View and zoom",
     displaySettings: "Display settings",
+    eyeComfortMode: "Eye comfort mode",
     showHeaders: "Row and column headings",
     showGridLines: "Gridlines",
     axisQuickTools: "Row and column quick tools",

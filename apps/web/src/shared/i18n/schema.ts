@@ -250,6 +250,7 @@ export type MessageSchema = {
     };
     viewAndZoom: string;
     displaySettings: string;
+    eyeComfortMode: string;
     showHeaders: string;
     showGridLines: string;
     axisQuickTools: string;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   ChevronDown,
+  Eye,
   Icon as LucideIcon,
   Maximize2,
   Minimize2,
@@ -54,6 +55,7 @@ const props = withDefaults(
     showHeaders?: boolean;
     showGridLines?: boolean;
     showAxisQuickTools?: boolean;
+    eyeComfortEnabled?: boolean;
     highlightEnabled?: boolean;
     highlightColor?: string;
     fullscreen?: boolean;
@@ -64,6 +66,7 @@ const props = withDefaults(
     showHeaders: true,
     showGridLines: true,
     showAxisQuickTools: false,
+    eyeComfortEnabled: false,
     highlightEnabled: false,
     highlightColor: "#22a06b",
     fullscreen: false,
@@ -76,6 +79,7 @@ const emit = defineEmits<{
   "update:showHeaders": [value: boolean];
   "update:showGridLines": [value: boolean];
   "update:showAxisQuickTools": [value: boolean];
+  "update:eyeComfortEnabled": [enabled: boolean];
   "update:highlightEnabled": [enabled: boolean];
   "update:highlightColor": [color: string];
   toggleFullscreen: [];
@@ -166,6 +170,18 @@ function selectHighlightColor(value: string | null): void {
 
 <template>
   <div class="workbook-view-controls" :aria-label="t('statusBar.viewAndZoom')" role="group">
+    <button
+      type="button"
+      class="workbook-view-controls__button workbook-view-controls__eye-comfort"
+      :class="{ 'is-active': eyeComfortEnabled }"
+      :aria-label="t('statusBar.eyeComfortMode')"
+      :aria-pressed="eyeComfortEnabled"
+      :title="t('statusBar.eyeComfortMode')"
+      data-view-control="eye-comfort"
+      @click="emit('update:eyeComfortEnabled', !eyeComfortEnabled)"
+    >
+      <Eye :size="15" aria-hidden="true" />
+    </button>
     <WorkbookDisplaySettings
       :show-headers="showHeaders"
       :show-grid-lines="showGridLines"
@@ -348,6 +364,15 @@ function selectHighlightColor(value: string | null): void {
     &:disabled {
       color: var(--idea-text-disabled);
       cursor: default;
+    }
+  }
+
+  &__eye-comfort {
+    border-radius: 2px;
+
+    &.is-active {
+      background: var(--idea-action-focus);
+      color: var(--idea-action-primary);
     }
   }
 

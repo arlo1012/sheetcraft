@@ -253,6 +253,7 @@ export const zhCN = {
     },
     viewAndZoom: "视图和缩放",
     displaySettings: "显示设置",
+    eyeComfortMode: "护眼模式",
     showHeaders: "行号列标",
     showGridLines: "网格线",
     axisQuickTools: "行列快捷工具",

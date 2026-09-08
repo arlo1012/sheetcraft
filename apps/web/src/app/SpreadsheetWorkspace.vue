@@ -3,6 +3,7 @@ import { nextTick, ref, shallowRef, shallowReactive, useId, watch } from "vue";
 import type { CellFormatChange } from "@idea10/core/commands";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { useWorkbookFullscreen } from "../modules/workbook/composables/useWorkbookFullscreen";
+import { useEyeComfortMode } from "../modules/workbook/composables/useEyeComfortMode";
 import { normalizeSheetZoom, SHEET_ZOOM_STEP } from "../shared/sheet-view/zoom";
 import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import {
@@ -40,6 +41,7 @@ const zoom = ref(100);
 const showHeaders = ref(true);
 const showGridLines = ref(true);
 const showAxisQuickTools = ref(false);
+const eyeComfortEnabled = useEyeComfortMode();
 const highlightEnabled = ref(false);
 const highlightColor = ref("#22a06b");
 const { fullscreen, fullscreenAvailable, toggleFullscreen } = useWorkbookFullscreen(() => {
@@ -369,6 +371,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     />
     <div
       class="spreadsheet-workspace__grid"
+      :class="{ 'is-eye-comfort': eyeComfortEnabled }"
       :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection"
     >
       <SheetGrid
@@ -420,6 +423,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       v-model:show-headers="showHeaders"
       v-model:show-grid-lines="showGridLines"
       v-model:show-axis-quick-tools="showAxisQuickTools"
+      v-model:eye-comfort-enabled="eyeComfortEnabled"
       v-model:highlight-enabled="highlightEnabled"
       v-model:highlight-color="highlightColor"
       :fullscreen="fullscreen"
@@ -469,6 +473,12 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
   &__grid {
     min-width: 0;
     min-height: 0;
+
+    &.is-eye-comfort {
+      --idea-surface-panel: var(--idea-eye-comfort-surface);
+      --idea-surface-secondary: var(--idea-eye-comfort-header);
+      --idea-border-subtle: var(--idea-eye-comfort-gridline);
+    }
   }
 }
 </style>
