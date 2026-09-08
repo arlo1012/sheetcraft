@@ -29,6 +29,7 @@ type VisibleRow = {
 type VisualMergeFragment = {
   key: string;
   paneId: VisibleCell["paneId"];
+  rect: Rect;
   style: CSSProperties;
 };
 
@@ -238,6 +239,7 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
       fragments.push({
         key: `${cell.key}:${fragment.paneId}`,
         paneId: fragment.paneId,
+        rect: fragment.rect,
         style: {
           left: `${fragment.rect.x - clip.x}px`,
           top: `${fragment.rect.y - clip.y}px`,
@@ -249,6 +251,26 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
     }
   }
   return fragments;
+});
+
+const gridLinePanes = computed(() => {
+  if (!props.showGridLines) return [];
+  const fragments = [...visibleCells.value, ...visualMergeFragments.value];
+  return paneClips.value.flatMap(({ paneId, style }) => {
+    const clip = props.layout.panes[paneId].clip;
+    if (clip.width <= 0 || clip.height <= 0) return [];
+    const path = fragments
+      .filter((fragment) => fragment.paneId === paneId)
+      .map(({ rect }) => {
+        const left = rect.x - clip.x;
+        const top = rect.y - clip.y;
+        const right = left + rect.width - 0.5;
+        const bottom = top + rect.height - 0.5;
+        return `M${left} ${bottom}H${right}V${top}`;
+      })
+      .join(" ");
+    return [{ paneId, style, path }];
+  });
 });
 </script>
 
@@ -300,6 +322,19 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
         </template>
       </SheetCellRowPane>
     </div>
+    <!-- Paint above all cell backgrounds so fractional zoom cannot cover adjacent grid lines. -->
+    <svg
+      v-for="pane in gridLinePanes"
+      :key="pane.paneId"
+      class="sheet-cell-layer__grid-lines"
+      :style="pane.style"
+      :data-gridline-pane="pane.paneId"
+      aria-hidden="true"
+      focusable="false"
+      shape-rendering="crispEdges"
+    >
+      <path :d="pane.path" />
+    </svg>
   </div>
 </template>
 
@@ -329,12 +364,22 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
     pointer-events: none;
   }
 
+  &__grid-lines {
+    position: absolute;
+    z-index: 1;
+    overflow: hidden;
+    fill: none;
+    stroke: var(--idea-border-subtle);
+    stroke-width: 1px;
+    pointer-events: none;
+  }
+
   &__merge-fragment {
     position: absolute;
     box-sizing: border-box;
     background: var(--idea-surface-panel);
-    border-right: var(--sheet-gridline-width) solid var(--idea-border-subtle);
-    border-bottom: var(--sheet-gridline-width) solid var(--idea-border-subtle);
+    border-right: var(--sheet-gridline-width) solid transparent;
+    border-bottom: var(--sheet-gridline-width) solid transparent;
     pointer-events: none;
   }
 }
