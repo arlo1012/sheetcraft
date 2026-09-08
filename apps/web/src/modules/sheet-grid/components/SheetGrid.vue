@@ -2035,7 +2035,7 @@ defineExpose({
     inset: var(--sheet-axis-tools-size) auto auto var(--sheet-axis-tools-size);
     z-index: 5;
     display: grid;
-    place-items: center;
+    place-items: end;
     width: calc(var(--sheet-row-header-width) - var(--sheet-axis-tools-size));
     height: calc(var(--sheet-column-header-height) - var(--sheet-axis-tools-size));
     background: var(--idea-surface-secondary);
@@ -2043,7 +2043,7 @@ defineExpose({
     border-right: 1px solid var(--idea-border-control);
     border-bottom: 1px solid var(--idea-border-control);
     color: var(--idea-text-muted);
-    padding: 0;
+    padding: 6px;
     appearance: none;
     cursor: pointer;
 
