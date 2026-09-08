@@ -26,12 +26,12 @@ const props = withDefaults(
 const emit = defineEmits<{ confirm: [change: CellFormatChange]; cancel: [] }>();
 const { t } = useAppI18n();
 const activeTab = ref<CellFormatTab>(props.initialTab);
-const bodyRef = ref<HTMLElement>();
+const tabsRef = ref<{ $el: HTMLElement }>();
 const tabOrder: CellFormatTab[] = ["number", "alignment", "font", "border", "fill"];
 onMounted(() => {
   void nextTick(() =>
-    bodyRef.value
-      ?.querySelector<HTMLElement>(`[data-cell-format-tab="${activeTab.value}"]`)
+    tabsRef.value?.$el
+      .querySelector<HTMLElement>(`[data-cell-format-tab="${activeTab.value}"]`)
       ?.focus(),
   );
 });
@@ -47,11 +47,13 @@ function onTabKeydown(event: KeyboardEvent): void {
         ? tabOrder.length - 1
         : (tabOrder.indexOf(activeTab.value) + direction + tabOrder.length) % tabOrder.length;
   activeTab.value = tabOrder[index]!;
-  bodyRef.value?.querySelector<HTMLElement>(`[data-cell-format-tab="${activeTab.value}"]`)?.focus();
+  tabsRef.value?.$el
+    .querySelector<HTMLElement>(`[data-cell-format-tab="${activeTab.value}"]`)
+    ?.focus();
 }
 function onDialogKeydown(event: KeyboardEvent): void {
   if (event.key !== "Tab") return;
-  const root = bodyRef.value?.closest('[role="dialog"]');
+  const root = tabsRef.value?.$el.closest('[role="dialog"]');
   const controls = Array.from(
     root?.querySelectorAll<HTMLElement>(
       'button:not(:disabled), input:not(:disabled), [tabindex]:not([tabindex="-1"])',
@@ -109,97 +111,95 @@ function confirm(): void {
     @confirm="confirm"
     @close="emit('cancel')"
   >
-    <div ref="bodyRef" class="cell-format-dialog__body">
-      <Tabs v-model="activeTab" class="cell-format-dialog__tabs">
-        <TabPanel value="number">
-          <template #label
-            ><button
-              type="button"
-              class="cell-format-dialog__tab"
-              data-cell-format-tab="number"
-              :aria-pressed="activeTab === 'number'"
-              :tabindex="activeTab === 'number' ? 0 : -1"
-              @keydown="onTabKeydown"
-            >
-              {{ t("cellFormat.number") }}
-            </button></template
-          ><CellFormatNumberPanel
-            :state="state"
-            :patch="stylePatch"
-            :sample-value="sampleValue"
-            @update:patch="updateStyle"
-        /></TabPanel>
-        <TabPanel value="alignment">
-          <template #label
-            ><button
-              type="button"
-              class="cell-format-dialog__tab"
-              data-cell-format-tab="alignment"
-              :aria-pressed="activeTab === 'alignment'"
-              :tabindex="activeTab === 'alignment' ? 0 : -1"
-              @keydown="onTabKeydown"
-            >
-              {{ t("cellFormat.alignment") }}
-            </button></template
-          ><CellFormatAlignmentPanel :state="state" :patch="stylePatch" @update:patch="updateStyle"
-        /></TabPanel>
-        <TabPanel value="font">
-          <template #label
-            ><button
-              type="button"
-              class="cell-format-dialog__tab"
-              data-cell-format-tab="font"
-              :aria-pressed="activeTab === 'font'"
-              :tabindex="activeTab === 'font' ? 0 : -1"
-              @keydown="onTabKeydown"
-            >
-              {{ t("cellFormat.font") }}
-            </button></template
-          ><CellFormatFontPanel
-            :state="state"
-            :patch="stylePatch"
-            :sample-value="sampleValue"
-            @update:patch="updateStyle"
-        /></TabPanel>
-        <TabPanel value="border">
-          <template #label
-            ><button
-              type="button"
-              class="cell-format-dialog__tab"
-              data-cell-format-tab="border"
-              :aria-pressed="activeTab === 'border'"
-              :tabindex="activeTab === 'border' ? 0 : -1"
-              @keydown="onTabKeydown"
-            >
-              {{ t("cellFormat.border") }}
-            </button></template
-          ><CellFormatBorderPanel
-            :state="borderState"
-            :actions="borderActions"
-            :format="borderFormat"
-            @update:actions="updateBorderActions"
-            @update:format="updateBorderFormat"
-        /></TabPanel>
-        <TabPanel value="fill">
-          <template #label
-            ><button
-              type="button"
-              class="cell-format-dialog__tab"
-              data-cell-format-tab="fill"
-              :aria-pressed="activeTab === 'fill'"
-              :tabindex="activeTab === 'fill' ? 0 : -1"
-              @keydown="onTabKeydown"
-            >
-              {{ t("cellFormat.fill") }}
-            </button></template
-          ><CellFormatFillPanel
-            :state="state"
-            :patch="stylePatch"
-            :sample-value="sampleValue"
-            @update:patch="updateStyle"
-        /></TabPanel>
-      </Tabs>
-    </div>
+    <Tabs ref="tabsRef" v-model="activeTab" class="cell-format-dialog__tabs">
+      <TabPanel value="number">
+        <template #label
+          ><button
+            type="button"
+            class="cell-format-dialog__tab"
+            data-cell-format-tab="number"
+            :aria-pressed="activeTab === 'number'"
+            :tabindex="activeTab === 'number' ? 0 : -1"
+            @keydown="onTabKeydown"
+          >
+            {{ t("cellFormat.number") }}
+          </button></template
+        ><CellFormatNumberPanel
+          :state="state"
+          :patch="stylePatch"
+          :sample-value="sampleValue"
+          @update:patch="updateStyle"
+      /></TabPanel>
+      <TabPanel value="alignment">
+        <template #label
+          ><button
+            type="button"
+            class="cell-format-dialog__tab"
+            data-cell-format-tab="alignment"
+            :aria-pressed="activeTab === 'alignment'"
+            :tabindex="activeTab === 'alignment' ? 0 : -1"
+            @keydown="onTabKeydown"
+          >
+            {{ t("cellFormat.alignment") }}
+          </button></template
+        ><CellFormatAlignmentPanel :state="state" :patch="stylePatch" @update:patch="updateStyle"
+      /></TabPanel>
+      <TabPanel value="font">
+        <template #label
+          ><button
+            type="button"
+            class="cell-format-dialog__tab"
+            data-cell-format-tab="font"
+            :aria-pressed="activeTab === 'font'"
+            :tabindex="activeTab === 'font' ? 0 : -1"
+            @keydown="onTabKeydown"
+          >
+            {{ t("cellFormat.font") }}
+          </button></template
+        ><CellFormatFontPanel
+          :state="state"
+          :patch="stylePatch"
+          :sample-value="sampleValue"
+          @update:patch="updateStyle"
+      /></TabPanel>
+      <TabPanel value="border">
+        <template #label
+          ><button
+            type="button"
+            class="cell-format-dialog__tab"
+            data-cell-format-tab="border"
+            :aria-pressed="activeTab === 'border'"
+            :tabindex="activeTab === 'border' ? 0 : -1"
+            @keydown="onTabKeydown"
+          >
+            {{ t("cellFormat.border") }}
+          </button></template
+        ><CellFormatBorderPanel
+          :state="borderState"
+          :actions="borderActions"
+          :format="borderFormat"
+          @update:actions="updateBorderActions"
+          @update:format="updateBorderFormat"
+      /></TabPanel>
+      <TabPanel value="fill">
+        <template #label
+          ><button
+            type="button"
+            class="cell-format-dialog__tab"
+            data-cell-format-tab="fill"
+            :aria-pressed="activeTab === 'fill'"
+            :tabindex="activeTab === 'fill' ? 0 : -1"
+            @keydown="onTabKeydown"
+          >
+            {{ t("cellFormat.fill") }}
+          </button></template
+        ><CellFormatFillPanel
+          :state="state"
+          :patch="stylePatch"
+          :sample-value="sampleValue"
+          @update:patch="updateStyle"
+      /></TabPanel>
+    </Tabs>
   </Dialog>
 </template>
 
@@ -216,8 +216,9 @@ function confirm(): void {
     outline-offset: 4px;
   }
 }
-.cell-format-dialog__body {
+.cell-format-dialog__tabs {
+  display: flex;
+  flex-direction: column;
   height: min(380px, calc(100dvh - 240px));
-  overflow: auto;
 }
 </style>

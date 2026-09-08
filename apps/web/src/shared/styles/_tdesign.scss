@@ -195,6 +195,23 @@
 .cell-format-dialog {
   --td-comp-paddingTB-xxl: var(--idea-space-6);
   --td-comp-paddingLR-xxl: var(--idea-space-6);
+
+  // Dialog always renders a body node; let Tabs own the content layout.
+  .t-dialog__body {
+    display: contents;
+  }
+
+  .cell-format-dialog__tabs {
+    > .t-tabs__header {
+      flex: none;
+    }
+
+    > .t-tabs__content {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+  }
 }
 
 // Embedded color panels share their owner's floating surface and reserve most
