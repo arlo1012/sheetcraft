@@ -11,6 +11,7 @@ import CellFormatBorderPanel from "./CellFormatBorderPanel.vue";
 import CellFormatFillPanel from "./CellFormatFillPanel.vue";
 import CellFormatFontPanel from "./CellFormatFontPanel.vue";
 import CellFormatNumberPanel from "./CellFormatNumberPanel.vue";
+import { rememberCustomNumberFormat } from "../number-format/custom-formats";
 
 export type CellFormatTab = "number" | "alignment" | "font" | "border" | "fill";
 
@@ -19,6 +20,7 @@ const props = withDefaults(
     state: SelectionCellStyleState;
     borderState: SelectionBorderState;
     sampleValue: string | number | boolean | null;
+    dateSystem?: "1900" | "1904";
     initialTab?: CellFormatTab;
   }>(),
   { initialTab: "border" },
@@ -71,6 +73,7 @@ function onDialogKeydown(event: KeyboardEvent): void {
 }
 
 const stylePatch = ref<CellStylePatch>({});
+const numberFormatValid = ref(true);
 const borderActions = ref<CellBorderAction[]>([]);
 const borderFormat = ref<CellBorderFormatPatch | undefined>();
 
@@ -84,6 +87,9 @@ function updateBorderFormat(format: CellBorderFormatPatch | undefined): void {
   borderFormat.value = format ? { ...borderFormat.value, ...format } : undefined;
 }
 function confirm(): void {
+  if (!numberFormatValid.value) return;
+  if (stylePatch.value.numberFormat && stylePatch.value.numberFormat.kind === "custom")
+    rememberCustomNumberFormat(stylePatch.value.numberFormat.code);
   const change: CellFormatChange = {};
   if (Object.keys(stylePatch.value).length > 0) change.style = stylePatch.value;
   if (borderActions.value.length > 0) change.borders = borderActions.value;
@@ -100,7 +106,7 @@ function confirm(): void {
     :visible="true"
     @keydown="onDialogKeydown"
     :header="t('cellFormat.title')"
-    :confirm-btn="{ content: t('cellFormat.confirm') }"
+    :confirm-btn="{ content: t('cellFormat.confirm'), disabled: !numberFormatValid }"
     :cancel-btn="t('cellFormat.cancel')"
     :close-on-overlay-click="false"
     :destroy-on-close="true"
@@ -111,8 +117,13 @@ function confirm(): void {
     @confirm="confirm"
     @close="emit('cancel')"
   >
-    <Tabs ref="tabsRef" v-model="activeTab" class="cell-format-dialog__tabs">
-      <TabPanel value="number">
+    <Tabs
+      ref="tabsRef"
+      v-model="activeTab"
+      class="cell-format-dialog__tabs"
+      :class="{ 'cell-format-dialog__tabs--number': activeTab === 'number' }"
+    >
+      <TabPanel value="number" :destroy-on-hide="false">
         <template #label
           ><button
             type="button"
@@ -128,7 +139,9 @@ function confirm(): void {
           :state="state"
           :patch="stylePatch"
           :sample-value="sampleValue"
+          :date-system="dateSystem"
           @update:patch="updateStyle"
+          @validity-change="numberFormatValid = $event"
       /></TabPanel>
       <TabPanel value="alignment">
         <template #label
@@ -224,5 +237,9 @@ function confirm(): void {
   display: flex;
   flex-direction: column;
   height: min(380px, calc(100dvh - 240px));
+
+  &--number {
+    height: min(508px, calc(100dvh - 192px));
+  }
 }
 </style>

@@ -151,4 +151,20 @@ describe("automatic row height", () => {
 
     expect(heights.get(0)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
   });
+
+  test("measures the adapter's formatted value when supplied", () => {
+    const calculator = createAutoRowHeightCalculator(fixedMeasurer);
+    const heights = calculator.reconcile({
+      cells: new Map([
+        ["0:0", { content: { kind: "literal", value: 1 }, style: { wrapText: true } }],
+      ]),
+      getComputedValue: () => 1,
+      formatValue: (_address, _cell, value) => (value === 1 ? "a\nb" : ""),
+      columnWidths: new Map([[0, 42]]),
+      rowCount: 2,
+      columnCount: 2,
+    });
+
+    expect(heights.get(0)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
+  });
 });

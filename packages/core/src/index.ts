@@ -7,6 +7,7 @@ export * from "./history.js";
 export * from "./image-transform.js";
 export * from "./input.js";
 export * from "./merged-cells.js";
+export * from "./number-format.js";
 export * from "./runtime.js";
 export * from "./search.js";
 export * from "./selection-summary.js";

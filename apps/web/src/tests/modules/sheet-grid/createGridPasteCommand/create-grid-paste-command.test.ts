@@ -59,6 +59,29 @@ function filteredPlan(rows: number[], rowCount = rows.length) {
 }
 
 describe("createGridPasteCommand", () => {
+  test("uses raw external TSV fields for Text-format targets while preserving ordinary values", () => {
+    const sheet = getActiveSheet(createWorkbook({ idFactory: createSequentialIdFactory() }));
+    const textTarget = { row: 0, column: 0 };
+    const numberTarget = { row: 0, column: 1 };
+    setCellStyle(sheet, textTarget, { numberFormat: { kind: "text" } });
+
+    const session = execute(sheet, {
+      kind: "all",
+      plan: {
+        anchor: textTarget,
+        range: { start: textTarget, end: numberTarget },
+        values: [[12, 12]],
+      },
+      rawTextValues: [["0012", "0012"]],
+    });
+
+    expect(getCellContent(sheet, textTarget)).toEqual({ kind: "literal", value: "0012" });
+    expect(getCellContent(sheet, numberTarget)).toEqual({ kind: "literal", value: 12 });
+    expect(session.history.undoStack).toHaveLength(1);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellContent(sheet, textTarget)).toBeNull();
+  });
+
   test("maps formulas using real non-contiguous source rows and tiles them across visible targets", () => {
     const sheet = createFilteredSheet();
     const payload: GridPastePayload = {

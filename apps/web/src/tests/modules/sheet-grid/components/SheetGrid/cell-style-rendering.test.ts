@@ -152,6 +152,25 @@ describe("SheetGrid cell style rendering", () => {
     expect(style.paddingRight).toBe("");
   });
 
+  test("renders number-format colors and fill characters for the selected section", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    setCellValue(sheet, { row: 0, column: 0 }, -123);
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        numberFormat: { kind: "custom", code: "0;[Red]*x0;*y0;*@" },
+      },
+    );
+    await nextTick();
+
+    const cell = wrapper.get<HTMLElement>('[data-row="0"][data-column="0"]');
+    expect(cell.element.style.color).toBe("red");
+    expect(cell.get(".sheet-cell-layer__value").classes()).toContain("has-fill");
+    expect(cell.get(".sheet-cell-layer__fill").text()).toContain("x");
+    expect(cell.text().endsWith("123")).toBe(true);
+  });
+
   test("renders explicit borders on a shared sheet layer", async () => {
     const { sheet, wrapper } = mountSheetGrid();
     setCellStyle(

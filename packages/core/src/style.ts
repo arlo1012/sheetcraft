@@ -1,3 +1,8 @@
+import {
+  canonicalizeCellNumberFormatCode,
+  validateCellNumberFormatCode,
+} from "./number-format-code.js";
+
 export const MIN_CELL_FONT_SIZE = 8;
 export const MAX_CELL_FONT_SIZE = 72;
 export const DEFAULT_CELL_FONT_SIZE = 13;
@@ -33,9 +38,51 @@ export type CellBorder = {
   color: string;
 };
 
+export type CellNumberFormatNegativeStyle = "minus" | "red" | "parentheses" | "red-parentheses";
+
+/**
+ * The semantic formats exposed by product UI.  Custom codes are preserved as
+ * codes rather than parsed into a lossy object, so they can round-trip through
+ * XLSX unchanged.
+ */
 export type CellNumberFormat =
-  | { kind: "number" | "percent"; fractionDigits: number }
-  | { kind: "currency"; currency: string; fractionDigits: number };
+  | {
+      kind: "number";
+      fractionDigits: number;
+      useGrouping?: boolean;
+      negativeStyle?: CellNumberFormatNegativeStyle;
+      locale?: string;
+    }
+  | {
+      kind: "percent";
+      fractionDigits: number;
+      useGrouping?: boolean;
+      negativeStyle?: CellNumberFormatNegativeStyle;
+      locale?: string;
+    }
+  | {
+      kind: "currency";
+      /** An ISO-4217 code, or an empty string for an accounting format without a symbol. */
+      currency: string;
+      fractionDigits: number;
+      negativeStyle?: CellNumberFormatNegativeStyle;
+      locale?: string;
+    }
+  | {
+      kind: "accounting";
+      /** An ISO-4217 code, or an empty string for an accounting format without a symbol. */
+      currency: string;
+      fractionDigits: number;
+      negativeStyle?: CellNumberFormatNegativeStyle;
+      locale?: string;
+    }
+  | { kind: "date"; code: string; locale?: string; fractionDigits?: never }
+  | { kind: "time"; code: string; locale?: string; fractionDigits?: never }
+  | { kind: "fraction"; code: string; locale?: string; fractionDigits?: never }
+  | { kind: "special"; code: string; locale?: string; fractionDigits?: never }
+  | { kind: "custom"; code: string; locale?: string; fractionDigits?: never }
+  | { kind: "scientific"; fractionDigits: number; locale?: string }
+  | { kind: "text"; fractionDigits?: never };
 
 export type CellBorderPreset =
   | "none"
@@ -132,33 +179,80 @@ const BORDER_PRESETS = new Set<CellBorderPreset>([
   "diagonalUp",
   "diagonalDown",
 ]);
-const NUMBER_FORMAT_KINDS = new Set<CellNumberFormat["kind"]>(["number", "percent", "currency"]);
+const NUMBER_FORMAT_KINDS = new Set<CellNumberFormat["kind"]>([
+  "number",
+  "percent",
+  "currency",
+  "accounting",
+  "date",
+  "time",
+  "fraction",
+  "scientific",
+  "text",
+  "special",
+  "custom",
+]);
 const CURRENCY_CODE_PATTERN = /^[A-Z]{3}$/;
+const NUMBER_FORMAT_NEGATIVE_STYLES = new Set<CellNumberFormatNegativeStyle>([
+  "minus",
+  "red",
+  "parentheses",
+  "red-parentheses",
+]);
+const MAX_NUMBER_FORMAT_CODE_LENGTH = 255;
 
 export function normalizeCellNumberFormat(format: CellNumberFormat): CellNumberFormat {
   if (!format || typeof format !== "object" || !NUMBER_FORMAT_KINDS.has(format.kind)) {
-    throw new TypeError("Cell number format kind must be number, percent, or currency.");
+    throw new TypeError("Cell number format kind is invalid.");
   }
+  if (format.kind === "text") return { kind: "text" };
+  const locale = normalizeNumberFormatLocale(format.locale);
   if (
-    !Number.isInteger(format.fractionDigits) ||
-    format.fractionDigits < MIN_NUMBER_FORMAT_FRACTION_DIGITS ||
-    format.fractionDigits > MAX_NUMBER_FORMAT_FRACTION_DIGITS
+    format.kind === "date" ||
+    format.kind === "time" ||
+    format.kind === "fraction" ||
+    format.kind === "special" ||
+    format.kind === "custom"
   ) {
-    throw new RangeError(
-      `Cell number format fraction digits must be an integer between ${MIN_NUMBER_FORMAT_FRACTION_DIGITS} and ${MAX_NUMBER_FORMAT_FRACTION_DIGITS}.`,
-    );
+    const code = normalizeNumberFormatCode(format.code);
+    return locale ? { kind: format.kind, code, locale } : { kind: format.kind, code };
   }
-  if (format.kind !== "currency") {
-    return { kind: format.kind, fractionDigits: format.fractionDigits };
+  if (format.kind === "number" || format.kind === "percent") {
+    assertFractionDigits(format.fractionDigits);
+    if (format.useGrouping !== undefined && typeof format.useGrouping !== "boolean") {
+      throw new TypeError("Cell number format grouping must be a boolean.");
+    }
+    assertNegativeStyle(format.negativeStyle);
+    return {
+      kind: format.kind,
+      fractionDigits: format.fractionDigits,
+      ...(format.useGrouping === undefined ? {} : { useGrouping: format.useGrouping }),
+      ...(format.negativeStyle === undefined ? {} : { negativeStyle: format.negativeStyle }),
+      ...(locale ? { locale } : {}),
+    };
   }
+  if (format.kind === "scientific") {
+    assertFractionDigits(format.fractionDigits);
+    return locale
+      ? { kind: "scientific", fractionDigits: format.fractionDigits, locale }
+      : { kind: "scientific", fractionDigits: format.fractionDigits };
+  }
+  assertFractionDigits(format.fractionDigits);
   if (typeof format.currency !== "string") {
     throw new TypeError("Cell currency format must contain an ISO currency code.");
   }
-  const currency = format.currency.toUpperCase();
-  if (!CURRENCY_CODE_PATTERN.test(currency)) {
+  const currency = format.currency.trim().toUpperCase();
+  if (currency && !CURRENCY_CODE_PATTERN.test(currency)) {
     throw new TypeError("Cell currency format must contain a three-letter ISO currency code.");
   }
-  return { kind: "currency", currency, fractionDigits: format.fractionDigits };
+  assertNegativeStyle(format.negativeStyle);
+  return {
+    kind: format.kind,
+    currency,
+    fractionDigits: format.fractionDigits,
+    ...(format.negativeStyle === undefined ? {} : { negativeStyle: format.negativeStyle }),
+    ...(locale ? { locale } : {}),
+  };
 }
 
 export function cloneCellNumberFormat(
@@ -175,10 +269,61 @@ export function areCellNumberFormatsEqual(
     left === right ||
     (left !== undefined &&
       right !== undefined &&
-      left.kind === right.kind &&
-      left.fractionDigits === right.fractionDigits &&
-      (left.kind !== "currency" || (right.kind === "currency" && left.currency === right.currency)))
+      JSON.stringify(normalizeCellNumberFormat(left)) ===
+        JSON.stringify(normalizeCellNumberFormat(right)))
   );
+}
+
+function assertFractionDigits(fractionDigits: unknown): asserts fractionDigits is number {
+  if (
+    typeof fractionDigits !== "number" ||
+    !Number.isInteger(fractionDigits) ||
+    fractionDigits < MIN_NUMBER_FORMAT_FRACTION_DIGITS ||
+    fractionDigits > MAX_NUMBER_FORMAT_FRACTION_DIGITS
+  ) {
+    throw new RangeError(
+      `Cell number format fraction digits must be an integer between ${MIN_NUMBER_FORMAT_FRACTION_DIGITS} and ${MAX_NUMBER_FORMAT_FRACTION_DIGITS}.`,
+    );
+  }
+}
+
+function assertNegativeStyle(
+  value: unknown,
+): asserts value is CellNumberFormatNegativeStyle | undefined {
+  if (
+    value !== undefined &&
+    !NUMBER_FORMAT_NEGATIVE_STYLES.has(value as CellNumberFormatNegativeStyle)
+  ) {
+    throw new TypeError("Cell number format negative style is invalid.");
+  }
+}
+
+function normalizeNumberFormatLocale(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") throw new TypeError("Cell number format locale must be a string.");
+  const locale = value.trim();
+  if (!locale || locale.length > 35)
+    throw new RangeError("Cell number format locale must contain between 1 and 35 characters.");
+  return locale;
+}
+
+function normalizeNumberFormatCode(value: unknown): string {
+  if (typeof value !== "string") throw new TypeError("Cell number format code must be a string.");
+  const code = value.trim();
+  if (
+    !code ||
+    code.length > MAX_NUMBER_FORMAT_CODE_LENGTH ||
+    [...code].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
+  ) {
+    throw new RangeError(
+      `Cell number format code must contain between 1 and ${MAX_NUMBER_FORMAT_CODE_LENGTH} printable characters.`,
+    );
+  }
+  const canonicalCode = canonicalizeCellNumberFormatCode(code);
+  if (!validateCellNumberFormatCode(canonicalCode)) {
+    throw new TypeError("Cell number format code is invalid or unsupported.");
+  }
+  return canonicalCode;
 }
 
 function normalizeFontFamily(value: unknown): string {

@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { createTestSheet } from "../helpers.js";
 import {
   getCellRangeValues,
+  parseTsvToCellTexts,
   parseTsvToCellValues,
   serializeCellValuesToTsv,
 } from "../../clipboard.js";
@@ -44,5 +45,12 @@ describe("workbook TSV clipboard", () => {
 
   test("parses blank clipboard text as one empty cell", () => {
     expect(parseTsvToCellValues("")).toEqual([[null]]);
+  });
+
+  test("keeps raw TSV text for text-formatted paste targets", () => {
+    expect(parseTsvToCellTexts('0012\t"Line 1\nLine 2"\r\n"He said ""yes"""\t')).toEqual([
+      ["0012", "Line 1\nLine 2"],
+      ['He said "yes"', ""],
+    ]);
   });
 });

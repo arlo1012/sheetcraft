@@ -17,6 +17,19 @@ describe("cell content input", () => {
     expect(parseCellContent("'=A1")).toEqual({ kind: "literal", value: "=A1" });
   });
 
+  test("keeps text-formatted input literal while stripping one explicit apostrophe", () => {
+    expect(parseCellContent("")).toBeNull();
+    expect(parseCellContent("0012", { asText: true })).toEqual({ kind: "literal", value: "0012" });
+    expect(parseCellContent("=A1+1", { asText: true })).toEqual({
+      kind: "literal",
+      value: "=A1+1",
+    });
+    expect(parseCellContent("'=A1+1", { asText: true })).toEqual({
+      kind: "literal",
+      value: "=A1+1",
+    });
+  });
+
   test.each(["=", "=A1", "'quoted"])("round trips literal %s", (value) => {
     const content = { kind: "literal" as const, value };
     expect(parseCellContent(formatCellContentForInput(content))).toEqual(content);

@@ -35,6 +35,11 @@ export type AutoRowHeightInput = {
    * formula expressions or depend on a particular cell-content representation.
    */
   getComputedValue: (address: CellAddress, cell: Readonly<Cell>) => FormulaValue;
+  /**
+   * Formats a computed value for measuring. This lets runtime adapters use the
+   * same presentation text as their rendered cell layer.
+   */
+  formatValue?: (address: CellAddress, cell: Readonly<Cell>, value: FormulaValue) => string;
   columnWidths: ReadonlyMap<number, number>;
   rowCount: number;
   columnCount: number;
@@ -236,7 +241,9 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
           continue;
         }
         if (cell.content?.kind === "image") continue;
-        const text = formatComputedValueForDisplay(input.getComputedValue(address, cell));
+        const value = input.getComputedValue(address, cell);
+        const text =
+          input.formatValue?.(address, cell, value) ?? formatComputedValueForDisplay(value);
         const wrapText = Boolean(cell.style?.wrapText);
         if (!text || (!wrapText && !/[\r\n]/u.test(text))) {
           continue;

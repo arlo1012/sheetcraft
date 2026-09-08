@@ -7,11 +7,12 @@ import {
   type Sheet,
   type SheetEvaluator,
 } from "@idea10/core/workbook";
+import type { ExcelDateSystem } from "@idea10/core/formula";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import type { Rect } from "@idea10/sheet-engine/geometry";
 import { isCellSelected, type CellSelection } from "@idea10/sheet-engine/selection";
 import { getCellContentStyle } from "../cell-presentation";
-import { formatCellValueForGrid } from "../cell-value-presentation";
+import { getCellValuePresentationForGrid } from "../cell-value-presentation";
 import SheetCellRowPane from "./SheetCellRowPane.vue";
 import type { VisibleCell, VisibleCellPaneId } from "./sheet-cell-view";
 
@@ -43,10 +44,11 @@ const props = withDefaults(
     editing: boolean;
     showGridLines?: boolean;
     locale?: string;
+    dateSystem?: ExcelDateSystem;
     imageAssetUrls?: ReadonlyMap<string, string>;
     loadingImageAssetIds?: ReadonlySet<string>;
   }>(),
-  { locale: "en-US", showGridLines: true },
+  { locale: "en-US", dateSystem: "1900", showGridLines: true },
 );
 
 const emit = defineEmits<{
@@ -77,9 +79,15 @@ const visibleCells = computed<VisibleCell[]>(() => {
     const cellStyle = getCellStyle(sheet, address);
     const content = getCellContent(sheet, address);
     const cellImage = content?.kind === "image" ? content.image : undefined;
-    const text = cellImage
-      ? ""
-      : formatCellValueForGrid(evaluator.getComputedValue(address), cellStyle, locale);
+    const presentation = cellImage
+      ? undefined
+      : getCellValuePresentationForGrid(
+          evaluator.getComputedValue(address),
+          cellStyle,
+          locale,
+          props.dateSystem,
+        );
+    const text = presentation?.text ?? "";
     const preservesLineBreaks = /[\r\n]/u.test(text);
     cells.push({
       key,
@@ -87,6 +95,7 @@ const visibleCells = computed<VisibleCell[]>(() => {
       address,
       rect,
       text,
+      ...(presentation?.fill ? { fill: presentation.fill } : {}),
       ...(cellImage
         ? { image: cellImage, imageTransformKey: getImageTransformKey(cellImage) }
         : { imageTransformKey: "" }),
@@ -98,6 +107,7 @@ const visibleCells = computed<VisibleCell[]>(() => {
         width: `${rect.width}px`,
         height: `${rect.height}px`,
         ...getCellContentStyle(cellStyle, preservesLineBreaks),
+        ...(presentation?.color ? { color: presentation.color } : {}),
       },
       viewportTop: rect.y,
       viewportHeight: rect.height,

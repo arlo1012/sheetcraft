@@ -106,4 +106,24 @@ describe("HomeNumberGroup", () => {
       wrapper.get('[data-ribbon-action="percent-format"]').attributes("disabled"),
     ).toBeDefined();
   });
+
+  test("keeps format choices available for dates while disabling decimal adjustments", async () => {
+    const wrapper = mountNumberGroup("en-US", false, { kind: "date", code: "yyyy-mm-dd" });
+
+    expect(wrapper.get("[data-number-format-trigger]").attributes("disabled")).toBeUndefined();
+    expect(
+      wrapper.get('[data-ribbon-action="percent-format"]').attributes("disabled"),
+    ).toBeUndefined();
+    expect(
+      wrapper.get('[data-ribbon-action="decrease-decimal"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(
+      wrapper.get('[data-ribbon-action="increase-decimal"]').attributes("disabled"),
+    ).toBeDefined();
+
+    await wrapper.get("[data-number-format-trigger]").trigger("click");
+    expect(
+      new DOMWrapper(document.body).find('[data-number-format-option="general"]').exists(),
+    ).toBe(true);
+  });
 });

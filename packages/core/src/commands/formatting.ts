@@ -263,6 +263,15 @@ function adjustNumberFormat(
   if (!format) {
     return delta > 0 ? { kind: "number", fractionDigits: 1 } : undefined;
   }
+  if (
+    format.kind !== "number" &&
+    format.kind !== "percent" &&
+    format.kind !== "currency" &&
+    format.kind !== "accounting" &&
+    format.kind !== "scientific"
+  ) {
+    return format;
+  }
   const fractionDigits = Math.max(
     MIN_NUMBER_FORMAT_FRACTION_DIGITS,
     Math.min(MAX_NUMBER_FORMAT_FRACTION_DIGITS, format.fractionDigits + delta),

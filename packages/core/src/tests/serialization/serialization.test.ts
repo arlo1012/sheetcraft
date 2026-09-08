@@ -102,6 +102,39 @@ describe("workbook snapshots", () => {
     });
   });
 
+  test("round trips expanded number formats without changing their format codes", () => {
+    const workbook = createWorkbook({ id: "number-formats", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        numberFormat: { kind: "date", code: '[DBNum1][$-804]yyyy"年"m"月"d"日"' },
+      },
+    );
+    setCellStyle(
+      sheet,
+      { row: 0, column: 1 },
+      {
+        numberFormat: { kind: "custom", code: "[Red][<0]0.00;0.00;0;@" },
+      },
+    );
+    setCellStyle(
+      sheet,
+      { row: 0, column: 2 },
+      {
+        numberFormat: { kind: "accounting", currency: "USD", fractionDigits: 2 },
+      },
+    );
+
+    const restored = deserializeWorkbook(serializeWorkbook(workbook));
+    expect(serializeWorkbook(restored)).toEqual(serializeWorkbook(workbook));
+    expect(getCellStyle(getActiveSheet(restored), { row: 0, column: 0 })?.numberFormat).toEqual({
+      kind: "date",
+      code: '[DBNum1][$-804]yyyy"年"m"月"d"日"',
+    });
+  });
+
   test("persists sheet metadata and accepts V2 snapshots without metadata fields", () => {
     const workbook = createWorkbook({ id: "workbook-1", sheetId: "sheet-1" });
     const sheet = getActiveSheet(workbook);

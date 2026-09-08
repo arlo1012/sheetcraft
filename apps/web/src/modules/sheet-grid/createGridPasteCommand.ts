@@ -6,8 +6,11 @@ import {
 } from "@idea10/core/commands";
 import { getCellMatrixSize, translateCellContentForCopy } from "@idea10/core/clipboard";
 import type { CellContent } from "@idea10/core/formula";
+import { parseCellContent } from "@idea10/core/input";
+import { isTextCellNumberFormat } from "@idea10/core/number-format";
 import {
   getCellContent,
+  getCellStyle,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   type CellAddress,
@@ -151,6 +154,18 @@ function toLiteralContent(value: string | number | boolean | null): CellContent 
   return value === null ? null : { kind: "literal", value };
 }
 
+function toPastedContent(
+  sheet: Sheet,
+  address: CellAddress,
+  value: string | number | boolean | null,
+  rawText: string | undefined,
+): CellContent | null {
+  if (rawText !== undefined && isTextCellNumberFormat(getCellStyle(sheet, address)?.numberFormat)) {
+    return parseCellContent(rawText, { asText: true });
+  }
+  return toLiteralContent(value);
+}
+
 function targetAddress(
   plan: GridPastePlan,
   rows: readonly number[],
@@ -161,11 +176,21 @@ function targetAddress(
 }
 
 function getTranslatedContents(
+  sheet: Sheet,
   payload: Extract<GridPastePayload, { kind: "all" }>,
   plan: ValidatedPlan,
 ): Array<Array<CellContent | null>> {
   if (!payload.contents || !payload.sourceRange) {
-    return payload.plan.values.map((row) => row.map(toLiteralContent));
+    return payload.plan.values.map((row, rowIndex) =>
+      row.map((value, columnIndex) =>
+        toPastedContent(
+          sheet,
+          targetAddress(payload.plan, plan.rows, rowIndex, columnIndex),
+          value,
+          payload.rawTextValues?.[rowIndex]?.[columnIndex],
+        ),
+      ),
+    );
   }
   let sourceSize: { rowCount: number; columnCount: number };
   try {
@@ -221,6 +246,9 @@ export function createGridPasteCommand(sheet: Sheet, payload: GridPastePayload):
   const visibility = createGridClipboardRowVisibility(sheet);
   ensureVisibleTargets(visibility, plan.rows);
   ensureNoMergedRange(sheet, payload.plan.range);
+  if (payload.kind !== "formats" && payload.rawTextValues) {
+    assertMatrixShape(payload.rawTextValues, plan);
+  }
   if (!payload.plan.preserveHiddenRows && !isPhysicalRectangle(payload.plan, plan.rows)) {
     throw new GridPasteError("rangeMismatch");
   }
@@ -249,7 +277,7 @@ export function createGridPasteCommand(sheet: Sheet, payload: GridPastePayload):
   }
 
   if (payload.kind === "all") {
-    const contents = getTranslatedContents(payload, plan);
+    const contents = getTranslatedContents(sheet, payload, plan);
     if (payload.styles) assertMatrixShape(payload.styles, plan);
     if (!payload.plan.preserveHiddenRows) {
       return createPasteCellContentsCommand(
@@ -276,7 +304,16 @@ export function createGridPasteCommand(sheet: Sheet, payload: GridPastePayload):
       return createPasteCellContentsCommand(
         sheet.id,
         payload.plan.anchor,
-        payload.plan.values.map((row) => row.map(toLiteralContent)),
+        payload.plan.values.map((row, rowIndex) =>
+          row.map((value, columnIndex) =>
+            toPastedContent(
+              sheet,
+              targetAddress(payload.plan, plan.rows, rowIndex, columnIndex),
+              value,
+              payload.rawTextValues?.[rowIndex]?.[columnIndex],
+            ),
+          ),
+        ),
       );
     }
     return createBatchSetCellContentsCommand(
@@ -284,7 +321,12 @@ export function createGridPasteCommand(sheet: Sheet, payload: GridPastePayload):
         row.map((value, columnIndex) => ({
           sheetId: sheet.id,
           address: targetAddress(payload.plan, plan.rows, rowIndex, columnIndex),
-          content: toLiteralContent(value),
+          content: toPastedContent(
+            sheet,
+            targetAddress(payload.plan, plan.rows, rowIndex, columnIndex),
+            value,
+            payload.rawTextValues?.[rowIndex]?.[columnIndex],
+          ),
         })),
       ),
     );

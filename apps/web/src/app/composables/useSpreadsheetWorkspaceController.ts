@@ -56,6 +56,8 @@ import {
   formatComputedValueForDisplay,
   parseCellContent,
 } from "@idea10/core/input";
+import { isTextCellNumberFormat } from "@idea10/core/number-format";
+import type { ExcelDateSystem } from "@idea10/core/formula";
 import { createAutoSumFormula, createFormulaError } from "@idea10/core/formula";
 import { doMergedCellRangesIntersect } from "@idea10/core";
 import { WorkbookDomainError } from "@idea10/core/errors";
@@ -75,6 +77,7 @@ import {
   getActiveSheet,
   createSheetEvaluator,
   getCellContent,
+  getCellStyle,
   getCellComputedValue,
   getWorkbookSheets,
   MAX_SHEET_COLUMNS,
@@ -151,6 +154,7 @@ export type CellFormatSelection = {
   state: SelectionCellStyleState;
   borderState: SelectionBorderState;
   sampleValue: string | number | boolean | null;
+  dateSystem: ExcelDateSystem;
 };
 
 export function useSpreadsheetWorkspaceController(
@@ -415,9 +419,16 @@ export function useSpreadsheetWorkspaceController(
 
   function commitCell(payload: { address: CellAddress; input: string; sheetId?: string }): void {
     const sheetId = payload.sheetId ?? activeSheet.value.id;
-    if (!session.workbook.sheets.has(sheetId)) return;
+    const sheet = session.workbook.sheets.get(sheetId);
+    if (!sheet) return;
     execute(
-      createSetCellContentCommand(sheetId, payload.address, parseCellContent(payload.input)),
+      createSetCellContentCommand(
+        sheetId,
+        payload.address,
+        parseCellContent(payload.input, {
+          asText: isTextCellNumberFormat(getCellStyle(sheet, payload.address)?.numberFormat),
+        }),
+      ),
       "cells.edit",
     );
     clearWorkspaceStatus();
@@ -685,6 +696,7 @@ export function useSpreadsheetWorkspaceController(
       borderState: getSelectionBorderState(sheet, range),
       sampleValue:
         typeof value === "object" && value !== null ? formatComputedValueForDisplay(value) : value,
+      dateSystem: session.workbook.dateSystem,
     };
   }
 

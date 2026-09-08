@@ -1,4 +1,5 @@
 import type { CSSProperties } from "vue";
+import type { CellNumberFormatPresentation } from "@idea10/core/number-format";
 import type { CellAddress, ImageTransform } from "@idea10/core/workbook";
 import type { Rect } from "@idea10/sheet-engine/geometry";
 
@@ -12,6 +13,7 @@ export type VisibleCell = {
   viewportTop: number;
   viewportHeight: number;
   text: string;
+  fill?: CellNumberFormatPresentation["fill"];
   image?: { assetId: string; altText: string; transform?: ImageTransform };
   imageTransformKey: string;
   multiline: boolean;

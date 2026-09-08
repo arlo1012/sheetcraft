@@ -10,6 +10,7 @@ import {
   watch,
 } from "vue";
 import { formatCellContentForInput } from "@idea10/core/input";
+import type { ExcelDateSystem } from "@idea10/core/formula";
 import { columnIndexToLabel, getCellAddressLabel } from "@idea10/core/coordinates";
 import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
@@ -167,6 +168,7 @@ const props = withDefaults(
     showHeaders?: boolean;
     showGridLines?: boolean;
     showAxisQuickTools?: boolean;
+    dateSystem?: ExcelDateSystem;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -183,6 +185,7 @@ const props = withDefaults(
     showHeaders: true,
     showGridLines: true,
     showAxisQuickTools: false,
+    dateSystem: "1900",
   },
 );
 
@@ -428,6 +431,8 @@ const automaticRowHeights = computed(() => {
   return autoRowHeightCalculator.reconcile({
     cells: props.sheet.cells,
     getComputedValue: sheetEvaluator.value.getComputedValue,
+    formatValue: (_address, cell, value) =>
+      formatCellValueForGrid(value, cell.style, locale.value, props.dateSystem),
     columnWidths: effectiveColumnWidths.value,
     rowCount: gridExtent.rowCount,
     columnCount: gridExtent.columnCount,
@@ -692,6 +697,7 @@ const activeCellDisplayValue = computed(() =>
         sheetEvaluator.value.getComputedValue(activeCell.value),
         getCellStyle(props.sheet, activeCell.value),
         locale.value,
+        props.dateSystem,
       ),
 );
 const activeCellEditorStyle = computed(() =>
@@ -1867,6 +1873,7 @@ defineExpose({
             :editing="isEditing"
             :show-grid-lines="showGridLines"
             :locale="locale"
+            :date-system="props.dateSystem"
             @cell-mousedown="onCellMouseDown"
             @cell-double-click="onCellDoubleClick"
             @cell-contextmenu="openCellContextMenu"

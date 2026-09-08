@@ -39,6 +39,10 @@
       "types": "./dist/input.d.ts",
       "import": "./dist/input.js"
     },
+    "./number-format": {
+      "types": "./dist/number-format.d.ts",
+      "import": "./dist/number-format.js"
+    },
     "./runtime": {
       "types": "./dist/runtime.d.ts",
       "import": "./dist/runtime.js"
@@ -72,6 +76,9 @@
     "build": "tsc -b tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "numfmt": "3.2.6"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

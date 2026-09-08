@@ -2,6 +2,7 @@ import { computed, shallowRef, watch, type ComputedRef } from "vue";
 import {
   getCellMatrixSize,
   getCellRangeContents,
+  parseTsvToCellTexts,
   parseTsvToCellValues,
   serializeCellValuesToTsv,
   tileCellMatrix,
@@ -64,8 +65,10 @@ export type GridPastePayload =
       /** Physical source rows before filtered copies compact their value matrix. */
       sourceRows?: number[];
       styles?: CellStyleMatrix;
+      /** Original external TSV fields for Text-number-format targets. */
+      rawTextValues?: string[][];
     }
-  | { kind: "values"; plan: GridPastePlan }
+  | { kind: "values"; plan: GridPastePlan; rawTextValues?: string[][] }
   | { kind: "formats"; plan: GridPastePlan; styles: CellStyleMatrix };
 
 type GridPasteKind = GridPastePayload["kind"];
@@ -356,6 +359,8 @@ export function useGridClipboard(options: {
       options.onFeedback("missingText");
       return;
     }
+    const rawTextValues =
+      isMatchingLocalClipboard && pending ? undefined : parseTsvToCellTexts(text ?? "");
     const values =
       isMatchingLocalClipboard && pending ? pending.values : parseTsvToCellValues(text ?? "");
     const isLocalCut = Boolean(
@@ -393,6 +398,9 @@ export function useGridClipboard(options: {
       options.onFeedback("mergedRangeUnsupported");
       return;
     }
+    const targetRawTextValues = rawTextValues
+      ? tileCellMatrix(rawTextValues, getCellMatrixSize(plan.values))
+      : undefined;
     if (isLocalCut && pending) {
       if (
         rangeTouchesHiddenClipboardRows(rowVisibility.value, pending.range) ||
@@ -411,7 +419,11 @@ export function useGridClipboard(options: {
         styles: tileCellMatrix(matchingFormatSource.styles, getCellMatrixSize(plan.values)),
       };
     } else if (kind === "values") {
-      payload = { kind, plan };
+      payload = {
+        kind,
+        plan,
+        ...(targetRawTextValues ? { rawTextValues: targetRawTextValues } : {}),
+      };
     } else {
       if (isLocalCut && pending) {
         payload = { kind: "all", plan, moveSource: pending.range };
@@ -428,6 +440,7 @@ export function useGridClipboard(options: {
             isMatchingLocalClipboard && pending
               ? tileCellMatrix(pending.styles, getCellMatrixSize(plan.values))
               : undefined,
+          ...(targetRawTextValues ? { rawTextValues: targetRawTextValues } : {}),
         };
       }
     }

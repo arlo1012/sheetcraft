@@ -1,375 +1,323 @@
 <script setup lang="ts">
+import { computed } from "vue";
+import { Input as TInput } from "tdesign-vue-next/es/input";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
-import type { SelectValue } from "tdesign-vue-next/es/select/type";
-import { computed, ref, watch } from "vue";
-import { formatComputedValueForDisplay } from "@idea10/core/input";
-import type { CellNumberFormat, CellStylePatch } from "@idea10/core/style";
+import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
+import { Button as TButton } from "tdesign-vue-next/es/button";
+import type { CellNumberFormatNegativeStyle, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
-
-type NumberKind = "general" | CellNumberFormat["kind"];
+import { useNumberFormatPanel } from "../number-format/useNumberFormatPanel";
+import NumberFormatCategoryList from "./NumberFormatCategoryList.vue";
+import NumberFormatTypeList from "./NumberFormatTypeList.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
   patch: CellStylePatch;
   sampleValue: string | number | boolean | null;
+  dateSystem?: "1900" | "1904";
 }>();
-const emit = defineEmits<{ "update:patch": [patch: CellStylePatch] }>();
-const { locale, t } = useAppI18n();
-const kind = ref<NumberKind>(resolveKind());
-const fractionDigits = ref(resolveFractionDigits());
-const currency = ref(resolveCurrency());
-
-function currentFormat(): CellNumberFormat | undefined {
-  return Object.hasOwn(props.patch, "numberFormat")
-    ? ((props.patch.numberFormat as CellNumberFormat | null | undefined) ?? undefined)
-    : props.state.numberFormat.mixed
-      ? undefined
-      : props.state.numberFormat.value;
-}
-function resolveKind(): NumberKind {
-  return currentFormat()?.kind ?? "general";
-}
-function resolveFractionDigits(): number {
-  return currentFormat()?.fractionDigits ?? 2;
-}
-function resolveCurrency(): string {
-  const format = currentFormat();
-  return format?.kind === "currency" ? format.currency : locale.value === "zh-CN" ? "CNY" : "USD";
-}
-function emitPatch(): void {
-  const next: CellStylePatch =
-    kind.value === "general"
-      ? { numberFormat: null }
-      : kind.value === "currency"
-        ? {
-            numberFormat: {
-              kind: "currency",
-              currency: currency.value,
-              fractionDigits: fractionDigits.value,
-            },
-          }
-        : { numberFormat: { kind: kind.value, fractionDigits: fractionDigits.value } };
-  emit("update:patch", next);
-}
-function updateKind(value: NumberKind): void {
-  kind.value = value;
-  emitPatch();
-}
-function updateDigits(value: InputNumberValue): void {
-  if (typeof value !== "number" || !Number.isFinite(value)) return;
-  fractionDigits.value = Math.max(0, Math.min(20, Math.round(value)));
-  emitPatch();
-}
-function updateCurrency(value: SelectValue): void {
-  if (typeof value !== "string") return;
-  currency.value = value;
-  emitPatch();
-}
-const kindLabels = computed<Record<NumberKind, string>>(() => ({
-  general: t("cellFormat.general"),
-  number: t("cellFormat.numeric"),
-  percent: t("cellFormat.percent"),
-  currency: t("cellFormat.currency"),
-}));
-const kindDescriptions = computed<Record<NumberKind, string>>(() => ({
-  general: t("cellFormat.generalDescription"),
-  number: t("cellFormat.numericDescription"),
-  percent: t("cellFormat.percentDescription"),
-  currency: t("cellFormat.currencyDescription"),
-}));
-const currencyOptions = computed(() =>
-  [...new Set(["CNY", "USD", "EUR", "JPY", currency.value])].map((value) => ({
-    label:
-      value === "CNY" || value === "JPY"
-        ? `${value} (¥)`
-        : value === "USD"
-          ? "USD ($)"
-          : value === "EUR"
-            ? "EUR (€)"
-            : value,
-    value,
-  })),
+const emit = defineEmits<{
+  "update:patch": [patch: CellStylePatch];
+  "validity-change": [valid: boolean];
+}>();
+const { t } = useAppI18n();
+const {
+  category,
+  fractionDigits,
+  currency,
+  grouping,
+  negativeStyle,
+  region,
+  selectedCode,
+  customCode,
+  mixed,
+  presets,
+  customPresets,
+  customValid,
+  showDecimals,
+  showCurrency,
+  showNegative,
+  showRegion,
+  showTypes,
+  description,
+  currencyOptions,
+  regionOptions,
+  negativeOptions,
+  preview,
+  canDeleteCustom,
+  selectCategory,
+  selectCode,
+  updateCustomCode,
+  updateDigits,
+  updateCurrency,
+  updateRegion,
+  updateGrouping,
+  updateNegativeStyle,
+  deleteCustom,
+} = useNumberFormatPanel(
+  props,
+  (patch) => emit("update:patch", patch),
+  (valid) => emit("validity-change", valid),
 );
-const kindValue = computed<NumberKind | undefined>(() =>
-  Object.hasOwn(props.patch, "numberFormat")
-    ? kind.value
-    : props.state.numberFormat.mixed
-      ? undefined
-      : kind.value,
+const negativeTypes = computed(() =>
+  negativeOptions.value.map(({ value, ...option }) => ({ code: value, ...option })),
 );
-const preview = computed(() => {
-  if (
-    kind.value === "general" ||
-    (props.sampleValue !== null && typeof props.sampleValue !== "number")
-  )
-    return formatComputedValueForDisplay(props.sampleValue ?? 1234.567);
-  const value = typeof props.sampleValue === "number" ? props.sampleValue : 1234.567;
-  if (kind.value === "percent")
-    return new Intl.NumberFormat(locale.value, {
-      style: "percent",
-      minimumFractionDigits: fractionDigits.value,
-      maximumFractionDigits: fractionDigits.value,
-    }).format(value);
-  if (kind.value === "currency")
-    return new Intl.NumberFormat(locale.value, {
-      style: "currency",
-      currency: currency.value,
-      minimumFractionDigits: fractionDigits.value,
-      maximumFractionDigits: fractionDigits.value,
-    }).format(value);
-  return new Intl.NumberFormat(locale.value, {
-    minimumFractionDigits: fractionDigits.value,
-    maximumFractionDigits: fractionDigits.value,
-  }).format(value);
+const previewFillText = computed(() => {
+  const character = preview.value.fill?.character;
+  return !character || /^\s$/u.test(character) ? "" : character.repeat(256);
 });
-watch(
-  () => props.state,
-  () => {
-    kind.value = resolveKind();
-    fractionDigits.value = resolveFractionDigits();
-    currency.value = resolveCurrency();
-  },
-  { deep: true },
-);
+function selectNegative(code: string): void {
+  if (["minus", "red", "parentheses", "red-parentheses"].includes(code))
+    updateNegativeStyle(code as CellNumberFormatNegativeStyle);
+}
 </script>
 
 <template>
   <section class="cell-format-number" :aria-label="t('cellFormat.number')">
-    <div class="cell-format-number__categories">
-      <p class="cell-format-number__caption">{{ t("cellFormat.category") }}</p>
-      <div
-        role="group"
-        :aria-label="t('cellFormat.category')"
-        class="cell-format-number__choices"
-        data-cell-format-number-kind
-      >
-        <button
-          type="button"
-          :aria-pressed="kindValue === 'general'"
-          data-cell-format-number-category="general"
-          @click="updateKind('general')"
-        >
-          {{ t("cellFormat.general") }}
-        </button>
-        <button
-          type="button"
-          :aria-pressed="kindValue === 'number'"
-          data-cell-format-number-category="number"
-          @click="updateKind('number')"
-        >
-          {{ t("cellFormat.numeric") }}
-        </button>
-        <button
-          type="button"
-          :aria-pressed="kindValue === 'percent'"
-          data-cell-format-number-category="percent"
-          @click="updateKind('percent')"
-        >
-          {{ t("cellFormat.percent") }}
-        </button>
-        <button
-          type="button"
-          :aria-pressed="kindValue === 'currency'"
-          data-cell-format-number-category="currency"
-          @click="updateKind('currency')"
-        >
-          {{ t("cellFormat.currency") }}
-        </button>
+    <div class="cell-format-number__body">
+      <NumberFormatCategoryList
+        :model-value="mixed ? undefined : category"
+        @select="selectCategory"
+      />
+      <div class="cell-format-number__details">
+        <div class="cell-format-number__preview">
+          <span class="cell-format-number__label">{{ t("cellFormat.preview") }}</span>
+          <output
+            class="cell-format-number__sample"
+            :style="{ color: preview.color }"
+            data-cell-format-number-preview
+          >
+            <template v-if="preview.fill">
+              <span>{{ preview.fill.before }}</span>
+              <span class="cell-format-number__sample-fill" aria-hidden="true">{{
+                previewFillText
+              }}</span>
+              <span>{{ preview.fill.after }}</span>
+            </template>
+            <template v-else>{{ preview.text }}</template>
+          </output>
+        </div>
+        <div v-if="!mixed" class="cell-format-number__settings">
+          <label v-if="showDecimals" class="cell-format-number__field">
+            <span>{{ t("cellFormat.decimalPlaces") }}</span>
+            <TInputNumber
+              :model-value="fractionDigits"
+              :min="0"
+              :max="20"
+              :decimal-places="0"
+              class="cell-format-number__digits"
+              data-cell-format-decimals
+              @change="updateDigits"
+            />
+          </label>
+          <label v-if="showCurrency" class="cell-format-number__field">
+            <span>{{ t("cellFormat.currencyCode") }}</span>
+            <TSelect
+              :model-value="currency"
+              :options="currencyOptions"
+              data-cell-format-currency
+              @change="updateCurrency"
+            />
+          </label>
+          <TCheckbox
+            v-if="category === 'number'"
+            :model-value="grouping"
+            class="cell-format-number__grouping"
+            data-cell-format-grouping
+            @change="updateGrouping"
+            >{{ t("cellFormat.grouping") }}</TCheckbox
+          >
+          <div v-if="showNegative" class="cell-format-number__negative">
+            <span class="cell-format-number__label">{{ t("cellFormat.negativeNumbers") }}</span>
+            <NumberFormatTypeList
+              :model-value="negativeStyle"
+              :options="negativeTypes"
+              :label="t('cellFormat.negativeNumbers')"
+              @select="selectNegative"
+            />
+          </div>
+          <div v-if="showTypes" class="cell-format-number__types">
+            <span class="cell-format-number__label">{{ t("cellFormat.type") }}</span>
+            <template v-if="category === 'custom'">
+              <TInput
+                :model-value="customCode"
+                :aria-label="t('cellFormat.customCode')"
+                :status="customValid ? 'default' : 'error'"
+                :maxlength="255"
+                data-cell-format-custom-code
+                @change="updateCustomCode"
+              />
+              <p v-if="!customValid" class="cell-format-number__error" role="alert">
+                {{ t("cellFormat.invalidFormat") }}
+              </p>
+            </template>
+            <NumberFormatTypeList
+              :model-value="category === 'custom' ? customCode : selectedCode"
+              :options="category === 'custom' ? customPresets : presets"
+              :label="t('cellFormat.type')"
+              :monospace="category === 'custom'"
+              @select="selectCode"
+            />
+          </div>
+          <label v-if="showRegion" class="cell-format-number__region">
+            <span class="cell-format-number__label">{{ t("cellFormat.region") }}</span>
+            <TSelect
+              :model-value="region"
+              :options="regionOptions"
+              data-cell-format-region
+              @change="updateRegion"
+            />
+          </label>
+          <div v-if="category === 'custom'" class="cell-format-number__custom-actions">
+            <TButton
+              variant="outline"
+              size="small"
+              :disabled="!canDeleteCustom"
+              data-cell-format-delete-custom
+              @click="deleteCustom"
+              >{{ t("cellFormat.deleteFormat") }}</TButton
+            >
+          </div>
+        </div>
       </div>
     </div>
-    <div class="cell-format-number__details">
-      <div class="cell-format-number__settings">
-        <div class="cell-format-number__intro">
-          <h3>{{ kindValue ? kindLabels[kindValue] : t("format.mixed") }}</h3>
-          <p>
-            {{ kindValue ? kindDescriptions[kindValue] : t("cellFormat.mixedNumberDescription") }}
-          </p>
-        </div>
-        <label v-if="kindValue && kind !== 'general'" class="cell-format-number__field">
-          <span>{{ t("cellFormat.decimalPlaces") }}</span>
-          <TInputNumber
-            :model-value="fractionDigits"
-            class="cell-format-number__control cell-format-number__control--digits"
-            :min="0"
-            :max="20"
-            :decimal-places="0"
-            data-cell-format-decimals
-            @change="updateDigits"
-          />
-        </label>
-        <label v-if="kindValue && kind === 'currency'" class="cell-format-number__field">
-          <span>{{ t("cellFormat.currencyCode") }}</span>
-          <TSelect
-            :model-value="currency"
-            :options="currencyOptions"
-            class="cell-format-number__control"
-            data-cell-format-currency
-            @change="updateCurrency"
-          />
-        </label>
-      </div>
-      <div class="cell-format-number__preview">
-        <span class="cell-format-number__caption">{{ t("cellFormat.preview") }}</span>
-        <div class="cell-format-preview">
-          <output data-cell-format-number-preview>{{
-            kindValue ? preview : t("format.mixed")
-          }}</output>
-        </div>
-      </div>
-    </div>
+    <p class="cell-format-number__description">{{ description }}</p>
   </section>
 </template>
 
 <style scoped lang="scss">
-@use "../styles/format-panel";
-
 .cell-format-number {
   display: grid;
-  grid-template-columns: 132px minmax(0, 1fr);
-  gap: 24px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
   padding-top: 16px;
+  color: var(--idea-text-primary);
   font-size: 13px;
 
-  &__categories {
-    padding-right: 16px;
-    border-right: 1px solid var(--idea-border-subtle);
+  &__body {
+    display: grid;
+    grid-template-columns: 144px minmax(0, 1fr);
+    gap: 16px;
+    min-height: 0;
   }
-
-  &__caption {
-    margin: 0;
-    color: var(--idea-text-secondary);
-    font-size: 12px;
+  &__details {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    min-height: 0;
+  }
+  &__label {
+    color: var(--idea-text-primary);
     line-height: 20px;
   }
-
-  &__categories > &__caption {
-    padding: 0 10px;
-    margin-bottom: 8px;
-  }
-
-  &__choices {
+  &__preview {
     display: grid;
-    gap: 4px;
-
-    button {
-      min-height: 36px;
-      padding: 8px 10px;
-      font: inherit;
-      text-align: left;
-      color: var(--idea-text-primary);
-      background: transparent;
-      border: 0;
-      border-radius: var(--idea-radius-default);
-      cursor: pointer;
-
-      &:hover {
-        background: var(--idea-surface-hover);
-      }
-
-      &[aria-pressed="true"] {
-        color: var(--idea-action-primary);
-        background: var(--idea-action-primary-subtle);
-        font-weight: 600;
-      }
-
-      &:focus-visible {
-        outline: 2px solid var(--idea-action-primary);
-        outline-offset: 2px;
-      }
-    }
+    grid-template-rows: auto 64px;
+    gap: 8px;
+    flex: none;
   }
-
-  &__details {
-    display: grid;
-    gap: 20px;
+  &__sample {
+    display: flex;
+    align-items: center;
     min-width: 0;
+    overflow: auto;
+    padding: 8px 12px;
+    border: 1px solid var(--idea-border-control);
+    border-radius: var(--idea-radius-default);
+    color: var(--idea-text-primary);
+    background: var(--idea-surface-panel);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
-
   &__settings {
-    display: grid;
-    align-content: start;
-    gap: 16px;
-    min-height: 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
   }
-
-  &__intro {
-    h3 {
-      margin: 0 0 8px;
-      color: var(--idea-text-primary);
-      font-size: 14px;
-      line-height: 20px;
-      font-weight: 600;
-    }
-
-    p {
-      margin: 0;
-      color: var(--idea-text-secondary);
-      font-size: 12px;
-      line-height: 20px;
-    }
+  &__sample-fill {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
   }
-
   &__field {
     display: grid;
     grid-template-columns: 88px minmax(0, 1fr);
-    gap: 12px;
     align-items: center;
-    color: var(--idea-text-secondary);
+    gap: 12px;
+    flex: none;
   }
-
-  &__control {
-    box-sizing: border-box;
-    min-width: 0;
-    width: 100%;
-
-    &--digits {
-      max-width: 144px;
+  &__digits {
+    max-width: 144px;
+  }
+  &__grouping {
+    align-self: start;
+    flex: none;
+  }
+  &__negative {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 8px;
+    min-height: 0;
+    max-height: 154px;
+  }
+  &__types {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+    > .number-format-types {
+      flex: 1;
     }
   }
-
-  &__preview {
+  &__region {
     display: grid;
     gap: 8px;
-
-    .cell-format-preview {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      min-height: 88px;
-    }
-
-    output {
-      min-width: 0;
-      overflow-wrap: anywhere;
-      font-size: 22px;
-      line-height: 1.4;
-      font-variant-numeric: tabular-nums;
-      text-align: right;
-    }
+    flex: none;
+  }
+  &__custom-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex: none;
+  }
+  &__error {
+    margin: 0;
+    color: var(--idea-status-error);
+    font-size: 12px;
+    line-height: 18px;
+  }
+  &__description {
+    min-height: 36px;
+    margin: 0;
+    color: var(--idea-text-secondary);
+    font-size: 12px;
+    line-height: 18px;
   }
 }
-
 @media (max-width: 480px) {
   .cell-format-number {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
-
-    &__categories {
-      padding-right: 0;
-      border-right: 0;
+    height: auto;
+    grid-template-rows: auto auto;
+    &__body {
+      grid-template-columns: minmax(0, 1fr);
     }
-
-    &__choices {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    &__details {
+      min-height: 300px;
     }
-
-    &__settings {
-      min-height: 0;
+    &__types {
+      min-height: 180px;
     }
-
     &__field {
       grid-template-columns: minmax(0, 1fr);
       gap: 8px;

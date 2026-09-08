@@ -1,32 +1,32 @@
 {
   "version": 1,
-  "description": "Production budgets combine shared formula editing, the lazy XLSX codec Worker and image tools with sheet management and the configurable two-row footer. Worker assets remain included in totals and their separate cap; see ADR 0004.",
+  "description": "Measured production budgets include the workbook UI and twelve number-format categories backed by numfmt in Core and the XLSX Worker. Worker assets remain included in totals and their separate cap; see ADR 0004.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
       "pattern": "^index-.*\\.js$",
-      "maximumRawBytes": 465000,
-      "maximumGzipBytes": 130000
+      "maximumRawBytes": 650000,
+      "maximumGzipBytes": 190000
     },
     "css": {
       "pattern": "^index-.*\\.css$",
-      "maximumRawBytes": 90000,
-      "maximumGzipBytes": 13400
+      "maximumRawBytes": 128000,
+      "maximumGzipBytes": 19000
     }
   },
   "totalAssets": {
     "javascript": {
-      "maximumRawBytes": 2035000,
-      "maximumGzipBytes": 580000
+      "maximumRawBytes": 2330000,
+      "maximumGzipBytes": 675000
     },
     "css": {
-      "maximumRawBytes": 250000,
-      "maximumGzipBytes": 34000
+      "maximumRawBytes": 300000,
+      "maximumGzipBytes": 40000
     }
   },
   "deferredWorkers": {
     "pattern": "^(?:workbookXlsx\\.worker|worker-).*\\.js$",
-    "maximumRawBytes": 1020000,
-    "maximumGzipBytes": 288000
+    "maximumRawBytes": 1100000,
+    "maximumGzipBytes": 316000
   }
 }

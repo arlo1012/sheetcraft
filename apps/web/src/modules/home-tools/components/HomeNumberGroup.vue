@@ -18,6 +18,7 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
 
 type NumberFormatChoice = "general" | CellNumberFormat["kind"];
+type NumberFormatShortcut = "number" | "percent" | "currency";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -38,6 +39,10 @@ const menuId = `number-format-menu-${useId().replaceAll(":", "")}`;
 const currentFormat = computed(() => props.state.numberFormat.value);
 const currentChoice = computed<NumberFormatChoice>(() => currentFormat.value?.kind ?? "general");
 const currentFormatLabel = computed(() => formatLabel(currentChoice.value));
+const canAdjustDecimals = computed(() => {
+  const kind = currentFormat.value?.kind;
+  return !kind || ["number", "percent", "currency", "accounting", "scientific"].includes(kind);
+});
 const triggerLabel = computed(() =>
   props.state.numberFormat.mixed
     ? t("format.numberFormatMixed")
@@ -54,7 +59,15 @@ function formatLabel(choice: NumberFormatChoice): string {
   if (choice === "general") return t("ribbon.generalFormat");
   if (choice === "number") return t("ribbon.numberFormat");
   if (choice === "percent") return t("ribbon.percentFormat");
-  return t("ribbon.currencyFormat");
+  if (choice === "currency") return t("ribbon.currencyFormat");
+  if (choice === "accounting") return t("cellFormat.accounting");
+  if (choice === "date") return t("cellFormat.date");
+  if (choice === "time") return t("cellFormat.time");
+  if (choice === "fraction") return t("cellFormat.fraction");
+  if (choice === "scientific") return t("cellFormat.scientific");
+  if (choice === "text") return t("cellFormat.text");
+  if (choice === "special") return t("cellFormat.special");
+  return t("cellFormat.custom");
 }
 
 function defaultCurrency(): "CNY" | "USD" {
@@ -67,7 +80,7 @@ function selectedCurrency(): string {
     : defaultCurrency();
 }
 
-function formatPatch(choice: Exclude<NumberFormatChoice, "general">): CellStylePatch {
+function formatPatch(choice: NumberFormatShortcut): CellStylePatch {
   if (choice === "number") {
     return { numberFormat: { kind: "number", fractionDigits: 2 } };
   }
@@ -103,7 +116,7 @@ function onTriggerKeydown(event: KeyboardEvent): void {
   }
 }
 
-function selectFormat(choice: NumberFormatChoice): void {
+function selectFormat(choice: "general" | NumberFormatShortcut): void {
   emit("applyStyle", choice === "general" ? { numberFormat: null } : formatPatch(choice));
   dismiss("programmatic", true);
 }
@@ -167,7 +180,7 @@ watch(
       </RibbonIconAction>
       <RibbonIconAction
         :label="t('ribbon.decreaseDecimal')"
-        :disabled="disabled"
+        :disabled="disabled || !canAdjustDecimals"
         data-ribbon-action="decrease-decimal"
         @activate="emit('adjustDecimals', -1)"
       >
@@ -175,7 +188,7 @@ watch(
       </RibbonIconAction>
       <RibbonIconAction
         :label="t('ribbon.increaseDecimal')"
-        :disabled="disabled"
+        :disabled="disabled || !canAdjustDecimals"
         data-ribbon-action="increase-decimal"
         @activate="emit('adjustDecimals', 1)"
       >

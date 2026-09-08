@@ -215,13 +215,16 @@ function readTsvRows(text: string): string[][] {
   return rows.length > 0 ? rows : [[""]];
 }
 
-export function parseTsvToCellValues(text: string): CellValueMatrix {
+/** Parses TSV fields without coercing their text representation. */
+export function parseTsvToCellTexts(text: string): string[][] {
   const rows = readTsvRows(text);
   const columnCount = Math.max(...rows.map((row) => row.length));
 
-  return rows.map((row) =>
-    Array.from({ length: columnCount }, (_, column) => parseCellInput(row[column] ?? "")),
-  );
+  return rows.map((row) => Array.from({ length: columnCount }, (_, column) => row[column] ?? ""));
+}
+
+export function parseTsvToCellValues(text: string): CellValueMatrix {
+  return parseTsvToCellTexts(text).map((row) => row.map(parseCellInput));
 }
 
 function createRangeFromMatrix(anchor: CellAddress, size: CellMatrixSize): CellRange | null {

@@ -26,10 +26,16 @@ function imageLoading(cell: VisibleCell): boolean {
   return Boolean(cell.image && props.loadingImageAssetIds?.has(cell.image.assetId));
 }
 
+function fillText(cell: VisibleCell): string {
+  const character = cell.fill?.character;
+  return !character || /^\s$/u.test(character) ? "" : character.repeat(256);
+}
+
 function memoDependencies(cell: VisibleCell): readonly unknown[] {
   return [
     cell.style,
     cell.text,
+    cell.fill,
     cell.image?.assetId,
     cell.image?.altText,
     cell.imageTransformKey,
@@ -88,7 +94,18 @@ function memoDependencies(cell: VisibleCell): readonly unknown[] {
         :aria-label="imageLoading(cell) ? t('image.loading') : t('image.assetUnavailable')"
         >{{ imageLoading(cell) ? t("image.loading") : t("image.assetUnavailable") }}</span
       >
-      <span v-else-if="cell.text" class="sheet-cell-layer__value">{{ cell.text }}</span>
+      <span
+        v-else-if="cell.text"
+        class="sheet-cell-layer__value"
+        :class="{ 'has-fill': Boolean(cell.fill) }"
+      >
+        <template v-if="cell.fill">
+          <span>{{ cell.fill.before }}</span>
+          <span class="sheet-cell-layer__fill" aria-hidden="true">{{ fillText(cell) }}</span>
+          <span>{{ cell.fill.after }}</span>
+        </template>
+        <template v-else>{{ cell.text }}</template>
+      </span>
     </div>
   </div>
 </template>
@@ -135,6 +152,17 @@ function memoDependencies(cell: VisibleCell): readonly unknown[] {
 .sheet-cell-layer__value {
   overflow: hidden;
   text-overflow: clip;
+}
+.sheet-cell-layer__value.has-fill {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+}
+.sheet-cell-layer__fill {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .sheet-cell-layer__cell.is-multiline .sheet-cell-layer__value {
   min-width: 0;

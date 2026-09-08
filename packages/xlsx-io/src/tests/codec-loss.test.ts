@@ -27,7 +27,7 @@ describe("XLSX codec loss and sparse-state handling", () => {
     expect(getCellStyle(sheet, { row: 4, column: 2 })).toMatchObject({ bold: true });
   });
 
-  test("reports unsupported style fields and restores shared formula children by their expanded source", async () => {
+  test("reports unsupported style fields, retains date formats, and restores shared formula children", async () => {
     const result = await decodeXlsx(
       await bytesFor((_workbook, sheet) => {
         sheet.getCell("A1").value = 1;
@@ -42,11 +42,15 @@ describe("XLSX codec loss and sparse-state handling", () => {
       kind: "formula",
       formula: { source: "=A2*2" },
     });
+    expect(getCellStyle(sheet, { row: 0, column: 1 })?.numberFormat).toEqual({
+      kind: "date",
+      code: "yyyy-mm-dd",
+    });
     expect(result.report.issues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: "style-omitted" }),
-        expect.objectContaining({ code: "number-format-omitted" }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ code: "style-omitted" })]),
+    );
+    expect(result.report.issues).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "number-format-omitted" })]),
     );
   });
 
@@ -75,6 +79,20 @@ describe("XLSX codec loss and sparse-state handling", () => {
       expect.arrayContaining([
         expect.objectContaining({ code: "style-omitted", locations: ["Data!A1"] }),
       ]),
+    );
+  });
+
+  test("reports malformed number format codes as omitted", async () => {
+    const result = await decodeXlsx(
+      await bytesFor((_workbook, sheet) => {
+        sheet.getCell("A1").value = 1;
+        sheet.getCell("A1").numFmt = "not-a-format";
+      }),
+    );
+    const sheet = [...result.workbook.sheets.values()][0]!;
+    expect(getCellStyle(sheet, { row: 0, column: 0 })?.numberFormat).toBeUndefined();
+    expect(result.report.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "number-format-omitted" })]),
     );
   });
 

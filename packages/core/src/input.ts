@@ -46,8 +46,14 @@ export function parseCellInput(input: string): CellValue {
   return input;
 }
 
-export function parseCellContent(input: string): CellContent | null {
+export function parseCellContent(
+  input: string,
+  options?: { asText?: boolean },
+): CellContent | null {
   if (input === "") return null;
+  if (options?.asText) {
+    return { kind: "literal", value: input.startsWith("'") ? input.slice(1) : input };
+  }
   if (input.startsWith("'")) return { kind: "literal", value: input.slice(1) };
   if (input.startsWith("=")) return { kind: "formula", formula: { source: input } };
   const errorCode = formulaErrorCodeFromToken(input);

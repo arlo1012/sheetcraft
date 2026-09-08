@@ -33,6 +33,7 @@ import {
 } from "@idea10/core/workbook";
 import { CompatibilityReportBuilder } from "./report.js";
 import { finalizeXlsxExport } from "./export-finalizer.js";
+import { readRawWorksheetNumericValues } from "./raw-cell-values.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
@@ -283,6 +284,7 @@ function readContent(
   dateSystem: "1900" | "1904",
   issueLocation: string,
   report: CompatibilityReportBuilder,
+  rawNumericValue?: number,
 ): CellContent | undefined {
   if (formula !== undefined) {
     const formulaValue = value as Record<string, unknown> | null;
@@ -299,6 +301,9 @@ function readContent(
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
     return { kind: "literal", value };
   if (value instanceof Date) {
+    if (rawNumericValue !== undefined) {
+      return { kind: "literal", value: rawNumericValue };
+    }
     add(report, "date-normalized", issueLocation);
     return {
       kind: "literal",
@@ -338,6 +343,7 @@ export async function decodeWithExcelJs(
   bytes: Uint8Array,
 ): Promise<{ workbook: Workbook; report: XlsxCompatibilityReport }> {
   const report = new CompatibilityReportBuilder();
+  const rawNumericValues = readRawWorksheetNumericValues(bytes);
   const source = new ExcelJS.Workbook();
   await source.xlsx.load(bytes);
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
@@ -383,6 +389,7 @@ export async function decodeWithExcelJs(
           dateSystem,
           issueLocation,
           report,
+          rawNumericValues[sheetIndex]?.get(modelCell.address.toUpperCase()),
         );
         const style = readStyle(cell.style, cell.numFmt, issueLocation, report);
         if (content || style) {

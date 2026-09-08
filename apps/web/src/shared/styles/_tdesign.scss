@@ -211,6 +211,10 @@
       min-height: 0;
       overflow: auto;
     }
+
+    &--number > .t-tabs__content > .t-tab-panel:not(.t-is-hidden) {
+      height: 100%;
+    }
   }
 }
 

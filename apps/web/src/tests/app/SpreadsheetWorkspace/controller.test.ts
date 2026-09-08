@@ -70,6 +70,23 @@ describe("spreadsheet workspace controller", () => {
     expect(getCellComputedValue(sheet, { row: 0, column: 1 })).toBe(8);
   });
 
+  test("keeps leading zeroes and formula-like input literal for a text-formatted cell", () => {
+    const controller = mountController();
+    const sheet = controller.activeSheet.value;
+    const address = { row: 0, column: 0 };
+    setCellStyle(sheet, address, { numberFormat: { kind: "text" } });
+
+    controller.commitCell({ address, input: "0012" });
+    expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value: "0012" });
+    expect(controller.session.history.undoStack).toHaveLength(1);
+
+    controller.commitCell({ address, input: "'=A1+1" });
+    expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value: "=A1+1" });
+    expect(controller.session.history.undoStack).toHaveLength(2);
+    controller.undo();
+    expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value: "0012" });
+  });
+
   test("rebases copied formula content and dispatches local cuts to the move command", () => {
     const controller = mountController();
     const sheet = controller.activeSheet.value;

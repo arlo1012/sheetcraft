@@ -189,6 +189,21 @@ cap stays at 1,020/288 KB; no runtime dependency is added by the integration.
 Worker verification checks the current serializer version when round-tripping
 XLSX so the V7 sheet-property migration cannot leave it expecting a V6 snapshot.
 
+The twelve number-format categories use pinned `numfmt@3.2.6` in runtime-neutral
+Core for the grid, preview, validation and XLSX mapping. Its MIT notice is
+served at `/third-party/number-format/NOTICE.txt`. An isolated `64c154f7` build
+already exceeds the previous entry/total budgets: entry JavaScript is 558,560 B
+/ 152,314 B gzip, entry CSS 121,723 B / 17,774 B gzip, and total JavaScript
+2,153,694 B / 608,351 B gzip. The inspected new build is approximately
+634,338 B / 181,429 B gzip entry JavaScript, 123,927 B / 18,110 B gzip entry CSS,
+2,285,610 B / 659,978 B gzip total JavaScript, and 291,735 B / 38,848 B gzip total
+CSS. Deferred Workers grow from 1,016,241 B / 284,073 B gzip to 1,072,359 B /
+306,583 B gzip because formatting also runs in the XLSX Worker. Limits become
+650/190 KB entry JavaScript, 128/19 KB entry CSS, 2,330/675 KB total JavaScript,
+300/40 KB total CSS and 1,100/316 KB deferred Workers. All gates remain enabled;
+this records existing UI growth separately from the new formatter, and chunk
+splitting does not hide either cost from the total-asset gate.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

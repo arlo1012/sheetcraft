@@ -1,66 +1,45 @@
 import { describe, expect, test } from "vitest";
-import { formatCellValueForGrid } from "../../../modules/sheet-grid/cell-value-presentation";
+import { formatCellNumberValue } from "@idea10/core/number-format";
+import {
+  formatCellValueForGrid,
+  getCellValuePresentationForGrid,
+} from "../../../modules/sheet-grid/cell-value-presentation";
 
 describe("cell value presentation", () => {
-  test("uses stored numeric formats with the current display locale", () => {
-    expect(
-      formatCellValueForGrid(
-        1234.5,
-        { numberFormat: { kind: "number", fractionDigits: 2 } },
-        "en-US",
-      ),
-    ).toBe(
-      new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-        1234.5,
-      ),
-    );
-    expect(
-      formatCellValueForGrid(
-        0.125,
-        { numberFormat: { kind: "percent", fractionDigits: 1 } },
-        "zh-CN",
-      ),
-    ).toBe(
-      new Intl.NumberFormat("zh-CN", {
-        style: "percent",
-        minimumFractionDigits: 1,
-        maximumFractionDigits: 1,
-      }).format(0.125),
-    );
-    expect(
-      formatCellValueForGrid(
-        12,
-        { numberFormat: { kind: "currency", currency: "CNY", fractionDigits: 2 } },
-        "en-US",
-      ),
-    ).toBe(
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "CNY",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(12),
+  test("uses the shared formatter for stored numeric formats", () => {
+    const style = { numberFormat: { kind: "number" as const, fractionDigits: 2 } };
+    expect(getCellValuePresentationForGrid(1234.5, style, "en-US", "1900")).toEqual(
+      formatCellNumberValue(1234.5, style.numberFormat, { locale: "en-US", dateSystem: "1900" }),
     );
   });
 
-  test("preserves General and non-numeric raw display semantics", () => {
+  test("forwards the workbook date system and format color without mutating the style", () => {
+    const dateStyle = { numberFormat: { kind: "date" as const, code: "yyyy-mm-dd" } };
+    const from1900 = getCellValuePresentationForGrid(0, dateStyle, "en-US", "1900");
+    const from1904 = getCellValuePresentationForGrid(0, dateStyle, "en-US", "1904");
+    expect(from1904).toEqual(
+      formatCellNumberValue(0, dateStyle.numberFormat, { locale: "en-US", dateSystem: "1904" }),
+    );
+    expect(from1904.text).not.toBe(from1900.text);
+
+    const colorStyle = { numberFormat: { kind: "custom" as const, code: "[Red]0" } };
+    expect(getCellValuePresentationForGrid(12, colorStyle, "en-US", "1900").color).toBeTruthy();
+    expect(colorStyle).toEqual({ numberFormat: { kind: "custom", code: "[Red]0" } });
+
+    expect(
+      getCellValuePresentationForGrid(
+        -123,
+        { numberFormat: { kind: "custom", code: "0;*x0;*y0;*@" } },
+        "en-US",
+        "1900",
+      ).fill,
+    ).toEqual({ before: "", after: "123", character: "x" });
+  });
+
+  test("preserves General and text display semantics", () => {
     expect(formatCellValueForGrid(12.5, undefined, "zh-CN")).toBe("12.5");
-    expect(
-      formatCellValueForGrid(-0, { numberFormat: { kind: "number", fractionDigits: 0 } }, "en-US"),
-    ).toBe("0");
-    expect(
-      formatCellValueForGrid(
-        "0012",
-        { numberFormat: { kind: "number", fractionDigits: 2 } },
-        "en-US",
-      ),
-    ).toBe("0012");
-    expect(
-      formatCellValueForGrid(
-        true,
-        { numberFormat: { kind: "percent", fractionDigits: 0 } },
-        "en-US",
-      ),
-    ).toBe("TRUE");
+    expect(formatCellValueForGrid("0012", { numberFormat: { kind: "text" } }, "en-US")).toBe(
+      "0012",
+    );
   });
 });
