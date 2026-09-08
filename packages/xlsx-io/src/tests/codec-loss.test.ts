@@ -108,7 +108,8 @@ describe("XLSX codec loss and sparse-state handling", () => {
       await bytesFor((_workbook, sheet) => {
         sheet.getCell("A1").value = "unsupported";
         sheet.getCell("A1").border = {
-          diagonal: { style: "thick", color: { argb: "FF112233" }, up: true },
+          top: { style: "thin", color: { theme: 1 } },
+          diagonal: { style: "thick", color: { theme: 1 }, up: true },
         };
       }),
     );

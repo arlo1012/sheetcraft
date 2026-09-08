@@ -3,6 +3,7 @@ import { readExcelBorder, writeExcelBorder } from "./border.js";
 import { createFormulaCacheEligibility, formulaCacheValue } from "./formula-cache.js";
 import { fromExcelNumberFormat, toExcelNumberFormat } from "./number-format.js";
 import { excelColumnWidthToPixels, pixelsToExcelColumnWidth } from "./column-width.js";
+import { getAutoFitRowNumbers } from "./auto-fit-rows.js";
 import {
   createFormulaError,
   datePartsToExcelSerial,
@@ -61,7 +62,7 @@ type BrowserRow = {
 };
 type BrowserWorksheet = XlsxImageWorksheet & {
   name: string;
-  properties: { defaultRowHeight?: number; defaultColWidth?: number };
+  properties: { defaultRowHeight?: number; defaultColWidth?: number; tabColor?: { argb: string } };
   views?: Array<Record<string, unknown>> | null;
   columns?: Array<{ number?: number; width?: number }>;
   autoFilter?: unknown;
@@ -550,16 +551,17 @@ export async function encodeWithExcelJs(
     });
     output.properties.defaultRowHeight = (DEFAULT_ROW_HEIGHT * 3) / 4;
     output.properties.defaultColWidth = pixelsToExcelColumnWidth(DEFAULT_COLUMN_WIDTH);
+    if (sheet.properties.tabColor) {
+      output.properties.tabColor = {
+        argb: `FF${sheet.properties.tabColor.slice(1).toUpperCase()}`,
+      };
+    }
     for (const [index, size] of sheet.rowHeights) {
       output.getRow(index + 1).height = (size * 3) / 4;
     }
     for (const [index, size] of sheet.columnWidths) {
       output.getColumn(index + 1).width = pixelsToExcelColumnWidth(size);
     }
-    for (const range of sheet.mergedCells)
-      output.mergeCells(
-        `${address(range.start.row, range.start.column)}:${address(range.end.row, range.end.column)}`,
-      );
     if (sheet.filter) add(report, "filter-omitted", sheet.name);
     for (const [key, cell] of sheet.cells) {
       encodedCells += 1;
@@ -607,14 +609,22 @@ export async function encodeWithExcelJs(
       }
       writeStyle(outputCell, cell.style, issueLocation, report);
     }
+    // ExcelJS shares the anchor's current style when merging. Apply styles first
+    // so every physical cell in the merged area receives its perimeter borders.
+    for (const range of sheet.mergedCells) {
+      output.mergeCells(
+        `${address(range.start.row, range.start.column)}:${address(range.end.row, range.end.column)}`,
+      );
+    }
     for (const image of sheet.floatingImages) {
       const issueLocation = `${sheet.name}!${address(image.anchor.row, image.anchor.column)}`;
       imageExporter.addFloatingImage(output, sheet, image, issueLocation);
     }
-    // Existing row records without ht are auto-sized by spreadsheet viewers.
-    // Pin only materialized rows, including merged/styled blanks; keep gaps sparse.
+    // Leave wrapped content rows without a fixed height for Excel to fit on load.
+    // Pin other materialized rows, including merged/styled blanks; keep gaps sparse.
+    const autoFitRows = getAutoFitRowNumbers(sheet);
     for (const row of output.model?.rows ?? []) {
-      if (row.number !== undefined && row.height === undefined)
+      if (row.number !== undefined && row.height === undefined && !autoFitRows.has(row.number))
         output.getRow(row.number).height = (DEFAULT_ROW_HEIGHT * 3) / 4;
     }
   }
