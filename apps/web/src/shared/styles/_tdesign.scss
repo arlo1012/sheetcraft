@@ -191,6 +191,12 @@
   --td-size-16: var(--idea-space-16);
 }
 
+// Keep the cell-format dialog inset independent from other component densities.
+.cell-format-dialog {
+  --td-comp-paddingTB-xxl: var(--idea-space-6);
+  --td-comp-paddingLR-xxl: var(--idea-space-6);
+}
+
 // Embedded color panels share their owner's floating surface and reserve most
 // of the format row for color values.
 .idea-color-palette-panel {
