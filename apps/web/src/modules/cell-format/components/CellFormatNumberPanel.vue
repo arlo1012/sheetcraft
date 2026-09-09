@@ -100,18 +100,25 @@ function selectNegative(code: string): void {
           </output>
         </div>
         <div v-if="!mixed" class="cell-format-number__settings">
-          <label v-if="showDecimals" class="cell-format-number__field">
+          <div
+            v-if="showDecimals"
+            class="cell-format-number__field"
+            role="group"
+            :aria-label="t('cellFormat.decimalPlaces')"
+          >
             <span>{{ t("cellFormat.decimalPlaces") }}</span>
             <TInputNumber
               :model-value="fractionDigits"
               :min="0"
               :max="20"
               :decimal-places="0"
-              class="cell-format-number__digits"
+              :placeholder="t('cellFormat.decimalPlaces')"
+              theme="column"
+              class="cell-format-number__digits idea-input-number--persistent-controls"
               data-cell-format-decimals
               @change="updateDigits"
             />
-          </label>
+          </div>
           <label v-if="showCurrency" class="cell-format-number__field">
             <span>{{ t("cellFormat.currencyCode") }}</span>
             <TSelect
@@ -252,9 +259,9 @@ function selectNegative(code: string): void {
   }
   &__field {
     display: grid;
-    grid-template-columns: 88px minmax(0, 1fr);
+    grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     flex: none;
   }
   &__digits {

@@ -8,6 +8,11 @@
   text/icon insets; hover and selection backgrounds span the menu width.
 - Select suggestions, tooltips, dialogs, input assists, and compact floating
   toolbars keep their own component density.
+- TDesign `InputNumber` uses `theme="column"` and
+  `idea-input-number--persistent-controls` for visible right-side controls.
+  Use a labelled group around this composite control instead of a native
+  wrapping label, which can forward clicks and hover to its decrease button.
+  Compact number-format fields use content-sized labels with an 8px control gap.
 - Exactly one layer owns the inset: the surface or its embedded content.
   Coordinate header, content, and footer insets; do not add nested padding.
 - Menu-item padding, control padding, and gaps are separate from the surface

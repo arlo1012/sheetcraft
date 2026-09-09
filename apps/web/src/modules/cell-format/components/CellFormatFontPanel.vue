@@ -75,18 +75,22 @@ function pressed(key: "bold" | "italic" | "underline", state: ToggleStyleState):
         :options="fontOptions()"
         :placeholder="state.fontFamily.mixed ? t('format.mixed') : undefined"
         data-cell-format-font-family
-        @change="setFamily" /></label
-    ><label
-      ><span>{{ t("format.fontSize") }}</span
+        @change="setFamily"
+    /></label>
+    <div class="cell-format-font__field" role="group" :aria-label="t('format.fontSize')">
+      <span>{{ t("format.fontSize") }}</span
       ><TInputNumber
         :model-value="value('fontSize') as number | undefined"
         :min="8"
         :max="72"
         :decimal-places="0"
-        :placeholder="state.fontSize.mixed ? t('format.mixed') : undefined"
+        :placeholder="state.fontSize.mixed ? t('format.mixed') : t('format.fontSize')"
+        theme="column"
+        class="idea-input-number--persistent-controls"
         data-cell-format-font-size
         @change="setSize"
-    /></label>
+      />
+    </div>
     <div class="cell-format-font__emphasis" role="group" :aria-label="t('format.emphasis')">
       <button
         type="button"
@@ -145,7 +149,8 @@ function pressed(key: "bold" | "italic" | "underline", state: ToggleStyleState):
   display: grid;
   gap: 16px;
   padding: 8px 4px;
-  > label {
+  > label,
+  &__field {
     display: grid;
     grid-template-columns: 120px minmax(0, 1fr);
     gap: 12px;
