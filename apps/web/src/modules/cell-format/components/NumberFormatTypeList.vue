@@ -41,25 +41,27 @@ function onKeydown(event: KeyboardEvent): void {
     :aria-label="label"
     @keydown="onKeydown"
   >
-    <button
-      v-for="(option, index) in options"
-      :key="option.code"
-      type="button"
-      role="option"
-      :aria-selected="modelValue === option.code"
-      :tabindex="
-        modelValue === option.code ||
-        (!options.some((item) => item.code === modelValue) && index === 0)
-          ? 0
-          : -1
-      "
-      :style="{ color: option.color }"
-      :title="option.label"
-      :data-cell-format-type="option.code"
-      @click="emit('select', option.code)"
-    >
-      {{ option.label }}
-    </button>
+    <div class="number-format-types__items">
+      <button
+        v-for="(option, index) in options"
+        :key="option.code"
+        type="button"
+        role="option"
+        :aria-selected="modelValue === option.code"
+        :tabindex="
+          modelValue === option.code ||
+          (!options.some((item) => item.code === modelValue) && index === 0)
+            ? 0
+            : -1
+        "
+        :style="{ color: option.color }"
+        :title="option.label"
+        :data-cell-format-type="option.code"
+        @click="emit('select', option.code)"
+      >
+        {{ option.label }}
+      </button>
+    </div>
   </div>
 </template>
 <style scoped lang="scss">
@@ -98,6 +100,11 @@ function onKeydown(event: KeyboardEvent): void {
   @supports not selector(::-webkit-scrollbar) {
     scrollbar-width: thin;
     scrollbar-color: var(--idea-scrollbar-thumb) transparent;
+  }
+
+  &__items {
+    width: max-content;
+    min-width: 100%;
   }
 
   button {
