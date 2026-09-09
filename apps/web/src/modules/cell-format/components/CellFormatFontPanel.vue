@@ -153,7 +153,7 @@ function pressed(key: "bold" | "italic" | "underline", state: ToggleStyleState):
   &__field {
     display: grid;
     grid-template-columns: 120px minmax(0, 1fr);
-    gap: 12px;
+    gap: 8px;
     align-items: center;
     color: var(--idea-text-secondary);
     font-size: 13px;
@@ -161,7 +161,7 @@ function pressed(key: "bold" | "italic" | "underline", state: ToggleStyleState):
   &__emphasis {
     display: flex;
     gap: 8px;
-    padding-left: 132px;
+    padding-left: 128px;
     button {
       display: grid;
       place-items: center;
@@ -181,7 +181,7 @@ function pressed(key: "bold" | "italic" | "underline", state: ToggleStyleState):
   &__color {
     display: grid;
     grid-template-columns: 120px minmax(0, 1fr);
-    gap: 12px;
+    gap: 8px;
     align-items: start;
     color: var(--idea-text-secondary);
     font-size: 13px;

@@ -192,6 +192,27 @@
   --td-size-16: var(--idea-space-16);
 }
 
+// Pair the 28px medium controls with compact typography without changing body
+// text or explicit small/large variants. InputNumber sizes its nested Input via
+// the parent class, and Select options render outside the trigger's subtree.
+.t-input:not(.t-size-s, .t-size-l):not(.t-input-number.t-size-s *, .t-input-number.t-size-l *),
+.t-input-number:not(.t-size-s, .t-size-l),
+.t-button:not(.t-size-s, .t-size-l),
+.t-select-option:not(.t-size-s, .t-size-l) {
+  --td-font-body-medium: 13px / 20px var(--idea-font-sans);
+  --td-font-size-body-large: 14px;
+
+  .t-fake-arrow {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.t-button:not(.t-size-s, .t-size-l, .t-button--shape-square, .t-button--shape-circle) {
+  padding-right: 12px;
+  padding-left: 12px;
+}
+
 // Keep the cell-format dialog inset independent from other component densities.
 .cell-format-dialog {
   --td-comp-paddingTB-xxl: var(--idea-space-6);
