@@ -211,6 +211,10 @@
   padding-left: 12px;
 }
 
+.t-select-option {
+  --td-comp-size-s: 22px;
+}
+
 .t-tooltip .t-popup__content {
   font: var(--td-font-body-small);
 }
