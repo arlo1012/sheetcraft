@@ -1,6 +1,7 @@
 // TDesign is a Web dependency. Keep its theme values mapped from product tokens
 // here so feature styles never depend on its internal token names or DOM structure.
 :root {
+  --td-comp-size-m: 28px;
   --td-brand-color-1: var(--idea-palette-brand-1);
   --td-brand-color-2: var(--idea-palette-brand-2);
   --td-brand-color-3: var(--idea-palette-brand-3);
