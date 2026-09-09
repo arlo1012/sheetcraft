@@ -26,7 +26,6 @@ function onLocaleChange(value: SelectValue): void {
       class="locale-switcher__select"
       data-locale-select
       borderless
-      size="small"
       :model-value="locale"
       :options="localeOptions"
       @change="onLocaleChange"

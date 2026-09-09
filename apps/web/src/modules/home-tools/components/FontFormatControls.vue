@@ -112,7 +112,6 @@ function setFontSize(value: SelectValue): void {
       <span class="ui-visually-hidden">{{ t("format.fontFamily") }}</span>
       <TSelect
         class="font-format-controls__family idea-ribbon-select"
-        size="small"
         borderless
         :model-value="fontFamilyValue"
         :options="fontFamilyOptions"
@@ -130,7 +129,6 @@ function setFontSize(value: SelectValue): void {
       <span class="ui-visually-hidden">{{ t("format.fontSize") }}</span>
       <TSelect
         class="font-format-controls__size idea-ribbon-select idea-ribbon-select--compact"
-        size="small"
         borderless
         :model-value="fontSizeValue"
         :options="fontSizeOptions"

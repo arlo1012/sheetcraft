@@ -164,7 +164,6 @@ function fitSelection(): void {
             :decimal-places="0"
             :step="1"
             :placeholder="t('statusBar.customZoom')"
-            size="small"
             theme="column"
             suffix="%"
             @change="customZoom = $event"

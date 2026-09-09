@@ -180,7 +180,6 @@ function selectNegative(code: string): void {
           <div v-if="category === 'custom'" class="cell-format-number__custom-actions">
             <TButton
               variant="outline"
-              size="small"
               :disabled="!canDeleteCustom"
               data-cell-format-delete-custom
               @click="deleteCustom"
