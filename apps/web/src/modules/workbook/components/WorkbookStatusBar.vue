@@ -228,7 +228,8 @@ function formatNumber(value: number): string {
   min-height: 48px;
   background: var(--idea-sheet-bar-surface);
   color: var(--idea-text-secondary);
-  font-size: 12px;
+  font-size: var(--idea-font-size-body-small);
+  line-height: var(--idea-line-height-body-small);
 
   &__top-row,
   &__bottom-row {

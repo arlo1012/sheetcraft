@@ -271,7 +271,8 @@ function onGripPointerDown(row: number, event: PointerEvent): void {
     justify-content: center;
     overflow: visible;
     color: var(--idea-text-secondary);
-    font-size: 12px;
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
 
     &:hover,
     &:focus-within {
@@ -284,7 +285,7 @@ function onGripPointerDown(row: number, event: PointerEvent): void {
 
     &.is-active {
       color: var(--idea-action-primary);
-      font-weight: 600;
+      font-weight: var(--idea-font-weight-medium);
     }
   }
 

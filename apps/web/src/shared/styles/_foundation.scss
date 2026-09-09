@@ -134,14 +134,17 @@
   :root {
     --idea-font-sans:
       Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --idea-font-weight-regular: 400;
+    --idea-font-weight-medium: 500;
+    --idea-font-weight-semibold: 600;
     --idea-font-size-link-small: 12px;
-    --idea-font-size-link-medium: 14px;
-    --idea-font-size-link-large: 16px;
+    --idea-font-size-link-medium: 13px;
+    --idea-font-size-link-large: 14px;
     --idea-font-size-mark-small: 12px;
-    --idea-font-size-mark-medium: 14px;
+    --idea-font-size-mark-medium: 13px;
     --idea-font-size-body-small: 12px;
-    --idea-font-size-body-medium: 14px;
-    --idea-font-size-body-large: 16px;
+    --idea-font-size-body-medium: 13px;
+    --idea-font-size-body-large: 14px;
     --idea-font-size-title-small: 14px;
     --idea-font-size-title-medium: 16px;
     --idea-font-size-title-large: 18px;
@@ -151,14 +154,14 @@
     --idea-font-size-headline-large: 36px;
     --idea-font-size-display-medium: 48px;
     --idea-font-size-display-large: 64px;
-    --idea-line-height-link-small: 20px;
-    --idea-line-height-link-medium: 22px;
-    --idea-line-height-link-large: 24px;
-    --idea-line-height-mark-small: 20px;
-    --idea-line-height-mark-medium: 22px;
-    --idea-line-height-body-small: 20px;
-    --idea-line-height-body-medium: 22px;
-    --idea-line-height-body-large: 24px;
+    --idea-line-height-link-small: 18px;
+    --idea-line-height-link-medium: 20px;
+    --idea-line-height-link-large: 22px;
+    --idea-line-height-mark-small: 18px;
+    --idea-line-height-mark-medium: 20px;
+    --idea-line-height-body-small: 18px;
+    --idea-line-height-body-medium: 20px;
+    --idea-line-height-body-large: 22px;
     --idea-line-height-title-small: 22px;
     --idea-line-height-title-medium: 24px;
     --idea-line-height-title-large: 26px;

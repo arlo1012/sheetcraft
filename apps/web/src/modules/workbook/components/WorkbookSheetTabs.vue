@@ -573,6 +573,8 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
   align-items: stretch;
   height: 26px;
   min-width: 0;
+  font-size: var(--idea-font-size-body-medium);
+  line-height: var(--idea-line-height-body-medium);
 
   &__navigation {
     display: flex;
@@ -698,7 +700,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     cursor: pointer;
 
     &.is-active {
-      font-weight: 600;
+      font-weight: var(--idea-font-weight-medium);
     }
 
     &:focus-visible {

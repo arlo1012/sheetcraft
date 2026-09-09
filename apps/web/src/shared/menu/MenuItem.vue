@@ -102,8 +102,8 @@ function onKeydown(event: KeyboardEvent): void {
   padding: 0 14px;
   color: var(--idea-text-primary);
   font: inherit;
-  font-size: var(--idea-font-size-body-small);
-  line-height: var(--idea-line-height-body-small);
+  font-size: var(--idea-font-size-body-medium);
+  line-height: var(--idea-line-height-body-medium);
   letter-spacing: 0;
   list-style: none;
   text-align: left;
@@ -181,6 +181,8 @@ function onKeydown(event: KeyboardEvent): void {
     justify-content: flex-end;
     gap: 5px;
     color: var(--idea-text-secondary);
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
   }
 }
 </style>

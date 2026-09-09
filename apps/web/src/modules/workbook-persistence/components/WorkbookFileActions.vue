@@ -172,6 +172,8 @@ watch(
   align-items: center;
   min-width: 0;
   gap: 8px;
+  font-size: var(--idea-font-size-body-medium);
+  line-height: var(--idea-line-height-body-medium);
 
   &__trigger {
     display: inline-flex;
@@ -181,7 +183,8 @@ watch(
     padding: 0 8px;
     color: var(--idea-text-primary);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
     white-space: nowrap;
     cursor: pointer;
     background: transparent;
@@ -203,7 +206,8 @@ watch(
   &__status {
     overflow: hidden;
     color: var(--idea-text-secondary);
-    font-size: 11px;
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
     text-overflow: ellipsis;
     white-space: nowrap;
 

@@ -63,8 +63,8 @@ const notice = computed(() => {
   padding: 6px 12px;
   margin: 0;
   color: var(--idea-status-error);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--idea-font-size-body-small);
+  line-height: var(--idea-line-height-body-small);
   background: var(--idea-surface-secondary);
   border-bottom: 1px solid var(--idea-border-subtle);
 }

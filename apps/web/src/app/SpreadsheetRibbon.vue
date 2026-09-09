@@ -115,8 +115,9 @@ defineSlots<{ "file-actions"?: () => unknown }>();
     align-items: center;
     padding: 0 10px;
     color: var(--idea-action-primary);
-    font-size: 12px;
-    font-weight: 600;
+    font-size: var(--idea-font-size-body-medium);
+    font-weight: var(--idea-font-weight-medium);
+    line-height: var(--idea-line-height-body-medium);
     white-space: nowrap;
 
     &::after {

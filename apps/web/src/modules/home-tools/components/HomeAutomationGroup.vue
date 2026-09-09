@@ -94,7 +94,7 @@ const { t } = useAppI18n();
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-automation-group {
-  @include ribbon.mixed(58px 58px max-content);
+  @include ribbon.mixed(max-content max-content max-content);
 
   &__quick-tools,
   &__generate-icon,

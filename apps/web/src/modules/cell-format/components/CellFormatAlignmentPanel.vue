@@ -166,7 +166,8 @@ function setWrap(value: boolean): void {
   gap: 16px;
   padding: 16px 0 0;
   color: var(--idea-text-secondary);
-  font-size: 13px;
+  font-size: var(--idea-font-size-body-medium);
+  line-height: var(--idea-line-height-body-medium);
 
   &__fields {
     display: grid;
@@ -194,13 +195,16 @@ function setWrap(value: boolean): void {
     align-items: baseline;
     justify-content: space-between;
     gap: 12px;
-    font-size: 12px;
-    line-height: 20px;
+    font-size: var(--idea-font-size-body-medium);
+    font-weight: var(--idea-font-weight-medium);
+    line-height: var(--idea-line-height-body-medium);
   }
 
   &__mixed-status {
     color: var(--idea-text-secondary);
-    font-size: 12px;
+    font-size: var(--idea-font-size-body-small);
+    font-weight: var(--idea-font-weight-regular);
+    line-height: var(--idea-line-height-body-small);
   }
 
   &__preview {

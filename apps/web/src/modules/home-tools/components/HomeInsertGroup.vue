@@ -63,7 +63,7 @@ const { t } = useAppI18n();
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-insert-group {
-  @include ribbon.mixed(58px 58px max-content);
+  @include ribbon.mixed(max-content max-content max-content);
 
   &__insert,
   &__image,

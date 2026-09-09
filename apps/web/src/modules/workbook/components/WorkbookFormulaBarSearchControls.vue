@@ -99,7 +99,8 @@ function onKeydown(event: KeyboardEvent): void {
   border-radius: 2px;
   outline: none;
   color: var(--idea-text-primary);
-  font-size: 12px;
+  font-size: var(--idea-font-size-body-medium);
+  line-height: var(--idea-line-height-body-medium);
   letter-spacing: 0;
 
   &:focus {

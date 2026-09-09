@@ -364,7 +364,8 @@ function getPanelAttach(): HTMLElement {
     background: var(--idea-surface-panel);
     color: inherit;
     font: inherit;
-    font-size: 12px;
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
     cursor: pointer;
 
     &:hover {
@@ -382,8 +383,9 @@ function getPanelAttach(): HTMLElement {
   &__heading {
     margin: 0 0 3px;
     color: var(--idea-text-secondary);
-    font-size: 12px;
-    line-height: 16px;
+    font-size: var(--idea-font-size-body-medium);
+    font-weight: var(--idea-font-weight-medium);
+    line-height: var(--idea-line-height-body-medium);
   }
   &__grid {
     display: grid;

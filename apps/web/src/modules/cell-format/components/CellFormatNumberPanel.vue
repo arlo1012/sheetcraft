@@ -203,7 +203,8 @@ function selectNegative(code: string): void {
   min-height: 0;
   padding-top: 16px;
   color: var(--idea-text-primary);
-  font-size: 13px;
+  font-size: var(--idea-font-size-body-medium);
+  line-height: var(--idea-line-height-body-medium);
 
   &__body {
     display: grid;
@@ -220,7 +221,8 @@ function selectNegative(code: string): void {
   }
   &__label {
     color: var(--idea-text-primary);
-    line-height: 20px;
+    font-weight: var(--idea-font-weight-medium);
+    line-height: var(--idea-line-height-body-medium);
   }
   &__preview {
     display: grid;
@@ -238,7 +240,9 @@ function selectNegative(code: string): void {
     border-radius: var(--idea-radius-default);
     color: var(--idea-text-primary);
     background: var(--idea-surface-panel);
-    font-size: 14px;
+    font-size: var(--idea-font-size-body-large);
+    font-weight: var(--idea-font-weight-regular);
+    line-height: var(--idea-line-height-body-large);
     font-variant-numeric: tabular-nums;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -291,6 +295,10 @@ function selectNegative(code: string): void {
     display: grid;
     gap: 8px;
     flex: none;
+
+    > .cell-format-number__label {
+      font-weight: var(--idea-font-weight-regular);
+    }
   }
   &__custom-actions {
     display: flex;
@@ -300,14 +308,14 @@ function selectNegative(code: string): void {
   &__error {
     margin: 0;
     color: var(--idea-status-error);
-    font-size: 12px;
-    line-height: 18px;
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
   }
   &__description {
     margin: 0;
     color: var(--idea-text-secondary);
-    font-size: 12px;
-    line-height: 18px;
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
   }
 }
 @media (max-width: 480px) {

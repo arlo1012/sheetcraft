@@ -232,8 +232,8 @@ watch(
   border-radius: var(--idea-radius-small);
   background: var(--idea-action-primary);
   color: var(--idea-text-inverse);
-  font-size: 12px;
-  line-height: 16px;
+  font-size: var(--idea-font-size-body-small);
+  line-height: var(--idea-line-height-body-small);
   white-space: nowrap;
 }
 .sheet-freeze-handles__preview.is-row span {

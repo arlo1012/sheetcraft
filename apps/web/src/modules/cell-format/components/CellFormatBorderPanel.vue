@@ -721,8 +721,9 @@ function colorFor(side: BorderSide): string {
   &__label {
     display: block;
     margin: 0 0 6px;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: var(--idea-font-size-body-medium);
+    font-weight: var(--idea-font-weight-regular);
+    line-height: var(--idea-line-height-body-medium);
   }
   &__select,
   &__color {
@@ -760,6 +761,9 @@ function colorFor(side: BorderSide): string {
     border: 0;
     background: transparent;
     color: var(--idea-text-primary);
+    font-size: var(--idea-font-size-body-medium);
+    font-weight: var(--idea-font-weight-regular);
+    line-height: var(--idea-line-height-body-medium);
     cursor: pointer;
   }
   &__style-menu > button:hover,
@@ -781,11 +785,16 @@ function colorFor(side: BorderSide): string {
     margin-top: var(--idea-space-6);
     padding-top: var(--idea-space-5);
     border-top: 1px solid var(--idea-border-control);
+
+    > .cell-format-border-panel__label {
+      font-weight: var(--idea-font-weight-medium);
+    }
   }
   &__hint {
     margin: -3px 0 10px;
     color: var(--idea-text-secondary);
-    font-size: 12px;
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
   }
   &__presets {
     display: flex;

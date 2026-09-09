@@ -53,7 +53,8 @@ function setColor(color: string | null): void {
     gap: 12px;
     align-items: start;
     color: var(--idea-text-secondary);
-    font-size: 13px;
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
   }
   &__preview {
     display: grid;

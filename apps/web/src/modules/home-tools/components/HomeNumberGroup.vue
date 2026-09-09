@@ -243,8 +243,8 @@ watch(
     padding: 0 3px;
     color: var(--idea-text-primary);
     font: inherit;
-    font-size: 12px;
-    line-height: 1;
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
     background: transparent;
     border: 1px solid transparent;
     border-radius: 2px;

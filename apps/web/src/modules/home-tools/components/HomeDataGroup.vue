@@ -103,7 +103,7 @@ const emit = defineEmits<{
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-data-group {
-  @include ribbon.mixed(58px max-content max-content 58px);
+  @include ribbon.mixed(max-content max-content max-content max-content);
 
   &__filter,
   &__stack,

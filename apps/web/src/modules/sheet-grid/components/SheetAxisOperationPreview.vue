@@ -74,7 +74,8 @@ defineProps<{
     border-radius: var(--idea-radius-small);
     background: var(--idea-surface-panel);
     color: var(--idea-action-primary);
-    font-size: 12px;
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
     white-space: nowrap;
   }
 }

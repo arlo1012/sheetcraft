@@ -396,6 +396,12 @@ defineExpose<
     text-align: left;
     background: transparent;
     border: 0;
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
+
+    strong {
+      font-weight: var(--idea-font-weight-medium);
+    }
 
     &.is-active {
       background: var(--idea-surface-hover);
@@ -404,6 +410,8 @@ defineExpose<
     span {
       overflow: hidden;
       color: var(--idea-text-secondary);
+      font-size: var(--idea-font-size-body-small);
+      line-height: var(--idea-line-height-body-small);
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -415,7 +423,8 @@ defineExpose<
     margin: 0;
     padding: 5px 10px;
     color: var(--idea-text-secondary);
-    font-size: 12px;
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
     border-top: 1px solid var(--idea-border-subtle);
 
     code {

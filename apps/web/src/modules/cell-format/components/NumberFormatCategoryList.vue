@@ -174,12 +174,13 @@ function onKeydown(event: KeyboardEvent): void {
   gap: 8px;
   min-width: 0;
   min-height: 0;
-  font-size: 13px;
+  font-size: var(--idea-font-size-body-medium);
+  line-height: var(--idea-line-height-body-medium);
 
   &__label {
     color: var(--idea-text-primary);
-    font-weight: 500;
-    line-height: 20px;
+    font-weight: var(--idea-font-weight-medium);
+    line-height: var(--idea-line-height-body-medium);
   }
   &__list {
     flex: 1;
@@ -199,7 +200,7 @@ function onKeydown(event: KeyboardEvent): void {
       border: 0;
       border-radius: var(--idea-radius-small);
       font: inherit;
-      line-height: 20px;
+      line-height: var(--idea-line-height-body-medium);
       text-align: left;
       cursor: pointer;
 
@@ -208,7 +209,7 @@ function onKeydown(event: KeyboardEvent): void {
       }
       &[aria-selected="true"] {
         background: var(--idea-surface-active);
-        font-weight: 500;
+        font-weight: var(--idea-font-weight-medium);
       }
       &:focus-visible {
         outline: 2px solid var(--idea-action-primary);

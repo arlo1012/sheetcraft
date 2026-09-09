@@ -176,6 +176,9 @@ watch(open, (isOpen) => {
 
 <style scoped lang="scss">
 .workbook-sheet-navigator {
+  font-size: var(--idea-font-size-body-medium);
+  line-height: var(--idea-line-height-body-medium);
+
   &__trigger {
     display: inline-grid;
     flex: 0 0 30px;
@@ -232,7 +235,8 @@ watch(open, (isOpen) => {
       border-radius: 3px;
       color: var(--idea-text-primary);
       font: inherit;
-      font-size: var(--idea-font-size-body-small);
+      font-size: var(--idea-font-size-body-medium);
+      line-height: var(--idea-line-height-body-medium);
 
       &:focus-visible {
         border-color: var(--idea-action-primary);
@@ -271,6 +275,8 @@ watch(open, (isOpen) => {
     list-style: none;
     color: var(--idea-text-muted);
     font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
+    font-weight: var(--idea-font-weight-medium);
   }
 
   &__color {

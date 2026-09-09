@@ -156,7 +156,8 @@ function pressed(key: "bold" | "italic" | "underline", state: ToggleStyleState):
     gap: 8px;
     align-items: center;
     color: var(--idea-text-secondary);
-    font-size: 13px;
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
   }
   &__emphasis {
     display: flex;
@@ -184,9 +185,12 @@ function pressed(key: "bold" | "italic" | "underline", state: ToggleStyleState):
     gap: 8px;
     align-items: start;
     color: var(--idea-text-secondary);
-    font-size: 13px;
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
   }
   &__preview {
+    // Let the document's preview font size determine its own line box.
+    line-height: normal;
     min-height: 56px;
     margin: 0;
     padding: 12px;

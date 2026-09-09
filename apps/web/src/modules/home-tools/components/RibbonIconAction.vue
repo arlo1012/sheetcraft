@@ -113,7 +113,7 @@ function activate(): void {
   &.is-tall {
     position: relative;
     align-self: stretch;
-    width: 58px;
+    width: max-content;
     min-width: 58px;
     height: 54px;
     flex-direction: column;
@@ -121,7 +121,7 @@ function activate(): void {
     padding: 2px;
 
     &.has-text {
-      width: 58px;
+      width: max-content;
       min-width: 58px;
       gap: 3px;
       padding: 2px;
@@ -130,10 +130,10 @@ function activate(): void {
     .ribbon-icon-action__text {
       max-width: 100%;
       overflow: visible;
-      line-height: 13px;
+      line-height: var(--idea-line-height-body-medium);
       text-align: center;
       text-overflow: clip;
-      white-space: normal;
+      white-space: nowrap;
     }
 
     .ribbon-icon-action__disclosure {
@@ -156,8 +156,8 @@ function activate(): void {
 
   &__text {
     overflow: hidden;
-    font-size: 12px;
-    line-height: 1;
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
     text-overflow: ellipsis;
     white-space: nowrap;
   }

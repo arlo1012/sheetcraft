@@ -408,6 +408,8 @@ defineExpose({
   align-items: center;
   min-width: 0;
   height: 34px;
+  font-size: var(--idea-font-size-body-medium);
+  line-height: var(--idea-line-height-body-medium);
   background: var(--idea-surface-secondary);
   border-bottom: 1px solid var(--idea-border-control);
 
@@ -432,7 +434,8 @@ defineExpose({
     border-radius: 2px;
     outline: none;
     color: var(--idea-text-primary);
-    font-size: 12px;
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
     letter-spacing: 0;
 
     &:focus {
@@ -465,7 +468,7 @@ defineExpose({
   &__formula-input {
     overflow: auto;
     scrollbar-width: none;
-    line-height: 18px;
+    line-height: var(--idea-line-height-body-medium);
     resize: none;
     white-space: pre;
 

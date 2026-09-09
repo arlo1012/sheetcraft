@@ -179,7 +179,8 @@ const { t } = useAppI18n();
     border-radius: 3px;
     cursor: pointer;
     font: inherit;
-    font-size: 13px;
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
 
     &:hover,
     &:focus-visible,

@@ -117,8 +117,8 @@ function onKeydown(event: KeyboardEvent): void {
     background: transparent;
     color: var(--idea-text-primary);
     font: inherit;
-    font-size: 13px;
-    line-height: 20px;
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
     text-align: left;
     white-space: nowrap;
     cursor: pointer;
@@ -136,7 +136,6 @@ function onKeydown(event: KeyboardEvent): void {
   }
   &.is-monospace button {
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 12px;
   }
 }
 </style>

@@ -32,7 +32,7 @@ const { t } = useAppI18n();
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-utility-group {
-  @include ribbon.mixed(58px);
+  @include ribbon.mixed(max-content);
 
   padding-right: 6px;
   padding-left: 6px;

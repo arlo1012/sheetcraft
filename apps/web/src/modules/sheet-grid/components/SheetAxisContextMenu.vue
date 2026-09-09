@@ -321,8 +321,8 @@ onMounted(() => {
     gap: 8px;
     padding: 0 14px;
     color: var(--idea-text-primary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
     list-style: none;
   }
 

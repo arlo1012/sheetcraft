@@ -2,7 +2,11 @@
   :root {
     --idea-tool-panel-padding: var(--idea-space-4);
     --idea-menu-padding: var(--idea-space-4) 0;
+    --idea-control-icon-size: 14px;
     font-family: var(--idea-font-sans);
+    font-size: var(--idea-font-size-body-medium);
+    font-weight: var(--idea-font-weight-regular);
+    line-height: var(--idea-line-height-body-medium);
     font-synthesis: none;
     text-rendering: optimizeLegibility;
   }

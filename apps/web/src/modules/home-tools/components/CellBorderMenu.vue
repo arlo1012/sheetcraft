@@ -418,7 +418,8 @@ onBeforeUnmount(() => {
       color: var(--idea-text-primary);
       cursor: pointer;
       font: inherit;
-      font-size: 13px;
+      font-size: var(--idea-font-size-body-medium);
+      line-height: var(--idea-line-height-body-medium);
       text-align: left;
       > svg:last-child {
         color: var(--idea-text-muted);

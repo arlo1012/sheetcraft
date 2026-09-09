@@ -191,7 +191,8 @@ function fitSelection(): void {
     gap: 1px;
     padding: 0;
     color: inherit;
-    font-size: 12px;
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
     font-variant-numeric: tabular-nums;
     background: transparent;
     border: 0;
@@ -233,7 +234,8 @@ function fitSelection(): void {
   &__custom {
     padding: 8px 14px 0;
     color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
     list-style: none;
 
     > [role="group"] {
@@ -242,7 +244,7 @@ function fitSelection(): void {
       gap: 6px;
 
       > span {
-        font-weight: 600;
+        font-weight: var(--idea-font-weight-regular);
       }
 
       > .workbook-zoom-menu__custom-input {
