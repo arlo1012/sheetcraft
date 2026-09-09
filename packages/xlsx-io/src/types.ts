@@ -20,6 +20,7 @@ export type XlsxCompatibilityCode =
   | "image-omitted"
   | "style-omitted"
   | "number-format-omitted"
+  | "number-format-degraded"
   | "dimension-approximated"
   | "date-normalized"
   | "cell-value-omitted"

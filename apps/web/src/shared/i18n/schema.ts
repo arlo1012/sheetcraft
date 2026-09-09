@@ -407,6 +407,10 @@ export type MessageSchema = {
     postalCode: string;
     chineseLower: string;
     chineseUpper: string;
+    chineseUpper2: string;
+    rmbUpper: string;
+    tenThousandYuan: string;
+    signedNumber: string;
     fractionOneDigit: string;
     fractionTwoDigits: string;
     fractionThreeDigits: string;

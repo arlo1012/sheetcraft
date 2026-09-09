@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref } from "vue";
 
-type FormatOption = Readonly<{ code: string; label: string; color?: string }>;
+type FormatOption = Readonly<{ code: string; value?: string; label: string; color?: string }>;
 const props = defineProps<{
   modelValue: string;
   options: readonly FormatOption[];
@@ -14,7 +14,7 @@ function onKeydown(event: KeyboardEvent): void {
   if (!props.options.length) return;
   const index = Math.max(
     0,
-    props.options.findIndex(({ code }) => code === props.modelValue),
+    props.options.findIndex((option) => optionValue(option) === props.modelValue),
   );
   const next =
     event.key === "Home"
@@ -28,8 +28,11 @@ function onKeydown(event: KeyboardEvent): void {
             : -1;
   if (next < 0) return;
   event.preventDefault();
-  emit("select", props.options[next]!.code);
+  emit("select", optionValue(props.options[next]!));
   void nextTick(() => listRef.value?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus());
+}
+function optionValue(option: FormatOption): string {
+  return option.value ?? option.code;
 }
 </script>
 <template>
@@ -44,20 +47,20 @@ function onKeydown(event: KeyboardEvent): void {
     <div class="number-format-types__items">
       <button
         v-for="(option, index) in options"
-        :key="option.code"
+        :key="optionValue(option)"
         type="button"
         role="option"
-        :aria-selected="modelValue === option.code"
+        :aria-selected="modelValue === optionValue(option)"
         :tabindex="
-          modelValue === option.code ||
-          (!options.some((item) => item.code === modelValue) && index === 0)
+          modelValue === optionValue(option) ||
+          (!options.some((item) => optionValue(item) === modelValue) && index === 0)
             ? 0
             : -1
         "
         :style="{ color: option.color }"
         :title="option.label"
-        :data-cell-format-type="option.code"
-        @click="emit('select', option.code)"
+        :data-cell-format-type="optionValue(option)"
+        @click="emit('select', optionValue(option))"
       >
         {{ option.label }}
       </button>

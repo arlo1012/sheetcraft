@@ -56,12 +56,25 @@ export function fromExcelNumberFormat(value: unknown): CellNumberFormat | null |
   }
   if (isFractionCode(code)) return createCodeFormat("fraction", code);
   if (isDateOrTimeCode(code)) return createCodeFormat(dateOrTimeKind(code), code);
-  if (/\[DBNum[12]\]/i.test(code) || /^0{5,6}$/.test(code))
-    return createCodeFormat("special", code);
+  if (isSpecialCode(code)) return createCodeFormat("special", code);
 
   // Valid but not confidently semantic codes must remain lossless. This also
   // covers conditions, colors, locale tokens, and vendor extensions.
   return createCodeFormat("custom", code);
+}
+
+/**
+ * These are product presets represented by standard XLSX number-format code.
+ * Keep the exact code on import so a later export does not turn their visible
+ * meaning into an arbitrary custom format.
+ */
+function isSpecialCode(code: string): boolean {
+  return (
+    /\[DBNum[12]\]/i.test(code) ||
+    /^0{5,6}$/.test(code) ||
+    code === '0"."0,"万元"' ||
+    code === "+0;-0;0"
+  );
 }
 
 type CodeFormatKind = "date" | "time" | "fraction" | "special" | "custom";

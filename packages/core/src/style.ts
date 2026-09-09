@@ -84,7 +84,14 @@ export type CellNumberFormat =
   | { kind: "date"; code: string; locale?: string; fractionDigits?: never }
   | { kind: "time"; code: string; locale?: string; fractionDigits?: never }
   | { kind: "fraction"; code: string; locale?: string; fractionDigits?: never }
-  | { kind: "special"; code: string; locale?: string; fractionDigits?: never }
+  | {
+      kind: "special";
+      code: string;
+      /** WPS-style compact upper Chinese numerals, represented by ordinary DBNum2 in XLSX. */
+      chineseUpperStyle?: "compact";
+      locale?: string;
+      fractionDigits?: never;
+    }
   | { kind: "custom"; code: string; locale?: string; fractionDigits?: never }
   | { kind: "scientific"; fractionDigits: number; locale?: string }
   | { kind: "text"; fractionDigits?: never };
@@ -216,11 +223,27 @@ export function normalizeCellNumberFormat(format: CellNumberFormat): CellNumberF
     format.kind === "date" ||
     format.kind === "time" ||
     format.kind === "fraction" ||
-    format.kind === "special" ||
     format.kind === "custom"
   ) {
     const code = normalizeNumberFormatCode(format.code);
     return locale ? { kind: format.kind, code, locale } : { kind: format.kind, code };
+  }
+  if (format.kind === "special") {
+    const code = normalizeNumberFormatCode(format.code);
+    if (format.chineseUpperStyle !== undefined && format.chineseUpperStyle !== "compact") {
+      throw new TypeError("Cell special number format Chinese upper style is invalid.");
+    }
+    if (format.chineseUpperStyle === "compact" && code !== "[DBNum2][$-804]General") {
+      throw new TypeError(
+        "Compact Chinese upper formatting requires the DBNum2 Chinese General code.",
+      );
+    }
+    return {
+      kind: "special",
+      code,
+      ...(format.chineseUpperStyle ? { chineseUpperStyle: format.chineseUpperStyle } : {}),
+      ...(locale ? { locale } : {}),
+    };
   }
   if (format.kind === "number" || format.kind === "percent") {
     assertFractionDigits(format.fractionDigits);

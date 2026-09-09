@@ -533,6 +533,11 @@ function writeStyle(
   }
   cell.style = next;
   if (style.numberFormat) cell.numFmt = toExcelNumberFormat(style.numberFormat);
+  // XLSX number-format codes cannot distinguish WPS's compact Chinese upper
+  // preset from ordinary DBNum2. Export its portable DBNum2 code and record
+  // that the compact presentation was intentionally downgraded.
+  if (style.numberFormat?.kind === "special" && style.numberFormat.chineseUpperStyle === "compact")
+    add(report, "number-format-degraded", issueLocation);
   if (diagonalConflict) add(report, "style-omitted", issueLocation);
 }
 

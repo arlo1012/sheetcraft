@@ -115,6 +115,80 @@ describe("XLSX number formats", () => {
     );
   });
 
+  test("roundtrips special WPS and portable codes without changing values", async () => {
+    const formats: readonly Readonly<{ format: CellNumberFormat; value: number }>[] = [
+      { format: { kind: "special", code: '0"."0,"万元"' }, value: 123_456 },
+      { format: { kind: "special", code: "+0;-0;0" }, value: -123_456 },
+      {
+        format: {
+          kind: "special",
+          code: "[DBNum2][$RMB]General;[Red][DBNum2][$RMB]General",
+        },
+        value: -12.03,
+      },
+    ];
+    const workbook = createWorkbook({ id: "special-xlsx", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    for (const [column, { format, value }] of formats.entries()) {
+      setCellContent(sheet, { row: 0, column }, { kind: "literal", value });
+      setCellStyle(sheet, { row: 0, column }, { numberFormat: format });
+    }
+
+    const decoded = await decodeXlsx((await encodeXlsx(workbook)).bytes);
+    const restored = getActiveSheet(decoded.workbook);
+    for (const [column, { format, value }] of formats.entries()) {
+      expect(getCellContent(restored, { row: 0, column })).toEqual({
+        kind: "literal",
+        value,
+      });
+      expect(getCellStyle(restored, { row: 0, column })?.numberFormat).toEqual(format);
+    }
+    expect(decoded.report.issues).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "number-format-omitted" })]),
+    );
+  });
+
+  test("downgrades compact Chinese upper formatting to portable DBNum2 on export", async () => {
+    const workbook = createWorkbook({ id: "compact-upper", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: 10 });
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        numberFormat: {
+          kind: "special",
+          code: "[DBNum2][$-804]General",
+          chineseUpperStyle: "compact",
+        },
+      },
+    );
+
+    const encoded = await encodeXlsx(workbook);
+    expect(encoded.report.issues).toEqual(
+      expect.arrayContaining([
+        {
+          code: "number-format-degraded",
+          severity: "warning",
+          count: 1,
+          locations: ["Sheet1!A1"],
+        },
+      ]),
+    );
+
+    const decoded = await decodeXlsx(encoded.bytes);
+    const restored = getActiveSheet(decoded.workbook);
+    expect(getCellContent(restored, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: 10,
+    });
+    expect(getCellStyle(restored, { row: 0, column: 0 })?.numberFormat).toEqual({
+      kind: "special",
+      code: "[DBNum2][$-804]General",
+      locale: "zh-CN",
+    });
+  });
+
   test("classifies only canonical semantic codes and preserves noncanonical variants", () => {
     expect(fromExcelNumberFormat("[$USD]#,##0.00")).toEqual({
       kind: "currency",
@@ -154,6 +228,15 @@ describe("XLSX number formats", () => {
     });
     expect(fromExcelNumberFormat("00000")).toEqual({ kind: "special", code: "00000" });
     expect(fromExcelNumberFormat("000000")).toEqual({ kind: "special", code: "000000" });
+    expect(fromExcelNumberFormat('0"."0,"万元"')).toEqual({
+      kind: "special",
+      code: '0"."0,"万元"',
+    });
+    expect(fromExcelNumberFormat("+0;-0;0")).toEqual({ kind: "special", code: "+0;-0;0" });
+    expect(fromExcelNumberFormat("[DBNum2][$RMB]General;[Red][DBNum2][$RMB]General")).toEqual({
+      kind: "special",
+      code: "[DBNum2][$RMB]General;[Red][DBNum2][$RMB]General",
+    });
   });
 
   test("only reads supported locale prefixes from format tokens", () => {

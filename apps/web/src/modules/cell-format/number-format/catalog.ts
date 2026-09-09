@@ -1,8 +1,4 @@
-import {
-  formatCellNumberValue,
-  getNumberFormatLocaleId,
-  toCellNumberFormatCode,
-} from "@idea10/core/number-format";
+import { formatCellNumberValue, getNumberFormatLocaleId } from "@idea10/core/number-format";
 import type { CellNumberFormat } from "@idea10/core/style";
 import type { MessageKey } from "../../../shared/i18n";
 import { getDateFormatPresets } from "./date-presets";
@@ -11,7 +7,9 @@ export type NumberFormatCategory = "general" | CellNumberFormat["kind"];
 export type NumberFormatPreset = Readonly<{
   id?: string;
   code: string;
+  value?: string;
   label: string;
+  format?: CellNumberFormat;
   aliasIds?: readonly string[];
 }>;
 type Translate = (key: MessageKey) => string;
@@ -115,38 +113,25 @@ export function getNumberFormatPresets(
           { code: "000000", label: t("cellFormat.postalCode") },
           { code: "[DBNum1][$-804]General", label: t("cellFormat.chineseLower") },
           { code: "[DBNum2][$-804]General", label: t("cellFormat.chineseUpper") },
+          {
+            value: "chinese-upper-2",
+            code: "[DBNum2][$-804]General",
+            label: t("cellFormat.chineseUpper2"),
+            format: {
+              kind: "special",
+              code: "[DBNum2][$-804]General",
+              locale: region,
+              chineseUpperStyle: "compact",
+            },
+          },
+          {
+            code: "[DBNum2][$RMB]General;[Red][DBNum2][$RMB]General",
+            label: t("cellFormat.rmbUpper"),
+          },
+          { code: '0"."0,"万元"', label: t("cellFormat.tenThousandYuan") },
+          { code: "+0;-0;0", label: t("cellFormat.signedNumber") },
         ]
       : [{ code: "00000", label: t("cellFormat.postalCode") }];
   }
   return [];
-}
-
-export function getCustomFormatPresets(region: string): string[] {
-  const currency = region.toLowerCase().startsWith("zh") ? "CNY" : "USD";
-  return [
-    "General",
-    "0",
-    "0.00",
-    "#,##0",
-    "#,##0.00",
-    toCellNumberFormatCode({ kind: "accounting", currency, fractionDigits: 0 }),
-    toCellNumberFormatCode({ kind: "accounting", currency, fractionDigits: 2 }),
-    "#,##0;-#,##0",
-    "#,##0;[Red]-#,##0",
-    "#,##0.00;-#,##0.00",
-    "#,##0.00;[Red]-#,##0.00",
-    "0%",
-    "0.00%",
-    "0.00E+00",
-    "# ?/?",
-    "# ??/??",
-    "yyyy/m/d",
-    "yyyy-mm-dd",
-    "h:mm",
-    "h:mm:ss",
-    "h:mm AM/PM",
-    "[h]:mm:ss",
-    "@",
-    "000000",
-  ];
 }

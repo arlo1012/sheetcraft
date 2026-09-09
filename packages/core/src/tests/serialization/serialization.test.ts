@@ -172,12 +172,28 @@ describe("workbook snapshots", () => {
         numberFormat: { kind: "accounting", currency: "USD", fractionDigits: 2 },
       },
     );
+    setCellStyle(
+      sheet,
+      { row: 0, column: 3 },
+      {
+        numberFormat: {
+          kind: "special",
+          code: "[DBNum2][$-804]General",
+          chineseUpperStyle: "compact",
+        },
+      },
+    );
 
     const restored = deserializeWorkbook(serializeWorkbook(workbook));
     expect(serializeWorkbook(restored)).toEqual(serializeWorkbook(workbook));
     expect(getCellStyle(getActiveSheet(restored), { row: 0, column: 0 })?.numberFormat).toEqual({
       kind: "date",
       code: '[DBNum1][$-804]yyyy"年"m"月"d"日"',
+    });
+    expect(getCellStyle(getActiveSheet(restored), { row: 0, column: 3 })?.numberFormat).toEqual({
+      kind: "special",
+      code: "[DBNum2][$-804]General",
+      chineseUpperStyle: "compact",
     });
   });
 

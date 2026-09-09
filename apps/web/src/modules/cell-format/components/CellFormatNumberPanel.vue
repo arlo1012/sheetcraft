@@ -125,6 +125,7 @@ function selectNegative(code: string): void {
             <TSelect
               :model-value="currency"
               :options="currencyOptions"
+              filterable
               :value-display="currencyDisplay"
               :popup-props="{
                 overlayClassName: 'idea-number-format-options',

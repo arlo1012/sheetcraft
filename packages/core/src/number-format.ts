@@ -6,6 +6,13 @@ import {
   validateCellNumberFormatCode as validateFormatCode,
 } from "./number-format-code.js";
 import { NUMBER_FORMAT_LOCALES, getNumberFormatLocaleId } from "./number-format-locales.js";
+import {
+  CHINESE_LOWER,
+  CHINESE_UPPER,
+  toChineseInteger,
+  type ChineseNativeNumber,
+} from "./number-format-chinese.js";
+import { formatWpsRmbUppercase } from "./special-number-format.js";
 import type { CellNumberFormat, CellNumberFormatNegativeStyle } from "./style.js";
 
 export {
@@ -207,15 +214,68 @@ export function formatCellNumberValue(
     rendering.value,
     formatterOptions,
   );
+  const wpsRmb =
+    typeof value === "number" && selectedDbNum?.modifier === "2"
+      ? replaceSelectedWpsRmbValue(rendering.code, value, formatterOptions, selectedDbNum.section)
+      : undefined;
   const fill = findSelectedFill(rendering.code, rendering.value, formatterOptions, text);
-  const nativeText = applyChineseNativeDigits(text, selectedDbNum);
+  const nativeText = wpsRmb ?? applyChineseNativeDigits(text, selectedDbNum);
+  const presentationText =
+    typeof value === "number" &&
+    cellFormat?.kind === "special" &&
+    cellFormat.chineseUpperStyle === "compact"
+      ? compactChineseUpperText(nativeText)
+      : nativeText;
   const nativeFill =
     fill && selectedDbNum ? applyNativeDigitsToFill(fill, selectedDbNum, nativeText) : fill;
   return {
-    text: nativeText,
+    text: presentationText,
     ...(typeof color === "string" ? { color } : {}),
     ...(nativeFill ? { fill: nativeFill } : {}),
   };
+}
+
+function compactChineseUpperText(text: string): string {
+  return text.replace(/^(-?)壹拾/, "$1拾");
+}
+
+function replaceSelectedWpsRmbValue(
+  code: string,
+  value: number,
+  options: FormatterOptions,
+  selectedSection: string,
+): string | undefined {
+  const marker = createMarker(code, value, "wps-rmb", 0);
+  const markedSection = replaceActiveWpsRmbToken(selectedSection, `"${marker}"`);
+  if (!markedSection) return undefined;
+  // The original value already selected this section. Render its literals
+  // with the magnitude so numfmt cannot prepend a second negative sign;
+  // the RMB amount below supplies `负` and preserves explicit literal signs.
+  const markedText = format(removeConditions(markedSection), Math.abs(value), options);
+  const markerIndex = markedText.indexOf(marker);
+  if (markerIndex < 0) return undefined;
+  const rmb = formatWpsRmbUppercase(value);
+  if (!rmb) return undefined;
+  return `${markedText.slice(0, markerIndex)}${rmb}${markedText.slice(markerIndex + marker.length)}`;
+}
+
+function replaceActiveWpsRmbToken(section: string, replacement: string): string | undefined {
+  let quoted = false;
+  for (let index = 0; index < section.length; index += 1) {
+    const character = section[index] ?? "";
+    if (character === "\\") {
+      index += 1;
+      continue;
+    }
+    if (character === '"') {
+      quoted = !quoted;
+      continue;
+    }
+    const match = !quoted && /^\[DBNum2\]\[\$RMB\]General/i.exec(section.slice(index));
+    if (match)
+      return `${section.slice(0, index)}${replacement}${section.slice(index + match[0].length)}`;
+  }
+  return undefined;
 }
 
 function localizeDateLocaleCodes(code: string): string {
@@ -254,7 +314,7 @@ function findSelectedDbNumModifier(
 ): SelectedDbNum | undefined {
   const sections = splitFormatSections(code);
   const candidates = sections.flatMap((section, index) => {
-    const modifier = /\[DBNum([12])\]/i.exec(section)?.[1] as "1" | "2" | undefined;
+    const modifier = findActiveDbNumModifier(section);
     return modifier
       ? [
           {
@@ -276,6 +336,24 @@ function findSelectedDbNumModifier(
   const markedText = format(markedCode, value, options);
   const selected = candidates.find((candidate) => markedText.includes(candidate.marker));
   return selected ? { modifier: selected.modifier, section: selected.section } : undefined;
+}
+
+function findActiveDbNumModifier(section: string): "1" | "2" | undefined {
+  let quoted = false;
+  for (let index = 0; index < section.length; index += 1) {
+    const character = section[index] ?? "";
+    if (character === "\\") {
+      index += 1;
+      continue;
+    }
+    if (character === '"') {
+      quoted = !quoted;
+      continue;
+    }
+    const match = !quoted && /^\[DBNum([12])\]/i.exec(section.slice(index));
+    if (match) return match[1] as "1" | "2";
+  }
+  return undefined;
 }
 
 function findSelectedFill(
@@ -501,58 +579,8 @@ function applyNativeDigitsToFill(
   return before + after === nativeText ? { before, after, character: fill.character } : undefined;
 }
 
-type ChineseNativeNumber = Readonly<{
-  digits: readonly string[];
-  smallUnits: readonly string[];
-  largeUnits: readonly string[];
-}>;
-
-const CHINESE_LOWER: ChineseNativeNumber = {
-  digits: ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"],
-  smallUnits: ["", "十", "百", "千"],
-  largeUnits: ["", "万", "亿", "兆"],
-};
-const CHINESE_UPPER: ChineseNativeNumber = {
-  digits: ["零", "壹", "贰", "叁", "肆", "伍", "陆", "柒", "捌", "玖"],
-  smallUnits: ["", "拾", "佰", "仟"],
-  largeUnits: ["", "万", "亿", "兆"],
-};
-
 function toChineseYear(year: string, digits: readonly string[]): string {
   return year.replace(/\d/g, (digit) => (digit === "0" ? "〇" : (digits[Number(digit)] ?? digit)));
-}
-
-function toChineseInteger(value: string, native: ChineseNativeNumber): string {
-  if (!/^\d+$/.test(value)) return value;
-  const normalized = value.replace(/^0+(?=\d)/, "");
-  if (normalized === "0") return native.digits[0] ?? "0";
-  const groups: string[] = [];
-  for (let end = normalized.length; end > 0; end -= 4) {
-    groups.unshift(normalized.slice(Math.max(0, end - 4), end));
-  }
-  let output = "";
-  let needsZero = false;
-  for (let index = 0; index < groups.length; index += 1) {
-    const group = groups[index];
-    if (!group || /^0+$/.test(group)) {
-      if (output) needsZero = true;
-      continue;
-    }
-    if (
-      output &&
-      (needsZero || Number(group) < 1000) &&
-      !output.endsWith(native.digits[0] ?? "零")
-    ) {
-      output += native.digits[0] ?? "零";
-    }
-    output += toChineseGroup(group, native);
-    const largeUnit = native.largeUnits[groups.length - index - 1];
-    if (largeUnit) output += largeUnit;
-    needsZero = false;
-  }
-  return native === CHINESE_LOWER && normalized.length <= 2 && output.startsWith("一十")
-    ? output.slice(1)
-    : output;
 }
 
 function toChineseNumber(value: string, native: ChineseNativeNumber): string {
@@ -591,23 +619,6 @@ function getDateComponentOrder(section: string): Array<"year" | "month" | "day">
     while (section[index + 1]?.toLowerCase() === character) index += 1;
   }
   return components;
-}
-
-function toChineseGroup(group: string, native: ChineseNativeNumber): string {
-  let output = "";
-  let needsZero = false;
-  for (let index = 0; index < group.length; index += 1) {
-    const digit = Number(group[index]);
-    const unit = native.smallUnits[group.length - index - 1];
-    if (digit === 0) {
-      if (output) needsZero = true;
-      continue;
-    }
-    if (needsZero && !output.endsWith(native.digits[0] ?? "零")) output += native.digits[0] ?? "零";
-    output += `${native.digits[digit] ?? ""}${unit ?? ""}`;
-    needsZero = false;
-  }
-  return output;
 }
 
 function currencyFormatPrefix(

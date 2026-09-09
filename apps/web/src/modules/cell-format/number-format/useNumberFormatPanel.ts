@@ -14,12 +14,12 @@ import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
 import { useAppI18n } from "../../../shared/i18n";
 import {
-  getCustomFormatPresets,
   getNumberFormatPresets,
   NUMBER_FORMAT_DESCRIPTION_KEYS,
   type NumberFormatCategory,
 } from "./catalog";
 import { readCustomNumberFormats, removeCustomNumberFormat } from "./custom-formats";
+import { getCustomFormatPresets } from "./custom-presets";
 import { getDateFormatRegionOptions } from "./region-options";
 import {
   getCurrencyChoiceValue,
@@ -78,15 +78,27 @@ export function useNumberFormatPanel(
   const presets = computed(() => {
     const options = getNumberFormatPresets(category.value, region.value, t);
     const format = currentFormat();
-    if (
-      format?.kind === category.value &&
-      "code" in format &&
-      !options.some(({ code }) => code === format.code)
-    )
-      options.push({ code: format.code, label: format.code });
+    if (format?.kind === category.value && "code" in format) {
+      const compact = format.kind === "special" && format.chineseUpperStyle === "compact";
+      const currentValue = compact ? "chinese-upper-2" : format.code;
+      if (!options.some(({ value, code }) => (value ?? code) === currentValue))
+        options.push({
+          code: format.code,
+          value: currentValue,
+          label: compact ? t("cellFormat.chineseUpper2") : format.code,
+          ...(compact ? { format } : {}),
+        });
+    }
     return options;
   });
-  const builtInCustomCodes = computed(() => getCustomFormatPresets(region.value));
+  const builtInCustomCodes = computed(() =>
+    getCustomFormatPresets(
+      region.value,
+      (["time", "fraction", "special"] as const).flatMap((category) =>
+        getNumberFormatPresets(category, region.value, t).map(({ code }) => code),
+      ),
+    ),
+  );
   const customPresets = computed(() =>
     [
       ...new Set([
@@ -153,6 +165,18 @@ export function useNumberFormatPanel(
         return { kind: "text" };
       case "custom":
         return { kind: "custom", code: customCode.value, locale: region.value };
+      case "special": {
+        const preset = presets.value.find(
+          ({ value, code }) => (value ?? code) === selectedCode.value,
+        );
+        return (
+          preset?.format ?? {
+            kind: "special",
+            code: preset?.code ?? selectedCode.value,
+            locale: region.value,
+          }
+        );
+      }
       default:
         return { kind: category.value, code: selectedCode.value, locale: region.value };
     }
@@ -181,8 +205,15 @@ export function useNumberFormatPanel(
     negativeStyle.value =
       format && "negativeStyle" in format ? (format.negativeStyle ?? "minus") : "minus";
     region.value = format && "locale" in format && format.locale ? format.locale : locale.value;
-    selectedCode.value = format && "code" in format ? format.code : (presets.value[0]?.code ?? "");
-    selectedPresetId.value = presets.value.find(({ code }) => code === selectedCode.value)?.id;
+    selectedCode.value =
+      format?.kind === "special" && format.chineseUpperStyle === "compact"
+        ? "chinese-upper-2"
+        : format && "code" in format
+          ? format.code
+          : (presets.value[0]?.value ?? presets.value[0]?.code ?? "");
+    selectedPresetId.value = presets.value.find(
+      ({ value, code }) => (value ?? code) === selectedCode.value,
+    )?.id;
     customCode.value = toCellNumberFormatCode(format, region.value);
   }
 
@@ -192,7 +223,7 @@ export function useNumberFormatPanel(
     category.value = value;
     if (value === "custom") customCode.value = toCellNumberFormatCode(previous, region.value);
     else {
-      selectedCode.value = presets.value[0]?.code ?? "";
+      selectedCode.value = presets.value[0]?.value ?? presets.value[0]?.code ?? "";
       selectedPresetId.value = presets.value[0]?.id;
     }
     apply();
@@ -202,7 +233,9 @@ export function useNumberFormatPanel(
     if (category.value === "custom") customCode.value = code;
     else {
       selectedCode.value = code;
-      selectedPresetId.value = presets.value.find((preset) => preset.code === code)?.id;
+      selectedPresetId.value = presets.value.find(
+        (preset) => (preset.value ?? preset.code) === code,
+      )?.id;
     }
     apply();
   }
@@ -234,7 +267,9 @@ export function useNumberFormatPanel(
     )
       return;
     const previousOptions = getNumberFormatPresets(category.value, region.value, t);
-    const index = previousOptions.findIndex(({ code }) => code === selectedCode.value);
+    const index = previousOptions.findIndex(
+      ({ value, code }) => (value ?? code) === selectedCode.value,
+    );
     const preferredId = selectedPresetId.value ?? previousOptions[index]?.id;
     region.value = value;
     const options = getNumberFormatPresets(category.value, region.value, t);
@@ -248,7 +283,7 @@ export function useNumberFormatPanel(
     const replacement =
       equivalent ??
       (category.value === "date" ? options[0] : (options[Math.max(0, index)] ?? options[0]));
-    selectedCode.value = replacement?.code ?? selectedCode.value;
+    selectedCode.value = replacement?.value ?? replacement?.code ?? selectedCode.value;
     // Keep the requested family when two regions share a merged preset row,
     // so switching back restores a padded/abbreviated choice faithfully.
     selectedPresetId.value = equivalent ? preferredId : replacement?.id;

@@ -1,6 +1,5 @@
 import { format } from "numfmt";
 
-const DB_NUM_PATTERN = /\[DBNum([0-9]+)\]/gi;
 const UNSUPPORTED_NATIVE_NUMBER_PATTERN = /\[(?:NatNum|DBNum(?![12]\]))/i;
 
 export function canonicalizeCellNumberFormatCode(code: string): string {
@@ -60,11 +59,37 @@ export function validateCellNumberFormatCode(code: string): boolean {
   )
     return false;
   const canonical = canonicalizeCellNumberFormatCode(code);
-  if ([...canonical.matchAll(DB_NUM_PATTERN)].length > 1) return false;
+  if (!hasAtMostOneDbNumPerSection(canonical)) return false;
   try {
     format(canonical, 1234.5, { locale: "en-US", throws: true });
     return true;
   } catch {
     return false;
   }
+}
+
+function hasAtMostOneDbNumPerSection(code: string): boolean {
+  let quoted = false;
+  let count = 0;
+  let sections = 1;
+  for (let index = 0; index < code.length; index += 1) {
+    const character = code[index] ?? "";
+    if (character === "\\") {
+      index += 1;
+      continue;
+    }
+    if (character === '"') {
+      quoted = !quoted;
+      continue;
+    }
+    if (!quoted && character === ";") {
+      if (count > 1) return false;
+      count = 0;
+      sections += 1;
+      if (sections > 4) return false;
+      continue;
+    }
+    if (!quoted && /^\[DBNum[0-9]+\]/i.test(code.slice(index))) count += 1;
+  }
+  return count <= 1;
 }
