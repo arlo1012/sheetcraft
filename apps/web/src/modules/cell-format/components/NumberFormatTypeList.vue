@@ -110,8 +110,8 @@ function onKeydown(event: KeyboardEvent): void {
   button {
     display: block;
     width: 100%;
-    min-height: 28px;
-    padding: 4px 8px;
+    min-height: 24px;
+    padding: 2px 8px;
     border: 0;
     border-radius: var(--idea-radius-small);
     background: transparent;
@@ -123,8 +123,8 @@ function onKeydown(event: KeyboardEvent): void {
     white-space: nowrap;
     cursor: pointer;
 
-    &:hover {
-      background: var(--idea-surface-hover);
+    &:hover:not([aria-selected="true"]) {
+      background: var(--idea-surface-secondary);
     }
     &[aria-selected="true"] {
       background: var(--idea-surface-active);
