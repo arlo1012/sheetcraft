@@ -132,8 +132,39 @@ describe("XLSX number formats", () => {
       code: "[$-0409]hh:mm:ss",
       locale: "en-US",
     });
+    expect(fromExcelNumberFormat("[$-0407]dddd, d. mmmm yyyy")).toEqual({
+      kind: "date",
+      code: "[$-0407]dddd, d. mmmm yyyy",
+      locale: "de-DE",
+    });
+    expect(fromExcelNumberFormat("[$-41E]yyyy/mm/dd")).toEqual({
+      kind: "date",
+      code: "[$-41E]yyyy/mm/dd",
+      locale: "th-TH",
+    });
+    expect(fromExcelNumberFormat("[$-804]aaaa")).toEqual({
+      kind: "date",
+      code: "[$-804]aaaa",
+      locale: "zh-CN",
+    });
+    expect(fromExcelNumberFormat("[$-804]aaa")).toEqual({
+      kind: "date",
+      code: "[$-804]aaa",
+      locale: "zh-CN",
+    });
     expect(fromExcelNumberFormat("00000")).toEqual({ kind: "special", code: "00000" });
     expect(fromExcelNumberFormat("000000")).toEqual({ kind: "special", code: "000000" });
+  });
+
+  test("only reads supported locale prefixes from format tokens", () => {
+    expect(fromExcelNumberFormat('"[$-0407]"yyyy-mm-dd')).toEqual({
+      kind: "date",
+      code: '"[$-0407]"yyyy-mm-dd',
+    });
+    expect(fromExcelNumberFormat("[$-DEAD]yyyy-mm-dd")).toEqual({
+      kind: "date",
+      code: "[$-DEAD]yyyy-mm-dd",
+    });
   });
 
   test("keeps the original object shape for legacy currency prefixes", () => {

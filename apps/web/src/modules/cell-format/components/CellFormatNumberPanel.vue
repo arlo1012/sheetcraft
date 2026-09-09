@@ -127,7 +127,7 @@ function selectNegative(code: string): void {
               :options="currencyOptions"
               :value-display="currencyDisplay"
               :popup-props="{
-                overlayClassName: 'idea-currency-symbol-options',
+                overlayClassName: 'idea-number-format-options',
                 overlayInnerStyle: { maxHeight: '240px' },
               }"
               data-cell-format-currency
@@ -179,6 +179,11 @@ function selectNegative(code: string): void {
             <TSelect
               :model-value="region"
               :options="regionOptions"
+              :filterable="category === 'date' || category === 'time'"
+              :popup-props="{
+                overlayClassName: 'idea-number-format-options',
+                overlayInnerStyle: { maxHeight: '240px' },
+              }"
               data-cell-format-region
               @change="updateRegion"
             />

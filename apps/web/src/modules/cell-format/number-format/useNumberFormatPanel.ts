@@ -20,6 +20,7 @@ import {
   type NumberFormatCategory,
 } from "./catalog";
 import { readCustomNumberFormats, removeCustomNumberFormat } from "./custom-formats";
+import { getDateFormatRegionOptions } from "./region-options";
 import {
   getCurrencyChoiceValue,
   getCurrencySymbolDisplay,
@@ -33,6 +34,15 @@ type PanelProps = Readonly<{
   sampleValue: string | number | boolean | null;
   dateSystem?: "1900" | "1904";
 }>;
+
+const DATE_PRESET_FALLBACKS: Readonly<Record<string, string>> = {
+  "date-native-full": "date-long",
+  "date-native-year-month": "date-year-month",
+  "date-native-month-day": "date-month-day",
+  "date-legacy-day-short-month-two-digit-year": "date-medium",
+  "date-legacy-day-short-month": "date-month-day-short",
+  "date-legacy-short-month-two-digit-year": "date-year-month-short",
+};
 
 export function useNumberFormatPanel(
   props: PanelProps,
@@ -59,6 +69,7 @@ export function useNumberFormatPanel(
   const negativeStyle = ref<CellNumberFormatNegativeStyle>("minus");
   const region = ref<string>(locale.value);
   const selectedCode = ref("");
+  const selectedPresetId = ref<string>();
   const customCode = ref("");
   const customFormats = ref(readCustomNumberFormats());
   const mixed = computed(
@@ -171,6 +182,7 @@ export function useNumberFormatPanel(
       format && "negativeStyle" in format ? (format.negativeStyle ?? "minus") : "minus";
     region.value = format && "locale" in format && format.locale ? format.locale : locale.value;
     selectedCode.value = format && "code" in format ? format.code : (presets.value[0]?.code ?? "");
+    selectedPresetId.value = presets.value.find(({ code }) => code === selectedCode.value)?.id;
     customCode.value = toCellNumberFormatCode(format, region.value);
   }
 
@@ -179,13 +191,19 @@ export function useNumberFormatPanel(
     const previous = customValid.value ? draftFormat() : currentFormat();
     category.value = value;
     if (value === "custom") customCode.value = toCellNumberFormatCode(previous, region.value);
-    else selectedCode.value = presets.value[0]?.code ?? "";
+    else {
+      selectedCode.value = presets.value[0]?.code ?? "";
+      selectedPresetId.value = presets.value[0]?.id;
+    }
     apply();
   }
 
   function selectCode(code: string): void {
     if (category.value === "custom") customCode.value = code;
-    else selectedCode.value = code;
+    else {
+      selectedCode.value = code;
+      selectedPresetId.value = presets.value.find((preset) => preset.code === code)?.id;
+    }
     apply();
   }
 
@@ -210,27 +228,47 @@ export function useNumberFormatPanel(
   }
 
   function updateRegion(value: SelectValue): void {
-    if (typeof value !== "string") return;
-    const index = getNumberFormatPresets(category.value, region.value, t).findIndex(
-      ({ code }) => code === selectedCode.value,
-    );
+    if (
+      typeof value !== "string" ||
+      !regionOptions.value.some(({ value: region }) => region === value)
+    )
+      return;
+    const previousOptions = getNumberFormatPresets(category.value, region.value, t);
+    const index = previousOptions.findIndex(({ code }) => code === selectedCode.value);
+    const preferredId = selectedPresetId.value ?? previousOptions[index]?.id;
     region.value = value;
     const options = getNumberFormatPresets(category.value, region.value, t);
-    selectedCode.value =
-      options[Math.max(0, index)]?.code ?? options[0]?.code ?? selectedCode.value;
+    const findPreset = (value: string | undefined) =>
+      value
+        ? options.find(({ id, aliasIds }) => id === value || aliasIds?.includes(value))
+        : undefined;
+    const equivalent =
+      findPreset(preferredId) ??
+      findPreset(preferredId ? DATE_PRESET_FALLBACKS[preferredId] : undefined);
+    const replacement =
+      equivalent ??
+      (category.value === "date" ? options[0] : (options[Math.max(0, index)] ?? options[0]));
+    selectedCode.value = replacement?.code ?? selectedCode.value;
+    // Keep the requested family when two regions share a merged preset row,
+    // so switching back restores a padded/abbreviated choice faithfully.
+    selectedPresetId.value = equivalent ? preferredId : replacement?.id;
     apply();
   }
 
   const currencyOptions = computed(() =>
     getCurrencySymbolOptions(locale.value, t("cellFormat.noCurrency"), currencyChoice.value),
   );
-  const regionOptions = computed(() => [
-    { value: "zh-CN", label: t("cellFormat.regionChineseChina") },
-    { value: "en-US", label: t("cellFormat.regionEnglishUS") },
-    ...(!["zh-CN", "en-US"].includes(region.value)
-      ? [{ value: region.value, label: region.value }]
-      : []),
-  ]);
+  const regionOptions = computed(() =>
+    category.value === "date" || category.value === "time"
+      ? getDateFormatRegionOptions(locale.value, region.value)
+      : [
+          { value: "zh-CN", label: t("cellFormat.regionChineseChina") },
+          { value: "en-US", label: t("cellFormat.regionEnglishUS") },
+          ...(!["zh-CN", "en-US"].includes(region.value)
+            ? [{ value: region.value, label: region.value }]
+            : []),
+        ],
+  );
   const negativeOptions = computed(() =>
     (["minus", "red", "parentheses", "red-parentheses"] as const).map((value) => {
       const format = draftFormat();

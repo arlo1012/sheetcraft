@@ -1,9 +1,19 @@
-import { formatCellNumberValue, toCellNumberFormatCode } from "@idea10/core/number-format";
+import {
+  formatCellNumberValue,
+  getNumberFormatLocaleId,
+  toCellNumberFormatCode,
+} from "@idea10/core/number-format";
 import type { CellNumberFormat } from "@idea10/core/style";
 import type { MessageKey } from "../../../shared/i18n";
+import { getDateFormatPresets } from "./date-presets";
 
 export type NumberFormatCategory = "general" | CellNumberFormat["kind"];
-export type NumberFormatPreset = Readonly<{ code: string; label: string }>;
+export type NumberFormatPreset = Readonly<{
+  id?: string;
+  code: string;
+  label: string;
+  aliasIds?: readonly string[];
+}>;
 type Translate = (key: MessageKey) => string;
 
 export const NUMBER_FORMAT_CATEGORY_ORDER: readonly NumberFormatCategory[] = [
@@ -36,30 +46,6 @@ export const NUMBER_FORMAT_DESCRIPTION_KEYS: Record<NumberFormatCategory, Messag
   custom: "cellFormat.customDescription",
 };
 
-const CHINESE_DATE_CODES = [
-  "yyyy/m/d",
-  'yyyy"年"m"月"d"日"',
-  "yyyy-mm-dd",
-  '[DBNum1][$-804]yyyy"年"m"月"d"日"',
-  '[DBNum1][$-804]yyyy"年"m"月"',
-  '[DBNum1][$-804]m"月"d"日"',
-  'yyyy"年"m"月"',
-  'm"月"d"日"',
-  "[$-804]aaaa",
-  "[$-804]aaa",
-];
-const ENGLISH_DATE_CODES = [
-  "m/d/yyyy",
-  "dddd, mmmm d, yyyy",
-  "yyyy-mm-dd",
-  "d-mmm-yy",
-  "d-mmm",
-  "mmm-yy",
-  "mmmm d",
-  "mmmm yyyy",
-  "dddd",
-  "ddd",
-];
 const TIME_CODES = [
   "h:mm:ss",
   "h:mm",
@@ -99,22 +85,18 @@ export function getNumberFormatPresets(
   t: Translate,
 ): NumberFormatPreset[] {
   const chinese = region.toLowerCase().startsWith("zh");
-  if (category === "date" || category === "time") {
-    const codes =
-      category === "date"
-        ? chinese
-          ? CHINESE_DATE_CODES
-          : ENGLISH_DATE_CODES
-        : chinese
-          ? CHINESE_TIME_CODES
-          : TIME_CODES;
+  if (category === "date") return getDateFormatPresets(region);
+  if (category === "time") {
+    const codes = chinese ? CHINESE_TIME_CODES : TIME_CODES;
     // The type list always uses the same civil date and time, independent of the selected cell.
-    const sample = category === "date" ? 40982 : (13 * 3600 + 30 * 60 + 55) / 86400;
+    const sample = (13 * 3600 + 30 * 60 + 55) / 86400;
+    const localeId = getNumberFormatLocaleId(region);
     return codes.map((presetCode) => {
       // Carry the chosen region into XLSX, where application locale metadata is absent.
-      const code = /\[\$[^\]]*-[\da-f]+\]/i.test(presetCode)
-        ? presetCode
-        : `[$-${chinese ? "804" : "409"}]${presetCode}`;
+      const code =
+        /\[\$[^\]]*-[\da-f]+\]/i.test(presetCode) || !localeId
+          ? presetCode
+          : `[$-${localeId}]${presetCode}`;
       try {
         return {
           code,

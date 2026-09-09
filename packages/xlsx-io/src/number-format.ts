@@ -71,10 +71,39 @@ function createCodeFormat(kind: CodeFormatKind, code: string): CellNumberFormat 
   return locale ? { kind, code, locale } : { kind, code };
 }
 
-function inferCodeLocale(code: string): "zh-CN" | "en-US" | undefined {
-  const match = /\[\$-0*(804|409)\]/i.exec(code);
-  if (!match) return undefined;
-  return match[1] === "804" ? "zh-CN" : "en-US";
+function inferCodeLocale(code: string): string | undefined {
+  for (const token of findUnescapedLocalePrefixes(code)) {
+    const locale = getNumberFormatLocale(token);
+    if (locale) return locale;
+  }
+  return undefined;
+}
+
+/**
+ * Locale prefixes only have meaning outside quoted literals and escaped text.
+ * Keep unknown LCIDs out of the semantic locale field so their original code
+ * remains the sole source of truth on a later XLSX export.
+ */
+function* findUnescapedLocalePrefixes(code: string): Generator<string> {
+  let quoted = false;
+  for (let index = 0; index < code.length; index += 1) {
+    const character = code[index] ?? "";
+    if (character === "\\") {
+      index += 1;
+      continue;
+    }
+    if (character === '"') {
+      if (quoted && code[index + 1] === '"') index += 1;
+      else quoted = !quoted;
+      continue;
+    }
+    if (quoted || character !== "[") continue;
+    const end = code.indexOf("]", index + 1);
+    if (end < 0) continue;
+    const match = /^\[\$-([0-9a-f]+)\]$/i.exec(code.slice(index, end + 1));
+    if (match?.[1]) yield match[1];
+    index = end;
+  }
 }
 
 function canRoundTripSemantically(format: CellNumberFormat, code: string): boolean {
@@ -161,12 +190,16 @@ function isFractionCode(code: string): boolean {
 
 function isDateOrTimeCode(code: string): boolean {
   const stripped = stripQuotedAndBracketedCode(code);
-  return /(?:y|m|d|h|s|AM\/PM|A\/P)/i.test(stripped) || /\[(?:h|m|s)\]/i.test(code);
+  return (
+    /(?:y|m|d|h|s|AM\/PM|A\/P)/i.test(stripped) ||
+    /a{3,4}/i.test(stripped) ||
+    /\[(?:h|m|s)\]/i.test(code)
+  );
 }
 
 function dateOrTimeKind(code: string): "date" | "time" {
   const stripped = stripQuotedAndBracketedCode(code);
-  if (/[yd]/i.test(stripped)) return "date";
+  if (/[yd]|a{3,4}/i.test(stripped)) return "date";
   if (/[hs]|AM\/PM|A\/P|m\s*:|\[(?:h|m|s)\]/i.test(stripped) || /\[(?:h|m|s)\]/i.test(code))
     return "time";
   return "date";

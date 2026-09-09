@@ -1,11 +1,11 @@
-import { format, formatColor, getFormatDateInfo, isTextFormat } from "numfmt";
+import { addLocale, format, formatColor, getFormatDateInfo, getLocale, isTextFormat } from "numfmt";
 import { FORMULA_ERROR_TOKENS, isFormulaError, type FormulaValue } from "./formula/types.js";
 import type { ExcelDateSystem } from "./formula/date-system.js";
 import {
   canonicalizeCellNumberFormatCode,
   validateCellNumberFormatCode as validateFormatCode,
 } from "./number-format-code.js";
-import { getNumberFormatLocaleId } from "./number-format-locales.js";
+import { NUMBER_FORMAT_LOCALES, getNumberFormatLocaleId } from "./number-format-locales.js";
 import type { CellNumberFormat, CellNumberFormatNegativeStyle } from "./style.js";
 
 export {
@@ -28,6 +28,130 @@ export type CellNumberFormatOptions = Readonly<{
 }>;
 
 const DEFAULT_LOCALE = "en-US";
+const DATE_LOCALE_KEY_BY_LCID = new Map<string, string>();
+
+/**
+ * numfmt recognizes the Excel LCID embedded in a format code, but its bundled
+ * date-name tables intentionally cover only a subset of Microsoft's locales.
+ * Register private, exact-LCID date tables from the host's ICU data. The
+ * calendar, numbering system, and time zone are specified so this
+ * initialization never depends on workbook or host date settings.
+ */
+registerMissingDateLocales();
+
+function registerMissingDateLocales(): void {
+  for (const entry of NUMBER_FORMAT_LOCALES) {
+    const language = entry.locale.split("-", 1)[0];
+    if (
+      !language ||
+      (getLocale(language) && getLocale(entry.lcid) && !hasScriptSubtag(entry.locale)) ||
+      !supportsDateLocale(entry.locale)
+    ) {
+      continue;
+    }
+    const data = createDateLocaleData(entry.locale);
+    if (!data) continue;
+    const key = `idea10l${entry.lcid.toLowerCase()}`;
+    addLocale({ ...getLegacyFallbackLocale(language), ...data }, key);
+    DATE_LOCALE_KEY_BY_LCID.set(entry.lcid, key);
+  }
+}
+
+function hasScriptSubtag(locale: string): boolean {
+  return locale.split("-").some((part) => /^[A-Z][a-z]{3}$/.test(part));
+}
+
+function getLegacyFallbackLocale(locale = DEFAULT_LOCALE): Record<string, unknown> {
+  // Preserve numfmt's previous fallback for numeric, currency and boolean
+  // formats. The date-name fields are the only values this module changes.
+  return { ...(getLocale(locale) ?? getLocale(DEFAULT_LOCALE)) };
+}
+
+function supportsDateLocale(locale: string): boolean {
+  try {
+    return Intl.DateTimeFormat.supportedLocalesOf([locale]).length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function createDateLocaleData(locale: string):
+  | {
+      mmmm: string[];
+      mmm: string[];
+      dddd: string[];
+      ddd: string[];
+      ampm: string[];
+      preferMDY: boolean;
+    }
+  | undefined {
+  try {
+    const options = { calendar: "gregory", numberingSystem: "latn", timeZone: "UTC" } as const;
+    const month = (style: "long" | "short") =>
+      getDateParts(
+        locale,
+        { ...options, day: "numeric", month: style },
+        "month",
+        12,
+        (index) => new Date(Date.UTC(2024, index, 1)),
+      );
+    const weekday = (style: "long" | "short") =>
+      getDateParts(
+        locale,
+        { ...options, weekday: style },
+        "weekday",
+        7,
+        (index) => new Date(Date.UTC(2024, 0, 7 + index)),
+      );
+    const ampm = getDateParts(
+      locale,
+      { ...options, hour: "numeric", hour12: true },
+      "dayPeriod",
+      2,
+      (index) => new Date(Date.UTC(2024, 0, 1, index ? 13 : 1)),
+    );
+    const order = new Intl.DateTimeFormat(locale, {
+      ...options,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    })
+      .formatToParts(new Date(Date.UTC(2024, 10, 21)))
+      .filter((part) => part.type === "month" || part.type === "day")
+      .map((part) => part.type);
+    const mmmm = month("long");
+    const mmm = month("short");
+    const dddd = weekday("long");
+    const ddd = weekday("short");
+    if (!mmmm || !mmm || !dddd || !ddd || !ampm) return undefined;
+    return {
+      mmmm,
+      mmm,
+      dddd,
+      ddd,
+      ampm,
+      preferMDY: order[0] === "month",
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function getDateParts(
+  locale: string,
+  options: Intl.DateTimeFormatOptions,
+  partType: Intl.DateTimeFormatPartTypes,
+  length: number,
+  dateAt: (index: number) => Date,
+): string[] | undefined {
+  const formatter = new Intl.DateTimeFormat(locale, options);
+  const values = Array.from(
+    { length },
+    (_, index) =>
+      formatter.formatToParts(dateAt(index)).find((part) => part.type === partType)?.value,
+  );
+  return values.every((value): value is string => Boolean(value)) ? values : undefined;
+}
 
 /** Converts a semantic format into its XLSX-compatible format code. */
 export function toCellNumberFormatCode(
@@ -71,7 +195,7 @@ export function formatCellNumberValue(
   options: CellNumberFormatOptions = {},
 ): CellNumberFormatPresentation {
   if (isFormulaError(value)) return { text: FORMULA_ERROR_TOKENS[value.code] };
-  const code = toCellNumberFormatCode(cellFormat, options.locale);
+  const code = localizeDateLocaleCodes(toCellNumberFormatCode(cellFormat, options.locale));
   const locale =
     cellFormat?.kind === "text" ? options.locale : (cellFormat?.locale ?? options.locale);
   const formatterOptions = { locale: locale ?? DEFAULT_LOCALE, throws: true, nbsp: false } as const;
@@ -92,6 +216,28 @@ export function formatCellNumberValue(
     ...(typeof color === "string" ? { color } : {}),
     ...(nativeFill ? { fill: nativeFill } : {}),
   };
+}
+
+function localizeDateLocaleCodes(code: string): string {
+  if (!code.includes("[$")) return code;
+  return splitFormatSections(code)
+    .map((section) => {
+      const info = getFormatDateInfo(section);
+      if (!(info.year || info.month || info.day || info.hours || info.minutes || info.seconds))
+        return section;
+      return replaceOutsideQuotedText(section, (source, index) => {
+        if (source[index] !== "[") return undefined;
+        const match = /^\[\$([^\]-]*)-([0-9a-f]+)\]/i.exec(source.slice(index));
+        if (!match) return undefined;
+        const currency = match[1] ?? "";
+        const lcid = match[2]?.toUpperCase().replace(/^0+(?=[0-9A-F])/, "");
+        const localeKey = lcid ? DATE_LOCALE_KEY_BY_LCID.get(lcid) : undefined;
+        return localeKey
+          ? { value: `[$${currency}-${localeKey}]`, length: match[0].length }
+          : undefined;
+      });
+    })
+    .join(";");
 }
 
 /** Returns false for malformed codes and intentionally unsupported native-number modifiers. */
