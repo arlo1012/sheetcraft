@@ -27,6 +27,7 @@ const {
   category,
   fractionDigits,
   currency,
+  currencyDisplay,
   grouping,
   negativeStyle,
   region,
@@ -124,6 +125,11 @@ function selectNegative(code: string): void {
             <TSelect
               :model-value="currency"
               :options="currencyOptions"
+              :value-display="currencyDisplay"
+              :popup-props="{
+                overlayClassName: 'idea-currency-symbol-options',
+                overlayInnerStyle: { maxHeight: '240px' },
+              }"
               data-cell-format-currency
               @change="updateCurrency"
             />

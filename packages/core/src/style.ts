@@ -12,6 +12,7 @@ export const DEFAULT_CELL_FILL_COLOR = "#ffffff";
 export const MAX_CELL_STYLE_PATCH_CELLS = 100_000;
 export const MIN_NUMBER_FORMAT_FRACTION_DIGITS = 0;
 export const MAX_NUMBER_FORMAT_FRACTION_DIGITS = 20;
+export const MAX_NUMBER_FORMAT_CURRENCY_SYMBOL_LENGTH = 32;
 
 export type HorizontalCellAlignment = "left" | "center" | "right";
 export type VerticalCellAlignment = "top" | "middle" | "bottom";
@@ -64,6 +65,8 @@ export type CellNumberFormat =
       kind: "currency";
       /** An ISO-4217 code, or an empty string for an accounting format without a symbol. */
       currency: string;
+      /** Optional display symbol, which distinguishes regional variants of the same currency. */
+      currencySymbol?: string;
       fractionDigits: number;
       negativeStyle?: CellNumberFormatNegativeStyle;
       locale?: string;
@@ -72,6 +75,8 @@ export type CellNumberFormat =
       kind: "accounting";
       /** An ISO-4217 code, or an empty string for an accounting format without a symbol. */
       currency: string;
+      /** Optional display symbol, which distinguishes regional variants of the same currency. */
+      currencySymbol?: string;
       fractionDigits: number;
       negativeStyle?: CellNumberFormatNegativeStyle;
       locale?: string;
@@ -245,10 +250,15 @@ export function normalizeCellNumberFormat(format: CellNumberFormat): CellNumberF
   if (currency && !CURRENCY_CODE_PATTERN.test(currency)) {
     throw new TypeError("Cell currency format must contain a three-letter ISO currency code.");
   }
+  const currencySymbol = normalizeCurrencySymbol(format.currencySymbol);
+  if (!currency && currencySymbol) {
+    throw new TypeError("A cell currency symbol requires an ISO currency code.");
+  }
   assertNegativeStyle(format.negativeStyle);
   return {
     kind: format.kind,
     currency,
+    ...(currencySymbol ? { currencySymbol } : {}),
     fractionDigits: format.fractionDigits,
     ...(format.negativeStyle === undefined ? {} : { negativeStyle: format.negativeStyle }),
     ...(locale ? { locale } : {}),
@@ -305,6 +315,26 @@ function normalizeNumberFormatLocale(value: unknown): string | undefined {
   if (!locale || locale.length > 35)
     throw new RangeError("Cell number format locale must contain between 1 and 35 characters.");
   return locale;
+}
+
+function normalizeCurrencySymbol(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") throw new TypeError("Cell currency symbol must be a string.");
+  const symbol = value.trim();
+  if (!symbol || symbol.length > MAX_NUMBER_FORMAT_CURRENCY_SYMBOL_LENGTH) {
+    throw new RangeError(
+      `Cell currency symbol must contain between 1 and ${MAX_NUMBER_FORMAT_CURRENCY_SYMBOL_LENGTH} characters.`,
+    );
+  }
+  if (
+    [...symbol].some((character) => {
+      const code = character.charCodeAt(0);
+      return code <= 0x1f || (code >= 0x7f && code <= 0x9f);
+    })
+  ) {
+    throw new TypeError("Cell currency symbol must not contain control characters.");
+  }
+  return symbol;
 }
 
 function normalizeNumberFormatCode(value: unknown): string {

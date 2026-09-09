@@ -41,10 +41,10 @@ describe("CellFormatNumberPanel", () => {
         .get("[data-cell-format-currency]")
         .findComponent({ name: "TSelect" });
       expect(currency.props("modelValue")).toBe("GBP");
-      expect(currency.props("options")).toContainEqual({
-        value: "GBP",
-        label: "GBP (£)",
-      });
+      expect(currency.props("options")).toContainEqual(
+        expect.objectContaining({ value: "GBP", label: "£" }),
+      );
+      expect(currency.props("valueDisplay")).toBe("£");
       const digits = wrapper
         .get("[data-cell-format-decimals]")
         .findComponent({ name: "TInputNumber" });

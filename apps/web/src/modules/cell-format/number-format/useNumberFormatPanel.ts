@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref } from "vue";
+import { computed, ref, watch } from "vue";
 import {
   formatCellNumberValue,
   toCellNumberFormatCode,
@@ -20,6 +20,12 @@ import {
   type NumberFormatCategory,
 } from "./catalog";
 import { readCustomNumberFormats, removeCustomNumberFormat } from "./custom-formats";
+import {
+  getCurrencyChoiceValue,
+  getCurrencySymbolDisplay,
+  getCurrencySymbolOptions,
+  type CurrencySymbolChoice,
+} from "./currency-options";
 
 type PanelProps = Readonly<{
   state: SelectionCellStyleState;
@@ -42,7 +48,13 @@ export function useNumberFormatPanel(
         : props.state.numberFormat.value;
   const category = ref<NumberFormatCategory>(currentFormat()?.kind ?? "general");
   const fractionDigits = ref(2);
-  const currency = ref(locale.value === "zh-CN" ? "CNY" : "USD");
+  const currencyChoice = ref<CurrencySymbolChoice>({
+    currency: locale.value === "zh-CN" ? "CNY" : "USD",
+  });
+  const currency = computed(() => getCurrencyChoiceValue(currencyChoice.value));
+  const currencyDisplay = computed(() =>
+    getCurrencySymbolDisplay(currencyChoice.value, t("cellFormat.noCurrency")),
+  );
   const grouping = ref(true);
   const negativeStyle = ref<CellNumberFormatNegativeStyle>("minus");
   const region = ref<string>(locale.value);
@@ -121,9 +133,9 @@ export function useNumberFormatPanel(
       case "percent":
         return { kind: "percent", fractionDigits: digits };
       case "currency":
-        return { kind: "currency", currency: currency.value, fractionDigits: digits, ...negative };
+        return { kind: "currency", ...currencyChoice.value, fractionDigits: digits, ...negative };
       case "accounting":
-        return { kind: "accounting", currency: currency.value, fractionDigits: digits };
+        return { kind: "accounting", ...currencyChoice.value, fractionDigits: digits };
       case "scientific":
         return { kind: "scientific", fractionDigits: digits };
       case "text":
@@ -144,8 +156,16 @@ export function useNumberFormatPanel(
     const format = currentFormat();
     category.value = format?.kind ?? "general";
     fractionDigits.value = format && "fractionDigits" in format ? (format.fractionDigits ?? 2) : 2;
-    currency.value =
-      format && "currency" in format ? format.currency : locale.value === "zh-CN" ? "CNY" : "USD";
+    currencyChoice.value =
+      format && "currency" in format
+        ? {
+            currency: format.currency,
+            ...(format.currencySymbol === undefined
+              ? {}
+              : { currencySymbol: format.currencySymbol }),
+            ...(format.locale ? { locale: format.locale } : {}),
+          }
+        : { currency: locale.value === "zh-CN" ? "CNY" : "USD" };
     grouping.value = format && "useGrouping" in format ? format.useGrouping !== false : true;
     negativeStyle.value =
       format && "negativeStyle" in format ? (format.negativeStyle ?? "minus") : "minus";
@@ -181,9 +201,11 @@ export function useNumberFormatPanel(
     apply();
   }
 
-  function updateSelect(target: Ref<string>, value: SelectValue): void {
+  function updateCurrency(value: SelectValue): void {
     if (typeof value !== "string") return;
-    target.value = value;
+    const option = currencyOptions.value.find((option) => option.value === value);
+    if (!option) return;
+    currencyChoice.value = option.choice;
     apply();
   }
 
@@ -200,20 +222,7 @@ export function useNumberFormatPanel(
   }
 
   const currencyOptions = computed(() =>
-    [...new Set(["", "CNY", "USD", "EUR", "GBP", "JPY", currency.value])].map((value) => ({
-      value,
-      label: !value
-        ? t("cellFormat.noCurrency")
-        : ((
-            {
-              CNY: "CNY (¥)",
-              USD: "USD ($)",
-              EUR: "EUR (€)",
-              GBP: "GBP (£)",
-              JPY: "JPY (¥)",
-            } as Record<string, string>
-          )[value] ?? value),
-    })),
+    getCurrencySymbolOptions(locale.value, t("cellFormat.noCurrency"), currencyChoice.value),
   );
   const regionOptions = computed(() => [
     { value: "zh-CN", label: t("cellFormat.regionChineseChina") },
@@ -284,6 +293,7 @@ export function useNumberFormatPanel(
     category,
     fractionDigits,
     currency,
+    currencyDisplay,
     grouping,
     negativeStyle,
     region,
@@ -308,7 +318,7 @@ export function useNumberFormatPanel(
     selectCode,
     updateCustomCode,
     updateDigits,
-    updateCurrency: (value: SelectValue) => updateSelect(currency, value),
+    updateCurrency,
     updateRegion,
     updateGrouping: (value: boolean) => {
       grouping.value = value;

@@ -1,4 +1,9 @@
-import { toCellNumberFormatCode, validateCellNumberFormatCode } from "@idea10/core/number-format";
+import {
+  getNumberFormatLocale,
+  getNumberFormatLocaleCurrency,
+  toCellNumberFormatCode,
+  validateCellNumberFormatCode,
+} from "@idea10/core/number-format";
 import type { CellNumberFormat, CellNumberFormatNegativeStyle } from "@idea10/core/style";
 
 export function toExcelNumberFormat(format: CellNumberFormat): string {
@@ -97,7 +102,7 @@ function parseStyledDecimal(code: string): CellNumberFormat | undefined {
     if (!currency || positive[2] === "0") return undefined;
     return {
       kind: "currency",
-      currency,
+      ...currency,
       fractionDigits,
       ...(negativeStyle ? { negativeStyle } : {}),
     };
@@ -126,8 +131,8 @@ function parseAccounting(
   // arbitrary custom codes containing one underscore do not change category.
   if (!/_\([^;]*\*|\*[^;]*_\)/.test(code)) return undefined;
   const prefix = /\[\$[^\]]+\]/i.exec(code)?.[0];
-  const currency =
-    (prefix ? currencyFromPrefix(prefix) : undefined) ?? /"([A-Z]{3})"\*/.exec(code)?.[1] ?? "";
+  const prefixCurrency = prefix ? currencyFromPrefix(prefix) : undefined;
+  const currency = prefixCurrency?.currency ?? /"([A-Z]{3})"\*/.exec(code)?.[1] ?? "";
   const fractionDigits = /#,##0(?:\.(0{1,20}))?/.exec(code)?.[1]?.length ?? 0;
   const negativeSection = code.split(";")[1] ?? "";
   const negativeStyle: CellNumberFormatNegativeStyle | undefined = /\[Red\]/i.test(negativeSection)
@@ -142,6 +147,8 @@ function parseAccounting(
   return {
     kind: "accounting",
     currency: currency.toUpperCase(),
+    ...(prefixCurrency?.currencySymbol ? { currencySymbol: prefixCurrency.currencySymbol } : {}),
+    ...(prefixCurrency?.locale ? { locale: prefixCurrency.locale } : {}),
     fractionDigits,
     ...(negativeStyle ? { negativeStyle } : {}),
   };
@@ -169,7 +176,33 @@ function stripQuotedAndBracketedCode(code: string): string {
   return code.replace(/"(?:[^"]|"")*"|\\.|\[[^\]]*\]/g, "");
 }
 
-const CURRENCY_PREFIXES: Readonly<Record<string, string>> = {
+type ParsedCurrencyPrefix = Readonly<{
+  currency: string;
+  currencySymbol?: string;
+  locale?: string;
+}>;
+
+function currencyFromPrefix(prefix: string): ParsedCurrencyPrefix | undefined {
+  const canonical = legacyCurrencyFromPrefix(prefix);
+  if (canonical) return { currency: canonical };
+
+  const legacy = /^\[\$([A-Z]{3})\]$/i.exec(prefix)?.[1];
+  if (legacy) return { currency: legacy.toUpperCase() };
+
+  const localized = /^\[\$([^\]-]+)-([0-9a-f]+)\]$/i.exec(prefix);
+  if (!localized) return undefined;
+  const symbol = localized[1] ?? "";
+  const locale = getNumberFormatLocale(localized[2] ?? "");
+  if (!locale) return undefined;
+  const currency = currencyForLocalizedSymbol(symbol, locale);
+  return currency ? { currency, currencySymbol: symbol, locale } : undefined;
+}
+
+/**
+ * These eleven prefixes predate currency-symbol and locale fields. Keep their
+ * original semantic shape so old snapshots do not gain presentation details.
+ */
+const LEGACY_CURRENCY_PREFIXES: Readonly<Record<string, string>> = {
   "[$$-409]": "USD",
   "[$A$-C09]": "AUD",
   "[$CA$-1009]": "CAD",
@@ -183,17 +216,62 @@ const CURRENCY_PREFIXES: Readonly<Record<string, string>> = {
   "[$₩-412]": "KRW",
 };
 
-function currencyFromPrefix(prefix: string): string | undefined {
-  const canonical =
-    CURRENCY_PREFIXES[prefix] ?? CURRENCY_PREFIXES[normalizeCurrencyPrefixCase(prefix)];
-  if (canonical) return canonical;
-  const legacy = /^\[\$([A-Z]{3})\]$/i.exec(prefix)?.[1];
-  return legacy?.toUpperCase();
+function legacyCurrencyFromPrefix(prefix: string): string | undefined {
+  return (
+    LEGACY_CURRENCY_PREFIXES[prefix] ??
+    LEGACY_CURRENCY_PREFIXES[normalizeLegacyCurrencyPrefixCase(prefix)]
+  );
 }
+
+function normalizeLegacyCurrencyPrefixCase(prefix: string): string {
+  return prefix.replace(/-[0-9a-f]+\]$/i, (suffix) => suffix.toUpperCase());
+}
+
+function currencyFromLegacyCodePrefix(prefix: string): string | undefined {
+  const legacy = /^\[\$([A-Z]{3})\]$/i.exec(prefix)?.[1];
+  return legacy?.toUpperCase() ?? legacyCurrencyFromPrefix(prefix);
+}
+
+/**
+ * An explicit national prefix (for example `US$`) identifies its currency even
+ * when the number-format locale is a different language. A short symbol such
+ * as `$` is only semantic when it is the locale's own currency symbol.
+ */
+function currencyForLocalizedSymbol(symbol: string, locale: string): string | undefined {
+  const explicit = EXPLICIT_CURRENCY_SYMBOLS[symbol];
+  if (explicit) return explicit;
+  const currency = getNumberFormatLocaleCurrency(locale);
+  return currency && symbolMatchesCurrency(symbol, locale, currency) ? currency : undefined;
+}
+
+function symbolMatchesCurrency(symbol: string, locale: string, currency: string): boolean {
+  try {
+    const displays = ["symbol", "narrowSymbol", "code"] as const;
+    return displays.some((currencyDisplay) =>
+      new Intl.NumberFormat(locale, { style: "currency", currency, currencyDisplay })
+        .formatToParts(0)
+        .some((part) => part.type === "currency" && part.value === symbol),
+    );
+  } catch {
+    return false;
+  }
+}
+
+const EXPLICIT_CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {
+  A$: "AUD",
+  CA$: "CAD",
+  "CN¥": "CNY",
+  HK$: "HKD",
+  NT$: "TWD",
+  NZ$: "NZD",
+  R$: "BRL",
+  S$: "SGD",
+  US$: "USD",
+};
 
 function normalizeCanonicalCurrencyCode(code: string): string {
   return code.replace(/\[\$[^\]]+\]/g, (prefix) => {
-    const currency = currencyFromPrefix(prefix);
+    const currency = currencyFromLegacyCodePrefix(prefix);
     return currency ? `[$${currency}]` : prefix;
   });
 }
@@ -202,8 +280,4 @@ function normalizeSemanticCode(code: string): string {
   // ExcelJS serializes escaped accounting parentheses without the optional
   // backslashes. In a number format section both forms are literal parens.
   return normalizeCanonicalCurrencyCode(code).replace(/\\([()])/g, "$1");
-}
-
-function normalizeCurrencyPrefixCase(prefix: string): string {
-  return prefix.replace(/-[0-9a-f]+\]/i, (suffix) => suffix.toUpperCase());
 }

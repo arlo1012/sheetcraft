@@ -10,7 +10,7 @@ import {
 import type { CellNumberFormat } from "@idea10/core/style";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../../index.js";
-import { fromExcelNumberFormat } from "../../number-format.js";
+import { fromExcelNumberFormat, toExcelNumberFormat } from "../../number-format.js";
 
 type BrowserWorkbook = {
   properties: { date1904?: boolean };
@@ -134,5 +134,76 @@ describe("XLSX number formats", () => {
     });
     expect(fromExcelNumberFormat("00000")).toEqual({ kind: "special", code: "00000" });
     expect(fromExcelNumberFormat("000000")).toEqual({ kind: "special", code: "000000" });
+  });
+
+  test("keeps the original object shape for legacy currency prefixes", () => {
+    expect(fromExcelNumberFormat("[$$-409]#,##0.00")).toEqual({
+      kind: "currency",
+      currency: "USD",
+      fractionDigits: 2,
+    });
+    expect(fromExcelNumberFormat("[$£-809]#,##0")).toEqual({
+      kind: "currency",
+      currency: "GBP",
+      fractionDigits: 0,
+    });
+    expect(fromExcelNumberFormat("[$A$-c09]#,##0.00")).toEqual({
+      kind: "currency",
+      currency: "AUD",
+      fractionDigits: 2,
+    });
+  });
+
+  test("roundtrips localized currency symbols with their XLSX locale", () => {
+    const usDollar = "[$US$-409]#,##0.00";
+    const canadianDollar = "[$$-1009]#,##0.00";
+    const usDollarFormat: CellNumberFormat = {
+      kind: "currency",
+      currency: "USD",
+      currencySymbol: "US$",
+      locale: "en-US",
+      fractionDigits: 2,
+    };
+
+    expect(fromExcelNumberFormat(usDollar)).toEqual(usDollarFormat);
+    expect(toExcelNumberFormat(usDollarFormat)).toBe(usDollar);
+    expect(fromExcelNumberFormat(canadianDollar)).toEqual({
+      kind: "currency",
+      currency: "CAD",
+      currencySymbol: "$",
+      locale: "en-CA",
+      fractionDigits: 2,
+    });
+    expect(toExcelNumberFormat(fromExcelNumberFormat(canadianDollar) as CellNumberFormat)).toBe(
+      canadianDollar,
+    );
+  });
+
+  test("roundtrips localized accounting symbols and keeps ambiguous prefixes custom", () => {
+    const accounting =
+      '_([$US$-409]* #,##0.00_);_([$US$-409]* \\(#,##0.00\\)_);_([$US$-409]* "-"??_);_(@_)';
+    const expected: CellNumberFormat = {
+      kind: "accounting",
+      currency: "USD",
+      currencySymbol: "US$",
+      locale: "en-US",
+      fractionDigits: 2,
+      negativeStyle: "parentheses",
+    };
+
+    expect(fromExcelNumberFormat(accounting)).toEqual(expected);
+    expect(toExcelNumberFormat(expected)).toBe(accounting);
+    expect(fromExcelNumberFormat("[$€-409]#,##0.00")).toEqual({
+      kind: "custom",
+      code: "[$€-409]#,##0.00",
+    });
+    expect(fromExcelNumberFormat("[$$-DEAD]#,##0.00")).toEqual({
+      kind: "custom",
+      code: "[$$-DEAD]#,##0.00",
+    });
+    expect(fromExcelNumberFormat("[$US$-0409]#,##0.00")).toEqual({
+      kind: "custom",
+      code: "[$US$-0409]#,##0.00",
+    });
   });
 });

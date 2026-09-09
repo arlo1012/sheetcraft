@@ -4,6 +4,7 @@ import {
   CELL_STYLE_KEYS,
   CELL_BORDER_LINE_STYLES,
   MAX_NUMBER_FORMAT_FRACTION_DIGITS,
+  MAX_NUMBER_FORMAT_CURRENCY_SYMBOL_LENGTH,
   areCellStylesEqual,
   areCellNumberFormatsEqual,
   cloneCellStyle,
@@ -100,6 +101,31 @@ describe("cell style model", () => {
     ).toThrow(TypeError);
     expect(() =>
       normalizeCellStyle({
+        numberFormat: { kind: "currency", currency: "", currencySymbol: "$", fractionDigits: 2 },
+      }),
+    ).toThrow(TypeError);
+    expect(() =>
+      normalizeCellStyle({
+        numberFormat: {
+          kind: "currency",
+          currency: "USD",
+          currencySymbol: "x".repeat(MAX_NUMBER_FORMAT_CURRENCY_SYMBOL_LENGTH + 1),
+          fractionDigits: 2,
+        },
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      normalizeCellStyle({
+        numberFormat: {
+          kind: "currency",
+          currency: "USD",
+          currencySymbol: "US\u0000$",
+          fractionDigits: 2,
+        },
+      }),
+    ).toThrow(TypeError);
+    expect(() =>
+      normalizeCellStyle({
         numberFormat: {
           kind: "number",
           fractionDigits: MAX_NUMBER_FORMAT_FRACTION_DIGITS + 1,
@@ -117,6 +143,21 @@ describe("cell style model", () => {
       fractionDigits: 2,
     });
     expect(
+      normalizeCellNumberFormat({
+        kind: "currency",
+        currency: "usd",
+        currencySymbol: "  US$  ",
+        fractionDigits: 2,
+        locale: "en-US",
+      }),
+    ).toEqual({
+      kind: "currency",
+      currency: "USD",
+      currencySymbol: "US$",
+      fractionDigits: 2,
+      locale: "en-US",
+    });
+    expect(
       areCellNumberFormatsEqual(
         { kind: "percent", fractionDigits: 1 },
         { kind: "percent", fractionDigits: 1 },
@@ -126,6 +167,12 @@ describe("cell style model", () => {
       areCellNumberFormatsEqual(
         { kind: "currency", currency: "USD", fractionDigits: 2 },
         { kind: "currency", currency: "CNY", fractionDigits: 2 },
+      ),
+    ).toBe(false);
+    expect(
+      areCellNumberFormatsEqual(
+        { kind: "currency", currency: "USD", currencySymbol: "$", fractionDigits: 2 },
+        { kind: "currency", currency: "USD", currencySymbol: "US$", fractionDigits: 2 },
       ),
     ).toBe(false);
   });

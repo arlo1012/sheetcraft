@@ -5,7 +5,15 @@ import {
   canonicalizeCellNumberFormatCode,
   validateCellNumberFormatCode as validateFormatCode,
 } from "./number-format-code.js";
+import { getNumberFormatLocaleId } from "./number-format-locales.js";
 import type { CellNumberFormat, CellNumberFormatNegativeStyle } from "./style.js";
+
+export {
+  NUMBER_FORMAT_LOCALES,
+  getNumberFormatLocale,
+  getNumberFormatLocaleCurrency,
+  getNumberFormatLocaleId,
+} from "./number-format-locales.js";
 
 export type CellNumberFormatPresentation = Readonly<{
   text: string;
@@ -45,7 +53,7 @@ export function toCellNumberFormatCode(
       ? withNegativeStyle(`${number}%`, format.negativeStyle)
       : withNegativeStyle(number, format.negativeStyle);
   }
-  const currency = currencyFormatPrefix(format.currency);
+  const currency = currencyFormatPrefix(format.currency, format.currencySymbol, format.locale);
   const number = `#,##0${decimalPlaces(format.fractionDigits)}`;
   return format.kind === "currency"
     ? withNegativeStyle(`${currency}${number}`, format.negativeStyle)
@@ -456,9 +464,28 @@ function toChineseGroup(group: string, native: ChineseNativeNumber): string {
   return output;
 }
 
-function currencyFormatPrefix(currency: string): string {
+function currencyFormatPrefix(
+  currency: string,
+  currencySymbol: string | undefined,
+  locale: string | undefined,
+): string {
+  if (currencySymbol) {
+    const localeId = locale ? getNumberFormatLocaleId(locale) : undefined;
+    if (localeId && canUseCurrencyLocalePrefix(currencySymbol)) {
+      return `[$${currencySymbol}-${localeId}]`;
+    }
+    return quoteCurrencySymbol(currencySymbol);
+  }
   const prefix = CURRENCY_FORMAT_PREFIXES[currency];
   return prefix ?? (currency ? `"${currency.replaceAll('"', '""')}"` : "");
+}
+
+function canUseCurrencyLocalePrefix(symbol: string): boolean {
+  return !["[", "]", '"', ";", "\\"].some((character) => symbol.includes(character));
+}
+
+function quoteCurrencySymbol(symbol: string): string {
+  return `"${symbol.replaceAll('"', '""')}"`;
 }
 
 const CURRENCY_FORMAT_PREFIXES: Readonly<Record<string, string>> = {

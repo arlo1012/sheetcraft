@@ -147,6 +147,54 @@ describe("cell number formats", () => {
     expect(toCellNumberFormatCode({ kind: "currency", currency: "CNY", fractionDigits: 0 })).toBe(
       "[$¥-804]#,##0",
     );
+    expect(
+      toCellNumberFormatCode({
+        kind: "currency",
+        currency: "USD",
+        currencySymbol: "US$",
+        fractionDigits: 2,
+        locale: "en-US",
+      }),
+    ).toBe("[$US$-409]#,##0.00");
+    expect(
+      formatCellNumberValue(1234.5, {
+        kind: "currency",
+        currency: "USD",
+        currencySymbol: "US$",
+        fractionDigits: 2,
+        locale: "en-US",
+      }).text,
+    ).toBe("US$1,234.50");
+    expect(
+      toCellNumberFormatCode({
+        kind: "currency",
+        currency: "USD",
+        currencySymbol: "US$",
+        fractionDigits: 2,
+        locale: "unsupported-region",
+      }),
+    ).toBe('"US$"#,##0.00');
+    expect(
+      toCellNumberFormatCode({
+        kind: "currency",
+        currency: "USD",
+        currencySymbol: 'US"$[test]',
+        fractionDigits: 2,
+        locale: "en-US",
+      }),
+    ).toBe('"US""$[test]"#,##0.00');
+    expect(
+      toCellNumberFormatCode({
+        kind: "accounting",
+        currency: "USD",
+        currencySymbol: "US$",
+        fractionDigits: 2,
+        negativeStyle: "red-parentheses",
+        locale: "en-US",
+      }),
+    ).toBe(
+      '_([$US$-409]* #,##0.00_);[Red]_([$US$-409]* \\(#,##0.00\\)_);_([$US$-409]* "-"??_);_(@_)',
+    );
     expect(formatCellNumberValue({ kind: "formula-error", code: "NA" }, undefined)).toEqual({
       text: "#N/A",
     });

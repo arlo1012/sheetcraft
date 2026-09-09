@@ -436,7 +436,7 @@ export const enUS = {
     numeric: "Number",
     percent: "Percentage",
     currency: "Currency",
-    currencyCode: "Currency",
+    currencyCode: "Currency symbol",
     decimalPlaces: "Decimal places",
     generalDescription: "Display the original value without a specific number format.",
     numericDescription: "Display a number with the decimal places you choose.",

@@ -215,6 +215,17 @@
   --td-comp-size-s: 24px;
 }
 
+.idea-currency-symbol-options .t-select-option {
+  &:hover:not(.t-is-selected):not(.t-is-disabled) {
+    background: var(--idea-surface-secondary);
+  }
+
+  &.t-is-selected:not(.t-is-disabled) {
+    color: var(--idea-text-primary);
+    background: var(--idea-surface-active);
+  }
+}
+
 .t-tooltip .t-popup__content {
   font: var(--td-font-body-small);
 }

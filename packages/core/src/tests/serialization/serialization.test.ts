@@ -59,6 +59,52 @@ describe("workbook snapshots", () => {
     });
   });
 
+  test("round trips regional currency symbol variants", () => {
+    const workbook = createWorkbook({ id: "regional-currency", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        numberFormat: {
+          kind: "currency",
+          currency: "USD",
+          currencySymbol: "US$",
+          fractionDigits: 2,
+          locale: "en-US",
+        },
+      },
+    );
+    setCellStyle(
+      sheet,
+      { row: 0, column: 1 },
+      {
+        numberFormat: {
+          kind: "accounting",
+          currency: "USD",
+          currencySymbol: "US$",
+          fractionDigits: 2,
+          locale: "en-US",
+        },
+      },
+    );
+
+    const restored = deserializeWorkbook(serializeWorkbook(workbook));
+    const restoredSheet = getActiveSheet(restored);
+    expect(getCellStyle(restoredSheet, { row: 0, column: 0 })?.numberFormat).toMatchObject({
+      kind: "currency",
+      currency: "USD",
+      currencySymbol: "US$",
+      locale: "en-US",
+    });
+    expect(getCellStyle(restoredSheet, { row: 0, column: 1 })?.numberFormat).toMatchObject({
+      kind: "accounting",
+      currency: "USD",
+      currencySymbol: "US$",
+      locale: "en-US",
+    });
+  });
+
   test("serializes sparse entries in deterministic address and dimension order", () => {
     const workbook = createWorkbook({ id: "workbook-1", sheetId: "sheet-1" });
     const sheet = getActiveSheet(workbook);
