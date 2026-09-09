@@ -242,12 +242,28 @@
   }
 }
 
-// TDesign has no public prop to keep column stepper controls visible.
+// Shared column stepper appearance; TDesign exposes neither persistent controls
+// nor their resting background and icon size as public props.
 .idea-input-number--persistent-controls.t-input-number.t-is-controls-right {
   .t-input-number__decrease,
   .t-input-number__increase {
     visibility: visible;
     opacity: 1;
+    background: transparent;
+
+    &.t-is-disabled {
+      background: transparent;
+    }
+
+    &:hover:not(.t-is-disabled):not(:disabled) {
+      background: var(--idea-icon-button-hover-bg);
+    }
+
+    .t-icon {
+      width: 16px;
+      height: 16px;
+      font-size: 16px;
+    }
   }
 }
 
