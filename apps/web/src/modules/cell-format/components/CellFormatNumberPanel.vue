@@ -235,7 +235,7 @@ function selectNegative(code: string): void {
     min-width: 0;
     overflow: auto;
     padding: 8px 12px;
-    border: 1px solid var(--idea-border-control);
+    border: 1px solid var(--idea-border-subtle);
     border-radius: var(--idea-radius-default);
     color: var(--idea-text-primary);
     background: var(--idea-surface-panel);

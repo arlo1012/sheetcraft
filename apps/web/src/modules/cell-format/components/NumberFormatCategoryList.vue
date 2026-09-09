@@ -186,7 +186,7 @@ function onKeydown(event: KeyboardEvent): void {
     min-height: 0;
     overflow: auto;
     padding: 4px;
-    border: 1px solid var(--idea-border-control);
+    border: 1px solid var(--idea-border-subtle);
     border-radius: var(--idea-radius-default);
 
     button {
