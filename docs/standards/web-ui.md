@@ -8,11 +8,11 @@ Use four typography levels for Web interface text. Sizes are CSS pixels at
 | Role                | Size / line height | Weight | Uses                                                                                                                                                      |
 | ------------------- | ------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Supporting text     | 12px / 18px        | 400    | Status bar, zoom readout, shortcuts, descriptions, tooltips, ribbon group captions, row/column headers                                                    |
-| Main interface text | 13px / 20px        | 400    | Ribbon actions and tabs, form labels and controls, checkbox/radio labels, menu and select options, dialog tabs, Sheet tabs, formula/address/search inputs |
+| Main interface text | 12px / 20px        | 400    | Ribbon actions and tabs, form labels and controls, checkbox/radio labels, menu and select options, dialog tabs, Sheet tabs, formula/address/search inputs |
 | Section heading     | 14px / 22px        | 600    | Panel and popover titles                                                                                                                                  |
 | Dialog heading      | 16px / 24px        | 600    | Dialog titles                                                                                                                                             |
 
-- The default Web interface typography is 13px / 20px. Keep font family tied
+- The default Web interface typography is 12px / 20px. Keep font family tied
   to `--idea-font-sans` for both native elements and TDesign components.
 - Use 500 weight for selected navigation and small group headings. Hover,
   focus, disabled, and selected states keep the same font size and line height.
@@ -22,7 +22,7 @@ Use four typography levels for Web interface text. Sizes are CSS pixels at
   heights; map TDesign typography through the shared adapter. Components
   choose a role instead of adding local pixel values or another density scale.
 - Control height and text line height are separate. The default 28px control
-  uses 13px / 20px text; accommodate that text in the container instead of
+  uses 12px / 20px text; accommodate that text in the container instead of
   shrinking labels to fit. Keep icon sizes independent from text roles,
   including TDesign icons that consume typography variables.
 - This standard covers the editing interface, including the formula bar.
