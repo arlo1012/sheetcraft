@@ -245,6 +245,16 @@
 // Shared column stepper appearance; TDesign exposes neither persistent controls
 // nor their resting background and icon size as public props.
 .idea-input-number--persistent-controls.t-input-number.t-is-controls-right {
+  --idea-input-number-icon-size: 14px;
+
+  &.t-size-s {
+    --idea-input-number-icon-size: 12px;
+  }
+
+  &.t-size-l {
+    --idea-input-number-icon-size: 16px;
+  }
+
   .t-input-number__decrease,
   .t-input-number__increase {
     visibility: visible;
@@ -260,9 +270,9 @@
     }
 
     .t-icon {
-      width: 14px;
-      height: 14px;
-      font-size: 14px;
+      width: var(--idea-input-number-icon-size);
+      height: var(--idea-input-number-icon-size);
+      font-size: var(--idea-input-number-icon-size);
     }
   }
 }
