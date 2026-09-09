@@ -298,7 +298,6 @@ function selectNegative(code: string): void {
     line-height: 18px;
   }
   &__description {
-    min-height: 36px;
     margin: 0;
     color: var(--idea-text-secondary);
     font-size: 12px;
