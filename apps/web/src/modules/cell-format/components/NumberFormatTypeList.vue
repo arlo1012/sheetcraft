@@ -72,6 +72,34 @@ function onKeydown(event: KeyboardEvent): void {
   border-radius: var(--idea-radius-default);
   background: var(--idea-surface-panel);
 
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  &::-webkit-scrollbar-track,
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: var(--idea-scrollbar-thumb);
+    background-clip: padding-box;
+
+    &:hover {
+      background-color: var(--idea-scrollbar-thumb-hover);
+    }
+  }
+  &::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--idea-scrollbar-thumb) transparent;
+  }
+
   button {
     display: block;
     width: 100%;
