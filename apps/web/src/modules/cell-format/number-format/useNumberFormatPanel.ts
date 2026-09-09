@@ -235,12 +235,29 @@ export function useNumberFormatPanel(
       return { value, label: formatted.text, color: formatted.color };
     }),
   );
+  const previewValue = computed(() => {
+    if (props.sampleValue !== null && props.sampleValue !== "") return props.sampleValue;
+    // Empty cells use examples only in the preview; the document value is untouched.
+    switch (category.value) {
+      case "date":
+        return 40982 - (props.dateSystem === "1904" ? 1462 : 0); // 2012-03-14
+      case "time":
+        return (13 * 3600 + 30 * 60 + 55) / 86400;
+      case "percent":
+        return 0.1234;
+      case "fraction":
+        return 12.5;
+      case "text":
+        return "00123";
+      default:
+        return 1234.567;
+    }
+  });
   const preview = computed(() => {
     if (mixed.value) return { text: t("format.mixed") };
     if (!customValid.value) return { text: "—" };
-    // The preview follows the selected cell; an empty cell remains empty, as in Format Cells.
     try {
-      return formatCellNumberValue(props.sampleValue, draftFormat(), {
+      return formatCellNumberValue(previewValue.value, draftFormat(), {
         locale: locale.value,
         dateSystem: props.dateSystem ?? "1900",
       });
