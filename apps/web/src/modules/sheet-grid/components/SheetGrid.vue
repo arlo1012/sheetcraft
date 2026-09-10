@@ -70,11 +70,8 @@ import {
 } from "../useGridClipboard";
 import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
 import {
-  createApproximateTextMeasurer,
   createAutoRowHeightCalculator,
   mergeRowHeightOverrides,
-  type AutoRowHeightFont,
-  type TextMeasurer,
 } from "@idea10/sheet-engine/row-height";
 import { useDimensionResize } from "../composables/useDimensionResize";
 import { useAxisMoveDrag, type AxisMovePayload } from "../composables/useAxisMoveDrag";
@@ -105,6 +102,8 @@ import SheetReadingHighlight from "./SheetReadingHighlight.vue";
 import type { FormulaReferenceOverlayGroup } from "./SheetSelectionOverlay.vue";
 import { getCellEditorFrameStyle, getCellEditorStyle } from "../cell-presentation";
 import { formatCellValueForGrid } from "../cell-value-presentation";
+import { isCellTextWrapped } from "../../../shared/cell-text/text-presentation";
+import { browserCellTextMeasurer } from "../../../shared/cell-text/text-metrics";
 
 type AxisContextMenuState = {
   axis: SheetDimensionAxis;
@@ -265,25 +264,7 @@ const cellContextMenu = ref<CellContextMenuState>();
 let fontFaceSet: FontFaceSet | undefined;
 let fontLoadingDoneListener: (() => void) | undefined;
 
-const approximateTextMeasurer = createApproximateTextMeasurer();
-let canvasContext: CanvasRenderingContext2D | null | undefined;
-const textMeasurer = markRaw<TextMeasurer>({
-  measure(text: string, font: AutoRowHeightFont): number {
-    if (canvasContext === undefined) {
-      canvasContext =
-        typeof document !== "undefined" && typeof CanvasRenderingContext2D !== "undefined"
-          ? document.createElement("canvas").getContext("2d")
-          : null;
-    }
-    if (!canvasContext) {
-      return approximateTextMeasurer.measure(text, font);
-    }
-    const family = font.family.includes(",") ? font.family : JSON.stringify(font.family);
-    canvasContext.font = `${font.italic ? "italic " : ""}${font.weight} ${font.size}px ${family}`;
-    return canvasContext.measureText(text).width;
-  },
-});
-const autoRowHeightCalculator = markRaw(createAutoRowHeightCalculator(textMeasurer));
+const autoRowHeightCalculator = markRaw(createAutoRowHeightCalculator(browserCellTextMeasurer));
 const defaultFontFamily = ref(DEFAULT_CELL_FONT_FAMILY);
 const fontMetricsVersion = ref(0);
 const contentExtent = computed(() => getSheetContentExtent(props.sheet));
@@ -701,13 +682,17 @@ const activeCellDisplayValue = computed(() =>
       ),
 );
 const activeCellEditorStyle = computed(() =>
-  getCellEditorStyle(getCellStyle(props.sheet, activeCell.value)),
+  getCellEditorStyle(
+    getCellStyle(props.sheet, activeCell.value),
+    sheetEvaluator.value.getComputedValue(activeCell.value),
+    isEditing.value ? editingValue.value : activeCellDisplayValue.value,
+  ),
 );
 const activeCellEditorFrameStyle = computed(() =>
   getCellEditorFrameStyle(getCellStyle(props.sheet, activeCell.value)),
 );
 const activeCellWrapText = computed(() =>
-  Boolean(getCellStyle(props.sheet, activeCell.value)?.wrapText),
+  isCellTextWrapped(getCellStyle(props.sheet, activeCell.value)),
 );
 const browserClipboard = createBrowserGridClipboardPort();
 const {

@@ -9,7 +9,10 @@ const mountedWrappers: Array<{
 }> = [];
 
 function mountMenu(
-  state: { value: "top" | "middle" | "bottom" | undefined; mixed: boolean } = {
+  state: {
+    value: "top" | "middle" | "bottom" | "justify" | "distributed" | undefined;
+    mixed: boolean;
+  } = {
     value: undefined,
     mixed: false,
   },
@@ -44,7 +47,7 @@ describe("VerticalAlignmentMenu interaction", () => {
     const trigger = wrapper.get<HTMLButtonElement>("[data-vertical-alignment-trigger]");
 
     expect(trigger.attributes()).toMatchObject({
-      "aria-label": "Vertical alignment: Align middle",
+      "aria-label": "Vertical alignment: Align bottom",
       "aria-expanded": "false",
       "aria-haspopup": "menu",
     });
@@ -52,20 +55,18 @@ describe("VerticalAlignmentMenu interaction", () => {
 
     const menu = getMenu();
     expect(trigger.attributes("aria-controls")).toBe(menu.attributes("id"));
-    expect(menu.findAll('[role="menuitemradio"]')).toHaveLength(3);
-    expect(menu.get('[data-vertical-alignment-option="middle"]').attributes("aria-checked")).toBe(
+    expect(menu.findAll('[role="menuitemradio"]')).toHaveLength(5);
+    expect(menu.get('[data-vertical-alignment-option="bottom"]').attributes("aria-checked")).toBe(
       "true",
     );
     expect(document.activeElement).toBe(
-      menu.get('[data-vertical-alignment-option="middle"]').element,
+      menu.get('[data-vertical-alignment-option="bottom"]').element,
     );
 
-    await menu.trigger("keydown", { key: "ArrowDown" });
     const bottom = menu.get('[data-vertical-alignment-option="bottom"]');
-    expect(document.activeElement).toBe(bottom.element);
     await bottom.trigger("click");
 
-    expect(wrapper.emitted("applyStyle")?.[0]).toEqual([{ verticalAlign: "bottom" }]);
+    expect(wrapper.emitted("applyStyle")?.[0]).toEqual([{ verticalAlign: null }]);
     expect(document.body.querySelector('[role="menu"]')).toBeNull();
     expect(document.activeElement).toBe(trigger.element);
   });
@@ -78,11 +79,11 @@ describe("VerticalAlignmentMenu interaction", () => {
     await trigger.trigger("keydown", { key: "ArrowUp" });
     const menu = getMenu();
     expect(document.activeElement).toBe(
-      menu.get('[data-vertical-alignment-option="bottom"]').element,
+      menu.get('[data-vertical-alignment-option="distributed"]').element,
     );
     expect(
       menu.findAll('[role="menuitemradio"]').map((item) => item.attributes("aria-checked")),
-    ).toEqual(["false", "false", "false"]);
+    ).toEqual(["false", "false", "false", "false", "false"]);
     expect(menu.text()).toContain("顶端对齐");
     expect(menu.text()).toContain("垂直居中");
     expect(menu.text()).toContain("底端对齐");
@@ -95,11 +96,11 @@ describe("VerticalAlignmentMenu interaction", () => {
     expect(wrapper.emitted("applyStyle")).toBeUndefined();
   });
 
-  test("clears the sparse override for middle and stays closed when disabled", async () => {
+  test("clears the sparse override for bottom and stays closed when disabled", async () => {
     const wrapper = mountMenu({ value: "bottom", mixed: false });
     const trigger = wrapper.get<HTMLButtonElement>("[data-vertical-alignment-trigger]");
     await trigger.trigger("click");
-    await getMenu().get('[data-vertical-alignment-option="middle"]').trigger("click");
+    await getMenu().get('[data-vertical-alignment-option="bottom"]').trigger("click");
     expect(wrapper.emitted("applyStyle")?.[0]).toEqual([{ verticalAlign: null }]);
 
     await wrapper.setProps({ disabled: true });

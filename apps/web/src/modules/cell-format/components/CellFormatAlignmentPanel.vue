@@ -1,274 +1,394 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
+import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
+import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
 import { formatComputedValueForDisplay } from "@idea10/core/input";
+import { formatCellNumberValue } from "@idea10/core/number-format";
 import type {
+  CellStyle,
   CellStylePatch,
+  CellTextDirection,
+  CellTextRotation,
   HorizontalCellAlignment,
   VerticalCellAlignment,
 } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { SelectionCellStyleState, ToggleStyleState } from "@idea10/core/style-state";
+import CellTextContent from "../../../shared/cell-text/CellTextContent.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import CellFormatTextOrientationControl from "./CellFormatTextOrientationControl.vue";
+
+type MergeState = "on" | "off" | "mixed";
+
 const props = defineProps<{
   state: SelectionCellStyleState;
   patch: CellStylePatch;
   sampleValue?: string | number | boolean | null;
+  mergeState?: MergeState;
+  mergeEnabled?: boolean;
+  dateSystem?: "1900" | "1904";
 }>();
-const emit = defineEmits<{ "update:patch": [patch: CellStylePatch] }>();
-const { t } = useAppI18n();
+const emit = defineEmits<{
+  "update:patch": [patch: CellStylePatch];
+  "update:merge": [merge: boolean];
+}>();
+const { locale, t } = useAppI18n();
+
 const horizontalOptions = computed(() => [
-  { label: t("format.alignLeft"), value: "left" },
-  { label: t("format.alignCenter"), value: "center" },
-  { label: t("format.alignRight"), value: "right" },
+  { label: t("cellFormat.horizontalGeneral"), value: "general" },
+  { label: t("cellFormat.horizontalLeft"), value: "left" },
+  { label: t("cellFormat.horizontalCenter"), value: "center" },
+  { label: t("cellFormat.horizontalRight"), value: "right" },
+  { label: t("cellFormat.horizontalFill"), value: "fill" },
+  { label: t("cellFormat.horizontalJustify"), value: "justify" },
+  {
+    label: t("cellFormat.horizontalCenterContinuous"),
+    value: "centerContinuous",
+  },
+  { label: t("cellFormat.horizontalDistributed"), value: "distributed" },
 ]);
 const verticalOptions = computed(() => [
-  { label: t("format.alignTop"), value: "top" },
-  { label: t("format.alignMiddle"), value: "middle" },
-  { label: t("format.alignBottom"), value: "bottom" },
+  { label: t("cellFormat.verticalTop"), value: "top" },
+  { label: t("cellFormat.verticalMiddle"), value: "middle" },
+  { label: t("cellFormat.verticalBottom"), value: "bottom" },
+  { label: t("cellFormat.verticalJustify"), value: "justify" },
+  { label: t("cellFormat.verticalDistributed"), value: "distributed" },
 ]);
-const hasHorizontalPatch = computed(() => Object.hasOwn(props.patch, "horizontalAlign"));
-const hasVerticalPatch = computed(() => Object.hasOwn(props.patch, "verticalAlign"));
-const hasWrapPatch = computed(() => Object.hasOwn(props.patch, "wrapText"));
-const horizontalMixed = computed(
-  () => !hasHorizontalPatch.value && props.state.horizontalAlign.mixed,
+const directionOptions = computed(() => [
+  { label: t("cellFormat.textDirectionContext"), value: "context" },
+  { label: t("cellFormat.textDirectionLtr"), value: "ltr" },
+  { label: t("cellFormat.textDirectionRtl"), value: "rtl" },
+]);
+
+function hasPatch(key: keyof CellStylePatch): boolean {
+  return Object.hasOwn(props.patch, key);
+}
+function rawValue(
+  key: "horizontalAlign" | "verticalAlign" | "indent" | "textDirection" | "textRotation",
+) {
+  if (hasPatch(key)) return props.patch[key];
+  const source = props.state[key];
+  return source.mixed ? undefined : source.value;
+}
+function toggleValue(key: "wrapText" | "shrinkToFit"): boolean {
+  return hasPatch(key) ? props.patch[key] === true : props.state[key] === "on";
+}
+function toggleMixed(key: "wrapText" | "shrinkToFit"): boolean {
+  return !hasPatch(key) && props.state[key] === "mixed";
+}
+
+const horizontal = computed<HorizontalCellAlignment | undefined>(() => {
+  const current = rawValue("horizontalAlign");
+  return typeof current === "string"
+    ? (current as HorizontalCellAlignment)
+    : hasPatch("horizontalAlign") || !props.state.horizontalAlign.mixed
+      ? "general"
+      : undefined;
+});
+const vertical = computed<VerticalCellAlignment | undefined>(() => {
+  const current = rawValue("verticalAlign");
+  return typeof current === "string"
+    ? (current as VerticalCellAlignment)
+    : hasPatch("verticalAlign") || !props.state.verticalAlign.mixed
+      ? "bottom"
+      : undefined;
+});
+const direction = computed<CellTextDirection | undefined>(() => {
+  const current = rawValue("textDirection");
+  return typeof current === "string"
+    ? (current as CellTextDirection)
+    : hasPatch("textDirection") || !props.state.textDirection.mixed
+      ? "context"
+      : undefined;
+});
+const indent = computed<number | undefined>(() => {
+  const current = rawValue("indent");
+  return typeof current === "number"
+    ? current
+    : hasPatch("indent") || !props.state.indent.mixed
+      ? 0
+      : undefined;
+});
+const rotation = computed<CellTextRotation | undefined>(() => {
+  const current = rawValue("textRotation");
+  return current === "vertical" || typeof current === "number"
+    ? current
+    : hasPatch("textRotation") || !props.state.textRotation.mixed
+      ? 0
+      : undefined;
+});
+const canIndent = computed(() => ["left", "right", "distributed"].includes(horizontal.value ?? ""));
+const manuallyWrapped = computed(() => toggleValue("wrapText"));
+const intrinsicWrap = computed(
+  () => horizontal.value === "justify" || horizontal.value === "distributed",
 );
-const verticalMixed = computed(() => !hasVerticalPatch.value && props.state.verticalAlign.mixed);
-const wrapMixed = computed(() => !hasWrapPatch.value && props.state.wrapText === "mixed");
-const previewHorizontal = computed<HorizontalCellAlignment>(() =>
-  horizontalMixed.value ? "left" : (horizontal() ?? "left"),
-);
-const previewVertical = computed<VerticalCellAlignment | "middle">(() =>
-  verticalMixed.value ? "middle" : (vertical() ?? "middle"),
-);
-const previewJustifyContent = computed(
-  () =>
-    ({
-      top: "flex-start",
-      middle: "center",
-      bottom: "flex-end",
-    })[previewVertical.value],
-);
+const wrapped = computed(() => manuallyWrapped.value || intrinsicWrap.value);
+const shrinkToFit = computed(() => toggleValue("shrinkToFit"));
+const multilineText = computed(() => /[\r\n]/u.test(previewText.value));
+const shrinkDisabled = computed(() => wrapped.value || multilineText.value);
+const rotationMixed = computed(() => !hasPatch("textRotation") && props.state.textRotation.mixed);
+const mergeMixed = computed(() => props.mergeState === "mixed");
+const merged = computed(() => props.mergeState === "on");
 const previewText = computed(() =>
   props.sampleValue === null || props.sampleValue === undefined
     ? t("cellFormat.alignmentPreviewText")
     : formatComputedValueForDisplay(props.sampleValue),
 );
-function horizontal(): HorizontalCellAlignment | undefined {
-  if (Object.hasOwn(props.patch, "horizontalAlign"))
-    return (props.patch.horizontalAlign || "left") as HorizontalCellAlignment;
-  return props.state.horizontalAlign.mixed
-    ? undefined
-    : (props.state.horizontalAlign.value ?? "left");
+function previewStringField(key: "fontFamily" | "textColor"): string | undefined {
+  const current = hasPatch(key)
+    ? props.patch[key]
+    : props.state[key].mixed
+      ? undefined
+      : props.state[key].value;
+  return typeof current === "string" ? current : undefined;
 }
-function vertical(): VerticalCellAlignment | undefined {
-  if (Object.hasOwn(props.patch, "verticalAlign"))
-    return (props.patch.verticalAlign || "middle") as VerticalCellAlignment;
-  return props.state.verticalAlign.mixed
-    ? undefined
-    : (props.state.verticalAlign.value ?? "middle");
+function previewNumberField(key: "fontSize"): number | undefined {
+  const current = hasPatch(key)
+    ? props.patch[key]
+    : props.state[key].mixed
+      ? undefined
+      : props.state[key].value;
+  return typeof current === "number" ? current : undefined;
 }
-function wrapped(): boolean {
-  const value = Object.hasOwn(props.patch, "wrapText")
-    ? props.patch.wrapText
-    : props.state.wrapText === "on"
-      ? true
-      : null;
-  return value === true;
+function previewToggle(key: "bold" | "italic" | "underline"): boolean {
+  return hasPatch(key) ? props.patch[key] === true : props.state[key] === "on";
 }
-function setHorizontal(value: SelectValue): void {
-  if (typeof value === "string")
-    emit("update:patch", { horizontalAlign: value as HorizontalCellAlignment });
-}
-function setVertical(value: SelectValue): void {
-  if (typeof value === "string")
+const previewNumberFormat = computed(() => {
+  const current = hasPatch("numberFormat")
+    ? props.patch.numberFormat
+    : props.state.numberFormat.mixed
+      ? undefined
+      : props.state.numberFormat.value;
+  return current && typeof current === "object" ? current : undefined;
+});
+const previewStyle = computed<Readonly<CellStyle>>(() => ({
+  ...(previewStringField("fontFamily") ? { fontFamily: previewStringField("fontFamily") } : {}),
+  ...(previewNumberField("fontSize") ? { fontSize: previewNumberField("fontSize") } : {}),
+  ...(previewToggle("bold") ? { bold: true } : {}),
+  ...(previewToggle("italic") ? { italic: true } : {}),
+  ...(previewToggle("underline") ? { underline: true } : {}),
+  ...(previewStringField("textColor") ? { textColor: previewStringField("textColor") } : {}),
+  ...(horizontal.value && horizontal.value !== "general"
+    ? { horizontalAlign: horizontal.value }
+    : {}),
+  ...(vertical.value && vertical.value !== "bottom" ? { verticalAlign: vertical.value } : {}),
+  ...(canIndent.value && indent.value ? { indent: indent.value } : {}),
+  ...(wrapped.value ? { wrapText: true } : {}),
+  ...(shrinkToFit.value ? { shrinkToFit: true } : {}),
+  ...(direction.value && direction.value !== "context" ? { textDirection: direction.value } : {}),
+  ...(rotation.value && rotation.value !== 0 ? { textRotation: rotation.value } : {}),
+  ...(previewNumberFormat.value ? { numberFormat: previewNumberFormat.value } : {}),
+}));
+const previewPresentation = computed(() =>
+  props.sampleValue === null || props.sampleValue === undefined
+    ? { text: previewText.value }
+    : formatCellNumberValue(props.sampleValue, previewNumberFormat.value, {
+        locale: locale.value,
+        dateSystem: props.dateSystem ?? "1900",
+      }),
+);
+
+function setHorizontal(next: SelectValue): void {
+  if (typeof next === "string")
     emit("update:patch", {
-      verticalAlign: value === "middle" ? null : (value as VerticalCellAlignment),
+      horizontalAlign: next === "general" ? null : (next as HorizontalCellAlignment),
     });
 }
-function setWrap(value: boolean): void {
-  emit("update:patch", { wrapText: value ? true : null });
+function setVertical(next: SelectValue): void {
+  if (typeof next === "string")
+    emit("update:patch", {
+      verticalAlign: next === "bottom" ? null : (next as VerticalCellAlignment),
+    });
+}
+function setDirection(next: SelectValue): void {
+  if (typeof next === "string")
+    emit("update:patch", {
+      textDirection: next === "context" ? null : (next as CellTextDirection),
+    });
+}
+function setIndent(next: InputNumberValue): void {
+  if (typeof next === "number" && Number.isFinite(next)) {
+    const value = Math.max(0, Math.min(250, Math.round(next)));
+    emit("update:patch", { indent: value || null });
+  }
+}
+function setWrap(next: boolean): void {
+  if (intrinsicWrap.value) return;
+  emit(
+    "update:patch",
+    next && shrinkToFit.value
+      ? { wrapText: true, shrinkToFit: null }
+      : { wrapText: next ? true : null },
+  );
+}
+function setShrink(next: boolean): void {
+  emit("update:patch", next ? { shrinkToFit: true, wrapText: null } : { shrinkToFit: null });
+}
+function setTextRotation(next: CellTextRotation | null): void {
+  emit("update:patch", { textRotation: next });
+}
+function checkboxPressed(
+  key: "wrapText" | "shrinkToFit",
+  state: ToggleStyleState,
+): boolean | "mixed" {
+  return hasPatch(key) ? toggleValue(key) : state === "mixed" ? "mixed" : state === "on";
 }
 </script>
+
 <template>
   <section class="cell-format-alignment" :aria-label="t('cellFormat.alignment')">
-    <div class="cell-format-alignment__fields">
-      <label class="cell-format-alignment__field"
-        ><span>{{ t("cellFormat.horizontal") }}</span
-        ><TSelect
-          :model-value="horizontal()"
-          :options="horizontalOptions"
-          :placeholder="state.horizontalAlign.mixed ? t('format.mixed') : undefined"
-          data-cell-format-horizontal
-          @change="setHorizontal" /></label
-      ><label class="cell-format-alignment__field"
-        ><span>{{ t("cellFormat.vertical") }}</span
-        ><TSelect
-          :model-value="vertical()"
-          :options="verticalOptions"
-          :placeholder="state.verticalAlign.mixed ? t('format.mixed') : undefined"
-          data-cell-format-vertical
-          @change="setVertical"
-      /></label>
-    </div>
-    <TCheckbox
-      class="cell-format-alignment__wrap"
-      :model-value="wrapped()"
-      :indeterminate="!Object.hasOwn(patch, 'wrapText') && state.wrapText === 'mixed'"
-      data-cell-format-wrap
-      @change="setWrap"
-      >{{ t("cellFormat.wrapText") }}</TCheckbox
-    >
-    <div class="cell-format-alignment__preview-group">
-      <div class="cell-format-alignment__preview-heading">
-        <span>{{ t("cellFormat.preview") }}</span>
-        <span
-          v-if="horizontalMixed || verticalMixed || wrapMixed"
-          class="cell-format-alignment__mixed-status"
-        >
-          <template v-if="horizontalMixed"
-            >{{ t("cellFormat.horizontal") }}: {{ t("format.mixed") }}</template
-          >
-          <template v-if="verticalMixed">
-            <span v-if="horizontalMixed"> · </span>{{ t("cellFormat.vertical") }}:
-            {{ t("format.mixed") }}
-          </template>
-          <template v-if="wrapMixed">
-            <span v-if="horizontalMixed || verticalMixed"> · </span>{{ t("cellFormat.wrapText") }}:
-            {{ t("format.mixed") }}
-          </template>
-        </span>
-      </div>
-      <div class="cell-format-preview cell-format-alignment__preview">
-        <div
-          class="cell-format-alignment__sample-cell"
-          :class="{
-            'is-mixed': horizontalMixed || verticalMixed || wrapMixed,
-            'is-wrapped': wrapped(),
-          }"
-          :style="{
-            justifyContent: previewJustifyContent,
-            textAlign: previewHorizontal,
-          }"
-        >
-          <span>{{ previewText }}</span>
+    <div class="cell-format-alignment__layout">
+      <div class="cell-format-alignment__content">
+        <h3>{{ t("cellFormat.textAlignment") }}</h3>
+        <label class="cell-format-alignment__field"
+          ><span>{{ t("cellFormat.horizontal") }}</span
+          ><TSelect
+            :model-value="horizontal"
+            :options="horizontalOptions"
+            :placeholder="state.horizontalAlign.mixed ? t('format.mixed') : undefined"
+            data-cell-format-horizontal
+            @change="setHorizontal"
+        /></label>
+        <label class="cell-format-alignment__field"
+          ><span>{{ t("cellFormat.vertical") }}</span
+          ><TSelect
+            :model-value="vertical"
+            :options="verticalOptions"
+            :placeholder="state.verticalAlign.mixed ? t('format.mixed') : undefined"
+            data-cell-format-vertical
+            @change="setVertical"
+        /></label>
+        <div class="cell-format-alignment__field" role="group" :aria-label="t('cellFormat.indent')">
+          <span>{{ t("cellFormat.indent") }}</span
+          ><TInputNumber
+            :model-value="indent"
+            :min="0"
+            :max="250"
+            :decimal-places="0"
+            :disabled="!canIndent"
+            theme="column"
+            class="idea-input-number--persistent-controls"
+            :placeholder="state.indent.mixed ? t('format.mixed') : undefined"
+            data-cell-format-indent
+            @change="setIndent"
+          />
         </div>
+        <h3>{{ t("cellFormat.textControl") }}</h3>
+        <div
+          class="cell-format-alignment__checks"
+          role="group"
+          :aria-label="t('cellFormat.textControl')"
+        >
+          <TCheckbox
+            :model-value="wrapped"
+            :indeterminate="!intrinsicWrap && toggleMixed('wrapText')"
+            :disabled="intrinsicWrap"
+            :aria-checked="intrinsicWrap || checkboxPressed('wrapText', state.wrapText)"
+            data-cell-format-wrap
+            @change="setWrap"
+            >{{ t("cellFormat.wrapText") }}</TCheckbox
+          >
+          <TCheckbox
+            :model-value="shrinkToFit"
+            :indeterminate="toggleMixed('shrinkToFit')"
+            :disabled="shrinkDisabled"
+            :aria-checked="checkboxPressed('shrinkToFit', state.shrinkToFit)"
+            data-cell-format-shrink
+            @change="setShrink"
+            >{{ t("cellFormat.shrinkToFit") }}</TCheckbox
+          >
+          <TCheckbox
+            v-if="mergeState"
+            :model-value="merged"
+            :indeterminate="mergeMixed"
+            :disabled="!mergeEnabled"
+            data-cell-format-merge
+            @change="emit('update:merge', $event)"
+            >{{ t("cellFormat.mergeCells") }}</TCheckbox
+          >
+        </div>
+        <h3>{{ t("cellFormat.rightToLeft") }}</h3>
+        <label class="cell-format-alignment__field"
+          ><span>{{ t("cellFormat.textDirection") }}</span
+          ><TSelect
+            :model-value="direction"
+            :options="directionOptions"
+            :placeholder="state.textDirection.mixed ? t('format.mixed') : undefined"
+            data-cell-format-text-direction
+            @change="setDirection"
+        /></label>
+      </div>
+      <CellFormatTextOrientationControl
+        :model-value="rotation"
+        :mixed="rotationMixed"
+        @update:model-value="setTextRotation"
+      />
+    </div>
+    <div class="cell-format-alignment__preview-group">
+      <span>{{ t("cellFormat.preview") }}</span>
+      <div class="cell-format-alignment__preview" data-cell-format-alignment-preview>
+        <CellTextContent
+          :text="previewPresentation.text"
+          :value="sampleValue ?? previewText"
+          :cell-style="previewStyle"
+          :fill="previewPresentation.fill"
+          fit-rotation
+        />
       </div>
     </div>
   </section>
 </template>
-<style scoped lang="scss">
-@use "../styles/format-panel";
 
+<style scoped lang="scss">
 .cell-format-alignment {
   display: grid;
-  gap: 16px;
-  padding: 16px 0 0;
-  color: var(--idea-text-secondary);
+  gap: 18px;
+  padding: 12px 2px 4px;
+  color: var(--idea-text-primary);
   font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
-
-  &__fields {
+  &__layout {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    grid-template-columns: minmax(0, 1fr) 156px;
+    gap: 18px;
   }
-
+  &__content {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+  h3 {
+    margin: 0 0 -2px;
+    font-size: inherit;
+    font-weight: var(--idea-font-weight-semibold);
+  }
   &__field {
     display: grid;
-    gap: 8px;
-    min-width: 0;
+    grid-template-columns: 92px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
   }
-
-  &__wrap {
-    justify-self: start;
+  &__checks {
+    display: grid;
+    gap: 7px;
+    padding-top: 1px;
   }
-
   &__preview-group {
     display: grid;
     gap: 8px;
   }
-
-  &__preview-heading {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: var(--idea-font-size-body-medium);
-    font-weight: var(--idea-font-weight-medium);
-    line-height: var(--idea-line-height-body-medium);
-  }
-
-  &__mixed-status {
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    font-weight: var(--idea-font-weight-regular);
-    line-height: var(--idea-line-height-body-small);
-  }
-
   &__preview {
-    position: relative;
-    box-sizing: border-box;
-    height: 136px;
-    padding: 0;
-    background-color: var(--idea-surface-secondary);
-    background-image:
-      linear-gradient(var(--idea-border-subtle) 1px, transparent 1px),
-      linear-gradient(90deg, var(--idea-border-subtle) 1px, transparent 1px);
-    background-position: -1px -1px;
-    background-size: 33.333% 50%;
-  }
-
-  &__sample-cell {
-    position: absolute;
-    inset-block: 34px;
-    left: 50%;
-    display: flex;
-    flex-direction: column;
-    width: min(280px, calc(100% - 48px));
-    min-width: 0;
+    height: 76px;
     overflow: hidden;
-    padding: 6px 10px;
-    color: var(--idea-text-primary);
-    background: var(--idea-surface-panel);
+    padding: 0;
+    background: var(--idea-surface-secondary);
     border: 1px solid var(--idea-border-control);
-    transform: translateX(-50%);
-
-    span {
-      flex-shrink: 0;
-      min-width: 0;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    &.is-wrapped span {
-      white-space: normal;
-      overflow-wrap: anywhere;
-    }
-
-    &:not(.is-wrapped) span {
-      white-space: nowrap;
-    }
-
-    &.is-mixed span {
-      color: var(--idea-text-secondary);
-    }
   }
 }
-@media (max-width: 480px) {
-  .cell-format-alignment {
-    &__fields {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 12px;
-    }
-
-    &__preview-heading {
-      align-items: flex-start;
-      flex-direction: column;
-      gap: 2px;
-    }
+@media (max-width: 520px) {
+  .cell-format-alignment__layout {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

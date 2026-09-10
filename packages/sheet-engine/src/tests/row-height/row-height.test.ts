@@ -152,6 +152,136 @@ describe("automatic row height", () => {
     expect(heights.get(0)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
   });
 
+  test("accounts for intrinsic justification, indentation, shrink-to-fit, and text rotation", () => {
+    const calculator = createAutoRowHeightCalculator(fixedMeasurer);
+    const cells = new Map([
+      [
+        "0:0",
+        {
+          content: { kind: "literal" as const, value: "abcdef" },
+          style: { horizontalAlign: "justify" as const },
+        },
+      ],
+      [
+        "1:0",
+        {
+          content: { kind: "literal" as const, value: "abcdef" },
+          style: { horizontalAlign: "left" as const, indent: 1, wrapText: true as const },
+        },
+      ],
+      [
+        "2:0",
+        {
+          content: { kind: "literal" as const, value: "abcdef" },
+          style: { wrapText: true as const, shrinkToFit: true as const },
+        },
+      ],
+      [
+        "3:0",
+        {
+          content: { kind: "literal" as const, value: "abcd" },
+          style: { textRotation: "vertical" as const },
+        },
+      ],
+      [
+        "4:0",
+        {
+          content: { kind: "literal" as const, value: "abcdefgh" },
+          style: { textRotation: 90 },
+        },
+      ],
+    ]);
+    const heights = calculator.reconcile({
+      cells,
+      getComputedValue: (address) =>
+        cells.get(`${address.row}:${address.column}`)?.content?.kind === "literal"
+          ? cells.get(`${address.row}:${address.column}`)!.content!.value
+          : null,
+      columnWidths: new Map([[0, 42]]),
+      rowCount: 5,
+      columnCount: 1,
+    });
+
+    expect(heights.get(0)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
+    expect(heights.get(1)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
+    expect(heights.get(2)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
+    expect(heights.get(3)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
+    expect(heights.get(4)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
+  });
+
+  test("uses the widest stacked paragraph and wrapped width for rotated text", () => {
+    const calculator = createAutoRowHeightCalculator(fixedMeasurer);
+    const cells = new Map([
+      [
+        "0:0",
+        {
+          content: { kind: "literal" as const, value: "ab\ncd" },
+          style: { textRotation: "vertical" as const },
+        },
+      ],
+      [
+        "1:0",
+        {
+          content: { kind: "literal" as const, value: "ab" },
+          style: { textRotation: "vertical" as const },
+        },
+      ],
+      [
+        "2:0",
+        {
+          content: { kind: "literal" as const, value: "ab cd" },
+          style: { wrapText: true as const, textRotation: 90 },
+        },
+      ],
+    ]);
+    const heights = calculator.reconcile({
+      cells,
+      getComputedValue: (address) =>
+        cells.get(`${address.row}:${address.column}`)?.content?.kind === "literal"
+          ? cells.get(`${address.row}:${address.column}`)!.content!.value
+          : null,
+      columnWidths: new Map([[0, 42]]),
+      rowCount: 3,
+      columnCount: 1,
+    });
+
+    expect(heights.get(0)).toBe(heights.get(1));
+    expect(heights.get(2)).toBeGreaterThan(35);
+  });
+
+  test("uses the shrink-to-fit font when measuring rotated single-line text", () => {
+    const calculator = createAutoRowHeightCalculator(fixedMeasurer);
+    const cells = new Map([
+      [
+        "0:0",
+        {
+          content: { kind: "literal" as const, value: "abcdefghij" },
+          style: { textRotation: 45 },
+        },
+      ],
+      [
+        "1:0",
+        {
+          content: { kind: "literal" as const, value: "abcdefghij" },
+          style: { textRotation: 45, shrinkToFit: true as const },
+        },
+      ],
+    ]);
+    const heights = calculator.reconcile({
+      cells,
+      getComputedValue: (address) =>
+        cells.get(`${address.row}:${address.column}`)?.content?.kind === "literal"
+          ? cells.get(`${address.row}:${address.column}`)!.content!.value
+          : null,
+      columnWidths: new Map([[0, 42]]),
+      rowCount: 2,
+      columnCount: 1,
+    });
+
+    expect(heights.get(0)).toBeGreaterThan(heights.get(1)!);
+    expect(heights.get(1)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
+  });
+
   test("measures the adapter's formatted value when supplied", () => {
     const calculator = createAutoRowHeightCalculator(fixedMeasurer);
     const heights = calculator.reconcile({

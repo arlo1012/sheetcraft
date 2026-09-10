@@ -16,6 +16,10 @@ function createStyleState(): SelectionCellStyleState {
     fillColor: { value: undefined, mixed: false },
     horizontalAlign: { value: undefined, mixed: false },
     verticalAlign: { value: undefined, mixed: false },
+    indent: { value: 0, mixed: false },
+    shrinkToFit: "off",
+    textDirection: { value: "context", mixed: false },
+    textRotation: { value: 0, mixed: false },
     wrapText: "off",
     numberFormat: { value: undefined, mixed: false },
   };
@@ -173,15 +177,27 @@ describe("HomeFormatToolbar overflow navigation", () => {
 
     const left = wrapper.get<HTMLButtonElement>('[data-ribbon-scroll="left"]');
     const right = wrapper.get<HTMLButtonElement>('[data-ribbon-scroll="right"]');
-    expect(left.attributes()).toMatchObject({ "aria-disabled": "true", tabindex: "-1" });
-    expect(right.attributes()).toMatchObject({ "aria-disabled": "false", tabindex: "0" });
+    expect(left.attributes()).toMatchObject({
+      "aria-disabled": "true",
+      tabindex: "-1",
+    });
+    expect(right.attributes()).toMatchObject({
+      "aria-disabled": "false",
+      tabindex: "0",
+    });
     expect(wrapper.get('[data-ribbon-overflow-cue="left"]').classes()).not.toContain("is-visible");
     expect(wrapper.get('[data-ribbon-overflow-cue="right"]').classes()).toContain("is-visible");
 
     await right.trigger("click");
     expect(geometry.getScrollLeft()).toBe(230);
-    expect(left.attributes()).toMatchObject({ "aria-disabled": "false", tabindex: "0" });
-    expect(right.attributes()).toMatchObject({ "aria-disabled": "false", tabindex: "0" });
+    expect(left.attributes()).toMatchObject({
+      "aria-disabled": "false",
+      tabindex: "0",
+    });
+    expect(right.attributes()).toMatchObject({
+      "aria-disabled": "false",
+      tabindex: "0",
+    });
 
     right.element.focus();
     expect(document.activeElement).toBe(right.element);
@@ -191,13 +207,22 @@ describe("HomeFormatToolbar overflow navigation", () => {
     expect(wrapper.get<HTMLButtonElement>('[data-ribbon-scroll="right"]').element).toBe(
       right.element,
     );
-    expect(right.attributes()).toMatchObject({ "aria-disabled": "true", tabindex: "-1" });
-    expect(left.attributes()).toMatchObject({ "aria-disabled": "false", tabindex: "0" });
+    expect(right.attributes()).toMatchObject({
+      "aria-disabled": "true",
+      tabindex: "-1",
+    });
+    expect(left.attributes()).toMatchObject({
+      "aria-disabled": "false",
+      tabindex: "0",
+    });
     expect(document.activeElement).toBe(right.element);
 
     await left.trigger("click");
     expect(geometry.getScrollLeft()).toBe(314);
-    expect(right.attributes()).toMatchObject({ "aria-disabled": "false", tabindex: "0" });
+    expect(right.attributes()).toMatchObject({
+      "aria-disabled": "false",
+      tabindex: "0",
+    });
   });
 
   test("returns focus to the first available tool when a resize removes overflow controls", async () => {

@@ -4,6 +4,43 @@ import { getSelectionBorderState, getSelectionCellStyleState } from "../../style
 import { getActiveSheet, setCellStyle } from "../../workbook.js";
 
 describe("selection cell style state", () => {
+  test("reports effective alignment defaults and newly supported alignment values", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    const defaultState = getSelectionCellStyleState(sheet, {
+      start: { row: 0, column: 0 },
+      end: { row: 0, column: 0 },
+    });
+    expect(defaultState.horizontalAlign).toEqual({ value: "general", mixed: false });
+    expect(defaultState.verticalAlign).toEqual({ value: "bottom", mixed: false });
+    expect(defaultState.indent).toEqual({ value: 0, mixed: false });
+    expect(defaultState.shrinkToFit).toBe("off");
+    expect(defaultState.textDirection).toEqual({ value: "context", mixed: false });
+    expect(defaultState.textRotation).toEqual({ value: 0, mixed: false });
+
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        horizontalAlign: "centerContinuous",
+        verticalAlign: "distributed",
+        indent: 2,
+        shrinkToFit: true,
+        textDirection: "rtl",
+        textRotation: "vertical",
+      },
+    );
+    const styled = getSelectionCellStyleState(sheet, {
+      start: { row: 0, column: 0 },
+      end: { row: 0, column: 0 },
+    });
+    expect(styled.horizontalAlign).toEqual({ value: "centerContinuous", mixed: false });
+    expect(styled.verticalAlign).toEqual({ value: "distributed", mixed: false });
+    expect(styled.indent).toEqual({ value: 2, mixed: false });
+    expect(styled.shrinkToFit).toBe("on");
+    expect(styled.textDirection).toEqual({ value: "rtl", mixed: false });
+    expect(styled.textRotation).toEqual({ value: "vertical", mixed: false });
+  });
+
   test("reports uniform, off, and mixed properties without scanning empty cells", () => {
     const sheet = getActiveSheet(createTestWorkbook());
     setCellStyle(

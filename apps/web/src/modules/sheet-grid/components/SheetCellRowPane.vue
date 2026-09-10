@@ -3,6 +3,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import SheetImageContent from "../../sheet-images/components/SheetImageContent.vue";
 import type { CellAddress } from "@idea10/core/workbook";
 import type { VisibleCell } from "./sheet-cell-view";
+import CellTextContent from "../../../shared/cell-text/CellTextContent.vue";
 
 const props = defineProps<{
   cells: readonly VisibleCell[];
@@ -26,15 +27,14 @@ function imageLoading(cell: VisibleCell): boolean {
   return Boolean(cell.image && props.loadingImageAssetIds?.has(cell.image.assetId));
 }
 
-function fillText(cell: VisibleCell): string {
-  const character = cell.fill?.character;
-  return !character || /^\s$/u.test(character) ? "" : character.repeat(256);
-}
-
 function memoDependencies(cell: VisibleCell): readonly unknown[] {
   return [
     cell.style,
     cell.text,
+    cell.displayText,
+    cell.value,
+    cell.formatStyle,
+    cell.spanning,
     cell.fill,
     cell.image?.assetId,
     cell.image?.altText,
@@ -74,6 +74,7 @@ function memoDependencies(cell: VisibleCell): readonly unknown[] {
       :aria-rowindex="cell.address.row + 1"
       :aria-colindex="cell.address.column + 1"
       :aria-selected="cell.selected"
+      :aria-label="cell.spanning ? cell.text : undefined"
       :aria-owns="cell.active ? activeEditorId : undefined"
       @mousedown.left.prevent="emit('cellMousedown', cell.address, $event)"
       @dblclick.left.prevent="emit('cellDoubleClick', cell.address, $event)"
@@ -94,18 +95,18 @@ function memoDependencies(cell: VisibleCell): readonly unknown[] {
         :aria-label="imageLoading(cell) ? t('image.loading') : t('image.assetUnavailable')"
         >{{ imageLoading(cell) ? t("image.loading") : t("image.assetUnavailable") }}</span
       >
-      <span
-        v-else-if="cell.text"
+      <CellTextContent
+        v-else-if="cell.displayText && !cell.spanning"
         class="sheet-cell-layer__value"
         :class="{ 'has-fill': Boolean(cell.fill) }"
-      >
-        <template v-if="cell.fill">
-          <span>{{ cell.fill.before }}</span>
-          <span class="sheet-cell-layer__fill" aria-hidden="true">{{ fillText(cell) }}</span>
-          <span>{{ cell.fill.after }}</span>
-        </template>
-        <template v-else>{{ cell.text }}</template>
-      </span>
+        :text="cell.displayText"
+        :value="cell.value"
+        :cell-style="cell.formatStyle"
+        :fill="cell.fill"
+        :width="cell.rect.width - 1"
+        :height="cell.rect.height - 1"
+        :aria-hidden="cell.text ? undefined : true"
+      />
     </div>
   </div>
 </template>
@@ -114,9 +115,9 @@ function memoDependencies(cell: VisibleCell): readonly unknown[] {
 .sheet-cell-layer__cell {
   position: absolute;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   overflow: hidden;
-  padding: 0 5px;
+  padding: 0;
   background: var(--idea-surface-panel);
   border-right: var(--sheet-gridline-width, 1px) solid transparent;
   border-bottom: var(--sheet-gridline-width, 1px) solid transparent;
@@ -154,15 +155,8 @@ function memoDependencies(cell: VisibleCell): readonly unknown[] {
   text-overflow: clip;
 }
 .sheet-cell-layer__value.has-fill {
-  display: inline-flex;
   width: 100%;
   min-width: 0;
-}
-.sheet-cell-layer__fill {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
 }
 .sheet-cell-layer__cell.is-multiline .sheet-cell-layer__value {
   min-width: 0;

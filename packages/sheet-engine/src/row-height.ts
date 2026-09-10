@@ -11,21 +11,26 @@ import {
   type CellAddress,
   type Cell,
 } from "@idea10/core/workbook";
+import {
+  getCellTextGraphemes,
+  isCellTextCjkGrapheme,
+  splitCellTextLines,
+  type AutoRowHeightFont,
+  type TextMeasurer,
+} from "./text-layout.js";
+
+export type { AutoRowHeightFont, TextMeasurer } from "./text-layout.js";
 
 export const WRAPPED_CELL_HORIZONTAL_PADDING = 10;
 export const WRAPPED_CELL_VERTICAL_PADDING = 4;
 export const WRAPPED_CELL_GRIDLINE_WIDTH = 1;
 export const WRAPPED_CELL_LINE_HEIGHT = 1.25;
 
-export type AutoRowHeightFont = {
-  family: string;
-  size: number;
-  weight: 400 | 700;
-  italic: boolean;
-};
-
-export type TextMeasurer = {
-  measure: (text: string, font: AutoRowHeightFont) => number;
+const NORMAL_STYLE_FONT: AutoRowHeightFont = {
+  family: DEFAULT_CELL_FONT_FAMILY,
+  size: DEFAULT_CELL_FONT_SIZE,
+  weight: 400,
+  italic: false,
 };
 
 export type AutoRowHeightInput = {
@@ -57,9 +62,6 @@ type CachedCellHeight = {
   height: number;
 };
 
-const CJK_GRAPHEME_PATTERN =
-  /[\u2e80-\u2fff\u3040-\u30ff\u31f0-\u31ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
-
 function parseCellKey(key: string): { row: number; column: number } | null {
   const separator = key.indexOf(":");
   if (separator < 1) {
@@ -68,116 +70,6 @@ function parseCellKey(key: string): { row: number; column: number } | null {
   const row = Number(key.slice(0, separator));
   const column = Number(key.slice(separator + 1));
   return Number.isInteger(row) && Number.isInteger(column) ? { row, column } : null;
-}
-
-function getGraphemes(text: string): string[] {
-  if (typeof Intl.Segmenter === "function") {
-    return [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text)].map(
-      ({ segment }) => segment,
-    );
-  }
-  return Array.from(text);
-}
-
-function getWrapTokens(text: string): string[] {
-  const tokens: string[] = [];
-  let buffered = "";
-  let bufferKind: "space" | "word" | undefined;
-
-  const flush = () => {
-    if (buffered) {
-      tokens.push(buffered);
-      buffered = "";
-      bufferKind = undefined;
-    }
-  };
-
-  for (const grapheme of getGraphemes(text)) {
-    if (/\s/u.test(grapheme)) {
-      if (bufferKind !== "space") {
-        flush();
-        bufferKind = "space";
-      }
-      buffered += grapheme;
-    } else if (CJK_GRAPHEME_PATTERN.test(grapheme)) {
-      flush();
-      tokens.push(grapheme);
-    } else {
-      if (bufferKind !== "word") {
-        flush();
-        bufferKind = "word";
-      }
-      buffered += grapheme;
-    }
-  }
-  flush();
-  return tokens;
-}
-
-function countWrappedLines(
-  text: string,
-  availableWidth: number,
-  font: AutoRowHeightFont,
-  measurer: TextMeasurer,
-  wrapText: boolean,
-): number {
-  const maximumLines = Math.max(
-    1,
-    Math.ceil(
-      (MAX_ROW_HEIGHT - WRAPPED_CELL_VERTICAL_PADDING - WRAPPED_CELL_GRIDLINE_WIDTH) /
-        (font.size * WRAPPED_CELL_LINE_HEIGHT),
-    ),
-  );
-  const paragraphs = text.replace(/\r\n?/gu, "\n").split("\n");
-  if (!wrapText) {
-    return Math.min(paragraphs.length, maximumLines);
-  }
-  let lineCount = 0;
-
-  for (const paragraph of paragraphs) {
-    lineCount += 1;
-    let lineWidth = 0;
-
-    for (const token of getWrapTokens(paragraph)) {
-      const tokenWidth = measurer.measure(token, font);
-      if (lineWidth > 0 && lineWidth + tokenWidth <= availableWidth) {
-        lineWidth += tokenWidth;
-        continue;
-      }
-      if (lineWidth === 0 && tokenWidth <= availableWidth) {
-        lineWidth = tokenWidth;
-        continue;
-      }
-      if (lineWidth > 0) {
-        lineCount += 1;
-        if (lineCount >= maximumLines) {
-          return maximumLines;
-        }
-        lineWidth = 0;
-      }
-      if (tokenWidth <= availableWidth) {
-        lineWidth = tokenWidth;
-        continue;
-      }
-
-      for (const grapheme of getGraphemes(token)) {
-        const graphemeWidth = measurer.measure(grapheme, font);
-        if (lineWidth > 0 && lineWidth + graphemeWidth > availableWidth) {
-          lineCount += 1;
-          if (lineCount >= maximumLines) {
-            return maximumLines;
-          }
-          lineWidth = 0;
-        }
-        lineWidth += graphemeWidth;
-      }
-    }
-
-    if (lineCount >= maximumLines) {
-      return maximumLines;
-    }
-  }
-  return Math.max(1, lineCount);
 }
 
 function getCellFont(
@@ -206,7 +98,24 @@ export function measureWrappedCellHeight(
     1,
     columnWidth - WRAPPED_CELL_HORIZONTAL_PADDING - WRAPPED_CELL_GRIDLINE_WIDTH,
   );
-  const lineCount = countWrappedLines(text, availableWidth, font, measurer, wrapText);
+  const lineCount = Math.min(
+    splitCellTextLines(text, availableWidth, font, measurer, wrapText).length,
+    getMaximumLineCount(font),
+  );
+  return getHeightForLineCount(lineCount, font);
+}
+
+function getMaximumLineCount(font: AutoRowHeightFont): number {
+  return Math.max(
+    1,
+    Math.ceil(
+      (MAX_ROW_HEIGHT - WRAPPED_CELL_VERTICAL_PADDING - WRAPPED_CELL_GRIDLINE_WIDTH) /
+        (font.size * WRAPPED_CELL_LINE_HEIGHT),
+    ),
+  );
+}
+
+function getHeightForLineCount(lineCount: number, font: AutoRowHeightFont): number {
   return Math.min(
     MAX_ROW_HEIGHT,
     Math.max(
@@ -217,6 +126,130 @@ export function measureWrappedCellHeight(
           WRAPPED_CELL_GRIDLINE_WIDTH,
       ),
     ),
+  );
+}
+
+function getAvailableTextWidth(
+  columnWidth: number,
+  style: Readonly<CellStyle> | undefined,
+  measurer: TextMeasurer,
+): number {
+  const horizontalAlign = style?.horizontalAlign;
+  const indent = style?.indent ?? 0;
+  // OOXML defines indentation in units of three spaces of the Normal style,
+  // independently of the formatted cell's font.
+  const indentWidth = measurer.measure("   ", NORMAL_STYLE_FONT) * indent;
+  const indentAllowance =
+    horizontalAlign === "distributed"
+      ? indentWidth * 2
+      : horizontalAlign === "left" || horizontalAlign === "right"
+        ? indentWidth
+        : 0;
+  return Math.max(
+    1,
+    columnWidth - WRAPPED_CELL_HORIZONTAL_PADDING - WRAPPED_CELL_GRIDLINE_WIDTH - indentAllowance,
+  );
+}
+
+function hasExplicitLineBreak(text: string): boolean {
+  return /[\r\n]/u.test(text);
+}
+
+function shouldWrapText(style: Readonly<CellStyle> | undefined, text: string): boolean {
+  const wraps =
+    Boolean(style?.wrapText) ||
+    style?.horizontalAlign === "justify" ||
+    style?.horizontalAlign === "distributed";
+  // Excel does not shrink a cell that already has a multiline alignment.
+  // Explicit line breaks still form paragraphs when neither alignment wraps.
+  if (wraps) return true;
+  if (style?.shrinkToFit && !hasExplicitLineBreak(text)) return false;
+  return false;
+}
+
+function getSingleLineAvailableTextWidth(
+  columnWidth: number,
+  style: Readonly<CellStyle> | undefined,
+  measurer: TextMeasurer,
+): number {
+  const horizontalAlign = style?.horizontalAlign;
+  const indent =
+    horizontalAlign === "left" || horizontalAlign === "right"
+      ? (style?.indent ?? 0) * measurer.measure("   ", NORMAL_STYLE_FONT)
+      : 0;
+  const isCentered = horizontalAlign === "center" || horizontalAlign === "centerContinuous";
+  return Math.max(1, columnWidth - WRAPPED_CELL_GRIDLINE_WIDTH - (isCentered ? 10 : 5) - indent);
+}
+
+function getShrinkToFitFont(
+  text: string,
+  columnWidth: number,
+  style: Readonly<CellStyle> | undefined,
+  font: AutoRowHeightFont,
+  measurer: TextMeasurer,
+  wraps: boolean,
+): AutoRowHeightFont {
+  const textRotation = style?.textRotation;
+  if (
+    !style?.shrinkToFit ||
+    wraps ||
+    hasExplicitLineBreak(text) ||
+    textRotation === "vertical" ||
+    style?.horizontalAlign === "fill"
+  ) {
+    return font;
+  }
+  const radians = typeof textRotation === "number" ? (Math.abs(textRotation) * Math.PI) / 180 : 0;
+  const naturalWidth = measurer.measure(text, font);
+  const rotatedWidth =
+    naturalWidth * Math.abs(Math.cos(radians)) +
+    font.size * WRAPPED_CELL_LINE_HEIGHT * Math.abs(Math.sin(radians));
+  const availableWidth = getSingleLineAvailableTextWidth(columnWidth, style, measurer);
+  const factor = rotatedWidth > 0 ? Math.min(1, availableWidth / rotatedWidth) : 1;
+  return { ...font, size: Math.max(1, font.size * factor) };
+}
+
+function measureCellHeight(
+  text: string,
+  columnWidth: number,
+  style: Readonly<CellStyle> | undefined,
+  font: AutoRowHeightFont,
+  measurer: TextMeasurer,
+): number {
+  const availableWidth = getAvailableTextWidth(columnWidth, style, measurer);
+  const wraps = shouldWrapText(style, text);
+  const measuredFont = getShrinkToFitFont(text, columnWidth, style, font, measurer, wraps);
+  const lines = splitCellTextLines(text, availableWidth, measuredFont, measurer, wraps);
+  const textRotation = style?.textRotation;
+  if (textRotation === "vertical") {
+    const graphemeCount = text
+      .replace(/\r\n?/gu, "\n")
+      .split("\n")
+      .reduce((maximum, paragraph) => Math.max(maximum, getCellTextGraphemes(paragraph).length), 1);
+    return getHeightForLineCount(
+      Math.min(graphemeCount, getMaximumLineCount(measuredFont)),
+      measuredFont,
+    );
+  }
+  if (typeof textRotation === "number" && textRotation !== 0) {
+    const radians = (Math.abs(textRotation) * Math.PI) / 180;
+    const textWidth = wraps ? availableWidth : Math.max(0, ...lines.map((line) => line.width));
+    const textHeight =
+      Math.min(lines.length, getMaximumLineCount(measuredFont)) *
+      measuredFont.size *
+      WRAPPED_CELL_LINE_HEIGHT;
+    const rotatedHeight = textWidth * Math.sin(radians) + textHeight * Math.cos(radians);
+    return Math.min(
+      MAX_ROW_HEIGHT,
+      Math.max(
+        DEFAULT_ROW_HEIGHT,
+        Math.ceil(rotatedHeight + WRAPPED_CELL_VERTICAL_PADDING + WRAPPED_CELL_GRIDLINE_WIDTH),
+      ),
+    );
+  }
+  return getHeightForLineCount(
+    Math.min(lines.length, getMaximumLineCount(measuredFont)),
+    measuredFont,
   );
 }
 
@@ -244,8 +277,10 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
         const value = input.getComputedValue(address, cell);
         const text =
           input.formatValue?.(address, cell, value) ?? formatComputedValueForDisplay(value);
-        const wrapText = Boolean(cell.style?.wrapText);
-        if (!text || (!wrapText && !/[\r\n]/u.test(text))) {
+        const wrapText = shouldWrapText(cell.style, text);
+        const hasLineBreak = hasExplicitLineBreak(text);
+        const hasHeightSensitiveTextLayout = cell.style?.textRotation !== undefined;
+        if (!text || (!wrapText && !hasLineBreak && !hasHeightSensitiveTextLayout)) {
           continue;
         }
 
@@ -254,15 +289,19 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
         const font = getCellFont(cell.style, defaultFontFamily);
         const fingerprint = JSON.stringify([
           text,
-          wrapText ? columnWidth : undefined,
+          wrapText || hasLineBreak || hasHeightSensitiveTextLayout ? columnWidth : undefined,
           font,
+          cell.style?.horizontalAlign,
+          cell.style?.indent,
+          cell.style?.shrinkToFit,
+          cell.style?.textRotation,
           input.measurementVersion ?? 0,
         ]);
         const cached = cellHeights.get(key);
         const height =
           cached?.fingerprint === fingerprint
             ? cached.height
-            : measureWrappedCellHeight(text, columnWidth, font, measurer, wrapText);
+            : measureCellHeight(text, columnWidth, cell.style, font, measurer);
         if (!cached || cached.fingerprint !== fingerprint) {
           cellHeights.set(key, { fingerprint, height });
         }
@@ -288,8 +327,8 @@ export function createApproximateTextMeasurer(): TextMeasurer {
   return {
     measure(text, font) {
       let units = 0;
-      for (const grapheme of getGraphemes(text)) {
-        units += CJK_GRAPHEME_PATTERN.test(grapheme) ? 1 : /\s/u.test(grapheme) ? 0.33 : 0.56;
+      for (const grapheme of getCellTextGraphemes(text)) {
+        units += isCellTextCjkGrapheme(grapheme) ? 1 : /\s/u.test(grapheme) ? 0.33 : 0.56;
       }
       return units * font.size * (font.weight === 700 ? 1.05 : 1) * (font.italic ? 1.02 : 1);
     },

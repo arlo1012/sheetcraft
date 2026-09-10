@@ -22,6 +22,11 @@ const props = withDefaults(
     sampleValue: string | number | boolean | null;
     dateSystem?: "1900" | "1904";
     initialTab?: CellFormatTab;
+    mergeState?: {
+      canMerge: boolean;
+      canUnmerge: boolean;
+      merged: "on" | "off" | "mixed";
+    };
   }>(),
   { initialTab: "border" },
 );
@@ -76,6 +81,7 @@ const stylePatch = ref<CellStylePatch>({});
 const numberFormatValid = ref(true);
 const borderActions = ref<CellBorderAction[]>([]);
 const borderFormat = ref<CellBorderFormatPatch | undefined>();
+const merge = ref<boolean | undefined>();
 
 function updateStyle(patch: CellStylePatch): void {
   stylePatch.value = { ...stylePatch.value, ...patch };
@@ -86,6 +92,10 @@ function updateBorderActions(actions: CellBorderAction[]): void {
 function updateBorderFormat(format: CellBorderFormatPatch | undefined): void {
   borderFormat.value = format ? { ...borderFormat.value, ...format } : undefined;
 }
+function updateMerge(next: boolean): void {
+  if (!props.mergeState || next === (props.mergeState.merged === "on")) return;
+  merge.value = next;
+}
 function confirm(): void {
   if (!numberFormatValid.value) return;
   if (stylePatch.value.numberFormat && stylePatch.value.numberFormat.kind === "custom")
@@ -94,6 +104,7 @@ function confirm(): void {
   if (Object.keys(stylePatch.value).length > 0) change.style = stylePatch.value;
   if (borderActions.value.length > 0) change.borders = borderActions.value;
   if (borderFormat.value) change.borderFormat = borderFormat.value;
+  if (merge.value !== undefined) change.merge = merge.value;
   emit("confirm", change);
 }
 </script>
@@ -106,7 +117,10 @@ function confirm(): void {
     :visible="true"
     @keydown="onDialogKeydown"
     :header="t('cellFormat.title')"
-    :confirm-btn="{ content: t('cellFormat.confirm'), disabled: !numberFormatValid }"
+    :confirm-btn="{
+      content: t('cellFormat.confirm'),
+      disabled: !numberFormatValid,
+    }"
     :cancel-btn="t('cellFormat.cancel')"
     :close-on-overlay-click="false"
     :destroy-on-close="true"
@@ -121,7 +135,10 @@ function confirm(): void {
       ref="tabsRef"
       v-model="activeTab"
       class="cell-format-dialog__tabs"
-      :class="{ 'cell-format-dialog__tabs--number': activeTab === 'number' }"
+      :class="{
+        'cell-format-dialog__tabs--number': activeTab === 'number',
+        'cell-format-dialog__tabs--alignment': activeTab === 'alignment',
+      }"
     >
       <TabPanel value="number" :destroy-on-hide="false">
         <template #label
@@ -159,7 +176,11 @@ function confirm(): void {
           :state="state"
           :patch="stylePatch"
           :sample-value="sampleValue"
+          :date-system="dateSystem"
+          :merge-state="mergeState?.merged"
+          :merge-enabled="mergeState?.canMerge || mergeState?.canUnmerge"
           @update:patch="updateStyle"
+          @update:merge="updateMerge"
       /></TabPanel>
       <TabPanel value="font">
         <template #label
@@ -238,7 +259,8 @@ function confirm(): void {
   flex-direction: column;
   height: min(380px, calc(100dvh - 240px));
 
-  &--number {
+  &--number,
+  &--alignment {
     height: min(508px, calc(100dvh - 192px));
   }
 }

@@ -15,6 +15,10 @@ function createStyleState(): SelectionCellStyleState {
     fillColor: { value: undefined, mixed: false },
     horizontalAlign: { value: undefined, mixed: false },
     verticalAlign: { value: undefined, mixed: false },
+    indent: { value: 0, mixed: false },
+    shrinkToFit: "off",
+    textDirection: { value: "context", mixed: false },
+    textRotation: { value: 0, mixed: false },
     wrapText: "off",
     numberFormat: { value: undefined, mixed: false },
   };
@@ -77,7 +81,10 @@ describe("HomeCellFormatGroup layout", () => {
     const colorIcons = wrapper.findAll(".cell-color-picker__icon svg");
     expect(colorIcons).toHaveLength(2);
     for (const colorIcon of colorIcons) {
-      expect(colorIcon.attributes()).toMatchObject({ width: "18", height: "18" });
+      expect(colorIcon.attributes()).toMatchObject({
+        width: "18",
+        height: "18",
+      });
     }
     expect(wrapper.find(".cell-color-picker__swatch").exists()).toBe(false);
     expect(wrapper.findAll("[data-color-indicator]")).toHaveLength(2);

@@ -35,7 +35,7 @@ const DOCUMENT_FOCUS_TARGET_SELECTOR = [
   'textarea:not(:disabled):not([tabindex="-1"])',
   '[tabindex]:not([tabindex="-1"]):not([aria-disabled="true"])',
 ].join(", ");
-const currentAlignment = computed<VerticalCellAlignment>(() => props.state.value ?? "middle");
+const currentAlignment = computed<VerticalCellAlignment>(() => props.state.value ?? "bottom");
 const currentAlignmentLabel = computed(() => {
   if (currentAlignment.value === "top") {
     return t("format.alignTop");
@@ -43,12 +43,16 @@ const currentAlignmentLabel = computed(() => {
   if (currentAlignment.value === "bottom") {
     return t("format.alignBottom");
   }
+  if (currentAlignment.value === "justify") return t("cellFormat.verticalJustify");
+  if (currentAlignment.value === "distributed") return t("cellFormat.verticalDistributed");
   return t("format.alignMiddle");
 });
 const triggerLabel = computed(() =>
   props.state.mixed
     ? t("format.verticalAlignmentMixed")
-    : t("format.verticalAlignmentValue", { value: currentAlignmentLabel.value }),
+    : t("format.verticalAlignmentValue", {
+        value: currentAlignmentLabel.value,
+      }),
 );
 const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, menuRef, open, {
   offset: 4,
@@ -78,7 +82,7 @@ function focusMenuItem(preferred: "selected" | "first" | "last"): void {
     return;
   }
   const selected = items.find((item) => item.getAttribute("aria-checked") === "true");
-  (selected ?? items[1] ?? items[0])?.focus();
+  (selected ?? items[2] ?? items[0])?.focus();
 }
 
 function openMenu(preferred: "selected" | "first" | "last" = "selected"): void {
@@ -102,7 +106,9 @@ function isSelected(alignment: VerticalCellAlignment): boolean {
 }
 
 function selectAlignment(alignment: VerticalCellAlignment): void {
-  emit("applyStyle", { verticalAlign: alignment === "middle" ? null : alignment });
+  emit("applyStyle", {
+    verticalAlign: alignment === "bottom" ? null : alignment,
+  });
   dismiss("programmatic", true);
 }
 
@@ -243,6 +249,40 @@ watch(
         <Check
           class="vertical-alignment-menu__check"
           :class="{ 'is-visible': isSelected('bottom') }"
+          :size="15"
+          aria-hidden="true"
+        />
+      </button>
+      <button
+        type="button"
+        role="menuitemradio"
+        tabindex="-1"
+        data-vertical-alignment-option="justify"
+        :aria-checked="isSelected('justify')"
+        @click="selectAlignment('justify')"
+      >
+        <AlignVerticalJustifyCenter :size="17" :stroke-width="2" aria-hidden="true" />
+        <span>{{ t("cellFormat.verticalJustify") }}</span>
+        <Check
+          class="vertical-alignment-menu__check"
+          :class="{ 'is-visible': isSelected('justify') }"
+          :size="15"
+          aria-hidden="true"
+        />
+      </button>
+      <button
+        type="button"
+        role="menuitemradio"
+        tabindex="-1"
+        data-vertical-alignment-option="distributed"
+        :aria-checked="isSelected('distributed')"
+        @click="selectAlignment('distributed')"
+      >
+        <AlignVerticalJustifyCenter :size="17" :stroke-width="2" aria-hidden="true" />
+        <span>{{ t("cellFormat.verticalDistributed") }}</span>
+        <Check
+          class="vertical-alignment-menu__check"
+          :class="{ 'is-visible': isSelected('distributed') }"
           :size="15"
           aria-hidden="true"
         />

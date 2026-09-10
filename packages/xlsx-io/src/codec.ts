@@ -33,7 +33,10 @@ import {
 } from "@idea10/core/workbook";
 import { CompatibilityReportBuilder } from "./report.js";
 import { finalizeXlsxExport } from "./export-finalizer.js";
-import { readRawWorksheetNumericValues } from "./raw-cell-values.js";
+import {
+  readRawWorksheetNumericValues,
+  readRawWorksheetTextDirections,
+} from "./raw-cell-values.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
@@ -161,6 +164,7 @@ function readStyle(
   rawNumberFormat: unknown,
   issueLocation: string,
   report: CompatibilityReportBuilder,
+  rawTextDirection?: "context" | "ltr" | "rtl",
 ): CellStyle | undefined {
   if (!style) return undefined;
   const font = style.font as Record<string, unknown> | undefined;
@@ -199,16 +203,42 @@ function readStyle(
   if (
     alignment?.horizontal === "left" ||
     alignment?.horizontal === "center" ||
-    alignment?.horizontal === "right"
+    alignment?.horizontal === "right" ||
+    alignment?.horizontal === "fill" ||
+    alignment?.horizontal === "justify" ||
+    alignment?.horizontal === "centerContinuous" ||
+    alignment?.horizontal === "distributed"
   )
     result.horizontalAlign = alignment.horizontal;
   if (
     alignment?.vertical === "top" ||
     alignment?.vertical === "middle" ||
-    alignment?.vertical === "bottom"
+    alignment?.vertical === "bottom" ||
+    alignment?.vertical === "justify" ||
+    alignment?.vertical === "distributed"
   )
     result.verticalAlign = alignment.vertical;
   if (alignment?.wrapText === true) result.wrapText = true;
+  if (
+    typeof alignment?.indent === "number" &&
+    Number.isInteger(alignment.indent) &&
+    alignment.indent > 0
+  )
+    result.indent = alignment.indent;
+  if (alignment?.shrinkToFit === true) result.shrinkToFit = true;
+  if (
+    alignment?.textRotation === "vertical" ||
+    (typeof alignment?.textRotation === "number" &&
+      Number.isInteger(alignment.textRotation) &&
+      alignment.textRotation !== 0)
+  )
+    result.textRotation = alignment.textRotation;
+  const textDirection =
+    rawTextDirection ??
+    (alignment?.readingOrder === "ltr" || alignment?.readingOrder === "rtl"
+      ? alignment.readingOrder
+      : undefined);
+  if (textDirection === "ltr" || textDirection === "rtl") result.textDirection = textDirection;
   const numberFormat = fromExcelNumberFormat(rawNumberFormat ?? style.numFmt);
   if (numberFormat) result.numberFormat = numberFormat;
   const borderEntries: Array<
@@ -257,10 +287,7 @@ function readStyle(
     (typeof font?.name === "string" && fontName === undefined) ||
     (typeof font?.size === "number" && fontSize === undefined);
   const hasUnsupportedAlignment =
-    alignment !== undefined &&
-    ["indent", "readingOrder", "shrinkToFit", "textRotation", "justifyLastLine"].some(
-      (key) => alignment[key] !== undefined,
-    );
+    alignment !== undefined && ["justifyLastLine"].some((key) => alignment[key] !== undefined);
   const hasUnsupportedStyle =
     hasUnsupportedBorder || hasUnsupportedFill || hasUnsupportedFont || hasUnsupportedAlignment;
   if (hasUnsupportedStyle) add(report, "style-omitted", issueLocation);
@@ -344,6 +371,7 @@ export async function decodeWithExcelJs(
 ): Promise<{ workbook: Workbook; report: XlsxCompatibilityReport }> {
   const report = new CompatibilityReportBuilder();
   const rawNumericValues = readRawWorksheetNumericValues(bytes);
+  const rawTextDirections = readRawWorksheetTextDirections(bytes);
   const source = new ExcelJS.Workbook();
   await source.xlsx.load(bytes);
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
@@ -391,7 +419,13 @@ export async function decodeWithExcelJs(
           report,
           rawNumericValues[sheetIndex]?.get(modelCell.address.toUpperCase()),
         );
-        const style = readStyle(cell.style, cell.numFmt, issueLocation, report);
+        const style = readStyle(
+          cell.style,
+          cell.numFmt,
+          issueLocation,
+          report,
+          rawTextDirections[sheetIndex]?.get(modelCell.address.toUpperCase()),
+        );
         if (content || style) {
           importedCells += 1;
           if (importedCells > MAX_SPARSE_CELLS) {
@@ -499,12 +533,20 @@ function writeStyle(
       pattern: "solid",
       fgColor: { argb: `FF${style.fillColor.slice(1).toUpperCase()}` },
     };
-  // Core's implicit middle alignment differs from XLSX's implicit bottom.
-  next.alignment = {
-    ...(style.horizontalAlign ? { horizontal: style.horizontalAlign } : {}),
-    vertical: style.verticalAlign ?? "middle",
+  const alignment: Record<string, unknown> = {
+    ...(style.horizontalAlign && style.horizontalAlign !== "general"
+      ? { horizontal: style.horizontalAlign }
+      : {}),
+    ...(style.verticalAlign ? { vertical: style.verticalAlign } : {}),
     ...(style.wrapText ? { wrapText: true } : {}),
+    ...(style.indent ? { indent: style.indent } : {}),
+    ...(style.shrinkToFit ? { shrinkToFit: true } : {}),
+    ...(style.textRotation ? { textRotation: style.textRotation } : {}),
+    ...(style.textDirection === "ltr" || style.textDirection === "rtl"
+      ? { readingOrder: style.textDirection }
+      : {}),
   };
+  if (Object.keys(alignment).length) next.alignment = alignment;
   const diagonalConflict =
     style.borderDiagonalUp &&
     style.borderDiagonalDown &&

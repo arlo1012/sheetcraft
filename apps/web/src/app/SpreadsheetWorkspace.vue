@@ -328,6 +328,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       v-if="cellFormatSelection"
       :state="cellFormatSelection.state"
       :border-state="cellFormatSelection.borderState"
+      :merge-state="cellFormatSelection.mergeState"
       :sample-value="cellFormatSelection.sampleValue"
       :date-system="cellFormatSelection.dateSystem"
       initial-tab="border"

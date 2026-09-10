@@ -19,6 +19,10 @@ function createStyleState(
     fillColor: { value: undefined, mixed: false },
     horizontalAlign: { value: undefined, mixed: false },
     verticalAlign: { value: undefined, mixed: false },
+    indent: { value: 0, mixed: false },
+    shrinkToFit: "off",
+    textDirection: { value: "context", mixed: false },
+    textRotation: { value: 0, mixed: false },
     wrapText: "off",
     numberFormat: { value: undefined, mixed: false },
     ...overrides,
@@ -182,7 +186,7 @@ describe("HomeFormatToolbar", () => {
       { fontFamily: "Arial" },
       { fontSize: 18 },
       { horizontalAlign: "center" },
-      { verticalAlign: "bottom" },
+      { verticalAlign: null },
     ]);
 
     fontSize.vm.$emit("change", 90);

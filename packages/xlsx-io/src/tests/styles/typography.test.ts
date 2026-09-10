@@ -58,7 +58,7 @@ describe("XLSX typography", () => {
   });
 
   test.each(implicitAlignmentStyles)(
-    "writes implicit vertical centering for style %j",
+    "leaves the default bottom alignment implicit for style %j",
     async (style) => {
       const workbook = createWorkbook({ id: "default-alignment", sheetId: "sheet" });
       const sheet = getActiveSheet(workbook);
@@ -67,7 +67,7 @@ describe("XLSX typography", () => {
       const result = await encodeXlsx(workbook);
       const { font, format } = cellFormat(result.bytes, "A1");
       expect(font).toContain(`<sz val="${style?.fontSize ?? DEFAULT_CELL_FONT_SIZE}"/>`);
-      expect(format).toContain('vertical="center"');
+      expect(format).not.toContain("vertical=");
       expect(format).not.toContain("horizontal=");
       if (style?.wrapText) expect(format).toContain('wrapText="1"');
       const restored = getActiveSheet((await decodeXlsx(result.bytes)).workbook);
@@ -90,9 +90,11 @@ describe("XLSX typography", () => {
       setCellStyle(sheet, { row: 0, column: 0 }, style);
       const result = await encodeXlsx(workbook);
       const { format } = cellFormat(result.bytes, "A1");
-      expect(format).toContain(
-        `vertical="${verticalAlign === "middle" ? "center" : verticalAlign}"`,
-      );
+      if (verticalAlign === "bottom") expect(format).not.toContain("vertical=");
+      else
+        expect(format).toContain(
+          `vertical="${verticalAlign === "middle" ? "center" : verticalAlign}"`,
+        );
       expect(format).toContain('horizontal="center"');
       expect(format).toContain('wrapText="1"');
       const restored = getActiveSheet((await decodeXlsx(result.bytes)).workbook);
@@ -109,9 +111,9 @@ describe("XLSX typography", () => {
     setCellContent(sheet, { row: 2, column: 0 }, { kind: "literal", value: "merged" });
     setCellStyle(sheet, { row: 0, column: 0 }, { fillColor: "#112233" });
     const result = await encodeXlsx(workbook);
-    expect(cellFormat(result.bytes, "A1").format).toContain('vertical="center"');
+    expect(cellFormat(result.bytes, "A1").format).not.toContain("vertical=");
     const merged = cellFormat(result.bytes, "A3");
-    expect(merged.format).toContain('vertical="center"');
+    expect(merged.format).not.toContain("vertical=");
     expect(merged.sheet).toContain('<mergeCell ref="A3:B4"/>');
   });
 });

@@ -46,8 +46,8 @@ describe("SheetGrid cell style rendering", () => {
     expect(style.textDecoration).toBe("");
     expect(style.color).toBe("");
     expect(style.backgroundColor).toBe("");
-    expect(style.justifyContent).toBe("");
-    expect(style.alignItems).toBe("");
+    expect(style.justifyContent).toBe("flex-start");
+    expect(style.alignItems).toBe("flex-end");
   });
 
   test("applies the active cell style to the editor only while editing", async () => {
@@ -137,19 +137,22 @@ describe("SheetGrid cell style rendering", () => {
     await nextTick();
 
     const cell = wrapper.get('[data-row="0"][data-column="0"]');
-    const style = (cell.element as HTMLElement).style;
-    expect(style.paddingRight).toBe("0px");
-    expect(style.paddingLeft).toBe("");
+    const value = cell.get(".sheet-cell-layer__value");
+    const content = () => value.get(".cell-text__content").element as HTMLElement;
+    expect(content().style.left).toBe("5px");
 
     setCellStyle(sheet, { row: 0, column: 0 }, { horizontalAlign: "right" });
     await nextTick();
-    expect(style.paddingLeft).toBe("0px");
-    expect(style.paddingRight).toBe("");
+    expect(
+      Number.parseFloat(content().style.left) + Number.parseFloat(content().style.width),
+    ).toBeCloseTo(90, 4);
+    expect(Number.parseFloat(content().style.left)).toBeLessThan(0);
+    expect(cell.findComponent({ name: "CellTextContent" }).props("width")).toBe(95);
+    expect(value.classes()).toContain("sheet-cell-layer__value");
 
     setCellStyle(sheet, { row: 0, column: 0 }, { wrapText: true });
     await nextTick();
-    expect(style.paddingLeft).toBe("");
-    expect(style.paddingRight).toBe("");
+    expect(content().style.left).toBe("5px");
   });
 
   test("renders number-format colors and fill characters for the selected section", async () => {
@@ -167,7 +170,7 @@ describe("SheetGrid cell style rendering", () => {
     const cell = wrapper.get<HTMLElement>('[data-row="0"][data-column="0"]');
     expect(cell.element.style.color).toBe("red");
     expect(cell.get(".sheet-cell-layer__value").classes()).toContain("has-fill");
-    expect(cell.get(".sheet-cell-layer__fill").text()).toContain("x");
+    expect(cell.get(".cell-text__line").text()).toContain("x");
     expect(cell.text().endsWith("123")).toBe(true);
   });
 
@@ -242,7 +245,10 @@ describe("SheetGrid cell style rendering", () => {
     const down = wrapper.get<HTMLElement>(
       '[data-sheet-diagonal-border-segment][data-border-direction="down"]',
     );
-    expect(up.attributes()).toMatchObject({ "data-border-row": "0", "data-border-column": "0" });
+    expect(up.attributes()).toMatchObject({
+      "data-border-row": "0",
+      "data-border-column": "0",
+    });
     const upLines = up.findAll(".sheet-border-layer__diagonal-line");
     const downLines = down.findAll(".sheet-border-layer__diagonal-line");
     expect(upLines).toHaveLength(1);

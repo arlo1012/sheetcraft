@@ -1,8 +1,15 @@
 import {
+  DEFAULT_CELL_HORIZONTAL_ALIGNMENT,
+  DEFAULT_CELL_INDENT,
+  DEFAULT_CELL_TEXT_DIRECTION,
+  DEFAULT_CELL_TEXT_ROTATION,
+  DEFAULT_CELL_VERTICAL_ALIGNMENT,
   MAX_CELL_STYLE_PATCH_CELLS,
   areCellNumberFormatsEqual,
   cloneCellNumberFormat,
   type CellNumberFormat,
+  type CellTextDirection,
+  type CellTextRotation,
   type CellBorder,
   type CellStyle,
   type HorizontalCellAlignment,
@@ -28,6 +35,10 @@ export type SelectionCellStyleState = {
   fillColor: StyleValueState<string>;
   horizontalAlign: StyleValueState<HorizontalCellAlignment>;
   verticalAlign: StyleValueState<VerticalCellAlignment>;
+  indent: StyleValueState<number>;
+  shrinkToFit: ToggleStyleState;
+  textDirection: StyleValueState<CellTextDirection>;
+  textRotation: StyleValueState<CellTextRotation>;
   wrapText: ToggleStyleState;
   numberFormat: StyleValueState<CellNumberFormat>;
 };
@@ -115,8 +126,12 @@ export function createDefaultSelectionCellStyleState(): SelectionCellStyleState 
     underline: "off",
     textColor: { value: undefined, mixed: false },
     fillColor: { value: undefined, mixed: false },
-    horizontalAlign: { value: undefined, mixed: false },
-    verticalAlign: { value: undefined, mixed: false },
+    horizontalAlign: { value: DEFAULT_CELL_HORIZONTAL_ALIGNMENT, mixed: false },
+    verticalAlign: { value: DEFAULT_CELL_VERTICAL_ALIGNMENT, mixed: false },
+    indent: { value: DEFAULT_CELL_INDENT, mixed: false },
+    shrinkToFit: "off",
+    textDirection: { value: DEFAULT_CELL_TEXT_DIRECTION, mixed: false },
+    textRotation: { value: DEFAULT_CELL_TEXT_ROTATION, mixed: false },
     wrapText: "off",
     numberFormat: { value: undefined, mixed: false },
   };
@@ -148,6 +163,10 @@ export function getSelectionCellStyleState(
   const fillColor = createAccumulator<string>();
   const horizontalAlign = createAccumulator<HorizontalCellAlignment>();
   const verticalAlign = createAccumulator<VerticalCellAlignment>();
+  const indent = createAccumulator<number>();
+  const shrinkToFit = createAccumulator<true>();
+  const textDirection = createAccumulator<CellTextDirection>();
+  const textRotation = createAccumulator<CellTextRotation>();
   const wrapText = createAccumulator<true>();
   const numberFormat = createAccumulator<CellNumberFormat>();
   let materializedCellCount = 0;
@@ -160,8 +179,12 @@ export function getSelectionCellStyleState(
     addValue(underline, style?.underline);
     addValue(textColor, style?.textColor);
     addValue(fillColor, style?.fillColor);
-    addValue(horizontalAlign, style?.horizontalAlign);
-    addValue(verticalAlign, style?.verticalAlign);
+    addValue(horizontalAlign, style?.horizontalAlign ?? DEFAULT_CELL_HORIZONTAL_ALIGNMENT);
+    addValue(verticalAlign, style?.verticalAlign ?? DEFAULT_CELL_VERTICAL_ALIGNMENT);
+    addValue(indent, style?.indent ?? DEFAULT_CELL_INDENT);
+    addValue(shrinkToFit, style?.shrinkToFit);
+    addValue(textDirection, style?.textDirection ?? DEFAULT_CELL_TEXT_DIRECTION);
+    addValue(textRotation, style?.textRotation ?? DEFAULT_CELL_TEXT_ROTATION);
     addValue(wrapText, style?.wrapText);
     addValue(numberFormat, cloneCellNumberFormat(style?.numberFormat), areCellNumberFormatsEqual);
   };
@@ -203,6 +226,10 @@ export function getSelectionCellStyleState(
     fillColor: toValueState(fillColor),
     horizontalAlign: toValueState(horizontalAlign),
     verticalAlign: toValueState(verticalAlign),
+    indent: toValueState(indent),
+    shrinkToFit: toToggleState(shrinkToFit),
+    textDirection: toValueState(textDirection),
+    textRotation: toValueState(textRotation),
     wrapText: toToggleState(wrapText),
     numberFormat: toValueState(numberFormat),
   };

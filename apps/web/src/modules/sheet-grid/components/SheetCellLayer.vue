@@ -15,6 +15,9 @@ import { getCellContentStyle } from "../cell-presentation";
 import { getCellValuePresentationForGrid } from "../cell-value-presentation";
 import SheetCellRowPane from "./SheetCellRowPane.vue";
 import type { VisibleCell, VisibleCellPaneId } from "./sheet-cell-view";
+import { createCellTextSpanResolver, type CellTextSpan } from "../cell-text-spans";
+import { isCellTextWrapped } from "../../../shared/cell-text/text-presentation";
+import CellTextContent from "../../../shared/cell-text/CellTextContent.vue";
 
 type VisibleRow = {
   key: string;
@@ -62,6 +65,9 @@ const activeEditorId = `sheet-cell-editor-${useId().replaceAll(":", "")}`;
 
 const visibleCells = computed<VisibleCell[]>(() => {
   const cells: VisibleCell[] = [];
+  const textSpans = createCellTextSpanResolver(props.sheet, (address) =>
+    Boolean(props.layout.getMergedRangeAt(address)),
+  );
   const visited = new Set<string>();
   const layout = props.layout;
   const sheet = props.sheet;
@@ -79,34 +85,41 @@ const visibleCells = computed<VisibleCell[]>(() => {
     const cellStyle = getCellStyle(sheet, address);
     const content = getCellContent(sheet, address);
     const cellImage = content?.kind === "image" ? content.image : undefined;
+    const span = textSpans(address);
+    const value = evaluator.getComputedValue(address);
+    const displayValue = span?.kind === "fill" ? evaluator.getComputedValue(span.source) : value;
     const presentation = cellImage
       ? undefined
-      : getCellValuePresentationForGrid(
-          evaluator.getComputedValue(address),
-          cellStyle,
-          locale,
-          props.dateSystem,
-        );
-    const text = presentation?.text ?? "";
-    const preservesLineBreaks = /[\r\n]/u.test(text);
+      : getCellValuePresentationForGrid(displayValue, cellStyle, locale, props.dateSystem);
+    const displayText = presentation?.text ?? "";
+    const text = span?.kind === "fill" && !content ? "" : displayText;
+    const preservesLineBreaks = /[\r\n]/u.test(displayText);
     cells.push({
       key,
       paneId,
       address,
       rect,
       text,
+      displayText,
+      value: displayValue,
+      formatStyle: presentation?.color
+        ? { ...cellStyle, textColor: presentation.color }
+        : cellStyle,
+      textSpan: span,
+      spanning:
+        span?.kind === "centerContinuous" && span.range.start.column !== span.range.end.column,
       ...(presentation?.fill ? { fill: presentation.fill } : {}),
       ...(cellImage
         ? { image: cellImage, imageTransformKey: getImageTransformKey(cellImage) }
         : { imageTransformKey: "" }),
-      multiline: Boolean(cellStyle?.wrapText) || preservesLineBreaks,
-      wrapped: Boolean(cellStyle?.wrapText),
+      multiline: isCellTextWrapped(cellStyle) || preservesLineBreaks,
+      wrapped: isCellTextWrapped(cellStyle),
       style: {
         left: `${rect.x - layout.panes[paneId].clip.x + (paneId === "body" || paneId === "top" ? layout.bodyScrollPosition.x : 0)}px`,
         top: `${rect.y - layout.panes[paneId].clip.y}px`,
         width: `${rect.width}px`,
         height: `${rect.height}px`,
-        ...getCellContentStyle(cellStyle, preservesLineBreaks),
+        ...getCellContentStyle(cellStyle, preservesLineBreaks, displayValue, displayText),
         ...(presentation?.color ? { color: presentation.color } : {}),
       },
       viewportTop: rect.y,
@@ -118,6 +131,62 @@ const visibleCells = computed<VisibleCell[]>(() => {
   });
   addCell(layout.getAnchorForAddress(props.activeCell), layout.getPaneForAddress(props.activeCell));
   return cells;
+});
+
+const spanningTextPanes = computed(() => {
+  const spans = new Map<string, CellTextSpan>();
+  for (const cell of visibleCells.value) {
+    if (!cell.spanning) continue;
+    const span = cell.textSpan;
+    if (span) spans.set(`${span.source.row}:${span.source.column}`, span);
+  }
+  return [...spans.entries()].flatMap(([key, span]) => {
+    if (
+      props.editing &&
+      span.source.row === props.activeCell.row &&
+      span.source.column === props.activeCell.column
+    )
+      return [];
+    const rect = props.layout.getRangeRect(span.range);
+    if (!rect) return [];
+    const value = props.evaluator.getComputedValue(span.source);
+    const cellStyle = getCellStyle(props.sheet, span.source);
+    const presentation = getCellValuePresentationForGrid(
+      value,
+      cellStyle,
+      props.locale,
+      props.dateSystem,
+    );
+    return props.layout.getRangePaneRects(span.range).map(({ paneId }) => {
+      const clip = props.layout.panes[paneId].clip;
+      const scrollingX = paneId === "body" || paneId === "top";
+      const scrollingY = paneId === "body" || paneId === "left";
+      return {
+        key: `${key}:${paneId}`,
+        source: span.source,
+        value,
+        text: presentation.text,
+        fill: presentation.fill,
+        formatStyle: presentation.color
+          ? { ...cellStyle, textColor: presentation.color }
+          : cellStyle,
+        width: rect.width - 1,
+        height: rect.height - 1,
+        paneStyle: {
+          left: `${clip.x}px`,
+          top: `${clip.y}px`,
+          width: `${clip.width}px`,
+          height: `${clip.height}px`,
+        },
+        style: {
+          left: `${rect.x - (scrollingX ? props.layout.frozenSize.width + props.layout.bodyScrollPosition.x : 0)}px`,
+          top: `${rect.y - (scrollingY ? props.layout.frozenSize.height + props.layout.bodyScrollPosition.y : 0)}px`,
+          width: `${rect.width - 1}px`,
+          height: `${rect.height - 1}px`,
+        },
+      };
+    });
+  });
 });
 
 const activeEditor = computed(() => {
@@ -365,6 +434,28 @@ const gridLinePanes = computed(() => {
       <path :d="pane.path" />
     </svg>
     <div
+      v-for="span in spanningTextPanes"
+      :key="span.key"
+      class="sheet-cell-layer__text-pane"
+      :style="span.paneStyle"
+      aria-hidden="true"
+    >
+      <div
+        class="sheet-cell-layer__spanning-text"
+        :style="span.style"
+        :data-center-across-source="`${span.source.row}:${span.source.column}`"
+      >
+        <CellTextContent
+          :text="span.text"
+          :value="span.value"
+          :cell-style="span.formatStyle"
+          :fill="span.fill"
+          :width="span.width"
+          :height="span.height"
+        />
+      </div>
+    </div>
+    <div
       v-if="activeEditor"
       class="sheet-cell-layer__editor-pane"
       :style="activeEditor.paneStyle"
@@ -418,6 +509,16 @@ const gridLinePanes = computed(() => {
     position: absolute;
     z-index: 5;
     pointer-events: none;
+  }
+
+  &__text-pane {
+    position: absolute;
+    z-index: 2;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  &__spanning-text {
+    position: absolute;
   }
 
   &__editor-anchor {

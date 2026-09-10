@@ -91,6 +91,7 @@ import {
   type SheetFilterValue,
   type SheetDimensionAxis,
   type SheetProperties,
+  type Sheet,
   type Workbook,
 } from "@idea10/core/workbook";
 import { getSelectionMode, getSelectionRange } from "@idea10/sheet-engine/selection";
@@ -153,6 +154,11 @@ export type CellFormatSelection = {
   generation: number;
   state: SelectionCellStyleState;
   borderState: SelectionBorderState;
+  mergeState: {
+    canMerge: boolean;
+    canUnmerge: boolean;
+    merged: "on" | "off" | "mixed";
+  };
   sampleValue: string | number | boolean | null;
   dateSystem: ExcelDateSystem;
 };
@@ -279,6 +285,21 @@ export function useSpreadsheetWorkspaceController(
       canUnmerge: cellSelection && intersectsMerge,
     };
   });
+
+  function getCellFormatMergeState(
+    sheet: Sheet,
+    range: CellRange,
+  ): CellFormatSelection["mergeState"] {
+    const intersecting = sheet.mergedCells.filter((merged) =>
+      doMergedCellRangesIntersect(merged, range),
+    );
+    const exactMerge = intersecting.some((merged) => areRangesEqual(merged, range));
+    return {
+      canMerge: mergeState.value.canMerge,
+      canUnmerge: mergeState.value.canUnmerge,
+      merged: exactMerge ? "on" : intersecting.length > 0 ? "mixed" : "off",
+    };
+  }
   const workspaceStatusText = computed(() =>
     workspaceStatus.value ? t(workspaceStatus.value.key, workspaceStatus.value.params) : "",
   );
@@ -694,6 +715,7 @@ export function useSpreadsheetWorkspaceController(
       generation: workbookGeneration.value,
       state: getSelectionCellStyleState(sheet, range),
       borderState: getSelectionBorderState(sheet, range),
+      mergeState: getCellFormatMergeState(sheet, range),
       sampleValue:
         typeof value === "object" && value !== null ? formatComputedValueForDisplay(value) : value,
       dateSystem: session.workbook.dateSystem,
@@ -709,13 +731,27 @@ export function useSpreadsheetWorkspaceController(
       showWorkspaceStatus({ key: "format.selectionTooLarge" });
       return false;
     }
+    if (change.merge === true && !target.mergeState.canMerge) {
+      showWorkspaceStatus({ key: "workspace.mergeUnavailable" });
+      return false;
+    }
     if (
       Object.keys(change.style ?? {}).length === 0 &&
       (change.borders?.length ?? 0) === 0 &&
-      Object.keys(change.borderFormat ?? {}).length === 0
+      Object.keys(change.borderFormat ?? {}).length === 0 &&
+      change.merge === undefined
     )
       return true;
-    execute(createApplyCellFormatCommand(target.sheetId, target.range, change), "format.cells");
+    const mergeWillChange =
+      change.merge !== undefined &&
+      (change.merge
+        ? !sheet.mergedCells.some((merged) => doMergedCellRangesIntersect(merged, target.range))
+        : sheet.mergedCells.some((merged) => doMergedCellRangesIntersect(merged, target.range)));
+    const changed = execute(
+      createApplyCellFormatCommand(target.sheetId, target.range, change),
+      "format.cells",
+    );
+    if (changed && mergeWillChange) gridRef.value?.clearClipboard?.();
     clearWorkspaceStatus();
     return true;
   }

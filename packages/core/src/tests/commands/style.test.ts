@@ -211,7 +211,6 @@ describe("cell style commands", () => {
     const secondStyle = {
       fontSize: 14,
       fillColor: "#fedcba",
-      verticalAlign: "bottom",
     } as const;
     const styleOnly = { italic: true, horizontalAlign: "center" } as const;
     setCellValue(sheet, { row: 0, column: 0 }, "text");

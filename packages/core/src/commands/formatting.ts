@@ -16,7 +16,9 @@ import {
   type CellNumberFormat,
 } from "../style.js";
 import {
+  createSheetSparseState,
   getCellStyle,
+  replaceSheetSparseState,
   setCellStyle,
   type CellAddress,
   type CellRange,
@@ -37,8 +39,10 @@ import type {
   AdjustCellNumberFormatDecimalsCommand,
   ApplyCellStyleCommand,
   CellFormatChange,
+  RestoreFullSheetStateCommand,
   RestoreCellStylesCommand,
 } from "./contracts.js";
+import { applyMergeCellsCommand, applyUnmergeCellsCommand } from "./metadata.js";
 import {
   assertCellAddress,
   assertCellRange,
@@ -109,8 +113,20 @@ function normalizeCellFormatChange(change: CellFormatChange): CellFormatChange {
   if ("borderFormat" in change && change.borderFormat !== undefined) {
     normalized.borderFormat = normalizeCellBorderFormatPatch(change.borderFormat);
   }
-  if (!normalized.style && !normalized.borders && !normalized.borderFormat) {
-    throw new TypeError("Cell format change must contain a style, borders, or border format.");
+  if ("merge" in change && change.merge !== undefined) {
+    if (typeof change.merge !== "boolean")
+      throw new TypeError("Cell format merge must be a boolean.");
+    normalized.merge = change.merge;
+  }
+  if (
+    !normalized.style &&
+    !normalized.borders &&
+    !normalized.borderFormat &&
+    normalized.merge === undefined
+  ) {
+    throw new TypeError(
+      "Cell format change must contain a style, borders, border format, or merge state.",
+    );
   }
   return normalized;
 }
@@ -570,7 +586,7 @@ function reconcileAndApply(
 export function applyCellFormatCommand(
   workbook: Workbook,
   command: ApplyCellFormatCommand,
-): RestoreCellStylesCommand | null {
+): RestoreCellStylesCommand | RestoreFullSheetStateCommand | null {
   const range = normalizeRange(command.range);
   assertCellRange(range);
   assertSupportedRange(range);
@@ -578,34 +594,64 @@ export function applyCellFormatCommand(
     normalizeCellFormatChange(command.change),
   );
   const sheet = getSheetOrThrow(workbook, command.sheetId);
-  const resolver = new MergedCellRangeResolver(sheet.mergedCells);
-  const patches: StylePatchMap = new Map();
-  const targets: BorderPatchMap = new Map();
+  const previousState = change.merge === undefined ? undefined : createSheetSparseState(sheet);
+  try {
+    const mergeInverse =
+      change.merge === undefined
+        ? null
+        : change.merge
+          ? applyMergeCellsCommand(workbook, {
+              type: "mergeCells",
+              sheetId: command.sheetId,
+              range,
+            })
+          : applyUnmergeCellsCommand(workbook, {
+              type: "unmergeCells",
+              sheetId: command.sheetId,
+              range,
+            });
+    const resolver = new MergedCellRangeResolver(sheet.mergedCells);
+    const patches: StylePatchMap = new Map();
+    const targets: BorderPatchMap = new Map();
 
-  if (change.style) {
-    for (let row = range.start.row; row <= range.end.row; row += 1) {
-      for (let column = range.start.column; column <= range.end.column; column += 1) {
-        const physicalAddress = { row, column };
-        const address = getMergeAwareAddress(resolver, physicalAddress);
-        const visiblePatch = excludeInternalMergedBorderSides(
-          change.style,
-          resolver,
-          physicalAddress,
-        );
-        addPatch(patches, address, visiblePatch);
-        const visibleBorderPatch = getExplicitCellBorderPatch(visiblePatch);
-        if (Object.keys(visibleBorderPatch).length > 0)
-          addTargetBorderPatch(targets, physicalAddress, visibleBorderPatch);
+    if (change.style) {
+      for (let row = range.start.row; row <= range.end.row; row += 1) {
+        for (let column = range.start.column; column <= range.end.column; column += 1) {
+          const physicalAddress = { row, column };
+          const address = getMergeAwareAddress(resolver, physicalAddress);
+          const visiblePatch = excludeInternalMergedBorderSides(
+            change.style,
+            resolver,
+            physicalAddress,
+          );
+          addPatch(patches, address, visiblePatch);
+          const visibleBorderPatch = getExplicitCellBorderPatch(visiblePatch);
+          if (Object.keys(visibleBorderPatch).length > 0)
+            addTargetBorderPatch(targets, physicalAddress, visibleBorderPatch);
+        }
       }
     }
+    for (const action of change.borders ?? []) {
+      addBorderActionPatches(range, action, resolver, patches, targets);
+    }
+    if (change.borderFormat) {
+      addExistingVisibleBorderPatches(
+        sheet,
+        range,
+        change.borderFormat,
+        resolver,
+        patches,
+        targets,
+      );
+    }
+    const styleInverse = reconcileAndApply(workbook, command.sheetId, resolver, patches, targets);
+    if (change.merge === undefined) return styleInverse;
+    if (!mergeInverse) return styleInverse;
+    return { type: "restoreSheetState", sheetId: command.sheetId, state: previousState! };
+  } catch (error) {
+    if (previousState) replaceSheetSparseState(sheet, previousState);
+    throw error;
   }
-  for (const action of change.borders ?? []) {
-    addBorderActionPatches(range, action, resolver, patches, targets);
-  }
-  if (change.borderFormat) {
-    addExistingVisibleBorderPatches(sheet, range, change.borderFormat, resolver, patches, targets);
-  }
-  return reconcileAndApply(workbook, command.sheetId, resolver, patches, targets);
 }
 
 export function applyCellBordersCommand(

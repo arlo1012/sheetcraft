@@ -51,6 +51,10 @@
       "types": "./dist/row-height.d.ts",
       "import": "./dist/row-height.js"
     },
+    "./text-layout": {
+      "types": "./dist/text-layout.d.ts",
+      "import": "./dist/text-layout.js"
+    },
     "./viewport-layout": {
       "types": "./dist/viewport-layout.d.ts",
       "import": "./dist/viewport-layout.js"

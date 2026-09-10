@@ -36,6 +36,12 @@ describe("workbook snapshots", () => {
       {
         bold: true,
         fillColor: "#AABBCC",
+        horizontalAlign: "centerContinuous",
+        verticalAlign: "distributed",
+        indent: 3,
+        shrinkToFit: true,
+        textDirection: "rtl",
+        textRotation: "vertical",
         numberFormat: { kind: "currency", currency: "cny", fractionDigits: 2 },
       },
     );
@@ -55,6 +61,12 @@ describe("workbook snapshots", () => {
     expect(getCellStyle(restored.sheets.get("sheet-1")!, { row: 0, column: 0 })).toEqual({
       bold: true,
       fillColor: "#aabbcc",
+      horizontalAlign: "centerContinuous",
+      verticalAlign: "distributed",
+      indent: 3,
+      shrinkToFit: true,
+      textDirection: "rtl",
+      textRotation: "vertical",
       numberFormat: { kind: "currency", currency: "CNY", fractionDigits: 2 },
     });
   });

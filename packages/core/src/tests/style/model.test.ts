@@ -56,7 +56,11 @@ describe("cell style model", () => {
         italic: true,
         textColor: "#ABCDEF",
         horizontalAlign: "center",
-        verticalAlign: "bottom",
+        verticalAlign: "middle",
+        indent: 3,
+        shrinkToFit: true,
+        textDirection: "rtl",
+        textRotation: "vertical",
         wrapText: true,
         numberFormat: { kind: "currency", currency: "cny", fractionDigits: 2 },
       }),
@@ -66,13 +70,28 @@ describe("cell style model", () => {
       italic: true,
       textColor: "#abcdef",
       horizontalAlign: "center",
-      verticalAlign: "bottom",
+      verticalAlign: "middle",
+      indent: 3,
+      shrinkToFit: true,
+      textDirection: "rtl",
+      textRotation: "vertical",
       wrapText: true,
       numberFormat: { kind: "currency", currency: "CNY", fractionDigits: 2 },
     });
-    expect(normalizeCellStyle({ verticalAlign: "middle" })).toBeUndefined();
-    expect(normalizeCellStylePatch({ verticalAlign: "middle" })).toEqual({
+    expect(normalizeCellStyle({ horizontalAlign: "general" })).toBeUndefined();
+    expect(normalizeCellStylePatch({ horizontalAlign: "general" })).toEqual({
+      horizontalAlign: null,
+    });
+    expect(normalizeCellStyle({ verticalAlign: "bottom" })).toBeUndefined();
+    expect(normalizeCellStylePatch({ verticalAlign: "bottom" })).toEqual({
       verticalAlign: null,
+    });
+    expect(normalizeCellStyle({ textDirection: "context" })).toBeUndefined();
+    expect(normalizeCellStylePatch({ textDirection: "context" })).toEqual({ textDirection: null });
+    expect(normalizeCellStyle({ indent: 0, textRotation: 0 })).toBeUndefined();
+    expect(normalizeCellStylePatch({ indent: 0, textRotation: 0 })).toEqual({
+      indent: null,
+      textRotation: null,
     });
     expect(normalizeCellStylePatch({ wrapText: false })).toEqual({ wrapText: null });
     expect(normalizeCellStyle({ wrapText: true })).toEqual({ wrapText: true });
@@ -93,6 +112,12 @@ describe("cell style model", () => {
       TypeError,
     );
     expect(() => normalizeCellStyle({ verticalAlign: "baseline" as never })).toThrow(TypeError);
+    expect(() => normalizeCellStyle({ horizontalAlign: "baseline" as never })).toThrow(TypeError);
+    expect(() => normalizeCellStyle({ textDirection: "auto" as never })).toThrow(TypeError);
+    expect(() => normalizeCellStyle({ indent: 1.5 })).toThrow(RangeError);
+    expect(() => normalizeCellStyle({ indent: 251 })).toThrow(RangeError);
+    expect(() => normalizeCellStyle({ textRotation: -91 })).toThrow(RangeError);
+    expect(() => normalizeCellStyle({ textRotation: 91 })).toThrow(RangeError);
     expect(() => normalizeCellStyle({ wrapText: "yes" as never })).toThrow(TypeError);
     expect(() =>
       normalizeCellStyle({

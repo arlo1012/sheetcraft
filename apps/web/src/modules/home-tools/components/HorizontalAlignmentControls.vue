@@ -28,11 +28,11 @@ function isActive(alignment: HorizontalCellAlignment): boolean {
   if (props.state.horizontalAlign.mixed) {
     return false;
   }
-  return (props.state.horizontalAlign.value ?? "left") === alignment;
+  return (props.state.horizontalAlign.value ?? "general") === alignment;
 }
 
 function align(alignment: HorizontalCellAlignment): void {
-  emit("applyStyle", { horizontalAlign: alignment === "left" ? null : alignment });
+  emit("applyStyle", { horizontalAlign: alignment });
 }
 </script>
 

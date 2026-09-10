@@ -14,8 +14,31 @@ export const MIN_NUMBER_FORMAT_FRACTION_DIGITS = 0;
 export const MAX_NUMBER_FORMAT_FRACTION_DIGITS = 20;
 export const MAX_NUMBER_FORMAT_CURRENCY_SYMBOL_LENGTH = 32;
 
-export type HorizontalCellAlignment = "left" | "center" | "right";
-export type VerticalCellAlignment = "top" | "middle" | "bottom";
+/** The effective alignment when no horizontal alignment is stored. */
+export const DEFAULT_CELL_HORIZONTAL_ALIGNMENT = "general";
+/** The effective alignment when no vertical alignment is stored. */
+export const DEFAULT_CELL_VERTICAL_ALIGNMENT = "bottom";
+/** The effective text direction when no direction is stored. */
+export const DEFAULT_CELL_TEXT_DIRECTION = "context";
+export const DEFAULT_CELL_INDENT = 0;
+export const DEFAULT_CELL_TEXT_ROTATION = 0;
+export const MIN_CELL_INDENT = 0;
+export const MAX_CELL_INDENT = 250;
+export const MIN_CELL_TEXT_ROTATION = -90;
+export const MAX_CELL_TEXT_ROTATION = 90;
+
+export type HorizontalCellAlignment =
+  | "general"
+  | "left"
+  | "center"
+  | "right"
+  | "fill"
+  | "justify"
+  | "centerContinuous"
+  | "distributed";
+export type VerticalCellAlignment = "top" | "middle" | "bottom" | "justify" | "distributed";
+export type CellTextDirection = "context" | "ltr" | "rtl";
+export type CellTextRotation = number | "vertical";
 export const CELL_BORDER_LINE_STYLES = [
   "hair",
   "thin",
@@ -131,6 +154,10 @@ export type CellStyle = {
   fillColor?: string;
   horizontalAlign?: HorizontalCellAlignment;
   verticalAlign?: VerticalCellAlignment;
+  indent?: number;
+  shrinkToFit?: true;
+  textDirection?: CellTextDirection;
+  textRotation?: CellTextRotation;
   wrapText?: true;
   numberFormat?: CellNumberFormat;
   borderTop?: CellBorder;
@@ -155,6 +182,10 @@ export const CELL_STYLE_KEYS = [
   "fillColor",
   "horizontalAlign",
   "verticalAlign",
+  "indent",
+  "shrinkToFit",
+  "textDirection",
+  "textRotation",
   "wrapText",
   "numberFormat",
   "borderTop",
@@ -174,8 +205,24 @@ export function createClearCellStylePatch(): CellStylePatch {
 }
 
 const CELL_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
-const HORIZONTAL_ALIGNMENTS = new Set<HorizontalCellAlignment>(["left", "center", "right"]);
-const VERTICAL_ALIGNMENTS = new Set<VerticalCellAlignment>(["top", "middle", "bottom"]);
+const HORIZONTAL_ALIGNMENTS = new Set<HorizontalCellAlignment>([
+  "general",
+  "left",
+  "center",
+  "right",
+  "fill",
+  "justify",
+  "centerContinuous",
+  "distributed",
+]);
+const VERTICAL_ALIGNMENTS = new Set<VerticalCellAlignment>([
+  "top",
+  "middle",
+  "bottom",
+  "justify",
+  "distributed",
+]);
+const TEXT_DIRECTIONS = new Set<CellTextDirection>(["context", "ltr", "rtl"]);
 const BORDER_LINE_STYLES = new Set<CellBorderLineStyle>(CELL_BORDER_LINE_STYLES);
 const BORDER_PRESETS = new Set<CellBorderPreset>([
   "none",
@@ -471,18 +518,60 @@ export function normalizeCellBorderAction(action: CellBorderAction): CellBorderA
   return { preset: action.preset, border: normalizeCellBorder(action.border) };
 }
 
-function normalizeHorizontalAlignment(value: unknown): HorizontalCellAlignment {
+function normalizeHorizontalAlignment(value: unknown): HorizontalCellAlignment | undefined {
   if (typeof value !== "string" || !HORIZONTAL_ALIGNMENTS.has(value as HorizontalCellAlignment)) {
-    throw new TypeError("Cell horizontal alignment must be left, center, or right.");
+    throw new TypeError(
+      "Cell horizontal alignment must be general, left, center, right, fill, justify, centerContinuous, or distributed.",
+    );
   }
-  return value as HorizontalCellAlignment;
+  return value === DEFAULT_CELL_HORIZONTAL_ALIGNMENT
+    ? undefined
+    : (value as HorizontalCellAlignment);
 }
 
 function normalizeVerticalAlignment(value: unknown): VerticalCellAlignment | undefined {
   if (typeof value !== "string" || !VERTICAL_ALIGNMENTS.has(value as VerticalCellAlignment)) {
-    throw new TypeError("Cell vertical alignment must be top, middle, or bottom.");
+    throw new TypeError(
+      "Cell vertical alignment must be top, middle, bottom, justify, or distributed.",
+    );
   }
-  return value === "middle" ? undefined : (value as VerticalCellAlignment);
+  return value === DEFAULT_CELL_VERTICAL_ALIGNMENT ? undefined : (value as VerticalCellAlignment);
+}
+
+function normalizeTextDirection(value: unknown): CellTextDirection | undefined {
+  if (typeof value !== "string" || !TEXT_DIRECTIONS.has(value as CellTextDirection)) {
+    throw new TypeError("Cell text direction must be context, ltr, or rtl.");
+  }
+  return value === DEFAULT_CELL_TEXT_DIRECTION ? undefined : (value as CellTextDirection);
+}
+
+function normalizeIndent(value: unknown): number | undefined {
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < MIN_CELL_INDENT ||
+    value > MAX_CELL_INDENT
+  ) {
+    throw new RangeError(
+      `Cell indent must be an integer between ${MIN_CELL_INDENT} and ${MAX_CELL_INDENT}.`,
+    );
+  }
+  return value === DEFAULT_CELL_INDENT ? undefined : value;
+}
+
+function normalizeTextRotation(value: unknown): CellTextRotation | undefined {
+  if (value === "vertical") return value;
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < MIN_CELL_TEXT_ROTATION ||
+    value > MAX_CELL_TEXT_ROTATION
+  ) {
+    throw new RangeError(
+      `Cell text rotation must be an integer between ${MIN_CELL_TEXT_ROTATION} and ${MAX_CELL_TEXT_ROTATION}, or vertical.`,
+    );
+  }
+  return value === DEFAULT_CELL_TEXT_ROTATION ? undefined : value;
 }
 
 function normalizeStyleValue<Key extends keyof CellStyle>(
@@ -498,7 +587,13 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
   if (key === "fontSize") {
     return normalizeFontSize(value) as CellStyle[Key];
   }
-  if (key === "bold" || key === "italic" || key === "underline" || key === "wrapText") {
+  if (
+    key === "bold" ||
+    key === "italic" ||
+    key === "underline" ||
+    key === "shrinkToFit" ||
+    key === "wrapText"
+  ) {
     if (value !== true) {
       throw new TypeError(`Cell ${key} must be true, false, or null.`);
     }
@@ -526,7 +621,16 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
   if (key === "horizontalAlign") {
     return normalizeHorizontalAlignment(value) as CellStyle[Key];
   }
-  return normalizeVerticalAlignment(value) as CellStyle[Key];
+  if (key === "verticalAlign") {
+    return normalizeVerticalAlignment(value) as CellStyle[Key];
+  }
+  if (key === "indent") {
+    return normalizeIndent(value) as CellStyle[Key];
+  }
+  if (key === "textDirection") {
+    return normalizeTextDirection(value) as CellStyle[Key];
+  }
+  return normalizeTextRotation(value) as CellStyle[Key];
 }
 
 export function normalizeCellStyle(style: CellStyle | null | undefined): CellStyle | undefined {

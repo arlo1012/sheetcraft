@@ -65,6 +65,8 @@ export type CellFormatChange = {
   style?: CellStylePatch;
   borders?: CellBorderAction[];
   borderFormat?: CellBorderFormatPatch;
+  /** Changes merged-cell state as part of the same undoable cell-format command. */
+  merge?: boolean;
 };
 
 export type ApplyCellFormatCommand = {
