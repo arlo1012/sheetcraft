@@ -10,7 +10,7 @@ import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import { useNumberFormatPanel } from "../number-format/useNumberFormatPanel";
 import NumberFormatCategoryList from "./NumberFormatCategoryList.vue";
-import NumberFormatTypeList from "./NumberFormatTypeList.vue";
+import NumberFormatOptionList from "./NumberFormatOptionList.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -84,7 +84,7 @@ function selectNegative(code: string): void {
       />
       <div class="cell-format-number__details">
         <div class="cell-format-number__preview">
-          <span class="cell-format-number__label">{{ t("cellFormat.preview") }}</span>
+          <h3 class="cell-format-number__heading">{{ t("cellFormat.preview") }}</h3>
           <output
             class="cell-format-number__sample"
             :style="{ color: preview.color }"
@@ -145,7 +145,8 @@ function selectNegative(code: string): void {
           >
           <div v-if="showNegative" class="cell-format-number__negative">
             <span class="cell-format-number__label">{{ t("cellFormat.negativeNumbers") }}</span>
-            <NumberFormatTypeList
+            <NumberFormatOptionList
+              class="number-format-types"
               :model-value="negativeStyle"
               :options="negativeTypes"
               :label="t('cellFormat.negativeNumbers')"
@@ -167,7 +168,8 @@ function selectNegative(code: string): void {
                 {{ t("cellFormat.invalidFormat") }}
               </p>
             </template>
-            <NumberFormatTypeList
+            <NumberFormatOptionList
+              class="number-format-types"
               :model-value="category === 'custom' ? customCode : selectedCode"
               :options="category === 'custom' ? customPresets : presets"
               :label="t('cellFormat.type')"
@@ -236,9 +238,14 @@ function selectNegative(code: string): void {
     font-weight: var(--idea-font-weight-medium);
     line-height: var(--idea-line-height-body-medium);
   }
+  &__heading {
+    margin: 0;
+    font-size: inherit;
+    font-weight: var(--idea-font-weight-semibold);
+  }
   &__preview {
     display: grid;
-    grid-template-rows: auto 64px;
+    grid-template-rows: auto 40px;
     gap: 8px;
     flex: none;
   }

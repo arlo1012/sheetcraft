@@ -1,21 +1,22 @@
-<script setup lang="ts">
-import { nextTick, ref } from "vue";
+<script setup lang="ts" generic="Value extends string">
+import { computed, nextTick, ref } from "vue";
 
-type FormatOption = Readonly<{ code: string; value?: string; label: string; color?: string }>;
+type FormatOption = Readonly<{ code: Value; value?: Value; label: string; color?: string }>;
 const props = defineProps<{
-  modelValue: string;
+  modelValue: Value | undefined;
   options: readonly FormatOption[];
   label: string;
+  variant?: "category" | "type";
   monospace?: boolean;
 }>();
-const emit = defineEmits<{ select: [code: string] }>();
+const emit = defineEmits<{ select: [code: Value] }>();
 const listRef = ref<HTMLElement>();
+const selectedIndex = computed(() =>
+  props.options.findIndex((option) => optionValue(option) === props.modelValue),
+);
 function onKeydown(event: KeyboardEvent): void {
   if (!props.options.length) return;
-  const index = Math.max(
-    0,
-    props.options.findIndex((option) => optionValue(option) === props.modelValue),
-  );
+  const index = Math.max(0, selectedIndex.value);
   const next =
     event.key === "Home"
       ? 0
@@ -31,35 +32,31 @@ function onKeydown(event: KeyboardEvent): void {
   emit("select", optionValue(props.options[next]!));
   void nextTick(() => listRef.value?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus());
 }
-function optionValue(option: FormatOption): string {
+function optionValue(option: FormatOption): Value {
   return option.value ?? option.code;
 }
 </script>
 <template>
   <div
     ref="listRef"
-    class="number-format-types"
-    :class="{ 'is-monospace': monospace }"
+    class="number-format-options"
+    :class="{ 'is-category': variant === 'category', 'is-monospace': monospace }"
     role="listbox"
     :aria-label="label"
     @keydown="onKeydown"
   >
-    <div class="number-format-types__items">
+    <div class="number-format-options__items">
       <button
         v-for="(option, index) in options"
         :key="optionValue(option)"
         type="button"
         role="option"
         :aria-selected="modelValue === optionValue(option)"
-        :tabindex="
-          modelValue === optionValue(option) ||
-          (!options.some((item) => optionValue(item) === modelValue) && index === 0)
-            ? 0
-            : -1
-        "
+        :tabindex="index === Math.max(0, selectedIndex) ? 0 : -1"
         :style="{ color: option.color }"
         :title="option.label"
-        :data-cell-format-type="optionValue(option)"
+        :data-cell-format-number-category="variant === 'category' ? optionValue(option) : undefined"
+        :data-cell-format-type="variant !== 'category' ? optionValue(option) : undefined"
         @click="emit('select', optionValue(option))"
       >
         {{ option.label }}
@@ -68,7 +65,7 @@ function optionValue(option: FormatOption): string {
   </div>
 </template>
 <style scoped lang="scss">
-.number-format-types {
+.number-format-options {
   min-width: 0;
   min-height: 0;
   overflow: auto;
@@ -139,6 +136,26 @@ function optionValue(option: FormatOption): string {
   }
   &.is-monospace button {
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+  &.is-category {
+    .number-format-options__items {
+      width: 100%;
+    }
+    button {
+      min-height: 28px;
+      padding: 4px 8px;
+      white-space: normal;
+
+      &[aria-selected="true"] {
+        font-weight: var(--idea-font-weight-medium);
+      }
+    }
+  }
+}
+@media (max-width: 480px) {
+  .number-format-options.is-category .number-format-options__items {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 </style>
