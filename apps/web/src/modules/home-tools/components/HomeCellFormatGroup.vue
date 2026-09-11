@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Sparkles, TableProperties } from "lucide-vue-next";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
@@ -7,7 +6,6 @@ import CellColorControl from "./CellColorControl.vue";
 import CellBorderMenu from "./CellBorderMenu.vue";
 import FontFormatControls from "./FontFormatControls.vue";
 import RibbonDialogLauncher from "./RibbonDialogLauncher.vue";
-import RibbonIconAction from "./RibbonIconAction.vue";
 import TextFormatControls from "./TextFormatControls.vue";
 
 defineProps<{
@@ -88,38 +86,6 @@ const { t } = useAppI18n();
         @activate="emit('openCellFormat', 'font')"
       />
     </div>
-
-    <div
-      class="home-cell-format-group__lane home-cell-format-group__lane--styles"
-      data-cell-format-lane="styles"
-      role="group"
-      :aria-label="t('format.styleRuleTools')"
-    >
-      <RibbonIconAction
-        class="home-cell-format-group__style-action"
-        :label="t('app.unavailableFeature', { feature: t('ribbon.tableStyles') })"
-        :text="t('ribbon.tableStyles')"
-        disabled
-        disclosure
-        data-ribbon-placeholder="table-styles"
-      >
-        <TableProperties :size="15" aria-hidden="true" />
-      </RibbonIconAction>
-      <RibbonIconAction
-        class="home-cell-format-group__style-action"
-        :label="
-          t('app.unavailableFeature', {
-            feature: t('ribbon.conditionalFormatting'),
-          })
-        "
-        :text="t('ribbon.conditionalFormatting')"
-        disabled
-        disclosure
-        data-ribbon-placeholder="conditional-formatting"
-      >
-        <Sparkles :size="15" aria-hidden="true" />
-      </RibbonIconAction>
-    </div>
   </section>
 </template>
 
@@ -137,7 +103,7 @@ const { t } = useAppI18n();
   display: grid;
   grid-template-columns:
     var(--cell-format-primary-track) var(--cell-format-compact-track)
-    var(--cell-format-compact-track) max-content;
+    var(--cell-format-compact-track);
   grid-template-rows: repeat(2, 27px);
   align-content: center;
   column-gap: var(--cell-format-column-gap);
@@ -173,21 +139,6 @@ const { t } = useAppI18n();
     grid-column: 3;
     grid-row: 1 / span 2;
     justify-items: stretch;
-  }
-
-  &__lane--styles {
-    grid-column: 4;
-    grid-row: 1 / span 2;
-    min-width: max-content;
-    padding-left: 4px;
-    border-left: 1px solid var(--idea-border-subtle);
-  }
-
-  &__style-action {
-    width: 100%;
-    justify-content: flex-start;
-    padding-right: 3px;
-    padding-left: 3px;
   }
 }
 </style>

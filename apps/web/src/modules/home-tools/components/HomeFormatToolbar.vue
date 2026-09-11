@@ -14,6 +14,7 @@ import HomeDataGroup from "./HomeDataGroup.vue";
 import HomeHistoryGroup from "./HomeHistoryGroup.vue";
 import HomeInsertGroup from "./HomeInsertGroup.vue";
 import HomeNumberGroup from "./HomeNumberGroup.vue";
+import HomeStylesGroup from "./HomeStylesGroup.vue";
 import HomeUtilityGroup from "./HomeUtilityGroup.vue";
 import {
   createDefaultHomeDataToolState,
@@ -290,6 +291,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           @adjust-decimals="emit('adjustDecimals', $event)"
           @open-cell-format="emit('openCellFormat', 'number')"
         />
+        <HomeStylesGroup />
         <HomeDataGroup
           :state="dataState"
           :read-only="readOnly"

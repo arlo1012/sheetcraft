@@ -51,17 +51,16 @@ function placeholders(wrapper: ReturnType<typeof mountGroup>, lane: string): str
 }
 
 describe("HomeCellFormatGroup layout", () => {
-  test("organizes controls into three semantic two-level lanes", () => {
+  test("organizes controls into typography and appearance lanes", () => {
     const wrapper = mountGroup();
 
     expect(
       wrapper
         .findAll(":scope > [data-cell-format-lane]")
         .map((lane) => lane.attributes("data-cell-format-lane")),
-    ).toEqual(["typography", "appearance", "styles"]);
+    ).toEqual(["typography", "appearance"]);
     expect(placeholders(wrapper, "typography")).toEqual([]);
     expect(placeholders(wrapper, "appearance")).toEqual([]);
-    expect(placeholders(wrapper, "styles")).toEqual(["table-styles", "conditional-formatting"]);
     expect(
       wrapper
         .get(".text-format-controls")
@@ -109,12 +108,12 @@ describe("HomeCellFormatGroup layout", () => {
     [
       "en-US",
       "Cell tools",
-      ["Text formatting", "Cell appearance", "Style rules"],
+      ["Text formatting", "Cell appearance"],
       "Bold",
       "Text color",
       "Fill color",
     ],
-    ["zh-CN", "单元格工具", ["文字格式", "单元格外观", "样式规则"], "加粗", "文字颜色", "填充颜色"],
+    ["zh-CN", "单元格工具", ["文字格式", "单元格外观"], "加粗", "文字颜色", "填充颜色"],
   ] as const)(
     "localizes the %s group and formatting controls",
     (locale, group, lanes, bold, text, fill) => {

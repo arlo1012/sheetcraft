@@ -50,7 +50,7 @@ describe("SpreadsheetRibbon", () => {
         .get('[data-ribbon-group="cell"]')
         .findAll(":scope > [data-cell-format-lane]")
         .map((lane) => lane.attributes("data-cell-format-lane")),
-    ).toEqual(["typography", "appearance", "styles"]);
+    ).toEqual(["typography", "appearance"]);
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-row="2"]')).toBeTruthy();
     expect(wrapper.get("[data-locale-select] input").element).toBeInstanceOf(HTMLInputElement);
 

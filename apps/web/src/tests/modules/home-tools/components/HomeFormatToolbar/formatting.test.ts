@@ -325,12 +325,13 @@ describe("HomeFormatToolbar", () => {
       "cell",
       "alignment",
       "number",
+      "styles",
       "data",
       "insert",
       "automation",
       "utility",
     ]);
-    for (const groupName of ["history", "alignment", "number"]) {
+    for (const groupName of ["history", "alignment", "number", "styles"]) {
       const group = wrapper.get(`[data-ribbon-group="${groupName}"]`);
       expect(
         group.findAll(":scope > [data-ribbon-row]").map((row) => row.attributes("data-ribbon-row")),
@@ -342,7 +343,7 @@ describe("HomeFormatToolbar", () => {
       cellGroup
         .findAll(":scope > [data-cell-format-lane]")
         .map((lane) => lane.attributes("data-cell-format-lane")),
-    ).toEqual(["typography", "appearance", "styles"]);
+    ).toEqual(["typography", "appearance"]);
 
     const tallActions = {
       data: ["filter", "protect"],
