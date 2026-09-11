@@ -78,7 +78,7 @@ function toggleMenu(): void {
       @click="toggleMenu"
       @keydown="emit('menuKeydown', $event)"
     >
-      <RibbonDropdownArrow />
+      <RibbonDropdownArrow :expanded="expanded" />
     </button>
   </div>
 </template>

@@ -153,7 +153,7 @@ watch(
         <span class="home-number-group__format-label" aria-hidden="true">
           {{ state.numberFormat.mixed ? t("format.mixed") : currentFormatLabel }}
         </span>
-        <RibbonDropdownArrow />
+        <RibbonDropdownArrow :expanded="open" />
       </button>
     </div>
     <div class="home-number-group__row" data-ribbon-row="2">

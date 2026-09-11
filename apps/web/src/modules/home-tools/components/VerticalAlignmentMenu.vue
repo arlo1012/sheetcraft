@@ -183,7 +183,7 @@ watch(
       />
       <AlignVerticalJustifyCenter v-else :size="17" :stroke-width="2" />
     </span>
-    <RibbonDropdownArrow class="vertical-alignment-menu__disclosure" />
+    <RibbonDropdownArrow class="vertical-alignment-menu__disclosure" :expanded="open" />
   </button>
 
   <Teleport to="body">

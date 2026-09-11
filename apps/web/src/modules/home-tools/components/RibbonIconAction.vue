@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, useAttrs } from "vue";
 import RibbonDropdownArrow from "./RibbonDropdownArrow.vue";
 
 const props = withDefaults(
@@ -24,6 +24,7 @@ const emit = defineEmits<{
   activate: [];
 }>();
 const rootElement = ref<HTMLButtonElement | null>(null);
+const attrs = useAttrs();
 
 defineExpose({ rootElement });
 
@@ -56,7 +57,11 @@ function activate(): void {
       <slot />
     </span>
     <span v-if="text" class="ribbon-icon-action__text" aria-hidden="true">{{ text }}</span>
-    <RibbonDropdownArrow v-if="disclosure" class="ribbon-icon-action__disclosure" />
+    <RibbonDropdownArrow
+      v-if="disclosure"
+      class="ribbon-icon-action__disclosure"
+      :expanded="attrs['aria-expanded'] === true || attrs['aria-expanded'] === 'true'"
+    />
   </button>
 </template>
 

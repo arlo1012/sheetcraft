@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import {
   DEFAULT_CELL_FONT_FAMILY,
   DEFAULT_CELL_FONT_SIZE,
@@ -36,6 +36,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
+const fontFamilyPopupVisible = ref(false);
+const fontSizePopupVisible = ref(false);
 const fontFamilyOptions = computed(() =>
   CELL_FONT_FAMILY_PRESETS.map((family) => ({
     label: family === DEFAULT_CELL_FONT_FAMILY ? t("format.defaultFont") : family,
@@ -113,8 +115,11 @@ function setFontSize(value: SelectValue): void {
         :placeholder="state.fontFamily.mixed ? t('format.mixed') : undefined"
         :disabled="disabled"
         @change="setFontFamily"
+        @popup-visible-change="fontFamilyPopupVisible = $event"
       >
-        <template #suffixIcon><RibbonDropdownArrow /></template>
+        <template #suffixIcon>
+          <RibbonDropdownArrow :expanded="fontFamilyPopupVisible" />
+        </template>
       </TSelect>
     </label>
     <label
@@ -132,8 +137,9 @@ function setFontSize(value: SelectValue): void {
         :placeholder="state.fontSize.mixed ? t('format.mixed') : undefined"
         :disabled="disabled"
         @change="setFontSize"
+        @popup-visible-change="fontSizePopupVisible = $event"
       >
-        <template #suffixIcon><RibbonDropdownArrow /></template>
+        <template #suffixIcon><RibbonDropdownArrow :expanded="fontSizePopupVisible" /></template>
       </TSelect>
     </label>
   </div>
