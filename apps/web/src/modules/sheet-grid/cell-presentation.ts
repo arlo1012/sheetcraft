@@ -13,6 +13,7 @@ import {
   getCellTextRenderFontSize,
   getCellTextTypographyStyle,
 } from "../../shared/cell-text/font-presentation";
+import { getCellFillStyle } from "../../shared/cell-fill/fill-presentation";
 
 const ALIGNMENT_JUSTIFICATION = {
   left: "flex-start",
@@ -60,7 +61,7 @@ export function getCellContentStyle(
   return {
     ...getTypographyStyle(style),
     ...multilineStyle,
-    ...(style?.fillColor ? { backgroundColor: style.fillColor } : {}),
+    ...getCellFillStyle(style),
     justifyContent: ALIGNMENT_JUSTIFICATION[alignment],
     alignItems: VERTICAL_ALIGNMENT[style?.verticalAlign ?? "bottom"],
   };
@@ -97,7 +98,7 @@ export function getCellEditorStyle(
 
 export function getCellEditorFrameStyle(style: Readonly<CellStyle> | undefined): CSSProperties {
   return {
-    ...(style?.fillColor ? { backgroundColor: style.fillColor } : {}),
+    ...getCellFillStyle(style),
     alignItems: VERTICAL_ALIGNMENT[style?.verticalAlign ?? "bottom"],
   };
 }

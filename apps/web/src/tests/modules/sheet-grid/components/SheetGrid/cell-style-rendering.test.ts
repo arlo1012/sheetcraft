@@ -5,6 +5,40 @@ import { setCellStyle, setCellValue } from "@idea10/core/workbook";
 import { mountSheetGrid } from "./fixture";
 
 describe("SheetGrid cell style rendering", () => {
+  test("renders patterned and gradient cell fills", async () => {
+    const { sheet, wrapper } = mountSheetGrid();
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        fillColor: "#fef3c7",
+        fillPattern: "darkTrellis",
+        fillPatternColor: "#b91c1c",
+      },
+    );
+    setCellStyle(
+      sheet,
+      { row: 0, column: 1 },
+      {
+        fillGradient: {
+          type: "linear",
+          angle: 0,
+          stops: [
+            { position: 0, color: "#ffffff" },
+            { position: 1, color: "#4472c4" },
+          ],
+        },
+      },
+    );
+    await nextTick();
+
+    const pattern = wrapper.get<HTMLElement>('[data-row="0"][data-column="0"]').element.style;
+    const gradient = wrapper.get<HTMLElement>('[data-row="0"][data-column="1"]').element.style;
+    expect(pattern.backgroundColor).toBe("#fef3c7");
+    expect(pattern.backgroundImage).toContain("data:image/svg+xml");
+    expect(gradient.backgroundImage).toBe("linear-gradient(90deg, #ffffff 0%, #4472c4 100%)");
+  });
+
   test("renders sparse cell formatting on visible values and empty cells", async () => {
     const { sheet, wrapper } = mountSheetGrid();
     setCellStyle(

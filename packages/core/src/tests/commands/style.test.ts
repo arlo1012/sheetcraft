@@ -69,6 +69,36 @@ describe("cell style commands", () => {
     expect(getCellStyle(sheet, { row: 0, column: 2 })?.verticalAlign).toBe("top");
   });
 
+  test("restores a gradient fill through undo and redo", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const gradient = {
+      type: "linear" as const,
+      angle: 90,
+      stops: [
+        { position: 0, color: "#112233" },
+        { position: 1, color: "#abcdef" },
+      ],
+    };
+    setCellStyle(sheet, { row: 0, column: 0 }, { fillColor: "#fde68a" });
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createApplyCellStyleCommand(
+          sheet.id,
+          { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+          { fillGradient: gradient },
+        ),
+      ),
+    ).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({ fillGradient: gradient });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({ fillColor: "#fde68a" });
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({ fillGradient: gradient });
+  });
+
   test("clears values without clearing styles", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);

@@ -13,6 +13,7 @@ import {
   normalizeCellNumberFormat,
   normalizeCellStyle,
   normalizeCellStylePatch,
+  mergeCellStyle,
 } from "../../style.js";
 import {
   getActiveSheet,
@@ -229,6 +230,101 @@ describe("cell style model", () => {
     }
     expect(original.borderTop.color).toBe("#112233");
     expect(areCellStylesEqual(original, clone)).toBe(false);
+  });
+
+  test("normalizes, deep clones, and compares pattern and gradient fills", () => {
+    const gradient = {
+      type: "linear" as const,
+      angle: -90,
+      stops: [
+        { position: 1, color: "#FFFFFF" },
+        { position: 0, color: "#123456" },
+      ],
+    };
+    const normalized = normalizeCellStyle({
+      fillColor: "#ffffff",
+      fillPattern: "lightTrellis",
+      fillPatternColor: "#112233",
+    });
+    expect(normalized).toEqual({
+      fillColor: "#ffffff",
+      fillPattern: "lightTrellis",
+      fillPatternColor: "#112233",
+    });
+    expect(normalizeCellStyle({ fillColor: "#ffffff", fillGradient: gradient })).toEqual({
+      fillGradient: {
+        type: "linear",
+        angle: 270,
+        stops: [
+          { position: 0, color: "#123456" },
+          { position: 1, color: "#ffffff" },
+        ],
+      },
+    });
+    const clone = cloneCellStyle({ fillGradient: gradient });
+    expect(clone?.fillGradient).not.toBe(gradient);
+    expect(clone?.fillGradient?.stops).not.toBe(gradient.stops);
+    expect(areCellStylesEqual({ fillGradient: gradient }, clone)).toBe(true);
+    expect(() =>
+      normalizeCellStyle({
+        fillGradient: {
+          type: "path",
+          left: 0,
+          right: 1.1,
+          top: 0,
+          bottom: 1,
+          stops: [
+            { position: 0, color: "#000000" },
+            { position: 1, color: "#ffffff" },
+          ],
+        },
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      normalizeCellStyle({
+        fillGradient: {
+          type: "linear",
+          angle: 0,
+          stops: [
+            { position: 0, color: "#000000" },
+            { position: 0, color: "#ffffff" },
+          ],
+        },
+      }),
+    ).toThrow(RangeError);
+  });
+
+  test("applies fill patch precedence without retaining incompatible fields", () => {
+    const gradient = {
+      type: "linear" as const,
+      angle: 0,
+      stops: [
+        { position: 0, color: "#000000" },
+        { position: 1, color: "#ffffff" },
+      ],
+    };
+    expect(
+      mergeCellStyle(
+        { fillGradient: gradient },
+        { fillColor: "#abcdef", fillPattern: "darkGrid", fillPatternColor: "#123456" },
+      ),
+    ).toEqual({
+      fillColor: "#abcdef",
+      fillPattern: "darkGrid",
+      fillPatternColor: "#123456",
+    });
+    expect(
+      mergeCellStyle(
+        { fillColor: "#abcdef", fillPattern: "darkGrid", fillPatternColor: "#123456" },
+        { fillColor: null },
+      ),
+    ).toBeUndefined();
+    expect(
+      mergeCellStyle(
+        { fillColor: "#abcdef" },
+        { fillColor: null, fillPattern: "darkGrid", fillPatternColor: "#123456" },
+      ),
+    ).toEqual({ fillPattern: "darkGrid", fillPatternColor: "#123456" });
   });
 
   test("normalizes border actions with default and clear semantics", () => {

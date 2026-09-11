@@ -17,9 +17,11 @@ import {
   type Workbook,
 } from "@idea10/core/workbook";
 import {
+  CELL_FILL_PATTERNS,
   DEFAULT_CELL_FONT_SIZE,
   MAX_CELL_FONT_SIZE,
   MIN_CELL_FONT_SIZE,
+  type CellFillGradient,
   type CellStyle,
 } from "@idea10/core/style";
 import {
@@ -98,6 +100,7 @@ type BrowserWorkbook = XlsxImageWorkbook & {
 };
 type BrowserExcelJs = { Workbook: new () => BrowserWorkbook };
 const ExcelJS = ExcelJSImport as BrowserExcelJs;
+const EXCEL_FILL_PATTERNS = new Set<string>(CELL_FILL_PATTERNS);
 
 function columnLabel(column: number): string {
   let value = column + 1;
@@ -177,6 +180,57 @@ function readStyle(
       ? `#${argb.slice(2).toLowerCase()}`
       : undefined;
   };
+  const patternFill = fill?.type === "pattern" ? fill : undefined;
+  const fillPattern =
+    typeof patternFill?.pattern === "string" && EXCEL_FILL_PATTERNS.has(patternFill.pattern)
+      ? (patternFill.pattern as NonNullable<CellStyle["fillPattern"]>)
+      : undefined;
+  const gradientStops = (value: unknown): CellFillGradient["stops"] | undefined => {
+    if (!Array.isArray(value) || value.length < 2) return undefined;
+    const stops = value.map((stop) => {
+      const source = stop as Record<string, unknown>;
+      const stopColor = color(source.color);
+      return typeof source.position === "number" &&
+        Number.isFinite(source.position) &&
+        source.position >= 0 &&
+        source.position <= 1 &&
+        stopColor
+        ? { position: source.position, color: stopColor }
+        : undefined;
+    });
+    if (stops.some((stop) => !stop)) return undefined;
+    const sorted = stops as CellFillGradient["stops"];
+    sorted.sort((left, right) => left.position - right.position);
+    return sorted[0]?.position === 0 &&
+      sorted.at(-1)?.position === 1 &&
+      sorted.every((stop, index) => index === 0 || sorted[index - 1]!.position < stop.position)
+      ? sorted
+      : undefined;
+  };
+  const fillGradient = (): CellFillGradient | undefined => {
+    if (fill?.type !== "gradient") return undefined;
+    const stops = gradientStops(fill.stops);
+    if (!stops) return undefined;
+    if (
+      fill.gradient === "angle" &&
+      typeof fill.degree === "number" &&
+      Number.isFinite(fill.degree)
+    )
+      return { type: "linear", angle: fill.degree, stops };
+    if (fill.gradient !== "path") return undefined;
+    const center = fill.center as Record<string, unknown> | undefined;
+    const coordinate = (key: "left" | "right" | "top" | "bottom", fallback: number) => {
+      const value = center?.[key];
+      return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1
+        ? value
+        : fallback;
+    };
+    const left = coordinate("left", 0);
+    const top = coordinate("top", 0);
+    const right = coordinate("right", left);
+    const bottom = coordinate("bottom", top);
+    return { type: "path", left, right, top, bottom, stops };
+  };
   const result: CellStyle = {};
   const fontName =
     typeof font?.name === "string" && font.name.length >= 1 && font.name.length <= 80
@@ -208,6 +262,15 @@ function readStyle(
   if (fill?.type === "pattern" && fill.pattern === "solid") {
     const fillColor = color(fill.fgColor);
     if (fillColor) result.fillColor = fillColor;
+  } else if (fillPattern) {
+    result.fillPattern = fillPattern;
+    const fillColor = color(patternFill?.bgColor);
+    const patternColor = color(patternFill?.fgColor);
+    if (fillColor) result.fillColor = fillColor;
+    if (patternColor) result.fillPatternColor = patternColor;
+  } else {
+    const gradient = fillGradient();
+    if (gradient) result.fillGradient = gradient;
   }
   if (
     alignment?.horizontal === "left" ||
@@ -282,12 +345,17 @@ function readStyle(
   if (diagonal && diagonalDown) result.borderDiagonalDown = diagonal;
   if ((diagonalUp || diagonalDown) && !diagonal) hasUnsupportedBorder = true;
   const hasSupportedNoopFill = fill?.type === "pattern" && fill.pattern === "none";
-  const hasUnsupportedFill =
-    fill !== undefined &&
-    !(
-      hasSupportedNoopFill ||
-      (fill.type === "pattern" && fill.pattern === "solid" && color(fill.fgColor))
+  const hasUnmappablePatternColor =
+    fillPattern !== undefined &&
+    [patternFill?.fgColor, patternFill?.bgColor].some(
+      (patternColor) => patternColor !== undefined && color(patternColor) === undefined,
     );
+  const hasSupportedFill =
+    hasSupportedNoopFill ||
+    (fill?.type === "pattern" && fill.pattern === "solid" && color(fill.fgColor) !== undefined) ||
+    fillPattern !== undefined ||
+    fillGradient() !== undefined;
+  const hasUnsupportedFill = fill !== undefined && (!hasSupportedFill || hasUnmappablePatternColor);
   const hasUnsupportedFont =
     (font !== undefined &&
       ["outline", "shadow", "condense", "extend"].some((key) => font[key] !== undefined)) ||
@@ -536,7 +604,44 @@ function writeStyle(
   if (style.textColor) font.color = { argb: `FF${style.textColor.slice(1).toUpperCase()}` };
   const next: Record<string, unknown> = {};
   if (Object.keys(font).length) next.font = font;
-  if (style.fillColor)
+  if (style.fillGradient) {
+    next.fill =
+      style.fillGradient.type === "linear"
+        ? {
+            type: "gradient",
+            gradient: "angle",
+            degree: style.fillGradient.angle,
+            stops: style.fillGradient.stops.map((stop) => ({
+              position: stop.position,
+              color: { argb: `FF${stop.color.slice(1).toUpperCase()}` },
+            })),
+          }
+        : {
+            type: "gradient",
+            gradient: "path",
+            center: {
+              left: style.fillGradient.left,
+              right: style.fillGradient.right,
+              top: style.fillGradient.top,
+              bottom: style.fillGradient.bottom,
+            },
+            stops: style.fillGradient.stops.map((stop) => ({
+              position: stop.position,
+              color: { argb: `FF${stop.color.slice(1).toUpperCase()}` },
+            })),
+          };
+  } else if (style.fillPattern) {
+    next.fill = {
+      type: "pattern",
+      pattern: style.fillPattern,
+      ...(style.fillPatternColor
+        ? { fgColor: { argb: `FF${style.fillPatternColor.slice(1).toUpperCase()}` } }
+        : {}),
+      ...(style.fillColor
+        ? { bgColor: { argb: `FF${style.fillColor.slice(1).toUpperCase()}` } }
+        : {}),
+    };
+  } else if (style.fillColor)
     next.fill = {
       type: "pattern",
       pattern: "solid",

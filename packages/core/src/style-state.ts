@@ -5,9 +5,13 @@ import {
   DEFAULT_CELL_TEXT_ROTATION,
   DEFAULT_CELL_VERTICAL_ALIGNMENT,
   MAX_CELL_STYLE_PATCH_CELLS,
+  areCellFillGradientsEqual,
   areCellNumberFormatsEqual,
+  cloneCellFillGradient,
   cloneCellNumberFormat,
   type CellFontScript,
+  type CellFillGradient,
+  type CellFillPatternStyle,
   type CellNumberFormat,
   type CellTextDirection,
   type CellTextRotation,
@@ -38,6 +42,9 @@ export type SelectionCellStyleState = {
   fontScript: StyleValueState<CellFontScript>;
   textColor: StyleValueState<string>;
   fillColor: StyleValueState<string>;
+  fillPattern: StyleValueState<CellFillPatternStyle>;
+  fillPatternColor: StyleValueState<string>;
+  fillGradient: StyleValueState<CellFillGradient>;
   horizontalAlign: StyleValueState<HorizontalCellAlignment>;
   verticalAlign: StyleValueState<VerticalCellAlignment>;
   indent: StyleValueState<number>;
@@ -134,6 +141,9 @@ export function createDefaultSelectionCellStyleState(): SelectionCellStyleState 
     fontScript: { value: undefined, mixed: false },
     textColor: { value: undefined, mixed: false },
     fillColor: { value: undefined, mixed: false },
+    fillPattern: { value: undefined, mixed: false },
+    fillPatternColor: { value: undefined, mixed: false },
+    fillGradient: { value: undefined, mixed: false },
     horizontalAlign: { value: DEFAULT_CELL_HORIZONTAL_ALIGNMENT, mixed: false },
     verticalAlign: { value: DEFAULT_CELL_VERTICAL_ALIGNMENT, mixed: false },
     indent: { value: DEFAULT_CELL_INDENT, mixed: false },
@@ -172,6 +182,9 @@ export function getSelectionCellStyleState(
   const fontScript = createAccumulator<CellFontScript>();
   const textColor = createAccumulator<string>();
   const fillColor = createAccumulator<string>();
+  const fillPattern = createAccumulator<CellFillPatternStyle>();
+  const fillPatternColor = createAccumulator<string>();
+  const fillGradient = createAccumulator<CellFillGradient>();
   const horizontalAlign = createAccumulator<HorizontalCellAlignment>();
   const verticalAlign = createAccumulator<VerticalCellAlignment>();
   const indent = createAccumulator<number>();
@@ -193,6 +206,9 @@ export function getSelectionCellStyleState(
     addValue(fontScript, style?.fontScript);
     addValue(textColor, style?.textColor);
     addValue(fillColor, style?.fillColor);
+    addValue(fillPattern, style?.fillPattern);
+    addValue(fillPatternColor, style?.fillPatternColor);
+    addValue(fillGradient, cloneCellFillGradient(style?.fillGradient), areCellFillGradientsEqual);
     addValue(horizontalAlign, style?.horizontalAlign ?? DEFAULT_CELL_HORIZONTAL_ALIGNMENT);
     addValue(verticalAlign, style?.verticalAlign ?? DEFAULT_CELL_VERTICAL_ALIGNMENT);
     addValue(indent, style?.indent ?? DEFAULT_CELL_INDENT);
@@ -241,6 +257,9 @@ export function getSelectionCellStyleState(
     fontScript: toValueState(fontScript),
     textColor: toValueState(textColor),
     fillColor: toValueState(fillColor),
+    fillPattern: toValueState(fillPattern),
+    fillPatternColor: toValueState(fillPatternColor),
+    fillGradient: toValueState(fillGradient),
     horizontalAlign: toValueState(horizontalAlign),
     verticalAlign: toValueState(verticalAlign),
     indent: toValueState(indent),

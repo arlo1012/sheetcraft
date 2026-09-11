@@ -18,6 +18,7 @@ import type { VisibleCell, VisibleCellPaneId } from "./sheet-cell-view";
 import { createCellTextSpanResolver, type CellTextSpan } from "../cell-text-spans";
 import { isCellTextWrapped } from "../../../shared/cell-text/text-presentation";
 import CellTextContent from "../../../shared/cell-text/CellTextContent.vue";
+import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
 
 type VisibleRow = {
   key: string;
@@ -334,7 +335,7 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
   for (const cell of visibleCells.value) {
     const range = props.layout.getMergedRangeAt(cell.address);
     if (!range) continue;
-    const fillColor = getCellStyle(props.sheet, cell.address)?.fillColor;
+    const fillStyle = getCellFillStyle(getCellStyle(props.sheet, cell.address));
     for (const fragment of props.layout.getRangePaneRects(range)) {
       if (fragment.paneId === cell.paneId) continue;
       const clip = props.layout.panes[fragment.paneId].clip;
@@ -347,7 +348,7 @@ const visualMergeFragments = computed<VisualMergeFragment[]>(() => {
           top: `${fragment.rect.y - clip.y}px`,
           width: `${fragment.rect.width}px`,
           height: `${fragment.rect.height}px`,
-          ...(fillColor ? { backgroundColor: fillColor } : {}),
+          ...fillStyle,
         },
       });
     }

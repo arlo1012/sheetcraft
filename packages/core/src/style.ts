@@ -2,6 +2,19 @@ import {
   canonicalizeCellNumberFormatCode,
   validateCellNumberFormatCode,
 } from "./number-format-code.js";
+import {
+  CELL_FILL_PATTERNS,
+  type CellFillGradient,
+  type CellFillGradientStop,
+  type CellFillPatternStyle,
+} from "./cell-fill.js";
+
+export {
+  CELL_FILL_PATTERNS,
+  type CellFillGradient,
+  type CellFillGradientStop,
+  type CellFillPatternStyle,
+} from "./cell-fill.js";
 
 export const MIN_CELL_FONT_SIZE = 8;
 export const MAX_CELL_FONT_SIZE = 72;
@@ -157,6 +170,9 @@ export type CellStyle = {
   fontScript?: CellFontScript;
   textColor?: string;
   fillColor?: string;
+  fillPattern?: CellFillPatternStyle;
+  fillPatternColor?: string;
+  fillGradient?: CellFillGradient;
   horizontalAlign?: HorizontalCellAlignment;
   verticalAlign?: VerticalCellAlignment;
   indent?: number;
@@ -187,6 +203,9 @@ export const CELL_STYLE_KEYS = [
   "fontScript",
   "textColor",
   "fillColor",
+  "fillPattern",
+  "fillPatternColor",
+  "fillGradient",
   "horizontalAlign",
   "verticalAlign",
   "indent",
@@ -231,6 +250,7 @@ const VERTICAL_ALIGNMENTS = new Set<VerticalCellAlignment>([
 ]);
 const TEXT_DIRECTIONS = new Set<CellTextDirection>(["context", "ltr", "rtl"]);
 const BORDER_LINE_STYLES = new Set<CellBorderLineStyle>(CELL_BORDER_LINE_STYLES);
+const FILL_PATTERNS = new Set<CellFillPatternStyle>(CELL_FILL_PATTERNS);
 const BORDER_PRESETS = new Set<CellBorderPreset>([
   "none",
   "all",
@@ -486,6 +506,104 @@ function normalizeColor(value: unknown, field: string): string {
   return value.toLowerCase();
 }
 
+function normalizeFillPattern(value: unknown): CellFillPatternStyle {
+  if (typeof value !== "string" || !FILL_PATTERNS.has(value as CellFillPatternStyle)) {
+    throw new TypeError(`Cell fill pattern must be one of: ${CELL_FILL_PATTERNS.join(", ")}.`);
+  }
+  return value as CellFillPatternStyle;
+}
+
+function normalizeFillGradientStop(value: unknown): CellFillGradientStop {
+  if (!value || typeof value !== "object") {
+    throw new TypeError("Cell fill gradient stops must be objects.");
+  }
+  const stop = value as Partial<CellFillGradientStop>;
+  if (
+    typeof stop.position !== "number" ||
+    !Number.isFinite(stop.position) ||
+    stop.position < 0 ||
+    stop.position > 1
+  ) {
+    throw new RangeError(
+      "Cell fill gradient stop positions must be finite numbers between 0 and 1.",
+    );
+  }
+  return {
+    position: stop.position,
+    color: normalizeColor(stop.color, "Cell fill gradient stop color"),
+  };
+}
+
+function normalizeFillGradientStops(value: unknown): CellFillGradientStop[] {
+  if (!Array.isArray(value) || value.length < 2) {
+    throw new RangeError("Cell fill gradients must contain at least two stops.");
+  }
+  const stops = value
+    .map(normalizeFillGradientStop)
+    .sort((left, right) => left.position - right.position);
+  if (stops[0]?.position !== 0 || stops.at(-1)?.position !== 1) {
+    throw new RangeError("Cell fill gradient stops must begin at 0 and end at 1.");
+  }
+  for (let index = 1; index < stops.length; index += 1) {
+    if (stops[index - 1]!.position >= stops[index]!.position) {
+      throw new RangeError("Cell fill gradient stop positions must be strictly ascending.");
+    }
+  }
+  return stops;
+}
+
+function normalizeGradientCoordinate(value: unknown, name: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new RangeError(
+      `Cell path fill gradient ${name} must be a finite number between 0 and 1.`,
+    );
+  }
+  return value;
+}
+
+export function normalizeCellFillGradient(value: CellFillGradient): CellFillGradient {
+  if (!value || typeof value !== "object") {
+    throw new TypeError("Cell fill gradient must be an object.");
+  }
+  if (value.type === "linear") {
+    if (typeof value.angle !== "number" || !Number.isFinite(value.angle)) {
+      throw new TypeError("Cell linear fill gradient angle must be finite.");
+    }
+    const angle = ((value.angle % 360) + 360) % 360;
+    return { type: "linear", angle, stops: normalizeFillGradientStops(value.stops) };
+  }
+  if (value.type === "path") {
+    return {
+      type: "path",
+      left: normalizeGradientCoordinate(value.left, "left"),
+      right: normalizeGradientCoordinate(value.right, "right"),
+      top: normalizeGradientCoordinate(value.top, "top"),
+      bottom: normalizeGradientCoordinate(value.bottom, "bottom"),
+      stops: normalizeFillGradientStops(value.stops),
+    };
+  }
+  throw new TypeError("Cell fill gradient type must be linear or path.");
+}
+
+export function cloneCellFillGradient(
+  gradient: CellFillGradient | undefined,
+): CellFillGradient | undefined {
+  return gradient ? normalizeCellFillGradient(gradient) : undefined;
+}
+
+export function areCellFillGradientsEqual(
+  left: CellFillGradient | undefined,
+  right: CellFillGradient | undefined,
+): boolean {
+  return (
+    left === right ||
+    (left !== undefined &&
+      right !== undefined &&
+      JSON.stringify(normalizeCellFillGradient(left)) ===
+        JSON.stringify(normalizeCellFillGradient(right)))
+  );
+}
+
 export function normalizeCellBorder(border: CellBorder): CellBorder {
   if (!border || typeof border !== "object") {
     throw new TypeError("Cell border must be an object.");
@@ -630,11 +748,21 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
     }
     return true as CellStyle[Key];
   }
-  if (key === "textColor" || key === "fillColor") {
+  if (key === "textColor" || key === "fillColor" || key === "fillPatternColor") {
     return normalizeColor(
       value,
-      key === "textColor" ? "Cell text color" : "Cell fill color",
+      key === "textColor"
+        ? "Cell text color"
+        : key === "fillColor"
+          ? "Cell fill color"
+          : "Cell fill pattern color",
     ) as CellStyle[Key];
+  }
+  if (key === "fillPattern") {
+    return normalizeFillPattern(value) as CellStyle[Key];
+  }
+  if (key === "fillGradient") {
+    return normalizeCellFillGradient(value as CellFillGradient) as CellStyle[Key];
   }
   if (key === "numberFormat") {
     return normalizeCellNumberFormat(value as CellNumberFormat) as CellStyle[Key];
@@ -681,6 +809,7 @@ export function normalizeCellStyle(style: CellStyle | null | undefined): CellSty
       Object.assign(normalized, { [key]: value });
     }
   }
+  normalizeCellFillFields(normalized);
   return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
 
@@ -713,7 +842,52 @@ export function mergeCellStyle(
       Object.assign(merged, { [key]: value });
     }
   }
+  mergeCellFillFields(merged, normalizedPatch);
   return normalizeCellStyle(merged);
+}
+
+/** Stores only a coherent fill representation. Gradients exclude solid and pattern fills. */
+function normalizeCellFillFields(style: CellStyle): void {
+  if (style.fillGradient) {
+    delete style.fillColor;
+    delete style.fillPattern;
+    delete style.fillPatternColor;
+    return;
+  }
+  if (!style.fillPattern) {
+    delete style.fillPatternColor;
+  }
+}
+
+/** Applies the user-visible precedence rules that require knowledge of a style patch. */
+function mergeCellFillFields(style: CellStyle, patch: CellStylePatch): void {
+  const gradient = patch.fillGradient;
+  const pattern = patch.fillPattern;
+  const fillColor = patch.fillColor;
+
+  if (gradient) {
+    delete style.fillColor;
+    delete style.fillPattern;
+    delete style.fillPatternColor;
+    return;
+  }
+  if (pattern) {
+    delete style.fillGradient;
+  }
+  if (fillColor) {
+    delete style.fillGradient;
+  }
+  if (fillColor === null && !gradient && !pattern) {
+    delete style.fillColor;
+    delete style.fillPattern;
+    delete style.fillPatternColor;
+    delete style.fillGradient;
+    return;
+  }
+  if (pattern === null) {
+    delete style.fillPatternColor;
+  }
+  normalizeCellFillFields(style);
 }
 
 export function cloneCellStyle(style: CellStyle | undefined): CellStyle | undefined {
@@ -750,6 +924,12 @@ export function areCellStylesEqual(
       return areCellNumberFormatsEqual(
         leftValue as CellNumberFormat | undefined,
         rightValue as CellNumberFormat | undefined,
+      );
+    }
+    if (key === "fillGradient") {
+      return areCellFillGradientsEqual(
+        leftValue as CellFillGradient | undefined,
+        rightValue as CellFillGradient | undefined,
       );
     }
     return Object.is(leftValue, rightValue);

@@ -91,6 +91,35 @@ describe("selection cell style state", () => {
     expect(withBlank.numberFormat.mixed).toBe(true);
   });
 
+  test("reports structural pattern and gradient fill selection state", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    const gradient = {
+      type: "path" as const,
+      left: 0.5,
+      right: 0.5,
+      top: 0.5,
+      bottom: 0.5,
+      stops: [
+        { position: 0, color: "#112233" },
+        { position: 1, color: "#abcdef" },
+      ],
+    };
+    setCellStyle(sheet, { row: 0, column: 0 }, { fillGradient: gradient });
+    setCellStyle(sheet, { row: 0, column: 1 }, { fillGradient: structuredClone(gradient) });
+    const uniform = getSelectionCellStyleState(sheet, {
+      start: { row: 0, column: 0 },
+      end: { row: 0, column: 1 },
+    });
+    expect(uniform.fillGradient).toEqual({ value: gradient, mixed: false });
+    setCellStyle(sheet, { row: 0, column: 1 }, { fillPattern: "darkGrid" });
+    const mixed = getSelectionCellStyleState(sheet, {
+      start: { row: 0, column: 0 },
+      end: { row: 0, column: 1 },
+    });
+    expect(mixed.fillGradient.mixed).toBe(true);
+    expect(mixed.fillPattern).toEqual({ value: undefined, mixed: true });
+  });
+
   test("queries a small selection directly when the sheet contains many other cells", () => {
     const sheet = getActiveSheet(createTestWorkbook());
     setCellStyle(sheet, { row: 1, column: 1 }, { bold: true });
