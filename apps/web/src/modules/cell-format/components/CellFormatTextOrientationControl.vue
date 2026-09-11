@@ -144,7 +144,7 @@ function endDialDrag(event: PointerEvent): void {
   min-width: 0;
   margin: 0;
   padding: 8px;
-  border: 1px solid var(--idea-border-control);
+  border: 0;
 
   > legend {
     padding: 0 4px;
