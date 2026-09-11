@@ -85,8 +85,12 @@ export type MessageSchema = {
     borders: string;
     moreOptions: string;
     wrapText: string;
+    wrap: string;
+    merge: string;
     mergeCells: string;
     unmergeCells: string;
+    decreaseIndent: string;
+    increaseIndent: string;
     numberFormat: string;
     generalFormat: string;
     percentFormat: string;

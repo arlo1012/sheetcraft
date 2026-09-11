@@ -4,6 +4,7 @@ import {
   createApplyCellBordersCommand,
   createApplyCellFormatCommand,
   createApplyCellStyleCommand,
+  createAdjustCellIndentCommand,
   createAdjustCellNumberFormatDecimalsCommand,
   createClearCellRangeCommand,
   createMergeCellsCommand,
@@ -192,6 +193,58 @@ describe("cell style commands", () => {
       ),
     ).toBe(false);
     expect(session.history.undoStack).toHaveLength(0);
+  });
+
+  test("adjusts mixed indents per cell and restores them exactly", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const range = { start: { row: 0, column: 0 }, end: { row: 0, column: 2 } };
+    setCellStyle(sheet, { row: 0, column: 0 }, { indent: 2, bold: true });
+    setCellStyle(sheet, { row: 0, column: 1 }, { indent: 249, italic: true });
+
+    expect(executeWorkbookCommand(session, createAdjustCellIndentCommand(sheet.id, range, 1))).toBe(
+      true,
+    );
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({ indent: 3, bold: true });
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toEqual({ indent: 250, italic: true });
+    expect(getCellStyle(sheet, { row: 0, column: 2 })).toEqual({ indent: 1 });
+    expect(session.history.undoStack).toHaveLength(1);
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({ indent: 2, bold: true });
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toEqual({ indent: 249, italic: true });
+    expect(getCellStyle(sheet, { row: 0, column: 2 })).toBeUndefined();
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toEqual({ indent: 250, italic: true });
+  });
+
+  test("clamps indents, respects merged anchors, and rejects protected sheets", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const single = { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } };
+
+    expect(
+      executeWorkbookCommand(session, createAdjustCellIndentCommand(sheet.id, single, -1)),
+    ).toBe(false);
+    setCellStyle(sheet, single.start, { indent: 250 });
+    expect(
+      executeWorkbookCommand(session, createAdjustCellIndentCommand(sheet.id, single, 1)),
+    ).toBe(false);
+    expect(session.history.undoStack).toHaveLength(0);
+
+    const merged = { start: { row: 2, column: 2 }, end: { row: 3, column: 3 } };
+    expect(executeWorkbookCommand(session, createMergeCellsCommand(sheet.id, merged))).toBe(true);
+    setCellStyle(sheet, merged.start, { indent: 4 });
+    expect(
+      executeWorkbookCommand(session, createAdjustCellIndentCommand(sheet.id, merged, 1)),
+    ).toBe(true);
+    expect(getCellStyle(sheet, merged.start)?.indent).toBe(5);
+    expect(getCellStyle(sheet, { row: 3, column: 3 })).toBeUndefined();
+
+    sheet.properties.protected = true;
+    expect(() =>
+      executeWorkbookCommand(session, createAdjustCellIndentCommand(sheet.id, single, -1)),
+    ).toThrow(WorkbookDomainError);
   });
 
   test("toggles wrapping as one reversible range style action", () => {

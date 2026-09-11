@@ -37,6 +37,7 @@ const emit = defineEmits<{
   updateBorderFormat: [patch: CellBorderFormatPatch];
   openCellFormat: [tab: CellFormatTab];
   adjustDecimals: [delta: -1 | 1];
+  adjustIndent: [delta: -1 | 1];
   activateFormatPainter: [];
   autoSum: [];
   sort: [direction: "ascending" | "descending"];
@@ -276,6 +277,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           :disabled="disabled"
           :merge-state="mergeState"
           @apply-style="emit('applyStyle', $event)"
+          @adjust-indent="emit('adjustIndent', $event)"
           @merge="emit('merge')"
           @unmerge="emit('unmerge')"
           @open-cell-format="emit('openCellFormat', 'alignment')"

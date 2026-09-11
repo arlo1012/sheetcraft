@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ALargeSmall, TextWrap } from "lucide-vue-next";
+import { TextWrap } from "lucide-vue-next";
 import type { CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState, ToggleStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import type { MergeCellsState } from "./data-tool-state";
 import HorizontalAlignmentControls from "./HorizontalAlignmentControls.vue";
+import IndentationControls from "./IndentationControls.vue";
 import MergeCellsMenu from "./MergeCellsMenu.vue";
 import RibbonDialogLauncher from "./RibbonDialogLauncher.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
-import VerticalAlignmentMenu from "./VerticalAlignmentMenu.vue";
+import VerticalAlignmentControls from "./VerticalAlignmentControls.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -18,6 +19,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
+  adjustIndent: [delta: -1 | 1];
   merge: [];
   unmerge: [];
   openCellFormat: [];
@@ -44,29 +46,16 @@ function toggleWrapText(state: ToggleStyleState): void {
     :title="disabled ? t('format.selectionTooLarge') : undefined"
   >
     <div class="home-alignment-group__row" data-ribbon-row="1">
-      <VerticalAlignmentMenu
+      <VerticalAlignmentControls
         :state="state.verticalAlign"
         :disabled="disabled"
         @apply-style="emit('applyStyle', $event)"
       />
-      <RibbonIconAction
-        :label="t('app.unavailableFeature', { feature: t('ribbon.textOrientation') })"
-        disabled
-        disclosure
-        data-ribbon-placeholder="text-orientation"
-      >
-        <ALargeSmall class="home-alignment-group__orientation-icon" :size="15" aria-hidden="true" />
-      </RibbonIconAction>
-      <RibbonIconAction
-        :label="t('ribbon.wrapText')"
-        :text="t('ribbon.wrapText')"
+      <IndentationControls
+        :state="state.indent"
         :disabled="disabled"
-        :pressed="ariaPressed(state.wrapText)"
-        data-ribbon-action="wrap-text"
-        @activate="toggleWrapText(state.wrapText)"
-      >
-        <TextWrap :size="15" aria-hidden="true" />
-      </RibbonIconAction>
+        @adjust-indent="emit('adjustIndent', $event)"
+      />
     </div>
     <div class="home-alignment-group__row" data-ribbon-row="2">
       <HorizontalAlignmentControls
@@ -74,13 +63,26 @@ function toggleWrapText(state: ToggleStyleState): void {
         :disabled="disabled"
         @apply-style="emit('applyStyle', $event)"
       />
-      <MergeCellsMenu
-        :state="props.mergeState"
-        :disabled="disabled"
-        @merge="emit('merge')"
-        @unmerge="emit('unmerge')"
-      />
     </div>
+    <RibbonIconAction
+      class="home-alignment-group__wrap"
+      :label="t('ribbon.wrapText')"
+      :text="t('ribbon.wrap')"
+      variant="tall"
+      :disabled="disabled"
+      :pressed="ariaPressed(state.wrapText)"
+      data-ribbon-action="wrap-text"
+      @activate="toggleWrapText(state.wrapText)"
+    >
+      <TextWrap :size="24" :stroke-width="1.5" aria-hidden="true" />
+    </RibbonIconAction>
+    <MergeCellsMenu
+      class="home-alignment-group__merge"
+      :state="props.mergeState"
+      :disabled="disabled"
+      @merge="emit('merge')"
+      @unmerge="emit('unmerge')"
+    />
     <RibbonDialogLauncher
       :label="`${t('cellFormat.title')} · ${t('cellFormat.alignment')}`"
       :disabled="disabled"
@@ -94,15 +96,28 @@ function toggleWrapText(state: ToggleStyleState): void {
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-alignment-group {
-  @include ribbon.compact;
+  @include ribbon.mixed(max-content max-content max-content);
   @include ribbon.dialog-launcher-anchor;
+
+  --ribbon-tall-action-min-width: 40px;
+
+  column-gap: 4px;
 
   &__row {
     @include ribbon.row;
+
+    grid-column: 1;
+    gap: 0;
   }
 
-  &__orientation-icon {
-    transform: rotate(-18deg);
+  &__wrap {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  &__merge {
+    grid-column: 3;
+    grid-row: 1 / span 2;
   }
 }
 </style>

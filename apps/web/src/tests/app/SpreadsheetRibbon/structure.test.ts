@@ -95,9 +95,7 @@ describe("SpreadsheetRibbon", () => {
 
     expect(wrapper.emitted("undo")).toHaveLength(1);
     expect(wrapper.emitted("redo")).toHaveLength(1);
-    expect(wrapper.get("[data-vertical-alignment-trigger]").attributes("aria-haspopup")).toBe(
-      "menu",
-    );
+    expect(wrapper.findAll("[data-vertical-alignment-action]")).toHaveLength(3);
     const clearFormatting = wrapper.get('[data-ribbon-action="clear-formatting"]');
     expect(clearFormatting.element).toBeInstanceOf(HTMLButtonElement);
     expect(clearFormatting.attributes("type")).toBe("button");
@@ -105,7 +103,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
       "false",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(14);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(13);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({

@@ -12,6 +12,7 @@ const props = withDefaults(
     expanded?: boolean;
     menuId?: string;
     popupRole?: "menu" | "dialog";
+    variant?: "compact" | "tall";
   }>(),
   {
     text: undefined,
@@ -20,6 +21,7 @@ const props = withDefaults(
     expanded: false,
     menuId: undefined,
     popupRole: "menu",
+    variant: "compact",
   },
 );
 const emit = defineEmits<{
@@ -49,6 +51,7 @@ function toggleMenu(): void {
       'has-text': text,
       'is-expanded': expanded,
       'is-disabled': disabled && menuDisabled,
+      'is-tall': variant === 'tall',
     }"
   >
     <button
@@ -113,6 +116,24 @@ function toggleMenu(): void {
   &.has-text {
     width: max-content;
     min-width: 40px;
+  }
+
+  &.is-tall {
+    align-self: stretch;
+    width: max-content;
+    min-width: var(--ribbon-tall-action-min-width, 58px);
+    height: 54px;
+
+    .ribbon-split-action__main {
+      flex-direction: column;
+      gap: 3px;
+      padding: 1px 2px;
+    }
+
+    .ribbon-split-action__menu {
+      align-items: flex-end;
+      padding-bottom: 5px;
+    }
   }
 
   &__main,

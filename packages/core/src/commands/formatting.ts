@@ -1,6 +1,8 @@
 import {
   MAX_CELL_STYLE_PATCH_CELLS,
+  MAX_CELL_INDENT,
   MAX_NUMBER_FORMAT_FRACTION_DIGITS,
+  MIN_CELL_INDENT,
   MIN_NUMBER_FORMAT_FRACTION_DIGITS,
   cloneCellStyle,
   normalizeCellBorderFormatPatch,
@@ -36,6 +38,7 @@ import {
 import type {
   ApplyCellBordersCommand,
   ApplyCellFormatCommand,
+  AdjustCellIndentCommand,
   AdjustCellNumberFormatDecimalsCommand,
   ApplyCellStyleCommand,
   CellFormatChange,
@@ -159,6 +162,20 @@ export function createAdjustCellNumberFormatDecimalsCommand(
     throw invalidCommandPayload("delta", delta, "Number format decimal delta must be -1 or 1.");
   }
   return { type: "adjustCellNumberFormatDecimals", sheetId, range: normalizedRange, delta };
+}
+
+export function createAdjustCellIndentCommand(
+  sheetId: string,
+  range: CellRange,
+  delta: -1 | 1,
+): AdjustCellIndentCommand {
+  const normalizedRange = normalizeRange(range);
+  assertCellRange(normalizedRange);
+  assertSupportedRange(normalizedRange);
+  if (delta !== -1 && delta !== 1) {
+    throw invalidCommandPayload("delta", delta, "Cell indent delta must be -1 or 1.");
+  }
+  return { type: "adjustCellIndent", sheetId, range: normalizedRange, delta };
 }
 
 export function createRestoreCellStylesCommand(
@@ -320,6 +337,33 @@ export function applyAdjustCellNumberFormatDecimalsCommand(
       if (adjusted !== current) {
         addPatch(patches, address, { numberFormat: adjusted ?? null });
       }
+    }
+  }
+  return applyStylePatches(workbook, command.sheetId, patches);
+}
+
+export function applyAdjustCellIndentCommand(
+  workbook: Workbook,
+  command: AdjustCellIndentCommand,
+): RestoreCellStylesCommand | null {
+  const range = normalizeRange(command.range);
+  assertCellRange(range);
+  assertSupportedRange(range);
+  if (command.delta !== -1 && command.delta !== 1) {
+    throw invalidCommandPayload("delta", command.delta, "Cell indent delta must be -1 or 1.");
+  }
+  const sheet = getSheetOrThrow(workbook, command.sheetId);
+  const mergeResolver = new MergedCellRangeResolver(sheet.mergedCells);
+  const patches = new Map<string, { address: CellAddress; patch: CellStylePatch }>();
+  for (let row = range.start.row; row <= range.end.row; row += 1) {
+    for (let column = range.start.column; column <= range.end.column; column += 1) {
+      const address = getMergeAwareAddress(mergeResolver, { row, column });
+      const current = getCellStyle(sheet, address)?.indent ?? MIN_CELL_INDENT;
+      const adjusted = Math.max(
+        MIN_CELL_INDENT,
+        Math.min(MAX_CELL_INDENT, current + command.delta),
+      );
+      if (adjusted !== current) addPatch(patches, address, { indent: adjusted || null });
     }
   }
   return applyStylePatches(workbook, command.sheetId, patches);

@@ -26,6 +26,7 @@ const emit = defineEmits<{
   openCellFormat: [tab: CellFormatTab];
   applyStyle: [patch: CellStylePatch];
   adjustDecimals: [delta: -1 | 1];
+  adjustIndent: [delta: -1 | 1];
   activateFormatPainter: [];
   autoSum: [];
   sort: [direction: "ascending" | "descending"];
@@ -70,6 +71,7 @@ defineSlots<{ "file-actions"?: () => unknown }>();
         @open-cell-format="emit('openCellFormat', $event)"
         @apply-style="emit('applyStyle', $event)"
         @adjust-decimals="emit('adjustDecimals', $event)"
+        @adjust-indent="emit('adjustIndent', $event)"
         @activate-format-painter="emit('activateFormatPainter')"
         @auto-sum="emit('autoSum')"
         @sort="emit('sort', $event)"

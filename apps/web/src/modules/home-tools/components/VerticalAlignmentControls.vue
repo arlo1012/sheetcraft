@@ -1,0 +1,71 @@
+<script setup lang="ts">
+import { ArrowDownToLine, ArrowUpToLine, FoldVertical } from "lucide-vue-next";
+import type { CellStylePatch, VerticalCellAlignment } from "@idea10/core/style";
+import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import { useAppI18n } from "../../../shared/i18n";
+import RibbonIconAction from "./RibbonIconAction.vue";
+
+const props = defineProps<{
+  state: SelectionCellStyleState["verticalAlign"];
+  disabled: boolean;
+}>();
+
+const emit = defineEmits<{
+  applyStyle: [patch: CellStylePatch];
+}>();
+
+const { t } = useAppI18n();
+
+function isActive(alignment: VerticalCellAlignment): boolean {
+  return !props.state.mixed && (props.state.value ?? "bottom") === alignment;
+}
+
+function align(alignment: "top" | "middle" | "bottom"): void {
+  emit("applyStyle", {
+    verticalAlign: alignment === "bottom" ? null : alignment,
+  });
+}
+</script>
+
+<template>
+  <div class="vertical-alignment-controls" role="group" :aria-label="t('format.verticalAlignment')">
+    <RibbonIconAction
+      class="vertical-alignment-controls__button"
+      :disabled="disabled"
+      :label="t('format.alignTop')"
+      :pressed="isActive('top')"
+      data-vertical-alignment-action="top"
+      @activate="align('top')"
+    >
+      <ArrowUpToLine :size="17" :stroke-width="1.5" aria-hidden="true" />
+    </RibbonIconAction>
+    <RibbonIconAction
+      class="vertical-alignment-controls__button"
+      :disabled="disabled"
+      :label="t('format.alignMiddle')"
+      :pressed="isActive('middle')"
+      data-vertical-alignment-action="middle"
+      @activate="align('middle')"
+    >
+      <FoldVertical :size="17" :stroke-width="1.5" aria-hidden="true" />
+    </RibbonIconAction>
+    <RibbonIconAction
+      class="vertical-alignment-controls__button"
+      :disabled="disabled"
+      :label="t('format.alignBottom')"
+      :pressed="isActive('bottom')"
+      data-vertical-alignment-action="bottom"
+      @activate="align('bottom')"
+    >
+      <ArrowDownToLine :size="17" :stroke-width="1.5" aria-hidden="true" />
+    </RibbonIconAction>
+  </div>
+</template>
+
+<style scoped lang="scss">
+.vertical-alignment-controls {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+</style>

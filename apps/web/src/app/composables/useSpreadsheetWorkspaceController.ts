@@ -9,6 +9,7 @@ import {
 } from "vue";
 import {
   createAddSheetCommand,
+  createAdjustCellIndentCommand,
   createAdjustCellNumberFormatDecimalsCommand,
   createApplyCellBordersCommand,
   createApplyCellFormatCommand,
@@ -792,6 +793,18 @@ export function useSpreadsheetWorkspaceController(
     clearWorkspaceStatus();
   }
 
+  function adjustIndent(delta: -1 | 1): void {
+    if (!isFormattingSupported.value) {
+      showWorkspaceStatus({ key: "format.selectionTooLarge" });
+      return;
+    }
+    execute(
+      createAdjustCellIndentCommand(activeSheet.value.id, activeSelectionRange.value, delta),
+      "format.cells",
+    );
+    clearWorkspaceStatus();
+  }
+
   function activateFormatPainter(): void {
     if (formatPainterSource.value) {
       cancelFormatPainter();
@@ -1208,6 +1221,7 @@ export function useSpreadsheetWorkspaceController(
     applyCellFormat,
     updateBorderFormat,
     adjustNumberFormatDecimals,
+    adjustIndent,
     activateFormatPainter,
     applyFormatPainterTarget,
     cancelFormatPainter,

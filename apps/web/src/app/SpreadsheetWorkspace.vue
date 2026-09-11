@@ -104,6 +104,7 @@ const {
   applyCellFormat,
   updateBorderFormat,
   adjustNumberFormatDecimals,
+  adjustIndent,
   activateFormatPainter,
   applyFormatPainterTarget,
   cancelFormatPainter,
@@ -295,6 +296,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @open-cell-format="openCellFormat"
       @apply-style="applyCellStyle"
       @adjust-decimals="adjustNumberFormatDecimals"
+      @adjust-indent="adjustIndent"
       @activate-format-painter="activateFormatPainter"
       @auto-sum="autoSum"
       @sort="sortSelection"

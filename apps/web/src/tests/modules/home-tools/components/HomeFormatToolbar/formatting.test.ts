@@ -195,10 +195,7 @@ describe("HomeFormatToolbar", () => {
     fontFamily.vm.$emit("change", "Arial");
     fontSize.vm.$emit("change", 18);
     await wrapper.get('[aria-label="Align center"]').trigger("click");
-    await wrapper.get("[data-vertical-alignment-trigger]").trigger("click");
-    await new DOMWrapper(document.body)
-      .get('[data-vertical-alignment-option="bottom"]')
-      .trigger("click");
+    await wrapper.get('[data-vertical-alignment-action="bottom"]').trigger("click");
 
     expect(emittedPatches(wrapper)).toEqual([
       { fontFamily: "Arial" },
@@ -428,16 +425,7 @@ describe("HomeFormatToolbar", () => {
     expect(
       wrapper.get('[data-ribbon-group="alignment"] [data-ribbon-action="wrap-text"]'),
     ).toBeTruthy();
-    for (const action of ["text-orientation"]) {
-      const control = wrapper.get(`[data-ribbon-placeholder="${action}"]`);
-      expect(control.find(".ribbon-icon-action__text").exists()).toBe(false);
-      expect(control.element).toBeInstanceOf(HTMLButtonElement);
-      expect(control.attributes()).toMatchObject({
-        type: "button",
-        disabled: "",
-      });
-    }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(14);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(13);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({
@@ -472,7 +460,13 @@ describe("HomeFormatToolbar", () => {
     expect(wrapper.get('[aria-label="Horizontal alignment, mixed"]').attributes("role")).toBe(
       "group",
     );
-    expect(wrapper.get('[aria-label="Vertical alignment, mixed"]').classes()).toContain("is-mixed");
+    expect(wrapper.get('[aria-label="Vertical alignment"]').findAll("button")).toHaveLength(3);
+    expect(
+      wrapper
+        .get('[aria-label="Vertical alignment"]')
+        .findAll("button")
+        .map((button) => button.attributes("aria-pressed")),
+    ).toEqual(["false", "false", "false"]);
   });
 
   test("forwards workbook history shortcuts while a toolbar control owns focus", async () => {
@@ -497,17 +491,6 @@ describe("HomeFormatToolbar", () => {
 
     expect(wrapper.emitted("undo")).toBeUndefined();
     expect(wrapper.emitted("redo")).toBeUndefined();
-  });
-
-  test("returns Tab from the teleported vertical menu to the ribbon sequence", async () => {
-    const wrapper = mountToolbar();
-    await wrapper.get("[data-vertical-alignment-trigger]").trigger("click");
-    const menu = new DOMWrapper(document.body).get('[role="menu"]');
-
-    await menu.trigger("keydown", { key: "Tab" });
-
-    expect(document.body.querySelector('[role="menu"]')).toBeNull();
-    expect(document.activeElement).toBe(wrapper.get('[data-ribbon-action="wrap-text"]').element);
   });
 
   test("returns Tab from the border menu to the ribbon sequence", async () => {

@@ -7,6 +7,7 @@ import {
 import type { Workbook } from "../workbook.js";
 import {
   applyCellBordersCommand,
+  applyAdjustCellIndentCommand,
   applyAdjustCellNumberFormatDecimalsCommand,
   applyCellFormatCommand,
   applyCellStyleCommand,
@@ -72,6 +73,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "applyCellBorders":
     case "applyCellFormat":
     case "adjustCellNumberFormatDecimals":
+    case "adjustCellIndent":
     case "restoreCellStyles":
     case "resizeSheetDimension":
     case "setSheetFreezePanes":
@@ -121,6 +123,8 @@ export function applyWorkbookCommand(
         return applyCellFormatCommand(workbook, command);
       case "adjustCellNumberFormatDecimals":
         return applyAdjustCellNumberFormatDecimalsCommand(workbook, command);
+      case "adjustCellIndent":
+        return applyAdjustCellIndentCommand(workbook, command);
       case "restoreCellStyles":
         return applyRestoreCellStylesCommand(workbook, command);
       case "resizeSheetDimension":

@@ -75,7 +75,8 @@ watch(menuDisabled, (disabled) => {
     v-bind="$attrs"
     :label="t('ribbon.mergeCells')"
     :menu-label="t('ribbon.moreOptions', { tool: t('ribbon.mergeCells') })"
-    :text="t('ribbon.mergeCells')"
+    :text="t('ribbon.merge')"
+    variant="tall"
     :disabled="mainDisabled"
     :menu-disabled="menuDisabled"
     :expanded="open"
@@ -85,7 +86,7 @@ watch(menuDisabled, (disabled) => {
     @toggle-menu="toggleMenu"
     @menu-keydown="onTriggerKeydown"
   >
-    <TableCellsMerge :size="15" aria-hidden="true" />
+    <TableCellsMerge :size="24" :stroke-width="1.5" aria-hidden="true" />
   </RibbonSplitAction>
 
   <Teleport to="body">

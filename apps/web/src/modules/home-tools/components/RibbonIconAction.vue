@@ -114,7 +114,7 @@ function activate(): void {
     position: relative;
     align-self: stretch;
     width: max-content;
-    min-width: 58px;
+    min-width: var(--ribbon-tall-action-min-width, 58px);
     height: 54px;
     flex-direction: column;
     gap: 3px;
@@ -122,7 +122,7 @@ function activate(): void {
 
     &.has-text {
       width: max-content;
-      min-width: 58px;
+      min-width: var(--ribbon-tall-action-min-width, 58px);
       gap: 3px;
       padding: 2px;
     }

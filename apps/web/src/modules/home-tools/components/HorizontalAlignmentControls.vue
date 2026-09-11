@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { TextAlignCenter, TextAlignEnd, TextAlignStart } from "lucide-vue-next";
+import {
+  AlignHorizontalSpaceBetween,
+  TextAlignCenter,
+  TextAlignEnd,
+  TextAlignJustify,
+  TextAlignStart,
+} from "lucide-vue-next";
 import { computed } from "vue";
 import type { CellStylePatch, HorizontalCellAlignment } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
@@ -49,9 +55,10 @@ function align(alignment: HorizontalCellAlignment): void {
       :disabled="disabled"
       :label="t('format.alignLeft')"
       :pressed="isActive('left')"
+      data-horizontal-alignment-action="left"
       @activate="align('left')"
     >
-      <TextAlignStart :size="17" :stroke-width="2" aria-hidden="true" />
+      <TextAlignStart :size="17" :stroke-width="1.5" aria-hidden="true" />
     </RibbonIconAction>
     <RibbonIconAction
       class="ui-toolbar-icon-button horizontal-alignment-controls__button"
@@ -59,9 +66,10 @@ function align(alignment: HorizontalCellAlignment): void {
       :disabled="disabled"
       :label="t('format.alignCenter')"
       :pressed="isActive('center')"
+      data-horizontal-alignment-action="center"
       @activate="align('center')"
     >
-      <TextAlignCenter :size="17" :stroke-width="2" aria-hidden="true" />
+      <TextAlignCenter :size="17" :stroke-width="1.5" aria-hidden="true" />
     </RibbonIconAction>
     <RibbonIconAction
       class="ui-toolbar-icon-button horizontal-alignment-controls__button"
@@ -69,9 +77,32 @@ function align(alignment: HorizontalCellAlignment): void {
       :disabled="disabled"
       :label="t('format.alignRight')"
       :pressed="isActive('right')"
+      data-horizontal-alignment-action="right"
       @activate="align('right')"
     >
-      <TextAlignEnd :size="17" :stroke-width="2" aria-hidden="true" />
+      <TextAlignEnd :size="17" :stroke-width="1.5" aria-hidden="true" />
+    </RibbonIconAction>
+    <RibbonIconAction
+      class="ui-toolbar-icon-button horizontal-alignment-controls__button"
+      :class="{ 'is-active': isActive('justify') }"
+      :disabled="disabled"
+      :label="t('cellFormat.horizontalJustify')"
+      :pressed="isActive('justify')"
+      data-horizontal-alignment-action="justify"
+      @activate="align('justify')"
+    >
+      <TextAlignJustify :size="17" :stroke-width="1.5" aria-hidden="true" />
+    </RibbonIconAction>
+    <RibbonIconAction
+      class="ui-toolbar-icon-button horizontal-alignment-controls__button"
+      :class="{ 'is-active': isActive('distributed') }"
+      :disabled="disabled"
+      :label="t('cellFormat.horizontalDistributed')"
+      :pressed="isActive('distributed')"
+      data-horizontal-alignment-action="distributed"
+      @activate="align('distributed')"
+    >
+      <AlignHorizontalSpaceBetween :size="17" :stroke-width="1.5" aria-hidden="true" />
     </RibbonIconAction>
   </div>
 </template>

@@ -83,6 +83,13 @@ export type AdjustCellNumberFormatDecimalsCommand = {
   delta: -1 | 1;
 };
 
+export type AdjustCellIndentCommand = {
+  type: "adjustCellIndent";
+  sheetId: string;
+  range: CellRange;
+  delta: -1 | 1;
+};
+
 export type RestoreCellStylesCommand = {
   type: "restoreCellStyles";
   sheetId: string;
@@ -285,6 +292,7 @@ export type WorkbookCommand =
   | ApplyCellBordersCommand
   | ApplyCellFormatCommand
   | AdjustCellNumberFormatDecimalsCommand
+  | AdjustCellIndentCommand
   | RestoreCellStylesCommand
   | ResizeSheetDimensionCommand
   | SetSheetFreezePanesCommand
@@ -347,6 +355,7 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "cells.move";
     case "applyCellStyle":
     case "adjustCellNumberFormatDecimals":
+    case "adjustCellIndent":
       return "format.cells";
     case "applyCellBorders":
       return "format.borders";

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   createAddSheetCommand,
+  createAdjustCellIndentCommand,
   createAdjustCellNumberFormatDecimalsCommand,
   createApplyCellBordersCommand,
   createApplyCellStyleCommand,
@@ -353,6 +354,11 @@ describe("workbook command transport", () => {
         { preset: "all", border: { style: "thin", color: "#123456" } },
       ),
       createAdjustCellNumberFormatDecimalsCommand(
+        sheet.id,
+        { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+        1,
+      ),
+      createAdjustCellIndentCommand(
         sheet.id,
         { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
         1,
