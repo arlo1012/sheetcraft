@@ -31,6 +31,17 @@ async function mountWorkspace() {
 }
 
 describe("workspace cell format dialog", () => {
+  test("opens each ribbon group launcher on its matching format tab", async () => {
+    const workspace = await mountWorkspace();
+    for (const tab of ["font", "alignment", "number"] as const) {
+      await workspace.get(`[data-ribbon-dialog-launcher="${tab}"]`).trigger("click");
+      const dialog = workspace.getComponent(CellFormatDialog);
+      expect(dialog.props("initialTab")).toBe(tab);
+      dialog.vm.$emit("cancel");
+      await nextTick();
+    }
+  });
+
   test("opens from More Border Settings and applies all tabs as one undoable edit", async () => {
     const workspace = await mountWorkspace();
     const sheet = workspace.getComponent(SheetGrid).props("sheet");

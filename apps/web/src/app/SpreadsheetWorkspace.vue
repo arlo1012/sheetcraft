@@ -22,7 +22,9 @@ import {
   useSpreadsheetWorkspaceController,
   type CellFormatSelection,
 } from "./composables/useSpreadsheetWorkspaceController";
-import CellFormatDialog from "../modules/cell-format/components/CellFormatDialog.vue";
+import CellFormatDialog, {
+  type CellFormatTab,
+} from "../modules/cell-format/components/CellFormatDialog.vue";
 import WorkbookFileActions from "../modules/workbook-persistence/components/WorkbookFileActions.vue";
 import WorkbookFileFeedback from "../modules/workbook-persistence/components/WorkbookFileFeedback.vue";
 import { createIndexedDbWorkbookStore } from "../modules/workbook-persistence/indexedDbWorkbookStore";
@@ -131,12 +133,14 @@ const {
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
 watch(workbookGeneration, () => cellEditSession.cancel(), { flush: "sync" });
 const cellFormatSelection = shallowRef<CellFormatSelection>();
+const cellFormatInitialTab = ref<CellFormatTab>("border");
 watch(workbookGeneration, () => {
   cellFormatSelection.value = undefined;
 });
 
-function openCellFormat(): void {
+function openCellFormat(tab: CellFormatTab = "border"): void {
   if (loading.value || fileBusy.value || xlsxBusy.value || !cellEditSession.finish()) return;
+  cellFormatInitialTab.value = tab;
   cellFormatSelection.value = captureCellFormatSelection();
 }
 
@@ -332,7 +336,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :merge-state="cellFormatSelection.mergeState"
       :sample-value="cellFormatSelection.sampleValue"
       :date-system="cellFormatSelection.dateSystem"
-      initial-tab="border"
+      :initial-tab="cellFormatInitialTab"
       @confirm="confirmCellFormat"
       @cancel="closeCellFormat"
     />

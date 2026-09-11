@@ -6,6 +6,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import type { MergeCellsState } from "./data-tool-state";
 import HorizontalAlignmentControls from "./HorizontalAlignmentControls.vue";
 import MergeCellsMenu from "./MergeCellsMenu.vue";
+import RibbonDialogLauncher from "./RibbonDialogLauncher.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
 import VerticalAlignmentMenu from "./VerticalAlignmentMenu.vue";
 
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
   merge: [];
   unmerge: [];
+  openCellFormat: [];
 }>();
 
 const { t } = useAppI18n();
@@ -79,6 +81,12 @@ function toggleWrapText(state: ToggleStyleState): void {
         @unmerge="emit('unmerge')"
       />
     </div>
+    <RibbonDialogLauncher
+      :label="`${t('cellFormat.title')} · ${t('cellFormat.alignment')}`"
+      :disabled="disabled"
+      data-ribbon-dialog-launcher="alignment"
+      @activate="emit('openCellFormat')"
+    />
   </section>
 </template>
 
@@ -87,6 +95,7 @@ function toggleWrapText(state: ToggleStyleState): void {
 
 .home-alignment-group {
   @include ribbon.compact;
+  @include ribbon.dialog-launcher-gutter;
 
   &__row {
     @include ribbon.row;

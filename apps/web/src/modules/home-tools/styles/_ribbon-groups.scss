@@ -5,6 +5,17 @@
   border-right: 1px solid var(--idea-border-subtle);
 }
 
+@mixin dialog-launcher-gutter {
+  position: relative;
+  padding-right: 18px;
+
+  > .ribbon-dialog-launcher {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+  }
+}
+
 @mixin compact {
   @include shell;
 

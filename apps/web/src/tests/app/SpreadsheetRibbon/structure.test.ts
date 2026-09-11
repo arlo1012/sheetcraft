@@ -84,7 +84,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.emitted("updateBorderFormat")?.[1]).toEqual([{ color: "#4472c4" }]);
 
     await new DOMWrapper(document.body).get('[data-border-menu-row="settings"]').trigger("click");
-    expect(wrapper.emitted("openCellFormat")).toEqual([[]]);
+    expect(wrapper.emitted("openCellFormat")).toEqual([["border"]]);
   });
 
   test("keeps concrete history actions and unavailable placeholders in the ribbon", async () => {
@@ -105,7 +105,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
       "false",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(15);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(14);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({
@@ -120,6 +120,13 @@ describe("SpreadsheetRibbon", () => {
     await wrapper.setProps({ disabled: true });
 
     expect((wrapper.get('[aria-label="Bold"]').element as HTMLButtonElement).disabled).toBe(true);
+    const formatLaunchers = wrapper.findAll("[data-ribbon-dialog-launcher]");
+    expect(formatLaunchers).toHaveLength(3);
+    for (const launcher of formatLaunchers) {
+      expect((launcher.element as HTMLButtonElement).disabled).toBe(true);
+      await launcher.trigger("click");
+    }
+    expect(wrapper.emitted("openCellFormat")).toBeUndefined();
     const autoSum = wrapper.get('[data-ribbon-action="auto-sum"]');
     expect((autoSum.element as HTMLButtonElement).disabled).toBe(false);
     await autoSum.trigger("click");

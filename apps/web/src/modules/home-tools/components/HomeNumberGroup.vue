@@ -15,6 +15,7 @@ import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismiss
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import RibbonDialogLauncher from "./RibbonDialogLauncher.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
 
 type NumberFormatChoice = "general" | CellNumberFormat["kind"];
@@ -28,6 +29,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
   adjustDecimals: [delta: -1 | 1];
+  openCellFormat: [];
 }>();
 
 const { locale, t } = useAppI18n();
@@ -195,6 +197,12 @@ watch(
         <MoveRight :size="15" aria-hidden="true" />
       </RibbonIconAction>
     </div>
+    <RibbonDialogLauncher
+      :label="`${t('cellFormat.title')} · ${t('cellFormat.number')}`"
+      :disabled="disabled"
+      data-ribbon-dialog-launcher="number"
+      @activate="emit('openCellFormat')"
+    />
   </section>
 
   <Teleport to="body">
@@ -228,6 +236,7 @@ watch(
 
 .home-number-group {
   @include ribbon.compact;
+  @include ribbon.dialog-launcher-gutter;
 
   &__row {
     @include ribbon.row;

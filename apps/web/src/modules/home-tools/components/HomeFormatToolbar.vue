@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { CellFormatTab } from "../../cell-format/components/CellFormatDialog.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
 import HomeAlignmentGroup from "./HomeAlignmentGroup.vue";
@@ -34,7 +35,7 @@ const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
   applyBorders: [action: CellBorderAction];
   updateBorderFormat: [patch: CellBorderFormatPatch];
-  openCellFormat: [];
+  openCellFormat: [tab: CellFormatTab];
   adjustDecimals: [delta: -1 | 1];
   activateFormatPainter: [];
   autoSum: [];
@@ -266,7 +267,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           @apply-style="emit('applyStyle', $event)"
           @apply-borders="emit('applyBorders', $event)"
           @update-border-format="emit('updateBorderFormat', $event)"
-          @open-cell-format="emit('openCellFormat')"
+          @open-cell-format="emit('openCellFormat', $event)"
           @undo="emit('undo')"
           @redo="emit('redo')"
         />
@@ -277,12 +278,14 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           @apply-style="emit('applyStyle', $event)"
           @merge="emit('merge')"
           @unmerge="emit('unmerge')"
+          @open-cell-format="emit('openCellFormat', 'alignment')"
         />
         <HomeNumberGroup
           :state="state"
           :disabled="disabled"
           @apply-style="emit('applyStyle', $event)"
           @adjust-decimals="emit('adjustDecimals', $event)"
+          @open-cell-format="emit('openCellFormat', 'number')"
         />
         <HomeDataGroup
           :state="dataState"

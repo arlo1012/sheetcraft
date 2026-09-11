@@ -6,6 +6,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import CellColorControl from "./CellColorControl.vue";
 import CellBorderMenu from "./CellBorderMenu.vue";
 import FontFormatControls from "./FontFormatControls.vue";
+import RibbonDialogLauncher from "./RibbonDialogLauncher.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
 import TextFormatControls from "./TextFormatControls.vue";
 
@@ -18,7 +19,7 @@ const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
   applyBorders: [action: CellBorderAction];
   updateBorderFormat: [patch: CellBorderFormatPatch];
-  openCellFormat: [];
+  openCellFormat: [tab: "font" | "border"];
   undo: [];
   redo: [];
 }>();
@@ -72,7 +73,7 @@ const { t } = useAppI18n();
         :disabled="disabled"
         @apply-borders="emit('applyBorders', $event)"
         @update-border-format="emit('updateBorderFormat', $event)"
-        @open-cell-format="emit('openCellFormat')"
+        @open-cell-format="emit('openCellFormat', 'border')"
         @undo="emit('undo')"
         @redo="emit('redo')"
       />
@@ -115,6 +116,13 @@ const { t } = useAppI18n();
         <Sparkles :size="15" aria-hidden="true" />
       </RibbonIconAction>
     </div>
+
+    <RibbonDialogLauncher
+      :label="`${t('cellFormat.title')} · ${t('cellFormat.font')}`"
+      :disabled="disabled"
+      data-ribbon-dialog-launcher="font"
+      @activate="emit('openCellFormat', 'font')"
+    />
   </section>
 </template>
 
@@ -123,6 +131,7 @@ const { t } = useAppI18n();
 
 .home-cell-format-group {
   @include ribbon.shell;
+  @include ribbon.dialog-launcher-gutter;
 
   --cell-format-primary-track: 126px;
   --cell-format-compact-track: 40px;
