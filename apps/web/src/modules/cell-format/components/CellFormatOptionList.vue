@@ -1,11 +1,13 @@
 <script setup lang="ts" generic="Value extends string">
 import { computed, nextTick, ref, watch } from "vue";
+import { findCellFormatOptionMatch, type CellFormatOption } from "../option-list";
 
-type FormatOption = Readonly<{ code: Value; value?: Value; label: string; color?: string }>;
+type FormatOption = CellFormatOption<Value>;
 const props = defineProps<{
   modelValue: Value | undefined;
   options: readonly FormatOption[];
   label: string;
+  searchText?: string;
   variant?: "navigation" | "compact";
   itemDataAttribute?: `data-${string}`;
   monospace?: boolean;
@@ -17,14 +19,21 @@ const itemAttribute = computed(() => props.itemDataAttribute ?? "data-cell-forma
 const selectedIndex = computed(() =>
   props.options.findIndex((option) => optionValue(option) === props.modelValue),
 );
+const matchedIndex = computed(() => {
+  const match = findCellFormatOptionMatch(props.options, props.searchText ?? "");
+  return match ? props.options.indexOf(match) : -1;
+});
+const activeIndex = computed(() =>
+  matchedIndex.value >= 0 ? matchedIndex.value : selectedIndex.value,
+);
 watch(
-  selectedIndex,
+  activeIndex,
   () => {
     void nextTick(() => {
       const list = listRef.value;
       const buttons = list?.querySelectorAll<HTMLButtonElement>("button");
       const first = buttons?.[0];
-      const selected = buttons?.[selectedIndex.value];
+      const selected = buttons?.[activeIndex.value];
       if (!list || !first || !selected) return;
       const top = selected.offsetTop - first.offsetTop + 4;
       const bottom = top + selected.offsetHeight;
@@ -37,7 +46,7 @@ watch(
 );
 function onKeydown(event: KeyboardEvent): void {
   if (!props.options.length) return;
-  const index = Math.max(0, selectedIndex.value);
+  const index = Math.max(0, activeIndex.value);
   const next =
     event.key === "Home"
       ? 0
@@ -73,7 +82,9 @@ function optionValue(option: FormatOption): Value {
         type="button"
         role="option"
         :aria-selected="modelValue === optionValue(option)"
-        :tabindex="index === Math.max(0, selectedIndex) ? 0 : -1"
+        :tabindex="index === Math.max(0, activeIndex) ? 0 : -1"
+        :class="{ 'is-located': index === matchedIndex }"
+        :data-cell-format-option-match="index === matchedIndex ? '' : undefined"
         :style="{ color: option.color }"
         :title="option.label"
         :[itemAttribute]="optionValue(option)"
@@ -148,6 +159,11 @@ function optionValue(option: FormatOption): Value {
     }
     &[aria-selected="true"] {
       background: var(--idea-surface-active);
+    }
+    &.is-located:not([aria-selected="true"]) {
+      background: var(--idea-surface-secondary);
+      outline: 1px solid var(--idea-border-control);
+      outline-offset: -1px;
     }
     &:focus-visible {
       outline: 2px solid var(--idea-action-primary);

@@ -15,6 +15,7 @@ import {
   CELL_FONT_SIZE_PRESETS,
 } from "../../../shared/cell-text/font-catalog";
 import { useAppI18n } from "../../../shared/i18n";
+import { findCellFormatOptionMatch } from "../option-list";
 
 type Props = Readonly<{ state: SelectionCellStyleState; patch: CellStylePatch }>;
 type FontStyleChoice = "regular" | "italic" | "bold" | "boldItalic";
@@ -125,7 +126,7 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
       familyInput.value = family.value ?? "";
       return;
     }
-    setFamily(name);
+    setFamily(findCellFormatOptionMatch(familyOptions.value, name)?.code ?? name);
   }
   function setSize(value: string): void {
     const parsed = Number(value);
@@ -144,6 +145,12 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
     setSize(sizeInput.value);
   }
   function commitSizeInput(): void {
+    const match = findCellFormatOptionMatch(sizeOptions.value, sizeInput.value);
+    if (match) {
+      sizeInput.value = match.code;
+      setSize(match.code);
+      return;
+    }
     const parsed = Number(sizeInput.value);
     if (!sizeInput.value.trim() || !Number.isFinite(parsed)) {
       sizeInput.value = size.value === undefined ? "" : String(size.value);
@@ -163,18 +170,14 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
       italic: value === "italic" || value === "boldItalic" ? true : null,
     });
   }
-  function updateFontStyleInput(value: string): void {
-    fontStyleInput.value = value;
-  }
-  function selectFontStyle(value: string): void {
-    const label = value.trim().toLocaleLowerCase();
-    const option = styleOptions.value.find((option) => option.label.toLocaleLowerCase() === label);
-    if (option) setFontStyle(option.code);
-    else fontStyleInput.value = styleLabel.value;
+  function updateFontStyleInput(value: string | number): void {
+    fontStyleInput.value = String(value);
   }
   function commitFontStyleInput(): void {
     if (fontStyleInput.value === styleLabel.value) return;
-    selectFontStyle(fontStyleInput.value);
+    const option = findCellFormatOptionMatch(styleOptions.value, fontStyleInput.value);
+    if (option) setFontStyle(option.code);
+    else fontStyleInput.value = styleLabel.value;
   }
   function setUnderline(value: unknown): void {
     if (value === "none") update({ underline: null });
@@ -232,8 +235,8 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
     setSize,
     updateSizeInput,
     commitSizeInput,
+    setFontStyle,
     updateFontStyleInput,
-    selectFontStyle,
     commitFontStyleInput,
     setUnderline,
     setStrikethrough,
