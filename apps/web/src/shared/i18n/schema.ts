@@ -464,10 +464,11 @@ export type MessageSchema = {
     degrees: string;
     verticalText: string;
     noFill: string;
-    cellShading: string;
     patternStyle: string;
     patternColor: string;
     patternNone: string;
+    patternSearch: string;
+    patternNoResults: string;
     fillEffects: string;
     fillEffectsColors: string;
     fillColor1: string;

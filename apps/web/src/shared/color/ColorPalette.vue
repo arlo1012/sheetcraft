@@ -23,6 +23,7 @@ const props = withDefaults(
     compact?: boolean;
     columns?: number;
     clearable?: boolean;
+    stableSize?: boolean;
   }>(),
   {
     defaultColor: "#20242c",
@@ -31,6 +32,7 @@ const props = withDefaults(
     compact: false,
     columns: 10,
     clearable: false,
+    stableSize: false,
   },
 );
 
@@ -128,7 +130,11 @@ function openMore(): void {
   draftColor.value = selectedColor.value ?? normalizeColor(props.defaultColor) ?? "#20242c";
   showingMore.value = true;
   void nextTick(() =>
-    rootRef.value?.querySelector<HTMLElement>("[role='slider'], input, button")?.focus(),
+    rootRef.value
+      ?.querySelector<HTMLElement>(
+        ".color-palette__view.is-active [role='slider'], .color-palette__view.is-active input, .color-palette__view.is-active button",
+      )
+      ?.focus(),
   );
 }
 
@@ -186,12 +192,20 @@ function getPanelAttach(): HTMLElement {
   <section
     ref="rootRef"
     class="color-palette"
-    :class="{ 'is-more': showingMore, 'is-compact': compact }"
+    :class="{
+      'is-more': showingMore,
+      'is-compact': compact,
+      'is-stable': stableSize,
+    }"
     :style="{ '--color-palette-columns': gridColumns }"
     :aria-label="t('colorPalette.label')"
     @keydown="onPanelKeydown"
   >
-    <template v-if="!showingMore">
+    <div
+      v-if="!showingMore || stableSize"
+      class="color-palette__view color-palette__view--palette"
+      :class="{ 'is-active': !showingMore }"
+    >
       <button
         v-if="showDefaultAction"
         type="button"
@@ -204,7 +218,9 @@ function getPanelAttach(): HTMLElement {
       </button>
 
       <div v-if="themeColors.length" class="color-palette__section">
-        <p v-if="!compact" class="color-palette__heading">{{ t("colorPalette.theme") }}</p>
+        <p v-if="!compact" class="color-palette__heading">
+          {{ t("colorPalette.theme") }}
+        </p>
         <div class="color-palette__grid" role="radiogroup" :aria-label="t('colorPalette.theme')">
           <button
             v-for="(color, index) in themeColors"
@@ -227,7 +243,9 @@ function getPanelAttach(): HTMLElement {
       </div>
 
       <div v-if="standardColors.length" class="color-palette__section">
-        <p v-if="!compact" class="color-palette__heading">{{ t("colorPalette.standard") }}</p>
+        <p v-if="!compact" class="color-palette__heading">
+          {{ t("colorPalette.standard") }}
+        </p>
         <div
           class="color-palette__grid color-palette__grid--single"
           role="radiogroup"
@@ -254,7 +272,9 @@ function getPanelAttach(): HTMLElement {
       </div>
 
       <div v-if="!isRestricted || paletteRecentColors.length" class="color-palette__section">
-        <p v-if="!compact" class="color-palette__heading">{{ t("colorPalette.recent") }}</p>
+        <p v-if="!compact" class="color-palette__heading">
+          {{ t("colorPalette.recent") }}
+        </p>
         <div
           class="color-palette__grid color-palette__grid--single"
           role="radiogroup"
@@ -314,9 +334,13 @@ function getPanelAttach(): HTMLElement {
       >
         {{ t("colorPalette.clear") }}
       </button>
-    </template>
+    </div>
 
-    <template v-else>
+    <div
+      v-if="showingMore || stableSize"
+      class="color-palette__view color-palette__view--more"
+      :class="{ 'is-active': showingMore }"
+    >
       <ColorPickerPanel
         class="idea-color-palette-panel"
         :model-value="draftColor"
@@ -342,7 +366,7 @@ function getPanelAttach(): HTMLElement {
           {{ t("format.applyColor") }}
         </button>
       </div>
-    </template>
+    </div>
   </section>
 </template>
 
@@ -352,6 +376,24 @@ function getPanelAttach(): HTMLElement {
   padding: var(--idea-tool-panel-padding);
   background: var(--idea-surface-panel);
   color: var(--idea-text-primary);
+
+  &.is-stable {
+    display: grid;
+    padding: 0;
+    width: max-content;
+    max-width: min(360px, 100%, calc(100vw - 32px));
+
+    .color-palette__view {
+      grid-area: 1 / 1;
+    }
+    .color-palette__view--palette {
+      padding: var(--idea-tool-panel-padding);
+    }
+    .color-palette__view:not(.is-active) {
+      visibility: hidden;
+      pointer-events: none;
+    }
+  }
 
   &__default,
   &__more,

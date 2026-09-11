@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { Select as TSelect } from "tdesign-vue-next/es/select";
 import {
   CELL_FILL_PATTERNS,
   mergeCellStyle,
@@ -15,6 +14,7 @@ import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
 import { useAppI18n } from "../../../shared/i18n";
 import CellFormatColorControl from "./CellFormatColorControl.vue";
 import CellFormatFillEffectsDialog from "./CellFormatFillEffectsDialog.vue";
+import CellFormatPatternControl from "./CellFormatPatternControl.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -47,23 +47,11 @@ const noFill = computed(
   () =>
     !mixed.value && !fill.value?.fillColor && !fill.value?.fillPattern && !fill.value?.fillGradient,
 );
-const pattern = computed(() =>
+const pattern = computed<CellFillPatternStyle | "none" | undefined>(() =>
   isMixed("fillPattern") ? undefined : (fill.value?.fillPattern ?? "none"),
 );
-const patternOptions = computed(() => [
-  { value: "none", label: t("cellFormat.patternNone") },
-  ...CELL_FILL_PATTERNS.map((value) => ({ value, label: t(`cellFormat.fillPatterns.${value}`) })),
-]);
 function isPattern(value: unknown): value is CellFillPatternStyle {
   return typeof value === "string" && CELL_FILL_PATTERNS.includes(value as CellFillPatternStyle);
-}
-function patternPreview(value: unknown) {
-  return getCellFillStyle({
-    fillColor: fill.value?.fillColor ?? "#ffffff",
-    ...(isPattern(value)
-      ? { fillPattern: value, fillPatternColor: fill.value?.fillPatternColor ?? "#000000" }
-      : {}),
-  });
 }
 function clearFill(): void {
   emit("update:patch", {
@@ -99,7 +87,6 @@ function setGradient(gradient: CellFillGradient): void {
 
 <template>
   <section class="cell-format-fill" :aria-label="t('cellFormat.fill')">
-    <h3>{{ t("cellFormat.cellShading") }}</h3>
     <div class="cell-format-fill__layout">
       <div class="cell-format-fill__background">
         <span>{{ t("format.fillColor") }}</span>
@@ -115,6 +102,7 @@ function setGradient(gradient: CellFillGradient): void {
         <div class="cell-format-fill__palette">
           <ColorPalette
             compact
+            stable-size
             :model-value="fill?.fillColor ?? null"
             :show-default="false"
             default-color="#ffffff"
@@ -138,24 +126,13 @@ function setGradient(gradient: CellFillGradient): void {
           :aria-label="t('cellFormat.patternStyle')"
         >
           <span>{{ t("cellFormat.patternStyle") }}</span>
-          <TSelect
+          <CellFormatPatternControl
             :model-value="pattern"
-            :options="patternOptions"
-            :aria-label="t('cellFormat.patternStyle')"
-            :placeholder="t('format.mixed')"
+            :background-color="fill?.fillColor"
+            :pattern-color="fill?.fillPatternColor"
             data-cell-format-pattern-style
-            @change="setPattern"
-          >
-            <template #option="{ option }"
-              ><span class="cell-format-fill__pattern-option"
-                ><span
-                  class="cell-format-fill__pattern-swatch"
-                  :style="patternPreview(option.value)"
-                  aria-hidden="true"
-                /><span>{{ option.label }}</span></span
-              ></template
-            >
-          </TSelect>
+            @select="setPattern"
+          />
         </div>
         <div
           class="cell-format-fill__field"
@@ -264,18 +241,6 @@ function setGradient(gradient: CellFillGradient): void {
     align-items: center;
     gap: 8px;
     min-width: 0;
-  }
-  &__pattern-option {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  &__pattern-swatch {
-    flex: none;
-    width: 36px;
-    height: 20px;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-small);
   }
   &__preview-group {
     display: grid;

@@ -1,11 +1,11 @@
 import { mount } from "@vue/test-utils";
 import { defineComponent, ref } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
-import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
 import type { CellFillGradient, CellStylePatch } from "@idea10/core/style";
 import CellFormatFillPanel from "../../../../../modules/cell-format/components/CellFormatFillPanel.vue";
 import CellFormatFillEffectsDialog from "../../../../../modules/cell-format/components/CellFormatFillEffectsDialog.vue";
+import CellFormatPatternControl from "../../../../../modules/cell-format/components/CellFormatPatternControl.vue";
 import ColorPalette from "../../../../../shared/color/ColorPalette.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 
@@ -35,23 +35,22 @@ const gradient: CellFillGradient = {
 };
 
 describe("CellFormatFillPanel", () => {
-  test("offers every pattern and changes background without losing the selected pattern", async () => {
+  test("changes background without losing the selected pattern", async () => {
     const state = createDefaultSelectionCellStyleState();
     state.fillColor.value = "#ffffff";
     state.fillPattern.value = "darkGrid";
     state.fillPatternColor.value = "#ff0000";
     const { wrapper, panel, patch } = mountPanel(state);
-    expect(panel.getComponent(TSelect).props("options")).toHaveLength(18);
-    expect(panel.getComponent(TSelect).props("modelValue")).toBe("darkGrid");
+    expect(panel.getComponent(CellFormatPatternControl).props("modelValue")).toBe("darkGrid");
     expect(panel.get("[data-cell-format-no-fill]").attributes("aria-pressed")).toBe("false");
     panel.getComponent(ColorPalette).vm.$emit("select", "#4472c4");
     await wrapper.vm.$nextTick();
     expect(patch()).toEqual({ fillColor: "#4472c4", fillGradient: null });
-    expect(panel.getComponent(TSelect).props("modelValue")).toBe("darkGrid");
+    expect(panel.getComponent(CellFormatPatternControl).props("modelValue")).toBe("darkGrid");
     const preview = panel.get<HTMLElement>("[data-cell-format-fill-preview]").element;
     expect(preview.style.backgroundColor).toBe("#4472c4");
     expect(preview.style.backgroundImage).toContain("data:image/svg+xml");
-    panel.getComponent(TSelect).vm.$emit("change", "none");
+    panel.getComponent(CellFormatPatternControl).vm.$emit("select", "none");
     await wrapper.vm.$nextTick();
     expect(patch()).toMatchObject({ fillPattern: null, fillPatternColor: null });
     expect(preview.style.backgroundImage).toBe("");
@@ -62,7 +61,7 @@ describe("CellFormatFillPanel", () => {
     const state = createDefaultSelectionCellStyleState();
     state.fillGradient.value = gradient;
     const { wrapper, panel, patch } = mountPanel(state);
-    panel.getComponent(TSelect).vm.$emit("change", "lightUp");
+    panel.getComponent(CellFormatPatternControl).vm.$emit("select", "lightUp");
     await wrapper.vm.$nextTick();
     expect(patch()).toEqual({
       fillPattern: "lightUp",
@@ -103,7 +102,7 @@ describe("CellFormatFillPanel", () => {
     state.fillPattern.mixed = true;
     const { panel, patch } = mountPanel(state);
     expect(patch()).toEqual({});
-    expect(panel.getComponent(TSelect).props("modelValue")).toBeUndefined();
+    expect(panel.getComponent(CellFormatPatternControl).props("modelValue")).toBeUndefined();
     expect(panel.get("[data-cell-format-fill-preview]").attributes("aria-label")).toBe("Mixed");
     await panel.get("[data-cell-format-no-fill]").trigger("click");
     expect(panel.get("[data-cell-format-fill-preview]").attributes("aria-label")).toBe("Preview");

@@ -263,7 +263,10 @@ watch(() => props.gradient, resetDraft, { immediate: true });
   &__variant-list {
     display: grid;
     grid-template-columns: repeat(2, 48px);
+    grid-auto-rows: 38px;
+    align-content: start;
     gap: 8px;
+    min-height: 84px;
   }
   &__variant {
     width: 48px;
