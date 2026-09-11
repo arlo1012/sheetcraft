@@ -85,15 +85,12 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
       .sort((left, right) => left - right)
       .map((size) => ({ code: String(size), label: String(size) })),
   );
-  const styleOptions = computed(
-    () =>
-      [
-        { code: "regular", label: t("cellFormat.fontRegular") },
-        { code: "italic", label: t("format.italic") },
-        { code: "bold", label: t("format.bold") },
-        { code: "boldItalic", label: t("cellFormat.fontBoldItalic") },
-      ] as const,
-  );
+  const styleOptions = computed<Array<{ code: FontStyleChoice; label: string }>>(() => [
+    { code: "regular", label: t("cellFormat.fontRegular") },
+    { code: "italic", label: t("format.italic") },
+    { code: "bold", label: t("format.bold") },
+    { code: "boldItalic", label: t("cellFormat.fontBoldItalic") },
+  ]);
   const underlineOptions = computed(() => [
     { value: "none", label: t("cellFormat.underlineNone") },
     { value: "single", label: t("cellFormat.underlineSingle") },
@@ -103,6 +100,11 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
   ]);
   const sizeInput = ref("");
   const familyInput = ref("");
+  const fontStyleInput = ref("");
+  const styleLabel = computed(
+    () => styleOptions.value.find((option) => option.code === fontStyle.value)?.label ?? "",
+  );
+  watch(styleLabel, (value) => (fontStyleInput.value = value), { immediate: true });
   watch(family, (value) => (familyInput.value = value ?? ""), { immediate: true });
   watch(size, (value) => (sizeInput.value = value === undefined ? "" : String(value)), {
     immediate: true,
@@ -155,10 +157,24 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
     setSize(sizeInput.value);
   }
   function setFontStyle(value: FontStyleChoice): void {
+    fontStyleInput.value = styleOptions.value.find((option) => option.code === value)?.label ?? "";
     update({
       bold: value === "bold" || value === "boldItalic" ? true : null,
       italic: value === "italic" || value === "boldItalic" ? true : null,
     });
+  }
+  function updateFontStyleInput(value: string): void {
+    fontStyleInput.value = value;
+  }
+  function selectFontStyle(value: string): void {
+    const label = value.trim().toLocaleLowerCase();
+    const option = styleOptions.value.find((option) => option.label.toLocaleLowerCase() === label);
+    if (option) setFontStyle(option.code);
+    else fontStyleInput.value = styleLabel.value;
+  }
+  function commitFontStyleInput(): void {
+    if (fontStyleInput.value === styleLabel.value) return;
+    selectFontStyle(fontStyleInput.value);
   }
   function setUnderline(value: unknown): void {
     if (value === "none") update({ underline: null });
@@ -200,6 +216,7 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
     sizeMixed,
     sizeOptions,
     fontStyle,
+    fontStyleInput,
     styleOptions,
     underline,
     underlineOptions,
@@ -215,7 +232,9 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
     setSize,
     updateSizeInput,
     commitSizeInput,
-    setFontStyle,
+    updateFontStyleInput,
+    selectFontStyle,
+    commitFontStyleInput,
     setUnderline,
     setStrikethrough,
     setScript,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Input as TInput } from "tdesign-vue-next/es/input";
+import { AutoComplete as TAutoComplete } from "tdesign-vue-next/es/auto-complete";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import type { CellStylePatch } from "@idea10/core/style";
@@ -13,7 +13,6 @@ import {
 } from "../../../shared/cell-text/font-presentation";
 import { useAppI18n } from "../../../shared/i18n";
 import { useFontFormatPanel } from "../font/useFontFormatPanel";
-import CellFormatOptionList from "./CellFormatOptionList.vue";
 import CellFormatFontColorControl from "./CellFormatFontColorControl.vue";
 
 const props = defineProps<{
@@ -24,15 +23,14 @@ const props = defineProps<{
 const emit = defineEmits<{ "update:patch": [patch: CellStylePatch] }>();
 const { t } = useAppI18n();
 const {
-  family,
   familyInput,
   familyMixed,
   familyOptions,
-  size,
   sizeInput,
   sizeMixed,
   sizeOptions,
   fontStyle,
+  fontStyleInput,
   styleOptions,
   underline,
   underlineOptions,
@@ -48,15 +46,35 @@ const {
   setSize,
   updateSizeInput,
   commitSizeInput,
-  setFontStyle,
+  updateFontStyleInput,
+  selectFontStyle,
+  commitFontStyleInput,
   setUnderline,
   setStrikethrough,
   setScript,
   setColor,
 } = useFontFormatPanel(props, (patch) => emit("update:patch", patch));
-const styleLabel = computed(
-  () => styleOptions.value.find((option) => option.code === fontStyle.value)?.label ?? "",
-);
+const fontPopupStyle = { maxHeight: "200px", overflow: "auto" as const };
+// Commit free text after the popup closes, so input blur cannot replace an
+// option between its mousedown and click events.
+const familyPopupProps = {
+  overlayInnerStyle: fontPopupStyle,
+  onVisibleChange: (visible: boolean) => {
+    if (!visible) commitFamilyInput();
+  },
+};
+const stylePopupProps = {
+  overlayInnerStyle: fontPopupStyle,
+  onVisibleChange: (visible: boolean) => {
+    if (!visible) commitFontStyleInput();
+  },
+};
+const sizePopupProps = {
+  overlayInnerStyle: fontPopupStyle,
+  onVisibleChange: (visible: boolean) => {
+    if (!visible) commitSizeInput();
+  },
+};
 const previewText = computed(() =>
   props.sampleValue === null || props.sampleValue === ""
     ? t("cellFormat.fontPreviewText")
@@ -67,81 +85,52 @@ const previewText = computed(() =>
 <template>
   <section class="cell-format-font" :aria-label="t('cellFormat.font')">
     <div class="cell-format-font__lists">
-      <div class="cell-format-font__field" role="group" :aria-label="t('format.fontFamily')">
+      <label class="cell-format-font__field">
         <span>{{ t("format.fontFamily") }}</span>
-        <TInput
+        <TAutoComplete
           :model-value="familyInput"
-          :aria-label="t('format.fontFamily')"
+          :options="familyOptions"
+          :input-props="{ maxlength: 80 }"
+          :popup-props="familyPopupProps"
           :placeholder="familyMixed ? t('format.mixed') : undefined"
-          :maxlength="80"
+          filterable
+          clearable
           data-cell-format-font-family
           @change="updateFamilyInput"
-          @blur="commitFamilyInput"
+          @select="setFamily"
           @enter="commitFamilyInput"
         />
-        <CellFormatOptionList
-          class="cell-format-font__list"
-          :model-value="family"
-          :options="familyOptions"
-          :label="t('format.fontFamily')"
-          data-cell-format-font-family-list
-          @select="setFamily"
-        >
-          <template #option="{ option }"
-            ><span :style="{ fontFamily: option.code }">{{ option.label }}</span></template
-          >
-        </CellFormatOptionList>
-      </div>
-      <div class="cell-format-font__field" role="group" :aria-label="t('cellFormat.fontStyle')">
+      </label>
+      <label class="cell-format-font__field">
         <span>{{ t("cellFormat.fontStyle") }}</span>
-        <TInput
-          :model-value="styleLabel"
-          :aria-label="t('cellFormat.fontStyle')"
-          :placeholder="fontStyle === undefined ? t('format.mixed') : undefined"
-          readonly
-          data-cell-format-font-style
-        />
-        <CellFormatOptionList
-          class="cell-format-font__list"
-          :model-value="fontStyle"
+        <TAutoComplete
+          :model-value="fontStyleInput"
           :options="styleOptions"
-          :label="t('cellFormat.fontStyle')"
-          data-cell-format-font-style-list
-          @select="setFontStyle"
-        >
-          <template #option="{ option }"
-            ><span
-              :style="{
-                fontWeight: option.code === 'bold' || option.code === 'boldItalic' ? 700 : 400,
-                fontStyle:
-                  option.code === 'italic' || option.code === 'boldItalic' ? 'italic' : 'normal',
-              }"
-              >{{ option.label }}</span
-            ></template
-          >
-        </CellFormatOptionList>
-      </div>
-      <div class="cell-format-font__field" role="group" :aria-label="t('format.fontSize')">
+          :popup-props="stylePopupProps"
+          :placeholder="fontStyle === undefined ? t('format.mixed') : undefined"
+          filterable
+          clearable
+          data-cell-format-font-style
+          @change="updateFontStyleInput"
+          @select="selectFontStyle"
+          @enter="commitFontStyleInput"
+        />
+      </label>
+      <label class="cell-format-font__field">
         <span>{{ t("format.fontSize") }}</span>
-        <TInput
+        <TAutoComplete
           :model-value="sizeInput"
-          :aria-label="t('format.fontSize')"
+          :options="sizeOptions"
+          :popup-props="sizePopupProps"
           :placeholder="sizeMixed ? t('format.mixed') : undefined"
-          inputmode="numeric"
+          filterable
+          clearable
           data-cell-format-font-size
           @change="updateSizeInput"
-          @blur="commitSizeInput"
+          @select="setSize"
           @enter="commitSizeInput"
         />
-        <CellFormatOptionList
-          class="cell-format-font__list"
-          :model-value="size === undefined ? undefined : String(size)"
-          :options="sizeOptions"
-          :label="t('format.fontSize')"
-          data-cell-format-font-size-list
-          @select="setSize"
-        />
-      </div>
+      </label>
     </div>
     <div class="cell-format-font__appearance">
       <div class="cell-format-font__field" role="group" :aria-label="t('format.underline')">
@@ -232,9 +221,6 @@ const previewText = computed(() =>
     align-content: start;
     gap: 4px;
     min-width: 0;
-  }
-  &__list {
-    height: 160px;
   }
   &__bottom {
     display: grid;

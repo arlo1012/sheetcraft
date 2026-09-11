@@ -1,7 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import { defineComponent, ref } from "vue";
-import { Input as TInput } from "tdesign-vue-next/es/input";
+import { AutoComplete as TAutoComplete } from "tdesign-vue-next/es/auto-complete";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
@@ -39,30 +39,35 @@ describe("CellFormatFontPanel", () => {
       expect(
         panel.get("[data-cell-format-superscript]").getComponent(TCheckbox).props("indeterminate"),
       ).toBe(true);
-      panel.get("[data-cell-format-font-size]").getComponent(TInput).vm.$emit("blur");
+      panel.get("[data-cell-format-font-size]").getComponent(TAutoComplete).vm.$emit("enter");
       await wrapper.vm.$nextTick();
       expect(patch()).toEqual({});
-      await panel
-        .get('[data-cell-format-font-style-list] [data-cell-format-option="regular"]')
-        .trigger("click");
+      panel
+        .get("[data-cell-format-font-style]")
+        .getComponent(TAutoComplete)
+        .vm.$emit("select", "Regular");
+      await wrapper.vm.$nextTick();
       expect(patch()).toEqual({ bold: null, italic: null });
     } finally {
       wrapper.unmount();
     }
   });
 
-  test("uses font family and combined style lists without changing other fields", async () => {
+  test("selects font family and combined style suggestions without changing other fields", async () => {
     const { wrapper, panel, patch } = mountPanel();
     try {
-      await panel
-        .get('[data-cell-format-font-family-list] [data-cell-format-option="Arial"]')
-        .trigger("click");
-      await panel
-        .get('[data-cell-format-font-style-list] [data-cell-format-option="boldItalic"]')
-        .trigger("click");
+      panel
+        .get("[data-cell-format-font-family]")
+        .getComponent(TAutoComplete)
+        .vm.$emit("select", "Arial");
+      panel
+        .get("[data-cell-format-font-style]")
+        .getComponent(TAutoComplete)
+        .vm.$emit("select", "Bold italic");
+      await wrapper.vm.$nextTick();
       expect(patch()).toEqual({ fontFamily: "Arial", bold: true, italic: true });
       expect(
-        panel.get("[data-cell-format-font-family]").getComponent(TInput).props("modelValue"),
+        panel.get("[data-cell-format-font-family]").getComponent(TAutoComplete).props("modelValue"),
       ).toBe("Arial");
       const preview = panel.get<HTMLElement>("[data-cell-format-font-preview]").element;
       expect(preview.style.fontFamily).toBe("Arial");
@@ -76,22 +81,22 @@ describe("CellFormatFontPanel", () => {
   test("commits a custom font name with spaces and rejects invalid drafts", async () => {
     const { wrapper, panel, patch } = mountPanel();
     try {
-      const input = panel.get("[data-cell-format-font-family]").getComponent(TInput);
+      const input = panel.get("[data-cell-format-font-family]").getComponent(TAutoComplete);
       input.vm.$emit("change", "Noto Sans ");
       await wrapper.vm.$nextTick();
       expect(input.props("modelValue")).toBe("Noto Sans ");
       expect(patch()).toEqual({});
       input.vm.$emit("change", "Noto Sans CJK");
-      input.vm.$emit("blur");
+      input.vm.$emit("enter");
       await wrapper.vm.$nextTick();
       expect(patch()).toEqual({ fontFamily: "Noto Sans CJK" });
       input.vm.$emit("change", "x".repeat(81));
-      input.vm.$emit("blur");
+      input.vm.$emit("enter");
       await wrapper.vm.$nextTick();
       expect(patch()).toEqual({ fontFamily: "Noto Sans CJK" });
       expect(input.props("modelValue")).toBe("Noto Sans CJK");
       input.vm.$emit("change", "");
-      input.vm.$emit("blur");
+      input.vm.$emit("enter");
       await wrapper.vm.$nextTick();
       expect(input.props("modelValue")).toBe("Noto Sans CJK");
     } finally {
@@ -99,31 +104,26 @@ describe("CellFormatFontPanel", () => {
     }
   });
 
-  test("links typed size and size list, clamps on blur, and restores an empty draft", async () => {
+  test("links typed size and suggestions, clamps on Enter, and restores an empty draft", async () => {
     const { wrapper, panel, patch } = mountPanel();
     try {
-      const input = panel.get("[data-cell-format-font-size]").getComponent(TInput);
-      input.vm.$emit("blur");
+      const input = panel.get("[data-cell-format-font-size]").getComponent(TAutoComplete);
+      input.vm.$emit("enter");
       expect(patch()).toEqual({});
       input.vm.$emit("change", "24");
       await wrapper.vm.$nextTick();
       expect(patch().fontSize).toBe(24);
-      expect(
-        panel
-          .get('[data-cell-format-font-size-list] [data-cell-format-option="24"]')
-          .attributes("aria-selected"),
-      ).toBe("true");
+      expect(input.props("modelValue")).toBe("24");
       input.vm.$emit("change", "3");
-      input.vm.$emit("blur");
+      input.vm.$emit("enter");
       await wrapper.vm.$nextTick();
       expect(patch().fontSize).toBe(8);
       input.vm.$emit("change", "");
-      input.vm.$emit("blur");
+      input.vm.$emit("enter");
       await wrapper.vm.$nextTick();
       expect(input.props("modelValue")).toBe("8");
-      await panel
-        .get('[data-cell-format-font-size-list] [data-cell-format-option="18"]')
-        .trigger("click");
+      input.vm.$emit("select", "18");
+      await wrapper.vm.$nextTick();
       expect(input.props("modelValue")).toBe("18");
     } finally {
       wrapper.unmount();
