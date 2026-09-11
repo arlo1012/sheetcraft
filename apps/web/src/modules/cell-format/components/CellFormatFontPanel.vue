@@ -196,19 +196,22 @@ const previewText = computed(() =>
       <div class="cell-format-font__preview-group">
         <h3>{{ t("cellFormat.preview") }}</h3>
         <div class="cell-format-font__preview" :aria-label="t('cellFormat.preview')">
-          <span class="cell-format-font__preview-rule" aria-hidden="true" />
-          <span
-            :style="{
-              ...getCellTextTypographyStyle(previewStyle, { includeDecorations: false }),
-              ...getCellTextScriptStyle(previewStyle),
-              ...getCellTextUnderlineStyle(previewStyle),
-            }"
-            data-cell-format-font-preview
-            ><span :style="getCellTextStrikethroughStyle(previewStyle)">{{
-              previewText
-            }}</span></span
-          >
-          <span class="cell-format-font__preview-rule" aria-hidden="true" />
+          <div class="cell-format-font__preview-content">
+            <span class="cell-format-font__preview-rule" aria-hidden="true" />
+            <span
+              class="cell-format-font__preview-text"
+              :style="{
+                ...getCellTextTypographyStyle(previewStyle, { includeDecorations: false }),
+                ...getCellTextScriptStyle(previewStyle),
+                ...getCellTextUnderlineStyle(previewStyle),
+              }"
+              data-cell-format-font-preview
+              ><span :style="getCellTextStrikethroughStyle(previewStyle)">{{
+                previewText
+              }}</span></span
+            >
+            <span class="cell-format-font__preview-rule" aria-hidden="true" />
+          </div>
         </div>
       </div>
     </div>
@@ -246,8 +249,8 @@ const previewText = computed(() =>
   }
   &__bottom {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-    gap: 16px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
     align-items: start;
   }
   &__effects,
@@ -256,19 +259,33 @@ const previewText = computed(() =>
     gap: 4px;
     min-width: 0;
   }
+  &__preview-group {
+    grid-column: span 2;
+  }
   &__preview {
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: center;
     min-width: 0;
-    min-height: 72px;
-    overflow: auto;
+    height: 72px;
+    overflow: hidden;
     padding: 12px 8px;
     border: 1px solid var(--idea-border-subtle);
     border-radius: var(--idea-radius-default);
     background: var(--idea-surface-panel);
     line-height: normal;
     white-space: pre;
+  }
+  &__preview-content {
+    display: flex;
+    flex: none;
+    align-items: baseline;
+    gap: 12px;
+    width: max-content;
+    min-width: 100%;
+  }
+  &__preview-text {
+    flex: none;
   }
   &__preview-rule {
     flex: 1 0 16px;
@@ -283,9 +300,14 @@ const previewText = computed(() =>
         grid-column: 1 / -1;
       }
     }
-    &__appearance,
-    &__bottom {
+    &__appearance {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    &__bottom {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    &__preview-group {
+      grid-column: auto;
     }
   }
 }
