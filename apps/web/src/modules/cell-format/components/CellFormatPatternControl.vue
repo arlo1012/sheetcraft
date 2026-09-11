@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { ChevronDown, Search } from "lucide-vue-next";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { Popup as TPopup } from "tdesign-vue-next/es/popup";
+import { SelectInput as TSelectInput } from "tdesign-vue-next/es/select-input";
 import { CELL_FILL_PATTERNS, type CellFillPatternStyle } from "@idea10/core/style";
 import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
 import { useAppI18n } from "../../../shared/i18n";
@@ -17,8 +17,9 @@ const emit = defineEmits<{ select: [value: PatternValue] }>();
 const { t } = useAppI18n();
 const open = ref(false);
 const query = ref("");
-const trigger = ref<HTMLButtonElement>();
+const control = ref<HTMLElement>();
 const panel = ref<HTMLElement>();
+const panelId = useId();
 const listId = useId();
 const options = computed(() => [
   { value: "none" as const, label: t("cellFormat.patternNone") },
@@ -32,6 +33,14 @@ const selectedLabel = computed(
   () =>
     options.value.find((option) => option.value === props.modelValue)?.label ?? t("format.mixed"),
 );
+const triggerInputProps = computed(() => ({
+  role: "combobox",
+  "aria-label": `${t("cellFormat.patternStyle")}: ${selectedLabel.value}`,
+  "aria-expanded": open.value,
+  "aria-haspopup": "dialog",
+  "aria-controls": open.value ? panelId : undefined,
+  onKeydown: onTriggerKeydown,
+}));
 
 function preview(value: PatternValue) {
   return getCellFillStyle({
@@ -43,11 +52,22 @@ function preview(value: PatternValue) {
 }
 function close(): void {
   open.value = false;
-  void nextTick(() => trigger.value?.focus());
+  void nextTick(() => control.value?.querySelector<HTMLInputElement>("input")?.focus());
 }
 function select(value: PatternValue): void {
   emit("select", value);
   close();
+}
+function onTriggerKeydown(_value: string | number, { e: event }: { e: KeyboardEvent }): void {
+  if (["Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key)) {
+    event.preventDefault();
+    event.stopPropagation();
+    open.value = true;
+  } else if (event.key === "Escape" && open.value) {
+    event.preventDefault();
+    event.stopPropagation();
+    close();
+  }
 }
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
@@ -96,34 +116,32 @@ watch(open, (value) => {
 </script>
 
 <template>
-  <div class="cell-format-pattern-control">
-    <TPopup
-      v-model:visible="open"
-      trigger="click"
-      placement="bottom-right"
-      :overlay-inner-style="{ padding: '0' }"
+  <div ref="control" class="cell-format-pattern-control">
+    <TSelectInput
+      :value="{ value: modelValue, label: selectedLabel }"
+      :popup-visible="open"
+      :popup-props="{ placement: 'bottom-right', overlayInnerStyle: { padding: '0' } }"
+      :input-props="triggerInputProps"
+      @popup-visible-change="open = $event"
     >
-      <button
-        ref="trigger"
-        type="button"
-        class="cell-format-pattern-control__trigger"
-        :aria-label="`${t('cellFormat.patternStyle')}: ${selectedLabel}`"
-        :aria-expanded="open"
-        aria-haspopup="dialog"
-        @keydown.down.prevent="open = true"
-      >
-        <span
-          v-if="modelValue && modelValue !== 'none'"
-          class="cell-format-pattern-control__selected-swatch"
-          :style="preview(modelValue)"
-          aria-hidden="true"
-        />
-        <span class="cell-format-pattern-control__label">{{ selectedLabel }}</span>
+      <template #valueDisplay>
+        <span class="cell-format-pattern-control__value">
+          <span
+            v-if="modelValue && modelValue !== 'none'"
+            class="cell-format-pattern-control__selected-swatch"
+            :style="preview(modelValue)"
+            aria-hidden="true"
+          />
+          <span class="cell-format-pattern-control__label">{{ selectedLabel }}</span>
+        </span>
+      </template>
+      <template #suffixIcon>
         <ChevronDown :size="14" aria-hidden="true" />
-      </button>
-      <template #content>
+      </template>
+      <template #panel>
         <div
           v-if="open"
+          :id="panelId"
           ref="panel"
           class="cell-format-pattern-control__panel"
           role="dialog"
@@ -173,37 +191,18 @@ watch(open, (value) => {
           </p>
         </div>
       </template>
-    </TPopup>
+    </TSelectInput>
   </div>
 </template>
 
 <style scoped lang="scss">
 .cell-format-pattern-control {
   min-width: 0;
-  &__trigger {
+  &__value {
     display: flex;
     align-items: center;
     gap: 8px;
-    width: 100%;
-    height: 28px;
-    padding: 4px 8px;
-    border: 1px solid var(--idea-border-strong);
-    border-radius: var(--idea-radius-default);
-    background: var(--idea-surface-panel);
-    color: var(--idea-text-primary);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-    &:hover {
-      border-color: var(--idea-action-primary-hover);
-    }
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-focus);
-    }
-    svg {
-      flex: none;
-      color: var(--idea-text-secondary);
-    }
+    min-width: 0;
   }
   &__label {
     flex: 1;
