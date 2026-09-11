@@ -219,7 +219,7 @@ watch(() => props.gradient, resetDraft, { immediate: true });
 .cell-format-fill-effects {
   &__body {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: max-content minmax(0, 1fr);
     gap: 16px 20px;
     color: var(--idea-text-primary);
     font-size: var(--idea-font-size-body-medium);
@@ -262,14 +262,14 @@ watch(() => props.gradient, resetDraft, { immediate: true });
   }
   &__variant-list {
     display: grid;
-    grid-template-columns: repeat(2, 48px);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     grid-auto-rows: 38px;
     align-content: start;
     gap: 8px;
-    min-height: 84px;
+    min-height: 38px;
   }
   &__variant {
-    width: 48px;
+    width: 100%;
     height: 38px;
     border: 1px solid var(--idea-border-control);
     border-radius: var(--idea-radius-default);
