@@ -45,7 +45,25 @@ const showingMore = ref(false);
 const showingInlineMore = computed(() => showingMore.value && props.moreMode === "inline");
 const focusedSwatch = ref(0);
 const swatchButtons = new Map<number, HTMLButtonElement>();
+const paletteRef = ref<HTMLElement | null>(null);
 const moreButtonRef = ref<HTMLButtonElement | null>(null);
+const morePopupOptions = {
+  modifiers: [
+    { name: "flip", enabled: false },
+    {
+      name: "offset",
+      options: {
+        offset: (): [number, number] => {
+          const palette = paletteRef.value?.getBoundingClientRect();
+          const trigger = moreButtonRef.value?.getBoundingClientRect();
+          return palette && trigger
+            ? [palette.left - trigger.left, palette.top - trigger.bottom]
+            : [0, 0];
+        },
+      },
+    },
+  ],
+};
 const allowedColorSet = computed(() => {
   if (props.allowedColors === undefined) return undefined;
   return new Set(
@@ -158,10 +176,12 @@ function setSwatchRef(index: number) {
 
 <template>
   <section
+    ref="paletteRef"
     class="color-palette"
     :class="{
       'is-more': showingInlineMore,
       'is-compact': compact,
+      'is-popup-open': showingMore && moreMode === 'popup',
     }"
     :style="{ '--color-palette-columns': gridColumns }"
     :aria-label="t('colorPalette.label')"
@@ -280,7 +300,8 @@ function setSwatchRef(index: number) {
         :visible="showingMore"
         trigger="click"
         placement="bottom-left"
-        :overlay-inner-style="{ padding: '0' }"
+        :popper-options="morePopupOptions"
+        :overlay-inner-style="{ padding: '0', margin: '0' }"
         @visible-change="onPopupVisibleChange"
       >
         <button
@@ -343,6 +364,10 @@ function setSwatchRef(index: number) {
   padding: var(--idea-tool-panel-padding);
   background: var(--idea-surface-panel);
   color: var(--idea-text-primary);
+
+  &.is-popup-open {
+    visibility: hidden;
+  }
 
   &__default,
   &__more,

@@ -54,7 +54,7 @@ describe("ColorPalette", () => {
     expect(wrapper.emitted("select")).toEqual([["#a1b2c3"]]);
   });
 
-  test("keeps the palette visible while custom colors are applied or dismissed in a popup", async () => {
+  test("returns to the original palette when custom colors are applied or dismissed", async () => {
     const wrapper = mountPalette({ moreMode: "popup", modelValue: "#ffffff" });
     const swatch = wrapper.get('[data-color-swatch="#ffffff"]').element;
     // TDesign dismisses floating content when its anchor has no layout box.
