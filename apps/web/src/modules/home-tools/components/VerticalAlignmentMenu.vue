@@ -346,7 +346,6 @@ watch(
 
   &__disclosure {
     flex: 0 0 auto;
-    color: var(--idea-text-muted);
   }
 
   &__panel {

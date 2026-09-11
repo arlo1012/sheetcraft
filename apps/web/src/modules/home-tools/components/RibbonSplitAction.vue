@@ -147,7 +147,6 @@ function toggleMenu(): void {
   &__menu {
     flex: 0 0 12px;
     border-radius: 0 var(--idea-radius-default) var(--idea-radius-default) 0;
-    color: var(--idea-text-muted);
   }
 
   &__icon {
