@@ -180,38 +180,44 @@ function checkboxPressed(
     <div class="cell-format-alignment__layout">
       <div class="cell-format-alignment__content">
         <h3>{{ t("cellFormat.textAlignment") }}</h3>
-        <label class="cell-format-alignment__field"
-          ><span>{{ t("cellFormat.horizontal") }}</span
-          ><TSelect
-            :model-value="horizontal"
-            :options="horizontalOptions"
-            :placeholder="state.horizontalAlign.mixed ? t('format.mixed') : undefined"
-            data-cell-format-horizontal
-            @change="setHorizontal"
-        /></label>
-        <label class="cell-format-alignment__field"
-          ><span>{{ t("cellFormat.vertical") }}</span
-          ><TSelect
-            :model-value="vertical"
-            :options="verticalOptions"
-            :placeholder="state.verticalAlign.mixed ? t('format.mixed') : undefined"
-            data-cell-format-vertical
-            @change="setVertical"
-        /></label>
-        <div class="cell-format-alignment__field" role="group" :aria-label="t('cellFormat.indent')">
-          <span>{{ t("cellFormat.indent") }}</span
-          ><TInputNumber
-            :model-value="indent"
-            :min="0"
-            :max="250"
-            :decimal-places="0"
-            :disabled="!canIndent"
-            theme="column"
-            class="idea-input-number--persistent-controls"
-            :placeholder="state.indent.mixed ? t('format.mixed') : undefined"
-            data-cell-format-indent
-            @change="setIndent"
-          />
+        <div class="cell-format-alignment__fields">
+          <label class="cell-format-alignment__field"
+            ><span>{{ t("cellFormat.horizontal") }}</span
+            ><TSelect
+              :model-value="horizontal"
+              :options="horizontalOptions"
+              :placeholder="state.horizontalAlign.mixed ? t('format.mixed') : undefined"
+              data-cell-format-horizontal
+              @change="setHorizontal"
+          /></label>
+          <label class="cell-format-alignment__field"
+            ><span>{{ t("cellFormat.vertical") }}</span
+            ><TSelect
+              :model-value="vertical"
+              :options="verticalOptions"
+              :placeholder="state.verticalAlign.mixed ? t('format.mixed') : undefined"
+              data-cell-format-vertical
+              @change="setVertical"
+          /></label>
+          <div
+            class="cell-format-alignment__field"
+            role="group"
+            :aria-label="t('cellFormat.indent')"
+          >
+            <span>{{ t("cellFormat.indent") }}</span
+            ><TInputNumber
+              :model-value="indent"
+              :min="0"
+              :max="250"
+              :decimal-places="0"
+              :disabled="!canIndent"
+              theme="column"
+              class="idea-input-number--persistent-controls"
+              :placeholder="state.indent.mixed ? t('format.mixed') : undefined"
+              data-cell-format-indent
+              @change="setIndent"
+            />
+          </div>
         </div>
         <h3>{{ t("cellFormat.textControl") }}</h3>
         <div
@@ -287,15 +293,23 @@ function checkboxPressed(
     font-size: inherit;
     font-weight: var(--idea-font-weight-semibold);
   }
+  &__fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) 96px;
+    gap: 12px;
+  }
   &__field {
     display: grid;
+    min-width: 0;
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
     gap: 4px;
   }
   &__checks {
-    display: grid;
-    gap: 7px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
     padding-top: 1px;
   }
 }
