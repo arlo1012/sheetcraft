@@ -142,6 +142,7 @@ function confirm(): void {
       :class="{
         'cell-format-dialog__tabs--number': activeTab === 'number',
         'cell-format-dialog__tabs--alignment': activeTab === 'alignment',
+        'cell-format-dialog__tabs--font': activeTab === 'font',
       }"
     >
       <TabPanel value="number" :destroy-on-hide="false">
@@ -266,7 +267,8 @@ function confirm(): void {
     height: min(508px, calc(100dvh - 192px));
   }
 
-  &--alignment {
+  &--alignment,
+  &--font {
     height: auto;
     max-height: calc(100dvh - 192px);
   }

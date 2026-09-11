@@ -1,18 +1,39 @@
 <script setup lang="ts" generic="Value extends string">
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 
 type FormatOption = Readonly<{ code: Value; value?: Value; label: string; color?: string }>;
 const props = defineProps<{
   modelValue: Value | undefined;
   options: readonly FormatOption[];
   label: string;
-  variant?: "category" | "type";
+  variant?: "navigation" | "compact";
+  itemDataAttribute?: `data-${string}`;
   monospace?: boolean;
 }>();
 const emit = defineEmits<{ select: [code: Value] }>();
+defineSlots<{ option?: (props: { option: FormatOption }) => unknown }>();
 const listRef = ref<HTMLElement>();
+const itemAttribute = computed(() => props.itemDataAttribute ?? "data-cell-format-option");
 const selectedIndex = computed(() =>
   props.options.findIndex((option) => optionValue(option) === props.modelValue),
+);
+watch(
+  selectedIndex,
+  () => {
+    void nextTick(() => {
+      const list = listRef.value;
+      const buttons = list?.querySelectorAll<HTMLButtonElement>("button");
+      const first = buttons?.[0];
+      const selected = buttons?.[selectedIndex.value];
+      if (!list || !first || !selected) return;
+      const top = selected.offsetTop - first.offsetTop + 4;
+      const bottom = top + selected.offsetHeight;
+      if (top < list.scrollTop) list.scrollTop = top;
+      else if (bottom > list.scrollTop + list.clientHeight)
+        list.scrollTop = bottom - list.clientHeight;
+    });
+  },
+  { immediate: true },
 );
 function onKeydown(event: KeyboardEvent): void {
   if (!props.options.length) return;
@@ -39,13 +60,13 @@ function optionValue(option: FormatOption): Value {
 <template>
   <div
     ref="listRef"
-    class="number-format-options"
-    :class="{ 'is-category': variant === 'category', 'is-monospace': monospace }"
+    class="cell-format-options"
+    :class="{ 'is-navigation': variant === 'navigation', 'is-monospace': monospace }"
     role="listbox"
     :aria-label="label"
     @keydown="onKeydown"
   >
-    <div class="number-format-options__items">
+    <div class="cell-format-options__items">
       <button
         v-for="(option, index) in options"
         :key="optionValue(option)"
@@ -55,17 +76,16 @@ function optionValue(option: FormatOption): Value {
         :tabindex="index === Math.max(0, selectedIndex) ? 0 : -1"
         :style="{ color: option.color }"
         :title="option.label"
-        :data-cell-format-number-category="variant === 'category' ? optionValue(option) : undefined"
-        :data-cell-format-type="variant !== 'category' ? optionValue(option) : undefined"
+        :[itemAttribute]="optionValue(option)"
         @click="emit('select', optionValue(option))"
       >
-        {{ option.label }}
+        <slot name="option" :option="option">{{ option.label }}</slot>
       </button>
     </div>
   </div>
 </template>
 <style scoped lang="scss">
-.number-format-options {
+.cell-format-options {
   min-width: 0;
   min-height: 0;
   overflow: auto;
@@ -137,8 +157,8 @@ function optionValue(option: FormatOption): Value {
   &.is-monospace button {
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   }
-  &.is-category {
-    .number-format-options__items {
+  &.is-navigation {
+    .cell-format-options__items {
       width: 100%;
     }
     button {
@@ -153,7 +173,7 @@ function optionValue(option: FormatOption): Value {
   }
 }
 @media (max-width: 480px) {
-  .number-format-options.is-category .number-format-options__items {
+  .cell-format-options.is-navigation .cell-format-options__items {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

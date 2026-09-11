@@ -11,6 +11,9 @@ function createStyleState(): SelectionCellStyleState {
     bold: "off",
     italic: "off",
     underline: "off",
+    underlineStyle: { value: undefined, mixed: false },
+    strikethrough: "off",
+    fontScript: { value: undefined, mixed: false },
     textColor: { value: undefined, mixed: false },
     fillColor: { value: undefined, mixed: false },
     horizontalAlign: { value: undefined, mixed: false },
@@ -53,7 +56,7 @@ describe("HomeCellFormatGroup layout", () => {
         .findAll(":scope > [data-cell-format-lane]")
         .map((lane) => lane.attributes("data-cell-format-lane")),
     ).toEqual(["typography", "appearance", "styles"]);
-    expect(placeholders(wrapper, "typography")).toEqual(["strikethrough"]);
+    expect(placeholders(wrapper, "typography")).toEqual([]);
     expect(placeholders(wrapper, "appearance")).toEqual([]);
     expect(placeholders(wrapper, "styles")).toEqual(["table-styles", "conditional-formatting"]);
     expect(
@@ -61,7 +64,7 @@ describe("HomeCellFormatGroup layout", () => {
         .get(".text-format-controls")
         .findAll("button")
         .map((action) => action.attributes("aria-label")),
-    ).toEqual(["Bold", "Italic", "Underline", "Strikethrough, not available yet"]);
+    ).toEqual(["Bold", "Italic", "Underline", "Strikethrough"]);
     expect(
       wrapper
         .get("[data-font-format-control]")

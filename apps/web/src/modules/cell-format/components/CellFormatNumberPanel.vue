@@ -10,7 +10,7 @@ import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import { useNumberFormatPanel } from "../number-format/useNumberFormatPanel";
 import NumberFormatCategoryList from "./NumberFormatCategoryList.vue";
-import NumberFormatOptionList from "./NumberFormatOptionList.vue";
+import CellFormatOptionList from "./CellFormatOptionList.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -145,8 +145,9 @@ function selectNegative(code: string): void {
           >
           <div v-if="showNegative" class="cell-format-number__negative">
             <span class="cell-format-number__label">{{ t("cellFormat.negativeNumbers") }}</span>
-            <NumberFormatOptionList
+            <CellFormatOptionList
               class="number-format-types"
+              item-data-attribute="data-cell-format-type"
               :model-value="negativeStyle"
               :options="negativeTypes"
               :label="t('cellFormat.negativeNumbers')"
@@ -168,8 +169,9 @@ function selectNegative(code: string): void {
                 {{ t("cellFormat.invalidFormat") }}
               </p>
             </template>
-            <NumberFormatOptionList
+            <CellFormatOptionList
               class="number-format-types"
+              item-data-attribute="data-cell-format-type"
               :model-value="category === 'custom' ? customCode : selectedCode"
               :options="category === 'custom' ? customPresets : presets"
               :label="t('cellFormat.type')"

@@ -33,6 +33,36 @@ function cellFormat(bytes: Uint8Array, address: string) {
 }
 
 describe("XLSX typography", () => {
+  test("round-trips every supported underline, strikethrough, and script effect", async () => {
+    const workbook = createWorkbook({ id: "font-effects", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    const effects: Array<{ style: CellStyle; xml: string }> = [
+      { style: { underline: true }, xml: "<u/>" },
+      { style: { underline: "double" }, xml: '<u val="double"/>' },
+      { style: { underline: "singleAccounting" }, xml: '<u val="singleAccounting"/>' },
+      { style: { underline: "doubleAccounting" }, xml: '<u val="doubleAccounting"/>' },
+      { style: { strikethrough: true }, xml: "<strike/>" },
+      { style: { fontScript: "superscript" }, xml: '<vertAlign val="superscript"/>' },
+      { style: { fontScript: "subscript" }, xml: '<vertAlign val="subscript"/>' },
+    ];
+    for (const [column, effect] of effects.entries()) {
+      setCellContent(sheet, { row: 0, column }, { kind: "literal", value: column });
+      setCellStyle(sheet, { row: 0, column }, effect.style);
+    }
+
+    const encoded = await encodeXlsx(workbook);
+    expect(encoded.report.issues).toEqual([]);
+    const decoded = await decodeXlsx(encoded.bytes);
+    expect(decoded.report.issues).toEqual([]);
+    const restored = getActiveSheet(decoded.workbook);
+    for (const [column, effect] of effects.entries()) {
+      expect(cellFormat(encoded.bytes, `${String.fromCharCode(65 + column)}1`).font).toContain(
+        effect.xml,
+      );
+      expect(getCellStyle(restored, { row: 0, column })).toMatchObject(effect.style);
+    }
+  });
+
   test("preserves every supported font-size number in XML and after reimport", async () => {
     const workbook = createWorkbook({ id: "font-sizes", sheetId: "sheet" });
     const sheet = getActiveSheet(workbook);

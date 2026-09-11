@@ -107,6 +107,45 @@ describe("selection cell style state", () => {
     expect(state.italic).toBe("off");
   });
 
+  test("summarizes font effects while retaining the exact underline style", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellStyle(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        underline: true,
+        strikethrough: true,
+        fontScript: "superscript",
+      },
+    );
+    setCellStyle(
+      sheet,
+      { row: 0, column: 1 },
+      {
+        underline: "double",
+        strikethrough: true,
+        fontScript: "superscript",
+      },
+    );
+
+    const mixedUnderline = getSelectionCellStyleState(sheet, {
+      start: { row: 0, column: 0 },
+      end: { row: 0, column: 1 },
+    });
+    expect(mixedUnderline.underline).toBe("on");
+    expect(mixedUnderline.underlineStyle).toEqual({ value: true, mixed: true });
+    expect(mixedUnderline.strikethrough).toBe("on");
+    expect(mixedUnderline.fontScript).toEqual({ value: "superscript", mixed: false });
+
+    const mixedEffects = getSelectionCellStyleState(sheet, {
+      start: { row: 0, column: 0 },
+      end: { row: 1, column: 1 },
+    });
+    expect(mixedEffects.underline).toBe("mixed");
+    expect(mixedEffects.strikethrough).toBe("mixed");
+    expect(mixedEffects.fontScript).toEqual({ value: "superscript", mixed: true });
+  });
+
   test("summarizes visible outer, inner, and diagonal borders", () => {
     const sheet = getActiveSheet(createTestWorkbook());
     const border = { style: "dashDot" as const, color: "#112233" };

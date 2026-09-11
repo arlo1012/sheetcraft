@@ -24,6 +24,9 @@ function createInput(value: string): HTMLTextAreaElement {
   input.style.fontFamily = "monospace";
   input.style.fontSize = "15px";
   input.style.fontWeight = "600";
+  input.style.position = "relative";
+  input.style.top = "-0.35em";
+  input.style.textDecoration = "underline line-through double";
   input.style.lineHeight = "20px";
   input.style.letterSpacing = "0.25px";
   input.style.whiteSpace = "pre-wrap";
@@ -94,6 +97,9 @@ describe("FormulaTextOverlay", () => {
     expect(content.style.padding).toBe("3px 7px");
     expect(content.style.fontFamily).toBe("monospace");
     expect(content.style.fontSize).toBe("15px");
+    expect(content.style.textDecoration).toBe("underline line-through double");
+    expect(content.style.position).toBe("relative");
+    expect(content.style.top).toBe("-5.6px");
     expect(content.style.lineHeight).toBe("20px");
     expect(content.style.whiteSpace).toBe("pre-wrap");
     expect(content.style.overflowWrap).toBe("anywhere");

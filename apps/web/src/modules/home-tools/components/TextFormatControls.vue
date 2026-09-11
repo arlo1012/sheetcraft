@@ -20,7 +20,10 @@ function ariaPressed(state: ToggleStyleState): boolean | "mixed" {
   return state === "mixed" ? "mixed" : state === "on";
 }
 
-function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): void {
+function toggle(
+  key: "bold" | "italic" | "underline" | "strikethrough",
+  state: ToggleStyleState,
+): void {
   emit("applyStyle", { [key]: state === "on" ? null : true });
 }
 </script>
@@ -56,9 +59,10 @@ function toggle(key: "bold" | "italic" | "underline", state: ToggleStyleState): 
     </RibbonIconAction>
     <RibbonIconAction
       class="text-format-controls__button"
-      :label="t('app.unavailableFeature', { feature: t('ribbon.strikethrough') })"
-      disabled
-      data-ribbon-placeholder="strikethrough"
+      :label="t('ribbon.strikethrough')"
+      :disabled="disabled"
+      :pressed="ariaPressed(state.strikethrough)"
+      @activate="toggle('strikethrough', state.strikethrough)"
     >
       <Strikethrough :size="15" aria-hidden="true" />
     </RibbonIconAction>

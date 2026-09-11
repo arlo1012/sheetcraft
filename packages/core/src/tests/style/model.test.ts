@@ -54,6 +54,9 @@ describe("cell style model", () => {
         fontFamily: "  Georgia  ",
         fontSize: 18,
         italic: true,
+        underline: "double",
+        strikethrough: true,
+        fontScript: "superscript",
         textColor: "#ABCDEF",
         horizontalAlign: "center",
         verticalAlign: "middle",
@@ -68,6 +71,9 @@ describe("cell style model", () => {
       fontFamily: "Georgia",
       fontSize: 18,
       italic: true,
+      underline: "double",
+      strikethrough: true,
+      fontScript: "superscript",
       textColor: "#abcdef",
       horizontalAlign: "center",
       verticalAlign: "middle",
@@ -119,6 +125,8 @@ describe("cell style model", () => {
     expect(() => normalizeCellStyle({ textRotation: -91 })).toThrow(RangeError);
     expect(() => normalizeCellStyle({ textRotation: 91 })).toThrow(RangeError);
     expect(() => normalizeCellStyle({ wrapText: "yes" as never })).toThrow(TypeError);
+    expect(() => normalizeCellStyle({ underline: "single" as never })).toThrow(TypeError);
+    expect(() => normalizeCellStyle({ fontScript: "baseline" as never })).toThrow(TypeError);
     expect(() =>
       normalizeCellStyle({
         numberFormat: { kind: "currency", currency: "yuan", fractionDigits: 2 },

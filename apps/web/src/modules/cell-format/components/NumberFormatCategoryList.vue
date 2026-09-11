@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { NUMBER_FORMAT_CATEGORY_ORDER, type NumberFormatCategory } from "../number-format/catalog";
-import NumberFormatOptionList from "./NumberFormatOptionList.vue";
+import CellFormatOptionList from "./CellFormatOptionList.vue";
 
 defineProps<{ modelValue: NumberFormatCategory | undefined }>();
 const emit = defineEmits<{ select: [category: NumberFormatCategory] }>();
@@ -29,12 +29,13 @@ const options = computed(() =>
 <template>
   <div class="number-format-categories">
     <h3 class="number-format-categories__label">{{ t("cellFormat.category") }}</h3>
-    <NumberFormatOptionList
+    <CellFormatOptionList
       class="number-format-categories__list"
       :model-value="modelValue"
       :options="options"
       :label="t('cellFormat.category')"
-      variant="category"
+      variant="navigation"
+      item-data-attribute="data-cell-format-number-category"
       data-cell-format-number-kind
       @select="emit('select', $event)"
     />

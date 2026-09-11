@@ -6,6 +6,11 @@ import type { CellNumberFormatPresentation } from "@idea10/core/number-format";
 import { DEFAULT_COLUMN_WIDTH, DEFAULT_ROW_HEIGHT } from "@idea10/core/workbook";
 import { browserCellTextMeasurer, cellTextFontRevision } from "./text-metrics";
 import { layoutCellText } from "./text-presentation";
+import {
+  getCellTextScriptStyle,
+  getCellTextStrikethroughStyle,
+  getCellTextUnderlineStyle,
+} from "./font-presentation";
 
 const props = defineProps<{
   text: string;
@@ -61,10 +66,14 @@ const contentStyle = computed<CSSProperties>(() => ({
   fontSize: `${layout.value.font.size}px`,
   fontWeight: layout.value.font.weight,
   fontStyle: layout.value.font.italic ? "italic" : undefined,
-  textDecoration: props.cellStyle?.underline ? "underline" : undefined,
+  ...getCellTextUnderlineStyle(props.cellStyle),
   lineHeight: `${layout.value.lineHeight}px`,
   ...(props.cellStyle?.textColor ? { color: props.cellStyle.textColor } : {}),
 }));
+const scriptStyle = computed<CSSProperties>(() => getCellTextScriptStyle(props.cellStyle));
+const strikethroughStyle = computed<CSSProperties>(() =>
+  getCellTextStrikethroughStyle(props.cellStyle),
+);
 </script>
 <template>
   <div
@@ -86,8 +95,11 @@ const contentStyle = computed<CSSProperties>(() => ({
           height: `${layout.lineHeight}px`,
           textAlign: line.align,
           textAlignLast: line.align,
+          ...scriptStyle,
         }"
-        >{{ line.text }}</span
+        ><span class="cell-text__strikethrough" :style="strikethroughStyle">{{
+          line.text
+        }}</span></span
       >
     </div>
   </div>
@@ -109,6 +121,9 @@ const contentStyle = computed<CSSProperties>(() => ({
     position: absolute;
     display: block;
     white-space: pre;
+  }
+  &__strikethrough {
+    display: block;
   }
 }
 </style>

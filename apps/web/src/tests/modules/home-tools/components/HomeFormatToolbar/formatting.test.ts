@@ -15,6 +15,9 @@ function createStyleState(
     bold: "off",
     italic: "off",
     underline: "off",
+    underlineStyle: { value: undefined, mixed: false },
+    strikethrough: "off",
+    fontScript: { value: undefined, mixed: false },
     textColor: { value: undefined, mixed: false },
     fillColor: { value: undefined, mixed: false },
     horizontalAlign: { value: undefined, mixed: false },
@@ -95,6 +98,18 @@ describe("HomeFormatToolbar", () => {
     await wrapper.get('[aria-label="Bold"]').trigger("click");
     await wrapper.get('[aria-label="Italic"]').trigger("click");
     expect(emittedPatches(wrapper)).toEqual([{ bold: null }, { italic: true }]);
+  });
+
+  test("activates strikethrough and preserves its mixed selection state", async () => {
+    const wrapper = mountToolbar(createStyleState({ strikethrough: "mixed" }));
+    const action = wrapper.get('[aria-label="Strikethrough"]');
+    expect(action.attributes("aria-pressed")).toBe("mixed");
+    expect(action.attributes("disabled")).toBeUndefined();
+    await action.trigger("click");
+    expect(emittedPatches(wrapper)).toEqual([{ strikethrough: true }]);
+    await wrapper.setProps({ state: createStyleState({ strikethrough: "on" }) });
+    await action.trigger("click");
+    expect(emittedPatches(wrapper).at(-1)).toEqual({ strikethrough: null });
   });
 
   test("uses native buttons for emphasis and alignment", async () => {
@@ -405,7 +420,7 @@ describe("HomeFormatToolbar", () => {
         disabled: "",
       });
     }
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(15);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(14);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({

@@ -15,7 +15,9 @@ describe("SheetGrid cell style rendering", () => {
         fontSize: 18,
         bold: true,
         italic: true,
-        underline: true,
+        underline: "doubleAccounting",
+        strikethrough: true,
+        fontScript: "superscript",
         textColor: "#123456",
         fillColor: "#abcdef",
         horizontalAlign: "center",
@@ -27,10 +29,10 @@ describe("SheetGrid cell style rendering", () => {
     const cell = wrapper.get('[data-row="0"][data-column="0"]');
     const style = (cell.element as HTMLElement).style;
     expect(style.fontFamily).toBe("Arial");
-    expect(style.fontSize).toBe("18px");
+    expect(style.fontSize).toBe("13.5px");
     expect(style.fontWeight).toBe("700");
     expect(style.fontStyle).toBe("italic");
-    expect(style.textDecoration).toBe("underline");
+    expect(style.textDecoration).toBe("");
     expect(style.color).toBe("#123456");
     expect(style.backgroundColor).toBe("#abcdef");
     expect(style.justifyContent).toBe("center");
@@ -58,6 +60,8 @@ describe("SheetGrid cell style rendering", () => {
       {
         fontFamily: "Courier New",
         fontSize: 20,
+        underline: true,
+        strikethrough: true,
         textColor: "#654321",
         fillColor: "#fedcba",
         horizontalAlign: "right",
@@ -76,6 +80,7 @@ describe("SheetGrid cell style rendering", () => {
     const style = (editor.element as HTMLTextAreaElement).style;
     expect(style.fontFamily).toBe('"Courier New"');
     expect(style.fontSize).toBe("20px");
+    expect(style.textDecoration).toBe("underline line-through");
     expect(style.color).toBe("#654321");
     expect(style.backgroundColor).toBe("");
     expect(style.textAlign).toBe("right");

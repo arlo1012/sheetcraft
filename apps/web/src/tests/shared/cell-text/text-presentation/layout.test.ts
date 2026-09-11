@@ -43,6 +43,16 @@ describe("cell text layout", () => {
     expect(wrapped.lines.length).toBeGreaterThan(1);
   });
 
+  test("measures superscript and subscript at their rendered size without changing the style", () => {
+    const style: CellStyle = { fontSize: 20, fontScript: "superscript" };
+    const superscript = layout("1234567890", style);
+    const baseline = layout("1234567890", { fontSize: 20 });
+    expect(superscript.font.size).toBe(15);
+    expect(superscript.width).toBeLessThan(baseline.width);
+    expect(style.fontSize).toBe(20);
+    expect(layout("1234567890", { fontSize: 20, fontScript: "subscript" }).font.size).toBe(15);
+  });
+
   test("fill repeats complete values and number-format fill keeps its suffix", () => {
     const result = layout("ab", { horizontalAlign: "fill" });
     expect(result.lines[0]?.text).toBe("ab".repeat(6));

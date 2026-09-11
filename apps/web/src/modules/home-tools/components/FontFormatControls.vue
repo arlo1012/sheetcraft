@@ -11,18 +11,11 @@ import {
 } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
+import {
+  CELL_FONT_FAMILY_PRESETS,
+  CELL_FONT_SIZE_PRESETS,
+} from "../../../shared/cell-text/font-catalog";
 
-const FONT_FAMILIES = [
-  "Inter",
-  "Arial",
-  "Times New Roman",
-  "Courier New",
-  "Microsoft YaHei",
-  "SimSun",
-] as const;
-const FONT_SIZE_PRESETS = [
-  8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 22, 24, 28, 32, 36, 48, 72,
-] as const;
 const fontFamilyPopupProps = {
   overlayStyle: { minWidth: "168px" },
   overlayInnerStyle: { minWidth: "168px" },
@@ -43,7 +36,7 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 const fontFamilyOptions = computed(() =>
-  FONT_FAMILIES.map((family) => ({
+  CELL_FONT_FAMILY_PRESETS.map((family) => ({
     label: family === DEFAULT_CELL_FONT_FAMILY ? t("format.defaultFont") : family,
     value: family,
   })),
@@ -57,7 +50,7 @@ const fontSizeValue = computed(() =>
   props.state.fontSize.mixed ? undefined : (props.state.fontSize.value ?? DEFAULT_CELL_FONT_SIZE),
 );
 const fontSizeOptions = computed(() => {
-  const values = new Set<number>(FONT_SIZE_PRESETS);
+  const values = new Set<number>(CELL_FONT_SIZE_PRESETS);
   if (props.state.fontSize.value !== undefined) {
     values.add(props.state.fontSize.value);
   }

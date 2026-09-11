@@ -203,6 +203,8 @@ describe("cell style commands", () => {
       bold: true,
       italic: true,
       underline: true,
+      strikethrough: true,
+      fontScript: "subscript",
       textColor: "#112233",
       fillColor: "#abcdef",
       horizontalAlign: "right",

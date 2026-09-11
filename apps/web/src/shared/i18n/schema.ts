@@ -465,6 +465,18 @@ export type MessageSchema = {
     verticalText: string;
     noFill: string;
     automatic: string;
+    fontStyle: string;
+    fontRegular: string;
+    fontBoldItalic: string;
+    fontEffects: string;
+    superscript: string;
+    subscript: string;
+    underlineNone: string;
+    underlineSingle: string;
+    underlineDouble: string;
+    underlineSingleAccounting: string;
+    underlineDoubleAccounting: string;
+    fontPreviewText: string;
     previewText: string;
     borderPreview: string;
     borderHint: string;

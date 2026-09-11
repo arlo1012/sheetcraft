@@ -39,6 +39,9 @@ export type HorizontalCellAlignment =
 export type VerticalCellAlignment = "top" | "middle" | "bottom" | "justify" | "distributed";
 export type CellTextDirection = "context" | "ltr" | "rtl";
 export type CellTextRotation = number | "vertical";
+/** `true` remains the backwards-compatible representation of a single underline. */
+export type CellUnderlineStyle = true | "double" | "singleAccounting" | "doubleAccounting";
+export type CellFontScript = "superscript" | "subscript";
 export const CELL_BORDER_LINE_STYLES = [
   "hair",
   "thin",
@@ -149,7 +152,9 @@ export type CellStyle = {
   fontSize?: number;
   bold?: true;
   italic?: true;
-  underline?: true;
+  underline?: CellUnderlineStyle;
+  strikethrough?: true;
+  fontScript?: CellFontScript;
   textColor?: string;
   fillColor?: string;
   horizontalAlign?: HorizontalCellAlignment;
@@ -178,6 +183,8 @@ export const CELL_STYLE_KEYS = [
   "bold",
   "italic",
   "underline",
+  "strikethrough",
+  "fontScript",
   "textColor",
   "fillColor",
   "horizontalAlign",
@@ -451,6 +458,27 @@ function normalizeFontSize(value: unknown): number {
   return value;
 }
 
+function normalizeUnderline(value: unknown): CellUnderlineStyle {
+  if (
+    value !== true &&
+    value !== "double" &&
+    value !== "singleAccounting" &&
+    value !== "doubleAccounting"
+  ) {
+    throw new TypeError(
+      "Cell underline must be true, double, singleAccounting, doubleAccounting, false, or null.",
+    );
+  }
+  return value;
+}
+
+function normalizeFontScript(value: unknown): CellFontScript {
+  if (value !== "superscript" && value !== "subscript") {
+    throw new TypeError("Cell font script must be superscript or subscript.");
+  }
+  return value;
+}
+
 function normalizeColor(value: unknown, field: string): string {
   if (typeof value !== "string" || !CELL_COLOR_PATTERN.test(value)) {
     throw new TypeError(`${field} must be a six-digit hexadecimal color.`);
@@ -587,10 +615,13 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
   if (key === "fontSize") {
     return normalizeFontSize(value) as CellStyle[Key];
   }
+  if (key === "underline") {
+    return normalizeUnderline(value) as CellStyle[Key];
+  }
   if (
     key === "bold" ||
     key === "italic" ||
-    key === "underline" ||
+    key === "strikethrough" ||
     key === "shrinkToFit" ||
     key === "wrapText"
   ) {
@@ -629,6 +660,9 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
   }
   if (key === "textDirection") {
     return normalizeTextDirection(value) as CellStyle[Key];
+  }
+  if (key === "fontScript") {
+    return normalizeFontScript(value) as CellStyle[Key];
   }
   return normalizeTextRotation(value) as CellStyle[Key];
 }

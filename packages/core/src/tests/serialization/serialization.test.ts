@@ -35,6 +35,9 @@ describe("workbook snapshots", () => {
       { row: 0, column: 0 },
       {
         bold: true,
+        underline: "singleAccounting",
+        strikethrough: true,
+        fontScript: "subscript",
         fillColor: "#AABBCC",
         horizontalAlign: "centerContinuous",
         verticalAlign: "distributed",
@@ -60,6 +63,9 @@ describe("workbook snapshots", () => {
     expect(getCellValue(restored.sheets.get("sheet-1")!, { row: 2, column: 1 })).toBe("Budget");
     expect(getCellStyle(restored.sheets.get("sheet-1")!, { row: 0, column: 0 })).toEqual({
       bold: true,
+      underline: "singleAccounting",
+      strikethrough: true,
+      fontScript: "subscript",
       fillColor: "#aabbcc",
       horizontalAlign: "centerContinuous",
       verticalAlign: "distributed",

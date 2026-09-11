@@ -7,11 +7,13 @@ import {
   MAX_CELL_STYLE_PATCH_CELLS,
   areCellNumberFormatsEqual,
   cloneCellNumberFormat,
+  type CellFontScript,
   type CellNumberFormat,
   type CellTextDirection,
   type CellTextRotation,
   type CellBorder,
   type CellStyle,
+  type CellUnderlineStyle,
   type HorizontalCellAlignment,
   type VerticalCellAlignment,
 } from "./style.js";
@@ -31,6 +33,9 @@ export type SelectionCellStyleState = {
   bold: ToggleStyleState;
   italic: ToggleStyleState;
   underline: ToggleStyleState;
+  underlineStyle: StyleValueState<CellUnderlineStyle>;
+  strikethrough: ToggleStyleState;
+  fontScript: StyleValueState<CellFontScript>;
   textColor: StyleValueState<string>;
   fillColor: StyleValueState<string>;
   horizontalAlign: StyleValueState<HorizontalCellAlignment>;
@@ -124,6 +129,9 @@ export function createDefaultSelectionCellStyleState(): SelectionCellStyleState 
     bold: "off",
     italic: "off",
     underline: "off",
+    underlineStyle: { value: undefined, mixed: false },
+    strikethrough: "off",
+    fontScript: { value: undefined, mixed: false },
     textColor: { value: undefined, mixed: false },
     fillColor: { value: undefined, mixed: false },
     horizontalAlign: { value: DEFAULT_CELL_HORIZONTAL_ALIGNMENT, mixed: false },
@@ -159,6 +167,9 @@ export function getSelectionCellStyleState(
   const bold = createAccumulator<true>();
   const italic = createAccumulator<true>();
   const underline = createAccumulator<true>();
+  const underlineStyle = createAccumulator<CellUnderlineStyle>();
+  const strikethrough = createAccumulator<true>();
+  const fontScript = createAccumulator<CellFontScript>();
   const textColor = createAccumulator<string>();
   const fillColor = createAccumulator<string>();
   const horizontalAlign = createAccumulator<HorizontalCellAlignment>();
@@ -176,7 +187,10 @@ export function getSelectionCellStyleState(
     addValue(fontSize, style?.fontSize);
     addValue(bold, style?.bold);
     addValue(italic, style?.italic);
-    addValue(underline, style?.underline);
+    addValue(underline, style?.underline ? true : undefined);
+    addValue(underlineStyle, style?.underline);
+    addValue(strikethrough, style?.strikethrough);
+    addValue(fontScript, style?.fontScript);
     addValue(textColor, style?.textColor);
     addValue(fillColor, style?.fillColor);
     addValue(horizontalAlign, style?.horizontalAlign ?? DEFAULT_CELL_HORIZONTAL_ALIGNMENT);
@@ -222,6 +236,9 @@ export function getSelectionCellStyleState(
     bold: toToggleState(bold),
     italic: toToggleState(italic),
     underline: toToggleState(underline),
+    underlineStyle: toValueState(underlineStyle),
+    strikethrough: toToggleState(strikethrough),
+    fontScript: toValueState(fontScript),
     textColor: toValueState(textColor),
     fillColor: toValueState(fillColor),
     horizontalAlign: toValueState(horizontalAlign),

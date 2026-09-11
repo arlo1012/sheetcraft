@@ -17,6 +17,7 @@ import {
   type AutoRowHeightFont,
   type TextMeasurer,
 } from "@idea10/sheet-engine/row-height";
+import { getCellTextRenderFontSize } from "./font-presentation";
 
 export type ResolvedCellTextAlignment =
   | "left"
@@ -93,6 +94,11 @@ export function getCellTextFont(style?: Readonly<CellStyle>): AutoRowHeightFont 
   };
 }
 
+/** The measurement font mirrors rendered scripts without mutating workbook style data. */
+export function getCellTextRenderFont(style?: Readonly<CellStyle>): AutoRowHeightFont {
+  return { ...getCellTextFont(style), size: getCellTextRenderFontSize(style) };
+}
+
 export function getCellIndentPixels(
   style: Readonly<CellStyle> | undefined,
   measurer: TextMeasurer,
@@ -144,7 +150,7 @@ export function layoutCellText(options: {
     (horizontal === "right" || horizontal === "distributed" ? indent : 0);
   const availableWidth = Math.max(1, options.width - leftInset - rightInset);
   const availableHeight = Math.max(0, options.height - 4);
-  let font = getCellTextFont(style);
+  let font = getCellTextRenderFont(style);
   let lineHeight = font.size * WRAPPED_CELL_LINE_HEIGHT;
   const angle = typeof style?.textRotation === "number" ? -style.textRotation : 0;
   const radians = (angle * Math.PI) / 180;

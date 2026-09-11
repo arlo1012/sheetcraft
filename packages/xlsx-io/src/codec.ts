@@ -194,6 +194,15 @@ function readStyle(
   if (font?.bold === true) result.bold = true;
   if (font?.italic === true) result.italic = true;
   if (font?.underline === true || font?.underline === "single") result.underline = true;
+  else if (
+    font?.underline === "double" ||
+    font?.underline === "singleAccounting" ||
+    font?.underline === "doubleAccounting"
+  )
+    result.underline = font.underline;
+  if (font?.strike === true) result.strikethrough = true;
+  if (font?.vertAlign === "superscript" || font?.vertAlign === "subscript")
+    result.fontScript = font.vertAlign;
   const textColor = color(font?.color);
   if (textColor) result.textColor = textColor;
   if (fill?.type === "pattern" && fill.pattern === "solid") {
@@ -281,9 +290,7 @@ function readStyle(
     );
   const hasUnsupportedFont =
     (font !== undefined &&
-      ["strike", "vertAlign", "outline", "shadow", "condense", "extend"].some(
-        (key) => font[key] !== undefined,
-      )) ||
+      ["outline", "shadow", "condense", "extend"].some((key) => font[key] !== undefined)) ||
     (typeof font?.name === "string" && fontName === undefined) ||
     (typeof font?.size === "number" && fontSize === undefined);
   const hasUnsupportedAlignment =
@@ -523,7 +530,9 @@ function writeStyle(
   };
   if (style.bold) font.bold = true;
   if (style.italic) font.italic = true;
-  if (style.underline) font.underline = true;
+  if (style.underline) font.underline = style.underline;
+  if (style.strikethrough) font.strike = true;
+  if (style.fontScript) font.vertAlign = style.fontScript;
   if (style.textColor) font.color = { argb: `FF${style.textColor.slice(1).toUpperCase()}` };
   const next: Record<string, unknown> = {};
   if (Object.keys(font).length) next.font = font;

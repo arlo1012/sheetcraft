@@ -9,6 +9,10 @@ import {
 } from "../../shared/cell-text/text-presentation";
 import { browserCellTextMeasurer } from "../../shared/cell-text/text-metrics";
 import { WRAPPED_CELL_LINE_HEIGHT } from "@idea10/sheet-engine/row-height";
+import {
+  getCellTextRenderFontSize,
+  getCellTextTypographyStyle,
+} from "../../shared/cell-text/font-presentation";
 
 const ALIGNMENT_JUSTIFICATION = {
   left: "flex-start",
@@ -28,18 +32,9 @@ const VERTICAL_ALIGNMENT = {
 } as const;
 
 function getTypographyStyle(style: Readonly<CellStyle> | undefined): CSSProperties {
-  if (!style) {
-    return {};
-  }
-
-  return {
-    ...(style.fontFamily ? { fontFamily: style.fontFamily } : {}),
-    ...(style.fontSize ? { fontSize: `${style.fontSize}px` } : {}),
-    ...(style.bold ? { fontWeight: 700 } : {}),
-    ...(style.italic ? { fontStyle: "italic" } : {}),
-    ...(style.underline ? { textDecoration: "underline" } : {}),
-    ...(style.textColor ? { color: style.textColor } : {}),
-  };
+  // CellTextContent renders underline and strikethrough in separate layers so a
+  // double underline never turns the strike into a double line.
+  return getCellTextTypographyStyle(style, { includeDecorations: false });
 }
 
 export function getCellContentStyle(
@@ -80,8 +75,10 @@ export function getCellEditorStyle(
   const alignment = resolveCellHorizontalAlignment(style?.horizontalAlign, value, direction);
   const indent = getCellIndentPixels(style, browserCellTextMeasurer);
   return {
-    ...getTypographyStyle(style),
-    ...(style?.fontSize ? { minHeight: `${style.fontSize + 2}px` } : {}),
+    ...getCellTextTypographyStyle(style),
+    ...(style?.fontSize || style?.fontScript
+      ? { minHeight: `${getCellTextRenderFontSize(style) + 2}px` }
+      : {}),
     textAlign:
       alignment === "fill" || alignment === "justify" || alignment === "distributed"
         ? direction === "rtl"
