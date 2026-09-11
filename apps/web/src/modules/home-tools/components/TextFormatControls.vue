@@ -71,8 +71,7 @@ function toggle(
 
 <style scoped lang="scss">
 .text-format-controls {
-  display: grid;
-  grid-template-columns: repeat(4, 27px);
+  display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;

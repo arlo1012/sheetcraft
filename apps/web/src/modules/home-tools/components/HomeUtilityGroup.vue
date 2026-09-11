@@ -14,7 +14,6 @@ const { t } = useAppI18n();
     :aria-label="t('ribbon.utilityTools')"
   >
     <RibbonIconAction
-      class="home-utility-group__print"
       variant="tall"
       :label="t('app.unavailableFeature', { feature: t('ribbon.print') })"
       :text="t('ribbon.print')"
@@ -32,14 +31,10 @@ const { t } = useAppI18n();
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-utility-group {
-  @include ribbon.mixed(max-content);
+  @include ribbon.columns;
 
   padding-right: 6px;
   padding-left: 6px;
   border-right: 0;
-
-  &__print {
-    grid-row: 1 / 3;
-  }
 }
 </style>

@@ -16,12 +16,17 @@
   }
 }
 
+@mixin stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-height: 54px;
+}
+
 @mixin compact {
   @include shell;
-
-  display: grid;
-  grid-template-rows: repeat(2, 27px);
-  align-content: center;
+  @include stack;
 }
 
 @mixin row {
@@ -30,21 +35,13 @@
   justify-content: flex-start;
   gap: 2px;
   min-width: 0;
-  min-height: 27px;
+  min-height: 26px;
 }
 
-@mixin mixed($columns) {
+@mixin columns {
   @include shell;
 
-  display: grid;
-  grid-template-columns: $columns;
-  grid-template-rows: repeat(2, 27px);
-  align-content: center;
-  column-gap: 2px;
-}
-
-@mixin stack {
-  display: grid;
-  grid-template-rows: repeat(2, 27px);
+  display: flex;
   align-items: center;
+  gap: 2px;
 }

@@ -17,7 +17,6 @@ const { t } = useAppI18n();
     :aria-label="t('ribbon.insertTools')"
   >
     <RibbonIconAction
-      class="home-insert-group__insert"
       variant="tall"
       :label="t('app.unavailableFeature', { feature: t('ribbon.insert') })"
       :text="t('ribbon.insert')"
@@ -29,11 +28,7 @@ const { t } = useAppI18n();
     >
       <CirclePlus :size="17" aria-hidden="true" />
     </RibbonIconAction>
-    <ImageInsertMenu
-      class="home-insert-group__image"
-      :disabled="disabled"
-      @insert-image="emit('insertImage', $event)"
-    />
+    <ImageInsertMenu :disabled="disabled" @insert-image="emit('insertImage', $event)" />
     <div class="home-insert-group__stack" data-ribbon-stack="chart-pivot">
       <RibbonIconAction
         :label="t('app.unavailableFeature', { feature: t('ribbon.chart') })"
@@ -63,26 +58,11 @@ const { t } = useAppI18n();
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-insert-group {
-  @include ribbon.mixed(max-content max-content max-content);
-
-  &__insert,
-  &__image,
-  &__stack {
-    grid-row: 1 / 3;
-  }
-
-  &__insert {
-    grid-column: 1;
-  }
-
-  &__image {
-    grid-column: 2;
-  }
+  @include ribbon.columns;
 
   &__stack {
     @include ribbon.stack;
 
-    grid-column: 3;
     min-width: 84px;
   }
 }

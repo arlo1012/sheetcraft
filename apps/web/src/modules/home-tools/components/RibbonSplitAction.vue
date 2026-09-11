@@ -91,7 +91,7 @@ function toggleMenu(): void {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: stretch;
-  width: var(--cell-format-compact-track, 40px);
+  width: var(--ribbon-compact-action-width, 40px);
   height: var(--cell-format-control-height, 26px);
   padding: 1px;
   border-radius: var(--idea-radius-default);

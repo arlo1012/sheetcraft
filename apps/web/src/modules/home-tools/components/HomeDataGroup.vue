@@ -30,7 +30,6 @@ const emit = defineEmits<{
     :aria-label="t('ribbon.dataTools')"
   >
     <FilterValueMenu
-      class="home-data-group__filter"
       :disabled="readOnly || !state.filterEnabled"
       :active="state.filter.active"
       :options="state.filter.options"
@@ -41,10 +40,7 @@ const emit = defineEmits<{
       @clear-filter="emit('clearFilter')"
     />
 
-    <div
-      class="home-data-group__stack home-data-group__freeze-stack"
-      data-ribbon-stack="freeze-sort"
-    >
+    <div class="home-data-group__stack" data-ribbon-stack="freeze-sort">
       <FreezeMenu
         :disabled="readOnly || !state.freezeEnabled"
         :active-cell="state.activeCell"
@@ -60,7 +56,7 @@ const emit = defineEmits<{
       />
     </div>
 
-    <div class="home-data-group__stack home-data-group__sum-stack" data-ribbon-stack="sum-data">
+    <div class="home-data-group__stack" data-ribbon-stack="sum-data">
       <RibbonIconAction
         :label="t('ribbon.autoSum')"
         :text="t('ribbon.autoSum')"
@@ -84,7 +80,6 @@ const emit = defineEmits<{
     </div>
 
     <RibbonIconAction
-      class="home-data-group__protect"
       variant="tall"
       :label="readOnly ? t('sheetTabs.unprotectAction') : t('sheetTabs.protectAction')"
       :text="readOnly ? t('sheetTabs.unprotectAction') : t('ribbon.protect')"
@@ -103,29 +98,7 @@ const emit = defineEmits<{
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-data-group {
-  @include ribbon.mixed(max-content max-content max-content max-content);
-
-  &__filter,
-  &__stack,
-  &__protect {
-    grid-row: 1 / 3;
-  }
-
-  &__filter {
-    grid-column: 1;
-  }
-
-  &__freeze-stack {
-    grid-column: 2;
-  }
-
-  &__sum-stack {
-    grid-column: 3;
-  }
-
-  &__protect {
-    grid-column: 4;
-  }
+  @include ribbon.columns;
 
   &__stack {
     @include ribbon.stack;

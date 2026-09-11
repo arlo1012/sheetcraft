@@ -93,14 +93,15 @@ defineSlots<{ "file-actions"?: () => unknown }>();
 
 <style scoped lang="scss">
 .spreadsheet-ribbon {
-  display: grid;
-  grid-template-rows: 30px 68px;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   background: var(--idea-surface-canvas);
   border-bottom: 1px solid var(--idea-border-control);
 
   &__categories {
     display: flex;
+    flex: 0 0 30px;
     align-items: stretch;
     justify-content: space-between;
     min-width: 0;
@@ -136,6 +137,7 @@ defineSlots<{ "file-actions"?: () => unknown }>();
   }
 
   &__panel {
+    flex: 0 0 68px;
     min-width: 0;
     margin: 0 8px;
     overflow: hidden;

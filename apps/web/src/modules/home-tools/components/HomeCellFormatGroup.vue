@@ -35,19 +35,19 @@ const { t } = useAppI18n();
     :title="disabled ? t('format.selectionTooLarge') : undefined"
   >
     <div
-      class="home-cell-format-group__lane home-cell-format-group__lane--typography"
+      class="home-cell-format-group__lane"
       data-cell-format-lane="typography"
       role="group"
       :aria-label="t('format.typographyTools')"
     >
       <FontFormatControls
-        class="home-cell-format-group__font-tools"
         :state="state"
         :disabled="disabled"
         @apply-style="emit('applyStyle', $event)"
       />
       <div class="home-cell-format-group__typography-tools">
         <TextFormatControls
+          class="home-cell-format-group__text-tools"
           :state="state"
           :disabled="disabled"
           @apply-style="emit('applyStyle', $event)"
@@ -93,20 +93,14 @@ const { t } = useAppI18n();
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-cell-format-group {
-  @include ribbon.shell;
+  @include ribbon.columns;
 
-  --cell-format-primary-track: 126px;
-  --cell-format-compact-track: 40px;
-  --cell-format-column-gap: 4px;
+  --cell-format-font-width: 126px;
+  --ribbon-compact-action-width: 40px;
+  --cell-format-gap: 4px;
   --cell-format-control-height: 26px;
 
-  display: grid;
-  grid-template-columns:
-    var(--cell-format-primary-track) var(--cell-format-compact-track)
-    var(--cell-format-compact-track);
-  grid-template-rows: repeat(2, 27px);
-  align-content: center;
-  column-gap: var(--cell-format-column-gap);
+  gap: var(--cell-format-gap);
 
   &__lane {
     @include ribbon.stack;
@@ -114,31 +108,18 @@ const { t } = useAppI18n();
     min-width: 0;
   }
 
-  &__lane--typography {
-    grid-column: 1 / span 2;
-    grid-row: 1 / span 2;
-    grid-template-columns: var(--cell-format-primary-track) var(--cell-format-compact-track);
-    column-gap: var(--cell-format-column-gap);
+  &__typography-tools {
+    @include ribbon.row;
+
+    gap: var(--cell-format-gap);
   }
 
-  &__font-tools,
-  &__typography-tools {
-    grid-column: 1 / -1;
-  }
-
-  &__typography-tools {
-    display: grid;
-    grid-template-columns: var(--cell-format-primary-track) var(--cell-format-compact-track);
-    align-items: center;
-    column-gap: var(--cell-format-column-gap);
+  &__text-tools {
+    flex: 0 0 var(--cell-format-font-width);
   }
 
   &__lane--appearance {
     @include ribbon.dialog-launcher-anchor;
-
-    grid-column: 3;
-    grid-row: 1 / span 2;
-    justify-items: stretch;
   }
 }
 </style>

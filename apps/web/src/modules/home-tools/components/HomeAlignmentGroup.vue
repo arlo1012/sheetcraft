@@ -46,24 +46,26 @@ function toggleWrapText(state: ToggleStyleState): void {
     :aria-disabled="disabled"
     :title="disabled ? t('format.selectionTooLarge') : undefined"
   >
-    <div class="home-alignment-group__row" data-ribbon-row="1">
-      <VerticalAlignmentControls
-        :state="state.verticalAlign"
-        :disabled="disabled"
-        @apply-style="emit('applyStyle', $event)"
-      />
-      <IndentationControls
-        :state="state.indent"
-        :disabled="disabled"
-        @adjust-indent="emit('adjustIndent', $event)"
-      />
-    </div>
-    <div class="home-alignment-group__row" data-ribbon-row="2">
-      <HorizontalAlignmentControls
-        :state="state"
-        :disabled="disabled"
-        @apply-style="emit('applyStyle', $event)"
-      />
+    <div class="home-alignment-group__stack" data-ribbon-stack="alignment">
+      <div class="home-alignment-group__row" data-ribbon-row="1">
+        <VerticalAlignmentControls
+          :state="state.verticalAlign"
+          :disabled="disabled"
+          @apply-style="emit('applyStyle', $event)"
+        />
+        <IndentationControls
+          :state="state.indent"
+          :disabled="disabled"
+          @adjust-indent="emit('adjustIndent', $event)"
+        />
+      </div>
+      <div class="home-alignment-group__row" data-ribbon-row="2">
+        <HorizontalAlignmentControls
+          :state="state"
+          :disabled="disabled"
+          @apply-style="emit('applyStyle', $event)"
+        />
+      </div>
     </div>
     <div class="home-alignment-group__actions">
       <RibbonIconAction
@@ -96,15 +98,18 @@ function toggleWrapText(state: ToggleStyleState): void {
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-alignment-group {
-  @include ribbon.mixed(max-content max-content);
+  @include ribbon.columns;
   @include ribbon.dialog-launcher-anchor;
 
-  column-gap: 4px;
+  gap: 4px;
+
+  &__stack {
+    @include ribbon.stack;
+  }
 
   &__row {
     @include ribbon.row;
 
-    grid-column: 1;
     gap: 0;
   }
 
@@ -115,8 +120,6 @@ function toggleWrapText(state: ToggleStyleState): void {
     --ribbon-labeled-action-justify: flex-start;
     --ribbon-labeled-action-padding: 4px;
 
-    grid-column: 2;
-    grid-row: 1 / span 2;
     min-width: 72px;
   }
 }

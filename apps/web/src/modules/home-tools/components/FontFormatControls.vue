@@ -101,7 +101,7 @@ function setFontSize(value: SelectValue): void {
     :aria-disabled="disabled"
   >
     <label
-      class="font-format-controls__field"
+      class="font-format-controls__field font-format-controls__field--family"
       data-font-format-segment="family"
       :title="t('format.fontFamily')"
     >
@@ -123,7 +123,7 @@ function setFontSize(value: SelectValue): void {
       </TSelect>
     </label>
     <label
-      class="font-format-controls__field"
+      class="font-format-controls__field font-format-controls__field--size"
       data-font-format-segment="size"
       :title="t('format.fontSize')"
     >
@@ -148,22 +148,27 @@ function setFontSize(value: SelectValue): void {
 
 <style scoped lang="scss">
 .font-format-controls {
-  display: inline-grid;
+  display: inline-flex;
   flex: 0 0 auto;
-  grid-template-columns: var(--cell-format-primary-track, 126px) var(
-      --cell-format-compact-track,
-      40px
-    );
-  column-gap: var(--cell-format-column-gap, 4px);
+  gap: var(--cell-format-gap, 4px);
   align-items: stretch;
   height: var(--cell-format-control-height, 26px);
 
   &__field {
     display: inline-flex;
+    flex: 0 0 auto;
     min-width: 0;
     height: var(--cell-format-control-height, 26px);
     overflow: hidden;
     border-radius: 2px;
+
+    &--family {
+      width: var(--cell-format-font-width, 126px);
+    }
+
+    &--size {
+      width: var(--ribbon-compact-action-width, 40px);
+    }
   }
 
   &:not(.is-disabled) &__field:is(:hover, :focus-within) {

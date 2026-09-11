@@ -334,7 +334,7 @@ describe("HomeFormatToolbar", () => {
     for (const groupName of ["history", "alignment", "number", "styles"]) {
       const group = wrapper.get(`[data-ribbon-group="${groupName}"]`);
       expect(
-        group.findAll(":scope > [data-ribbon-row]").map((row) => row.attributes("data-ribbon-row")),
+        group.findAll("[data-ribbon-row]").map((row) => row.attributes("data-ribbon-row")),
       ).toEqual(["1", "2"]);
     }
 
@@ -370,6 +370,8 @@ describe("HomeFormatToolbar", () => {
     for (const [stackName, actionNames] of [
       ["freeze-sort", ["freeze", "sort"]],
       ["chart-pivot", ["chart", "pivot-table"]],
+      ["smart-table-pdf", ["smart-table", "pdf-to-editable"]],
+      ["app-generator-pdf", ["app-generator", "pdf-to-image"]],
     ] as const) {
       const actions = wrapper
         .get(`[data-ribbon-stack="${stackName}"]`)
@@ -392,22 +394,6 @@ describe("HomeFormatToolbar", () => {
         .findAll("[data-ribbon-placeholder]")
         .map((action) => action.attributes("data-ribbon-placeholder")),
     ).toEqual(["data"]);
-
-    expect(
-      wrapper
-        .get('[data-ribbon-grid="automation-secondary"]')
-        .findAll("[data-ribbon-placeholder]")
-        .map((action) => ({
-          name: action.attributes("data-ribbon-placeholder"),
-          row: action.attributes("data-ribbon-row"),
-          column: action.attributes("data-ribbon-column"),
-        })),
-    ).toEqual([
-      { name: "smart-table", row: "1", column: "1" },
-      { name: "app-generator", row: "1", column: "2" },
-      { name: "pdf-to-editable", row: "2", column: "1" },
-      { name: "pdf-to-image", row: "2", column: "2" },
-    ]);
 
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="undo"]')).toBeTruthy();
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="redo"]')).toBeTruthy();
