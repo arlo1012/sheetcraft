@@ -42,7 +42,15 @@ function toggleMenu(): void {
 </script>
 
 <template>
-  <div ref="rootElement" class="ribbon-split-action" :class="{ 'has-text': text }">
+  <div
+    ref="rootElement"
+    class="ribbon-split-action"
+    :class="{
+      'has-text': text,
+      'is-expanded': expanded,
+      'is-disabled': disabled && menuDisabled,
+    }"
+  >
     <button
       ref="mainElement"
       class="ribbon-split-action__main"
@@ -83,6 +91,16 @@ function toggleMenu(): void {
   width: var(--cell-format-compact-track, 40px);
   height: var(--cell-format-control-height, 26px);
   padding: 1px;
+  border-radius: var(--idea-radius-default);
+
+  &:hover:not(.is-disabled),
+  &.is-expanded {
+    background: var(--idea-icon-button-hover-bg);
+  }
+
+  &:has(> button:focus-visible) {
+    background: var(--idea-action-primary-subtle);
+  }
 
   &.has-text {
     width: max-content;
@@ -105,14 +123,6 @@ function toggleMenu(): void {
     font: inherit;
     outline: none;
 
-    &:hover:not(:disabled) {
-      background: var(--idea-icon-button-hover-bg);
-    }
-
-    &:focus-visible {
-      background: var(--idea-action-primary-subtle);
-    }
-
     &:disabled {
       color: var(--idea-text-secondary);
       cursor: default;
@@ -124,17 +134,11 @@ function toggleMenu(): void {
     flex: 1 1 auto;
     gap: 2px;
     padding: 0 2px;
-    border-radius: 2px 0 0 2px;
   }
 
   &__menu {
     flex: 0 0 12px;
-    border-radius: 0 2px 2px 0;
     color: var(--idea-text-muted);
-
-    &[aria-expanded="true"] {
-      background: var(--idea-icon-button-hover-bg);
-    }
   }
 
   &__icon {
