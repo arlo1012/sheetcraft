@@ -139,7 +139,7 @@ const { t } = useAppI18n();
   display: grid;
   grid-template-columns:
     var(--cell-format-primary-track) var(--cell-format-compact-track)
-    calc(var(--cell-format-compact-track) + 18px) max-content;
+    var(--cell-format-compact-track) max-content;
   grid-template-rows: repeat(2, 27px);
   align-content: center;
   column-gap: var(--cell-format-column-gap);
@@ -170,7 +170,7 @@ const { t } = useAppI18n();
   }
 
   &__lane--appearance {
-    @include ribbon.dialog-launcher-gutter;
+    @include ribbon.dialog-launcher-anchor;
 
     grid-column: 3;
     grid-row: 1 / span 2;

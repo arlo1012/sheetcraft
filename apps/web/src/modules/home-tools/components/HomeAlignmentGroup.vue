@@ -95,7 +95,7 @@ function toggleWrapText(state: ToggleStyleState): void {
 
 .home-alignment-group {
   @include ribbon.compact;
-  @include ribbon.dialog-launcher-gutter;
+  @include ribbon.dialog-launcher-anchor;
 
   &__row {
     @include ribbon.row;
