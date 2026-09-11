@@ -58,7 +58,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="left"
       @activate="align('left')"
     >
-      <TextAlignStart :size="17" :stroke-width="1.5" aria-hidden="true" />
+      <TextAlignStart :size="17" aria-hidden="true" />
     </RibbonIconAction>
     <RibbonIconAction
       class="ui-toolbar-icon-button horizontal-alignment-controls__button"
@@ -69,7 +69,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="center"
       @activate="align('center')"
     >
-      <TextAlignCenter :size="17" :stroke-width="1.5" aria-hidden="true" />
+      <TextAlignCenter :size="17" aria-hidden="true" />
     </RibbonIconAction>
     <RibbonIconAction
       class="ui-toolbar-icon-button horizontal-alignment-controls__button"
@@ -80,7 +80,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="right"
       @activate="align('right')"
     >
-      <TextAlignEnd :size="17" :stroke-width="1.5" aria-hidden="true" />
+      <TextAlignEnd :size="17" aria-hidden="true" />
     </RibbonIconAction>
     <RibbonIconAction
       class="ui-toolbar-icon-button horizontal-alignment-controls__button"
