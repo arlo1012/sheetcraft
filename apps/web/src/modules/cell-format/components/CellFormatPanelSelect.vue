@@ -10,9 +10,9 @@ const props = withDefaults(
     label: string;
     valueLabel: string;
     disabled?: boolean;
-    minPanelWidth?: number;
+    panelWidth?: "trigger" | "content";
   }>(),
-  { disabled: false, minPanelWidth: 0 },
+  { disabled: false, panelWidth: "trigger" },
 );
 const emit = defineEmits<{ "open-change": [open: boolean] }>();
 defineSlots<{
@@ -34,7 +34,7 @@ const inputAttributes = computed(() => ({
 const popupProps = computed<PopupProps>(() => ({
   placement: "bottom-left",
   overlayInnerStyle: (triggerElement) => ({
-    width: `${Math.max(triggerElement.offsetWidth, props.minPanelWidth)}px`,
+    width: props.panelWidth === "content" ? "max-content" : `${triggerElement.offsetWidth}px`,
     padding: "0",
   }),
 }));

@@ -24,7 +24,6 @@ const props = withDefaults(
     columns?: number;
     clearable?: boolean;
     stableSize?: boolean;
-    fluid?: boolean;
     showRecentHeading?: boolean;
   }>(),
   {
@@ -35,7 +34,6 @@ const props = withDefaults(
     columns: 10,
     clearable: false,
     stableSize: false,
-    fluid: false,
     showRecentHeading: false,
   },
 );
@@ -82,9 +80,6 @@ const isDefaultSelected = computed(
 );
 const defaultLabel = computed(() => props.defaultLabel ?? t("colorPalette.default"));
 const gridColumns = computed(() => Math.max(1, Math.min(10, Math.trunc(props.columns) || 10)));
-const colorPickerPanelStyle = computed(() =>
-  props.stableSize || props.fluid ? { width: "100%" } : undefined,
-);
 
 onMounted(() => {
   recentColors.value = readRecentColors();
@@ -203,7 +198,6 @@ function getPanelAttach(): HTMLElement {
       'is-more': showingMore,
       'is-compact': compact,
       'is-stable': stableSize,
-      'is-fluid': fluid,
     }"
     :style="{ '--color-palette-columns': gridColumns }"
     :aria-label="t('colorPalette.label')"
@@ -351,7 +345,7 @@ function getPanelAttach(): HTMLElement {
     >
       <ColorPickerPanel
         class="idea-color-palette-panel"
-        :style="colorPickerPanelStyle"
+        :style="stableSize ? { width: '100%' } : undefined"
         :model-value="draftColor"
         :color-modes="['monochrome']"
         format="HEX"
@@ -525,22 +519,6 @@ function getPanelAttach(): HTMLElement {
     .color-palette__view:not(.is-active) {
       visibility: hidden;
       pointer-events: none;
-    }
-  }
-  &.is-fluid {
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-
-    .color-palette__grid {
-      grid-template-columns: repeat(var(--color-palette-columns), minmax(0, 1fr));
-    }
-    .color-palette__swatch {
-      width: 100%;
-    }
-    &.is-more {
-      width: 100%;
-      max-width: 100%;
     }
   }
 }

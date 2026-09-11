@@ -38,7 +38,7 @@ function select(value: string | null, close: () => void): void {
     :label="label"
     :value-label="valueLabel"
     :disabled="disabled"
-    :min-panel-width="208"
+    panel-width="content"
   >
     <template #value>
       <span v-if="mixed || disabled" class="cell-format-color-control__label">{{
@@ -62,7 +62,6 @@ function select(value: string | null, close: () => void): void {
     </template>
     <template #panel="{ close }">
       <ColorPalette
-        fluid
         :model-value="modelValue ?? null"
         :default-color="defaultColor"
         :default-label="t('cellFormat.automatic')"
