@@ -170,7 +170,7 @@ describe("SpreadsheetRibbon", () => {
     await wrapper
       .get('[data-ribbon-action="merge-cells"] [data-ribbon-split-main]')
       .trigger("click");
-    expect(wrapper.emitted("merge")).toEqual([[]]);
+    expect(wrapper.emitted("merge")).toEqual([["all"]]);
 
     await wrapper.get('[data-ribbon-action="image"]').trigger("click");
     await new DOMWrapper(document.body).get('[data-image-insert-mode="floating"]').trigger("click");

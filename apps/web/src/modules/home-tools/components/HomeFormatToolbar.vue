@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import type { CellMergeMode } from "@idea10/core/commands";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import type { CellFormatTab } from "../../cell-format/components/CellFormatDialog.vue";
@@ -45,7 +46,7 @@ const emit = defineEmits<{
   clearFilter: [];
   freeze: [mode: "panes" | "top-row" | "first-column"];
   unfreeze: [];
-  merge: [];
+  merge: [mode: CellMergeMode];
   unmerge: [];
   insertImage: [mode: "cell" | "floating"];
   undo: [];
@@ -278,7 +279,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           :merge-state="mergeState"
           @apply-style="emit('applyStyle', $event)"
           @adjust-indent="emit('adjustIndent', $event)"
-          @merge="emit('merge')"
+          @merge="emit('merge', $event)"
           @unmerge="emit('unmerge')"
           @open-cell-format="emit('openCellFormat', 'alignment')"
         />

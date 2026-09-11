@@ -232,18 +232,66 @@ describe("spreadsheet workspace data tools", () => {
       navigateToCell() {},
     } as never);
 
-    expect(controller.mergeState.value).toEqual({ canMerge: true, canUnmerge: false });
+    expect(controller.mergeState.value).toMatchObject({ canMerge: true, canUnmerge: false });
     controller.mergeSelection();
     expect(sheet.mergedCells).toEqual([range]);
     expect(getCellContent(sheet, range.start)).toEqual({ kind: "literal", value: "anchor" });
     expect(getCellContent(sheet, range.end)).toBeNull();
-    expect(controller.mergeState.value).toEqual({ canMerge: false, canUnmerge: true });
+    expect(controller.mergeState.value).toMatchObject({ canMerge: false, canUnmerge: true });
 
     controller.unmergeSelection();
     expect(sheet.mergedCells).toEqual([]);
     expect(clearClipboard).toHaveBeenCalledTimes(2);
     expect(controller.undo()).toBe(true);
     expect(sheet.mergedCells).toEqual([range]);
+  });
+
+  test("allows merging across each row when an ordinary merge would cross frozen rows", () => {
+    const controller = mountController();
+    const sheet = controller.activeSheet.value;
+    const range = { start: { row: 0, column: 0 }, end: { row: 1, column: 1 } };
+    setCellContent(sheet, range.start, { kind: "literal", value: "first" });
+    setCellContent(sheet, range.end, { kind: "literal", value: "last" });
+    controller.freeze("top-row");
+    select(controller, cellRangeSelection(range));
+
+    expect(controller.mergeState.value.canMerge).toBe(false);
+    expect(controller.mergeState.value.availableModes).toMatchObject({
+      all: false,
+      center: false,
+      content: false,
+      across: true,
+    });
+    controller.mergeSelection("across");
+    expect(sheet.mergedCells).toEqual([
+      { start: { row: 0, column: 0 }, end: { row: 0, column: 1 } },
+      { start: { row: 1, column: 0 }, end: { row: 1, column: 1 } },
+    ]);
+    expect(controller.undo()).toBe(true);
+    expect(sheet.mergedCells).toEqual([]);
+    expect(getCellContent(sheet, range.end)).toEqual({ kind: "literal", value: "last" });
+  });
+
+  test("joins cell contents in row order and restores all inputs in one undo", () => {
+    const controller = mountController("zh-CN");
+    const sheet = controller.activeSheet.value;
+    const range = { start: { row: 0, column: 0 }, end: { row: 1, column: 1 } };
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "甲" });
+    setCellContent(sheet, { row: 0, column: 1 }, { kind: "literal", value: 0 });
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: false });
+    setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: "乙" });
+    select(controller, cellRangeSelection(range));
+
+    controller.mergeSelection("content");
+    expect(sheet.mergedCells).toEqual([range]);
+    expect(getCellContent(sheet, range.start)).toEqual({
+      kind: "literal",
+      value: "甲\n0\nFALSE\n乙",
+    });
+    expect(controller.undo()).toBe(true);
+    expect(sheet.mergedCells).toEqual([]);
+    expect(getCellContent(sheet, { row: 0, column: 1 })).toEqual({ kind: "literal", value: 0 });
+    expect(getCellContent(sheet, range.end)).toEqual({ kind: "literal", value: "乙" });
   });
 
   test("disables data and merge actions for incompatible selections", () => {

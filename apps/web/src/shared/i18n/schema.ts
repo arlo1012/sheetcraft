@@ -88,6 +88,13 @@ export type MessageSchema = {
     wrap: string;
     merge: string;
     mergeCells: string;
+    mergeCenter: string;
+    mergeSame: string;
+    mergeSameColumns: string;
+    mergeSameRows: string;
+    mergeContent: string;
+    mergeAcross: string;
+    mergeAcrossDescription: string;
     unmergeCells: string;
     decreaseIndent: string;
     increaseIndent: string;

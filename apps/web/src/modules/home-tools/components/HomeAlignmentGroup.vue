@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { TextWrap } from "lucide-vue-next";
+import type { CellMergeMode } from "@idea10/core/commands";
 import type { CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState, ToggleStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
@@ -20,7 +21,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
   adjustIndent: [delta: -1 | 1];
-  merge: [];
+  merge: [mode: CellMergeMode];
   unmerge: [];
   openCellFormat: [];
 }>();
@@ -64,23 +65,21 @@ function toggleWrapText(state: ToggleStyleState): void {
         @apply-style="emit('applyStyle', $event)"
       />
     </div>
-    <RibbonIconAction
-      class="home-alignment-group__wrap"
-      :label="t('ribbon.wrapText')"
-      :text="t('ribbon.wrap')"
-      variant="tall"
-      :disabled="disabled"
-      :pressed="ariaPressed(state.wrapText)"
-      data-ribbon-action="wrap-text"
-      @activate="toggleWrapText(state.wrapText)"
-    >
-      <TextWrap :size="24" :stroke-width="1.5" aria-hidden="true" />
-    </RibbonIconAction>
-    <div class="home-alignment-group__merge">
+    <div class="home-alignment-group__actions">
+      <RibbonIconAction
+        :label="t('ribbon.wrapText')"
+        :text="t('ribbon.wrap')"
+        :disabled="disabled"
+        :pressed="ariaPressed(state.wrapText)"
+        data-ribbon-action="wrap-text"
+        @activate="toggleWrapText(state.wrapText)"
+      >
+        <TextWrap :size="17" aria-hidden="true" />
+      </RibbonIconAction>
       <MergeCellsMenu
         :state="props.mergeState"
         :disabled="disabled"
-        @merge="emit('merge')"
+        @merge="emit('merge', $event)"
         @unmerge="emit('unmerge')"
       />
     </div>
@@ -97,10 +96,8 @@ function toggleWrapText(state: ToggleStyleState): void {
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-alignment-group {
-  @include ribbon.mixed(max-content max-content max-content);
+  @include ribbon.mixed(max-content max-content);
   @include ribbon.dialog-launcher-anchor;
-
-  --ribbon-tall-action-min-width: 40px;
 
   column-gap: 4px;
 
@@ -111,14 +108,16 @@ function toggleWrapText(state: ToggleStyleState): void {
     gap: 0;
   }
 
-  &__wrap {
+  &__actions {
+    @include ribbon.stack;
+
+    --ribbon-labeled-action-width: 100%;
+    --ribbon-labeled-action-justify: flex-start;
+    --ribbon-labeled-action-padding: 4px;
+
     grid-column: 2;
     grid-row: 1 / span 2;
-  }
-
-  &__merge {
-    grid-column: 3;
-    grid-row: 1 / span 2;
+    min-width: 72px;
   }
 }
 </style>

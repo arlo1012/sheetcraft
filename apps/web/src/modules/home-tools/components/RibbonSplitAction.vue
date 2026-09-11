@@ -114,7 +114,7 @@ function toggleMenu(): void {
   }
 
   &.has-text {
-    width: max-content;
+    width: var(--ribbon-labeled-action-width, max-content);
     min-width: 40px;
   }
 
@@ -161,8 +161,9 @@ function toggleMenu(): void {
 
   &__main {
     flex: 1 1 auto;
+    justify-content: var(--ribbon-labeled-action-justify, center);
     gap: 2px;
-    padding: 0 2px;
+    padding: 0 var(--ribbon-labeled-action-padding, 2px);
   }
 
   &__menu {

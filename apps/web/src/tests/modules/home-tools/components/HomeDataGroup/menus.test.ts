@@ -155,27 +155,63 @@ describe("Home data tool menus", () => {
     expect(freeze.emitted("unfreeze")).toEqual([[]]);
   });
 
-  test("uses a fixed merge main action and exposes merge options independently", async () => {
+  test("uses a fixed all-merge main action and exposes every merge mode", async () => {
     const wrapper = mountMenu(MergeCellsMenu, {
       disabled: false,
-      state: { canMerge: true, canUnmerge: false },
+      state: {
+        canMerge: true,
+        canUnmerge: false,
+        availableModes: {
+          all: true,
+          center: true,
+          "same-columns": true,
+          "same-rows": true,
+          content: true,
+          across: true,
+        },
+      },
     });
     const control = wrapper.get('[data-ribbon-action="merge-cells"]');
     const main = control.get("[data-ribbon-split-main]");
     const menuTrigger = control.get("[data-ribbon-split-menu]");
     await main.trigger("click");
-    expect(wrapper.emitted("merge")).toEqual([[]]);
+    expect(wrapper.emitted("merge")).toEqual([["all"]]);
     await menuTrigger.trigger("click");
+    expect(
+      menu()
+        .findAll("[data-merge-action]")
+        .map((item) => item.attributes("data-merge-action")),
+    ).toEqual(["center", "merge", "same", "content", "across", "unmerge"]);
     expect(menu().get('[data-merge-action="unmerge"]').attributes("aria-disabled")).toBe("true");
-    await menu().get('[data-merge-action="merge"]').trigger("click");
-    expect(wrapper.emitted("merge")).toEqual([[], []]);
+    expect(menu().get('[data-merge-action="across"]').attributes("aria-description")).toBe(
+      "Merge the selected cells in each row into one larger cell.",
+    );
+    await menu().get('[data-merge-action="center"]').trigger("click");
+    expect(wrapper.emitted("merge")).toEqual([["all"], ["center"]]);
 
     await menuTrigger.trigger("click");
-    (main.element as HTMLButtonElement).focus();
-    await main.trigger("click");
-    expect(wrapper.emitted("merge")).toEqual([[], [], []]);
+    const same = menu().get('[data-merge-action="same"]');
+    (same.element as HTMLElement).focus();
+    await same.trigger("keydown", { key: "ArrowRight" });
+    const sameMenu = new DOMWrapper(document.body).get('[data-merge-submenu="same"]');
+    expect(same.attributes("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(sameMenu.get('[data-merge-action="same-columns"]').element);
+    await sameMenu.trigger("keydown", { key: "ArrowLeft" });
+    expect(document.body.querySelector('[data-merge-submenu="same"]')).toBeNull();
+    expect(document.activeElement).toBe(same.element);
+
+    await same.trigger("click");
+    const reopenedSameMenu = new DOMWrapper(document.body).get('[data-merge-submenu="same"]');
+    await reopenedSameMenu.trigger("keydown", { key: "Escape" });
+    expect(document.body.querySelector('[data-merge-submenu="same"]')).toBeNull();
+    expect(document.activeElement).toBe(same.element);
+
+    await same.trigger("click");
+    await new DOMWrapper(document.body)
+      .get('[data-merge-submenu="same"] [data-merge-action="same-rows"]')
+      .trigger("click");
+    expect(wrapper.emitted("merge")).toEqual([["all"], ["center"], ["same-rows"]]);
     expect(menuTrigger.attributes("aria-expanded")).toBe("false");
-    expect(document.activeElement).toBe(main.element);
 
     await wrapper.setProps({ state: { canMerge: false, canUnmerge: true } });
     expect((main.element as HTMLButtonElement).disabled).toBe(true);

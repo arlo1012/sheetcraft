@@ -110,10 +110,16 @@ export type SetSheetFreezePanesCommand = {
   freezePanes: FreezePanes;
 };
 
+export type CellMergeMode = "all" | "center" | "same-columns" | "same-rows" | "content" | "across";
+
 export type MergeCellsCommand = {
   type: "mergeCells";
   sheetId: string;
   range: CellRange;
+  /** Omitted for the legacy ordinary rectangular merge. */
+  mode?: CellMergeMode;
+  /** Locale used to materialize formatted text when merging content. */
+  locale?: string;
 };
 
 export type UnmergeCellsCommand = {

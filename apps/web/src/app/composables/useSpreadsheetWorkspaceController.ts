@@ -35,10 +35,12 @@ import {
   createSetSheetPropertiesCommand,
   createSortSheetRangeCommand,
   createUnmergeCellsCommand,
+  getCellMergeModeAvailability,
   getSheetFilterColumnDistinctValues,
   getSheetFilterValueKey,
   type SortDirection,
   type CellFormatChange,
+  type CellMergeMode,
   type WorkbookCommand,
   type WorkbookOperation,
 } from "@idea10/core/commands";
@@ -172,7 +174,7 @@ export type CellFormatSelection = {
 export function useSpreadsheetWorkspaceController(
   options: SpreadsheetWorkspaceControllerOptions = {},
 ) {
-  const { t } = useAppI18n();
+  const { t, locale } = useAppI18n();
   const idFactory = options.idFactory ?? createBrowserIdFactory();
   const session = reactive(createWorkbookSession({ idFactory })) as WorkbookSession;
   const viewStates = reactive(new Map<string, SheetGridViewState>());
@@ -281,6 +283,19 @@ export function useSpreadsheetWorkspaceController(
     );
     const hasMultipleCells =
       range.start.row !== range.end.row || range.start.column !== range.end.column;
+    const canUseModes =
+      cellSelection &&
+      hasMultipleCells &&
+      isFormattingSupported.value &&
+      !sheet.properties.protected;
+    const availableModes: Record<CellMergeMode, boolean> = {
+      all: canUseModes && getCellMergeModeAvailability(sheet, range, "all"),
+      center: canUseModes && getCellMergeModeAvailability(sheet, range, "center"),
+      "same-columns": canUseModes && getCellMergeModeAvailability(sheet, range, "same-columns"),
+      "same-rows": canUseModes && getCellMergeModeAvailability(sheet, range, "same-rows"),
+      content: canUseModes && getCellMergeModeAvailability(sheet, range, "content"),
+      across: canUseModes && getCellMergeModeAvailability(sheet, range, "across"),
+    };
     return {
       canMerge:
         cellSelection &&
@@ -289,6 +304,7 @@ export function useSpreadsheetWorkspaceController(
         !crossesFreeze &&
         !intersectsFilter,
       canUnmerge: cellSelection && intersectsMerge,
+      availableModes,
     };
   });
 
@@ -654,14 +670,20 @@ export function useSpreadsheetWorkspaceController(
     );
   }
 
-  function mergeSelection(): void {
-    if (!mergeState.value.canMerge) {
+  function mergeSelection(mode: CellMergeMode = "all"): void {
+    if (!(mergeState.value.availableModes?.[mode] ?? mergeState.value.canMerge)) {
       showWorkspaceStatus({ key: "workspace.mergeUnavailable" });
       return;
     }
     if (
       executeFeature(
-        () => createMergeCellsCommand(activeSheet.value.id, activeSelectionRange.value),
+        () =>
+          createMergeCellsCommand(
+            activeSheet.value.id,
+            activeSelectionRange.value,
+            mode,
+            mode === "content" ? locale.value : undefined,
+          ),
         "cells.merge",
         "workspace.mergeUnavailable",
       )

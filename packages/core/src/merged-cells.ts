@@ -125,20 +125,153 @@ export function doMergedCellRangesIntersect(left: CellRange, right: CellRange): 
 
 export function validateMergedCellRanges(ranges: readonly CellRange[]): MergedCellRange[] {
   const normalized = ranges.map(normalizeMergedCellRange).sort(compareRanges);
+  const expirationOrder = [...normalized].sort(
+    (left, right) =>
+      left.end.row - right.end.row ||
+      left.start.column - right.start.column ||
+      left.end.column - right.end.column,
+  );
+  let active: MergeIntervalNode | undefined;
+  let expirationIndex = 0;
   for (let index = 0; index < normalized.length; index += 1) {
     const range = normalized[index];
     if (!range) continue;
     if (isSingleCellRange(range)) {
       throw new RangeError("A merged cell range must contain more than one cell.");
     }
-    for (let previousIndex = 0; previousIndex < index; previousIndex += 1) {
-      const previous = normalized[previousIndex];
-      if (previous && doMergedCellRangesIntersect(previous, range)) {
-        throw new RangeError("Merged cell ranges must not overlap.");
-      }
+    while (
+      (expirationOrder[expirationIndex]?.end.row ?? Number.POSITIVE_INFINITY) < range.start.row
+    ) {
+      const expired = expirationOrder[expirationIndex];
+      if (expired) active = removeMergeInterval(active, expired);
+      expirationIndex += 1;
     }
+    if (findOverlappingMergeInterval(active, range.start.column, range.end.column)) {
+      throw new RangeError("Merged cell ranges must not overlap.");
+    }
+    active = insertMergeInterval(active, range);
   }
   return normalized.map(cloneRange);
+}
+
+/**
+ * A row sweep keeps only ranges whose inclusive row spans overlap the current
+ * range. The active intervals are indexed by their column spans, so validation
+ * stays O(n log n) for plans such as one merge per selected row.
+ */
+type MergeIntervalNode = {
+  range: MergedCellRange;
+  priority: number;
+  maxEndColumn: number;
+  left?: MergeIntervalNode;
+  right?: MergeIntervalNode;
+};
+
+function compareMergeIntervalKeys(left: MergedCellRange, right: MergedCellRange): number {
+  return (
+    left.start.column - right.start.column ||
+    left.end.column - right.end.column ||
+    left.start.row - right.start.row ||
+    left.end.row - right.end.row
+  );
+}
+
+function mergeIntervalPriority(range: MergedCellRange): number {
+  let value =
+    Math.imul(range.start.row + 1, 0x9e3779b1) ^
+    Math.imul(range.start.column + 1, 0x85ebca6b) ^
+    Math.imul(range.end.row + 1, 0xc2b2ae35) ^
+    Math.imul(range.end.column + 1, 0x27d4eb2f);
+  value = Math.imul(value ^ (value >>> 16), 0x21f0aaad);
+  value = Math.imul(value ^ (value >>> 15), 0x735a2d97);
+  return (value ^ (value >>> 15)) >>> 0;
+}
+
+function refreshMergeInterval(node: MergeIntervalNode): MergeIntervalNode {
+  node.maxEndColumn = Math.max(
+    node.range.end.column,
+    node.left?.maxEndColumn ?? Number.NEGATIVE_INFINITY,
+    node.right?.maxEndColumn ?? Number.NEGATIVE_INFINITY,
+  );
+  return node;
+}
+
+function rotateMergeIntervalLeft(node: MergeIntervalNode): MergeIntervalNode {
+  const pivot = node.right;
+  if (!pivot) return node;
+  node.right = pivot.left;
+  pivot.left = refreshMergeInterval(node);
+  return refreshMergeInterval(pivot);
+}
+
+function rotateMergeIntervalRight(node: MergeIntervalNode): MergeIntervalNode {
+  const pivot = node.left;
+  if (!pivot) return node;
+  node.left = pivot.right;
+  pivot.right = refreshMergeInterval(node);
+  return refreshMergeInterval(pivot);
+}
+
+function insertMergeInterval(
+  node: MergeIntervalNode | undefined,
+  range: MergedCellRange,
+): MergeIntervalNode {
+  if (!node) {
+    return {
+      range,
+      priority: mergeIntervalPriority(range),
+      maxEndColumn: range.end.column,
+    };
+  }
+  if (compareMergeIntervalKeys(range, node.range) < 0) {
+    node.left = insertMergeInterval(node.left, range);
+    if ((node.left?.priority ?? 0) > node.priority) return rotateMergeIntervalRight(node);
+  } else {
+    node.right = insertMergeInterval(node.right, range);
+    if ((node.right?.priority ?? 0) > node.priority) return rotateMergeIntervalLeft(node);
+  }
+  return refreshMergeInterval(node);
+}
+
+function removeMergeInterval(
+  node: MergeIntervalNode | undefined,
+  range: MergedCellRange,
+): MergeIntervalNode | undefined {
+  if (!node) return undefined;
+  const comparison = compareMergeIntervalKeys(range, node.range);
+  if (comparison < 0) {
+    node.left = removeMergeInterval(node.left, range);
+    return refreshMergeInterval(node);
+  }
+  if (comparison > 0) {
+    node.right = removeMergeInterval(node.right, range);
+    return refreshMergeInterval(node);
+  }
+  if (!node.left) return node.right;
+  if (!node.right) return node.left;
+  if (node.left.priority > node.right.priority) {
+    const root = rotateMergeIntervalRight(node);
+    root.right = removeMergeInterval(root.right, range);
+    return refreshMergeInterval(root);
+  }
+  const root = rotateMergeIntervalLeft(node);
+  root.left = removeMergeInterval(root.left, range);
+  return refreshMergeInterval(root);
+}
+
+function findOverlappingMergeInterval(
+  node: MergeIntervalNode | undefined,
+  startColumn: number,
+  endColumn: number,
+): MergedCellRange | undefined {
+  if (!node || node.maxEndColumn < startColumn) return undefined;
+  const left = findOverlappingMergeInterval(node.left, startColumn, endColumn);
+  if (left) return left;
+  if (node.range.start.column <= endColumn && node.range.end.column >= startColumn) {
+    return node.range;
+  }
+  if (node.range.start.column > endColumn) return undefined;
+  return findOverlappingMergeInterval(node.right, startColumn, endColumn);
 }
 
 export function getMergedCellRangeAtAddress(

@@ -1,4 +1,5 @@
 import type { CellAddress, SheetFilterValue } from "@idea10/core/workbook";
+import type { CellMergeMode } from "@idea10/core/commands";
 
 export type FilterValueKey = SheetFilterValue;
 
@@ -24,6 +25,7 @@ export type HomeDataToolState = {
 export type MergeCellsState = {
   canMerge: boolean;
   canUnmerge: boolean;
+  availableModes?: Record<CellMergeMode, boolean>;
 };
 
 export function createDefaultHomeDataToolState(): HomeDataToolState {

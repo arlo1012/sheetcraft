@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
+import type { CellMergeMode } from "@idea10/core/commands";
 import type { CellFormatTab } from "../modules/cell-format/components/CellFormatDialog.vue";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
@@ -34,7 +35,7 @@ const emit = defineEmits<{
   clearFilter: [];
   freeze: [mode: "panes" | "top-row" | "first-column"];
   unfreeze: [];
-  merge: [];
+  merge: [mode: CellMergeMode];
   unmerge: [];
   insertImage: [mode: "cell" | "floating"];
   undo: [];
@@ -79,7 +80,7 @@ defineSlots<{ "file-actions"?: () => unknown }>();
         @clear-filter="emit('clearFilter')"
         @freeze="emit('freeze', $event)"
         @unfreeze="emit('unfreeze')"
-        @merge="emit('merge')"
+        @merge="emit('merge', $event)"
         @unmerge="emit('unmerge')"
         @insert-image="emit('insertImage', $event)"
         @undo="emit('undo')"

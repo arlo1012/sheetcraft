@@ -71,6 +71,28 @@ describe("merged cell ranges", () => {
     ).toThrow("must not overlap");
   });
 
+  test("rejects a crossing overlap even when neither range starts inside the other", () => {
+    expect(() =>
+      validateMergedCellRanges([
+        { start: { row: 0, column: 2 }, end: { row: 4, column: 3 } },
+        { start: { row: 2, column: 0 }, end: { row: 3, column: 5 } },
+      ]),
+    ).toThrow("must not overlap");
+  });
+
+  test("validates a large disjoint row merge plan without quadratic pair scans", () => {
+    const ranges = Array.from({ length: 50_000 }, (_, index) => ({
+      start: { row: index * 2, column: 0 },
+      end: { row: index * 2, column: 1 },
+    }));
+
+    const validated = validateMergedCellRanges(ranges);
+
+    expect(validated).toHaveLength(50_000);
+    expect(validated[0]).toEqual(ranges[0]);
+    expect(validated.at(-1)).toEqual(ranges.at(-1));
+  });
+
   test("finds the enclosing merge and its top-left anchor", () => {
     const ranges = [{ start: { row: 2, column: 3 }, end: { row: 4, column: 5 } }];
 

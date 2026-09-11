@@ -104,10 +104,11 @@ function activate(): void {
   }
 
   &.has-text {
-    width: auto;
+    justify-content: var(--ribbon-labeled-action-justify, center);
+    width: var(--ribbon-labeled-action-width, auto);
     min-width: 27px;
     gap: 2px;
-    padding: 0 1px;
+    padding: 0 var(--ribbon-labeled-action-padding, 1px);
   }
 
   &.is-tall {
