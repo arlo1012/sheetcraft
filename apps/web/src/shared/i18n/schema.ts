@@ -459,6 +459,7 @@ export type MessageSchema = {
     textDirectionLtr: string;
     textDirectionRtl: string;
     orientation: string;
+    orientationText: string;
     rotationDegrees: string;
     degrees: string;
     verticalText: string;

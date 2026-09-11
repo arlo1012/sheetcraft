@@ -13,10 +13,7 @@ describe("CellFormatTextOrientationControl", () => {
       .get("[data-cell-format-rotation]")
       .findComponent({ name: "TInputNumber" })
       .vm.$emit("change", -120);
-    wrapper
-      .get("[data-cell-format-vertical-text]")
-      .findComponent({ name: "TCheckbox" })
-      .vm.$emit("change", true);
+    await wrapper.get("[data-cell-format-vertical-text]").trigger("click");
     await wrapper.vm.$nextTick();
     expect(wrapper.emitted("update:modelValue")).toEqual([[-90], ["vertical"]]);
   });

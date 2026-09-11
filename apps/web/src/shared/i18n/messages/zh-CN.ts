@@ -466,6 +466,7 @@ export const zhCN = {
     textDirectionLtr: "总是从左向右",
     textDirectionRtl: "总是从右向左",
     orientation: "方向",
+    orientationText: "文本",
     rotationDegrees: "文字旋转角度",
     degrees: "度",
     verticalText: "文字竖排",

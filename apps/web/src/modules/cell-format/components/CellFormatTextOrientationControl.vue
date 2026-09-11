@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import type { CellTextRotation } from "@idea10/core/style";
@@ -15,41 +14,106 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 const degrees = computed(() => (typeof props.modelValue === "number" ? props.modelValue : 0));
+let activePointer: number | undefined;
 
 function setDegrees(next: InputNumberValue): void {
   if (typeof next !== "number" || !Number.isFinite(next)) return;
   const value = Math.max(-90, Math.min(90, Math.round(next)));
   emit("update:modelValue", value || null);
 }
-function setVertical(next: boolean): void {
-  emit("update:modelValue", next ? "vertical" : null);
+function toggleVertical(): void {
+  emit("update:modelValue", props.modelValue === "vertical" ? null : "vertical");
+}
+function updatePointerAngle(event: PointerEvent): void {
+  const target = event.currentTarget as HTMLInputElement;
+  const rect = target.getBoundingClientRect();
+  if (props.modelValue === "vertical" || !rect.width || !rect.height) return;
+  const x = Math.max(0, ((event.clientX - rect.left) / rect.width) * 100 - 12);
+  const y = 72 - ((event.clientY - rect.top) / rect.height) * 144;
+  setDegrees((Math.atan2(y, x) * 180) / Math.PI);
+}
+function startDialDrag(event: PointerEvent): void {
+  if (event.button !== 0 || props.modelValue === "vertical") return;
+  event.preventDefault();
+  const target = event.currentTarget as HTMLInputElement;
+  target.focus({ preventScroll: true });
+  activePointer = event.pointerId;
+  target.setPointerCapture?.(event.pointerId);
+  updatePointerAngle(event);
+}
+function moveDialDrag(event: PointerEvent): void {
+  if (activePointer === event.pointerId) updatePointerAngle(event);
+}
+function endDialDrag(event: PointerEvent): void {
+  if (activePointer !== event.pointerId) return;
+  activePointer = undefined;
+  const target = event.currentTarget as HTMLInputElement;
+  if (target.hasPointerCapture?.(event.pointerId)) target.releasePointerCapture(event.pointerId);
 }
 </script>
 
 <template>
   <fieldset class="cell-format-text-orientation">
     <legend>{{ t("cellFormat.orientation") }}</legend>
-    <div class="cell-format-text-orientation__dial" aria-hidden="true">
-      <span :style="{ transform: `rotate(${-degrees}deg)` }"></span>
-      <i
-        v-for="tick in 9"
-        :key="tick"
-        :style="{ transform: `rotate(${(tick - 5) * 22.5}deg)` }"
-      ></i>
+    <div class="cell-format-text-orientation__controls">
+      <button
+        type="button"
+        class="cell-format-text-orientation__vertical"
+        :class="{ 'is-selected': modelValue === 'vertical' }"
+        :aria-label="t('cellFormat.verticalText')"
+        :aria-pressed="mixed ? 'mixed' : modelValue === 'vertical'"
+        data-cell-format-vertical-text
+        @click="toggleVertical"
+      >
+        {{ t("cellFormat.orientationText") }}
+      </button>
+      <div
+        class="cell-format-text-orientation__dial"
+        :class="{ 'is-disabled': modelValue === 'vertical' }"
+      >
+        <svg viewBox="0 0 100 144" preserveAspectRatio="none" aria-hidden="true">
+          <g v-for="tick in 13" :key="tick" :transform="`rotate(${(tick - 7) * 15} 12 72)`">
+            <rect
+              v-if="(tick - 1) % 3 === 0"
+              x="70"
+              y="70"
+              width="4"
+              height="4"
+              transform="rotate(45 72 72)"
+            />
+            <circle v-else cx="72" cy="72" r="1" />
+          </g>
+          <g
+            v-if="!mixed && modelValue !== 'vertical'"
+            :transform="`rotate(${-degrees} 12 72)`"
+            class="cell-format-text-orientation__pointer"
+          >
+            <text x="18" y="72" dominant-baseline="central">
+              {{ t("cellFormat.orientationText") }}
+            </text>
+            <line x1="48" y1="72" x2="72" y2="72" />
+            <rect x="70" y="70" width="4" height="4" transform="rotate(45 72 72)" />
+          </g>
+        </svg>
+        <input
+          type="range"
+          min="-90"
+          max="90"
+          step="1"
+          :value="degrees"
+          :disabled="modelValue === 'vertical'"
+          :aria-label="t('cellFormat.rotationDegrees')"
+          :aria-valuetext="mixed ? t('format.mixed') : `${degrees} ${t('cellFormat.degrees')}`"
+          data-cell-format-rotation-dial
+          @input="setDegrees(Number(($event.target as HTMLInputElement).value))"
+          @pointerdown="startDialDrag"
+          @pointermove="moveDialDrag"
+          @pointerup="endDialDrag"
+          @pointercancel="endDialDrag"
+          @lostpointercapture="endDialDrag"
+        />
+      </div>
     </div>
-    <label class="cell-format-text-orientation__range">
-      <span class="sr-only">{{ t("cellFormat.rotationDegrees") }}</span>
-      <input
-        type="range"
-        min="-90"
-        max="90"
-        step="1"
-        :value="degrees"
-        :disabled="modelValue === 'vertical'"
-        data-cell-format-rotation-dial
-        @input="setDegrees(Number(($event.target as HTMLInputElement).value))"
-      />
-    </label>
     <div
       class="cell-format-text-orientation__input"
       role="group"
@@ -69,74 +133,100 @@ function setVertical(next: boolean): void {
       />
       <span>{{ t("cellFormat.degrees") }}</span>
     </div>
-    <TCheckbox
-      :model-value="modelValue === 'vertical'"
-      :indeterminate="mixed"
-      data-cell-format-vertical-text
-      @change="setVertical"
-      >{{ t("cellFormat.verticalText") }}</TCheckbox
-    >
   </fieldset>
 </template>
 
 <style scoped lang="scss">
 .cell-format-text-orientation {
   display: grid;
+  align-self: start;
+  gap: 6px;
   min-width: 0;
   margin: 0;
-  padding: 0;
-  border: 0;
+  padding: 8px;
+  border: 1px solid var(--idea-border-control);
 
   > legend {
-    padding: 0 0 8px;
-    font-weight: var(--idea-font-weight-semibold);
+    padding: 0 4px;
+    font-weight: var(--idea-font-weight-medium);
+  }
+
+  &__controls {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 4px;
+    height: 144px;
+  }
+
+  &__vertical {
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    padding: 0;
+    border: 1px solid var(--idea-border-control);
+    background: var(--idea-surface-panel);
+    color: var(--idea-text-primary);
+    font: inherit;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--idea-icon-button-hover-bg);
+    }
+    &.is-selected {
+      border-color: var(--idea-action-primary);
+      color: var(--idea-action-primary);
+      background: var(--idea-surface-secondary);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--idea-action-primary);
+      outline-offset: 2px;
+    }
   }
 
   &__dial {
     position: relative;
-    display: grid;
-    place-items: center;
-    width: 118px;
-    height: 118px;
-    margin: 0 auto 8px;
+    min-width: 0;
     overflow: hidden;
     border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-default);
+    background: var(--idea-surface-panel);
 
-    span {
-      width: 70px;
-      height: 1px;
-      background: var(--idea-text-primary);
-      transform-origin: center;
-
-      &::before {
-        position: absolute;
-        top: -3px;
-        left: 33px;
-        width: 7px;
-        height: 7px;
-        background: var(--idea-action-primary);
-        border-radius: 50%;
-        content: "";
-      }
+    svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      fill: var(--idea-text-primary);
     }
-
-    i {
+    input {
       position: absolute;
-      width: 4px;
-      height: 4px;
-      margin-top: -86px;
-      background: var(--idea-text-primary);
-      border-radius: 50%;
-      transform-origin: 2px 61px;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      opacity: 0;
+      cursor: crosshair;
+      touch-action: none;
+    }
+    &:focus-within {
+      outline: 2px solid var(--idea-action-primary);
+      outline-offset: 2px;
+    }
+    &.is-disabled {
+      opacity: 0.45;
     }
   }
 
-  &__range {
-    margin: 0 0 8px;
-
-    input {
-      width: 100%;
+  &__pointer {
+    text {
+      font: inherit;
+    }
+    line {
+      stroke: var(--idea-text-primary);
+      stroke-width: 1;
+    }
+    rect {
+      fill: var(--idea-action-primary);
     }
   }
 
@@ -145,33 +235,6 @@ function setVertical(next: boolean): void {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 6px;
-    margin-bottom: 8px;
   }
-}
-
-@media (max-width: 520px) {
-  .cell-format-text-orientation {
-    grid-template-columns: 118px minmax(0, 1fr);
-    column-gap: 12px;
-
-    > legend {
-      grid-column: 1 / -1;
-    }
-    &__dial {
-      grid-row: span 3;
-    }
-  }
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 </style>

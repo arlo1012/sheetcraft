@@ -476,6 +476,7 @@ export const enUS = {
     textDirectionLtr: "Always left-to-right",
     textDirectionRtl: "Always right-to-left",
     orientation: "Orientation",
+    orientationText: "Text",
     rotationDegrees: "Text rotation in degrees",
     degrees: "Degrees",
     verticalText: "Vertical text",
