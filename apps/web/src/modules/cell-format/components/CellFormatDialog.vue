@@ -263,7 +263,8 @@ function confirm(): void {
   }
 
   &--alignment {
-    height: min(500px, calc(100dvh - 192px));
+    height: auto;
+    max-height: calc(100dvh - 192px);
   }
 }
 </style>
