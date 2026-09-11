@@ -133,6 +133,7 @@ function setFontSize(value: SelectValue): void {
         borderless
         :model-value="fontSizeValue"
         :options="fontSizeOptions"
+        :input-props="{ align: 'center' }"
         :popup-props="fontSizePopupProps"
         :placeholder="state.fontSize.mixed ? t('format.mixed') : undefined"
         :disabled="disabled"
