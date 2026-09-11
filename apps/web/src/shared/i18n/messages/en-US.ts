@@ -448,7 +448,6 @@ export const enUS = {
     currencyDescription: "Display an amount with a currency symbol and decimal places.",
     mixedNumberDescription:
       "The selected cells use different formats. Choose a category to apply one format.",
-    alignmentPreviewText: "Sample text to preview cell alignment and automatic text wrapping.",
     preview: "Preview",
     horizontal: "Horizontal",
     vertical: "Vertical",

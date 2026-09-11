@@ -176,7 +176,6 @@ function confirm(): void {
           :state="state"
           :patch="stylePatch"
           :sample-value="sampleValue"
-          :date-system="dateSystem"
           :merge-state="mergeState?.merged"
           :merge-enabled="mergeState?.canMerge || mergeState?.canUnmerge"
           @update:patch="updateStyle"
@@ -259,9 +258,12 @@ function confirm(): void {
   flex-direction: column;
   height: min(380px, calc(100dvh - 240px));
 
-  &--number,
-  &--alignment {
+  &--number {
     height: min(508px, calc(100dvh - 192px));
+  }
+
+  &--alignment {
+    height: min(400px, calc(100dvh - 192px));
   }
 }
 </style>

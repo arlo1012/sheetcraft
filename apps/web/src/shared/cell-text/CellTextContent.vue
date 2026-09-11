@@ -14,7 +14,6 @@ const props = defineProps<{
   fill?: CellNumberFormatPresentation["fill"];
   width?: number;
   height?: number;
-  fitRotation?: boolean;
 }>();
 const root = ref<HTMLElement>();
 const measuredWidth = ref(DEFAULT_COLUMN_WIDTH);
@@ -48,24 +47,6 @@ const layout = computed(() => {
 });
 const placementStyle = computed<CSSProperties>(() => {
   const current = layout.value;
-  if (props.fitRotation && current.angle) {
-    const radians = (Math.abs(current.angle) * Math.PI) / 180;
-    const width = current.width * Math.cos(radians) + current.height * Math.sin(radians);
-    const height = current.width * Math.sin(radians) + current.height * Math.cos(radians);
-    const availableWidth = props.width ?? measuredWidth.value;
-    const availableHeight = props.height ?? measuredHeight.value;
-    const scale = Math.min(
-      1,
-      Math.max(1, availableWidth - 10) / width,
-      Math.max(1, availableHeight - 4) / height,
-    );
-    if (scale < 1)
-      return {
-        left: `${(availableWidth - width * scale) / 2 + current.rotationX * scale}px`,
-        top: `${(availableHeight - height * scale) / 2 + current.rotationY * scale}px`,
-        transform: `scale(${scale}) rotate(${current.angle}deg)`,
-      };
-  }
   return {
     left: `${current.x + current.rotationX}px`,
     top: `${current.y + current.rotationY}px`,

@@ -431,7 +431,6 @@ export type MessageSchema = {
     percentDescription: string;
     currencyDescription: string;
     mixedNumberDescription: string;
-    alignmentPreviewText: string;
     preview: string;
     horizontal: string;
     vertical: string;

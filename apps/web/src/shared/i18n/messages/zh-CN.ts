@@ -438,7 +438,6 @@ export const zhCN = {
     percentDescription: "将数值乘以 100，并显示百分号。",
     currencyDescription: "以货币金额显示，可设置货币符号和小数位数。",
     mixedNumberDescription: "所选单元格包含多种格式，选择分类后统一设置。",
-    alignmentPreviewText: "示例文本，用于预览单元格中的对齐和自动换行效果。",
     preview: "预览",
     horizontal: "水平",
     vertical: "垂直",

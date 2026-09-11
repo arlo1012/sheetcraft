@@ -101,7 +101,7 @@ describe("CellFormatAlignmentPanel", () => {
     expect(wrapper.emitted("update:patch")?.at(-1)).toEqual([{ indent: 4 }]);
     expect(wrapper.emitted("update:merge")).toEqual([[true]]);
   });
-  test("uses effective wrapping for justify and preserves General numeric preview alignment", async () => {
+  test("uses effective wrapping for justify", () => {
     const state = createDefaultSelectionCellStyleState();
     const wrapper = mount(CellFormatAlignmentPanel, {
       global: { plugins: [createAppI18n("en-US")] },
@@ -116,10 +116,5 @@ describe("CellFormatAlignmentPanel", () => {
     expect(wrap.props("modelValue")).toBe(true);
     expect(wrap.props("disabled")).toBe(true);
     expect(shrink.props("disabled")).toBe(true);
-
-    await wrapper.setProps({ patch: {} });
-    expect(wrapper.get("[data-cell-text-alignment]").attributes("data-cell-text-alignment")).toBe(
-      "right",
-    );
   });
 });
