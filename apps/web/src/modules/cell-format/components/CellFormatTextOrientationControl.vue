@@ -187,12 +187,11 @@ function endDialDrag(event: PointerEvent): void {
       background: var(--idea-icon-button-hover-bg);
     }
     &.is-selected {
-      border-color: var(--idea-action-primary);
       color: var(--idea-action-primary);
       background: var(--idea-surface-secondary);
     }
     &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
+      outline: 1px solid var(--idea-text-muted);
       outline-offset: 2px;
     }
   }
@@ -221,8 +220,8 @@ function endDialDrag(event: PointerEvent): void {
       cursor: crosshair;
       touch-action: none;
     }
-    &:focus-within {
-      outline: 2px solid var(--idea-action-primary);
+    &:has(input:focus-visible) {
+      outline: 1px solid var(--idea-text-muted);
       outline-offset: 2px;
     }
     &.is-disabled {
