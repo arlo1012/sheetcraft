@@ -22,8 +22,8 @@ const fontFamilyPopupProps = {
   overlayInnerStyle: { minWidth: "168px" },
 };
 const fontSizePopupProps = {
-  overlayStyle: { minWidth: "72px" },
-  overlayInnerStyle: { minWidth: "72px" },
+  overlayStyle: { minWidth: "48px" },
+  overlayInnerStyle: { minWidth: "48px" },
 };
 
 const props = defineProps<{
