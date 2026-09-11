@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import type { CellTextRotation } from "@idea10/core/style";
@@ -21,8 +22,11 @@ function setDegrees(next: InputNumberValue): void {
   const value = Math.max(-90, Math.min(90, Math.round(next)));
   emit("update:modelValue", value || null);
 }
+function setVertical(next: boolean): void {
+  emit("update:modelValue", next ? "vertical" : null);
+}
 function toggleVertical(): void {
-  emit("update:modelValue", props.modelValue === "vertical" ? null : "vertical");
+  setVertical(props.modelValue !== "vertical");
 }
 function updatePointerAngle(event: PointerEvent): void {
   const target = event.currentTarget as HTMLInputElement;
@@ -53,8 +57,8 @@ function endDialDrag(event: PointerEvent): void {
 </script>
 
 <template>
-  <fieldset class="cell-format-text-orientation">
-    <legend>{{ t("cellFormat.orientation") }}</legend>
+  <section class="cell-format-text-orientation" :aria-label="t('cellFormat.orientation')">
+    <h3>{{ t("cellFormat.orientation") }}</h3>
     <div class="cell-format-text-orientation__controls">
       <button
         type="button"
@@ -126,35 +130,42 @@ function endDialDrag(event: PointerEvent): void {
         :decimal-places="0"
         :disabled="modelValue === 'vertical'"
         theme="column"
-        class="idea-input-number--persistent-controls"
+        class="idea-input-number--persistent-controls cell-format-text-orientation__degrees"
         :placeholder="mixed ? t('format.mixed') : undefined"
         data-cell-format-rotation
         @change="setDegrees"
       />
       <span>{{ t("cellFormat.degrees") }}</span>
     </div>
-  </fieldset>
+    <TCheckbox
+      :model-value="modelValue === 'vertical'"
+      :indeterminate="mixed"
+      data-cell-format-vertical-text-checkbox
+      @change="setVertical"
+      >{{ t("cellFormat.verticalText") }}</TCheckbox
+    >
+  </section>
 </template>
 
 <style scoped lang="scss">
 .cell-format-text-orientation {
   display: grid;
   align-self: start;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   margin: 0;
-  padding: 8px;
-  border: 0;
+  padding: 0;
 
-  > legend {
-    padding: 0 4px;
-    font-weight: var(--idea-font-weight-medium);
+  > h3 {
+    margin: 0;
+    font-size: inherit;
+    font-weight: var(--idea-font-weight-semibold);
   }
 
   &__controls {
     display: grid;
-    grid-template-columns: 24px minmax(0, 1fr);
-    gap: 4px;
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 8px;
     height: 144px;
   }
 
@@ -163,7 +174,8 @@ function endDialDrag(event: PointerEvent): void {
     place-items: center;
     min-width: 0;
     padding: 0;
-    border: 1px solid var(--idea-border-control);
+    border: 1px solid var(--idea-border-strong);
+    border-radius: var(--idea-radius-default);
     background: var(--idea-surface-panel);
     color: var(--idea-text-primary);
     font: inherit;
@@ -189,7 +201,8 @@ function endDialDrag(event: PointerEvent): void {
     position: relative;
     min-width: 0;
     overflow: hidden;
-    border: 1px solid var(--idea-border-control);
+    border: 1px solid var(--idea-border-strong);
+    border-radius: var(--idea-radius-default);
     background: var(--idea-surface-panel);
 
     svg {
@@ -234,7 +247,12 @@ function endDialDrag(event: PointerEvent): void {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+
+    > .cell-format-text-orientation__degrees {
+      width: 100%;
+      min-width: 0;
+    }
   }
 }
 </style>
