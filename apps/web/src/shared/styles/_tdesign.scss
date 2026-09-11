@@ -215,6 +215,21 @@
   --td-comp-size-s: 24px;
 }
 
+// Custom panel selects render the selected preview across the input's value area.
+// SelectInput places valueDisplay in its prefix; the native input remains focusable.
+.idea-panel-select .t-input {
+  > .t-input__prefix:not(:empty) {
+    flex: 1;
+    min-width: 0;
+    margin-right: 0;
+  }
+
+  > .t-input__inner {
+    flex: 0;
+    width: 0;
+  }
+}
+
 .idea-number-format-options .t-select-option {
   &:hover:not(.t-is-selected):not(.t-is-disabled) {
     background: var(--idea-surface-secondary);

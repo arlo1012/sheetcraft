@@ -50,4 +50,19 @@ describe("CellFormatFillEffectsDialog", () => {
     expect(wrapper.emitted("cancel")).toHaveLength(1);
     expect(wrapper.emitted("confirm")).toBeUndefined();
   });
+
+  test("maps automatic color selections to each gradient color default", async () => {
+    const wrapper = mountDialog();
+    const controls = wrapper.findAllComponents(CellFormatColorControl);
+    controls[0]!.vm.$emit("select", null);
+    controls[1]!.vm.$emit("select", null);
+    await wrapper.vm.$nextTick();
+
+    wrapper.findComponent({ name: "TDialog" }).vm.$emit("confirm");
+    const gradient = wrapper.emitted("confirm")?.at(-1)?.[0] as CellFillGradient;
+    expect(gradient.stops).toEqual([
+      { position: 0, color: "#ffffff" },
+      { position: 1, color: "#4472c4" },
+    ]);
+  });
 });

@@ -147,7 +147,7 @@ function setGradient(gradient: CellFillGradient): void {
             :disabled="!fill?.fillPattern && !isMixed('fillPattern')"
             :mixed="isMixed('fillPatternColor')"
             data-cell-format-pattern-color
-            @select="emit('update:patch', { fillPatternColor: $event })"
+            @select="emit('update:patch', { fillPatternColor: $event ?? '#000000' })"
           />
         </div>
         <div class="cell-format-fill__preview-group">

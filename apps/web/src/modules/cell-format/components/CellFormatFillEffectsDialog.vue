@@ -73,13 +73,13 @@ function selectVariant(variant: number): void {
   applyPreset();
 }
 
-function selectColor1(color: string): void {
-  color1.value = color;
+function selectColor1(color: string | null): void {
+  color1.value = color ?? props.defaultColor;
   applyPreset();
 }
 
-function selectColor2(color: string): void {
-  color2.value = color;
+function selectColor2(color: string | null): void {
+  color2.value = color ?? DEFAULT_SECOND_COLOR;
   applyPreset();
 }
 

@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown } from "lucide-vue-next";
-import { Popup as TPopup } from "tdesign-vue-next/es/popup";
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import type {
   CellBorder,
   CellBorderAction,
@@ -13,7 +11,7 @@ import BorderLinePreview from "../../../shared/borders/BorderLinePreview.vue";
 import BorderLineStylePanel from "../../../shared/borders/BorderLineStylePanel.vue";
 import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
 import CellFormatBorderPreview from "./CellFormatBorderPreview.vue";
-import ColorPalette from "../../../shared/color/ColorPalette.vue";
+import CellFormatColorControl from "./CellFormatColorControl.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { CellFormatBorderCapabilities } from "../border-capabilities";
 
@@ -36,8 +34,6 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 const lineStyle = ref<CellBorderLineStyle | null>(DEFAULT_BORDER.style);
 const color = ref(DEFAULT_BORDER.color);
-const colorPickerOpen = ref(false);
-const colorTriggerRef = ref<HTMLButtonElement | null>(null);
 
 const border = computed<CellBorder>(() => ({
   style: lineStyle.value ?? props.format?.style ?? DEFAULT_BORDER.style,
@@ -137,19 +133,6 @@ function selectColor(value: string | null): void {
   const selected = value ?? DEFAULT_BORDER.color;
   color.value = selected;
   emit("update:format", { color: selected });
-  closeColorPicker(true);
-}
-
-function closeColorPicker(restoreFocus = false): void {
-  colorPickerOpen.value = false;
-  if (restoreFocus) void nextTick(() => colorTriggerRef.value?.focus());
-}
-
-function onPickerKeydown(event: KeyboardEvent): void {
-  if (event.key !== "Escape") return;
-  event.preventDefault();
-  event.stopPropagation();
-  closeColorPicker(true);
 }
 
 watch(
@@ -222,50 +205,14 @@ const previewState = computed<SelectionBorderState>(() => ({
         </div>
         <div class="cell-format-border-panel__field">
           <span>{{ t("format.borderColor") }}</span>
-          <TPopup
-            v-model:visible="colorPickerOpen"
-            trigger="click"
-            placement="bottom-left"
-            :overlay-inner-style="{ padding: '0' }"
-          >
-            <button
-              ref="colorTriggerRef"
-              type="button"
-              class="cell-format-border-panel__color"
-              data-border-color-trigger
-              :aria-label="t('format.borderColorValue', { value: color.toUpperCase() })"
-              :aria-expanded="colorPickerOpen"
-              aria-haspopup="dialog"
-            >
-              <span class="cell-format-border-panel__color-value">
-                <span
-                  v-if="color !== DEFAULT_BORDER.color"
-                  class="cell-format-border-panel__swatch"
-                  :style="{ backgroundColor: color }"
-                  aria-hidden="true"
-                />
-                {{
-                  color === DEFAULT_BORDER.color ? t("cellFormat.automatic") : color.toUpperCase()
-                }}
-              </span>
-              <ChevronDown :size="14" aria-hidden="true" />
-            </button>
-            <template #content>
-              <div
-                v-if="colorPickerOpen"
-                role="dialog"
-                :aria-label="t('format.borderColor')"
-                @keydown="onPickerKeydown"
-              >
-                <ColorPalette
-                  :model-value="color"
-                  :default-color="DEFAULT_BORDER.color"
-                  :default-label="t('cellFormat.automatic')"
-                  @select="selectColor"
-                />
-              </div>
-            </template>
-          </TPopup>
+          <CellFormatColorControl
+            :model-value="color"
+            :label="t('format.borderColor')"
+            :default-color="DEFAULT_BORDER.color"
+            show-value
+            data-border-color-trigger
+            @select="selectColor"
+          />
           <div class="cell-format-border-panel__line-sample" aria-hidden="true">
             <BorderLinePreview
               v-if="lineStyle"
@@ -386,49 +333,19 @@ const previewState = computed<SelectionBorderState>(() => ({
     border-radius: var(--idea-radius-default);
     background: var(--idea-surface-panel);
   }
-  &__color,
   &__line-sample {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     width: 100%;
     height: 28px;
     padding: 0 8px;
-    border: 1px solid var(--idea-border-strong);
+    overflow: hidden;
+    border: 1px solid var(--idea-border-subtle);
     border-radius: var(--idea-radius-default);
     background: var(--idea-surface-panel);
     color: inherit;
     font: inherit;
-  }
-  &__color {
-    cursor: pointer;
-
-    &:hover {
-      border-color: var(--idea-action-primary-hover);
-    }
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-focus);
-      border-color: var(--idea-action-primary);
-    }
-  }
-  &__color-value {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-width: 0;
-  }
-  &__swatch {
-    flex: none;
-    width: 14px;
-    height: 14px;
-    border-radius: var(--idea-radius-small);
-  }
-  &__line-sample {
-    justify-content: center;
-    overflow: hidden;
-    border-color: var(--idea-border-subtle);
   }
   &__borders {
     display: grid;

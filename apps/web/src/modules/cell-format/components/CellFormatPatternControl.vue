@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useId, watch } from "vue";
-import { ChevronDown, Search } from "lucide-vue-next";
+import { computed, ref, useId } from "vue";
+import { Search } from "lucide-vue-next";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { SelectInput as TSelectInput } from "tdesign-vue-next/es/select-input";
 import { CELL_FILL_PATTERNS, type CellFillPatternStyle } from "@idea10/core/style";
 import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
 import { useAppI18n } from "../../../shared/i18n";
+import CellFormatPanelSelect from "./CellFormatPanelSelect.vue";
 
 type PatternValue = CellFillPatternStyle | "none";
 const props = defineProps<{
@@ -15,11 +15,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ select: [value: PatternValue] }>();
 const { t } = useAppI18n();
-const open = ref(false);
 const query = ref("");
-const control = ref<HTMLElement>();
 const panel = ref<HTMLElement>();
-const panelId = useId();
 const listId = useId();
 const options = computed(() => [
   { value: "none" as const, label: t("cellFormat.patternNone") },
@@ -33,14 +30,6 @@ const selectedLabel = computed(
   () =>
     options.value.find((option) => option.value === props.modelValue)?.label ?? t("format.mixed"),
 );
-const triggerInputProps = computed(() => ({
-  role: "combobox",
-  "aria-label": `${t("cellFormat.patternStyle")}: ${selectedLabel.value}`,
-  "aria-expanded": open.value,
-  "aria-haspopup": "dialog",
-  "aria-controls": open.value ? panelId : undefined,
-  onKeydown: onTriggerKeydown,
-}));
 
 function preview(value: PatternValue) {
   return getCellFillStyle({
@@ -50,32 +39,11 @@ function preview(value: PatternValue) {
       : { fillPattern: value, fillPatternColor: props.patternColor ?? "#000000" }),
   });
 }
-function close(): void {
-  open.value = false;
-  void nextTick(() => control.value?.querySelector<HTMLInputElement>("input")?.focus());
-}
-function select(value: PatternValue): void {
+function select(value: PatternValue, close: () => void): void {
   emit("select", value);
   close();
 }
-function onTriggerKeydown(_value: string | number, { e: event }: { e: KeyboardEvent }): void {
-  if (["Enter", " ", "ArrowDown", "ArrowUp"].includes(event.key)) {
-    event.preventDefault();
-    event.stopPropagation();
-    open.value = true;
-  } else if (event.key === "Escape" && open.value) {
-    event.preventDefault();
-    event.stopPropagation();
-    close();
-  }
-}
 function onKeydown(event: KeyboardEvent): void {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    event.stopPropagation();
-    close();
-    return;
-  }
   const buttons = [
     ...(panel.value?.querySelectorAll<HTMLButtonElement>("[data-fill-pattern]") ?? []),
   ];
@@ -109,107 +77,72 @@ function onKeydown(event: KeyboardEvent): void {
   event.stopPropagation();
   buttons[Math.max(0, Math.min(buttons.length - 1, next))]?.focus();
 }
-watch(open, (value) => {
-  query.value = "";
-  if (value) void nextTick(() => panel.value?.querySelector<HTMLInputElement>("input")?.focus());
-});
 </script>
 
 <template>
-  <div ref="control" class="cell-format-pattern-control">
-    <TSelectInput
-      :value="{ value: modelValue, label: selectedLabel }"
-      :popup-visible="open"
-      :popup-props="{
-        placement: 'bottom-right',
-        overlayInnerStyle: (triggerElement) => ({
-          width: `${triggerElement.offsetWidth}px`,
-          padding: '0',
-        }),
-      }"
-      :input-props="triggerInputProps"
-      @popup-visible-change="open = $event"
-    >
-      <template #valueDisplay>
-        <span class="cell-format-pattern-control__value">
-          <span
-            v-if="modelValue && modelValue !== 'none'"
-            class="cell-format-pattern-control__selected-swatch"
-            :style="preview(modelValue)"
-            aria-hidden="true"
-          />
-          <span class="cell-format-pattern-control__label">{{ selectedLabel }}</span>
-        </span>
-      </template>
-      <template #suffixIcon>
-        <ChevronDown :size="14" aria-hidden="true" />
-      </template>
-      <template #panel>
-        <div
-          v-if="open"
-          :id="panelId"
-          ref="panel"
-          class="cell-format-pattern-control__panel"
-          role="dialog"
-          :aria-label="t('cellFormat.patternStyle')"
-          @keydown="onKeydown"
+  <CellFormatPanelSelect
+    class="cell-format-pattern-control"
+    :model-value="modelValue"
+    :label="t('cellFormat.patternStyle')"
+    :value-label="selectedLabel"
+    @open-change="query = ''"
+  >
+    <template #value>
+      <span
+        v-if="modelValue && modelValue !== 'none'"
+        class="cell-format-pattern-control__selected-swatch"
+        :style="preview(modelValue)"
+        aria-hidden="true"
+      />
+      <span class="cell-format-pattern-control__label">{{ selectedLabel }}</span>
+    </template>
+    <template #panel="{ close }">
+      <div ref="panel" class="cell-format-pattern-control__panel" @keydown="onKeydown">
+        <TInput
+          v-model="query"
+          clearable
+          :aria-label="t('cellFormat.patternSearch')"
+          :aria-controls="listId"
+          :placeholder="t('cellFormat.patternSearch')"
         >
-          <TInput
-            v-model="query"
-            clearable
-            :aria-label="t('cellFormat.patternSearch')"
-            :aria-controls="listId"
-            :placeholder="t('cellFormat.patternSearch')"
+          <template #prefix-icon><Search :size="14" aria-hidden="true" /></template>
+        </TInput>
+        <div
+          :id="listId"
+          class="cell-format-pattern-control__options narrow-scrollbar"
+          role="group"
+          :aria-label="t('cellFormat.patternStyle')"
+        >
+          <button
+            v-for="option in filteredOptions"
+            :key="option.value"
+            type="button"
+            class="cell-format-pattern-control__option"
+            :data-fill-pattern="option.value"
+            :aria-label="option.label"
+            :aria-pressed="modelValue === option.value"
+            :title="option.label"
+            @click="select(option.value, close)"
           >
-            <template #prefix-icon><Search :size="14" aria-hidden="true" /></template>
-          </TInput>
-          <div
-            :id="listId"
-            class="cell-format-pattern-control__options narrow-scrollbar"
-            role="group"
-            :aria-label="t('cellFormat.patternStyle')"
-          >
-            <button
-              v-for="option in filteredOptions"
-              :key="option.value"
-              type="button"
-              class="cell-format-pattern-control__option"
-              :data-fill-pattern="option.value"
-              :aria-label="option.label"
-              :aria-pressed="modelValue === option.value"
-              :title="option.label"
-              @click="select(option.value)"
-            >
-              <span
-                class="cell-format-pattern-control__swatch"
-                :style="preview(option.value)"
-                aria-hidden="true"
-              />
-              <span class="cell-format-pattern-control__option-label">{{ option.label }}</span>
-            </button>
-          </div>
-          <p
-            v-if="!filteredOptions.length"
-            class="cell-format-pattern-control__empty"
-            role="status"
-          >
-            {{ t("cellFormat.patternNoResults") }}
-          </p>
+            <span
+              class="cell-format-pattern-control__swatch"
+              :style="preview(option.value)"
+              aria-hidden="true"
+            />
+            <span class="cell-format-pattern-control__option-label">{{ option.label }}</span>
+          </button>
         </div>
-      </template>
-    </TSelectInput>
-  </div>
+        <p v-if="!filteredOptions.length" class="cell-format-pattern-control__empty" role="status">
+          {{ t("cellFormat.patternNoResults") }}
+        </p>
+      </div>
+    </template>
+  </CellFormatPanelSelect>
 </template>
 
 <style scoped lang="scss">
 .cell-format-pattern-control {
   min-width: 0;
-  &__value {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-  }
   &__label {
     flex: 1;
     min-width: 0;

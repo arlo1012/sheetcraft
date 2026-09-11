@@ -45,6 +45,18 @@ describe("ColorPalette", () => {
     expect(wrapper.emitted("select")).toEqual([["#a1b2c3"]]);
   });
 
+  test("keeps the default fixed-width layout unless fluid is enabled", async () => {
+    const fixed = mountPalette();
+    expect(fixed.classes()).not.toContain("is-fluid");
+    await fixed.get('[data-color-action="more"]').trigger("click");
+    expect(fixed.findComponent(ColorPickerPanel).attributes("style")).toBeUndefined();
+
+    const fluid = mountPalette({ fluid: true });
+    expect(fluid.classes()).toContain("is-fluid");
+    await fluid.get('[data-color-action="more"]').trigger("click");
+    expect(fluid.findComponent(ColorPickerPanel).attributes("style")).toContain("width: 100%");
+  });
+
   test("limits swatches and entry points to normalized allowed colors", async () => {
     const wrapper = mountPalette({
       allowedColors: [" #A1B2C3 ", "#d4e5f6", "#A1B2C3", "invalid"],
