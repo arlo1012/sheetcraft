@@ -263,7 +263,7 @@ function confirm(): void {
   }
 
   &--alignment {
-    height: min(400px, calc(100dvh - 192px));
+    height: min(500px, calc(100dvh - 192px));
   }
 }
 </style>

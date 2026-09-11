@@ -289,9 +289,9 @@ function checkboxPressed(
   }
   &__field {
     display: grid;
-    grid-template-columns: 92px minmax(0, 1fr);
-    align-items: center;
-    gap: 10px;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 4px;
   }
   &__checks {
     display: grid;
