@@ -95,11 +95,19 @@ function toggleMenu(): void {
 
   &:hover:not(.is-disabled),
   &.is-expanded {
-    background: var(--idea-icon-button-hover-bg);
+    background: color-mix(in srgb, var(--idea-icon-button-hover-bg) 50%, transparent);
+
+    .ribbon-split-action__menu {
+      background: var(--idea-icon-button-hover-bg);
+    }
   }
 
   &:has(> button:focus-visible) {
-    background: var(--idea-action-primary-subtle);
+    background: color-mix(in srgb, var(--idea-action-primary-subtle) 50%, transparent);
+
+    .ribbon-split-action__menu {
+      background: var(--idea-action-primary-subtle);
+    }
   }
 
   &.has-text {
@@ -138,6 +146,7 @@ function toggleMenu(): void {
 
   &__menu {
     flex: 0 0 12px;
+    border-radius: 0 var(--idea-radius-default) var(--idea-radius-default) 0;
     color: var(--idea-text-muted);
   }
 
