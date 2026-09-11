@@ -486,7 +486,8 @@ export const zhCN = {
     fontPreviewText: "字体预览 AaBbCc",
     previewText: "示例文本",
     borderPreview: "边框预览",
-    borderHint: "点击边框以添加或移除",
+    borderLines: "线条",
+    borderHint: "点击预设、预览图或周围的按钮，可添加或移除边框。",
   },
   colorPalette: {
     label: "颜色选择",

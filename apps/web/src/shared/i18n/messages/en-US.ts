@@ -496,7 +496,8 @@ export const enUS = {
     fontPreviewText: "AaBbCc 123",
     previewText: "Sample text",
     borderPreview: "Border preview",
-    borderHint: "Click a border to add or remove it",
+    borderLines: "Line",
+    borderHint: "Use the presets, preview, or surrounding buttons to add or remove borders.",
   },
   colorPalette: {
     label: "Color picker",

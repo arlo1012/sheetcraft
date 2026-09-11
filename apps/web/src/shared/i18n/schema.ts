@@ -479,6 +479,7 @@ export type MessageSchema = {
     fontPreviewText: string;
     previewText: string;
     borderPreview: string;
+    borderLines: string;
     borderHint: string;
   };
   colorPalette: {

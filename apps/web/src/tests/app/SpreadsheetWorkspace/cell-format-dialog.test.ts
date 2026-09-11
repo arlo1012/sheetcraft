@@ -46,7 +46,7 @@ describe("workspace cell format dialog", () => {
       style: {
         bold: true,
         fillColor: "#ff0000",
-        verticalAlign: "bottom",
+        verticalAlign: "middle",
         numberFormat: { kind: "currency", currency: "CNY", fractionDigits: 2 },
       },
       borders: [{ preset: "outer", border: { style: "mediumDashDot", color: "#4472c4" } }],
@@ -56,7 +56,7 @@ describe("workspace cell format dialog", () => {
     expect(getCellStyle(sheet, { row: 0, column: 0 })).toMatchObject({
       bold: true,
       fillColor: "#ff0000",
-      verticalAlign: "bottom",
+      verticalAlign: "middle",
       borderTop: { style: "mediumDashDot", color: "#4472c4" },
     });
     await workspace.get('[data-ribbon-action="undo"]').trigger("click");

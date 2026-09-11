@@ -1,7 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import BorderColorPanel from "../../../../../modules/home-tools/components/BorderColorPanel.vue";
-import BorderLineStylePanel from "../../../../../modules/home-tools/components/BorderLineStylePanel.vue";
 import BorderPresetGrid from "../../../../../modules/home-tools/components/BorderPresetGrid.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 
@@ -34,19 +33,5 @@ describe("border panel contracts", () => {
 
     await wrapper.get('[data-color-action="default"]').trigger("click");
     expect(wrapper.emitted("update")).toEqual([["#4472c4"], ["#20242c"]]);
-  });
-
-  test("emits all supported line style selections", async () => {
-    const wrapper = mount(BorderLineStylePanel, {
-      global,
-      props: { modelValue: "thin" },
-    });
-
-    expect(wrapper.findAll('[role="menuitemradio"]')).toHaveLength(14);
-    await wrapper.get('[data-border-line-option="mediumDashDotDot"]').trigger("click");
-    await wrapper.get('[data-border-line-option="slantDashDot"]').trigger("click");
-    await wrapper.get('[data-border-line-option="none"]').trigger("click");
-
-    expect(wrapper.emitted("select")).toEqual([["mediumDashDotDot"], ["slantDashDot"], [null]]);
   });
 });

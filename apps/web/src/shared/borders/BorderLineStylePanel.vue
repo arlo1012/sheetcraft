@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import type { CellBorderLineStyle } from "@idea10/core/style";
-import BorderLinePreview from "../../../shared/borders/BorderLinePreview.vue";
-import { useAppI18n } from "../../../shared/i18n";
+import BorderLinePreview from "./BorderLinePreview.vue";
+import { useAppI18n } from "../i18n";
 
-defineProps<{
-  modelValue: CellBorderLineStyle | null;
-}>();
+withDefaults(
+  defineProps<{
+    modelValue: CellBorderLineStyle | null;
+    color?: string;
+  }>(),
+  { color: "currentColor" },
+);
 
 const emit = defineEmits<{
   select: [style: CellBorderLineStyle | null];
@@ -34,7 +38,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'hair'"
       @click="emit('select', 'hair')"
     >
-      <BorderLinePreview line-style="hair" />
+      <BorderLinePreview line-style="hair" :color="color" />
     </button>
     <button
       type="button"
@@ -44,7 +48,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'dotted'"
       @click="emit('select', 'dotted')"
     >
-      <BorderLinePreview line-style="dotted" />
+      <BorderLinePreview line-style="dotted" :color="color" />
     </button>
     <button
       type="button"
@@ -54,7 +58,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'dashDot'"
       @click="emit('select', 'dashDot')"
     >
-      <BorderLinePreview line-style="dashDot" />
+      <BorderLinePreview line-style="dashDot" :color="color" />
     </button>
     <button
       type="button"
@@ -64,7 +68,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'dashDotDot'"
       @click="emit('select', 'dashDotDot')"
     >
-      <BorderLinePreview line-style="dashDotDot" />
+      <BorderLinePreview line-style="dashDotDot" :color="color" />
     </button>
     <button
       type="button"
@@ -74,7 +78,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'dashed'"
       @click="emit('select', 'dashed')"
     >
-      <BorderLinePreview line-style="dashed" />
+      <BorderLinePreview line-style="dashed" :color="color" />
     </button>
     <button
       type="button"
@@ -84,7 +88,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'thin'"
       @click="emit('select', 'thin')"
     >
-      <BorderLinePreview line-style="thin" />
+      <BorderLinePreview line-style="thin" :color="color" />
     </button>
     <button
       type="button"
@@ -94,7 +98,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'slantDashDot'"
       @click="emit('select', 'slantDashDot')"
     >
-      <BorderLinePreview line-style="slantDashDot" />
+      <BorderLinePreview line-style="slantDashDot" :color="color" />
     </button>
     <button
       type="button"
@@ -104,7 +108,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'mediumDashDotDot'"
       @click="emit('select', 'mediumDashDotDot')"
     >
-      <BorderLinePreview line-style="mediumDashDotDot" />
+      <BorderLinePreview line-style="mediumDashDotDot" :color="color" />
     </button>
     <button
       type="button"
@@ -114,7 +118,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'mediumDashDot'"
       @click="emit('select', 'mediumDashDot')"
     >
-      <BorderLinePreview line-style="mediumDashDot" />
+      <BorderLinePreview line-style="mediumDashDot" :color="color" />
     </button>
     <button
       type="button"
@@ -124,7 +128,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'mediumDashed'"
       @click="emit('select', 'mediumDashed')"
     >
-      <BorderLinePreview line-style="mediumDashed" />
+      <BorderLinePreview line-style="mediumDashed" :color="color" />
     </button>
     <button
       type="button"
@@ -134,7 +138,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'medium'"
       @click="emit('select', 'medium')"
     >
-      <BorderLinePreview line-style="medium" />
+      <BorderLinePreview line-style="medium" :color="color" />
     </button>
     <button
       type="button"
@@ -144,7 +148,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'thick'"
       @click="emit('select', 'thick')"
     >
-      <BorderLinePreview line-style="thick" />
+      <BorderLinePreview line-style="thick" :color="color" />
     </button>
     <button
       type="button"
@@ -154,7 +158,7 @@ const { t } = useAppI18n();
       :aria-checked="modelValue === 'double'"
       @click="emit('select', 'double')"
     >
-      <BorderLinePreview line-style="double" />
+      <BorderLinePreview line-style="double" :color="color" />
     </button>
   </div>
 </template>

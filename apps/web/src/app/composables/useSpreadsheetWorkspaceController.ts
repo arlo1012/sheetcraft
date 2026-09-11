@@ -121,6 +121,10 @@ import type {
   HomeDataToolState,
   MergeCellsState,
 } from "../../modules/home-tools/components/data-tool-state";
+import {
+  getCellFormatBorderCapabilities,
+  type CellFormatBorderCapabilities,
+} from "../../modules/cell-format/border-capabilities";
 
 type FeedbackState = {
   key: MessageKey;
@@ -154,6 +158,7 @@ export type CellFormatSelection = {
   generation: number;
   state: SelectionCellStyleState;
   borderState: SelectionBorderState;
+  borderCapabilities: CellFormatBorderCapabilities;
   mergeState: {
     canMerge: boolean;
     canUnmerge: boolean;
@@ -715,6 +720,7 @@ export function useSpreadsheetWorkspaceController(
       generation: workbookGeneration.value,
       state: getSelectionCellStyleState(sheet, range),
       borderState: getSelectionBorderState(sheet, range),
+      borderCapabilities: getCellFormatBorderCapabilities(range, sheet.mergedCells),
       mergeState: getCellFormatMergeState(sheet, range),
       sampleValue:
         typeof value === "object" && value !== null ? formatComputedValueForDisplay(value) : value,

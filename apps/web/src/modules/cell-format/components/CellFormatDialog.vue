@@ -12,6 +12,7 @@ import CellFormatFillPanel from "./CellFormatFillPanel.vue";
 import CellFormatFontPanel from "./CellFormatFontPanel.vue";
 import CellFormatNumberPanel from "./CellFormatNumberPanel.vue";
 import { rememberCustomNumberFormat } from "../number-format/custom-formats";
+import type { CellFormatBorderCapabilities } from "../border-capabilities";
 
 export type CellFormatTab = "number" | "alignment" | "font" | "border" | "fill";
 
@@ -19,6 +20,7 @@ const props = withDefaults(
   defineProps<{
     state: SelectionCellStyleState;
     borderState: SelectionBorderState;
+    borderCapabilities?: CellFormatBorderCapabilities;
     sampleValue: string | number | boolean | null;
     dateSystem?: "1900" | "1904";
     initialTab?: CellFormatTab;
@@ -143,6 +145,7 @@ function confirm(): void {
         'cell-format-dialog__tabs--number': activeTab === 'number',
         'cell-format-dialog__tabs--alignment': activeTab === 'alignment',
         'cell-format-dialog__tabs--font': activeTab === 'font',
+        'cell-format-dialog__tabs--border': activeTab === 'border',
       }"
     >
       <TabPanel value="number" :destroy-on-hide="false">
@@ -218,6 +221,7 @@ function confirm(): void {
           </button></template
         ><CellFormatBorderPanel
           :state="borderState"
+          :capabilities="borderCapabilities"
           :actions="borderActions"
           :format="borderFormat"
           @update:actions="updateBorderActions"
@@ -268,7 +272,8 @@ function confirm(): void {
   }
 
   &--alignment,
-  &--font {
+  &--font,
+  &--border {
     height: auto;
     max-height: calc(100dvh - 192px);
   }

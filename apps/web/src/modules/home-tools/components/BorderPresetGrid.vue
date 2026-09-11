@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CellBorder, CellBorderAction, CellBorderPreset } from "@idea10/core/style";
 import { useAppI18n } from "../../../shared/i18n";
-import CellBorderPresetIcon from "./CellBorderPresetIcon.vue";
+import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
 
 const props = defineProps<{
   border: CellBorder;

@@ -13,7 +13,7 @@ import { useRovingFocus } from "../../../shared/focus/useRovingFocus";
 import { useAppI18n } from "../../../shared/i18n";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
 import BorderColorPanel from "./BorderColorPanel.vue";
-import BorderLineStylePanel from "./BorderLineStylePanel.vue";
+import BorderLineStylePanel from "../../../shared/borders/BorderLineStylePanel.vue";
 import BorderPresetGrid from "./BorderPresetGrid.vue";
 
 type BorderSubmenu = "color" | "style";
@@ -343,6 +343,7 @@ onBeforeUnmount(() => {
       <BorderLineStylePanel
         v-else-if="activeSubmenu === 'style'"
         :model-value="lineStyle"
+        :color="color"
         @select="selectLineStyle"
       />
     </div>
