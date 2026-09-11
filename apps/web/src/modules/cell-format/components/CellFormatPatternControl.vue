@@ -122,7 +122,10 @@ watch(open, (value) => {
       :popup-visible="open"
       :popup-props="{
         placement: 'bottom-right',
-        overlayInnerStyle: { width: 'min(296px, calc(100vw - 32px))', padding: '0' },
+        overlayInnerStyle: (triggerElement) => ({
+          width: `${triggerElement.offsetWidth}px`,
+          padding: '0',
+        }),
       }"
       :input-props="triggerInputProps"
       @popup-visible-change="open = $event"
