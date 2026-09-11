@@ -102,7 +102,7 @@ function setGradient(gradient: CellFillGradient): void {
         <div class="cell-format-fill__palette">
           <ColorPalette
             compact
-            more-mode="popup"
+            stable-size
             show-recent-heading
             :model-value="fill?.fillColor ?? null"
             :show-default="false"

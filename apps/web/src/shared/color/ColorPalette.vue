@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ChevronRight } from "lucide-vue-next";
-import { Popup as TPopup } from "tdesign-vue-next/es/popup";
+import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useAppI18n } from "../i18n";
-import CustomColorPanel from "./CustomColorPanel.vue";
+import { createColorPickerSelectInputProps } from "../tdesign/colorPickerPopup";
 import {
   PRESET_COLORS,
   STANDARD_COLORS,
@@ -23,7 +23,7 @@ const props = withDefaults(
     compact?: boolean;
     columns?: number;
     clearable?: boolean;
-    moreMode?: "inline" | "popup";
+    stableSize?: boolean;
     showRecentHeading?: boolean;
   }>(),
   {
@@ -33,7 +33,7 @@ const props = withDefaults(
     compact: false,
     columns: 10,
     clearable: false,
-    moreMode: "inline",
+    stableSize: false,
     showRecentHeading: false,
   },
 );
@@ -42,28 +42,15 @@ const emit = defineEmits<{ select: [color: string | null] }>();
 const { t } = useAppI18n();
 const recentColors = ref<string[]>([]);
 const showingMore = ref(false);
-const showingInlineMore = computed(() => showingMore.value && props.moreMode === "inline");
+const draftColor = ref(
+  normalizeColor(props.modelValue) ?? normalizeColor(props.defaultColor) ?? "#20242c",
+);
 const focusedSwatch = ref(0);
 const swatchButtons = new Map<number, HTMLButtonElement>();
-const paletteRef = ref<HTMLElement | null>(null);
+const disabledRecentColors = null as unknown as string[];
+const rootRef = ref<HTMLElement | null>(null);
 const moreButtonRef = ref<HTMLButtonElement | null>(null);
-const morePopupOptions = {
-  modifiers: [
-    { name: "flip", enabled: false },
-    {
-      name: "offset",
-      options: {
-        offset: (): [number, number] => {
-          const palette = paletteRef.value?.getBoundingClientRect();
-          const trigger = moreButtonRef.value?.getBoundingClientRect();
-          return palette && trigger
-            ? [palette.left - trigger.left, palette.top - trigger.bottom]
-            : [0, 0];
-        },
-      },
-    },
-  ],
-};
+const selectInputProps = createColorPickerSelectInputProps(getPanelAttach);
 const allowedColorSet = computed(() => {
   if (props.allowedColors === undefined) return undefined;
   return new Set(
@@ -97,6 +84,15 @@ const gridColumns = computed(() => Math.max(1, Math.min(10, Math.trunc(props.col
 onMounted(() => {
   recentColors.value = readRecentColors();
 });
+
+watch(
+  () => props.modelValue,
+  (value) => {
+    if (!showingMore.value) {
+      draftColor.value = normalizeColor(value) ?? normalizeColor(props.defaultColor) ?? "#20242c";
+    }
+  },
+);
 
 watch(
   () => allSwatches.value.length,
@@ -133,12 +129,15 @@ function selectDefault(): void {
 
 function openMore(): void {
   if (isRestricted.value) return;
+  draftColor.value = selectedColor.value ?? normalizeColor(props.defaultColor) ?? "#20242c";
   showingMore.value = true;
-}
-
-function onPopupVisibleChange(visible: boolean): void {
-  if (visible) openMore();
-  else showingMore.value = false;
+  void nextTick(() =>
+    rootRef.value
+      ?.querySelector<HTMLElement>(
+        ".color-palette__view.is-active [role='slider'], .color-palette__view.is-active input, .color-palette__view.is-active button",
+      )
+      ?.focus(),
+  );
 }
 
 function backToPalette(): void {
@@ -146,9 +145,22 @@ function backToPalette(): void {
   void nextTick(() => moreButtonRef.value?.focus());
 }
 
-function applyCustomColor(color: string): void {
-  chooseColor(color);
-  backToPalette();
+function applyDraft(): void {
+  chooseColor(draftColor.value);
+  showingMore.value = false;
+}
+
+function updateDraft(value: string, context?: { color?: { hex?: string } }): void {
+  const normalized = normalizeColor(context?.color?.hex ?? value);
+  if (normalized) draftColor.value = normalized;
+}
+
+function onPanelKeydown(event: KeyboardEvent): void {
+  if (event.key === "Escape" && showingMore.value) {
+    event.preventDefault();
+    event.stopPropagation();
+    backToPalette();
+  }
 }
 
 function onSwatchKeydown(event: KeyboardEvent, index: number, columns: number): void {
@@ -172,21 +184,30 @@ function setSwatchRef(index: number) {
     }
   };
 }
+
+function getPanelAttach(): HTMLElement {
+  return rootRef.value ?? document.body;
+}
 </script>
 
 <template>
   <section
-    ref="paletteRef"
+    ref="rootRef"
     class="color-palette"
     :class="{
-      'is-more': showingInlineMore,
+      'is-more': showingMore,
       'is-compact': compact,
-      'is-popup-open': showingMore && moreMode === 'popup',
+      'is-stable': stableSize,
     }"
     :style="{ '--color-palette-columns': gridColumns }"
     :aria-label="t('colorPalette.label')"
+    @keydown="onPanelKeydown"
   >
-    <template v-if="!showingInlineMore">
+    <div
+      v-if="!showingMore || stableSize"
+      class="color-palette__view color-palette__view--palette"
+      :class="{ 'is-active': !showingMore }"
+    >
       <button
         v-if="showDefaultAction"
         type="button"
@@ -295,38 +316,8 @@ function setSwatchRef(index: number) {
         </div>
       </div>
 
-      <TPopup
-        v-if="!isRestricted && moreMode === 'popup'"
-        :visible="showingMore"
-        trigger="click"
-        placement="bottom-left"
-        :popper-options="morePopupOptions"
-        :overlay-inner-style="{ padding: '0', margin: '0' }"
-        @visible-change="onPopupVisibleChange"
-      >
-        <button
-          ref="moreButtonRef"
-          type="button"
-          class="color-palette__more"
-          data-color-action="more"
-          aria-haspopup="dialog"
-          :aria-expanded="showingMore"
-        >
-          <span>{{ t("colorPalette.more") }}</span>
-          <ChevronRight :size="14" aria-hidden="true" />
-        </button>
-        <template #content>
-          <div v-if="showingMore" role="dialog" :aria-label="t('colorPalette.more')">
-            <CustomColorPanel
-              :model-value="selectedColor ?? normalizedDefaultColor ?? '#20242c'"
-              @back="backToPalette"
-              @apply="applyCustomColor"
-            />
-          </div>
-        </template>
-      </TPopup>
       <button
-        v-else-if="!isRestricted"
+        v-if="!isRestricted"
         ref="moreButtonRef"
         type="button"
         class="color-palette__more"
@@ -345,14 +336,40 @@ function setSwatchRef(index: number) {
       >
         {{ t("colorPalette.clear") }}
       </button>
-    </template>
+    </div>
 
-    <CustomColorPanel
-      v-else
-      :model-value="selectedColor ?? normalizedDefaultColor ?? '#20242c'"
-      @back="backToPalette"
-      @apply="applyCustomColor"
-    />
+    <div
+      v-if="showingMore || stableSize"
+      class="color-palette__view color-palette__view--more"
+      :class="{ 'is-active': showingMore }"
+    >
+      <ColorPickerPanel
+        class="idea-color-palette-panel"
+        :style="stableSize ? { width: '100%' } : undefined"
+        :model-value="draftColor"
+        :color-modes="['monochrome']"
+        format="HEX"
+        :enable-alpha="false"
+        :recent-colors="disabledRecentColors"
+        :swatch-colors="[]"
+        :show-primary-color-preview="false"
+        :select-input-props="selectInputProps"
+        @change="updateDraft"
+      />
+      <div class="color-palette__actions">
+        <button type="button" data-color-action="back" @click="backToPalette">
+          {{ t("colorPalette.back") }}
+        </button>
+        <button
+          type="button"
+          class="color-palette__apply"
+          data-color-action="apply"
+          @click="applyDraft"
+        >
+          {{ t("format.applyColor") }}
+        </button>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -365,13 +382,10 @@ function setSwatchRef(index: number) {
   background: var(--idea-surface-panel);
   color: var(--idea-text-primary);
 
-  &.is-popup-open {
-    visibility: hidden;
-  }
-
   &__default,
   &__more,
-  &__clear {
+  &__clear,
+  &__actions button {
     width: 100%;
     min-height: 25px;
     border: 1px solid var(--idea-border-control);
@@ -456,10 +470,56 @@ function setSwatchRef(index: number) {
       margin-top: 0;
     }
   }
+  &__actions {
+    display: flex;
+    gap: 6px;
+    padding: var(--idea-space-2) var(--idea-tool-panel-padding) var(--idea-tool-panel-padding);
+  }
+  &__actions button {
+    width: auto;
+    flex: 1;
+  }
   &.is-more {
     width: max-content;
     max-width: min(360px, calc(100vw - 32px));
     padding: 0;
+
+    .color-palette__apply {
+      border-color: var(--idea-action-primary);
+      background: var(--idea-action-primary);
+      color: #fff;
+    }
+  }
+  &.is-stable {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0;
+    width: calc(
+      var(--color-palette-columns) * var(--color-palette-swatch-size) +
+        (var(--color-palette-columns) - 1) * 3px + 2 * var(--idea-tool-panel-padding)
+    );
+    max-width: min(360px, 100%, calc(100vw - 32px));
+
+    .color-palette__view {
+      grid-area: 1 / 1;
+      min-width: 0;
+    }
+    .color-palette__view--palette {
+      display: flex;
+      flex-direction: column;
+      padding: var(--idea-tool-panel-padding);
+
+      .color-palette__section:last-of-type {
+        margin-bottom: 9px;
+      }
+      .color-palette__more {
+        margin-top: auto;
+      }
+    }
+    .color-palette__view:not(.is-active) {
+      visibility: hidden;
+      pointer-events: none;
+    }
   }
 }
 </style>
