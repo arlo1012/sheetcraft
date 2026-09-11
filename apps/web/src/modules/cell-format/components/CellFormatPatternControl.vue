@@ -159,7 +159,7 @@ watch(open, (value) => {
           </TInput>
           <div
             :id="listId"
-            class="cell-format-pattern-control__options"
+            class="cell-format-pattern-control__options narrow-scrollbar"
             role="group"
             :aria-label="t('cellFormat.patternStyle')"
           >
