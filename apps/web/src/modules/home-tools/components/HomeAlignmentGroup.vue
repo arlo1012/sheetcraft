@@ -76,13 +76,14 @@ function toggleWrapText(state: ToggleStyleState): void {
     >
       <TextWrap :size="24" :stroke-width="1.5" aria-hidden="true" />
     </RibbonIconAction>
-    <MergeCellsMenu
-      class="home-alignment-group__merge"
-      :state="props.mergeState"
-      :disabled="disabled"
-      @merge="emit('merge')"
-      @unmerge="emit('unmerge')"
-    />
+    <div class="home-alignment-group__merge">
+      <MergeCellsMenu
+        :state="props.mergeState"
+        :disabled="disabled"
+        @merge="emit('merge')"
+        @unmerge="emit('unmerge')"
+      />
+    </div>
     <RibbonDialogLauncher
       :label="`${t('cellFormat.title')} · ${t('cellFormat.alignment')}`"
       :disabled="disabled"
