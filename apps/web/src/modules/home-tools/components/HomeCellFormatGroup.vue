@@ -56,7 +56,6 @@ const { t } = useAppI18n();
         />
         <CellColorControl
           kind="text"
-          :state="state"
           :disabled="disabled"
           @apply-style="emit('applyStyle', $event)"
         />
@@ -79,7 +78,6 @@ const { t } = useAppI18n();
       />
       <CellColorControl
         kind="fill"
-        :state="state"
         :disabled="disabled"
         @apply-style="emit('applyStyle', $event)"
       />

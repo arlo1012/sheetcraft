@@ -3,6 +3,8 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import App from "../../../app/App.vue";
 import LocaleSwitcher from "../../../app/LocaleSwitcher.vue";
+import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
+import { getCellStyle } from "@idea10/core/workbook";
 import { createAppI18n, type AppLocale } from "../../../shared/i18n";
 
 function mountApp(locale: AppLocale = "en-US") {
@@ -362,17 +364,23 @@ describe("App", () => {
       shiftKey: true,
     });
 
-    const borderTrigger = wrapper.get("[data-cell-border-trigger]");
+    const borderTrigger = wrapper.get("[data-cell-border-control] [data-ribbon-split-menu]");
     await borderTrigger.trigger("click");
     await new DOMWrapper(document.body).get('[data-border-preset="outer"]').trigger("click");
 
     const findBorder = (orientation: "horizontal" | "vertical", edge: number) =>
-      wrapper.find<HTMLElement>(
-        `[data-border-orientation="${orientation}"][data-border-edge="${edge}"]`,
-      );
-    expect(findBorder("horizontal", 0).element.style.borderTop).toBe("1px solid #20242c");
-    expect(findBorder("vertical", 0).element.style.borderLeft).toBe("1px solid #20242c");
-    expect(findBorder("vertical", 2).element.style.borderLeft).toBe("1px solid #20242c");
+      wrapper.find(`[data-border-orientation="${orientation}"][data-border-edge="${edge}"]`);
+    for (const border of [
+      findBorder("horizontal", 0),
+      findBorder("vertical", 0),
+      findBorder("vertical", 2),
+    ]) {
+      expect(border.attributes("data-border-style")).toBe("thin");
+      expect(border.get("line").attributes()).toMatchObject({
+        stroke: "#20242c",
+        "stroke-width": "1",
+      });
+    }
 
     await borderTrigger.trigger("keydown", { key: "z", ctrlKey: true });
     expect(findBorder("horizontal", 0).exists()).toBe(false);
@@ -385,6 +393,29 @@ describe("App", () => {
     await wrapper.get('[data-ribbon-action="clear-formatting"]').trigger("click");
     expect(findBorder("horizontal", 0).exists()).toBe(false);
     expect(findBorder("vertical", 2).exists()).toBe(false);
+  });
+
+  test("reapplies the remembered ribbon color to a new selection and undoes only that edit", async () => {
+    const wrapper = mountApp();
+    const sheet = () => wrapper.getComponent(SheetGrid).props("sheet");
+    const textTool = wrapper.get('[data-cell-color-control="text"]');
+
+    await textTool.get("[data-ribbon-split-menu]").trigger("click");
+    expect(getCellStyle(sheet(), { row: 0, column: 0 })?.textColor).toBeUndefined();
+    await new DOMWrapper(document.body).get('[data-color-swatch="#4472c4"]').trigger("click");
+    expect(getCellStyle(sheet(), { row: 0, column: 0 })?.textColor).toBe("#4472c4");
+
+    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
+    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("B2");
+    await textTool.get("[data-ribbon-split-main]").trigger("click");
+    expect(getCellStyle(sheet(), { row: 1, column: 1 })?.textColor).toBe("#4472c4");
+    expect(textTool.get("[data-ribbon-split-menu]").attributes("aria-expanded")).toBe("false");
+
+    await wrapper.get('[data-ribbon-action="undo"]').trigger("click");
+    expect(getCellStyle(sheet(), { row: 1, column: 1 })?.textColor).toBeUndefined();
+    expect(getCellStyle(sheet(), { row: 0, column: 0 })?.textColor).toBe("#4472c4");
+    await textTool.get("[data-ribbon-split-main]").trigger("click");
+    expect(getCellStyle(sheet(), { row: 1, column: 1 })?.textColor).toBe("#4472c4");
   });
 
   test("toggles wrapped content and its derived row height through workbook history", async () => {

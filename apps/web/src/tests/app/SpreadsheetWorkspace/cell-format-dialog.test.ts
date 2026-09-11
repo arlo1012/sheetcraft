@@ -45,7 +45,7 @@ describe("workspace cell format dialog", () => {
   test("opens from More Border Settings and applies all tabs as one undoable edit", async () => {
     const workspace = await mountWorkspace();
     const sheet = workspace.getComponent(SheetGrid).props("sheet");
-    await workspace.get("[data-cell-border-trigger]").trigger("click");
+    await workspace.get("[data-cell-border-control] [data-ribbon-split-menu]").trigger("click");
     const more = document.querySelector<HTMLButtonElement>('[data-border-menu-row="settings"]')!;
     expect(more).not.toBeNull();
     more.click();

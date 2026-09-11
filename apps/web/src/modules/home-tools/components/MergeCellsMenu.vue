@@ -6,15 +6,15 @@ import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import type { MergeCellsState } from "./data-tool-state";
-import RibbonIconAction from "./RibbonIconAction.vue";
+import RibbonSplitAction from "./RibbonSplitAction.vue";
 
 defineOptions({ inheritAttrs: false });
 
 const props = defineProps<{ state: MergeCellsState; disabled: boolean }>();
 const emit = defineEmits<{ merge: []; unmerge: [] }>();
 const { t } = useAppI18n();
-const triggerComponentRef = ref<InstanceType<typeof RibbonIconAction> | null>(null);
-const triggerRef = computed(() => triggerComponentRef.value?.rootElement ?? null);
+const splitActionRef = ref<InstanceType<typeof RibbonSplitAction> | null>(null);
+const triggerRef = computed(() => splitActionRef.value?.menuElement ?? null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuRef = computed<HTMLElement | null>(() => menuSurfaceRef.value?.rootElement ?? null);
 const open = ref(false);
@@ -22,8 +22,10 @@ const menuId = `merge-cells-menu-${useId().replaceAll(":", "")}`;
 const menuDisabled = computed(
   () => props.disabled || (!props.state.canMerge && !props.state.canUnmerge),
 );
+const mainDisabled = computed(() => props.disabled || !props.state.canMerge);
 const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, menuRef, open, {
   offset: 4,
+  additionalInside: () => [splitActionRef.value?.rootElement],
   onDismiss: () => {
     open.value = false;
   },
@@ -50,12 +52,14 @@ function onTriggerKeydown(event: KeyboardEvent): void {
   openMenu(event.key === "ArrowDown" ? "first" : "last");
 }
 
-function merge(): void {
+function merge(restoreFocus = true): void {
+  if (props.disabled || !props.state.canMerge) return;
   emit("merge");
-  dismiss("programmatic", true);
+  dismiss("programmatic", restoreFocus);
 }
 
 function unmerge(): void {
+  if (props.disabled || !props.state.canUnmerge) return;
   emit("unmerge");
   dismiss("programmatic", true);
 }
@@ -66,22 +70,23 @@ watch(menuDisabled, (disabled) => {
 </script>
 
 <template>
-  <RibbonIconAction
-    ref="triggerComponentRef"
+  <RibbonSplitAction
+    ref="splitActionRef"
     v-bind="$attrs"
     :label="t('ribbon.mergeCells')"
+    :menu-label="t('ribbon.moreOptions', { tool: t('ribbon.mergeCells') })"
     :text="t('ribbon.mergeCells')"
-    :disabled="menuDisabled"
-    disclosure
+    :disabled="mainDisabled"
+    :menu-disabled="menuDisabled"
+    :expanded="open"
+    :menu-id="menuId"
     data-ribbon-action="merge-cells"
-    aria-haspopup="menu"
-    :aria-expanded="open"
-    :aria-controls="open ? menuId : undefined"
-    @activate="toggleMenu"
-    @keydown="onTriggerKeydown"
+    @activate="merge(false)"
+    @toggle-menu="toggleMenu"
+    @menu-keydown="onTriggerKeydown"
   >
     <TableCellsMerge :size="15" aria-hidden="true" />
-  </RibbonIconAction>
+  </RibbonSplitAction>
 
   <Teleport to="body">
     <MenuSurface
@@ -92,7 +97,7 @@ watch(menuDisabled, (disabled) => {
       :style="floatingStyles"
       :label="t('ribbon.mergeCells')"
     >
-      <MenuItem data-merge-action="merge" :disabled="!state.canMerge" @select="merge">
+      <MenuItem data-merge-action="merge" :disabled="!state.canMerge" @select="merge()">
         <template #icon><Combine :size="15" /></template>
         {{ t("ribbon.mergeCells") }}
       </MenuItem>

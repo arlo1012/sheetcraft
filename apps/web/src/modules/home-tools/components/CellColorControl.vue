@@ -1,18 +1,16 @@
 <script setup lang="ts">
 import { Baseline, PaintBucket } from "lucide-vue-next";
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import {
   DEFAULT_CELL_FILL_COLOR,
   DEFAULT_CELL_TEXT_COLOR,
   type CellStylePatch,
 } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import CellColorPicker from "./CellColorPicker.vue";
 
 const props = defineProps<{
   kind: "text" | "fill";
-  state: SelectionCellStyleState;
   disabled: boolean;
 }>();
 
@@ -21,23 +19,21 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const colorState = computed(() =>
-  props.kind === "text" ? props.state.textColor : props.state.fillColor,
-);
+const selectedColor = ref<string | null>(props.kind === "text" ? "#ff0000" : "#ffff00");
 const defaultColor = computed(() =>
   props.kind === "text" ? DEFAULT_CELL_TEXT_COLOR : DEFAULT_CELL_FILL_COLOR,
 );
 const indicatorStyle = computed<CSSProperties>(() => ({
-  "--cell-color-indicator": colorState.value.value ?? defaultColor.value,
+  "--cell-color-indicator": selectedColor.value ?? defaultColor.value,
 }));
-const label = computed(() => {
-  if (props.kind === "text") {
-    return t(props.state.textColor.mixed ? "format.textColorMixed" : "format.textColor");
-  }
-  return t(props.state.fillColor.mixed ? "format.fillColorMixed" : "format.fillColor");
-});
+const label = computed(() => t(props.kind === "text" ? "format.textColor" : "format.fillColor"));
+const defaultLabel = computed(() =>
+  t(props.kind === "text" ? "cellFormat.automatic" : "cellFormat.noFill"),
+);
 
 function applyColor(color: string | null): void {
+  if (props.disabled) return;
+  selectedColor.value = color;
   emit("applyStyle", props.kind === "text" ? { textColor: color } : { fillColor: color });
 }
 </script>
@@ -46,15 +42,15 @@ function applyColor(color: string | null): void {
   <div class="cell-color-control" :data-cell-color-control="kind">
     <CellColorPicker
       :label="label"
-      :value="colorState.value"
+      :value="selectedColor"
       :default-color="defaultColor"
-      :mixed="colorState.mixed"
+      :default-label="defaultLabel"
       :disabled="disabled"
       @change="applyColor"
     >
       <span
         class="cell-color-control__icon"
-        :class="[`cell-color-control__icon--${kind}`, { 'is-mixed': colorState.mixed }]"
+        :class="`cell-color-control__icon--${kind}`"
         :style="indicatorStyle"
         :data-cell-color-icon="kind"
       >
@@ -114,11 +110,6 @@ function applyColor(color: string | null): void {
     background: var(--cell-color-indicator);
     border-radius: 1px;
     box-shadow: inset 0 0 0 1px rgb(32 36 44 / 22%);
-  }
-
-  &__icon.is-mixed &__indicator {
-    background: transparent;
-    box-shadow: inset 0 0 0 1px var(--idea-text-muted);
   }
 }
 </style>

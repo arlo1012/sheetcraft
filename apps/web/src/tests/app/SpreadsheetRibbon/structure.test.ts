@@ -66,13 +66,13 @@ describe("SpreadsheetRibbon", () => {
     await autoSum.trigger("click");
     expect(wrapper.emitted("autoSum")).toEqual([[]]);
 
-    await wrapper.get("[data-cell-border-trigger]").trigger("click");
+    await wrapper.get("[data-cell-border-control] [data-ribbon-split-menu]").trigger("click");
     await new DOMWrapper(document.body).get('[data-border-preset="outer"]').trigger("click");
     expect(wrapper.emitted("applyBorders")?.[0]).toEqual([
       { preset: "outer", border: { style: "thin", color: "#20242c" } },
     ]);
 
-    await wrapper.get("[data-cell-border-trigger]").trigger("click");
+    await wrapper.get("[data-cell-border-control] [data-ribbon-split-menu]").trigger("click");
     await new DOMWrapper(document.body).get('[data-border-menu-row="style"]').trigger("click");
     await new DOMWrapper(document.body)
       .get('[data-border-line-option="mediumDashDot"]')
@@ -169,8 +169,9 @@ describe("SpreadsheetRibbon", () => {
     await new DOMWrapper(document.body).get('[data-freeze-action="top-row"]').trigger("click");
     expect(wrapper.emitted("freeze")).toEqual([["top-row"]]);
 
-    await wrapper.get('[data-ribbon-action="merge-cells"]').trigger("click");
-    await new DOMWrapper(document.body).get('[data-merge-action="merge"]').trigger("click");
+    await wrapper
+      .get('[data-ribbon-action="merge-cells"] [data-ribbon-split-main]')
+      .trigger("click");
     expect(wrapper.emitted("merge")).toEqual([[]]);
 
     await wrapper.get('[data-ribbon-action="image"]').trigger("click");
@@ -193,9 +194,11 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="filter"]').attributes("aria-label")).toBe("筛选");
     expect(wrapper.get('[data-ribbon-action="freeze"]').attributes("aria-label")).toBe("冻结");
     expect(wrapper.get('[data-ribbon-action="sort"]').attributes("aria-label")).toBe("排序");
-    expect(wrapper.get('[data-ribbon-action="merge-cells"]').attributes("aria-label")).toBe(
-      "合并单元格",
-    );
+    expect(
+      wrapper
+        .get('[data-ribbon-action="merge-cells"] [data-ribbon-split-main]')
+        .attributes("aria-label"),
+    ).toBe("合并单元格");
     expect(wrapper.get(".font-format-controls__family input").element).toHaveProperty(
       "value",
       "默认字体",

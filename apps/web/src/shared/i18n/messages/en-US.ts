@@ -95,6 +95,7 @@ export const enUS = {
     formatPainter: "Format painter",
     clearFormatting: "Clear formatting",
     borders: "Cell borders",
+    moreOptions: "{tool} options",
     wrapText: "Wrap text",
     mergeCells: "Merge cells",
     unmergeCells: "Unmerge cells",

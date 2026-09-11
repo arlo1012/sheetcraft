@@ -90,6 +90,7 @@ export const zhCN = {
     formatPainter: "格式刷",
     clearFormatting: "清除格式",
     borders: "单元格边框",
+    moreOptions: "{tool}选项",
     wrapText: "自动换行",
     mergeCells: "合并单元格",
     unmergeCells: "取消合并单元格",

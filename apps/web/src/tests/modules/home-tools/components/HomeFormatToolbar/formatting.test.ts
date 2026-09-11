@@ -214,27 +214,41 @@ describe("HomeFormatToolbar", () => {
     expect(emittedPatches(wrapper).at(-1)).toEqual({ fontSize: 20 });
   });
 
-  test("applies a selected palette color as one formatting patch", async () => {
+  test("opens palette colors from the menu action and applies them immediately", async () => {
     const wrapper = mountToolbar();
-    const textColor = wrapper.get('[aria-label="Text color"]');
-    const textColorDisclosure = textColor.get("[data-color-disclosure]");
+    const textColor = wrapper.get('[data-cell-color-control="text"]');
+    const textColorMenu = textColor.get("[data-ribbon-split-menu]");
 
-    expect(textColor.attributes("aria-expanded")).toBe("false");
-    expect(textColorDisclosure.classes()).not.toContain("is-expanded");
-    await textColor.trigger("click");
-    expect(textColor.attributes("aria-expanded")).toBe("true");
-    expect(textColorDisclosure.classes()).toContain("is-expanded");
+    expect(textColorMenu.attributes("aria-expanded")).toBe("false");
+    await textColorMenu.trigger("click");
+    expect(textColorMenu.attributes("aria-expanded")).toBe("true");
     await new DOMWrapper(document.body).get('[data-color-swatch="#4472c4"]').trigger("click");
 
-    await wrapper.get('[aria-label="Fill color"]').trigger("click");
+    await wrapper.get('[data-cell-color-control="fill"] [data-ribbon-split-menu]').trigger("click");
     await new DOMWrapper(document.body).get('[data-color-swatch="#c00000"]').trigger("click");
 
     expect(emittedPatches(wrapper)).toEqual([{ textColor: "#4472c4" }, { fillColor: "#c00000" }]);
   });
 
+  test("keeps a selected tool color when the active selection changes", async () => {
+    const wrapper = mountToolbar();
+    const textControl = wrapper.get('[data-cell-color-control="text"]');
+    await textControl.get("[data-ribbon-split-menu]").trigger("click");
+    await new DOMWrapper(document.body).get('[data-color-swatch="#4472c4"]').trigger("click");
+
+    await wrapper.setProps({
+      state: createStyleState({ textColor: { value: "#c00000", mixed: false } }),
+    });
+    expect(textControl.get('[data-cell-color-icon="text"]').attributes("style")).toContain(
+      "#4472c4",
+    );
+    await textControl.get("[data-ribbon-split-main]").trigger("click");
+    expect(emittedPatches(wrapper)).toEqual([{ textColor: "#4472c4" }, { textColor: "#4472c4" }]);
+  });
+
   test("forwards border presets without converting them into style patches", async () => {
     const wrapper = mountToolbar();
-    await wrapper.get("[data-cell-border-trigger]").trigger("click");
+    await wrapper.get("[data-cell-border-control] [data-ribbon-split-menu]").trigger("click");
     await new DOMWrapper(document.body)
       .get('[data-border-preset="innerVertical"]')
       .trigger("click");
@@ -253,7 +267,7 @@ describe("HomeFormatToolbar", () => {
   test("shows an image menu disclosure for the available image control", () => {
     const wrapper = mountToolbar();
 
-    expect(wrapper.findAll("[data-color-disclosure]")).toHaveLength(2);
+    expect(wrapper.findAll("[data-cell-color-control] [data-ribbon-split-menu]")).toHaveLength(2);
     expect(
       wrapper.get('[data-ribbon-action="image"]').find(".ribbon-icon-action__disclosure").exists(),
     ).toBe(true);
@@ -271,9 +285,9 @@ describe("HomeFormatToolbar", () => {
 
     expect(wrapper.get(".font-format-controls__family input").element).toHaveProperty("value", "");
     expect(wrapper.get(".font-format-controls__size input").element).toHaveProperty("value", "");
-    expect(wrapper.get('[aria-label="Text color, mixed"]').element).toBeInstanceOf(
-      HTMLButtonElement,
-    );
+    expect(
+      wrapper.get('[data-cell-color-control="text"] [data-ribbon-split-main]').element,
+    ).toBeInstanceOf(HTMLButtonElement);
     const toolbar = wrapper.get(".home-format-toolbar");
     expect(toolbar.attributes("role")).toBe("group");
     expect(toolbar.attributes("aria-disabled")).toBeUndefined();
@@ -433,7 +447,7 @@ describe("HomeFormatToolbar", () => {
     }
   });
 
-  test("exposes mixed color and alignment state to assistive technology", () => {
+  test("keeps color tools independent from mixed selection state", () => {
     const wrapper = mountToolbar(
       createStyleState({
         textColor: { value: "#123456", mixed: true },
@@ -443,19 +457,17 @@ describe("HomeFormatToolbar", () => {
       }),
     );
 
-    expect(wrapper.get('[aria-label="Text color, mixed"]').element).toBeInstanceOf(
-      HTMLButtonElement,
-    );
-    expect(wrapper.get('[aria-label="Fill color, mixed"]').element).toBeInstanceOf(
-      HTMLButtonElement,
-    );
-    expect(wrapper.get('[data-cell-color-icon="text"]').classes()).toContain("is-mixed");
-    expect(wrapper.get('[data-cell-color-icon="fill"]').classes()).toContain("is-mixed");
+    expect(
+      wrapper.get('[data-cell-color-control="text"] [data-ribbon-split-main]').element,
+    ).toBeInstanceOf(HTMLButtonElement);
+    expect(
+      wrapper.get('[data-cell-color-control="fill"] [data-ribbon-split-main]').element,
+    ).toBeInstanceOf(HTMLButtonElement);
     expect(wrapper.get('[data-cell-color-icon="text"]').attributes("style")).toContain(
-      "--cell-color-indicator: #123456",
+      "--cell-color-indicator: #ff0000",
     );
     expect(wrapper.get('[data-cell-color-icon="fill"]').attributes("style")).toContain(
-      "--cell-color-indicator: #abcdef",
+      "--cell-color-indicator: #ffff00",
     );
     expect(wrapper.get('[aria-label="Horizontal alignment, mixed"]').attributes("role")).toBe(
       "group",
@@ -500,7 +512,7 @@ describe("HomeFormatToolbar", () => {
 
   test("returns Tab from the border menu to the ribbon sequence", async () => {
     const wrapper = mountToolbar();
-    const trigger = wrapper.get("[data-cell-border-trigger]");
+    const trigger = wrapper.get("[data-cell-border-control] [data-ribbon-split-menu]");
     await trigger.trigger("click");
     const panel = new DOMWrapper(document.body).get("[data-cell-border-panel]");
     await panel.trigger("keydown", { key: "Tab" });
@@ -511,7 +523,7 @@ describe("HomeFormatToolbar", () => {
 
   test("forwards history shortcuts from the teleported border menus", async () => {
     const wrapper = mountToolbar();
-    await wrapper.get("[data-cell-border-trigger]").trigger("click");
+    await wrapper.get("[data-cell-border-control] [data-ribbon-split-menu]").trigger("click");
     const panel = new DOMWrapper(document.body).get("[data-cell-border-panel]");
     await panel.trigger("keydown", { key: "z", ctrlKey: true });
     await panel.get('[data-border-menu-row="style"]').trigger("click");
@@ -528,7 +540,7 @@ describe("HomeFormatToolbar", () => {
 
   test("dismisses a color palette with Escape and restores trigger focus", async () => {
     const wrapper = mountToolbar();
-    const trigger = wrapper.get('[aria-label="Text color"]');
+    const trigger = wrapper.get('[data-cell-color-control="text"] [data-ribbon-split-menu]');
     await trigger.trigger("click");
     expect(document.activeElement).toBe(getTeleportedDialog().element);
     await getTeleportedDialog().trigger("keydown", { key: "Escape" });
@@ -540,10 +552,10 @@ describe("HomeFormatToolbar", () => {
 
   test("dismisses a drafted color when focus leaves the panel", async () => {
     const wrapper = mountToolbar();
-    await wrapper.get('[aria-label="Text color"]').trigger("click");
+    await wrapper.get('[data-cell-color-control="text"] [data-ribbon-split-menu]').trigger("click");
     expect(document.activeElement).toBe(getTeleportedDialog().element);
 
-    const outsideControl = wrapper.get('[aria-label="Fill color"]');
+    const outsideControl = wrapper.get('[data-cell-color-control="fill"] [data-ribbon-split-main]');
     (outsideControl.element as HTMLButtonElement).focus();
     await wrapper.vm.$nextTick();
 

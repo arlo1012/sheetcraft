@@ -83,6 +83,7 @@ export type MessageSchema = {
     formatPainter: string;
     clearFormatting: string;
     borders: string;
+    moreOptions: string;
     wrapText: string;
     mergeCells: string;
     unmergeCells: string;

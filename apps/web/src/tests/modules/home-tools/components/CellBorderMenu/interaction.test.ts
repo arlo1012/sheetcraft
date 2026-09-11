@@ -38,9 +38,11 @@ afterEach(() => {
 describe("CellBorderMenu interaction", () => {
   test("opens a compact icon matrix and applies its default border", async () => {
     const wrapper = mountMenu();
-    const trigger = wrapper.get<HTMLButtonElement>("[data-cell-border-trigger]");
+    const trigger = wrapper.get<HTMLButtonElement>(
+      "[data-cell-border-control] [data-ribbon-split-menu]",
+    );
     expect(trigger.attributes()).toMatchObject({
-      "aria-label": "Cell borders",
+      "aria-label": "Cell borders options",
       "aria-haspopup": "menu",
       "aria-expanded": "false",
     });
@@ -125,7 +127,9 @@ describe("CellBorderMenu interaction", () => {
 
   test("applies both diagonal border directions", async () => {
     const wrapper = mountMenu();
-    const trigger = wrapper.get<HTMLButtonElement>("[data-cell-border-trigger]");
+    const trigger = wrapper.get<HTMLButtonElement>(
+      "[data-cell-border-control] [data-ribbon-split-menu]",
+    );
     await trigger.trigger("click");
     await getMenu().get('[data-border-preset="diagonalUp"]').trigger("click");
     await trigger.trigger("click");
@@ -137,9 +141,34 @@ describe("CellBorderMenu interaction", () => {
     ]);
   });
 
+  test("applies the remembered preset from the main button", async () => {
+    const wrapper = mountMenu();
+    const main = wrapper.get<HTMLButtonElement>(
+      "[data-cell-border-control] [data-ribbon-split-main]",
+    );
+    const menuTrigger = wrapper.get<HTMLButtonElement>(
+      "[data-cell-border-control] [data-ribbon-split-menu]",
+    );
+
+    await main.trigger("click");
+    expect(wrapper.emitted("applyBorders")).toEqual([
+      [{ preset: "bottom", border: { style: "thin", color: "#20242c" } }],
+    ]);
+    await menuTrigger.trigger("click");
+    await getMenu().get('[data-border-preset="outer"]').trigger("click");
+    await main.trigger("click");
+    expect(wrapper.emitted("applyBorders")).toEqual([
+      [{ preset: "bottom", border: { style: "thin", color: "#20242c" } }],
+      [{ preset: "outer", border: { style: "thin", color: "#20242c" } }],
+      [{ preset: "outer", border: { style: "thin", color: "#20242c" } }],
+    ]);
+  });
+
   test("opens localized color and style submenus with real line samples", async () => {
     const wrapper = mountMenu("zh-CN");
-    const trigger = wrapper.get<HTMLButtonElement>("[data-cell-border-trigger]");
+    const trigger = wrapper.get<HTMLButtonElement>(
+      "[data-cell-border-control] [data-ribbon-split-menu]",
+    );
     await trigger.trigger("click");
     const menu = getMenu();
     expect(menu.findAll("[data-border-menu-row]").map((item) => item.text())).toEqual([
@@ -152,7 +181,7 @@ describe("CellBorderMenu interaction", () => {
     await styleRow.trigger("click");
     const style = getSubmenu("style");
     expect(style.findAll('[role="menuitemradio"]')).toHaveLength(14);
-    expect(style.get('[data-border-line-option="none"]').attributes("aria-checked")).toBe("true");
+    expect(style.get('[data-border-line-option="thin"]').attributes("aria-checked")).toBe("true");
     expect(style.get('[data-border-line-option="none"]').text()).toBe("无");
     expect(style.findAll("button")).toHaveLength(14);
     await style.get('[data-border-line-option="double"]').trigger("click");
@@ -178,7 +207,7 @@ describe("CellBorderMenu interaction", () => {
 
   test("clears borders with the none line option and restores a thin border for a preset", async () => {
     const wrapper = mountMenu();
-    const trigger = wrapper.get("[data-cell-border-trigger]");
+    const trigger = wrapper.get("[data-cell-border-control] [data-ribbon-split-menu]");
     await trigger.trigger("click");
     const menu = getMenu();
     const styleRow = menu.get('[data-border-menu-row="style"]');
@@ -208,7 +237,9 @@ describe("CellBorderMenu interaction", () => {
 
   test("opens the cell format dialog from more settings", async () => {
     const wrapper = mountMenu();
-    const trigger = wrapper.get<HTMLButtonElement>("[data-cell-border-trigger]");
+    const trigger = wrapper.get<HTMLButtonElement>(
+      "[data-cell-border-control] [data-ribbon-split-menu]",
+    );
     await trigger.trigger("click");
     const menu = getMenu();
     const settingsRow = menu.get('[data-border-menu-row="settings"]');
@@ -220,19 +251,27 @@ describe("CellBorderMenu interaction", () => {
 
   test("emits no border without a payload and remains closed when disabled", async () => {
     const wrapper = mountMenu();
-    const trigger = wrapper.get<HTMLButtonElement>("[data-cell-border-trigger]");
+    const trigger = wrapper.get<HTMLButtonElement>(
+      "[data-cell-border-control] [data-ribbon-split-menu]",
+    );
     await trigger.trigger("click");
     await getMenu().get('[data-border-preset="none"]').trigger("click");
     expect(wrapper.emitted("applyBorders")).toEqual([[{ preset: "none" }]]);
     await wrapper.setProps({ disabled: true });
     expect(trigger.element.disabled).toBe(true);
+    expect(
+      wrapper.get<HTMLButtonElement>("[data-cell-border-control] [data-ribbon-split-main]").element
+        .disabled,
+    ).toBe(true);
     await trigger.trigger("click");
     expect(document.body.querySelector("[data-cell-border-panel]")).toBeNull();
   });
 
   test("forwards workbook history shortcuts from teleported menus", async () => {
     const wrapper = mountMenu();
-    await wrapper.get<HTMLButtonElement>("[data-cell-border-trigger]").trigger("click");
+    await wrapper
+      .get<HTMLButtonElement>("[data-cell-border-control] [data-ribbon-split-menu]")
+      .trigger("click");
     const menu = getMenu();
     await menu.trigger("keydown", { key: "z", ctrlKey: true });
     await menu.get('[data-border-menu-row="style"]').trigger("click");
@@ -249,7 +288,9 @@ describe("CellBorderMenu interaction", () => {
       value: 390,
     });
     const wrapper = mountMenu();
-    await wrapper.get<HTMLButtonElement>("[data-cell-border-trigger]").trigger("click");
+    await wrapper
+      .get<HTMLButtonElement>("[data-cell-border-control] [data-ribbon-split-menu]")
+      .trigger("click");
     await getMenu().get('[data-border-menu-row="style"]').trigger("click");
 
     expect(getSubmenu("style").attributes("data-border-submenu-layout")).toBe("stacked");

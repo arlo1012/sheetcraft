@@ -80,11 +80,12 @@ describe("HomeCellFormatGroup layout", () => {
     expect(
       wrapper.get('[data-cell-format-lane="appearance"] [data-cell-color-control="fill"]'),
     ).toBeTruthy();
-    expect(wrapper.get("[data-cell-border-trigger] svg").attributes()).toMatchObject({
-      width: "18",
-      height: "18",
-    });
-    const colorIcons = wrapper.findAll(".cell-color-picker__icon svg");
+    expect(
+      wrapper
+        .get("[data-cell-border-control] [data-border-preset-icon]")
+        .attributes("data-border-preset-icon"),
+    ).toBe("bottom");
+    const colorIcons = wrapper.findAll(".cell-color-control__icon svg");
     expect(colorIcons).toHaveLength(2);
     for (const colorIcon of colorIcons) {
       expect(colorIcon.attributes()).toMatchObject({
@@ -97,10 +98,10 @@ describe("HomeCellFormatGroup layout", () => {
     expect(wrapper.get('[data-cell-color-icon="text"] [data-color-indicator]')).toBeTruthy();
     expect(wrapper.get('[data-cell-color-icon="fill"] [data-color-indicator]')).toBeTruthy();
     expect(wrapper.get('[data-cell-color-icon="text"]').attributes("style")).toContain(
-      "--cell-color-indicator: #20242c",
+      "--cell-color-indicator: #ff0000",
     );
     expect(wrapper.get('[data-cell-color-icon="fill"]').attributes("style")).toContain(
-      "--cell-color-indicator: #ffffff",
+      "--cell-color-indicator: #ffff00",
     );
   });
 

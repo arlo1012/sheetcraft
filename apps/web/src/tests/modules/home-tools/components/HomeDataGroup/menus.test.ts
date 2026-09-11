@@ -155,19 +155,32 @@ describe("Home data tool menus", () => {
     expect(freeze.emitted("unfreeze")).toEqual([[]]);
   });
 
-  test("emits merge and unmerge only when their state allows it", async () => {
+  test("uses a fixed merge main action and exposes merge options independently", async () => {
     const wrapper = mountMenu(MergeCellsMenu, {
       disabled: false,
       state: { canMerge: true, canUnmerge: false },
     });
-    const trigger = wrapper.get('[data-ribbon-action="merge-cells"]');
-    await trigger.trigger("click");
+    const control = wrapper.get('[data-ribbon-action="merge-cells"]');
+    const main = control.get("[data-ribbon-split-main]");
+    const menuTrigger = control.get("[data-ribbon-split-menu]");
+    await main.trigger("click");
+    expect(wrapper.emitted("merge")).toEqual([[]]);
+    await menuTrigger.trigger("click");
     expect(menu().get('[data-merge-action="unmerge"]').attributes("aria-disabled")).toBe("true");
     await menu().get('[data-merge-action="merge"]').trigger("click");
-    expect(wrapper.emitted("merge")).toEqual([[]]);
+    expect(wrapper.emitted("merge")).toEqual([[], []]);
+
+    await menuTrigger.trigger("click");
+    (main.element as HTMLButtonElement).focus();
+    await main.trigger("click");
+    expect(wrapper.emitted("merge")).toEqual([[], [], []]);
+    expect(menuTrigger.attributes("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(main.element);
 
     await wrapper.setProps({ state: { canMerge: false, canUnmerge: true } });
-    await trigger.trigger("click");
+    expect((main.element as HTMLButtonElement).disabled).toBe(true);
+    expect((menuTrigger.element as HTMLButtonElement).disabled).toBe(false);
+    await menuTrigger.trigger("keydown", { key: "ArrowDown" });
     await menu().get('[data-merge-action="unmerge"]').trigger("keydown", { key: " " });
     expect(wrapper.emitted("unmerge")).toEqual([[]]);
   });

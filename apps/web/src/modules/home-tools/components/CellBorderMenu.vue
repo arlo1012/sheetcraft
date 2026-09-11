@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronRight, Grid2X2, List, PencilLine, Settings2 } from "lucide-vue-next";
+import { ChevronRight, List, PencilLine, Settings2 } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import type {
   CellBorder,
   CellBorderAction,
   CellBorderFormatPatch,
   CellBorderLineStyle,
+  CellBorderPreset,
 } from "@idea10/core/style";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
@@ -15,6 +16,8 @@ import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-hi
 import BorderColorPanel from "./BorderColorPanel.vue";
 import BorderLineStylePanel from "../../../shared/borders/BorderLineStylePanel.vue";
 import BorderPresetGrid from "./BorderPresetGrid.vue";
+import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
+import RibbonSplitAction from "./RibbonSplitAction.vue";
 
 type BorderSubmenu = "color" | "style";
 
@@ -29,7 +32,8 @@ const emit = defineEmits<{
   redo: [];
 }>();
 const { t } = useAppI18n();
-const triggerRef = ref<HTMLButtonElement | null>(null);
+const splitActionRef = ref<InstanceType<typeof RibbonSplitAction> | null>(null);
+const triggerRef = computed(() => splitActionRef.value?.menuElement ?? null);
 const menuRef = ref<HTMLDivElement | null>(null);
 const submenuRef = ref<HTMLDivElement | null>(null);
 const colorRowRef = ref<HTMLButtonElement | null>(null);
@@ -37,8 +41,9 @@ const styleRowRef = ref<HTMLButtonElement | null>(null);
 const open = ref(false);
 const activeSubmenu = ref<BorderSubmenu | null>(null);
 const stackedSubmenu = ref(false);
-const lineStyle = ref<CellBorderLineStyle | null>(null);
+const lineStyle = ref<CellBorderLineStyle | null>(DEFAULT_BORDER.style);
 const color = ref(DEFAULT_BORDER.color);
+const lastPreset = ref<CellBorderPreset>("bottom");
 const menuId = `cell-border-menu-${useId().replaceAll(":", "")}`;
 const submenuId = `cell-border-submenu-${useId().replaceAll(":", "")}`;
 const submenuOpen = computed(() => activeSubmenu.value !== null);
@@ -57,7 +62,7 @@ const { floatingStyles: menuStyles, dismiss: dismissMenu } = useDismissibleFloat
   open,
   {
     offset: 4,
-    additionalInside: () => [submenuRef.value],
+    additionalInside: () => [splitActionRef.value?.rootElement, submenuRef.value],
     onDismiss: () => {
       activeSubmenu.value = null;
       open.value = false;
@@ -120,11 +125,41 @@ function toggleMenu(): void {
   if (open.value) closeAll(true);
   else openMenu();
 }
+const lastPresetLabel = computed(() => {
+  const key: Record<CellBorderPreset, Parameters<typeof t>[0]> = {
+    none: "format.borderNone",
+    all: "format.borderAll",
+    outer: "format.borderOuter",
+    inner: "format.borderInner",
+    top: "format.borderTop",
+    right: "format.borderRight",
+    bottom: "format.borderBottom",
+    left: "format.borderLeft",
+    innerHorizontal: "format.borderInnerHorizontal",
+    innerVertical: "format.borderInnerVertical",
+    diagonalUp: "format.borderDiagonalUp",
+    diagonalDown: "format.borderDiagonalDown",
+  };
+  return t(key[lastPreset.value]);
+});
+function applyLastPreset(): void {
+  if (props.disabled) return;
+  const preset = lastPreset.value;
+  emit(
+    "applyBorders",
+    preset === "none"
+      ? { preset }
+      : { preset, border: { style: lineStyle.value ?? DEFAULT_BORDER.style, color: color.value } },
+  );
+  closeAll(false);
+}
 function openSubmenu(submenu: BorderSubmenu): void {
   activeSubmenu.value = submenu;
   void nextTick(() => submenuItems()[0]?.focus());
 }
 function selectPreset(action: CellBorderAction): void {
+  if (props.disabled) return;
+  lastPreset.value = action.preset;
   lineStyle.value =
     action.preset === "none" ? null : (action.border?.style ?? DEFAULT_BORDER.style);
   emit("applyBorders", action);
@@ -136,6 +171,7 @@ function setColor(value: string): string | undefined {
   return normalizedColor;
 }
 function selectPaletteColor(value: string): void {
+  if (props.disabled) return;
   const selectedColor = setColor(value);
   if (!selectedColor) return;
   emit("updateBorderFormat", { color: selectedColor });
@@ -143,9 +179,12 @@ function selectPaletteColor(value: string): void {
 }
 
 function selectLineStyle(style: CellBorderLineStyle | null): void {
+  if (props.disabled) return;
   lineStyle.value = style;
-  if (style === null) emit("applyBorders", { preset: "none" });
-  else emit("updateBorderFormat", { style });
+  if (style === null) {
+    lastPreset.value = "none";
+    emit("applyBorders", { preset: "none" });
+  } else emit("updateBorderFormat", { style });
   closeSubmenu(true);
 }
 function openCellFormat(): void {
@@ -232,29 +271,22 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <button
-    ref="triggerRef"
-    type="button"
-    class="cell-border-menu__trigger"
-    :class="{ 'is-expanded': open }"
-    data-cell-border-trigger
+  <RibbonSplitAction
+    ref="splitActionRef"
+    class="cell-border-menu"
+    data-cell-border-control
+    :label="lastPresetLabel"
+    :menu-label="t('ribbon.moreOptions', { tool: t('ribbon.borders') })"
     :disabled="disabled"
-    :aria-label="t('format.cellBorders')"
-    :title="t('format.cellBorders')"
-    aria-haspopup="menu"
-    :aria-expanded="open"
-    :aria-controls="open ? menuId : undefined"
-    @click="toggleMenu"
-    @keydown="onTriggerKeydown"
+    :menu-disabled="disabled"
+    :expanded="open"
+    :menu-id="menuId"
+    @activate="applyLastPreset"
+    @toggle-menu="toggleMenu"
+    @menu-keydown="onTriggerKeydown"
   >
-    <Grid2X2 :size="18" :stroke-width="1.8" aria-hidden="true" />
-    <ChevronDown
-      class="cell-border-menu__disclosure"
-      :class="{ 'is-expanded': open }"
-      :size="10"
-      aria-hidden="true"
-    />
-  </button>
+    <CellBorderPresetIcon :preset="lastPreset" />
+  </RibbonSplitAction>
 
   <Teleport to="body">
     <div
@@ -352,40 +384,6 @@ onBeforeUnmount(() => {
 
 <style scoped lang="scss">
 .cell-border-menu {
-  &__trigger {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--cell-format-compact-track, 40px);
-    height: var(--cell-format-control-height, 26px);
-    gap: 2px;
-    padding: 0 3px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 2px;
-    color: var(--idea-text-primary);
-    cursor: pointer;
-    &:hover:not(:disabled),
-    &.is-expanded {
-      background: var(--idea-surface-hover);
-    }
-    &:focus-visible:not(.is-expanded) {
-      border-color: var(--idea-action-primary);
-      outline: none;
-      box-shadow: 0 0 0 2px var(--idea-action-focus);
-    }
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.45;
-    }
-  }
-  &__disclosure {
-    color: var(--idea-text-muted);
-    transition: transform 120ms ease;
-    &.is-expanded {
-      transform: rotate(180deg);
-    }
-  }
   &__panel,
   &__submenu {
     z-index: 100;
@@ -451,11 +449,6 @@ onBeforeUnmount(() => {
     width: max-content;
     min-width: 208px;
     padding: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .cell-border-menu__disclosure {
-    transition: none;
   }
 }
 </style>

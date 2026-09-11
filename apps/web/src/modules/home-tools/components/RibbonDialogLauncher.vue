@@ -37,7 +37,7 @@ function activate(): void {
   align-items: center;
   justify-content: center;
   width: 14px;
-  height: 14px;
+  height: 8px;
   padding: 0;
   appearance: none;
   background: transparent;
@@ -46,6 +46,10 @@ function activate(): void {
   color: var(--idea-text-muted);
   cursor: pointer;
   outline: none;
+
+  > svg {
+    pointer-events: none;
+  }
 
   &:hover:not(:disabled) {
     background: var(--idea-icon-button-hover-bg);
