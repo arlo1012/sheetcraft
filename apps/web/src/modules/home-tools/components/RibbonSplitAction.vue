@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ChevronDown } from "lucide-vue-next";
 import { ref } from "vue";
+import RibbonDropdownArrow from "./RibbonDropdownArrow.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -42,11 +42,7 @@ function toggleMenu(): void {
 </script>
 
 <template>
-  <div
-    ref="rootElement"
-    class="ribbon-split-action"
-    :class="{ 'has-text': text, 'is-expanded': expanded }"
-  >
+  <div ref="rootElement" class="ribbon-split-action" :class="{ 'has-text': text }">
     <button
       ref="mainElement"
       class="ribbon-split-action__main"
@@ -74,7 +70,7 @@ function toggleMenu(): void {
       @click="toggleMenu"
       @keydown="emit('menuKeydown', $event)"
     >
-      <ChevronDown :size="9" aria-hidden="true" />
+      <RibbonDropdownArrow />
     </button>
   </div>
 </template>
@@ -86,22 +82,11 @@ function toggleMenu(): void {
   align-items: stretch;
   width: var(--cell-format-compact-track, 40px);
   height: var(--cell-format-control-height, 26px);
-  border: 1px solid transparent;
-  border-radius: 3px;
+  padding: 1px;
 
   &.has-text {
     width: max-content;
     min-width: 40px;
-  }
-
-  &:hover,
-  &:focus-within,
-  &.is-expanded {
-    border-color: var(--idea-border-control);
-
-    .ribbon-split-action__menu {
-      border-left-color: var(--idea-border-control);
-    }
   }
 
   &__main,
@@ -125,11 +110,7 @@ function toggleMenu(): void {
     }
 
     &:focus-visible {
-      position: relative;
-      z-index: 1;
-      box-shadow: 0 0 0 2px var(--idea-action-focus);
-      outline: 1px solid var(--idea-action-primary);
-      outline-offset: -1px;
+      background: var(--idea-action-primary-subtle);
     }
 
     &:disabled {
@@ -148,7 +129,6 @@ function toggleMenu(): void {
 
   &__menu {
     flex: 0 0 12px;
-    border-left: 1px solid transparent;
     border-radius: 0 2px 2px 0;
     color: var(--idea-text-muted);
 

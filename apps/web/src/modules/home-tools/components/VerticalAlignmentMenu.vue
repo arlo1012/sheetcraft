@@ -4,7 +4,6 @@ import {
   AlignVerticalJustifyEnd,
   AlignVerticalJustifyStart,
   Check,
-  ChevronDown,
 } from "lucide-vue-next";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import type { CellStylePatch, VerticalCellAlignment } from "@idea10/core/style";
@@ -12,6 +11,7 @@ import type { StyleValueState } from "@idea10/core/style-state";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useRovingFocus } from "../../../shared/focus/useRovingFocus";
 import { useAppI18n } from "../../../shared/i18n";
+import RibbonDropdownArrow from "./RibbonDropdownArrow.vue";
 
 const props = defineProps<{
   state: StyleValueState<VerticalCellAlignment>;
@@ -183,12 +183,7 @@ watch(
       />
       <AlignVerticalJustifyCenter v-else :size="17" :stroke-width="2" />
     </span>
-    <ChevronDown
-      class="vertical-alignment-menu__disclosure"
-      :class="{ 'is-expanded': open }"
-      :size="10"
-      aria-hidden="true"
-    />
+    <RibbonDropdownArrow class="vertical-alignment-menu__disclosure" />
   </button>
 
   <Teleport to="body">
@@ -352,11 +347,6 @@ watch(
   &__disclosure {
     flex: 0 0 auto;
     color: var(--idea-text-muted);
-    transition: transform 120ms ease;
-
-    &.is-expanded {
-      transform: rotate(180deg);
-    }
   }
 
   &__panel {
@@ -399,12 +389,6 @@ watch(
     &.is-visible {
       opacity: 1;
     }
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .vertical-alignment-menu__disclosure {
-    transition: none;
   }
 }
 </style>

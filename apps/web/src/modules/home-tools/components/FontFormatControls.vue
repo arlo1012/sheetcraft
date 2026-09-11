@@ -11,6 +11,7 @@ import {
 } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
+import RibbonDropdownArrow from "./RibbonDropdownArrow.vue";
 import {
   CELL_FONT_FAMILY_PRESETS,
   CELL_FONT_SIZE_PRESETS,
@@ -112,7 +113,9 @@ function setFontSize(value: SelectValue): void {
         :placeholder="state.fontFamily.mixed ? t('format.mixed') : undefined"
         :disabled="disabled"
         @change="setFontFamily"
-      />
+      >
+        <template #suffixIcon><RibbonDropdownArrow /></template>
+      </TSelect>
     </label>
     <label
       class="font-format-controls__field"
@@ -129,7 +132,9 @@ function setFontSize(value: SelectValue): void {
         :placeholder="state.fontSize.mixed ? t('format.mixed') : undefined"
         :disabled="disabled"
         @change="setFontSize"
-      />
+      >
+        <template #suffixIcon><RibbonDropdownArrow /></template>
+      </TSelect>
     </label>
   </div>
 </template>

@@ -1,13 +1,5 @@
 <script setup lang="ts">
-import {
-  Check,
-  ChevronDown,
-  DollarSign,
-  Hash,
-  MoveLeft,
-  MoveRight,
-  Percent,
-} from "lucide-vue-next";
+import { Check, DollarSign, Hash, MoveLeft, MoveRight, Percent } from "lucide-vue-next";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import type { CellNumberFormat, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
@@ -17,6 +9,7 @@ import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import RibbonDialogLauncher from "./RibbonDialogLauncher.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
+import RibbonDropdownArrow from "./RibbonDropdownArrow.vue";
 
 type NumberFormatChoice = "general" | CellNumberFormat["kind"];
 type NumberFormatShortcut = "number" | "percent" | "currency";
@@ -160,7 +153,7 @@ watch(
         <span class="home-number-group__format-label" aria-hidden="true">
           {{ state.numberFormat.mixed ? t("format.mixed") : currentFormatLabel }}
         </span>
-        <ChevronDown :size="10" aria-hidden="true" />
+        <RibbonDropdownArrow />
       </button>
     </div>
     <div class="home-number-group__row" data-ribbon-row="2">

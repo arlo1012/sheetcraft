@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ChevronDown } from "lucide-vue-next";
 import { ref } from "vue";
+import RibbonDropdownArrow from "./RibbonDropdownArrow.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -56,12 +56,7 @@ function activate(): void {
       <slot />
     </span>
     <span v-if="text" class="ribbon-icon-action__text" aria-hidden="true">{{ text }}</span>
-    <ChevronDown
-      v-if="disclosure"
-      class="ribbon-icon-action__disclosure"
-      :size="11"
-      aria-hidden="true"
-    />
+    <RibbonDropdownArrow v-if="disclosure" class="ribbon-icon-action__disclosure" />
   </button>
 </template>
 
@@ -164,8 +159,6 @@ function activate(): void {
 
   &__disclosure {
     flex: 0 0 auto;
-    width: 9px;
-    height: 9px;
     color: var(--idea-text-muted);
   }
 }
