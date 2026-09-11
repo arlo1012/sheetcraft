@@ -24,6 +24,7 @@ const props = withDefaults(
     columns?: number;
     clearable?: boolean;
     stableSize?: boolean;
+    showRecentHeading?: boolean;
   }>(),
   {
     defaultColor: "#20242c",
@@ -33,6 +34,7 @@ const props = withDefaults(
     columns: 10,
     clearable: false,
     stableSize: false,
+    showRecentHeading: false,
   },
 );
 
@@ -272,7 +274,7 @@ function getPanelAttach(): HTMLElement {
       </div>
 
       <div v-if="!isRestricted || paletteRecentColors.length" class="color-palette__section">
-        <p v-if="!compact" class="color-palette__heading">
+        <p v-if="!compact || showRecentHeading" class="color-palette__heading">
           {{ t("colorPalette.recent") }}
         </p>
         <div
@@ -387,7 +389,16 @@ function getPanelAttach(): HTMLElement {
       grid-area: 1 / 1;
     }
     .color-palette__view--palette {
+      display: flex;
+      flex-direction: column;
       padding: var(--idea-tool-panel-padding);
+
+      .color-palette__section:last-of-type {
+        margin-bottom: 9px;
+      }
+      .color-palette__more {
+        margin-top: auto;
+      }
     }
     .color-palette__view:not(.is-active) {
       visibility: hidden;

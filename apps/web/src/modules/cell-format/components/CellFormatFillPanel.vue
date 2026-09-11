@@ -103,6 +103,7 @@ function setGradient(gradient: CellFillGradient): void {
           <ColorPalette
             compact
             stable-size
+            show-recent-heading
             :model-value="fill?.fillColor ?? null"
             :show-default="false"
             default-color="#ffffff"
