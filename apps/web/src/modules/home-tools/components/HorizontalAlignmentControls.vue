@@ -50,8 +50,7 @@ function align(alignment: HorizontalCellAlignment): void {
     :aria-label="groupLabel"
   >
     <RibbonIconAction
-      class="ui-toolbar-icon-button horizontal-alignment-controls__button"
-      :class="{ 'is-active': isActive('left') }"
+      class="horizontal-alignment-controls__button"
       :disabled="disabled"
       :label="t('format.alignLeft')"
       :pressed="isActive('left')"
@@ -61,8 +60,7 @@ function align(alignment: HorizontalCellAlignment): void {
       <TextAlignStart :size="17" aria-hidden="true" />
     </RibbonIconAction>
     <RibbonIconAction
-      class="ui-toolbar-icon-button horizontal-alignment-controls__button"
-      :class="{ 'is-active': isActive('center') }"
+      class="horizontal-alignment-controls__button"
       :disabled="disabled"
       :label="t('format.alignCenter')"
       :pressed="isActive('center')"
@@ -72,8 +70,7 @@ function align(alignment: HorizontalCellAlignment): void {
       <TextAlignCenter :size="17" aria-hidden="true" />
     </RibbonIconAction>
     <RibbonIconAction
-      class="ui-toolbar-icon-button horizontal-alignment-controls__button"
-      :class="{ 'is-active': isActive('right') }"
+      class="horizontal-alignment-controls__button"
       :disabled="disabled"
       :label="t('format.alignRight')"
       :pressed="isActive('right')"
@@ -83,8 +80,7 @@ function align(alignment: HorizontalCellAlignment): void {
       <TextAlignEnd :size="17" aria-hidden="true" />
     </RibbonIconAction>
     <RibbonIconAction
-      class="ui-toolbar-icon-button horizontal-alignment-controls__button"
-      :class="{ 'is-active': isActive('justify') }"
+      class="horizontal-alignment-controls__button"
       :disabled="disabled"
       :label="t('cellFormat.horizontalJustify')"
       :pressed="isActive('justify')"
@@ -94,8 +90,7 @@ function align(alignment: HorizontalCellAlignment): void {
       <TextAlignJustify :size="17" :stroke-width="1.5" aria-hidden="true" />
     </RibbonIconAction>
     <RibbonIconAction
-      class="ui-toolbar-icon-button horizontal-alignment-controls__button"
-      :class="{ 'is-active': isActive('distributed') }"
+      class="horizontal-alignment-controls__button"
       :disabled="disabled"
       :label="t('cellFormat.horizontalDistributed')"
       :pressed="isActive('distributed')"
