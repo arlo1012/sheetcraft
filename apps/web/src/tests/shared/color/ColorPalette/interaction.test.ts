@@ -1,5 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
+import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { afterEach, describe, expect, test } from "vitest";
 import ColorPalette from "../../../../shared/color/ColorPalette.vue";
 import { createAppI18n } from "../../../../shared/i18n";
@@ -43,6 +44,28 @@ describe("ColorPalette", () => {
     wrapper.findComponent(ColorPickerPanel).vm.$emit("change", "#A1B2C3");
     await wrapper.get('[data-color-action="apply"]').trigger("click");
     expect(wrapper.emitted("select")).toEqual([["#a1b2c3"]]);
+  });
+
+  test("keeps the palette visible while custom colors are confirmed or cancelled in a dialog", async () => {
+    const wrapper = mountPalette({ moreMode: "dialog", modelValue: "#ffffff" });
+    const swatch = wrapper.get('[data-color-swatch="#ffffff"]').element;
+    await wrapper.get('[data-color-action="more"]').trigger("click");
+    expect(wrapper.get('[data-color-swatch="#ffffff"]').element).toBe(swatch);
+    expect(wrapper.classes()).not.toContain("is-more");
+    wrapper.getComponent(ColorPickerPanel).vm.$emit("change", "#A1B2C3");
+    wrapper.getComponent(TDialog).vm.$emit("close");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("select")).toBeUndefined();
+    expect(wrapper.findComponent(TDialog).exists()).toBe(false);
+
+    await wrapper.get('[data-color-action="more"]').trigger("click");
+    expect(wrapper.getComponent(ColorPickerPanel).props("modelValue")).toBe("#ffffff");
+    wrapper.getComponent(ColorPickerPanel).vm.$emit("change", "#A1B2C3");
+    wrapper.getComponent(TDialog).vm.$emit("confirm");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("select")).toEqual([["#a1b2c3"]]);
+    expect(wrapper.findComponent(TDialog).exists()).toBe(false);
+    expect(wrapper.get('[data-color-swatch="#ffffff"]').element).toBe(swatch);
   });
 
   test("limits swatches and entry points to normalized allowed colors", async () => {

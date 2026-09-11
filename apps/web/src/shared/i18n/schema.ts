@@ -520,6 +520,7 @@ export type MessageSchema = {
     borderHint: string;
   };
   colorPalette: {
+    cancel: string;
     label: string;
     default: string;
     clear: string;

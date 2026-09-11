@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ChevronRight } from "lucide-vue-next";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
+import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useAppI18n } from "../i18n";
 import { createColorPickerSelectInputProps } from "../tdesign/colorPickerPopup";
@@ -23,7 +24,7 @@ const props = withDefaults(
     compact?: boolean;
     columns?: number;
     clearable?: boolean;
-    stableSize?: boolean;
+    moreMode?: "inline" | "dialog";
     showRecentHeading?: boolean;
   }>(),
   {
@@ -33,7 +34,7 @@ const props = withDefaults(
     compact: false,
     columns: 10,
     clearable: false,
-    stableSize: false,
+    moreMode: "inline",
     showRecentHeading: false,
   },
 );
@@ -42,6 +43,7 @@ const emit = defineEmits<{ select: [color: string | null] }>();
 const { t } = useAppI18n();
 const recentColors = ref<string[]>([]);
 const showingMore = ref(false);
+const showingInlineMore = computed(() => showingMore.value && props.moreMode === "inline");
 const draftColor = ref(
   normalizeColor(props.modelValue) ?? normalizeColor(props.defaultColor) ?? "#20242c",
 );
@@ -49,6 +51,7 @@ const focusedSwatch = ref(0);
 const swatchButtons = new Map<number, HTMLButtonElement>();
 const disabledRecentColors = null as unknown as string[];
 const rootRef = ref<HTMLElement | null>(null);
+const customPickerRef = ref<HTMLElement | null>(null);
 const moreButtonRef = ref<HTMLButtonElement | null>(null);
 const selectInputProps = createColorPickerSelectInputProps(getPanelAttach);
 const allowedColorSet = computed(() => {
@@ -131,13 +134,11 @@ function openMore(): void {
   if (isRestricted.value) return;
   draftColor.value = selectedColor.value ?? normalizeColor(props.defaultColor) ?? "#20242c";
   showingMore.value = true;
-  void nextTick(() =>
-    rootRef.value
-      ?.querySelector<HTMLElement>(
-        ".color-palette__view.is-active [role='slider'], .color-palette__view.is-active input, .color-palette__view.is-active button",
-      )
-      ?.focus(),
-  );
+  void nextTick(focusCustomPicker);
+}
+
+function focusCustomPicker(): void {
+  customPickerRef.value?.querySelector<HTMLElement>("[role='slider'], input, button")?.focus();
 }
 
 function backToPalette(): void {
@@ -147,7 +148,7 @@ function backToPalette(): void {
 
 function applyDraft(): void {
   chooseColor(draftColor.value);
-  showingMore.value = false;
+  backToPalette();
 }
 
 function updateDraft(value: string, context?: { color?: { hex?: string } }): void {
@@ -186,7 +187,7 @@ function setSwatchRef(index: number) {
 }
 
 function getPanelAttach(): HTMLElement {
-  return rootRef.value ?? document.body;
+  return customPickerRef.value ?? rootRef.value ?? document.body;
 }
 </script>
 
@@ -195,19 +196,14 @@ function getPanelAttach(): HTMLElement {
     ref="rootRef"
     class="color-palette"
     :class="{
-      'is-more': showingMore,
+      'is-more': showingInlineMore,
       'is-compact': compact,
-      'is-stable': stableSize,
     }"
     :style="{ '--color-palette-columns': gridColumns }"
     :aria-label="t('colorPalette.label')"
     @keydown="onPanelKeydown"
   >
-    <div
-      v-if="!showingMore || stableSize"
-      class="color-palette__view color-palette__view--palette"
-      :class="{ 'is-active': !showingMore }"
-    >
+    <template v-if="!showingInlineMore">
       <button
         v-if="showDefaultAction"
         type="button"
@@ -336,16 +332,11 @@ function getPanelAttach(): HTMLElement {
       >
         {{ t("colorPalette.clear") }}
       </button>
-    </div>
+    </template>
 
-    <div
-      v-if="showingMore || stableSize"
-      class="color-palette__view color-palette__view--more"
-      :class="{ 'is-active': showingMore }"
-    >
+    <div v-else ref="customPickerRef">
       <ColorPickerPanel
         class="idea-color-palette-panel"
-        :style="stableSize ? { width: '100%' } : undefined"
         :model-value="draftColor"
         :color-modes="['monochrome']"
         format="HEX"
@@ -370,6 +361,40 @@ function getPanelAttach(): HTMLElement {
         </button>
       </div>
     </div>
+    <TDialog
+      v-if="showingMore && moreMode === 'dialog'"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('colorPalette.more')"
+      :visible="true"
+      :header="t('colorPalette.more')"
+      :confirm-btn="t('format.applyColor')"
+      :cancel-btn="t('colorPalette.cancel')"
+      :close-on-overlay-click="false"
+      :confirm-on-enter="false"
+      :destroy-on-close="true"
+      width="min(320px, calc(100vw - 32px))"
+      placement="center"
+      @opened="focusCustomPicker"
+      @confirm="applyDraft"
+      @close="backToPalette"
+    >
+      <div ref="customPickerRef">
+        <ColorPickerPanel
+          class="idea-color-palette-panel"
+          style="width: 100%"
+          :model-value="draftColor"
+          :color-modes="['monochrome']"
+          format="HEX"
+          :enable-alpha="false"
+          :recent-colors="disabledRecentColors"
+          :swatch-colors="[]"
+          :show-primary-color-preview="false"
+          :select-input-props="selectInputProps"
+          @change="updateDraft"
+        />
+      </div>
+    </TDialog>
   </section>
 </template>
 
@@ -488,37 +513,6 @@ function getPanelAttach(): HTMLElement {
       border-color: var(--idea-action-primary);
       background: var(--idea-action-primary);
       color: #fff;
-    }
-  }
-  &.is-stable {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    padding: 0;
-    width: calc(
-      var(--color-palette-columns) * var(--color-palette-swatch-size) +
-        (var(--color-palette-columns) - 1) * 3px + 2 * var(--idea-tool-panel-padding)
-    );
-    max-width: min(360px, 100%, calc(100vw - 32px));
-
-    .color-palette__view {
-      grid-area: 1 / 1;
-      min-width: 0;
-    }
-    .color-palette__view--palette {
-      display: flex;
-      flex-direction: column;
-      padding: var(--idea-tool-panel-padding);
-
-      .color-palette__section:last-of-type {
-        margin-bottom: 9px;
-      }
-      .color-palette__more {
-        margin-top: auto;
-      }
-    }
-    .color-palette__view:not(.is-active) {
-      visibility: hidden;
-      pointer-events: none;
     }
   }
 }

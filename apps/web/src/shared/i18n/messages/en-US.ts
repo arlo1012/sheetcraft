@@ -537,6 +537,7 @@ export const enUS = {
     borderHint: "Use the presets, preview, or surrounding buttons to add or remove borders.",
   },
   colorPalette: {
+    cancel: "Cancel",
     label: "Color picker",
     default: "No fill",
     clear: "Clear",

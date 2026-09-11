@@ -527,6 +527,7 @@ export const zhCN = {
     borderHint: "点击预设、预览图或周围的按钮，可添加或移除边框。",
   },
   colorPalette: {
+    cancel: "取消",
     label: "颜色选择",
     default: "无填充",
     clear: "清除",
