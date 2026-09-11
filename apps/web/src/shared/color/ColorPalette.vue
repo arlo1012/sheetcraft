@@ -345,6 +345,7 @@ function getPanelAttach(): HTMLElement {
     >
       <ColorPickerPanel
         class="idea-color-palette-panel"
+        :style="stableSize ? { width: '100%' } : undefined"
         :model-value="draftColor"
         :color-modes="['monochrome']"
         format="HEX"
@@ -374,37 +375,12 @@ function getPanelAttach(): HTMLElement {
 
 <style scoped lang="scss">
 .color-palette {
+  --color-palette-swatch-size: 16px;
+
   width: 208px;
   padding: var(--idea-tool-panel-padding);
   background: var(--idea-surface-panel);
   color: var(--idea-text-primary);
-
-  &.is-stable {
-    display: grid;
-    padding: 0;
-    width: max-content;
-    max-width: min(360px, 100%, calc(100vw - 32px));
-
-    .color-palette__view {
-      grid-area: 1 / 1;
-    }
-    .color-palette__view--palette {
-      display: flex;
-      flex-direction: column;
-      padding: var(--idea-tool-panel-padding);
-
-      .color-palette__section:last-of-type {
-        margin-bottom: 9px;
-      }
-      .color-palette__more {
-        margin-top: auto;
-      }
-    }
-    .color-palette__view:not(.is-active) {
-      visibility: hidden;
-      pointer-events: none;
-    }
-  }
 
   &__default,
   &__more,
@@ -442,15 +418,15 @@ function getPanelAttach(): HTMLElement {
   }
   &__grid {
     display: grid;
-    grid-template-columns: repeat(var(--color-palette-columns), 16px);
+    grid-template-columns: repeat(var(--color-palette-columns), var(--color-palette-swatch-size));
     gap: 3px;
   }
   &__grid--single {
     min-height: 16px;
   }
   &__swatch {
-    width: 16px;
-    height: 16px;
+    width: var(--color-palette-swatch-size);
+    height: var(--color-palette-swatch-size);
     box-sizing: border-box;
     border: 1px solid rgb(0 0 0 / 12%);
     border-radius: 1px;
@@ -486,17 +462,12 @@ function getPanelAttach(): HTMLElement {
     margin-top: 8px;
   }
   &.is-compact {
+    --color-palette-swatch-size: 20px;
+
     width: max-content;
 
     .color-palette__section:first-of-type {
       margin-top: 0;
-    }
-    .color-palette__grid {
-      grid-template-columns: repeat(var(--color-palette-columns), 20px);
-    }
-    .color-palette__swatch {
-      width: 20px;
-      height: 20px;
     }
   }
   &__actions {
@@ -517,6 +488,37 @@ function getPanelAttach(): HTMLElement {
       border-color: var(--idea-action-primary);
       background: var(--idea-action-primary);
       color: #fff;
+    }
+  }
+  &.is-stable {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0;
+    width: calc(
+      var(--color-palette-columns) * var(--color-palette-swatch-size) +
+        (var(--color-palette-columns) - 1) * 3px + 2 * var(--idea-tool-panel-padding)
+    );
+    max-width: min(360px, 100%, calc(100vw - 32px));
+
+    .color-palette__view {
+      grid-area: 1 / 1;
+      min-width: 0;
+    }
+    .color-palette__view--palette {
+      display: flex;
+      flex-direction: column;
+      padding: var(--idea-tool-panel-padding);
+
+      .color-palette__section:last-of-type {
+        margin-bottom: 9px;
+      }
+      .color-palette__more {
+        margin-top: auto;
+      }
+    }
+    .color-palette__view:not(.is-active) {
+      visibility: hidden;
+      pointer-events: none;
     }
   }
 }
