@@ -120,7 +120,10 @@ watch(open, (value) => {
     <TSelectInput
       :value="{ value: modelValue, label: selectedLabel }"
       :popup-visible="open"
-      :popup-props="{ placement: 'bottom-right', overlayInnerStyle: { padding: '0' } }"
+      :popup-props="{
+        placement: 'bottom-right',
+        overlayInnerStyle: { width: 'min(296px, calc(100vw - 32px))', padding: '0' },
+      }"
       :input-props="triggerInputProps"
       @popup-visible-change="open = $event"
     >
@@ -219,7 +222,7 @@ watch(open, (value) => {
     border-radius: var(--idea-radius-small);
   }
   &__panel {
-    width: min(296px, calc(100vw - 32px));
+    width: 100%;
     padding: var(--idea-tool-panel-padding);
     color: var(--idea-text-primary);
     font-size: var(--idea-font-size-body-medium);
