@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { SquareArrowOutDownRight } from "lucide-vue-next";
+import { ArrowDownRight } from "lucide-vue-next";
 
 const props = withDefaults(
   defineProps<{
@@ -27,7 +27,7 @@ function activate(): void {
     :title="label"
     @click="activate"
   >
-    <SquareArrowOutDownRight :size="12" :stroke-width="1.8" aria-hidden="true" />
+    <ArrowDownRight :size="12" :stroke-width="1.8" aria-hidden="true" />
   </button>
 </template>
 
@@ -49,7 +49,6 @@ function activate(): void {
 
   &:hover:not(:disabled) {
     background: var(--idea-icon-button-hover-bg);
-    color: var(--idea-text-primary);
   }
 
   &:focus-visible {

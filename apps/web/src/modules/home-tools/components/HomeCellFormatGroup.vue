@@ -83,6 +83,12 @@ const { t } = useAppI18n();
         :disabled="disabled"
         @apply-style="emit('applyStyle', $event)"
       />
+      <RibbonDialogLauncher
+        :label="`${t('cellFormat.title')} · ${t('cellFormat.font')}`"
+        :disabled="disabled"
+        data-ribbon-dialog-launcher="font"
+        @activate="emit('openCellFormat', 'font')"
+      />
     </div>
 
     <div
@@ -116,13 +122,6 @@ const { t } = useAppI18n();
         <Sparkles :size="15" aria-hidden="true" />
       </RibbonIconAction>
     </div>
-
-    <RibbonDialogLauncher
-      :label="`${t('cellFormat.title')} · ${t('cellFormat.font')}`"
-      :disabled="disabled"
-      data-ribbon-dialog-launcher="font"
-      @activate="emit('openCellFormat', 'font')"
-    />
   </section>
 </template>
 
@@ -131,7 +130,6 @@ const { t } = useAppI18n();
 
 .home-cell-format-group {
   @include ribbon.shell;
-  @include ribbon.dialog-launcher-gutter;
 
   --cell-format-primary-track: 126px;
   --cell-format-compact-track: 40px;
@@ -141,7 +139,7 @@ const { t } = useAppI18n();
   display: grid;
   grid-template-columns:
     var(--cell-format-primary-track) var(--cell-format-compact-track)
-    var(--cell-format-compact-track) max-content;
+    calc(var(--cell-format-compact-track) + 18px) max-content;
   grid-template-rows: repeat(2, 27px);
   align-content: center;
   column-gap: var(--cell-format-column-gap);
@@ -172,6 +170,8 @@ const { t } = useAppI18n();
   }
 
   &__lane--appearance {
+    @include ribbon.dialog-launcher-gutter;
+
     grid-column: 3;
     grid-row: 1 / span 2;
     justify-items: stretch;
