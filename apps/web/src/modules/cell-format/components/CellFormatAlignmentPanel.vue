@@ -179,90 +179,96 @@ function checkboxPressed(
   <section class="cell-format-alignment" :aria-label="t('cellFormat.alignment')">
     <div class="cell-format-alignment__layout">
       <div class="cell-format-alignment__content">
-        <h3>{{ t("cellFormat.textAlignment") }}</h3>
-        <div class="cell-format-alignment__fields">
-          <label class="cell-format-alignment__field"
-            ><span>{{ t("cellFormat.horizontal") }}</span
-            ><TSelect
-              :model-value="horizontal"
-              :options="horizontalOptions"
-              :placeholder="state.horizontalAlign.mixed ? t('format.mixed') : undefined"
-              data-cell-format-horizontal
-              @change="setHorizontal"
-          /></label>
-          <label class="cell-format-alignment__field"
-            ><span>{{ t("cellFormat.vertical") }}</span
-            ><TSelect
-              :model-value="vertical"
-              :options="verticalOptions"
-              :placeholder="state.verticalAlign.mixed ? t('format.mixed') : undefined"
-              data-cell-format-vertical
-              @change="setVertical"
-          /></label>
-          <div
-            class="cell-format-alignment__field"
-            role="group"
-            :aria-label="t('cellFormat.indent')"
-          >
-            <span>{{ t("cellFormat.indent") }}</span
-            ><TInputNumber
-              :model-value="indent"
-              :min="0"
-              :max="250"
-              :decimal-places="0"
-              :disabled="!canIndent"
-              theme="column"
-              class="idea-input-number--persistent-controls"
-              :placeholder="state.indent.mixed ? t('format.mixed') : undefined"
-              data-cell-format-indent
-              @change="setIndent"
-            />
+        <section class="cell-format-alignment__group">
+          <h3>{{ t("cellFormat.textAlignment") }}</h3>
+          <div class="cell-format-alignment__fields">
+            <label class="cell-format-alignment__field"
+              ><span>{{ t("cellFormat.horizontal") }}</span
+              ><TSelect
+                :model-value="horizontal"
+                :options="horizontalOptions"
+                :placeholder="state.horizontalAlign.mixed ? t('format.mixed') : undefined"
+                data-cell-format-horizontal
+                @change="setHorizontal"
+            /></label>
+            <label class="cell-format-alignment__field"
+              ><span>{{ t("cellFormat.vertical") }}</span
+              ><TSelect
+                :model-value="vertical"
+                :options="verticalOptions"
+                :placeholder="state.verticalAlign.mixed ? t('format.mixed') : undefined"
+                data-cell-format-vertical
+                @change="setVertical"
+            /></label>
+            <div
+              class="cell-format-alignment__field"
+              role="group"
+              :aria-label="t('cellFormat.indent')"
+            >
+              <span>{{ t("cellFormat.indent") }}</span
+              ><TInputNumber
+                :model-value="indent"
+                :min="0"
+                :max="250"
+                :decimal-places="0"
+                :disabled="!canIndent"
+                theme="column"
+                class="idea-input-number--persistent-controls"
+                :placeholder="state.indent.mixed ? t('format.mixed') : undefined"
+                data-cell-format-indent
+                @change="setIndent"
+              />
+            </div>
           </div>
-        </div>
-        <h3>{{ t("cellFormat.textControl") }}</h3>
-        <div
-          class="cell-format-alignment__checks"
-          role="group"
-          :aria-label="t('cellFormat.textControl')"
-        >
-          <TCheckbox
-            :model-value="wrapped"
-            :indeterminate="!intrinsicWrap && toggleMixed('wrapText')"
-            :disabled="intrinsicWrap"
-            :aria-checked="intrinsicWrap || checkboxPressed('wrapText', state.wrapText)"
-            data-cell-format-wrap
-            @change="setWrap"
-            >{{ t("cellFormat.wrapText") }}</TCheckbox
+        </section>
+        <section class="cell-format-alignment__group">
+          <h3>{{ t("cellFormat.textControl") }}</h3>
+          <div
+            class="cell-format-alignment__checks"
+            role="group"
+            :aria-label="t('cellFormat.textControl')"
           >
-          <TCheckbox
-            :model-value="shrinkToFit"
-            :indeterminate="toggleMixed('shrinkToFit')"
-            :disabled="shrinkDisabled"
-            :aria-checked="checkboxPressed('shrinkToFit', state.shrinkToFit)"
-            data-cell-format-shrink
-            @change="setShrink"
-            >{{ t("cellFormat.shrinkToFit") }}</TCheckbox
-          >
-          <TCheckbox
-            v-if="mergeState"
-            :model-value="merged"
-            :indeterminate="mergeMixed"
-            :disabled="!mergeEnabled"
-            data-cell-format-merge
-            @change="emit('update:merge', $event)"
-            >{{ t("cellFormat.mergeCells") }}</TCheckbox
-          >
-        </div>
-        <h3>{{ t("cellFormat.rightToLeft") }}</h3>
-        <label class="cell-format-alignment__field"
-          ><span>{{ t("cellFormat.textDirection") }}</span
-          ><TSelect
-            :model-value="direction"
-            :options="directionOptions"
-            :placeholder="state.textDirection.mixed ? t('format.mixed') : undefined"
-            data-cell-format-text-direction
-            @change="setDirection"
-        /></label>
+            <TCheckbox
+              :model-value="wrapped"
+              :indeterminate="!intrinsicWrap && toggleMixed('wrapText')"
+              :disabled="intrinsicWrap"
+              :aria-checked="intrinsicWrap || checkboxPressed('wrapText', state.wrapText)"
+              data-cell-format-wrap
+              @change="setWrap"
+              >{{ t("cellFormat.wrapText") }}</TCheckbox
+            >
+            <TCheckbox
+              :model-value="shrinkToFit"
+              :indeterminate="toggleMixed('shrinkToFit')"
+              :disabled="shrinkDisabled"
+              :aria-checked="checkboxPressed('shrinkToFit', state.shrinkToFit)"
+              data-cell-format-shrink
+              @change="setShrink"
+              >{{ t("cellFormat.shrinkToFit") }}</TCheckbox
+            >
+            <TCheckbox
+              v-if="mergeState"
+              :model-value="merged"
+              :indeterminate="mergeMixed"
+              :disabled="!mergeEnabled"
+              data-cell-format-merge
+              @change="emit('update:merge', $event)"
+              >{{ t("cellFormat.mergeCells") }}</TCheckbox
+            >
+          </div>
+        </section>
+        <section class="cell-format-alignment__group">
+          <h3>{{ t("cellFormat.rightToLeft") }}</h3>
+          <label class="cell-format-alignment__field"
+            ><span>{{ t("cellFormat.textDirection") }}</span
+            ><TSelect
+              :model-value="direction"
+              :options="directionOptions"
+              :placeholder="state.textDirection.mixed ? t('format.mixed') : undefined"
+              data-cell-format-text-direction
+              @change="setDirection"
+          /></label>
+        </section>
       </div>
       <CellFormatTextOrientationControl
         :model-value="rotation"
@@ -285,11 +291,16 @@ function checkboxPressed(
   }
   &__content {
     display: grid;
-    gap: 10px;
+    gap: 16px;
     align-content: start;
   }
+  &__group {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
   h3 {
-    margin: 0 0 -2px;
+    margin: 0;
     font-size: inherit;
     font-weight: var(--idea-font-weight-semibold);
   }
@@ -310,7 +321,6 @@ function checkboxPressed(
     flex-wrap: wrap;
     align-items: center;
     gap: 8px 12px;
-    padding-top: 1px;
   }
 }
 @media (max-width: 520px) {
