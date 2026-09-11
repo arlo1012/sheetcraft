@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { TabPanel, Tabs } from "tdesign-vue-next/es/tabs";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
@@ -82,6 +82,9 @@ const numberFormatValid = ref(true);
 const borderActions = ref<CellBorderAction[]>([]);
 const borderFormat = ref<CellBorderFormatPatch | undefined>();
 const merge = ref<boolean | undefined>();
+const displayedMergeState = computed(() =>
+  merge.value === undefined ? props.mergeState?.merged : merge.value ? "on" : "off",
+);
 
 function updateStyle(patch: CellStylePatch): void {
   stylePatch.value = { ...stylePatch.value, ...patch };
@@ -93,8 +96,9 @@ function updateBorderFormat(format: CellBorderFormatPatch | undefined): void {
   borderFormat.value = format ? { ...borderFormat.value, ...format } : undefined;
 }
 function updateMerge(next: boolean): void {
-  if (!props.mergeState || next === (props.mergeState.merged === "on")) return;
-  merge.value = next;
+  if (!props.mergeState) return;
+  const initial = props.mergeState.merged;
+  merge.value = initial !== "mixed" && next === (initial === "on") ? undefined : next;
 }
 function confirm(): void {
   if (!numberFormatValid.value) return;
@@ -176,7 +180,7 @@ function confirm(): void {
           :state="state"
           :patch="stylePatch"
           :sample-value="sampleValue"
-          :merge-state="mergeState?.merged"
+          :merge-state="displayedMergeState"
           :merge-enabled="mergeState?.canMerge || mergeState?.canUnmerge"
           @update:patch="updateStyle"
           @update:merge="updateMerge"
