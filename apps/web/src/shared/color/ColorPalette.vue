@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { ChevronRight } from "lucide-vue-next";
-import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
-import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
+import { Popup as TPopup } from "tdesign-vue-next/es/popup";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useAppI18n } from "../i18n";
-import { createColorPickerSelectInputProps } from "../tdesign/colorPickerPopup";
+import CustomColorPanel from "./CustomColorPanel.vue";
 import {
   PRESET_COLORS,
   STANDARD_COLORS,
@@ -24,7 +23,7 @@ const props = withDefaults(
     compact?: boolean;
     columns?: number;
     clearable?: boolean;
-    moreMode?: "inline" | "dialog";
+    moreMode?: "inline" | "popup";
     showRecentHeading?: boolean;
   }>(),
   {
@@ -44,16 +43,9 @@ const { t } = useAppI18n();
 const recentColors = ref<string[]>([]);
 const showingMore = ref(false);
 const showingInlineMore = computed(() => showingMore.value && props.moreMode === "inline");
-const draftColor = ref(
-  normalizeColor(props.modelValue) ?? normalizeColor(props.defaultColor) ?? "#20242c",
-);
 const focusedSwatch = ref(0);
 const swatchButtons = new Map<number, HTMLButtonElement>();
-const disabledRecentColors = null as unknown as string[];
-const rootRef = ref<HTMLElement | null>(null);
-const customPickerRef = ref<HTMLElement | null>(null);
 const moreButtonRef = ref<HTMLButtonElement | null>(null);
-const selectInputProps = createColorPickerSelectInputProps(getPanelAttach);
 const allowedColorSet = computed(() => {
   if (props.allowedColors === undefined) return undefined;
   return new Set(
@@ -87,15 +79,6 @@ const gridColumns = computed(() => Math.max(1, Math.min(10, Math.trunc(props.col
 onMounted(() => {
   recentColors.value = readRecentColors();
 });
-
-watch(
-  () => props.modelValue,
-  (value) => {
-    if (!showingMore.value) {
-      draftColor.value = normalizeColor(value) ?? normalizeColor(props.defaultColor) ?? "#20242c";
-    }
-  },
-);
 
 watch(
   () => allSwatches.value.length,
@@ -132,13 +115,12 @@ function selectDefault(): void {
 
 function openMore(): void {
   if (isRestricted.value) return;
-  draftColor.value = selectedColor.value ?? normalizeColor(props.defaultColor) ?? "#20242c";
   showingMore.value = true;
-  void nextTick(focusCustomPicker);
 }
 
-function focusCustomPicker(): void {
-  customPickerRef.value?.querySelector<HTMLElement>("[role='slider'], input, button")?.focus();
+function onPopupVisibleChange(visible: boolean): void {
+  if (visible) openMore();
+  else showingMore.value = false;
 }
 
 function backToPalette(): void {
@@ -146,22 +128,9 @@ function backToPalette(): void {
   void nextTick(() => moreButtonRef.value?.focus());
 }
 
-function applyDraft(): void {
-  chooseColor(draftColor.value);
+function applyCustomColor(color: string): void {
+  chooseColor(color);
   backToPalette();
-}
-
-function updateDraft(value: string, context?: { color?: { hex?: string } }): void {
-  const normalized = normalizeColor(context?.color?.hex ?? value);
-  if (normalized) draftColor.value = normalized;
-}
-
-function onPanelKeydown(event: KeyboardEvent): void {
-  if (event.key === "Escape" && showingMore.value) {
-    event.preventDefault();
-    event.stopPropagation();
-    backToPalette();
-  }
 }
 
 function onSwatchKeydown(event: KeyboardEvent, index: number, columns: number): void {
@@ -185,15 +154,10 @@ function setSwatchRef(index: number) {
     }
   };
 }
-
-function getPanelAttach(): HTMLElement {
-  return customPickerRef.value ?? rootRef.value ?? document.body;
-}
 </script>
 
 <template>
   <section
-    ref="rootRef"
     class="color-palette"
     :class="{
       'is-more': showingInlineMore,
@@ -201,7 +165,6 @@ function getPanelAttach(): HTMLElement {
     }"
     :style="{ '--color-palette-columns': gridColumns }"
     :aria-label="t('colorPalette.label')"
-    @keydown="onPanelKeydown"
   >
     <template v-if="!showingInlineMore">
       <button
@@ -312,8 +275,37 @@ function getPanelAttach(): HTMLElement {
         </div>
       </div>
 
+      <TPopup
+        v-if="!isRestricted && moreMode === 'popup'"
+        :visible="showingMore"
+        trigger="click"
+        placement="bottom-left"
+        :overlay-inner-style="{ padding: '0' }"
+        @visible-change="onPopupVisibleChange"
+      >
+        <button
+          ref="moreButtonRef"
+          type="button"
+          class="color-palette__more"
+          data-color-action="more"
+          aria-haspopup="dialog"
+          :aria-expanded="showingMore"
+        >
+          <span>{{ t("colorPalette.more") }}</span>
+          <ChevronRight :size="14" aria-hidden="true" />
+        </button>
+        <template #content>
+          <div v-if="showingMore" role="dialog" :aria-label="t('colorPalette.more')">
+            <CustomColorPanel
+              :model-value="selectedColor ?? normalizedDefaultColor ?? '#20242c'"
+              @back="backToPalette"
+              @apply="applyCustomColor"
+            />
+          </div>
+        </template>
+      </TPopup>
       <button
-        v-if="!isRestricted"
+        v-else-if="!isRestricted"
         ref="moreButtonRef"
         type="button"
         class="color-palette__more"
@@ -334,67 +326,12 @@ function getPanelAttach(): HTMLElement {
       </button>
     </template>
 
-    <div v-else ref="customPickerRef">
-      <ColorPickerPanel
-        class="idea-color-palette-panel"
-        :model-value="draftColor"
-        :color-modes="['monochrome']"
-        format="HEX"
-        :enable-alpha="false"
-        :recent-colors="disabledRecentColors"
-        :swatch-colors="[]"
-        :show-primary-color-preview="false"
-        :select-input-props="selectInputProps"
-        @change="updateDraft"
-      />
-      <div class="color-palette__actions">
-        <button type="button" data-color-action="back" @click="backToPalette">
-          {{ t("colorPalette.back") }}
-        </button>
-        <button
-          type="button"
-          class="color-palette__apply"
-          data-color-action="apply"
-          @click="applyDraft"
-        >
-          {{ t("format.applyColor") }}
-        </button>
-      </div>
-    </div>
-    <TDialog
-      v-if="showingMore && moreMode === 'dialog'"
-      role="dialog"
-      aria-modal="true"
-      :aria-label="t('colorPalette.more')"
-      :visible="true"
-      :header="t('colorPalette.more')"
-      :confirm-btn="t('format.applyColor')"
-      :cancel-btn="t('colorPalette.cancel')"
-      :close-on-overlay-click="false"
-      :confirm-on-enter="false"
-      :destroy-on-close="true"
-      width="min(320px, calc(100vw - 32px))"
-      placement="center"
-      @opened="focusCustomPicker"
-      @confirm="applyDraft"
-      @close="backToPalette"
-    >
-      <div ref="customPickerRef">
-        <ColorPickerPanel
-          class="idea-color-palette-panel"
-          style="width: 100%"
-          :model-value="draftColor"
-          :color-modes="['monochrome']"
-          format="HEX"
-          :enable-alpha="false"
-          :recent-colors="disabledRecentColors"
-          :swatch-colors="[]"
-          :show-primary-color-preview="false"
-          :select-input-props="selectInputProps"
-          @change="updateDraft"
-        />
-      </div>
-    </TDialog>
+    <CustomColorPanel
+      v-else
+      :model-value="selectedColor ?? normalizedDefaultColor ?? '#20242c'"
+      @back="backToPalette"
+      @apply="applyCustomColor"
+    />
   </section>
 </template>
 
@@ -409,8 +346,7 @@ function getPanelAttach(): HTMLElement {
 
   &__default,
   &__more,
-  &__clear,
-  &__actions button {
+  &__clear {
     width: 100%;
     min-height: 25px;
     border: 1px solid var(--idea-border-control);
@@ -495,25 +431,10 @@ function getPanelAttach(): HTMLElement {
       margin-top: 0;
     }
   }
-  &__actions {
-    display: flex;
-    gap: 6px;
-    padding: var(--idea-space-2) var(--idea-tool-panel-padding) var(--idea-tool-panel-padding);
-  }
-  &__actions button {
-    width: auto;
-    flex: 1;
-  }
   &.is-more {
     width: max-content;
     max-width: min(360px, calc(100vw - 32px));
     padding: 0;
-
-    .color-palette__apply {
-      border-color: var(--idea-action-primary);
-      background: var(--idea-action-primary);
-      color: #fff;
-    }
   }
 }
 </style>

@@ -1,8 +1,8 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
-import { Dialog as TDialog } from "tdesign-vue-next/es/dialog";
 import { afterEach, describe, expect, test } from "vitest";
 import ColorPalette from "../../../../shared/color/ColorPalette.vue";
+import CustomColorPanel from "../../../../shared/color/CustomColorPanel.vue";
 import { createAppI18n } from "../../../../shared/i18n";
 
 const wrappers: Array<{ unmount(): void }> = [];
@@ -13,13 +13,21 @@ afterEach(() => {
 });
 
 function mountPalette(props: Record<string, unknown> = {}) {
+  const host = document.createElement("div");
+  document.body.append(host);
   const wrapper = mount(ColorPalette, {
+    attachTo: host,
     props,
     global: {
       plugins: [createAppI18n("en-US")],
     },
   });
-  wrappers.push(wrapper);
+  wrappers.push({
+    unmount() {
+      wrapper.unmount();
+      host.remove();
+    },
+  });
   return wrapper;
 }
 
@@ -46,25 +54,32 @@ describe("ColorPalette", () => {
     expect(wrapper.emitted("select")).toEqual([["#a1b2c3"]]);
   });
 
-  test("keeps the palette visible while custom colors are confirmed or cancelled in a dialog", async () => {
-    const wrapper = mountPalette({ moreMode: "dialog", modelValue: "#ffffff" });
+  test("keeps the palette visible while custom colors are applied or dismissed in a popup", async () => {
+    const wrapper = mountPalette({ moreMode: "popup", modelValue: "#ffffff" });
     const swatch = wrapper.get('[data-color-swatch="#ffffff"]').element;
+    // TDesign dismisses floating content when its anchor has no layout box.
+    wrapper.get<HTMLButtonElement>('[data-color-action="more"]').element.getBoundingClientRect =
+      () => new DOMRect(10, 10, 208, 25);
+    await flushPromises();
     await wrapper.get('[data-color-action="more"]').trigger("click");
+    await expect.poll(() => wrapper.findComponent(CustomColorPanel).exists()).toBe(true);
     expect(wrapper.get('[data-color-swatch="#ffffff"]').element).toBe(swatch);
     expect(wrapper.classes()).not.toContain("is-more");
     wrapper.getComponent(ColorPickerPanel).vm.$emit("change", "#A1B2C3");
-    wrapper.getComponent(TDialog).vm.$emit("close");
-    await wrapper.vm.$nextTick();
+    await wrapper.getComponent(CustomColorPanel).get('[data-color-action="back"]').trigger("click");
     expect(wrapper.emitted("select")).toBeUndefined();
-    expect(wrapper.findComponent(TDialog).exists()).toBe(false);
+    expect(wrapper.findComponent(CustomColorPanel).exists()).toBe(false);
 
     await wrapper.get('[data-color-action="more"]').trigger("click");
+    await expect.poll(() => wrapper.findComponent(CustomColorPanel).exists()).toBe(true);
     expect(wrapper.getComponent(ColorPickerPanel).props("modelValue")).toBe("#ffffff");
     wrapper.getComponent(ColorPickerPanel).vm.$emit("change", "#A1B2C3");
-    wrapper.getComponent(TDialog).vm.$emit("confirm");
-    await wrapper.vm.$nextTick();
+    await wrapper
+      .getComponent(CustomColorPanel)
+      .get('[data-color-action="apply"]')
+      .trigger("click");
     expect(wrapper.emitted("select")).toEqual([["#a1b2c3"]]);
-    expect(wrapper.findComponent(TDialog).exists()).toBe(false);
+    expect(wrapper.findComponent(CustomColorPanel).exists()).toBe(false);
     expect(wrapper.get('[data-color-swatch="#ffffff"]').element).toBe(swatch);
   });
 
