@@ -3,6 +3,7 @@ import type { IdFactory } from "../runtime.js";
 import { deserializeSheet, serializeSheet } from "../serialization.js";
 import {
   renameQualifiedReferencesForSheet,
+  restoreFormulaSources,
   rewriteQualifiedReferencesForSheet,
 } from "../formula/workbook-references.js";
 import {
@@ -433,8 +434,16 @@ export function applyRenameSheetCommand(
   assertSheetNameAvailable(workbook, name, command.sheetId);
   const previousName = sheet.name;
   const changed = renameSheet(workbook, command.sheetId, name);
-  if (changed) renameQualifiedReferencesForSheet(workbook, previousName, name);
-  return changed ? createRenameSheetCommand(command.sheetId, previousName) : null;
+  if (!changed) return null;
+  if (command.formulaSources) {
+    restoreFormulaSources(workbook, command.formulaSources);
+    return createRenameSheetCommand(command.sheetId, previousName);
+  }
+  const formulaSources = renameQualifiedReferencesForSheet(workbook, previousName, name);
+  return {
+    ...createRenameSheetCommand(command.sheetId, previousName),
+    ...(formulaSources.length ? { formulaSources } : {}),
+  };
 }
 
 export function applyMoveSheetCommand(

@@ -1,7 +1,17 @@
 import { parseFormulaReference } from "../formula/reference-model.js";
 import { parseA1FormulaReference } from "../formula/reference-model.js";
-import type { DefinedName, Workbook } from "../workbook.js";
-import type { DeleteDefinedNameCommand, UpsertDefinedNameCommand } from "./contracts.js";
+import { getFormulaAst } from "../formula/parser.js";
+import type { FormulaExpression } from "../formula/types.js";
+import {
+  setCellContent,
+  type DefinedName,
+  type Workbook,
+} from "../workbook.js";
+import type {
+  DeleteDefinedNameCommand,
+  FormulaSourceRestore,
+  UpsertDefinedNameCommand,
+} from "./contracts.js";
 import { invalidCommandPayload } from "./helpers.js";
 
 export type DefinedNameDraft = {
@@ -28,7 +38,13 @@ export function createUpsertDefinedNameCommand(
   draft: DefinedNameDraft,
 ): UpsertDefinedNameCommand {
   if (!isName(draft.name)) throw invalidCommandPayload("name", draft.name);
-  if (draft.scopeSheetId !== undefined && !workbook.sheets.has(draft.scopeSheetId))
+  if (
+    draft.scopeSheetId !== undefined &&
+    !workbook.sheets.has(draft.scopeSheetId)
+  )
+    throw invalidCommandPayload("scopeSheetId", draft.scopeSheetId);
+  const existing = draft.id ? workbook.definedNames.get(draft.id) : undefined;
+  if (existing && existing.scopeSheetId !== draft.scopeSheetId)
     throw invalidCommandPayload("scopeSheetId", draft.scopeSheetId);
   if (
     draft.id === undefined &&
@@ -46,11 +62,14 @@ export function createUpsertDefinedNameCommand(
   const reference = parseFormulaReference(source, {
     currentSheetId: draft.scopeSheetId ?? workbook.activeSheetId,
     resolveSheetId: (name) =>
-      [...workbook.sheets.values()].find((sheet) => sheet.name.toLowerCase() === name.toLowerCase())
-        ?.id,
+      [...workbook.sheets.values()].find(
+        (sheet) => sheet.name.toLowerCase() === name.toLowerCase(),
+      )?.id,
   });
   if (!reference) throw invalidCommandPayload("reference", draft.reference);
-  const id = draft.id ?? `${draft.scopeSheetId ?? "workbook"}:${draft.name.toUpperCase()}`;
+  const id =
+    draft.id ??
+    `${draft.scopeSheetId ?? "workbook"}:${draft.name.toUpperCase()}`;
   return {
     type: "upsertDefinedName",
     definition: {
@@ -85,20 +104,217 @@ export function applyUpsertDefinedNameCommand(
     !workbook.sheets.has(definition.reference.sheetId)
   )
     throw invalidCommandPayload("definition", definition);
-  if (definition.scopeSheetId !== undefined && !workbook.sheets.has(definition.scopeSheetId))
-    throw invalidCommandPayload("definition.scopeSheetId", definition.scopeSheetId);
+  if (
+    definition.scopeSheetId !== undefined &&
+    !workbook.sheets.has(definition.scopeSheetId)
+  )
+    throw invalidCommandPayload(
+      "definition.scopeSheetId",
+      definition.scopeSheetId,
+    );
   const duplicate = [...workbook.definedNames.values()].find(
     (item) =>
       item.id !== definition.id &&
       item.scopeSheetId === definition.scopeSheetId &&
       item.name.toUpperCase() === definition.name.toUpperCase(),
   );
-  if (duplicate) throw invalidCommandPayload("definition.name", definition.name);
+  if (duplicate)
+    throw invalidCommandPayload("definition.name", definition.name);
   const previous = workbook.definedNames.get(definition.id);
+  if (previous && previous.scopeSheetId !== definition.scopeSheetId) {
+    throw invalidCommandPayload(
+      "definition.scopeSheetId",
+      definition.scopeSheetId,
+    );
+  }
+  if (
+    !command.formulaSources &&
+    previous !== undefined &&
+    previous.scopeSheetId === undefined &&
+    previous.name.toUpperCase() !== definition.name.toUpperCase() &&
+    [...workbook.definedNames.values()].some(
+      (item) =>
+        item.scopeSheetId !== undefined &&
+        item.name.toUpperCase() === definition.name.toUpperCase(),
+    )
+  ) {
+    throw invalidCommandPayload("definition.name", definition.name);
+  }
+  const previousFormulaSources = command.formulaSources
+    ? captureFormulaSources(workbook, command.formulaSources)
+    : undefined;
   workbook.definedNames.set(definition.id, cloneDefinedName(definition));
-  return previous
-    ? { type: "upsertDefinedName", definition: cloneDefinedName(previous) }
-    : { type: "deleteDefinedName", id: definition.id };
+  const formulaSources = command.formulaSources
+    ? restoreFormulaSources(workbook, command.formulaSources)
+    : previous && previous.scopeSheetId === definition.scopeSheetId
+      ? renameDefinedNameReferences(workbook, previous, definition)
+      : [];
+  const inverseFormulaSources = command.formulaSources
+    ? previousFormulaSources
+    : formulaSources;
+  if (previous) {
+    return {
+      type: "upsertDefinedName",
+      definition: cloneDefinedName(previous),
+      ...(inverseFormulaSources?.length
+        ? { formulaSources: inverseFormulaSources }
+        : {}),
+    };
+  }
+  return { type: "deleteDefinedName", id: definition.id };
+}
+
+/**
+ * Formula source retains the spelling of a defined name, so a rename needs to
+ * update identifier expressions that resolved to the renamed definition.
+ * Parsing first deliberately avoids changing text inside strings or function
+ * names that merely contain the former name.
+ */
+function renameDefinedNameReferences(
+  workbook: Workbook,
+  previous: DefinedName,
+  definition: DefinedName,
+): FormulaSourceRestore[] {
+  if (previous.name === definition.name) return [];
+  const previousName = previous.name.toUpperCase();
+  const formulaSources: FormulaSourceRestore[] = [];
+
+  for (const sheet of workbook.sheets.values()) {
+    if (
+      previous.scopeSheetId !== undefined &&
+      sheet.id !== previous.scopeSheetId
+    )
+      continue;
+    if (
+      previous.scopeSheetId === undefined &&
+      [...workbook.definedNames.values()].some(
+        (item) =>
+          item.scopeSheetId === sheet.id &&
+          item.name.toUpperCase() === previousName,
+      )
+    ) {
+      continue;
+    }
+    for (const [key, cell] of sheet.cells) {
+      if (cell.content?.kind !== "formula") continue;
+      const source = renameFormulaIdentifiers(
+        cell.content.formula.source,
+        previousName,
+        definition.name,
+      );
+      if (source !== cell.content.formula.source) {
+        const [rowText, columnText] = key.split(":");
+        const row = Number(rowText);
+        const column = Number(columnText);
+        formulaSources.push({
+          sheetId: sheet.id,
+          address: { row, column },
+          source: cell.content.formula.source,
+        });
+        setCellContent(
+          sheet,
+          { row, column },
+          { kind: "formula", formula: { source } },
+        );
+      }
+    }
+  }
+  return formulaSources;
+}
+
+function captureFormulaSources(
+  workbook: Workbook,
+  formulaSources: readonly FormulaSourceRestore[],
+): FormulaSourceRestore[] {
+  assertFormulaSources(formulaSources);
+  return formulaSources.map((formula) => {
+    const sheet = workbook.sheets.get(formula.sheetId);
+    const source = sheet?.cells.get(
+      `${formula.address.row}:${formula.address.column}`,
+    )?.content;
+    if (!sheet || source?.kind !== "formula") {
+      throw invalidCommandPayload("formulaSources", formula);
+    }
+    return {
+      sheetId: formula.sheetId,
+      address: { ...formula.address },
+      source: source.formula.source,
+    };
+  });
+}
+
+function restoreFormulaSources(
+  workbook: Workbook,
+  formulaSources: readonly FormulaSourceRestore[],
+): FormulaSourceRestore[] {
+  assertFormulaSources(formulaSources);
+  const captured = captureFormulaSources(workbook, formulaSources);
+  for (const formula of formulaSources) {
+    const sheet = workbook.sheets.get(formula.sheetId);
+    if (!sheet) throw invalidCommandPayload("formulaSources", formula);
+    setCellContent(sheet, formula.address, {
+      kind: "formula",
+      formula: { source: formula.source },
+    });
+  }
+  return captured;
+}
+
+function assertFormulaSources(
+  formulaSources: readonly FormulaSourceRestore[],
+): void {
+  for (const formula of formulaSources) {
+    if (
+      !formula ||
+      typeof formula.sheetId !== "string" ||
+      !formula.address ||
+      !Number.isInteger(formula.address.row) ||
+      !Number.isInteger(formula.address.column) ||
+      typeof formula.source !== "string" ||
+      !formula.source.startsWith("=")
+    ) {
+      throw invalidCommandPayload("formulaSources", formula);
+    }
+  }
+}
+
+function renameFormulaIdentifiers(
+  source: string,
+  previousName: string,
+  nextName: string,
+): string {
+  const ast = getFormulaAst(source);
+  if (!ast) return source;
+  const replacements: Array<{ start: number; end: number }> = [];
+  const visit = (expression: FormulaExpression): void => {
+    switch (expression.kind) {
+      case "identifier":
+        if (expression.name.toUpperCase() === previousName) {
+          replacements.push({ start: expression.start, end: expression.end });
+        }
+        return;
+      case "unary":
+        visit(expression.operand);
+        return;
+      case "binary":
+        visit(expression.left);
+        visit(expression.right);
+        return;
+      case "function":
+        expression.args.forEach(visit);
+        return;
+      default:
+        return;
+    }
+  };
+  visit(ast.expression);
+  return replacements
+    .sort((left, right) => right.start - left.start)
+    .reduce(
+      (result, replacement) =>
+        `${result.slice(0, replacement.start)}${nextName}${result.slice(replacement.end)}`,
+      source,
+    );
 }
 
 export function applyDeleteDefinedNameCommand(
@@ -115,7 +331,9 @@ function cloneDefinedName(definition: DefinedName): DefinedName {
   return {
     id: definition.id,
     name: definition.name,
-    ...(definition.scopeSheetId ? { scopeSheetId: definition.scopeSheetId } : {}),
+    ...(definition.scopeSheetId
+      ? { scopeSheetId: definition.scopeSheetId }
+      : {}),
     reference: {
       sheetId: definition.reference.sheetId,
       start: { ...definition.reference.start },

@@ -4,6 +4,8 @@ import {
   createDeleteSheetAxisCommand,
   createRenameSheetCommand,
 } from "../../commands/index.js";
+import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
+import { createTestWorkbookSession } from "../helpers.js";
 import {
   createSheet,
   createWorkbookEvaluator,
@@ -63,4 +65,32 @@ describe("workbook formula reference rewrites", () => {
     expect(sheet.cells.get("1:0")?.content).toMatchObject({ formula: { source: "='Bob''s'!A1" } });
     expect(createWorkbookEvaluator(workbook, sheet.id).getComputedValue({ row: 1, column: 0 })).toBe(4);
   });
+});
+
+test("renaming through history restores only formulas actually transformed", () => {
+  const session = createTestWorkbookSession();
+  const sheet = getActiveSheet(session.workbook);
+  const data = createSheet("Data", "data");
+  insertSheet(session.workbook, data);
+  setCellContent(data, { row: 0, column: 0 }, { kind: "literal", value: 2 });
+  setCellContent(sheet, { row: 0, column: 0 }, {
+    kind: "formula",
+    formula: { source: "=Data!A1" },
+  });
+  setCellContent(sheet, { row: 1, column: 0 }, {
+    kind: "formula",
+    formula: { source: "=Next!A1" },
+  });
+
+  expect(executeWorkbookCommand(session, createRenameSheetCommand(data.id, "Next"))).toBe(true);
+  expect(sheet.cells.get("0:0")?.content).toMatchObject({ formula: { source: "=Next!A1" } });
+  expect(sheet.cells.get("1:0")?.content).toMatchObject({ formula: { source: "=Next!A1" } });
+
+  expect(undoWorkbookCommand(session)).toBe(true);
+  expect(sheet.cells.get("0:0")?.content).toMatchObject({ formula: { source: "=Data!A1" } });
+  expect(sheet.cells.get("1:0")?.content).toMatchObject({ formula: { source: "=Next!A1" } });
+
+  expect(redoWorkbookCommand(session)).toBe(true);
+  expect(sheet.cells.get("0:0")?.content).toMatchObject({ formula: { source: "=Next!A1" } });
+  expect(sheet.cells.get("1:0")?.content).toMatchObject({ formula: { source: "=Next!A1" } });
 });
