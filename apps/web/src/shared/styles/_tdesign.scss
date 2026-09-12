@@ -217,6 +217,15 @@
   --td-comp-size-s: 24px;
 }
 
+.t-select__wrap .t-input:not(.t-size-s, .t-size-l) .t-tag {
+  --td-comp-size-xs: 20px;
+}
+
+// Action options keep the same label alignment as selectable options.
+.idea-select-option--action .t-checkbox__input {
+  visibility: hidden;
+}
+
 // Custom panel selects render the selected preview across the input's value area.
 // SelectInput places valueDisplay in its prefix; the native input remains focusable.
 .idea-panel-select .t-input {

@@ -82,7 +82,13 @@ const filteredRanges = computed<NameTableRow[]>(() => {
 const filterOptions = computed(() => [
   {
     group: "",
-    children: [{ value: "clear", label: t("formulaTools.clearNameFilters") }],
+    children: [
+      {
+        value: "clear",
+        label: t("formulaTools.clearNameFilters"),
+        class: "idea-select-option--action",
+      },
+    ],
   },
   {
     group: "",
@@ -367,7 +373,7 @@ watch(
     min-width: 100px;
   }
   &__filter {
-    width: 190px;
+    width: 260px;
     flex-shrink: 0;
   }
   &__reference {
