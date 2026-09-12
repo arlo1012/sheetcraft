@@ -182,9 +182,5 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
   &__range-picker:hover {
     --td-bg-color-container-hover: transparent;
   }
-
-  &__form {
-    --td-comp-margin-xxl: var(--idea-space-4);
-  }
 }
 </style>
