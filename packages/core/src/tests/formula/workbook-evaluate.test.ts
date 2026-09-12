@@ -51,6 +51,33 @@ describe("sheet formula evaluation", () => {
     expect(getCellComputedValue(sheet, { row: 0, column: 11 })).toBe(7);
   });
 
+  test("projects dynamic arrays without persisting synthetic cells", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "formula", formula: { source: "=SEQUENCE(2,2)" } });
+    const evaluator = createSheetEvaluator(sheet);
+    expect(evaluator.getComputedValue({ row: 1, column: 1 })).toBe(4);
+    expect(evaluator.getComputedValue({ row: 0, column: 0 })).toBe(1);
+    expect(getCellContent(sheet, { row: 1, column: 1 })).toBeNull();
+    expect([...evaluator.getSpillProjections!()]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ address: { row: 1, column: 1 }, root: { row: 0, column: 0 }, value: 4 }),
+    ]));
+  });
+
+  test("returns SPILL when a dynamic result would overwrite content", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "formula", formula: { source: "=SEQUENCE(2)" } });
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: 9 });
+    const result = getCellComputedValue(sheet, { row: 0, column: 0 });
+    expect(isFormulaError(result) && result.code).toBe("SPILL");
+  });
+
+  test("uses sparse traversal for whole-axis references", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellContent(sheet, { row: 900_000, column: 0 }, { kind: "literal", value: 5 });
+    setCellContent(sheet, { row: 0, column: 1 }, { kind: "formula", formula: { source: "=SUM(A:A)" } });
+    expect(getCellComputedValue(sheet, { row: 0, column: 1 })).toBe(5);
+  });
+
   test("returns parse errors and propagates dependency errors", () => {
     const sheet = getActiveSheet(createTestWorkbook());
     setCellContent(sheet, { row: 0, column: 0 }, { kind: "formula", formula: { source: "=SUM(" } });
