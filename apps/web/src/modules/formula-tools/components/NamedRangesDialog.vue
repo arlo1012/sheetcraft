@@ -45,7 +45,7 @@ const props = withDefaults(
 );
 const emit = defineEmits<{
   close: [];
-  save: [row: NamedRangeDraft];
+  save: [row: NamedRangeDraft, onSaved?: (id: string) => void];
   delete: [id: string];
 }>();
 const { t } = useAppI18n();
@@ -166,6 +166,13 @@ function editRange(range = selectedRange.value): void {
 function editRow({ row }: RowEventContext<TableRowData>): void {
   const range = props.ranges.find((range) => range.id === row.id);
   if (range) editRange(range);
+}
+function saveEditor(draft: NamedRangeDraft): void {
+  emit("save", draft, (id) => {
+    editorDraft.value = undefined;
+    clearFilters();
+    selectedId.value = id;
+  });
 }
 function remove(): void {
   if (!selectedId.value) return;
@@ -338,7 +345,7 @@ watch(
     :suspended="suspended"
     :select-reference="selectReference"
     @close="editorDraft = undefined"
-    @save="emit('save', $event)"
+    @save="saveEditor"
   />
 </template>
 
