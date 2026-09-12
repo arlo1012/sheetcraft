@@ -312,8 +312,11 @@ defineExpose({
     return formulaAssistRef.value?.editingFormula ?? false;
   },
   canPickReference: () => formulaAssistRef.value?.canPickReference() ?? false,
-  pickReference: (range: CellRange, phase: "start" | "update" | "end") =>
-    formulaAssistRef.value?.pickReference(range, phase) ?? false,
+  pickReference: (
+    range: CellRange,
+    phase: "start" | "update" | "end",
+    rangeKind?: "row-axis" | "column-axis" | "cells",
+  ) => formulaAssistRef.value?.pickReference(range, phase, rangeKind) ?? false,
   get referenceActive() {
     return formulaFocused.value && (formulaAssistRef.value?.referenceActive ?? false);
   },

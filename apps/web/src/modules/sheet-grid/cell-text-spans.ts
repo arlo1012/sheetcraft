@@ -18,6 +18,8 @@ export function createCellTextSpanResolver(
   sheet: Sheet,
   isMerged: (address: CellAddress) => boolean,
   columnCount = MAX_SHEET_COLUMNS,
+  isOccupied: (address: CellAddress) => boolean = (address) =>
+    Boolean(getCellContent(sheet, address)),
 ): (address: CellAddress) => CellTextSpan | undefined {
   const cache = new Map<string, CellTextSpan | undefined>();
   return (address) => {
@@ -26,7 +28,7 @@ export function createCellTextSpanResolver(
     const kind = getCellStyle(sheet, address)?.horizontalAlign;
     if ((kind !== "fill" && kind !== "centerContinuous") || isMerged(address)) return undefined;
     let column = address.column;
-    while (column > 0 && !getCellContent(sheet, { row: address.row, column })) {
+    while (column > 0 && !isOccupied({ row: address.row, column })) {
       const previous = { row: address.row, column: column - 1 };
       if (getCellStyle(sheet, previous)?.horizontalAlign !== kind || isMerged(previous)) break;
       column -= 1;
@@ -36,11 +38,7 @@ export function createCellTextSpanResolver(
     let end = column;
     while (end + 1 < columnCount) {
       const next = { row: address.row, column: end + 1 };
-      if (
-        getCellContent(sheet, next) ||
-        getCellStyle(sheet, next)?.horizontalAlign !== kind ||
-        isMerged(next)
-      )
+      if (isOccupied(next) || getCellStyle(sheet, next)?.horizontalAlign !== kind || isMerged(next))
         break;
       end += 1;
     }

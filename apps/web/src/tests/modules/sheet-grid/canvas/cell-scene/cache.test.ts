@@ -83,6 +83,28 @@ describe("Canvas cell presentation cache", () => {
     expect(after).not.toBe(before);
   });
 
+  test("renders dynamic-array projections without persisting spill cells", () => {
+    const { sheet, render } = fixture();
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=SEQUENCE(2)" } },
+    );
+    const before = render();
+    expect(cell(before, 0, 0).content.text).toBe("1");
+    expect(cell(before, 1, 0).content.text).toBe("2");
+    expect(cell(render({ y: 24 }), 1, 0).content.text).toBe("2");
+    expect(sheet.cells.has("1:0")).toBe(false);
+
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=SEQUENCE(3)" } },
+    );
+    expect(cell(render(), 2, 0).content.text).toBe("3");
+    expect(sheet.cells.has("2:0")).toBe(false);
+  });
+
   test("updates changed styles, locale and loaded font metrics", () => {
     const { sheet, measure, render } = fixture();
     setCellValue(sheet, { row: 0, column: 0 }, 12.5);

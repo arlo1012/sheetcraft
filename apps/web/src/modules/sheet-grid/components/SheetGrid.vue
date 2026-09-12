@@ -269,7 +269,20 @@ let fontLoadingDoneListener: (() => void) | undefined;
 const autoRowHeightCalculator = markRaw(createAutoRowHeightCalculator(browserCellTextMeasurer));
 const defaultFontFamily = ref(DEFAULT_CELL_FONT_FAMILY);
 const fontMetricsVersion = ref(0);
-const contentExtent = computed(() => getSheetContentExtent(props.sheet));
+const contentExtent = computed(() => {
+  const extent = getSheetContentExtent(props.sheet);
+  const evaluator = createSheetEvaluator(props.sheet);
+  for (const [key, cell] of props.sheet.cells) {
+    if (cell.content?.kind !== "formula") continue;
+    const [row, column] = key.split(":").map(Number);
+    if (row !== undefined && column !== undefined) evaluator.getComputedValue({ row, column });
+  }
+  for (const projection of evaluator.getSpillProjections?.() ?? []) {
+    extent.rowCount = Math.max(extent.rowCount, projection.address.row + 1);
+    extent.columnCount = Math.max(extent.columnCount, projection.address.column + 1);
+  }
+  return extent;
+});
 const {
   dimensionResize,
   request: requestDimensionResize,
@@ -646,7 +659,13 @@ const formulaReferenceGroups = computed<readonly FormulaReferenceOverlayGroup[]>
   return [...groups.values()].map(({ token, active }) => ({
     key: token.key,
     colorIndex: token.colorIndex,
-    rects: layout.value.getRangeFragments(token.range),
+    rects: layout.value.getRangeFragments({
+      start: token.range.start,
+      end: {
+        row: Math.min(token.range.end.row, geometry.value.rowCount - 1),
+        column: Math.min(token.range.end.column, geometry.value.columnCount - 1),
+      },
+    }),
     active,
   }));
 });
@@ -1196,11 +1215,43 @@ function selectAxis(
 }
 
 function onColumnHeaderSelect(payload: { column: number; shiftKey: boolean }): void {
+  if (pickAxisReference("columns", { row: 0, column: payload.column }, payload.shiftKey)) return;
   selectAxis("columns", { row: 0, column: payload.column }, payload.shiftKey);
 }
 
 function onRowHeaderSelect(payload: { row: number; shiftKey: boolean }): void {
+  if (pickAxisReference("rows", { row: payload.row, column: 0 }, payload.shiftKey)) return;
   selectAxis("rows", { row: payload.row, column: 0 }, payload.shiftKey);
+}
+
+function pickAxisReference(
+  mode: "rows" | "columns",
+  address: CellAddress,
+  shiftKey: boolean,
+): boolean {
+  const editor = getReferenceEditor();
+  if (!editor || isComposing.value) return false;
+  const previous = editor.referenceActive ? editor.referenceRange : null;
+  const next =
+    shiftKey && previous
+      ? extendAxisSelection(
+          createAxisSelection(mode, {
+            row: previous.start.row,
+            column: previous.start.column,
+          }),
+          mode,
+          address,
+        )
+      : createAxisSelection(mode, address);
+  const range = getSelectionRange(next);
+  const rangeKind = mode === "rows" ? "row-axis" : "column-axis";
+  if (!editor.pickReference(range, "start", rangeKind)) return false;
+  formulaReferenceRange.value = range;
+  axisContextMenu.value = undefined;
+  cellContextMenu.value = undefined;
+  stopDragSelection();
+  stopFormulaReferenceDrag();
+  return true;
 }
 
 function isAxisIndexSelected(axis: SheetDimensionAxis, index: number): boolean {

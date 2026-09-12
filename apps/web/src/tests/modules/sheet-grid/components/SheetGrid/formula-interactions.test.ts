@@ -138,4 +138,28 @@ describe("SheetGrid formula drafting", () => {
       "2",
     ]);
   });
+
+  test("uses row and column headers as whole-axis references without ending the draft", async () => {
+    const { wrapper } = mountSheetGrid();
+    const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
+    await editor.trigger("keydown", { key: "=" });
+    await editor.setValue("=SUM(");
+
+    await wrapper.get('[data-select-column="1"]').trigger("mousedown", { button: 0 });
+    expect(editor.element.value).toBe("=SUM(B:B");
+    expect(activeCell(wrapper)).toBe("A1");
+
+    await wrapper.get('[data-select-column="3"]').trigger("mousedown", {
+      button: 0,
+      shiftKey: true,
+    });
+    expect(editor.element.value).toBe("=SUM(B:D");
+    expect(activeCell(wrapper)).toBe("A1");
+
+    await wrapper.get('[data-select-row="2"]').trigger("mousedown", { button: 0 });
+    expect(editor.element.value).toBe("=SUM(3:3");
+    await wrapper.get('[data-select-row="4"]').trigger("mousedown", { button: 0, shiftKey: true });
+    expect(editor.element.value).toBe("=SUM(3:5");
+    expect(activeCell(wrapper)).toBe("A1");
+  });
 });
