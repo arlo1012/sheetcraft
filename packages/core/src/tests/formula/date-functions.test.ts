@@ -30,6 +30,20 @@ describe("date function bounds", () => {
     );
   });
 
+  test("rejects out-of-range serial dates without throwing or scanning", () => {
+    expect(evaluateFormula("=YEARFRAC(99999999,1)", resolver)).toEqual(createFormulaError("NUM"));
+    expect(evaluateFormula("=WEEKNUM(99999999)", resolver)).toEqual(createFormulaError("NUM"));
+    expect(evaluateFormula("=NETWORKDAYS(99999999,1)", resolver)).toEqual(
+      createFormulaError("NUM"),
+    );
+    expect(evaluateFormula("=WORKDAY(DATE(9999,12,31),1)", resolver)).toEqual(
+      createFormulaError("NUM"),
+    );
+    expect(evaluateFormula("=WORKDAY(DATE(1900,1,1),100000000)", resolver)).toEqual(
+      createFormulaError("NUM"),
+    );
+  });
+
   test("uses a local clock when no deterministic clock is injected", () => {
     expect(typeof evaluateFormula("=TODAY()", resolver)).toBe("number");
     expect(typeof evaluateFormula("=NOW()", resolver)).toBe("number");

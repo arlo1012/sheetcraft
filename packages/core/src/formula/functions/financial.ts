@@ -94,7 +94,8 @@ function rate(
   type: number,
   guess: number,
 ): FormulaValue {
-  if (periods <= 0 || guess <= -1) return formulaError("NUM");
+  if (periods <= 0 || guess <= -1 || (payment === 0 && present * future >= 0))
+    return formulaError("NUM");
   let current = guess;
   const cashFlow = (value: number) => {
     if (value <= -1) return Number.NaN;
@@ -107,16 +108,43 @@ function rate(
           : Math.expm1(periods * Math.log1p(value)) / value;
     return present * growth + payment * (1 + value * type) * annuity + future;
   };
+  const tolerance =
+    1e-10 * (Math.abs(present) + Math.abs(future) + Math.abs(payment) * periods + 1);
+  let lower = -0.999999999;
+  let upper = Math.max(guess, 0.1);
+  let lowerResult = cashFlow(lower);
+  let upperResult = cashFlow(upper);
+  for (let attempt = 0; lowerResult * upperResult > 0 && attempt < 100; attempt += 1) {
+    upper = upper * 2 + 0.1;
+    upperResult = cashFlow(upper);
+  }
+  if (
+    !Number.isFinite(lowerResult) ||
+    !Number.isFinite(upperResult) ||
+    lowerResult * upperResult > 0
+  )
+    return formulaError("NUM");
+  if (Math.abs(lowerResult) <= tolerance) return lower;
+  if (Math.abs(upperResult) <= tolerance) return upper;
+  if (current <= lower || current >= upper) current = (lower + upper) / 2;
   for (let iteration = 0; iteration < 100; iteration += 1) {
     const result = cashFlow(current);
-    if (Math.abs(result) < 1e-10) return current;
+    if (Math.abs(result) <= tolerance) return current;
     const h = Math.max(1e-7, Math.abs(current) * 1e-6);
     const derivative = (cashFlow(current + h) - cashFlow(current - h)) / (2 * h);
-    if (!Number.isFinite(result) || !Number.isFinite(derivative) || derivative === 0)
-      return formulaError("NUM");
-    const next = current - result / derivative;
-    if (next <= -1 || !Number.isFinite(next)) return formulaError("NUM");
-    if (Math.abs(next - current) < 1e-10) return next;
+    if (!Number.isFinite(result)) return formulaError("NUM");
+    if (result * lowerResult > 0) {
+      lower = current;
+      lowerResult = result;
+    } else {
+      upper = current;
+      upperResult = result;
+    }
+    const newton =
+      Number.isFinite(derivative) && derivative !== 0 ? current - result / derivative : Number.NaN;
+    const next =
+      Number.isFinite(newton) && newton > lower && newton < upper ? newton : (lower + upper) / 2;
+    if (Math.abs(next - current) < 1e-12) return next;
     current = next;
   }
   return formulaError("NUM");
@@ -143,6 +171,18 @@ function rangeNumbers(
     const number = finiteNumber(item);
     if (isFormulaError(number)) return number;
     result.push(number);
+  }
+  return result;
+}
+
+function irrNumbers(
+  context: FormulaFunctionContext,
+  index: number,
+): number[] | ReturnType<typeof formulaError> {
+  const result: number[] = [];
+  for (const value of values(context.evaluateArgument(index))) {
+    if (isFormulaError(value)) return value;
+    if (typeof value === "number" && Number.isFinite(value)) result.push(value);
   }
   return result;
 }
@@ -256,8 +296,10 @@ function cumulativePayment(
   interestOnly: boolean,
 ): FormulaValue {
   if (
+    rateValue <= 0 ||
     !Number.isInteger(periods) ||
     periods <= 0 ||
+    present <= 0 ||
     !Number.isInteger(start) ||
     !Number.isInteger(end) ||
     start < 1 ||
@@ -577,7 +619,7 @@ export const FINANCIAL_FUNCTIONS = [
       lazy: false,
     },
     (context) => {
-      const cashflows = rangeNumbers(context, 0);
+      const cashflows = irrNumbers(context, 0);
       const guess = context.argumentCount === 1 ? 0.1 : number(context, 1);
       return isFormulaError(cashflows)
         ? cashflows

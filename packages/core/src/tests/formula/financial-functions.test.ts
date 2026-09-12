@@ -40,6 +40,7 @@ describe("expanded financial functions", () => {
     expect(evaluateFormula("=RATE(10,-100,1000,0,0,0)", resolver)).toBe(0);
     expect(evaluateFormula("=RATE(10,-110,1000)>0", resolver)).toBe(true);
     expect(evaluateFormula("=RATE(10,-90,1000)<0", resolver)).toBe(true);
+    expect(evaluateFormula("=RATE(10,0,1000)", resolver)).toEqual(createFormulaError("NUM"));
     expect(evaluateFormula("=RATE(10,0,1000,1000)", resolver)).toEqual(createFormulaError("NUM"));
   });
 
@@ -50,6 +51,19 @@ describe("expanded financial functions", () => {
     };
     expect(evaluateFormula("=IRR(A1:C1)", cashflowResolver)).toBeCloseTo(0.130662, 5);
     expect(evaluateFormula("=MIRR(A1:C1,10%,12%)", cashflowResolver)).toBeCloseTo(0.12783, 4);
+  });
+
+  test("ignores nonnumeric IRR range entries but preserves formula errors", () => {
+    const sparseCashflowResolver: FormulaEvaluationResolver = {
+      resolveCell: () => null,
+      resolveRange: () => [-100, null, "note", true, 60, 60],
+    };
+    expect(evaluateFormula("=IRR(A1:F1)", sparseCashflowResolver)).toBeCloseTo(0.130662, 5);
+    const errorCashflowResolver: FormulaEvaluationResolver = {
+      resolveCell: () => null,
+      resolveRange: () => [-100, createFormulaError("NA"), 60, 60],
+    };
+    expect(evaluateFormula("=IRR(A1:D1)", errorCashflowResolver)).toEqual(createFormulaError("NA"));
   });
 
   test("discounts dated cash flows", () => {
@@ -90,5 +104,14 @@ describe("expanded financial functions", () => {
   test("accumulates interest and principal across payment periods", () => {
     expect(evaluateFormula("=CUMIPMT(1%,12,1000,1,1,0)", resolver)).toBeCloseTo(-10, 8);
     expect(evaluateFormula("=CUMPRINC(1%,12,1000,1,1,0)", resolver)).toBeCloseTo(-78.8488, 3);
+    expect(evaluateFormula("=CUMIPMT(0,12,1000,1,1,0)", resolver)).toEqual(
+      createFormulaError("NUM"),
+    );
+    expect(evaluateFormula("=CUMIPMT(1%,0,1000,1,1,0)", resolver)).toEqual(
+      createFormulaError("NUM"),
+    );
+    expect(evaluateFormula("=CUMPRINC(1%,12,0,1,1,0)", resolver)).toEqual(
+      createFormulaError("NUM"),
+    );
   });
 });

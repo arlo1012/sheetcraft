@@ -99,13 +99,11 @@ function shiftedMonth(context: FormulaFunctionContext, endOfMonth: boolean): For
 }
 
 function weekday(context: FormulaFunctionContext): FormulaValue {
-  const value = number(context, 0);
+  const value = serialDay(context, 0);
   const returnType = context.argumentCount === 1 ? 1 : whole(context, 1);
   if (isFormulaError(value) || isFormulaError(returnType))
     return isFormulaError(value) ? value : returnType;
-  const serialDay = Math.floor(value);
-  if (serialDay < 0) return formulaError("NUM");
-  const sundayZero = (((serialDay + (system(context) === "1900" ? 6 : 5)) % 7) + 7) % 7;
+  const sundayZero = (((value + (system(context) === "1900" ? 6 : 5)) % 7) + 7) % 7;
   if (returnType === 1) return sundayZero + 1;
   if (returnType === 2 || returnType === 11) return ((sundayZero + 6) % 7) + 1;
   if (returnType === 3) return (sundayZero + 6) % 7;
@@ -136,7 +134,12 @@ function serialDay(
   const value = number(context, index);
   if (isFormulaError(value)) return value;
   const day = Math.floor(value);
-  return day < 0 ? formulaError("NUM") : day;
+  try {
+    excelSerialToDateParts(day, system(context));
+    return day;
+  } catch {
+    return formulaError("NUM");
+  }
 }
 
 function sundayZero(day: number, context: FormulaFunctionContext): number {
@@ -153,15 +156,16 @@ function holidays(
       if (value === null) continue;
       const date = finiteNumber(value);
       if (isFormulaError(date)) return date;
-      result.add(Math.floor(date));
+      const day = Math.floor(date);
+      try {
+        excelSerialToDateParts(day, system(context));
+      } catch {
+        return formulaError("NUM");
+      }
+      result.add(day);
     }
   }
   return result;
-}
-
-function isWeekend(day: number, context: FormulaFunctionContext): boolean {
-  const weekday = sundayZero(day, context);
-  return weekday === 0 || weekday === 6;
 }
 
 function weekendDays(
@@ -188,6 +192,59 @@ function isWeekendIntl(
   weekend: ReadonlySet<number>,
 ): boolean {
   return weekend.has(sundayZero(day, context));
+}
+
+function businessDays(
+  start: number,
+  end: number,
+  context: FormulaFunctionContext,
+  weekend: ReadonlySet<number>,
+  offDays: ReadonlySet<number>,
+): number {
+  const direction = start <= end ? 1 : -1;
+  const first = Math.min(start, end);
+  const last = Math.max(start, end);
+  const span = last - first + 1;
+  const completeWeeks = Math.floor(span / 7);
+  let total = completeWeeks * (7 - weekend.size);
+  for (let day = first + completeWeeks * 7; day <= last; day += 1)
+    if (!isWeekendIntl(day, context, weekend)) total += 1;
+  for (const day of offDays)
+    if (day >= first && day <= last && !isWeekendIntl(day, context, weekend)) total -= 1;
+  return direction * total;
+}
+
+function workdayResult(
+  start: number,
+  count: number,
+  context: FormulaFunctionContext,
+  weekend: ReadonlySet<number>,
+  offDays: ReadonlySet<number>,
+): FormulaValue {
+  const direction = count < 0 ? -1 : 1;
+  let remaining = Math.abs(count);
+  let day = start;
+  const workingDaysPerWeek = 7 - weekend.size;
+  if (offDays.size === 0 && remaining >= workingDaysPerWeek) {
+    const weeks = Math.floor(remaining / workingDaysPerWeek);
+    day += direction * weeks * 7;
+    remaining -= weeks * workingDaysPerWeek;
+  }
+  while (remaining > 0) {
+    day += direction;
+    try {
+      excelSerialToDateParts(day, system(context));
+    } catch {
+      return formulaError("NUM");
+    }
+    if (!isWeekendIntl(day, context, weekend) && !offDays.has(day)) remaining -= 1;
+  }
+  try {
+    excelSerialToDateParts(day, system(context));
+    return day;
+  } catch {
+    return formulaError("NUM");
+  }
 }
 
 function days360(start: ExcelDateParts, end: ExcelDateParts, european: boolean): number {
@@ -289,11 +346,7 @@ export const DATE_FUNCTIONS = [
       if (isFormulaError(end)) return end;
       if (isFormulaError(weekend)) return weekend;
       if (isFormulaError(offDays)) return offDays;
-      const direction = start <= end ? 1 : -1;
-      let result = 0;
-      for (let day = start; direction > 0 ? day <= end : day >= end; day += direction)
-        if (!isWeekendIntl(day, context, weekend) && !offDays.has(day)) result += direction;
-      return result;
+      return businessDays(start, end, context, weekend, offDays);
     },
   ),
   defineFunction(
@@ -319,15 +372,7 @@ export const DATE_FUNCTIONS = [
       if (isFormulaError(count)) return count;
       if (isFormulaError(weekend)) return weekend;
       if (isFormulaError(offDays)) return offDays;
-      const direction = count < 0 ? -1 : 1;
-      let remaining = Math.abs(count);
-      let day = start;
-      while (remaining > 0) {
-        day += direction;
-        if (day < 0 || day > 2_958_465) return formulaError("NUM");
-        if (!isWeekendIntl(day, context, weekend) && !offDays.has(day)) remaining -= 1;
-      }
-      return day;
+      return workdayResult(start, count, context, weekend, offDays);
     },
   ),
   defineFunction(
@@ -507,11 +552,7 @@ export const DATE_FUNCTIONS = [
       if (isFormulaError(start)) return start;
       if (isFormulaError(end)) return end;
       if (isFormulaError(offDays)) return offDays;
-      const direction = start <= end ? 1 : -1;
-      let result = 0;
-      for (let day = start; direction > 0 ? day <= end : day >= end; day += direction)
-        if (!isWeekend(day, context) && !offDays.has(day)) result += direction;
-      return result;
+      return businessDays(start, end, context, new Set([0, 6]), offDays);
     },
   ),
   defineFunction(
@@ -530,15 +571,7 @@ export const DATE_FUNCTIONS = [
       if (isFormulaError(start)) return start;
       if (isFormulaError(count)) return count;
       if (isFormulaError(offDays)) return offDays;
-      const direction = count < 0 ? -1 : 1;
-      let remaining = Math.abs(count);
-      let day = start;
-      while (remaining > 0) {
-        day += direction;
-        if (day < 0 || day > 2_958_465) return formulaError("NUM");
-        if (!isWeekend(day, context) && !offDays.has(day)) remaining -= 1;
-      }
-      return day;
+      return workdayResult(start, count, context, new Set([0, 6]), offDays);
     },
   ),
   defineFunction(
