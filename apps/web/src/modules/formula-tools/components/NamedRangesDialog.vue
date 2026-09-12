@@ -14,6 +14,7 @@ import type {
 } from "tdesign-vue-next/es/table/type";
 import { useAppI18n } from "../../../shared/i18n";
 import type { NamedRangeDraft, NamedRangeRow, NamedRangeSheet } from "../named-range-types";
+import TableHeightWrapper from "./TableHeightWrapper.vue";
 import NamedRangeEditorDialog from "./NamedRangeEditorDialog.vue";
 
 type NameTableRow = NamedRangeRow & { scopeLabel: string };
@@ -184,25 +185,28 @@ watch(
           data-name-filter
         />
       </div>
-      <TTable
-        class="named-ranges-dialog__table"
-        row-key="id"
-        :data="filteredRanges"
-        :columns="columns"
-        :row-attributes="rowAttributes"
-        :active-row-keys="selectedId ? [selectedId] : []"
-        active-row-type="single"
-        :disable-space-inactive-row="true"
-        size="small"
-        table-layout="fixed"
-        height="min(330px, 42vh)"
-        bordered
-        hover
-        :empty="t('formulaTools.noNames')"
-        :aria-label="t('formulaTools.namedRanges')"
-        @active-change="selectRows"
-        @row-dblclick="editRow"
-      />
+      <TableHeightWrapper v-slot="{ height }">
+        <TTable
+          class="named-ranges-dialog__table"
+          row-key="id"
+          :data="filteredRanges"
+          :columns="columns"
+          :row-attributes="rowAttributes"
+          :active-row-keys="selectedId ? [selectedId] : []"
+          active-row-type="single"
+          :disable-space-inactive-row="true"
+          size="small"
+          table-layout="fixed"
+          :height="height"
+          :bordered="false"
+          resizable
+          hover
+          :empty="t('formulaTools.noNames')"
+          :aria-label="t('formulaTools.namedRanges')"
+          @active-change="selectRows"
+          @row-dblclick="editRow"
+        />
+      </TableHeightWrapper>
       <div
         class="named-ranges-dialog__reference"
         role="group"
@@ -263,6 +267,9 @@ watch(
 .named-ranges-dialog {
   &__content {
     display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: min(440px, calc(100dvh - 180px));
+    min-height: 0;
     gap: 12px;
     color: var(--idea-text-primary);
   }
