@@ -96,5 +96,7 @@ describe("database criteria", () => {
       ["1:4", ""],
     ]);
     expect(evaluateFormula('=DSUM(A1:B4,"Amount",E1:E2)', blank)).toBe(60);
+    expect(evaluateFormula("=DCOUNT(A1:B4,,E1:E2)", formulas)).toBe(2);
+    expect(evaluateFormula("=DCOUNTA(A1:B4,,E1:E2)", formulas)).toBe(2);
   });
 });

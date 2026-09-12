@@ -7,6 +7,7 @@ import {
   compareValues,
   defineFunction,
   formulaError,
+  isOmittedArgument,
   scalar,
   wildcardMatch,
 } from "./helpers.js";
@@ -81,7 +82,7 @@ function fieldIndex(
 function records(
   context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
 ):
-  | { database: Database; field: number; rows: FormulaValue[][] }
+  | { database: Database; field: number | null; rows: FormulaValue[][] }
   | ReturnType<typeof formulaError> {
   const source = matrix(context.evaluateArgument(0));
   const criteria = matrix(context.evaluateArgument(2));
@@ -92,7 +93,9 @@ function records(
   const [headers, ...data] = source;
   if (!headers || !criteria.length) return formulaError("VALUE");
   const database = { headers, rows: data };
-  const index = fieldIndex(database, field);
+  const index = isOmittedArgument(context.evaluateArgument(1))
+    ? null
+    : fieldIndex(database, field);
   if (isFormulaError(index)) return index;
   const matches = data.filter((row) => {
     for (const criterionRow of criteria.slice(1)) {
@@ -149,14 +152,18 @@ function databaseAggregate(
 ): FormulaValue {
   const result = records(context);
   if ("kind" in result) return result;
-  const values = numbers(result.rows, result.field);
+  if (result.field === null && (kind === "DCOUNT" || kind === "DCOUNTA"))
+    return result.rows.length;
+  if (result.field === null) return formulaError("VALUE");
+  const field = result.field;
+  const values = numbers(result.rows, field);
   if (!Array.isArray(values)) return values;
   if (kind === "DCOUNT") return values.length;
   if (kind === "DCOUNTA")
-    return result.rows.filter((row) => row[result.field] !== null).length;
+    return result.rows.filter((row) => row[field] !== null).length;
   if (kind === "DGET")
     return result.rows.length === 1
-      ? (result.rows[0]![result.field] ?? null)
+      ? (result.rows[0]![field] ?? null)
       : formulaError(result.rows.length ? "NUM" : "VALUE");
   if (kind === "DSUM") return values.reduce((sum, value) => sum + value, 0);
   if (kind === "DPRODUCT")
