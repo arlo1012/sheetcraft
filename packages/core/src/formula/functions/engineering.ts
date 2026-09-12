@@ -106,8 +106,9 @@ function convertBase(
   if (to === 10) return parsed;
   let requested: number | null = null;
   if (context.argumentCount === 2) {
-    requested = integer(context, 1);
-    if (isFormulaError(requested)) return requested;
+    const places = integer(context, 1);
+    if (isFormulaError(places)) return places;
+    requested = places;
   }
   return formatBase(parsed, to, requested);
 }
