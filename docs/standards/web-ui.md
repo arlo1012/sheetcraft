@@ -41,7 +41,9 @@ Use four typography levels for Web interface text. Sizes are CSS pixels at
 - List menus (statistics, alignment, commands, right-click menus)
   use **8px vertically and 0 horizontally**, via `--idea-menu-padding`. Rows own
   text/icon insets; hover and selection backgrounds span the menu width.
-- Select suggestions, tooltips, dialogs, input assists, and compact floating
+- Dialogs use **16px outer padding on all four sides**, mapped in the shared
+  TDesign adapter. Content groups own their internal spacing.
+- Select suggestions, tooltips, input assists, and compact floating
   toolbars keep their own component density.
 - TDesign `InputNumber` uses `theme="column"` and
   `idea-input-number--persistent-controls` for visible right-side controls.

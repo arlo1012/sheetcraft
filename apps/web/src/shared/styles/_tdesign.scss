@@ -245,6 +245,11 @@
   font: var(--td-font-body-small);
 }
 
+.t-dialog {
+  --td-comp-paddingTB-xxl: var(--idea-space-6);
+  --td-comp-paddingLR-xxl: var(--idea-space-6);
+}
+
 .t-dialog__header {
   font-weight: var(--idea-font-weight-semibold);
 }
@@ -268,11 +273,7 @@
   font-size: 24px;
 }
 
-// Keep the cell-format dialog inset independent from other component densities.
 .cell-format-dialog {
-  --td-comp-paddingTB-xxl: var(--idea-space-6);
-  --td-comp-paddingLR-xxl: var(--idea-space-6);
-
   // Dialog always renders a body node; let Tabs own the content layout.
   .t-dialog__body {
     display: contents;
