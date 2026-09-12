@@ -56,7 +56,6 @@ export type FormulaToolsMessageSchema = {
     definedNames: string;
     tableNames: string;
     clearNameFilters: string;
-    activeNameFilters: string;
     noMatchingNames: string;
 
     allNames: string;
@@ -67,6 +66,7 @@ export type FormulaToolsMessageSchema = {
     saveReference: string;
     close: string;
     name: string;
+    nameCannotStartWithNumber: string;
     scope: string;
     workbook: string;
     reference: string;

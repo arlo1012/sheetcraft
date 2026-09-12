@@ -35,6 +35,12 @@ const contentRef = ref<HTMLElement | null>(null);
 const workbookScopeValue = "__idea10_workbook_scope__";
 const scopePopupProps = { attach: () => contentRef.value ?? document.body };
 const draft = ref<NamedRangeDraft>({ name: "", reference: "" });
+const nameError = computed(() =>
+  /^\p{N}/u.test(draft.value.name.trim()) ? t("formulaTools.nameCannotStartWithNumber") : "",
+);
+const canSave = computed(
+  () => Boolean(draft.value.name.trim() && draft.value.reference.trim()) && !nameError.value,
+);
 
 const isEditing = computed(() => Boolean(draft.value.id));
 const header = computed(() =>
@@ -64,7 +70,7 @@ function resetDraft(): void {
 }
 
 function save(): void {
-  if (!draft.value.name.trim() || !draft.value.reference.trim()) return;
+  if (!canSave.value) return;
   emit("save", {
     ...draft.value,
     name: draft.value.name.trim(),
@@ -89,7 +95,7 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
     :header="header"
     :confirm-btn="{
       content: t('formulaTools.saveName'),
-      disabled: !draft.name.trim() || !draft.reference.trim(),
+      disabled: !canSave,
     }"
     :cancel-btn="t('formulaTools.cancel')"
     :close-on-overlay-click="false"
@@ -116,6 +122,9 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
           <TInput
             v-model="draft.name"
             :aria-label="t('formulaTools.name')"
+            :status="nameError ? 'error' : 'default'"
+            :tips="nameError"
+            :aria-invalid="Boolean(nameError)"
             data-formula-name
             autocomplete="off"
           />
@@ -155,7 +164,7 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
           <TTextarea
             v-model="draft.comment"
             :aria-label="t('formulaTools.comment')"
-            :autosize="{ minRows: 1, maxRows: 2 }"
+            :autosize="{ minRows: 3, maxRows: 5 }"
             :maxlength="255"
           />
         </TFormItem>
@@ -172,10 +181,6 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
 
   &__range-picker:hover {
     --td-bg-color-container-hover: transparent;
-  }
-
-  &__form {
-    --td-comp-margin-xxl: var(--idea-space-4);
   }
 }
 </style>

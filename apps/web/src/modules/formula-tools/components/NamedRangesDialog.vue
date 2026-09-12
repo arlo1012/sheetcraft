@@ -45,7 +45,7 @@ const props = withDefaults(
 );
 const emit = defineEmits<{
   close: [];
-  save: [row: NamedRangeDraft];
+  save: [row: NamedRangeDraft, onSaved?: (id: string) => void];
   delete: [id: string];
 }>();
 const { t } = useAppI18n();
@@ -80,17 +80,46 @@ const filteredRanges = computed<NameTableRow[]>(() => {
     );
 });
 const filterOptions = computed(() => [
-  { value: "sheet", label: t("formulaTools.worksheetNames") },
-  { value: "workbook", label: t("formulaTools.workbookNames") },
-  { value: "errors", label: t("formulaTools.namesWithErrors") },
-  { value: "no-errors", label: t("formulaTools.namesWithoutErrors") },
-  { value: "defined", label: t("formulaTools.definedNames") },
-  { value: "table", label: t("formulaTools.tableNames") },
+  {
+    group: "",
+    children: [
+      {
+        value: "clear",
+        label: t("formulaTools.clearNameFilters"),
+        class: "idea-select-option--action",
+      },
+    ],
+  },
+  {
+    group: "",
+    children: [
+      { value: "sheet", label: t("formulaTools.worksheetNames") },
+      { value: "workbook", label: t("formulaTools.workbookNames") },
+    ],
+  },
+  {
+    group: "",
+    children: [
+      { value: "errors", label: t("formulaTools.namesWithErrors") },
+      { value: "no-errors", label: t("formulaTools.namesWithoutErrors") },
+    ],
+  },
+  {
+    group: "",
+    children: [
+      { value: "defined", label: t("formulaTools.definedNames") },
+      { value: "table", label: t("formulaTools.tableNames") },
+    ],
+  },
 ]);
 function changeFilters(value: SelectValue): void {
   const next = Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+  if (next.includes("clear")) {
+    clearFilters();
+    return;
+  }
   nameFilters.value = updateNamedRangeFilters(nameFilters.value, next);
 }
 function clearFilters(): void {
@@ -137,6 +166,13 @@ function editRange(range = selectedRange.value): void {
 function editRow({ row }: RowEventContext<TableRowData>): void {
   const range = props.ranges.find((range) => range.id === row.id);
   if (range) editRange(range);
+}
+function saveEditor(draft: NamedRangeDraft): void {
+  emit("save", draft, (id) => {
+    editorDraft.value = undefined;
+    clearFilters();
+    selectedId.value = id;
+  });
 }
 function remove(): void {
   if (!selectedId.value) return;
@@ -220,21 +256,13 @@ watch(
             :options="filterOptions"
             :popup-props="filterPopupProps"
             :placeholder="t('formulaTools.allNames')"
-            :value-display="
-              nameFilters.length
-                ? t('formulaTools.activeNameFilters', { count: nameFilters.length })
-                : undefined
-            "
+            :min-collapsed-num="1"
+            :tag-input-props="{ excessTagsDisplayType: 'scroll' }"
+            :tag-props="{ maxWidth: 110 }"
             :aria-label="t('formulaTools.filterNames')"
             data-name-filter
             @change="changeFilters"
-          >
-            <template #panelTopContent>
-              <TButton variant="text" block data-clear-name-filters @click="clearFilters">
-                {{ t("formulaTools.clearNameFilters") }}
-              </TButton>
-            </template>
-          </TSelect>
+          />
         </div>
       </div>
       <TableHeightWrapper v-slot="{ height }">
@@ -317,7 +345,7 @@ watch(
     :suspended="suspended"
     :select-reference="selectReference"
     @close="editorDraft = undefined"
-    @save="emit('save', $event)"
+    @save="saveEditor"
   />
 </template>
 
@@ -352,7 +380,7 @@ watch(
     min-width: 100px;
   }
   &__filter {
-    width: 190px;
+    width: 260px;
     flex-shrink: 0;
   }
   &__reference {

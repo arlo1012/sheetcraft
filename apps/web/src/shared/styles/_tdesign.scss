@@ -217,6 +217,15 @@
   --td-comp-size-s: 24px;
 }
 
+.t-select__wrap .t-input:not(.t-size-s, .t-size-l) .t-tag {
+  --td-comp-size-xs: 20px;
+}
+
+// Action options keep the same label alignment as selectable options.
+.idea-select-option--action .t-checkbox__input {
+  visibility: hidden;
+}
+
 // Custom panel selects render the selected preview across the input's value area.
 // SelectInput places valueDisplay in its prefix; the native input remains focusable.
 .idea-panel-select .t-input {
@@ -256,8 +265,40 @@
   font-weight: var(--idea-font-weight-semibold);
 }
 
-.named-range-picker-dialog .t-dialog__footer {
-  padding-top: 0;
+.t-dialog__footer {
+  padding: 0;
+}
+
+.t-form__label {
+  padding-right: var(--td-comp-paddingLR-s);
+}
+
+.t-form__item {
+  margin-bottom: var(--td-comp-margin-xl);
+
+  &:not(:has(.t-form__extra)) {
+    margin-bottom: var(--td-comp-margin-s);
+  }
+}
+
+.t-form-inline {
+  row-gap: 0;
+}
+
+.search-form {
+  .t-form__item {
+    margin-bottom: 0;
+  }
+}
+
+// Match the reference adapter's higher priority for validation feedback.
+.t-form:not(.t-form-inline) .t-form__item.t-form__item-with-extra {
+  margin-bottom: var(--td-comp-margin-xl);
+}
+
+// Input-owned feedback needs the same space as FormItem validation feedback.
+.t-form:not(.t-form-inline) .t-form__item:has(.t-input__tips) {
+  margin-bottom: var(--td-comp-margin-xl);
 }
 
 .t-tabs__nav-item.t-is-active {

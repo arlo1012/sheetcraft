@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import { deserializeWorkbook } from "@idea10/core/serialization";
 import SpreadsheetRibbon from "../../../../app/SpreadsheetRibbon.vue";
 import NamedRangesDialog from "../../../../modules/formula-tools/components/NamedRangesDialog.vue";
+import NamedRangeEditorDialog from "../../../../modules/formula-tools/components/NamedRangeEditorDialog.vue";
 import WorkbookFormulaBar from "../../../../modules/workbook/components/WorkbookFormulaBar.vue";
 import {
   createFormulaToolsStore,
@@ -28,10 +29,7 @@ describe("SpreadsheetWorkspace defined names", () => {
       reference: "=Summary!$B$1:$C$1",
     });
     await flushPromises();
-    expect(dialog.props("visible")).toBe(false);
-
-    ribbon.vm.$emit("openNames");
-    await flushPromises();
+    expect(dialog.props("visible")).toBe(true);
     const created = (dialog.props("ranges") as readonly { id: string; name: string }[])[0]!;
     expect(created.name).toBe("Revenue");
     dialog.vm.$emit("save", {
@@ -42,13 +40,15 @@ describe("SpreadsheetWorkspace defined names", () => {
     });
     await flushPromises();
 
-    ribbon.vm.$emit("openNames");
-    await flushPromises();
+    expect(dialog.props("visible")).toBe(true);
     const updated = (dialog.props("ranges") as readonly { id: string; reference: string }[])[0]!;
     expect(updated.reference).toBe("=Details!$A$1");
     dialog.vm.$emit("delete", updated.id);
     await flushPromises();
     expect(dialog.props("ranges")).toEqual([]);
+
+    dialog.vm.$emit("close");
+    await flushPromises();
 
     const input = wrapper
       .findComponent(WorkbookFormulaBar)
@@ -56,6 +56,41 @@ describe("SpreadsheetWorkspace defined names", () => {
     await input.trigger("keydown", { key: "s", ctrlKey: true });
     await flushPromises();
     expect(deserializeWorkbook(memory.record().snapshot).definedNames.size).toBe(0);
+  });
+
+  test("returns to the manager after saving and retains the editor when saving fails", async () => {
+    const wrapper = await mountFormulaToolsWorkspace(createFormulaToolsStore().store);
+    wrapper.findComponent(SpreadsheetRibbon).vm.$emit("openNames");
+    await flushPromises();
+    const manager = wrapper.getComponent(NamedRangesDialog);
+    await manager.get("[data-name-search] input").setValue("unrelated");
+    await manager.get('[data-name-action="new"]').trigger("click");
+    const editor = manager.getComponent(NamedRangeEditorDialog);
+    await editor.get("[data-formula-name] input").setValue("Revenue");
+    await editor.get("[data-formula-reference] input").setValue("invalid");
+    await editor.get("form").trigger("submit");
+    await flushPromises();
+    expect(manager.props("visible")).toBe(true);
+    expect(manager.findComponent(NamedRangeEditorDialog).exists()).toBe(true);
+    expect(editor.get<HTMLInputElement>("[data-formula-name] input").element.value).toBe("Revenue");
+
+    await editor.get("[data-formula-reference] input").setValue("=Summary!$B$1:$C$1");
+    await editor.get("form").trigger("submit");
+    await flushPromises();
+    expect(manager.props("visible")).toBe(true);
+    expect(manager.findComponent(NamedRangeEditorDialog).exists()).toBe(false);
+    expect(manager.get('[data-named-range][aria-selected="true"]').text()).toContain("Revenue");
+
+    await manager.get('[data-name-action="edit"]').trigger("click");
+    const reopenedEditor = manager.getComponent(NamedRangeEditorDialog);
+    await reopenedEditor.get("[data-formula-name] input").setValue("RevenueUpdated");
+    await reopenedEditor.get("form").trigger("submit");
+    await flushPromises();
+    expect(manager.props("visible")).toBe(true);
+    expect(manager.findComponent(NamedRangeEditorDialog).exists()).toBe(false);
+    expect(manager.get('[data-named-range][aria-selected="true"]').text()).toContain(
+      "RevenueUpdated",
+    );
   });
 
   test("keeps an unfinished formula-bar draft while opening and closing the name manager", async () => {

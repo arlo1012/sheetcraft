@@ -183,11 +183,12 @@ export function useFormulaToolsController(options: {
     focusFormulaBar();
   }
 
-  function saveName(draft: DefinedNameDraft): void {
+  function saveName(draft: DefinedNameDraft, onSaved?: (id: string) => void): void {
     try {
-      if (!options.execute(createUpsertDefinedNameCommand(options.getWorkbook(), draft))) return;
+      const command = createUpsertDefinedNameCommand(options.getWorkbook(), draft);
+      if (!options.execute(command)) return;
       void MessagePlugin.success(t("workspace.nameSaved", { name: draft.name }));
-      closeNames();
+      onSaved?.(command.definition.id);
     } catch {
       void MessagePlugin.warning(t("workspace.nameInvalid"));
     }

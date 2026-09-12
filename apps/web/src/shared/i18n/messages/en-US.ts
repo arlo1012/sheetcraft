@@ -168,7 +168,7 @@ export const enUS = {
       "Place the cursor at a formula argument or after an operator to insert a function.",
     recalculated: "Workbook recalculated.",
     nameInvalid: "Check the name, scope, and reference. Names must be unique within their scope.",
-    nameSaved: "Saved the name {name}.",
+    nameSaved: "Saved the name {name}",
     nameDeleted: "Name deleted.",
     filterUnavailable: "Filter cannot be applied to the current selection.",
     sortUnavailable: "The current selection cannot be sorted.",
