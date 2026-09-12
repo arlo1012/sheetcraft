@@ -188,7 +188,7 @@ export function useFormulaToolsController(options: {
     }
   }
 
-  function createNamesFromSelection(positions: DefinedNameLabelPosition[]): void {
+  function createNamesFromSelection(positions: readonly DefinedNameLabelPosition[]): void {
     try {
       const workbook = options.getWorkbook();
       const command = createDefinedNamesFromSelectionCommand(workbook, {
