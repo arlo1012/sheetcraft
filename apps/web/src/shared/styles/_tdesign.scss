@@ -273,22 +273,32 @@
   padding-right: var(--td-comp-paddingLR-s);
 }
 
-.t-form .t-form__item {
-  margin-bottom: var(--td-comp-margin-s);
+.t-form__item {
+  margin-bottom: var(--td-comp-margin-xl);
+
+  &:not(:has(.t-form__extra)) {
+    margin-bottom: var(--td-comp-margin-s);
+  }
 }
 
 .t-form-inline {
   row-gap: 0;
 }
 
-// Let validation text grow the item instead of reserving a fixed error gap.
-.t-form__item {
-  .t-input__wrap > .t-input__tips,
-  .t-input__extra {
-    position: static;
-    white-space: normal;
-    overflow-wrap: anywhere;
+.search-form {
+  .t-form__item {
+    margin-bottom: 0;
   }
+}
+
+// Match the reference adapter's higher priority for validation feedback.
+.t-form:not(.t-form-inline) .t-form__item.t-form__item-with-extra {
+  margin-bottom: var(--td-comp-margin-xl);
+}
+
+// Input-owned feedback needs the same space as FormItem validation feedback.
+.t-form:not(.t-form-inline) .t-form__item:has(.t-input__tips) {
+  margin-bottom: var(--td-comp-margin-xl);
 }
 
 .t-tabs__nav-item.t-is-active {
