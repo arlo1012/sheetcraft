@@ -1,5 +1,9 @@
-import { isFormulaError, type FormulaValue } from "../types.js";
-import { formulaArray } from "../runtime.js";
+import {
+  createFormulaError,
+  isFormulaError,
+  type FormulaValue,
+} from "../types.js";
+import { formulaArray, isFormulaArray } from "../runtime.js";
 import type {
   FormulaFunctionArgument,
   FormulaFunctionDefinition,
@@ -16,15 +20,34 @@ import {
 function range(
   argument: FormulaFunctionArgument,
 ): FormulaValue[] | ReturnType<typeof formulaError> {
-  return argument.kind === "range"
-    ? [...argument.values]
+  if (argument.kind === "range") {
+    if (!argument.bounds || !argument.getValue) return [...argument.values];
+    const rows = argument.bounds.end.row - argument.bounds.start.row + 1;
+    const columns =
+      argument.bounds.end.column - argument.bounds.start.column + 1;
+    if (rows * columns > 100_000) return createFormulaError("CALC");
+    return Array.from({ length: rows * columns }, (_, index) =>
+      argument.getValue!(
+        argument.bounds!.start.row + Math.floor(index / columns),
+        argument.bounds!.start.column + (index % columns),
+      ),
+    );
+  }
+  return isFormulaArray(argument.value)
+    ? argument.value.rows.flatMap((row) => [...row])
     : formulaError("VALUE");
 }
 function dimensions(
   argument: FormulaFunctionArgument,
 ): { rows: number; columns: number } | ReturnType<typeof formulaError> {
-  if (argument.kind !== "range" || !argument.bounds)
-    return formulaError("VALUE");
+  if (argument.kind === "scalar") {
+    if (!isFormulaArray(argument.value)) return formulaError("VALUE");
+    return {
+      rows: argument.value.rows.length,
+      columns: argument.value.rows[0]?.length ?? 0,
+    };
+  }
+  if (!argument.bounds) return formulaError("VALUE");
   return {
     rows: argument.bounds.end.row - argument.bounds.start.row + 1,
     columns: argument.bounds.end.column - argument.bounds.start.column + 1,
@@ -81,14 +104,12 @@ export const LOOKUP_FUNCTIONS = [
       lazy: false,
     },
     (context) => {
-      const array = range(context.evaluateArgument(0));
       const shape = dimensions(context.evaluateArgument(0));
       const row = finiteNumber(scalar(context.evaluateArgument(1)));
       const column =
         context.argumentCount === 3
           ? finiteNumber(scalar(context.evaluateArgument(2)))
           : 1;
-      if (isFormulaError(array)) return array;
       if (isFormulaError(shape)) return shape;
       if (isFormulaError(row)) return row;
       if (isFormulaError(column)) return column;
@@ -102,6 +123,20 @@ export const LOOKUP_FUNCTIONS = [
         (row === 0 && column === 0 && shape.rows === 0)
       )
         return formulaError("REF");
+      const source = context.evaluateArgument(0);
+      if (
+        row > 0 &&
+        column > 0 &&
+        source.kind === "range" &&
+        source.bounds &&
+        source.getValue
+      )
+        return source.getValue(
+          source.bounds.start.row + row - 1,
+          source.bounds.start.column + column - 1,
+        );
+      const array = range(source);
+      if (isFormulaError(array)) return array;
       if (row === 0 && column === 0)
         return formulaArray(
           Array.from({ length: shape.rows }, (_, index) =>

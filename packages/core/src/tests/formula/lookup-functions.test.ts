@@ -90,3 +90,22 @@ test("ROW and COLUMN use the formula address when no reference is supplied", () 
     evaluateFormula("=COLUMN()", resolver, { address: { row: 4, column: 27 } }),
   ).toBe(28);
 });
+
+test("lookup functions preserve sparse worksheet range coordinates", () => {
+  const cells = new Map<string, FormulaValue>([
+    ["0:0", 1],
+    ["2:0", 3],
+    ["0:1", 1],
+    ["0:3", 10],
+    ["2:1", 3],
+    ["2:3", 30],
+  ]);
+  const sparse = {
+    resolveCell: ({ row, column }: { row: number; column: number }) =>
+      cells.get(`${row}:${column}`) ?? null,
+    resolveRange: () => [...cells.values()],
+  };
+  expect(evaluateFormula("=INDEX(A1:A3,3)", sparse)).toBe(3);
+  expect(evaluateFormula("=MATCH(3,A1:A3,0)", sparse)).toBe(3);
+  expect(evaluateFormula("=VLOOKUP(3,B1:D3,3,FALSE)", sparse)).toBe(30);
+});
