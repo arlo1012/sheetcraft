@@ -204,6 +204,27 @@ CSS. Deferred Workers grow from 1,016,241 B / 284,073 B gzip to 1,072,359 B /
 this records existing UI growth separately from the new formatter, and chunk
 splitting does not hide either cost from the total-asset gate.
 
+The formula workbench expands the runtime to 96 functions and adds workbook
+references, scoped names, localized tool menus and function help. An isolated
+`f97d71c7` checkout with its own workspace dependencies measures 721,375 B /
+207,521 B gzip entry JavaScript, 139,148 B / 19,588 B entry CSS, 2,399,420 B /
+693,398 B total JavaScript and 306,956 B / 40,326 B total CSS. These UI gates were
+already exceeded before this change. Its deferred Workers measure 1,098,074 B /
+313,732 B and still fit the old Worker cap.
+
+The formula build measures approximately 2,538 KB / 730 KB total JavaScript,
+316.3 KB / 41.3 KB total CSS and 1,143 KB / 325.1 KB deferred Workers. The actual
+feature increment is approximately 138.4 KB JavaScript (36.3 KB gzip), 9.3 KB CSS
+(0.9 KB gzip) and, within the JavaScript total, 44.9 KB Worker code (11.4 KB gzip).
+The grid and XLSX formula caches both need the same runtime; no new runtime
+dependency is introduced. The 624.5 KB JavaScript entry also imports a shared
+188.4 KB application chunk, so its smaller file alone is not a startup reduction.
+All chunks remain included in total budgets. Limits are now 152/22 KB entry CSS,
+2,600/750 KB total JavaScript, 322/43 KB total CSS and 1,170/335 KB deferred
+Workers. The existing 650/190 KB entry JavaScript gate stays enabled. The Worker
+smoke now round-trips a scoped-range definition and computes its cross-sheet
+formula after structured cloning, in addition to command undo and redo.
+
 High-risk visible interaction changes additionally require a real-browser
 regression. The regression covers selection, editing and IME, clipboard,
 history shortcuts, row and column operations, Sheet view-state restoration,

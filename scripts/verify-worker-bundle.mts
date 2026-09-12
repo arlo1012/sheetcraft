@@ -13,6 +13,9 @@ import { createSetCellContentCommand } from "@idea10/core/commands";
 import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
 import {
   createWorkbook,
+  createSheet,
+  insertSheet,
+  createWorkbookEvaluator,
   getActiveSheet,
   getCellContent,
   getCellValue,
@@ -87,13 +90,25 @@ function createWorkerPayload(): WorkerRoundTripPayload {
     sheetId: "worker-sheet",
   });
   const sheet = getActiveSheet(workbook);
+  const sourceSheet = createSheet("Source", "worker-source");
+  insertSheet(workbook, sourceSheet);
+  setCellContent(sourceSheet, { row: 0, column: 0 }, { kind: "literal", value: 7 });
+  workbook.definedNames.set("worker-data", {
+    id: "worker-data",
+    name: "WorkerData",
+    reference: {
+      sheetId: sourceSheet.id,
+      start: { row: 0, column: 0 },
+      end: { row: 0, column: 0 },
+    },
+  });
   setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: 7 });
   setCellContent(
     sheet,
     { row: 0, column: 1 },
     {
       kind: "formula",
-      formula: { source: "=A1*2" },
+      formula: { source: "=SUM(WorkerData)*2" },
     },
   );
   const snapshot = serializeWorkbook(workbook);
@@ -127,21 +142,31 @@ function assertRoundTripResult(
   ) {
     throw new Error("Worker command history did not execute, undo, and redo the cell edit.");
   }
-  if (result.formulaValue !== 14 || result.formulaSource !== "=A1*2") {
+  if (result.formulaValue !== 14 || result.formulaSource !== "=SUM(WorkerData)*2") {
     throw new Error("Worker did not preserve and evaluate the formula cell.");
   }
   const snapshot = result.snapshot as { version?: unknown; dateSystem?: unknown } | null;
-  if (!snapshot || snapshot.version !== 7 || snapshot.dateSystem !== "1900") {
-    throw new Error("Worker did not return a V6 workbook snapshot with an explicit date system.");
+  if (
+    !snapshot ||
+    snapshot.version !== (inputSnapshot as { version: number }).version ||
+    snapshot.dateSystem !== "1900"
+  ) {
+    throw new Error(
+      "Worker did not return the current workbook snapshot with an explicit date system.",
+    );
   }
   const restoredWorkbook = deserializeWorkbook(result.snapshot);
   const restoredSheet = getActiveSheet(restoredWorkbook);
   const restoredFormula = getCellContent(restoredSheet, { row: 0, column: 1 });
   if (
     getCellValue(restoredSheet, { row: 1, column: 0 }) !== 9 ||
-    getCellValue(restoredSheet, { row: 0, column: 1 }) !== 14 ||
+    createWorkbookEvaluator(restoredWorkbook, restoredSheet.id).getComputedValue({
+      row: 0,
+      column: 1,
+    }) !== 14 ||
+    restoredWorkbook.definedNames.get("worker-data")?.reference.sheetId !== "worker-source" ||
     restoredFormula?.kind !== "formula" ||
-    restoredFormula.formula.source !== "=A1*2"
+    restoredFormula.formula.source !== "=SUM(WorkerData)*2"
   ) {
     throw new Error(
       "Worker returned a workbook snapshot with incorrect command or formula content.",
@@ -253,7 +278,7 @@ self.addEventListener("message", (event) => {
     commandValue,
     undoneValue,
     redoneValue,
-    formulaValue: core.getCellValue(sheet, { row: 0, column: 1 }),
+    formulaValue: core.createWorkbookEvaluator(workbook, sheet.id).getComputedValue({ row: 0, column: 1 }),
     formulaSource: formulaContent?.kind === "formula" ? formulaContent.formula.source : null,
     snapshot: core.serializeWorkbook(workbook),
     geometryCell,

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Measured production budgets include the workbook UI and twelve number-format categories backed by numfmt in Core and the XLSX Worker. Worker assets remain included in totals and their separate cap; see ADR 0004.",
+  "description": "Measured production budgets include the formula workbench with 96 functions, workbook references and defined names in Core and the XLSX Worker. Totals include deferred assets; see ADR 0004 for isolated baseline and feature increments.",
   "distDirectory": "apps/web/dist",
   "entryAssets": {
     "javascript": {
@@ -10,23 +10,23 @@
     },
     "css": {
       "pattern": "^index-.*\\.css$",
-      "maximumRawBytes": 128000,
-      "maximumGzipBytes": 19000
+      "maximumRawBytes": 152000,
+      "maximumGzipBytes": 22000
     }
   },
   "totalAssets": {
     "javascript": {
-      "maximumRawBytes": 2330000,
-      "maximumGzipBytes": 675000
+      "maximumRawBytes": 2600000,
+      "maximumGzipBytes": 750000
     },
     "css": {
-      "maximumRawBytes": 300000,
-      "maximumGzipBytes": 40000
+      "maximumRawBytes": 322000,
+      "maximumGzipBytes": 43000
     }
   },
   "deferredWorkers": {
     "pattern": "^(?:workbookXlsx\\.worker|worker-).*\\.js$",
-    "maximumRawBytes": 1100000,
-    "maximumGzipBytes": 316000
+    "maximumRawBytes": 1170000,
+    "maximumGzipBytes": 335000
   }
 }
