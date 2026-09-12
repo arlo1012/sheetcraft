@@ -99,4 +99,32 @@ describe("database criteria", () => {
     expect(evaluateFormula("=DCOUNT(A1:B4,,E1:E2)", formulas)).toBe(2);
     expect(evaluateFormula("=DCOUNTA(A1:B4,,E1:E2)", formulas)).toBe(2);
   });
+
+  test("uses cell coordinates to preserve blank cells in sparse worksheet ranges", () => {
+    const cells = new Map<string, FormulaValue>([
+      ["0:0", "Item"],
+      ["0:1", "Amount"],
+      ["0:2", "Group"],
+      ["1:0", "apple"],
+      ["1:1", 10],
+      ["1:2", "x"],
+      ["2:0", "apricot"],
+      ["2:1", 20],
+      ["2:2", "y"],
+      ["3:0", "banana"],
+      ["3:1", 30],
+      ["3:2", "x"],
+      ["0:4", "Item"],
+      ["0:5", "Group"],
+      ["1:5", "x"],
+    ]);
+    const sparse = {
+      resolveCell: ({ row, column }: { row: number; column: number }) =>
+        cells.get(`${row}:${column}`) ?? null,
+      resolveRange: () => [...cells.values()],
+    };
+    expect(evaluateFormula('=DSUM(A1:C4,"Amount",E1:F2)', sparse)).toBe(40);
+    expect(evaluateFormula('=DCOUNT(A1:C4,"Amount",E1:F2)', sparse)).toBe(2);
+    expect(evaluateFormula('=DCOUNTA(A1:C4,"Amount",E1:F2)', sparse)).toBe(2);
+  });
 });

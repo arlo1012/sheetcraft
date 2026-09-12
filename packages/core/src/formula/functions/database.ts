@@ -19,12 +19,18 @@ function matrix(
 ): FormulaValue[][] | ReturnType<typeof formulaError> {
   if (argument.kind !== "range" || !argument.bounds)
     return formulaError("VALUE");
+  const rows = argument.bounds.end.row - argument.bounds.start.row + 1;
   const columns = argument.bounds.end.column - argument.bounds.start.column + 1;
-  const values = [...argument.values];
-  if (columns < 1 || values.length < columns || values.length % columns !== 0)
+  if (rows < 1 || columns < 1 || rows * columns > 100_000)
     return formulaError("VALUE");
-  return Array.from({ length: values.length / columns }, (_, row) =>
-    values.slice(row * columns, (row + 1) * columns),
+  if (!argument.getValue) return formulaError("VALUE");
+  return Array.from({ length: rows }, (_, row) =>
+    Array.from({ length: columns }, (_, column) =>
+      argument.getValue!(
+        argument.bounds!.start.row + row,
+        argument.bounds!.start.column + column,
+      ),
+    ),
   );
 }
 function criteriaMatches(
