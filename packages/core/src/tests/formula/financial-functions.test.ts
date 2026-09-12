@@ -44,9 +44,23 @@ describe("expanded financial functions", () => {
     expect(evaluateFormula("=MIRR(A1:C1,10%,12%)", cashflowResolver)).toBeCloseTo(0.12783, 4);
   });
 
+  test("discounts dated cash flows", () => {
+    const datedCashflowResolver: FormulaEvaluationResolver = {
+      resolveCell: () => null,
+      resolveRange: ({ start }) => (start.row === 0 ? [-1_000, 1_100] : [45292, 45657]),
+    };
+    expect(evaluateFormula("=XNPV(10%,A1:B1,A2:B2)", datedCashflowResolver)).toBeCloseTo(0, 8);
+    expect(evaluateFormula("=XIRR(A1:B1,A2:B2)", datedCashflowResolver)).toBeCloseTo(0.1, 8);
+  });
+
   test("calculates common depreciation schedules", () => {
     expect(evaluateFormula("=SLN(1000,100,3)", resolver)).toBe(300);
     expect(evaluateFormula("=SYD(1000,100,3,1)", resolver)).toBe(450);
     expect(evaluateFormula("=DDB(1000,100,5,1)", resolver)).toBe(400);
+  });
+
+  test("accumulates interest and principal across payment periods", () => {
+    expect(evaluateFormula("=CUMIPMT(1%,12,1000,1,1,0)", resolver)).toBeCloseTo(-10, 8);
+    expect(evaluateFormula("=CUMPRINC(1%,12,1000,1,1,0)", resolver)).toBeCloseTo(-78.8488, 3);
   });
 });

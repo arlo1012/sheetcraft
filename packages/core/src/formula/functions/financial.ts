@@ -163,6 +163,50 @@ function irr(cashflows: readonly number[], guess: number): FormulaValue {
   return formulaError("NUM");
 }
 
+function xnpv(
+  rateValue: number,
+  cashflows: readonly number[],
+  dates: readonly number[],
+): FormulaValue {
+  if (rateValue <= -1 || cashflows.length === 0 || cashflows.length !== dates.length)
+    return formulaError("NUM");
+  const first = dates[0]!;
+  const result = cashflows.reduce(
+    (total, value, index) => total + value / (1 + rateValue) ** ((dates[index]! - first) / 365),
+    0,
+  );
+  return Number.isFinite(result) ? result : formulaError("NUM");
+}
+
+function xirr(cashflows: readonly number[], dates: readonly number[], guess: number): FormulaValue {
+  if (
+    cashflows.length === 0 ||
+    cashflows.length !== dates.length ||
+    !cashflows.some((value) => value > 0) ||
+    !cashflows.some((value) => value < 0) ||
+    guess <= -1
+  )
+    return formulaError("NUM");
+  let current = guess;
+  const first = dates[0]!;
+  for (let iteration = 0; iteration < 100; iteration += 1) {
+    let result = 0;
+    let derivative = 0;
+    for (let index = 0; index < cashflows.length; index += 1) {
+      const years = (dates[index]! - first) / 365;
+      result += cashflows[index]! / (1 + current) ** years;
+      derivative -= (years * cashflows[index]!) / (1 + current) ** (years + 1);
+    }
+    if (!Number.isFinite(result) || !Number.isFinite(derivative) || derivative === 0)
+      return formulaError("NUM");
+    const next = current - result / derivative;
+    if (next <= -1 || !Number.isFinite(next)) return formulaError("NUM");
+    if (Math.abs(next - current) < 1e-10) return next;
+    current = next;
+  }
+  return formulaError("NUM");
+}
+
 function depreciationArguments(
   context: FormulaFunctionContext,
   required: number,
@@ -170,6 +214,45 @@ function depreciationArguments(
   const result = argumentsFor(context, required);
   if (isFormulaError(result)) return result;
   return result.some((value) => value < 0) ? formulaError("NUM") : result;
+}
+
+function cumulativePayment(
+  rateValue: number,
+  periods: number,
+  present: number,
+  start: number,
+  end: number,
+  type: number,
+  interestOnly: boolean,
+): FormulaValue {
+  if (
+    !Number.isInteger(periods) ||
+    periods <= 0 ||
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 1 ||
+    end < start ||
+    end > periods
+  )
+    return formulaError("NUM");
+  const payment = pmt(rateValue, periods, present, 0, type);
+  if (typeof payment !== "number") return isFormulaError(payment) ? payment : formulaError("NUM");
+  let total = 0;
+  for (let period = start; period <= end; period += 1) {
+    const interest =
+      period === 1 && type === 1
+        ? 0
+        : -(
+            (rateValue === 0
+              ? present + payment * (period - 1)
+              : present * (1 + rateValue) ** (period - 1) +
+                payment *
+                  (1 + rateValue * type) *
+                  (((1 + rateValue) ** (period - 1) - 1) / rateValue)) * rateValue
+          );
+    total += interestOnly ? interest : payment - interest;
+  }
+  return Number.isFinite(total) ? total : formulaError("NUM");
 }
 
 export const FINANCIAL_FUNCTIONS = [
@@ -198,6 +281,83 @@ export const FINANCIAL_FUNCTIONS = [
         : isFormulaError(type)
           ? type
           : fv(values[0]!, values[1]!, values[2]!, present, type);
+    },
+  ),
+  ...(["CUMIPMT", "CUMPRINC"] as const).map((name) =>
+    defineFunction(
+      {
+        name,
+        category: "Financial",
+        minArgs: 6,
+        maxArgs: 6,
+        arguments: [
+          { name: "rate" },
+          { name: "nper" },
+          { name: "pv" },
+          { name: "start_period" },
+          { name: "end_period" },
+          { name: "type" },
+        ],
+        lazy: false,
+      },
+      (context) => {
+        const args = argumentsFor(context, 5);
+        const type = paymentType(context, 5);
+        if (isFormulaError(args) || isFormulaError(type)) return isFormulaError(args) ? args : type;
+        return cumulativePayment(
+          args[0]!,
+          args[1]!,
+          args[2]!,
+          args[3]!,
+          args[4]!,
+          type,
+          name === "CUMIPMT",
+        );
+      },
+    ),
+  ),
+  defineFunction(
+    {
+      name: "XNPV",
+      category: "Financial",
+      minArgs: 3,
+      maxArgs: 3,
+      arguments: [{ name: "rate" }, { name: "values" }, { name: "dates" }],
+      lazy: false,
+    },
+    (context) => {
+      const rateValue = number(context, 0);
+      const cashflows = rangeNumbers(context, 1);
+      const dates = rangeNumbers(context, 2);
+      return isFormulaError(rateValue)
+        ? rateValue
+        : isFormulaError(cashflows)
+          ? cashflows
+          : isFormulaError(dates)
+            ? dates
+            : xnpv(rateValue, cashflows, dates);
+    },
+  ),
+  defineFunction(
+    {
+      name: "XIRR",
+      category: "Financial",
+      minArgs: 2,
+      maxArgs: 3,
+      arguments: [{ name: "values" }, { name: "dates" }, { name: "guess", optional: true }],
+      lazy: false,
+    },
+    (context) => {
+      const cashflows = rangeNumbers(context, 0);
+      const dates = rangeNumbers(context, 1);
+      const guess = context.argumentCount === 2 ? 0.1 : number(context, 2);
+      return isFormulaError(cashflows)
+        ? cashflows
+        : isFormulaError(dates)
+          ? dates
+          : isFormulaError(guess)
+            ? guess
+            : xirr(cashflows, dates, guess);
     },
   ),
   defineFunction(

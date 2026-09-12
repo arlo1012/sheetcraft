@@ -68,6 +68,50 @@ function decimalTo(context: FormulaFunctionContext, base: 2 | 16): FormulaValue 
   return requested === 0 ? result : result.padStart(requested, "0");
 }
 
+function signedBase(
+  context: FormulaFunctionContext,
+  base: 2 | 8 | 16,
+): number | ReturnType<typeof formulaError> {
+  if (base === 2 || base === 16) return parseSigned(context, base);
+  const source = sourceText(context, 0);
+  if (isFormulaError(source)) return source;
+  if (!/^[0-7]{1,10}$/.test(source)) return formulaError("NUM");
+  const parsed = Number.parseInt(source, 8);
+  return parsed >= 2 ** 29 ? parsed - 2 ** 30 : parsed;
+}
+
+function formatBase(value: number, base: 2 | 8 | 16, places: number | null): FormulaValue {
+  const bits = base === 2 ? 10 : base === 8 ? 30 : 40;
+  const minimum = -(2 ** (bits - 1));
+  const maximum = 2 ** (bits - 1) - 1;
+  if (value < minimum || value > maximum) return formulaError("NUM");
+  const negative = value < 0;
+  const formatted = (negative ? value + 2 ** bits : value)
+    .toString(base)
+    .toUpperCase()
+    .padStart(negative ? 10 : 0, "0");
+  if (negative || places === null) return formatted;
+  return places < formatted.length || places > 10
+    ? formulaError("NUM")
+    : formatted.padStart(places, "0");
+}
+
+function convertBase(
+  context: FormulaFunctionContext,
+  from: 2 | 8 | 16,
+  to: 2 | 8 | 16 | 10,
+): FormulaValue {
+  const parsed = signedBase(context, from);
+  if (isFormulaError(parsed)) return parsed;
+  if (to === 10) return parsed;
+  let requested: number | null = null;
+  if (context.argumentCount === 2) {
+    requested = integer(context, 1);
+    if (isFormulaError(requested)) return requested;
+  }
+  return formatBase(parsed, to, requested);
+}
+
 const MAX_BIT = 2 ** 48 - 1;
 
 function bitOperand(
@@ -177,6 +221,51 @@ export const ENGINEERING_FUNCTIONS = [
       lazy: false,
     },
     (context) => decimalTo(context, 16),
+  ),
+  defineFunction(
+    {
+      name: "OCT2DEC",
+      category: "Engineering",
+      minArgs: 1,
+      maxArgs: 1,
+      arguments: [{ name: "number" }],
+      lazy: false,
+    },
+    (context) => signedBase(context, 8),
+  ),
+  defineFunction(
+    {
+      name: "DEC2OCT",
+      category: "Engineering",
+      minArgs: 1,
+      maxArgs: 2,
+      arguments: [{ name: "number" }, { name: "places", optional: true }],
+      lazy: false,
+    },
+    (context) => {
+      const value = integer(context, 0);
+      if (isFormulaError(value)) return value;
+      const places = context.argumentCount === 1 ? null : integer(context, 1);
+      return isFormulaError(places) ? places : formatBase(value, 8, places);
+    },
+  ),
+  ...([2, 8, 16] as const).flatMap((from) =>
+    ([2, 8, 16] as const)
+      .filter((to) => to !== from)
+      .map((to) => {
+        const labels: Record<2 | 8 | 16, string> = { 2: "BIN", 8: "OCT", 16: "HEX" };
+        return defineFunction(
+          {
+            name: `${labels[from]}2${labels[to]}`,
+            category: "Engineering",
+            minArgs: 1,
+            maxArgs: 2,
+            arguments: [{ name: "number" }, { name: "places", optional: true }],
+            lazy: false,
+          },
+          (context) => convertBase(context, from, to),
+        );
+      }),
   ),
   defineFunction(
     {

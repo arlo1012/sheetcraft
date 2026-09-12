@@ -27,4 +27,11 @@ describe("engineering bit functions", () => {
     expect(evaluateFormula('=CONVERT(32,"F","C")', resolver)).toBeCloseTo(0, 10);
     expect(evaluateFormula('=CONVERT(1,"m","kg")', resolver)).toEqual(createFormulaError("NA"));
   });
+
+  test("converts binary, octal, and hexadecimal complements", () => {
+    expect(evaluateFormula("=DEC2OCT(64)", resolver)).toBe("100");
+    expect(evaluateFormula('=BIN2OCT("1010")', resolver)).toBe("12");
+    expect(evaluateFormula('=OCT2HEX("17")', resolver)).toBe("F");
+    expect(evaluateFormula('=HEX2BIN("F")', resolver)).toBe("1111");
+  });
 });
