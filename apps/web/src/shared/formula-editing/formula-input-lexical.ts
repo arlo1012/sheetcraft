@@ -1,7 +1,7 @@
-import type { CellRange } from "@idea10/core/workbook";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellRange } from "@idea10/core/workbook";
 import { formatCellAddress } from "@idea10/core/coordinates";
 import { getFormulaFunctionMetadata, type FormulaFunctionMetadata } from "@idea10/core/formula";
-import { getFormulaReferenceTokens } from "./formula-reference-tokens";
+import { getFormulaReferenceTokens, type FormulaReferenceRangeKind } from "./formula-reference-tokens";
 
 export type FormulaFunctionCandidate = FormulaFunctionMetadata & Readonly<{ id: string }>;
 
@@ -104,7 +104,22 @@ export function getFormulaReferenceEditContext(
     : null;
 }
 
-export function formatFormulaReferenceRange(range: CellRange, sheetName?: string): string {
+export function formatFormulaReferenceRange(
+  range: CellRange,
+  sheetName?: string,
+  rangeKind?: Exclude<FormulaReferenceRangeKind, "spill">,
+): string {
+  const kind = rangeKind ?? inferReferenceRangeKind(range);
+  if (kind === "column-axis") {
+    const start = columnLabel(Math.min(range.start.column, range.end.column));
+    const end = columnLabel(Math.max(range.start.column, range.end.column));
+    return `${sheetName ? `${quoteFormulaSheetName(sheetName)}!` : ""}${start}:${end}`;
+  }
+  if (kind === "row-axis") {
+    const start = Math.min(range.start.row, range.end.row) + 1;
+    const end = Math.max(range.start.row, range.end.row) + 1;
+    return `${sheetName ? `${quoteFormulaSheetName(sheetName)}!` : ""}${start}:${end}`;
+  }
   const start = formatCellAddress({
     row: Math.min(range.start.row, range.end.row),
     column: Math.min(range.start.column, range.end.column),
@@ -128,8 +143,9 @@ export function replaceFormulaReference(
   context: FormulaReferenceEditContext,
   range: CellRange,
   sheetName?: string,
+  rangeKind?: Exclude<FormulaReferenceRangeKind, "spill">,
 ): { value: string; caret: number; context: FormulaReferenceEditContext } {
-  const insertion = formatFormulaReferenceRange(range, sheetName);
+  const insertion = formatFormulaReferenceRange(range, sheetName, rangeKind);
   const edit = replaceRange(value, context.replaceStart, context.replaceEnd, insertion);
   return {
     ...edit,
@@ -152,13 +168,10 @@ export function cycleFormulaReferenceAbsoluteMarkers(
   const token = getFormulaReferenceTokens(`=${text}`)[0];
   if (!token || token.text.length !== text.length) return null;
   const qualifierEnd = text.lastIndexOf("!") + 1;
+  const suffix = token.rangeKind === "spill" ? "#" : "";
+  const body = text.slice(qualifierEnd, suffix ? -1 : undefined);
   const insertion =
-    text.slice(0, qualifierEnd) +
-    text
-      .slice(qualifierEnd)
-      .split(":")
-      .map((part) => cycleSingleReference(part.trim()))
-      .join(":");
+    text.slice(0, qualifierEnd) + cycleReferenceBody(body, token.rangeKind ?? "cells") + suffix;
   const edit = replaceRange(value, context.replaceStart, context.replaceEnd, insertion);
   return {
     ...edit,
@@ -167,6 +180,29 @@ export function cycleFormulaReferenceAbsoluteMarkers(
       replaceEnd: context.replaceStart + insertion.length,
     },
   };
+}
+
+function cycleReferenceBody(reference: string, rangeKind: FormulaReferenceRangeKind): string {
+  if (rangeKind === "column-axis")
+    return reference
+      .split(":")
+      .map((part) => cycleAxisReference(part.trim(), /^[A-Za-z]+$/))
+      .join(":");
+  if (rangeKind === "row-axis")
+    return reference
+      .split(":")
+      .map((part) => cycleAxisReference(part.trim(), /^\d+$/))
+      .join(":");
+  return reference
+    .split(":")
+    .map((part) => cycleSingleReference(part.trim()))
+    .join(":");
+}
+
+function cycleAxisReference(reference: string, valid: RegExp): string {
+  const marker = reference.startsWith("$") ? "$" : "";
+  const value = marker ? reference.slice(1) : reference;
+  return valid.test(value) ? `${marker ? "" : "$"}${value}` : reference;
 }
 
 function cycleSingleReference(reference: string): string {
@@ -178,6 +214,27 @@ function cycleSingleReference(reference: string): string {
   if (columnMarker === "$" && rowMarker === "$") return `${column}$${row}`;
   if (columnMarker !== "$" && rowMarker === "$") return `$${column}${row}`;
   return `${column}${row}`;
+}
+
+function inferReferenceRangeKind(range: CellRange): Exclude<FormulaReferenceRangeKind, "spill"> {
+  const rows = Math.min(range.start.row, range.end.row) === 0 &&
+    Math.max(range.start.row, range.end.row) === MAX_SHEET_ROWS - 1;
+  const columns = Math.min(range.start.column, range.end.column) === 0 &&
+    Math.max(range.start.column, range.end.column) === MAX_SHEET_COLUMNS - 1;
+  if (rows && !columns) return "column-axis";
+  if (columns && !rows) return "row-axis";
+  return "cells";
+}
+
+function columnLabel(column: number): string {
+  let value = column + 1;
+  let result = "";
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    result = String.fromCharCode(65 + remainder) + result;
+    value = Math.floor((value - 1) / 26);
+  }
+  return result;
 }
 
 export function getFormulaArgumentContext(

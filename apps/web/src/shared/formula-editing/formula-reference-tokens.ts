@@ -1,5 +1,7 @@
-import { parseA1FormulaReference } from "@idea10/core/formula";
+import { MAX_FORMULA_COLUMNS, MAX_FORMULA_ROWS, parseA1FormulaReference } from "@idea10/core/formula";
 import type { CellRange } from "@idea10/core/workbook";
+
+export type FormulaReferenceRangeKind = "cells" | "row-axis" | "column-axis" | "spill";
 
 export type FormulaReferenceToken = Readonly<{
   start: number;
@@ -9,10 +11,12 @@ export type FormulaReferenceToken = Readonly<{
   sheetName?: string;
   colorIndex: number;
   key: string;
+  /** Omitted only by legacy editor adapters; scanned tokens always provide it. */
+  rangeKind?: FormulaReferenceRangeKind;
 }>;
 
 const REFERENCE_AT_START =
-  /^(?:(?<sheet>'(?:[^']|'')+'|[\p{L}\p{N}_.]+)!)?(?<range>\$?[A-Za-z]+\$?[1-9]\d*(?:\s*:\s*\$?[A-Za-z]+\$?[1-9]\d*)?)/u;
+  /^(?:(?<sheet>'(?:[^']|'')+'|[\p{L}\p{N}_.]+)!)?(?<range>(?:\$?[A-Za-z]+\$?[1-9]\d*(?:\s*:\s*\$?[A-Za-z]+\$?[1-9]\d*)?#?)|(?:\$?[A-Za-z]+\s*:\s*\$?[A-Za-z]+)|(?:\$?[1-9]\d*\s*:\s*\$?[1-9]\d*))/u;
 
 /** Finds A1 references without requiring the incomplete formula to parse. */
 export function getFormulaReferenceTokens(source: string): readonly FormulaReferenceToken[] {
@@ -47,28 +51,82 @@ export function getFormulaReferenceTokens(source: string): readonly FormulaRefer
     const text = match[0];
     const end = start + text.length;
     if (!hasReferenceBoundaryAfter(source, end) || /^\s*\(/.test(source.slice(end))) continue;
-    const range = parseLocalRange(match.groups!.range!);
-    if (!range) continue;
+    const parsed = parseLocalRange(match.groups!.range!);
+    if (!parsed) continue;
     const sheet = match.groups?.sheet;
     const sheetName = sheet?.startsWith("'") ? sheet.slice(1, -1).replaceAll("''", "'") : sheet;
     if (sheetName?.includes("[")) continue;
-    const key = `${sheetName ? `${sheetName.toLowerCase()}!` : ""}${normalizedRangeKey(range)}`;
+    const geometry = normalizedRangeKey(parsed.range);
+    const key = `${sheetName ? `${sheetName.toLowerCase()}!` : ""}${parsed.rangeKind === "cells" ? "" : `${parsed.rangeKind}:`}${geometry}`;
     const colorIndex = colors.get(key) ?? colors.size;
     colors.set(key, colorIndex);
-    tokens.push({ start, end, text, range, colorIndex, key, ...(sheetName ? { sheetName } : {}) });
+    tokens.push({
+      start,
+      end,
+      text,
+      range: parsed.range,
+      rangeKind: parsed.rangeKind,
+      colorIndex,
+      key,
+      ...(sheetName ? { sheetName } : {}),
+    });
     start = end - 1;
   }
   return tokens;
 }
 
-function parseLocalRange(text: string): CellRange | null {
-  const [startText, endText] = text.split(":").map((part) => part.trim());
+function parseLocalRange(text: string): { range: CellRange; rangeKind: FormulaReferenceRangeKind } | null {
+  const spill = text.endsWith("#");
+  const referenceText = spill ? text.slice(0, -1) : text;
+  const [startText, endText] = referenceText.split(":").map((part) => part.trim());
   if (!startText) return null;
   const start = parseA1FormulaReference(startText);
   const end = endText ? parseA1FormulaReference(endText) : start;
-  return start && end
-    ? { start: { row: start.row, column: start.column }, end: { row: end.row, column: end.column } }
+  if (start && end && !spill && (!endText || end))
+    return {
+      range: { start: { row: start.row, column: start.column }, end: { row: end.row, column: end.column } },
+      rangeKind: "cells",
+    };
+  if (start && !endText && spill)
+    return {
+      range: { start: { row: start.row, column: start.column }, end: { row: start.row, column: start.column } },
+      rangeKind: "spill",
+    };
+  if (!endText || spill) return null;
+  const startColumn = columnIndex(startText.replace("$", ""));
+  const endColumn = columnIndex(endText.replace("$", ""));
+  if (startColumn !== null && endColumn !== null)
+    return {
+      range: {
+        start: { row: 0, column: startColumn },
+        end: { row: MAX_FORMULA_ROWS - 1, column: endColumn },
+      },
+      rangeKind: "column-axis",
+    };
+  const startRow = rowIndex(startText.replace("$", ""));
+  const endRow = rowIndex(endText.replace("$", ""));
+  return startRow !== null && endRow !== null
+    ? {
+        range: {
+          start: { row: startRow, column: 0 },
+          end: { row: endRow, column: MAX_FORMULA_COLUMNS - 1 },
+        },
+        rangeKind: "row-axis",
+      }
     : null;
+}
+
+function columnIndex(value: string): number | null {
+  if (!/^[A-Za-z]+$/.test(value)) return null;
+  let result = 0;
+  for (const character of value.toUpperCase()) result = result * 26 + character.charCodeAt(0) - 64;
+  return result > 0 && result <= MAX_FORMULA_COLUMNS ? result - 1 : null;
+}
+
+function rowIndex(value: string): number | null {
+  if (!/^[1-9]\d*$/.test(value)) return null;
+  const result = Number(value);
+  return Number.isSafeInteger(result) && result <= MAX_FORMULA_ROWS ? result - 1 : null;
 }
 
 function normalizedRangeKey(range: CellRange): string {

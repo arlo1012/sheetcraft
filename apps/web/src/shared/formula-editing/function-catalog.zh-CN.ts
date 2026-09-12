@@ -140,6 +140,8 @@ export const formulaArgumentLabelsZhCN: Record<string, string> = {
   dates: "日期",
   start_period: "起始期次",
   end_period: "结束期次",
+  weekend: "周末",
+  match_end: "匹配末端",
 };
 
 export const formulaFunctionCopyZhCN = createFormulaFunctionCopy(
@@ -558,6 +560,10 @@ export const formulaFunctionCopyZhCN = createFormulaFunctionCopy(
     XIRR: { description: "返回按指定日期计算的现金流内部收益率。", example: "=XIRR(A1:A3,B1:B3)" },
     CUMIPMT: { description: "返回两个期次之间累计支付的利息。", example: "=CUMIPMT(0.1,12,1000,1,3,0)" },
     CUMPRINC: { description: "返回两个期次之间累计支付的本金。", example: "=CUMPRINC(0.1,12,1000,1,3,0)" },
+    "NETWORKDAYS.INTL": { description: "按自定义周末返回两个日期之间的工作日数。", example: "=NETWORKDAYS.INTL(DATE(2026,1,1),DATE(2026,1,10))" },
+    "WORKDAY.INTL": { description: "按自定义周末返回指定日期前后若干工作日的日期。", example: "=WORKDAY.INTL(DATE(2026,1,1),5)" },
+    TEXTBEFORE: { description: "返回分隔符之前的文本。", example: "=TEXTBEFORE(\"a-b\",\"-\")" },
+    TEXTAFTER: { description: "返回分隔符之后的文本。", example: "=TEXTAFTER(\"a-b\",\"-\")" },
   },
   formulaArgumentLabelsZhCN,
 );

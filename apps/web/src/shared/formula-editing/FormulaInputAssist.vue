@@ -16,7 +16,7 @@ import {
   type FormulaReferenceEditContext,
 } from "./formula-input-lexical";
 import type { FormulaReferenceEditor, FormulaReferencePickPhase } from "./formula-editor-contract";
-import { getFormulaReferenceTokens } from "./formula-reference-tokens";
+import { getFormulaReferenceTokens, type FormulaReferenceRangeKind } from "./formula-reference-tokens";
 
 const props = defineProps<{
   value: string;
@@ -239,7 +239,11 @@ function canPickReference(): boolean {
   );
 }
 
-function pickReference(range: CellRange, phase: FormulaReferencePickPhase): boolean {
+function pickReference(
+  range: CellRange,
+  phase: FormulaReferencePickPhase,
+  rangeKind?: Exclude<FormulaReferenceRangeKind, "spill">,
+): boolean {
   if (phase === "start") {
     if (!canPickReference()) return false;
     referenceContext =
@@ -253,7 +257,13 @@ function pickReference(range: CellRange, phase: FormulaReferencePickPhase): bool
   }
   if (!referenceContext) return false;
   const source = expectedReferenceValue ?? props.value;
-  const edit = replaceFormulaReference(source, referenceContext, range, props.referenceSheetName);
+  const edit = replaceFormulaReference(
+    source,
+    referenceContext,
+    range,
+    props.referenceSheetName,
+    rangeKind,
+  );
   referenceContext = edit.context;
   referenceRangeState.value = { start: { ...range.start }, end: { ...range.end } };
   referenceActiveState.value = true;

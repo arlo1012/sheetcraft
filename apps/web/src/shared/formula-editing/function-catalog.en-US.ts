@@ -140,6 +140,8 @@ export const formulaArgumentLabelsEnUS: Record<string, string> = {
   dates: "dates",
   start_period: "start period",
   end_period: "end period",
+  weekend: "weekend",
+  match_end: "match end",
 };
 
 export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
@@ -645,6 +647,10 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
     XIRR: { description: "Returns the internal rate of return for dated cash flows.", example: "=XIRR(A1:A3,B1:B3)" },
     CUMIPMT: { description: "Returns cumulative interest paid between two periods.", example: "=CUMIPMT(0.1,12,1000,1,3,0)" },
     CUMPRINC: { description: "Returns cumulative principal paid between two periods.", example: "=CUMPRINC(0.1,12,1000,1,3,0)" },
+    "NETWORKDAYS.INTL": { description: "Returns working days between two dates using custom weekends.", example: "=NETWORKDAYS.INTL(DATE(2026,1,1),DATE(2026,1,10))" },
+    "WORKDAY.INTL": { description: "Returns a workday before or after a date using custom weekends.", example: "=WORKDAY.INTL(DATE(2026,1,1),5)" },
+    TEXTBEFORE: { description: "Returns text before a delimiter.", example: "=TEXTBEFORE(\"a-b\",\"-\")" },
+    TEXTAFTER: { description: "Returns text after a delimiter.", example: "=TEXTAFTER(\"a-b\",\"-\")" },
   },
   formulaArgumentLabelsEnUS,
 );

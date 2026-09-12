@@ -1,5 +1,5 @@
 import type { CellRange } from "@idea10/core/workbook";
-import type { FormulaReferenceToken } from "./formula-reference-tokens";
+import type { FormulaReferenceRangeKind, FormulaReferenceToken } from "./formula-reference-tokens";
 
 export type FormulaReferencePickPhase = "start" | "update" | "end";
 
@@ -9,7 +9,11 @@ export type FormulaReferencePickPhase = "start" | "update" | "end";
  */
 export type FormulaReferenceEditor = {
   canPickReference: () => boolean;
-  pickReference: (range: CellRange, phase: FormulaReferencePickPhase) => boolean;
+  pickReference: (
+    range: CellRange,
+    phase: FormulaReferencePickPhase,
+    rangeKind?: Exclude<FormulaReferenceRangeKind, "spill">,
+  ) => boolean;
   readonly referenceRange: CellRange | null;
   readonly referenceActive: boolean;
   readonly references: readonly FormulaReferenceToken[];

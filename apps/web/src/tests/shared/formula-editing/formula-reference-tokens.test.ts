@@ -54,6 +54,22 @@ describe("formula reference tokens", () => {
       ),
     ).toEqual(["'FY, (draft)'!A1"]);
   });
+
+  test("bounds whole row and column references and retains spill anchors", () => {
+    const tokens = getFormulaReferenceTokens("=SUM(A:A,$B:$D,2:2,$3:$5,A1#,'Sheet 2'!C:C)");
+    expect(tokens.map((token) => [token.text, token.rangeKind, token.range])).toEqual([
+      ["A:A", "column-axis", { start: { row: 0, column: 0 }, end: { row: 1048575, column: 0 } }],
+      ["$B:$D", "column-axis", { start: { row: 0, column: 1 }, end: { row: 1048575, column: 3 } }],
+      ["2:2", "row-axis", { start: { row: 1, column: 0 }, end: { row: 1, column: 16383 } }],
+      ["$3:$5", "row-axis", { start: { row: 2, column: 0 }, end: { row: 4, column: 16383 } }],
+      ["A1#", "spill", { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
+      [
+        "'Sheet 2'!C:C",
+        "column-axis",
+        { start: { row: 0, column: 2 }, end: { row: 1048575, column: 2 } },
+      ],
+    ]);
+  });
 });
 
 describe("formula commit completion", () => {

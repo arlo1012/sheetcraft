@@ -147,4 +147,35 @@ describe("formula input lexical assistance", () => {
       value: "=A1:B2",
     });
   });
+
+  test("edits axis and spill references without unbounded overlay geometry", () => {
+    expect(getFormulaReferenceEditContext("=SUM(A:A)", 6, 6)).toEqual({
+      replaceStart: 5,
+      replaceEnd: 8,
+    });
+    expect(getFormulaReferenceEditContext("=SUM(A1#)", 7, 7)).toEqual({
+      replaceStart: 5,
+      replaceEnd: 8,
+    });
+    expect(cycleFormulaReferenceAbsoluteMarkers("=A:A", { replaceStart: 1, replaceEnd: 4 }))
+      .toMatchObject({ value: "=$A:$A" });
+    expect(cycleFormulaReferenceAbsoluteMarkers("=$1:$3", { replaceStart: 1, replaceEnd: 6 }))
+      .toMatchObject({ value: "=1:3" });
+    expect(cycleFormulaReferenceAbsoluteMarkers("=A1#", { replaceStart: 1, replaceEnd: 4 }))
+      .toMatchObject({ value: "=$A$1#" });
+    expect(
+      replaceFormulaReference(
+        "=SUM(",
+        { replaceStart: 5, replaceEnd: 5 },
+        { start: { row: 0, column: 0 }, end: { row: 1048575, column: 2 } },
+      ).value,
+    ).toBe("=SUM(A:C");
+    expect(
+      replaceFormulaReference(
+        "=SUM(",
+        { replaceStart: 5, replaceEnd: 5 },
+        { start: { row: 1, column: 0 }, end: { row: 3, column: 16383 } },
+      ).value,
+    ).toBe("=SUM(2:4");
+  });
 });
