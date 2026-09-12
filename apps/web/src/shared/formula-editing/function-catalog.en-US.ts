@@ -98,6 +98,10 @@ export const formulaArgumentLabelsEnUS: Record<string, string> = {
   x: "x",
   lookup_vector: "lookup vector",
   result_vector: "result vector",
+  function_num: "function number",
+  options: "options",
+  ref1: "reference 1",
+  ref2: "reference 2",
   index_num: "index number",
   database: "database",
   field: "field",
@@ -201,7 +205,8 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=SUMPRODUCT(A1:A3,B1:B3)",
     },
     IF: {
-      description: "Returns one value when a condition is true and another when it is false.",
+      description:
+        "Returns one value when a condition is true and another when it is false.",
       example: '=IF(A1>0,"Yes","No")',
     },
     IFERROR: {
@@ -238,7 +243,8 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: '=IFS(A1>0,"positive",A1<0,"negative")',
     },
     SWITCH: {
-      description: "Matches an expression to values and returns the matching result.",
+      description:
+        "Matches an expression to values and returns the matching result.",
       example: '=SWITCH(A1,1,"one","other")',
     },
     AVERAGE: {
@@ -283,7 +289,8 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: '=AVERAGEIF(A1:A10,">0")',
     },
     AVERAGEIFS: {
-      description: "Returns the average of values that meet multiple conditions.",
+      description:
+        "Returns the average of values that meet multiple conditions.",
       example: '=AVERAGEIFS(B1:B10,A1:A10,">0")',
     },
     MEDIAN: {
@@ -340,15 +347,18 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=MATCH(A1,A1:A10,0)",
     },
     VLOOKUP: {
-      description: "Looks up a value in the first column and returns a value from that row.",
+      description:
+        "Looks up a value in the first column and returns a value from that row.",
       example: "=VLOOKUP(A1,A1:C10,2,FALSE)",
     },
     HLOOKUP: {
-      description: "Looks up a value in the first row and returns a value from that column.",
+      description:
+        "Looks up a value in the first row and returns a value from that column.",
       example: "=HLOOKUP(A1,A1:C3,2,FALSE)",
     },
     XLOOKUP: {
-      description: "Looks up a value and returns the matching value from another array.",
+      description:
+        "Looks up a value and returns the matching value from another array.",
       example: "=XLOOKUP(A1,A1:A10,B1:B10)",
     },
     LEN: {
@@ -429,7 +439,8 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=DATE(2026,9,12)",
     },
     TIME: {
-      description: "Returns a time serial number from hours, minutes, and seconds.",
+      description:
+        "Returns a time serial number from hours, minutes, and seconds.",
       example: "=TIME(12,30,0)",
     },
     YEAR: {
@@ -461,11 +472,13 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=DAYS(DATE(2026,9,12),DATE(2026,9,1))",
     },
     EDATE: {
-      description: "Returns a date a number of months before or after a start date.",
+      description:
+        "Returns a date a number of months before or after a start date.",
       example: "=EDATE(DATE(2026,1,1),1)",
     },
     EOMONTH: {
-      description: "Returns the last day of a month before or after a start date.",
+      description:
+        "Returns the last day of a month before or after a start date.",
       example: "=EOMONTH(DATE(2026,1,1),0)",
     },
     WEEKDAY: {
@@ -509,148 +522,581 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       description: "Converts a decimal number to hexadecimal.",
       example: "=DEC2HEX(10)",
     },
-    BITAND: { description: "Returns the bitwise AND of two numbers.", example: "=BITAND(13,25)" },
-    BITOR: { description: "Returns the bitwise OR of two numbers.", example: "=BITOR(13,25)" },
-    BITXOR: { description: "Returns the bitwise XOR of two numbers.", example: "=BITXOR(13,25)" },
-    BITLSHIFT: { description: "Shifts a number's bits left.", example: "=BITLSHIFT(4,2)" },
-    BITRSHIFT: { description: "Shifts a number's bits right.", example: "=BITRSHIFT(16,2)" },
-    DELTA: { description: "Tests whether two numbers are equal.", example: "=DELTA(5,5)" },
-    GESTEP: { description: "Tests whether a number is at least a step value.", example: "=GESTEP(5,3)" },
-    YEARFRAC: { description: "Returns the fraction of a year between two dates.", example: "=YEARFRAC(DATE(2026,1,1),DATE(2026,7,1))" },
-    DAYS360: { description: "Returns days between dates using a 360-day year.", example: "=DAYS360(DATE(2026,1,1),DATE(2026,2,1))" },
-    NETWORKDAYS: { description: "Returns working days between two dates.", example: "=NETWORKDAYS(DATE(2026,1,1),DATE(2026,1,10))" },
-    WORKDAY: { description: "Returns a workday before or after a date.", example: "=WORKDAY(DATE(2026,1,1),5)" },
-    WEEKNUM: { description: "Returns the week number for a date.", example: "=WEEKNUM(DATE(2026,1,1))" },
-    ISOWEEKNUM: { description: "Returns the ISO week number for a date.", example: "=ISOWEEKNUM(DATE(2026,1,1))" },
+    BITAND: {
+      description: "Returns the bitwise AND of two numbers.",
+      example: "=BITAND(13,25)",
+    },
+    BITOR: {
+      description: "Returns the bitwise OR of two numbers.",
+      example: "=BITOR(13,25)",
+    },
+    BITXOR: {
+      description: "Returns the bitwise XOR of two numbers.",
+      example: "=BITXOR(13,25)",
+    },
+    BITLSHIFT: {
+      description: "Shifts a number's bits left.",
+      example: "=BITLSHIFT(4,2)",
+    },
+    BITRSHIFT: {
+      description: "Shifts a number's bits right.",
+      example: "=BITRSHIFT(16,2)",
+    },
+    DELTA: {
+      description: "Tests whether two numbers are equal.",
+      example: "=DELTA(5,5)",
+    },
+    GESTEP: {
+      description: "Tests whether a number is at least a step value.",
+      example: "=GESTEP(5,3)",
+    },
+    YEARFRAC: {
+      description: "Returns the fraction of a year between two dates.",
+      example: "=YEARFRAC(DATE(2026,1,1),DATE(2026,7,1))",
+    },
+    DAYS360: {
+      description: "Returns days between dates using a 360-day year.",
+      example: "=DAYS360(DATE(2026,1,1),DATE(2026,2,1))",
+    },
+    NETWORKDAYS: {
+      description: "Returns working days between two dates.",
+      example: "=NETWORKDAYS(DATE(2026,1,1),DATE(2026,1,10))",
+    },
+    WORKDAY: {
+      description: "Returns a workday before or after a date.",
+      example: "=WORKDAY(DATE(2026,1,1),5)",
+    },
+    WEEKNUM: {
+      description: "Returns the week number for a date.",
+      example: "=WEEKNUM(DATE(2026,1,1))",
+    },
+    ISOWEEKNUM: {
+      description: "Returns the ISO week number for a date.",
+      example: "=ISOWEEKNUM(DATE(2026,1,1))",
+    },
     PI: { description: "Returns the value of pi.", example: "=PI()" },
-    RAND: { description: "Returns a random number from 0 through 1.", example: "=RAND()" },
-    RANDBETWEEN: { description: "Returns a random integer between two bounds.", example: "=RANDBETWEEN(1,10)" },
-    MROUND: { description: "Rounds a number to the requested multiple.", example: "=MROUND(10,3)" },
-    "CEILING.MATH": { description: "Rounds a number up to a multiple.", example: "=CEILING.MATH(-4.3)" },
-    "FLOOR.MATH": { description: "Rounds a number down to a multiple.", example: "=FLOOR.MATH(-4.3)" },
-    "ISO.CEILING": { description: "Rounds a number up using ISO ceiling rules.", example: "=ISO.CEILING(-4.3)" },
-    QUOTIENT: { description: "Returns the integer portion of a division.", example: "=QUOTIENT(10,3)" },
-    EVEN: { description: "Rounds a number away from zero to an even integer.", example: "=EVEN(3.2)" },
-    ODD: { description: "Rounds a number away from zero to an odd integer.", example: "=ODD(3.2)" },
-    SUMSQ: { description: "Returns the sum of squared arguments.", example: "=SUMSQ(3,4)" },
-    GCD: { description: "Returns the greatest common divisor.", example: "=GCD(24,36)" },
-    LCM: { description: "Returns the least common multiple.", example: "=LCM(6,8)" },
+    RAND: {
+      description: "Returns a random number from 0 through 1.",
+      example: "=RAND()",
+    },
+    RANDBETWEEN: {
+      description: "Returns a random integer between two bounds.",
+      example: "=RANDBETWEEN(1,10)",
+    },
+    MROUND: {
+      description: "Rounds a number to the requested multiple.",
+      example: "=MROUND(10,3)",
+    },
+    "CEILING.MATH": {
+      description: "Rounds a number up to a multiple.",
+      example: "=CEILING.MATH(-4.3)",
+    },
+    "FLOOR.MATH": {
+      description: "Rounds a number down to a multiple.",
+      example: "=FLOOR.MATH(-4.3)",
+    },
+    "ISO.CEILING": {
+      description: "Rounds a number up using ISO ceiling rules.",
+      example: "=ISO.CEILING(-4.3)",
+    },
+    QUOTIENT: {
+      description: "Returns the integer portion of a division.",
+      example: "=QUOTIENT(10,3)",
+    },
+    EVEN: {
+      description: "Rounds a number away from zero to an even integer.",
+      example: "=EVEN(3.2)",
+    },
+    ODD: {
+      description: "Rounds a number away from zero to an odd integer.",
+      example: "=ODD(3.2)",
+    },
+    SUMSQ: {
+      description: "Returns the sum of squared arguments.",
+      example: "=SUMSQ(3,4)",
+    },
+    GCD: {
+      description: "Returns the greatest common divisor.",
+      example: "=GCD(24,36)",
+    },
+    LCM: {
+      description: "Returns the least common multiple.",
+      example: "=LCM(6,8)",
+    },
     FACT: { description: "Returns a number's factorial.", example: "=FACT(5)" },
-    COMBIN: { description: "Returns the number of combinations for a number of items.", example: "=COMBIN(5,2)" },
-    "RANK.EQ": { description: "Returns a value's rank in a list.", example: "=RANK.EQ(3,A1:A3)" },
-    "RANK.AVG": { description: "Returns the average rank of a value in a list.", example: "=RANK.AVG(3,A1:A3)" },
-    "VAR.S": { description: "Returns the sample variance.", example: "=VAR.S(1,2,3)" },
-    "VAR.P": { description: "Returns the population variance.", example: "=VAR.P(1,2,3)" },
-    "STDEV.S": { description: "Returns the sample standard deviation.", example: "=STDEV.S(1,2,3)" },
-    "STDEV.P": { description: "Returns the population standard deviation.", example: "=STDEV.P(1,2,3)" },
-    AVEDEV: { description: "Returns the average absolute deviation.", example: "=AVEDEV(1,2,3)" },
-    DEVSQ: { description: "Returns the sum of squared deviations.", example: "=DEVSQ(1,2,3)" },
-    GEOMEAN: { description: "Returns the geometric mean.", example: "=GEOMEAN(1,2,4)" },
-    HARMEAN: { description: "Returns the harmonic mean.", example: "=HARMEAN(1,2,4)" },
-    "PERCENTILE.INC": { description: "Returns an inclusive percentile of an array.", example: "=PERCENTILE.INC(A1:A3,0.5)" },
-    "PERCENTILE.EXC": { description: "Returns an exclusive percentile of an array.", example: "=PERCENTILE.EXC(A1:A4,0.5)" },
-    "QUARTILE.INC": { description: "Returns an inclusive quartile of an array.", example: "=QUARTILE.INC(A1:A4,1)" },
-    "QUARTILE.EXC": { description: "Returns an exclusive quartile of an array.", example: "=QUARTILE.EXC(A1:A5,1)" },
-    "PERCENTRANK.INC": { description: "Returns an inclusive percent rank in an array.", example: "=PERCENTRANK.INC(A1:A3,2)" },
-    "PERCENTRANK.EXC": { description: "Returns an exclusive percent rank in an array.", example: "=PERCENTRANK.EXC(A1:A4,2)" },
-    "MODE.SNGL": { description: "Returns the most frequent value in a data set.", example: "=MODE.SNGL(1,2,2)" },
-    XMATCH: { description: "Returns the relative position of an item in an array.", example: "=XMATCH(2,A1:A3)" },
-    LOOKUP: { description: "Looks up a value in a vector.", example: "=LOOKUP(2,A1:A3,B1:B3)" },
-    CHOOSE: { description: "Returns a value from a list by index.", example: "=CHOOSE(2,\"red\",\"blue\")" },
-    AREAS: { description: "Returns the number of areas in a reference.", example: "=AREAS(A1:B2)" },
-    ROW: { description: "Returns a reference's row number.", example: "=ROW(A2)" },
-    COLUMN: { description: "Returns a reference's column number.", example: "=COLUMN(B1)" },
-    ROWS: { description: "Returns the number of rows in an array.", example: "=ROWS(A1:A3)" },
-    COLUMNS: { description: "Returns the number of columns in an array.", example: "=COLUMNS(A1:C1)" },
-    ADDRESS: { description: "Returns a cell reference as text.", example: "=ADDRESS(2,3)" },
+    COMBIN: {
+      description: "Returns the number of combinations for a number of items.",
+      example: "=COMBIN(5,2)",
+    },
+    SUBTOTAL: {
+      description: "Returns a subtotal for visible values in references.",
+      example: "=SUBTOTAL(9,A1:A10)",
+    },
+    AGGREGATE: {
+      description:
+        "Calculates an aggregate while optionally ignoring errors and hidden rows.",
+      example: "=AGGREGATE(9,5,A1:A10)",
+    },
+    "RANK.EQ": {
+      description: "Returns a value's rank in a list.",
+      example: "=RANK.EQ(3,A1:A3)",
+    },
+    "RANK.AVG": {
+      description: "Returns the average rank of a value in a list.",
+      example: "=RANK.AVG(3,A1:A3)",
+    },
+    "VAR.S": {
+      description: "Returns the sample variance.",
+      example: "=VAR.S(1,2,3)",
+    },
+    "VAR.P": {
+      description: "Returns the population variance.",
+      example: "=VAR.P(1,2,3)",
+    },
+    "STDEV.S": {
+      description: "Returns the sample standard deviation.",
+      example: "=STDEV.S(1,2,3)",
+    },
+    "STDEV.P": {
+      description: "Returns the population standard deviation.",
+      example: "=STDEV.P(1,2,3)",
+    },
+    AVEDEV: {
+      description: "Returns the average absolute deviation.",
+      example: "=AVEDEV(1,2,3)",
+    },
+    DEVSQ: {
+      description: "Returns the sum of squared deviations.",
+      example: "=DEVSQ(1,2,3)",
+    },
+    GEOMEAN: {
+      description: "Returns the geometric mean.",
+      example: "=GEOMEAN(1,2,4)",
+    },
+    HARMEAN: {
+      description: "Returns the harmonic mean.",
+      example: "=HARMEAN(1,2,4)",
+    },
+    "PERCENTILE.INC": {
+      description: "Returns an inclusive percentile of an array.",
+      example: "=PERCENTILE.INC(A1:A3,0.5)",
+    },
+    "PERCENTILE.EXC": {
+      description: "Returns an exclusive percentile of an array.",
+      example: "=PERCENTILE.EXC(A1:A4,0.5)",
+    },
+    "QUARTILE.INC": {
+      description: "Returns an inclusive quartile of an array.",
+      example: "=QUARTILE.INC(A1:A4,1)",
+    },
+    "QUARTILE.EXC": {
+      description: "Returns an exclusive quartile of an array.",
+      example: "=QUARTILE.EXC(A1:A5,1)",
+    },
+    "PERCENTRANK.INC": {
+      description: "Returns an inclusive percent rank in an array.",
+      example: "=PERCENTRANK.INC(A1:A3,2)",
+    },
+    "PERCENTRANK.EXC": {
+      description: "Returns an exclusive percent rank in an array.",
+      example: "=PERCENTRANK.EXC(A1:A4,2)",
+    },
+    "MODE.SNGL": {
+      description: "Returns the most frequent value in a data set.",
+      example: "=MODE.SNGL(1,2,2)",
+    },
+    XMATCH: {
+      description: "Returns the relative position of an item in an array.",
+      example: "=XMATCH(2,A1:A3)",
+    },
+    LOOKUP: {
+      description: "Looks up a value in a vector.",
+      example: "=LOOKUP(2,A1:A3,B1:B3)",
+    },
+    CHOOSE: {
+      description: "Returns a value from a list by index.",
+      example: '=CHOOSE(2,"red","blue")',
+    },
+    AREAS: {
+      description: "Returns the number of areas in a reference.",
+      example: "=AREAS(A1:B2)",
+    },
+    ROW: {
+      description: "Returns a reference's row number.",
+      example: "=ROW(A2)",
+    },
+    COLUMN: {
+      description: "Returns a reference's column number.",
+      example: "=COLUMN(B1)",
+    },
+    ROWS: {
+      description: "Returns the number of rows in an array.",
+      example: "=ROWS(A1:A3)",
+    },
+    COLUMNS: {
+      description: "Returns the number of columns in an array.",
+      example: "=COLUMNS(A1:C1)",
+    },
+    ADDRESS: {
+      description: "Returns a cell reference as text.",
+      example: "=ADDRESS(2,3)",
+    },
     N: { description: "Converts a value to a number.", example: "=N(TRUE)" },
-    TYPE: { description: "Returns a code for a value's data type.", example: "=TYPE(1)" },
-    "ERROR.TYPE": { description: "Returns a code for an error value.", example: "=ERROR.TYPE(NA())" },
-    ISNONTEXT: { description: "Tests whether a value is not text.", example: "=ISNONTEXT(1)" },
-    ISEVEN: { description: "Tests whether a number is even.", example: "=ISEVEN(2)" },
-    ISODD: { description: "Tests whether a number is odd.", example: "=ISODD(3)" },
-    DAVERAGE: { description: "Returns the average of database records meeting criteria.", example: "=DAVERAGE(A1:B3,2,D1:D2)" },
-    DCOUNT: { description: "Counts numeric database records meeting criteria.", example: "=DCOUNT(A1:B3,2,D1:D2)" },
-    DCOUNTA: { description: "Counts nonblank database records meeting criteria.", example: "=DCOUNTA(A1:B3,2,D1:D2)" },
-    DGET: { description: "Returns one database record meeting criteria.", example: "=DGET(A1:B3,2,D1:D2)" },
-    DMAX: { description: "Returns the maximum database value meeting criteria.", example: "=DMAX(A1:B3,2,D1:D2)" },
-    DMIN: { description: "Returns the minimum database value meeting criteria.", example: "=DMIN(A1:B3,2,D1:D2)" },
-    DPRODUCT: { description: "Multiplies database values meeting criteria.", example: "=DPRODUCT(A1:B3,2,D1:D2)" },
-    DSTDEV: { description: "Returns the sample standard deviation for database values.", example: "=DSTDEV(A1:B3,2,D1:D2)" },
-    DSTDEVP: { description: "Returns the population standard deviation for database values.", example: "=DSTDEVP(A1:B3,2,D1:D2)" },
-    DSUM: { description: "Sums database values meeting criteria.", example: "=DSUM(A1:B3,2,D1:D2)" },
-    DVAR: { description: "Returns the sample variance for database values.", example: "=DVAR(A1:B3,2,D1:D2)" },
-    DVARP: { description: "Returns the population variance for database values.", example: "=DVARP(A1:B3,2,D1:D2)" },
-    SEQUENCE: { description: "Returns a sequence of numbers in an array.", example: "=SEQUENCE(3)" },
-    FILTER: { description: "Filters an array using an include condition.", example: "=FILTER(A1:A3,B1:B3)" },
-    TAKE: { description: "Returns specified rows or columns from an array.", example: "=TAKE(A1:B3,2)" },
-    DROP: { description: "Excludes specified rows or columns from an array.", example: "=DROP(A1:B3,1)" },
-    HSTACK: { description: "Appends arrays horizontally.", example: "=HSTACK(A1:A2,B1:B2)" },
-    VSTACK: { description: "Appends arrays vertically.", example: "=VSTACK(A1:A2,B1:B2)" },
-    CHOOSECOLS: { description: "Returns selected columns from an array.", example: "=CHOOSECOLS(A1:C2,1,3)" },
-    CHOOSEROWS: { description: "Returns selected rows from an array.", example: "=CHOOSEROWS(A1:B3,1,3)" },
-    RATE: { description: "Returns the interest rate per period of an annuity.", example: "=RATE(12,-100,1000)" },
-    IPMT: { description: "Returns the interest payment for a period.", example: "=IPMT(0.1,1,12,1000)" },
-    PPMT: { description: "Returns the principal payment for a period.", example: "=PPMT(0.1,1,12,1000)" },
-    IRR: { description: "Returns the internal rate of return for cash flows.", example: "=IRR(A1:A4)" },
-    MIRR: { description: "Returns the modified internal rate of return for cash flows.", example: "=MIRR(A1:A4,0.1,0.12)" },
-    SLN: { description: "Returns straight-line depreciation for one period.", example: "=SLN(1000,100,5)" },
-    SYD: { description: "Returns sum-of-years' digits depreciation for a period.", example: "=SYD(1000,100,5,1)" },
-    DDB: { description: "Returns double-declining balance depreciation for a period.", example: "=DDB(1000,100,5,1)" },
-    CHAR: { description: "Returns the character specified by a code number.", example: "=CHAR(65)" },
-    CODE: { description: "Returns the numeric code for a character.", example: "=CODE(\"A\")" },
-    UNICHAR: { description: "Returns the Unicode character for a code point.", example: "=UNICHAR(65)" },
-    UNICODE: { description: "Returns the Unicode code point for a character.", example: "=UNICODE(\"A\")" },
-    NUMBERVALUE: { description: "Converts text to a number using supplied separators.", example: "=NUMBERVALUE(\"1,234.5\")" },
-    DOLLAR: { description: "Formats a number as currency text.", example: "=DOLLAR(1234.5,2)" },
-    FIXED: { description: "Formats a number as text with fixed decimal places.", example: "=FIXED(1234.5,1)" },
-    CONVERT: { description: "Converts a number from one measurement unit to another.", example: "=CONVERT(1,\"km\",\"m\")" },
-    BIN2HEX: { description: "Converts a binary number to hexadecimal.", example: "=BIN2HEX(\"1010\")" },
-    BIN2OCT: { description: "Converts a binary number to octal.", example: "=BIN2OCT(\"1010\")" },
-    DEC2OCT: { description: "Converts a decimal number to octal.", example: "=DEC2OCT(10)" },
-    HEX2BIN: { description: "Converts a hexadecimal number to binary.", example: "=HEX2BIN(\"A\")" },
-    HEX2OCT: { description: "Converts a hexadecimal number to octal.", example: "=HEX2OCT(\"A\")" },
-    OCT2BIN: { description: "Converts an octal number to binary.", example: "=OCT2BIN(\"12\")" },
-    OCT2DEC: { description: "Converts an octal number to decimal.", example: "=OCT2DEC(\"12\")" },
-    OCT2HEX: { description: "Converts an octal number to hexadecimal.", example: "=OCT2HEX(\"12\")" },
-    STDEV: { description: "Returns the sample standard deviation for compatibility.", example: "=STDEV(1,2,3)" },
-    STDEVP: { description: "Returns the population standard deviation for compatibility.", example: "=STDEVP(1,2,3)" },
-    VAR: { description: "Returns the sample variance for compatibility.", example: "=VAR(1,2,3)" },
-    VARP: { description: "Returns the population variance for compatibility.", example: "=VARP(1,2,3)" },
-    PERCENTILE: { description: "Returns a percentile of an array for compatibility.", example: "=PERCENTILE(A1:A3,0.5)" },
-    QUARTILE: { description: "Returns a quartile of an array for compatibility.", example: "=QUARTILE(A1:A4,1)" },
-    PERCENTRANK: { description: "Returns a percent rank in an array for compatibility.", example: "=PERCENTRANK(A1:A3,2)" },
-    SORT: { description: "Sorts the rows of an array.", example: "=SORT(A1:B3)" },
-    UNIQUE: { description: "Returns the unique rows or values from an array.", example: "=UNIQUE(A1:A3)" },
-    TRANSPOSE: { description: "Transposes rows and columns in an array.", example: "=TRANSPOSE(A1:B2)" },
-    ACOS: { description: "Returns the arccosine of a number.", example: "=ACOS(0.5)" },
-    ACOSH: { description: "Returns the inverse hyperbolic cosine of a number.", example: "=ACOSH(2)" },
-    ASIN: { description: "Returns the arcsine of a number.", example: "=ASIN(0.5)" },
-    ASINH: { description: "Returns the inverse hyperbolic sine of a number.", example: "=ASINH(1)" },
-    ATAN: { description: "Returns the arctangent of a number.", example: "=ATAN(1)" },
-    ATAN2: { description: "Returns the arctangent from x and y coordinates.", example: "=ATAN2(1,1)" },
-    ATANH: { description: "Returns the inverse hyperbolic tangent of a number.", example: "=ATANH(0.5)" },
-    COS: { description: "Returns the cosine of an angle in radians.", example: "=COS(0)" },
-    COSH: { description: "Returns the hyperbolic cosine of a number.", example: "=COSH(0)" },
-    DEGREES: { description: "Converts radians to degrees.", example: "=DEGREES(PI())" },
-    EXP: { description: "Returns e raised to a number's power.", example: "=EXP(1)" },
-    LN: { description: "Returns the natural logarithm of a number.", example: "=LN(2)" },
-    LOG: { description: "Returns a logarithm using a specified base.", example: "=LOG(100,10)" },
-    LOG10: { description: "Returns a base-10 logarithm.", example: "=LOG10(100)" },
-    RADIANS: { description: "Converts degrees to radians.", example: "=RADIANS(180)" },
-    SIN: { description: "Returns the sine of an angle in radians.", example: "=SIN(0)" },
-    SINH: { description: "Returns the hyperbolic sine of a number.", example: "=SINH(0)" },
-    SQRTPI: { description: "Returns the square root of a number multiplied by pi.", example: "=SQRTPI(4)" },
-    TAN: { description: "Returns the tangent of an angle in radians.", example: "=TAN(0)" },
-    TANH: { description: "Returns the hyperbolic tangent of a number.", example: "=TANH(0)" },
-    XNPV: { description: "Returns the net present value for cash flows on scheduled dates.", example: "=XNPV(0.1,A1:A3,B1:B3)" },
-    XIRR: { description: "Returns the internal rate of return for dated cash flows.", example: "=XIRR(A1:A3,B1:B3)" },
-    CUMIPMT: { description: "Returns cumulative interest paid between two periods.", example: "=CUMIPMT(0.1,12,1000,1,3,0)" },
-    CUMPRINC: { description: "Returns cumulative principal paid between two periods.", example: "=CUMPRINC(0.1,12,1000,1,3,0)" },
-    "NETWORKDAYS.INTL": { description: "Returns working days between two dates using custom weekends.", example: "=NETWORKDAYS.INTL(DATE(2026,1,1),DATE(2026,1,10))" },
-    "WORKDAY.INTL": { description: "Returns a workday before or after a date using custom weekends.", example: "=WORKDAY.INTL(DATE(2026,1,1),5)" },
-    TEXTBEFORE: { description: "Returns text before a delimiter.", example: "=TEXTBEFORE(\"a-b\",\"-\")" },
-    TEXTAFTER: { description: "Returns text after a delimiter.", example: "=TEXTAFTER(\"a-b\",\"-\")" },
+    TYPE: {
+      description: "Returns a code for a value's data type.",
+      example: "=TYPE(1)",
+    },
+    "ERROR.TYPE": {
+      description: "Returns a code for an error value.",
+      example: "=ERROR.TYPE(NA())",
+    },
+    ISNONTEXT: {
+      description: "Tests whether a value is not text.",
+      example: "=ISNONTEXT(1)",
+    },
+    ISEVEN: {
+      description: "Tests whether a number is even.",
+      example: "=ISEVEN(2)",
+    },
+    ISODD: {
+      description: "Tests whether a number is odd.",
+      example: "=ISODD(3)",
+    },
+    DAVERAGE: {
+      description: "Returns the average of database records meeting criteria.",
+      example: "=DAVERAGE(A1:B3,2,D1:D2)",
+    },
+    DCOUNT: {
+      description: "Counts numeric database records meeting criteria.",
+      example: "=DCOUNT(A1:B3,2,D1:D2)",
+    },
+    DCOUNTA: {
+      description: "Counts nonblank database records meeting criteria.",
+      example: "=DCOUNTA(A1:B3,2,D1:D2)",
+    },
+    DGET: {
+      description: "Returns one database record meeting criteria.",
+      example: "=DGET(A1:B3,2,D1:D2)",
+    },
+    DMAX: {
+      description: "Returns the maximum database value meeting criteria.",
+      example: "=DMAX(A1:B3,2,D1:D2)",
+    },
+    DMIN: {
+      description: "Returns the minimum database value meeting criteria.",
+      example: "=DMIN(A1:B3,2,D1:D2)",
+    },
+    DPRODUCT: {
+      description: "Multiplies database values meeting criteria.",
+      example: "=DPRODUCT(A1:B3,2,D1:D2)",
+    },
+    DSTDEV: {
+      description: "Returns the sample standard deviation for database values.",
+      example: "=DSTDEV(A1:B3,2,D1:D2)",
+    },
+    DSTDEVP: {
+      description:
+        "Returns the population standard deviation for database values.",
+      example: "=DSTDEVP(A1:B3,2,D1:D2)",
+    },
+    DSUM: {
+      description: "Sums database values meeting criteria.",
+      example: "=DSUM(A1:B3,2,D1:D2)",
+    },
+    DVAR: {
+      description: "Returns the sample variance for database values.",
+      example: "=DVAR(A1:B3,2,D1:D2)",
+    },
+    DVARP: {
+      description: "Returns the population variance for database values.",
+      example: "=DVARP(A1:B3,2,D1:D2)",
+    },
+    SEQUENCE: {
+      description: "Returns a sequence of numbers in an array.",
+      example: "=SEQUENCE(3)",
+    },
+    FILTER: {
+      description: "Filters an array using an include condition.",
+      example: "=FILTER(A1:A3,B1:B3)",
+    },
+    TAKE: {
+      description: "Returns specified rows or columns from an array.",
+      example: "=TAKE(A1:B3,2)",
+    },
+    DROP: {
+      description: "Excludes specified rows or columns from an array.",
+      example: "=DROP(A1:B3,1)",
+    },
+    HSTACK: {
+      description: "Appends arrays horizontally.",
+      example: "=HSTACK(A1:A2,B1:B2)",
+    },
+    VSTACK: {
+      description: "Appends arrays vertically.",
+      example: "=VSTACK(A1:A2,B1:B2)",
+    },
+    CHOOSECOLS: {
+      description: "Returns selected columns from an array.",
+      example: "=CHOOSECOLS(A1:C2,1,3)",
+    },
+    CHOOSEROWS: {
+      description: "Returns selected rows from an array.",
+      example: "=CHOOSEROWS(A1:B3,1,3)",
+    },
+    RATE: {
+      description: "Returns the interest rate per period of an annuity.",
+      example: "=RATE(12,-100,1000)",
+    },
+    IPMT: {
+      description: "Returns the interest payment for a period.",
+      example: "=IPMT(0.1,1,12,1000)",
+    },
+    PPMT: {
+      description: "Returns the principal payment for a period.",
+      example: "=PPMT(0.1,1,12,1000)",
+    },
+    IRR: {
+      description: "Returns the internal rate of return for cash flows.",
+      example: "=IRR(A1:A4)",
+    },
+    MIRR: {
+      description:
+        "Returns the modified internal rate of return for cash flows.",
+      example: "=MIRR(A1:A4,0.1,0.12)",
+    },
+    SLN: {
+      description: "Returns straight-line depreciation for one period.",
+      example: "=SLN(1000,100,5)",
+    },
+    SYD: {
+      description: "Returns sum-of-years' digits depreciation for a period.",
+      example: "=SYD(1000,100,5,1)",
+    },
+    DDB: {
+      description:
+        "Returns double-declining balance depreciation for a period.",
+      example: "=DDB(1000,100,5,1)",
+    },
+    CHAR: {
+      description: "Returns the character specified by a code number.",
+      example: "=CHAR(65)",
+    },
+    CODE: {
+      description: "Returns the numeric code for a character.",
+      example: '=CODE("A")',
+    },
+    UNICHAR: {
+      description: "Returns the Unicode character for a code point.",
+      example: "=UNICHAR(65)",
+    },
+    UNICODE: {
+      description: "Returns the Unicode code point for a character.",
+      example: '=UNICODE("A")',
+    },
+    NUMBERVALUE: {
+      description: "Converts text to a number using supplied separators.",
+      example: '=NUMBERVALUE("1,234.5")',
+    },
+    DOLLAR: {
+      description: "Formats a number as currency text.",
+      example: "=DOLLAR(1234.5,2)",
+    },
+    FIXED: {
+      description: "Formats a number as text with fixed decimal places.",
+      example: "=FIXED(1234.5,1)",
+    },
+    CONVERT: {
+      description: "Converts a number from one measurement unit to another.",
+      example: '=CONVERT(1,"km","m")',
+    },
+    BIN2HEX: {
+      description: "Converts a binary number to hexadecimal.",
+      example: '=BIN2HEX("1010")',
+    },
+    BIN2OCT: {
+      description: "Converts a binary number to octal.",
+      example: '=BIN2OCT("1010")',
+    },
+    DEC2OCT: {
+      description: "Converts a decimal number to octal.",
+      example: "=DEC2OCT(10)",
+    },
+    HEX2BIN: {
+      description: "Converts a hexadecimal number to binary.",
+      example: '=HEX2BIN("A")',
+    },
+    HEX2OCT: {
+      description: "Converts a hexadecimal number to octal.",
+      example: '=HEX2OCT("A")',
+    },
+    OCT2BIN: {
+      description: "Converts an octal number to binary.",
+      example: '=OCT2BIN("12")',
+    },
+    OCT2DEC: {
+      description: "Converts an octal number to decimal.",
+      example: '=OCT2DEC("12")',
+    },
+    OCT2HEX: {
+      description: "Converts an octal number to hexadecimal.",
+      example: '=OCT2HEX("12")',
+    },
+    STDEV: {
+      description: "Returns the sample standard deviation for compatibility.",
+      example: "=STDEV(1,2,3)",
+    },
+    STDEVP: {
+      description:
+        "Returns the population standard deviation for compatibility.",
+      example: "=STDEVP(1,2,3)",
+    },
+    VAR: {
+      description: "Returns the sample variance for compatibility.",
+      example: "=VAR(1,2,3)",
+    },
+    VARP: {
+      description: "Returns the population variance for compatibility.",
+      example: "=VARP(1,2,3)",
+    },
+    PERCENTILE: {
+      description: "Returns a percentile of an array for compatibility.",
+      example: "=PERCENTILE(A1:A3,0.5)",
+    },
+    QUARTILE: {
+      description: "Returns a quartile of an array for compatibility.",
+      example: "=QUARTILE(A1:A4,1)",
+    },
+    PERCENTRANK: {
+      description: "Returns a percent rank in an array for compatibility.",
+      example: "=PERCENTRANK(A1:A3,2)",
+    },
+    SORT: {
+      description: "Sorts the rows of an array.",
+      example: "=SORT(A1:B3)",
+    },
+    UNIQUE: {
+      description: "Returns the unique rows or values from an array.",
+      example: "=UNIQUE(A1:A3)",
+    },
+    TRANSPOSE: {
+      description: "Transposes rows and columns in an array.",
+      example: "=TRANSPOSE(A1:B2)",
+    },
+    ACOS: {
+      description: "Returns the arccosine of a number.",
+      example: "=ACOS(0.5)",
+    },
+    ACOSH: {
+      description: "Returns the inverse hyperbolic cosine of a number.",
+      example: "=ACOSH(2)",
+    },
+    ASIN: {
+      description: "Returns the arcsine of a number.",
+      example: "=ASIN(0.5)",
+    },
+    ASINH: {
+      description: "Returns the inverse hyperbolic sine of a number.",
+      example: "=ASINH(1)",
+    },
+    ATAN: {
+      description: "Returns the arctangent of a number.",
+      example: "=ATAN(1)",
+    },
+    ATAN2: {
+      description: "Returns the arctangent from x and y coordinates.",
+      example: "=ATAN2(1,1)",
+    },
+    ATANH: {
+      description: "Returns the inverse hyperbolic tangent of a number.",
+      example: "=ATANH(0.5)",
+    },
+    COS: {
+      description: "Returns the cosine of an angle in radians.",
+      example: "=COS(0)",
+    },
+    COSH: {
+      description: "Returns the hyperbolic cosine of a number.",
+      example: "=COSH(0)",
+    },
+    DEGREES: {
+      description: "Converts radians to degrees.",
+      example: "=DEGREES(PI())",
+    },
+    EXP: {
+      description: "Returns e raised to a number's power.",
+      example: "=EXP(1)",
+    },
+    LN: {
+      description: "Returns the natural logarithm of a number.",
+      example: "=LN(2)",
+    },
+    LOG: {
+      description: "Returns a logarithm using a specified base.",
+      example: "=LOG(100,10)",
+    },
+    LOG10: {
+      description: "Returns a base-10 logarithm.",
+      example: "=LOG10(100)",
+    },
+    RADIANS: {
+      description: "Converts degrees to radians.",
+      example: "=RADIANS(180)",
+    },
+    SIN: {
+      description: "Returns the sine of an angle in radians.",
+      example: "=SIN(0)",
+    },
+    SINH: {
+      description: "Returns the hyperbolic sine of a number.",
+      example: "=SINH(0)",
+    },
+    SQRTPI: {
+      description: "Returns the square root of a number multiplied by pi.",
+      example: "=SQRTPI(4)",
+    },
+    TAN: {
+      description: "Returns the tangent of an angle in radians.",
+      example: "=TAN(0)",
+    },
+    TANH: {
+      description: "Returns the hyperbolic tangent of a number.",
+      example: "=TANH(0)",
+    },
+    XNPV: {
+      description:
+        "Returns the net present value for cash flows on scheduled dates.",
+      example: "=XNPV(0.1,A1:A3,B1:B3)",
+    },
+    XIRR: {
+      description: "Returns the internal rate of return for dated cash flows.",
+      example: "=XIRR(A1:A3,B1:B3)",
+    },
+    CUMIPMT: {
+      description: "Returns cumulative interest paid between two periods.",
+      example: "=CUMIPMT(0.1,12,1000,1,3,0)",
+    },
+    CUMPRINC: {
+      description: "Returns cumulative principal paid between two periods.",
+      example: "=CUMPRINC(0.1,12,1000,1,3,0)",
+    },
+    "NETWORKDAYS.INTL": {
+      description:
+        "Returns working days between two dates using custom weekends.",
+      example: "=NETWORKDAYS.INTL(DATE(2026,1,1),DATE(2026,1,10))",
+    },
+    "WORKDAY.INTL": {
+      description:
+        "Returns a workday before or after a date using custom weekends.",
+      example: "=WORKDAY.INTL(DATE(2026,1,1),5)",
+    },
+    TEXTBEFORE: {
+      description: "Returns text before a delimiter.",
+      example: '=TEXTBEFORE("a-b","-")',
+    },
+    TEXTAFTER: {
+      description: "Returns text after a delimiter.",
+      example: '=TEXTAFTER("a-b","-")',
+    },
   },
   formulaArgumentLabelsEnUS,
 );
