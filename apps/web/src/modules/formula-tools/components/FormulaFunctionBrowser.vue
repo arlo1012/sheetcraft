@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { Search, X } from "lucide-vue-next";
 import { computed, nextTick, ref, watch } from "vue";
+import { Button as TButton } from "tdesign-vue-next/es/button";
+import { Drawer } from "tdesign-vue-next/es/drawer";
+import { Input as TInput } from "tdesign-vue-next/es/input";
+import { List as TList, ListItem as TListItem } from "tdesign-vue-next/es/list";
+import { Menu as TMenu, MenuItem as TMenuItem } from "tdesign-vue-next/es/menu";
+import { Search } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   FORMULA_CATEGORY_ORDER,
@@ -22,7 +27,7 @@ const { t } = useAppI18n();
 const query = ref("");
 const selectedCategory = ref<string | "recent" | "all">("all");
 const selectedName = ref<string | undefined>();
-const searchRef = ref<HTMLInputElement | null>(null);
+const searchRef = ref<{ focus(): void } | null>(null);
 const translate = ((key) => t(key)) as FormulaCatalogTranslator;
 const entries = computed(() => getFormulaCatalogEntries(translate));
 const visibleCategories = computed(() =>
@@ -65,7 +70,8 @@ watch(
   },
 );
 
-function selectCategory(category: string | "recent" | "all"): void {
+function selectCategory(category: string | number): void {
+  if (typeof category !== "string") return;
   selectedCategory.value = category;
   selectedName.value = undefined;
 }
@@ -101,81 +107,80 @@ function onKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-  <Teleport to="body">
-    <aside
-      v-if="visible"
-      class="formula-function-browser"
-      role="dialog"
-      aria-modal="false"
-      tabindex="-1"
-      :aria-label="t('formulaTools.functionBrowser')"
-      :data-cell-edit-session="editSessionId"
-      @keydown="onKeydown"
-    >
-      <header class="formula-function-browser__header">
-        <h2>{{ t("formulaTools.functionBrowser") }}</h2>
-        <button type="button" :aria-label="t('formulaTools.cancel')" @click="emit('close')">
-          <X :size="16" />
-        </button>
-      </header>
-      <label class="formula-function-browser__search">
-        <Search :size="15" aria-hidden="true" />
-        <input
-          ref="searchRef"
-          v-model="query"
-          type="search"
-          :aria-label="t('formulaTools.searchFunctions')"
-          :placeholder="t('formulaTools.searchFunctions')"
-        />
-      </label>
+  <Drawer
+    v-if="visible"
+    :visible="visible"
+    :header="t('formulaTools.functionBrowser')"
+    :close-btn="true"
+    :footer="false"
+    placement="right"
+    mode="overlay"
+    size="min(740px, calc(100vw - 24px))"
+    :show-overlay="false"
+    :close-on-overlay-click="false"
+    :close-on-esc-keydown="false"
+    drawer-class-name="formula-function-browser"
+    :aria-label="t('formulaTools.functionBrowser')"
+    :data-cell-edit-session="editSessionId"
+    @close="emit('close')"
+    @keydown="onKeydown"
+  >
+    <div class="formula-function-browser__content">
+      <TInput
+        ref="searchRef"
+        v-model="query"
+        type="search"
+        clearable
+        :aria-label="t('formulaTools.searchFunctions')"
+        :placeholder="t('formulaTools.searchFunctions')"
+      >
+        <template #prefix-icon><Search :size="15" aria-hidden="true" /></template>
+      </TInput>
       <div class="formula-function-browser__body">
-        <nav :aria-label="t('formulaTools.categories')">
-          <button
-            :class="{ active: selectedCategory === 'all' }"
-            type="button"
-            @click="selectCategory('all')"
-          >
-            {{ t("formulaTools.allFunctions") }}
-          </button>
-          <button
-            v-if="recentFunctions.length"
-            :class="{ active: selectedCategory === 'recent' }"
-            type="button"
-            @click="selectCategory('recent')"
-          >
+        <TMenu
+          class="formula-function-browser__categories"
+          :value="selectedCategory"
+          :width="150"
+          :aria-label="t('formulaTools.categories')"
+          @change="selectCategory"
+        >
+          <TMenuItem value="all">{{ t("formulaTools.allFunctions") }}</TMenuItem>
+          <TMenuItem v-if="recentFunctions.length" value="recent">
             {{ t("formulaTools.recent") }}
-          </button>
-          <button
-            v-for="category in visibleCategories"
-            :key="category"
-            :class="{ active: selectedCategory === category }"
-            type="button"
-            @click="selectCategory(category)"
-          >
+          </TMenuItem>
+          <TMenuItem v-for="category in visibleCategories" :key="category" :value="category">
             {{ getFormulaCategoryLabel(category, (key) => t(key)) }}
-          </button>
-        </nav>
-        <div class="formula-function-browser__results" role="listbox">
-          <button
+          </TMenuItem>
+        </TMenu>
+        <TList class="formula-function-browser__results" role="listbox" :split="false">
+          <TListItem
             v-for="(entry, index) in filteredEntries"
             :key="entry.name"
-            :class="{ active: selectedEntry?.name === entry.name }"
-            type="button"
-            role="option"
-            :tabindex="selectedIndex === index ? 0 : -1"
-            :aria-selected="selectedEntry?.name === entry.name"
-            :data-formula-browser-result="entry.name"
-            @keydown="onResultKeydown"
-            @click="selectedName = entry.name"
-            @dblclick="insert(entry.name)"
+            class="formula-function-browser__result-item"
           >
-            <strong>{{ entry.name }}</strong
-            ><span>{{ entry.description }}</span>
-          </button>
-          <p v-if="!filteredEntries.length">
+            <TButton
+              class="formula-function-browser__result"
+              :theme="selectedEntry?.name === entry.name ? 'primary' : 'default'"
+              :variant="selectedEntry?.name === entry.name ? 'base' : 'text'"
+              type="button"
+              role="option"
+              :tabindex="selectedIndex === index ? 0 : -1"
+              :aria-selected="selectedEntry?.name === entry.name"
+              :data-formula-browser-result="entry.name"
+              @keydown="onResultKeydown"
+              @click="selectedName = entry.name"
+              @dblclick="insert(entry.name)"
+            >
+              <span class="formula-function-browser__result-content">
+                <strong>{{ entry.name }}</strong>
+                <span>{{ entry.description }}</span>
+              </span>
+            </TButton>
+          </TListItem>
+          <p v-if="!filteredEntries.length" class="formula-function-browser__empty">
             {{ t("formulaTools.noFunctions") }}
           </p>
-        </div>
+        </TList>
         <section v-if="selectedEntry" class="formula-function-browser__details">
           <h3>{{ selectedEntry.name }}</h3>
           <dl>
@@ -186,177 +191,90 @@ function onKeydown(event: KeyboardEvent): void {
             <dt>{{ t("formulaTools.example") }}</dt>
             <dd>{{ selectedEntry.example }}</dd>
           </dl>
-          <button type="button" class="formula-function-browser__insert" @click="insert()">
-            {{ t("formulaTools.insertFunction") }}
-          </button>
+          <div class="formula-function-browser__insert-action">
+            <TButton block theme="primary" type="button" @click="insert()">
+              {{ t("formulaTools.insertFunction") }}
+            </TButton>
+          </div>
         </section>
       </div>
-    </aside>
-  </Teleport>
+    </div>
+  </Drawer>
 </template>
 
 <style scoped lang="scss">
-.formula-function-browser {
-  position: fixed;
-  z-index: 50;
-  top: 0;
-  right: 0;
-  bottom: 0;
+.formula-function-browser__content {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  width: min(740px, calc(100vw - 24px));
-  background: var(--idea-surface-panel);
-  border-left: 1px solid var(--idea-border-subtle);
-  box-shadow: var(--idea-shadow-dialog);
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
   color: var(--idea-text-primary);
   font: inherit;
-  &__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 16px 8px;
-    h2 {
-      margin: 0;
-      font-size: var(--idea-font-size-heading);
-      line-height: var(--idea-line-height-heading);
-    }
-    button {
-      display: grid;
-      width: 28px;
-      height: 28px;
-      place-items: center;
-      padding: 0;
-      background: transparent;
-      border: 0;
-      border-radius: var(--idea-radius-default);
-      color: inherit;
-      &:hover {
-        background: var(--idea-icon-button-hover-bg);
-      }
-    }
+}
+.formula-function-browser__body {
+  display: grid;
+  grid-template-columns: 150px minmax(190px, 1fr) minmax(220px, 1.1fr);
+  min-height: 0;
+  margin-top: 12px;
+  border-top: 1px solid var(--idea-border-subtle);
+}
+.formula-function-browser__categories,
+.formula-function-browser__results {
+  min-height: 0;
+  overflow: auto;
+  border-right: 1px solid var(--idea-border-subtle);
+}
+.formula-function-browser__result {
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 8px;
+  text-align: left;
+}
+.formula-function-browser__result-item {
+  padding: 0;
+}
+.formula-function-browser__result-content {
+  display: grid;
+  text-align: left;
+  & strong {
+    line-height: var(--idea-line-height-body-medium);
   }
-  &__search {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0 16px 12px;
-    padding: 3px 8px;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
+  & span {
     color: var(--idea-text-secondary);
-    input {
-      width: 100%;
-      height: 26px;
-      padding: 0;
-      background: transparent;
-      border: 0;
-      color: var(--idea-text-primary);
-      font: inherit;
-      outline: none;
-    }
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
   }
-  &__body {
+}
+.formula-function-browser__empty {
+  padding: 8px;
+  color: var(--idea-text-secondary);
+}
+.formula-function-browser__details {
+  padding-left: 16px;
+  overflow: auto;
+  h3 {
+    margin: 0 0 12px;
+    font-size: var(--idea-font-size-heading);
+    line-height: var(--idea-line-height-heading);
+  }
+  dl {
     display: grid;
-    grid-template-columns: 150px minmax(190px, 1fr) minmax(220px, 1.1fr);
-    min-height: 0;
-    border-top: 1px solid var(--idea-border-subtle);
+    gap: 3px;
+    margin: 0;
   }
-  nav {
-    display: grid;
-    align-content: start;
-    gap: 2px;
-    padding: 8px;
-    border-right: 1px solid var(--idea-border-subtle);
-    button {
-      min-height: 28px;
-      padding: 0 8px;
-      overflow: hidden;
-      background: transparent;
-      border: 0;
-      border-radius: 2px;
-      color: var(--idea-text-primary);
-      font: inherit;
-      text-align: left;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      &:hover,
-      &.active {
-        background: var(--idea-surface-hover);
-      }
-      &.active {
-        color: var(--idea-action-primary);
-        font-weight: 500;
-      }
-    }
+  dt {
+    margin-top: 10px;
+    color: var(--idea-text-secondary);
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
   }
-  &__results {
-    min-height: 0;
-    padding: var(--idea-menu-padding);
-    overflow: auto;
-    border-right: 1px solid var(--idea-border-subtle);
-    button {
-      display: grid;
-      width: 100%;
-      min-height: 48px;
-      padding: 6px 8px;
-      background: transparent;
-      border: 0;
-      border-radius: 2px;
-      color: var(--idea-text-primary);
-      font: inherit;
-      text-align: left;
-      &:hover,
-      &.active {
-        background: var(--idea-surface-hover);
-      }
-      strong {
-        line-height: 20px;
-      }
-      span,
-      p {
-        color: var(--idea-text-secondary);
-        font-size: var(--idea-font-size-body-small);
-        line-height: var(--idea-line-height-body-small);
-      }
-    }
-    p {
-      padding: 8px;
-    }
+  dd {
+    margin: 0;
+    line-height: var(--idea-line-height-body-medium);
+    white-space: pre-wrap;
   }
-  &__details {
-    padding: 16px;
-    overflow: auto;
-    h3 {
-      margin: 0 0 12px;
-      font-size: var(--idea-font-size-heading);
-      line-height: var(--idea-line-height-heading);
-    }
-    dl {
-      display: grid;
-      gap: 3px;
-      margin: 0;
-    }
-    dt {
-      margin-top: 10px;
-      color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-body-small);
-      line-height: var(--idea-line-height-body-small);
-    }
-    dd {
-      margin: 0;
-      line-height: var(--idea-line-height-body-medium);
-      white-space: pre-wrap;
-    }
-  }
-  &__insert {
-    width: 100%;
-    height: 28px;
-    margin-top: 18px;
-    background: var(--idea-action-primary);
-    border: 1px solid var(--idea-action-primary);
-    border-radius: var(--idea-radius-default);
-    color: var(--idea-text-inverse);
-    font: inherit;
-  }
+}
+.formula-function-browser__insert-action {
+  margin-top: 18px;
 }
 </style>

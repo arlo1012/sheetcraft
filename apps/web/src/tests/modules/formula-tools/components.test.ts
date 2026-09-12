@@ -1,6 +1,6 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { createAppI18n } from "../../../shared/i18n";
 import {
   evaluateFormula,
@@ -50,9 +50,12 @@ function mountToolbar() {
 describe("FormulaToolbar", () => {
   test("emits the primary aggregate and a category function without committing the edit session", async () => {
     const wrapper = mountToolbar();
-    await wrapper.get("[data-ribbon-split-main]").trigger("click");
+    await wrapper.get('button[aria-label="AutoSum"]').trigger("click");
     expect(wrapper.emitted("aggregate")).toEqual([["SUM"]]);
     await wrapper.get(".formula-category-menu__trigger").trigger("click");
+    await vi.waitFor(() =>
+      expect(document.querySelector("[data-formula-function]")).not.toBeNull(),
+    );
     const menu = document.querySelector<HTMLElement>(
       "[data-cell-edit-session='edit-1'] [data-formula-function]",
     );
@@ -99,19 +102,28 @@ describe("FormulaToolbar", () => {
   test("creates names from selected label edges and sends actual calculation settings", async () => {
     const wrapper = mountToolbar();
     await wrapper.get('[aria-label="Quick create"]').trigger("click");
-    const left = document.querySelector<HTMLInputElement>("[data-formula-name-position='left']");
-    left!.checked = true;
-    left?.dispatchEvent(new Event("change", { bubbles: true }));
+    await vi.waitFor(() =>
+      expect(document.querySelector("[data-formula-name-confirm]")).not.toBeNull(),
+    );
+    const left = document.querySelector<HTMLInputElement>(
+      "[data-formula-name-position='left'] input",
+    );
+    left?.click();
+    await nextTick();
     document
       .querySelector<HTMLElement>("[data-formula-name-confirm]")
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(wrapper.emitted("createNamesFromSelection")).toEqual([[["top", "left"]]]);
 
     await wrapper.get('[aria-label="Calculation options"]').trigger("click");
+    await vi.waitFor(() =>
+      expect(document.querySelector(".formula-toolbar__calculation-menu")).not.toBeNull(),
+    );
     const manual = document.querySelectorAll<HTMLInputElement>(
       ".formula-toolbar__calculation-menu input[type='radio']",
     )[1];
-    manual?.dispatchEvent(new Event("change", { bubbles: true }));
+    manual?.closest("label")?.click();
+    await nextTick();
     expect(wrapper.emitted("updateCalculationSettings")).toEqual([
       [{ mode: "manual", iterative: false, maxIterations: 100, maxChange: 0.001 }],
     ]);
@@ -181,10 +193,10 @@ describe("NamedRangesDialog", () => {
       },
     });
     mounted.push(wrapper);
-    const inputs = wrapper.findAll("input");
-    await inputs[0]!.setValue("Revenue");
-    await inputs[1]!.setValue("Budget!A1:A5");
+    await wrapper.get("[data-formula-name] input").setValue("Revenue");
+    await wrapper.get("[data-formula-reference] input").setValue("Budget!A1:A5");
     await wrapper.find("form").trigger("submit");
+    await flushPromises();
     expect(wrapper.emitted("save")).toEqual([
       [{ name: "Revenue", scopeSheetId: "sheet-1", reference: "Budget!A1:A5" }],
     ]);

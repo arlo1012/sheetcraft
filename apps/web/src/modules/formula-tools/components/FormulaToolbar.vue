@@ -18,6 +18,12 @@ import {
   Wrench,
 } from "lucide-vue-next";
 import { computed, nextTick, ref } from "vue";
+import { Button as TButton } from "tdesign-vue-next/es/button";
+import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
+import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
+import type { RadioValue } from "tdesign-vue-next/es/radio/type";
+import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
+import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import type { DefinedNameLabelPosition } from "@idea10/core/commands";
 import type { WorkbookCalculationSettings } from "@idea10/core/workbook";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
@@ -161,13 +167,16 @@ function updateCalculationSettings(patch: Partial<WorkbookCalculationSettings>):
   if (!props.calculationSettings) return;
   emit("updateCalculationSettings", { ...props.calculationSettings, ...patch });
 }
-function updateNumericCalculationSetting(key: "maxIterations" | "maxChange", event: Event): void {
-  const value = Number((event.target as HTMLInputElement).value);
-  if (!Number.isFinite(value) || value <= 0) return;
-  updateCalculationSettings({ [key]: key === "maxIterations" ? Math.floor(value) : value });
+function updateNumericCalculationSetting(
+  key: "maxIterations" | "maxChange",
+  value: InputNumberValue,
+): void {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return;
+  if (key === "maxIterations" && (!Number.isInteger(value) || value > 10000)) return;
+  updateCalculationSettings({ [key]: value });
 }
-function updateIterativeCalculation(event: Event): void {
-  updateCalculationSettings({ iterative: (event.target as HTMLInputElement).checked });
+function updateCalculationMode(value: RadioValue): void {
+  if (value === "automatic" || value === "manual") updateCalculationSettings({ mode: value });
 }
 function insertFunction(name: string): void {
   emit("insertFunction", name);
@@ -371,47 +380,29 @@ function insertFunction(name: string): void {
             :data-cell-edit-session="editSessionId"
           >
             <p>{{ t("formulaTools.createNamesFromSelection") }}</p>
-            <label
-              ><input
-                v-model="namePositions.top"
-                type="checkbox"
-                data-formula-name-position="top"
-              />
-              {{ t("formulaTools.nameFromTopRow") }}</label
-            ><label
-              ><input
-                v-model="namePositions.left"
-                type="checkbox"
-                data-formula-name-position="left"
-              />
-              {{ t("formulaTools.nameFromLeftColumn") }}</label
-            ><label
-              ><input
-                v-model="namePositions.bottom"
-                type="checkbox"
-                data-formula-name-position="bottom"
-              />
-              {{ t("formulaTools.nameFromBottomRow") }}</label
-            ><label
-              ><input
-                v-model="namePositions.right"
-                type="checkbox"
-                data-formula-name-position="right"
-              />
-              {{ t("formulaTools.nameFromRightColumn") }}</label
-            >
+            <TCheckbox v-model="namePositions.top" data-formula-name-position="top">{{
+              t("formulaTools.nameFromTopRow")
+            }}</TCheckbox>
+            <TCheckbox v-model="namePositions.left" data-formula-name-position="left">{{
+              t("formulaTools.nameFromLeftColumn")
+            }}</TCheckbox>
+            <TCheckbox v-model="namePositions.bottom" data-formula-name-position="bottom">{{
+              t("formulaTools.nameFromBottomRow")
+            }}</TCheckbox>
+            <TCheckbox v-model="namePositions.right" data-formula-name-position="right">{{
+              t("formulaTools.nameFromRightColumn")
+            }}</TCheckbox>
             <div class="formula-toolbar__name-menu-actions">
-              <button type="button" @click="nameMenuOpen = false">
-                {{ t("formulaTools.cancel") }}
-              </button>
-              <button
-                type="button"
+              <TButton variant="outline" theme="default" @click="nameMenuOpen = false">{{
+                t("formulaTools.cancel")
+              }}</TButton>
+              <TButton
+                theme="primary"
                 data-formula-name-confirm
                 :disabled="!Object.values(namePositions).some(Boolean)"
                 @click="createNamesFromSelection"
+                >{{ t("formulaTools.createNamesFromSelection") }}</TButton
               >
-                {{ t("formulaTools.createNamesFromSelection") }}
-              </button>
             </div>
           </section></Teleport
         >
@@ -442,55 +433,63 @@ function insertFunction(name: string): void {
             :style="calculationMenuStyles"
             :data-cell-edit-session="editSessionId"
           >
-            <fieldset>
-              <legend>{{ t("formulaTools.calculation") }}</legend>
-              <label
-                ><input
-                  type="radio"
-                  name="calculation-mode"
-                  :checked="calculationSettings.mode === 'automatic'"
-                  @change="updateCalculationSettings({ mode: 'automatic' })"
-                />{{ t("formulaTools.automaticCalculation") }}</label
-              ><label
-                ><input
-                  type="radio"
-                  name="calculation-mode"
-                  :checked="calculationSettings.mode === 'manual'"
-                  @change="updateCalculationSettings({ mode: 'manual' })"
-                />{{ t("formulaTools.manualCalculation") }}</label
+            <div
+              class="formula-toolbar__calculation-mode"
+              role="group"
+              :aria-label="t('formulaTools.calculation')"
+            >
+              <span>{{ t("formulaTools.calculation") }}</span>
+              <TRadioGroup
+                :value="calculationSettings.mode"
+                direction="vertical"
+                @change="updateCalculationMode"
               >
-            </fieldset>
-            <fieldset>
-              <label
-                ><input
-                  type="checkbox"
-                  :checked="calculationSettings.iterative"
-                  @change="updateIterativeCalculation"
-                />{{ t("formulaTools.iterativeCalculation") }}</label
-              >
-              <label
-                >{{ t("formulaTools.maximumIterations") }}
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  :disabled="!calculationSettings.iterative"
-                  :value="calculationSettings.maxIterations"
-                  @change="updateNumericCalculationSetting('maxIterations', $event)"
-                />
-              </label>
-              <label
-                >{{ t("formulaTools.maximumChange") }}
-                <input
-                  type="number"
-                  min="0.000000001"
-                  step="any"
-                  :disabled="!calculationSettings.iterative"
-                  :value="calculationSettings.maxChange"
-                  @change="updateNumericCalculationSetting('maxChange', $event)"
-                />
-              </label>
-            </fieldset></section
+                <TRadio value="automatic">{{ t("formulaTools.automaticCalculation") }}</TRadio>
+                <TRadio value="manual">{{ t("formulaTools.manualCalculation") }}</TRadio>
+              </TRadioGroup>
+            </div>
+            <TCheckbox
+              :checked="calculationSettings.iterative"
+              @change="updateCalculationSettings({ iterative: $event })"
+              >{{ t("formulaTools.iterativeCalculation") }}</TCheckbox
+            >
+            <div
+              class="formula-toolbar__number-field"
+              role="group"
+              :aria-label="t('formulaTools.maximumIterations')"
+            >
+              <span>{{ t("formulaTools.maximumIterations") }}</span>
+              <TInputNumber
+                class="idea-input-number--persistent-controls"
+                theme="column"
+                :value="calculationSettings.maxIterations"
+                :min="1"
+                :max="10000"
+                :decimal-places="0"
+                :allow-input-over-limit="false"
+                :disabled="!calculationSettings.iterative"
+                :input-props="{ name: 'maxIterations' }"
+                @change="updateNumericCalculationSetting('maxIterations', $event)"
+              />
+            </div>
+            <div
+              class="formula-toolbar__number-field"
+              role="group"
+              :aria-label="t('formulaTools.maximumChange')"
+            >
+              <span>{{ t("formulaTools.maximumChange") }}</span>
+              <TInputNumber
+                class="idea-input-number--persistent-controls"
+                theme="column"
+                :value="calculationSettings.maxChange"
+                :min="0.000000001"
+                :step="0.001"
+                :allow-input-over-limit="false"
+                :disabled="!calculationSettings.iterative"
+                :input-props="{ name: 'maxChange' }"
+                @change="updateNumericCalculationSetting('maxChange', $event)"
+              />
+            </div></section
         ></Teleport>
         <RibbonIconAction
           variant="tall"
@@ -569,7 +568,7 @@ function insertFunction(name: string): void {
     display: grid;
     gap: 7px;
     min-width: 210px;
-    padding: 12px;
+    padding: var(--idea-tool-panel-padding);
     background: var(--idea-surface-panel);
     border: 1px solid var(--idea-border-subtle);
     border-radius: var(--idea-radius-default);
@@ -581,75 +580,37 @@ function insertFunction(name: string): void {
       color: var(--idea-text-secondary);
       font-size: var(--idea-font-size-body-small);
     }
-    label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
   }
   &__name-menu-actions {
     display: flex;
     justify-content: flex-end;
     gap: 6px;
     margin-top: 4px;
-    button {
-      min-height: 26px;
-      padding: 0 8px;
-      background: var(--idea-surface-canvas);
-      border: 1px solid var(--idea-border-control);
-      border-radius: var(--idea-radius-default);
-      color: inherit;
-      font: inherit;
-      &:last-child {
-        background: var(--idea-action-primary);
-        border-color: var(--idea-action-primary);
-        color: var(--idea-text-on-action);
-      }
-      &:disabled {
-        cursor: default;
-        opacity: 0.55;
-      }
-    }
   }
   &__calculation-menu {
     display: grid;
     gap: 10px;
-    min-width: 224px;
-    padding: 12px;
+    width: 280px;
+    padding: var(--idea-tool-panel-padding);
     background: var(--idea-surface-panel);
     border: 1px solid var(--idea-border-subtle);
     border-radius: var(--idea-radius-default);
     box-shadow: var(--idea-shadow-floating);
     color: var(--idea-text-primary);
     font-size: var(--idea-font-size-body-medium);
-    fieldset {
-      display: grid;
-      gap: 7px;
-      margin: 0;
-      padding: 0;
-      border: 0;
-    }
-    legend {
-      margin-bottom: 6px;
+  }
+  &__calculation-mode {
+    display: grid;
+    gap: 8px;
+    > span {
       color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-body-small);
     }
-    label {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    input[type="number"] {
-      width: 82px;
-      min-height: 26px;
-      padding-inline: 5px;
-      background: var(--idea-surface-canvas);
-      border: 1px solid var(--idea-border-control);
-      border-radius: var(--idea-radius-default);
-      color: inherit;
-      font: inherit;
-    }
+  }
+  &__number-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 120px;
+    align-items: center;
+    gap: 8px;
   }
 }
 </style>
