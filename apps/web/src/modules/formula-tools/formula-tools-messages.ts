@@ -59,6 +59,9 @@ export type FormulaToolsMessageSchema = {
     workbook: string;
     reference: string;
     selection: string;
+    selectRange: string;
+    confirmRange: string;
+    selectRangeHint: string;
     createFromSelection: string;
     deleteName: string;
     saveName: string;

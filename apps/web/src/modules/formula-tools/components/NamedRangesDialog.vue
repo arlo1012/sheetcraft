@@ -25,14 +25,21 @@ const props = withDefaults(
     activeSheetId?: string;
     selectionReference?: string;
     editSessionId?: string;
+    suspended?: boolean;
+    selectReference?: (current: string) => Promise<string | undefined>;
   }>(),
-  { activeSheetId: undefined, selectionReference: undefined, editSessionId: undefined },
+  {
+    activeSheetId: undefined,
+    selectionReference: undefined,
+    editSessionId: undefined,
+    suspended: false,
+    selectReference: undefined,
+  },
 );
 const emit = defineEmits<{
   close: [];
   save: [row: NamedRangeDraft];
   delete: [id: string];
-  createFromSelection: [];
 }>();
 const { t } = useAppI18n();
 const contentRef = ref<HTMLElement | null>(null);
@@ -133,7 +140,7 @@ watch(
   <Dialog
     v-if="visible"
     class="named-ranges-dialog"
-    :visible="visible"
+    :visible="visible && !suspended"
     :header="t('formulaTools.namedRanges')"
     width="min(720px, calc(100vw - 32px))"
     placement="center"
@@ -245,9 +252,10 @@ watch(
     :sheets="sheets"
     :selection-reference="selectionReference"
     :edit-session-id="editSessionId"
+    :suspended="suspended"
+    :select-reference="selectReference"
     @close="editorDraft = undefined"
     @save="emit('save', $event)"
-    @create-from-selection="emit('createFromSelection')"
   />
 </template>
 

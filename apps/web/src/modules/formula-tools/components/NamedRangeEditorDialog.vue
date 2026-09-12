@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { SquareMousePointer } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
@@ -14,16 +15,19 @@ const props = withDefaults(
     sheets: readonly NamedRangeSheet[];
     selectionReference?: string;
     editSessionId?: string;
+    suspended?: boolean;
+    selectReference?: (current: string) => Promise<string | undefined>;
   }>(),
   {
     selectionReference: undefined,
     editSessionId: undefined,
+    suspended: false,
+    selectReference: undefined,
   },
 );
 const emit = defineEmits<{
   close: [];
   save: [draft: NamedRangeDraft];
-  createFromSelection: [];
 }>();
 const { t } = useAppI18n();
 const contentRef = ref<HTMLElement | null>(null);
@@ -67,19 +71,12 @@ function save(): void {
   });
 }
 
-function createFromSelection(): void {
-  emit("createFromSelection");
-  if (!isEditing.value && props.selectionReference)
-    draft.value = { ...draft.value, reference: props.selectionReference };
+async function selectReference(): Promise<void> {
+  const reference = await props.selectReference?.(draft.value.reference);
+  if (reference !== undefined) draft.value = { ...draft.value, reference };
 }
 
 watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
-watch(
-  () => props.selectionReference,
-  (reference) => {
-    if (!isEditing.value && reference) draft.value = { ...draft.value, reference };
-  },
-);
 </script>
 
 <template>
@@ -87,7 +84,7 @@ watch(
     role="dialog"
     aria-modal="true"
     class="named-range-editor-dialog"
-    :visible="true"
+    :visible="!suspended"
     :header="header"
     :confirm-btn="{
       content: t('formulaTools.saveName'),
@@ -107,7 +104,7 @@ watch(
       class="named-range-editor-dialog__content"
       :data-cell-edit-session="editSessionId"
     >
-      <TForm layout="vertical" @submit="save">
+      <TForm class="named-range-editor-dialog__form" layout="vertical" @submit="save">
         <TFormItem :label="t('formulaTools.name')">
           <TInput
             v-model="draft.name"
@@ -131,15 +128,21 @@ watch(
             :aria-label="t('formulaTools.reference')"
             data-formula-reference
             autocomplete="off"
-          />
+          >
+            <template #suffix>
+              <TButton
+                variant="text"
+                shape="square"
+                :aria-label="t('formulaTools.selectRange')"
+                :title="t('formulaTools.selectRange')"
+                data-select-formula-reference
+                @click="selectReference"
+              >
+                <SquareMousePointer :size="16" aria-hidden="true" />
+              </TButton>
+            </template>
+          </TInput>
         </TFormItem>
-        <TButton
-          class="named-range-editor-dialog__selection"
-          variant="outline"
-          @click="createFromSelection"
-        >
-          {{ t("formulaTools.createFromSelection") }}
-        </TButton>
       </TForm>
     </div>
   </Dialog>
@@ -151,8 +154,8 @@ watch(
     min-width: 0;
   }
 
-  &__selection {
-    width: fit-content;
+  &__form {
+    --td-comp-margin-xxl: var(--idea-space-4);
   }
 }
 </style>

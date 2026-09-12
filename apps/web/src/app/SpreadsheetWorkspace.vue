@@ -7,6 +7,8 @@ import { useEyeComfortMode } from "../modules/workbook/composables/useEyeComfort
 import { normalizeSheetZoom, SHEET_ZOOM_STEP } from "../shared/sheet-view/zoom";
 import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import { useFormulaToolsController } from "../modules/formula-tools/useFormulaToolsController";
+import NamedRangePicker from "../modules/formula-tools/components/NamedRangePicker.vue";
+import { useNamedRangePicker } from "../modules/formula-tools/useNamedRangePicker";
 import NamedRangesDialog from "../modules/formula-tools/components/NamedRangesDialog.vue";
 import {
   createIndexedDbImageAssetStore,
@@ -261,6 +263,12 @@ watch(workbookGeneration, () => {
   recentFunctions.value = [];
 });
 
+const nameRangePicker = useNamedRangePicker(() => activeSheet.value.name);
+const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
+watch(namesVisible, (visible) => {
+  if (!visible) nameRangePicker.cancel();
+});
+
 function changeSheetProperties(payload: {
   sheetId: string;
   patch: Partial<SheetProperties>;
@@ -279,6 +287,14 @@ function onWorkspaceWheel(event: WheelEvent): void {
 }
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
+  if (pickingNameRange.value) {
+    if (event.key === "Escape") nameRangePicker.cancel();
+    else if (event.key === "Enter") nameRangePicker.confirm();
+    else if (event.key === "Tab") return;
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   if (
     event.key === "1" &&
     (event.ctrlKey || event.metaKey) &&
@@ -400,6 +416,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     <NamedRangesDialog
       :edit-session-id="cellEditSession.id"
       :visible="namesVisible"
+      :suspended="pickingNameRange"
+      :select-reference="nameRangePicker.selectReference"
       :ranges="namedRanges"
       :sheets="sheets"
       :active-sheet-id="activeSheet.id"
@@ -407,7 +425,13 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @close="formulaTools.closeNames"
       @save="formulaTools.saveName"
       @delete="formulaTools.deleteName"
-      @create-from-selection="formulaTools.captureNameSelection"
+    />
+    <NamedRangePicker
+      v-if="pickingNameRange"
+      :reference="pickedNameReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="nameRangePicker.confirm"
+      @cancel="nameRangePicker.cancel"
     />
     <CellFormatDialog
       v-if="cellFormatSelection"
@@ -443,7 +467,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :read-only="formulaReadOnly"
       :key="workbookGeneration"
       ref="formulaBarRef"
-      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection"
+      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection || pickingNameRange"
       :address="activeAddress"
       :sheet-id="activeSheet.id"
       :sheet-name="activeSheet.name"
@@ -480,7 +504,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :sheet="activeSheet"
         :evaluator="activeSheetEvaluator"
         :date-system="session.workbook.dateSystem"
-        :reference-editor="formulaBarRef"
+        :reference-editor="pickingNameRange ? nameRangePicker.editor : formulaBarRef"
         :edit-session="cellEditSession"
         :image-asset-urls="imageAssetUrls"
         :loading-image-asset-ids="loadingImageAssetIds"

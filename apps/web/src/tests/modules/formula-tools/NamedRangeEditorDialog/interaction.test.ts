@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { afterEach, expect, test } from "vitest";
 import { createAppI18n } from "../../../../shared/i18n";
@@ -11,12 +11,15 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function mountEditor(initialDraft: {
-  id?: string;
-  name: string;
-  scopeSheetId?: string;
-  reference: string;
-}) {
+function mountEditor(
+  initialDraft: {
+    id?: string;
+    name: string;
+    scopeSheetId?: string;
+    reference: string;
+  },
+  selectReference?: (current: string) => Promise<string | undefined>,
+) {
   const wrapper = mount(NamedRangeEditorDialog, {
     attachTo: document.body,
     global: { plugins: [createAppI18n("en-US")] },
@@ -24,35 +27,60 @@ function mountEditor(initialDraft: {
       initialDraft,
       sheets: [{ id: "budget", name: "Budget" }],
       selectionReference: "=Budget!$A$1:$B$4",
+      selectReference,
     },
   });
   mounted.push(wrapper);
   return wrapper;
 }
 
-test("uses the captured selection for a new named range", async () => {
-  const wrapper = mountEditor({ name: "", reference: "" });
+test("uses the selected reference for a new named range", async () => {
+  const selectReference = async (current: string) => {
+    expect(current).toBe("=Budget!$A$1:$B$4");
+    return "=Budget!$C$1:$D$4";
+  };
+  const wrapper = mountEditor({ name: "", reference: "" }, selectReference);
 
   const reference = wrapper.get<HTMLInputElement>("[data-formula-reference] input");
   expect(reference.element.value).toBe("=Budget!$A$1:$B$4");
-  await wrapper.get(".named-range-editor-dialog__selection").trigger("click");
+  await wrapper.get("[data-select-formula-reference]").trigger("click");
+  await flushPromises();
 
-  expect(wrapper.emitted("createFromSelection")).toHaveLength(1);
-  expect(reference.element.value).toBe("=Budget!$A$1:$B$4");
+  expect(reference.element.value).toBe("=Budget!$C$1:$D$4");
 });
 
-test("does not replace an existing range reference with the selection", async () => {
-  const wrapper = mountEditor({
-    id: "revenue",
-    name: "Revenue",
-    scopeSheetId: "budget",
-    reference: "=Budget!$C$1",
-  });
+test("updates an existing range reference from the selected range", async () => {
+  const wrapper = mountEditor(
+    {
+      id: "revenue",
+      name: "Revenue",
+      scopeSheetId: "budget",
+      reference: "=Budget!$C$1",
+    },
+    async (current) => {
+      expect(current).toBe("=Budget!$C$1");
+      return "=Budget!$D$1";
+    },
+  );
 
   const reference = wrapper.get<HTMLInputElement>("[data-formula-reference] input");
   expect(reference.element.value).toBe("=Budget!$C$1");
-  await wrapper.setProps({ selectionReference: "=Budget!$D$1" });
+  await wrapper.get("[data-select-formula-reference]").trigger("click");
+  await flushPromises();
+
+  expect(reference.element.value).toBe("=Budget!$D$1");
+  expect(wrapper.getComponent(TSelect).props("disabled")).toBe(true);
+});
+
+test("keeps the current reference when selection is cancelled", async () => {
+  const wrapper = mountEditor(
+    { name: "Revenue", reference: "=Budget!$C$1" },
+    async () => undefined,
+  );
+
+  const reference = wrapper.get<HTMLInputElement>("[data-formula-reference] input");
+  await wrapper.get("[data-select-formula-reference]").trigger("click");
+  await flushPromises();
 
   expect(reference.element.value).toBe("=Budget!$C$1");
-  expect(wrapper.getComponent(TSelect).props("disabled")).toBe(true);
 });
