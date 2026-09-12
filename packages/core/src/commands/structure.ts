@@ -890,7 +890,11 @@ export function applySheetAxisCommand(
     }
     workbook.definedNames.set(id, { ...definition, reference: { ...reference, sheetId: command.sheetId } });
   }
-  return changed || metadataChanged
+  const externalChanged = (slice.workbookFormulaSources ?? []).some((formula) => {
+    const current = workbook.sheets.get(formula.sheetId)?.cells.get(createCellKey(formula.address))?.content;
+    return current?.kind === "formula" && current.formula.source !== formula.source;
+  }) || JSON.stringify(slice.definedNames) !== JSON.stringify([...workbook.definedNames.values()]);
+  return changed || metadataChanged || externalChanged
     ? createRestoreSheetAxisSliceCommand(
         command.sheetId,
         command.axis,

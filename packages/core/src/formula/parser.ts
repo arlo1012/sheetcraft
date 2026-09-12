@@ -163,9 +163,22 @@ class FormulaParser {
   }
 
   private parsePower(): FormulaExpression | null {
-    const left = this.parsePrimary();
+    let left = this.parsePrimary();
     if (!left) return null;
     this.skipWhitespace();
+    while (this.peek() === "%") {
+      const start: number = left.start;
+      this.offset += 1;
+      left = {
+        kind: "binary",
+        operator: "*",
+        left,
+        right: { kind: "number", value: 0.01, start: this.offset - 1, end: this.offset },
+        start,
+        end: this.offset,
+      };
+      this.skipWhitespace();
+    }
     if (this.peek() !== "^") return left;
     this.offset += 1;
     const right = this.parseUnary();

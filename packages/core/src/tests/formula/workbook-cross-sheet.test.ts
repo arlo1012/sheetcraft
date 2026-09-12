@@ -25,10 +25,10 @@ describe("workbook formula evaluation", () => {
     setCellContent(data, { row: 1, column: 0 }, { kind: "literal", value: 4 });
     setCellContent(getActiveSheet(workbook), { row: 0, column: 0 }, {
       kind: "formula",
-      formula: { source: "=SUM('Data Set'!A1:A2)^2+10%" },
+      formula: { source: "=SUM('Data Set'!A1:A2)^2+'Data Set'!A1%" },
     });
 
-    expect(createWorkbookEvaluator(workbook, workbook.activeSheetId).getComputedValue({ row: 0, column: 0 })).toBe(49.1);
+    expect(createWorkbookEvaluator(workbook, workbook.activeSheetId).getComputedValue({ row: 0, column: 0 })).toBe(49.03);
   });
 
   test("detects cycles across sheet boundaries", () => {
