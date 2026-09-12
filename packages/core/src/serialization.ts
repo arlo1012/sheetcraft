@@ -1,5 +1,6 @@
 import { WorkbookDomainError } from "./errors.js";
 import { normalizeExcelDateSystem, type ExcelDateSystem } from "./formula/date-system.js";
+import { parseA1FormulaReference } from "./formula/reference-model.js";
 import { normalizeCellStyle, type CellStyle } from "./style.js";
 import { normalizeImageTransform, type ImageTransform } from "./image-transform.js";
 import {
@@ -595,6 +596,15 @@ export function deserializeWorkbook(value: unknown): Workbook {
   };
 }
 
+function isSnapshotDefinedName(name: string): boolean {
+  return (
+    /^[\p{L}_][\p{L}\p{N}_]*$/u.test(name) &&
+    !parseA1FormulaReference(name) &&
+    !/^R\d+C\d+$/i.test(name) &&
+    !/^(TRUE|FALSE)$/i.test(name)
+  );
+}
+
 function parseDefinedNames(value: unknown, sheetIds: Set<string>): Map<string, DefinedName> {
   const names = new Map<string, DefinedName>();
   const keys = new Set<string>();
@@ -603,7 +613,7 @@ function parseDefinedNames(value: unknown, sheetIds: Set<string>): Map<string, D
     const record = asRecord(candidate, path);
     const id = asIdentifier(record.id, `${path}.id`);
     const name = asIdentifier(record.name, `${path}.name`);
-    if (!/^[\p{L}_][\p{L}\p{N}_]*$/u.test(name)) return fail(`${path}.name`, "Invalid name.");
+    if (!isSnapshotDefinedName(name)) return fail(`${path}.name`, "Invalid name.");
     const scopeSheetId = record.scopeSheetId === undefined ? undefined : asIdentifier(record.scopeSheetId, `${path}.scopeSheetId`);
     if (scopeSheetId && !sheetIds.has(scopeSheetId)) return fail(`${path}.scopeSheetId`, "Sheet does not exist.");
     const reference = asRecord(record.reference, `${path}.reference`);

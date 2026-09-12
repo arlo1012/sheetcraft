@@ -26,6 +26,34 @@ import {
 } from "../../workbook.js";
 
 describe("workbook snapshots", () => {
+  test("rejects V8 names that collide with formula tokens and A1 references", () => {
+    const snapshot = serializeWorkbook(createWorkbook({ id: "workbook", sheetId: "sheet" }));
+    for (const name of ["A1", "TRUE", "false", "R1C1"]) {
+      const invalid = {
+        ...snapshot,
+        definedNames: [
+          {
+            id: `workbook:${name}`,
+            name,
+            reference: {
+              sheetId: "sheet",
+              start: { row: 0, column: 0 },
+              end: { row: 0, column: 0 },
+            },
+          },
+        ],
+      };
+      expect(() => deserializeWorkbook(invalid)).toThrow(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            code: "invalid_snapshot",
+            details: expect.objectContaining({ path: "$.definedNames[0].name" }),
+          }),
+        }),
+      );
+    }
+  });
+
   test("round trips ordered workbook state without sharing mutable maps", () => {
     const workbook = createWorkbook({ id: "workbook-1", sheetId: "sheet-1" });
     const firstSheet = getActiveSheet(workbook);

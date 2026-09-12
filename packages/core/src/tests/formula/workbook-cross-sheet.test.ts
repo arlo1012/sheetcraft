@@ -98,6 +98,35 @@ describe("workbook formula evaluation", () => {
     expect(getActiveSheet(workbook).cells.get("0:1")?.content).toMatchObject({ formula: { source: "=Data!A1" } });
   });
 
+  test("keeps named dependencies valid through rename, deletion inverse, and V8 snapshots", () => {
+    const workbook = createTestWorkbook();
+    const data = createSheet("Data", "data");
+    insertSheet(workbook, data);
+    setCellContent(data, { row: 0, column: 0 }, { kind: "literal", value: 4 });
+    applyWorkbookCommand(
+      workbook,
+      createUpsertDefinedNameCommand(workbook, { name: "Revenue", reference: "=Data!A1" }),
+    );
+    setCellContent(getActiveSheet(workbook), { row: 0, column: 0 }, {
+      kind: "formula",
+      formula: { source: "=SUM(Revenue)" },
+    });
+
+    const valueAt = () =>
+      createWorkbookEvaluator(workbook, workbook.activeSheetId).getComputedValue({ row: 0, column: 0 });
+    expect(valueAt()).toBe(4);
+    expect(valueAt()).toBe(4);
+    applyWorkbookCommand(workbook, createRenameSheetCommand(data.id, "Actuals"));
+    expect(valueAt()).toBe(4);
+    const inverse = applyWorkbookCommand(workbook, createDeleteSheetCommand(workbook, data.id));
+    expect(valueAt()).toMatchObject({ code: "NAME" });
+    if (!inverse || !("type" in inverse)) throw new Error("Expected delete inverse.");
+    applyWorkbookCommand(workbook, inverse);
+    expect(valueAt()).toBe(4);
+    const restored = deserializeWorkbook(serializeWorkbook(workbook));
+    expect(createWorkbookEvaluator(restored, restored.activeSheetId).getComputedValue({ row: 0, column: 0 })).toBe(4);
+  });
+
   test("rewrites qualified references for rename and delete, while the delete inverse restores them", () => {
     const workbook = createTestWorkbook();
     const data = createSheet("Data", "data");
