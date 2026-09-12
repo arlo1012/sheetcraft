@@ -44,6 +44,12 @@ describe("formula parser", () => {
     expect(parseFormula("=TRUE()").ok).toBe(true);
   });
 
+  test("parses dotted built-in function names", () => {
+    expect(parseFormula("=CEILING.MATH(1.2)")).toEqual(
+      expect.objectContaining({ ok: true }),
+    );
+  });
+
   test("preserves exact source spans for parenthesized expressions and bare identifiers", () => {
     const parenthesized = parseFormula("= ( A1 )");
     expect(parenthesized).toEqual({

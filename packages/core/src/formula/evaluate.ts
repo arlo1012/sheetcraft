@@ -5,7 +5,7 @@ import {
   type FormulaFunctionRegistry,
 } from "./functions.js";
 import { parseFormula } from "./parser.js";
-import { formulaArray, scalarize } from "./runtime.js";
+import { formulaArray, isFormulaArray, scalarize } from "./runtime.js";
 import {
   createFormulaError,
   isFormulaError,
@@ -13,6 +13,7 @@ import {
   type FormulaEvaluationResolver,
   type FormulaExpression,
   type FormulaRange,
+  type FormulaRangeBounds,
   type FormulaRuntimeValue,
   type FormulaValue,
 } from "./types.js";
@@ -58,6 +59,12 @@ function rangeBounds(range: FormulaRange) {
   };
 }
 
+function evaluateRange(bounds: FormulaRangeBounds & { sheetName?: string }, resolver: FormulaEvaluationResolver): FormulaRuntimeValue {
+  const rows = bounds.end.row - bounds.start.row + 1, columns = bounds.end.column - bounds.start.column + 1;
+  if (rows * columns > 100_000) return createFormulaError("CALC");
+  return formulaArray(Array.from({ length: rows }, (_, row) => Array.from({ length: columns }, (_, column) => resolver.resolveCell({ row: bounds.start.row + row, column: bounds.start.column + column, ...(bounds.sheetName ? { sheetName: bounds.sheetName } : {}) }))));
+}
+
 function compare(
   left: FormulaValue,
   right: FormulaValue,
@@ -100,6 +107,35 @@ function isComparison(operator: string): boolean {
   return ["=", "<>", "<", "<=", ">", ">="].includes(operator);
 }
 
+function broadcast(
+  left: FormulaRuntimeValue,
+  right: FormulaRuntimeValue,
+  operation: (left: FormulaValue, right: FormulaValue) => FormulaValue,
+): FormulaRuntimeValue {
+  if (!isFormulaArray(left) && !isFormulaArray(right)) return operation(left, right);
+  const leftRows = isFormulaArray(left) ? left.rows : [[left]];
+  const rightRows = isFormulaArray(right) ? right.rows : [[right]];
+  const rows = Math.max(leftRows.length, rightRows.length);
+  const columns = Math.max(leftRows[0]?.length ?? 0, rightRows[0]?.length ?? 0);
+  if ((!isFormulaArray(left) || leftRows.length === rows) && (!isFormulaArray(right) || rightRows.length === rows) &&
+      (!isFormulaArray(left) || (leftRows[0]?.length ?? 0) === columns) && (!isFormulaArray(right) || (rightRows[0]?.length ?? 0) === columns))
+    return formulaArray(Array.from({ length: rows }, (_, row) => Array.from({ length: columns }, (_, column) => operation(leftRows[isFormulaArray(left) ? row : 0]![isFormulaArray(left) ? column : 0]!, rightRows[isFormulaArray(right) ? row : 0]![isFormulaArray(right) ? column : 0]!))));
+  return createFormulaError("VALUE");
+}
+
+function binaryScalar(operator: "+" | "-" | "*" | "/" | "^" | "&" | "=" | "<>" | "<" | "<=" | ">" | ">=", left: FormulaValue, right: FormulaValue): FormulaValue {
+  if (operator === "&") { const first = text(left), second = text(right); return isFormulaError(first) ? first : isFormulaError(second) ? second : `${first}${second}`; }
+  if (isComparison(operator)) { const value = compare(left, right); return isFormulaError(value) ? value : comparison(operator, value); }
+  const first = arithmetic(left), second = arithmetic(right);
+  if (isFormulaError(first)) return first;
+  if (isFormulaError(second)) return second;
+  if (operator === "+") return result(first + second);
+  if (operator === "-") return result(first - second);
+  if (operator === "*") return result(first * second);
+  if (operator === "^") return result(first ** second);
+  return second === 0 ? createFormulaError("DIV0") : result(first / second);
+}
+
 function evaluateExpression(
   expression: FormulaExpression,
   resolver: FormulaEvaluationResolver,
@@ -116,7 +152,13 @@ function evaluateExpression(
         ...(expression.reference.sheetName ? { sheetName: expression.reference.sheetName } : {}),
       }),
     );
-  if (expression.kind === "range" || expression.kind === "axis-range") return createFormulaError("VALUE");
+  if (expression.kind === "range") return evaluateRange({ ...rangeBounds(expression.range), ...(expression.range.start.sheetName ? { sheetName: expression.range.start.sheetName } : {}) }, resolver);
+  if (expression.kind === "axis-range") {
+    const bounds = expression.range.axis === "column"
+      ? { start: { row: 0, column: Math.min(expression.range.start, expression.range.end) }, end: { row: 1_048_575, column: Math.max(expression.range.start, expression.range.end) } }
+      : { start: { row: Math.min(expression.range.start, expression.range.end), column: 0 }, end: { row: Math.max(expression.range.start, expression.range.end), column: 16_383 } };
+    return evaluateRange({ ...bounds, ...(expression.range.sheetName ? { sheetName: expression.range.sheetName } : {}) }, resolver);
+  }
   if (expression.kind === "array")
     return formulaArray(expression.rows.map((row) => row.map((item) => scalarize(evaluateExpression(item, resolver, registry, options)))));
   if (expression.kind === "error") return createFormulaError(expression.code);
@@ -136,32 +178,13 @@ function evaluateExpression(
     return validate(named);
   }
   if (expression.kind === "unary") {
-    const operand = arithmetic(scalarize(evaluateExpression(expression.operand, resolver, registry, options)));
-    if (isFormulaError(operand)) return operand;
-    return result(expression.operator === "-" ? -operand : operand);
+    const value = evaluateExpression(expression.operand, resolver, registry, options);
+    return isFormulaArray(value)
+      ? formulaArray(value.rows.map((row) => row.map((item) => { const operand = arithmetic(item); return isFormulaError(operand) ? operand : result(expression.operator === "-" ? -operand : operand); })))
+      : (() => { const operand = arithmetic(value); return isFormulaError(operand) ? operand : result(expression.operator === "-" ? -operand : operand); })();
   }
   if (expression.kind === "binary") {
-    const left = scalarize(evaluateExpression(expression.left, resolver, registry, options));
-    const right = () => scalarize(evaluateExpression(expression.right, resolver, registry, options));
-    if (expression.operator === "&") {
-      const first = text(left);
-      if (isFormulaError(first)) return first;
-      const second = text(right());
-      return isFormulaError(second) ? second : `${first}${second}`;
-    }
-    if (isComparison(expression.operator)) {
-      const value = compare(left, right());
-      return isFormulaError(value) ? value : comparison(expression.operator, value);
-    }
-    const first = arithmetic(left);
-    if (isFormulaError(first)) return first;
-    const second = arithmetic(right());
-    if (isFormulaError(second)) return second;
-    if (expression.operator === "+") return result(first + second);
-    if (expression.operator === "-") return result(first - second);
-    if (expression.operator === "*") return result(first * second);
-    if (expression.operator === "^") return result(first ** second);
-    return second === 0 ? createFormulaError("DIV0") : result(first / second);
+    return broadcast(evaluateExpression(expression.left, resolver, registry, options), evaluateExpression(expression.right, resolver, registry, options), (left, right) => binaryScalar(expression.operator, left, right));
   }
   const definition = registry.get(expression.name);
   if (!definition) return createFormulaError("NAME");

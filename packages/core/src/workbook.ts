@@ -1,5 +1,7 @@
 import { evaluateFormulaRuntime, evaluateFormulaAst } from "./formula/evaluate.js";
 import { isFormulaArray, scalarize } from "./formula/runtime.js";
+import { DEFAULT_WORKBOOK_CALCULATION_SETTINGS, type WorkbookCalculationSettings } from "./calculation.js";
+export { DEFAULT_WORKBOOK_CALCULATION_SETTINGS, normalizeWorkbookCalculationSettings, type WorkbookCalculationSettings } from "./calculation.js";
 import { normalizeExcelDateSystem, type ExcelDateSystem } from "./formula/date-system.js";
 import {
   DEFAULT_FORMULA_FUNCTION_REGISTRY,
@@ -151,6 +153,7 @@ export type Workbook = {
   id: string;
   /** Interpretation of date serials; cell numbers are not converted when this changes. */
   dateSystem: ExcelDateSystem;
+  calculation: WorkbookCalculationSettings;
   sheets: Map<string, Sheet>;
   activeSheetId: string;
   definedNames: Map<string, DefinedName>;
@@ -212,6 +215,7 @@ export function createWorkbook(options?: {
   return {
     id: options?.id ?? createRequiredId("workbook", idFactory),
     dateSystem: normalizeExcelDateSystem(options?.dateSystem ?? "1900"),
+    calculation: { ...DEFAULT_WORKBOOK_CALCULATION_SETTINGS },
     sheets: new Map([[sheet.id, sheet]]),
     activeSheetId: sheet.id,
     definedNames: new Map(),
@@ -417,7 +421,11 @@ export function getCellContent(sheet: Sheet, address: CellAddress): CellContent 
 export type SheetEvaluator = {
   getComputedValue: (address: CellAddress) => FormulaValue;
   getSpillProjections?: () => Iterable<{ address: CellAddress; root: CellAddress; value: FormulaValue }>;
+  getRuntimeValue?: (address: CellAddress) => FormulaRuntimeValue;
 };
+export type WorkbookEvaluatorOptions = Readonly<{
+  getCachedFormulaValue?: (sheetId: string, address: CellAddress, source: string) => FormulaRuntimeValue | undefined;
+}>;
 type SparseRangeIndex = { rows: number[]; byRow: Map<number, CellAddress[]> };
 
 /**
@@ -430,6 +438,7 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
     {
       id: "isolated-sheet-evaluator",
       dateSystem: "1900",
+      calculation: { ...DEFAULT_WORKBOOK_CALCULATION_SETTINGS },
       sheets: new Map([[sheet.id, sheet]]),
       activeSheetId: sheet.id,
       definedNames: new Map(),
@@ -443,7 +452,7 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
  * workbook/sheet scoped names. The existing sheet evaluator remains available
  * for consumers that own an isolated sheet (such as the canvas adapter).
  */
-export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): SheetEvaluator {
+export function createWorkbookEvaluator(workbook: Workbook, sheetId: string, options?: WorkbookEvaluatorOptions): SheetEvaluator {
   if (!workbook.sheets.has(sheetId)) throw new Error(`Sheet ${sheetId} does not exist.`);
 
   type Dependency = { sheetId: string; address: CellAddress };
@@ -693,8 +702,15 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
     if (!isCellAddressInBounds(target)) return createFormulaError("REF");
     const targetKey = keyFor(targetSheetId, target);
     if (memo.has(targetKey)) return memo.get(targetKey) ?? null;
-    if (contentFor(targetSheetId, target)?.kind !== "formula")
+    const source = contentFor(targetSheetId, target);
+    if (source?.kind !== "formula")
       return valueFor(targetSheetId, target);
+    const cached = options?.getCachedFormulaValue?.(targetSheetId, target, source.formula.source);
+    if (cached !== undefined) {
+      runtimeMemo.set(targetKey, cached);
+      memo.set(targetKey, registerSpill(targetSheetId, target, cached));
+      return valueFor(targetSheetId, target);
+    }
     const stack: Frame[] = [{ sheetId: targetSheetId, address: target, stage: "prepare" }];
     while (stack.length) {
       const frame = stack.pop();
@@ -757,7 +773,10 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
     }
     return valueFor(targetSheetId, target);
   };
-  return { getComputedValue: (address) => resolve(sheetId, address), getSpillProjections: function* () {
+  return { getComputedValue: (address) => resolve(sheetId, address), getRuntimeValue: (address) => {
+    resolve(sheetId, address);
+    return runtimeMemo.get(keyFor(sheetId, address)) ?? valueFor(sheetId, address);
+  }, getSpillProjections: function* () {
     for (const [key, projection] of spills) {
       const divider = key.indexOf("|");
       if (key.slice(0, divider) === sheetId) yield { address: parseCellKey(key.slice(divider + 1)), ...projection };

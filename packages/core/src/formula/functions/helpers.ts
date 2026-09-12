@@ -1,4 +1,5 @@
 import { createFormulaError, isFormulaError, type FormulaValue } from "../types.js";
+import { isFormulaArray } from "../runtime.js";
 import type {
   FormulaFunctionArgument,
   FormulaFunctionContext,
@@ -41,7 +42,9 @@ export function condition(value: FormulaValue): boolean | ReturnType<typeof form
 }
 
 export function values(argument: FormulaFunctionArgument): Iterable<FormulaValue> {
-  return argument.kind === "range" ? argument.values : [argument.value];
+  if (argument.kind === "range") return argument.values;
+  const value = argument.value as unknown as import("../types.js").FormulaRuntimeValue;
+  return isFormulaArray(value) ? value.rows.flat() : [argument.value];
 }
 
 export function argumentsValues(

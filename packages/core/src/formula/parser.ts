@@ -11,7 +11,8 @@ import {
 import { parseA1FormulaReference } from "./reference-model.js";
 
 const NUMBER_PATTERN = /^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i;
-const IDENTIFIER_PATTERN = /^[\p{L}_][\p{L}\p{N}_]*/u;
+/** Dots are accepted only as function-name segments (for example CEILING.MATH). */
+const IDENTIFIER_PATTERN = /^[\p{L}_][\p{L}\p{N}_]*(?:\.[\p{L}_][\p{L}\p{N}_]*)*/u;
 const REFERENCE_PATTERN = /^\$?[A-Za-z]+\$?[1-9]\d*/;
 const CELL_LIKE_PATTERN = /^\$?[A-Za-z]+\$?\d+/;
 const QUALIFIED_REFERENCE_PATTERN =
