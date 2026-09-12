@@ -93,6 +93,8 @@ export type FormulaExpression =
   | { kind: "boolean"; value: boolean; start: number; end: number }
   /** A deliberately empty function argument, such as the second argument in `=F(1,,3)`. */
   | { kind: "omitted"; start: number; end: number }
+  /** A dynamic-array spill reference such as `A1#`. */
+  | { kind: "spill"; reference: FormulaReference; start: number; end: number }
   | {
       kind: "reference";
       reference: FormulaReference;
@@ -150,6 +152,8 @@ export type FormulaResolver = (address: FormulaAddress) => FormulaValue;
 export type FormulaEvaluationResolver = {
   resolveCell: (address: FormulaAddress & { sheetName?: string }) => FormulaValue;
   resolveRange: (bounds: FormulaRangeBounds & { sheetName?: string }) => Iterable<FormulaValue>;
+  resolveRangeEntries?: (bounds: FormulaRangeBounds & { sheetName?: string }) => Iterable<import("./functions/contracts.js").FormulaRangeEntry>;
+  resolveSpill?: (address: FormulaAddress & { sheetName?: string }) => FormulaRuntimeValue;
   resolveName?: (
     name: string,
   ) => FormulaValue | (FormulaRangeBounds & { sheetName?: string }) | undefined;

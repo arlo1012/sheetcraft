@@ -33,6 +33,11 @@ describe("formula references", () => {
     );
   });
 
+  test("translates relative whole-axis ranges", () => {
+    expect(translateFormulaForCopy("=SUM(A:A)", { row: 1, column: 1 })).toBe("=SUM(B:B)");
+    expect(translateFormulaForCopy("=SUM(2:4)", { row: 1, column: 0 })).toBe("=SUM(3:5)");
+  });
+
   test("turns an out-of-bounds copied range into a reference error", () => {
     expect(translateFormulaForCopy("=SUM(A1:B2)", { row: -1, column: 0 })).toBe("=SUM(#REF!)");
   });
@@ -64,8 +69,8 @@ describe("formula references", () => {
     ).toBe("=A1+$D$2+E3");
   });
 
-  test("leaves an unparseable source intact during reference transformations", () => {
-    expect(translateFormulaForCopy("=SUM(A1,)", { row: 1, column: 1 })).toBe("=SUM(A1,)");
+  test("preserves omitted arguments while translating parsed references", () => {
+    expect(translateFormulaForCopy("=SUM(A1,)", { row: 1, column: 1 })).toBe("=SUM(B2,)");
   });
 
   test("validates row transform bounds and turns shifted final rows into reference errors", () => {

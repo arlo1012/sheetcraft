@@ -268,6 +268,10 @@ class FormulaParser {
       if (qualifier.sheetName) reference.sheetName = qualifier.sheetName;
       this.skipWhitespace();
       if (!this.consume(":")) {
+        if (this.peek() === "#") {
+          this.offset += 1;
+          return { kind: "spill", reference, start: reference.start, end: this.offset };
+        }
         return { kind: "reference", reference, start: reference.start, end: reference.end };
       }
       const rangeEnd = this.parseReference();
@@ -350,7 +354,7 @@ class FormulaParser {
     let row: FormulaExpression[] = [];
     while (true) {
       const item = this.parseComparison();
-      if (!item) return null;
+      if (!item || !isArrayConstantItem(item) || this.source.slice(item.start, item.end).includes("%")) return null;
       row.push(item);
       this.skipWhitespace();
       const next = this.peek();
@@ -375,6 +379,21 @@ class FormulaParser {
     this.offset += text.length;
     return reference;
   }
+}
+
+function isArrayConstantItem(expression: FormulaExpression): boolean {
+  if (
+    expression.kind === "number" ||
+    expression.kind === "string" ||
+    expression.kind === "boolean" ||
+    expression.kind === "error"
+  )
+    return true;
+  return (
+    expression.kind === "unary" &&
+    (expression.operator === "+" || expression.operator === "-") &&
+    expression.operand.kind === "number"
+  );
 }
 
 function splitSheetQualifier(

@@ -126,6 +126,10 @@ function qualifiedReferenceCandidates(source: string): QualifiedReferenceCandida
       add(expression.range.start, expression.range.end.end);
       return;
     }
+    if (expression.kind === "spill") {
+      add(expression.reference, expression.end);
+      return;
+    }
     if (expression.kind === "unary") {
       visit(expression.operand);
       return;
@@ -133,6 +137,10 @@ function qualifiedReferenceCandidates(source: string): QualifiedReferenceCandida
     if (expression.kind === "binary") {
       visit(expression.left);
       visit(expression.right);
+      return;
+    }
+    if (expression.kind === "array") {
+      for (const row of expression.rows) for (const item of row) visit(item);
       return;
     }
     if (expression.kind === "function") for (const argument of expression.args) visit(argument);

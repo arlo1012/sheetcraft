@@ -48,6 +48,24 @@ describe("formula parser", () => {
     );
   });
 
+  test("parses dynamic-array spill references", () => {
+    expect(parseFormula("=SUM(A1#)")).toEqual(
+      expect.objectContaining({
+        ok: true,
+        ast: expect.objectContaining({
+          expression: expect.objectContaining({
+            args: [expect.objectContaining({ kind: "spill" })],
+          }),
+        }),
+      }),
+    );
+  });
+
+  test.each(["={A1,2}", "={SUM(A1),2}", "={{1},2}", "={1%}"])(
+    "rejects non-constant array item %s",
+    (source) => expect(parseFormula(source)).toEqual(expect.objectContaining({ ok: false })),
+  );
+
   test("parses a reference error token written by structural transforms", () => {
     const result = parseFormula("=#REF! + 1");
     expect(result.ok).toBe(true);

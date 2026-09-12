@@ -64,6 +64,19 @@ describe("formula evaluation", () => {
     expect(evaluateFormula("=SUM(1,)", resolver(new Map()))).toBe(1);
   });
 
+  test("evaluates a spill reference as its complete runtime array", () => {
+    const formulaResolver: FormulaEvaluationResolver = {
+      resolveCell: () => null,
+      resolveRange: () => [],
+      resolveSpill: () => ({ kind: "formula-array", rows: [[1], [2], [3]] }),
+    };
+    expect(evaluateFormula("=SUM(A1#)", formulaResolver)).toBe(6);
+  });
+
+  test("does not evaluate the unselected scalar IF branch", () => {
+    expect(evaluateFormula("=IF(FALSE,#REF!,42)", resolver(new Map()))).toBe(42);
+  });
+
   test.each(["text", true] as const)(
     "returns VALUE when arithmetic receives %j from a scalar reference",
     (value) => {

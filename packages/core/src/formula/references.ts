@@ -45,6 +45,9 @@ function walkExpression(
   } else if (expression.kind === "binary") {
     walkExpression(expression.left, visit);
     walkExpression(expression.right, visit);
+  } else if (expression.kind === "array") {
+    for (const row of expression.rows)
+      for (const item of row) walkExpression(item, visit);
   } else if (expression.kind === "function") {
     for (const argument of expression.args) walkExpression(argument, visit);
   }
@@ -65,44 +68,14 @@ function formatReference(reference: FormulaReference, address: FormulaAddress): 
   }${address.row + 1}`;
 }
 
-function replaceTransformedRanges(
-  ast: FormulaAst,
-  transform: (reference: FormulaReference) => FormulaAddress | null,
+function formatAxisRange(
+  range: Extract<FormulaExpression, { kind: "axis-range" }>["range"],
+  start: number,
+  end: number,
 ): string {
-  const replacements: Replacement[] = [];
-  walkExpression(ast.expression, (expression) => {
-    if (expression.kind === "reference") {
-      const address = transform(expression.reference);
-      replacements.push({
-        start: expression.reference.start,
-        end: expression.reference.end,
-        text: address ? formatReference(expression.reference, address) : "#REF!",
-      });
-      return;
-    }
-    if (expression.kind !== "range") return;
-    const startAddress = transform(expression.range.start);
-    const endAddress = transform(expression.range.end);
-    if (!startAddress || !endAddress) {
-      replacements.push({
-        start: expression.range.startOffset,
-        end: expression.range.endOffset,
-        text: "#REF!",
-      });
-      return;
-    }
-    replacements.push({
-      start: expression.range.start.start,
-      end: expression.range.start.end,
-      text: formatReference(expression.range.start, startAddress),
-    });
-    replacements.push({
-      start: expression.range.end.start,
-      end: expression.range.end.end,
-      text: formatReference(expression.range.end, endAddress),
-    });
-  });
-  return applyReplacements(ast.source, replacements);
+  const format = (value: number, absolute: boolean) =>
+    `${absolute ? "$" : ""}${range.axis === "column" ? columnIndexToLabel(value) : value + 1}`;
+  return `${format(start, range.startAbsolute)}:${format(end, range.endAbsolute)}`;
 }
 
 function getAst(sourceOrAst: string | FormulaAst): FormulaAst | null {
@@ -115,6 +88,7 @@ export function collectFormulaReferences(sourceOrAst: string | FormulaAst): Form
   const references: FormulaReference[] = [];
   walkExpression(ast.expression, (expression) => {
     if (expression.kind === "reference") references.push({ ...expression.reference });
+    if (expression.kind === "spill") references.push({ ...expression.reference });
     if (expression.kind === "range") {
       references.push({ ...expression.range.start }, { ...expression.range.end });
     }
@@ -153,6 +127,10 @@ export function collectFormulaEvaluationDependencies(sourceOrAst: string | Formu
       references.push({ ...expression.reference });
       return;
     }
+    if (expression.kind === "spill") {
+      references.push({ ...expression.reference });
+      return;
+    }
     if (expression.kind === "range") {
       ranges.push({
         start: { ...expression.range.start },
@@ -171,6 +149,10 @@ export function collectFormulaEvaluationDependencies(sourceOrAst: string | Formu
       visit(expression.right);
       return;
     }
+    if (expression.kind === "array") {
+      for (const row of expression.rows) for (const item of row) visit(item);
+      return;
+    }
     if (expression.kind !== "function") return;
     for (const argument of expression.args) visit(argument);
   };
@@ -181,14 +163,33 @@ export function collectFormulaEvaluationDependencies(sourceOrAst: string | Formu
 export function translateFormulaForCopy(source: string, offset: FormulaCopyOffset): string {
   const ast = getFormulaAst(source);
   if (!ast) return source;
-  return replaceTransformedRanges(ast, (reference) => {
-    if (reference.sheetName) return { row: reference.row, column: reference.column };
-    const address = {
-      row: reference.row + (reference.rowAbsolute ? 0 : offset.row),
-      column: reference.column + (reference.columnAbsolute ? 0 : offset.column),
-    };
-    return isAddressInBounds(address) ? address : null;
+  const replacements: Replacement[] = [];
+  walkExpression(ast.expression, (expression) => {
+    if (expression.kind === "axis-range" && !expression.range.sheetName) {
+      const delta = expression.range.axis === "row" ? offset.row : offset.column;
+      const start = expression.range.start + (expression.range.startAbsolute ? 0 : delta);
+      const end = expression.range.end + (expression.range.endAbsolute ? 0 : delta);
+      const maximum = expression.range.axis === "row" ? MAX_FORMULA_ROWS : MAX_FORMULA_COLUMNS;
+      replacements.push({ start: expression.range.startOffset, end: expression.range.endOffset, text:
+        start < 0 || end < 0 || start >= maximum || end >= maximum ? "#REF!" : formatAxisRange(expression.range, start, end) });
+      return;
+    }
+    if (expression.kind === "range") {
+      if (expression.range.start.sheetName) return;
+      const translate = (reference: FormulaReference) => ({ row: reference.row + (reference.rowAbsolute ? 0 : offset.row), column: reference.column + (reference.columnAbsolute ? 0 : offset.column) });
+      const start = translate(expression.range.start), end = translate(expression.range.end);
+      replacements.push({ start: expression.range.startOffset, end: expression.range.endOffset, text:
+        isAddressInBounds(start) && isAddressInBounds(end)
+          ? `${formatReference(expression.range.start, start)}:${formatReference(expression.range.end, end)}`
+          : "#REF!" });
+      return;
+    }
+    const reference = expression.kind === "reference" || expression.kind === "spill" ? expression.reference : null;
+    if (!reference || reference.sheetName) return;
+    const address = { row: reference.row + (reference.rowAbsolute ? 0 : offset.row), column: reference.column + (reference.columnAbsolute ? 0 : offset.column) };
+    replacements.push({ start: reference.start, end: reference.end, text: isAddressInBounds(address) ? formatReference(reference, address) : "#REF!" });
   });
+  return applyReplacements(ast.source, replacements);
 }
 
 export function transformFormulaForMove(
@@ -215,6 +216,15 @@ export function transformFormulaForMove(
   const replacements: Replacement[] = [];
   walkExpression(ast.expression, (expression) => {
     if (expression.kind === "reference") {
+      if (expression.reference.sheetName) return;
+      const address = map(expression.reference);
+      if (address)
+        replacements.push({
+          start: expression.reference.start,
+          end: expression.reference.end,
+          text: formatReference(expression.reference, address),
+        });
+    } else if (expression.kind === "spill") {
       if (expression.reference.sheetName) return;
       const address = map(expression.reference);
       if (address)
@@ -339,6 +349,14 @@ export function transformFormulaForAxis(source: string, transform: FormulaAxisTr
         end: expression.reference.end,
         text: address ? formatReference(expression.reference, address) : "#REF!",
       });
+    } else if (expression.kind === "spill") {
+      if (expression.reference.sheetName) return;
+      const address = transformAxisReference(expression.reference, transform);
+      replacements.push({
+        start: expression.reference.start,
+        end: expression.reference.end,
+        text: address ? formatReference(expression.reference, address) : "#REF!",
+      });
     } else if (expression.kind === "range") {
       if (expression.range.start.sheetName) return;
       const range = transformAxisRange(expression.range, transform);
@@ -409,6 +427,13 @@ export function transformFormulaForAxisMove(
   const replacements: Replacement[] = [];
   walkExpression(parsed.ast.expression, (expression) => {
     if (expression.kind === "reference") {
+      if (expression.reference.sheetName) return;
+      replacements.push({
+        start: expression.reference.start,
+        end: expression.reference.end,
+        text: formatReference(expression.reference, mapReference(expression.reference)),
+      });
+    } else if (expression.kind === "spill") {
       if (expression.reference.sheetName) return;
       replacements.push({
         start: expression.reference.start,

@@ -148,12 +148,17 @@ function evaluateIfRuntime(
   args: FormulaExpression[], resolver: FormulaEvaluationResolver, registry: FormulaFunctionRegistry, options?: FormulaEvaluationOptions,
 ): FormulaRuntimeValue {
   const condition = evaluateExpression(args[0]!, resolver, registry, options);
-  const whenTrue = evaluateExpression(args[1]!, resolver, registry, options);
-  const whenFalse = args[2] ? evaluateExpression(args[2], resolver, registry, options) : false;
   if (!isFormulaArray(condition)) {
     const selected = ifCondition(condition);
-    return isFormulaError(selected) ? selected : selected ? whenTrue : whenFalse;
+    if (isFormulaError(selected)) return selected;
+    return selected
+      ? evaluateExpression(args[1]!, resolver, registry, options)
+      : args[2]
+        ? evaluateExpression(args[2], resolver, registry, options)
+        : false;
   }
+  const whenTrue = evaluateExpression(args[1]!, resolver, registry, options);
+  const whenFalse = args[2] ? evaluateExpression(args[2], resolver, registry, options) : false;
   const trueRows = isFormulaArray(whenTrue) ? whenTrue.rows : [[whenTrue]], falseRows = isFormulaArray(whenFalse) ? whenFalse.rows : [[whenFalse]];
   const rows = condition.rows.length, columns = condition.rows[0]?.length ?? 0;
   if ((isFormulaArray(whenTrue) && (trueRows.length !== rows || (trueRows[0]?.length ?? 0) !== columns)) || (isFormulaArray(whenFalse) && (falseRows.length !== rows || (falseRows[0]?.length ?? 0) !== columns))) return createFormulaError("VALUE");
@@ -177,6 +182,14 @@ function evaluateExpression(
         ...(expression.reference.sheetName ? { sheetName: expression.reference.sheetName } : {}),
       }),
     );
+  if (expression.kind === "spill") {
+    const value = resolver.resolveSpill?.({
+      row: expression.reference.row,
+      column: expression.reference.column,
+      ...(expression.reference.sheetName ? { sheetName: expression.reference.sheetName } : {}),
+    });
+    return value === undefined ? createFormulaError("REF") : value;
+  }
   if (expression.kind === "range") return evaluateRange({ ...rangeBounds(expression.range), ...(expression.range.start.sheetName ? { sheetName: expression.range.start.sheetName } : {}) }, resolver);
   if (expression.kind === "axis-range") {
     const bounds = expression.range.axis === "column"
