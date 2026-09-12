@@ -1,0 +1,21 @@
+// Shared compact table density. Keep sizing rows and drag/selection cells under
+// TDesign's control; data cells can still grow for wrapped text and controls.
+.t-table {
+  --idea-table-cell-padding-y: var(--idea-space-2);
+  --idea-table-cell-padding-x: var(--idea-space-4);
+
+  &.t-size-s {
+    --idea-table-cell-padding-y: var(--idea-space-1);
+  }
+
+  &.t-size-l {
+    --idea-table-cell-padding-y: var(--idea-space-3);
+  }
+
+  .t-table__header > tr > th:not(.t-table__th-drag, .t-table__cell-check),
+  .t-table__body > tr > td:not(.t-table__handle-draggable, .t-table__cell-check) {
+    padding: var(--idea-table-cell-padding-y) var(--idea-table-cell-padding-x);
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
+  }
+}

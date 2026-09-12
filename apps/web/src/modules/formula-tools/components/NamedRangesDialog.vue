@@ -14,7 +14,7 @@ import type {
 } from "tdesign-vue-next/es/table/type";
 import { useAppI18n } from "../../../shared/i18n";
 import type { NamedRangeDraft, NamedRangeRow, NamedRangeSheet } from "../named-range-types";
-import TableHeightWrapper from "./TableHeightWrapper.vue";
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import NamedRangeEditorDialog from "./NamedRangeEditorDialog.vue";
 
 type NameTableRow = NamedRangeRow & { scopeLabel: string };
