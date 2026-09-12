@@ -112,7 +112,7 @@ describe("selection summary", () => {
       selectedCellCount: 1,
       sum: 24,
     });
-    expect(keysSpy).toHaveBeenCalledOnce();
+    expect(keysSpy).not.toHaveBeenCalled();
   });
 
   test("summarizes cross-sheet formula results with an injected evaluator", () => {
