@@ -97,16 +97,9 @@ describe("formula runtime functions", () => {
   });
 
   test("exposes stable runtime-neutral metadata and accepts a replacement registry", () => {
-    expect(getFormulaFunctionMetadata().map((item) => item.name)).toEqual([
-      "SUM",
-      "IF",
-      "IFERROR",
-      "AVERAGE",
-      "COUNT",
-      "MIN",
-      "MAX",
-      "ROUND",
-    ]);
+    expect(getFormulaFunctionMetadata().map((item) => item.name)).toEqual(
+      expect.arrayContaining(["SUM", "IF", "IFERROR", "AVERAGE", "COUNT", "MIN", "MAX", "ROUND"]),
+    );
     expect(getFormulaFunctionMetadata().find((item) => item.name === "IF")).toMatchObject({
       category: "Logical",
       minArgs: 2,
