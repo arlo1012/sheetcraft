@@ -112,7 +112,6 @@ function onKeydown(event: KeyboardEvent): void {
     :visible="visible"
     :header="t('formulaTools.functionBrowser')"
     :close-btn="true"
-    :footer="false"
     placement="right"
     mode="overlay"
     size="min(740px, calc(100vw - 24px))"
@@ -137,144 +136,268 @@ function onKeydown(event: KeyboardEvent): void {
         <template #prefix-icon><Search :size="15" aria-hidden="true" /></template>
       </TInput>
       <div class="formula-function-browser__body">
-        <TMenu
-          class="formula-function-browser__categories"
-          :value="selectedCategory"
-          :width="150"
-          :aria-label="t('formulaTools.categories')"
-          @change="selectCategory"
-        >
-          <TMenuItem value="all">{{ t("formulaTools.allFunctions") }}</TMenuItem>
-          <TMenuItem v-if="recentFunctions.length" value="recent">
-            {{ t("formulaTools.recent") }}
-          </TMenuItem>
-          <TMenuItem v-for="category in visibleCategories" :key="category" :value="category">
-            {{ getFormulaCategoryLabel(category, (key) => t(key)) }}
-          </TMenuItem>
-        </TMenu>
-        <TList class="formula-function-browser__results" role="listbox" :split="false">
-          <TListItem
-            v-for="(entry, index) in filteredEntries"
-            :key="entry.name"
-            class="formula-function-browser__result-item"
+        <section class="formula-function-browser__group">
+          <h3>{{ t("formulaTools.categories") }}</h3>
+          <TMenu
+            class="formula-function-browser__categories narrow-scrollbar"
+            :value="selectedCategory"
+            width="100%"
+            :aria-label="t('formulaTools.categories')"
+            @change="selectCategory"
           >
-            <TButton
-              class="formula-function-browser__result"
-              :theme="selectedEntry?.name === entry.name ? 'primary' : 'default'"
-              :variant="selectedEntry?.name === entry.name ? 'base' : 'text'"
-              type="button"
-              role="option"
-              :tabindex="selectedIndex === index ? 0 : -1"
-              :aria-selected="selectedEntry?.name === entry.name"
-              :data-formula-browser-result="entry.name"
-              @keydown="onResultKeydown"
-              @click="selectedName = entry.name"
-              @dblclick="insert(entry.name)"
+            <TMenuItem value="all">{{ t("formulaTools.allFunctions") }}</TMenuItem>
+            <TMenuItem v-if="recentFunctions.length" value="recent">
+              {{ t("formulaTools.recent") }}
+            </TMenuItem>
+            <TMenuItem v-for="category in visibleCategories" :key="category" :value="category">
+              {{ getFormulaCategoryLabel(category, (key) => t(key)) }}
+            </TMenuItem>
+          </TMenu>
+        </section>
+        <section class="formula-function-browser__group">
+          <h3>
+            {{
+              selectedCategory === "all"
+                ? t("formulaTools.allFunctions")
+                : selectedCategory === "recent"
+                  ? t("formulaTools.recent")
+                  : getFormulaCategoryLabel(selectedCategory, (key) => t(key))
+            }}
+          </h3>
+          <TList
+            class="formula-function-browser__results narrow-scrollbar"
+            role="listbox"
+            :aria-label="t('formulaTools.allFunctions')"
+            :split="false"
+          >
+            <TListItem
+              v-for="(entry, index) in filteredEntries"
+              :key="entry.name"
+              class="formula-function-browser__result-item"
             >
-              <span class="formula-function-browser__result-content">
-                <strong>{{ entry.name }}</strong>
-                <span>{{ entry.description }}</span>
-              </span>
-            </TButton>
-          </TListItem>
-          <p v-if="!filteredEntries.length" class="formula-function-browser__empty">
-            {{ t("formulaTools.noFunctions") }}
-          </p>
-        </TList>
-        <section v-if="selectedEntry" class="formula-function-browser__details">
-          <h3>{{ selectedEntry.name }}</h3>
-          <dl>
-            <dt>{{ t("formulaTools.syntax") }}</dt>
-            <dd>{{ selectedEntry.signature }}</dd>
-            <dt>{{ t("formulaTools.description") }}</dt>
-            <dd>{{ selectedEntry.description }}</dd>
-            <dt>{{ t("formulaTools.example") }}</dt>
-            <dd>{{ selectedEntry.example }}</dd>
-          </dl>
-          <div class="formula-function-browser__insert-action">
-            <TButton block theme="primary" type="button" @click="insert()">
-              {{ t("formulaTools.insertFunction") }}
-            </TButton>
-          </div>
+              <TButton
+                class="formula-function-browser__result"
+                theme="default"
+                variant="text"
+                type="button"
+                role="option"
+                :tabindex="selectedIndex === index ? 0 : -1"
+                :aria-selected="selectedEntry?.name === entry.name"
+                :data-formula-browser-result="entry.name"
+                @keydown="onResultKeydown"
+                @click="selectedName = entry.name"
+                @dblclick="insert(entry.name)"
+              >
+                <span class="formula-function-browser__result-content">
+                  <strong>{{ entry.name }}</strong>
+                  <span>{{ entry.description }}</span>
+                </span>
+              </TButton>
+            </TListItem>
+            <p v-if="!filteredEntries.length" class="formula-function-browser__empty" role="status">
+              {{ t("formulaTools.noFunctions") }}
+            </p>
+          </TList>
         </section>
       </div>
+      <section v-if="selectedEntry" class="formula-function-browser__details narrow-scrollbar">
+        <div class="formula-function-browser__detail-heading">
+          <h3>{{ selectedEntry.name }}</h3>
+          <span>{{ getFormulaCategoryLabel(selectedEntry.category, (key) => t(key)) }}</span>
+        </div>
+        <p class="formula-function-browser__description">{{ selectedEntry.description }}</p>
+        <dl class="formula-function-browser__examples">
+          <div>
+            <dt>{{ t("formulaTools.syntax") }}</dt>
+            <dd>
+              <code>{{ selectedEntry.signature }}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>{{ t("formulaTools.example") }}</dt>
+            <dd>
+              <code>{{ selectedEntry.example }}</code>
+            </dd>
+          </div>
+        </dl>
+      </section>
     </div>
+    <template #footer>
+      <div class="formula-function-browser__actions" :data-cell-edit-session="editSessionId">
+        <TButton variant="outline" @click="emit('close')">{{ t("formulaTools.cancel") }}</TButton>
+        <TButton theme="primary" :disabled="!selectedEntry" @click="insert()">
+          {{ t("formulaTools.insertFunction") }}
+        </TButton>
+      </div>
+    </template>
   </Drawer>
 </template>
 
 <style scoped lang="scss">
-.formula-function-browser__content {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  height: 100%;
-  min-height: 0;
-  color: var(--idea-text-primary);
-  font: inherit;
-}
-.formula-function-browser__body {
-  display: grid;
-  grid-template-columns: 150px minmax(190px, 1fr) minmax(220px, 1.1fr);
-  min-height: 0;
-  margin-top: 12px;
-  border-top: 1px solid var(--idea-border-subtle);
-}
-.formula-function-browser__categories,
-.formula-function-browser__results {
-  min-height: 0;
-  overflow: auto;
-  border-right: 1px solid var(--idea-border-subtle);
-}
-.formula-function-browser__result {
-  width: 100%;
-  min-height: 48px;
-  padding: 6px 8px;
-  text-align: left;
-}
-.formula-function-browser__result-item {
-  padding: 0;
-}
-.formula-function-browser__result-content {
-  display: grid;
-  text-align: left;
-  & strong {
-    line-height: var(--idea-line-height-body-medium);
+.formula-function-browser {
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    height: 100%;
+    min-height: 0;
+    color: var(--idea-text-primary);
+    font: inherit;
   }
-  & span {
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
-  }
-}
-.formula-function-browser__empty {
-  padding: 8px;
-  color: var(--idea-text-secondary);
-}
-.formula-function-browser__details {
-  padding-left: 16px;
-  overflow: auto;
-  h3 {
-    margin: 0 0 12px;
-    font-size: var(--idea-font-size-heading);
-    line-height: var(--idea-line-height-heading);
-  }
-  dl {
+  &__body {
     display: grid;
-    gap: 3px;
-    margin: 0;
+    flex: 1;
+    grid-template-columns: 144px minmax(0, 1fr);
+    gap: 16px;
+    min-height: 180px;
   }
-  dt {
-    margin-top: 10px;
+  &__group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    min-height: 0;
+    h3 {
+      margin: 0;
+      font-size: var(--idea-font-size-body-medium);
+      font-weight: var(--idea-font-weight-semibold);
+      line-height: var(--idea-line-height-body-medium);
+    }
+  }
+  &__categories,
+  &__results {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--idea-border-subtle);
+    border-radius: var(--idea-radius-default);
+  }
+  &__categories {
+    --td-comp-size-l: 28px;
+    --td-brand-color: var(--idea-text-primary);
+    --td-brand-color-light: var(--idea-surface-active);
+  }
+  &__results {
+    padding: 4px;
+  }
+  &__result-item {
+    padding: 0;
+  }
+  &__result {
+    justify-content: flex-start;
+    width: 100%;
+    height: auto;
+    min-height: 48px;
+    padding: 5px 8px;
+    text-align: left;
+    white-space: normal;
+    border-radius: var(--idea-radius-small);
+    &:hover {
+      background: var(--idea-surface-secondary);
+    }
+    &[aria-selected="true"] {
+      color: var(--idea-text-primary);
+      background: var(--idea-surface-active);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--idea-action-primary);
+      outline-offset: -2px;
+    }
+  }
+  &__result-content {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    text-align: left;
+    strong {
+      font-weight: var(--idea-font-weight-semibold);
+      line-height: var(--idea-line-height-body-medium);
+    }
+    span {
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 1;
+      color: var(--idea-text-secondary);
+      font-size: var(--idea-font-size-body-small);
+      line-height: var(--idea-line-height-body-small);
+    }
+  }
+  &__empty {
+    margin: 0;
+    padding: 24px 8px;
     color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-small);
+    text-align: center;
   }
-  dd {
-    margin: 0;
+  &__details {
+    flex: none;
+    max-height: 32vh;
+    overflow: auto;
+    padding: 16px;
+    background: var(--idea-surface-secondary);
+    border: 1px solid var(--idea-border-subtle);
+    border-radius: var(--idea-radius-default);
+  }
+  &__detail-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    h3 {
+      margin: 0;
+      font-size: var(--idea-font-size-heading);
+      line-height: var(--idea-line-height-heading);
+      font-weight: var(--idea-font-weight-semibold);
+    }
+    > span {
+      color: var(--idea-text-secondary);
+      font-size: var(--idea-font-size-body-small);
+    }
+  }
+  &__description {
+    margin: 8px 0 12px;
     line-height: var(--idea-line-height-body-medium);
-    white-space: pre-wrap;
+  }
+  &__examples {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0;
+    dt {
+      margin-bottom: 4px;
+      color: var(--idea-text-secondary);
+      font-size: var(--idea-font-size-body-small);
+    }
+    dd {
+      margin: 0;
+      padding: 8px;
+      background: var(--idea-surface-panel);
+      border: 1px solid var(--idea-border-subtle);
+      border-radius: var(--idea-radius-small);
+      line-height: var(--idea-line-height-body-medium);
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: var(--idea-font-size-body-medium);
+    }
+  }
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
   }
 }
-.formula-function-browser__insert-action {
-  margin-top: 18px;
+@media (max-width: 480px) {
+  .formula-function-browser {
+    &__body {
+      grid-template-columns: 112px minmax(0, 1fr);
+      gap: 8px;
+    }
+    &__examples {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
 }
 </style>
