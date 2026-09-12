@@ -216,14 +216,22 @@ export function createWorkbook(options?: {
   };
 }
 
-export function getDefinedName(workbook: Workbook, name: string, sheetId: string): DefinedName | null {
+export function getDefinedName(
+  workbook: Workbook,
+  name: string,
+  sheetId: string,
+): DefinedName | null {
   const normalized = name.toUpperCase();
   const local = [...workbook.definedNames.values()].find(
     (item) => item.scopeSheetId === sheetId && item.name.toUpperCase() === normalized,
   );
-  return local ?? [...workbook.definedNames.values()].find(
-    (item) => item.scopeSheetId === undefined && item.name.toUpperCase() === normalized,
-  ) ?? null;
+  return (
+    local ??
+    [...workbook.definedNames.values()].find(
+      (item) => item.scopeSheetId === undefined && item.name.toUpperCase() === normalized,
+    ) ??
+    null
+  );
 }
 
 function createRequiredId(prefix: string, idFactory: IdFactory | undefined): string {
@@ -415,49 +423,153 @@ type SparseRangeIndex = { rows: number[]; byRow: Map<number, CellAddress[]> };
  * the sparse address index, never by walking a rectangular area.
  */
 export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
+  return createWorkbookEvaluator(
+    {
+      id: "isolated-sheet-evaluator",
+      dateSystem: "1900",
+      sheets: new Map([[sheet.id, sheet]]),
+      activeSheetId: sheet.id,
+      definedNames: new Map(),
+    },
+    sheet.id,
+  );
+}
+
+/**
+ * Evaluates formulas in a workbook, resolving qualified A1 references and
+ * workbook/sheet scoped names. The existing sheet evaluator remains available
+ * for consumers that own an isolated sheet (such as the canvas adapter).
+ */
+export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): SheetEvaluator {
+  if (!workbook.sheets.has(sheetId)) throw new Error(`Sheet ${sheetId} does not exist.`);
+
+  type Dependency = { sheetId: string; address: CellAddress };
+  type Frame = Dependency & { stage: "prepare" | "select" | "evaluate" };
   const memo = new Map<string, FormulaValue>();
   const state = new Map<string, "visiting" | "done">();
-  const byRow = new Map<number, CellAddress[]>();
-  for (const address of [...sheet.cells.keys()].map(parseCellKey)) {
-    const row = byRow.get(address.row) ?? [];
-    row.push(address);
-    byRow.set(address.row, row);
-  }
-  for (const row of byRow.values()) row.sort((left, right) => left.column - right.column);
-  const sparseIndex: SparseRangeIndex = {
-    rows: [...byRow.keys()].sort((a, b) => a - b),
-    byRow,
+  const indexes = new Map<string, SparseRangeIndex>();
+  const keyFor = (targetSheetId: string, address: CellAddress) =>
+    `${targetSheetId}|${createCellKey(address)}`;
+  const sheetForName = (name: string | undefined, fallback: string): string | null => {
+    if (!name) return fallback;
+    return (
+      getWorkbookSheets(workbook).find(
+        (sheet) => sheet.name.toLocaleLowerCase("en-US") === name.toLocaleLowerCase("en-US"),
+      )?.id ?? null
+    );
   };
-  const valueFor = (target: CellAddress): FormulaValue => {
-    if (!isCellAddressInBounds(target)) return createFormulaError("REF");
-    const key = createCellKey(target);
-    const content = sheet.cells.get(key)?.content;
+  const indexFor = (targetSheetId: string): SparseRangeIndex => {
+    const cached = indexes.get(targetSheetId);
+    if (cached) return cached;
+    const sheet = workbook.sheets.get(targetSheetId);
+    if (!sheet) return { rows: [], byRow: new Map() };
+    const byRow = new Map<number, CellAddress[]>();
+    for (const address of [...sheet.cells.keys()].map(parseCellKey)) {
+      const row = byRow.get(address.row) ?? [];
+      row.push(address);
+      byRow.set(address.row, row);
+    }
+    for (const row of byRow.values()) row.sort((left, right) => left.column - right.column);
+    const index = { rows: [...byRow.keys()].sort((left, right) => left - right), byRow };
+    indexes.set(targetSheetId, index);
+    return index;
+  };
+  const contentFor = (targetSheetId: string, address: CellAddress): CellContent | undefined =>
+    workbook.sheets.get(targetSheetId)?.cells.get(createCellKey(address))?.content;
+  const valueFor = (targetSheetId: string, address: CellAddress): FormulaValue => {
+    if (!isCellAddressInBounds(address) || !workbook.sheets.has(targetSheetId))
+      return createFormulaError("REF");
+    const content = contentFor(targetSheetId, address);
     if (!content) return null;
     if (content.kind === "literal") return content.value;
     if (content.kind === "error") return createFormulaError(content.error.code);
     if (content.kind === "image") return createFormulaError("VALUE");
-    return memo.get(key) ?? createFormulaError("CYCLE");
+    return memo.get(keyFor(targetSheetId, address)) ?? createFormulaError("CYCLE");
   };
-  const dependenciesFor = (address: CellAddress, stage: "prepare" | "select"): CellAddress[] => {
-    const source = sheet.cells.get(createCellKey(address))?.content;
-    if (source?.kind !== "formula") return [];
-    const ast = getFormulaAst(source.formula.source);
+  const nameReference = (name: string, fromSheetId: string) => {
+    const defined = getDefinedName(workbook, name, fromSheetId);
+    if (!defined) return null;
+    const targetSheet = workbook.sheets.get(defined.reference.sheetId);
+    return targetSheet
+      ? { start: defined.reference.start, end: defined.reference.end, sheetId: targetSheet.id }
+      : null;
+  };
+  const resolveRange = (
+    fromSheetId: string,
+    start: CellAddress & { sheetName?: string },
+    end: CellAddress,
+  ) => {
+    const targetSheetId = sheetForName(start.sheetName, fromSheetId);
+    if (!targetSheetId) return [createFormulaError("REF")];
+    return resolveSparseRange(indexFor(targetSheetId), start, end, (address) =>
+      valueFor(targetSheetId, address),
+    );
+  };
+  const resolverFor = (fromSheetId: string) => ({
+    resolveCell: (target: CellAddress & { sheetName?: string }) => {
+      const targetSheetId = sheetForName(target.sheetName, fromSheetId);
+      return targetSheetId ? valueFor(targetSheetId, target) : createFormulaError("REF");
+    },
+    resolveRange: (bounds: { start: CellAddress; end: CellAddress; sheetName?: string }) =>
+      resolveRange(
+        fromSheetId,
+        { ...bounds.start, ...(bounds.sheetName ? { sheetName: bounds.sheetName } : {}) },
+        bounds.end,
+      ),
+    resolveName: (name: string) => {
+      const named = nameReference(name, fromSheetId);
+      return named
+        ? {
+            start: named.start,
+            end: named.end,
+            sheetName: workbook.sheets.get(named.sheetId)?.name,
+          }
+        : undefined;
+    },
+  });
+  const dependenciesFor = (
+    fromSheetId: string,
+    address: CellAddress,
+    stage: "prepare" | "select",
+  ): Dependency[] => {
+    const content = contentFor(fromSheetId, address);
+    if (content?.kind !== "formula") return [];
+    const ast = getFormulaAst(content.formula.source);
     if (!ast) return [];
-    const unresolvedFormula = (dependency: CellAddress): boolean => {
-      const key = createCellKey(dependency);
-      return sheet.cells.get(key)?.content?.kind === "formula" && !memo.has(key);
-    };
-    const collect = (expression: FormulaExpression, mode: "prepare" | "select"): CellAddress[] => {
-      const dependencies: CellAddress[] = [];
+    const unresolvedFormula = (dependency: Dependency): boolean =>
+      contentFor(dependency.sheetId, dependency.address)?.kind === "formula" &&
+      !memo.has(keyFor(dependency.sheetId, dependency.address));
+    const collect = (expression: FormulaExpression, mode: "prepare" | "select"): Dependency[] => {
+      const dependencies: Dependency[] = [];
+      const addReference = (reference: { row: number; column: number; sheetName?: string }) => {
+        const targetSheetId = sheetForName(reference.sheetName, fromSheetId);
+        if (targetSheetId) dependencies.push({ sheetId: targetSheetId, address: reference });
+      };
       const visit = (current: FormulaExpression): void => {
         if (current.kind === "reference") {
-          dependencies.push({ row: current.reference.row, column: current.reference.column });
+          addReference(current.reference);
           return;
         }
         if (current.kind === "range") {
-          dependencies.push(
-            ...getSparseRangeAddresses(sparseIndex, current.range.start, current.range.end),
-          );
+          const targetSheetId = sheetForName(current.range.start.sheetName, fromSheetId);
+          if (targetSheetId)
+            for (const dependency of getSparseRangeAddresses(
+              indexFor(targetSheetId),
+              current.range.start,
+              current.range.end,
+            ))
+              dependencies.push({ sheetId: targetSheetId, address: dependency });
+          return;
+        }
+        if (current.kind === "identifier") {
+          const named = nameReference(current.name, fromSheetId);
+          if (named)
+            for (const dependency of getSparseRangeAddresses(
+              indexFor(named.sheetId),
+              named.start,
+              named.end,
+            ))
+              dependencies.push({ sheetId: named.sheetId, address: dependency });
           return;
         }
         if (current.kind === "unary") {
@@ -478,12 +590,9 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
         const selector = current.args[0];
         if (!selector) return;
         if (mode === "prepare") {
-          for (const dependency of collect(selector, "prepare")) dependencies.push(dependency);
+          dependencies.push(...collect(selector, "prepare"));
           return;
         }
-        // A selector can itself contain lazy functions. Select its currently reachable
-        // frontier so an unresolved dependency (for example IF(TRUE, B1, 0)) is
-        // scheduled before its enclosing IF/IFERROR decides a branch.
         const selectorDependencies = collect(selector, "select");
         if (selectorDependencies.some(unresolvedFormula)) {
           dependencies.push(...selectorDependencies);
@@ -500,23 +609,15 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
               argument?.kind === "range"
                 ? {
                     kind: "range",
-                    values: resolveSparseRange(
-                      sparseIndex,
-                      argument.range.start,
-                      argument.range.end,
-                      valueFor,
-                    ),
+                    values: resolveRange(fromSheetId, argument.range.start, argument.range.end),
                   }
                 : {
                     kind: "scalar",
                     value: argument
                       ? evaluateFormulaAst(
-                          { source: source.formula.source, expression: argument },
-                          {
-                            resolveCell: valueFor,
-                            resolveRange: (bounds) =>
-                              resolveSparseRange(sparseIndex, bounds.start, bounds.end, valueFor),
-                          },
+                          { source: content.formula.source, expression: argument },
+                          resolverFor(fromSheetId),
+                          { dateSystem: workbook.dateSystem },
                         )
                       : createFormulaError("VALUE"),
                     source: "expression",
@@ -531,232 +632,83 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
         }
       };
       visit(expression);
-      const uniqueDependencies = new Map<string, CellAddress>();
+      const unique = new Map<string, Dependency>();
       for (const dependency of dependencies)
-        uniqueDependencies.set(createCellKey(dependency), dependency);
-      return [...uniqueDependencies.values()];
+        unique.set(keyFor(dependency.sheetId, dependency.address), dependency);
+      return [...unique.values()];
     };
     return collect(ast.expression, stage);
   };
-  const resolve = (target: CellAddress): FormulaValue => {
+  const resolve = (targetSheetId: string, target: CellAddress): FormulaValue => {
     if (!isCellAddressInBounds(target)) return createFormulaError("REF");
-    const key = createCellKey(target);
-    if (memo.has(key)) return memo.get(key) ?? null;
-    const content = sheet.cells.get(key)?.content;
-    if (!content || content.kind !== "formula") return valueFor(target);
-    const stack: Array<{ address: CellAddress; stage: "prepare" | "select" | "evaluate" }> = [
-      { address: target, stage: "prepare" },
-    ];
-    while (stack.length > 0) {
+    const targetKey = keyFor(targetSheetId, target);
+    if (memo.has(targetKey)) return memo.get(targetKey) ?? null;
+    if (contentFor(targetSheetId, target)?.kind !== "formula")
+      return valueFor(targetSheetId, target);
+    const stack: Frame[] = [{ sheetId: targetSheetId, address: target, stage: "prepare" }];
+    while (stack.length) {
       const frame = stack.pop();
       if (!frame) break;
-      const frameKey = createCellKey(frame.address);
+      const frameKey = keyFor(frame.sheetId, frame.address);
       if (memo.has(frameKey)) continue;
-      const frameContent = sheet.cells.get(frameKey)?.content;
-      if (!frameContent || frameContent.kind !== "formula") continue;
+      const content = contentFor(frame.sheetId, frame.address);
+      if (content?.kind !== "formula") continue;
       if (frame.stage === "prepare") {
-        const current = state.get(frameKey);
-        if (current === "visiting") {
+        if (state.get(frameKey) === "visiting") {
           memo.set(frameKey, createFormulaError("CYCLE"));
           continue;
         }
         state.set(frameKey, "visiting");
-        stack.push({ address: frame.address, stage: "select" });
-        for (const dependency of dependenciesFor(frame.address, "prepare").reverse()) {
-          const dependencyKey = createCellKey(dependency);
-          const dependencyContent = sheet.cells.get(dependencyKey)?.content;
-          if (dependencyContent?.kind !== "formula" || memo.has(dependencyKey)) continue;
+        stack.push({ ...frame, stage: "select" });
+        for (const dependency of dependenciesFor(
+          frame.sheetId,
+          frame.address,
+          "prepare",
+        ).reverse()) {
+          const dependencyKey = keyFor(dependency.sheetId, dependency.address);
+          if (
+            contentFor(dependency.sheetId, dependency.address)?.kind !== "formula" ||
+            memo.has(dependencyKey)
+          )
+            continue;
           if (state.get(dependencyKey) === "visiting")
             memo.set(dependencyKey, createFormulaError("CYCLE"));
-          else stack.push({ address: dependency, stage: "prepare" });
+          else stack.push({ ...dependency, stage: "prepare" });
         }
         continue;
       }
       if (frame.stage === "select") {
-        const dependencies = dependenciesFor(frame.address, "select");
-        const hasPendingDependency = dependencies.some((dependency) => {
-          const dependencyKey = createCellKey(dependency);
-          return (
-            sheet.cells.get(dependencyKey)?.content?.kind === "formula" && !memo.has(dependencyKey)
-          );
-        });
-        stack.push({ address: frame.address, stage: hasPendingDependency ? "select" : "evaluate" });
+        const dependencies = dependenciesFor(frame.sheetId, frame.address, "select");
+        const pending = dependencies.some(
+          (dependency) =>
+            contentFor(dependency.sheetId, dependency.address)?.kind === "formula" &&
+            !memo.has(keyFor(dependency.sheetId, dependency.address)),
+        );
+        stack.push({ ...frame, stage: pending ? "select" : "evaluate" });
         for (const dependency of dependencies.reverse()) {
-          const dependencyKey = createCellKey(dependency);
-          const dependencyContent = sheet.cells.get(dependencyKey)?.content;
-          if (dependencyContent?.kind !== "formula" || memo.has(dependencyKey)) continue;
+          const dependencyKey = keyFor(dependency.sheetId, dependency.address);
+          if (
+            contentFor(dependency.sheetId, dependency.address)?.kind !== "formula" ||
+            memo.has(dependencyKey)
+          )
+            continue;
           if (state.get(dependencyKey) === "visiting")
             memo.set(dependencyKey, createFormulaError("CYCLE"));
-          else stack.push({ address: dependency, stage: "prepare" });
+          else stack.push({ ...dependency, stage: "prepare" });
         }
         continue;
       }
-      const value = evaluateFormula(frameContent.formula.source, {
-        resolveCell: valueFor,
-        resolveRange: (bounds) =>
-          resolveSparseRange(sparseIndex, bounds.start, bounds.end, valueFor),
-      });
-      memo.set(frameKey, value);
+      memo.set(
+        frameKey,
+        evaluateFormula(content.formula.source, resolverFor(frame.sheetId), {
+          dateSystem: workbook.dateSystem,
+        }),
+      );
       state.set(frameKey, "done");
     }
-    return valueFor(target);
+    return valueFor(targetSheetId, target);
   };
-  return { getComputedValue: resolve };
-}
-
-/**
- * Evaluates formulas in a workbook, resolving qualified A1 references and
- * workbook/sheet scoped names. The existing sheet evaluator remains available
- * for consumers that own an isolated sheet (such as the canvas adapter).
- */
-export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): SheetEvaluator {
-  if (!workbook.sheets.has(sheetId)) throw new Error(`Sheet ${sheetId} does not exist.`);
-  const anchoredSheet = workbook.sheets.get(sheetId);
-  if (
-    anchoredSheet &&
-    workbook.definedNames.size === 0 &&
-    [...anchoredSheet.cells.values()].every(
-      (cell) => cell.content?.kind !== "formula" || !cell.content.formula.source.includes("!"),
-    )
-  )
-    return createSheetEvaluator(anchoredSheet);
-  const memo = new Map<string, FormulaValue>();
-  const state = new Set<string>();
-  const indexes = new Map<string, SparseRangeIndex>();
-  const indexFor = (id: string): SparseRangeIndex => {
-    const cached = indexes.get(id);
-    if (cached) return cached;
-    const sheet = workbook.sheets.get(id);
-    if (!sheet) return { rows: [], byRow: new Map() };
-    const byRow = new Map<number, CellAddress[]>();
-    for (const address of [...sheet.cells.keys()].map(parseCellKey)) {
-      const row = byRow.get(address.row) ?? [];
-      row.push(address);
-      byRow.set(address.row, row);
-    }
-    for (const row of byRow.values()) row.sort((left, right) => left.column - right.column);
-    const index = { rows: [...byRow.keys()].sort((left, right) => left - right), byRow };
-    indexes.set(id, index);
-    return index;
-  };
-  const resolveSheetId = (name: string | undefined, fallback: string): string | null => {
-    if (!name) return fallback;
-    return getWorkbookSheets(workbook).find((sheet) => sheet.name.toLowerCase() === name.toLowerCase())
-      ?.id ?? null;
-  };
-  const valueFor = (targetSheetId: string, address: CellAddress): FormulaValue => {
-    if (!isCellAddressInBounds(address)) return createFormulaError("REF");
-    const targetSheet = workbook.sheets.get(targetSheetId);
-    if (!targetSheet) return createFormulaError("REF");
-    const content = targetSheet.cells.get(createCellKey(address))?.content;
-    if (!content) return null;
-    if (content.kind === "literal") return content.value;
-    if (content.kind === "error") return createFormulaError(content.error.code);
-    if (content.kind === "image") return createFormulaError("VALUE");
-    return resolve(targetSheetId, address);
-  };
-  const resolveLinearDependencyChain = (
-    initialSheetId: string,
-    initialAddress: CellAddress,
-  ): { handled: boolean; value: FormulaValue } => {
-    const path: Array<{ sheetId: string; address: CellAddress; key: string }> = [];
-    const pathKeys = new Set<string>();
-    let currentSheetId = initialSheetId;
-    let currentAddress = initialAddress;
-    while (true) {
-      const key = `${currentSheetId}|${createCellKey(currentAddress)}`;
-      const cached = memo.get(key);
-      if (cached !== undefined) {
-        for (const item of path) memo.set(item.key, cached);
-        return { handled: path.length > 0, value: cached };
-      }
-      const content = workbook.sheets.get(currentSheetId)?.cells.get(createCellKey(currentAddress))?.content;
-      if (content?.kind !== "formula") {
-        const value = valueFor(currentSheetId, currentAddress);
-        for (const item of path) memo.set(item.key, value);
-        return { handled: path.length > 0, value };
-      }
-      const ast = getFormulaAst(content.formula.source);
-      const dependency = ast ? linearDependency(ast.expression, currentSheetId) : null;
-      if (!dependency) {
-        if (path.length === 0) return { handled: false, value: createFormulaError("VALUE") };
-        const value = valueFor(currentSheetId, currentAddress);
-        for (const item of path) memo.set(item.key, value);
-        return { handled: true, value };
-      }
-      if (pathKeys.has(key)) {
-        const value = createFormulaError("CYCLE");
-        for (const item of path) memo.set(item.key, value);
-        return { handled: true, value };
-      }
-      path.push({ sheetId: currentSheetId, address: currentAddress, key });
-      pathKeys.add(key);
-      currentSheetId = dependency.sheetId;
-      currentAddress = dependency.address;
-    }
-  };
-  const resolve = (currentSheetId: string, address: CellAddress): FormulaValue => {
-    if (!isCellAddressInBounds(address)) return createFormulaError("REF");
-    const key = `${currentSheetId}|${createCellKey(address)}`;
-    const cached = memo.get(key);
-    if (cached !== undefined) return cached;
-    if (state.has(key)) return createFormulaError("CYCLE");
-    const currentSheet = workbook.sheets.get(currentSheetId);
-    const content = currentSheet?.cells.get(createCellKey(address))?.content;
-    if (!content || content.kind !== "formula") return valueFor(currentSheetId, address);
-    const direct = resolveLinearDependencyChain(currentSheetId, address);
-    if (direct.handled) return direct.value;
-    state.add(key);
-    const value = evaluateFormula(content.formula.source, {
-      resolveCell: (target) => {
-        const targetSheetId = resolveSheetId(target.sheetName, currentSheetId);
-        return targetSheetId ? valueFor(targetSheetId, target) : createFormulaError("REF");
-      },
-      resolveRange: (bounds) => {
-        const targetSheetId = resolveSheetId(bounds.sheetName, currentSheetId);
-        if (!targetSheetId) return [createFormulaError("REF")];
-        return resolveSparseRange(indexFor(targetSheetId), bounds.start, bounds.end, (target) =>
-          valueFor(targetSheetId, target),
-        );
-      },
-      resolveName: (name) => {
-        const defined = getDefinedName(workbook, name, currentSheetId);
-        if (!defined) return undefined;
-        const referenceSheet = workbook.sheets.get(defined.reference.sheetId);
-        return referenceSheet
-          ? { start: defined.reference.start, end: defined.reference.end, sheetName: referenceSheet.name }
-          : createFormulaError("REF");
-      },
-    }, { dateSystem: workbook.dateSystem });
-    state.delete(key);
-    memo.set(key, value);
-    return value;
-  };
-  return { getComputedValue: (address) => valueFor(sheetId, address) };
-
-  function linearDependency(
-    expression: FormulaExpression,
-    fromSheetId: string,
-  ): { sheetId: string; address: CellAddress } | null {
-    let reference = expression.kind === "reference" ? expression.reference : null;
-    if (
-      expression.kind === "function" &&
-      expression.name.toUpperCase() === "IF" &&
-      expression.args[0]?.kind === "boolean"
-    ) {
-      const selected = expression.args[0].value ? expression.args[1] : expression.args[2];
-      reference = selected?.kind === "reference" ? selected.reference : null;
-    }
-    if (expression.kind === "identifier") {
-      const defined = getDefinedName(workbook, expression.name, fromSheetId);
-      reference = defined && defined.reference.start.row === defined.reference.end.row && defined.reference.start.column === defined.reference.end.column
-        ? { row: defined.reference.start.row, column: defined.reference.start.column, sheetName: workbook.sheets.get(defined.reference.sheetId)?.name, rowAbsolute: false, columnAbsolute: false, start: 0, end: 0 }
-        : null;
-    }
-    if (!reference) return null;
-    const targetSheetId = resolveSheetId(reference.sheetName, fromSheetId);
-    return targetSheetId ? { sheetId: targetSheetId, address: { row: reference.row, column: reference.column } } : null;
-  }
+  return { getComputedValue: (address) => resolve(sheetId, address) };
 }
 
 export function getCellComputedValue(sheet: Sheet, address: CellAddress): FormulaValue {

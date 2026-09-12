@@ -53,6 +53,30 @@ describe("workbook formula evaluation", () => {
     expect(createWorkbookEvaluator(workbook, data.id).getComputedValue({ row: 15_000, column: 0 })).toBe(1);
   });
 
+  test("schedules a deep cross-sheet lazy chain with expression and name dependencies", () => {
+    const workbook = createTestWorkbook();
+    const data = createSheet("Data", "data");
+    insertSheet(workbook, data);
+    applyWorkbookCommand(
+      workbook,
+      createUpsertDefinedNameCommand(workbook, { name: "Anchor", reference: "=Data!A1" }),
+    );
+    setCellContent(data, { row: 0, column: 0 }, { kind: "literal", value: 1 });
+    setCellContent(data, { row: 0, column: 1 }, { kind: "literal", value: true });
+    const main = getActiveSheet(workbook);
+    for (let row = 0; row < 15_000; row += 1) {
+      setCellContent(data, { row: row + 1, column: 0 }, {
+        kind: "formula",
+        formula: { source: row === 0 ? "=SUM(Anchor)" : `=SUM(Sheet1!A${row})` },
+      });
+      setCellContent(main, { row, column: 0 }, {
+        kind: "formula",
+        formula: { source: `=IF(Data!B1,Data!A${row + 2},0)` },
+      });
+    }
+    expect(createWorkbookEvaluator(workbook, data.id).getComputedValue({ row: 15_000, column: 0 })).toBe(1);
+  });
+
   test("persists names and gives a local name precedence over a workbook name", () => {
     const workbook = createTestWorkbook();
     const data = createSheet("Data", "data");
