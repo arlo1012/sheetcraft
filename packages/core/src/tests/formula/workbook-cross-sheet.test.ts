@@ -33,10 +33,7 @@ describe("workbook formula evaluation", () => {
     );
 
     expect(
-      createWorkbookEvaluator(
-        workbook,
-        workbook.activeSheetId,
-      ).getComputedValue({
+      createWorkbookEvaluator(workbook, workbook.activeSheetId).getComputedValue({
         row: 0,
         column: 0,
       }),
@@ -58,10 +55,7 @@ describe("workbook formula evaluation", () => {
       { kind: "formula", formula: { source: "=Sheet1!A1" } },
     );
     expect(
-      createWorkbookEvaluator(
-        workbook,
-        workbook.activeSheetId,
-      ).getComputedValue({
+      createWorkbookEvaluator(workbook, workbook.activeSheetId).getComputedValue({
         row: 0,
         column: 0,
       }),
@@ -74,13 +68,8 @@ describe("workbook formula evaluation", () => {
     insertSheet(workbook, data);
     setCellContent(data, { row: 0, column: 0 }, { kind: "literal", value: 1 });
     for (let row = 0; row < 15_000; row += 1) {
-      const source =
-        row === 0 ? "=IF(TRUE,Data!A1,0)" : `=IF(TRUE,Sheet1!A${row},0)`;
-      setCellContent(
-        data,
-        { row: row + 1, column: 0 },
-        { kind: "formula", formula: { source } },
-      );
+      const source = row === 0 ? "=IF(TRUE,Data!A1,0)" : `=IF(TRUE,Sheet1!A${row},0)`;
+      setCellContent(data, { row: row + 1, column: 0 }, { kind: "formula", formula: { source } });
       setCellContent(
         getActiveSheet(workbook),
         { row, column: 0 },
@@ -110,11 +99,7 @@ describe("workbook formula evaluation", () => {
       }),
     );
     setCellContent(data, { row: 0, column: 0 }, { kind: "literal", value: 1 });
-    setCellContent(
-      data,
-      { row: 0, column: 1 },
-      { kind: "literal", value: true },
-    );
+    setCellContent(data, { row: 0, column: 1 }, { kind: "literal", value: true });
     const main = getActiveSheet(workbook);
     for (let row = 0; row < 15_000; row += 1) {
       setCellContent(
@@ -172,31 +157,22 @@ describe("workbook formula evaluation", () => {
     );
 
     expect(
-      createWorkbookEvaluator(
-        workbook,
-        workbook.activeSheetId,
-      ).getComputedValue({
+      createWorkbookEvaluator(workbook, workbook.activeSheetId).getComputedValue({
         row: 0,
         column: 0,
       }),
     ).toBe(5);
-    expect(
-      serializeWorkbook(deserializeWorkbook(serializeWorkbook(workbook))),
-    ).toEqual(serializeWorkbook(workbook));
+    expect(serializeWorkbook(deserializeWorkbook(serializeWorkbook(workbook)))).toEqual(
+      serializeWorkbook(workbook),
+    );
     setCellContent(
       getActiveSheet(workbook),
       { row: 0, column: 1 },
       { kind: "formula", formula: { source: "=Data!A1" } },
     );
-    const inverse = applyWorkbookCommand(
-      workbook,
-      createInsertSheetAxisCommand(data.id, "row", 0),
-    );
+    const inverse = applyWorkbookCommand(workbook, createInsertSheetAxisCommand(data.id, "row", 0));
     expect(
-      createWorkbookEvaluator(
-        workbook,
-        workbook.activeSheetId,
-      ).getComputedValue({
+      createWorkbookEvaluator(workbook, workbook.activeSheetId).getComputedValue({
         row: 0,
         column: 0,
       }),
@@ -204,8 +180,7 @@ describe("workbook formula evaluation", () => {
     expect(getActiveSheet(workbook).cells.get("0:1")?.content).toMatchObject({
       formula: { source: "=Data!A2" },
     });
-    if (!inverse || !("type" in inverse))
-      throw new Error("Expected axis inverse.");
+    if (!inverse || !("type" in inverse)) throw new Error("Expected axis inverse.");
     applyWorkbookCommand(workbook, inverse);
     expect(getActiveSheet(workbook).cells.get("0:1")?.content).toMatchObject({
       formula: { source: "=Data!A1" },
@@ -260,8 +235,7 @@ describe("workbook formula evaluation", () => {
     expect(data.cells.get("0:0")?.content).toMatchObject({
       formula: { source: "=Sales" },
     });
-    if (!inverse || !("type" in inverse))
-      throw new Error("Expected name inverse.");
+    if (!inverse || !("type" in inverse)) throw new Error("Expected name inverse.");
     setCellContent(
       main,
       { row: 0, column: 1 },
@@ -396,35 +370,22 @@ describe("workbook formula evaluation", () => {
     );
 
     const valueAt = () =>
-      createWorkbookEvaluator(
-        workbook,
-        workbook.activeSheetId,
-      ).getComputedValue({
+      createWorkbookEvaluator(workbook, workbook.activeSheetId).getComputedValue({
         row: 0,
         column: 0,
       });
     expect(valueAt()).toBe(4);
     expect(valueAt()).toBe(4);
-    applyWorkbookCommand(
-      workbook,
-      createRenameSheetCommand(data.id, "Actuals"),
-    );
+    applyWorkbookCommand(workbook, createRenameSheetCommand(data.id, "Actuals"));
     expect(valueAt()).toBe(4);
-    const inverse = applyWorkbookCommand(
-      workbook,
-      createDeleteSheetCommand(workbook, data.id),
-    );
+    const inverse = applyWorkbookCommand(workbook, createDeleteSheetCommand(workbook, data.id));
     expect(valueAt()).toMatchObject({ code: "NAME" });
-    if (!inverse || !("type" in inverse))
-      throw new Error("Expected delete inverse.");
+    if (!inverse || !("type" in inverse)) throw new Error("Expected delete inverse.");
     applyWorkbookCommand(workbook, inverse);
     expect(valueAt()).toBe(4);
     const restored = deserializeWorkbook(serializeWorkbook(workbook));
     expect(
-      createWorkbookEvaluator(
-        restored,
-        restored.activeSheetId,
-      ).getComputedValue({
+      createWorkbookEvaluator(restored, restored.activeSheetId).getComputedValue({
         row: 0,
         column: 0,
       }),
@@ -440,22 +401,15 @@ describe("workbook formula evaluation", () => {
       { row: 0, column: 0 },
       { kind: "formula", formula: { source: "=Data!A1" } },
     );
-    applyWorkbookCommand(
-      workbook,
-      createRenameSheetCommand(data.id, "Revenue"),
-    );
+    applyWorkbookCommand(workbook, createRenameSheetCommand(data.id, "Revenue"));
     expect(getActiveSheet(workbook).cells.get("0:0")?.content).toMatchObject({
       formula: { source: "=Revenue!A1" },
     });
-    const inverse = applyWorkbookCommand(
-      workbook,
-      createDeleteSheetCommand(workbook, data.id),
-    );
+    const inverse = applyWorkbookCommand(workbook, createDeleteSheetCommand(workbook, data.id));
     expect(getActiveSheet(workbook).cells.get("0:0")?.content).toMatchObject({
       formula: { source: "=#REF!" },
     });
-    if (!inverse || !("type" in inverse))
-      throw new Error("Expected delete inverse.");
+    if (!inverse || !("type" in inverse)) throw new Error("Expected delete inverse.");
     applyWorkbookCommand(workbook, inverse);
     expect(getActiveSheet(workbook).cells.get("0:0")?.content).toMatchObject({
       formula: { source: "=Revenue!A1" },

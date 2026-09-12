@@ -111,8 +111,7 @@ export type SetSheetFreezePanesCommand = {
   freezePanes: FreezePanes;
 };
 
-export type CellMergeMode =
-  "all" | "center" | "same-columns" | "same-rows" | "content" | "across";
+export type CellMergeMode = "all" | "center" | "same-columns" | "same-rows" | "content" | "across";
 
 export type MergeCellsCommand = {
   type: "mergeCells";
@@ -310,8 +309,7 @@ export type RestoreSheetAxisSliceCommand = {
   slice: SheetAxisSparseSlice;
 };
 
-export type RestoreSheetStateCommand =
-  RestoreFullSheetStateCommand | RestoreSheetAxisSliceCommand;
+export type RestoreSheetStateCommand = RestoreFullSheetStateCommand | RestoreSheetAxisSliceCommand;
 
 export type SetWorkbookDateSystemCommand = {
   type: "setWorkbookDateSystem";
@@ -381,9 +379,7 @@ export type WorkbookOperation =
   | "structure.move"
   | "history.restore";
 
-export function getWorkbookOperation(
-  command: WorkbookCommand,
-): WorkbookOperation {
+export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperation {
   switch (command.type) {
     case "setWorkbookDateSystem":
       return "workbook.dateSystem";

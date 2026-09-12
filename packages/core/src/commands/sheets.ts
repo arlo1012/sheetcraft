@@ -442,7 +442,7 @@ export function applyRenameSheetCommand(
   const formulaSources = renameQualifiedReferencesForSheet(workbook, previousName, name);
   return {
     ...createRenameSheetCommand(command.sheetId, previousName),
-    ...(formulaSources.length ? { formulaSources } : {}),
+    formulaSources,
   };
 }
 
