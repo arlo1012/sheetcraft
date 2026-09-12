@@ -13,26 +13,28 @@ const { t } = useAppI18n();
     role="group"
     :aria-label="t('format.styleRuleTools')"
   >
-    <RibbonIconAction
-      :label="t('app.unavailableFeature', { feature: t('ribbon.tableStyles') })"
-      :text="t('ribbon.tableStyles')"
-      disabled
-      disclosure
-      data-ribbon-row="1"
-      data-ribbon-placeholder="table-styles"
-    >
-      <TableProperties :size="15" aria-hidden="true" />
-    </RibbonIconAction>
-    <RibbonIconAction
-      :label="t('app.unavailableFeature', { feature: t('ribbon.conditionalFormatting') })"
-      :text="t('ribbon.conditionalFormatting')"
-      disabled
-      disclosure
-      data-ribbon-row="2"
-      data-ribbon-placeholder="conditional-formatting"
-    >
-      <Sparkles :size="15" aria-hidden="true" />
-    </RibbonIconAction>
+    <div class="home-styles-group__row" data-ribbon-row="1">
+      <RibbonIconAction
+        :label="t('app.unavailableFeature', { feature: t('ribbon.tableStyles') })"
+        :text="t('ribbon.tableStyles')"
+        disabled
+        disclosure
+        data-ribbon-placeholder="table-styles"
+      >
+        <TableProperties :size="15" aria-hidden="true" />
+      </RibbonIconAction>
+    </div>
+    <div class="home-styles-group__row" data-ribbon-row="2">
+      <RibbonIconAction
+        :label="t('app.unavailableFeature', { feature: t('ribbon.conditionalFormatting') })"
+        :text="t('ribbon.conditionalFormatting')"
+        disabled
+        disclosure
+        data-ribbon-placeholder="conditional-formatting"
+      >
+        <Sparkles :size="15" aria-hidden="true" />
+      </RibbonIconAction>
+    </div>
   </section>
 </template>
 
@@ -46,6 +48,8 @@ const { t } = useAppI18n();
   --ribbon-labeled-action-justify: flex-start;
   --ribbon-labeled-action-padding: 3px;
 
-  align-items: center;
+  &__row {
+    @include ribbon.row;
+  }
 }
 </style>

@@ -48,9 +48,20 @@ describe("SpreadsheetRibbon", () => {
     expect(
       wrapper
         .get('[data-ribbon-group="cell"]')
-        .findAll(":scope > [data-cell-format-lane]")
-        .map((lane) => lane.attributes("data-cell-format-lane")),
-    ).toEqual(["typography", "appearance"]);
+        .findAll(":scope > [data-ribbon-row]")
+        .map((row) => row.attributes("data-ribbon-row")),
+    ).toEqual(["1", "2"]);
+    const cellGroup = wrapper.get('[data-ribbon-group="cell"]');
+    expect(cellGroup.get(':scope > [data-ribbon-row="1"] [data-font-format-control]')).toBeTruthy();
+    expect(cellGroup.get(':scope > [data-ribbon-row="1"] [data-cell-border-control]')).toBeTruthy();
+    expect(cellGroup.get(':scope > [data-ribbon-row="2"] .text-format-controls')).toBeTruthy();
+    expect(
+      cellGroup.get(':scope > [data-ribbon-row="2"] [data-cell-color-control="text"]'),
+    ).toBeTruthy();
+    expect(
+      cellGroup.get(':scope > [data-ribbon-row="2"] [data-cell-color-control="fill"]'),
+    ).toBeTruthy();
+    expect(cellGroup.get(':scope > [data-ribbon-dialog-launcher="font"]')).toBeTruthy();
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-row="2"]')).toBeTruthy();
     expect(wrapper.get("[data-locale-select] input").element).toBeInstanceOf(HTMLInputElement);
 

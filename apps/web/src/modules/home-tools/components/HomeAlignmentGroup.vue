@@ -46,29 +46,19 @@ function toggleWrapText(state: ToggleStyleState): void {
     :aria-disabled="disabled"
     :title="disabled ? t('format.selectionTooLarge') : undefined"
   >
-    <div class="home-alignment-group__stack" data-ribbon-stack="alignment">
-      <div class="home-alignment-group__row" data-ribbon-row="1">
-        <VerticalAlignmentControls
-          :state="state.verticalAlign"
-          :disabled="disabled"
-          @apply-style="emit('applyStyle', $event)"
-        />
-        <IndentationControls
-          :state="state.indent"
-          :disabled="disabled"
-          @adjust-indent="emit('adjustIndent', $event)"
-        />
-      </div>
-      <div class="home-alignment-group__row" data-ribbon-row="2">
-        <HorizontalAlignmentControls
-          :state="state"
-          :disabled="disabled"
-          @apply-style="emit('applyStyle', $event)"
-        />
-      </div>
-    </div>
-    <div class="home-alignment-group__actions">
+    <div class="home-alignment-group__row" data-ribbon-row="1">
+      <VerticalAlignmentControls
+        :state="state.verticalAlign"
+        :disabled="disabled"
+        @apply-style="emit('applyStyle', $event)"
+      />
+      <IndentationControls
+        :state="state.indent"
+        :disabled="disabled"
+        @adjust-indent="emit('adjustIndent', $event)"
+      />
       <RibbonIconAction
+        class="home-alignment-group__action"
         :label="t('ribbon.wrapText')"
         :text="t('ribbon.wrap')"
         :disabled="disabled"
@@ -78,7 +68,15 @@ function toggleWrapText(state: ToggleStyleState): void {
       >
         <TextWrap :size="17" aria-hidden="true" />
       </RibbonIconAction>
+    </div>
+    <div class="home-alignment-group__row" data-ribbon-row="2">
+      <HorizontalAlignmentControls
+        :state="state"
+        :disabled="disabled"
+        @apply-style="emit('applyStyle', $event)"
+      />
       <MergeCellsMenu
+        class="home-alignment-group__action"
         :state="props.mergeState"
         :disabled="disabled"
         @merge="emit('merge', $event)"
@@ -98,14 +96,8 @@ function toggleWrapText(state: ToggleStyleState): void {
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-alignment-group {
-  @include ribbon.columns;
+  @include ribbon.compact;
   @include ribbon.dialog-launcher-anchor;
-
-  gap: 4px;
-
-  &__stack {
-    @include ribbon.stack;
-  }
 
   &__row {
     @include ribbon.row;
@@ -113,14 +105,13 @@ function toggleWrapText(state: ToggleStyleState): void {
     gap: 0;
   }
 
-  &__actions {
-    @include ribbon.stack;
-
-    --ribbon-labeled-action-width: 100%;
+  &__action {
+    --ribbon-labeled-action-width: auto;
     --ribbon-labeled-action-justify: flex-start;
     --ribbon-labeled-action-padding: 4px;
 
-    min-width: 72px;
+    flex: 1 0 72px;
+    margin-left: 4px;
   }
 }
 </style>

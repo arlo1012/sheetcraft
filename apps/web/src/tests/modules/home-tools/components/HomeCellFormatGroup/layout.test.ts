@@ -42,25 +42,21 @@ function mountGroup(locale: "en-US" | "zh-CN" = "en-US") {
   });
 }
 
-function placeholders(wrapper: ReturnType<typeof mountGroup>, lane: string): string[] {
-  return wrapper
-    .get(`[data-cell-format-lane="${lane}"]`)
-    .findAll("[data-ribbon-placeholder]")
-    .map((action) => action.attributes("data-ribbon-placeholder"))
-    .filter((value): value is string => value !== undefined);
-}
-
 describe("HomeCellFormatGroup layout", () => {
-  test("organizes controls into typography and appearance lanes", () => {
+  test("organizes controls across two direct ribbon rows", () => {
     const wrapper = mountGroup();
 
     expect(
-      wrapper
-        .findAll(":scope > [data-cell-format-lane]")
-        .map((lane) => lane.attributes("data-cell-format-lane")),
-    ).toEqual(["typography", "appearance"]);
-    expect(placeholders(wrapper, "typography")).toEqual([]);
-    expect(placeholders(wrapper, "appearance")).toEqual([]);
+      wrapper.findAll(":scope > [data-ribbon-row]").map((row) => row.attributes("data-ribbon-row")),
+    ).toEqual(["1", "2"]);
+    const firstRow = wrapper.get('[data-ribbon-row="1"]');
+    const secondRow = wrapper.get('[data-ribbon-row="2"]');
+    expect(firstRow.get("[data-font-format-control]")).toBeTruthy();
+    expect(firstRow.get("[data-cell-border-control]")).toBeTruthy();
+    expect(secondRow.get(".text-format-controls")).toBeTruthy();
+    expect(secondRow.get('[data-cell-color-control="text"]')).toBeTruthy();
+    expect(secondRow.get('[data-cell-color-control="fill"]')).toBeTruthy();
+    expect(wrapper.get(':scope > [data-ribbon-dialog-launcher="font"]')).toBeTruthy();
     expect(
       wrapper
         .get(".text-format-controls")
@@ -73,12 +69,6 @@ describe("HomeCellFormatGroup layout", () => {
         .findAll(":scope > [data-font-format-segment]")
         .map((segment) => segment.attributes("data-font-format-segment")),
     ).toEqual(["family", "size"]);
-    expect(
-      wrapper.get('[data-cell-format-lane="typography"] [data-cell-color-control="text"]'),
-    ).toBeTruthy();
-    expect(
-      wrapper.get('[data-cell-format-lane="appearance"] [data-cell-color-control="fill"]'),
-    ).toBeTruthy();
     expect(
       wrapper
         .get("[data-cell-border-control] [data-border-preset-icon]")
@@ -105,26 +95,14 @@ describe("HomeCellFormatGroup layout", () => {
   });
 
   test.each([
-    [
-      "en-US",
-      "Cell tools",
-      ["Text formatting", "Cell appearance"],
-      "Bold",
-      "Text color",
-      "Fill color",
-    ],
-    ["zh-CN", "单元格工具", ["文字格式", "单元格外观"], "加粗", "文字颜色", "填充颜色"],
+    ["en-US", "Cell tools", "Bold", "Text color", "Fill color"],
+    ["zh-CN", "单元格工具", "加粗", "文字颜色", "填充颜色"],
   ] as const)(
     "localizes the %s group and formatting controls",
-    (locale, group, lanes, bold, text, fill) => {
+    (locale, group, bold, text, fill) => {
       const wrapper = mountGroup(locale);
 
       expect(wrapper.attributes("aria-label")).toBe(group);
-      expect(
-        wrapper
-          .findAll(":scope > [data-cell-format-lane]")
-          .map((lane) => lane.attributes("aria-label")),
-      ).toEqual(lanes);
       expect(wrapper.get(`[aria-label="${bold}"]`)).toBeTruthy();
       expect(wrapper.get(`[aria-label="${text}"]`)).toBeTruthy();
       expect(wrapper.get(`[aria-label="${fill}"]`)).toBeTruthy();

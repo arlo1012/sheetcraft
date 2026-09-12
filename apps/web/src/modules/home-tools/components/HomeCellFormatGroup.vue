@@ -34,38 +34,12 @@ const { t } = useAppI18n();
     :aria-disabled="disabled"
     :title="disabled ? t('format.selectionTooLarge') : undefined"
   >
-    <div
-      class="home-cell-format-group__lane"
-      data-cell-format-lane="typography"
-      role="group"
-      :aria-label="t('format.typographyTools')"
-    >
+    <div class="home-cell-format-group__row" data-ribbon-row="1">
       <FontFormatControls
         :state="state"
         :disabled="disabled"
         @apply-style="emit('applyStyle', $event)"
       />
-      <div class="home-cell-format-group__typography-tools">
-        <TextFormatControls
-          class="home-cell-format-group__text-tools"
-          :state="state"
-          :disabled="disabled"
-          @apply-style="emit('applyStyle', $event)"
-        />
-        <CellColorControl
-          kind="text"
-          :disabled="disabled"
-          @apply-style="emit('applyStyle', $event)"
-        />
-      </div>
-    </div>
-
-    <div
-      class="home-cell-format-group__lane home-cell-format-group__lane--appearance"
-      data-cell-format-lane="appearance"
-      role="group"
-      :aria-label="t('format.appearanceTools')"
-    >
       <CellBorderMenu
         :disabled="disabled"
         @apply-borders="emit('applyBorders', $event)"
@@ -74,18 +48,31 @@ const { t } = useAppI18n();
         @undo="emit('undo')"
         @redo="emit('redo')"
       />
+    </div>
+    <div class="home-cell-format-group__row" data-ribbon-row="2">
+      <TextFormatControls
+        class="home-cell-format-group__text-tools"
+        :state="state"
+        :disabled="disabled"
+        @apply-style="emit('applyStyle', $event)"
+      />
+      <CellColorControl
+        kind="text"
+        :disabled="disabled"
+        @apply-style="emit('applyStyle', $event)"
+      />
       <CellColorControl
         kind="fill"
         :disabled="disabled"
         @apply-style="emit('applyStyle', $event)"
       />
-      <RibbonDialogLauncher
-        :label="`${t('cellFormat.title')} · ${t('cellFormat.font')}`"
-        :disabled="disabled"
-        data-ribbon-dialog-launcher="font"
-        @activate="emit('openCellFormat', 'font')"
-      />
     </div>
+    <RibbonDialogLauncher
+      :label="`${t('cellFormat.title')} · ${t('cellFormat.font')}`"
+      :disabled="disabled"
+      data-ribbon-dialog-launcher="font"
+      @activate="emit('openCellFormat', 'font')"
+    />
   </section>
 </template>
 
@@ -93,22 +80,15 @@ const { t } = useAppI18n();
 @use "../styles/ribbon-groups" as ribbon;
 
 .home-cell-format-group {
-  @include ribbon.columns;
+  @include ribbon.compact;
+  @include ribbon.dialog-launcher-anchor;
 
   --cell-format-font-width: 126px;
   --ribbon-compact-action-width: 40px;
   --cell-format-gap: 4px;
   --cell-format-control-height: 26px;
 
-  gap: var(--cell-format-gap);
-
-  &__lane {
-    @include ribbon.stack;
-
-    min-width: 0;
-  }
-
-  &__typography-tools {
+  &__row {
     @include ribbon.row;
 
     gap: var(--cell-format-gap);
@@ -116,10 +96,6 @@ const { t } = useAppI18n();
 
   &__text-tools {
     flex: 0 0 var(--cell-format-font-width);
-  }
-
-  &__lane--appearance {
-    @include ribbon.dialog-launcher-anchor;
   }
 }
 </style>

@@ -316,7 +316,7 @@ describe("HomeFormatToolbar", () => {
     expect(wrapper.emitted("autoSum")).toHaveLength(1);
   });
 
-  test("renders ordered compact and mixed-layout tool groups", () => {
+  test("renders ordered two-row tool groups", () => {
     const wrapper = mountToolbar();
 
     const groups = wrapper.findAll("[data-ribbon-group]");
@@ -331,19 +331,33 @@ describe("HomeFormatToolbar", () => {
       "automation",
       "utility",
     ]);
-    for (const groupName of ["history", "alignment", "number", "styles"]) {
+    for (const groupName of ["history", "cell", "alignment", "number", "styles"]) {
       const group = wrapper.get(`[data-ribbon-group="${groupName}"]`);
       expect(
-        group.findAll("[data-ribbon-row]").map((row) => row.attributes("data-ribbon-row")),
+        group.findAll(":scope > [data-ribbon-row]").map((row) => row.attributes("data-ribbon-row")),
       ).toEqual(["1", "2"]);
     }
 
     const cellGroup = wrapper.get('[data-ribbon-group="cell"]');
+    const cellFirstRow = cellGroup.get(':scope > [data-ribbon-row="1"]');
+    const cellSecondRow = cellGroup.get(':scope > [data-ribbon-row="2"]');
+    expect(cellFirstRow.get("[data-font-format-control]")).toBeTruthy();
+    expect(cellFirstRow.get("[data-cell-border-control]")).toBeTruthy();
+    expect(cellSecondRow.get(".text-format-controls")).toBeTruthy();
+    expect(cellSecondRow.get('[data-cell-color-control="text"]')).toBeTruthy();
+    expect(cellSecondRow.get('[data-cell-color-control="fill"]')).toBeTruthy();
+    expect(cellGroup.get(':scope > [data-ribbon-dialog-launcher="font"]')).toBeTruthy();
+
+    const alignmentGroup = wrapper.get('[data-ribbon-group="alignment"]');
     expect(
-      cellGroup
-        .findAll(":scope > [data-cell-format-lane]")
-        .map((lane) => lane.attributes("data-cell-format-lane")),
-    ).toEqual(["typography", "appearance"]);
+      alignmentGroup.get(':scope > [data-ribbon-row="1"] [data-vertical-alignment-action]'),
+    ).toBeTruthy();
+    expect(
+      alignmentGroup.get(':scope > [data-ribbon-row="1"] [data-ribbon-action="wrap-text"]'),
+    ).toBeTruthy();
+    expect(
+      alignmentGroup.get(':scope > [data-ribbon-row="2"] [data-ribbon-action="merge-cells"]'),
+    ).toBeTruthy();
 
     const tallActions = {
       data: ["filter", "protect"],
