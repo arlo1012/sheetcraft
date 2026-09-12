@@ -136,6 +136,29 @@ function binaryScalar(operator: "+" | "-" | "*" | "/" | "^" | "&" | "=" | "<>" |
   return second === 0 ? createFormulaError("DIV0") : result(first / second);
 }
 
+function ifCondition(value: FormulaValue): boolean | FormulaValue {
+  if (isFormulaError(value)) return value;
+  if (value === null) return false;
+  if (typeof value === "boolean") return value;
+  return typeof value === "number" ? value !== 0 : createFormulaError("VALUE");
+}
+
+function evaluateIfRuntime(
+  args: FormulaExpression[], resolver: FormulaEvaluationResolver, registry: FormulaFunctionRegistry, options?: FormulaEvaluationOptions,
+): FormulaRuntimeValue {
+  const condition = evaluateExpression(args[0]!, resolver, registry, options);
+  const whenTrue = evaluateExpression(args[1]!, resolver, registry, options);
+  const whenFalse = args[2] ? evaluateExpression(args[2], resolver, registry, options) : false;
+  if (!isFormulaArray(condition)) {
+    const selected = ifCondition(condition);
+    return isFormulaError(selected) ? selected : selected ? whenTrue : whenFalse;
+  }
+  const trueRows = isFormulaArray(whenTrue) ? whenTrue.rows : [[whenTrue]], falseRows = isFormulaArray(whenFalse) ? whenFalse.rows : [[whenFalse]];
+  const rows = condition.rows.length, columns = condition.rows[0]?.length ?? 0;
+  if ((isFormulaArray(whenTrue) && (trueRows.length !== rows || (trueRows[0]?.length ?? 0) !== columns)) || (isFormulaArray(whenFalse) && (falseRows.length !== rows || (falseRows[0]?.length ?? 0) !== columns))) return createFormulaError("VALUE");
+  return formulaArray(condition.rows.map((row, r) => row.map((item, c) => { const selected = ifCondition(item); return isFormulaError(selected) ? selected : selected ? trueRows[isFormulaArray(whenTrue) ? r : 0]![isFormulaArray(whenTrue) ? c : 0]! : falseRows[isFormulaArray(whenFalse) ? r : 0]![isFormulaArray(whenFalse) ? c : 0]!; })));
+}
+
 function evaluateExpression(
   expression: FormulaExpression,
   resolver: FormulaEvaluationResolver,
@@ -187,6 +210,8 @@ function evaluateExpression(
     return broadcast(evaluateExpression(expression.left, resolver, registry, options), evaluateExpression(expression.right, resolver, registry, options), (left, right) => binaryScalar(expression.operator, left, right));
   }
   const definition = registry.get(expression.name);
+  if (expression.name.toUpperCase() === "IF" && expression.args.length >= 2 && expression.args.length <= 3)
+    return evaluateIfRuntime(expression.args, resolver, registry, options);
   if (!definition) return createFormulaError("NAME");
   const { minArgs, maxArgs } = definition.metadata;
   if (expression.args.length < minArgs || (maxArgs !== null && expression.args.length > maxArgs))

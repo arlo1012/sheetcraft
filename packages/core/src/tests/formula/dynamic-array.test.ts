@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { evaluateFormulaRuntime } from "../../formula/evaluate.js";
 import { DYNAMIC_ARRAY_FUNCTIONS } from "../../formula/functions/dynamic-array.js";
+import { DEFAULT_FORMULA_FUNCTION_REGISTRY } from "../../formula/functions.js";
 import { isFormulaArray } from "../../formula/runtime.js";
 import type { FormulaFunctionRegistry } from "../../formula/functions/contracts.js";
 
@@ -44,5 +45,11 @@ describe("dynamic array runtime", () => {
     };
     const compared = evaluateFormulaRuntime("=A1:A3>1", rangeResolver, { registry });
     expect(isFormulaArray(compared) && compared.rows).toEqual([[false], [true], [true]]);
+  });
+
+  test("keeps array branches through IF and scalar aggregate functions", () => {
+    const result = evaluateFormulaRuntime("=IF(SEQUENCE(3)>1,SEQUENCE(3)*10,0)", resolver, { registry: DEFAULT_FORMULA_FUNCTION_REGISTRY });
+    expect(isFormulaArray(result) && result.rows).toEqual([[0], [20], [30]]);
+    expect(evaluateFormulaRuntime("=SUM(SEQUENCE(3))", resolver, { registry: DEFAULT_FORMULA_FUNCTION_REGISTRY })).toBe(6);
   });
 });
