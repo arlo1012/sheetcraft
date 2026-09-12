@@ -1,8 +1,11 @@
 import { computed, nextTick, ref } from "vue";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import {
+  createDefinedNamesFromSelectionCommand,
   createDeleteDefinedNameCommand,
+  createSetWorkbookCalculationCommand,
   createUpsertDefinedNameCommand,
+  type DefinedNameLabelPosition,
   type DefinedNameDraft,
   type WorkbookCommand,
 } from "@idea10/core/commands";
@@ -14,6 +17,7 @@ import {
   getCellContent,
   type CellAddress,
   type CellRange,
+  type WorkbookCalculationSettings,
   type Workbook,
 } from "@idea10/core/workbook";
 import type { CellEditSession } from "../../shared/cell-editing/useCellEditSession";
@@ -70,6 +74,7 @@ export function useFormulaToolsController(options: {
         : "=#REF!",
     }));
   });
+  const calculationSettings = computed(() => options.getWorkbook().calculation);
 
   function rememberFunction(name: string): void {
     recentFunctions.value = [name, ...recentFunctions.value.filter((item) => item !== name)].slice(
@@ -183,6 +188,32 @@ export function useFormulaToolsController(options: {
     }
   }
 
+  function createNamesFromSelection(positions: DefinedNameLabelPosition[]): void {
+    try {
+      const workbook = options.getWorkbook();
+      const command = createDefinedNamesFromSelectionCommand(workbook, {
+        sheetId: getActiveSheet(workbook).id,
+        range: options.getSelection().range,
+        positions,
+      });
+      if (options.execute(command)) {
+        void MessagePlugin.success(
+          t("formulaTools.namesCreated", { count: command.changes.length }),
+        );
+      }
+    } catch {
+      void MessagePlugin.warning(t("formulaTools.namesNotCreated"));
+    }
+  }
+
+  function updateCalculationSettings(settings: WorkbookCalculationSettings): void {
+    try {
+      options.execute(createSetWorkbookCalculationCommand(options.getWorkbook(), settings));
+    } catch {
+      // Core rejects invalid calculation settings; leave the visible workbook state unchanged.
+    }
+  }
+
   function recalculate(): void {
     if (options.isBusy() || session.state.composing) return;
     options.recalculate();
@@ -196,6 +227,7 @@ export function useFormulaToolsController(options: {
     recentFunctions,
     namesVisible,
     namedRanges,
+    calculationSettings,
     nameSelectionReference,
     insertFunction,
     aggregate,
@@ -205,6 +237,8 @@ export function useFormulaToolsController(options: {
     captureNameSelection,
     saveName,
     deleteName,
+    createNamesFromSelection,
+    updateCalculationSettings,
     recalculate,
   };
 }

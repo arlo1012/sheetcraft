@@ -31,7 +31,17 @@ function mountToolbar() {
   const wrapper = mount(FormulaToolbar, {
     attachTo: document.body,
     global: { plugins: [createAppI18n("en-US")] },
-    props: { editSessionId: "edit-1", recentFunctions: ["IF"] },
+    props: {
+      editSessionId: "edit-1",
+      recentFunctions: ["IF"],
+      nameCreationEnabled: true,
+      calculationSettings: {
+        mode: "automatic",
+        iterative: false,
+        maxIterations: 100,
+        maxChange: 0.001,
+      },
+    },
   });
   mounted.push(wrapper);
   return wrapper;
@@ -53,8 +63,7 @@ describe("FormulaToolbar", () => {
 
   test("opens the function browser and inserts the selected function", async () => {
     const wrapper = mountToolbar();
-    const actions = wrapper.findAll(".formula-toolbar__group--actions button");
-    await actions[0]!.trigger("click");
+    await wrapper.get('[aria-label="Insert function"]').trigger("click");
     const browser = document.querySelector(".formula-function-browser");
     expect(browser?.getAttribute("data-cell-edit-session")).toBe("edit-1");
     const option = document.querySelector<HTMLButtonElement>(
@@ -67,7 +76,7 @@ describe("FormulaToolbar", () => {
 
   test("focuses search, supports result keys, and closes on Escape", async () => {
     const wrapper = mountToolbar();
-    await wrapper.findAll(".formula-toolbar__group--actions button")[0]!.trigger("click");
+    await wrapper.get('[aria-label="Insert function"]').trigger("click");
     const search = document.querySelector<HTMLInputElement>(".formula-function-browser input");
     expect(document.activeElement).toBe(search);
     const result = document.querySelector<HTMLButtonElement>("[data-formula-browser-result]");
@@ -85,6 +94,24 @@ describe("FormulaToolbar", () => {
     await nextTick();
     expect(document.querySelector(".formula-function-browser")).toBeNull();
     expect(wrapper.emitted("interactionEnd")).toHaveLength(1);
+  });
+
+  test("creates names from a selected edge and sends actual calculation settings", async () => {
+    const wrapper = mountToolbar();
+    const nameMenu = wrapper.get('[aria-label="Define names from selection"]');
+    await nameMenu.trigger("click");
+    const top = document.querySelector<HTMLElement>("[data-formula-name-position='top']");
+    top?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(wrapper.emitted("createNamesFromSelection")).toEqual([[["top"]]]);
+
+    await wrapper.get('[aria-label="Calculation options"]').trigger("click");
+    const manual = document.querySelectorAll<HTMLInputElement>(
+      ".formula-toolbar__calculation-menu input[type='radio']",
+    )[1];
+    manual?.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(wrapper.emitted("updateCalculationSettings")).toEqual([
+      [{ mode: "manual", iterative: false, maxIterations: 100, maxChange: 0.001 }],
+    ]);
   });
 });
 
