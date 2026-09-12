@@ -8,8 +8,10 @@ export const FORMULA_CATEGORY_ORDER = [
   "Statistical",
   "Engineering",
   "Information",
+  "Database",
   "Lookup",
   "Math",
+  "Compatibility",
 ] as const;
 export type FormulaCategory = (typeof FORMULA_CATEGORY_ORDER)[number];
 
@@ -23,13 +25,13 @@ export type FormulaCatalogTranslator = (
   key: `formulaFunctions.${string}.${"description" | "signature" | "example"}`,
 ) => string;
 export type FormulaCategoryTranslator = (
-  key: `formulaTools.${"math" | "logical" | "statistical" | "text" | "dateTime" | "financial" | "information" | "lookup" | "engineering"}`,
+  key: `formulaTools.${"math" | "logical" | "statistical" | "text" | "dateTime" | "financial" | "information" | "database" | "lookup" | "engineering" | "compatibility"}`,
 ) => string;
 export type FormulaArgumentTranslator = (key: `formulaArguments.${string}`) => string;
 
 const categoryKeys: Record<
   FormulaCategory,
-  `formulaTools.${"math" | "logical" | "statistical" | "text" | "dateTime" | "financial" | "information" | "lookup" | "engineering"}`
+  `formulaTools.${"math" | "logical" | "statistical" | "text" | "dateTime" | "financial" | "information" | "database" | "lookup" | "engineering" | "compatibility"}`
 > = {
   Math: "formulaTools.math",
   Logical: "formulaTools.logical",
@@ -38,8 +40,10 @@ const categoryKeys: Record<
   Date: "formulaTools.dateTime",
   Financial: "formulaTools.financial",
   Information: "formulaTools.information",
+  Database: "formulaTools.database",
   Lookup: "formulaTools.lookup",
   Engineering: "formulaTools.engineering",
+  Compatibility: "formulaTools.compatibility",
 };
 
 function localCopy(name: string, t: FormulaCatalogTranslator): FormulaFunctionCopy {
