@@ -1,4 +1,7 @@
-import { formulaFunctionCopyZhCN } from "../../shared/formula-editing/function-catalog.zh-CN";
+import {
+  formulaArgumentLabelsZhCN,
+  formulaFunctionCopyZhCN,
+} from "../../shared/formula-editing/function-catalog.zh-CN";
 import type { FormulaToolsMessageSchema } from "./formula-tools-messages";
 
 export const formulaToolsZhCN = {
@@ -42,4 +45,5 @@ export const formulaToolsZhCN = {
     cancel: "取消",
   },
   formulaFunctions: formulaFunctionCopyZhCN,
+  formulaArguments: formulaArgumentLabelsZhCN,
 } satisfies FormulaToolsMessageSchema;

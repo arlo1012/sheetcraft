@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Search, X } from "lucide-vue-next";
-import { computed, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   FORMULA_CATEGORY_ORDER,
@@ -22,6 +22,7 @@ const { t } = useAppI18n();
 const query = ref("");
 const selectedCategory = ref<string | "recent" | "all">("all");
 const selectedName = ref<string | undefined>();
+const searchRef = ref<HTMLInputElement | null>(null);
 const translate = ((key) => t(key)) as FormulaCatalogTranslator;
 const entries = computed(() => getFormulaCatalogEntries(translate));
 const visibleCategories = computed(() =>
@@ -54,6 +55,21 @@ const selectedEntry = computed(
     filteredEntries.value.find((entry) => entry.name === selectedName.value) ??
     filteredEntries.value[0],
 );
+const selectedIndex = computed(() =>
+  Math.max(
+    0,
+    filteredEntries.value.findIndex(
+      (entry) => entry.name === selectedEntry.value?.name,
+    ),
+  ),
+);
+
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) void nextTick(() => searchRef.value?.focus());
+  },
+);
 
 function selectCategory(category: string | "recent" | "all"): void {
   selectedCategory.value = category;
@@ -61,6 +77,34 @@ function selectCategory(category: string | "recent" | "all"): void {
 }
 function insert(name = selectedEntry.value?.name): void {
   if (name) emit("insertFunction", name);
+}
+function moveResult(direction: -1 | 1): void {
+  const count = filteredEntries.value.length;
+  if (!count) return;
+  const index = (selectedIndex.value + direction + count) % count;
+  selectedName.value = filteredEntries.value[index]?.name;
+  void nextTick(() =>
+    document
+      .querySelector<HTMLButtonElement>(
+        `[data-formula-browser-result="${selectedName.value}"]`,
+      )
+      ?.focus(),
+  );
+}
+function onResultKeydown(event: KeyboardEvent): void {
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    moveResult(event.key === "ArrowDown" ? 1 : -1);
+  } else if (event.key === "Enter") {
+    event.preventDefault();
+    insert();
+  }
+}
+function onKeydown(event: KeyboardEvent): void {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    emit("close");
+  }
 }
 </script>
 
@@ -74,6 +118,7 @@ function insert(name = selectedEntry.value?.name): void {
       tabindex="-1"
       :aria-label="t('formulaTools.functionBrowser')"
       :data-cell-edit-session="editSessionId"
+      @keydown="onKeydown"
     >
       <header class="formula-function-browser__header">
         <h2>{{ t("formulaTools.functionBrowser") }}</h2>
@@ -88,8 +133,10 @@ function insert(name = selectedEntry.value?.name): void {
       <label class="formula-function-browser__search">
         <Search :size="15" aria-hidden="true" />
         <input
+          ref="searchRef"
           v-model="query"
           type="search"
+          :aria-label="t('formulaTools.searchFunctions')"
           :placeholder="t('formulaTools.searchFunctions')"
         />
       </label>
@@ -122,12 +169,15 @@ function insert(name = selectedEntry.value?.name): void {
         </nav>
         <div class="formula-function-browser__results" role="listbox">
           <button
-            v-for="entry in filteredEntries"
+            v-for="(entry, index) in filteredEntries"
             :key="entry.name"
             :class="{ active: selectedEntry?.name === entry.name }"
             type="button"
             role="option"
+            :tabindex="selectedIndex === index ? 0 : -1"
             :aria-selected="selectedEntry?.name === entry.name"
+            :data-formula-browser-result="entry.name"
+            @keydown="onResultKeydown"
             @click="selectedName = entry.name"
             @dblclick="insert(entry.name)"
           >
@@ -281,8 +331,8 @@ function insert(name = selectedEntry.value?.name): void {
       span,
       p {
         color: var(--idea-text-secondary);
-        font-size: var(--idea-font-size-supporting);
-        line-height: var(--idea-line-height-supporting);
+        font-size: var(--idea-font-size-body-small);
+        line-height: var(--idea-line-height-body-small);
       }
     }
     p {
@@ -305,8 +355,8 @@ function insert(name = selectedEntry.value?.name): void {
     dt {
       margin-top: 10px;
       color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-supporting);
-      line-height: var(--idea-line-height-supporting);
+      font-size: var(--idea-font-size-body-small);
+      line-height: var(--idea-line-height-body-small);
     }
     dd {
       margin: 0;

@@ -28,6 +28,9 @@ export type FormulaCatalogTranslator = (
 export type FormulaCategoryTranslator = (
   key: `formulaTools.${"math" | "logical" | "statistical" | "text" | "dateTime" | "financial" | "information" | "lookup" | "engineering"}`,
 ) => string;
+export type FormulaArgumentTranslator = (
+  key: `formulaArguments.${string}`,
+) => string;
 
 const categoryKeys: Record<
   FormulaCategory,
@@ -76,4 +79,11 @@ export function getFormulaCategoryLabel(
 ): string {
   const key = categoryKeys[category as FormulaCategory];
   return key ? t(key) : category;
+}
+
+export function getFormulaArgumentLabel(
+  name: string,
+  t: FormulaArgumentTranslator,
+): string {
+  return t(`formulaArguments.${name}`);
 }

@@ -1,9 +1,23 @@
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
 import { createAppI18n } from "../../../shared/i18n";
-import { getFormulaFunctionMetadata, parseFormula } from "@idea10/core/formula";
-import { formulaFunctionCopyEnUS } from "../../../shared/formula-editing/function-catalog.en-US";
-import { formulaFunctionCopyZhCN } from "../../../shared/formula-editing/function-catalog.zh-CN";
+import {
+  evaluateFormula,
+  getFormulaFunctionMetadata,
+  parseFormula,
+  type FormulaEvaluationResolver,
+  type FormulaValue,
+} from "@idea10/core/formula";
+import {
+  formulaArgumentLabelsEnUS,
+  formulaFunctionCopyEnUS,
+} from "../../../shared/formula-editing/function-catalog.en-US";
+import {
+  formulaArgumentLabelsZhCN,
+  formulaFunctionCopyZhCN,
+} from "../../../shared/formula-editing/function-catalog.zh-CN";
+import { getFormulaArgumentLabel } from "../../../shared/formula-editing/function-catalog";
 import FormulaToolbar from "../../../modules/formula-tools/components/FormulaToolbar.vue";
 import NamedRangesDialog from "../../../modules/formula-tools/components/NamedRangesDialog.vue";
 
@@ -50,6 +64,38 @@ describe("FormulaToolbar", () => {
     expect(wrapper.emitted("insertFunction")?.[0]?.[0]).toBeTruthy();
     expect(wrapper.emitted("interactionEnd")).toHaveLength(1);
   });
+
+  test("focuses search, supports result keys, and closes on Escape", async () => {
+    const wrapper = mountToolbar();
+    await wrapper
+      .findAll(".formula-toolbar__group--actions button")[0]!
+      .trigger("click");
+    const search = document.querySelector<HTMLInputElement>(
+      ".formula-function-browser input",
+    );
+    expect(document.activeElement).toBe(search);
+    const result = document.querySelector<HTMLButtonElement>(
+      "[data-formula-browser-result]",
+    );
+    result?.focus();
+    result?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+    );
+    await nextTick();
+    expect(
+      document.activeElement?.getAttribute("data-formula-browser-result"),
+    ).toBeTruthy();
+    document.querySelector(".formula-function-browser")?.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await nextTick();
+    expect(document.querySelector(".formula-function-browser")).toBeNull();
+    expect(wrapper.emitted("interactionEnd")).toHaveLength(1);
+  });
 });
 
 test("provides localized function copy for every Core formula function", () => {
@@ -78,6 +124,57 @@ test("provides localized function copy for every Core formula function", () => {
       true,
     );
   }
+  for (const argument of getFormulaFunctionMetadata().flatMap(
+    (metadata) => metadata.arguments,
+  )) {
+    expect(formulaArgumentLabelsEnUS[argument.name]).toBeTruthy();
+    expect(formulaArgumentLabelsZhCN[argument.name]).toBeTruthy();
+  }
+  expect(
+    getFormulaArgumentLabel("number", (key) =>
+      key === "formulaArguments.number" ? "数值" : "",
+    ),
+  ).toBe("数值");
+});
+
+test("function examples evaluate against a concrete sheet resolver", () => {
+  const values = new Map<string, FormulaValue>([
+    ["0:0", 2],
+    ["1:0", 3],
+    ["0:1", 4],
+    ["1:1", 5],
+  ]);
+  const resolver: FormulaEvaluationResolver = {
+    resolveCell: ({ row, column }) => values.get(`${row}:${column}`) ?? null,
+    resolveRange: ({ start, end }) => {
+      const result: FormulaValue[] = [];
+      for (let row = start.row; row <= end.row; row += 1)
+        for (let column = start.column; column <= end.column; column += 1)
+          result.push(values.get(`${row}:${column}`) ?? null);
+      return result;
+    },
+  };
+  expect(evaluateFormula(formulaFunctionCopyEnUS.SUM!.example, resolver)).toBe(
+    3,
+  );
+  expect(evaluateFormula(formulaFunctionCopyEnUS.IF!.example, resolver)).toBe(
+    "Yes",
+  );
+  expect(
+    evaluateFormula(formulaFunctionCopyEnUS.AVERAGE!.example, resolver),
+  ).toBe(2);
+  expect(evaluateFormula(formulaFunctionCopyEnUS.LEN!.example, resolver)).toBe(
+    4,
+  );
+  expect(
+    evaluateFormula(formulaFunctionCopyEnUS.DATE!.example, resolver),
+  ).toBeTypeOf("number");
+  expect(
+    evaluateFormula(formulaFunctionCopyEnUS.FV!.example, resolver),
+  ).toBeTypeOf("number");
+  expect(
+    evaluateFormula(formulaFunctionCopyEnUS.BIN2DEC!.example, resolver),
+  ).toBe(5);
 });
 
 describe("NamedRangesDialog", () => {

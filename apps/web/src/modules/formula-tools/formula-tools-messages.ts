@@ -42,10 +42,12 @@ export type FormulaToolsMessageSchema = {
     string,
     { description: string; signature: string; example: string }
   >;
+  formulaArguments: Record<string, string>;
 };
 
 export type FormulaToolsMessageKey =
   | `formulaTools.${keyof FormulaToolsMessageSchema["formulaTools"]}`
   | `formulaFunctions.${string}.description`
   | `formulaFunctions.${string}.signature`
-  | `formulaFunctions.${string}.example`;
+  | `formulaFunctions.${string}.example`
+  | `formulaArguments.${string}`;

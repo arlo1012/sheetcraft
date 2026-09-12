@@ -1,4 +1,7 @@
-import { formulaFunctionCopyEnUS } from "../../shared/formula-editing/function-catalog.en-US";
+import {
+  formulaArgumentLabelsEnUS,
+  formulaFunctionCopyEnUS,
+} from "../../shared/formula-editing/function-catalog.en-US";
 import type { FormulaToolsMessageSchema } from "./formula-tools-messages";
 
 export const formulaToolsEnUS = {
@@ -42,4 +45,5 @@ export const formulaToolsEnUS = {
     cancel: "Cancel",
   },
   formulaFunctions: formulaFunctionCopyEnUS,
+  formulaArguments: formulaArgumentLabelsEnUS,
 } satisfies FormulaToolsMessageSchema;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ChevronDown } from "lucide-vue-next";
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import {
@@ -55,12 +55,18 @@ function choose(name: string): void {
   emit("insertFunction", name);
 }
 function onKeydown(event: KeyboardEvent): void {
-  if (event.key === "ArrowDown" && !open.value) {
+  if (!props.disabled && event.key === "ArrowDown" && !open.value) {
     event.preventDefault();
     open.value = true;
     void nextTick(() => menuRef.value?.focusFirstItem());
   }
 }
+watch(
+  () => props.disabled,
+  (disabled) => {
+    if (disabled) open.value = false;
+  },
+);
 </script>
 
 <template>
@@ -71,6 +77,7 @@ function onKeydown(event: KeyboardEvent): void {
       type="button"
       :disabled="disabled"
       :aria-label="label"
+      aria-haspopup="menu"
       :aria-expanded="open"
       :aria-controls="open ? panelId : undefined"
       @click="toggle"
@@ -137,20 +144,26 @@ function onKeydown(event: KeyboardEvent): void {
   }
   &__panel {
     z-index: 40;
+    :deep(.idea-menu-surface) {
+      max-height: min(360px, calc(100vh - 24px));
+    }
   }
   &__name {
-    display: block;
+    display: inline;
     font-weight: 500;
   }
   &__description {
-    display: block;
+    display: inline;
     max-width: 240px;
     overflow: hidden;
     color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-supporting);
-    line-height: var(--idea-line-height-supporting);
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
     text-overflow: ellipsis;
     white-space: nowrap;
+    &::before {
+      content: " — ";
+    }
   }
 }
 </style>

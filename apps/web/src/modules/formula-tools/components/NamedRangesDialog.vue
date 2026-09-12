@@ -113,7 +113,10 @@ if (props.visible) createRange();
     @close="emit('close')"
     @cancel="emit('close')"
   >
-    <div class="named-ranges-dialog__content" :data-cell-edit-session="editSessionId">
+    <div
+      class="named-ranges-dialog__content"
+      :data-cell-edit-session="editSessionId"
+    >
       <section
         class="named-ranges-dialog__list"
         :aria-label="t('formulaTools.namedRanges')"
@@ -224,7 +227,7 @@ if (props.visible) createRange();
     span {
       overflow: hidden;
       color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-supporting);
+      font-size: var(--idea-font-size-body-small);
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -238,8 +241,8 @@ if (props.visible) createRange();
       display: grid;
       gap: 4px;
       color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-supporting);
-      line-height: var(--idea-line-height-supporting);
+      font-size: var(--idea-font-size-body-small);
+      line-height: var(--idea-line-height-body-small);
     }
     input,
     select {
@@ -264,7 +267,7 @@ if (props.visible) createRange();
     text-align: left;
     span {
       color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-supporting);
+      font-size: var(--idea-font-size-body-small);
     }
   }
 }

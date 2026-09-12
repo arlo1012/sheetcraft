@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Calculator, FunctionSquare, Sigma, Tags } from "lucide-vue-next";
-import { nextTick, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -26,7 +26,8 @@ const emit = defineEmits<{
   interactionEnd: [];
 }>();
 const { t } = useAppI18n();
-const sumTriggerRef = ref<HTMLElement | null>(null);
+const sumSplitRef = ref<InstanceType<typeof RibbonSplitAction> | null>(null);
+const sumTriggerRef = computed(() => sumSplitRef.value?.menuElement ?? null);
 const sumPanelRef = ref<HTMLElement | null>(null);
 const sumMenuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const sumMenuOpen = ref(false);
@@ -96,7 +97,7 @@ function insertFunction(name: string): void {
         :aria-label="t('formulaTools.autoSum')"
       >
         <RibbonSplitAction
-          ref="sumTriggerRef"
+          ref="sumSplitRef"
           variant="tall"
           :label="t('formulaTools.autoSum')"
           :menu-label="t('formulaTools.autoSumMenu')"
