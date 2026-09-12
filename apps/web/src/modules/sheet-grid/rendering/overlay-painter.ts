@@ -79,27 +79,46 @@ function paintRangeOutline(
   context.save();
   context.strokeStyle = color;
   context.lineWidth = width;
+  context.lineCap = "square";
   context.setLineDash(dash ? [...dash] : []);
   context.lineDashOffset = dashOffset;
   for (const fragment of fragments) {
     const { rect } = fragment;
     withBodyFragment(context, frame, fragment, () => {
+      // Match the former CSS border box (x - 1, y - 1, width + 1, height + 1),
+      // with stroke edges aligned to backing pixels at the current zoom and DPR.
+      const transform = context.getTransform();
+      const strokeWidth = Math.max(1, Math.round(width * transform.a)) / transform.a;
+      const snapX = (x: number) =>
+        (Math.round(x * transform.a + transform.e) - transform.e) / transform.a;
+      const snapY = (y: number) =>
+        (Math.round(y * transform.d + transform.f) - transform.f) / transform.d;
+      const half = strokeWidth / 2;
+      const left = hasNeighbour(rect, fragments, "left") ? rect.x : snapX(rect.x - 1) + half;
+      const top = hasNeighbour(rect, fragments, "top") ? rect.y : snapY(rect.y - 1) + half;
+      const right = hasNeighbour(rect, fragments, "right")
+        ? rect.x + rect.width
+        : snapX(rect.x + rect.width) - half;
+      const bottom = hasNeighbour(rect, fragments, "bottom")
+        ? rect.y + rect.height
+        : snapY(rect.y + rect.height) - half;
+      context.lineWidth = strokeWidth;
       const edges: readonly Edge[] = ["top", "right", "bottom", "left"];
       for (const edge of edges) {
         if (hasNeighbour(rect, fragments, edge)) continue;
         context.beginPath();
         if (edge === "top") {
-          context.moveTo(rect.x, rect.y);
-          context.lineTo(rect.x + rect.width, rect.y);
+          context.moveTo(left, top);
+          context.lineTo(right, top);
         } else if (edge === "right") {
-          context.moveTo(rect.x + rect.width, rect.y);
-          context.lineTo(rect.x + rect.width, rect.y + rect.height);
+          context.moveTo(right, top);
+          context.lineTo(right, bottom);
         } else if (edge === "bottom") {
-          context.moveTo(rect.x + rect.width, rect.y + rect.height);
-          context.lineTo(rect.x, rect.y + rect.height);
+          context.moveTo(right, bottom);
+          context.lineTo(left, bottom);
         } else {
-          context.moveTo(rect.x, rect.y + rect.height);
-          context.lineTo(rect.x, rect.y);
+          context.moveTo(left, bottom);
+          context.lineTo(left, top);
         }
         context.stroke();
       }
@@ -139,8 +158,22 @@ export function paintSheetForeground(
 ): void {
   if (!state.editing && state.rangeRects?.length)
     paintRangeOutline(context, frame, state.rangeRects, palette.actionPrimary, 1);
-  if (!state.editing && state.activeRects?.length)
-    paintRangeOutline(context, frame, state.activeRects, palette.actionPrimary, 1);
+  if (!state.editing && state.activeRects?.length) {
+    const matchesRange =
+      state.activeRects.length === state.rangeRects?.length &&
+      state.activeRects.every(({ paneId, rect }) =>
+        state.rangeRects?.some(
+          (range) =>
+            range.paneId === paneId &&
+            range.rect.x === rect.x &&
+            range.rect.y === rect.y &&
+            range.rect.width === rect.width &&
+            range.rect.height === rect.height,
+        ),
+      );
+    if (!matchesRange)
+      paintRangeOutline(context, frame, state.activeRects, palette.actionPrimary, 1);
+  }
   for (const group of state.referenceGroups ?? []) {
     const color =
       palette.formulaReferenceColors[group.colorIndex % palette.formulaReferenceColors.length];

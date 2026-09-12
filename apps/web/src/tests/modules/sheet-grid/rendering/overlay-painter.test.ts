@@ -18,6 +18,7 @@ function createContext() {
     rect: vi.fn(),
     clip: vi.fn(),
     translate: vi.fn(),
+    getTransform: vi.fn(() => ({ a: 1, d: 1, e: 0, f: 0 })),
     fillRect: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
@@ -56,6 +57,56 @@ function createFrame() {
 }
 
 describe("overlay painter", () => {
+  test("paints a single-cell selection once at the former one-pixel border position", () => {
+    const frame = createFrame();
+    const context = createContext();
+    const fragments = frame.layout.getRangeFragments({
+      start: { row: 2, column: 2 },
+      end: { row: 2, column: 2 },
+    });
+
+    paintSheetForeground(
+      context,
+      frame,
+      { rangeRects: fragments, activeRects: fragments },
+      palette,
+      0,
+    );
+
+    expect(context.stroke).toHaveBeenCalledTimes(4);
+    expect(context.lineWidth).toBe(1);
+    expect(context.moveTo).toHaveBeenNthCalledWith(1, 79.5, 39.5);
+    expect(context.lineTo).toHaveBeenNthCalledWith(1, 119.5, 39.5);
+    expect(context.lineTo).toHaveBeenNthCalledWith(2, 119.5, 59.5);
+  });
+
+  test.each([0.9, 1.25, 2])(
+    "aligns selection stroke edges to physical pixels at density %s",
+    (density) => {
+      const frame = createFrame();
+      const context = createContext();
+      vi.mocked(context.getTransform).mockReturnValue({
+        a: density,
+        d: density,
+        e: 0,
+        f: 0,
+      } as DOMMatrix);
+      const fragments = frame.layout.getRangeFragments({
+        start: { row: 2, column: 2 },
+        end: { row: 2, column: 2 },
+      });
+
+      paintSheetForeground(context, frame, { rangeRects: fragments }, palette, 0);
+
+      const [x, y] = vi.mocked(context.moveTo).mock.calls[0]!;
+      const halfWidth = (context.lineWidth * density) / 2;
+      for (const center of [x * density, y * density]) {
+        expect(center - halfWidth).toBeCloseTo(Math.round(center - halfWidth));
+        expect(center + halfWidth).toBeCloseTo(Math.round(center + halfWidth));
+      }
+    },
+  );
+
   test("clips and translates body fragments once before painting underlay fills", () => {
     const frame = createFrame();
     const context = createContext();
