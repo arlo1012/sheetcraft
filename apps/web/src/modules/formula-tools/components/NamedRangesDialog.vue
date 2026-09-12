@@ -187,7 +187,7 @@ watch(
       </div>
       <TableHeightWrapper v-slot="{ height }">
         <TTable
-          class="named-ranges-dialog__table"
+          class="named-ranges-dialog__table idea-table--outlined"
           row-key="id"
           :data="filteredRanges"
           :columns="columns"

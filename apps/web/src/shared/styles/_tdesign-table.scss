@@ -19,3 +19,9 @@
     line-height: var(--idea-line-height-body-medium);
   }
 }
+
+// Opt-in outer frame, independent of the bordered prop that adds cell dividers.
+.t-table.idea-table--outlined:not(.t-table--bordered) > .t-table__content {
+  box-sizing: border-box;
+  border: 1px solid var(--idea-border-control);
+}
