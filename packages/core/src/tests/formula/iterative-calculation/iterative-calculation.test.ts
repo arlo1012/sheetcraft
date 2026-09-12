@@ -48,6 +48,24 @@ describe("iterative calculation", () => {
     expect(values.get("b")).toBeCloseTo(1, 5);
   });
 
+  test("resolves an acyclic bridge before a downstream cyclic component", () => {
+    const values = calculate(
+      new Map([
+        ["a", new Set(["a"])],
+        ["bridge", new Set(["a"])],
+        ["c", new Set(["c", "bridge"])],
+      ]),
+      (key, read) => {
+        if (key === "a") return ((read("a") as number) + 1) / 2;
+        if (key === "bridge") return (read("a") as number) + 1;
+        return ((read("c") as number) + (read("bridge") as number)) / 2;
+      },
+    );
+    expect(values.get("a")).toBeCloseTo(1, 5);
+    expect(values.get("c")).toBeCloseTo(2, 5);
+    expect(values.has("bridge")).toBe(false);
+  });
+
   test("returns the exact final pass when the iteration limit is reached", () => {
     const values = calculate(
       new Map([["x", new Set(["x"])]]),
@@ -70,10 +88,11 @@ describe("iterative calculation", () => {
     expect(values.get("x")).toBe("complete");
   });
 
-  test("does not calculate acyclic formula nodes", () => {
-    const values = calculate(new Map([["a", new Set(["b"])], ["b", new Set()]]), () => {
-      throw new Error("acyclic formulas must be left to the normal evaluator");
-    });
+  test("keeps calculated acyclic nodes internal to the result", () => {
+    const values = calculate(
+      new Map([["a", new Set(["b"])], ["b", new Set()]]),
+      (key, read) => key === "a" ? (read("b") as number) + 1 : 1,
+    );
     expect(values).toEqual(new Map());
   });
 

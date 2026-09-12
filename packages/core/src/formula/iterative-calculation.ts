@@ -54,10 +54,22 @@ export function calculateIterativeComponents(options: IterativeCalculationOption
     }
   });
 
+  /** Includes acyclic bridge nodes so a later cyclic component can read them. */
+  const resolved = new Map<string, FormulaValue>();
+  /** The public result intentionally includes only nodes that were iterated. */
   const result = new Map<string, FormulaValue>();
   for (const componentIndex of dependencyFirstOrder(componentDependencies)) {
     const component = components[componentIndex]!;
-    if (!isCyclicComponent(component, forward)) continue;
+    if (!isCyclicComponent(component, forward)) {
+      const key = component[0]!;
+      resolved.set(key, normalizeValue(options.evaluate(key, (dependency) => readResolved(
+        dependency,
+        new Map(),
+        resolved,
+        options.initialValue,
+      ))));
+      continue;
+    }
     const values = new Map<string, FormulaValue>();
     for (const key of component) values.set(key, initialIterationValue(options.initialValue(key)));
 
@@ -65,19 +77,31 @@ export function calculateIterativeComponents(options: IterativeCalculationOption
       let converged = true;
       for (const key of component) {
         const previous = values.get(key) as FormulaValue;
-        const next = normalizeValue(options.evaluate(key, (dependency) => {
-          if (values.has(dependency)) return values.get(dependency) as FormulaValue;
-          if (result.has(dependency)) return result.get(dependency) as FormulaValue;
-          return normalizeValue(options.initialValue(dependency));
-        }));
+        const next = normalizeValue(options.evaluate(key, (dependency) =>
+          readResolved(dependency, values, resolved, options.initialValue),
+        ));
         values.set(key, next);
         if (!hasConverged(previous, next, options.maxChange)) converged = false;
       }
       if (converged) break;
     }
-    for (const [key, value] of values) result.set(key, value);
+    for (const [key, value] of values) {
+      resolved.set(key, value);
+      result.set(key, value);
+    }
   }
   return result;
+}
+
+function readResolved(
+  key: string,
+  componentValues: ReadonlyMap<string, FormulaValue>,
+  resolved: ReadonlyMap<string, FormulaValue>,
+  initialValue: (key: string) => FormulaValue,
+): FormulaValue {
+  if (componentValues.has(key)) return componentValues.get(key) as FormulaValue;
+  if (resolved.has(key)) return resolved.get(key) as FormulaValue;
+  return normalizeValue(initialValue(key));
 }
 
 function validateOptions({ maxIterations, maxChange }: IterativeCalculationOptions): void {
