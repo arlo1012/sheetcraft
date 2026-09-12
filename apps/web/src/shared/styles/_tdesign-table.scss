@@ -115,3 +115,13 @@
     padding: 5px;
   }
 }
+
+// Optional mini density; the migrated table defaults above remain unchanged.
+.t-table.idea-table--mini {
+  .t-table__header > tr > th:not(.t-table__th-drag, .t-table__cell-check),
+  .t-table__body > tr > td:not(.t-table__handle-draggable, .t-table__cell-check) {
+    padding-block: var(--idea-space-1);
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
+  }
+}

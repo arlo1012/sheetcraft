@@ -140,7 +140,6 @@ watch(
 <template>
   <Dialog
     v-if="visible"
-    class="named-ranges-dialog"
     :visible="visible && !suspended"
     :header="t('formulaTools.namedRanges')"
     width="min(720px, calc(100vw - 32px))"
@@ -187,7 +186,7 @@ watch(
       </div>
       <TableHeightWrapper v-slot="{ height }">
         <TTable
-          class="named-ranges-dialog__table idea-table--outlined"
+          class="idea-table--mini"
           row-key="id"
           :data="filteredRanges"
           :columns="columns"
@@ -285,9 +284,6 @@ watch(
   }
   &__filter {
     width: 170px;
-  }
-  &__table {
-    min-width: 0;
   }
   &__reference {
     display: grid;
