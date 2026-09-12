@@ -195,7 +195,7 @@ export const DATABASE_FUNCTIONS = DATABASE_NAMES.map((name) =>
       maxArgs: 3,
       arguments: [
         { name: "database" },
-        { name: "field" },
+        { name: "field", optional: name === "DCOUNT" || name === "DCOUNTA" },
         { name: "criteria" },
       ],
       lazy: false,
