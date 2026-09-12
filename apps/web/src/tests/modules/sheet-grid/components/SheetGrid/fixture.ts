@@ -1,4 +1,4 @@
-import { DOMWrapper, mount } from "@vue/test-utils";
+import { DOMWrapper, mount, type VueWrapper } from "@vue/test-utils";
 import { reactive } from "vue";
 import type {
   GridPastePayload,
@@ -27,9 +27,12 @@ import {
 import { parseCellContent } from "@idea10/core/input";
 import { getActiveSheet, type CellRange, type SheetDimensionAxis } from "@idea10/core/workbook";
 import SheetGrid from "../../../../../modules/sheet-grid/components/SheetGrid.vue";
+import SheetCanvasLayer from "../../../../../modules/sheet-grid/components/SheetCanvasLayer.vue";
 import type { AxisMovePayload } from "../../../../../modules/sheet-grid/composables/useAxisMoveDrag";
 import { createAppI18n } from "../../../../../shared/i18n";
 import { createBrowserIdFactory } from "../../../../../shared/runtime/browser-id-factory";
+import type { CellAddress } from "@idea10/core/workbook";
+import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 
 export type SheetGridFixtureOptions = {
   attachTo?: HTMLElement;
@@ -144,4 +147,33 @@ export function activeCell(
   wrapper: ReturnType<typeof mountSheetGrid>["wrapper"],
 ): string | undefined {
   return wrapper.get("[data-active-cell]").attributes("data-active-cell");
+}
+
+/**
+ * Dispatches a pointer event through the canvas at the centre of a logical cell.
+ * Tests therefore exercise the same viewport hit-testing used by the sheet.
+ */
+export async function triggerCell(
+  wrapper: VueWrapper,
+  address: CellAddress,
+  event: string,
+  options: MouseEventInit = {},
+): Promise<void> {
+  const canvasLayer = wrapper.getComponent(SheetCanvasLayer);
+  const layout = canvasLayer.props("layout") as SheetViewportLayout;
+  const scale = (canvasLayer.props("scale") as number | undefined) ?? 1;
+  const rect = layout.getCellViewportRect(address);
+  if (!rect) throw new Error(`Cell ${address.row}:${address.column} is outside the viewport`);
+
+  const canvas = canvasLayer.get<HTMLCanvasElement>("[data-sheet-canvas]");
+  const bounds = canvas.element.getBoundingClientRect();
+  await canvas.trigger(event, {
+    ...options,
+    clientX: bounds.left + (rect.x + rect.width / 2) * scale,
+    clientY: bounds.top + (rect.y + rect.height / 2) * scale,
+  });
+}
+
+export function getCanvasLayout(wrapper: VueWrapper): SheetViewportLayout {
+  return wrapper.getComponent(SheetCanvasLayer).props("layout") as SheetViewportLayout;
 }

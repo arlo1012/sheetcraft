@@ -1,7 +1,7 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { getCellValue, setCellValue, setColumnWidth, setRowHeight } from "@idea10/core/workbook";
-import { mountSheetGrid, type SheetGridFixtureOptions } from "./fixture";
+import { activeCell, getCanvasLayout, mountSheetGrid, type SheetGridFixtureOptions } from "./fixture";
 
 const ROW_HEIGHT = 24;
 const COLUMN_WIDTH = 96;
@@ -80,7 +80,7 @@ describe("SheetGrid extent scrolling", () => {
 
     expectExtent(scroller, 150, 34);
     expect(getCellValue(sheet, { row: 132, column: 30 })).toBe("tail value");
-    expect(wrapper.find('[data-cell-editor="AE133"]').exists()).toBe(true);
+    expect(activeCell(wrapper)).toBe("AE133");
 
     setCellValue(sheet, { row: 132, column: 30 }, "");
     setRowHeight(sheet, 145, ROW_HEIGHT);
@@ -92,7 +92,7 @@ describe("SheetGrid extent scrolling", () => {
     await scroller.trigger("scroll");
 
     expectExtent(scroller, 100, 26);
-    expect(wrapper.find('[data-cell-editor="A1"]').exists()).toBe(true);
+    expect(activeCell(wrapper)).toBe("A1");
     wrapper.unmount();
   });
 
@@ -108,8 +108,8 @@ describe("SheetGrid extent scrolling", () => {
 
     wrapper.vm.navigateToCell({ row: 119, column: 30 });
     await nextTick();
-    expect(wrapper.find('[data-cell-editor="AD119"]').exists()).toBe(true);
-    expect(wrapper.findAll('[data-row="118"][data-column="29"]')).toHaveLength(1);
+    expect(activeCell(wrapper)).toBe("AD119");
+    expect(getCanvasLayout(wrapper).getCellViewportRect({ row: 118, column: 29 })).not.toBeNull();
 
     scroller.element.scrollTop = 0;
     scroller.element.scrollLeft = 0;

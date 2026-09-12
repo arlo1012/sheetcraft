@@ -12,15 +12,13 @@ import {
   WEB_IDEA10_CLIPBOARD_TYPE,
 } from "../../../../../modules/sheet-grid/gridClipboardPort";
 import { createTestClipboardEvent } from "./clipboard-fixture";
-import { mountSheetGrid } from "./fixture";
+import { mountSheetGrid, triggerCell } from "./fixture";
 
 describe("SheetGrid clipboard", () => {
   test("aligns the copy outline to gridlines and cancels it with Escape", async () => {
     const { session, wrapper } = mountSheetGrid();
-    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
-    await wrapper
-      .get('[data-row="2"][data-column="2"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0, shiftKey: true });
 
     const copied = createTestClipboardEvent("copy");
     wrapper.get("textarea.cell-editor").element.dispatchEvent(copied.event);
@@ -58,9 +56,7 @@ describe("SheetGrid clipboard", () => {
     setCellValue(sheet, { row: 0, column: 0 }, "0012");
     setCellValue(sheet, { row: 0, column: 1 }, 2);
     setCellValue(sheet, { row: 1, column: 1 }, true);
-    await wrapper
-      .get('[data-row="1"][data-column="1"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0, shiftKey: true });
 
     const copied = createTestClipboardEvent("copy");
     wrapper.get("textarea.cell-editor").element.dispatchEvent(copied.event);
@@ -69,7 +65,7 @@ describe("SheetGrid clipboard", () => {
     expect(copied.data.get("text/plain")).toBe("0012\t2\r\n\tTRUE");
     expect(wrapper.find("[data-clipboard-range]").exists()).toBe(true);
 
-    await wrapper.get('[data-row="3"][data-column="3"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 3, column: 3 }, "mousedown", { button: 0 });
     const pasted = createTestClipboardEvent("paste", copied.data);
     wrapper.get("textarea.cell-editor").element.dispatchEvent(pasted.event);
     await wrapper.vm.$nextTick();
@@ -100,10 +96,8 @@ describe("SheetGrid clipboard", () => {
 
     const copied = createTestClipboardEvent("copy");
     wrapper.get("textarea.cell-editor").element.dispatchEvent(copied.event);
-    await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });
-    await wrapper
-      .get('[data-row="3"][data-column="3"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 3, column: 3 }, "mousedown", { button: 0, shiftKey: true });
     wrapper
       .get("textarea.cell-editor")
       .element.dispatchEvent(createTestClipboardEvent("paste", copied.data).event);
@@ -160,16 +154,14 @@ describe("SheetGrid clipboard", () => {
     setCellValue(sheet, { row: 0, column: 1 }, "B");
     setCellValue(sheet, { row: 1, column: 0 }, "C");
     setCellValue(sheet, { row: 1, column: 1 }, "D");
-    await wrapper
-      .get('[data-row="1"][data-column="1"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0, shiftKey: true });
 
     const cut = createTestClipboardEvent("cut");
     wrapper.get("textarea.cell-editor").element.dispatchEvent(cut.event);
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("A");
     expect(session.history.undoStack).toHaveLength(0);
 
-    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
     wrapper
       .get("textarea.cell-editor")
       .element.dispatchEvent(createTestClipboardEvent("paste", cut.data).event);
@@ -195,7 +187,7 @@ describe("SheetGrid clipboard", () => {
     const webClipboardData = new Map(cut.data);
     webClipboardData.delete(IDEA10_CLIPBOARD_TYPE);
     webClipboardData.set(WEB_IDEA10_CLIPBOARD_TYPE, token ?? "");
-    await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0 });
     wrapper
       .get("textarea.cell-editor")
       .element.dispatchEvent(createTestClipboardEvent("paste", webClipboardData).event);
@@ -226,7 +218,7 @@ describe("SheetGrid clipboard", () => {
 
     const copied = createTestClipboardEvent("copy");
     wrapper.get("textarea.cell-editor").element.dispatchEvent(copied.event);
-    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
     wrapper
       .get("textarea.cell-editor")
       .element.dispatchEvent(createTestClipboardEvent("paste", copied.data).event);
@@ -240,7 +232,7 @@ describe("SheetGrid clipboard", () => {
       borderDiagonalDown: { style: "dashed", color: "#445566" },
     });
 
-    await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0 });
     wrapper
       .get("textarea.cell-editor")
       .element.dispatchEvent(
@@ -252,9 +244,7 @@ describe("SheetGrid clipboard", () => {
 
   test("tiles a single external cell over a selected range", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
-    await wrapper
-      .get('[data-row="1"][data-column="2"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 1, column: 2 }, "mousedown", { button: 0, shiftKey: true });
     const external = createTestClipboardEvent("paste", new Map([["text/plain", "7"]]));
 
     wrapper.get("textarea.cell-editor").element.dispatchEvent(external.event);
@@ -267,9 +257,7 @@ describe("SheetGrid clipboard", () => {
 
   test("rejects an incompatible external matrix without a partial write", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
-    await wrapper
-      .get('[data-row="1"][data-column="2"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 1, column: 2 }, "mousedown", { button: 0, shiftKey: true });
     const external = createTestClipboardEvent("paste", new Map([["text/plain", "1\t2"]]));
 
     wrapper.get("textarea.cell-editor").element.dispatchEvent(external.event);
@@ -284,9 +272,7 @@ describe("SheetGrid clipboard", () => {
     const { session, sheet, wrapper } = mountSheetGrid();
     setCellValue(sheet, { row: 0, column: 0 }, "keep A1");
     setCellValue(sheet, { row: 0, column: 1 }, "keep B1");
-    await wrapper
-      .get('[data-row="0"][data-column="1"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 0, column: 1 }, "mousedown", { button: 0, shiftKey: true });
     const image = createTestClipboardEvent("paste", new Map([["image/png", "opaque"]]));
 
     wrapper.get("textarea.cell-editor").element.dispatchEvent(image.event);

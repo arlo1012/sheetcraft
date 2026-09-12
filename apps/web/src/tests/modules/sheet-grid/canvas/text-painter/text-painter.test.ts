@@ -33,14 +33,21 @@ describe("paintCellText", () => {
     expect(ctx.calls).toContain("translate:8,9");
     expect(ctx.calls).toContain(`rotate:${-Math.PI / 2}`);
     expect(ctx.calls).toContain("translate:0,-5.6");
-    expect(ctx.calls).toContain("text:AB@0,4");
+    expect(ctx.calls).toContain("text:AB@0,18.8");
   });
 
-  test("spreads justified glyphs and draws double accounting underline with strikethrough", () => {
+  test("spreads justified CJK glyphs and draws double accounting underline with strikethrough", () => {
     const ctx = context();
-    paintCellText(ctx, { ...layout, angle: 0, rotationX: 0, rotationY: 0, lines: [{ text: "AB", x: 0, y: 0, width: 40, align: "justify" }] }, { underline: "doubleAccounting", strikethrough: true }, "#000");
-    expect(ctx.calls).toContain("text:A@0,0");
-    expect(ctx.calls).toContain("text:B@30,0");
+    paintCellText(ctx, { ...layout, angle: 0, rotationX: 0, rotationY: 0, lines: [{ text: "你好", x: 0, y: 0, width: 40, align: "justify" }] }, { underline: "doubleAccounting", strikethrough: true }, "#000");
+    expect(ctx.calls).toContain("text:你@0,14.8");
+    expect(ctx.calls).toContain("text:好@30,14.8");
     expect(ctx.calls.filter((call) => call === "stroke")).toHaveLength(3);
+  });
+
+  test("keeps RTL justified words anchored from the right edge", () => {
+    const ctx = context();
+    paintCellText(ctx, { ...layout, direction: "rtl", angle: 0, rotationX: 0, rotationY: 0, lines: [{ text: "אב גד", x: 0, y: 0, width: 80, align: "justify" }] }, undefined, "#000");
+    expect(ctx.textAlign).toBe("right");
+    expect(ctx.calls).toContain("text:אב@80,14.8");
   });
 });

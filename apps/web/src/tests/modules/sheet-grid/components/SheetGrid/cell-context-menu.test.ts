@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { getCellValue, setCellValue } from "@idea10/core/workbook";
-import { activeCell, getFloatingMenu, hasFloatingMenu, mountSheetGrid } from "./fixture";
+import { activeCell, getFloatingMenu, hasFloatingMenu, mountSheetGrid, triggerCell } from "./fixture";
 
 describe("SheetGrid cell context menu", () => {
   test("preserves a cell range when right-clicking inside it and clears it atomically", async () => {
@@ -10,11 +10,9 @@ describe("SheetGrid cell context menu", () => {
     setCellValue(sheet, { row: 1, column: 0 }, "C");
     setCellValue(sheet, { row: 1, column: 1 }, "D");
     setCellValue(sheet, { row: 2, column: 2 }, "outside");
-    await wrapper
-      .get('[data-row="1"][data-column="1"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0, shiftKey: true });
 
-    await wrapper.get('[data-row="1"][data-column="1"]').trigger("contextmenu", {
+    await triggerCell(wrapper, { row: 1, column: 1 }, "contextmenu", {
       clientX: 160,
       clientY: 48,
     });
@@ -34,11 +32,9 @@ describe("SheetGrid cell context menu", () => {
     const { sheet, wrapper } = mountSheetGrid();
     setCellValue(sheet, { row: 0, column: 0 }, "keep");
     setCellValue(sheet, { row: 2, column: 2 }, "remove");
-    await wrapper
-      .get('[data-row="1"][data-column="1"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0, shiftKey: true });
 
-    await wrapper.get('[data-row="2"][data-column="2"]').trigger("contextmenu", {
+    await triggerCell(wrapper, { row: 2, column: 2 }, "contextmenu", {
       clientX: 256,
       clientY: 72,
     });

@@ -72,6 +72,45 @@ function strokePattern(
   ctx.restore();
 }
 
+function paintPathGradient(
+  ctx: CanvasRenderingContext2D,
+  rect: Rect,
+  gradient: Extract<NonNullable<CellStyle["fillGradient"]>, { type: "path" }>,
+): void {
+  const left = rect.x + rect.width * gradient.left;
+  const right = rect.x + rect.width * gradient.right;
+  const top = rect.y + rect.height * gradient.top;
+  const bottom = rect.y + rect.height * gradient.bottom;
+  const paintBand = (
+    points: readonly [number, number][],
+    fill: CanvasGradient,
+  ) => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(...points[0]!);
+    for (const point of points.slice(1)) ctx.lineTo(...point);
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = fill;
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    ctx.restore();
+  };
+  const topFill = ctx.createLinearGradient(0, top, 0, rect.y);
+  addStops(topFill, gradient.stops);
+  paintBand([[rect.x, rect.y], [rect.x + rect.width, rect.y], [right, top], [left, top]], topFill);
+  const bottomFill = ctx.createLinearGradient(0, bottom, 0, rect.y + rect.height);
+  addStops(bottomFill, gradient.stops);
+  paintBand([[rect.x, rect.y + rect.height], [rect.x + rect.width, rect.y + rect.height], [right, bottom], [left, bottom]], bottomFill);
+  const leftFill = ctx.createLinearGradient(left, 0, rect.x, 0);
+  addStops(leftFill, gradient.stops);
+  paintBand([[rect.x, rect.y], [left, top], [left, bottom], [rect.x, rect.y + rect.height]], leftFill);
+  const rightFill = ctx.createLinearGradient(right, 0, rect.x + rect.width, 0);
+  addStops(rightFill, gradient.stops);
+  paintBand([[rect.x + rect.width, rect.y], [right, top], [right, bottom], [rect.x + rect.width, rect.y + rect.height]], rightFill);
+  ctx.fillStyle = gradient.stops[0]!.color;
+  ctx.fillRect(left, top, right - left, bottom - top);
+}
+
 /** Paints a cell fill over the caller's default cell surface. */
 export function paintCellFill(
   ctx: CanvasRenderingContext2D,
@@ -92,19 +131,8 @@ export function paintCellFill(
       );
       addStops(fill, gradient.stops);
       ctx.fillStyle = fill;
-    } else {
-      const left = rect.x + rect.width * gradient.left;
-      const right = rect.x + rect.width * gradient.right;
-      const top = rect.y + rect.height * gradient.top;
-      const bottom = rect.y + rect.height * gradient.bottom;
-      const x = (left + right) / 2;
-      const y = (top + bottom) / 2;
-      const radius = Math.max(Math.hypot(x - rect.x, y - rect.y), Math.hypot(x - (rect.x + rect.width), y - (rect.y + rect.height)));
-      const fill = ctx.createRadialGradient(x, y, 0, x, y, radius);
-      addStops(fill, gradient.stops);
-      ctx.fillStyle = fill;
-    }
-    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    } else paintPathGradient(ctx, rect, gradient);
     return;
   }
   if (style.fillColor) {

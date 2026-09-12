@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { activeCell, mountSheetGrid } from "./fixture";
+import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
 function selectionStyle(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]): string {
   return wrapper.get("[data-selection-range]").attributes("style") ?? "";
@@ -9,17 +9,11 @@ describe("SheetGrid range selection", () => {
   test("extends a range with Shift click while retaining the active cell", async () => {
     const { session, wrapper } = mountSheetGrid();
 
-    await wrapper
-      .get('[data-row="2"][data-column="2"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0, shiftKey: true });
 
     expect(activeCell(wrapper)).toBe("A1");
     expect(selectionStyle(wrapper)).toContain("width: 288px");
     expect(selectionStyle(wrapper)).toContain("height: 72px");
-    expect(wrapper.get('[data-row="1"][data-column="1"]').attributes("aria-selected")).toBe("true");
-    expect(wrapper.get('[data-row="3"][data-column="3"]').attributes("aria-selected")).toBe(
-      "false",
-    );
     expect((wrapper.get("[data-selection-outline]").element as HTMLElement).style.borderWidth).toBe(
       "1px",
     );
@@ -30,7 +24,7 @@ describe("SheetGrid range selection", () => {
   test("emits the completed cell selection as a format painter target", async () => {
     const { wrapper } = mountSheetGrid();
     await wrapper.setProps({ formatPainterActive: true });
-    await wrapper.get('[data-row="2"][data-column="3"]').trigger("mousedown", {
+    await triggerCell(wrapper, { row: 2, column: 3 }, "mousedown", {
       button: 0,
       buttons: 1,
     });
@@ -84,8 +78,6 @@ describe("SheetGrid range selection", () => {
     expect(activeCell(wrapper)).toBe("A1");
     expect(selectionStyle(wrapper)).toContain("width: 192px");
     expect(selectionStyle(wrapper)).toContain("height: 48px");
-    expect(wrapper.get('[data-row="1"][data-column="1"]').attributes("aria-selected")).toBe("true");
-
     await editor.trigger("keydown", { key: "ArrowRight" });
     expect(activeCell(wrapper)).toBe("B1");
     expect(selectionStyle(wrapper)).toContain("width: 96px");
@@ -95,10 +87,8 @@ describe("SheetGrid range selection", () => {
 
   test("aligns non-origin selection outlines with the preceding gridline pixels", async () => {
     const { wrapper } = mountSheetGrid();
-    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
-    await wrapper
-      .get('[data-row="2"][data-column="2"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0, shiftKey: true });
 
     const fillStyle = (wrapper.get("[data-selection-range]").element as HTMLElement).style;
     const outlineStyle = (wrapper.get("[data-selection-outline]").element as HTMLElement).style;
@@ -126,9 +116,7 @@ describe("SheetGrid range selection", () => {
   test("cycles Tab and Enter inside a retained range", async () => {
     const { wrapper } = mountSheetGrid();
     const editor = wrapper.get("textarea.cell-editor");
-    await wrapper
-      .get('[data-row="1"][data-column="1"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0, shiftKey: true });
 
     await editor.trigger("keydown", { key: "Tab" });
     expect(activeCell(wrapper)).toBe("B1");

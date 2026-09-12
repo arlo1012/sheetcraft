@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { getCellValue, setCellValue } from "@idea10/core/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
-import { activeCell, mountSheetGrid } from "./fixture";
+import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
 describe("SheetGrid range clearing", () => {
   test("clears a selected rectangle with Delete and preserves one-step history", async () => {
@@ -11,9 +11,7 @@ describe("SheetGrid range clearing", () => {
     setCellValue(sheet, { row: 1, column: 0 }, "C");
     setCellValue(sheet, { row: 1, column: 1 }, "D");
     setCellValue(sheet, { row: 2, column: 2 }, "outside");
-    await wrapper
-      .get('[data-row="1"][data-column="1"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0, shiftKey: true });
 
     const copied = createTestClipboardEvent("copy");
     wrapper.get("textarea.cell-editor").element.dispatchEvent(copied.event);

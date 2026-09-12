@@ -1,6 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { mountSheetGrid } from "./fixture";
+import { getCanvasLayout, mountSheetGrid } from "./fixture";
 
 describe("SheetGrid external horizontal scrolling", () => {
   test("reports native scrolling, preserves vertical position and selection for external scrolling", async () => {
@@ -42,7 +42,7 @@ describe("SheetGrid external horizontal scrolling", () => {
         .get('.sheet-column-headers [data-header-pane="frozen"] [data-column="0"]')
         .attributes("style"),
     ).toContain("left: 0px");
-    expect(wrapper.find('[data-row="2"][data-column="7"]').exists()).toBe(true);
+    expect(getCanvasLayout(wrapper).getCellViewportRect({ row: 2, column: 7 })).not.toBeNull();
     wrapper.unmount();
   });
 

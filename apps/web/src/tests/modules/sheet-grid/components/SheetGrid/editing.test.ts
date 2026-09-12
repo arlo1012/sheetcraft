@@ -1,7 +1,7 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { DEFAULT_ROW_HEIGHT, getCellValue, setCellValue } from "@idea10/core/workbook";
-import { activeCell, mountSheetGrid } from "./fixture";
+import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
 describe("cell editor", () => {
   test("replaces content with printable input and commits with Enter", async () => {
@@ -21,7 +21,7 @@ describe("cell editor", () => {
   test("uses Enter to navigate and F2 to edit existing content", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
     setCellValue(sheet, { row: 1, column: 0 }, "Original");
-    await wrapper.get('[data-row="1"][data-column="0"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 1, column: 0 }, "mousedown", { button: 0 });
 
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Enter" });
     expect(activeCell(wrapper)).toBe("A3");
@@ -45,7 +45,7 @@ describe("cell editor", () => {
     const { session, sheet, wrapper } = mountSheetGrid();
     setCellValue(sheet, { row: 1, column: 1 }, "Original");
 
-    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
     const editor = wrapper.get("textarea.cell-editor");
     await editor.trigger("keydown", { key: "F2" });
     expect((editor.element as HTMLTextAreaElement).value).toBe("Original");
@@ -66,7 +66,7 @@ describe("cell editor", () => {
     await editor.trigger("keydown", { key: "Enter" });
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("0012");
 
-    await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 0, column: 0 }, "mousedown", { button: 0 });
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "F2" });
     expect((wrapper.get("textarea.cell-editor").element as HTMLTextAreaElement).value).toBe(
       "'0012",
@@ -82,7 +82,7 @@ describe("cell editor", () => {
     const editor = wrapper.get("textarea.cell-editor");
 
     await editor.trigger("keydown", { key: "a" });
-    await wrapper.get('[data-row="2"][data-column="3"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 2, column: 3 }, "mousedown", { button: 0 });
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("a");
     expect(activeCell(wrapper)).toBe("D3");
     expect(session.history.undoStack).toHaveLength(1);
@@ -142,13 +142,9 @@ describe("cell editor", () => {
     expect(activeCell(wrapper)).toBe("A1");
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBeNull();
     expect(session.history.undoStack).toHaveLength(0);
-    const firstRow = wrapper.get('[data-row="0"][data-column="0"]').element
-      .parentElement as HTMLElement;
-    expect(Number.parseFloat(firstRow.style.height)).toBe(DEFAULT_ROW_HEIGHT);
 
     await editor.trigger("keydown", { key: "Enter" });
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("first\nsecond");
-    expect(Number.parseFloat(firstRow.style.height)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
     expect(activeCell(wrapper)).toBe("A2");
     expect(session.history.undoStack).toHaveLength(1);
   });
@@ -157,8 +153,6 @@ describe("cell editor", () => {
     const { wrapper } = mountSheetGrid();
     const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
     const frame = wrapper.get<HTMLElement>("[data-cell-editor-frame]");
-    const firstRow = wrapper.get('[data-row="0"][data-column="0"]').element
-      .parentElement as HTMLElement;
     const initialWidth = Number.parseFloat(frame.element.style.width);
 
     Object.defineProperties(editor.element, {
@@ -172,12 +166,7 @@ describe("cell editor", () => {
     expect(Number.parseFloat(frame.element.style.width)).toBe(248);
     expect(Number.parseFloat(frame.element.style.width)).toBeGreaterThan(initialWidth);
     expect(Number.parseFloat(frame.element.style.height)).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
-    expect(Number.parseFloat(firstRow.style.height)).toBe(DEFAULT_ROW_HEIGHT);
     const anchor = wrapper.get<HTMLElement>("[data-cell-editor-anchor]");
-    const activeCell = wrapper.get<HTMLElement>('[role="gridcell"][aria-selected="true"]');
     expect(frame.element.parentElement).toBe(anchor.element);
-    expect(frame.element.closest('[role="row"]')).toBeNull();
-    expect(activeCell.attributes("aria-owns")).toBe(anchor.attributes("id"));
-    expect(activeCell.element.closest('[role="row"]')?.classList).not.toContain("is-editing");
   });
 });

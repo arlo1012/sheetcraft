@@ -1,7 +1,7 @@
 import { nextTick } from "vue";
 import { describe, expect, test, vi } from "vitest";
 import { getCellValue } from "@idea10/core/workbook";
-import { activeCell, mountSheetGrid } from "./fixture";
+import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
 describe("cell editor IME composition", () => {
   test("keeps composition inside the editor until an explicit commit", async () => {
@@ -102,7 +102,7 @@ describe("cell editor IME composition", () => {
     await editor.trigger("compositionstart");
     await editor.setValue("中文");
 
-    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
 
     expect(activeCell(wrapper)).toBe("A1");
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBeNull();

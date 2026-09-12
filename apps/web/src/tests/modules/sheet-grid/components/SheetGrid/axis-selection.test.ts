@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { getCellValue, getRowHeight, setCellValue } from "@idea10/core/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
-import { activeCell, getFloatingMenu, hasFloatingMenu, mountSheetGrid } from "./fixture";
+import { activeCell, getFloatingMenu, hasFloatingMenu, mountSheetGrid, triggerCell } from "./fixture";
 
 describe("SheetGrid axis selection", () => {
   test("selects rows and columns from headers, with Shift extending the same axis", async () => {
@@ -11,46 +11,39 @@ describe("SheetGrid axis selection", () => {
       button: 0,
     });
     expect(activeCell(wrapper)).toBe("A3");
-    expect(wrapper.get('[data-row="2"][data-column="5"]').attributes("aria-selected")).toBe("true");
-    expect(wrapper.get('[data-row="1"][data-column="5"]').attributes("aria-selected")).toBe(
-      "false",
-    );
+    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("height: 24px");
 
     await wrapper.get('[data-select-row="4"]').trigger("mousedown", {
       button: 0,
       shiftKey: true,
     });
-    expect(wrapper.get('[data-row="3"][data-column="5"]').attributes("aria-selected")).toBe("true");
+    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("height: 72px");
 
     await wrapper.get('[data-select-column="3"]').trigger("mousedown", {
       button: 0,
     });
     expect(activeCell(wrapper)).toBe("D1");
-    expect(wrapper.get('[data-row="5"][data-column="3"]').attributes("aria-selected")).toBe("true");
-    expect(wrapper.get('[data-row="5"][data-column="2"]').attributes("aria-selected")).toBe(
-      "false",
-    );
+    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 96px");
   });
 
   test("uses the corner and keyboard shortcuts for whole-axis selection", async () => {
     const { wrapper } = mountSheetGrid();
 
-    await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0 });
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: " ", shiftKey: true });
-    expect(wrapper.get('[data-row="2"][data-column="8"]').attributes("aria-selected")).toBe("true");
+    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 960px");
 
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: " ", ctrlKey: true });
-    expect(wrapper.get('[data-row="8"][data-column="2"]').attributes("aria-selected")).toBe("true");
+    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("height: 600px");
 
     await wrapper.get("button.sheet-grid__corner").trigger("click");
-    expect(wrapper.get('[data-row="8"][data-column="8"]').attributes("aria-selected")).toBe("true");
     const rangeStyle = wrapper.get("[data-selection-range]").attributes("style") ?? "";
     expect(rangeStyle).toContain("width: 960px");
     expect(rangeStyle).toContain("height: 600px");
 
-    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "a", ctrlKey: true });
-    expect(wrapper.get('[data-row="8"][data-column="8"]').attributes("aria-selected")).toBe("true");
+    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 960px");
 
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "F2" });
     const editingSelectAll = new KeyboardEvent("keydown", {
@@ -71,9 +64,7 @@ describe("SheetGrid axis selection", () => {
 
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "ArrowRight" });
     expect(activeCell(wrapper)).toBe("B3");
-    expect(wrapper.get('[data-row="2"][data-column="8"]').attributes("aria-selected")).toBe(
-      "false",
-    );
+    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 96px");
   });
 
   test("exposes keyboard-operable row and column headers", async () => {
