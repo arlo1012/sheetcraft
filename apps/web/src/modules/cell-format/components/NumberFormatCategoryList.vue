@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { NUMBER_FORMAT_CATEGORY_ORDER, type NumberFormatCategory } from "../number-format/catalog";
-import CellFormatOptionList from "./CellFormatOptionList.vue";
+import OptionList from "../../../shared/option-list/OptionList.vue";
 
 defineProps<{ modelValue: NumberFormatCategory | undefined }>();
 const emit = defineEmits<{ select: [category: NumberFormatCategory] }>();
@@ -22,14 +22,14 @@ const categoryLabels: Record<NumberFormatCategory, MessageKey> = {
   custom: "cellFormat.custom",
 };
 const options = computed(() =>
-  NUMBER_FORMAT_CATEGORY_ORDER.map((code) => ({ code, label: t(categoryLabels[code]) })),
+  NUMBER_FORMAT_CATEGORY_ORDER.map((code) => ({ value: code, label: t(categoryLabels[code]) })),
 );
 </script>
 
 <template>
   <div class="number-format-categories">
     <h3 class="number-format-categories__label">{{ t("cellFormat.category") }}</h3>
-    <CellFormatOptionList
+    <OptionList
       class="number-format-categories__list"
       :model-value="modelValue"
       :options="options"
@@ -67,6 +67,10 @@ const options = computed(() =>
 @media (max-width: 480px) {
   .number-format-categories__list {
     flex: none;
+    :deep(.option-list__items) {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 }
 </style>

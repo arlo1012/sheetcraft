@@ -13,7 +13,7 @@ import {
 } from "../../../shared/cell-text/font-presentation";
 import { useAppI18n } from "../../../shared/i18n";
 import { useFontFormatPanel } from "../font/useFontFormatPanel";
-import CellFormatOptionList from "./CellFormatOptionList.vue";
+import OptionList from "../../../shared/option-list/OptionList.vue";
 import CellFormatColorControl from "./CellFormatColorControl.vue";
 
 const props = defineProps<{
@@ -57,6 +57,15 @@ const {
   setScript,
   setColor,
 } = useFontFormatPanel(props, (patch) => emit("update:patch", patch));
+const familyListOptions = computed(() =>
+  familyOptions.value.map(({ code, ...option }) => ({ ...option, value: code })),
+);
+const styleListOptions = computed(() =>
+  styleOptions.value.map(({ code, ...option }) => ({ ...option, value: code })),
+);
+const sizeListOptions = computed(() =>
+  sizeOptions.value.map(({ code, ...option }) => ({ ...option, value: code })),
+);
 const previewText = computed(() =>
   props.sampleValue === null || props.sampleValue === ""
     ? t("cellFormat.fontPreviewText")
@@ -80,19 +89,19 @@ const previewText = computed(() =>
           @blur="commitFamilyInput"
           @enter="commitFamilyInput"
         />
-        <CellFormatOptionList
+        <OptionList
           class="cell-format-font__list"
           :model-value="family"
           :search-text="familyInput"
-          :options="familyOptions"
+          :options="familyListOptions"
           :label="t('format.fontFamily')"
           data-cell-format-font-family-list
           @select="setFamily"
         >
           <template #option="{ option }"
-            ><span :style="{ fontFamily: option.code }">{{ option.label }}</span></template
+            ><span :style="{ fontFamily: option.value }">{{ option.label }}</span></template
           >
-        </CellFormatOptionList>
+        </OptionList>
       </div>
       <div class="cell-format-font__field" role="group" :aria-label="t('cellFormat.fontStyle')">
         <span>{{ t("cellFormat.fontStyle") }}</span>
@@ -106,11 +115,11 @@ const previewText = computed(() =>
           @blur="commitFontStyleInput"
           @enter="commitFontStyleInput"
         />
-        <CellFormatOptionList
+        <OptionList
           class="cell-format-font__list"
           :model-value="fontStyle"
           :search-text="fontStyleInput"
-          :options="styleOptions"
+          :options="styleListOptions"
           :label="t('cellFormat.fontStyle')"
           data-cell-format-font-style-list
           @select="setFontStyle"
@@ -118,14 +127,14 @@ const previewText = computed(() =>
           <template #option="{ option }"
             ><span
               :style="{
-                fontWeight: option.code === 'bold' || option.code === 'boldItalic' ? 700 : 400,
+                fontWeight: option.value === 'bold' || option.value === 'boldItalic' ? 700 : 400,
                 fontStyle:
-                  option.code === 'italic' || option.code === 'boldItalic' ? 'italic' : 'normal',
+                  option.value === 'italic' || option.value === 'boldItalic' ? 'italic' : 'normal',
               }"
               >{{ option.label }}</span
             ></template
           >
-        </CellFormatOptionList>
+        </OptionList>
       </div>
       <div class="cell-format-font__field" role="group" :aria-label="t('format.fontSize')">
         <span>{{ t("format.fontSize") }}</span>
@@ -140,11 +149,11 @@ const previewText = computed(() =>
           @blur="commitSizeInput"
           @enter="commitSizeInput"
         />
-        <CellFormatOptionList
+        <OptionList
           class="cell-format-font__list"
           :model-value="size === undefined ? undefined : String(size)"
           :search-text="sizeInput"
-          :options="sizeOptions"
+          :options="sizeListOptions"
           :label="t('format.fontSize')"
           data-cell-format-font-size-list
           @select="setSize"

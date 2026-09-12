@@ -49,9 +49,9 @@ describe("font input location", () => {
         input.vm.$emit("change", query);
         await wrapper.vm.$nextTick();
         expect(list.findAll('[role="option"]')).toHaveLength(count);
-        expect(
-          list.get("[data-cell-format-option-match]").attributes("data-cell-format-option"),
-        ).toBe(match);
+        expect(list.get("[data-option-list-match]").attributes("data-option-list-value")).toBe(
+          match,
+        );
         expect(input.props("modelValue")).toBe(query);
         expect(panel.props("patch")).toEqual({});
         input.vm.$emit("enter");
@@ -77,9 +77,7 @@ describe("font input location", () => {
       panel.get("[data-cell-format-font-size]").getComponent(TInput).vm.$emit("change", "72");
       await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
-      expect(
-        list.get("[data-cell-format-option-match]").attributes("data-cell-format-option"),
-      ).toBe("72");
+      expect(list.get("[data-option-list-match]").attributes("data-option-list-value")).toBe("72");
       expect(list.element.scrollTop).toBeGreaterThan(0);
       expect(list.findAll("button")).toHaveLength(17);
     } finally {

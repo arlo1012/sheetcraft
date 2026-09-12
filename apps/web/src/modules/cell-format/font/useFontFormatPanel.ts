@@ -15,7 +15,7 @@ import {
   CELL_FONT_SIZE_PRESETS,
 } from "../../../shared/cell-text/font-catalog";
 import { useAppI18n } from "../../../shared/i18n";
-import { findCellFormatOptionMatch } from "../option-list";
+import { findOptionMatch } from "../../../shared/option-list/option-list";
 
 type Props = Readonly<{ state: SelectionCellStyleState; patch: CellStylePatch }>;
 type FontStyleChoice = "regular" | "italic" | "bold" | "boldItalic";
@@ -126,7 +126,7 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
       familyInput.value = family.value ?? "";
       return;
     }
-    setFamily(findCellFormatOptionMatch(familyOptions.value, name)?.code ?? name);
+    setFamily(findOptionMatch(familyOptions.value, name)?.code ?? name);
   }
   function setSize(value: string): void {
     const parsed = Number(value);
@@ -145,7 +145,7 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
     setSize(sizeInput.value);
   }
   function commitSizeInput(): void {
-    const match = findCellFormatOptionMatch(sizeOptions.value, sizeInput.value);
+    const match = findOptionMatch(sizeOptions.value, sizeInput.value);
     if (match) {
       sizeInput.value = match.code;
       setSize(match.code);
@@ -175,7 +175,7 @@ export function useFontFormatPanel(props: Props, update: (patch: CellStylePatch)
   }
   function commitFontStyleInput(): void {
     if (fontStyleInput.value === styleLabel.value) return;
-    const option = findCellFormatOptionMatch(styleOptions.value, fontStyleInput.value);
+    const option = findOptionMatch(styleOptions.value, fontStyleInput.value);
     if (option) setFontStyle(option.code);
     else fontStyleInput.value = styleLabel.value;
   }

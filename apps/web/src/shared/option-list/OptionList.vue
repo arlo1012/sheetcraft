@@ -1,33 +1,36 @@
-<script setup lang="ts" generic="Value extends string">
+<script setup lang="ts" generic="Option extends OptionListOption">
 import { computed, nextTick, ref, watch } from "vue";
-import { findCellFormatOptionMatch, type CellFormatOption } from "../option-list";
+import { findOptionMatch, type OptionListOption } from "./option-list";
 
-type FormatOption = CellFormatOption<Value>;
 const props = defineProps<{
-  modelValue: Value | undefined;
-  options: readonly FormatOption[];
+  modelValue: Option["value"] | undefined;
+  options: readonly Option[];
   label: string;
   searchText?: string;
   variant?: "navigation" | "compact";
   itemDataAttribute?: `data-${string}`;
   monospace?: boolean;
+  overflow?: "scroll" | "ellipsis";
 }>();
-const emit = defineEmits<{ select: [code: Value] }>();
-defineSlots<{ option?: (props: { option: FormatOption }) => unknown }>();
+const emit = defineEmits<{
+  select: [value: Option["value"]];
+  activate: [value: Option["value"]];
+}>();
+defineSlots<{ option?: (props: { option: Option }) => unknown; empty?: () => unknown }>();
 const listRef = ref<HTMLElement>();
-const itemAttribute = computed(() => props.itemDataAttribute ?? "data-cell-format-option");
+const itemAttribute = computed(() => props.itemDataAttribute ?? "data-option-list-value");
 const selectedIndex = computed(() =>
-  props.options.findIndex((option) => optionValue(option) === props.modelValue),
+  props.options.findIndex((option) => option.value === props.modelValue),
 );
 const matchedIndex = computed(() => {
-  const match = findCellFormatOptionMatch(props.options, props.searchText ?? "");
+  const match = findOptionMatch(props.options, props.searchText ?? "");
   return match ? props.options.indexOf(match) : -1;
 });
 const activeIndex = computed(() =>
   matchedIndex.value >= 0 ? matchedIndex.value : selectedIndex.value,
 );
 watch(
-  activeIndex,
+  [activeIndex, () => props.options],
   () => {
     void nextTick(() => {
       const list = listRef.value;
@@ -59,44 +62,52 @@ function onKeydown(event: KeyboardEvent): void {
             : -1;
   if (next < 0) return;
   event.preventDefault();
-  emit("select", optionValue(props.options[next]!));
+  emit("select", props.options[next]!.value);
   void nextTick(() => listRef.value?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus());
 }
-function optionValue(option: FormatOption): Value {
-  return option.value ?? option.code;
+function confirmOption(value: Option["value"]): void {
+  emit("select", value);
+  emit("activate", value);
 }
 </script>
 <template>
   <div
     ref="listRef"
-    class="cell-format-options"
-    :class="{ 'is-navigation': variant === 'navigation', 'is-monospace': monospace }"
+    class="option-list"
+    :class="{
+      'is-navigation': variant === 'navigation',
+      'is-monospace': monospace,
+      'is-ellipsis': overflow === 'ellipsis',
+    }"
     role="listbox"
     :aria-label="label"
     @keydown="onKeydown"
   >
-    <div class="cell-format-options__items">
+    <div class="option-list__items">
       <button
         v-for="(option, index) in options"
-        :key="optionValue(option)"
+        :key="option.value"
         type="button"
         role="option"
-        :aria-selected="modelValue === optionValue(option)"
+        :aria-selected="modelValue === option.value"
         :tabindex="index === Math.max(0, activeIndex) ? 0 : -1"
         :class="{ 'is-located': index === matchedIndex }"
-        :data-cell-format-option-match="index === matchedIndex ? '' : undefined"
+        :data-option-list-match="index === matchedIndex ? '' : undefined"
         :style="{ color: option.color }"
         :title="option.label"
-        :[itemAttribute]="optionValue(option)"
-        @click="emit('select', optionValue(option))"
+        :[itemAttribute]="option.value"
+        @click="emit('select', option.value)"
+        @keydown.enter.prevent="confirmOption(option.value)"
+        @dblclick="emit('activate', option.value)"
       >
         <slot name="option" :option="option">{{ option.label }}</slot>
       </button>
     </div>
+    <slot v-if="!options.length" name="empty" />
   </div>
 </template>
 <style scoped lang="scss">
-.cell-format-options {
+.option-list {
   min-width: 0;
   min-height: 0;
   overflow: auto;
@@ -170,11 +181,20 @@ function optionValue(option: FormatOption): Value {
       outline-offset: -2px;
     }
   }
+  &.is-ellipsis {
+    .option-list__items {
+      width: 100%;
+    }
+    button {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
   &.is-monospace button {
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   }
   &.is-navigation {
-    .cell-format-options__items {
+    .option-list__items {
       width: 100%;
     }
     button {
@@ -186,12 +206,6 @@ function optionValue(option: FormatOption): Value {
         font-weight: var(--idea-font-weight-medium);
       }
     }
-  }
-}
-@media (max-width: 480px) {
-  .cell-format-options.is-navigation .cell-format-options__items {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 </style>

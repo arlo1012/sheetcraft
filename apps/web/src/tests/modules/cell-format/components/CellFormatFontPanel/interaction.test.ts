@@ -43,7 +43,7 @@ describe("CellFormatFontPanel", () => {
       await wrapper.vm.$nextTick();
       expect(patch()).toEqual({});
       await panel
-        .get('[data-cell-format-font-style-list] [data-cell-format-option="regular"]')
+        .get('[data-cell-format-font-style-list] [data-option-list-value="regular"]')
         .trigger("click");
       expect(patch()).toEqual({ bold: null, italic: null });
     } finally {
@@ -55,10 +55,10 @@ describe("CellFormatFontPanel", () => {
     const { wrapper, panel, patch } = mountPanel();
     try {
       await panel
-        .get('[data-cell-format-font-family-list] [data-cell-format-option="Arial"]')
+        .get('[data-cell-format-font-family-list] [data-option-list-value="Arial"]')
         .trigger("click");
       await panel
-        .get('[data-cell-format-font-style-list] [data-cell-format-option="boldItalic"]')
+        .get('[data-cell-format-font-style-list] [data-option-list-value="boldItalic"]')
         .trigger("click");
       expect(patch()).toEqual({ fontFamily: "Arial", bold: true, italic: true });
       expect(
@@ -110,7 +110,7 @@ describe("CellFormatFontPanel", () => {
       expect(patch().fontSize).toBe(24);
       expect(
         panel
-          .get('[data-cell-format-font-size-list] [data-cell-format-option="24"]')
+          .get('[data-cell-format-font-size-list] [data-option-list-value="24"]')
           .attributes("aria-selected"),
       ).toBe("true");
       input.vm.$emit("change", "999");
@@ -122,7 +122,7 @@ describe("CellFormatFontPanel", () => {
       await wrapper.vm.$nextTick();
       expect(input.props("modelValue")).toBe("72");
       await panel
-        .get('[data-cell-format-font-size-list] [data-cell-format-option="18"]')
+        .get('[data-cell-format-font-size-list] [data-option-list-value="18"]')
         .trigger("click");
       expect(input.props("modelValue")).toBe("18");
     } finally {

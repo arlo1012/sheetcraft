@@ -1,14 +1,13 @@
-export type CellFormatOption<Value extends string = string> = Readonly<{
-  code: Value;
-  value?: Value;
+export type OptionListOption<Value extends string = string> = Readonly<{
+  value: Value;
   label: string;
   color?: string;
 }>;
 
-export function findCellFormatOptionMatch<Value extends string>(
-  options: readonly CellFormatOption<Value>[],
+export function findOptionMatch<Option extends Readonly<{ label: string }>>(
+  options: readonly Option[],
   text: string,
-): CellFormatOption<Value> | undefined {
+): Option | undefined {
   const query = text.trim().toLocaleLowerCase();
   if (!query) return undefined;
   const entries = options.map((option) => ({

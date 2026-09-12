@@ -10,7 +10,7 @@ import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import { useNumberFormatPanel } from "../number-format/useNumberFormatPanel";
 import NumberFormatCategoryList from "./NumberFormatCategoryList.vue";
-import CellFormatOptionList from "./CellFormatOptionList.vue";
+import OptionList from "../../../shared/option-list/OptionList.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -62,8 +62,11 @@ const {
   (patch) => emit("update:patch", patch),
   (valid) => emit("validity-change", valid),
 );
-const negativeTypes = computed(() =>
-  negativeOptions.value.map(({ value, ...option }) => ({ code: value, ...option })),
+const typeOptions = computed(() =>
+  (category.value === "custom" ? customPresets.value : presets.value).map((option) => ({
+    ...option,
+    value: ("value" in option ? option.value : undefined) ?? option.code,
+  })),
 );
 const previewFillText = computed(() => {
   const character = preview.value.fill?.character;
@@ -145,11 +148,11 @@ function selectNegative(code: string): void {
           >
           <div v-if="showNegative" class="cell-format-number__negative">
             <span class="cell-format-number__label">{{ t("cellFormat.negativeNumbers") }}</span>
-            <CellFormatOptionList
+            <OptionList
               class="number-format-types"
               item-data-attribute="data-cell-format-type"
               :model-value="negativeStyle"
-              :options="negativeTypes"
+              :options="negativeOptions"
               :label="t('cellFormat.negativeNumbers')"
               @select="selectNegative"
             />
@@ -169,11 +172,11 @@ function selectNegative(code: string): void {
                 {{ t("cellFormat.invalidFormat") }}
               </p>
             </template>
-            <CellFormatOptionList
+            <OptionList
               class="number-format-types"
               item-data-attribute="data-cell-format-type"
               :model-value="category === 'custom' ? customCode : selectedCode"
-              :options="category === 'custom' ? customPresets : presets"
+              :options="typeOptions"
               :label="t('cellFormat.type')"
               :monospace="category === 'custom'"
               @select="selectCode"

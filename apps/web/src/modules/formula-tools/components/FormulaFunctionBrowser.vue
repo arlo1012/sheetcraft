@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { List as TList, ListItem as TListItem } from "tdesign-vue-next/es/list";
-import { Menu as TMenu, MenuItem as TMenuItem } from "tdesign-vue-next/es/menu";
+import OptionList from "../../../shared/option-list/OptionList.vue";
 import { Search } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import {
@@ -64,11 +62,12 @@ const selectedEntry = computed(
     filteredEntries.value.find((entry) => entry.name === selectedName.value) ??
     filteredEntries.value[0],
 );
-const selectedIndex = computed(() =>
-  Math.max(
-    0,
-    filteredEntries.value.findIndex((entry) => entry.name === selectedEntry.value?.name),
-  ),
+const functionOptions = computed(() =>
+  filteredEntries.value.map((entry) => ({
+    value: entry.name,
+    label: entry.name,
+    description: entry.description,
+  })),
 );
 
 watch(
@@ -85,26 +84,6 @@ function selectCategory(category: string | number): void {
 }
 function insert(name = selectedEntry.value?.name): void {
   if (name) emit("insertFunction", name);
-}
-function moveResult(direction: -1 | 1): void {
-  const count = filteredEntries.value.length;
-  if (!count) return;
-  const index = (selectedIndex.value + direction + count) % count;
-  selectedName.value = filteredEntries.value[index]?.name;
-  void nextTick(() =>
-    document
-      .querySelector<HTMLButtonElement>(`[data-formula-browser-result="${selectedName.value}"]`)
-      ?.focus(),
-  );
-}
-function onResultKeydown(event: KeyboardEvent): void {
-  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-    event.preventDefault();
-    moveResult(event.key === "ArrowDown" ? 1 : -1);
-  } else if (event.key === "Enter") {
-    event.preventDefault();
-    insert();
-  }
 }
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
@@ -137,21 +116,15 @@ function onKeydown(event: KeyboardEvent): void {
       <div class="formula-function-browser__body">
         <section class="formula-function-browser__field">
           <span>{{ t("formulaTools.categories") }}</span>
-          <TMenu
-            class="formula-function-browser__categories narrow-scrollbar"
-            :value="selectedCategory"
-            width="100%"
-            :aria-label="t('formulaTools.categories')"
-            @change="selectCategory"
-          >
-            <TMenuItem
-              v-for="category in categoryOptions"
-              :key="category.value"
-              :value="category.value"
-            >
-              {{ category.label }}
-            </TMenuItem>
-          </TMenu>
+          <OptionList
+            class="formula-function-browser__categories"
+            :model-value="selectedCategory"
+            :options="categoryOptions"
+            :label="t('formulaTools.categories')"
+            variant="navigation"
+            item-data-attribute="data-formula-browser-category"
+            @select="selectCategory"
+          />
         </section>
         <section class="formula-function-browser__field">
           <span>{{ t("formulaTools.selectFunction") }}</span>
@@ -165,42 +138,30 @@ function onKeydown(event: KeyboardEvent): void {
           >
             <template #prefix-icon><Search :size="15" aria-hidden="true" /></template>
           </TInput>
-          <TList
-            class="formula-function-browser__results narrow-scrollbar"
-            role="listbox"
-            :aria-label="t('formulaTools.selectFunction')"
-            :split="false"
+          <OptionList
+            class="formula-function-browser__results"
+            :model-value="selectedEntry?.name"
+            :options="functionOptions"
+            :label="t('formulaTools.selectFunction')"
+            overflow="ellipsis"
+            item-data-attribute="data-formula-browser-result"
+            @select="selectedName = $event"
+            @activate="insert($event)"
           >
-            <TListItem
-              v-for="(entry, index) in filteredEntries"
-              :key="entry.name"
-              class="formula-function-browser__result-item"
-            >
-              <TButton
-                class="formula-function-browser__result"
-                theme="default"
-                variant="text"
-                type="button"
-                role="option"
-                :tabindex="selectedIndex === index ? 0 : -1"
-                :aria-selected="selectedEntry?.name === entry.name"
-                :data-formula-browser-result="entry.name"
-                @keydown="onResultKeydown"
-                @click="selectedName = entry.name"
-                @dblclick="insert(entry.name)"
-              >
-                <span class="formula-function-browser__result-content">
-                  <span class="formula-function-browser__result-name">{{ entry.name }}</span>
-                  <span class="formula-function-browser__result-description">{{
-                    entry.description
-                  }}</span>
-                </span>
-              </TButton>
-            </TListItem>
-            <p v-if="!filteredEntries.length" class="formula-function-browser__empty" role="status">
-              {{ t("formulaTools.noFunctions") }}
-            </p>
-          </TList>
+            <template #option="{ option }">
+              <span class="formula-function-browser__result-content">
+                <span class="formula-function-browser__result-name">{{ option.label }}</span>
+                <span class="formula-function-browser__result-description">{{
+                  option.description
+                }}</span>
+              </span>
+            </template>
+            <template #empty>
+              <p class="formula-function-browser__empty" role="status">
+                {{ t("formulaTools.noFunctions") }}
+              </p>
+            </template>
+          </OptionList>
         </section>
       </div>
       <section class="formula-function-browser__details narrow-scrollbar">
@@ -244,41 +205,6 @@ function onKeydown(event: KeyboardEvent): void {
   &__results {
     flex: 1;
     min-height: 0;
-    overflow: auto;
-    overscroll-behavior: contain;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
-  }
-  &__categories {
-    --td-comp-size-l: 28px;
-    --td-brand-color: var(--idea-text-primary);
-    --td-brand-color-light: var(--idea-surface-active);
-  }
-  &__results {
-    padding: 4px;
-  }
-  &__result-item {
-    padding: 0;
-  }
-  &__result {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    width: 100%;
-    height: 28px;
-    padding: 4px 8px;
-    text-align: left;
-    border-radius: var(--idea-radius-small);
-    &:hover {
-      background: var(--idea-surface-secondary);
-    }
-    &[aria-selected="true"] {
-      color: var(--idea-text-primary);
-      background: var(--idea-surface-active);
-    }
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
-      outline-offset: -2px;
-    }
   }
   &__result-content {
     display: flex;
