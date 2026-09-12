@@ -25,7 +25,12 @@ import {
   type WorkbookSession,
 } from "@idea10/core/history";
 import { parseCellContent } from "@idea10/core/input";
-import { getActiveSheet, type CellRange, type SheetDimensionAxis } from "@idea10/core/workbook";
+import {
+  getActiveSheet,
+  type CellRange,
+  type SheetDimensionAxis,
+  type SheetEvaluator,
+} from "@idea10/core/workbook";
 import SheetGrid from "../../../../../modules/sheet-grid/components/SheetGrid.vue";
 import SheetCanvasLayer from "../../../../../modules/sheet-grid/components/SheetCanvasLayer.vue";
 import type { AxisMovePayload } from "../../../../../modules/sheet-grid/composables/useAxisMoveDrag";
@@ -46,6 +51,10 @@ export type SheetGridFixtureOptions = {
   showGridLines?: boolean;
   showAxisQuickTools?: boolean;
   beforeMount?: (sheet: ReturnType<typeof getActiveSheet>) => void;
+  evaluator?: (
+    session: WorkbookSession,
+    sheet: ReturnType<typeof getActiveSheet>,
+  ) => SheetEvaluator;
 };
 
 export function mountSheetGrid(options?: SheetGridFixtureOptions) {
@@ -61,6 +70,7 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
     },
     props: {
       sheet,
+      evaluator: options?.evaluator?.(session, sheet),
       initialRowCount: options?.initialRowCount ?? 100,
       initialColumnCount: options?.initialColumnCount ?? 50,
       rowExpansionStep: options?.rowExpansionStep ?? 25,

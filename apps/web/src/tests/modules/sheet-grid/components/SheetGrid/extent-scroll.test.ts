@@ -1,6 +1,13 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { getCellValue, setCellValue, setColumnWidth, setRowHeight } from "@idea10/core/workbook";
+import {
+  getCellValue,
+  setCellContent,
+  setCellValue,
+  setColumnWidth,
+  setRowHeight,
+} from "@idea10/core/workbook";
+import { createWorkbookCalculationSession } from "@idea10/core/formula";
 import {
   activeCell,
   getCanvasLayout,
@@ -35,6 +42,39 @@ function expectExtent(
 }
 
 describe("SheetGrid extent scrolling", () => {
+  test("uses the supplied manual evaluator for dynamic-array spill extent", async () => {
+    let calculation: ReturnType<typeof createWorkbookCalculationSession>;
+    const { sheet, wrapper } = mountCompactGrid({
+      beforeMount(sheet) {
+        setCellValue(sheet, { row: 0, column: 0 }, 1);
+        setCellContent(
+          sheet,
+          { row: 99, column: 0 },
+          { kind: "formula", formula: { source: "=SEQUENCE(A1)" } },
+        );
+      },
+      evaluator(session, sheet) {
+        session.workbook.calculation = {
+          mode: "manual",
+          iterative: false,
+          maxIterations: 100,
+          maxChange: 0.001,
+        };
+        calculation = createWorkbookCalculationSession(session.workbook);
+        const evaluator = calculation.getEvaluator(sheet.id);
+        evaluator.getComputedValue({ row: 99, column: 0 });
+        return evaluator;
+      },
+    });
+    const scroller = wrapper.get<HTMLDivElement>(".sheet-grid__scroller");
+    expectExtent(scroller, 100, 26);
+
+    setCellValue(sheet, { row: 0, column: 0 }, 2);
+    await nextTick();
+    expectExtent(scroller, 100, 26);
+    wrapper.unmount();
+  });
+
   test("does not allocate more rows or columns when native or external scrolling reaches the end", async () => {
     const { wrapper } = mountCompactGrid();
     const scroller = wrapper.get<HTMLDivElement>(".sheet-grid__scroller");

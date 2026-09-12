@@ -271,11 +271,14 @@ const defaultFontFamily = ref(DEFAULT_CELL_FONT_FAMILY);
 const fontMetricsVersion = ref(0);
 const contentExtent = computed(() => {
   const extent = getSheetContentExtent(props.sheet);
-  const evaluator = createSheetEvaluator(props.sheet);
+  const evaluator = props.evaluator ?? createSheetEvaluator(props.sheet);
   for (const [key, cell] of props.sheet.cells) {
     if (cell.content?.kind !== "formula") continue;
-    const [row, column] = key.split(":").map(Number);
-    if (row !== undefined && column !== undefined) evaluator.getComputedValue({ row, column });
+    const separator = key.indexOf(":");
+    const row = Number(key.slice(0, separator));
+    const column = Number(key.slice(separator + 1));
+    if (Number.isInteger(row) && Number.isInteger(column))
+      evaluator.getComputedValue({ row, column });
   }
   for (const projection of evaluator.getSpillProjections?.() ?? []) {
     extent.rowCount = Math.max(extent.rowCount, projection.address.row + 1);
