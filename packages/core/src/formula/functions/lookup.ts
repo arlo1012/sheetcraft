@@ -418,7 +418,8 @@ function coordinate(
   context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
   part: "row" | "column",
 ): FormulaValue {
-  if (context.argumentCount === 0) return formulaError("VALUE");
+  if (context.argumentCount === 0)
+    return context.address ? context.address[part] + 1 : formulaError("VALUE");
   const argument = context.evaluateArgument(0);
   const address =
     argument.kind === "range" ? argument.bounds?.start : argument.address;

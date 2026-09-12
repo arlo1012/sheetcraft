@@ -80,3 +80,13 @@ describe("lookup compatibility arguments", () => {
     );
   });
 });
+
+test("ROW and COLUMN use the formula address when no reference is supplied", () => {
+  const resolver = { resolveCell: () => null, resolveRange: () => [] };
+  expect(
+    evaluateFormula("=ROW()", resolver, { address: { row: 4, column: 27 } }),
+  ).toBe(5);
+  expect(
+    evaluateFormula("=COLUMN()", resolver, { address: { row: 4, column: 27 } }),
+  ).toBe(28);
+});
