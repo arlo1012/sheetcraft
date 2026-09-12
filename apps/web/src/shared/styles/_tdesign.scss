@@ -256,6 +256,10 @@
   font-weight: var(--idea-font-weight-semibold);
 }
 
+.named-range-picker-dialog .t-dialog__footer {
+  padding-top: 0;
+}
+
 .t-tabs__nav-item.t-is-active {
   font-weight: var(--idea-font-weight-medium);
 }

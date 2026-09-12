@@ -20,6 +20,7 @@ import {
   type WorkbookCalculationSettings,
   type Workbook,
 } from "@idea10/core/workbook";
+import { getNamedRangeValue } from "./named-range-values";
 import type { CellEditSession } from "../../shared/cell-editing/useCellEditSession";
 import { useAppI18n } from "../../shared/i18n";
 import { insertFormulaFunction } from "../../shared/formula-editing/formula-function-insertion";
@@ -63,7 +64,18 @@ export function useFormulaToolsController(options: {
   );
   const namedRanges = computed(() => {
     const workbook = options.getWorkbook();
+    const evaluator = namesVisible.value ? options.getSheetEvaluator() : undefined;
     return [...workbook.definedNames.values()].map((definition) => ({
+      ...getNamedRangeValue(
+        workbook.sheets.get(definition.reference.sheetId),
+        definition.reference,
+        workbook.sheets.has(definition.reference.sheetId)
+          ? (evaluator?.forSheet?.(definition.reference.sheetId) ??
+              (definition.reference.sheetId === workbook.activeSheetId ? evaluator : undefined))
+          : undefined,
+      ),
+      comment: definition.comment,
+      kind: "defined" as const,
       id: definition.id,
       name: definition.name,
       scopeSheetId: definition.scopeSheetId,

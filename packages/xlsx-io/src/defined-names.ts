@@ -4,8 +4,14 @@ import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "@idea10/core/workbook";
 import type { CompatibilityReportBuilder } from "./report.js";
 
 const NAME_PATTERN = /^[\p{L}_][\p{L}\p{N}_]*$/u;
+const MAX_DEFINED_NAME_COMMENT_LENGTH = 255;
 
-type XlsxDefinedName = Readonly<{ name: string; localSheetId?: number; reference: string }>;
+type XlsxDefinedName = Readonly<{
+  name: string;
+  localSheetId?: number;
+  comment?: string;
+  reference: string;
+}>;
 
 function decodeXmlEntities(value: string): string {
   return value.replace(/&(#x[0-9a-f]+|#\d+|amp|apos|gt|lt|quot);/gi, (entity, token: string) => {
@@ -27,6 +33,22 @@ function escapeXml(value: string): string {
     (character) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character]!,
   );
+}
+
+/** XML attributes normalize raw whitespace, so preserve textarea content explicitly. */
+function escapeXmlAttribute(value: string): string {
+  return escapeXml(value).replace(/[\t\n\r]/g, (character) => {
+    switch (character) {
+      case "\t":
+        return "&#9;";
+      case "\n":
+        return "&#10;";
+      case "\r":
+        return "&#13;";
+      default:
+        return character;
+    }
+  });
 }
 
 function columnIndex(label: string): number {
@@ -105,6 +127,7 @@ export function readDefinedNames(
     if (
       !name ||
       !NAME_PATTERN.test(name) ||
+      (attrs.comment !== undefined && attrs.comment.length > MAX_DEFINED_NAME_COMMENT_LENGTH) ||
       (localSheetId !== undefined && (!Number.isInteger(localSheetId) || !scopeSheet)) ||
       !reference
     ) {
@@ -124,6 +147,7 @@ export function readDefinedNames(
       id,
       name,
       ...(scopeSheet ? { scopeSheetId: scopeSheet.id } : {}),
+      ...(attrs.comment !== undefined ? { comment: attrs.comment } : {}),
       reference: {
         sheetId: reference.sheetId,
         start: reference.range.start,
@@ -170,7 +194,14 @@ export function collectDefinedNames(
         : sheets.findIndex((sheet) => sheet.id === definition.scopeSheetId);
     const targetSheet = sheets.find((sheet) => sheet.id === definition.reference.sheetId);
     const key = `${definition.scopeSheetId ?? "workbook"}:${definition.name.toUpperCase()}`;
-    if (!NAME_PATTERN.test(definition.name) || scopeIndex === -1 || !targetSheet || keys.has(key)) {
+    if (
+      !NAME_PATTERN.test(definition.name) ||
+      (definition.comment !== undefined &&
+        definition.comment.length > MAX_DEFINED_NAME_COMMENT_LENGTH) ||
+      scopeIndex === -1 ||
+      !targetSheet ||
+      keys.has(key)
+    ) {
       report.add("feature-omitted", "warning", `definedName:${definition.name}`);
       continue;
     }
@@ -178,6 +209,7 @@ export function collectDefinedNames(
     result.push({
       name: definition.name,
       ...(scopeIndex === undefined ? {} : { localSheetId: scopeIndex }),
+      ...(definition.comment !== undefined ? { comment: definition.comment } : {}),
       reference: formatReference(targetSheet, definition.reference),
     });
   }
@@ -195,7 +227,7 @@ export function writeDefinedNames(
   const content = definitions
     .map(
       (definition) =>
-        `<definedName name="${escapeXml(definition.name)}"${definition.localSheetId === undefined ? "" : ` localSheetId="${definition.localSheetId}"`}>${escapeXml(definition.reference)}</definedName>`,
+        `<definedName name="${escapeXml(definition.name)}"${definition.localSheetId === undefined ? "" : ` localSheetId="${definition.localSheetId}"`}${definition.comment === undefined ? "" : ` comment="${escapeXmlAttribute(definition.comment)}"`}>${escapeXml(definition.reference)}</definedName>`,
     )
     .join("");
   const withoutExisting = xml.replace(

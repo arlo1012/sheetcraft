@@ -47,6 +47,18 @@ export type FormulaToolsMessageSchema = {
     newName: string;
     editName: string;
     filterNames: string;
+    comment: string;
+    value: string;
+    searchNames: string;
+    worksheetNames: string;
+    namesWithErrors: string;
+    namesWithoutErrors: string;
+    definedNames: string;
+    tableNames: string;
+    clearNameFilters: string;
+    activeNameFilters: string;
+    noMatchingNames: string;
+
     allNames: string;
     workbookNames: string;
     currentSheetNames: string;

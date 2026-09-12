@@ -20,6 +20,7 @@ const { t } = useAppI18n();
     :close-on-esc-keydown="true"
     :prevent-scroll-through="false"
     :show-overlay="false"
+    dialog-class-name="named-range-picker-dialog"
     width="min(460px, calc(100vw - 32px))"
     :data-cell-edit-session="editSessionId"
     @confirm="emit('confirm')"

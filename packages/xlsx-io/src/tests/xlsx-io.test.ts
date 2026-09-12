@@ -237,6 +237,7 @@ describe("XLSX IO", () => {
     workbook.definedNames.set("sales", {
       id: "sales",
       name: "Sales",
+      comment: "FY26 & plan",
       reference: {
         sheetId: data.id,
         start: { row: 0, column: 0 },
@@ -256,7 +257,9 @@ describe("XLSX IO", () => {
 
     const encoded = await encodeXlsx(workbook);
     const xml = xlsxEntryText(encoded.bytes, "xl/workbook.xml");
-    expect(xml).toContain('<definedName name="Sales">&apos;Data&apos;!$A$1:$A$2</definedName>');
+    expect(xml).toContain(
+      '<definedName name="Sales" comment="FY26 &amp; plan">&apos;Data&apos;!$A$1:$A$2</definedName>',
+    );
     expect(xml).toContain(
       '<definedName name="Sales" localSheetId="1">&apos;Data&apos;!$A$1:$A$1</definedName>',
     );
@@ -270,6 +273,7 @@ describe("XLSX IO", () => {
           {
             id: "xlsx-defined-name-workbook-SALES",
             name: "Sales",
+            comment: "FY26 & plan",
             reference: {
               sheetId: restoredSheets[0]!.id,
               start: { row: 0, column: 0 },
@@ -296,6 +300,29 @@ describe("XLSX IO", () => {
       kind: "formula",
       formula: { source: "=Data!A1+1" },
     });
+  });
+
+  test("roundtrips multiline defined-name comments without XML attribute normalization", async () => {
+    const workbook = createWorkbook({ id: "workbook", sheetId: "data", sheetName: "Data" });
+    const sheet = getActiveSheet(workbook);
+    const comment = "FY26\nPlan\tReviewed\rFinal";
+    workbook.definedNames.set("sales", {
+      id: "sales",
+      name: "Sales",
+      comment,
+      reference: {
+        sheetId: sheet.id,
+        start: { row: 0, column: 0 },
+        end: { row: 0, column: 0 },
+      },
+    });
+
+    const encoded = await encodeXlsx(workbook);
+    expect(xlsxEntryText(encoded.bytes, "xl/workbook.xml")).toContain(
+      'comment="FY26&#10;Plan&#9;Reviewed&#13;Final"',
+    );
+    const restored = await decodeXlsx(encoded.bytes);
+    expect([...restored.workbook.definedNames.values()][0]?.comment).toBe(comment);
   });
 
   test("roundtrips canonical number formats and representable borders", async () => {

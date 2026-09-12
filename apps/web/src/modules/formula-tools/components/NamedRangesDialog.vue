@@ -5,6 +5,7 @@ import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
+import type { SelectValue } from "tdesign-vue-next/es/select/type";
 import { BaseTable as TTable } from "tdesign-vue-next/es/table";
 import type {
   BaseTableCol,
@@ -15,6 +16,11 @@ import type {
 import { useAppI18n } from "../../../shared/i18n";
 import type { NamedRangeDraft, NamedRangeRow, NamedRangeSheet } from "../named-range-types";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
+import {
+  matchesNamedRangeFilters,
+  updateNamedRangeFilters,
+  type NamedRangeFilter,
+} from "../named-range-filters";
 import NamedRangeEditorDialog from "./NamedRangeEditorDialog.vue";
 
 type NameTableRow = NamedRangeRow & { scopeLabel: string };
@@ -44,38 +50,59 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 const contentRef = ref<HTMLElement | null>(null);
-const filterPopupProps = { attach: () => contentRef.value ?? document.body };
-const nameFilter = ref("all");
+const filterPopupProps = {
+  attach: () => contentRef.value ?? document.body,
+  overlayInnerStyle: { minWidth: "250px" },
+};
+const nameFilters = ref<NamedRangeFilter[]>([]);
+const searchQuery = ref("");
 const selectedId = ref<string | undefined>();
 const editorDraft = ref<NamedRangeDraft>();
 const referenceDraft = ref("");
 const selectedRange = computed(() => props.ranges.find((range) => range.id === selectedId.value));
-const filteredRanges = computed<NameTableRow[]>(() =>
-  props.ranges
-    .filter((range) =>
-      nameFilter.value === "workbook"
-        ? range.scopeSheetId === undefined
-        : nameFilter.value === "sheet"
-          ? range.scopeSheetId === props.activeSheetId
-          : true,
-    )
+const filteredRanges = computed<NameTableRow[]>(() => {
+  const query = searchQuery.value.trim().toLocaleLowerCase();
+  return props.ranges
     .map((range) => ({
       ...range,
       scopeLabel: range.scopeSheetId
         ? (props.sheets.find((sheet) => sheet.id === range.scopeSheetId)?.name ??
           range.scopeSheetId)
         : t("formulaTools.workbook"),
-    })),
-);
+    }))
+    .filter((range) => matchesNamedRangeFilters(range, nameFilters.value))
+    .filter(
+      (range) =>
+        !query ||
+        [range.name, range.value, range.reference, range.scopeLabel, range.comment].some((value) =>
+          value?.toLocaleLowerCase().includes(query),
+        ),
+    );
+});
 const filterOptions = computed(() => [
-  { value: "all", label: t("formulaTools.allNames") },
+  { value: "sheet", label: t("formulaTools.worksheetNames") },
   { value: "workbook", label: t("formulaTools.workbookNames") },
-  { value: "sheet", label: t("formulaTools.currentSheetNames"), disabled: !props.activeSheetId },
+  { value: "errors", label: t("formulaTools.namesWithErrors") },
+  { value: "no-errors", label: t("formulaTools.namesWithoutErrors") },
+  { value: "defined", label: t("formulaTools.definedNames") },
+  { value: "table", label: t("formulaTools.tableNames") },
 ]);
+function changeFilters(value: SelectValue): void {
+  const next = Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+  nameFilters.value = updateNamedRangeFilters(nameFilters.value, next);
+}
+function clearFilters(): void {
+  nameFilters.value = [];
+  searchQuery.value = "";
+}
 const columns = computed<BaseTableCol[]>(() => [
-  { colKey: "name", title: t("formulaTools.name"), width: 170, ellipsis: true },
+  { colKey: "name", title: t("formulaTools.name"), width: 140, ellipsis: true },
+  { colKey: "value", title: t("formulaTools.value"), width: 140, ellipsis: true },
   { colKey: "reference", title: t("formulaTools.reference"), ellipsis: true },
-  { colKey: "scopeLabel", title: t("formulaTools.scope"), width: 140, ellipsis: true },
+  { colKey: "scopeLabel", title: t("formulaTools.scope"), width: 110, ellipsis: true },
+  { colKey: "comment", title: t("formulaTools.comment"), width: 180, ellipsis: true },
 ]);
 const rowAttributes: TableRowAttributes<TableRowData> = ({ row, rowIndex }) => ({
   "data-named-range": String(row.id),
@@ -104,6 +131,7 @@ function editRange(range = selectedRange.value): void {
     name: range.name,
     scopeSheetId: range.scopeSheetId,
     reference: range.reference,
+    comment: range.comment,
   };
 }
 function editRow({ row }: RowEventContext<TableRowData>): void {
@@ -130,7 +158,7 @@ watch(
   () => props.visible,
   () => {
     selectedId.value = undefined;
-    nameFilter.value = "all";
+    clearFilters();
     editorDraft.value = undefined;
     resetReference();
   },
@@ -142,7 +170,7 @@ watch(
     v-if="visible"
     :visible="visible && !suspended"
     :header="t('formulaTools.namedRanges')"
-    width="min(720px, calc(100vw - 32px))"
+    width="min(920px, calc(100vw - 32px))"
     placement="center"
     :close-on-overlay-click="false"
     :close-on-esc-keydown="!editorDraft"
@@ -175,14 +203,39 @@ watch(
             >{{ t("formulaTools.deleteName") }}</TButton
           >
         </div>
-        <TSelect
-          v-model="nameFilter"
-          class="named-ranges-dialog__filter"
-          :options="filterOptions"
-          :popup-props="filterPopupProps"
-          :aria-label="t('formulaTools.filterNames')"
-          data-name-filter
-        />
+        <div class="named-ranges-dialog__filters">
+          <TInput
+            v-model="searchQuery"
+            class="named-ranges-dialog__search"
+            clearable
+            :placeholder="t('formulaTools.searchNames')"
+            :aria-label="t('formulaTools.searchNames')"
+            data-name-search
+          />
+          <TSelect
+            :value="nameFilters"
+            class="named-ranges-dialog__filter"
+            multiple
+            clearable
+            :options="filterOptions"
+            :popup-props="filterPopupProps"
+            :placeholder="t('formulaTools.allNames')"
+            :value-display="
+              nameFilters.length
+                ? t('formulaTools.activeNameFilters', { count: nameFilters.length })
+                : undefined
+            "
+            :aria-label="t('formulaTools.filterNames')"
+            data-name-filter
+            @change="changeFilters"
+          >
+            <template #panelTopContent>
+              <TButton variant="text" block data-clear-name-filters @click="clearFilters">
+                {{ t("formulaTools.clearNameFilters") }}
+              </TButton>
+            </template>
+          </TSelect>
+        </div>
       </div>
       <TableHeightWrapper v-slot="{ height }">
         <TTable
@@ -200,7 +253,13 @@ watch(
           :bordered="false"
           resizable
           hover
-          :empty="t('formulaTools.noNames')"
+          :empty="
+            t(
+              searchQuery || nameFilters.length
+                ? 'formulaTools.noMatchingNames'
+                : 'formulaTools.noNames',
+            )
+          "
           :aria-label="t('formulaTools.namedRanges')"
           @active-change="selectRows"
           @row-dblclick="editRow"
@@ -267,7 +326,7 @@ watch(
   &__content {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
-    height: min(440px, calc(100dvh - 180px));
+    height: min(340px, calc(100dvh - 180px));
     min-height: 0;
     gap: 12px;
     color: var(--idea-text-primary);
@@ -282,8 +341,19 @@ watch(
     display: flex;
     gap: 8px;
   }
+  &__filters {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    min-width: 0;
+  }
+  &__search {
+    width: 210px;
+    min-width: 100px;
+  }
   &__filter {
-    width: 170px;
+    width: 190px;
+    flex-shrink: 0;
   }
   &__reference {
     display: grid;
@@ -298,9 +368,15 @@ watch(
     gap: 6px;
   }
 }
-@media (max-width: 480px) {
+@media (max-width: 760px) {
   .named-ranges-dialog__toolbar {
     flex-wrap: wrap;
+  }
+  .named-ranges-dialog__filters {
+    width: 100%;
+  }
+  .named-ranges-dialog__search {
+    flex: 1;
   }
 }
 </style>

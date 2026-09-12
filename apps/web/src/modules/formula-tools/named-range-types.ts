@@ -3,6 +3,10 @@ export type NamedRangeRow = Readonly<{
   name: string;
   scopeSheetId?: string;
   reference: string;
+  comment?: string;
+  value?: string;
+  hasError?: boolean;
+  kind?: "defined" | "table";
 }>;
 
 export type NamedRangeDraft = Readonly<{
@@ -10,6 +14,7 @@ export type NamedRangeDraft = Readonly<{
   name: string;
   scopeSheetId?: string;
   reference: string;
+  comment?: string;
 }>;
 
 export type NamedRangeSheet = Readonly<{ id: string; name: string }>;

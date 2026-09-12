@@ -14,10 +14,12 @@ export type DefinedNameDraft = {
   id?: string;
   name: string;
   scopeSheetId?: string;
+  comment?: string;
   reference: string;
 };
 
 const NAME_PATTERN = /^[\p{L}_][\p{L}\p{N}_]*$/u;
+const MAX_DEFINED_NAME_COMMENT_LENGTH = 255;
 
 function isName(value: unknown): value is string {
   return (
@@ -29,11 +31,17 @@ function isName(value: unknown): value is string {
   );
 }
 
+function isComment(value: unknown): value is string {
+  return typeof value === "string" && value.length <= MAX_DEFINED_NAME_COMMENT_LENGTH;
+}
+
 export function createUpsertDefinedNameCommand(
   workbook: Workbook,
   draft: DefinedNameDraft,
 ): UpsertDefinedNameCommand {
   if (!isName(draft.name)) throw invalidCommandPayload("name", draft.name);
+  if (draft.comment !== undefined && !isComment(draft.comment))
+    throw invalidCommandPayload("comment", draft.comment);
   if (draft.scopeSheetId !== undefined && !workbook.sheets.has(draft.scopeSheetId))
     throw invalidCommandPayload("scopeSheetId", draft.scopeSheetId);
   const existing = draft.id ? workbook.definedNames.get(draft.id) : undefined;
@@ -66,6 +74,11 @@ export function createUpsertDefinedNameCommand(
       id,
       name: draft.name,
       ...(draft.scopeSheetId ? { scopeSheetId: draft.scopeSheetId } : {}),
+      ...(draft.comment !== undefined
+        ? { comment: draft.comment }
+        : existing?.comment !== undefined
+          ? { comment: existing.comment }
+          : {}),
       reference: {
         sheetId: reference.target.sheetId,
         start: reference.target.range.start,
@@ -91,6 +104,7 @@ export function applyUpsertDefinedNameCommand(
   if (
     !definition.id ||
     !isName(definition.name) ||
+    (definition.comment !== undefined && !isComment(definition.comment)) ||
     !workbook.sheets.has(definition.reference.sheetId)
   )
     throw invalidCommandPayload("definition", definition);
@@ -284,6 +298,7 @@ function cloneDefinedName(definition: DefinedName): DefinedName {
     id: definition.id,
     name: definition.name,
     ...(definition.scopeSheetId ? { scopeSheetId: definition.scopeSheetId } : {}),
+    ...(definition.comment !== undefined ? { comment: definition.comment } : {}),
     reference: {
       sheetId: definition.reference.sheetId,
       start: { ...definition.reference.start },

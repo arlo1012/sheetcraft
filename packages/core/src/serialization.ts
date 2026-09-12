@@ -644,6 +644,9 @@ function parseDefinedNames(value: unknown, sheetIds: Set<string>): Map<string, D
         : asIdentifier(record.scopeSheetId, `${path}.scopeSheetId`);
     if (scopeSheetId && !sheetIds.has(scopeSheetId))
       return fail(`${path}.scopeSheetId`, "Sheet does not exist.");
+    const comment = record.comment;
+    if (comment !== undefined && (typeof comment !== "string" || comment.length > 255))
+      return fail(`${path}.comment`, "Expected a string no longer than 255 characters.");
     const reference = asRecord(record.reference, `${path}.reference`);
     const referenceSheetId = asIdentifier(reference.sheetId, `${path}.reference.sheetId`);
     if (!sheetIds.has(referenceSheetId))
@@ -652,6 +655,7 @@ function parseDefinedNames(value: unknown, sheetIds: Set<string>): Map<string, D
       id,
       name,
       ...(scopeSheetId ? { scopeSheetId } : {}),
+      ...(comment !== undefined ? { comment } : {}),
       reference: {
         sheetId: referenceSheetId,
         start: parseAddress(reference.start, `${path}.reference.start`),

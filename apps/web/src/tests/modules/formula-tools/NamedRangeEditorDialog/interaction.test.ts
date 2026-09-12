@@ -84,3 +84,15 @@ test("keeps the current reference when selection is cancelled", async () => {
 
   expect(reference.element.value).toBe("=Budget!$C$1");
 });
+
+test("saves an edited multiline comment with the name draft", async () => {
+  const wrapper = mountEditor({ name: "Revenue", reference: "=Budget!$C$1" });
+  await wrapper.get("textarea").setValue("Forecast\nReviewed");
+  await wrapper.get("form").trigger("submit");
+  await flushPromises();
+  expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({
+    name: "Revenue",
+    reference: "=Budget!$C$1",
+    comment: "Forecast\nReviewed",
+  });
+});

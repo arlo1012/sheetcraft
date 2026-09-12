@@ -6,6 +6,7 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
 import { useAppI18n } from "../../../shared/i18n";
 import type { NamedRangeDraft, NamedRangeSheet } from "../named-range-types";
 
@@ -29,7 +30,7 @@ const emit = defineEmits<{
   close: [];
   save: [draft: NamedRangeDraft];
 }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const contentRef = ref<HTMLElement | null>(null);
 const workbookScopeValue = "__idea10_workbook_scope__";
 const scopePopupProps = { attach: () => contentRef.value ?? document.body };
@@ -104,7 +105,13 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
       class="named-range-editor-dialog__content"
       :data-cell-edit-session="editSessionId"
     >
-      <TForm class="named-range-editor-dialog__form" layout="vertical" @submit="save">
+      <TForm
+        class="named-range-editor-dialog__form"
+        layout="vertical"
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 64 : 80"
+        @submit="save"
+      >
         <TFormItem :label="t('formulaTools.name')">
           <TInput
             v-model="draft.name"
@@ -142,6 +149,14 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
               </TButton>
             </template>
           </TInput>
+        </TFormItem>
+        <TFormItem :label="t('formulaTools.comment')">
+          <TTextarea
+            v-model="draft.comment"
+            :aria-label="t('formulaTools.comment')"
+            :autosize="{ minRows: 1, maxRows: 2 }"
+            :maxlength="255"
+          />
         </TFormItem>
       </TForm>
     </div>

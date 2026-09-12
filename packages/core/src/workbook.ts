@@ -178,6 +178,8 @@ export type DefinedName = {
   id: string;
   name: string;
   scopeSheetId?: string;
+  /** Optional user-facing description for the defined name. */
+  comment?: string;
   reference: CellRange & { sheetId: string };
 };
 
