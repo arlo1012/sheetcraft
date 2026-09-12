@@ -120,6 +120,10 @@ export function useDragSelection(options: {
     if (!dragSelection) {
       return;
     }
+    if ((event.buttons & 1) === 0) {
+      stop();
+      return;
+    }
     dragSelection.pointerX = event.clientX;
     dragSelection.pointerY = event.clientY;
     if (
