@@ -55,6 +55,7 @@ export type SheetOverlayPalette = Readonly<{
   mutedText: string;
   panel: string;
   inverseText: string;
+  iconHover: string;
   formulaReferenceColors: readonly string[];
   readingColor?: string;
 }>;

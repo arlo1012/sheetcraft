@@ -3,6 +3,8 @@ import type { SheetViewportRangeFragment } from "@idea10/sheet-engine/viewport-l
 import type { SheetRenderFrame } from "./sheet-render-frame";
 import type { FreezeHandleTarget, SheetOverlayPalette, SheetOverlayState } from "./overlay-types";
 
+import { paintGripIcon } from "./grip-painter";
+
 const BODY_PANES = ["topLeft", "top", "left", "body"] as const;
 
 type Edge = "top" | "right" | "bottom" | "left";
@@ -201,29 +203,6 @@ function isHandleActive(state: SheetOverlayState, target: FreezeHandleTarget): b
   );
 }
 
-function paintGrip(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  horizontal: boolean,
-): void {
-  context.save();
-  context.lineWidth = 1.5;
-  context.lineCap = "round";
-  for (const offset of [-3, 0, 3]) {
-    context.beginPath();
-    if (horizontal) {
-      context.moveTo(x - 3, y + offset);
-      context.lineTo(x + 3, y + offset);
-    } else {
-      context.moveTo(x + offset, y - 3);
-      context.lineTo(x + offset, y + 3);
-    }
-    context.stroke();
-  }
-  context.restore();
-}
-
 function paintFreezeHandles(
   context: CanvasRenderingContext2D,
   frame: SheetRenderFrame,
@@ -242,18 +221,14 @@ function paintFreezeHandles(
     const active = isHandleActive(state, target);
     context.save();
     if (active) {
-      context.fillStyle = palette.actionPrimary;
-      context.globalAlpha = 0.12;
-      context.fillRect(point.x - 8, point.y - 8, 16, 16);
-      context.globalAlpha = 1;
+      context.fillStyle = palette.iconHover;
+      context.beginPath();
+      context.roundRect(point.x - 8, point.y - 8, 16, 16, 3);
+      context.fill();
     }
-    context.strokeStyle = disabled
-      ? palette.mutedText
-      : active
-        ? palette.actionPrimary
-        : palette.mutedText;
+    const color = disabled ? palette.mutedText : active ? palette.actionPrimary : palette.mutedText;
     context.globalAlpha = disabled ? 0.45 : 1;
-    paintGrip(context, point.x, point.y, horizontal);
+    paintGripIcon(context, point.x, point.y, horizontal, color);
     context.restore();
   }
   const rowBoundary = frame.body.y + frame.layout.frozenSize.height;

@@ -26,6 +26,7 @@ function createContext() {
     fill: vi.fn(),
     setLineDash: vi.fn(),
     roundRect: vi.fn(),
+    arc: vi.fn(),
     fillText: vi.fn(),
     measureText: vi.fn(() => ({ width: 80 })),
   } as unknown as CanvasRenderingContext2D;
@@ -36,6 +37,7 @@ const palette: SheetOverlayPalette = {
   mutedText: "#64748b",
   panel: "#ffffff",
   inverseText: "#ffffff",
+  iconHover: "rgb(32 36 44 / 12%)",
   formulaReferenceColors: ["#ef4444", "#22c55e"],
 };
 

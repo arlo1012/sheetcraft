@@ -35,6 +35,7 @@ export function useSheetRenderEnvironment(getRoot: () => HTMLElement | null) {
       mutedText: "#666",
       panel: "#fff",
       inverseText: "#fff",
+      iconHover: "rgb(32 36 44 / 12%)",
       formulaReferenceColors: referenceColors,
     },
   });
@@ -58,12 +59,14 @@ export function useSheetRenderEnvironment(getRoot: () => HTMLElement | null) {
       cells: { background, text, gridLine: color("border-subtle", "#e5e7eb"), mutedText },
       headers: {
         background: color("surface-secondary", "#f5f6f7"),
+        hover: color("surface-hover", "#eceef0"),
         border: color("border-control", "#dcdfe4"),
         subtleBorder: color("border-subtle", "#e7e9ed"),
         text,
         mutedText,
+        cornerText: color("text-muted", "#666"),
         action,
-        actionSubtle: color("action-subtle", "#e8f0ff"),
+        actionSubtle: color("action-primary-subtle", "#e8f0ff"),
         actionFocus: color("action-focus", "#dce8ff"),
         panel: background,
         font: `400 12px ${fontFamily}`,
@@ -73,6 +76,7 @@ export function useSheetRenderEnvironment(getRoot: () => HTMLElement | null) {
         mutedText,
         panel: background,
         inverseText: color("text-inverse", "#fff"),
+        iconHover: color("icon-button-hover-bg", "rgb(32 36 44 / 12%)"),
         formulaReferenceColors: referenceColors.map((fallback, index) =>
           color(`formula-reference-${index}`, fallback),
         ),

@@ -3,6 +3,7 @@ import type { SheetDimensionAxis } from "@idea10/core/workbook";
 import type { SelectionMode } from "@idea10/sheet-engine/selection";
 import type { Rect } from "@idea10/sheet-engine/geometry";
 import type { HeaderItem, HeaderPane, SheetRenderFrame } from "./sheet-render-frame";
+import { paintGripIcon } from "./grip-painter";
 
 export type HeaderFocus = Readonly<{
   axis: SheetDimensionAxis | "corner";
@@ -34,10 +35,12 @@ export type HeaderQuickToolsState = Readonly<{
 /** Colors and text metrics read once by the surface from its computed style. */
 export type SheetHeaderPalette = Readonly<{
   background: string;
+  hover: string;
   border: string;
   subtleBorder: string;
   text: string;
   mutedText: string;
+  cornerText: string;
   action: string;
   actionSubtle: string;
   actionFocus: string;
@@ -47,10 +50,12 @@ export type SheetHeaderPalette = Readonly<{
 
 export const DEFAULT_SHEET_HEADER_PALETTE: SheetHeaderPalette = {
   background: "#f5f6f7",
+  hover: "#eceef0",
   border: "#dcdfe4",
   subtleBorder: "#e7e9ed",
   text: "#24272b",
   mutedText: "#60656d",
+  cornerText: "#60656d",
   action: "#0052d9",
   actionSubtle: "#e8f0ff",
   actionFocus: "#dce8ff",
@@ -143,32 +148,6 @@ function paintPlus(
   context.restore();
 }
 
-function paintGrip(
-  context: CanvasRenderingContext2D,
-  axis: SheetDimensionAxis,
-  x: number,
-  y: number,
-  palette: SheetHeaderPalette,
-): void {
-  context.save();
-  context.strokeStyle = palette.action;
-  context.lineWidth = 1.25;
-  context.lineCap = "round";
-  const offsets = [-3, 0, 3];
-  for (const offset of offsets) {
-    context.beginPath();
-    if (axis === "row") {
-      context.moveTo(x + offset, y - 3);
-      context.lineTo(x + offset, y + 3);
-    } else {
-      context.moveTo(x - 3, y + offset);
-      context.lineTo(x + 3, y + offset);
-    }
-    context.stroke();
-  }
-  context.restore();
-}
-
 function paintFocus(
   context: CanvasRenderingContext2D,
   rect: Rect,
@@ -215,14 +194,14 @@ function paintAxisItem(
       ? {
           x: gutter,
           y: item.offset,
-          width: Math.max(0, frame.headerSize.width - gutter),
+          width: Math.max(0, frame.headerSize.width - gutter - 1),
           height: item.size,
         }
       : {
           x: item.offset,
           y: gutter,
           width: item.size,
-          height: Math.max(0, frame.headerSize.height - gutter),
+          height: Math.max(0, frame.headerSize.height - gutter - 1),
         };
   if (rect.width <= 0 || rect.height <= 0) return;
   const axisSelected = isAxisSelected(axis, item.index, selection);
@@ -234,7 +213,7 @@ function paintAxisItem(
       : palette.background;
   context.fillRect(rect.x, rect.y, rect.width, rect.height);
   context.fillStyle = selected ? palette.action : palette.mutedText;
-  context.font = selected ? state.palette.font.replace(/^400/, "500") : state.palette.font;
+  context.font = axisSelected ? state.palette.font.replace(/^400/, "500") : state.palette.font;
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText(
@@ -248,31 +227,30 @@ function paintAxisItem(
   if (axis === "row") {
     const y = item.offset + item.size - 0.5;
     context.moveTo(rect.x, y);
-    context.lineTo(frame.headerSize.width, y);
-    if (axisSelected) {
-      context.strokeStyle = palette.action;
-      context.lineWidth = 2;
-      context.moveTo(frame.headerSize.width - 1, rect.y);
-      context.lineTo(frame.headerSize.width - 1, rect.y + rect.height);
-    }
+    context.lineTo(rect.x + rect.width, y);
   } else {
     const x = item.offset + item.size - 0.5;
     context.moveTo(x, rect.y);
-    context.lineTo(x, frame.headerSize.height);
-    if (axisSelected) {
-      context.strokeStyle = palette.action;
-      context.lineWidth = 2;
-      context.moveTo(rect.x, frame.headerSize.height - 1);
-      context.lineTo(rect.x + rect.width, frame.headerSize.height - 1);
-    }
+    context.lineTo(x, rect.y + rect.height);
   }
   context.stroke();
+  if (selected) {
+    context.fillStyle = palette.action;
+    if (axis === "row") context.fillRect(rect.x + rect.width - 2, rect.y, 2, rect.height);
+    else context.fillRect(rect.x, rect.y + rect.height - 2, rect.width, 2);
+  }
 
   const revealed = quickTools.enabled && isRevealedItem(axis, item.index, hovered, focused);
   if (revealed) {
     const gripX = axis === "row" ? gutter / 2 : item.offset + item.size / 2;
     const gripY = axis === "row" ? item.offset + item.size / 2 : gutter / 2;
-    paintGrip(context, axis, gripX, gripY, palette);
+    paintGripIcon(
+      context,
+      gripX,
+      gripY,
+      axis === "column",
+      selected ? palette.action : palette.mutedText,
+    );
     const hoverIsBoundary = hovered?.axis === axis && hovered.action === "quickInsert";
     if (shouldShowBoundary(axis, item.index, true, selection)) {
       paintPlus(
@@ -316,7 +294,7 @@ export function paintSheetHeaders(
   context: CanvasRenderingContext2D,
   state: HeaderPaintState,
 ): void {
-  const { frame, palette, quickTools, selection, focused } = state;
+  const { frame, palette, quickTools, selection, focused, hovered } = state;
   const { width, height } = frame.size;
   context.save();
   context.fillStyle = palette.background;
@@ -331,21 +309,28 @@ export function paintSheetHeaders(
     width: Math.max(0, frame.headerSize.width - (quickTools.enabled ? quickTools.gutter : 0)),
     height: Math.max(0, frame.headerSize.height - (quickTools.enabled ? quickTools.gutter : 0)),
   };
-  context.fillStyle = selection.mode === "all" ? palette.actionFocus : palette.background;
+  context.fillStyle =
+    selection.mode === "all"
+      ? palette.actionFocus
+      : hovered?.axis === "corner"
+        ? palette.hover
+        : palette.background;
   context.fillRect(corner.x, corner.y, corner.width, corner.height);
   context.strokeStyle = palette.border;
   context.lineWidth = 1;
   context.beginPath();
-  context.moveTo(frame.headerSize.width - 0.5, 0);
-  context.lineTo(frame.headerSize.width - 0.5, frame.headerSize.height);
-  context.moveTo(0, frame.headerSize.height - 0.5);
-  context.lineTo(frame.headerSize.width, frame.headerSize.height - 0.5);
+  context.moveTo(frame.headerSize.width - 0.5, corner.y);
+  context.lineTo(frame.headerSize.width - 0.5, height);
+  context.moveTo(corner.x, frame.headerSize.height - 0.5);
+  context.lineTo(width, frame.headerSize.height - 0.5);
   context.stroke();
-  context.fillStyle = selection.mode === "all" ? palette.action : palette.mutedText;
+  context.fillStyle = selection.mode === "all" ? palette.action : palette.cornerText;
   context.beginPath();
-  context.moveTo(corner.x + corner.width - 8, corner.y + corner.height - 8);
-  context.lineTo(corner.x + corner.width, corner.y + corner.height - 8);
-  context.lineTo(corner.x + corner.width, corner.y + corner.height);
+  const triangleRight = corner.x + corner.width - 7;
+  const triangleBottom = corner.y + corner.height - 7;
+  context.moveTo(triangleRight, triangleBottom - 8);
+  context.lineTo(triangleRight, triangleBottom);
+  context.lineTo(triangleRight - 8, triangleBottom);
   context.closePath();
   context.fill();
   if (focused?.axis === "corner") paintFocus(context, corner, palette);
