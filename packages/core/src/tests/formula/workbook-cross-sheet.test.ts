@@ -46,9 +46,9 @@ describe("workbook formula evaluation", () => {
     insertSheet(workbook, data);
     setCellContent(data, { row: 0, column: 0 }, { kind: "literal", value: 1 });
     for (let row = 0; row < 15_000; row += 1) {
-      const source = row === 0 ? "=Data!A1" : `=Sheet1!A${row}`;
+      const source = row === 0 ? "=IF(TRUE,Data!A1,0)" : `=IF(TRUE,Sheet1!A${row},0)`;
       setCellContent(data, { row: row + 1, column: 0 }, { kind: "formula", formula: { source } });
-      setCellContent(getActiveSheet(workbook), { row, column: 0 }, { kind: "formula", formula: { source: `=Data!A${row + 2}` } });
+      setCellContent(getActiveSheet(workbook), { row, column: 0 }, { kind: "formula", formula: { source: `=IF(TRUE,Data!A${row + 2},0)` } });
     }
     expect(createWorkbookEvaluator(workbook, data.id).getComputedValue({ row: 15_000, column: 0 })).toBe(1);
   });

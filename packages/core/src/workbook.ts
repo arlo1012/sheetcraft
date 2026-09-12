@@ -655,7 +655,7 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
     if (content.kind === "image") return createFormulaError("VALUE");
     return resolve(targetSheetId, address);
   };
-  const resolveDirectReferenceChain = (
+  const resolveLinearDependencyChain = (
     initialSheetId: string,
     initialAddress: CellAddress,
   ): { handled: boolean; value: FormulaValue } => {
@@ -677,7 +677,8 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
         return { handled: path.length > 0, value };
       }
       const ast = getFormulaAst(content.formula.source);
-      if (ast?.expression.kind !== "reference") {
+      const dependency = ast ? linearDependency(ast.expression, currentSheetId) : null;
+      if (!dependency) {
         if (path.length === 0) return { handled: false, value: createFormulaError("VALUE") };
         const value = valueFor(currentSheetId, currentAddress);
         for (const item of path) memo.set(item.key, value);
@@ -690,15 +691,8 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
       }
       path.push({ sheetId: currentSheetId, address: currentAddress, key });
       pathKeys.add(key);
-      const next = ast.expression.reference;
-      const nextSheetId = resolveSheetId(next.sheetName, currentSheetId);
-      if (!nextSheetId) {
-        const value = createFormulaError("REF");
-        for (const item of path) memo.set(item.key, value);
-        return { handled: true, value };
-      }
-      currentSheetId = nextSheetId;
-      currentAddress = { row: next.row, column: next.column };
+      currentSheetId = dependency.sheetId;
+      currentAddress = dependency.address;
     }
   };
   const resolve = (currentSheetId: string, address: CellAddress): FormulaValue => {
@@ -710,7 +704,7 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
     const currentSheet = workbook.sheets.get(currentSheetId);
     const content = currentSheet?.cells.get(createCellKey(address))?.content;
     if (!content || content.kind !== "formula") return valueFor(currentSheetId, address);
-    const direct = resolveDirectReferenceChain(currentSheetId, address);
+    const direct = resolveLinearDependencyChain(currentSheetId, address);
     if (direct.handled) return direct.value;
     state.add(key);
     const value = evaluateFormula(content.formula.source, {
@@ -739,6 +733,30 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
     return value;
   };
   return { getComputedValue: (address) => valueFor(sheetId, address) };
+
+  function linearDependency(
+    expression: FormulaExpression,
+    fromSheetId: string,
+  ): { sheetId: string; address: CellAddress } | null {
+    let reference = expression.kind === "reference" ? expression.reference : null;
+    if (
+      expression.kind === "function" &&
+      expression.name.toUpperCase() === "IF" &&
+      expression.args[0]?.kind === "boolean"
+    ) {
+      const selected = expression.args[0].value ? expression.args[1] : expression.args[2];
+      reference = selected?.kind === "reference" ? selected.reference : null;
+    }
+    if (expression.kind === "identifier") {
+      const defined = getDefinedName(workbook, expression.name, fromSheetId);
+      reference = defined && defined.reference.start.row === defined.reference.end.row && defined.reference.start.column === defined.reference.end.column
+        ? { row: defined.reference.start.row, column: defined.reference.start.column, sheetName: workbook.sheets.get(defined.reference.sheetId)?.name, rowAbsolute: false, columnAbsolute: false, start: 0, end: 0 }
+        : null;
+    }
+    if (!reference) return null;
+    const targetSheetId = resolveSheetId(reference.sheetName, fromSheetId);
+    return targetSheetId ? { sheetId: targetSheetId, address: { row: reference.row, column: reference.column } } : null;
+  }
 }
 
 export function getCellComputedValue(sheet: Sheet, address: CellAddress): FormulaValue {
