@@ -66,6 +66,7 @@ export type FormulaToolsMessageSchema = {
     saveReference: string;
     close: string;
     name: string;
+    nameCannotStartWithNumber: string;
     scope: string;
     workbook: string;
     reference: string;

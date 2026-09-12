@@ -71,6 +71,7 @@ export const formulaToolsZhCN = {
     saveReference: "保存引用",
     close: "关闭",
     name: "名称",
+    nameCannotStartWithNumber: "名称不能以数字开头",
     scope: "作用域",
     workbook: "工作簿",
     reference: "引用位置",

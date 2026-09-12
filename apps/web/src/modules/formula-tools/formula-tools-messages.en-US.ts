@@ -71,6 +71,7 @@ export const formulaToolsEnUS = {
     saveReference: "Save reference",
     close: "Close",
     name: "Name",
+    nameCannotStartWithNumber: "Names cannot start with a number.",
     scope: "Scope",
     workbook: "Workbook",
     reference: "Refers to",
