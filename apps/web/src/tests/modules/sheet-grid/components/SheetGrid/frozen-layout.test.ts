@@ -77,7 +77,7 @@ describe("SheetGrid frozen viewport", () => {
   test("keeps the canvas event and border surfaces fixed while viewport panes virtualize", () => {
     const { wrapper } = mountSheetGrid();
     const layout = getCanvasLayout(wrapper);
-    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(2);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(1);
     expect(layout.panes.body.rows.length).toBeLessThan(100);
     expect(layout.panes.body.columns.length).toBeLessThan(50);
   });

@@ -1,11 +1,10 @@
 # Sheet Canvas renderer
 
-The Sheet is one rendering and input surface. `SheetSurface.vue` owns two visible
-canvases: cell content, and the interactive overlay. An offscreen border bitmap
-preserves explicit borders above selection fills without rebuilding border paths
-on every selection change. Row and column headings, the select-all corner,
-selection/reference/clipboard outlines, reading highlights, frozen lines, image
-pixels and operation previews are painted by this surface.
+The Sheet is one rendering and input surface. `SheetSurface.vue` owns one canvas
+for cell content, borders, headings, selection/reference/clipboard outlines,
+reading highlights, frozen lines, image pixels and operation previews. Rendering
+uses one ordered pass without content/overlay canvases or an offscreen border
+bitmap. Native editing and menus remain DOM adapters.
 
 ## Ownership and invalidation
 
@@ -20,16 +19,18 @@ once per document change. Viewport scene preparation never scans all formulas.
 panes and header items; header hit testing never resolves merged-cell anchors.
 Editor clipping, image fragments and overlay ranges use the same engine layout.
 
-The centralized scheduler coalesces content, borders and overlay invalidation:
+The centralized scheduler coalesces all invalidations into one animation-frame
+paint. Selection changes reuse prepared cell presentations and border plans, but
+repaint the visible surface so previous selection pixels are removed:
 
 | Change                                                         | Work                                        |
 | -------------------------------------------------------------- | ------------------------------------------- |
-| Selection, header hover/focus, reference/copy state            | Overlay paint only                          |
-| Image drag/resize/crop or decoded floating image               | Overlay paint only                          |
+| Selection, header hover/focus, reference/copy state            | Repaint with existing scene and border plan |
+| Image drag/resize/crop or decoded floating image               | Repaint with existing scene and border plan |
 | Scroll inside current visible row/column membership            | Repaint with existing scene and border plan |
 | Visible membership, dimensions, hidden rows, document revision | Rebuild visible scene and border plan       |
 | Locale, date system, loaded fonts                              | Rebuild cell presentation                   |
-| Theme, DPR, zoom                                               | Refresh palette/backing bitmaps and repaint |
+| Theme, DPR, zoom                                               | Refresh palette/backing bitmap and repaint  |
 
 The backing density is device pixel ratio multiplied by Sheet zoom. Theme and DPR
 observation have one per-sheet lifecycle. Text measurement and automatic row
@@ -83,9 +84,18 @@ pause following each gesture is included in elapsed time; mouse-release work is
 included in the drag's long-task total. These are local development-build
 diagnostics, not a cross-device performance promise.
 
-## Unified surface verification
+## Single-canvas verification
 
-The 2026-09-12 browser check used the same 100,000-cell fixture with fills,
+The single-canvas browser check confirmed one canvas in the Sheet surface, cell
+editing, click selection, held-button drag selection, stable selection after
+release, scrolling and zooming. Focused tests verify that selection repaint
+reuses the existing scene and border plan and that multiple invalidations share
+one frame. Historical multi-canvas timing samples below do not measure the
+current single-canvas renderer.
+
+## Historical two-canvas surface verification
+
+Before the single-canvas update, the 2026-09-12 browser check used the same 100,000-cell fixture with fills,
 borders, wrapping, a merge and frozen row/column. At 100%, 50% and 10% zoom,
 the Sheet subtree had 11 descendant DOM nodes and two visible canvases; it had
 zero row/column heading DOM nodes at every zoom. This is a node-count check,
@@ -115,13 +125,14 @@ by the import confirmation dialog.
 | 50%  |             13,591 |                 1,142 |
 | 10%  |            257,609 |                 2,658 |
 
-The Canvas renderer keeps two canvases and zero per-cell DOM elements at each
+That cell-only renderer kept two canvases and zero per-cell DOM elements at each
 zoom. In that earlier implementation, header nodes still grew with the visible row and column count. The unified surface described above removes those heading nodes. Zoom
 transition time is not claimed here; the controlled comparison records the
 resulting node pressure. A separate Canvas drag check showed a 16.8 ms 95th
 percentile frame interval during movement; its remaining long task occurred
-when the mouse-release aggregates refreshed. Unit tests also verify that
-selection movement neither rebuilds the scene nor repaints cell content.
+when the mouse-release aggregates refreshed. At that time, unit tests also verified that
+selection movement neither rebuilt the scene nor repainted cell content. The
+current single-canvas renderer reuses the scene and repaints the visible surface.
 
 Browser checks confirmed cell editing, selection, frozen rows/columns, merged
 cells, cell images and filter controls. Changing the root theme refreshed the

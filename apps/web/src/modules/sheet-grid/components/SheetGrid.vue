@@ -615,9 +615,7 @@ const emptyImageUrls: ReadonlyMap<string, string> = new Map();
 const resolvedImageUrls = computed(() => props.imageAssetUrls ?? emptyImageUrls);
 const imageLayerRef = ref<InstanceType<typeof SheetFloatingImageLayer>>();
 const imagePaintState = shallowRef<FloatingImagePaintState>({ images: [], revision: 0 });
-const floatingImageCache = createFloatingImageCanvasCache(() =>
-  surfaceRef.value?.invalidate("overlay"),
-);
+const floatingImageCache = createFloatingImageCanvasCache(() => surfaceRef.value?.invalidate());
 const paintSurfaceImages = computed(() => {
   const state = imagePaintState.value;
   const currentLayout = layout.value;

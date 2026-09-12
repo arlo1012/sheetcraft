@@ -26,7 +26,7 @@ import { paintSheetScene } from "../canvas/scene-painter";
 import type { SheetDisplaySnapshot } from "../canvas/sheet-display-snapshot";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
 import type { SheetRenderEnvironment } from "../rendering/useSheetRenderEnvironment";
-import { createSheetRenderScheduler, type SheetPaintLayer } from "../rendering/render-scheduler";
+import { createSheetRenderScheduler } from "../rendering/render-scheduler";
 import { paintSheetHeaders, type HeaderPaintState } from "../rendering/header-painter";
 import type { SheetOverlayState } from "../rendering/overlay-types";
 import {
@@ -68,19 +68,15 @@ const emit = defineEmits<{
 }>();
 defineSlots<{ "active-cell"?: (props: { cellRect: Rect }) => unknown }>();
 const { t } = useAppI18n();
-const contentCanvas = ref<HTMLCanvasElement>();
-const overlayCanvas = ref<HTMLCanvasElement>();
+const surfaceCanvas = ref<HTMLCanvasElement>();
 const activeEditorId = `sheet-cell-editor-${useId().replaceAll(":", "")}`;
 const viewportKey = computed(() => getCanvasViewportKey(props.frame.layout));
 const presentationCache = createCellPresentationCache(browserCellTextMeasurer);
 let scene: SheetCanvasScene | undefined;
 let borderPlan: SheetBorderPaintPlan | undefined;
-let content: CanvasRenderingContext2D | null = null;
-let overlay: CanvasRenderingContext2D | null = null;
-let borderBitmap: HTMLCanvasElement | undefined;
-let borders: CanvasRenderingContext2D | null = null;
+let context: CanvasRenderingContext2D | null = null;
 let scheduler: ReturnType<typeof createSheetRenderScheduler> | undefined;
-const images = createCanvasImageCache(() => invalidate("content"));
+const images = createCanvasImageCache(() => invalidate());
 const sizeStyle = computed(() => ({
   width: `${props.frame.size.width}px`,
   height: `${props.frame.size.height}px`,
@@ -108,8 +104,8 @@ const activeEditor = computed(() => {
     anchorStyle: { left: `${rect.x - clip.x}px`, top: `${rect.y - clip.y}px` },
   };
 });
-function invalidate(...layers: SheetPaintLayer[]): void {
-  scheduler?.invalidate(...layers);
+function invalidate(): void {
+  scheduler?.invalidate();
 }
 function rebuildScene(): void {
   scene = createSheetCanvasScene({
@@ -127,7 +123,7 @@ function rebuildScene(): void {
     props.frame.layout,
     props.rows,
   );
-  invalidate("content", "borders", "overlay");
+  invalidate();
 }
 function resize(element: HTMLCanvasElement, context: CanvasRenderingContext2D): void {
   const density = props.environment.density * props.frame.scale;
@@ -139,51 +135,37 @@ function resize(element: HTMLCanvasElement, context: CanvasRenderingContext2D): 
   }
   context.setTransform(density, 0, 0, density, 0, 0);
 }
-function paint(dirty: ReadonlySet<SheetPaintLayer>): void {
-  if (!content || !overlay || !borders || !scene || !borderPlan) return;
+function paint(): void {
+  if (!context || !scene || !borderPlan) return;
   const frame = props.frame;
-  if (dirty.has("content")) {
-    resize(contentCanvas.value!, content);
-    content.fillStyle = props.environment.cells.background;
-    content.fillRect(0, 0, frame.size.width, frame.size.height);
-    content.save();
-    content.translate(frame.body.x, frame.body.y);
-    paintSheetScene(content, scene, frame.layout, {
-      palette: props.environment.cells,
-      showGridLines: props.showGridLines,
-      editingCell: props.editing ? props.activeCell : undefined,
-      imageUrls: props.imageAssetUrls,
-      images,
-      imagePlaceholder: (id) =>
-        t(props.loadingImageAssetIds?.has(id) ? "image.loading" : "image.assetUnavailable"),
-    });
-    content.restore();
-  }
-  if (dirty.has("borders")) {
-    resize(borderBitmap!, borders);
-    borders.clearRect(0, 0, frame.size.width, frame.size.height);
-    borders.save();
-    borders.translate(frame.body.x, frame.body.y);
-    paintSheetBorders(borders, borderPlan, frame.layout);
-    borders.restore();
-  }
-  if (dirty.has("overlay") || dirty.has("borders")) {
-    resize(overlayCanvas.value!, overlay);
-    overlay.clearRect(0, 0, frame.size.width, frame.size.height);
-    paintSheetUnderlay(overlay, frame, props.overlays, props.environment.overlays);
-    overlay.save();
-    overlay.setTransform(1, 0, 0, 1, 0, 0);
-    overlay.drawImage(borderBitmap!, 0, 0);
-    overlay.restore();
-    paintSheetForeground(overlay, frame, props.overlays, props.environment.overlays, 0);
-    overlay.save();
-    overlay.translate(frame.body.x, frame.body.y);
-    props.paintImages?.(overlay);
-    overlay.restore();
-    if (frame.headerSize.width || frame.headerSize.height)
-      paintSheetHeaders(overlay, { ...props.headers, frame, palette: props.environment.headers });
-    paintSheetChrome(overlay, frame, props.overlays, props.environment.overlays);
-  }
+  resize(surfaceCanvas.value!, context);
+  context.fillStyle = props.environment.cells.background;
+  context.fillRect(0, 0, frame.size.width, frame.size.height);
+  context.save();
+  context.translate(frame.body.x, frame.body.y);
+  paintSheetScene(context, scene, frame.layout, {
+    palette: props.environment.cells,
+    showGridLines: props.showGridLines,
+    editingCell: props.editing ? props.activeCell : undefined,
+    imageUrls: props.imageAssetUrls,
+    images,
+    imagePlaceholder: (id) =>
+      t(props.loadingImageAssetIds?.has(id) ? "image.loading" : "image.assetUnavailable"),
+  });
+  context.restore();
+  paintSheetUnderlay(context, frame, props.overlays, props.environment.overlays);
+  context.save();
+  context.translate(frame.body.x, frame.body.y);
+  paintSheetBorders(context, borderPlan, frame.layout);
+  context.restore();
+  paintSheetForeground(context, frame, props.overlays, props.environment.overlays, 0);
+  context.save();
+  context.translate(frame.body.x, frame.body.y);
+  props.paintImages?.(context);
+  context.restore();
+  if (frame.headerSize.width || frame.headerSize.height)
+    paintSheetHeaders(context, { ...props.headers, frame, palette: props.environment.headers });
+  paintSheetChrome(context, frame, props.overlays, props.environment.overlays);
 }
 watch(
   [
@@ -200,11 +182,7 @@ watch(
   rebuildScene,
   { immediate: true, flush: "post" },
 );
-watch(
-  [() => props.frame, () => props.environment],
-  () => invalidate("content", "borders", "overlay"),
-  { flush: "post" },
-);
+watch([() => props.frame, () => props.environment], () => invalidate(), { flush: "post" });
 watch(
   [
     () => props.showGridLines,
@@ -213,22 +191,17 @@ watch(
     () => props.editing,
     () => (props.editing ? `${props.activeCell.row}:${props.activeCell.column}` : ""),
   ],
-  () => invalidate("content"),
+  () => invalidate(),
   { flush: "post" },
 );
-watch(
-  [() => props.headers, () => props.overlays, () => props.paintImages],
-  () => invalidate("overlay"),
-  { flush: "post" },
-);
+watch([() => props.headers, () => props.overlays, () => props.paintImages], () => invalidate(), {
+  flush: "post",
+});
 watch(cellTextFontRevision, clearCanvasTextMetrics, { flush: "sync" });
 onMounted(() => {
-  content = contentCanvas.value!.getContext("2d", { alpha: false });
-  overlay = overlayCanvas.value!.getContext("2d");
-  borderBitmap = document.createElement("canvas");
-  borders = borderBitmap.getContext("2d");
+  context = surfaceCanvas.value!.getContext("2d", { alpha: false });
   scheduler = createSheetRenderScheduler(paint);
-  invalidate("content", "borders", "overlay");
+  invalidate();
 });
 onBeforeUnmount(() => {
   scheduler?.dispose();
@@ -239,14 +212,9 @@ defineExpose({ invalidate });
 <template>
   <div class="sheet-surface" :style="sizeStyle">
     <canvas
-      ref="contentCanvas"
-      class="sheet-surface__content"
+      ref="surfaceCanvas"
+      class="sheet-surface__canvas"
       data-sheet-canvas
-      aria-hidden="true"
-    />
-    <canvas
-      ref="overlayCanvas"
-      class="sheet-surface__overlay"
       data-sheet-surface
       tabindex="0"
       :aria-label="label"
@@ -282,18 +250,12 @@ defineExpose({ invalidate });
   top: 0;
   left: 0;
   z-index: 2;
-  &__content,
-  &__overlay {
+  &__canvas {
     position: absolute;
     inset: 0;
     display: block;
     width: 100%;
     height: 100%;
-  }
-  &__content {
-    pointer-events: none;
-  }
-  &__overlay {
     outline: none;
     user-select: none;
     touch-action: none;

@@ -68,7 +68,7 @@ afterEach(() => {
 });
 
 describe("SheetSurface invalidation", () => {
-  test("does not rebuild content or borders for a non-editing active-cell selection", async () => {
+  test("repaints one canvas with cached content and borders when the selection changes", async () => {
     const host = installCanvasHost();
     const createScene = vi.spyOn(cellScene, "createSheetCanvasScene");
     const createBorders = vi.spyOn(borderPainter, "createBorderPaintPlan");
@@ -86,7 +86,8 @@ describe("SheetSurface invalidation", () => {
 
     expect(createScene).not.toHaveBeenCalled();
     expect(createBorders).not.toHaveBeenCalled();
-    expect(paint).not.toHaveBeenCalled();
+    expect(paint).toHaveBeenCalledOnce();
+    expect(wrapper.findAll("canvas")).toHaveLength(1);
   });
 
   test("repaints a sub-cell scroll without rebuilding its scene or border plan", async () => {

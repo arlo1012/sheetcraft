@@ -31,14 +31,14 @@ describe("SheetGrid viewport", () => {
     });
 
     expect(wrapper.getComponent(SheetSurface).props("showGridLines")).toBe(false);
-    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(2);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(1);
   });
 
   test("renders only the viewport and overscan cells while scrolling", async () => {
     const { wrapper } = mountSheetGrid();
     const scroller = wrapper.get(".sheet-grid__scroller");
 
-    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(2);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(1);
     (scroller.element as HTMLDivElement).scrollTop = 1_200;
     (scroller.element as HTMLDivElement).scrollLeft = 800;
     await scroller.trigger("scroll");
@@ -47,7 +47,7 @@ describe("SheetGrid viewport", () => {
     expect(layout.panes.body.rows.map((row) => row.index)).toContain(48);
     expect(layout.panes.body.columns.map((column) => column.index)).toContain(8);
     expect(layout.getCellViewportRect({ row: 50, column: 8 })).toMatchObject({ x: -32, y: 0 });
-    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(2);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(1);
   });
 
   test("keeps the allocated extent stable when native scrolling reaches its tail", async () => {
@@ -112,6 +112,6 @@ describe("SheetGrid viewport", () => {
 
     expect((scroller.element as HTMLDivElement).scrollTop).toBeGreaterThan(1_200);
     expect(getCanvasLayout(wrapper).getCellViewportRect({ row: 50, column: 0 })?.y).toBe(0);
-    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(2);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(1);
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 import { createSheetRenderScheduler } from "../../../../modules/sheet-grid/rendering/render-scheduler";
 
 describe("sheet render scheduler", () => {
-  test("coalesces invalidations and preserves only requested paint layers", () => {
+  test("coalesces invalidations into one paint", () => {
     const paint = vi.fn();
     let callback: FrameRequestCallback | undefined;
     const scheduler = createSheetRenderScheduler(
@@ -14,14 +14,13 @@ describe("sheet render scheduler", () => {
       vi.fn(),
     );
 
-    scheduler.invalidate("overlay");
-    scheduler.invalidate("overlay", "borders");
+    scheduler.invalidate();
+    scheduler.invalidate();
 
     expect(callback).toBeTypeOf("function");
     expect(paint).not.toHaveBeenCalled();
     callback?.(0);
-    expect(paint).toHaveBeenCalledWith(new Set(["overlay", "borders"]));
-    expect(paint.mock.calls[0]?.[0]).not.toContain("content");
+    expect(paint).toHaveBeenCalledOnce();
   });
 
   test("cancels a queued frame and suppresses future work after disposal", () => {
@@ -37,10 +36,10 @@ describe("sheet render scheduler", () => {
       cancel,
     );
 
-    scheduler.invalidate("content");
+    scheduler.invalidate();
     scheduler.dispose();
     callback?.(0);
-    scheduler.invalidate("overlay");
+    scheduler.invalidate();
 
     expect(cancel).toHaveBeenCalledWith(11);
     expect(paint).not.toHaveBeenCalled();
