@@ -408,8 +408,11 @@ function nth(
   context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
   order: "large" | "small",
 ): FormulaValue {
-  const array = argumentValues(context.evaluateArgument(0));
-  const values = array.filter((v): v is number => typeof v === "number");
+  const values: number[] = [];
+  for (const value of argumentValues(context.evaluateArgument(0))) {
+    if (isFormulaError(value)) return value;
+    if (typeof value === "number") values.push(value);
+  }
   const k = finiteNumber(scalar(context.evaluateArgument(1)));
   if (isFormulaError(k)) return k;
   if (!Number.isInteger(k) || k < 1 || k > values.length) return formulaError("NUM");
@@ -440,11 +443,13 @@ function count(context: Parameters<FormulaFunctionDefinition["evaluate"]>[0]): F
 function rank(context: Parameters<FormulaFunctionDefinition["evaluate"]>[0]): FormulaValue {
   const n = finiteNumber(scalar(context.evaluateArgument(0)));
   if (isFormulaError(n)) return n;
-  const values = argumentValues(context.evaluateArgument(1)).filter(
-    (v): v is number => typeof v === "number",
-  );
+  const values: number[] = [];
+  for (const value of argumentValues(context.evaluateArgument(1))) {
+    if (isFormulaError(value)) return value;
+    if (typeof value === "number") values.push(value);
+  }
   const order = context.argumentCount === 3 ? finiteNumber(scalar(context.evaluateArgument(2))) : 0;
   if (isFormulaError(order)) return order;
-  if (!values.length) return formulaError("NA");
-  return values.filter((v) => (order === 0 ? v > n : v < n)).length + 1;
+  if (!values.includes(n)) return formulaError("NA");
+  return values.filter((value) => (order === 0 ? value > n : value < n)).length + 1;
 }
