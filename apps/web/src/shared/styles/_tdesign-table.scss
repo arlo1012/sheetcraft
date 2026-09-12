@@ -1,27 +1,117 @@
-// Shared compact table density. Keep sizing rows and drag/selection cells under
-// TDesign's control; data cells can still grow for wrapped text and controls.
-.t-table {
-  --idea-table-cell-padding-y: var(--idea-space-2);
-  --idea-table-cell-padding-x: var(--idea-space-4);
+// Table rules migrated from whimsy-web-admin tdesign-overrides.scss.
+.t-table__pagination {
+  padding: var(--td-comp-paddingTB-s);
+}
 
-  &.t-size-s {
-    --idea-table-cell-padding-y: var(--idea-space-1);
+// .t-table 前 不是 .search-tools
+.t-table:not(.search-tools + .t-table) {
+  .t-table__content {
+    border-top-left-radius: var(--td-radius-default);
+    border-top-right-radius: var(--td-radius-default);
+  }
+}
+// 当 .t-table 后面不是分页时生效
+.t-table__content:not(:has(+ .t-table__pagination-wrap > .t-table__pagination)) {
+  border-bottom-left-radius: var(--td-radius-default);
+  border-bottom-right-radius: var(--td-radius-default);
+}
+
+// 存在边框 且 存在 分页 的表格
+.t-table.t-table--bordered:has(.t-table__pagination-wrap > .t-table__pagination) {
+  .t-table--layout-fixed,
+  .t-table--layout-auto {
+    box-shadow: 0 0.0625em 0 0 var(--td-component-border);
   }
 
-  &.t-size-l {
-    --idea-table-cell-padding-y: var(--idea-space-3);
+  .t-table__pagination {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0 0 var(--td-radius-default) var(--td-radius-default);
+    box-shadow:
+      inset -0.0625em 0 0 0 var(--td-gray-color-2),
+      inset 0.0625em 0 0 0 var(--td-gray-color-2),
+      inset 0 -0.0625em 0 0 var(--td-gray-color-2);
   }
-
-  .t-table__header > tr > th:not(.t-table__th-drag, .t-table__cell-check),
-  .t-table__body > tr > td:not(.t-table__handle-draggable, .t-table__cell-check) {
-    padding: var(--idea-table-cell-padding-y) var(--idea-table-cell-padding-x);
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
+}
+// 存在边框 但 不存在 分页 的表格
+.t-table.t-table--bordered:not(:has(.t-table__pagination-wrap > .t-table__pagination)) {
+  .t-table--layout-fixed,
+  .t-table--layout-auto {
+    border-bottom: 0.0625em solid var(--td-component-border);
   }
 }
 
-// Opt-in outer frame, independent of the bordered prop that adds cell dividers.
-.t-table.idea-table--outlined:not(.t-table--bordered) > .t-table__content {
-  box-sizing: border-box;
-  border: 1px solid var(--idea-border-control);
+// 不存在边框 但 存在 分页 的表格
+.t-table:not(.t-table--bordered):has(.t-table__pagination-wrap > .t-table__pagination) {
+  .t-table__content {
+    border: 0.0625em solid var(--td-component-border);
+  }
+
+  .t-table__pagination {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0 0 var(--td-radius-default) var(--td-radius-default);
+    box-shadow:
+      inset -0.0625em 0 0 0 var(--td-gray-color-2),
+      inset 0.0625em 0 0 0 var(--td-gray-color-2),
+      inset 0 -0.0625em 0 0 var(--td-gray-color-2);
+  }
+}
+
+// 不存在边框 且 不存在 分页 的表格
+.t-table:not(.t-table--bordered):not(:has(.t-table__pagination-wrap > .t-table__pagination)) {
+  .t-table__content {
+    border: 0.0625em solid var(--td-component-border);
+  }
+}
+
+// 不存在边框 且 .t-table__content 内容高度溢出产生上下滚动条的表格
+.t-table:not(.t-table--bordered).t-table--header-fixed {
+  .t-table__body > tr:last-child > td {
+    border-bottom: none;
+  }
+}
+
+.t-table--column-resizable:not(.t-table--bordered) thead.t-table__header:hover th {
+  border-top: 1px solid transparent;
+
+  &:first-child {
+    left: 0;
+  }
+}
+
+.t-table--column-resizable:not(.t-table--bordered) thead.t-table__header th:first-child {
+  left: 1px;
+}
+
+.t-table {
+  flex: 1;
+
+  .t-table__content {
+    border-radius: 0;
+  }
+
+  td,
+  th {
+    padding: 5px;
+  }
+
+  .t-button--variant-text {
+    height: unset;
+  }
+
+  .t-table__cell--fixed-right {
+    .t-button {
+      padding-left: 6px;
+      padding-right: 6px;
+    }
+  }
+}
+
+// TDesign has more specific padding rules for explicit small/large sizes.
+// Apply the migrated 5px density to those sizes as well.
+.t-table.t-size-s,
+.t-table.t-size-l {
+  td,
+  th {
+    padding: 5px;
+  }
 }
