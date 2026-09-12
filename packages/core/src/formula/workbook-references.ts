@@ -1,7 +1,7 @@
 import { getFormulaAst } from "./parser.js";
 import { formatFormulaReference, parseFormulaReference } from "./reference-model.js";
 import type { FormulaAddress, FormulaExpression, FormulaReference } from "./types.js";
-import type { Sheet, Workbook } from "../workbook.js";
+import type { CellAddress, Sheet, Workbook } from "../workbook.js";
 
 /** Rewrites qualified references to one sheet while retaining sparse cell storage. */
 export function rewriteQualifiedReferencesForSheet(
@@ -51,7 +51,8 @@ export function renameQualifiedReferencesForSheet(
   workbook: Workbook,
   previousName: string,
   nextName: string,
-): void {
+): FormulaSource[] {
+  const formulaSources: FormulaSource[] = [];
   const formatted = /^[\p{L}\p{N}_.]+$/u.test(nextName)
     ? nextName
     : `'${nextName.replaceAll("'", "''")}'`;
@@ -66,9 +67,35 @@ export function renameQualifiedReferencesForSheet(
           end: candidate.end,
           value: `${formatted}!${source.slice(candidate.referenceStart, candidate.end)}`,
         }));
-      replaceFormulaReferences(sheet, key, source, replacements);
+      if (replacements.length) {
+        formulaSources.push({ sheetId: sheet.id, address: parseCellAddress(key), source });
+        replaceFormulaReferences(sheet, key, source, replacements);
+      }
     }
   }
+  return formulaSources;
+}
+
+export type FormulaSource = { sheetId: string; address: CellAddress; source: string };
+
+/** Restores only the formula texts transformed by an inverse command. */
+export function restoreFormulaSources(workbook: Workbook, formulaSources: readonly FormulaSource[]): void {
+  for (const formula of formulaSources) {
+    const sheet = workbook.sheets.get(formula.sheetId);
+    const key = `${formula.address.row}:${formula.address.column}`;
+    const cell = sheet?.cells.get(key);
+    if (sheet && cell?.content?.kind === "formula") {
+      sheet.cells.set(key, {
+        ...cell,
+        content: { kind: "formula", formula: { source: formula.source } },
+      });
+    }
+  }
+}
+
+function parseCellAddress(key: string): CellAddress {
+  const [rawRow, rawColumn] = key.split(":");
+  return { row: Number(rawRow), column: Number(rawColumn) };
 }
 
 type QualifiedReferenceCandidate = {
