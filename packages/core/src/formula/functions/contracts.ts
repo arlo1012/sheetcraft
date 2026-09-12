@@ -1,5 +1,12 @@
 import type { ExcelDateParts, ExcelDateSystem } from "../date-system.js";
-import type { FormulaAddress, FormulaRangeBounds, FormulaValue } from "../types.js";
+import type {
+  FormulaAddress,
+  FormulaRangeBounds,
+  FormulaRuntimeValue,
+  FormulaValue,
+} from "../types.js";
+
+export type FormulaRangeEntry = Readonly<{ address: FormulaAddress; value: FormulaValue; hidden: boolean; filtered: boolean; nestedSubtotal: boolean }>;
 
 export type FormulaFunctionArgumentMetadata = Readonly<{ name: string; optional?: boolean }>;
 
@@ -17,7 +24,12 @@ export type FormulaFunctionMetadata = Readonly<{
 export type FormulaFunctionArgument =
   | Readonly<{
       kind: "scalar";
-      value: FormulaValue;
+      /**
+       * An expression argument may produce a dynamic array. Functions that
+       * need one value should use `scalar()`; array-aware functions can retain
+       * the complete runtime value.
+       */
+      value: FormulaRuntimeValue;
       source: "literal" | "reference" | "expression";
       /** Present for a direct cell reference when a function needs its anchor. */
       address?: FormulaAddress;
@@ -26,6 +38,7 @@ export type FormulaFunctionArgument =
   | Readonly<{
       kind: "range";
       values: Iterable<FormulaValue>;
+      entries?: Iterable<FormulaRangeEntry>;
       bounds?: FormulaRangeBounds;
       getValue?: (row: number, column: number) => FormulaValue;
     }>;
@@ -38,11 +51,12 @@ export type FormulaFunctionContext = Readonly<{
   dateSystem?: ExcelDateSystem;
   /** Clock injection keeps volatile functions deterministic for callers that need it. */
   now?: () => ExcelDateParts;
+  address?: FormulaAddress;
 }>;
 
 export type FormulaFunctionDefinition = Readonly<{
   metadata: FormulaFunctionMetadata;
-  evaluate: (context: FormulaFunctionContext) => FormulaValue;
+  evaluate: (context: FormulaFunctionContext) => FormulaRuntimeValue;
   selectDependencyArguments?: (context: FormulaFunctionContext) => readonly number[];
 }>;
 

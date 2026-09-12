@@ -22,6 +22,7 @@ export type FormulaEvaluationOptions = Readonly<{
   registry?: FormulaFunctionRegistry;
   dateSystem?: ExcelDateSystem;
   now?: () => ExcelDateParts;
+  address?: { row: number; column: number };
 }>;
 
 function finite(value: FormulaValue): value is number {
@@ -221,6 +222,7 @@ function evaluateExpression(
     argumentCount: expression.args.length,
     ...(options?.dateSystem ? { dateSystem: options.dateSystem } : {}),
     ...(options?.now ? { now: options.now } : {}),
+    ...(options?.address ? { address: options.address } : {}),
     evaluateArgument(index) {
       const cached = cache[index];
       if (cached) return cached;
@@ -250,6 +252,7 @@ function functionArgument(
       return {
         kind: "range" as const,
         values: resolver.resolveRange(named),
+        ...(resolver.resolveRangeEntries ? { entries: resolver.resolveRangeEntries(named) } : {}),
         bounds: named,
         getValue: (row, column) =>
           resolver.resolveCell({
@@ -269,6 +272,7 @@ function functionArgument(
         ...bounds,
         ...(sheetName ? { sheetName } : {}),
       }),
+      ...(resolver.resolveRangeEntries ? { entries: resolver.resolveRangeEntries({ ...bounds, ...(sheetName ? { sheetName } : {}) }) } : {}),
       bounds,
       getValue: (row, column) =>
         resolver.resolveCell({ row, column, ...(sheetName ? { sheetName } : {}) }),
@@ -279,13 +283,13 @@ function functionArgument(
       ? { start: { row: 0, column: Math.min(expression.range.start, expression.range.end) }, end: { row: 1_048_575, column: Math.max(expression.range.start, expression.range.end) } }
       : { start: { row: Math.min(expression.range.start, expression.range.end), column: 0 }, end: { row: Math.max(expression.range.start, expression.range.end), column: 16_383 } };
     const sheetName = expression.range.sheetName;
-    return { kind: "range", values: resolver.resolveRange({ ...bounds, ...(sheetName ? { sheetName } : {}) }), bounds,
+    return { kind: "range", values: resolver.resolveRange({ ...bounds, ...(sheetName ? { sheetName } : {}) }), ...(resolver.resolveRangeEntries ? { entries: resolver.resolveRangeEntries({ ...bounds, ...(sheetName ? { sheetName } : {}) }) } : {}), bounds,
       getValue: (row, column) => resolver.resolveCell({ row, column, ...(sheetName ? { sheetName } : {}) }) };
   }
   const reference = expression.kind === "reference" ? expression.reference : null;
   return {
     kind: "scalar" as const,
-    value: evaluateExpression(expression, resolver, registry, options) as FormulaValue,
+    value: evaluateExpression(expression, resolver, registry, options),
     source:
       expression.kind === "number" || expression.kind === "string" || expression.kind === "boolean"
         ? "literal"

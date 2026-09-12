@@ -1,5 +1,5 @@
 import { createFormulaError, isFormulaError, type FormulaValue } from "../types.js";
-import { isFormulaArray } from "../runtime.js";
+import { isFormulaArray, scalarize } from "../runtime.js";
 import type {
   FormulaFunctionArgument,
   FormulaFunctionContext,
@@ -19,7 +19,7 @@ export function defineFunction(
 }
 
 export function scalar(argument: FormulaFunctionArgument): FormulaValue {
-  return argument.kind === "scalar" ? argument.value : formulaError("VALUE");
+  return argument.kind === "scalar" ? scalarize(argument.value) : formulaError("VALUE");
 }
 
 export function finiteNumber(value: FormulaValue): number | ReturnType<typeof formulaError> {
@@ -43,8 +43,8 @@ export function condition(value: FormulaValue): boolean | ReturnType<typeof form
 
 export function values(argument: FormulaFunctionArgument): Iterable<FormulaValue> {
   if (argument.kind === "range") return argument.values;
-  const value = argument.value as unknown as import("../types.js").FormulaRuntimeValue;
-  return isFormulaArray(value) ? value.rows.flat() : [argument.value];
+  const value = argument.value;
+  return isFormulaArray(value) ? value.rows.flat() : [scalarize(value)];
 }
 
 export function argumentsValues(

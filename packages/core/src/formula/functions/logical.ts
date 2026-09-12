@@ -1,6 +1,6 @@
 import { isFormulaError, type FormulaValue } from "../types.js";
 import type { FormulaFunctionDefinition } from "./contracts.js";
-import { condition, defineFunction, formulaError, scalar } from "./helpers.js";
+import { condition, defineFunction, formulaError, scalar, values } from "./helpers.js";
 
 function booleanAggregate(
   context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
@@ -10,7 +10,7 @@ function booleanAggregate(
   let truthy = 0;
   for (let index = 0; index < context.argumentCount; index += 1) {
     const argument = context.evaluateArgument(index);
-    for (const value of argument.kind === "range" ? argument.values : [argument.value]) {
+    for (const value of values(argument)) {
       if (value === null || typeof value === "string") continue;
       const item = condition(value);
       if (isFormulaError(item)) return item;
