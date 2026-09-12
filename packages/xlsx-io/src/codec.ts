@@ -36,6 +36,7 @@ import {
 import { CompatibilityReportBuilder } from "./report.js";
 import { finalizeXlsxExport } from "./export-finalizer.js";
 import { collectDefinedNames, readDefinedNames } from "./defined-names.js";
+import { readWorkbookCalculationSettings } from "./workbook-calculation.js";
 import {
   readRawWorksheetNumericValues,
   readRawWorksheetTextDirections,
@@ -452,6 +453,7 @@ export async function decodeWithExcelJs(
   await source.xlsx.load(bytes);
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
   const dateSystem = source.properties.date1904 ? "1904" : "1900";
+  const calculation = readWorkbookCalculationSettings(bytes);
   let importedCells = 0;
   const sheets = source.worksheets.map((sourceSheet, sheetIndex) => {
     const sheet = createSheet(
@@ -576,6 +578,7 @@ export async function decodeWithExcelJs(
     workbook: {
       id: workbookId(),
       dateSystem,
+      calculation,
       activeSheetId: sheets[activeSheetIndex]?.id ?? sheets[0]?.id ?? "",
       sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
       definedNames: readDefinedNames(bytes, sheets, report),
@@ -804,6 +807,7 @@ export async function encodeWithExcelJs(
       new Uint8Array(bytes),
       cellImages,
       collectDefinedNames(workbook, report),
+      workbook.calculation,
     ),
     report: report.build(),
   };

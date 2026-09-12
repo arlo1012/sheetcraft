@@ -13,6 +13,10 @@ type FormulaCell = Readonly<{ key: string; row: number; column: number }>;
 function hasSupportedExpression(expression: FormulaExpression): boolean {
   if (expression.kind === "error") return !["NAME", "PARSE", "CYCLE"].includes(expression.code);
   if (expression.kind === "identifier") return false;
+  // A whole-axis range is valid and exported verbatim, but cache dependency
+  // analysis is intentionally sparse and cannot prove every formula in it safe.
+  // Leave the cache out so Excel recalculates it rather than emitting a stale value.
+  if (expression.kind === "axis-range") return false;
   if (expression.kind === "unary") return hasSupportedExpression(expression.operand);
   if (expression.kind === "binary")
     return hasSupportedExpression(expression.left) && hasSupportedExpression(expression.right);

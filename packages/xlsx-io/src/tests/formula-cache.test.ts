@@ -61,4 +61,15 @@ describe("formula cache eligibility", () => {
     setCellContent(sheet, { row: 0, column: 1 }, { kind: "formula", formula: { source: "=A1" } });
     expect(createFormulaCacheEligibility(sheet)(0, 0)).toBe(false);
   });
+
+  test("leaves whole-axis formulas for Excel recalculation while retaining their source", () => {
+    const workbook = createWorkbook({ id: "workbook", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=SUM(A:A)" } },
+    );
+    expect(createFormulaCacheEligibility(sheet)(0, 0)).toBe(false);
+  });
 });

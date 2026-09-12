@@ -118,6 +118,12 @@ describe("XLSX IO", () => {
     const sheet = [...result.workbook.sheets.values()][0]!;
     expect(input).toEqual(original);
     expect(result.workbook.dateSystem).toBe("1904");
+    expect(result.workbook.calculation).toEqual({
+      mode: "automatic",
+      iterative: false,
+      maxIterations: 100,
+      maxChange: 0.001,
+    });
     expect(getCellContent(sheet, { row: 0, column: 0 })).toMatchObject({
       kind: "literal",
       value: 41,
@@ -132,6 +138,54 @@ describe("XLSX IO", () => {
     expect(result.report.issues).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: "formula-cache-discarded" })]),
     );
+  });
+
+  test("roundtrips workbook calculation mode and iterative settings through calcPr", async () => {
+    const workbook = createWorkbook({ id: "calculation", sheetId: "sheet" });
+    workbook.calculation = {
+      mode: "manual",
+      iterative: true,
+      maxIterations: 37,
+      maxChange: 0.00025,
+    };
+
+    const encoded = await encodeXlsx(workbook);
+    const xml = xlsxEntryText(encoded.bytes, "xl/workbook.xml");
+    expect(xml).toContain('calcMode="manual"');
+    expect(xml).toContain('iterate="1"');
+    expect(xml).toContain('iterateCount="37"');
+    expect(xml).toContain('iterateDelta="0.00025"');
+    expect((await decodeXlsx(encoded.bytes)).workbook.calculation).toEqual(workbook.calculation);
+  });
+
+  test("retains whole-axis and dynamic-array formula sources without materializing spills", async () => {
+    const workbook = createWorkbook({ id: "modern-formulas", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=SUM(B:B)" } },
+    );
+    setCellContent(
+      sheet,
+      { row: 0, column: 1 },
+      { kind: "formula", formula: { source: "=_xlfn.SEQUENCE(3)" } },
+    );
+
+    const encoded = await encodeXlsx(workbook);
+    const xml = xlsxEntryText(encoded.bytes, "xl/worksheets/sheet1.xml");
+    expect(xml).toContain("<f>SUM(B:B)</f>");
+    expect(xml).toContain("<f>_xlfn.SEQUENCE(3)</f>");
+    expect(xml.match(/<c\b/g)).toHaveLength(2);
+    const restored = await decodeXlsx(encoded.bytes);
+    expect(getCellContent(getActiveSheet(restored.workbook), { row: 0, column: 0 })).toMatchObject({
+      kind: "formula",
+      formula: { source: "=SUM(B:B)" },
+    });
+    expect(getCellContent(getActiveSheet(restored.workbook), { row: 0, column: 1 })).toMatchObject({
+      kind: "formula",
+      formula: { source: "=_xlfn.SEQUENCE(3)" },
+    });
   });
 
   test("roundtrips the supported Core subset with a fresh formula cache", async () => {
