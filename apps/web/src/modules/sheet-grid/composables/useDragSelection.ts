@@ -18,6 +18,7 @@ export function useDragSelection(options: {
   getScroller: () => HTMLDivElement | null;
   getViewportSize: () => Size;
   onComplete: () => void;
+  onDraggingChange?: (dragging: boolean) => void;
   onEnsureGridExtentContains: (address: CellAddress) => void;
   onEnsureGridExtentCoversViewport: () => void;
   onScrollPositionChange: (position: Point) => void;
@@ -40,7 +41,9 @@ export function useDragSelection(options: {
 
   function stop(): void {
     cancelAutoScroll();
+    const moved = dragSelection?.moved;
     dragSelection = undefined;
+    if (moved) options.onDraggingChange?.(false);
     window.removeEventListener("mousemove", onMouseMove);
     window.removeEventListener("mouseup", onMouseUp);
   }
@@ -110,6 +113,7 @@ export function useDragSelection(options: {
       Math.hypot(event.clientX - dragSelection.startX, event.clientY - dragSelection.startY) >= 3
     ) {
       dragSelection.moved = true;
+      options.onDraggingChange?.(true);
     }
     if (!dragSelection.moved) {
       return;

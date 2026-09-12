@@ -8,38 +8,41 @@ import {
   getRowHeight,
   setCellValue,
 } from "@idea10/core/workbook";
-import { mountSheetGrid } from "./fixture";
+import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
 describe("SheetGrid accessibility", () => {
-  test("exposes virtualized rows and keeps the editor inside the active gridcell", () => {
-    const { wrapper } = mountSheetGrid();
-    const activeGridCell = wrapper.get('[role="gridcell"][aria-selected="true"]');
-    const activeRow = activeGridCell.element.closest<HTMLElement>('[role="row"]');
+  test("exposes grid metadata and one labelled editor", () => {
+    const { wrapper } = mountSheetGrid({ attachTo: document.body });
+    try {
+      const grid = wrapper.get('[role="grid"]');
+      const editor = wrapper.get('textarea[aria-label="Cell A1, blank"]');
 
-    expect(activeGridCell.get('textarea[aria-label="Cell A1, blank"]')).toBeDefined();
-    expect(activeRow?.getAttribute("aria-rowindex")).toBe("1");
+      expect(grid.attributes("aria-rowcount")).toBe("100");
+      expect(grid.attributes("aria-colcount")).toBe("50");
+      expect(wrapper.findAll("textarea.cell-editor")).toHaveLength(1);
+      (editor.element as HTMLTextAreaElement).focus();
+      expect(document.activeElement).toBe(editor.element);
+    } finally {
+      wrapper.unmount();
+    }
   });
 
   test("announces the display value when a populated cell becomes active", async () => {
     const { sheet, wrapper } = mountSheetGrid();
     setCellValue(sheet, { row: 0, column: 1 }, "Budget");
 
-    await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 0, column: 1 }, "mousedown", { button: 0 });
 
     expect(wrapper.get("textarea.cell-editor").attributes("aria-label")).toBe("Cell B1, Budget");
   });
 
   test("marks visible range cells selected while keeping one active editor", async () => {
     const { wrapper } = mountSheetGrid();
-    await wrapper
-      .get('[data-row="1"][data-column="2"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 1, column: 2 }, "mousedown", { button: 0, shiftKey: true });
 
     expect(wrapper.get('[role="grid"]').attributes("aria-multiselectable")).toBe("true");
-    expect(wrapper.get('[data-row="0"][data-column="2"]').attributes("aria-selected")).toBe("true");
-    expect(wrapper.get('[data-row="2"][data-column="2"]').attributes("aria-selected")).toBe(
-      "false",
-    );
+    expect(activeCell(wrapper)).toBe("A1");
+    expect(wrapper.findAll("[data-selection-range]")).not.toHaveLength(0);
     expect(wrapper.findAll("textarea.cell-editor")).toHaveLength(1);
     expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
   });

@@ -223,14 +223,9 @@ describe("SheetGrid clipboard", () => {
       .get("textarea.cell-editor")
       .element.dispatchEvent(createTestClipboardEvent("paste", copied.data).event);
     await wrapper.vm.$nextTick();
-    expect(getCellStyle(sheet, { row: 1, column: 1 })).toEqual({
-      bold: true,
-      fillColor: "#fde68a",
-      verticalAlign: "bottom",
-      wrapText: true,
-      borderDiagonalUp: { style: "thin", color: "#112233" },
-      borderDiagonalDown: { style: "dashed", color: "#445566" },
-    });
+    expect(getCellStyle(sheet, { row: 1, column: 1 })).toEqual(
+      getCellStyle(sheet, { row: 0, column: 0 }),
+    );
 
     await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0 });
     wrapper

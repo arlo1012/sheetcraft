@@ -1,6 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { getCellValue, setCellValue } from "@idea10/core/workbook";
-import { activeCell, getFloatingMenu, hasFloatingMenu, mountSheetGrid, triggerCell } from "./fixture";
+import {
+  activeCell,
+  getFloatingMenu,
+  hasFloatingMenu,
+  mountSheetGrid,
+  triggerCell,
+} from "./fixture";
 
 describe("SheetGrid cell context menu", () => {
   test("preserves a cell range when right-clicking inside it and clears it atomically", async () => {

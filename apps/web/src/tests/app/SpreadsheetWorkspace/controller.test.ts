@@ -1,6 +1,6 @@
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import {
   getCellStyle,
@@ -42,6 +42,7 @@ function mountController(): Controller {
 afterEach(() => {
   wrapper?.unmount();
   wrapper = undefined;
+  vi.useRealTimers();
 });
 
 describe("spreadsheet workspace controller", () => {
@@ -252,6 +253,45 @@ describe("spreadsheet workspace controller", () => {
     expect(controller.activeSelectionSummary.value).not.toBe(initialSummary);
     expect(controller.activeSelectionStyle.value).not.toBe(initialStyle);
     expect(controller.dataToolState.value).not.toBe(initialDataToolState);
+  });
+
+  test("freezes toolbar aggregates only during a drag and keeps the command range live", () => {
+    const controller = mountController();
+    const sheet = controller.activeSheet.value;
+    for (let column = 0; column < 100; column += 1) {
+      setCellValue(sheet, { row: 0, column }, column + 1);
+    }
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection: {
+          active: { row: 0, column: 0 },
+          anchor: { row: 0, column: 0 },
+          focus: { row: 0, column: 79 },
+          mode: "cells",
+        },
+      }),
+    );
+    expect(controller.activeSelectionSummary.value).toMatchObject({ count: 80, sum: 3240 });
+    controller.setSelectionDragging(true);
+    const summaryDuringDrag = controller.activeSelectionSummary.value;
+
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection: {
+          active: { row: 0, column: 0 },
+          anchor: { row: 0, column: 0 },
+          focus: { row: 0, column: 99 },
+          mode: "cells",
+        },
+      }),
+    );
+    expect(controller.activeSelectionSummary.value).toBe(summaryDuringDrag);
+    expect(controller.activeSelectionRange.value.end.column).toBe(99);
+    controller.setSelectionDragging(false);
+    expect(controller.activeSelectionSummary.value).toMatchObject({ count: 100, sum: 5050 });
+
+    controller.commitCell({ address: { row: 0, column: 0 }, input: "10" });
+    expect(controller.activeSelectionSummary.value).toMatchObject({ count: 100, sum: 5059 });
   });
 
   test("preserves deleted sheet view state so undo restores the same viewport", () => {

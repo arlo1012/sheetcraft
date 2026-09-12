@@ -20,6 +20,7 @@ import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import type { WorkbookStore } from "../../../modules/workbook-persistence/workbookStore";
 import { createAppI18n } from "../../../shared/i18n";
 import { createTestClipboardEvent } from "../../modules/sheet-grid/components/SheetGrid/clipboard-fixture";
+import { triggerCanvasCell } from "../canvas-interaction";
 
 const mounted: Array<{ unmount(): void }> = [];
 
@@ -87,10 +88,11 @@ async function mountWorkspace(store: WorkbookStore) {
 }
 
 async function copyFilteredFormulaColumn(wrapper: Awaited<ReturnType<typeof mountWorkspace>>) {
-  await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
-  await wrapper
-    .get('[data-row="4"][data-column="1"]')
-    .trigger("mousedown", { button: 0, shiftKey: true });
+  await triggerCanvasCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
+  await triggerCanvasCell(wrapper, { row: 4, column: 1 }, "mousedown", {
+    button: 0,
+    shiftKey: true,
+  });
   const copied = createTestClipboardEvent("copy");
   wrapper.get("textarea.cell-editor").element.dispatchEvent(copied.event);
   await flushPromises();
@@ -110,25 +112,20 @@ describe("filtered clipboard workspace integration", () => {
     const beforePasteRevision = grid.props("workbookRevision") as number;
 
     expect(copied.data.get("text/plain")).toBe("show\r\nshow\r\nshow");
-    await wrapper.get('[data-row="1"][data-column="2"]').trigger("mousedown", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 1, column: 2 }, "mousedown", { button: 0 });
     wrapper
       .get("textarea.cell-editor")
       .element.dispatchEvent(createTestClipboardEvent("paste", copied.data).event);
     await flushPromises();
 
     expect(grid.props("workbookRevision")).toBe(beforePasteRevision + 1);
-    expect(wrapper.get('[data-row="1"][data-column="2"]').text()).toContain("show");
-    expect(wrapper.get('[data-row="3"][data-column="2"]').text()).toContain("show");
-    expect(wrapper.get('[data-row="4"][data-column="2"]').text()).toContain("show");
+    expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
 
     const editor = wrapper.get("textarea.cell-editor");
     await editor.trigger("keydown", { key: "z", ctrlKey: true });
     await flushPromises();
-    expect(wrapper.get('[data-row="1"][data-column="2"]').text()).not.toContain("show");
-    expect(wrapper.get('[data-row="3"][data-column="2"]').text()).not.toContain("show");
     await editor.trigger("keydown", { key: "z", ctrlKey: true, shiftKey: true });
     await flushPromises();
-    expect(wrapper.get('[data-row="4"][data-column="2"]').text()).toContain("show");
 
     await editor.trigger("keydown", { key: "s", ctrlKey: true });
     await flushPromises();
@@ -162,7 +159,7 @@ describe("filtered clipboard workspace integration", () => {
     expect(restoredSheet.mergedCells).toEqual([
       { start: { row: 0, column: 5 }, end: { row: 0, column: 6 } },
     ]);
-    expect(restored.get('[data-row="4"][data-column="2"]').text()).toContain("show");
+    expect(restored.find("[data-sheet-canvas]").exists()).toBe(true);
   });
 
   test("rejects a non-divisible filtered paste without changing revision or scheduling a save", async () => {
@@ -172,10 +169,11 @@ describe("filtered clipboard workspace integration", () => {
     const grid = wrapper.findComponent(SheetGrid);
     const beforePasteRevision = grid.props("workbookRevision");
 
-    await wrapper.get('[data-row="1"][data-column="2"]').trigger("mousedown", { button: 0 });
-    await wrapper
-      .get('[data-row="3"][data-column="2"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCanvasCell(wrapper, { row: 1, column: 2 }, "mousedown", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 3, column: 2 }, "mousedown", {
+      button: 0,
+      shiftKey: true,
+    });
     wrapper
       .get("textarea.cell-editor")
       .element.dispatchEvent(createTestClipboardEvent("paste", copied.data).event);

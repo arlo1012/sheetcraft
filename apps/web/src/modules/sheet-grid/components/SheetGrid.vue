@@ -92,9 +92,8 @@ import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetAxisOperationPreview from "./SheetAxisOperationPreview.vue";
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
 import SheetFreezeLines from "./SheetFreezeLines.vue";
-import SheetCellLayer from "./SheetCellLayer.vue";
+import SheetCanvasLayer from "./SheetCanvasLayer.vue";
 import SheetCellContextMenu from "./SheetCellContextMenu.vue";
-import SheetBorderLayer from "./SheetBorderLayer.vue";
 import SheetColumnHeaders from "./SheetColumnHeaders.vue";
 import SheetRowHeaders from "./SheetRowHeaders.vue";
 import SheetSelectionOverlay from "./SheetSelectionOverlay.vue";
@@ -208,6 +207,7 @@ const emit = defineEmits<{
   undo: [];
   redo: [];
   viewStateChange: [viewState: SheetGridViewState];
+  selectionDraggingChange: [dragging: boolean];
   horizontalScrollChange: [state: SheetHorizontalScrollState];
   "update:zoom": [zoom: number];
 }>();
@@ -341,6 +341,7 @@ const { start: startDragSelection, stop: stopDragSelection } = useDragSelection(
   getCellAtClientPoint,
   getScroller: () => scrollerRef.value,
   getViewportSize: () => viewportSize,
+  onDraggingChange: (dragging) => emit("selectionDraggingChange", dragging),
   onComplete: () => {
     if (props.formatPainterActive && !props.readOnly) {
       emit("formatPainterTarget", getSelectionRange(selection.value));
@@ -1847,14 +1848,17 @@ defineExpose({
     >
       <div class="sheet-grid__canvas" :style="gridCanvasStyle">
         <div class="sheet-grid__viewport" :style="gridViewportStyle">
-          <SheetCellLayer
+          <SheetCanvasLayer
             :sheet="sheet"
+            :scale="scale"
+            :geometry="geometry"
+            :rows="rowVisibility"
+            :workbook-revision="workbookRevision"
             :image-asset-urls="imageAssetUrls"
             :loading-image-asset-ids="loadingImageAssetIds"
             :evaluator="sheetEvaluator"
             :layout="layout"
             :active-cell="activeCell"
-            :selection="selection"
             :editing="isEditing"
             :show-grid-lines="showGridLines"
             :locale="locale"
@@ -1888,7 +1892,7 @@ defineExpose({
                 @update:model-value="onEditorInput"
               />
             </template>
-          </SheetCellLayer>
+          </SheetCanvasLayer>
           <SheetReadingHighlight
             v-if="highlightEnabled"
             :layout="layout"
@@ -1923,12 +1927,6 @@ defineExpose({
             @copy="requestFloatingImageCopy($event, 'copy')"
             @cut="requestFloatingImageCopy($event, 'cut')"
             @paste="requestFloatingImagePaste"
-          />
-          <SheetBorderLayer
-            :sheet="sheet"
-            :geometry="geometry"
-            :layout="layout"
-            :rows="rowVisibility"
           />
         </div>
       </div>

@@ -1,21 +1,6 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { setCellStyle } from "@idea10/core/workbook";
-import { activeCell, mountSheetGrid } from "./fixture";
-
-function expectGridcellsToHaveUniqueLogicalRows(
-  wrapper: ReturnType<typeof mountSheetGrid>["wrapper"],
-): void {
-  const cells = wrapper.findAll<HTMLElement>('[role="gridcell"]');
-  const rowIndexes = new Set(cells.map((cell) => cell.attributes("data-row")));
-  expect(wrapper.findAll('[role="row"]')).toHaveLength(rowIndexes.size);
-  for (const cell of cells) {
-    const row = cell.element.closest<HTMLElement>('[role="row"]');
-    expect(row?.getAttribute("aria-rowindex")).toBe(
-      String(Number(cell.attributes("data-row")) + 1),
-    );
-  }
-}
+import { activeCell, getCanvasLayout, mountSheetGrid, triggerCell } from "./fixture";
 
 describe("SheetGrid frozen viewport", () => {
   test("expands for persisted freeze and merge metadata before its first render", () => {
@@ -33,22 +18,23 @@ describe("SheetGrid frozen viewport", () => {
     expect(Number(scroller.attributes("aria-colcount"))).toBeGreaterThanOrEqual(18);
   });
 
-  test("keeps one grid while cells and headers use all four frozen panes once", async () => {
+  test("keeps one grid while the canvas layout and headers use all four frozen panes", async () => {
     const { sheet, wrapper } = mountSheetGrid();
     sheet.freezePanes = { rows: 2, columns: 1 };
     await nextTick();
 
     expect(wrapper.findAll('[role="grid"]')).toHaveLength(1);
-    for (const pane of ["topLeft", "top", "left", "body"]) {
-      expect(wrapper.find(`[data-pane="${pane}"]`).exists()).toBe(true);
+    const layout = getCanvasLayout(wrapper);
+    for (const pane of ["topLeft", "top", "left", "body"] as const) {
+      expect(layout.panes[pane].rows.length).toBeGreaterThan(0);
+      expect(layout.panes[pane].columns.length).toBeGreaterThan(0);
     }
-    expect(wrapper.findAll('[data-row="0"][data-column="0"]')).toHaveLength(1);
-    expect(wrapper.findAll('[data-row="0"][data-column="1"]')).toHaveLength(1);
-    expect(wrapper.findAll('[data-row="2"][data-column="0"]')).toHaveLength(1);
-    expect(wrapper.findAll('[data-row="2"][data-column="1"]')).toHaveLength(1);
+    expect(layout.getPaneForAddress({ row: 0, column: 0 })).toBe("topLeft");
+    expect(layout.getPaneForAddress({ row: 0, column: 1 })).toBe("top");
+    expect(layout.getPaneForAddress({ row: 2, column: 0 })).toBe("left");
+    expect(layout.getPaneForAddress({ row: 2, column: 1 })).toBe("body");
     expect(wrapper.findAll('[data-select-row="0"]')).toHaveLength(1);
     expect(wrapper.findAll('[data-select-column="0"]')).toHaveLength(1);
-    expectGridcellsToHaveUniqueLogicalRows(wrapper);
   });
 
   test("clips overscanned body headers below and after frozen headers", async () => {
@@ -93,13 +79,15 @@ describe("SheetGrid frozen viewport", () => {
     expect(frozenRows.get('[data-select-row="0"]').attributes("aria-pressed")).toBe("true");
   });
 
-  test("groups visible gridcells into their logical accessibility rows", () => {
+  test("keeps the canvas event and border surfaces fixed while viewport panes virtualize", () => {
     const { wrapper } = mountSheetGrid();
-
-    expectGridcellsToHaveUniqueLogicalRows(wrapper);
+    const layout = getCanvasLayout(wrapper);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-border-canvas]")).toHaveLength(2);
+    expect(layout.panes.body.rows.length).toBeLessThan(100);
+    expect(layout.panes.body.columns.length).toBeLessThan(50);
   });
 
-  test("keeps one canonical gridcell when only a merged tail is visible", async () => {
+  test("keeps a canonical merge anchor when only a merged tail is visible", async () => {
     const { sheet, wrapper } = mountSheetGrid();
     sheet.mergedCells = [{ start: { row: 0, column: 0 }, end: { row: 2, column: 1 } }];
     await nextTick();
@@ -107,20 +95,17 @@ describe("SheetGrid frozen viewport", () => {
     (scroller.element as HTMLDivElement).scrollTop = 48;
     await scroller.trigger("scroll");
 
-    expect(wrapper.findAll('[data-row="0"][data-column="0"]')).toHaveLength(1);
-    expect(wrapper.findAll('[data-row="2"][data-column="0"]')).toHaveLength(0);
-    expect(wrapper.findAll('[role="gridcell"]')).toHaveLength(
-      new Set(
-        wrapper
-          .findAll('[role="gridcell"]')
-          .map((cell) => `${cell.attributes("data-row")}:${cell.attributes("data-column")}`),
-      ).size,
-    );
+    const layout = getCanvasLayout(wrapper);
+    expect(layout.getAnchorForAddress({ row: 2, column: 0 })).toEqual({ row: 0, column: 0 });
+    expect(layout.getMergedRangeAt({ row: 2, column: 0 })).toEqual({
+      start: { row: 0, column: 0 },
+      end: { row: 2, column: 1 },
+    });
   });
 
   test("reanchors an active merge tail when merged metadata changes", async () => {
     const { sheet, wrapper } = mountSheetGrid();
-    await wrapper.get('[data-row="2"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 2, column: 1 }, "mousedown", { button: 0 });
     expect(activeCell(wrapper)).toBe("B3");
 
     sheet.mergedCells = [{ start: { row: 0, column: 0 }, end: { row: 2, column: 1 } }];
@@ -143,10 +128,8 @@ describe("SheetGrid frozen viewport", () => {
     sheet.freezePanes = { rows: 1, columns: 1 };
     await nextTick();
 
-    await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", { button: 0 });
-    await wrapper
-      .get('[data-row="2"][data-column="2"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 0, column: 0 }, "mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0, shiftKey: true });
 
     expect(wrapper.findAll("[data-selection-range]")).toHaveLength(4);
     const outlineStyles = wrapper
@@ -169,19 +152,20 @@ describe("SheetGrid frozen viewport", () => {
     }
   });
 
-  test("defensively renders an invalid cross-freeze merge with one semantic gridcell", async () => {
+  test("keeps invalid cross-freeze merge fragments in the canvas layout", async () => {
     const { sheet, wrapper } = mountSheetGrid();
     sheet.freezePanes = { rows: 1, columns: 1 };
     sheet.mergedCells = [{ start: { row: 0, column: 0 }, end: { row: 1, column: 1 } }];
-    setCellStyle(sheet, { row: 0, column: 0 }, { fillColor: "#123456" });
     await nextTick();
 
-    expect(wrapper.findAll('[data-row="0"][data-column="0"]')).toHaveLength(1);
-    const fragments = wrapper.findAll('[aria-hidden="true"].sheet-cell-layer__merge-fragment');
-    expect(fragments.length).toBeGreaterThan(0);
+    const layout = getCanvasLayout(wrapper);
+    expect(layout.getMergedRangeAt({ row: 1, column: 1 })).toEqual({
+      start: { row: 0, column: 0 },
+      end: { row: 1, column: 1 },
+    });
     expect(
-      fragments.map((fragment) => (fragment.element as HTMLElement).style.backgroundColor),
-    ).toEqual(Array.from({ length: fragments.length }, () => "#123456"));
+      layout.getRangePaneRects({ start: { row: 0, column: 0 }, end: { row: 1, column: 1 } }),
+    ).not.toHaveLength(0);
   });
 
   test("expands and reclamps the viewport when freeze or merge metadata grows", async () => {
@@ -207,7 +191,8 @@ describe("SheetGrid frozen viewport", () => {
     }));
     await nextTick();
 
-    expect(wrapper.findAll('[data-row="0"][data-column="2"]')).toHaveLength(1);
-    expect(wrapper.findAll('[data-row="20"][data-column="2"]')).toHaveLength(1);
+    const layout = getCanvasLayout(wrapper);
+    expect(layout.getAnchorForAddress({ row: 0, column: 3 })).toEqual({ row: 0, column: 2 });
+    expect(layout.getAnchorForAddress({ row: 20, column: 3 })).toEqual({ row: 20, column: 2 });
   });
 });

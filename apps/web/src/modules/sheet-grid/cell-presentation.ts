@@ -2,27 +2,16 @@ import type { CSSProperties } from "vue";
 import type { CellStyle } from "@idea10/core/style";
 import type { FormulaValue } from "@idea10/core/formula";
 import {
-  isCellTextWrapped,
   resolveCellHorizontalAlignment,
   resolveCellTextDirection,
   getCellIndentPixels,
 } from "../../shared/cell-text/text-presentation";
 import { browserCellTextMeasurer } from "../../shared/cell-text/text-metrics";
-import { WRAPPED_CELL_LINE_HEIGHT } from "@idea10/sheet-engine/row-height";
 import {
   getCellTextRenderFontSize,
   getCellTextTypographyStyle,
 } from "../../shared/cell-text/font-presentation";
 import { getCellFillStyle } from "../../shared/cell-fill/fill-presentation";
-
-const ALIGNMENT_JUSTIFICATION = {
-  left: "flex-start",
-  center: "center",
-  right: "flex-end",
-  fill: "flex-start",
-  justify: "flex-start",
-  distributed: "flex-start",
-} as const;
 
 const VERTICAL_ALIGNMENT = {
   top: "flex-start",
@@ -31,41 +20,6 @@ const VERTICAL_ALIGNMENT = {
   justify: "flex-start",
   distributed: "center",
 } as const;
-
-function getTypographyStyle(style: Readonly<CellStyle> | undefined): CSSProperties {
-  // CellTextContent renders underline and strikethrough in separate layers so a
-  // double underline never turns the strike into a double line.
-  return getCellTextTypographyStyle(style, { includeDecorations: false });
-}
-
-export function getCellContentStyle(
-  style: Readonly<CellStyle> | undefined,
-  preserveLineBreaks = false,
-  value?: FormulaValue,
-  text = "",
-): CSSProperties {
-  const wrapped = isCellTextWrapped(style);
-  const multiline = wrapped || preserveLineBreaks;
-  const direction = resolveCellTextDirection(text, style?.textDirection);
-  const alignment = resolveCellHorizontalAlignment(style?.horizontalAlign, value, direction);
-  const multilineStyle: CSSProperties = multiline
-    ? {
-        whiteSpace: wrapped ? "pre-wrap" : "pre",
-        ...(wrapped ? { overflowWrap: "anywhere" } : {}),
-        wordBreak: "normal",
-        lineHeight: String(WRAPPED_CELL_LINE_HEIGHT),
-        textAlign: alignment === "fill" || alignment === "distributed" ? "left" : alignment,
-      }
-    : {};
-
-  return {
-    ...getTypographyStyle(style),
-    ...multilineStyle,
-    ...getCellFillStyle(style),
-    justifyContent: ALIGNMENT_JUSTIFICATION[alignment],
-    alignItems: VERTICAL_ALIGNMENT[style?.verticalAlign ?? "bottom"],
-  };
-}
 
 export function getCellEditorStyle(
   style: Readonly<CellStyle> | undefined,

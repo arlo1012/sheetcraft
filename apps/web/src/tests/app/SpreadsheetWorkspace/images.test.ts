@@ -13,6 +13,7 @@ import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { prepareImageAsset } from "../../../modules/image-assets/prepareImageAsset";
 import { createAppI18n } from "../../../shared/i18n";
+import { triggerCanvasCell } from "../canvas-interaction";
 
 vi.mock("../../../modules/image-assets/prepareImageAsset", async (original) => ({
   ...(await original<object>()),
@@ -112,9 +113,9 @@ describe("workspace cell image entry points", () => {
       await flushPromises();
       document.querySelector<HTMLButtonElement>('[data-floating-image-action="copy"]')!.click();
       await flushPromises();
-      await wrapper
-        .get('[data-row="0"][data-column="0"]')
-        .trigger(editing ? "dblclick" : "mousedown", { button: 0 });
+      await triggerCanvasCell(wrapper, { row: 0, column: 0 }, editing ? "dblclick" : "mousedown", {
+        button: 0,
+      });
       const event = new Event("paste", { bubbles: true, cancelable: true });
       Object.defineProperty(event, "clipboardData", {
         value: {
@@ -155,7 +156,7 @@ describe("workspace cell image entry points", () => {
     await flushPromises();
     document.querySelector<HTMLButtonElement>('[data-floating-image-action="copy"]')!.click();
     await flushPromises();
-    await wrapper.get('[data-row="0"][data-column="0"]').trigger("dblclick", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 0, column: 0 }, "dblclick", { button: 0 });
     const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
     await editor.setValue("ab");
     editor.element.setSelectionRange(1, 1);
@@ -180,9 +181,7 @@ describe("workspace cell image entry points", () => {
 
   test("converts a cell image to floating with its asset geometry and restores it through undo", async () => {
     const { wrapper, sheet } = await fixture(true);
-    await wrapper
-      .get('[data-row="0"][data-column="0"]')
-      .trigger("contextmenu", { clientX: 80, clientY: 120 });
+    await triggerCanvasCell(wrapper, { row: 0, column: 0 }, "contextmenu");
     await flushPromises();
     document
       .querySelector<HTMLButtonElement>('[data-cell-action="convert-image-to-floating"]')!
@@ -207,7 +206,7 @@ describe("workspace cell image entry points", () => {
 
   test("double-click previews cell and floating images without altering document contents", async () => {
     const { wrapper, sheet } = await fixture(true);
-    await wrapper.get('[data-row="0"][data-column="0"]').trigger("dblclick", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 0, column: 0 }, "dblclick", { button: 0 });
     expect(wrapper.get("[data-image-preview]").text()).toContain("Cell diagram");
     expect(wrapper.get("[data-image-preview]").attributes("data-src")).toBe("blob:fixture");
     await wrapper.get("[data-image-preview] button").trigger("click");
@@ -222,9 +221,7 @@ describe("workspace cell image entry points", () => {
     const { wrapper, sheet } = await fixture(true);
     vi.spyOn(navigator, "clipboard", "get").mockReturnValue(undefined as unknown as Clipboard);
     async function menu(row: number, column: number, action: string) {
-      await wrapper
-        .get(`[data-row="${row}"][data-column="${column}"]`)
-        .trigger("contextmenu", { clientX: 80, clientY: 120 });
+      await triggerCanvasCell(wrapper, { row, column }, "contextmenu");
       await flushPromises();
       document.querySelector<HTMLButtonElement>(`[data-cell-action="${action}"]`)!.click();
       await flushPromises();
@@ -245,7 +242,7 @@ describe("workspace cell image entry points", () => {
   });
   test("double-click plus bitmap paste creates a saved and undoable cell image", async () => {
     const { wrapper, sheet, workbookStore } = await fixture();
-    await wrapper.get('[data-row="0"][data-column="0"]').trigger("dblclick", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 0, column: 0 }, "dblclick", { button: 0 });
     const event = new Event("paste", { bubbles: true, cancelable: true });
     Object.defineProperty(event, "clipboardData", {
       value: {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
-import SheetCellLayer from "../../../../../modules/sheet-grid/components/SheetCellLayer.vue";
+import SheetCanvasLayer from "../../../../../modules/sheet-grid/components/SheetCanvasLayer.vue";
 
 function dispatchMouse(type: string, options: MouseEventInit): void {
   window.dispatchEvent(new MouseEvent(type, options));
@@ -76,7 +76,7 @@ describe("SheetGrid drag selection", () => {
       clientX: 110,
       clientY: 58,
     });
-    const layer = wrapper.findComponent(SheetCellLayer);
+    const layer = wrapper.findComponent(SheetCanvasLayer);
     const evaluate = vi.spyOn(layer.props("evaluator"), "getComputedValue");
     dispatchMouse("mousemove", { buttons: 1, clientX: 420, clientY: 180 });
     await wrapper.vm.$nextTick();

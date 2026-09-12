@@ -16,9 +16,24 @@ import {
 type BorderPaintPane = {
   id: FrozenPaneId;
   scrollPosition: { x: number; y: number };
-  segments: readonly SheetBorderSegment[];
-  diagonals: readonly SheetDiagonalBorderSegment[];
+  lines: readonly BorderLinePaintInstruction[];
   junctions: readonly SheetBorderJunction[];
+};
+
+type BorderLinePart = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+};
+
+type BorderLinePaintInstruction = {
+  thickness: number;
+  color: string;
+  strokeWidth: number;
+  lineCap: CanvasLineCap;
+  dashArray: number[];
+  parts: readonly BorderLinePart[];
 };
 
 export type SheetBorderPaintPlan = {
@@ -36,6 +51,61 @@ function getPaneScrollPosition(layout: SheetViewportLayout, id: FrozenPaneId) {
       id === "topLeft" || id === "top"
         ? 0
         : layout.frozenSize.height + layout.bodyScrollPosition.y - pane.clip.y,
+  };
+}
+
+function getDashArray(dashArray: string | undefined): number[] {
+  return dashArray ? dashArray.split(" ").map(Number) : [];
+}
+
+function createOrthogonalLineInstruction(segment: SheetBorderSegment): BorderLinePaintInstruction {
+  const presentation = getBorderLinePresentation(segment.style);
+  return {
+    thickness: segment.thickness,
+    color: segment.color,
+    strokeWidth: presentation.strokeWidth,
+    lineCap: presentation.lineCap,
+    dashArray: getDashArray(presentation.dashArray),
+    parts: presentation.offsets.map((offset) =>
+      segment.orientation === "horizontal"
+        ? {
+            x1: segment.x,
+            y1: segment.y + segment.thickness / 2 + offset,
+            x2: segment.x + segment.length,
+            y2: segment.y + segment.thickness / 2 + offset,
+          }
+        : {
+            x1: segment.x + segment.thickness / 2 + offset,
+            y1: segment.y,
+            x2: segment.x + segment.thickness / 2 + offset,
+            y2: segment.y + segment.length,
+          },
+    ),
+  };
+}
+
+function createDiagonalLineInstruction(
+  segment: SheetDiagonalBorderSegment,
+): BorderLinePaintInstruction {
+  const presentation = getBorderLinePresentation(segment.style);
+  const x1 = segment.x - 0.5;
+  const x2 = segment.x + segment.width - 0.5;
+  const y1 = (segment.direction === "up" ? segment.y + segment.height : segment.y) - 0.5;
+  const y2 = (segment.direction === "up" ? segment.y : segment.y + segment.height) - 0.5;
+  const normalX = -(y2 - y1) / segment.length;
+  const normalY = (x2 - x1) / segment.length;
+  return {
+    thickness: segment.thickness,
+    color: segment.color,
+    strokeWidth: presentation.strokeWidth,
+    lineCap: presentation.lineCap,
+    dashArray: getDashArray(presentation.dashArray),
+    parts: presentation.offsets.map((offset) => ({
+      x1: x1 + normalX * offset,
+      y1: y1 + normalY * offset,
+      x2: x2 + normalX * offset,
+      y2: y2 + normalY * offset,
+    })),
   };
 }
 
@@ -76,20 +146,23 @@ export function createBorderPaintPlan(
       columnIndexes,
       layout.getMergedRangeAt,
     );
+    const diagonals = resolveVisibleDiagonalBorderSegments(
+      sheet,
+      geometry,
+      visibleRange,
+      scrollPosition,
+      rows,
+      rowIndexes,
+      columnIndexes,
+      layout.getMergedRangeAt,
+    );
     panes.push({
       id,
       scrollPosition,
-      segments,
-      diagonals: resolveVisibleDiagonalBorderSegments(
-        sheet,
-        geometry,
-        visibleRange,
-        scrollPosition,
-        rows,
-        rowIndexes,
-        columnIndexes,
-        layout.getMergedRangeAt,
-      ),
+      lines: [
+        ...segments.map(createOrthogonalLineInstruction),
+        ...diagonals.map(createDiagonalLineInstruction),
+      ].sort((left, right) => left.thickness - right.thickness),
       junctions: resolveBorderJunctions(segments),
     });
   }
@@ -97,55 +170,18 @@ export function createBorderPaintPlan(
   return { panes };
 }
 
-function setLineDash(context: CanvasRenderingContext2D, dashArray: string | undefined): void {
-  context.setLineDash(dashArray ? dashArray.split(" ").map(Number) : []);
-}
-
-function paintOrthogonalSegment(
+function paintLineInstruction(
   context: CanvasRenderingContext2D,
-  segment: SheetBorderSegment,
+  instruction: BorderLinePaintInstruction,
 ): void {
-  const presentation = getBorderLinePresentation(segment.style);
-  context.strokeStyle = segment.color;
-  context.lineWidth = presentation.strokeWidth;
-  context.lineCap = presentation.lineCap;
-  setLineDash(context, presentation.dashArray);
-
-  for (const offset of presentation.offsets) {
+  context.strokeStyle = instruction.color;
+  context.lineWidth = instruction.strokeWidth;
+  context.lineCap = instruction.lineCap;
+  context.setLineDash(instruction.dashArray);
+  for (const part of instruction.parts) {
     context.beginPath();
-    if (segment.orientation === "horizontal") {
-      const y = segment.y + segment.thickness / 2 + offset;
-      context.moveTo(segment.x, y);
-      context.lineTo(segment.x + segment.length, y);
-    } else {
-      const x = segment.x + segment.thickness / 2 + offset;
-      context.moveTo(x, segment.y);
-      context.lineTo(x, segment.y + segment.length);
-    }
-    context.stroke();
-  }
-}
-
-function paintDiagonalSegment(
-  context: CanvasRenderingContext2D,
-  segment: SheetDiagonalBorderSegment,
-): void {
-  const presentation = getBorderLinePresentation(segment.style);
-  const x1 = segment.x - 0.5;
-  const x2 = segment.x + segment.width - 0.5;
-  const y1 = (segment.direction === "up" ? segment.y + segment.height : segment.y) - 0.5;
-  const y2 = (segment.direction === "up" ? segment.y : segment.y + segment.height) - 0.5;
-  const normalX = -(y2 - y1) / segment.length;
-  const normalY = (x2 - x1) / segment.length;
-  context.strokeStyle = segment.color;
-  context.lineWidth = presentation.strokeWidth;
-  context.lineCap = presentation.lineCap;
-  setLineDash(context, presentation.dashArray);
-
-  for (const offset of presentation.offsets) {
-    context.beginPath();
-    context.moveTo(x1 + normalX * offset, y1 + normalY * offset);
-    context.lineTo(x2 + normalX * offset, y2 + normalY * offset);
+    context.moveTo(part.x1, part.y1);
+    context.lineTo(part.x2, part.y2);
     context.stroke();
   }
 }
@@ -177,14 +213,7 @@ export function paintSheetBorders(
       pane.scrollPosition.y - currentScrollPosition.y,
     );
 
-    const lines = [
-      ...pane.segments.map((segment) => ({ type: "orthogonal" as const, segment })),
-      ...pane.diagonals.map((segment) => ({ type: "diagonal" as const, segment })),
-    ].sort((left, right) => left.segment.thickness - right.segment.thickness);
-    for (const line of lines) {
-      if (line.type === "orthogonal") paintOrthogonalSegment(context, line.segment);
-      else paintDiagonalSegment(context, line.segment);
-    }
+    for (const line of pane.lines) paintLineInstruction(context, line);
     for (const junction of pane.junctions) paintJunction(context, junction);
     context.restore();
   }

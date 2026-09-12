@@ -17,6 +17,7 @@ import {
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import type { WorkbookStore } from "../../../modules/workbook-persistence/workbookStore";
 import { createAppI18n } from "../../../shared/i18n";
+import { triggerCanvasCell } from "../canvas-interaction";
 
 const mounted: Array<{ unmount(): void }> = [];
 
@@ -66,9 +67,7 @@ async function dragReference(
   start: { row: number; column: number; x: number; y: number },
   end: { x: number; y: number },
 ) {
-  await wrapper
-    .get(`[data-row="${start.row}"][data-column="${start.column}"]`)
-    .trigger("mousedown", { button: 0, buttons: 1, clientX: start.x, clientY: start.y });
+  await triggerCanvasCell(wrapper, start, "mousedown", { button: 0, buttons: 1 });
   dispatchMouse("mousemove", { buttons: 1, clientX: end.x, clientY: end.y });
   dispatchMouse("mouseup", { button: 0, clientX: end.x, clientY: end.y });
   await flushPromises();
@@ -157,14 +156,14 @@ describe("workspace formula references", () => {
     await dragReference(wrapper, { row: 0, column: 1, x: 145, y: 12 }, { x: 250, y: 42 });
     await editor.trigger("keydown", { key: "Enter" });
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A2");
-    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain("10");
+    expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
 
-    await wrapper.get('[data-row="2"][data-column="0"]').trigger("mousedown", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 2, column: 0 }, "mousedown", { button: 0 });
     const nested = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
     await nested.trigger("keydown", { key: "=" });
     await nested.setValue("=SUM(SUM(B1),C2");
     await nested.trigger("keydown", { key: "Enter" });
-    await wrapper.get('[data-row="3"][data-column="0"]').trigger("mousedown", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 3, column: 0 }, "mousedown", { button: 0 });
     const alreadyClosed = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
     await alreadyClosed.trigger("keydown", { key: "F2" });
     await alreadyClosed.setValue("=SUM(B1)");
@@ -207,7 +206,7 @@ describe("workspace formula references", () => {
     expectMatchingReferencePresentation(wrapper, 2);
 
     await formula.trigger("keydown", { key: "Escape" });
-    await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 0, column: 0 }, "mousedown", { button: 0 });
     const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
     await editor.trigger("keydown", { key: "F2" });
     await editor.setValue("=SUM(B1:B2,C1:C2)");

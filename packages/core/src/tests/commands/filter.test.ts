@@ -109,6 +109,49 @@ describe("sheet filter commands", () => {
     ]);
   });
 
+  test("derives literal, formula, error, and image values with evaluator-equivalent semantics", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: "text" });
+    setCellContent(
+      sheet,
+      { row: 2, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=1+2" },
+      },
+    );
+    setCellContent(
+      sheet,
+      { row: 3, column: 0 },
+      {
+        kind: "error",
+        error: { kind: "formula-error", code: "NA" },
+      },
+    );
+    setCellContent(
+      sheet,
+      { row: 4, column: 0 },
+      {
+        kind: "image",
+        image: { assetId: "image", altText: "Diagram" },
+      },
+    );
+
+    expect(
+      getSheetFilterColumnDistinctValues(
+        sheet,
+        { start: { row: 0, column: 0 }, end: { row: 4, column: 0 } },
+        0,
+      ),
+    ).toEqual([
+      { kind: "error", code: "NA" },
+      { kind: "error", code: "VALUE" },
+      { kind: "number", value: 3 },
+      { kind: "string", value: "text" },
+    ]);
+  });
+
   test("normalizes public distinct-value ranges and rejects invalid bounds or columns", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);

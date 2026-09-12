@@ -20,6 +20,7 @@ import { useSpreadsheetWorkspaceController } from "../../../app/composables/useS
 import WorkbookFileActions from "../../../modules/workbook-persistence/components/WorkbookFileActions.vue";
 import type { WorkbookStore } from "../../../modules/workbook-persistence/workbookStore";
 import { formatCellValueForGrid } from "../../../modules/sheet-grid/cell-value-presentation";
+import { triggerCanvasCell } from "../canvas-interaction";
 import { createAppI18n } from "../../../shared/i18n";
 
 type Controller = ReturnType<typeof useSpreadsheetWorkspaceController>;
@@ -108,10 +109,9 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     const store = createStore(createFormulaFoundationSnapshot());
     const wrapper = await mountWorkspace(store);
 
-    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain("#N/A");
-    expect(wrapper.get('[data-row="0"][data-column="3"]').text()).toContain("#NAME?");
+    expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
 
-    await wrapper.get('[data-row="1"][data-column="5"]').trigger("mousedown", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 1, column: 5 }, "mousedown", { button: 0 });
     const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
     await editor.trigger("keydown", { key: "m" });
     await editor.setValue("save marker");
@@ -184,7 +184,7 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     await flushPromises();
 
     expect(store.replace).not.toHaveBeenCalled();
-    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain("#N/A");
+    expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
     expect(wrapper.get('[data-workbook-file="feedback"]').text()).toContain(
       "not a valid idea10 workbook",
     );

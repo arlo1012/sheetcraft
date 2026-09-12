@@ -100,7 +100,7 @@ describe("workspace persistence integration", () => {
 
     expect(store.replace).toHaveBeenCalledTimes(1);
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
-    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain("imported");
+    expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
     expect(wrapper.get<HTMLTextAreaElement>("[data-formula-input]").element.value).toBe("imported");
     expect(wrapper.find('[data-workbook-file="feedback"]').exists()).toBe(false);
   });
@@ -115,7 +115,7 @@ describe("workspace persistence integration", () => {
 
     expect(store.replace).not.toHaveBeenCalled();
     expect(wrapper.findComponent(WorkbookFileFeedback).props("confirmation")).toBeUndefined();
-    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain("safe");
+    expect(wrapper.get<HTMLTextAreaElement>("[data-formula-input]").element.value).toBe("safe");
     expect(wrapper.get('[data-workbook-file="feedback"]').text()).toContain("unsupported version");
   });
 });

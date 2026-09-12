@@ -1,7 +1,13 @@
 import { describe, expect, test } from "vitest";
 import { getCellValue, getRowHeight, setCellValue } from "@idea10/core/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
-import { activeCell, getFloatingMenu, hasFloatingMenu, mountSheetGrid, triggerCell } from "./fixture";
+import {
+  activeCell,
+  getFloatingMenu,
+  hasFloatingMenu,
+  mountSheetGrid,
+  triggerCell,
+} from "./fixture";
 
 describe("SheetGrid axis selection", () => {
   test("selects rows and columns from headers, with Shift extending the same axis", async () => {
