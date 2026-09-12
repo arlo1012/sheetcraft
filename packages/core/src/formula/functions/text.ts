@@ -428,8 +428,21 @@ function find(context: FormulaFunctionContext, insensitive: boolean): FormulaVal
     return isFormulaError(needle) ? needle : haystack;
   const start = context.argumentCount === 2 ? 1 : count(context, 2);
   if (isFormulaError(start) || start < 1) return formulaError("VALUE");
-  const source = insensitive ? haystack.toLocaleLowerCase() : haystack;
-  const target = insensitive ? needle.toLocaleLowerCase() : needle;
-  const index = source.indexOf(target, start - 1);
-  return index < 0 ? formulaError("VALUE") : Array.from(haystack.slice(0, index)).length + 1;
+  const source = Array.from(insensitive ? haystack.toLocaleLowerCase() : haystack);
+  const target = Array.from(insensitive ? needle.toLocaleLowerCase() : needle);
+  if (start > source.length) return formulaError("VALUE");
+  const index = findCharacters(source, target, start - 1);
+  return index < 0 ? formulaError("VALUE") : index + 1;
+}
+
+function findCharacters(
+  source: readonly string[],
+  target: readonly string[],
+  start: number,
+): number {
+  if (target.length === 0) return start;
+  for (let index = start; index + target.length <= source.length; index += 1) {
+    if (target.every((character, offset) => source[index + offset] === character)) return index;
+  }
+  return -1;
 }

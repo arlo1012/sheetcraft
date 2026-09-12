@@ -72,11 +72,15 @@ function normalizedDate(
     { year, month, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 },
     context,
   );
-  return typeof first === "number"
-    ? first + day - 1
-    : isFormulaError(first)
-      ? first
-      : formulaError("NUM");
+  if (typeof first !== "number") return isFormulaError(first) ? first : formulaError("NUM");
+  const result = first + day - 1;
+  if (!Number.isFinite(result)) return formulaError("NUM");
+  try {
+    excelSerialToDateParts(result, system(context));
+    return result;
+  } catch {
+    return formulaError("NUM");
+  }
 }
 
 function shiftedMonth(context: FormulaFunctionContext, endOfMonth: boolean): FormulaValue {
@@ -153,8 +157,18 @@ export const DATE_FUNCTIONS = [
       const second = whole(context, 2);
       if (isFormulaError(hour) || isFormulaError(minute) || isFormulaError(second))
         return isFormulaError(hour) ? hour : isFormulaError(minute) ? minute : second;
-      if (hour < 0 || minute < 0 || second < 0) return formulaError("NUM");
-      return ((hour * 3_600 + minute * 60 + second) % 86_400) / 86_400;
+      if (
+        hour < 0 ||
+        minute < 0 ||
+        second < 0 ||
+        hour > 32_767 ||
+        minute > 32_767 ||
+        second > 32_767
+      )
+        return formulaError("NUM");
+      const totalSeconds = hour * 3_600 + minute * 60 + second;
+      const result = (totalSeconds % 86_400) / 86_400;
+      return Number.isFinite(result) ? result : formulaError("NUM");
     },
   ),
   ...(["YEAR", "MONTH", "DAY", "HOUR", "MINUTE", "SECOND"] as const).map((name) =>

@@ -15,7 +15,8 @@ function paymentType(
 ): 0 | 1 | ReturnType<typeof formulaError> {
   if (context.argumentCount <= index) return 0;
   const value = number(context, index);
-  return isFormulaError(value) || (value !== 0 && value !== 1) ? formulaError("NUM") : value;
+  if (isFormulaError(value)) return value;
+  return value !== 0 && value !== 1 ? formulaError("NUM") : value;
 }
 
 function argumentsFor(
@@ -57,7 +58,7 @@ function pmt(
   future: number,
   type: number,
 ): FormulaValue {
-  if (nper === 0) return formulaError("NUM");
+  if (nper <= 0) return formulaError("NUM");
   const result =
     rate === 0
       ? -(present + future) / nper
