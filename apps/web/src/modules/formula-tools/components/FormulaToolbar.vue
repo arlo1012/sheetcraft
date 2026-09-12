@@ -9,6 +9,7 @@ import {
   FunctionSquare,
   GitBranch,
   Info,
+  Plus,
   Radical,
   RotateCcw,
   Search,
@@ -60,17 +61,16 @@ const sumPanelRef = ref<HTMLElement | null>(null);
 const sumMenuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const sumMenuOpen = ref(false);
 const browserOpen = ref(false);
-const nameSplitRef = ref<InstanceType<typeof RibbonSplitAction> | null>(null);
-const nameTriggerRef = computed(() => nameSplitRef.value?.menuElement ?? null);
+const nameQuickCreateRef = ref<InstanceType<typeof RibbonIconAction> | null>(null);
+const nameTriggerRef = computed(() => nameQuickCreateRef.value?.rootElement ?? null);
 const namePanelRef = ref<HTMLElement | null>(null);
-const nameMenuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const nameMenuOpen = ref(false);
 const calculationSplitRef = ref<InstanceType<typeof RibbonSplitAction> | null>(null);
 const calculationTriggerRef = computed(() => calculationSplitRef.value?.menuElement ?? null);
 const calculationPanelRef = ref<HTMLElement | null>(null);
 const calculationMenuOpen = ref(false);
 const sumMenuId = `formula-sum-${Math.random().toString(36).slice(2)}`;
-const nameMenuId = `formula-name-${Math.random().toString(36).slice(2)}`;
+const nameMenuId = `formula-name-create-${Math.random().toString(36).slice(2)}`;
 const calculationMenuId = `formula-calculation-${Math.random().toString(36).slice(2)}`;
 const aggregates: ReadonlyArray<{
   name: "SUM" | "AVERAGE" | "COUNT" | "MAX" | "MIN";
@@ -82,6 +82,12 @@ const aggregates: ReadonlyArray<{
   { name: "MAX", label: "MAX" },
   { name: "MIN", label: "MIN" },
 ];
+const namePositions = ref<Record<DefinedNameLabelPosition, boolean>>({
+  top: true,
+  left: false,
+  bottom: false,
+  right: false,
+});
 const { floatingStyles } = useDismissibleFloatingPanel(sumTriggerRef, sumPanelRef, sumMenuOpen, {
   placement: "bottom-start",
   offset: 4,
@@ -131,19 +137,21 @@ function closeBrowser(): void {
   browserOpen.value = false;
   emit("interactionEnd");
 }
-function toggleNameMenu(): void {
-  if (!props.disabled && props.nameCreationEnabled) nameMenuOpen.value = !nameMenuOpen.value;
-}
-function openNameMenuFromKeyboard(event: KeyboardEvent): void {
-  if (event.key === "ArrowDown" && props.nameCreationEnabled) {
-    event.preventDefault();
+function openNameMenu(): void {
+  if (!props.disabled && props.nameCreationEnabled) {
+    namePositions.value = { top: true, left: false, bottom: false, right: false };
     nameMenuOpen.value = true;
-    void nextTick(() => nameMenuRef.value?.focusFirstItem());
   }
 }
-function createNamesFromSelection(position: DefinedNameLabelPosition): void {
+function createNamesFromSelection(): void {
+  const positions = (
+    Object.entries(namePositions.value) as Array<[DefinedNameLabelPosition, boolean]>
+  )
+    .filter(([, selected]) => selected)
+    .map(([position]) => position);
+  if (!positions.length) return;
   nameMenuOpen.value = false;
-  emit("createNamesFromSelection", [position]);
+  emit("createNamesFromSelection", positions);
 }
 function toggleCalculationMenu(): void {
   if (!props.disabled && props.calculationSettings)
@@ -333,53 +341,6 @@ function insertFunction(name: string): void {
         role="group"
         :aria-label="t('formulaTools.toolbar')"
       >
-        <RibbonSplitAction
-          ref="nameSplitRef"
-          variant="tall"
-          :label="t('formulaTools.defineName')"
-          :menu-label="t('formulaTools.defineNameMenu')"
-          :text="t('formulaTools.defineName')"
-          :disabled="disabled"
-          :menu-disabled="disabled || !nameCreationEnabled"
-          :expanded="nameMenuOpen"
-          :menu-id="nameMenuId"
-          @activate="emit('openNames')"
-          @toggle-menu="toggleNameMenu"
-          @menu-keydown="openNameMenuFromKeyboard"
-          ><Tags :size="18"
-        /></RibbonSplitAction>
-        <Teleport to="body"
-          ><div
-            v-if="nameMenuOpen"
-            :id="nameMenuId"
-            ref="namePanelRef"
-            class="formula-toolbar__name-menu"
-            role="presentation"
-            tabindex="-1"
-            :style="nameMenuStyles"
-            :data-cell-edit-session="editSessionId"
-          >
-            <MenuSurface ref="nameMenuRef" :label="t('formulaTools.defineNameMenu')"
-              ><MenuItem
-                data-formula-name-position="top"
-                @select="createNamesFromSelection('top')"
-                >{{ t("formulaTools.nameFromTopRow") }}</MenuItem
-              ><MenuItem
-                data-formula-name-position="left"
-                @select="createNamesFromSelection('left')"
-                >{{ t("formulaTools.nameFromLeftColumn") }}</MenuItem
-              ><MenuItem
-                data-formula-name-position="bottom"
-                @select="createNamesFromSelection('bottom')"
-                >{{ t("formulaTools.nameFromBottomRow") }}</MenuItem
-              ><MenuItem
-                data-formula-name-position="right"
-                @select="createNamesFromSelection('right')"
-                >{{ t("formulaTools.nameFromRightColumn") }}</MenuItem
-              ></MenuSurface
-            >
-          </div></Teleport
-        >
         <RibbonIconAction
           variant="tall"
           :label="t('formulaTools.nameManager')"
@@ -388,6 +349,72 @@ function insertFunction(name: string): void {
           @activate="emit('openNames')"
           ><Tags :size="18"
         /></RibbonIconAction>
+        <RibbonIconAction
+          ref="nameQuickCreateRef"
+          variant="tall"
+          :label="t('formulaTools.quickCreateNames')"
+          :text="t('formulaTools.quickCreateNames')"
+          :disabled="disabled || !nameCreationEnabled"
+          @activate="openNameMenu"
+          ><Plus :size="18"
+        /></RibbonIconAction>
+        <Teleport to="body"
+          ><section
+            v-if="nameMenuOpen"
+            :id="nameMenuId"
+            ref="namePanelRef"
+            class="formula-toolbar__name-menu"
+            role="dialog"
+            :aria-label="t('formulaTools.createNamesFromSelection')"
+            tabindex="-1"
+            :style="nameMenuStyles"
+            :data-cell-edit-session="editSessionId"
+          >
+            <p>{{ t("formulaTools.createNamesFromSelection") }}</p>
+            <label
+              ><input
+                v-model="namePositions.top"
+                type="checkbox"
+                data-formula-name-position="top"
+              />
+              {{ t("formulaTools.nameFromTopRow") }}</label
+            ><label
+              ><input
+                v-model="namePositions.left"
+                type="checkbox"
+                data-formula-name-position="left"
+              />
+              {{ t("formulaTools.nameFromLeftColumn") }}</label
+            ><label
+              ><input
+                v-model="namePositions.bottom"
+                type="checkbox"
+                data-formula-name-position="bottom"
+              />
+              {{ t("formulaTools.nameFromBottomRow") }}</label
+            ><label
+              ><input
+                v-model="namePositions.right"
+                type="checkbox"
+                data-formula-name-position="right"
+              />
+              {{ t("formulaTools.nameFromRightColumn") }}</label
+            >
+            <div class="formula-toolbar__name-menu-actions">
+              <button type="button" @click="nameMenuOpen = false">
+                {{ t("formulaTools.cancel") }}
+              </button>
+              <button
+                type="button"
+                data-formula-name-confirm
+                :disabled="!Object.values(namePositions).some(Boolean)"
+                @click="createNamesFromSelection"
+              >
+                {{ t("formulaTools.createNamesFromSelection") }}
+              </button>
+            </div>
+          </section></Teleport
+        >
         <RibbonSplitAction
           ref="calculationSplitRef"
           variant="tall"
@@ -537,6 +564,52 @@ function insertFunction(name: string): void {
   &__name-menu,
   &__calculation-menu {
     z-index: 40;
+  }
+  &__name-menu {
+    display: grid;
+    gap: 7px;
+    min-width: 210px;
+    padding: 12px;
+    background: var(--idea-surface-panel);
+    border: 1px solid var(--idea-border-subtle);
+    border-radius: var(--idea-radius-default);
+    box-shadow: var(--idea-shadow-floating);
+    color: var(--idea-text-primary);
+    font-size: var(--idea-font-size-body-medium);
+    p {
+      margin: 0 0 2px;
+      color: var(--idea-text-secondary);
+      font-size: var(--idea-font-size-body-small);
+    }
+    label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+  }
+  &__name-menu-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 4px;
+    button {
+      min-height: 26px;
+      padding: 0 8px;
+      background: var(--idea-surface-canvas);
+      border: 1px solid var(--idea-border-control);
+      border-radius: var(--idea-radius-default);
+      color: inherit;
+      font: inherit;
+      &:last-child {
+        background: var(--idea-action-primary);
+        border-color: var(--idea-action-primary);
+        color: var(--idea-text-on-action);
+      }
+      &:disabled {
+        cursor: default;
+        opacity: 0.55;
+      }
+    }
   }
   &__calculation-menu {
     display: grid;

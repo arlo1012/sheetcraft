@@ -6,9 +6,8 @@ export type FormulaToolsMessageSchema = {
     autoSum: string;
     autoSumMenu: string;
     nameManager: string;
-    defineName: string;
-    defineNameMenu: string;
     createNamesFromSelection: string;
+    quickCreateNames: string;
     nameFromTopRow: string;
     nameFromLeftColumn: string;
     nameFromBottomRow: string;

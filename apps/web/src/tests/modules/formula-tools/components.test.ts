@@ -96,13 +96,16 @@ describe("FormulaToolbar", () => {
     expect(wrapper.emitted("interactionEnd")).toHaveLength(1);
   });
 
-  test("creates names from a selected edge and sends actual calculation settings", async () => {
+  test("creates names from selected label edges and sends actual calculation settings", async () => {
     const wrapper = mountToolbar();
-    const nameMenu = wrapper.get('[aria-label="Define names from selection"]');
-    await nameMenu.trigger("click");
-    const top = document.querySelector<HTMLElement>("[data-formula-name-position='top']");
-    top?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(wrapper.emitted("createNamesFromSelection")).toEqual([[["top"]]]);
+    await wrapper.get('[aria-label="Quick create"]').trigger("click");
+    const left = document.querySelector<HTMLInputElement>("[data-formula-name-position='left']");
+    left!.checked = true;
+    left?.dispatchEvent(new Event("change", { bubbles: true }));
+    document
+      .querySelector<HTMLElement>("[data-formula-name-confirm]")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(wrapper.emitted("createNamesFromSelection")).toEqual([[["top", "left"]]]);
 
     await wrapper.get('[aria-label="Calculation options"]').trigger("click");
     const manual = document.querySelectorAll<HTMLInputElement>(
