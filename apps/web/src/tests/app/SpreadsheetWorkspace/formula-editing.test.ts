@@ -14,6 +14,7 @@ import {
   setCellValue,
 } from "@idea10/core/workbook";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { getFormulaFunctionMetadata } from "@idea10/core/formula";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import type { WorkbookStore } from "../../../modules/workbook-persistence/workbookStore";
 import { createAppI18n } from "../../../shared/i18n";
@@ -31,13 +32,17 @@ function createFormulaFixture(): WorkbookSnapshot {
 }
 
 function createMemoryStore(initialSnapshot?: WorkbookSnapshot) {
-  let record = initialSnapshot ? { revision: 1, savedAt: 1, snapshot: initialSnapshot } : undefined;
+  let record = initialSnapshot
+    ? { revision: 1, savedAt: 1, snapshot: initialSnapshot }
+    : undefined;
   const store = {
     load: vi.fn(async () => record),
-    save: vi.fn(async (snapshot: WorkbookSnapshot, revision: number | undefined) => {
-      record = { revision: (revision ?? 0) + 1, savedAt: 1, snapshot };
-      return { revision: record.revision, savedAt: record.savedAt };
-    }),
+    save: vi.fn(
+      async (snapshot: WorkbookSnapshot, revision: number | undefined) => {
+        record = { revision: (revision ?? 0) + 1, savedAt: 1, snapshot };
+        return { revision: record.revision, savedAt: record.savedAt };
+      },
+    ),
     replace: vi.fn(async (snapshot: WorkbookSnapshot) => {
       record = { revision: (record?.revision ?? 0) + 1, savedAt: 1, snapshot };
       return { revision: record.revision, savedAt: record.savedAt };
@@ -66,7 +71,7 @@ afterEach(() => {
 });
 
 describe("workspace formula authoring", () => {
-  test("renders the same single supported SUM suggestion from the grid editor", async () => {
+  test("renders matching Core suggestions from the grid editor with SUM as the default", async () => {
     const memory = createMemoryStore();
     const wrapper = await mountWorkspace(memory.store);
     const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
@@ -75,8 +80,18 @@ describe("workspace formula authoring", () => {
     await editor.setValue("=s");
 
     const suggestions = new DOMWrapper(document.body).get('[role="listbox"]');
-    expect(suggestions.findAll('[role="option"]')).toHaveLength(1);
-    expect(suggestions.get('[data-formula-suggestion="SUM"]').text()).toContain("SUM");
+    expect(suggestions.findAll('[role="option"]')).toHaveLength(
+      getFormulaFunctionMetadata().filter((item) => item.name.startsWith("S"))
+        .length,
+    );
+    expect(suggestions.get('[data-formula-suggestion="SUM"]').text()).toContain(
+      "SUM",
+    );
+    expect(
+      suggestions
+        .get('[data-formula-suggestion="SUM"]')
+        .attributes("aria-selected"),
+    ).toBe("true");
   });
 
   test("keeps one formula draft while a grid drag inserts a range, then commits and undoes once", async () => {
@@ -103,18 +118,24 @@ describe("workspace formula authoring", () => {
     expect(formula.element.value).toBe("=SUM(B1:C2");
     expect(document.activeElement).toBe(formula.element);
     expect(wrapper.find("[data-formula-reference-range]").exists()).toBe(true);
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
+    expect(
+      wrapper.get("[data-active-cell]").attributes("data-active-cell"),
+    ).toBe("A1");
 
     await formula.setValue("=SUM(B1:C2)");
     await formula.trigger("keydown", { key: "Enter" });
     await flushPromises();
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A2");
+    expect(
+      wrapper.get("[data-active-cell]").attributes("data-active-cell"),
+    ).toBe("A2");
 
     const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
     await editor.trigger("keydown", { key: "s", ctrlKey: true });
     await flushPromises();
     const savedFormula = memory.getRecord();
-    const savedSheet = getActiveSheet(deserializeWorkbook(savedFormula!.snapshot));
+    const savedSheet = getActiveSheet(
+      deserializeWorkbook(savedFormula!.snapshot),
+    );
     expect(getCellContent(savedSheet, { row: 0, column: 0 })).toEqual({
       kind: "formula",
       formula: { source: "=SUM(B1:C2)" },
@@ -127,7 +148,10 @@ describe("workspace formula authoring", () => {
 
     const saved = memory.getRecord();
     expect(
-      getCellContent(getActiveSheet(deserializeWorkbook(saved!.snapshot)), { row: 0, column: 0 }),
+      getCellContent(getActiveSheet(deserializeWorkbook(saved!.snapshot)), {
+        row: 0,
+        column: 0,
+      }),
     ).toBeNull();
   });
 
@@ -151,10 +175,13 @@ describe("workspace formula authoring", () => {
 
     expect(formula.element.value).toBe("=SUM($B$1");
     expect(
-      getCellContent(getActiveSheet(deserializeWorkbook(memory.getRecord()!.snapshot)), {
-        row: 0,
-        column: 0,
-      }),
+      getCellContent(
+        getActiveSheet(deserializeWorkbook(memory.getRecord()!.snapshot)),
+        {
+          row: 0,
+          column: 0,
+        },
+      ),
     ).toBeNull();
   });
 
@@ -179,10 +206,13 @@ describe("workspace formula authoring", () => {
     await editor.trigger("keydown", { key: "Escape" });
     expect(formula.element.value).toBe("");
     expect(
-      getCellContent(getActiveSheet(deserializeWorkbook(memory.getRecord()!.snapshot)), {
-        row: 0,
-        column: 0,
-      }),
+      getCellContent(
+        getActiveSheet(deserializeWorkbook(memory.getRecord()!.snapshot)),
+        {
+          row: 0,
+          column: 0,
+        },
+      ),
     ).toBeNull();
   });
 

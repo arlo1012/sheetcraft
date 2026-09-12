@@ -1,5 +1,6 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
+import { getFormulaFunctionMetadata } from "@idea10/core/formula";
 import WorkbookFormulaBar from "../../../../../modules/workbook/components/WorkbookFormulaBar.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 
@@ -29,7 +30,7 @@ afterEach(() => {
 });
 
 describe("WorkbookFormulaBar formula autocomplete", () => {
-  test("offers only the supported SUM function for an =s formula prefix", async () => {
+  test("offers all matching Core functions while keeping SUM as the selected default for an =s prefix", async () => {
     const wrapper = mountFormulaBar();
     const input = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
 
@@ -38,10 +39,15 @@ describe("WorkbookFormulaBar formula autocomplete", () => {
 
     const suggestions = getAutocomplete();
     expect(suggestions.get('[role="option"]').text()).toContain("SUM");
-    expect(suggestions.findAll('[role="option"]')).toHaveLength(1);
-    expect(suggestions.get('[data-formula-suggestion="SUM"]').attributes("aria-selected")).toBe(
-      "true",
+    expect(suggestions.findAll('[role="option"]')).toHaveLength(
+      getFormulaFunctionMetadata().filter((item) => item.name.startsWith("S"))
+        .length,
     );
+    expect(
+      suggestions
+        .get('[data-formula-suggestion="SUM"]')
+        .attributes("aria-selected"),
+    ).toBe("true");
   });
 
   test.each(["Enter", "Tab"])(
@@ -58,7 +64,9 @@ describe("WorkbookFormulaBar formula autocomplete", () => {
       expect(wrapper.emitted("commitCell")).toBeUndefined();
       expect(wrapper.emitted("traverse")).toBeUndefined();
       expect(document.body.querySelector('[role="listbox"]')).toBeNull();
-      expect(new DOMWrapper(document.body).get("[data-formula-help]").text()).toContain("SUM");
+      expect(
+        new DOMWrapper(document.body).get("[data-formula-help]").text(),
+      ).toContain("SUM");
     },
   );
 
@@ -108,7 +116,13 @@ describe("WorkbookFormulaBar formula autocomplete", () => {
     await input.trigger("blur");
 
     expect(wrapper.emitted("commitCell")).toEqual([
-      [{ sheetId: "first-sheet", address: { row: 0, column: 0 }, input: "=SUM(1)" }],
+      [
+        {
+          sheetId: "first-sheet",
+          address: { row: 0, column: 0 },
+          input: "=SUM(1)",
+        },
+      ],
     ]);
   });
 

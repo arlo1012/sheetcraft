@@ -2,11 +2,13 @@ import { describe, expect, test } from "vitest";
 import {
   applyFunctionCompletion,
   cycleFormulaReferenceAbsoluteMarkers,
+  getFormulaArgumentContext,
   getFormulaCompletionContext,
   getFormulaReferenceEditContext,
   getSupportedFormulaCandidates,
   replaceFormulaReference,
 } from "../../../shared/formula-editing/formula-input-lexical";
+import { getFormulaFunctionMetadata } from "@idea10/core/formula";
 
 function completion(value: string, start = value.length, end = start) {
   const context = getFormulaCompletionContext(value, start, end);
@@ -15,19 +17,31 @@ function completion(value: string, start = value.length, end = start) {
 }
 
 describe("formula input lexical assistance", () => {
-  test("offers Core-supported functions and applies a parenthesis", () => {
+  test("offers the complete Core registry while keeping SUM first for an =s prefix", () => {
     const context = completion("=s");
-    expect(getSupportedFormulaCandidates(context).map((item) => item.id)).toEqual(["SUM"]);
-    expect(applyFunctionCompletion("=s", context, "SUM")).toEqual({ value: "=SUM(", caret: 5 });
-    expect(getSupportedFormulaCandidates(completion("=i")).map((item) => item.id)).toEqual([
-      "IF",
-      "IFERROR",
-    ]);
+    const candidates = getSupportedFormulaCandidates(context).map(
+      (item) => item.id,
+    );
+    const registered = getFormulaFunctionMetadata().map((item) => item.name);
+    expect(candidates[0]).toBe("SUM");
+    expect(candidates).toEqual(
+      registered.filter((name) => name.startsWith("S")),
+    );
+    expect(applyFunctionCompletion("=s", context, "SUM")).toEqual({
+      value: "=SUM(",
+      caret: 5,
+    });
+    expect(
+      getSupportedFormulaCandidates(completion("=i")).map((item) => item.id),
+    ).toEqual(registered.filter((name) => name.startsWith("I")));
   });
 
   test("replaces a prefix in the middle or a whole selected identifier without duplicate parentheses", () => {
     const middle = completion("=SXM", 2);
-    expect(applyFunctionCompletion("=SXM", middle, "SUM")).toEqual({ value: "=SUM(", caret: 5 });
+    expect(applyFunctionCompletion("=SXM", middle, "SUM")).toEqual({
+      value: "=SUM(",
+      caret: 5,
+    });
 
     const selected = completion("=sum(A1)", 1, 4);
     expect(applyFunctionCompletion("=sum(A1)", selected, "SUM")).toEqual({
@@ -62,7 +76,9 @@ describe("formula input lexical assistance", () => {
   test("allows reference insertion after supported comparison and concatenation operators", () => {
     for (const operator of ["<", ">", "=", "&"]) {
       const value = `=A1${operator}`;
-      expect(getFormulaReferenceEditContext(value, value.length, value.length)).toEqual({
+      expect(
+        getFormulaReferenceEditContext(value, value.length, value.length),
+      ).toEqual({
         replaceStart: value.length,
         replaceEnd: value.length,
       });
@@ -95,23 +111,46 @@ describe("formula input lexical assistance", () => {
     expect(getFormulaReferenceEditContext("=SUM(A1)", 8, 8)).toBeNull();
   });
 
+  test("keeps quoted cross-sheet references as one editable token without treating their punctuation as formula syntax", () => {
+    const value = "=SUM('FY, (draft)'!A1)";
+    expect(getFormulaReferenceEditContext(value, 16, 16)).toEqual({
+      replaceStart: 5,
+      replaceEnd: 21,
+    });
+    expect(getFormulaArgumentContext(value, 20)).toEqual({
+      functionName: "SUM",
+      index: 0,
+    });
+  });
+
   test("cycles absolute markers for every endpoint in a range", () => {
     const context = { replaceStart: 1, replaceEnd: 6 };
-    expect(cycleFormulaReferenceAbsoluteMarkers("=A1:B2", context)).toMatchObject({
+    expect(
+      cycleFormulaReferenceAbsoluteMarkers("=A1:B2", context),
+    ).toMatchObject({
       value: "=$A$1:$B$2",
     });
     expect(
-      cycleFormulaReferenceAbsoluteMarkers("=$A$1:$B$2", { replaceStart: 1, replaceEnd: 10 }),
+      cycleFormulaReferenceAbsoluteMarkers("=$A$1:$B$2", {
+        replaceStart: 1,
+        replaceEnd: 10,
+      }),
     ).toMatchObject({
       value: "=A$1:B$2",
     });
     expect(
-      cycleFormulaReferenceAbsoluteMarkers("=A$1:B$2", { replaceStart: 1, replaceEnd: 8 }),
+      cycleFormulaReferenceAbsoluteMarkers("=A$1:B$2", {
+        replaceStart: 1,
+        replaceEnd: 8,
+      }),
     ).toMatchObject({
       value: "=$A1:$B2",
     });
     expect(
-      cycleFormulaReferenceAbsoluteMarkers("=$A1:$B2", { replaceStart: 1, replaceEnd: 8 }),
+      cycleFormulaReferenceAbsoluteMarkers("=$A1:$B2", {
+        replaceStart: 1,
+        replaceEnd: 8,
+      }),
     ).toMatchObject({
       value: "=A1:B2",
     });

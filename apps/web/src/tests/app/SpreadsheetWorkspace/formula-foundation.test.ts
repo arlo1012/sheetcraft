@@ -41,7 +41,11 @@ function createFormulaFoundationSnapshot(): WorkbookSnapshot {
     },
   );
   setCellContent(sheet, { row: 0, column: 1 }, { kind: "literal", value: "" });
-  setCellContent(sheet, { row: 0, column: 2 }, { kind: "literal", value: "#N/A" });
+  setCellContent(
+    sheet,
+    { row: 0, column: 2 },
+    { kind: "literal", value: "#N/A" },
+  );
   setCellContent(
     sheet,
     { row: 0, column: 3 },
@@ -64,11 +68,16 @@ function createFormulaFoundationSnapshot(): WorkbookSnapshot {
 function createStore(snapshot: WorkbookSnapshot) {
   return {
     load: vi.fn(async () => ({ revision: 1, savedAt: 1, snapshot })),
-    save: vi.fn(async (_snapshot: WorkbookSnapshot, revision: number | undefined) => ({
-      revision: (revision ?? 0) + 1,
+    save: vi.fn(
+      async (_snapshot: WorkbookSnapshot, revision: number | undefined) => ({
+        revision: (revision ?? 0) + 1,
+        savedAt: 2,
+      }),
+    ),
+    replace: vi.fn(async (_snapshot: WorkbookSnapshot) => ({
+      revision: 2,
       savedAt: 2,
     })),
-    replace: vi.fn(async (_snapshot: WorkbookSnapshot) => ({ revision: 2, savedAt: 2 })),
   } satisfies WorkbookStore;
 }
 
@@ -88,7 +97,9 @@ function mountController(): Controller {
   const wrapper = mount(
     defineComponent({
       setup() {
-        controller = useSpreadsheetWorkspaceController({ idFactory: createSequentialIdFactory() });
+        controller = useSpreadsheetWorkspaceController({
+          idFactory: createSequentialIdFactory(),
+        });
         return () => h("div");
       },
     }),
@@ -108,10 +119,16 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     const store = createStore(createFormulaFoundationSnapshot());
     const wrapper = await mountWorkspace(store);
 
-    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain("#N/A");
-    expect(wrapper.get('[data-row="0"][data-column="3"]').text()).toContain("#NAME?");
+    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain(
+      "#N/A",
+    );
+    expect(wrapper.get('[data-row="0"][data-column="3"]').text()).toContain(
+      "#NAME?",
+    );
 
-    await wrapper.get('[data-row="1"][data-column="5"]').trigger("mousedown", { button: 0 });
+    await wrapper
+      .get('[data-row="1"][data-column="5"]')
+      .trigger("mousedown", { button: 0 });
     const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
     await editor.trigger("keydown", { key: "m" });
     await editor.setValue("save marker");
@@ -119,7 +136,7 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     await flushPromises();
 
     const savedSnapshot = store.save.mock.calls[0]?.[0];
-    expect(savedSnapshot).toMatchObject({ version: 7, dateSystem: "1904" });
+    expect(savedSnapshot).toMatchObject({ version: 8, dateSystem: "1904" });
     const restored = deserializeWorkbook(savedSnapshot);
     const sheet = getActiveSheet(restored);
     expect(restored.dateSystem).toBe("1904");
@@ -127,7 +144,10 @@ describe("SpreadsheetWorkspace formula foundation", () => {
       kind: "error",
       error: { kind: "formula-error", code: "NA" },
     });
-    expect(getCellContent(sheet, { row: 0, column: 1 })).toEqual({ kind: "literal", value: "" });
+    expect(getCellContent(sheet, { row: 0, column: 1 })).toEqual({
+      kind: "literal",
+      value: "",
+    });
     expect(getCellContent(sheet, { row: 0, column: 2 })).toEqual({
       kind: "literal",
       value: "#N/A",
@@ -147,12 +167,19 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     const sheet = controller.activeSheet.value;
     const source = { row: 0, column: 0 };
     const target = { row: 2, column: 2 };
-    setCellContent(sheet, source, { kind: "error", error: createFormulaError("NA") });
+    setCellContent(sheet, source, {
+      kind: "error",
+      error: createFormulaError("NA"),
+    });
 
     expect(
       controller.pasteCells({
         kind: "all",
-        plan: { anchor: target, range: { start: target, end: target }, values: [["#N/A"]] },
+        plan: {
+          anchor: target,
+          range: { start: target, end: target },
+          values: [["#N/A"]],
+        },
         contents: [[{ kind: "error", error: createFormulaError("NA") }]],
         sourceRange: { start: source, end: source },
       }),
@@ -161,9 +188,13 @@ describe("SpreadsheetWorkspace formula foundation", () => {
       kind: "error",
       error: { kind: "formula-error", code: "NA" },
     });
-    expect(formatCellValueForGrid(getCellComputedValue(sheet, target), undefined, "en-US")).toBe(
-      "#N/A",
-    );
+    expect(
+      formatCellValueForGrid(
+        getCellComputedValue(sheet, target),
+        undefined,
+        "en-US",
+      ),
+    ).toBe("#N/A");
   });
 
   test("rejects malformed V4 JSON before it replaces the loaded document", async () => {
@@ -175,7 +206,10 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     const cells = sheet.cells as Array<Record<string, unknown>>;
     cells[0] = {
       ...cells[0],
-      content: { kind: "error", error: { kind: "formula-error", code: "NOT_A_REAL_CODE" } },
+      content: {
+        kind: "error",
+        error: { kind: "formula-error", code: "NOT_A_REAL_CODE" },
+      },
     };
 
     wrapper.findComponent(WorkbookFileActions).vm.$emit("importJson", {
@@ -184,7 +218,9 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     await flushPromises();
 
     expect(store.replace).not.toHaveBeenCalled();
-    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain("#N/A");
+    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain(
+      "#N/A",
+    );
     expect(wrapper.get('[data-workbook-file="feedback"]').text()).toContain(
       "not a valid idea10 workbook",
     );

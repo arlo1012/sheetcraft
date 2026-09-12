@@ -8,7 +8,10 @@ type AssistHandle = {
   handleKeydown(event: KeyboardEvent): boolean;
   canPickReference(): boolean;
   pickReference(
-    range: { start: { row: number; column: number }; end: { row: number; column: number } },
+    range: {
+      start: { row: number; column: number };
+      end: { row: number; column: number };
+    },
     phase: "start" | "update" | "end",
   ): boolean;
   readonly referenceActive: boolean;
@@ -43,7 +46,9 @@ describe("FormulaInputAssist", () => {
     await nextTick();
     expect(document.querySelector('[role="option"]')).not.toBeNull();
     const assist = fixture.wrapper.vm as unknown as AssistHandle;
-    expect(assist.handleKeydown(new KeyboardEvent("keydown", { key: "Escape" }))).toBe(true);
+    expect(
+      assist.handleKeydown(new KeyboardEvent("keydown", { key: "Escape" })),
+    ).toBe(true);
     await nextTick();
     expect(document.querySelector('[role="option"]')).toBeNull();
     expect(document.querySelector("[data-formula-help]")).not.toBeNull();
@@ -59,10 +64,18 @@ describe("FormulaInputAssist", () => {
   test("handles completion keys before the owning editor", async () => {
     const fixture = mountAssist();
     await nextTick();
-    const event = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
-    expect((fixture.wrapper.vm as unknown as AssistHandle).handleKeydown(event)).toBe(true);
+    const event = new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    });
+    expect(
+      (fixture.wrapper.vm as unknown as AssistHandle).handleKeydown(event),
+    ).toBe(true);
     expect(event.defaultPrevented).toBe(true);
-    expect(fixture.wrapper.emitted("textEdit")).toEqual([[{ value: "=SUM(", caret: 5 }]]);
+    expect(fixture.wrapper.emitted("textEdit")).toEqual([
+      [{ value: "=SUM(", caret: 5 }],
+    ]);
     fixture.dispose();
   });
 
@@ -79,9 +92,13 @@ describe("FormulaInputAssist", () => {
     fixture.input.setSelectionRange(5, 5);
     fixture.input.dispatchEvent(new Event("select"));
     await nextTick();
-    expect(document.querySelector("[data-formula-help]")?.textContent).toContain("SUM argument 1");
     expect(
-      document.querySelector(".formula-input-assist")?.classList.contains("is-help-only"),
+      document.querySelector("[data-formula-help]")?.textContent,
+    ).toContain("SUM argument 1");
+    expect(
+      document
+        .querySelector(".formula-input-assist")
+        ?.classList.contains("is-help-only"),
     ).toBe(true);
     fixture.dispose();
   });
@@ -90,28 +107,41 @@ describe("FormulaInputAssist", () => {
     const fixture = mountAssist();
     fixture.input.focus();
     await nextTick();
-    const option = document.querySelector<HTMLButtonElement>("[data-formula-suggestion='SUM']");
+    const option = document.querySelector<HTMLButtonElement>(
+      "[data-formula-suggestion='SUM']",
+    );
     expect(option).not.toBeNull();
-    option?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+    option?.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true, cancelable: true }),
+    );
     await nextTick();
     expect(document.activeElement).toBe(fixture.input);
-    expect(fixture.wrapper.emitted("textEdit")?.[0]).toEqual([{ value: "=SUM(", caret: 5 }]);
+    expect(fixture.wrapper.emitted("textEdit")?.[0]).toEqual([
+      { value: "=SUM(", caret: 5 },
+    ]);
     fixture.dispose();
   });
 
-  test("cycles multiple Core candidates and lets a pointer choose its own candidate", async () => {
-    const fixture = mountAssist("=i");
+  test("uses the first registered candidate by keyboard and lets a pointer choose its own candidate", async () => {
+    const fixture = mountAssist("=if");
     await nextTick();
     const assist = fixture.wrapper.vm as unknown as AssistHandle;
-    expect(assist.handleKeydown(new KeyboardEvent("keydown", { key: "ArrowDown" }))).toBe(true);
-    expect(assist.handleKeydown(new KeyboardEvent("keydown", { key: "Enter" }))).toBe(true);
-    expect(fixture.wrapper.emitted("textEdit")?.at(-1)).toEqual([{ value: "=IFERROR(", caret: 9 }]);
+    expect(
+      assist.handleKeydown(new KeyboardEvent("keydown", { key: "Enter" })),
+    ).toBe(true);
+    expect(fixture.wrapper.emitted("textEdit")?.at(-1)).toEqual([
+      { value: "=IF(", caret: 4 },
+    ]);
     fixture.dispose();
 
-    const pointerFixture = mountAssist("=i");
+    const pointerFixture = mountAssist("=if");
     await nextTick();
-    const option = document.querySelector<HTMLButtonElement>("[data-formula-suggestion='IFERROR']");
-    option?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+    const option = document.querySelector<HTMLButtonElement>(
+      "[data-formula-suggestion='IFERROR']",
+    );
+    option?.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true, cancelable: true }),
+    );
     await nextTick();
     expect(pointerFixture.wrapper.emitted("textEdit")?.at(-1)).toEqual([
       { value: "=IFERROR(", caret: 9 },
@@ -124,7 +154,10 @@ describe("FormulaInputAssist", () => {
     const assist = fixture.wrapper.vm as unknown as AssistHandle;
     expect(assist.canPickReference()).toBe(true);
     expect(
-      assist.pickReference({ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }, "start"),
+      assist.pickReference(
+        { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+        "start",
+      ),
     ).toBe(true);
     const first = fixture.wrapper.emitted("textEdit")?.at(-1)?.[0] as {
       value: string;
@@ -134,7 +167,10 @@ describe("FormulaInputAssist", () => {
     fixture.input.value = first.value;
     fixture.input.setSelectionRange(first.caret, first.caret);
     expect(
-      assist.pickReference({ start: { row: 0, column: 0 }, end: { row: 1, column: 1 } }, "update"),
+      assist.pickReference(
+        { start: { row: 0, column: 0 }, end: { row: 1, column: 1 } },
+        "update",
+      ),
     ).toBe(true);
     const second = fixture.wrapper.emitted("textEdit")?.at(-1)?.[0] as {
       value: string;
@@ -148,8 +184,7 @@ describe("FormulaInputAssist", () => {
     expect(assist.handleKeydown(f4)).toBe(true);
     expect(f4.defaultPrevented).toBe(true);
     const f4Edit = fixture.wrapper.emitted("textEdit")?.at(-1)?.[0] as
-      | { value: string }
-      | undefined;
+      { value: string } | undefined;
     expect(f4Edit?.value).toBe("=SUM($A$1:$B$2");
     expect(assist.referenceActive).toBe(true);
     fixture.dispose();
@@ -160,16 +195,28 @@ describe("FormulaInputAssist", () => {
     fixture.input.setSelectionRange(6, 6);
     const assist = fixture.wrapper.vm as unknown as AssistHandle;
     expect(
-      assist.pickReference({ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }, "start"),
+      assist.pickReference(
+        { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+        "start",
+      ),
     ).toBe(true);
     expect(
-      assist.pickReference({ start: { row: 0, column: 0 }, end: { row: 1, column: 1 } }, "update"),
+      assist.pickReference(
+        { start: { row: 0, column: 0 }, end: { row: 1, column: 1 } },
+        "update",
+      ),
     ).toBe(true);
     expect(
-      assist.pickReference({ start: { row: 0, column: 0 }, end: { row: 1, column: 1 } }, "end"),
+      assist.pickReference(
+        { start: { row: 0, column: 0 }, end: { row: 1, column: 1 } },
+        "end",
+      ),
     ).toBe(true);
     expect(
-      (fixture.wrapper.emitted("textEdit")?.at(-1)?.[0] as { value: string } | undefined)?.value,
+      (
+        fixture.wrapper.emitted("textEdit")?.at(-1)?.[0] as
+          { value: string } | undefined
+      )?.value,
     ).toBe("=SUM(A1:B2)+2");
     fixture.dispose();
   });
