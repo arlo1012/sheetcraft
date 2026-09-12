@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { getCellValue, setCellValue } from "@idea10/core/workbook";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import {
   activeCell,
   getFloatingMenu,
@@ -7,6 +8,14 @@ import {
   mountSheetGrid,
   triggerCell,
 } from "./fixture";
+
+function rangeWidth(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]): number | undefined {
+  return (
+    wrapper.getComponent(SheetSurface).props("overlays") as {
+      rangeRects?: Array<{ rect: { width: number } }>;
+    }
+  ).rangeRects?.[0]?.rect.width;
+}
 
 describe("SheetGrid cell context menu", () => {
   test("preserves a cell range when right-clicking inside it and clears it atomically", async () => {
@@ -25,7 +34,7 @@ describe("SheetGrid cell context menu", () => {
     const menu = getFloatingMenu();
     expect(menu.attributes("aria-label")).toBe("Cell actions");
     expect(activeCell(wrapper)).toBe("A1");
-    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 192px");
+    expect(rangeWidth(wrapper)).toBe(192);
     await menu.get('[data-cell-action="clear"]').trigger("click");
 
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBeNull();
@@ -45,7 +54,7 @@ describe("SheetGrid cell context menu", () => {
       clientY: 72,
     });
     expect(activeCell(wrapper)).toBe("C3");
-    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 96px");
+    expect(rangeWidth(wrapper)).toBe(96);
     await getFloatingMenu().get('[data-cell-action="clear"]').trigger("click");
 
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("keep");

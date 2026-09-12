@@ -1,7 +1,7 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
-import { mountSheetGrid } from "./fixture";
+import { activeCell, mountSheetGrid } from "./fixture";
 
 describe("SheetGrid view state", () => {
   test("restores a sheet's selection and scroll position when its identity changes", async () => {
@@ -33,7 +33,7 @@ describe("SheetGrid view state", () => {
     await nextTick();
 
     const scroller = wrapper.get(".sheet-grid__scroller").element as HTMLDivElement;
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("E9");
+    expect(activeCell(wrapper)).toBe("E9");
     expect(scroller.scrollLeft).toBe(288);
     expect(scroller.scrollTop).toBe(168);
   });

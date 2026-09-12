@@ -10,6 +10,8 @@ import {
 } from "@idea10/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
+import SheetSurface from "../../../modules/sheet-grid/components/SheetSurface.vue";
+import type { SheetRenderFrame } from "../../../modules/sheet-grid/rendering/sheet-render-frame";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { prepareImageAsset } from "../../../modules/image-assets/prepareImageAsset";
 import { createAppI18n } from "../../../shared/i18n";
@@ -91,6 +93,34 @@ async function fixture(cellImage = false) {
   await flushPromises();
   return { wrapper, workbookStore, sheet: wrapper.findComponent(SheetGrid).props("sheet") };
 }
+
+async function triggerFloatingImage(
+  wrapper: ReturnType<typeof mount>,
+  image: {
+    anchor: { row: number; column: number };
+    offsetX: number;
+    offsetY: number;
+    width: number;
+    height: number;
+  },
+  event: "contextmenu" | "dblclick" | "pointerdown",
+  options: PointerEventInit = {},
+): Promise<void> {
+  const surface = wrapper.getComponent(SheetSurface);
+  const frame = surface.props("frame") as SheetRenderFrame;
+  const anchor = frame.layout.getCellViewportRect(image.anchor);
+  if (!anchor) throw new Error("Floating image anchor is outside the viewport");
+  const canvas = surface.get<HTMLCanvasElement>("[data-sheet-surface]");
+  const bounds = canvas.element.getBoundingClientRect();
+  await canvas.trigger(event, {
+    ...options,
+    clientX:
+      bounds.left + (frame.body.x + anchor.x + image.offsetX + image.width / 2) * frame.scale,
+    clientY:
+      bounds.top + (frame.body.y + anchor.y + image.offsetY + image.height / 2) * frame.scale,
+  });
+}
+
 describe("workspace cell image entry points", () => {
   test.each([false, true])(
     "native paste resolves menu image metadata while editing=%s",
@@ -107,9 +137,7 @@ describe("workspace cell image entry points", () => {
           },
         ]),
       } as unknown as Clipboard);
-      await wrapper
-        .get('[data-floating-image-id="float"]')
-        .trigger("contextmenu", { clientX: 180, clientY: 180 });
+      await triggerFloatingImage(wrapper, image, "contextmenu");
       await flushPromises();
       document.querySelector<HTMLButtonElement>('[data-floating-image-action="copy"]')!.click();
       await flushPromises();
@@ -150,9 +178,7 @@ describe("workspace cell image entry points", () => {
         throw new Error("denied");
       }),
     } as unknown as Clipboard);
-    await wrapper
-      .get('[data-floating-image-id="float"]')
-      .trigger("contextmenu", { clientX: 180, clientY: 180 });
+    await triggerFloatingImage(wrapper, sheet.floatingImages[0]!, "contextmenu");
     await flushPromises();
     document.querySelector<HTMLButtonElement>('[data-floating-image-action="copy"]')!.click();
     await flushPromises();
@@ -211,10 +237,44 @@ describe("workspace cell image entry points", () => {
     expect(wrapper.get("[data-image-preview]").attributes("data-src")).toBe("blob:fixture");
     await wrapper.get("[data-image-preview] button").trigger("click");
     expect(wrapper.find("[data-image-preview]").exists()).toBe(false);
-    await wrapper.get('[data-floating-image-id="float"]').trigger("dblclick", { button: 0 });
+    await triggerFloatingImage(wrapper, sheet.floatingImages[0]!, "dblclick", { button: 0 });
     expect(wrapper.get("[data-image-preview]").text()).toContain("Diagram");
     expect(sheet.floatingImages).toHaveLength(1);
     expect(getCellContent(sheet, { row: 0, column: 0 })?.kind).toBe("image");
+  });
+
+  test("lets a selected image proxy bubble wheel scrolling to the grid root", async () => {
+    const { wrapper, sheet } = await fixture();
+    await triggerFloatingImage(wrapper, sheet.floatingImages[0]!, "pointerdown", {
+      button: 0,
+      pointerId: 54,
+    });
+    await flushPromises();
+    const selected = wrapper.get<HTMLElement>("[data-floating-image-selected]");
+    const scroller = wrapper.get<HTMLElement>(".sheet-grid__scroller").element;
+    scroller.scrollTop = 0;
+    selected.element.dispatchEvent(
+      new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 100 }),
+    );
+    await flushPromises();
+    expect(scroller.scrollTop).toBe(100);
+  });
+
+  test("returns canvas preview focus to an operable control after closing", async () => {
+    const { wrapper, sheet } = await fixture();
+    vi.spyOn(
+      wrapper.get<HTMLElement>("[data-floating-image-layer]").element,
+      "focus",
+    ).mockImplementation(() => {});
+    await triggerFloatingImage(wrapper, sheet.floatingImages[0]!, "dblclick", { button: 0 });
+    await flushPromises();
+    await wrapper.get("[data-image-preview] button").trigger("click");
+    await flushPromises();
+    const active = document.activeElement;
+    expect(
+      active === wrapper.get("textarea.cell-editor").element ||
+        active?.matches("[data-floating-image-selected]"),
+    ).toBe(true);
   });
 
   test("right-click copy and cut preserve cell images when system clipboard access is unavailable", async () => {
@@ -269,9 +329,7 @@ describe("workspace cell image entry points", () => {
   });
   test("right-click conversion targets the image anchor and undoes in one step", async () => {
     const { wrapper, sheet } = await fixture();
-    await wrapper
-      .get('[data-floating-image-id="float"]')
-      .trigger("contextmenu", { clientX: 220, clientY: 180 });
+    await triggerFloatingImage(wrapper, sheet.floatingImages[0]!, "contextmenu");
     await flushPromises();
     const action = document.querySelector<HTMLButtonElement>(
       '[data-floating-image-action="convert-to-cell"]',

@@ -2,10 +2,26 @@ import { DOMWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { getCellContent } from "@idea10/core/workbook";
-import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
+import { activeCell, mountSheetGrid, triggerAxisHeader, triggerCell } from "./fixture";
 
 function dispatchMouse(type: string, options: MouseEventInit): void {
-  window.dispatchEvent(new MouseEvent(type, options));
+  const event = new MouseEvent(
+    type === "mousemove" ? "pointermove" : "pointerup",
+    options,
+  ) as PointerEvent;
+  Object.defineProperty(event, "pointerId", { value: 1 });
+  window.dispatchEvent(event);
+}
+
+function formulaReferences(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]) {
+  return (
+    (
+      wrapper.getComponent(SheetSurface).props("overlays") as {
+        referenceGroups?: readonly { key: string; colorIndex: number }[];
+      }
+    ).referenceGroups ?? []
+  );
 }
 
 describe("SheetGrid formula drafting", () => {
@@ -24,6 +40,7 @@ describe("SheetGrid formula drafting", () => {
     await triggerCell(wrapper, { row: 0, column: 1 }, "mousedown", {
       button: 0,
       buttons: 1,
+      pointerId: 1,
       clientX: 154,
       clientY: 38,
     });
@@ -33,7 +50,7 @@ describe("SheetGrid formula drafting", () => {
 
     expect(editor.element.value).toBe("=SUM(B1:C2");
     expect(activeCell(wrapper)).toBe("A1");
-    expect(wrapper.find("[data-formula-reference-range]").exists()).toBe(true);
+    expect(formulaReferences(wrapper)).toHaveLength(1);
 
     await editor.trigger("keydown", { key: "F4" });
     expect(editor.element.value).toBe("=SUM($B$1:$C$2");
@@ -43,7 +60,7 @@ describe("SheetGrid formula drafting", () => {
       formula: { source: "=SUM($B$1:$C$2)" },
     });
     expect(activeCell(wrapper)).toBe("A2");
-    expect(wrapper.find("[data-formula-reference-range]").exists()).toBe(false);
+    expect(formulaReferences(wrapper)).toHaveLength(0);
     expect(session.history.undoStack).toHaveLength(1);
   });
 
@@ -75,6 +92,7 @@ describe("SheetGrid formula drafting", () => {
     await triggerCell(wrapper, { row: 0, column: 1 }, "mousedown", {
       button: 0,
       buttons: 1,
+      pointerId: 1,
       clientX: 154,
       clientY: 12,
     });
@@ -125,18 +143,10 @@ describe("SheetGrid formula drafting", () => {
     await editor.setValue("=SUM(A1,B2,A1:C2)");
     await nextTick();
 
-    const references = wrapper.findAll("[data-formula-reference-range]");
+    const references = formulaReferences(wrapper);
     expect(references).toHaveLength(3);
-    expect(references.map((reference) => reference.attributes("data-reference-key"))).toEqual([
-      "0:0-0:0",
-      "1:1-1:1",
-      "0:0-1:2",
-    ]);
-    expect(references.map((reference) => reference.attributes("data-reference-color"))).toEqual([
-      "0",
-      "1",
-      "2",
-    ]);
+    expect(references.map((reference) => reference.key)).toEqual(["0:0-0:0", "1:1-1:1", "0:0-1:2"]);
+    expect(references.map((reference) => reference.colorIndex)).toEqual([0, 1, 2]);
   });
 
   test("uses row and column headers as whole-axis references without ending the draft", async () => {
@@ -145,20 +155,17 @@ describe("SheetGrid formula drafting", () => {
     await editor.trigger("keydown", { key: "=" });
     await editor.setValue("=SUM(");
 
-    await wrapper.get('[data-select-column="1"]').trigger("mousedown", { button: 0 });
+    await triggerAxisHeader(wrapper, "column", 1);
     expect(editor.element.value).toBe("=SUM(B:B");
     expect(activeCell(wrapper)).toBe("A1");
 
-    await wrapper.get('[data-select-column="3"]').trigger("mousedown", {
-      button: 0,
-      shiftKey: true,
-    });
+    await triggerAxisHeader(wrapper, "column", 3, "pointerdown", { shiftKey: true });
     expect(editor.element.value).toBe("=SUM(B:D");
     expect(activeCell(wrapper)).toBe("A1");
 
-    await wrapper.get('[data-select-row="2"]').trigger("mousedown", { button: 0 });
+    await triggerAxisHeader(wrapper, "row", 2);
     expect(editor.element.value).toBe("=SUM(3:3");
-    await wrapper.get('[data-select-row="4"]').trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerAxisHeader(wrapper, "row", 4, "pointerdown", { shiftKey: true });
     expect(editor.element.value).toBe("=SUM(3:5");
     expect(activeCell(wrapper)).toBe("A1");
   });

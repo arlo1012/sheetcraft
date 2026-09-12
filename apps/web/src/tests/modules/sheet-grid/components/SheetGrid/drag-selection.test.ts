@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
-import SheetCanvasLayer from "../../../../../modules/sheet-grid/components/SheetCanvasLayer.vue";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 
-function dispatchMouse(type: string, options: MouseEventInit): void {
-  window.dispatchEvent(new MouseEvent(type, options));
+function dispatchPointer(type: "pointermove" | "pointerup", options: MouseEventInit): void {
+  const event = new MouseEvent(type, options) as PointerEvent;
+  Object.defineProperty(event, "pointerId", { value: 1 });
+  window.dispatchEvent(event);
+}
+
+function rangeRects(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]) {
+  return wrapper.getComponent(SheetSurface).props("overlays").rangeRects ?? [];
 }
 
 describe("SheetGrid drag selection", () => {
@@ -20,13 +26,12 @@ describe("SheetGrid drag selection", () => {
       clientY: 94,
     });
 
-    dispatchMouse("mousemove", { buttons: 1, clientX: 10, clientY: 10 });
-    dispatchMouse("mouseup", { button: 0, clientX: 10, clientY: 10 });
+    dispatchPointer("pointermove", { buttons: 1, clientX: 10, clientY: 10 });
+    dispatchPointer("pointerup", { button: 0, clientX: 10, clientY: 10 });
     await wrapper.vm.$nextTick();
 
     expect(activeCell(wrapper)).toBe("D4");
-    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 384px");
-    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("height: 96px");
+    expect(rangeRects(wrapper)[0]!.rect).toMatchObject({ width: 384, height: 96 });
     expect(session.history.undoStack).toHaveLength(0);
   });
 
@@ -58,14 +63,14 @@ describe("SheetGrid drag selection", () => {
       clientX: 10,
       clientY: 10,
     });
-    dispatchMouse("mousemove", { buttons: 1, clientX: 410, clientY: 210 });
+    dispatchPointer("pointermove", { buttons: 1, clientX: 410, clientY: 210 });
     scheduledFrame?.(0);
-    dispatchMouse("mouseup", { button: 0, clientX: 410, clientY: 210 });
+    dispatchPointer("pointerup", { button: 0, clientX: 410, clientY: 210 });
     await wrapper.vm.$nextTick();
 
     expect((scroller.element as HTMLDivElement).scrollLeft).toBeGreaterThan(0);
     expect((scroller.element as HTMLDivElement).scrollTop).toBeGreaterThan(0);
-    expect(wrapper.get("[data-selection-range]").attributes("style")).not.toContain("width: 96px");
+    expect(rangeRects(wrapper)[0]!.rect.width).not.toBe(96);
   });
 
   test("keeps displayed cell values cached while a drag only extends the selection", async () => {
@@ -76,14 +81,14 @@ describe("SheetGrid drag selection", () => {
       clientX: 110,
       clientY: 58,
     });
-    const layer = wrapper.findComponent(SheetCanvasLayer);
-    const evaluate = vi.spyOn(layer.props("evaluator"), "getComputedValue");
-    dispatchMouse("mousemove", { buttons: 1, clientX: 420, clientY: 180 });
+    const surface = wrapper.findComponent(SheetSurface);
+    const evaluate = vi.spyOn(surface.props("display").evaluator, "getComputedValue");
+    dispatchPointer("pointermove", { buttons: 1, clientX: 420, clientY: 180 });
     await wrapper.vm.$nextTick();
     expect(activeCell(wrapper)).toBe("B3");
-    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 384px");
+    expect(rangeRects(wrapper)[0]!.rect.width).toBe(384);
     expect(evaluate).not.toHaveBeenCalled();
-    dispatchMouse("mouseup", { button: 0 });
+    dispatchPointer("pointerup", { button: 0 });
     evaluate.mockRestore();
     wrapper.unmount();
   });

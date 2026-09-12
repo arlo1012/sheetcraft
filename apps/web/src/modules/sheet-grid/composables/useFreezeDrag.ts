@@ -5,13 +5,21 @@ import {
   getViewportAxisBoundary,
   getViewportAxisBoundaryOffset,
 } from "@idea10/sheet-engine/axis-interactions";
+import {
+  startPointerSession,
+  type PointerSession,
+} from "../../../shared/sheet-input/pointer-session";
+import {
+  clientDistanceToSurface,
+  clientPointToElementBody,
+  getElementEffectiveScale,
+} from "../../../shared/sheet-input/surface-coordinates";
 
 export type FreezeAxis = "row" | "column";
 
 export type FreezeDragState = {
   axis: FreezeAxis;
   pointerId: number;
-  captureTarget: HTMLElement | null;
   startClientPosition: number;
   count: number;
   previewPosition: number;
@@ -35,16 +43,7 @@ export function useFreezeDrag(options: {
 }) {
   const freezeDrag = ref<FreezeDragState>();
   let isStopping = false;
-
-  function getRootScale(): { x: number; y: number } {
-    const root = options.getRoot();
-    if (!root) return { x: 1, y: 1 };
-    const bounds = root.getBoundingClientRect();
-    return {
-      x: root.offsetWidth > 0 ? bounds.width / root.offsetWidth : 1,
-      y: root.offsetHeight > 0 ? bounds.height / root.offsetHeight : 1,
-    };
-  }
+  let session: PointerSession | undefined;
 
   function getPreview(
     axis: FreezeAxis,
@@ -52,14 +51,13 @@ export function useFreezeDrag(options: {
   ): { count: number; position: number } {
     const root = options.getRoot();
     const layout = options.getLayout();
-    const headerSize = options.getHeaderSize();
     if (!root) return { count: 0, position: 0 };
-    const bounds = root.getBoundingClientRect();
-    const scale = getRootScale();
-    const local =
-      axis === "row"
-        ? (clientPosition - bounds.top) / scale.y - headerSize.height
-        : (clientPosition - bounds.left) / scale.x - headerSize.width;
+    const bodyPoint = clientPointToElementBody(
+      axis === "row" ? { x: 0, y: clientPosition } : { x: clientPosition, y: 0 },
+      root,
+      options.getHeaderSize(),
+    );
+    const local = axis === "row" ? bodyPoint.y : bodyPoint.x;
     if (local <= 0) return { count: 0, position: 0 };
 
     const boundary = getViewportAxisBoundary(layout, axis as SheetDimensionAxis, local);
@@ -72,23 +70,20 @@ export function useFreezeDrag(options: {
     };
   }
 
-  function stop(): void {
+  function clear(): void {
     if (isStopping) return;
     const drag = freezeDrag.value;
     if (!drag) return;
     isStopping = true;
-    const target = drag?.captureTarget;
-    target?.removeEventListener("lostpointercapture", onLostPointerCapture);
     freezeDrag.value = undefined;
-    if (drag && target?.hasPointerCapture?.(drag.pointerId))
-      target.releasePointerCapture(drag.pointerId);
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-    window.removeEventListener("pointercancel", onPointerCancel);
-    window.removeEventListener("keydown", onKeydown, true);
-    window.removeEventListener("blur", stop);
     options.onDragChange(false);
     isStopping = false;
+  }
+
+  function stop(): void {
+    session?.cancel();
+    session = undefined;
+    clear();
   }
 
   function start(axis: FreezeAxis, event: PointerEvent): void {
@@ -100,18 +95,20 @@ export function useFreezeDrag(options: {
     freezeDrag.value = {
       axis,
       pointerId: event.pointerId,
-      captureTarget: target,
       startClientPosition: position,
       count: preview.count,
       previewPosition: preview.position,
     };
-    target?.setPointerCapture?.(event.pointerId);
-    target?.addEventListener("lostpointercapture", onLostPointerCapture);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-    window.addEventListener("pointercancel", onPointerCancel);
-    window.addEventListener("keydown", onKeydown, true);
-    window.addEventListener("blur", stop);
+    session = startPointerSession({
+      event,
+      captureTarget: target,
+      onMove: (pointerEvent) => onPointerMove(pointerEvent as PointerEvent),
+      onEnd: (pointerEvent) => onPointerUp(pointerEvent as PointerEvent),
+      onCancel: () => {
+        session = undefined;
+        clear();
+      },
+    });
     options.onDragChange(true);
   }
 
@@ -127,11 +124,14 @@ export function useFreezeDrag(options: {
   function onPointerUp(event: PointerEvent): void {
     const drag = freezeDrag.value;
     if (!drag || event.pointerId !== drag.pointerId) return;
-    const scale = getRootScale();
+    const root = options.getRoot();
+    const scale = root ? getElementEffectiveScale(root) : { x: 1, y: 1 };
     const distance = Math.abs(
-      (drag.axis === "row"
-        ? event.clientY - drag.startClientPosition
-        : event.clientX - drag.startClientPosition) / (drag.axis === "row" ? scale.y : scale.x),
+      clientDistanceToSurface(
+        drag.startClientPosition,
+        drag.axis === "row" ? event.clientY : event.clientX,
+        drag.axis === "row" ? scale.y : scale.x,
+      ),
     );
     const preview = getPreview(drag.axis, drag.axis === "row" ? event.clientY : event.clientX);
     const next = { ...options.getLayout().freeze };
@@ -139,23 +139,9 @@ export function useFreezeDrag(options: {
       if (drag.axis === "row") next.rows = preview.count;
       else next.columns = preview.count;
     }
-    stop();
+    session = undefined;
+    clear();
     if (distance >= DRAG_THRESHOLD) options.onCommit(next);
-  }
-
-  function onPointerCancel(event: PointerEvent): void {
-    if (event.pointerId === freezeDrag.value?.pointerId) stop();
-  }
-
-  function onLostPointerCapture(event: PointerEvent): void {
-    if (event.pointerId === freezeDrag.value?.pointerId) stop();
-  }
-
-  function onKeydown(event: KeyboardEvent): void {
-    if (event.key !== "Escape") return;
-    event.preventDefault();
-    event.stopPropagation();
-    stop();
   }
 
   return { freezeDrag, start, stop };

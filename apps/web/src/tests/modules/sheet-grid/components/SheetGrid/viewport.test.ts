@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { setCellStyle, setCellValue } from "@idea10/core/workbook";
 import { activeCell, getCanvasLayout, mountSheetGrid, triggerCell } from "./fixture";
-import SheetCanvasLayer from "../../../../../modules/sheet-grid/components/SheetCanvasLayer.vue";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 
 describe("SheetGrid viewport", () => {
   test("can hide headers without reserving their grid space", () => {
@@ -30,15 +30,15 @@ describe("SheetGrid viewport", () => {
       },
     });
 
-    expect(wrapper.getComponent(SheetCanvasLayer).props("showGridLines")).toBe(false);
-    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-border-canvas]")).toHaveLength(2);
+    expect(wrapper.getComponent(SheetSurface).props("showGridLines")).toBe(false);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(2);
   });
 
   test("renders only the viewport and overscan cells while scrolling", async () => {
     const { wrapper } = mountSheetGrid();
     const scroller = wrapper.get(".sheet-grid__scroller");
 
-    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-border-canvas]")).toHaveLength(2);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(2);
     (scroller.element as HTMLDivElement).scrollTop = 1_200;
     (scroller.element as HTMLDivElement).scrollLeft = 800;
     await scroller.trigger("scroll");
@@ -47,7 +47,7 @@ describe("SheetGrid viewport", () => {
     expect(layout.panes.body.rows.map((row) => row.index)).toContain(48);
     expect(layout.panes.body.columns.map((column) => column.index)).toContain(8);
     expect(layout.getCellViewportRect({ row: 50, column: 8 })).toMatchObject({ x: -32, y: 0 });
-    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-border-canvas]")).toHaveLength(2);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(2);
   });
 
   test("keeps the allocated extent stable when native scrolling reaches its tail", async () => {
@@ -57,8 +57,8 @@ describe("SheetGrid viewport", () => {
     (scroller.element as HTMLDivElement).scrollLeft = 3_840;
     await scroller.trigger("scroll");
 
-    expect(scroller.attributes("aria-rowcount")).toBe("100");
-    expect(scroller.attributes("aria-colcount")).toBe("50");
+    expect(wrapper.get('[role="grid"]').attributes("aria-rowcount")).toBe("100");
+    expect(wrapper.get('[role="grid"]').attributes("aria-colcount")).toBe("50");
     expect((scroller.element as HTMLDivElement).scrollTop).toBe(1_800);
     expect((scroller.element as HTMLDivElement).scrollLeft).toBe(3_840);
   });
@@ -82,8 +82,8 @@ describe("SheetGrid viewport", () => {
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Tab" });
 
     expect(activeCell(wrapper)).toBe("M31");
-    expect(scroller.attributes("aria-rowcount")).toBe("35");
-    expect(scroller.attributes("aria-colcount")).toBe("16");
+    expect(wrapper.get('[role="grid"]').attributes("aria-rowcount")).toBe("35");
+    expect(wrapper.get('[role="grid"]').attributes("aria-colcount")).toBe("16");
     expect(session.history.undoStack).toHaveLength(0);
   });
 
@@ -112,6 +112,6 @@ describe("SheetGrid viewport", () => {
 
     expect((scroller.element as HTMLDivElement).scrollTop).toBeGreaterThan(1_200);
     expect(getCanvasLayout(wrapper).getCellViewportRect({ row: 50, column: 0 })?.y).toBe(0);
-    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-border-canvas]")).toHaveLength(2);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(2);
   });
 });

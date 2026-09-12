@@ -1,7 +1,14 @@
 import { extendCellSelection, type CellSelection } from "@idea10/sheet-engine/selection";
+import { onScopeDispose } from "vue";
 import type { CellAddress } from "@idea10/core/workbook";
 import type { Point, Size } from "@idea10/sheet-engine/geometry";
 import { getSelectionAutoScrollDelta } from "@idea10/sheet-engine/selection";
+import {
+  startPointerSession,
+  type GestureEvent,
+  type PointerSession,
+} from "../../../shared/sheet-input/pointer-session";
+import { clientVectorToSurface } from "../../../shared/sheet-input/surface-coordinates";
 
 type DragSelectionState = {
   baseSelection: CellSelection;
@@ -26,6 +33,7 @@ export function useDragSelection(options: {
 }) {
   let dragSelection: DragSelectionState | undefined;
   let autoScrollFrame: number | undefined;
+  let session: PointerSession | undefined;
 
   function cancelAutoScroll(): void {
     if (autoScrollFrame === undefined) {
@@ -39,13 +47,18 @@ export function useDragSelection(options: {
     autoScrollFrame = undefined;
   }
 
-  function stop(): void {
+  function clear(): boolean {
     cancelAutoScroll();
     const moved = dragSelection?.moved;
     dragSelection = undefined;
     if (moved) options.onDraggingChange?.(false);
-    window.removeEventListener("mousemove", onMouseMove);
-    window.removeEventListener("mouseup", onMouseUp);
+    return Boolean(moved);
+  }
+
+  function stop(): void {
+    session?.cancel();
+    session = undefined;
+    clear();
   }
 
   function updateSelectionAddress(): void {
@@ -87,8 +100,9 @@ export function useDragSelection(options: {
     if (delta.x === 0 && delta.y === 0) {
       return;
     }
-    scroller.scrollLeft = Math.max(0, scroller.scrollLeft + delta.x / scale);
-    scroller.scrollTop = Math.max(0, scroller.scrollTop + delta.y / scale);
+    const surfaceDelta = clientVectorToSurface(delta, { x: scale, y: scale });
+    scroller.scrollLeft = Math.max(0, scroller.scrollLeft + surfaceDelta.x);
+    scroller.scrollTop = Math.max(0, scroller.scrollTop + surfaceDelta.y);
     options.onScrollPositionChange({ x: scroller.scrollLeft, y: scroller.scrollTop });
     options.onEnsureGridExtentCoversViewport();
     updateSelectionAddress();
@@ -102,7 +116,7 @@ export function useDragSelection(options: {
     }
   }
 
-  function onMouseMove(event: MouseEvent): void {
+  function onMouseMove(event: GestureEvent): void {
     if (!dragSelection) {
       return;
     }
@@ -124,13 +138,14 @@ export function useDragSelection(options: {
 
   function onMouseUp(): void {
     const completed = Boolean(dragSelection);
-    stop();
+    session = undefined;
+    clear();
     if (completed) {
       options.onComplete();
     }
   }
 
-  function start(baseSelection: CellSelection, event: MouseEvent): void {
+  function start(baseSelection: CellSelection, event: GestureEvent): void {
     if (event.buttons !== 1) {
       return;
     }
@@ -143,9 +158,19 @@ export function useDragSelection(options: {
       pointerY: event.clientY,
       moved: false,
     };
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    session = startPointerSession({
+      event,
+      captureTarget: event.currentTarget as HTMLElement | null,
+      onMove: onMouseMove,
+      onEnd: onMouseUp,
+      onCancel: () => {
+        session = undefined;
+        clear();
+      },
+    });
   }
+
+  onScopeDispose(stop);
 
   return {
     start,

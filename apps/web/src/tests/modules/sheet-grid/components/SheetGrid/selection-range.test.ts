@@ -1,8 +1,27 @@
 import { describe, expect, test } from "vitest";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
-function selectionStyle(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]): string {
-  return wrapper.get("[data-selection-range]").attributes("style") ?? "";
+type OverlayRects = Array<{ rect: { x: number; y: number; width: number; height: number } }>;
+
+function selectionRects(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]): OverlayRects {
+  return (
+    (wrapper.getComponent(SheetSurface).props("overlays") as { rangeRects?: OverlayRects })
+      .rangeRects ?? []
+  );
+}
+
+function activeRects(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]): OverlayRects {
+  return (
+    (wrapper.getComponent(SheetSurface).props("overlays") as { activeRects?: OverlayRects })
+      .activeRects ?? []
+  );
+}
+
+function dispatchPointerUp(): void {
+  const event = new MouseEvent("pointerup", { button: 0 }) as PointerEvent;
+  Object.defineProperty(event, "pointerId", { value: 1 });
+  window.dispatchEvent(event);
 }
 
 describe("SheetGrid range selection", () => {
@@ -12,12 +31,12 @@ describe("SheetGrid range selection", () => {
     await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0, shiftKey: true });
 
     expect(activeCell(wrapper)).toBe("A1");
-    expect(selectionStyle(wrapper)).toContain("width: 288px");
-    expect(selectionStyle(wrapper)).toContain("height: 72px");
-    expect((wrapper.get("[data-selection-outline]").element as HTMLElement).style.borderWidth).toBe(
-      "1px",
-    );
-    expect(wrapper.find(".sheet-selection-overlay__range-fill").exists()).toBe(true);
+    expect(selectionRects(wrapper)).toEqual([
+      expect.objectContaining({ rect: { x: 0, y: 0, width: 288, height: 72 } }),
+    ]);
+    expect(activeRects(wrapper)).toEqual([
+      expect.objectContaining({ rect: { x: 0, y: 0, width: 96, height: 24 } }),
+    ]);
     expect(session.history.undoStack).toHaveLength(0);
   });
 
@@ -28,7 +47,7 @@ describe("SheetGrid range selection", () => {
       button: 0,
       buttons: 1,
     });
-    window.dispatchEvent(new MouseEvent("mouseup", { button: 0 }));
+    dispatchPointerUp();
     await wrapper.vm.$nextTick();
 
     expect(wrapper.emitted("formatPainterTarget")).toEqual([
@@ -76,12 +95,14 @@ describe("SheetGrid range selection", () => {
     await editor.trigger("keydown", { key: "ArrowDown", shiftKey: true });
 
     expect(activeCell(wrapper)).toBe("A1");
-    expect(selectionStyle(wrapper)).toContain("width: 192px");
-    expect(selectionStyle(wrapper)).toContain("height: 48px");
+    expect(selectionRects(wrapper)).toEqual([
+      expect.objectContaining({ rect: { x: 0, y: 0, width: 192, height: 48 } }),
+    ]);
     await editor.trigger("keydown", { key: "ArrowRight" });
     expect(activeCell(wrapper)).toBe("B1");
-    expect(selectionStyle(wrapper)).toContain("width: 96px");
-    expect(selectionStyle(wrapper)).toContain("height: 24px");
+    expect(selectionRects(wrapper)).toEqual([
+      expect.objectContaining({ rect: { x: 96, y: 0, width: 96, height: 24 } }),
+    ]);
     expect(session.history.undoStack).toHaveLength(0);
   });
 
@@ -90,27 +111,12 @@ describe("SheetGrid range selection", () => {
     await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
     await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0, shiftKey: true });
 
-    const fillStyle = (wrapper.get("[data-selection-range]").element as HTMLElement).style;
-    const outlineStyle = (wrapper.get("[data-selection-outline]").element as HTMLElement).style;
-    const activeStyle = (wrapper.get("[data-active-cell]").element as HTMLElement).style;
-    expect({
-      left: fillStyle.left,
-      top: fillStyle.top,
-      width: fillStyle.width,
-      height: fillStyle.height,
-    }).toEqual({ left: "96px", top: "24px", width: "192px", height: "48px" });
-    expect({
-      left: outlineStyle.left,
-      top: outlineStyle.top,
-      width: outlineStyle.width,
-      height: outlineStyle.height,
-    }).toEqual({ left: "95px", top: "23px", width: "193px", height: "49px" });
-    expect({
-      left: activeStyle.left,
-      top: activeStyle.top,
-      width: activeStyle.width,
-      height: activeStyle.height,
-    }).toEqual({ left: "95px", top: "23px", width: "97px", height: "25px" });
+    expect(selectionRects(wrapper)).toEqual([
+      expect.objectContaining({ rect: { x: 96, y: 24, width: 192, height: 48 } }),
+    ]);
+    expect(activeRects(wrapper)).toEqual([
+      expect.objectContaining({ rect: { x: 96, y: 24, width: 96, height: 24 } }),
+    ]);
   });
 
   test("cycles Tab and Enter inside a retained range", async () => {
@@ -120,9 +126,9 @@ describe("SheetGrid range selection", () => {
 
     await editor.trigger("keydown", { key: "Tab" });
     expect(activeCell(wrapper)).toBe("B1");
-    expect(selectionStyle(wrapper)).toContain("width: 192px");
+    expect(selectionRects(wrapper)[0]?.rect.width).toBe(192);
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Enter" });
     expect(activeCell(wrapper)).toBe("B2");
-    expect(selectionStyle(wrapper)).toContain("height: 48px");
+    expect(selectionRects(wrapper)[0]?.rect.height).toBe(48);
   });
 });

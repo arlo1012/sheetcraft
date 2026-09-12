@@ -1,49 +1,60 @@
 # Sheet Canvas renderer
 
-The Web Sheet grid draws cell fills, grid lines, text and cell images on one
-viewport-sized Canvas. A second Canvas draws explicit borders above selection
-fills. Headers, selection outlines, floating images, menus and the active text
-editor remain Vue components. Hit testing uses the existing Sheet viewport
-layout, including frozen panes and merged-cell anchors.
+The Sheet is one rendering and input surface. `SheetSurface.vue` owns two visible
+canvases: cell content, and the interactive overlay. An offscreen border bitmap
+preserves explicit borders above selection fills without rebuilding border paths
+on every selection change. Row and column headings, the select-all corner,
+selection/reference/clipboard outlines, reading highlights, frozen lines, image
+pixels and operation previews are painted by this surface.
 
 ## Ownership and invalidation
 
-`packages/core` continues to own workbook data, commands and history.
-`packages/sheet-engine` continues to own geometry, row visibility, selection and
-viewport contracts. Canvas code lives in the Web `sheet-grid` module and adds
-no dependency to either runtime-neutral package.
+Core owns workbook state, calculation, commands and history. Sheet Engine owns
+geometry, hidden rows, selection and viewport contracts. The Web `sheet-grid`
+module owns the display snapshot, render frame, paint scheduling and native
+editor/menu adapters. The `sheet-images` module owns image editing and its painter.
 
-`SheetCanvasLayer.vue` owns the two contexts and schedules at most one paint per
-animation frame. Its scene is in Sheet coordinates; each frozen pane applies
-its own clip and scroll translation. A pixel scroll within the same visible
-rows and columns reuses the scene and border plan. Changes to visible members,
-workbook revision, geometry, row visibility, merges, locale, date system or
-loaded fonts rebuild the relevant presentation. Cell formatting and text
-wrapping are cached by source cell identity and dimensions; formula results
-also depend on the evaluator revision. Caches retain visible cells and images.
+`useSheetDisplaySnapshot` prepares document-derived spill values and content extent
+once per document change. Viewport scene preparation never scans all formulas.
+`SheetRenderFrame` projects the engine layout into surface coordinates for body
+panes and header items; header hit testing never resolves merged-cell anchors.
+Editor clipping, image fragments and overlay ranges use the same engine layout.
 
-The backing bitmap uses device pixel ratio multiplied by Sheet zoom. Root
-theme class or `theme-mode` changes refresh the Canvas palette. Image decoding
-and font loading schedule another paint without requiring a document edit.
+The centralized scheduler coalesces content, borders and overlay invalidation:
 
-Dragging updates the live selection and DOM selection overlay. Toolbar style,
-filter/merge state and statistics use the last settled selection until mouse
-release, so they do not scan workbook data on every pointer move. Commands
-always use the live selection. Small selection summaries use direct cell
-lookups, and literal summaries/filter values do not construct a formula
-evaluator.
+| Change                                                         | Work                                        |
+| -------------------------------------------------------------- | ------------------------------------------- |
+| Selection, header hover/focus, reference/copy state            | Overlay paint only                          |
+| Image drag/resize/crop or decoded floating image               | Overlay paint only                          |
+| Scroll inside current visible row/column membership            | Repaint with existing scene and border plan |
+| Visible membership, dimensions, hidden rows, document revision | Rebuild visible scene and border plan       |
+| Locale, date system, loaded fonts                              | Rebuild cell presentation                   |
+| Theme, DPR, zoom                                               | Refresh palette/backing bitmaps and repaint |
+
+The backing density is device pixel ratio multiplied by Sheet zoom. Theme and DPR
+observation have one per-sheet lifecycle. Text measurement and automatic row
+heights consume the shared font-loading revision. Decoded image caches retain
+visible sources and release callbacks on teardown.
 
 ## Interaction and accessibility
 
-The native textarea, keyboard navigation, clipboard commands, formula reference
-picking and localized UI remain. Canvas cells do not create individual
-`gridcell` elements; per-cell screen-reader semantics have been removed.
+The native scroller provides scroll extent. A constant-size surface routes hits to
+headers, images or cells. Native DOM remains for the active textarea, selected
+image controls, fixed freeze hit targets, menus and dialogs. There is no visual
+DOM node per cell, heading or unselected image. The heading focus entry has a
+localized label and supports keyboard menus and dimension adjustment. Ordinary
+axis selection returns to the native editor to retain clipboard and IME behavior;
+formula reference picking keeps the active formula editor focused.
 
-Tests drive real Canvas hit coordinates and inspect workbook state, editor
-geometry and the actual scene/border builders. Focused tests cover scrolling
-without scene rebuilds, selection without repainting, formula dependencies,
-merged frozen fragments, styles and transformed images. Browser checks cover
-the painted result and interaction timing.
+The shared `sheet-input` boundary converts browser coordinates to logical sheet
+coordinates and owns the active pointer session. Starting another gesture cancels
+the previous one. Pointer cancellation, Escape, blur and unmount release capture
+and listeners; each controller retains its independent command/preview rules.
+
+Focused tests verify document snapshot reuse, visible-scene invalidation, scheduler
+coalescing, frozen/hidden header hits, overlay clipping, pointer cancellation,
+editing, clipboard, transformed images and command/history effects. Browser
+verification complements these contracts with actual Canvas and native focus.
 
 ## Reproducing the comparison
 
@@ -72,9 +83,21 @@ pause following each gesture is included in elapsed time; mouse-release work is
 included in the drag's long-task total. These are local development-build
 diagnostics, not a cross-device performance promise.
 
-## Measured result
+## Unified surface verification
 
-The final paired local sample on 2026-09-12 used the original `f97d71c7` DOM
+The 2026-09-12 browser check used the same 100,000-cell fixture with fills,
+borders, wrapping, a merge and frozen row/column. At 100%, 50% and 10% zoom,
+the Sheet subtree had 11 descendant DOM nodes and two visible canvases; it had
+zero row/column heading DOM nodes at every zoom. This is a node-count check,
+not a throughput comparison. The active editor remains native.
+
+Browser checks also exercised cell editing, whole-column formula reference
+picking, keyboard axis menus and menu focus. Focused regression tests cover
+selected-image wheel routing and preview focus restoration.
+
+## Historical cell-only migration sample
+
+The earlier cell-only paired local sample on 2026-09-12 used the original `f97d71c7` DOM
 renderer and this Canvas implementation. Other worktree checks had finished
 before sampling. The comparison excludes an earlier DOM run that was blocked
 by the import confirmation dialog.
@@ -93,7 +116,7 @@ by the import confirmation dialog.
 | 10%  |            257,609 |                 2,658 |
 
 The Canvas renderer keeps two canvases and zero per-cell DOM elements at each
-zoom. Header nodes still grow with the visible row and column count. Zoom
+zoom. In that earlier implementation, header nodes still grew with the visible row and column count. The unified surface described above removes those heading nodes. Zoom
 transition time is not claimed here; the controlled comparison records the
 resulting node pressure. A separate Canvas drag check showed a 16.8 ms 95th
 percentile frame interval during movement; its remaining long task occurred
@@ -105,7 +128,7 @@ cells, cell images and filter controls. Changing the root theme refreshed the
 painted background, and DPR=2 produced the expected two bitmap pixels per CSS
 pixel. Test browsers and the comparison servers were closed after verification.
 
-## Bundle comparison
+## Historical cell-only bundle comparison
 
 Both the original `f97d71c7` and the Canvas implementation build successfully.
 The original already exceeds the configured bundle budgets: its entry is

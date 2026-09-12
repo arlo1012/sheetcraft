@@ -13,7 +13,6 @@ import {
 } from "vue";
 import { MAX_FLOATING_IMAGE_SIZE, type FloatingImage } from "@idea10/core/workbook";
 import {
-  getFloatingImageViewportFragments,
   moveFloatingImageBy,
   resizeFloatingImageBy,
   type FloatingImageResizeDirection,
@@ -24,13 +23,22 @@ import {
   type ImageCropGesture,
 } from "@idea10/sheet-engine/image-crop-selection";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { Point } from "@idea10/sheet-engine/geometry";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import SheetFloatingImageContextMenu from "./SheetFloatingImageContextMenu.vue";
 import SheetFloatingImageSelection from "./SheetFloatingImageSelection.vue";
 
 import { useFloatingImageEditing } from "../useFloatingImageEditing";
-import SheetImageContent from "./SheetImageContent.vue";
+import {
+  getFloatingImageViewportFragmentsForPaint,
+  type FloatingImagePaintState,
+} from "../floating-image-painter";
+import { clientPointToElementSurface } from "../../../shared/sheet-input/surface-coordinates";
+import {
+  startPointerSession,
+  type PointerSession,
+} from "../../../shared/sheet-input/pointer-session";
 const SheetFloatingImageToolbar = defineAsyncComponent(
   () => import("./SheetFloatingImageToolbar.vue"),
 );
@@ -62,6 +70,7 @@ const emit = defineEmits<{
   copy: [id: string];
   cut: [id: string];
   paste: [id: string];
+  paintStateChange: [state: FloatingImagePaintState];
 }>();
 
 const { t } = useAppI18n();
@@ -71,10 +80,8 @@ type Gesture = {
   image: FloatingImage;
   mode: "move" | FloatingImageResizeDirection;
   pointerId: number;
-  target: HTMLElement;
   focusTarget: HTMLElement;
-  startClientX: number;
-  startClientY: number;
+  startPoint: Point;
 };
 
 type ContextMenuState = {
@@ -87,6 +94,8 @@ const gesture = shallowRef<Gesture>();
 const previewImage = shallowRef<FloatingImage>();
 const layerRef = ref<HTMLElement | null>(null);
 const contextMenu = shallowRef<ContextMenuState>();
+const paintRevision = ref(0);
+let pointerSession: PointerSession | undefined;
 const selectedImage = computed(() =>
   props.images.find((image) => image.id === props.selectedImageId),
 );
@@ -134,13 +143,12 @@ const {
 let lastGestureMode: Gesture["mode"] = "move";
 
 const fragments = computed<ImageFragment[]>(() =>
-  props.images.flatMap((image) =>
-    getFloatingImageViewportFragments(displayImage(image), props.layout).map((fragment) => ({
-      ...fragment,
-      image: displayImage(image),
-    })),
-  ),
+  getFloatingImageViewportFragmentsForPaint(displayImages(), props.layout),
 );
+
+function displayImages(): readonly FloatingImage[] {
+  return props.images.map(displayImage);
+}
 
 function displayImage(image: FloatingImage): FloatingImage {
   return previewImage.value?.id === image.id ? previewImage.value : image;
@@ -160,15 +168,6 @@ function getFragmentStyle(fragment: ImageFragment): CSSProperties {
   };
 }
 
-function getImageStyle(fragment: ImageFragment): CSSProperties {
-  return {
-    left: `${fragment.rect.x - fragment.clippedRect.x}px`,
-    top: `${fragment.rect.y - fragment.clippedRect.y}px`,
-    width: `${fragment.rect.width}px`,
-    height: `${fragment.rect.height}px`,
-  };
-}
-
 function getFragmentKey(fragment: ImageFragment): string {
   return `${fragment.image.id}:${fragment.paneId}`;
 }
@@ -180,36 +179,66 @@ function getAccessibleLabel(image: FloatingImage): string {
     : t("image.assetUnavailable");
 }
 
-function setPointerCapture(target: HTMLElement, pointerId: number): void {
-  if (!target.hasPointerCapture?.(pointerId)) target.setPointerCapture?.(pointerId);
+function getLayerPoint(event: MouseEvent): Point {
+  const layer = layerRef.value;
+  if (!layer) return { x: 0, y: 0 };
+  return clientPointToElementSurface({ x: event.clientX, y: event.clientY }, layer, props.scale);
 }
 
-function releasePointerCapture(target: HTMLElement, pointerId: number): void {
-  if (target.hasPointerCapture?.(pointerId)) target.releasePointerCapture?.(pointerId);
+function focusSelectedImageProxy(fallback?: HTMLElement): void {
+  void nextTick(() => {
+    const selected = layerRef.value?.querySelector<HTMLElement>(".is-selected");
+    if (selected?.isConnected) selected.focus({ preventScroll: true });
+    else if (fallback?.isConnected) fallback.focus({ preventScroll: true });
+  });
 }
 
-function startGesture(image: FloatingImage, mode: Gesture["mode"], event: PointerEvent): void {
+function cancelPointerSession(): void {
+  const active = pointerSession;
+  pointerSession = undefined;
+  active?.cancel();
+}
+
+function startGesture(
+  image: FloatingImage,
+  mode: Gesture["mode"],
+  event: PointerEvent,
+  startPoint = getLayerPoint(event),
+): void {
   if (event.button !== 0 || crop.value) return;
+  cancelPointerSession();
   const focusTarget =
     (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-floating-image-id]") ??
     (event.currentTarget as HTMLElement);
   const target = layerRef.value;
   if (!target) return;
   emit("select", image.id);
-  focusTarget.focus({ preventScroll: true });
+  focusSelectedImageProxy(focusTarget);
   if (props.readOnly) return;
   lastGestureMode = mode;
-  setPointerCapture(target, event.pointerId);
   previewImage.value = cloneImage(image);
   gesture.value = {
     image: cloneImage(image),
     mode,
     pointerId: event.pointerId,
-    target,
     focusTarget,
-    startClientX: event.clientX,
-    startClientY: event.clientY,
+    startPoint,
   };
+  pointerSession = startPointerSession({
+    event,
+    captureTarget: target,
+    onMove: (moveEvent) => {
+      if (moveEvent instanceof PointerEvent) onPointerMove(moveEvent);
+    },
+    onEnd: (endEvent) => {
+      pointerSession = undefined;
+      if (endEvent instanceof PointerEvent) onPointerUp(endEvent);
+    },
+    onCancel: () => {
+      pointerSession = undefined;
+      finishGesture(false);
+    },
+  });
 }
 
 function onPointerMove(event: PointerEvent): void {
@@ -218,14 +247,15 @@ function onPointerMove(event: PointerEvent): void {
     return;
   }
   const activeGesture = gesture.value;
-  if (
-    !activeGesture ||
-    activeGesture.pointerId !== event.pointerId ||
-    activeGesture.target !== event.currentTarget
-  )
-    return;
-  const deltaX = (event.clientX - activeGesture.startClientX) / props.scale;
-  const deltaY = (event.clientY - activeGesture.startClientY) / props.scale;
+  if (!activeGesture || activeGesture.pointerId !== event.pointerId) return;
+  moveGestureAt(activeGesture, {
+    ...getLayerPoint(event),
+  });
+}
+
+function moveGestureAt(activeGesture: Gesture, point: Point): void {
+  const deltaX = point.x - activeGesture.startPoint.x;
+  const deltaY = point.y - activeGesture.startPoint.y;
   if (activeGesture.mode === "move") {
     previewImage.value =
       moveFloatingImageBy(activeGesture.image, { x: deltaX, y: deltaY }, props.layout) ??
@@ -248,10 +278,14 @@ function startCrop(): void {
 
 function cancelCrop(restoreFocus = true): void {
   cancelCropEdit(restoreFocus);
+  cancelPointerSession();
 }
 
 function applyCrop(): void {
-  if (!props.readOnly) applyCropEdit();
+  if (!props.readOnly) {
+    applyCropEdit();
+    cancelPointerSession();
+  }
 }
 
 function rotateImage(turns: -1 | 1 | 2): void {
@@ -267,7 +301,27 @@ function restoreImage(): void {
 }
 
 function startCropGesture(direction: ImageCropGesture, event: PointerEvent): void {
-  if (!props.readOnly) startCropGestureEdit(direction, event);
+  if (props.readOnly) return;
+  cancelPointerSession();
+  startCropGestureEdit(direction, event);
+  const target = layerRef.value;
+  if (!target || !cropGesture.value) return;
+  pointerSession = startPointerSession({
+    event,
+    captureTarget: target,
+    onMove: (moveEvent) => {
+      if (moveEvent instanceof PointerEvent) moveCropGesture(moveEvent);
+    },
+    onEnd: (endEvent) => {
+      pointerSession = undefined;
+      if (endEvent instanceof PointerEvent && cropGesture.value?.pointerId === endEvent.pointerId)
+        endCropGesture();
+    },
+    onCancel: () => {
+      pointerSession = undefined;
+      cancelCrop(false);
+    },
+  });
 }
 
 function finishGesture(commit: boolean): void {
@@ -275,15 +329,9 @@ function finishGesture(commit: boolean): void {
   const preview = previewImage.value;
   gesture.value = undefined;
   previewImage.value = undefined;
+  cancelPointerSession();
   if (!activeGesture) return;
-  releasePointerCapture(activeGesture.target, activeGesture.pointerId);
-  if (!activeGesture.focusTarget.isConnected) {
-    void nextTick(() => {
-      if (props.selectedImageId === activeGesture.image.id) {
-        layerRef.value?.querySelector<HTMLElement>(".is-selected")?.focus({ preventScroll: true });
-      }
-    });
-  }
+  focusSelectedImageProxy(activeGesture.focusTarget);
   if (
     commit &&
     preview &&
@@ -419,12 +467,117 @@ function requestDelete(): void {
   if (imageId && !props.readOnly) emit("delete", imageId);
 }
 
+function getPaintState(): FloatingImagePaintState {
+  return { images: displayImages(), revision: paintRevision.value };
+}
+
+function emitPaintState(): void {
+  paintRevision.value += 1;
+  emit("paintStateChange", getPaintState());
+}
+
+function hitTestFloatingImage(point: Point): FloatingImage | undefined {
+  for (let index = fragments.value.length - 1; index >= 0; index -= 1) {
+    const fragment = fragments.value[index];
+    if (!fragment) continue;
+    const rect = fragment.clippedRect;
+    if (
+      point.x >= rect.x &&
+      point.x < rect.x + rect.width &&
+      point.y >= rect.y &&
+      point.y < rect.y + rect.height
+    )
+      return fragment.image;
+  }
+  return undefined;
+}
+
+function isSelectedOverlayTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest("[data-floating-image-selected]"));
+}
+
+/** Called by the shared surface before its cell pointer routing. */
+function handleSurfacePointerDown(event: PointerEvent, point: Point): boolean {
+  if (isSelectedOverlayTarget(event.target) || crop.value || event.button !== 0) return false;
+  const image = hitTestFloatingImage(point);
+  if (!image) return false;
+  startGesture(image, "move", event, point);
+  return true;
+}
+
+function handleSurfacePointerMove(event: PointerEvent, point: Point): boolean {
+  const active = gesture.value;
+  if (!active || active.pointerId !== event.pointerId) return false;
+  moveGestureAt(active, point);
+  return true;
+}
+
+function handleSurfacePointerUp(event: PointerEvent): boolean {
+  if (gesture.value?.pointerId !== event.pointerId) return false;
+  finishGesture(true);
+  return true;
+}
+
+function handleSurfacePointerCancel(event: PointerEvent): boolean {
+  if (gesture.value?.pointerId !== event.pointerId) return false;
+  finishGesture(false);
+  return true;
+}
+
+function handleSurfaceDoubleClick(event: MouseEvent, point: Point): boolean {
+  if (isSelectedOverlayTarget(event.target) || crop.value) return false;
+  const image = hitTestFloatingImage(point);
+  if (!image) return false;
+  emit("preview", image, layerRef.value ?? undefined);
+  return true;
+}
+
+function handleSurfaceContextMenu(event: MouseEvent, point: Point): boolean {
+  if (isSelectedOverlayTarget(event.target)) return false;
+  const image = hitTestFloatingImage(point);
+  if (!image) return false;
+  event.preventDefault();
+  openContextMenu(image, layerRef.value ?? document.body, event.clientX, event.clientY);
+  return true;
+}
+
+function getSurfaceCursor(point: Point): "move" | undefined {
+  return !crop.value && hitTestFloatingImage(point) ? "move" : undefined;
+}
+
 watch(
   () => props.images.map((image) => image.id),
   (ids) => {
+    if (gesture.value && !ids.includes(gesture.value.image.id)) finishGesture(false);
     if (crop.value && !ids.includes(crop.value.image.id)) cancelCrop(false);
     if (contextMenu.value && !ids.includes(contextMenu.value.imageId)) closeContextMenu(false);
   },
+);
+
+watch(
+  [() => props.images, previewImage, crop, () => props.layout, () => props.assetUrls],
+  emitPaintState,
+  { deep: false, flush: "post", immediate: true },
+);
+
+watch(
+  () =>
+    [
+      selectedImage.value?.assetId,
+      selectedImage.value && props.assetUrls.get(selectedImage.value.assetId),
+    ] as const,
+  ([assetId, source], _previous, onCleanup) => {
+    if (!assetId || !source) return;
+    const probe = new Image();
+    probe.onload = () =>
+      cacheImageSize(assetId, { width: probe.naturalWidth, height: probe.naturalHeight });
+    probe.src = source;
+    onCleanup(() => {
+      probe.onload = null;
+      probe.src = "";
+    });
+  },
+  { immediate: true },
 );
 
 watch(
@@ -452,10 +605,23 @@ watch(
 );
 onMounted(() => window.addEventListener("keydown", onWindowKeydown));
 onBeforeUnmount(() => {
+  cancelPointerSession();
   window.removeEventListener("keydown", onWindowKeydown);
   finishGesture(false);
   cancelCrop(false);
   closeContextMenu(false);
+});
+
+defineExpose({
+  getPaintState,
+  cacheImageSize,
+  handleSurfacePointerDown,
+  handleSurfacePointerMove,
+  handleSurfacePointerUp,
+  handleSurfacePointerCancel,
+  handleSurfaceDoubleClick,
+  handleSurfaceContextMenu,
+  getSurfaceCursor,
 });
 
 function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
@@ -530,14 +696,15 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
     @dblclick.prevent.stop="onLayerDoubleClick"
   >
     <div
-      v-for="fragment in fragments"
+      v-for="fragment in fragments.filter((entry) => entry.image.id === selectedImageId)"
       :key="getFragmentKey(fragment)"
-      class="sheet-floating-image-layer__fragment"
-      :class="{ 'is-selected': fragment.image.id === selectedImageId }"
+      class="sheet-floating-image-layer__selected"
+      :class="{ 'is-selected': !crop }"
       :style="getFragmentStyle(fragment)"
       :data-floating-image-id="fragment.image.id"
       :data-floating-image-pane="fragment.paneId"
-      :tabindex="fragment.image.id === selectedImageId ? 0 : -1"
+      data-floating-image-selected
+      tabindex="0"
       role="group"
       :aria-label="getAccessibleLabel(fragment.image)"
       @pointerdown.stop="startGesture(fragment.image, 'move', $event)"
@@ -545,29 +712,6 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
       @dblclick.prevent.stop="onImageDoubleClick(fragment.image, $event)"
       @keydown="onImageKeydown(fragment.image, $event)"
     >
-      <div class="sheet-floating-image-layer__content">
-        <SheetImageContent
-          v-if="assetUrls.get(fragment.image.assetId)"
-          class="sheet-floating-image-layer__image"
-          :src="assetUrls.get(fragment.image.assetId)!"
-          :alt-text="fragment.image.altText || t('image.floatingAlt')"
-          :transform="fragment.image.transform"
-          fit="fill"
-          @load="(size) => cacheImageSize(fragment.image.assetId, size)"
-          :style="getImageStyle(fragment)"
-          draggable="false"
-        />
-        <span
-          v-else
-          class="sheet-floating-image-layer__placeholder"
-          :class="{
-            'is-loading': loadingAssetIds?.has(fragment.image.assetId),
-            'is-missing': missingAssetIds?.has(fragment.image.assetId),
-          }"
-          :style="getImageStyle(fragment)"
-          aria-hidden="true"
-        />
-      </div>
       <SheetFloatingImageCropOverlay
         v-if="crop?.image.id === fragment.image.id"
         :fragment="fragment"
@@ -615,7 +759,7 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
   inset: 0;
   pointer-events: none;
 
-  &__fragment {
+  &__selected {
     position: absolute;
     box-sizing: border-box;
     pointer-events: auto;
@@ -625,46 +769,6 @@ function onImageKeydown(image: FloatingImage, event: KeyboardEvent): void {
 
     &:focus-visible {
       --image-selection-style: dashed;
-    }
-  }
-
-  &__content {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-  }
-
-  &__image,
-  &__placeholder {
-    position: absolute;
-    display: block;
-    box-sizing: border-box;
-    max-width: none;
-    user-select: none;
-    z-index: 1;
-  }
-
-  &__image {
-    object-fit: fill;
-    pointer-events: none;
-  }
-
-  &__placeholder {
-    border: 1px solid color-mix(in srgb, var(--idea-text-secondary) 50%, transparent);
-    background: color-mix(in srgb, var(--idea-surface-panel) 80%, var(--idea-text-secondary));
-
-    &.is-loading {
-      background: repeating-linear-gradient(
-        -45deg,
-        color-mix(in srgb, var(--idea-surface-panel) 84%, var(--idea-text-secondary)),
-        color-mix(in srgb, var(--idea-surface-panel) 84%, var(--idea-text-secondary)) 8px,
-        color-mix(in srgb, var(--idea-surface-panel) 94%, var(--idea-text-secondary)) 8px,
-        color-mix(in srgb, var(--idea-surface-panel) 94%, var(--idea-text-secondary)) 16px
-      );
-    }
-
-    &.is-missing {
-      border-style: dashed;
     }
   }
 }

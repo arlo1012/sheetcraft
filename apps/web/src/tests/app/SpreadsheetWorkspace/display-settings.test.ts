@@ -2,6 +2,7 @@ import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
+import SheetSurface from "../../../modules/sheet-grid/components/SheetSurface.vue";
 import { createAppI18n } from "../../../shared/i18n";
 
 describe("workspace display settings", () => {
@@ -34,8 +35,13 @@ describe("workspace display settings", () => {
       expect(quickTools.attributes("aria-checked")).toBe("false");
 
       await headers.trigger("keydown", { key: " " });
-      expect(wrapper.find(".sheet-row-headers").exists()).toBe(false);
-      expect(wrapper.find(".sheet-column-headers").exists()).toBe(false);
+      expect(
+        (
+          wrapper.getComponent(SheetSurface).props("frame") as {
+            headerSize: { width: number; height: number };
+          }
+        ).headerSize,
+      ).toEqual({ width: 0, height: 0 });
       expect(headers.attributes("aria-checked")).toBe("false");
       expect(grid.props("showGridLines")).toBe(true);
 
@@ -46,7 +52,13 @@ describe("workspace display settings", () => {
       expect(quickTools.attributes("aria-checked")).toBe("true");
 
       await headers.trigger("click");
-      expect(wrapper.find(".sheet-row-headers").exists()).toBe(true);
+      expect(
+        (
+          wrapper.getComponent(SheetSurface).props("frame") as {
+            headerSize: { width: number; height: number };
+          }
+        ).headerSize,
+      ).toEqual({ width: 68, height: 48 });
       expect(grid.props("showAxisQuickTools")).toBe(true);
       expect(grid.props("showGridLines")).toBe(false);
       expect(grid.props("workbookRevision")).toBe(revision);

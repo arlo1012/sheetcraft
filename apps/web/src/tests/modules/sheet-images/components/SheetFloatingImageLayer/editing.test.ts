@@ -136,9 +136,11 @@ describe("floating image editing", () => {
   });
   test("uses one rotation update and restores intrinsic dimensions", async () => {
     const { wrapper, image } = await fixture();
-    const probe = wrapper.get(".sheet-image-content__probe").element as HTMLImageElement;
-    Object.defineProperties(probe, { naturalWidth: { value: 240 }, naturalHeight: { value: 160 } });
-    await wrapper.get(".sheet-image-content__probe").trigger("load");
+    (
+      wrapper.vm as unknown as {
+        cacheImageSize: (assetId: string, size: { width: number; height: number }) => void;
+      }
+    ).cacheImageSize(image.assetId, { width: 240, height: 160 });
     await toolbarAction("rotate");
     document.querySelector<HTMLElement>('[data-floating-image-rotate="right"]')!.click();
     await flushPromises();

@@ -39,6 +39,12 @@ async function mountWorkspace(store = createStore()) {
   return wrapper;
 }
 
+function activeCellAddress(
+  wrapper: Awaited<ReturnType<typeof mountWorkspace>>,
+): string | undefined {
+  return wrapper.get("textarea.cell-editor").attributes("data-cell-editor");
+}
+
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
 });
@@ -57,7 +63,7 @@ describe("workspace persistence integration", () => {
     expect(store.save.mock.calls[0]![0]).toMatchObject({
       sheets: [{ cells: [{ content: { kind: "literal", value: "draft" } }] }],
     });
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
+    expect(activeCellAddress(wrapper)).toBe("A1");
     expect(wrapper.get("[data-save-status]").attributes("data-save-status")).toBe("saved");
   });
 
@@ -88,7 +94,7 @@ describe("workspace persistence integration", () => {
     const address = wrapper.get<HTMLInputElement>("[data-address-input]");
     await address.setValue("C3");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("C3");
+    expect(activeCellAddress(wrapper)).toBe("C3");
     const file = { text: async () => JSON.stringify(snapshotWithValue("imported")) };
     wrapper.findComponent(WorkbookFileActions).vm.$emit("importJson", file);
     await flushPromises();
@@ -99,7 +105,7 @@ describe("workspace persistence integration", () => {
     await flushPromises();
 
     expect(store.replace).toHaveBeenCalledTimes(1);
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
+    expect(activeCellAddress(wrapper)).toBe("A1");
     expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
     expect(wrapper.get<HTMLTextAreaElement>("[data-formula-input]").element.value).toBe("imported");
     expect(wrapper.find('[data-workbook-file="feedback"]').exists()).toBe(false);

@@ -8,13 +8,17 @@ import {
   setRowHeight,
 } from "@idea10/core/workbook";
 import { mountSheetGrid } from "./fixture";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 
 function renderedRowHeight(
   wrapper: ReturnType<typeof mountSheetGrid>["wrapper"],
   row: number,
 ): number {
-  return Number.parseFloat(
-    wrapper.get(`[data-resize-row="${row}"]`).attributes("aria-valuenow") ?? "0",
+  const frame = wrapper.getComponent(SheetSurface).props("frame") as {
+    rowHeaders: readonly { items: readonly { index: number; size: number }[] }[];
+  };
+  return (
+    frame.rowHeaders.flatMap((pane) => pane.items).find((item) => item.index === row)?.size ?? 0
   );
 }
 
@@ -27,9 +31,6 @@ describe("SheetGrid automatic row height", () => {
     await nextTick();
     const wrappedHeight = renderedRowHeight(wrapper, 0);
     expect(wrappedHeight).toBeGreaterThan(DEFAULT_ROW_HEIGHT);
-    expect(wrapper.get('[aria-label="Row 1 height"]').attributes("aria-valuenow")).toBe(
-      String(wrappedHeight),
-    );
 
     setColumnWidth(sheet, 0, 640);
     await nextTick();

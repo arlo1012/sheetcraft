@@ -4,10 +4,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import App from "../../../app/App.vue";
 import LocaleSwitcher from "../../../app/LocaleSwitcher.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
-import SheetCanvasLayer from "../../../modules/sheet-grid/components/SheetCanvasLayer.vue";
+import SheetSurface from "../../../modules/sheet-grid/components/SheetSurface.vue";
 import { getCellStyle } from "@idea10/core/workbook";
 import { createAppI18n, type AppLocale } from "../../../shared/i18n";
-import { triggerCanvasCell } from "../canvas-interaction";
+import { triggerCanvasCell, triggerCanvasCorner, triggerCanvasHeader } from "../canvas-interaction";
 
 function mountApp(locale: AppLocale = "en-US") {
   const host = document.createElement("div");
@@ -21,6 +21,10 @@ function mountApp(locale: AppLocale = "en-US") {
   mountedWrappers.push(wrapper);
   mountedHosts.push(host);
   return wrapper;
+}
+
+function activeCellAddress(wrapper: ReturnType<typeof mountApp>): string | undefined {
+  return wrapper.get("textarea.cell-editor").attributes("data-cell-editor");
 }
 
 function getAddressInput(wrapper: ReturnType<typeof mountApp>) {
@@ -53,10 +57,10 @@ describe("App", () => {
     const wrapper = mountApp();
 
     expect(wrapper.get("[data-app-root]").attributes("aria-label")).toBe("idea10 workspace");
-    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet1");
+    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet1 worksheet");
     expect(wrapper.get('[role="grid"]').attributes("aria-rowcount")).toBe("100");
     expect(wrapper.get('[role="grid"]').attributes("aria-colcount")).toBe("26");
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
+    expect(activeCellAddress(wrapper)).toBe("A1");
     expect(wrapper.get(".spreadsheet-ribbon").attributes("aria-label")).toBe("Workbook tools");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("Home");
     expect(wrapper.get(".workbook-status-bar").attributes("aria-label")).toBe("Workbook status");
@@ -78,14 +82,14 @@ describe("App", () => {
 
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
     expect(wrapper.findAll('[role="tab"]')).toHaveLength(2);
-    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet2");
+    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet2 worksheet");
 
     const sheetTab = wrapper.get('[title="Sheet2 (double-click to rename)"]');
     await sheetTab.trigger("dblclick");
     const renameInput = wrapper.get('[aria-label="Rename Sheet2"]');
     await renameInput.setValue("Budget");
     await renameInput.trigger("keydown", { key: "Enter" });
-    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Budget");
+    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Budget worksheet");
 
     await wrapper
       .get('[role="tab"][title="Budget (double-click to rename)"]')
@@ -93,7 +97,7 @@ describe("App", () => {
     sheetMenu = new DOMWrapper(document.body).get('[role="menu"]');
     await sheetMenu.get('[data-sheet-tab-action="delete"]').trigger("click");
     expect(wrapper.findAll('[role="tab"]')).toHaveLength(1);
-    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet1");
+    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet1 worksheet");
   });
 
   test("switches sheet tabs with the standard arrow and boundary keys", async () => {
@@ -125,7 +129,7 @@ describe("App", () => {
     await wrapper.get('[title="Sheet1 (double-click to rename)"]').trigger("click");
 
     const restoredScroller = wrapper.get(".sheet-grid__scroller").element as HTMLDivElement;
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("C7");
+    expect(activeCellAddress(wrapper)).toBe("C7");
     expect(restoredScroller.scrollTop).toBe(120);
     expect(restoredScroller.scrollLeft).toBe(192);
   });
@@ -136,7 +140,7 @@ describe("App", () => {
 
     await addressInput.setValue("D20");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("D20");
+    expect(activeCellAddress(wrapper)).toBe("D20");
 
     const formulaInput = getFormulaInput(wrapper);
     await formulaInput.trigger("focus");
@@ -144,7 +148,7 @@ describe("App", () => {
     await formulaInput.trigger("keydown", { key: "Enter" });
     await formulaInput.trigger("blur");
     expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("D21");
+    expect(activeCellAddress(wrapper)).toBe("D21");
     expect(document.activeElement).toBe(wrapper.get("textarea.cell-editor").element);
 
     await addressInput.setValue("A1");
@@ -154,7 +158,7 @@ describe("App", () => {
     await addressInput.setValue("D20");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
 
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("D20");
+    expect(activeCellAddress(wrapper)).toBe("D20");
     expect(getFormulaInput(wrapper).element.value).toBe("42");
   });
 
@@ -170,7 +174,7 @@ describe("App", () => {
     await getSearchInput(wrapper).setValue("needle");
     await wrapper.get('[aria-label="Find next"]').trigger("click");
 
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
+    expect(activeCellAddress(wrapper)).toBe("A1");
     expect(wrapper.find(".workbook-status-bar__status").exists()).toBe(false);
   });
 
@@ -179,7 +183,7 @@ describe("App", () => {
 
     await getAddressInput(wrapper).setValue("XFE1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
+    expect(activeCellAddress(wrapper)).toBe("A1");
     expect(wrapper.find(".workbook-status-bar__status").exists()).toBe(false);
   });
 
@@ -191,10 +195,10 @@ describe("App", () => {
 
     await getAddressInput(wrapper).setValue("C3");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
+    expect(activeCellAddress(wrapper)).toBe("A1");
 
     await editor.trigger("compositionend", { data: "中文" });
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("C3");
+    expect(activeCellAddress(wrapper)).toBe("C3");
 
     await getAddressInput(wrapper).setValue("A1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
@@ -210,13 +214,13 @@ describe("App", () => {
     await renameInput.setValue(" ");
     await renameInput.trigger("keydown", { key: "Enter" });
     expect(wrapper.text()).not.toContain("Sheet name cannot be empty");
-    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet2");
+    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet2 worksheet");
 
     await wrapper.get('[title="Sheet2 (double-click to rename)"]').trigger("dblclick");
     await wrapper.get('[aria-label="Rename Sheet2"]').setValue("Sheet1");
     await wrapper.get('[aria-label="Rename Sheet2"]').trigger("keydown", { key: "Enter" });
     expect(wrapper.text()).not.toContain("A sheet named Sheet1 already exists");
-    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet2");
+    expect(wrapper.get('[role="grid"]').attributes("aria-label")).toBe("Sheet2 worksheet");
   });
 
   test("switches visible and assistive labels between English and Chinese", async () => {
@@ -241,7 +245,7 @@ describe("App", () => {
     expect(wrapper.text()).not.toContain("单元格地址无效");
     expect(wrapper.text()).not.toContain("就绪");
 
-    await wrapper.get('[data-select-row="2"]').trigger("contextmenu", {
+    await triggerCanvasHeader(wrapper, "row", 2, "contextmenu", {
       clientX: 16,
       clientY: 72,
     });
@@ -294,19 +298,19 @@ describe("App", () => {
     await triggerCanvasCell(wrapper, { row: 0, column: 1 }, "mousedown", { button: 0 });
     await enterValue("20");
 
-    await wrapper.get('[aria-label="Select row 1"]').trigger("mousedown", { button: 0 });
+    await triggerCanvasHeader(wrapper, "row", 0, "mousedown", { button: 0 });
     await vi.advanceTimersByTimeAsync(120);
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=15");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=2");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum=30");
 
-    await wrapper.get('[aria-label="Select column A"]').trigger("mousedown", { button: 0 });
+    await triggerCanvasHeader(wrapper, "column", 0, "mousedown", { button: 0 });
     await vi.advanceTimersByTimeAsync(120);
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=54.5");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=2");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum=109");
 
-    await wrapper.get('[aria-label="Select all cells"]').trigger("click");
+    await triggerCanvasCorner(wrapper, "mousedown", { button: 0 });
     await vi.advanceTimersByTimeAsync(120);
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=43");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=3");
@@ -394,7 +398,7 @@ describe("App", () => {
     expect(getCellStyle(sheet(), { row: 0, column: 0 })?.textColor).toBe("#4472c4");
 
     await triggerCanvasCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("B2");
+    expect(activeCellAddress(wrapper)).toBe("B2");
     await textTool.get("[data-ribbon-split-main]").trigger("click");
     expect(getCellStyle(sheet(), { row: 1, column: 1 })?.textColor).toBe("#4472c4");
     expect(textTool.get("[data-ribbon-split-menu]").attributes("aria-expanded")).toBe("false");
@@ -421,26 +425,30 @@ describe("App", () => {
     expect(wrapText.attributes("aria-pressed")).toBe("true");
     expect(
       (
-        wrapper.getComponent(SheetCanvasLayer).props("layout") as {
-          getCellViewportRect(address: {
-            row: number;
-            column: number;
-          }): { height: number } | undefined;
+        wrapper.getComponent(SheetSurface).props("frame") as {
+          layout: {
+            getCellViewportRect(address: {
+              row: number;
+              column: number;
+            }): { height: number } | undefined;
+          };
         }
-      ).getCellViewportRect({ row: 0, column: 0 })?.height,
+      ).layout.getCellViewportRect({ row: 0, column: 0 })?.height,
     ).toBeGreaterThan(24);
 
     await wrapText.trigger("click");
     expect(wrapText.attributes("aria-pressed")).toBe("false");
     expect(
       (
-        wrapper.getComponent(SheetCanvasLayer).props("layout") as {
-          getCellViewportRect(address: {
-            row: number;
-            column: number;
-          }): { height: number } | undefined;
+        wrapper.getComponent(SheetSurface).props("frame") as {
+          layout: {
+            getCellViewportRect(address: {
+              row: number;
+              column: number;
+            }): { height: number } | undefined;
+          };
         }
-      ).getCellViewportRect({ row: 0, column: 0 })?.height,
+      ).layout.getCellViewportRect({ row: 0, column: 0 })?.height,
     ).toBe(24);
 
     await wrapText.trigger("keydown", { key: "z", ctrlKey: true });
@@ -451,7 +459,7 @@ describe("App", () => {
 
   test("disables formatting when a whole-column selection exceeds the command limit", async () => {
     const wrapper = mountApp();
-    await wrapper.get('[data-select-column="0"]').trigger("mousedown", { button: 0 });
+    await triggerCanvasHeader(wrapper, "column", 0, "mousedown", { button: 0 });
 
     const formatGroup = wrapper.get('[data-ribbon-group="cell"]');
     expect(formatGroup.attributes("aria-disabled")).toBe("true");

@@ -12,7 +12,6 @@ import {
 import { formatCellContentForInput } from "@idea10/core/input";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import { columnIndexToLabel, getCellAddressLabel } from "@idea10/core/coordinates";
-import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
 import { getSelectionFitZoom } from "../selection-zoom";
@@ -46,7 +45,6 @@ import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import {
   DEFAULT_GRID_EXTENT_POLICY,
   DEFAULT_INITIAL_GRID_EXTENT,
-  getSheetContentExtent,
 } from "@idea10/sheet-engine/extent";
 import {
   areCellAddressesEqual,
@@ -89,16 +87,29 @@ import { areGridClipboardTextsEqual, createBrowserGridClipboardPort } from "../g
 import { readFloatingImageClipboard } from "../../sheet-images/imageClipboard";
 import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
-import SheetAxisOperationPreview from "./SheetAxisOperationPreview.vue";
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
-import SheetFreezeLines from "./SheetFreezeLines.vue";
-import SheetCanvasLayer from "./SheetCanvasLayer.vue";
 import SheetCellContextMenu from "./SheetCellContextMenu.vue";
-import SheetColumnHeaders from "./SheetColumnHeaders.vue";
-import SheetRowHeaders from "./SheetRowHeaders.vue";
-import SheetSelectionOverlay from "./SheetSelectionOverlay.vue";
-import SheetReadingHighlight from "./SheetReadingHighlight.vue";
-import type { FormulaReferenceOverlayGroup } from "./SheetSelectionOverlay.vue";
+import SheetSurface from "./SheetSurface.vue";
+import {
+  createFloatingImageCanvasCache,
+  paintFloatingImages,
+  type FloatingImagePaintState,
+} from "../../sheet-images/floating-image-painter";
+import { useSheetDisplaySnapshot } from "../canvas/sheet-display-snapshot";
+import { createSheetRenderFrame, getSurfaceCell } from "../rendering/sheet-render-frame";
+import { useSheetRenderEnvironment } from "../rendering/useSheetRenderEnvironment";
+import {
+  clientPointToElementSurface,
+  surfacePointToBody,
+} from "../../../shared/sheet-input/surface-coordinates";
+import { useHeaderInteraction } from "../input/useHeaderInteraction";
+import type { HeaderInteractionState } from "../input/useHeaderInteraction";
+import type {
+  FormulaReferenceOverlay as FormulaReferenceOverlayGroup,
+  SheetOverlayState,
+  SheetFreezeDragOverlay,
+  SheetFreezeHandlesOverlay,
+} from "../rendering/overlay-types";
 import { getCellEditorFrameStyle, getCellEditorStyle } from "../cell-presentation";
 import { formatCellValueForGrid } from "../cell-value-presentation";
 import { isCellTextWrapped } from "../../../shared/cell-text/text-presentation";
@@ -109,7 +120,7 @@ type AxisContextMenuState = {
   index: number;
   count: number;
   anchor: FloatingReference;
-  trigger: HTMLButtonElement;
+  trigger: HTMLElement;
 };
 
 type CellContextMenuState = {
@@ -252,9 +263,13 @@ function closeImagePreview(): void {
   if (!imagePreview.value) return;
   const trigger = imagePreview.value?.trigger;
   imagePreview.value = undefined;
-  void nextTick(() =>
-    trigger?.isConnected ? trigger.focus({ preventScroll: true }) : focusEditor(),
-  );
+  void nextTick(() => {
+    if (trigger?.isConnected) {
+      trigger.focus({ preventScroll: true });
+      if (document.activeElement === trigger) return;
+    }
+    focusEditor();
+  });
 }
 
 watch(() => props.sheet.id, closeImagePreview);
@@ -263,29 +278,26 @@ watch(previewUrl, (url) => {
 });
 const axisContextMenu = ref<AxisContextMenuState>();
 const cellContextMenu = ref<CellContextMenuState>();
-let fontFaceSet: FontFaceSet | undefined;
-let fontLoadingDoneListener: (() => void) | undefined;
-
+const { environment, fontRevision: fontMetricsVersion } = useSheetRenderEnvironment(
+  () => rootRef.value,
+);
+const defaultFontFamily = computed(() => environment.value.fontFamily);
 const autoRowHeightCalculator = markRaw(createAutoRowHeightCalculator(browserCellTextMeasurer));
-const defaultFontFamily = ref(DEFAULT_CELL_FONT_FAMILY);
-const fontMetricsVersion = ref(0);
-const contentExtent = computed(() => {
-  const extent = getSheetContentExtent(props.sheet);
-  const evaluator = props.evaluator ?? createSheetEvaluator(props.sheet);
-  for (const [key, cell] of props.sheet.cells) {
-    if (cell.content?.kind !== "formula") continue;
-    const separator = key.indexOf(":");
-    const row = Number(key.slice(0, separator));
-    const column = Number(key.slice(separator + 1));
-    if (Number.isInteger(row) && Number.isInteger(column))
-      evaluator.getComputedValue({ row, column });
+const sheetEvaluator = computed<SheetEvaluator>(() => {
+  if (props.evaluator) return props.evaluator;
+  // Value iteration also invalidates an existing sparse cell whose content changes in place.
+  for (const cell of props.sheet.cells.values()) {
+    void cell;
   }
-  for (const projection of evaluator.getSpillProjections?.() ?? []) {
-    extent.rowCount = Math.max(extent.rowCount, projection.address.row + 1);
-    extent.columnCount = Math.max(extent.columnCount, projection.address.column + 1);
-  }
-  return extent;
+  return createSheetEvaluator(props.sheet);
 });
+
+const display = useSheetDisplaySnapshot({
+  getSheet: () => props.sheet,
+  getEvaluator: () => sheetEvaluator.value,
+  getRevision: () => props.workbookRevision,
+});
+const contentExtent = computed(() => display.value.contentExtent);
 const {
   dimensionResize,
   request: requestDimensionResize,
@@ -297,12 +309,10 @@ const {
   onCommit: (payload) => emit("resizeDimension", payload),
 });
 const {
-  columnHeaderPanes,
   geometry,
   getCellAtClientPoint,
   gridCanvasStyle,
   gridExtent,
-  gridViewportStyle,
   horizontalScrollState,
   ensureGridExtentContains,
   ensureGridExtentCoversViewport,
@@ -313,7 +323,6 @@ const {
   onScroll,
   onWheel,
   restore: restoreViewport,
-  rowHeaderPanes,
   rowVisibility,
   scrollPosition,
   scrollHorizontally,
@@ -417,15 +426,6 @@ const effectiveColumnWidths = computed(() => {
     columnWidths.set(resize.index, resize.previewSize);
   }
   return columnWidths;
-});
-
-const sheetEvaluator = computed<SheetEvaluator>(() => {
-  if (props.evaluator) return props.evaluator;
-  // Value iteration also invalidates an existing sparse cell whose content changes in place.
-  for (const cell of props.sheet.cells.values()) {
-    void cell;
-  }
-  return createSheetEvaluator(props.sheet);
 });
 
 const automaticRowHeights = computed(() => {
@@ -606,6 +606,189 @@ watch(quickToolsAvailable, (available) => {
     quickInsertHover.value = undefined;
   }
 });
+
+const renderFrame = computed(() =>
+  createSheetRenderFrame(layout.value, headerSize.value, scale.value),
+);
+const surfaceRef = ref<InstanceType<typeof SheetSurface>>();
+const emptyImageUrls: ReadonlyMap<string, string> = new Map();
+const resolvedImageUrls = computed(() => props.imageAssetUrls ?? emptyImageUrls);
+const imageLayerRef = ref<InstanceType<typeof SheetFloatingImageLayer>>();
+const imagePaintState = shallowRef<FloatingImagePaintState>({ images: [], revision: 0 });
+const floatingImageCache = createFloatingImageCanvasCache(() =>
+  surfaceRef.value?.invalidate("overlay"),
+);
+const paintSurfaceImages = computed(() => {
+  const state = imagePaintState.value;
+  const currentLayout = layout.value;
+  const assetUrls = resolvedImageUrls.value;
+  const loadingAssetIds = props.loadingImageAssetIds;
+  const palette = environment.value;
+  const loadingLabel = t("image.loading");
+  const unavailableLabel = t("image.assetUnavailable");
+  return (context: CanvasRenderingContext2D) =>
+    paintFloatingImages(context, {
+      state,
+      layout: currentLayout,
+      assetUrls,
+      loadingAssetIds,
+      cache: floatingImageCache,
+      palette: {
+        placeholderBackground: palette.cells.background,
+        placeholderStripe: palette.headers.background,
+        placeholderBorder: palette.headers.border,
+        placeholderText: palette.cells.mutedText,
+      },
+      loadingLabel,
+      unavailableLabel,
+    });
+});
+onBeforeUnmount(() => floatingImageCache.dispose());
+function imagePoint(event: MouseEvent) {
+  const point = surfacePoint(event);
+  return surfacePointToBody(point, renderFrame.value.headerSize);
+}
+const headerState = shallowRef<HeaderInteractionState>({});
+const headerSelection = computed(() => ({
+  startRow: selectedRange.value.start.row,
+  endRow: selectedRange.value.end.row,
+  startColumn: selectedRange.value.start.column,
+  endColumn: selectedRange.value.end.column,
+  mode: getSelectionMode(selection.value),
+  activeRow: activeCell.value.row,
+  activeColumn: activeCell.value.column,
+}));
+const headerQuickTools = computed(() => ({
+  enabled: headerQuickToolsEnabled.value,
+  gutter: quickToolsGutter.value,
+}));
+const headerInput = useHeaderInteraction({
+  canFocus: () => !getReferenceEditor() && !isComposing.value,
+  getFrame: () => renderFrame.value,
+  getSelection: () => headerSelection.value,
+  getQuickTools: () => headerQuickTools.value,
+  getGeometry: () => geometry.value,
+  onInvalidate: () => {
+    headerState.value = headerInput.state;
+  },
+  callbacks: {
+    selectAxis: (axis, index, shiftKey) =>
+      axis === "row"
+        ? onRowHeaderSelect({ row: index, shiftKey })
+        : onColumnHeaderSelect({ column: index, shiftKey }),
+    selectAll: onCornerClick,
+    resizeStart: (axis, index, event) => onDimensionResizeStart(axis, { index, event }),
+    resize: (axis, index, size) => onDimensionResizeRequest(axis, { index, size }),
+    quickInsert: (axis, index) => onQuickInsert(axis, { index }),
+    quickInsertHover: (axis, index) => onQuickInsertHover(axis, index === null ? null : { index }),
+    axisDragStart: (axis, index, event) => onAxisDragStart(axis, { index, event }),
+    openContextMenu: openAxisContextMenu,
+  },
+});
+const headerLabel = computed(() => {
+  const focused = headerState.value.focused;
+  if (!focused) return t("grid.worksheet", { name: props.sheet.name });
+  if (focused.axis === "corner") return t("grid.selectAll");
+  return focused.axis === "row"
+    ? t("grid.selectRow", { row: (focused.index ?? 0) + 1 })
+    : t("grid.selectColumn", { column: columnIndexToLabel(focused.index ?? 0) });
+});
+const headerPaintState = computed(() => ({
+  selection: headerSelection.value,
+  quickTools: headerQuickTools.value,
+  ...headerState.value,
+}));
+const freezePreview = shallowRef<SheetFreezeDragOverlay>();
+const freezeHandleState = shallowRef<SheetFreezeHandlesOverlay>();
+const overlayState = computed<SheetOverlayState>(() => {
+  const range = selectedRange.value;
+  const readingRects = !props.highlightEnabled
+    ? []
+    : getSelectionMode(selection.value) !== "cells"
+      ? layout.value.getRangeFragments(range)
+      : [
+          ...layout.value.getRangeFragments({
+            start: { row: range.start.row, column: 0 },
+            end: { row: range.end.row, column: gridExtent.columnCount - 1 },
+          }),
+          ...layout.value.getRangeFragments({
+            start: { row: 0, column: range.start.column },
+            end: { row: gridExtent.rowCount - 1, column: range.end.column },
+          }),
+        ];
+  return {
+    activeRects: activeCellOutlineRects.value,
+    rangeRects: selectedRangeRects.value,
+    editing: isEditing.value,
+    referenceGroups: formulaReferenceGroups.value,
+    clipboardRects: clipboardRangeRects.value,
+    clipboardMode: clipboardMode.value,
+    readingRects,
+    readingColor: props.highlightColor,
+    axisOperationPreview: axisOperationPreview.value,
+    freezeDrag: freezePreview.value,
+    freezeHandles: {
+      ...freezeHandleState.value,
+      visible: quickToolsAvailable.value,
+      disabled: Boolean(axisMoveDrag.value),
+    },
+  };
+});
+const imageHoverCursor = ref<string>();
+const surfaceCursor = computed(() => {
+  const hit = headerState.value.hovered;
+  if (dimensionResize.value)
+    return dimensionResize.value.axis === "row" ? "row-resize" : "col-resize";
+  if (axisMoveDrag.value?.active) return "grabbing";
+  if (hit?.action === "resize") return hit.axis === "row" ? "row-resize" : "col-resize";
+  if (hit?.action === "grip") return "grab";
+  return hit ? "pointer" : (imageHoverCursor.value ?? "cell");
+});
+function surfacePoint(event: MouseEvent) {
+  return clientPointToElementSurface(
+    { x: event.clientX, y: event.clientY },
+    rootRef.value!,
+    scale.value,
+  );
+}
+function onSurfacePointerDown(event: PointerEvent): void {
+  const point = surfacePoint(event);
+  if (headerInput.onPointerDown(point, event, event.currentTarget as HTMLElement)) return;
+  if (imageLayerRef.value?.handleSurfacePointerDown(event, imagePoint(event))) return;
+  if (event.button !== 0) return;
+  const address = getSurfaceCell(renderFrame.value, point);
+  if (address) {
+    headerInput.focus(undefined);
+    event.preventDefault();
+    onCellMouseDown(address, event);
+  }
+}
+function onSurfacePointerMove(event: PointerEvent): void {
+  headerInput.onPointerMove(surfacePoint(event));
+  imageHoverCursor.value = imageLayerRef.value?.getSurfaceCursor(imagePoint(event));
+}
+function onSurfacePointerLeave(): void {
+  headerInput.onPointerLeave();
+  imageHoverCursor.value = undefined;
+}
+function onSurfaceContextMenu(event: MouseEvent): void {
+  const point = surfacePoint(event);
+  if (headerInput.onContextMenu(point, event, event.currentTarget as HTMLElement)) return;
+  if (imageLayerRef.value?.handleSurfaceContextMenu(event, imagePoint(event))) return;
+  const address = getSurfaceCell(renderFrame.value, point);
+  if (address) openCellContextMenu(address, event);
+}
+function onSurfaceDoubleClick(event: MouseEvent): void {
+  if (imageLayerRef.value?.handleSurfaceDoubleClick(event, imagePoint(event))) return;
+  const address = getSurfaceCell(renderFrame.value, surfacePoint(event));
+  if (address) {
+    event.preventDefault();
+    onCellDoubleClick(address, event);
+  }
+}
+function onSurfaceKeydown(event: KeyboardEvent): void {
+  if (!headerInput.onKeyDown(event, event.currentTarget as HTMLElement)) onEditorKeydown(event);
+}
 
 const activeCellRect = computed(
   () => layout.value.getCellViewportRect(activeCell.value) ?? { x: 0, y: 0, width: 0, height: 0 },
@@ -1273,7 +1456,7 @@ function openAxisContextMenu(
   index: number,
   clientX: number,
   clientY: number,
-  trigger: HTMLButtonElement,
+  trigger: HTMLElement,
 ): void {
   if (isComposing.value) {
     return;
@@ -1485,7 +1668,7 @@ function closeCellContextMenu(restoreFocus: boolean): void {
 }
 
 function onCornerClick(): void {
-  selectAxis("all", { row: 0, column: 0 }, false, false);
+  selectAxis("all", { row: 0, column: 0 }, false);
 }
 
 function onCellDoubleClick(address: CellAddress, event: MouseEvent): void {
@@ -1563,12 +1746,36 @@ function onEditorKeydown(event: KeyboardEvent): void {
 
   if (
     !isEditing.value &&
-    getSelectionMode(selection.value) === "cells" &&
     (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey))
   ) {
+    const mode = getSelectionMode(selection.value);
+    if (mode === "cells") openActiveCellContextMenu();
+    else if (mode === "rows" || mode === "columns") {
+      const axis = mode === "rows" ? "row" : "column";
+      const index = axis === "row" ? activeCell.value.row : activeCell.value.column;
+      const frame = renderFrame.value;
+      const item = (axis === "row" ? frame.rowHeaders : frame.columnHeaders)
+        .flatMap((pane) => pane.items)
+        .find((item) => item.index === index);
+      const bounds = rootRef.value!.getBoundingClientRect();
+      const x =
+        axis === "row"
+          ? frame.headerSize.width / 2
+          : (item?.offset ?? frame.body.x) + (item?.size ?? 0) / 2;
+      const y =
+        axis === "column"
+          ? frame.headerSize.height / 2
+          : (item?.offset ?? frame.body.y) + (item?.size ?? 0) / 2;
+      openAxisContextMenu(
+        axis,
+        index,
+        bounds.left + x * scale.value,
+        bounds.top + y * scale.value,
+        event.currentTarget as HTMLElement,
+      );
+    } else return;
     event.preventDefault();
     event.stopPropagation();
-    openActiveCellContextMenu();
     return;
   }
 
@@ -1749,25 +1956,6 @@ watch(
 );
 
 onMounted(() => {
-  const root = rootRef.value;
-  const resolvedFontFamily = root ? getComputedStyle(root).fontFamily.trim() : "";
-  if (resolvedFontFamily) {
-    defaultFontFamily.value = resolvedFontFamily;
-  }
-  if (typeof document !== "undefined" && "fonts" in document) {
-    fontFaceSet = document.fonts;
-    const refreshFontMetrics = () => {
-      autoRowHeightCalculator.clear();
-      fontMetricsVersion.value += 1;
-    };
-    fontFaceSet.addEventListener("loadingdone", refreshFontMetrics);
-    void fontFaceSet.ready.then(() => {
-      if (rootRef.value) {
-        refreshFontMetrics();
-      }
-    });
-    fontLoadingDoneListener = refreshFontMetrics;
-  }
   updateViewportSize();
   restoreViewState(props.viewState);
   observeViewport();
@@ -1780,9 +1968,6 @@ watch(horizontalScrollState, (state) => emit("horizontalScrollChange", state), {
 });
 
 onBeforeUnmount(() => {
-  if (fontFaceSet && fontLoadingDoneListener) {
-    fontFaceSet.removeEventListener("loadingdone", fontLoadingDoneListener);
-  }
   stopObservingViewport();
   stopGeometryWatching();
   stopDragSelection();
@@ -1819,61 +2004,18 @@ defineExpose({
       '--sheet-column-header-height': `${headerSize.height}px`,
       '--sheet-axis-tools-size': `${quickToolsGutter}px`,
     }"
+    role="grid"
     :aria-label="t('grid.worksheet', { name: sheet.name })"
+    :aria-readonly="readOnly"
+    :aria-rowcount="gridExtent.rowCount"
+    :aria-colcount="gridExtent.columnCount"
+    aria-multiselectable="true"
+    @wheel="onWheel"
     @keydown.capture="onGridKeydown"
     @copy.capture="onImageCopy"
     @cut.capture="onImageCut"
     @paste.capture="onImagePaste"
   >
-    <button
-      v-if="showHeaders"
-      type="button"
-      class="sheet-grid__corner"
-      :class="{ 'is-active': getSelectionMode(selection) === 'all' }"
-      :aria-label="t('grid.selectAll')"
-      @click="onCornerClick"
-    />
-    <SheetColumnHeaders
-      v-if="showHeaders"
-      :panes="columnHeaderPanes"
-      :geometry="geometry"
-      :selected-start-column="selectedRange.start.column"
-      :selected-end-column="selectedRange.end.column"
-      :selected="getSelectionMode(selection) === 'columns' || getSelectionMode(selection) === 'all'"
-      :axis-selected="getSelectionMode(selection) === 'columns'"
-      :quick-tools-enabled="headerQuickToolsEnabled"
-      :quick-tools-gutter="quickToolsGutter"
-      @quick-insert="onQuickInsert('column', $event)"
-      @quick-insert-hover="onQuickInsertHover('column', $event)"
-      @axis-drag-start="onAxisDragStart('column', $event)"
-      @resize="onDimensionResizeRequest('column', $event)"
-      @resize-start="onDimensionResizeStart('column', $event)"
-      @select="onColumnHeaderSelect"
-      @open-context-menu="
-        openAxisContextMenu('column', $event.column, $event.clientX, $event.clientY, $event.trigger)
-      "
-    />
-    <SheetRowHeaders
-      v-if="showHeaders"
-      :panes="rowHeaderPanes"
-      :geometry="geometry"
-      :selected-start-row="selectedRange.start.row"
-      :selected-end-row="selectedRange.end.row"
-      :selected="getSelectionMode(selection) === 'rows' || getSelectionMode(selection) === 'all'"
-      :axis-selected="getSelectionMode(selection) === 'rows'"
-      :quick-tools-enabled="headerQuickToolsEnabled"
-      :quick-tools-gutter="quickToolsGutter"
-      @quick-insert="onQuickInsert('row', $event)"
-      @quick-insert-hover="onQuickInsertHover('row', $event)"
-      @axis-drag-start="onAxisDragStart('row', $event)"
-      @resize="onDimensionResizeRequest('row', $event)"
-      @resize-start="onDimensionResizeStart('row', $event)"
-      @select="onRowHeaderSelect"
-      @open-context-menu="
-        openAxisContextMenu('row', $event.row, $event.clientX, $event.clientY, $event.trigger)
-      "
-    />
-    <SheetFreezeLines :layout="layout" :header-size="headerSize" />
     <SheetFreezeHandles
       v-if="quickToolsAvailable"
       :key="`${sheet.id}:${scale}`"
@@ -1883,115 +2025,99 @@ defineExpose({
       :disabled="Boolean(axisMoveDrag)"
       @freeze-change="emit('freezeChange', $event)"
       @drag-change="freezeDragging = $event"
+      @preview-change="freezePreview = $event"
+      @visual-state-change="freezeHandleState = $event"
     />
-    <SheetAxisOperationPreview
-      v-if="axisOperationPreview"
-      :axis="axisOperationPreview.axis"
-      :offset="axisOperationPreview.offset"
-      :label="axisOperationPreview.label"
-      :header-size="headerSize"
-      :viewport-size="viewportSize"
-      :data-axis-operation="axisMoveDrag?.active ? 'move' : 'insert'"
-    />
-
     <div
       ref="scrollerRef"
       :id="gridId"
       class="sheet-grid__scroller"
       :class="{ 'has-external-horizontal-scrollbar': externalHorizontalScrollbar }"
-      role="grid"
-      :aria-label="sheet.name"
-      :aria-readonly="readOnly"
-      :aria-rowcount="gridExtent.rowCount"
-      :aria-colcount="gridExtent.columnCount"
-      aria-multiselectable="true"
       @scroll="onScroll"
-      @wheel="onWheel"
     >
-      <div class="sheet-grid__canvas" :style="gridCanvasStyle">
-        <div class="sheet-grid__viewport" :style="gridViewportStyle">
-          <SheetCanvasLayer
-            :sheet="sheet"
-            :scale="scale"
-            :geometry="geometry"
-            :rows="rowVisibility"
-            :workbook-revision="workbookRevision"
-            :image-asset-urls="imageAssetUrls"
-            :loading-image-asset-ids="loadingImageAssetIds"
-            :evaluator="sheetEvaluator"
-            :layout="layout"
-            :active-cell="activeCell"
-            :editing="isEditing"
-            :show-grid-lines="showGridLines"
-            :locale="locale"
-            :date-system="props.dateSystem"
-            @cell-mousedown="onCellMouseDown"
-            @cell-double-click="onCellDoubleClick"
-            @cell-contextmenu="openCellContextMenu"
-          >
-            <template #active-cell="{ cellRect }">
-              <CellEditor
-                :scale="scale"
-                ref="editorRef"
-                :model-value="editingValue"
-                :edit-session="editSession"
-                :address-label="activeCellLabel"
-                :display-value="activeCellDisplayValue"
-                :editing="isEditing"
-                :composing="isComposing"
-                :wrap-text="activeCellWrapText"
-                :cell-rect="cellRect"
-                :viewport-size="viewportSize"
-                :style="activeCellEditorStyle"
-                :frame-style="activeCellEditorFrameStyle"
-                @keydown="onEditorKeydown"
-                @blur="onEditorBlur"
-                @composition-start="onCompositionStart"
-                @composition-end="onCompositionEnd"
-                @copy="onCopy"
-                @cut="onCut"
-                @paste="onPaste"
-                @update:model-value="onEditorInput"
-              />
-            </template>
-          </SheetCanvasLayer>
-          <SheetReadingHighlight
-            v-if="highlightEnabled"
-            :layout="layout"
-            :extent="gridExtent"
-            :range="selectedRange"
-            :mode="selection.mode"
-            :color="highlightColor"
-          />
-          <SheetSelectionOverlay
-            :active-rects="activeCellOutlineRects"
-            :range-rects="selectedRangeRects"
-            :address-label="activeCellLabel"
-            :editing="isEditing"
-            :reference-groups="formulaReferenceGroups"
-            :clipboard-rects="clipboardRangeRects"
-            :clipboard-mode="clipboardMode"
-          />
-          <SheetFloatingImageLayer
-            :scale="scale"
-            :images="sheet.floatingImages"
-            :layout="layout"
-            :asset-urls="imageAssetUrls ?? new Map()"
-            :loading-asset-ids="loadingImageAssetIds"
-            :missing-asset-ids="missingImageAssetIds"
-            :selected-image-id="selectedImageId"
-            :read-only="readOnly"
-            @select="selectFloatingImage"
-            @update="emit('updateFloatingImage', $event)"
-            @delete="deleteSelectedFloatingImage"
-            @convert-to-cell="convertSelectedFloatingImageToCell"
-            @preview="openImagePreview"
-            @copy="requestFloatingImageCopy($event, 'copy')"
-            @cut="requestFloatingImageCopy($event, 'cut')"
-            @paste="requestFloatingImagePaste"
-          />
-        </div>
-      </div>
+      <div class="sheet-grid__canvas" :style="gridCanvasStyle" />
+    </div>
+    <SheetSurface
+      ref="surfaceRef"
+      :display="display"
+      :geometry="geometry"
+      :rows="rowVisibility"
+      :frame="renderFrame"
+      :environment="environment"
+      :headers="headerPaintState"
+      :overlays="overlayState"
+      :paint-images="paintSurfaceImages"
+      :active-cell="activeCell"
+      :editing="isEditing"
+      :label="headerLabel"
+      :cursor="surfaceCursor"
+      :show-grid-lines="showGridLines"
+      :locale="locale"
+      :date-system="dateSystem"
+      :image-asset-urls="imageAssetUrls"
+      :loading-image-asset-ids="loadingImageAssetIds"
+      @pointerdown="onSurfacePointerDown"
+      @pointermove="onSurfacePointerMove"
+      @pointerleave="onSurfacePointerLeave"
+      @double-click="onSurfaceDoubleClick"
+      @contextmenu="onSurfaceContextMenu"
+      @keydown="onSurfaceKeydown"
+    >
+      <template #active-cell="{ cellRect }">
+        <CellEditor
+          :scale="scale"
+          ref="editorRef"
+          :model-value="editingValue"
+          :edit-session="editSession"
+          :address-label="activeCellLabel"
+          :display-value="activeCellDisplayValue"
+          :editing="isEditing"
+          :composing="isComposing"
+          :wrap-text="activeCellWrapText"
+          :cell-rect="cellRect"
+          :viewport-size="viewportSize"
+          :style="activeCellEditorStyle"
+          :frame-style="activeCellEditorFrameStyle"
+          @keydown="onEditorKeydown"
+          @blur="onEditorBlur"
+          @composition-start="onCompositionStart"
+          @composition-end="onCompositionEnd"
+          @copy="onCopy"
+          @cut="onCut"
+          @paste="onPaste"
+          @update:model-value="onEditorInput"
+        />
+      </template>
+    </SheetSurface>
+    <div
+      class="sheet-grid__image-controls"
+      :style="{
+        left: `${headerSize.width}px`,
+        top: `${headerSize.height}px`,
+        width: `${viewportSize.width}px`,
+        height: `${viewportSize.height}px`,
+      }"
+    >
+      <SheetFloatingImageLayer
+        ref="imageLayerRef"
+        @paint-state-change="imagePaintState = $event"
+        :scale="scale"
+        :images="sheet.floatingImages"
+        :layout="layout"
+        :asset-urls="resolvedImageUrls"
+        :loading-asset-ids="loadingImageAssetIds"
+        :missing-asset-ids="missingImageAssetIds"
+        :selected-image-id="selectedImageId"
+        :read-only="readOnly"
+        @select="selectFloatingImage"
+        @update="emit('updateFloatingImage', $event)"
+        @delete="deleteSelectedFloatingImage"
+        @convert-to-cell="convertSelectedFloatingImageToCell"
+        @preview="openImagePreview"
+        @copy="requestFloatingImageCopy($event, 'copy')"
+        @cut="requestFloatingImageCopy($event, 'cut')"
+        @paste="requestFloatingImagePaste"
+      />
     </div>
     <SheetAxisContextMenu
       v-if="axisContextMenu"
@@ -2058,18 +2184,6 @@ defineExpose({
   overflow: hidden;
   background: var(--idea-surface-panel);
 
-  &::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 4;
-    width: var(--sheet-row-header-width);
-    height: var(--sheet-column-header-height);
-    background: var(--idea-surface-secondary);
-    pointer-events: none;
-  }
-
   &.is-resizing-column {
     cursor: col-resize;
   }
@@ -2078,51 +2192,8 @@ defineExpose({
     cursor: row-resize;
   }
 
-  &.is-moving-axis,
-  &.is-moving-axis :deep(.sheet-row-headers__select-button),
-  &.is-moving-axis :deep(.sheet-column-headers__select-button) {
+  &.is-moving-axis {
     cursor: grabbing;
-  }
-
-  &__corner {
-    position: absolute;
-    inset: var(--sheet-axis-tools-size) auto auto var(--sheet-axis-tools-size);
-    z-index: 5;
-    display: grid;
-    place-items: end;
-    width: calc(var(--sheet-row-header-width) - var(--sheet-axis-tools-size));
-    height: calc(var(--sheet-column-header-height) - var(--sheet-axis-tools-size));
-    background: var(--idea-surface-secondary);
-    border: 0;
-    border-right: 1px solid var(--idea-border-control);
-    border-bottom: 1px solid var(--idea-border-control);
-    color: var(--idea-text-muted);
-    padding: 6px;
-    appearance: none;
-    cursor: pointer;
-
-    &::after {
-      width: 8px;
-      height: 8px;
-      background: currentColor;
-      clip-path: polygon(100% 0, 100% 100%, 0 100%);
-      content: "";
-    }
-
-    &:hover {
-      background: var(--idea-surface-hover);
-    }
-
-    &.is-active {
-      background: var(--idea-action-focus);
-      color: var(--idea-action-primary);
-    }
-
-    &:focus-visible {
-      z-index: 6;
-      outline: 2px solid var(--idea-action-primary);
-      outline-offset: -2px;
-    }
   }
 
   &__scroller {
@@ -2166,12 +2237,10 @@ defineExpose({
     position: relative;
   }
 
-  &__viewport {
-    position: sticky;
-    top: 0;
-    left: 0;
-    overflow: hidden;
-    background: var(--idea-surface-panel);
+  &__image-controls {
+    position: absolute;
+    z-index: 6;
+    pointer-events: none;
   }
 }
 </style>

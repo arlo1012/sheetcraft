@@ -51,7 +51,7 @@ function mountLayer(options?: {
       images: [currentImage],
       layout: options?.layout ?? createLayout(),
       assetUrls: new Map([["asset-1", "blob:asset-1"]]),
-      selectedImageId: options?.selectedImageId ?? "image-1",
+      selectedImageId: options?.selectedImageId === undefined ? "image-1" : options.selectedImageId,
       readOnly: options?.readOnly ?? false,
       scale: options?.scale,
     },
@@ -64,6 +64,26 @@ function floatingImageMenu(): HTMLElement | null {
 }
 
 describe("SheetFloatingImageLayer", () => {
+  test("keeps image pixels out of the DOM and routes an unselected image through the surface hit test", () => {
+    const wrapper = mountLayer({ selectedImageId: null });
+    expect(wrapper.findAll("img, svg, .sheet-floating-image-layer__placeholder")).toHaveLength(0);
+    expect(wrapper.findAll("[data-floating-image-id]")).toHaveLength(0);
+
+    const event = pointerEvent("pointerdown", {
+      button: 0,
+      pointerId: 19,
+      clientX: 88,
+      clientY: 30,
+    });
+    Object.defineProperty(event, "currentTarget", { value: wrapper.element });
+    const layer = wrapper.vm as unknown as {
+      handleSurfacePointerDown: (event: PointerEvent, point: { x: number; y: number }) => boolean;
+    };
+    expect(layer.handleSurfacePointerDown(event, { x: 88, y: 30 })).toBe(true);
+    expect(wrapper.emitted("select")).toEqual([["image-1"]]);
+    wrapper.unmount();
+  });
+
   test("keeps selection and preview available while preventing image edits", async () => {
     const wrapper = mountLayer({ readOnly: true });
     const fragment = wrapper.get('[data-floating-image-id="image-1"]');
@@ -99,13 +119,19 @@ describe("SheetFloatingImageLayer", () => {
     expect(wrapper.emitted("preview")?.[0]?.[0]).toEqual(image);
     wrapper.unmount();
   });
-  test("renders a positioned image and selects it from its viewport fragment", async () => {
+  test("selects an unselected canvas image through the surface hit test", async () => {
     const wrapper = mountLayer({ selectedImageId: null });
-    const fragment = wrapper.get('[data-floating-image-id="image-1"]');
-    expect(fragment.attributes("style")).toContain("left: 84px");
-    expect(fragment.attributes("style")).toContain("top: 26px");
-
-    await fragment.trigger("pointerdown", { button: 0, pointerId: 3, clientX: 10, clientY: 12 });
+    const event = pointerEvent("pointerdown", {
+      button: 0,
+      pointerId: 3,
+      clientX: 90,
+      clientY: 30,
+    });
+    Object.defineProperty(event, "currentTarget", { value: wrapper.element });
+    const layer = wrapper.vm as unknown as {
+      handleSurfacePointerDown: (event: PointerEvent, point: { x: number; y: number }) => boolean;
+    };
+    expect(layer.handleSurfacePointerDown(event, { x: 90, y: 30 })).toBe(true);
     expect(wrapper.emitted("select")).toEqual([["image-1"]]);
   });
 
@@ -140,6 +166,26 @@ describe("SheetFloatingImageLayer", () => {
     expect(wrapper.emitted("update")).toEqual([
       [{ ...image, anchor: { row: 2, column: 1 }, offsetX: 24, offsetY: 6 }],
     ]);
+  });
+
+  test("uses the same layer-relative scaled coordinates for resize start and movement", async () => {
+    const wrapper = mountLayer({ scale: 2 });
+    Object.defineProperty(wrapper.element, "getBoundingClientRect", {
+      value: () => new DOMRect(100, 50, 480, 240),
+    });
+    const handle = wrapper.get('[data-image-resize="se"]');
+    await handle.trigger("pointerdown", { button: 0, pointerId: 22, clientX: 180, clientY: 100 });
+    const fragment = wrapper.get('[data-floating-image-id="image-1"]');
+    fragment.element.dispatchEvent(
+      pointerEvent("pointermove", { pointerId: 22, clientX: 220, clientY: 100 }),
+    );
+    fragment.element.dispatchEvent(
+      pointerEvent("pointerup", { pointerId: 22, clientX: 220, clientY: 100 }),
+    );
+    expect(wrapper.emitted("update")).toEqual([
+      [{ ...image, anchor: { ...image.anchor }, width: 140, height: 70 }],
+    ]);
+    wrapper.unmount();
   });
 
   test("keeps the image aspect ratio while resizing", async () => {
@@ -201,8 +247,13 @@ describe("SheetFloatingImageLayer", () => {
 
   test("opens the image action menu on right-click and emits conversion", async () => {
     const wrapper = mountLayer({ selectedImageId: null });
-    const fragment = wrapper.get('[data-floating-image-id="image-1"]');
-    await fragment.trigger("contextmenu", { clientX: 120, clientY: 80 });
+    const event = new MouseEvent("contextmenu", { bubbles: true, clientX: 120, clientY: 80 });
+    Object.defineProperty(event, "currentTarget", { value: wrapper.element });
+    const layer = wrapper.vm as unknown as {
+      handleSurfaceContextMenu: (event: MouseEvent, point: { x: number; y: number }) => boolean;
+    };
+    expect(layer.handleSurfaceContextMenu(event, { x: 120, y: 80 })).toBe(true);
+    await nextTick();
 
     expect(wrapper.emitted("select")).toEqual([["image-1"]]);
     expect(floatingImageMenu()?.textContent).toContain("Convert to cell image");

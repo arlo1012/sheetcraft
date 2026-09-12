@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { onScopeDispose, ref } from "vue";
 import {
   MAX_COLUMN_WIDTH,
   MAX_ROW_HEIGHT,
@@ -6,12 +6,16 @@ import {
   MIN_ROW_HEIGHT,
   type SheetDimensionAxis,
 } from "@idea10/core/workbook";
+import {
+  startPointerSession,
+  type PointerSession,
+} from "../../../shared/sheet-input/pointer-session";
+import { clientDistanceToSurface } from "../../../shared/sheet-input/surface-coordinates";
 
 export type DimensionResizeState = {
   axis: SheetDimensionAxis;
   index: number;
   pointerId: number;
-  captureTarget: HTMLElement | null;
   startClientPosition: number;
   startSize: number;
   previewSize: number;
@@ -29,6 +33,7 @@ export function useDimensionResize(options: {
   onCommit: (payload: { axis: SheetDimensionAxis; index: number; size: number }) => void;
 }) {
   const dimensionResize = ref<DimensionResizeState>();
+  let session: PointerSession | undefined;
 
   function clampSize(axis: SheetDimensionAxis, size: number): number {
     const minimum = axis === "row" ? MIN_ROW_HEIGHT : MIN_COLUMN_WIDTH;
@@ -37,17 +42,9 @@ export function useDimensionResize(options: {
   }
 
   function stop(): void {
-    const resize = dimensionResize.value;
-    const target = resize?.captureTarget;
-    target?.removeEventListener("lostpointercapture", onLostPointerCapture);
-    if (resize && target?.hasPointerCapture?.(resize.pointerId)) {
-      target.releasePointerCapture(resize.pointerId);
-    }
+    session?.cancel();
+    session = undefined;
     dimensionResize.value = undefined;
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-    window.removeEventListener("pointercancel", onPointerCancel);
-    window.removeEventListener("blur", stop);
   }
 
   function start(axis: SheetDimensionAxis, payload: DimensionResizeStart): void {
@@ -58,27 +55,30 @@ export function useDimensionResize(options: {
       axis,
       index: payload.index,
       pointerId: payload.event.pointerId,
-      captureTarget: target,
       startClientPosition: axis === "row" ? payload.event.clientY : payload.event.clientX,
       startSize: payload.startSize,
       previewSize: payload.startSize,
     };
 
-    target?.setPointerCapture?.(payload.event.pointerId);
-    target?.addEventListener("lostpointercapture", onLostPointerCapture);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-    window.addEventListener("pointercancel", onPointerCancel);
-    window.addEventListener("blur", stop);
+    session = startPointerSession({
+      event: payload.event,
+      captureTarget: target,
+      onMove: onPointerMove,
+      onEnd: onPointerUp,
+      onCancel: () => {
+        session = undefined;
+        dimensionResize.value = undefined;
+      },
+    });
   }
 
   function request(axis: SheetDimensionAxis, payload: { index: number; size: number }): void {
     options.onCommit({ axis, ...payload });
   }
 
-  function onPointerMove(event: PointerEvent): void {
+  function onPointerMove(event: PointerEvent | MouseEvent): void {
     const resize = dimensionResize.value;
-    if (!resize || event.pointerId !== resize.pointerId) {
+    if (!resize || ("pointerId" in event && event.pointerId !== resize.pointerId)) {
       return;
     }
     event.preventDefault();
@@ -86,38 +86,34 @@ export function useDimensionResize(options: {
     resize.previewSize = clampSize(
       resize.axis,
       resize.startSize +
-        (clientPosition - resize.startClientPosition) / (options.getScale?.() ?? 1),
+        clientDistanceToSurface(
+          resize.startClientPosition,
+          clientPosition,
+          options.getScale?.() ?? 1,
+        ),
     );
   }
 
-  function onPointerUp(event: PointerEvent): void {
+  function onPointerUp(event: PointerEvent | MouseEvent): void {
     const resize = dimensionResize.value;
-    if (!resize || event.pointerId !== resize.pointerId) {
+    if (!resize || ("pointerId" in event && event.pointerId !== resize.pointerId)) {
       return;
     }
+    onPointerMove(event);
     const payload = {
       axis: resize.axis,
       index: resize.index,
       size: resize.previewSize,
     };
     const changed = resize.previewSize !== resize.startSize;
-    stop();
+    session = undefined;
+    dimensionResize.value = undefined;
     if (changed) {
       options.onCommit(payload);
     }
   }
 
-  function onPointerCancel(event: PointerEvent): void {
-    if (event.pointerId === dimensionResize.value?.pointerId) {
-      stop();
-    }
-  }
-
-  function onLostPointerCapture(event: PointerEvent): void {
-    if (event.pointerId === dimensionResize.value?.pointerId) {
-      stop();
-    }
-  }
+  onScopeDispose(stop);
 
   return {
     dimensionResize,

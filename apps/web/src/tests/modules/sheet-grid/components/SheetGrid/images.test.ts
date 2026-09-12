@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import SheetCanvasLayer from "../../../../../modules/sheet-grid/components/SheetCanvasLayer.vue";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { recordCanvasRenderPlans } from "./canvas-render-fixture";
 import { getCellContent, setCellContent } from "@idea10/core/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
@@ -16,7 +16,7 @@ describe("SheetGrid cell images", () => {
     await wrapper.setProps({ imageAssetUrls: new Map([["asset", "blob:fixture"]]) });
     const cell = plans.scene.panes.flatMap((pane) => pane.cells)[0]!;
     expect(cell.content.image).toEqual(content.image);
-    expect(wrapper.getComponent(SheetCanvasLayer).props("imageAssetUrls")?.get("asset")).toBe(
+    expect(wrapper.getComponent(SheetSurface).props("imageAssetUrls")?.get("asset")).toBe(
       "blob:fixture",
     );
     expect(cell.content.text).toBe("");

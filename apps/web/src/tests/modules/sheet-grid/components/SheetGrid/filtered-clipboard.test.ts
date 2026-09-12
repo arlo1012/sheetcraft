@@ -1,10 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { getCellValue, setCellValue } from "@idea10/core/workbook";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { createTestClipboardEvent } from "./clipboard-fixture";
 import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
-function selectionStyle(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]): string {
-  return wrapper.get("[data-selection-range]").attributes("style") ?? "";
+function selectionRects(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]) {
+  return (wrapper.getComponent(SheetSurface).props("overlays") as { rangeRects?: unknown[] })
+    .rangeRects;
 }
 
 describe("SheetGrid filtered clipboard", () => {
@@ -66,7 +68,7 @@ describe("SheetGrid filtered clipboard", () => {
       },
     });
     await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
-    const before = { active: activeCell(wrapper), selection: selectionStyle(wrapper) };
+    const before = { active: activeCell(wrapper), selection: selectionRects(wrapper) };
 
     wrapper
       .get("textarea.cell-editor")
@@ -77,7 +79,7 @@ describe("SheetGrid filtered clipboard", () => {
 
     expect(getCellValue(sheet, { row: 1, column: 1 })).toBeNull();
     expect(session.history.undoStack).toHaveLength(0);
-    expect({ active: activeCell(wrapper), selection: selectionStyle(wrapper) }).toEqual(before);
+    expect({ active: activeCell(wrapper), selection: selectionRects(wrapper) }).toEqual(before);
     expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
   });
 });

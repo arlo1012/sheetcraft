@@ -15,6 +15,7 @@ import {
   createSheetCanvasScene,
   type SheetCanvasScene,
 } from "../../../../../modules/sheet-grid/canvas/cell-scene";
+import { createSheetDisplaySnapshot } from "../../../../../modules/sheet-grid/canvas/sheet-display-snapshot";
 
 function cell(scene: SheetCanvasScene, row: number, column: number) {
   return scene.panes
@@ -28,6 +29,20 @@ function fixture() {
   const cache = createCellPresentationCache({ measure });
   const geometry = createSheetGeometry({ rowCount: 100, columnCount: 20 });
   const rows = createRowVisibilityIndex({ rowCount: 100, defaultRowHeight: 24 });
+  let revision = 0;
+  let display = createSheetDisplaySnapshot({
+    sheet,
+    evaluator: createSheetEvaluator(sheet),
+    revision,
+  });
+  function refreshDisplay() {
+    revision += 1;
+    display = createSheetDisplaySnapshot({
+      sheet,
+      evaluator: createSheetEvaluator(sheet),
+      revision,
+    });
+  }
   function render(options: { y?: number; locale?: string; fontRevision?: number } = {}) {
     const resolver = new MergedCellRangeResolver(sheet.mergedCells);
     const layout = createSheetViewportLayout({
@@ -39,8 +54,7 @@ function fixture() {
       mergeResolver: { getRangeAt: (address) => resolver.getRangeAtAddress(address) },
     });
     return createSheetCanvasScene({
-      sheet,
-      evaluator: createSheetEvaluator(sheet),
+      display,
       layout,
       columnCount: geometry.columnCount,
       locale: options.locale ?? "en-US",
@@ -49,7 +63,7 @@ function fixture() {
       cache,
     });
   }
-  return { sheet, measure, render };
+  return { sheet, measure, render, refreshDisplay };
 }
 
 describe("Canvas cell presentation cache", () => {
@@ -68,28 +82,31 @@ describe("Canvas cell presentation cache", () => {
   });
 
   test("invalidates formulas when an off-screen dependency changes", () => {
-    const { sheet, render } = fixture();
+    const { sheet, render, refreshDisplay } = fixture();
     setCellValue(sheet, { row: 90, column: 0 }, 2);
     setCellContent(
       sheet,
       { row: 0, column: 0 },
       { kind: "formula", formula: { source: "=A91*3" } },
     );
+    refreshDisplay();
     const before = cell(render(), 0, 0).content;
     expect(before.text).toBe("6");
     setCellValue(sheet, { row: 90, column: 0 }, 4);
+    refreshDisplay();
     const after = cell(render(), 0, 0).content;
     expect(after.text).toBe("12");
     expect(after).not.toBe(before);
   });
 
   test("renders dynamic-array projections without persisting spill cells", () => {
-    const { sheet, render } = fixture();
+    const { sheet, render, refreshDisplay } = fixture();
     setCellContent(
       sheet,
       { row: 0, column: 0 },
       { kind: "formula", formula: { source: "=SEQUENCE(2)" } },
     );
+    refreshDisplay();
     const before = render();
     expect(cell(before, 0, 0).content.text).toBe("1");
     expect(cell(before, 1, 0).content.text).toBe("2");
@@ -101,23 +118,26 @@ describe("Canvas cell presentation cache", () => {
       { row: 0, column: 0 },
       { kind: "formula", formula: { source: "=SEQUENCE(3)" } },
     );
+    refreshDisplay();
     expect(cell(render(), 2, 0).content.text).toBe("3");
     expect(sheet.cells.has("2:0")).toBe(false);
   });
 
   test("updates changed styles, locale and loaded font metrics", () => {
-    const { sheet, measure, render } = fixture();
+    const { sheet, measure, render, refreshDisplay } = fixture();
     setCellValue(sheet, { row: 0, column: 0 }, 12.5);
     setCellStyle(
       sheet,
       { row: 0, column: 0 },
       { numberFormat: { kind: "number", fractionDigits: 2, useGrouping: false } },
     );
+    refreshDisplay();
     const before = cell(render(), 0, 0).content;
     expect(before.text).toBe("12.50");
     const translated = cell(render({ locale: "de-DE" }), 0, 0).content;
     expect(translated.text).toBe("12,50");
     setCellStyle(sheet, { row: 0, column: 0 }, { bold: true, textColor: "#123456" });
+    refreshDisplay();
     const formatted = cell(render(), 0, 0).content;
     expect(formatted.textLayout?.font.weight).toBe(700);
     expect(formatted.style?.textColor).toBe("#123456");
@@ -127,10 +147,11 @@ describe("Canvas cell presentation cache", () => {
   });
 
   test("shares one full merged text layout across all frozen fragments", () => {
-    const { sheet, render } = fixture();
+    const { sheet, render, refreshDisplay } = fixture();
     sheet.freezePanes = { rows: 1, columns: 1 };
     sheet.mergedCells = [{ start: { row: 0, column: 0 }, end: { row: 1, column: 1 } }];
     setCellValue(sheet, { row: 0, column: 0 }, "Merged title");
+    refreshDisplay();
     const scene = render();
     const fragments = scene.panes.map((pane) =>
       pane.cells.find((entry) => entry.address.row === 0 && entry.address.column === 0)!,

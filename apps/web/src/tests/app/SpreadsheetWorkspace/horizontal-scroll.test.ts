@@ -20,7 +20,7 @@ describe("workspace footer horizontal scrollbar", () => {
     });
     try {
       await flushPromises();
-      const grid = wrapper.get<HTMLDivElement>('[role="grid"]');
+      const grid = wrapper.get<HTMLDivElement>(".sheet-grid__scroller");
       const scrollbar = () => wrapper.get('[role="scrollbar"]');
       expect(scrollbar().attributes("aria-controls")).toBe(grid.attributes("id"));
       grid.element.scrollLeft = 700;
@@ -41,15 +41,15 @@ describe("workspace footer horizontal scrollbar", () => {
 
       await scrollbar().trigger("keydown", { key: "End" });
       const previousMaximum = Number(scrollbar().attributes("aria-valuemax"));
-      expect(grid.attributes("aria-colcount")).toBe("26");
+      expect(wrapper.get('[role="grid"]').attributes("aria-colcount")).toBe("26");
       await scrollbar().trigger("wheel", { deltaY: 48 });
-      expect(grid.attributes("aria-colcount")).toBe("26");
+      expect(wrapper.get('[role="grid"]').attributes("aria-colcount")).toBe("26");
       await scrollbar().trigger("wheel", { deltaY: 48, shiftKey: true });
-      expect(grid.attributes("aria-colcount")).toBe("34");
+      expect(wrapper.get('[role="grid"]').attributes("aria-colcount")).toBe("34");
       expect(grid.element.scrollLeft).toBe(previousMaximum + 48);
       expect(grid.element.scrollTop).toBe(240);
       await scrollbar().trigger("keydown", { key: "Home" });
-      expect(grid.attributes("aria-colcount")).toBe("26");
+      expect(wrapper.get('[role="grid"]').attributes("aria-colcount")).toBe("26");
     } finally {
       wrapper.unmount();
     }

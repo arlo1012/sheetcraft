@@ -15,6 +15,7 @@ import {
   setCellValue,
 } from "@idea10/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
+import SheetSurface from "../../../modules/sheet-grid/components/SheetSurface.vue";
 import type { WorkbookStore } from "../../../modules/workbook-persistence/workbookStore";
 import { createAppI18n } from "../../../shared/i18n";
 import { triggerCanvasCell } from "../canvas-interaction";
@@ -58,8 +59,15 @@ async function mountWorkspace(store: WorkbookStore) {
   return wrapper;
 }
 
-function dispatchMouse(type: string, options: MouseEventInit): void {
-  window.dispatchEvent(new MouseEvent(type, options));
+function dispatchPointer(type: "pointermove" | "pointerup", options: MouseEventInit): void {
+  const bounds = document.querySelector(".sheet-grid__scroller")!.getBoundingClientRect();
+  const event = new MouseEvent(type, {
+    ...options,
+    clientX: (options.clientX ?? 0) + bounds.left,
+    clientY: (options.clientY ?? 0) + bounds.top,
+  }) as PointerEvent;
+  Object.defineProperty(event, "pointerId", { value: 1 });
+  window.dispatchEvent(event);
 }
 
 async function dragReference(
@@ -68,8 +76,8 @@ async function dragReference(
   end: { x: number; y: number },
 ) {
   await triggerCanvasCell(wrapper, start, "mousedown", { button: 0, buttons: 1 });
-  dispatchMouse("mousemove", { buttons: 1, clientX: end.x, clientY: end.y });
-  dispatchMouse("mouseup", { button: 0, clientX: end.x, clientY: end.y });
+  dispatchPointer("pointermove", { buttons: 1, clientX: end.x, clientY: end.y });
+  dispatchPointer("pointerup", { button: 0, clientX: end.x, clientY: end.y });
   await flushPromises();
 }
 
@@ -78,15 +86,17 @@ function expectMatchingReferencePresentation(
   count: number,
 ) {
   const tokens = wrapper.findAll("[data-formula-text-overlay] [data-formula-reference-token]");
-  const outlines = wrapper.findAll("[data-formula-reference-range]");
+  const groups =
+    (
+      wrapper.getComponent(SheetSurface).props("overlays") as {
+        referenceGroups?: Array<{ key: string; colorIndex: number }>;
+      }
+    ).referenceGroups ?? [];
   const overlays = wrapper.findAll("[data-formula-text-overlay]");
   expect(overlays).toHaveLength(2);
   expect(tokens).toHaveLength(count * 2);
-  expect(outlines).toHaveLength(count);
-  const expected = outlines.map((outline) => [
-    outline.attributes("data-reference-key"),
-    outline.attributes("data-reference-color"),
-  ]);
+  expect(groups).toHaveLength(count);
+  const expected = groups.map((group) => [group.key, String(group.colorIndex)]);
   for (const overlay of overlays) {
     expect(
       overlay
@@ -114,7 +124,7 @@ describe("workspace formula references", () => {
     await formula.setValue("=s");
     await formula.trigger("keydown", { key: "Enter" });
     expect(formula.element.value).toBe("=SUM(");
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
+    expect(wrapper.get("textarea.cell-editor").attributes("data-cell-editor")).toBe("A1");
 
     await dragReference(wrapper, { row: 0, column: 1, x: 145, y: 12 }, { x: 250, y: 42 });
     expect(formula.element.value).toBe("=SUM(B1:C2");
@@ -155,7 +165,7 @@ describe("workspace formula references", () => {
     await editor.trigger("keydown", { key: "Tab" });
     await dragReference(wrapper, { row: 0, column: 1, x: 145, y: 12 }, { x: 250, y: 42 });
     await editor.trigger("keydown", { key: "Enter" });
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A2");
+    expect(wrapper.get("textarea.cell-editor").attributes("data-cell-editor")).toBe("A2");
     expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
 
     await triggerCanvasCell(wrapper, { row: 2, column: 0 }, "mousedown", { button: 0 });
@@ -246,6 +256,9 @@ describe("workspace formula references", () => {
     expectMatchingReferencePresentation(wrapper, 1);
     await formula.trigger("keydown", { key: "Escape" });
     expect(wrapper.find("[data-formula-text-overlay]").exists()).toBe(false);
-    expect(wrapper.find("[data-formula-reference-range]").exists()).toBe(false);
+    expect(
+      (wrapper.getComponent(SheetSurface).props("overlays") as { referenceGroups?: unknown[] })
+        .referenceGroups ?? [],
+    ).toHaveLength(0);
   });
 });

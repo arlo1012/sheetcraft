@@ -3,6 +3,8 @@ import { setCellValue } from "@idea10/core/workbook";
 import * as borderPainter from "../../../../../modules/sheet-grid/canvas/border-painter";
 import * as cellScene from "../../../../../modules/sheet-grid/canvas/cell-scene";
 import * as scenePainter from "../../../../../modules/sheet-grid/canvas/scene-painter";
+import * as headerPainter from "../../../../../modules/sheet-grid/rendering/header-painter";
+import * as overlayPainter from "../../../../../modules/sheet-grid/rendering/overlay-painter";
 import { mountSheetGrid, triggerCell } from "../SheetGrid/fixture";
 
 type Frame = { id: number; callback: FrameRequestCallback };
@@ -19,12 +21,24 @@ function installCanvasHost() {
     const index = frames.findIndex((frame) => frame.id === id);
     if (index >= 0) frames.splice(index, 1);
   });
-  vi.stubGlobal("matchMedia", () => ({ addEventListener: vi.fn(), removeEventListener: vi.fn() }));
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
-    () => ({ setTransform: vi.fn(), clearRect: vi.fn() }) as unknown as CanvasRenderingContext2D,
+    () =>
+      ({
+        setTransform: vi.fn(),
+        clearRect: vi.fn(),
+        fillRect: vi.fn(),
+        save: vi.fn(),
+        restore: vi.fn(),
+        translate: vi.fn(),
+        drawImage: vi.fn(),
+      }) as unknown as CanvasRenderingContext2D,
   );
   vi.spyOn(scenePainter, "paintSheetScene").mockImplementation(() => undefined);
   vi.spyOn(borderPainter, "paintSheetBorders").mockImplementation(() => undefined);
+  vi.spyOn(headerPainter, "paintSheetHeaders").mockImplementation(() => undefined);
+  vi.spyOn(overlayPainter, "paintSheetUnderlay").mockImplementation(() => undefined);
+  vi.spyOn(overlayPainter, "paintSheetForeground").mockImplementation(() => undefined);
+  vi.spyOn(overlayPainter, "paintSheetChrome").mockImplementation(() => undefined);
 
   return {
     flush() {
@@ -53,13 +67,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("SheetCanvasLayer invalidation", () => {
-  test("does not rebuild or repaint for a non-editing active-cell selection", async () => {
+describe("SheetSurface invalidation", () => {
+  test("does not rebuild content or borders for a non-editing active-cell selection", async () => {
     const host = installCanvasHost();
     const createScene = vi.spyOn(cellScene, "createSheetCanvasScene");
     const createBorders = vi.spyOn(borderPainter, "createBorderPaintPlan");
     const paint = vi.spyOn(scenePainter, "paintSheetScene");
     const { wrapper } = mountCanvasGrid();
+    host.flush();
+    await wrapper.vm.$nextTick();
     host.flush();
     createScene.mockClear();
     createBorders.mockClear();
@@ -79,6 +95,8 @@ describe("SheetCanvasLayer invalidation", () => {
     const createBorders = vi.spyOn(borderPainter, "createBorderPaintPlan");
     const paint = vi.spyOn(scenePainter, "paintSheetScene");
     const { wrapper } = mountCanvasGrid();
+    host.flush();
+    await wrapper.vm.$nextTick();
     host.flush();
     createScene.mockClear();
     createBorders.mockClear();
@@ -108,6 +126,8 @@ describe("SheetCanvasLayer invalidation", () => {
     const paint = vi.spyOn(scenePainter, "paintSheetScene");
     const { wrapper } = mountCanvasGrid();
     host.flush();
+    await wrapper.vm.$nextTick();
+    host.flush();
     paint.mockClear();
 
     const scroller = wrapper.get<HTMLDivElement>(".sheet-grid__scroller");
@@ -126,6 +146,8 @@ describe("SheetCanvasLayer invalidation", () => {
     const createBorders = vi.spyOn(borderPainter, "createBorderPaintPlan");
     const paint = vi.spyOn(scenePainter, "paintSheetScene");
     const { sheet, wrapper } = mountCanvasGrid();
+    host.flush();
+    await wrapper.vm.$nextTick();
     host.flush();
     createScene.mockClear();
     createBorders.mockClear();

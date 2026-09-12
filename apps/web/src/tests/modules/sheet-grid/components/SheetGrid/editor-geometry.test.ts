@@ -1,6 +1,7 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { getCellValue } from "@idea10/core/workbook";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { getCanvasLayout, mountSheetGrid, triggerCell } from "./fixture";
 
 describe("cell editor geometry", () => {
@@ -46,7 +47,8 @@ describe("cell editor geometry", () => {
       const editorPane = wrapper.get<HTMLElement>(`[data-editor-pane="${paneId}"]`).element;
       const anchor = wrapper.get<HTMLElement>("[data-cell-editor-anchor]").element;
       const frame = wrapper.get<HTMLElement>("[data-cell-editor-frame]").element;
-      const outline = wrapper.get<HTMLElement>("[data-active-cell]").element;
+      const surfaceFrame = wrapper.getComponent(SheetSurface).props("frame");
+      const outline = getCanvasLayout(wrapper).getCellViewportRect({ row, column })!;
       const insets = editorPane.style.clipPath
         .replace(/^inset\(|\)$/gu, "")
         .split(/\s+/u)
@@ -61,10 +63,10 @@ describe("cell editor geometry", () => {
       expect(frameTop).toBeGreaterThanOrEqual(clipTop);
       expect(frameLeft).toBeGreaterThanOrEqual(clipLeft);
       expect(Number.parseFloat(editorPane.style.left) + frameLeft).toBe(
-        Number.parseFloat(outline.style.left),
+        surfaceFrame.body.x + outline.x - 1,
       );
       expect(Number.parseFloat(editorPane.style.top) + frameTop).toBe(
-        Number.parseFloat(outline.style.top),
+        surfaceFrame.body.y + outline.y - 1,
       );
 
       await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Escape" });
@@ -98,13 +100,14 @@ describe("cell editor geometry", () => {
 
     const pane = wrapper.get<HTMLElement>('[data-editor-pane="body"]').element;
     const anchor = wrapper.get<HTMLElement>("[data-cell-editor-anchor]").element;
-    const outline = wrapper.get<HTMLElement>("[data-active-cell]").element;
+    const surfaceFrame = wrapper.getComponent(SheetSurface).props("frame");
+    const outline = layout.getCellViewportRect(address!)!;
 
     expect(Number.parseFloat(pane.style.left) + Number.parseFloat(anchor.style.left)).toBe(
-      Number.parseFloat(outline.style.left) + 1,
+      surfaceFrame.body.x + outline.x,
     );
     expect(Number.parseFloat(pane.style.top) + Number.parseFloat(anchor.style.top)).toBe(
-      Number.parseFloat(outline.style.top) + 1,
+      surfaceFrame.body.y + outline.y,
     );
   });
 
@@ -112,7 +115,7 @@ describe("cell editor geometry", () => {
     const { wrapper } = mountSheetGrid();
     await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
     const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
-    const outline = wrapper.get<HTMLElement>("[data-active-cell]").element.style;
+    const outline = getCanvasLayout(wrapper).getCellViewportRect({ row: 1, column: 1 })!;
     Object.defineProperties(editor.element, {
       clientWidth: { configurable: true, get: () => 95 },
       scrollWidth: { configurable: true, get: () => 95 },
@@ -122,13 +125,13 @@ describe("cell editor geometry", () => {
     await editor.trigger("keydown", { key: "F2" });
     await nextTick();
     const frame = wrapper.get<HTMLElement>("[data-cell-editor-frame]").element.style;
-    expect(frame.width).toBe(outline.width);
-    expect(frame.height).toBe(outline.height);
+    expect(frame.width).toBe(`${outline.width + 1}px`);
+    expect(frame.height).toBe(`${outline.height + 1}px`);
 
     await editor.setValue("Short");
     await nextTick();
-    expect(frame.width).toBe(outline.width);
-    expect(frame.height).toBe(outline.height);
+    expect(frame.width).toBe(`${outline.width + 1}px`);
+    expect(frame.height).toBe(`${outline.height + 1}px`);
   });
 
   test("edits across the complete merged area and returns to ordinary cell dimensions", async () => {

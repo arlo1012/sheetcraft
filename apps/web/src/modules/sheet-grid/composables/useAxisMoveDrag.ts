@@ -3,6 +3,11 @@ import type { SheetDimensionAxis } from "@idea10/core/workbook";
 import type { Size } from "@idea10/sheet-engine/geometry";
 import { getViewportAxisBoundary } from "@idea10/sheet-engine/axis-interactions";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import {
+  startPointerSession,
+  type PointerSession,
+} from "../../../shared/sheet-input/pointer-session";
+import { clientPointToElementBody } from "../../../shared/sheet-input/surface-coordinates";
 
 export type AxisMovePayload = {
   axis: SheetDimensionAxis;
@@ -16,7 +21,6 @@ type AxisMoveDrag = {
   index: number;
   count: number;
   pointerId: number;
-  target: HTMLElement;
   startX: number;
   startY: number;
   clientX: number;
@@ -37,36 +41,30 @@ export function useAxisMoveDrag(options: {
 }) {
   const drag = shallowRef<AxisMoveDrag>();
   let frame: number | undefined;
+  let session: PointerSession | undefined;
 
-  function stop(): void {
-    const current = drag.value;
+  function clear(): void {
     drag.value = undefined;
     if (frame !== undefined) cancelAnimationFrame(frame);
     frame = undefined;
-    current?.target.removeEventListener("lostpointercapture", onCancel);
-    if (current?.target.hasPointerCapture?.(current.pointerId)) {
-      current.target.releasePointerCapture(current.pointerId);
-    }
-    window.removeEventListener("pointermove", onMove);
-    window.removeEventListener("pointerup", onUp);
-    window.removeEventListener("pointercancel", onCancel);
-    window.removeEventListener("keydown", onKeydown, true);
-    window.removeEventListener("blur", stop);
+  }
+
+  function stop(): void {
+    session?.cancel();
+    session = undefined;
+    clear();
   }
 
   function pointerPosition(current: AxisMoveDrag): number | null {
     const root = options.getRoot();
     if (!root) return null;
-    const bounds = root.getBoundingClientRect();
     const headers = options.getHeaderSize();
-    const isRow = current.axis === "row";
-    const extent = isRow ? root.offsetHeight : root.offsetWidth;
-    const pixels = isRow ? bounds.height : bounds.width;
-    const scale = extent > 0 && pixels > 0 ? pixels / extent : 1;
-    return (
-      ((isRow ? current.clientY : current.clientX) - (isRow ? bounds.top : bounds.left)) / scale -
-      (isRow ? headers.height : headers.width)
+    const bodyPoint = clientPointToElementBody(
+      { x: current.clientX, y: current.clientY },
+      root,
+      headers,
     );
+    return current.axis === "row" ? bodyPoint.y : bodyPoint.x;
   }
 
   function updatePreview(current: AxisMoveDrag): void {
@@ -121,7 +119,8 @@ export function useAxisMoveDrag(options: {
     if (event.pointerId !== drag.value?.pointerId) return;
     onMove(event);
     const current = drag.value;
-    stop();
+    session = undefined;
+    clear();
     if (!current?.active) return;
     if (current.boundary >= current.index && current.boundary <= current.index + current.count)
       return;
@@ -134,18 +133,6 @@ export function useAxisMoveDrag(options: {
       count: current.count,
       toIndex,
     });
-  }
-
-  function onCancel(event: PointerEvent): void {
-    if (event.pointerId === drag.value?.pointerId) stop();
-  }
-
-  function onKeydown(event: KeyboardEvent): void {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      stop();
-    }
   }
 
   function start(
@@ -163,7 +150,6 @@ export function useAxisMoveDrag(options: {
       axis,
       index,
       count,
-      target,
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
@@ -173,13 +159,16 @@ export function useAxisMoveDrag(options: {
       boundary: index,
       offset: 0,
     };
-    target.setPointerCapture?.(event.pointerId);
-    target.addEventListener("lostpointercapture", onCancel);
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onCancel);
-    window.addEventListener("keydown", onKeydown, true);
-    window.addEventListener("blur", stop);
+    session = startPointerSession({
+      event,
+      captureTarget: target,
+      onMove: (pointerEvent) => onMove(pointerEvent as PointerEvent),
+      onEnd: (pointerEvent) => onUp(pointerEvent as PointerEvent),
+      onCancel: () => {
+        session = undefined;
+        clear();
+      },
+    });
   }
 
   onScopeDispose(stop);

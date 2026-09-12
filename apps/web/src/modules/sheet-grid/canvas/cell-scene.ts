@@ -1,4 +1,4 @@
-import type { Cell, CellAddress, CellRange, Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import type { Cell, CellAddress, CellRange } from "@idea10/core/workbook";
 import type { ExcelDateSystem, FormulaValue } from "@idea10/core/formula";
 import type { CellStyle } from "@idea10/core/style";
 import type { FrozenPaneId } from "@idea10/sheet-engine/frozen-layout";
@@ -8,6 +8,7 @@ import type { TextMeasurer } from "@idea10/sheet-engine/text-layout";
 import { layoutCellText, type CellTextLayout } from "../../../shared/cell-text/text-presentation";
 import { getCellValuePresentationForGrid } from "../cell-value-presentation";
 import { createCellTextSpanResolver, type CellTextSpan } from "../cell-text-spans";
+import type { SheetDisplaySnapshot } from "./sheet-display-snapshot";
 
 export const SHEET_PANE_IDS = ["topLeft", "top", "left", "body"] as const;
 
@@ -33,8 +34,7 @@ export type SheetCanvasScene = {
 };
 
 type PresentationOptions = {
-  sheet: Sheet;
-  evaluator: SheetEvaluator;
+  display: SheetDisplaySnapshot;
   locale: string;
   dateSystem: ExcelDateSystem;
   fontRevision: number;
@@ -45,7 +45,7 @@ type CachedContent = {
   source: Cell | undefined;
   width: number;
   height: number;
-  evaluator: SheetEvaluator | undefined;
+  display?: SheetDisplaySnapshot;
   spillRoot?: CellAddress;
   spillValue?: FormulaValue;
   content: CanvasCellContent;
@@ -58,11 +58,10 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
   let spans: ReturnType<typeof createCellTextSpanResolver>;
   let previousMerges: readonly CellRange[] | undefined;
   let previousColumnCount = 0;
-  let spills = new Map<string, { root: CellAddress; value: FormulaValue }>();
 
   function prepare(options: PresentationOptions, layout: SheetViewportLayout, columnCount: number) {
     if (
-      previous?.sheet !== options.sheet ||
+      previous?.display.sheet !== options.display.sheet ||
       previous.locale !== options.locale ||
       previous.dateSystem !== options.dateSystem ||
       previous.fontRevision !== options.fontRevision
@@ -71,49 +70,34 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
     }
     if (
       !previous ||
-      previous.sheet !== options.sheet ||
-      previous.evaluator !== options.evaluator ||
-      previousMerges !== options.sheet.mergedCells ||
+      previous.display !== options.display ||
+      previous.display.sheet !== options.display.sheet ||
+      previousMerges !== options.display.sheet.mergedCells ||
       previousColumnCount !== columnCount
     ) {
       spans = createCellTextSpanResolver(
-        options.sheet,
+        options.display.sheet,
         (address) => Boolean(layout.getMergedRangeAt(address)),
         columnCount,
         (address) =>
-          Boolean(options.sheet.cells.get(`${address.row}:${address.column}`)) ||
-          Boolean(getSpill(address)),
+          Boolean(options.display.sheet.cells.get(`${address.row}:${address.column}`)?.content) ||
+          Boolean(options.display.getSpill(address)),
       );
     }
-    spills = new Map();
-    for (const [key, cell] of options.sheet.cells) {
-      if (cell.content?.kind !== "formula") continue;
-      const separator = key.indexOf(":");
-      const row = Number(key.slice(0, separator));
-      const column = Number(key.slice(separator + 1));
-      if (Number.isInteger(row) && Number.isInteger(column))
-        options.evaluator.getComputedValue({ row, column });
-    }
-    for (const projection of options.evaluator.getSpillProjections?.() ?? []) {
-      spills.set(`${projection.address.row}:${projection.address.column}`, {
-        root: projection.root,
-        value: projection.value,
-      });
-    }
     previous = options;
-    previousMerges = options.sheet.mergedCells;
+    previousMerges = options.display.sheet.mergedCells;
     previousColumnCount = columnCount;
   }
 
   function getContent(address: CellAddress, rect: Rect, span?: CellTextSpan): CanvasCellContent {
     const options = previous!;
     const key = `${address.row}:${address.column}`;
-    const cell = options.sheet.cells.get(key);
-    const spill = getSpill(address);
+    const cell = options.display.sheet.cells.get(key);
+    const spill = options.display.getSpill(address);
     const sourceAddress = span?.kind === "fill" ? span.source : (spill?.root ?? address);
-    const source = options.sheet.cells.get(`${sourceAddress.row}:${sourceAddress.column}`);
+    const source = options.display.sheet.cells.get(`${sourceAddress.row}:${sourceAddress.column}`);
     const formulaEvaluator =
-      source?.content?.kind === "formula" || spill ? options.evaluator : undefined;
+      source?.content?.kind === "formula" || spill ? options.display : undefined;
     const cached = contents.get(key);
     if (
       cached &&
@@ -121,7 +105,7 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
       cached.source === source &&
       cached.width === rect.width &&
       cached.height === rect.height &&
-      cached.evaluator === formulaEvaluator &&
+      cached.display === formulaEvaluator &&
       cached.spillRoot?.row === spill?.root.row &&
       cached.spillRoot?.column === spill?.root.column &&
       cached.spillValue === spill?.value
@@ -130,9 +114,7 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
     }
     const displayCell = cell ?? source;
     const image = displayCell?.content?.kind === "image" ? displayCell.content.image : undefined;
-    const value = image
-      ? null
-      : (spill?.value ?? options.evaluator.getComputedValue(sourceAddress));
+    const value = image ? null : (spill?.value ?? options.display.getComputedValue(sourceAddress));
     const presentation = getCellValuePresentationForGrid(
       value,
       displayCell?.style,
@@ -165,22 +147,16 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
       source,
       width: rect.width,
       height: rect.height,
-      evaluator: formulaEvaluator,
+      display: formulaEvaluator,
       ...(spill ? { spillRoot: { ...spill.root }, spillValue: spill.value } : {}),
       content,
     });
     return content;
   }
 
-  function getSpill(address: CellAddress) {
-    return spills.get(`${address.row}:${address.column}`);
-  }
-
   function getSpan(address: CellAddress): CellTextSpan | undefined {
     const options = previous!;
-    if (options.sheet.cells.get(`${address.row}:${address.column}`)?.content?.kind === "formula")
-      options.evaluator.getComputedValue(address);
-    return getSpill(address) ? undefined : spans(address);
+    return options.display.getSpill(address) ? undefined : spans(address);
   }
 
   function retain(keys: ReadonlySet<string>): void {
@@ -260,7 +236,7 @@ export function createSheetCanvasScene(
           rect,
           contentRect,
           content: cache.getContent(source, contentRect, span),
-          style: options.sheet.cells.get(key)?.style,
+          style: options.display.sheet.cells.get(key)?.style,
           span,
         });
       }

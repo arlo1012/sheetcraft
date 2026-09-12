@@ -1,10 +1,26 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { DEFAULT_COLUMN_WIDTH, getColumnWidth } from "@idea10/core/workbook";
-import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
+import {
+  activeCell,
+  mountSheetGrid,
+  triggerAxisHeader,
+  triggerAxisResize,
+  triggerCell,
+} from "./fixture";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 
 function dispatchMouse(type: string, options: MouseEventInit): void {
-  window.dispatchEvent(new MouseEvent(type, options));
+  const event = new MouseEvent(
+    type === "mousemove" ? "pointermove" : "pointerup",
+    options,
+  ) as PointerEvent;
+  Object.defineProperty(event, "pointerId", { value: 1 });
+  window.dispatchEvent(event);
+}
+
+function overlays(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]) {
+  return wrapper.getComponent(SheetSurface).props("overlays");
 }
 
 function createPointerEvent(
@@ -45,8 +61,7 @@ describe("SheetGrid view controls", () => {
       await nextTick();
 
       expect(activeCell(wrapper)).toBe("A1");
-      expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 288px");
-      expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("height: 72px");
+      expect(overlays(wrapper).rangeRects![0]!.rect).toMatchObject({ width: 288, height: 72 });
       expect(session.history.undoStack).toHaveLength(0);
     },
   );
@@ -55,19 +70,29 @@ describe("SheetGrid view controls", () => {
     const { session, sheet, wrapper } = mountSheetGrid();
     await wrapper.setProps({ zoom: 200 });
 
-    await wrapper.get('[data-resize-column="0"]').trigger("pointerdown", {
-      button: 0,
-      pointerId: 1,
-      clientX: DEFAULT_COLUMN_WIDTH * 2,
-    });
+    const surface = wrapper.getComponent(SheetSurface);
+    const frame = surface.props("frame") as {
+      scale: number;
+      columnHeaders: readonly {
+        items: readonly { index: number; offset: number; size: number }[];
+      }[];
+    };
+    const column = frame.columnHeaders
+      .flatMap((pane) => pane.items)
+      .find((item) => item.index === 0)!;
+    const bounds = surface
+      .get<HTMLCanvasElement>("[data-sheet-surface]")
+      .element.getBoundingClientRect();
+    const start = bounds.left + (column.offset + column.size - 1) * frame.scale;
+    await triggerAxisResize(wrapper, "column", 0, { button: 0, pointerId: 1 });
     dispatchPointer("pointermove", {
       buttons: 1,
       pointerId: 1,
-      clientX: DEFAULT_COLUMN_WIDTH * 2 + 40,
+      clientX: start + 40,
     });
     dispatchPointer("pointerup", {
       pointerId: 1,
-      clientX: DEFAULT_COLUMN_WIDTH * 2 + 40,
+      clientX: start + 40,
     });
     await nextTick();
 
@@ -85,18 +110,18 @@ describe("SheetGrid view controls", () => {
     await wrapper.setProps({ highlightEnabled: true, highlightColor: "#7a3cff" });
     await nextTick();
 
-    const bands = wrapper.findAll<HTMLElement>(".sheet-reading-highlight__band");
-    expect(bands.length).toBeGreaterThan(2);
-    expect(wrapper.get(".sheet-reading-highlight").attributes("style")).toContain("color: #7a3cff");
+    const bands = overlays(wrapper).readingRects;
+    expect(bands?.length).toBeGreaterThan(2);
+    expect(overlays(wrapper).readingColor).toBe("#7a3cff");
     expect(activeCell(wrapper)).toBe("A1");
-    const mergedBandStyles = bands.map((band) => band.attributes("style"));
+    const mergedBands = bands!.map((band) => band.rect);
 
     await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0 });
     await nextTick();
     expect(activeCell(wrapper)).toBe("C3");
-    const movedBands = wrapper.findAll(".sheet-reading-highlight__band");
+    const movedBands = overlays(wrapper).readingRects;
     expect(movedBands).toHaveLength(4);
-    expect(movedBands.map((band) => band.attributes("style"))).not.toEqual(mergedBandStyles);
+    expect(movedBands!.map((band) => band.rect)).not.toEqual(mergedBands);
     expect(session.history.undoStack).toHaveLength(0);
   });
 
@@ -118,39 +143,38 @@ describe("SheetGrid view controls", () => {
     dispatchMouse("mouseup", { button: 0 });
     await nextTick();
 
-    const bandStyles = wrapper
-      .findAll<HTMLElement>(".sheet-reading-highlight__band")
-      .map((band) => band.attributes("style"));
-    expect(bandStyles).toEqual(
+    const bands = overlays(wrapper).readingRects;
+    expect(bands!.map((band: { rect: object }) => band.rect)).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("width: 960px; height: 72px"),
-        expect.stringContaining("width: 288px; height: 600px"),
+        expect.objectContaining({ width: 960, height: 72 }),
+        expect.objectContaining({ width: 288, height: 600 }),
       ]),
     );
-    expect(bandStyles).toHaveLength(2);
+    expect(bands).toHaveLength(2);
   });
 
   test("keeps whole-row and whole-column highlights on their selected axes", async () => {
     const { wrapper } = mountSheetGrid();
     await wrapper.setProps({ highlightEnabled: true });
 
-    await wrapper.get('[data-select-row="2"]').trigger("mousedown", { button: 0 });
-    await wrapper.get('[data-select-row="4"]').trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerAxisHeader(wrapper, "row", 2);
+    await triggerAxisHeader(wrapper, "row", 4, "pointerdown", { shiftKey: true });
     await nextTick();
-    const rowBands = wrapper.findAll<HTMLElement>(".sheet-reading-highlight__band");
-    expect(rowBands).toHaveLength(1);
-    expect(rowBands[0]?.attributes("style")).toContain("height: 72px");
-    expect(rowBands[0]?.attributes("style")).toContain("width: 960px");
+    const rowBands = overlays(wrapper).readingRects;
+    expect(rowBands).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rect: expect.objectContaining({ height: 72, width: 960 }) }),
+      ]),
+    );
 
-    await wrapper.get('[data-select-column="2"]').trigger("mousedown", { button: 0 });
-    await wrapper.get('[data-select-column="4"]').trigger("mousedown", {
-      button: 0,
-      shiftKey: true,
-    });
+    await triggerAxisHeader(wrapper, "column", 2);
+    await triggerAxisHeader(wrapper, "column", 4, "pointerdown", { shiftKey: true });
     await nextTick();
-    const columnBands = wrapper.findAll<HTMLElement>(".sheet-reading-highlight__band");
-    expect(columnBands).toHaveLength(1);
-    expect(columnBands[0]?.attributes("style")).toContain("height: 600px");
-    expect(columnBands[0]?.attributes("style")).toContain("width: 288px");
+    const columnBands = overlays(wrapper).readingRects;
+    expect(columnBands).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rect: expect.objectContaining({ height: 600, width: 288 }) }),
+      ]),
+    );
   });
 });

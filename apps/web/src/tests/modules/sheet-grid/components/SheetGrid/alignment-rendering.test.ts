@@ -17,6 +17,7 @@ describe("SheetGrid alignment spans", () => {
           setCellStyle(sheet, { row: 0, column }, { horizontalAlign: "centerContinuous" });
       },
     });
+    await nextTick();
     const cell = (column: number) =>
       plans.scene.panes
         .flatMap((pane) => pane.cells)
@@ -63,7 +64,7 @@ describe("SheetGrid alignment spans", () => {
     wrapper.unmount();
   });
 
-  test("fill repeats into adjacent blank fill cells without changing their data", () => {
+  test("fill repeats into adjacent blank fill cells without changing their data", async () => {
     const plans = recordCanvasRenderPlans();
     const { sheet, wrapper } = mountSheetGrid({
       beforeMount(sheet) {
@@ -72,6 +73,7 @@ describe("SheetGrid alignment spans", () => {
           setCellStyle(sheet, { row: 0, column }, { horizontalAlign: "fill" });
       },
     });
+    await nextTick();
     const cells = plans.scene.panes.flatMap((pane) => pane.cells);
     const repeated = cells.find((cell) => cell.address.row === 0 && cell.address.column === 1)!;
     expect(repeated.content.textLayout?.lines[0]?.text).toMatch(/^(ab){2,}$/u);

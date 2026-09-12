@@ -11,8 +11,16 @@ import {
   IDEA10_CLIPBOARD_TYPE,
   WEB_IDEA10_CLIPBOARD_TYPE,
 } from "../../../../../modules/sheet-grid/gridClipboardPort";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { createTestClipboardEvent } from "./clipboard-fixture";
 import { mountSheetGrid, triggerCell } from "./fixture";
+
+function overlays(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]) {
+  return wrapper.getComponent(SheetSurface).props("overlays") as {
+    rangeRects?: Array<{ rect: { x: number; y: number; width: number; height: number } }>;
+    clipboardRects?: unknown[];
+  };
+}
 
 describe("SheetGrid clipboard", () => {
   test("aligns the copy outline to gridlines and cancels it with Escape", async () => {
@@ -24,20 +32,9 @@ describe("SheetGrid clipboard", () => {
     wrapper.get("textarea.cell-editor").element.dispatchEvent(copied.event);
     await wrapper.vm.$nextTick();
 
-    const clipboardStyle = (wrapper.get("[data-clipboard-range]").element as HTMLElement).style;
-    expect({
-      left: clipboardStyle.left,
-      top: clipboardStyle.top,
-      width: clipboardStyle.width,
-      height: clipboardStyle.height,
-      borderWidth: clipboardStyle.borderWidth,
-    }).toEqual({
-      left: "95px",
-      top: "23px",
-      width: "193px",
-      height: "49px",
-      borderWidth: "2px",
-    });
+    expect(overlays(wrapper).clipboardRects).toEqual([
+      expect.objectContaining({ rect: { x: 96, y: 24, width: 192, height: 48 } }),
+    ]);
 
     const escape = new KeyboardEvent("keydown", {
       key: "Escape",
@@ -47,7 +44,7 @@ describe("SheetGrid clipboard", () => {
     wrapper.get("textarea.cell-editor").element.dispatchEvent(escape);
     await wrapper.vm.$nextTick();
     expect(escape.defaultPrevented).toBe(true);
-    expect(wrapper.find("[data-clipboard-range]").exists()).toBe(false);
+    expect(overlays(wrapper).clipboardRects ?? []).toHaveLength(0);
     expect(session.history.undoStack).toHaveLength(0);
   });
 
@@ -63,7 +60,7 @@ describe("SheetGrid clipboard", () => {
     await wrapper.vm.$nextTick();
     expect(copied.event.defaultPrevented).toBe(true);
     expect(copied.data.get("text/plain")).toBe("0012\t2\r\n\tTRUE");
-    expect(wrapper.find("[data-clipboard-range]").exists()).toBe(true);
+    expect(overlays(wrapper).clipboardRects ?? []).not.toHaveLength(0);
 
     await triggerCell(wrapper, { row: 3, column: 3 }, "mousedown", { button: 0 });
     const pasted = createTestClipboardEvent("paste", copied.data);
@@ -75,7 +72,7 @@ describe("SheetGrid clipboard", () => {
     expect(getCellValue(sheet, { row: 4, column: 3 })).toBeNull();
     expect(getCellValue(sheet, { row: 4, column: 4 })).toBe(true);
     expect(session.history.undoStack).toHaveLength(1);
-    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 192px");
+    expect(overlays(wrapper).rangeRects?.[0]?.rect.width).toBe(192);
 
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
     expect(getCellValue(sheet, { row: 3, column: 3 })).toBeNull();
@@ -171,7 +168,7 @@ describe("SheetGrid clipboard", () => {
     expect(getCellValue(sheet, { row: 1, column: 1 })).toBe("A");
     expect(getCellValue(sheet, { row: 2, column: 2 })).toBe("D");
     expect(session.history.undoStack).toHaveLength(1);
-    expect(wrapper.find("[data-clipboard-range]").exists()).toBe(false);
+    expect(overlays(wrapper).clipboardRects ?? []).toHaveLength(0);
   });
 
   test("recognizes a web-prefixed local token when keyboard paste follows a rich clipboard write", async () => {

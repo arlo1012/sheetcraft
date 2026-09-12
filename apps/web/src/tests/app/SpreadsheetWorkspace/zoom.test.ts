@@ -65,7 +65,7 @@ describe("workspace zoom gestures", () => {
     });
     try {
       await flushPromises();
-      const grid = wrapper.get<HTMLDivElement>('[role="grid"]');
+      const grid = wrapper.get<HTMLDivElement>(".sheet-grid__scroller");
       const slider = wrapper.get<HTMLInputElement>('input[type="range"]');
       const sheet = wrapper.get<HTMLElement>(".sheet-grid");
       const wheel = async (target: Element, deltaY: number) => {

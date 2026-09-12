@@ -26,6 +26,7 @@ import {
   type CellAddress,
   type CellRange,
 } from "@idea10/core/workbook";
+import { clientPointToElementSurface } from "../../../shared/sheet-input/surface-coordinates";
 import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 
 const DEFAULT_VIEWPORT_SIZE: Size = { width: 960, height: 600 };
@@ -135,43 +136,6 @@ export function useSheetViewport(options: {
     viewportSize: layout.value.panes.body.clip.width,
     contentSize: Math.max(0, layout.value.getTotalSize().width - layout.value.frozenSize.width),
   }));
-  const gridViewportStyle = computed<CSSProperties>(() => ({
-    width: `${viewportSize.width}px`,
-    height: `${viewportSize.height}px`,
-  }));
-  const rowHeaderPanes = computed(() =>
-    (
-      [
-        { id: "frozen", pane: layout.value.panes.topLeft },
-        { id: "body", pane: layout.value.panes.left },
-      ] as const
-    ).map(({ id, pane }) => ({
-      id,
-      offset: pane.clip.y,
-      size: pane.clip.height,
-      items: pane.rows.flatMap((row) => {
-        const rect = layout.value.getCellViewportRect({ row: row.index, column: 0 });
-        return rect ? [{ index: row.index, offset: rect.y, size: row.size }] : [];
-      }),
-    })),
-  );
-  const columnHeaderPanes = computed(() =>
-    (
-      [
-        { id: "frozen", pane: layout.value.panes.topLeft },
-        { id: "body", pane: layout.value.panes.top },
-      ] as const
-    ).map(({ id, pane }) => ({
-      id,
-      offset: pane.clip.x,
-      size: pane.clip.width,
-      items: pane.columns.flatMap((column) => {
-        const rect = layout.value.getCellViewportRect({ row: 0, column: column.index });
-        return rect ? [{ index: column.index, offset: rect.x, size: column.size }] : [];
-      }),
-    })),
-  );
-
   function getCurrentViewState(): SheetGridViewState {
     return createSheetGridViewState({
       selection: options.getSelection(),
@@ -307,17 +271,14 @@ export function useSheetViewport(options: {
   function getCellAtClientPoint(clientX: number, clientY: number): CellAddress | null {
     const scroller = scrollerRef.value;
     if (!scroller) return null;
-    const bounds = scroller.getBoundingClientRect();
-    const scale = options.getScale?.() ?? 1;
+    const point = clientPointToElementSurface(
+      { x: clientX, y: clientY },
+      scroller,
+      options.getScale?.() ?? 1,
+    );
     return layout.value.getCellAtViewportPoint({
-      x: Math.min(
-        Math.max((clientX - bounds.left) / scale, 0),
-        Math.max(0, viewportSize.width - 1),
-      ),
-      y: Math.min(
-        Math.max((clientY - bounds.top) / scale, 0),
-        Math.max(0, viewportSize.height - 1),
-      ),
+      x: Math.min(Math.max(point.x, 0), Math.max(0, viewportSize.width - 1)),
+      y: Math.min(Math.max(point.y, 0), Math.max(0, viewportSize.height - 1)),
     });
   }
 
@@ -475,13 +436,11 @@ export function useSheetViewport(options: {
   }
 
   return {
-    columnHeaderPanes,
     geometry,
     getCellAtClientPoint,
     getCurrentViewState,
     gridCanvasStyle,
     gridExtent,
-    gridViewportStyle,
     horizontalScrollState,
     ensureGridExtentContains,
     ensureGridExtentCoversViewport,
@@ -492,7 +451,6 @@ export function useSheetViewport(options: {
     onScroll,
     onWheel,
     restore,
-    rowHeaderPanes,
     rowVisibility,
     scrollPosition,
     scrollHorizontally,

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { getCellValue, setCellValue } from "@idea10/core/workbook";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { createTestClipboardEvent } from "./clipboard-fixture";
 import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
@@ -16,7 +17,10 @@ describe("SheetGrid range clearing", () => {
     const copied = createTestClipboardEvent("copy");
     wrapper.get("textarea.cell-editor").element.dispatchEvent(copied.event);
     await wrapper.vm.$nextTick();
-    expect(wrapper.find("[data-clipboard-range]").exists()).toBe(true);
+    expect(
+      (wrapper.getComponent(SheetSurface).props("overlays") as { clipboardRects?: unknown[] })
+        .clipboardRects ?? [],
+    ).not.toHaveLength(0);
 
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Delete" });
 
@@ -27,8 +31,12 @@ describe("SheetGrid range clearing", () => {
     expect(getCellValue(sheet, { row: 2, column: 2 })).toBe("outside");
     expect(session.history.undoStack).toHaveLength(1);
     expect(activeCell(wrapper)).toBe("A1");
-    expect(wrapper.get("[data-selection-range]").attributes("style")).toContain("width: 192px");
-    expect(wrapper.find("[data-clipboard-range]").exists()).toBe(false);
+    const overlays = wrapper.getComponent(SheetSurface).props("overlays") as {
+      rangeRects?: Array<{ rect: { width: number } }>;
+      clipboardRects?: unknown[];
+    };
+    expect(overlays.rangeRects?.[0]?.rect.width).toBe(192);
+    expect(overlays.clipboardRects ?? []).toHaveLength(0);
 
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "z", ctrlKey: true });
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("A");

@@ -1,14 +1,7 @@
 import { describe, expect, test } from "vitest";
-import {
-  DEFAULT_COLUMN_WIDTH,
-  DEFAULT_ROW_HEIGHT,
-  MAX_COLUMN_WIDTH,
-  MIN_COLUMN_WIDTH,
-  getColumnWidth,
-  getRowHeight,
-  setCellValue,
-} from "@idea10/core/workbook";
-import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
+import { setCellValue } from "@idea10/core/workbook";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
+import { activeCell, mountSheetGrid, triggerAxisHeader, triggerCell } from "./fixture";
 
 describe("SheetGrid accessibility", () => {
   test("exposes grid metadata and one labelled editor", () => {
@@ -19,6 +12,8 @@ describe("SheetGrid accessibility", () => {
 
       expect(grid.attributes("aria-rowcount")).toBe("100");
       expect(grid.attributes("aria-colcount")).toBe("50");
+      expect(grid.find("[data-sheet-surface]").exists()).toBe(true);
+      expect(grid.find("textarea.cell-editor").exists()).toBe(true);
       expect(wrapper.findAll("textarea.cell-editor")).toHaveLength(1);
       (editor.element as HTMLTextAreaElement).focus();
       expect(document.activeElement).toBe(editor.element);
@@ -42,33 +37,26 @@ describe("SheetGrid accessibility", () => {
 
     expect(wrapper.get('[role="grid"]').attributes("aria-multiselectable")).toBe("true");
     expect(activeCell(wrapper)).toBe("A1");
-    expect(wrapper.findAll("[data-selection-range]")).not.toHaveLength(0);
+    expect(
+      (wrapper.getComponent(SheetSurface).props("overlays") as { rangeRects: unknown[] })
+        .rangeRects,
+    ).not.toHaveLength(0);
     expect(wrapper.findAll("textarea.cell-editor")).toHaveLength(1);
     expect(wrapper.find('[aria-live="polite"]').exists()).toBe(false);
   });
 
-  test("exposes keyboard-adjustable row and column resize separators", async () => {
-    const { session, sheet, wrapper } = mountSheetGrid();
-    const columnHandle = wrapper.get('[data-resize-column="0"]');
-    const rowHandle = wrapper.get('[data-resize-row="0"]');
-
-    expect(columnHandle.attributes()).toMatchObject({
-      role: "separator",
-      "aria-label": "Column A width",
-      "aria-orientation": "vertical",
-      "aria-valuemin": String(MIN_COLUMN_WIDTH),
-      "aria-valuemax": String(MAX_COLUMN_WIDTH),
-      "aria-valuenow": String(DEFAULT_COLUMN_WIDTH),
-      tabindex: "0",
-    });
-    expect(rowHandle.attributes("aria-orientation")).toBe("horizontal");
-    expect(rowHandle.attributes("aria-valuenow")).toBe(String(DEFAULT_ROW_HEIGHT));
-
-    await columnHandle.trigger("keydown", { key: "ArrowRight" });
-    await rowHandle.trigger("keydown", { key: "ArrowDown" });
-
-    expect(getColumnWidth(sheet, 0)).toBe(DEFAULT_COLUMN_WIDTH + 8);
-    expect(getRowHeight(sheet, 0)).toBe(DEFAULT_ROW_HEIGHT + 8);
-    expect(session.history.undoStack).toHaveLength(2);
+  test("exposes one focusable Canvas surface with an axis label after a header interaction", async () => {
+    const { wrapper } = mountSheetGrid({ attachTo: document.body });
+    try {
+      await triggerAxisHeader(wrapper, "column", 0);
+      const surface = wrapper
+        .getComponent(SheetSurface)
+        .get<HTMLCanvasElement>("[data-sheet-surface]");
+      expect(surface.attributes("tabindex")).toBe("0");
+      expect(surface.attributes("aria-label")).toBe("Select column A");
+      expect(wrapper.findAll('[role="separator"]')).toHaveLength(0);
+    } finally {
+      wrapper.unmount();
+    }
   });
 });

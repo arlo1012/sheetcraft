@@ -32,11 +32,12 @@ import {
   type SheetEvaluator,
 } from "@idea10/core/workbook";
 import SheetGrid from "../../../../../modules/sheet-grid/components/SheetGrid.vue";
-import SheetCanvasLayer from "../../../../../modules/sheet-grid/components/SheetCanvasLayer.vue";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import type { AxisMovePayload } from "../../../../../modules/sheet-grid/composables/useAxisMoveDrag";
 import { createAppI18n } from "../../../../../shared/i18n";
 import { createBrowserIdFactory } from "../../../../../shared/runtime/browser-id-factory";
 import type { CellAddress } from "@idea10/core/workbook";
+import type { SheetRenderFrame } from "../../../../../modules/sheet-grid/rendering/sheet-render-frame";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 
 export type SheetGridFixtureOptions = {
@@ -156,34 +157,142 @@ export function hasFloatingMenu(): boolean {
 export function activeCell(
   wrapper: ReturnType<typeof mountSheetGrid>["wrapper"],
 ): string | undefined {
-  return wrapper.get("[data-active-cell]").attributes("data-active-cell");
+  return wrapper.get("textarea.cell-editor").attributes("data-cell-editor");
 }
 
 /**
- * Dispatches a pointer event through the canvas at the centre of a logical cell.
+ * Dispatches a pointer event through the unified surface at the centre of a logical cell.
  * Tests therefore exercise the same viewport hit-testing used by the sheet.
  */
 export async function triggerCell(
   wrapper: VueWrapper,
   address: CellAddress,
   event: string,
-  options: MouseEventInit = {},
+  options: PointerEventInit = {},
 ): Promise<void> {
-  const canvasLayer = wrapper.getComponent(SheetCanvasLayer);
-  const layout = canvasLayer.props("layout") as SheetViewportLayout;
-  const scale = (canvasLayer.props("scale") as number | undefined) ?? 1;
+  const surface = wrapper.getComponent(SheetSurface);
+  const frame = surface.props("frame") as SheetRenderFrame;
+  const layout = frame.layout;
+  const scale = frame.scale;
   const rect = layout.getCellViewportRect(address);
   if (!rect) throw new Error(`Cell ${address.row}:${address.column} is outside the viewport`);
 
-  const canvas = canvasLayer.get<HTMLCanvasElement>("[data-sheet-canvas]");
+  const canvas = surface.get<HTMLCanvasElement>("[data-sheet-surface]");
   const bounds = canvas.element.getBoundingClientRect();
-  await canvas.trigger(event, {
+  await canvas.trigger(event === "mousedown" ? "pointerdown" : event, {
     ...options,
-    clientX: bounds.left + (rect.x + rect.width / 2) * scale,
-    clientY: bounds.top + (rect.y + rect.height / 2) * scale,
+    pointerId: (options as MouseEventInit & { pointerId?: number }).pointerId ?? 1,
+    clientX: bounds.left + (frame.body.x + rect.x + rect.width / 2) * scale,
+    clientY: bounds.top + (frame.body.y + rect.y + rect.height / 2) * scale,
   });
 }
 
 export function getCanvasLayout(wrapper: VueWrapper): SheetViewportLayout {
-  return wrapper.getComponent(SheetCanvasLayer).props("layout") as SheetViewportLayout;
+  return (wrapper.getComponent(SheetSurface).props("frame") as SheetRenderFrame).layout;
+}
+
+export async function triggerAxisHeader(
+  wrapper: VueWrapper,
+  axis: SheetDimensionAxis,
+  index: number,
+  event: "pointerdown" | "pointermove" | "contextmenu" = "pointerdown",
+  options: PointerEventInit = {},
+): Promise<void> {
+  const surface = wrapper.getComponent(SheetSurface);
+  const frame = surface.props("frame") as SheetRenderFrame;
+  const panes = axis === "row" ? frame.rowHeaders : frame.columnHeaders;
+  const item = panes.flatMap((pane) => pane.items).find((candidate) => candidate.index === index);
+  if (!item) throw new Error(`${axis} header ${index} is outside the viewport`);
+  const canvas = surface.get<HTMLCanvasElement>("[data-sheet-surface]");
+  const bounds = canvas.element.getBoundingClientRect();
+  const point =
+    axis === "row"
+      ? { x: frame.headerSize.width - 4, y: item.offset + item.size / 2 }
+      : { x: item.offset + item.size / 2, y: frame.headerSize.height - 4 };
+  await canvas.trigger(event, {
+    ...options,
+    clientX: bounds.left + point.x * frame.scale,
+    clientY: bounds.top + point.y * frame.scale,
+  });
+}
+
+export async function triggerAxisResize(
+  wrapper: VueWrapper,
+  axis: SheetDimensionAxis,
+  index: number,
+  options: PointerEventInit = {},
+): Promise<void> {
+  const surface = wrapper.getComponent(SheetSurface);
+  const frame = surface.props("frame") as SheetRenderFrame;
+  const panes = axis === "row" ? frame.rowHeaders : frame.columnHeaders;
+  const item = panes.flatMap((pane) => pane.items).find((candidate) => candidate.index === index);
+  if (!item) throw new Error(`${axis} header ${index} is outside the viewport`);
+  const canvas = surface.get<HTMLCanvasElement>("[data-sheet-surface]");
+  const bounds = canvas.element.getBoundingClientRect();
+  const point =
+    axis === "row"
+      ? { x: frame.headerSize.width - 4, y: item.offset + item.size - 1 }
+      : { x: item.offset + item.size - 1, y: frame.headerSize.height - 4 };
+  await canvas.trigger("pointerdown", {
+    ...options,
+    clientX: bounds.left + point.x * frame.scale,
+    clientY: bounds.top + point.y * frame.scale,
+  });
+}
+
+export async function triggerAxisInsert(
+  wrapper: VueWrapper,
+  axis: SheetDimensionAxis,
+  index: number,
+  options: PointerEventInit = {},
+): Promise<void> {
+  const surface = wrapper.getComponent(SheetSurface);
+  const frame = surface.props("frame") as SheetRenderFrame;
+  const headers = surface.props("headers") as { quickTools: { gutter: number } };
+  const panes = axis === "row" ? frame.rowHeaders : frame.columnHeaders;
+  const item = panes.flatMap((pane) => pane.items).find((candidate) => candidate.index === index);
+  if (!item) throw new Error(`${axis} header ${index} is outside the viewport`);
+  const canvas = surface.get<HTMLCanvasElement>("[data-sheet-surface]");
+  const bounds = canvas.element.getBoundingClientRect();
+  const mainPoint =
+    axis === "row"
+      ? { x: frame.headerSize.width - 4, y: item.offset + item.size / 2 }
+      : { x: item.offset + item.size / 2, y: frame.headerSize.height - 4 };
+  const insertPoint =
+    axis === "row"
+      ? { x: headers.quickTools.gutter / 2, y: item.offset }
+      : { x: item.offset, y: headers.quickTools.gutter / 2 };
+  await canvas.trigger("pointermove", {
+    clientX: bounds.left + mainPoint.x * frame.scale,
+    clientY: bounds.top + mainPoint.y * frame.scale,
+  });
+  await canvas.trigger("pointerdown", {
+    ...options,
+    clientX: bounds.left + insertPoint.x * frame.scale,
+    clientY: bounds.top + insertPoint.y * frame.scale,
+  });
+}
+
+export async function triggerHeaderCorner(
+  wrapper: VueWrapper,
+  options: MouseEventInit = {},
+): Promise<void> {
+  const surface = wrapper.getComponent(SheetSurface);
+  const frame = surface.props("frame") as SheetRenderFrame;
+  const headers = surface.props("headers") as { quickTools: { gutter: number } };
+  const canvas = surface.get<HTMLCanvasElement>("[data-sheet-surface]");
+  const bounds = canvas.element.getBoundingClientRect();
+  const point = {
+    x: Math.max(headers.quickTools.gutter, frame.headerSize.width / 2),
+    y: Math.max(headers.quickTools.gutter, frame.headerSize.height / 2),
+  };
+  await canvas.trigger("pointerdown", {
+    ...options,
+    clientX: bounds.left + point.x * frame.scale,
+    clientY: bounds.top + point.y * frame.scale,
+  });
+}
+
+export function getSheetRenderFrame(wrapper: VueWrapper): SheetRenderFrame {
+  return wrapper.getComponent(SheetSurface).props("frame") as SheetRenderFrame;
 }

@@ -16,6 +16,7 @@ import {
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { getFormulaFunctionMetadata } from "@idea10/core/formula";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
+import SheetSurface from "../../../modules/sheet-grid/components/SheetSurface.vue";
 import type { WorkbookStore } from "../../../modules/workbook-persistence/workbookStore";
 import { createAppI18n } from "../../../shared/i18n";
 import { triggerCanvasCell } from "../canvas-interaction";
@@ -59,8 +60,15 @@ async function mountWorkspace(store: WorkbookStore) {
   return wrapper;
 }
 
-function dispatchMouse(type: string, options: MouseEventInit): void {
-  window.dispatchEvent(new MouseEvent(type, options));
+function dispatchPointer(type: "pointermove" | "pointerup", options: MouseEventInit): void {
+  const bounds = document.querySelector(".sheet-grid__scroller")!.getBoundingClientRect();
+  const event = new MouseEvent(type, {
+    ...options,
+    clientX: (options.clientX ?? 0) + bounds.left,
+    clientY: (options.clientY ?? 0) + bounds.top,
+  }) as PointerEvent;
+  Object.defineProperty(event, "pointerId", { value: 1 });
+  window.dispatchEvent(event);
 }
 
 afterEach(() => {
@@ -103,19 +111,22 @@ describe("workspace formula authoring", () => {
       clientX: 145,
       clientY: 12,
     });
-    dispatchMouse("mousemove", { buttons: 1, clientX: 250, clientY: 42 });
-    dispatchMouse("mouseup", { button: 0, clientX: 250, clientY: 42 });
+    dispatchPointer("pointermove", { buttons: 1, clientX: 250, clientY: 42 });
+    dispatchPointer("pointerup", { button: 0, clientX: 250, clientY: 42 });
     await flushPromises();
 
     expect(formula.element.value).toBe("=SUM(B1:C2");
     expect(document.activeElement).toBe(formula.element);
-    expect(wrapper.find("[data-formula-reference-range]").exists()).toBe(true);
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
+    expect(
+      (wrapper.getComponent(SheetSurface).props("overlays") as { referenceGroups?: unknown[] })
+        .referenceGroups ?? [],
+    ).not.toHaveLength(0);
+    expect(wrapper.get("textarea.cell-editor").attributes("data-cell-editor")).toBe("A1");
 
     await formula.setValue("=SUM(B1:C2)");
     await formula.trigger("keydown", { key: "Enter" });
     await flushPromises();
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A2");
+    expect(wrapper.get("textarea.cell-editor").attributes("data-cell-editor")).toBe("A2");
 
     const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
     await editor.trigger("keydown", { key: "s", ctrlKey: true });
@@ -155,7 +166,7 @@ describe("workspace formula authoring", () => {
       clientX: 145,
       clientY: 12,
     });
-    dispatchMouse("mouseup", { button: 0, clientX: 145, clientY: 12 });
+    dispatchPointer("pointerup", { button: 0, clientX: 145, clientY: 12 });
     await flushPromises();
     await formula.trigger("keydown", { key: "F4" });
 

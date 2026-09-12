@@ -66,12 +66,11 @@ describe("SheetGrid extent scrolling", () => {
         return evaluator;
       },
     });
-    const scroller = wrapper.get<HTMLDivElement>(".sheet-grid__scroller");
-    expectExtent(scroller, 100, 26);
+    expectExtent(wrapper.get('[role="grid"]'), 100, 26);
 
     setCellValue(sheet, { row: 0, column: 0 }, 2);
     await nextTick();
-    expectExtent(scroller, 100, 26);
+    expectExtent(wrapper.get('[role="grid"]'), 100, 26);
     wrapper.unmount();
   });
 
@@ -81,11 +80,11 @@ describe("SheetGrid extent scrolling", () => {
     scroller.element.scrollTop = 100 * ROW_HEIGHT - VIEWPORT_HEIGHT;
     scroller.element.scrollLeft = 26 * COLUMN_WIDTH - VIEWPORT_WIDTH;
     await scroller.trigger("scroll");
-    expectExtent(scroller, 100, 26);
+    expectExtent(wrapper.get('[role="grid"]'), 100, 26);
 
     wrapper.vm.scrollHorizontally(26 * COLUMN_WIDTH - VIEWPORT_WIDTH);
     await nextTick();
-    expectExtent(scroller, 100, 26);
+    expectExtent(wrapper.get('[role="grid"]'), 100, 26);
     wrapper.unmount();
   });
 
@@ -95,12 +94,12 @@ describe("SheetGrid extent scrolling", () => {
     scroller.element.scrollTop = 100 * ROW_HEIGHT - VIEWPORT_HEIGHT;
     await scroller.trigger("scroll");
     await scroller.trigger("wheel", { deltaY: 24 });
-    expectExtent(scroller, 150, 26);
+    expectExtent(wrapper.get('[role="grid"]'), 150, 26);
 
     scroller.element.scrollLeft = 26 * COLUMN_WIDTH - VIEWPORT_WIDTH;
     await scroller.trigger("scroll");
     await scroller.trigger("wheel", { deltaY: 24, shiftKey: true });
-    expectExtent(scroller, 150, 34);
+    expectExtent(wrapper.get('[role="grid"]'), 150, 34);
     wrapper.unmount();
   });
 
@@ -112,7 +111,7 @@ describe("SheetGrid extent scrolling", () => {
     await scroller.trigger("scroll");
     await scroller.trigger("wheel", { deltaY: 24 });
     await scroller.trigger("wheel", { deltaY: 24, shiftKey: true });
-    expectExtent(scroller, 150, 34);
+    expectExtent(wrapper.get('[role="grid"]'), 150, 34);
 
     setCellValue(sheet, { row: 132, column: 30 }, "tail value");
     setRowHeight(sheet, 145, 40);
@@ -123,7 +122,7 @@ describe("SheetGrid extent scrolling", () => {
     scroller.element.scrollLeft = 0;
     await scroller.trigger("scroll");
 
-    expectExtent(scroller, 150, 34);
+    expectExtent(wrapper.get('[role="grid"]'), 150, 34);
     expect(getCellValue(sheet, { row: 132, column: 30 })).toBe("tail value");
     expect(wrapper.find('[data-cell-editor="AE133"]').exists()).toBe(true);
 
@@ -136,7 +135,7 @@ describe("SheetGrid extent scrolling", () => {
     scroller.element.scrollLeft = 0;
     await scroller.trigger("scroll");
 
-    expectExtent(scroller, 100, 26);
+    expectExtent(wrapper.get('[role="grid"]'), 100, 26);
     expect(wrapper.find('[data-cell-editor="A1"]').exists()).toBe(true);
     wrapper.unmount();
   });
@@ -149,7 +148,7 @@ describe("SheetGrid extent scrolling", () => {
       },
     });
     const scroller = wrapper.get<HTMLDivElement>(".sheet-grid__scroller");
-    expectExtent(scroller, 150, 34);
+    expectExtent(wrapper.get('[role="grid"]'), 150, 34);
 
     wrapper.vm.navigateToCell({ row: 119, column: 30 });
     await nextTick();
@@ -159,7 +158,7 @@ describe("SheetGrid extent scrolling", () => {
     scroller.element.scrollTop = 0;
     scroller.element.scrollLeft = 0;
     await scroller.trigger("scroll");
-    expectExtent(scroller, 150, 34);
+    expectExtent(wrapper.get('[role="grid"]'), 150, 34);
     expect(sheet.freezePanes).toEqual({ rows: 4, columns: 2 });
     wrapper.unmount();
   });

@@ -23,7 +23,7 @@ describe("SheetGrid save contract", () => {
     expect(saveContract.hasPendingEdit()).toBe(true);
     expect(saveContract.flushPendingEdit()).toBe(true);
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("Draft");
-    expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("A1");
+    expect(wrapper.get("[data-cell-editor]").attributes("data-cell-editor")).toBe("A1");
     expect(session.history.undoStack).toHaveLength(1);
     expect(saveContract.hasPendingEdit()).toBe(false);
   });

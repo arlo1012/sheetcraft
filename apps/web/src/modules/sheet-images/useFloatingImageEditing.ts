@@ -60,10 +60,7 @@ export function useFloatingImageEditing(options: {
     focusSelectedImage();
   }
   function endCropGesture(): void {
-    const active = cropGesture.value;
     cropGesture.value = undefined;
-    if (active && options.layer.value)
-      options.layer.value.releasePointerCapture?.(active.pointerId);
   }
   function cancelCrop(restoreFocus = true): void {
     endCropGesture();
@@ -114,7 +111,6 @@ export function useFloatingImageEditing(options: {
       x: event.clientX,
       y: event.clientY,
     };
-    options.layer.value.setPointerCapture?.(event.pointerId);
   }
   function moveCropGesture(event: PointerEvent): void {
     const active = cropGesture.value;

@@ -1,6 +1,13 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
-import { activeCell, getCanvasLayout, mountSheetGrid, triggerCell } from "./fixture";
+import {
+  activeCell,
+  getCanvasLayout,
+  getSheetRenderFrame,
+  mountSheetGrid,
+  triggerCell,
+} from "./fixture";
+import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 
 describe("SheetGrid frozen viewport", () => {
   test("expands for persisted freeze and merge metadata before its first render", () => {
@@ -12,10 +19,13 @@ describe("SheetGrid frozen viewport", () => {
         sheet.mergedCells = [{ start: { row: 26, column: 15 }, end: { row: 28, column: 17 } }];
       },
     });
-    const scroller = wrapper.get(".sheet-grid__scroller");
 
-    expect(Number(scroller.attributes("aria-rowcount"))).toBeGreaterThanOrEqual(29);
-    expect(Number(scroller.attributes("aria-colcount"))).toBeGreaterThanOrEqual(18);
+    expect(Number(wrapper.get('[role="grid"]').attributes("aria-rowcount"))).toBeGreaterThanOrEqual(
+      29,
+    );
+    expect(Number(wrapper.get('[role="grid"]').attributes("aria-colcount"))).toBeGreaterThanOrEqual(
+      18,
+    );
   });
 
   test("keeps one grid while the canvas layout and headers use all four frozen panes", async () => {
@@ -33,8 +43,9 @@ describe("SheetGrid frozen viewport", () => {
     expect(layout.getPaneForAddress({ row: 0, column: 1 })).toBe("top");
     expect(layout.getPaneForAddress({ row: 2, column: 0 })).toBe("left");
     expect(layout.getPaneForAddress({ row: 2, column: 1 })).toBe("body");
-    expect(wrapper.findAll('[data-select-row="0"]')).toHaveLength(1);
-    expect(wrapper.findAll('[data-select-column="0"]')).toHaveLength(1);
+    const frame = getSheetRenderFrame(wrapper);
+    expect(frame.rowHeaders).toHaveLength(2);
+    expect(frame.columnHeaders).toHaveLength(2);
   });
 
   test("clips overscanned body headers below and after frozen headers", async () => {
@@ -48,41 +59,25 @@ describe("SheetGrid frozen viewport", () => {
     element.scrollLeft = 400;
     await scroller.trigger("scroll");
 
-    const frozenRows = wrapper.get('.sheet-row-headers [data-header-pane="frozen"]');
-    const bodyRows = wrapper.get('.sheet-row-headers [data-header-pane="body"]');
-    const frozenColumns = wrapper.get('.sheet-column-headers [data-header-pane="frozen"]');
-    const bodyColumns = wrapper.get('.sheet-column-headers [data-header-pane="body"]');
-
-    expect(frozenRows.attributes("style")).toContain("top: 0px");
-    expect(frozenRows.attributes("style")).toContain("height: 72px");
-    expect(bodyRows.attributes("style")).toContain("top: 72px");
-    expect(bodyRows.attributes("style")).toContain("height: 528px");
-    expect(frozenColumns.attributes("style")).toContain("left: 0px");
-    expect(frozenColumns.attributes("style")).toContain("width: 96px");
-    expect(bodyColumns.attributes("style")).toContain("left: 96px");
-    expect(bodyColumns.attributes("style")).toContain("width: 864px");
-
-    expect(frozenRows.get('[data-row="0"]').attributes("style")).toContain("top: 0px");
-    expect(frozenColumns.get('[data-column="0"]').attributes("style")).toContain("left: 0px");
-    expect(
-      bodyRows
-        .findAll<HTMLElement>("[data-row]")
-        .some((item) => Number.parseFloat(item.element.style.top) < 0),
-    ).toBe(true);
-    expect(
-      bodyColumns
-        .findAll<HTMLElement>("[data-column]")
-        .some((item) => Number.parseFloat(item.element.style.left) < 0),
-    ).toBe(true);
-
-    await frozenRows.get('[data-select-row="0"]').trigger("mousedown", { button: 0 });
-    expect(frozenRows.get('[data-select-row="0"]').attributes("aria-pressed")).toBe("true");
+    const frame = getSheetRenderFrame(wrapper);
+    expect(frame.rowHeaders.map((pane) => pane.clip)).toEqual([
+      { x: 0, y: 28, width: 48, height: 72 },
+      { x: 0, y: 100, width: 48, height: 528 },
+    ]);
+    expect(frame.columnHeaders.map((pane) => pane.clip)).toEqual([
+      { x: 48, y: 0, width: 96, height: 28 },
+      { x: 144, y: 0, width: 864, height: 28 },
+    ]);
+    expect(frame.rowHeaders[0]?.items[0]?.offset).toBe(28);
+    expect(frame.columnHeaders[0]?.items[0]?.offset).toBe(48);
+    expect(frame.rowHeaders[1]?.items.some((item) => item.offset < 100)).toBe(true);
+    expect(frame.columnHeaders[1]?.items.some((item) => item.offset < 144)).toBe(true);
   });
 
   test("keeps the canvas event and border surfaces fixed while viewport panes virtualize", () => {
     const { wrapper } = mountSheetGrid();
     const layout = getCanvasLayout(wrapper);
-    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-border-canvas]")).toHaveLength(2);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-surface]")).toHaveLength(2);
     expect(layout.panes.body.rows.length).toBeLessThan(100);
     expect(layout.panes.body.columns.length).toBeLessThan(50);
   });
@@ -131,25 +126,14 @@ describe("SheetGrid frozen viewport", () => {
     await triggerCell(wrapper, { row: 0, column: 0 }, "mousedown", { button: 0 });
     await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0, shiftKey: true });
 
-    expect(wrapper.findAll("[data-selection-range]")).toHaveLength(4);
-    const outlineStyles = wrapper
-      .findAll<HTMLElement>("[data-selection-outline]")
-      .map((outline) => outline.element.style);
-    expect(outlineStyles).toHaveLength(4);
-    const transparentSides = outlineStyles.flatMap((style) =>
-      ["borderTopColor", "borderRightColor", "borderBottomColor", "borderLeftColor"].filter(
-        (property) => style[property as keyof CSSStyleDeclaration] === "transparent",
-      ),
+    const overlays = wrapper.getComponent(SheetSurface).props("overlays");
+    expect(overlays.rangeRects).toHaveLength(4);
+    expect(overlays.rangeRects!.map((fragment: { paneId: string }) => fragment.paneId)).toEqual(
+      expect.arrayContaining(["topLeft", "top", "left", "body"]),
     );
-    expect(transparentSides).toHaveLength(8);
-    for (const property of [
-      "borderTopColor",
-      "borderRightColor",
-      "borderBottomColor",
-      "borderLeftColor",
-    ]) {
-      expect(transparentSides.filter((side) => side === property)).toHaveLength(2);
-    }
+    // The overlay painter receives fragments, then omits shared edges while stroking.
+    // This keeps split frozen-pane selections visually continuous without DOM outlines.
+    expect(overlays.activeRects).toHaveLength(1);
   });
 
   test("keeps invalid cross-freeze merge fragments in the canvas layout", async () => {
@@ -178,8 +162,12 @@ describe("SheetGrid frozen viewport", () => {
     sheet.mergedCells = [{ start: { row: 190, column: 75 }, end: { row: 191, column: 76 } }];
     await nextTick();
 
-    expect(Number(scroller.attributes("aria-rowcount"))).toBeGreaterThanOrEqual(192);
-    expect(Number(scroller.attributes("aria-colcount"))).toBeGreaterThanOrEqual(77);
+    expect(Number(wrapper.get('[role="grid"]').attributes("aria-rowcount"))).toBeGreaterThanOrEqual(
+      192,
+    );
+    expect(Number(wrapper.get('[role="grid"]').attributes("aria-colcount"))).toBeGreaterThanOrEqual(
+      77,
+    );
     expect((scroller.element as HTMLDivElement).scrollTop).toBeGreaterThanOrEqual(0);
   });
 
