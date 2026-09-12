@@ -132,21 +132,23 @@ watch(open, (isOpen) => {
         :style="floatingStyles"
         :data-cell-edit-session="editSessionId"
       >
-        <MenuSurface ref="menuRef" :label="label">
-          <li v-if="hasSearch" class="formula-category-menu__controls" role="presentation">
-            <div class="formula-category-menu__search">
-              <TInput
-                ref="searchInputRef"
-                v-model="query"
-                type="search"
-                clearable
-                :aria-label="t('formulaTools.searchFunctions')"
-                :placeholder="t('formulaTools.searchFunctions')"
-                data-formula-category-search
-                @keydown="onSearchKeydown"
-              />
-            </div>
-          </li>
+        <div v-if="hasSearch" class="formula-category-menu__search">
+          <TInput
+            ref="searchInputRef"
+            v-model="query"
+            type="search"
+            clearable
+            :aria-label="t('formulaTools.searchFunctions')"
+            :placeholder="t('formulaTools.searchFunctions')"
+            data-formula-category-search
+            @keydown="onSearchKeydown"
+          />
+        </div>
+        <MenuSurface
+          ref="menuRef"
+          class="formula-category-menu__list narrow-scrollbar"
+          :label="label"
+        >
           <MenuItem
             v-for="entry in matchingFunctions"
             :key="entry.name"
@@ -214,21 +216,28 @@ watch(open, (isOpen) => {
 
   &__panel {
     z-index: 40;
-
-    :deep(.idea-menu-surface) {
-      max-height: min(360px, calc(100vh - 24px));
-    }
+    display: flex;
+    flex-direction: column;
+    max-width: calc(100vw - 24px);
+    max-height: min(360px, calc(100vh - 24px));
+    padding: var(--idea-menu-padding);
+    overflow: hidden;
+    background: var(--idea-surface-panel);
+    border: 1px solid var(--idea-border-subtle);
+    border-radius: var(--idea-radius-default);
+    box-shadow: var(--idea-shadow-menu);
   }
 
-  &__controls {
-    position: sticky;
-    z-index: 1;
-    top: 0;
-    background: var(--idea-surface-panel);
-    list-style: none;
+  &__list {
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   &__search {
+    flex: none;
     padding: 0 8px 6px;
   }
 
