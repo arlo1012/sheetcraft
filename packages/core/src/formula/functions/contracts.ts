@@ -1,5 +1,5 @@
 import type { ExcelDateParts, ExcelDateSystem } from "../date-system.js";
-import type { FormulaRangeBounds, FormulaValue } from "../types.js";
+import type { FormulaAddress, FormulaRangeBounds, FormulaValue } from "../types.js";
 
 export type FormulaFunctionArgumentMetadata = Readonly<{ name: string; optional?: boolean }>;
 
@@ -15,7 +15,14 @@ export type FormulaFunctionMetadata = Readonly<{
 
 /** A range is enumerated in row-major order. getValue uses sheet coordinates. */
 export type FormulaFunctionArgument =
-  | Readonly<{ kind: "scalar"; value: FormulaValue; source: "literal" | "reference" | "expression" }>
+  | Readonly<{
+      kind: "scalar";
+      value: FormulaValue;
+      source: "literal" | "reference" | "expression";
+      /** Present for a direct cell reference when a function needs its anchor. */
+      address?: FormulaAddress;
+      getValue?: (row: number, column: number) => FormulaValue;
+    }>
   | Readonly<{
       kind: "range";
       values: Iterable<FormulaValue>;

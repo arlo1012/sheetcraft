@@ -34,13 +34,24 @@ export const LOGICAL_FUNCTIONS = [
   defineFunction({ name: "TRUE", category: "Logical", minArgs: 0, maxArgs: 0, arguments: [], lazy: false }, () => true),
   defineFunction({ name: "FALSE", category: "Logical", minArgs: 0, maxArgs: 0, arguments: [], lazy: false }, () => false),
   defineFunction({ name: "IFS", category: "Logical", minArgs: 2, maxArgs: null, arguments: [{ name: "logical_test1" }, { name: "value_if_true1" }], lazy: true }, (context) => {
+    if (context.argumentCount % 2 !== 0) return formulaError("VALUE");
     for (let index = 0; index < context.argumentCount; index += 2) { const test = condition(scalar(context.evaluateArgument(index))); if (isFormulaError(test)) return test; if (test) return scalar(context.evaluateArgument(index + 1)); }
     return formulaError("NA");
-  }, (context) => { for (let index = 0; index < context.argumentCount; index += 2) { const test = condition(scalar(context.evaluateArgument(index))); if (isFormulaError(test) || test) return [index, ...(test ? [index + 1] : [])]; } return Array.from({ length: context.argumentCount }, (_, index) => index); }),
+  }, (context) => { if (context.argumentCount % 2 !== 0) return Array.from({ length: context.argumentCount }, (_, index) => index); for (let index = 0; index < context.argumentCount; index += 2) { const test = condition(scalar(context.evaluateArgument(index))); if (isFormulaError(test) || test) return [index, ...(test ? [index + 1] : [])]; } return Array.from({ length: context.argumentCount }, (_, index) => index); }),
   defineFunction({ name: "SWITCH", category: "Logical", minArgs: 3, maxArgs: null, arguments: [{ name: "expression" }, { name: "value1" }, { name: "result1" }, { name: "default", optional: true }], lazy: true }, (context) => {
     const expression = scalar(context.evaluateArgument(0)); if (isFormulaError(expression)) return expression;
     const pairsEnd = context.argumentCount % 2 === 0 ? context.argumentCount - 1 : context.argumentCount;
     for (let index = 1; index < pairsEnd; index += 2) { const value = scalar(context.evaluateArgument(index)); if (isFormulaError(value)) return value; if (value === expression || String(value).toUpperCase() === String(expression).toUpperCase()) return scalar(context.evaluateArgument(index + 1)); }
     return context.argumentCount % 2 === 0 ? scalar(context.evaluateArgument(context.argumentCount - 1)) : formulaError("NA");
+  }, (context) => {
+    const expression = scalar(context.evaluateArgument(0));
+    if (isFormulaError(expression)) return [0];
+    const pairsEnd = context.argumentCount % 2 === 0 ? context.argumentCount - 1 : context.argumentCount;
+    for (let index = 1; index < pairsEnd; index += 2) {
+      const value = scalar(context.evaluateArgument(index));
+      if (isFormulaError(value)) return [0, index];
+      if (value === expression || String(value).toUpperCase() === String(expression).toUpperCase()) return [0, index, index + 1];
+    }
+    return context.argumentCount % 2 === 0 ? [0, context.argumentCount - 1] : Array.from({ length: context.argumentCount }, (_, index) => index);
   }),
 ] as const satisfies readonly FormulaFunctionDefinition[];

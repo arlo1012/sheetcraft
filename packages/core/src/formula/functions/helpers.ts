@@ -50,6 +50,25 @@ export function compareValues(left: FormulaValue, right: FormulaValue): number |
   return a === b ? 0 : a < b ? -1 : 1;
 }
 
+/** Excel wildcard matching: * and ? match text, and ~ escapes either character. */
+export function wildcardMatch(value: string, pattern: string): boolean {
+  let expression = "^";
+  for (let index = 0; index < pattern.length; index += 1) {
+    const character = pattern[index]!;
+    if (character === "~" && index + 1 < pattern.length) {
+      expression += escapeRegExp(pattern[index + 1]!);
+      index += 1;
+    } else {
+      expression += character === "*" ? ".*" : character === "?" ? "." : escapeRegExp(character);
+    }
+  }
+  return new RegExp(`${expression}$`, "i").test(value);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function roundAwayFromZero(value: number, digits: number): FormulaValue {
   const roundedDigits = Math.trunc(digits);
   if (!Number.isFinite(roundedDigits) || Math.abs(roundedDigits) > 308) return formulaError("NUM");
