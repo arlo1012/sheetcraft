@@ -20,7 +20,7 @@ describe("formula parser", () => {
     expect(collectFormulaRanges(result.ast)).toHaveLength(1);
   });
 
-  test.each(["", "A1", "=", "=SUM(A1,)", "=A0", "=A1:", "=1 + )"])(
+  test.each(["", "A1", "=", "=A0", "=A1:", "=1 + )"])(
     "returns a stable parse error for %j",
     (source) => {
       const result = parseFormula(source);
@@ -32,6 +32,21 @@ describe("formula parser", () => {
       );
     },
   );
+
+  test("preserves omitted function argument positions", () => {
+    const result = parseFormula("=DCOUNT(A1:B3,,D1:D2)");
+    expect(result).toEqual(
+      expect.objectContaining({
+        ok: true,
+        ast: expect.objectContaining({
+          expression: expect.objectContaining({
+            kind: "function",
+            args: expect.arrayContaining([expect.objectContaining({ kind: "omitted" })]),
+          }),
+        }),
+      }),
+    );
+  });
 
   test("parses a reference error token written by structural transforms", () => {
     const result = parseFormula("=#REF! + 1");

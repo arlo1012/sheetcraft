@@ -22,6 +22,11 @@ export function scalar(argument: FormulaFunctionArgument): FormulaValue {
   return argument.kind === "scalar" ? scalarize(argument.value) : formulaError("VALUE");
 }
 
+/** Distinguishes an empty argument slot from a reference whose computed value is blank. */
+export function isOmittedArgument(argument: FormulaFunctionArgument): boolean {
+  return argument.kind === "scalar" && argument.source === "omitted";
+}
+
 export function finiteNumber(value: FormulaValue): number | ReturnType<typeof formulaError> {
   if (isFormulaError(value)) return value;
   return typeof value === "number" && Number.isFinite(value) ? value : formulaError("VALUE");

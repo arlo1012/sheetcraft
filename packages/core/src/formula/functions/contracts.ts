@@ -30,7 +30,7 @@ export type FormulaFunctionArgument =
        * the complete runtime value.
        */
       value: FormulaRuntimeValue;
-      source: "literal" | "reference" | "expression";
+      source: "literal" | "reference" | "expression" | "omitted";
       /** Present for a direct cell reference when a function needs its anchor. */
       address?: FormulaAddress;
       getValue?: (row: number, column: number) => FormulaValue;

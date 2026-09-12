@@ -91,6 +91,8 @@ export type FormulaExpression =
   | { kind: "number"; value: number; start: number; end: number }
   | { kind: "string"; value: string; start: number; end: number }
   | { kind: "boolean"; value: boolean; start: number; end: number }
+  /** A deliberately empty function argument, such as the second argument in `=F(1,,3)`. */
+  | { kind: "omitted"; start: number; end: number }
   | {
       kind: "reference";
       reference: FormulaReference;

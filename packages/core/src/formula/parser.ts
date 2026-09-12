@@ -307,7 +307,12 @@ class FormulaParser {
     this.skipWhitespace();
     if (!this.consume(")")) {
       while (true) {
-        const argument = this.parseComparison();
+        this.skipWhitespace();
+        const omittedStart = this.offset;
+        const argument =
+          this.peek() === "," || this.peek() === ")"
+            ? { kind: "omitted" as const, start: omittedStart, end: omittedStart }
+            : this.parseComparison();
         if (!argument) return null;
         args.push(argument);
         if (this.consume(")")) break;

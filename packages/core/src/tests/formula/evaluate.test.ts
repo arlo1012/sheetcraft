@@ -59,6 +59,11 @@ describe("formula evaluation", () => {
     expect(evaluateFormula("=SUM(A1:B2)", resolver(values))).toEqual(createFormulaError("CYCLE"));
   });
 
+  test("keeps deliberately omitted arguments as blank values at their original positions", () => {
+    expect(evaluateFormula("=SUM(1,,2)", resolver(new Map()))).toBe(3);
+    expect(evaluateFormula("=SUM(1,)", resolver(new Map()))).toBe(1);
+  });
+
   test.each(["text", true] as const)(
     "returns VALUE when arithmetic receives %j from a scalar reference",
     (value) => {
@@ -91,7 +96,6 @@ describe("formula evaluation", () => {
     ["=SUM(B2 + 1)", "VALUE"],
     ["=UNKNOWN(1)", "NAME"],
     ["=SUM(A1)", "CYCLE"],
-    ["=SUM(A1,)", "PARSE"],
     ["=#REF! + 1", "REF"],
   ] as const)("returns %s for %s", (source, code) => {
     const values = new Map<string, ReturnType<typeof createFormulaError> | number | string>([

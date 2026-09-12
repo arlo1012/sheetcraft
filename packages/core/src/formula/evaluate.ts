@@ -168,6 +168,7 @@ function evaluateExpression(
 ): FormulaRuntimeValue {
   if (expression.kind === "number" || expression.kind === "string" || expression.kind === "boolean")
     return validate(expression.value);
+  if (expression.kind === "omitted") return null;
   if (expression.kind === "reference")
     return validate(
       resolver.resolveCell({
@@ -246,6 +247,9 @@ function functionArgument(
   registry: FormulaFunctionRegistry,
   options?: FormulaEvaluationOptions,
 ): FormulaFunctionArgument {
+  if (expression.kind === "omitted") {
+    return { kind: "scalar", value: null, source: "omitted" };
+  }
   if (expression.kind === "identifier") {
     const named = resolver.resolveName?.(expression.name);
     if (typeof named === "object" && named !== null && "start" in named) {
