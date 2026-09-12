@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { activeCell, mountSheetGrid } from "./fixture";
-import SheetCellLayer from "../../../../../modules/sheet-grid/components/SheetCellLayer.vue";
+import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
+import SheetCanvasLayer from "../../../../../modules/sheet-grid/components/SheetCanvasLayer.vue";
 
 function dispatchMouse(type: string, options: MouseEventInit): void {
   window.dispatchEvent(new MouseEvent(type, options));
@@ -13,7 +13,7 @@ describe("SheetGrid drag selection", () => {
 
   test("selects a reverse rectangle without writing history", async () => {
     const { session, wrapper } = mountSheetGrid();
-    await wrapper.get('[data-row="3"][data-column="3"]').trigger("mousedown", {
+    await triggerCell(wrapper, { row: 3, column: 3 }, "mousedown", {
       button: 0,
       buttons: 1,
       clientX: 346,
@@ -52,7 +52,7 @@ describe("SheetGrid drag selection", () => {
       toJSON: () => ({}),
     });
 
-    await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", {
+    await triggerCell(wrapper, { row: 0, column: 0 }, "mousedown", {
       button: 0,
       buttons: 1,
       clientX: 10,
@@ -70,13 +70,13 @@ describe("SheetGrid drag selection", () => {
 
   test("keeps displayed cell values cached while a drag only extends the selection", async () => {
     const { wrapper } = mountSheetGrid();
-    await wrapper.get('[data-row="2"][data-column="1"]').trigger("mousedown", {
+    await triggerCell(wrapper, { row: 2, column: 1 }, "mousedown", {
       button: 0,
       buttons: 1,
       clientX: 110,
       clientY: 58,
     });
-    const layer = wrapper.findComponent(SheetCellLayer);
+    const layer = wrapper.findComponent(SheetCanvasLayer);
     const evaluate = vi.spyOn(layer.props("evaluator"), "getComputedValue");
     dispatchMouse("mousemove", { buttons: 1, clientX: 420, clientY: 180 });
     await wrapper.vm.$nextTick();

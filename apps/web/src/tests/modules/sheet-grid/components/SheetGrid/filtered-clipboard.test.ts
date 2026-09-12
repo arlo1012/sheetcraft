@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { getCellValue, setCellValue } from "@idea10/core/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
-import { activeCell, mountSheetGrid } from "./fixture";
+import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
 function selectionStyle(wrapper: ReturnType<typeof mountSheetGrid>["wrapper"]): string {
   return wrapper.get("[data-selection-range]").attributes("style") ?? "";
@@ -30,10 +30,8 @@ describe("SheetGrid filtered clipboard", () => {
         };
       },
     });
-    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
-    await wrapper
-      .get('[data-row="4"][data-column="1"]')
-      .trigger("mousedown", { button: 0, shiftKey: true });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 4, column: 1 }, "mousedown", { button: 0, shiftKey: true });
 
     wrapper
       .get("textarea.cell-editor")
@@ -67,7 +65,7 @@ describe("SheetGrid filtered clipboard", () => {
         target.mergedCells = [{ start: { row: 1, column: 1 }, end: { row: 2, column: 2 } }];
       },
     });
-    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
     const before = { active: activeCell(wrapper), selection: selectionStyle(wrapper) };
 
     wrapper

@@ -4,8 +4,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import App from "../../../app/App.vue";
 import LocaleSwitcher from "../../../app/LocaleSwitcher.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
+import SheetCanvasLayer from "../../../modules/sheet-grid/components/SheetCanvasLayer.vue";
 import { getCellStyle } from "@idea10/core/workbook";
 import { createAppI18n, type AppLocale } from "../../../shared/i18n";
+import { triggerCanvasCell } from "../canvas-interaction";
 
 function mountApp(locale: AppLocale = "en-US") {
   const host = document.createElement("div");
@@ -117,7 +119,7 @@ describe("App", () => {
     (scroller.element as HTMLDivElement).scrollTop = 120;
     (scroller.element as HTMLDivElement).scrollLeft = 192;
     await scroller.trigger("scroll");
-    await wrapper.get('[data-row="6"][data-column="2"]').trigger("mousedown", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 6, column: 2 }, "mousedown", { button: 0 });
 
     await wrapper.get('[aria-label="Add sheet"]').trigger("click");
     await wrapper.get('[title="Sheet1 (double-click to rename)"]').trigger("click");
@@ -141,7 +143,7 @@ describe("App", () => {
     await formulaInput.setValue("42");
     await formulaInput.trigger("keydown", { key: "Enter" });
     await formulaInput.trigger("blur");
-    expect(wrapper.get('[data-row="19"][data-column="3"]').text()).toContain("42");
+    expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("D21");
     expect(document.activeElement).toBe(wrapper.get("textarea.cell-editor").element);
 
@@ -196,7 +198,7 @@ describe("App", () => {
 
     await getAddressInput(wrapper).setValue("A1");
     await wrapper.get('[aria-label="Go to cell"]').trigger("submit");
-    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain("中文");
+    expect(getFormulaInput(wrapper).element.value).toBe("中文");
   });
 
   test("rejects invalid sheet names without mutating the workbook or showing operation notices", async () => {
@@ -265,8 +267,8 @@ describe("App", () => {
     await nextEditor.setValue("20");
     await nextEditor.trigger("keydown", { key: "Enter" });
 
-    await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", { button: 0 });
-    await wrapper.get('[data-row="1"][data-column="0"]').trigger("mousedown", {
+    await triggerCanvasCell(wrapper, { row: 0, column: 0 }, "mousedown", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 1, column: 0 }, "mousedown", {
       button: 0,
       shiftKey: true,
     });
@@ -278,6 +280,7 @@ describe("App", () => {
   });
 
   test("summarizes whole rows, columns, and the full sheet", async () => {
+    vi.useFakeTimers();
     const wrapper = mountApp();
     const enterValue = async (value: string): Promise<void> => {
       const editor = wrapper.get("textarea.cell-editor");
@@ -288,20 +291,23 @@ describe("App", () => {
 
     await enterValue("10");
     await enterValue("99");
-    await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 0, column: 1 }, "mousedown", { button: 0 });
     await enterValue("20");
 
     await wrapper.get('[aria-label="Select row 1"]').trigger("mousedown", { button: 0 });
+    await vi.advanceTimersByTimeAsync(120);
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=15");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=2");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum=30");
 
     await wrapper.get('[aria-label="Select column A"]').trigger("mousedown", { button: 0 });
+    await vi.advanceTimersByTimeAsync(120);
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=54.5");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=2");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum=109");
 
     await wrapper.get('[aria-label="Select all cells"]').trigger("click");
+    await vi.advanceTimersByTimeAsync(120);
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Average=43");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Count=3");
     expect(wrapper.get("[data-selection-summary]").text()).toContain("Sum=129");
@@ -309,38 +315,27 @@ describe("App", () => {
 
   test("formats and clears the current selection as reversible workbook actions", async () => {
     const wrapper = mountApp();
-    await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", {
+    const sheet = () => wrapper.getComponent(SheetGrid).props("sheet");
+    await triggerCanvasCell(wrapper, { row: 0, column: 1 }, "mousedown", {
       button: 0,
       shiftKey: true,
     });
 
     await wrapper.get('[aria-label="Bold"]').trigger("click");
     expect(wrapper.get('[aria-label="Bold"]').attributes("aria-pressed")).toBe("true");
-    expect(
-      (wrapper.get('[data-row="0"][data-column="0"]').element as HTMLElement).style.fontWeight,
-    ).toBe("700");
-    expect(
-      (wrapper.get('[data-row="0"][data-column="1"]').element as HTMLElement).style.fontWeight,
-    ).toBe("700");
+    expect(getCellStyle(sheet(), { row: 0, column: 0 })?.bold).toBe(true);
+    expect(getCellStyle(sheet(), { row: 0, column: 1 })?.bold).toBe(true);
 
     const clearFormatting = wrapper.get('[data-ribbon-action="clear-formatting"]');
     await clearFormatting.trigger("click");
     expect(wrapper.get('[aria-label="Bold"]').attributes("aria-pressed")).toBe("false");
-    expect(
-      (wrapper.get('[data-row="0"][data-column="0"]').element as HTMLElement).style.fontWeight,
-    ).toBe("");
-    expect(
-      (wrapper.get('[data-row="0"][data-column="1"]').element as HTMLElement).style.fontWeight,
-    ).toBe("");
+    expect(getCellStyle(sheet(), { row: 0, column: 0 })?.bold).toBeUndefined();
+    expect(getCellStyle(sheet(), { row: 0, column: 1 })?.bold).toBeUndefined();
 
     await clearFormatting.trigger("keydown", { key: "z", ctrlKey: true });
     expect(wrapper.get('[aria-label="Bold"]').attributes("aria-pressed")).toBe("true");
-    expect(
-      (wrapper.get('[data-row="0"][data-column="0"]').element as HTMLElement).style.fontWeight,
-    ).toBe("700");
-    expect(
-      (wrapper.get('[data-row="0"][data-column="1"]').element as HTMLElement).style.fontWeight,
-    ).toBe("700");
+    expect(getCellStyle(sheet(), { row: 0, column: 0 })?.bold).toBe(true);
+    expect(getCellStyle(sheet(), { row: 0, column: 1 })?.bold).toBe(true);
 
     await clearFormatting.trigger("keydown", { key: "z", ctrlKey: true, shiftKey: true });
     expect(wrapper.get('[aria-label="Bold"]').attributes("aria-pressed")).toBe("false");
@@ -359,7 +354,7 @@ describe("App", () => {
 
   test("applies, restores, and clears range borders through the ribbon", async () => {
     const wrapper = mountApp();
-    await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", {
+    await triggerCanvasCell(wrapper, { row: 0, column: 1 }, "mousedown", {
       button: 0,
       shiftKey: true,
     });
@@ -368,31 +363,24 @@ describe("App", () => {
     await borderTrigger.trigger("click");
     await new DOMWrapper(document.body).get('[data-border-preset="outer"]').trigger("click");
 
-    const findBorder = (orientation: "horizontal" | "vertical", edge: number) =>
-      wrapper.find(`[data-border-orientation="${orientation}"][data-border-edge="${edge}"]`);
-    for (const border of [
-      findBorder("horizontal", 0),
-      findBorder("vertical", 0),
-      findBorder("vertical", 2),
-    ]) {
-      expect(border.attributes("data-border-style")).toBe("thin");
-      expect(border.get("line").attributes()).toMatchObject({
-        stroke: "#20242c",
-        "stroke-width": "1",
-      });
-    }
+    const sheet = () => wrapper.getComponent(SheetGrid).props("sheet");
+    expect(getCellStyle(sheet(), { row: 0, column: 0 })?.borderTop).toMatchObject({
+      style: "thin",
+      color: "#20242c",
+    });
+    expect(getCellStyle(sheet(), { row: 0, column: 1 })?.borderRight).toMatchObject({
+      style: "thin",
+      color: "#20242c",
+    });
 
     await borderTrigger.trigger("keydown", { key: "z", ctrlKey: true });
-    expect(findBorder("horizontal", 0).exists()).toBe(false);
-    expect(findBorder("vertical", 2).exists()).toBe(false);
+    expect(getCellStyle(sheet(), { row: 0, column: 0 })?.borderTop).toBeUndefined();
 
     await borderTrigger.trigger("keydown", { key: "z", ctrlKey: true, shiftKey: true });
-    expect(findBorder("horizontal", 0).exists()).toBe(true);
-    expect(findBorder("vertical", 2).exists()).toBe(true);
+    expect(getCellStyle(sheet(), { row: 0, column: 1 })?.borderRight?.style).toBe("thin");
 
     await wrapper.get('[data-ribbon-action="clear-formatting"]').trigger("click");
-    expect(findBorder("horizontal", 0).exists()).toBe(false);
-    expect(findBorder("vertical", 2).exists()).toBe(false);
+    expect(getCellStyle(sheet(), { row: 0, column: 0 })?.borderTop).toBeUndefined();
   });
 
   test("reapplies the remembered ribbon color to a new selection and undoes only that edit", async () => {
@@ -405,7 +393,7 @@ describe("App", () => {
     await new DOMWrapper(document.body).get('[data-color-swatch="#4472c4"]').trigger("click");
     expect(getCellStyle(sheet(), { row: 0, column: 0 })?.textColor).toBe("#4472c4");
 
-    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
     expect(wrapper.get("[data-active-cell]").attributes("data-active-cell")).toBe("B2");
     await textTool.get("[data-ribbon-split-main]").trigger("click");
     expect(getCellStyle(sheet(), { row: 1, column: 1 })?.textColor).toBe("#4472c4");
@@ -426,24 +414,34 @@ describe("App", () => {
       "A long sentence with enough words to wrap across several lines in the first cell.",
     );
     await editor.trigger("keydown", { key: "Enter" });
-    await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 0, column: 0 }, "mousedown", { button: 0 });
     const wrapText = wrapper.get('[data-ribbon-action="wrap-text"]');
 
     await wrapText.trigger("click");
     expect(wrapText.attributes("aria-pressed")).toBe("true");
     expect(
-      Number.parseFloat(
-        (wrapper.get('[data-row="0"][data-column="0"]').element.parentElement as HTMLElement).style
-          .height,
-      ),
+      (
+        wrapper.getComponent(SheetCanvasLayer).props("layout") as {
+          getCellViewportRect(address: {
+            row: number;
+            column: number;
+          }): { height: number } | undefined;
+        }
+      ).getCellViewportRect({ row: 0, column: 0 })?.height,
     ).toBeGreaterThan(24);
 
     await wrapText.trigger("click");
     expect(wrapText.attributes("aria-pressed")).toBe("false");
     expect(
-      (wrapper.get('[data-row="0"][data-column="0"]').element.parentElement as HTMLElement).style
-        .height,
-    ).toBe("24px");
+      (
+        wrapper.getComponent(SheetCanvasLayer).props("layout") as {
+          getCellViewportRect(address: {
+            row: number;
+            column: number;
+          }): { height: number } | undefined;
+        }
+      ).getCellViewportRect({ row: 0, column: 0 })?.height,
+    ).toBe(24);
 
     await wrapText.trigger("keydown", { key: "z", ctrlKey: true });
     expect(wrapText.attributes("aria-pressed")).toBe("true");

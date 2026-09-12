@@ -1,4 +1,4 @@
-import { isFormulaError, type FormulaValue } from "../formula/types.js";
+import { createFormulaError, isFormulaError, type FormulaValue } from "../formula/types.js";
 import {
   createSheetEvaluator,
   createSheetSparseState,
@@ -70,7 +70,7 @@ export function getSheetFilterColumnDistinctValues(
   sheet: Sheet,
   filterRange: SheetFilter["range"],
   column: number,
-  evaluator: SheetEvaluator = createSheetEvaluator(sheet),
+  evaluator?: SheetEvaluator,
 ): SheetFilterValue[] {
   const range = normalizeRange(filterRange);
   assertCellRange(range);
@@ -84,6 +84,7 @@ export function getSheetFilterColumnDistinctValues(
   const values = new Map<string, SheetFilterValue>();
   const occupiedRows = new Set<number>();
   let hasBlank = false;
+  let formulaEvaluator = evaluator;
   for (const [key, cell] of sheet.cells) {
     const address = parseCellKey(key);
     if (
@@ -94,7 +95,18 @@ export function getSheetFilterColumnDistinctValues(
       continue;
     }
     if (cell.content) occupiedRows.add(address.row);
-    const value = getSheetFilterValue(evaluator.getComputedValue(address));
+    const content = cell.content;
+    const value = getSheetFilterValue(
+      content?.kind === "formula"
+        ? (formulaEvaluator ??= createSheetEvaluator(sheet)).getComputedValue(address)
+        : content?.kind === "literal"
+          ? content.value
+          : content?.kind === "error"
+            ? content.error
+            : content?.kind === "image"
+              ? createFormulaError("VALUE")
+              : null,
+    );
     if (value.kind === "blank") hasBlank = true;
     else values.set(getSheetFilterValueKey(value), value);
   }

@@ -1,7 +1,7 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { getCellValue } from "@idea10/core/workbook";
-import { mountSheetGrid } from "./fixture";
+import { getCanvasLayout, mountSheetGrid, triggerCell } from "./fixture";
 
 describe("cell editor geometry", () => {
   test.each([
@@ -41,9 +41,7 @@ describe("cell editor geometry", () => {
           sheet.freezePanes = freeze;
         },
       });
-      const cell = wrapper.get<HTMLElement>(`[data-row="${row}"][data-column="${column}"]`);
-
-      await cell.trigger("dblclick", { button: 0 });
+      await triggerCell(wrapper, { row, column }, "dblclick", { button: 0 });
       await nextTick();
       const editorPane = wrapper.get<HTMLElement>(`[data-editor-pane="${paneId}"]`).element;
       const anchor = wrapper.get<HTMLElement>("[data-cell-editor-anchor]").element;
@@ -86,20 +84,20 @@ describe("cell editor geometry", () => {
     await scroller.trigger("scroll");
     await nextTick();
 
-    const cell = wrapper
-      .findAll<HTMLElement>("[data-row][data-column]")
-      .find(
-        (candidate) =>
-          Number(candidate.attributes("data-row")) >= 2 &&
-          Number(candidate.attributes("data-column")) >= 2,
-      );
-    expect(cell).toBeDefined();
-    await cell?.trigger("dblclick", { button: 0 });
+    const layout = getCanvasLayout(wrapper);
+    const body = layout.panes.body;
+    const address = body.rows
+      .flatMap((row) => body.columns.map((column) => ({ row: row.index, column: column.index })))
+      .find((address) => {
+        const rect = layout.getCellViewportRect(address);
+        return rect && rect.x >= body.clip.x && rect.y >= body.clip.y;
+      });
+    expect(address).toBeDefined();
+    await triggerCell(wrapper, address!, "dblclick", { button: 0 });
     await nextTick();
 
     const pane = wrapper.get<HTMLElement>('[data-editor-pane="body"]').element;
     const anchor = wrapper.get<HTMLElement>("[data-cell-editor-anchor]").element;
-    const frame = wrapper.get<HTMLElement>("[data-cell-editor-frame]").element;
     const outline = wrapper.get<HTMLElement>("[data-active-cell]").element;
 
     expect(Number.parseFloat(pane.style.left) + Number.parseFloat(anchor.style.left)).toBe(
@@ -108,12 +106,11 @@ describe("cell editor geometry", () => {
     expect(Number.parseFloat(pane.style.top) + Number.parseFloat(anchor.style.top)).toBe(
       Number.parseFloat(outline.style.top) + 1,
     );
-    expect(frame.closest('[role="row"]')).toBeNull();
   });
 
   test("keeps a fitting editor aligned with the selected cell without extra trailing width", async () => {
     const { wrapper } = mountSheetGrid();
-    await wrapper.get('[data-row="1"][data-column="1"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 1, column: 1 }, "mousedown", { button: 0 });
     const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
     const outline = wrapper.get<HTMLElement>("[data-active-cell]").element.style;
     Object.defineProperties(editor.element, {
@@ -142,14 +139,16 @@ describe("cell editor geometry", () => {
         sheet.rowHeights.set(3, 40);
       },
     });
-    const cell = wrapper.get<HTMLElement>('[data-row="1"][data-column="1"]');
-    await cell.trigger("dblclick", { button: 0 });
+    const layout = getCanvasLayout(wrapper);
+    const mergedRange = layout.getMergedRangeAt({ row: 1, column: 1 });
+    const mergedRect = layout.getRangePaneRects(mergedRange!)[0]?.rect;
+    await triggerCell(wrapper, { row: 1, column: 1 }, "dblclick", { button: 0 });
     await nextTick();
     const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
     const frame = wrapper.get<HTMLElement>("[data-cell-editor-frame]").element.style;
     expect(editor.classes()).toContain("is-editing");
-    expect(frame.width).toBe(`${Number.parseFloat(cell.element.style.width) + 1}px`);
-    expect(frame.height).toBe(`${Number.parseFloat(cell.element.style.height) + 1}px`);
+    expect(frame.width).toBe(`${mergedRect!.width + 1}px`);
+    expect(frame.height).toBe(`${mergedRect!.height + 1}px`);
     expect(frame.width).toBe("409px");
     expect(frame.height).toBe("137px");
 
@@ -158,7 +157,7 @@ describe("cell editor geometry", () => {
     expect(getCellValue(sheet, { row: 1, column: 1 })).toBe("Merged content");
     expect(session.history.undoStack).toHaveLength(1);
 
-    await wrapper.get('[data-row="6"][data-column="5"]').trigger("dblclick", { button: 0 });
+    await triggerCell(wrapper, { row: 6, column: 5 }, "dblclick", { button: 0 });
     await nextTick();
     const nextFrame = wrapper.get<HTMLElement>("[data-cell-editor-frame]").element.style;
     expect(nextFrame.width).toBe("97px");

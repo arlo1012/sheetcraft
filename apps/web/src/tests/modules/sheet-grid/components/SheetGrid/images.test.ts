@@ -1,25 +1,32 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import SheetCanvasLayer from "../../../../../modules/sheet-grid/components/SheetCanvasLayer.vue";
+import { recordCanvasRenderPlans } from "./canvas-render-fixture";
 import { getCellContent, setCellContent } from "@idea10/core/workbook";
 import { createTestClipboardEvent } from "./clipboard-fixture";
-import { mountSheetGrid } from "./fixture";
+import { mountSheetGrid, triggerCell } from "./fixture";
 
 const content = { kind: "image", image: { assetId: "asset", altText: "Diagram" } } as const;
 describe("SheetGrid cell images", () => {
+  afterEach(() => vi.restoreAllMocks());
   test("renders the image and keeps double-click / F2 out of text editing", async () => {
+    const plans = recordCanvasRenderPlans();
     const { wrapper } = mountSheetGrid({
       beforeMount: (sheet) => setCellContent(sheet, { row: 0, column: 0 }, content),
     });
     await wrapper.setProps({ imageAssetUrls: new Map([["asset", "blob:fixture"]]) });
-    const cell = wrapper.get('[data-row="0"][data-column="0"]');
-    expect(cell.get(".sheet-image-content").attributes("aria-label")).toBe("Diagram");
-    expect(cell.get(".sheet-image-content__probe").attributes("src")).toBe("blob:fixture");
-    expect(cell.text()).not.toContain("#VALUE!");
-    await cell.trigger("dblclick", { button: 0 });
+    const cell = plans.scene.panes.flatMap((pane) => pane.cells)[0]!;
+    expect(cell.content.image).toEqual(content.image);
+    expect(wrapper.getComponent(SheetCanvasLayer).props("imageAssetUrls")?.get("asset")).toBe(
+      "blob:fixture",
+    );
+    expect(cell.content.text).toBe("");
+    await triggerCell(wrapper, { row: 0, column: 0 }, "dblclick", { button: 0 });
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "F2" });
     expect(wrapper.get("textarea.cell-editor").classes()).not.toContain("is-editing");
     wrapper.unmount();
   });
   test("passes cell image edits to the contained renderer", async () => {
+    const plans = recordCanvasRenderPlans();
     const { wrapper } = mountSheetGrid({
       beforeMount: (sheet) =>
         setCellContent(
@@ -36,10 +43,11 @@ describe("SheetGrid cell images", () => {
         ),
     });
     await wrapper.setProps({ imageAssetUrls: new Map([["asset", "blob:fixture"]]) });
-    const image = wrapper.get('[data-row="0"][data-column="0"] .sheet-image-content');
-    expect(image.attributes("preserveAspectRatio")).toBe("xMidYMid meet");
-    expect(image.get("image").attributes("x")).toBe("-0.25");
-    expect(image.get("g").attributes("transform")).toBe("translate(1 0) rotate(90)");
+    const image = plans.scene.panes.flatMap((pane) => pane.cells)[0]!.content.image;
+    expect(image?.transform).toEqual({
+      crop: { x: 0.25, y: 0, width: 0.5, height: 1 },
+      rotation: 90,
+    });
     wrapper.unmount();
   });
   test("copies image content locally with a blank text projection and undoable deletion", async () => {
@@ -49,7 +57,7 @@ describe("SheetGrid cell images", () => {
     const copy = createTestClipboardEvent("copy");
     wrapper.get("textarea.cell-editor").element.dispatchEvent(copy.event);
     expect(copy.data.get("text/plain")).toBe("");
-    await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0 });
     wrapper
       .get("textarea.cell-editor")
       .element.dispatchEvent(createTestClipboardEvent("paste", copy.data).event);
@@ -93,7 +101,7 @@ describe("SheetGrid cell images", () => {
   });
   test("pastes an image into the cell after double-clicking to edit", async () => {
     const { wrapper } = mountSheetGrid();
-    await wrapper.get('[data-row="0"][data-column="0"]').trigger("dblclick", { button: 0 });
+    await triggerCell(wrapper, { row: 0, column: 0 }, "dblclick", { button: 0 });
     expect(wrapper.get("textarea.cell-editor").classes()).toContain("is-editing");
     const file = new File(["image"], "pasted.png", { type: "image/png" });
     const event = new Event("paste", { bubbles: true, cancelable: true });

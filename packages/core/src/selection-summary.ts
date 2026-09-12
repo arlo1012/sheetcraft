@@ -1,5 +1,8 @@
 import {
+  createCellKey,
   createSheetEvaluator,
+  type CellAddress,
+  type Cell,
   type CellRange,
   type Sheet,
   type SheetEvaluator,
@@ -16,6 +19,8 @@ export type SelectionSummary = {
   sum: number;
 };
 
+const DIRECT_RANGE_CELL_LIMIT = 1_024;
+
 function normalizeRange(range: CellRange): CellRange {
   return {
     start: {
@@ -29,7 +34,7 @@ function normalizeRange(range: CellRange): CellRange {
   };
 }
 
-function parseCellKey(key: string): { row: number; column: number } {
+function parseCellKey(key: string): CellAddress {
   const separator = key.indexOf(":");
   return {
     row: Number(key.slice(0, separator)),
@@ -37,10 +42,39 @@ function parseCellKey(key: string): { row: number; column: number } {
   };
 }
 
+function getRangeSize(range: CellRange): number {
+  return (range.end.row - range.start.row + 1) * (range.end.column - range.start.column + 1);
+}
+
+function* getSelectedContentCells(sheet: Sheet, range: CellRange): Generator<[CellAddress, Cell]> {
+  if (getRangeSize(range) <= DIRECT_RANGE_CELL_LIMIT) {
+    for (let row = range.start.row; row <= range.end.row; row += 1) {
+      for (let column = range.start.column; column <= range.end.column; column += 1) {
+        const cell = sheet.cells.get(createCellKey({ row, column }));
+        if (cell?.content !== undefined) yield [{ row, column }, cell];
+      }
+    }
+    return;
+  }
+
+  for (const [key, cell] of sheet.cells) {
+    if (cell.content === undefined) continue;
+    const address = parseCellKey(key);
+    if (
+      address.row >= range.start.row &&
+      address.row <= range.end.row &&
+      address.column >= range.start.column &&
+      address.column <= range.end.column
+    ) {
+      yield [address, cell];
+    }
+  }
+}
+
 export function getSelectionSummary(
   sheet: Sheet,
   range: CellRange,
-  evaluator: SheetEvaluator = createSheetEvaluator(sheet),
+  evaluator?: SheetEvaluator,
 ): SelectionSummary {
   const normalized = normalizeRange(range);
   let count = 0;
@@ -67,21 +101,20 @@ export function getSelectionSummary(
     }
   };
 
-  const rangeSize =
-    (normalized.end.row - normalized.start.row + 1) *
-    (normalized.end.column - normalized.start.column + 1);
-  for (const [key, cell] of sheet.cells) {
-    if (cell.content === undefined) continue;
-    const address = parseCellKey(key);
-    if (
-      address.row < normalized.start.row ||
-      address.row > normalized.end.row ||
-      address.column < normalized.start.column ||
-      address.column > normalized.end.column
-    ) {
-      continue;
+  const rangeSize = getRangeSize(normalized);
+  for (const [address, cell] of getSelectedContentCells(sheet, normalized)) {
+    const content = cell.content;
+    if (!content) continue;
+    if (content.kind === "formula") {
+      evaluator ??= createSheetEvaluator(sheet);
+      addValue(evaluator.getComputedValue(address));
+    } else if (content.kind === "literal") {
+      addValue(content.value);
+    } else if (content.kind === "error") {
+      addValue(content.error);
+    } else {
+      addValue(null);
     }
-    addValue(evaluator.getComputedValue(address));
   }
 
   return {

@@ -502,7 +502,7 @@ describe("HomeFormatToolbar", () => {
     await panel.trigger("keydown", { key: "Tab" });
 
     expect(document.body.querySelector("[data-cell-border-panel]")).toBeNull();
-    expect(document.activeElement).toBe(wrapper.get('[aria-label="Fill color"]').element);
+    expect(document.activeElement).toBe(wrapper.get('[aria-label="Bold"]').element);
   });
 
   test("forwards history shortcuts from the teleported border menus", async () => {

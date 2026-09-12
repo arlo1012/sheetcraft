@@ -1,6 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { recordCanvasRenderPlans } from "./canvas-render-fixture";
 
 const harness = vi.hoisted(() => {
   return {
@@ -57,7 +58,14 @@ describe("SheetGrid formula evaluation", () => {
     harness.evaluatorFunctions.splice(0);
   });
 
+  afterEach(() => vi.restoreAllMocks());
+
   test("shares one evaluator across grid consumers and refreshes existing cell updates", async () => {
+    const plans = recordCanvasRenderPlans();
+    const paintedValue = () =>
+      plans.scene.panes
+        .flatMap((pane) => pane.cells)
+        .find((cell) => cell.address.row === 0 && cell.address.column === 1)?.content.text;
     const workbook = reactive(createWorkbook({ id: "workbook-1", sheetId: "sheet-1" }));
     const sheet = getActiveSheet(workbook);
     setCellValue(sheet, { row: 0, column: 0 }, 1);
@@ -90,14 +98,14 @@ describe("SheetGrid formula evaluation", () => {
     const input = harness.reconciledInputs.at(-1);
     expect(harness.createSheetEvaluator).toHaveBeenCalledTimes(1);
     expect(input?.getComputedValue).toBe(harness.evaluatorFunctions[0]);
-    expect(wrapper.get('[data-row="0"][data-column="1"]').text()).toBe("2");
+    expect(paintedValue()).toBe("2");
 
     setCellValue(sheet, { row: 0, column: 0 }, 2);
     await nextTick();
 
     expect(harness.createSheetEvaluator).toHaveBeenCalledTimes(2);
     expect(harness.reconciledInputs.at(-1)?.getComputedValue).toBe(harness.evaluatorFunctions[1]);
-    expect(wrapper.get('[data-row="0"][data-column="1"]').text()).toBe("3");
+    expect(paintedValue()).toBe("3");
 
     setCellContent(
       sheet,
@@ -110,7 +118,7 @@ describe("SheetGrid formula evaluation", () => {
     await nextTick();
 
     expect(harness.createSheetEvaluator).toHaveBeenCalledTimes(3);
-    expect(wrapper.get('[data-row="0"][data-column="1"]').text()).toBe("4");
+    expect(paintedValue()).toBe("4");
 
     wrapper.unmount();
   });

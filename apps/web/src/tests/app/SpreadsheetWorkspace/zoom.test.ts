@@ -4,6 +4,7 @@ import { describe, expect, test } from "vitest";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
 import { createAppI18n } from "../../../shared/i18n";
+import { triggerCanvasCell } from "../canvas-interaction";
 
 describe("workspace zoom gestures", () => {
   test("fits a selection and applies exact preset and custom percentages from the menu", async () => {
@@ -22,7 +23,7 @@ describe("workspace zoom gestures", () => {
     try {
       await flushPromises();
       const revision = wrapper.findComponent({ name: "SheetGrid" }).props("workbookRevision");
-      await wrapper.get('[data-row="19"][data-column="4"]').trigger("mousedown", {
+      await triggerCanvasCell(wrapper, { row: 19, column: 4 }, "mousedown", {
         button: 0,
         shiftKey: true,
       });

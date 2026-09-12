@@ -18,6 +18,7 @@ import { getFormulaFunctionMetadata } from "@idea10/core/formula";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import type { WorkbookStore } from "../../../modules/workbook-persistence/workbookStore";
 import { createAppI18n } from "../../../shared/i18n";
+import { triggerCanvasCell } from "../canvas-interaction";
 
 const mounted: Array<{ unmount(): void }> = [];
 
@@ -105,7 +106,7 @@ describe("workspace formula authoring", () => {
     await formula.trigger("keydown", { key: "Tab" });
     expect(formula.element.value).toBe("=SUM(");
 
-    await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", {
+    await triggerCanvasCell(wrapper, { row: 0, column: 1 }, "mousedown", {
       button: 0,
       buttons: 1,
       clientX: 145,
@@ -163,7 +164,7 @@ describe("workspace formula authoring", () => {
     formula.element.focus();
     await nextTick();
     await formula.setValue("=SUM(");
-    await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", {
+    await triggerCanvasCell(wrapper, { row: 0, column: 1 }, "mousedown", {
       button: 0,
       buttons: 1,
       clientX: 145,

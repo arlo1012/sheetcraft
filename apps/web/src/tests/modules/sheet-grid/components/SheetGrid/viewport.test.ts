@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { setCellStyle, setCellValue } from "@idea10/core/workbook";
-import { activeCell, mountSheetGrid } from "./fixture";
+import { activeCell, getCanvasLayout, mountSheetGrid, triggerCell } from "./fixture";
+import SheetCanvasLayer from "../../../../../modules/sheet-grid/components/SheetCanvasLayer.vue";
 
 describe("SheetGrid viewport", () => {
   test("can hide headers without reserving their grid space", () => {
@@ -21,38 +22,32 @@ describe("SheetGrid viewport", () => {
     const { wrapper } = mountSheetGrid({
       showGridLines: false,
       beforeMount(sheet) {
-        setCellStyle(sheet, { row: 0, column: 0 }, { borderRight: { style: "thin", color: "#123456" } });
+        setCellStyle(
+          sheet,
+          { row: 0, column: 0 },
+          { borderRight: { style: "thin", color: "#123456" } },
+        );
       },
     });
 
-    expect(wrapper.get(".sheet-cell-layer").attributes("style")).toContain(
-      "--sheet-gridline-width: 0px",
-    );
-    expect(
-      wrapper.find('[data-sheet-border-segment][data-border-style="thin"]').exists(),
-    ).toBe(true);
+    expect(wrapper.getComponent(SheetCanvasLayer).props("showGridLines")).toBe(false);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-border-canvas]")).toHaveLength(2);
   });
 
   test("renders only the viewport and overscan cells while scrolling", async () => {
     const { wrapper } = mountSheetGrid();
     const scroller = wrapper.get(".sheet-grid__scroller");
 
-    expect(wrapper.findAll(".sheet-cell-layer__cell").length).toBeLessThan(1_000);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-border-canvas]")).toHaveLength(2);
     (scroller.element as HTMLDivElement).scrollTop = 1_200;
     (scroller.element as HTMLDivElement).scrollLeft = 800;
     await scroller.trigger("scroll");
 
-    expect(wrapper.find('[data-row="48"][data-column="8"]').exists()).toBe(true);
-    expect(wrapper.get('[data-row="50"][data-column="8"]').element.parentElement?.style.top).toBe(
-      "0px",
-    );
-    expect(wrapper.get('[data-row="50"][data-column="8"]').attributes("style")).toContain(
-      "left: 768px",
-    );
-    expect(
-      wrapper.get('[data-row="50"][data-column="8"]').element.parentElement?.style.transform,
-    ).toBe("translateX(-800px)");
-    expect(wrapper.findAll(".sheet-cell-layer__cell").length).toBeLessThan(1_000);
+    const layout = getCanvasLayout(wrapper);
+    expect(layout.panes.body.rows.map((row) => row.index)).toContain(48);
+    expect(layout.panes.body.columns.map((column) => column.index)).toContain(8);
+    expect(layout.getCellViewportRect({ row: 50, column: 8 })).toMatchObject({ x: -32, y: 0 });
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-border-canvas]")).toHaveLength(2);
   });
 
   test("keeps the allocated extent stable when native scrolling reaches its tail", async () => {
@@ -81,7 +76,7 @@ describe("SheetGrid viewport", () => {
     (scroller.element as HTMLDivElement).scrollTop = 120;
     (scroller.element as HTMLDivElement).scrollLeft = 192;
     await scroller.trigger("scroll");
-    await wrapper.get('[data-row="29"][data-column="11"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 29, column: 11 }, "mousedown", { button: 0 });
 
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Enter" });
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Tab" });
@@ -109,18 +104,14 @@ describe("SheetGrid viewport", () => {
     const scroller = wrapper.get(".sheet-grid__scroller");
     (scroller.element as HTMLDivElement).scrollTop = 1_200;
     await scroller.trigger("scroll");
-    expect(wrapper.get('[data-row="50"][data-column="0"]').element.parentElement?.style.top).toBe(
-      "0px",
-    );
+    expect(getCanvasLayout(wrapper).getCellViewportRect({ row: 50, column: 0 })?.y).toBe(0);
 
     setCellValue(sheet, { row: 0, column: 0 }, "wrapped ".repeat(40));
     setCellStyle(sheet, { row: 0, column: 0 }, { wrapText: true });
     await wrapper.vm.$nextTick();
 
     expect((scroller.element as HTMLDivElement).scrollTop).toBeGreaterThan(1_200);
-    expect(wrapper.get('[data-row="50"][data-column="0"]').element.parentElement?.style.top).toBe(
-      "0px",
-    );
-    expect(wrapper.findAll(".sheet-cell-layer__cell").length).toBeLessThan(1_000);
+    expect(getCanvasLayout(wrapper).getCellViewportRect({ row: 50, column: 0 })?.y).toBe(0);
+    expect(wrapper.findAll("[data-sheet-canvas], [data-sheet-border-canvas]")).toHaveLength(2);
   });
 });

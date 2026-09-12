@@ -1,7 +1,7 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { DEFAULT_COLUMN_WIDTH } from "@idea10/core/workbook";
-import { mountSheetGrid } from "./fixture";
+import { mountSheetGrid, triggerCell } from "./fixture";
 
 function dispatchMouse(type: string, options: MouseEventInit): void {
   window.dispatchEvent(new MouseEvent(type, options));
@@ -19,7 +19,7 @@ describe("SheetGrid header selection indicator", () => {
   test("indicates the headers of a cell selection without presenting them as whole-axis selections", async () => {
     const { wrapper } = mountSheetGrid();
 
-    await wrapper.get('[data-row="2"][data-column="3"]').trigger("mousedown", {
+    await triggerCell(wrapper, { row: 2, column: 3 }, "mousedown", {
       button: 0,
       clientX: DEFAULT_COLUMN_WIDTH * 3 + 10,
       clientY: 24 * 2 + 10,
@@ -37,7 +37,7 @@ describe("SheetGrid header selection indicator", () => {
   test("indicates every header intersecting an extended cell range", async () => {
     const { wrapper } = mountSheetGrid();
 
-    await wrapper.get('[data-row="1"][data-column="2"]').trigger("mousedown", {
+    await triggerCell(wrapper, { row: 1, column: 2 }, "mousedown", {
       button: 0,
       buttons: 1,
       clientX: DEFAULT_COLUMN_WIDTH * 2 + 10,
@@ -67,7 +67,7 @@ describe("SheetGrid header selection indicator", () => {
 
   test("keeps header selection indicators when reading highlights are toggled", async () => {
     const { wrapper } = mountSheetGrid();
-    await wrapper.get('[data-row="4"][data-column="5"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 4, column: 5 }, "mousedown", { button: 0 });
     await nextTick();
 
     expect(rowHeader(wrapper, 4).classes()).toContain("is-in-selection");

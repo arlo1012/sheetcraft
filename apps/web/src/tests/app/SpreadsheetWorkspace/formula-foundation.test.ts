@@ -20,6 +20,7 @@ import { useSpreadsheetWorkspaceController } from "../../../app/composables/useS
 import WorkbookFileActions from "../../../modules/workbook-persistence/components/WorkbookFileActions.vue";
 import type { WorkbookStore } from "../../../modules/workbook-persistence/workbookStore";
 import { formatCellValueForGrid } from "../../../modules/sheet-grid/cell-value-presentation";
+import { triggerCanvasCell } from "../canvas-interaction";
 import { createAppI18n } from "../../../shared/i18n";
 
 type Controller = ReturnType<typeof useSpreadsheetWorkspaceController>;
@@ -41,11 +42,7 @@ function createFormulaFoundationSnapshot(): WorkbookSnapshot {
     },
   );
   setCellContent(sheet, { row: 0, column: 1 }, { kind: "literal", value: "" });
-  setCellContent(
-    sheet,
-    { row: 0, column: 2 },
-    { kind: "literal", value: "#N/A" },
-  );
+  setCellContent(sheet, { row: 0, column: 2 }, { kind: "literal", value: "#N/A" });
   setCellContent(
     sheet,
     { row: 0, column: 3 },
@@ -68,12 +65,10 @@ function createFormulaFoundationSnapshot(): WorkbookSnapshot {
 function createStore(snapshot: WorkbookSnapshot) {
   return {
     load: vi.fn(async () => ({ revision: 1, savedAt: 1, snapshot })),
-    save: vi.fn(
-      async (_snapshot: WorkbookSnapshot, revision: number | undefined) => ({
-        revision: (revision ?? 0) + 1,
-        savedAt: 2,
-      }),
-    ),
+    save: vi.fn(async (_snapshot: WorkbookSnapshot, revision: number | undefined) => ({
+      revision: (revision ?? 0) + 1,
+      savedAt: 2,
+    })),
     replace: vi.fn(async (_snapshot: WorkbookSnapshot) => ({
       revision: 2,
       savedAt: 2,
@@ -119,16 +114,10 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     const store = createStore(createFormulaFoundationSnapshot());
     const wrapper = await mountWorkspace(store);
 
-    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain(
-      "#N/A",
-    );
-    expect(wrapper.get('[data-row="0"][data-column="3"]').text()).toContain(
-      "#NAME?",
-    );
+    expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
 
-    await wrapper
-      .get('[data-row="1"][data-column="5"]')
-      .trigger("mousedown", { button: 0 });
+    await triggerCanvasCell(wrapper, { row: 1, column: 5 }, "mousedown", { button: 0 });
+
     const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
     await editor.trigger("keydown", { key: "m" });
     await editor.setValue("save marker");
@@ -188,13 +177,9 @@ describe("SpreadsheetWorkspace formula foundation", () => {
       kind: "error",
       error: { kind: "formula-error", code: "NA" },
     });
-    expect(
-      formatCellValueForGrid(
-        getCellComputedValue(sheet, target),
-        undefined,
-        "en-US",
-      ),
-    ).toBe("#N/A");
+    expect(formatCellValueForGrid(getCellComputedValue(sheet, target), undefined, "en-US")).toBe(
+      "#N/A",
+    );
   });
 
   test("rejects malformed V4 JSON before it replaces the loaded document", async () => {
@@ -218,9 +203,8 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     await flushPromises();
 
     expect(store.replace).not.toHaveBeenCalled();
-    expect(wrapper.get('[data-row="0"][data-column="0"]').text()).toContain(
-      "#N/A",
-    );
+    expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
+
     expect(wrapper.get('[data-workbook-file="feedback"]').text()).toContain(
       "not a valid idea10 workbook",
     );

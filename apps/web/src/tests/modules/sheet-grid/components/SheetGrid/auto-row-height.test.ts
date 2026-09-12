@@ -14,8 +14,7 @@ function renderedRowHeight(
   row: number,
 ): number {
   return Number.parseFloat(
-    (wrapper.get(`[data-row="${row}"][data-column="0"]`).element.parentElement as HTMLElement).style
-      .height,
+    wrapper.get(`[data-resize-row="${row}"]`).attributes("aria-valuenow") ?? "0",
   );
 }
 

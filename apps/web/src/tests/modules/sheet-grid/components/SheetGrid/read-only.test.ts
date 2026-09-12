@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { getCellContent, setCellContent } from "@idea10/core/workbook";
-import { activeCell, mountSheetGrid } from "./fixture";
+import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
 describe("SheetGrid read-only mode", () => {
   test("keeps navigation while preventing keyboard cell edits and clears", async () => {
@@ -27,7 +27,7 @@ describe("SheetGrid read-only mode", () => {
   test("disables write actions but leaves copy available in the cell menu", async () => {
     const { wrapper } = mountSheetGrid();
     await wrapper.setProps({ readOnly: true });
-    await wrapper.get('[data-row="0"][data-column="0"]').trigger("contextmenu", {
+    await triggerCell(wrapper, { row: 0, column: 0 }, "contextmenu", {
       clientX: 20,
       clientY: 20,
     });

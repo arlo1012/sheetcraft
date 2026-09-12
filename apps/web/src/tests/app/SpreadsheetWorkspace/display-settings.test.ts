@@ -40,11 +40,7 @@ describe("workspace display settings", () => {
       expect(grid.props("showGridLines")).toBe(true);
 
       await gridLines.trigger("click");
-      expect(
-        wrapper
-          .get<HTMLElement>(".sheet-cell-layer")
-          .element.style.getPropertyValue("--sheet-gridline-width"),
-      ).toBe("0px");
+      expect(grid.props("showGridLines")).toBe(false);
       await quickTools.trigger("click");
       expect(grid.props("showAxisQuickTools")).toBe(true);
       expect(quickTools.attributes("aria-checked")).toBe("true");

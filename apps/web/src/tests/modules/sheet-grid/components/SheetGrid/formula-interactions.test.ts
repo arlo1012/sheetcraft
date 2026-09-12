@@ -2,7 +2,7 @@ import { DOMWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { getCellContent } from "@idea10/core/workbook";
-import { activeCell, mountSheetGrid } from "./fixture";
+import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
 function dispatchMouse(type: string, options: MouseEventInit): void {
   window.dispatchEvent(new MouseEvent(type, options));
@@ -21,7 +21,7 @@ describe("SheetGrid formula drafting", () => {
     await nextTick();
     expect(editor.element.value).toBe("=SUM(");
 
-    await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", {
+    await triggerCell(wrapper, { row: 0, column: 1 }, "mousedown", {
       button: 0,
       buttons: 1,
       clientX: 154,
@@ -72,7 +72,7 @@ describe("SheetGrid formula drafting", () => {
     await editor.trigger("keydown", { key: "=" });
     await editor.setValue("=SUM(");
 
-    await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", {
+    await triggerCell(wrapper, { row: 0, column: 1 }, "mousedown", {
       button: 0,
       buttons: 1,
       clientX: 154,
@@ -100,7 +100,7 @@ describe("SheetGrid formula drafting", () => {
     editor.element.focus();
     editor.element.setSelectionRange(7, 7);
 
-    await wrapper.get('[data-row="0"][data-column="1"]').trigger("mousedown", {
+    await triggerCell(wrapper, { row: 0, column: 1 }, "mousedown", {
       button: 0,
       buttons: 1,
       clientX: 154,

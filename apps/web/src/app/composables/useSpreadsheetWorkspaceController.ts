@@ -96,7 +96,11 @@ import {
   type Sheet,
   type Workbook,
 } from "@idea10/core/workbook";
-import { getSelectionMode, getSelectionRange } from "@idea10/sheet-engine/selection";
+import {
+  getSelectionMode,
+  getSelectionRange,
+  type SelectionMode,
+} from "@idea10/sheet-engine/selection";
 import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet-engine/view-state";
 import type { AxisMovePayload } from "../../modules/sheet-grid/composables/useAxisMoveDrag";
 import {
@@ -118,6 +122,7 @@ import {
 } from "../../modules/sheet-grid/gridClipboardRows";
 import { useAppI18n, type MessageKey, type MessageParams } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
+import { useDeferredSelectionSnapshot } from "../../modules/workbook/composables/useDeferredSelectionSnapshot";
 import type {
   FilterValueKey,
   HomeDataToolState,
@@ -181,6 +186,7 @@ export function useSpreadsheetWorkspaceController(
   const workbookVersion = ref(0);
   const calculationVersion = ref(0);
   const workbookGeneration = ref(0);
+  const selectionDragging = ref(false);
   const searchQuery = ref("");
   const formatPainterSource = ref<FormatPainterSource>();
   const workspaceStatus = ref<FeedbackState>();
@@ -213,20 +219,37 @@ export function useSpreadsheetWorkspaceController(
       ? getSelectionRange(selection)
       : { start: { ...activeAddress.value }, end: { ...activeAddress.value } };
   });
+  const activeSelectionMode = computed<SelectionMode>(() => getSelectionModeValue());
+  const deferredSelection = useDeferredSelectionSnapshot({
+    activeAddress,
+    isDragging: selectionDragging,
+    range: activeSelectionRange,
+    selectionMode: activeSelectionMode,
+  });
+  const toolbarSelection = deferredSelection;
   const isFormattingSupported = computed(() =>
     isCellStyleRangeSupported(activeSelectionRange.value),
   );
   const activeSelectionStyle = computed(() =>
-    isFormattingSupported.value
-      ? getSelectionCellStyleState(activeSheet.value, activeSelectionRange.value)
+    isCellStyleRangeSupported(toolbarSelection.value.range)
+      ? getSelectionCellStyleState(activeSheet.value, toolbarSelection.value.range)
       : createDefaultSelectionCellStyleState(),
   );
   const activeSelectionSummary = computed(() =>
-    getSelectionSummary(activeSheet.value, activeSelectionRange.value, activeSheetEvaluator.value),
+    getSelectionSummary(
+      activeSheet.value,
+      toolbarSelection.value.range,
+      activeSheetEvaluator.value,
+    ),
   );
   const dataToolState = computed<HomeDataToolState>(() => {
     const sheet = activeSheet.value;
-    const filterRange = getFilterTargetRange();
+    const selection = toolbarSelection.value;
+    const filterRange = getFilterTargetRange(
+      selection.range,
+      selection.activeAddress,
+      selection.mode,
+    );
     const filterEnabled = Boolean(
       filterRange &&
       !sheet.mergedCells.some((merged) => doMergedCellRangesIntersect(merged, filterRange)),
@@ -235,7 +258,7 @@ export function useSpreadsheetWorkspaceController(
       ? getSheetFilterColumnDistinctValues(
           sheet,
           filterRange!,
-          activeAddress.value.column,
+          selection.activeAddress.column,
           activeSheetEvaluator.value,
         ).map((key) => ({ key, label: formatFilterValueLabel(key) }))
       : [];
@@ -244,15 +267,15 @@ export function useSpreadsheetWorkspaceController(
         ? sheet.filter
         : null;
     const criterion = activeFilter?.columns.find(
-      (column) => column.column === activeAddress.value.column,
+      (column) => column.column === selection.activeAddress.column,
     );
-    const sortRange = getSortTargetRange();
+    const sortRange = getSortTargetRange(selection.range, selection.activeAddress, selection.mode);
     const sortIntersectsFilter = Boolean(
       sortRange && sheet.filter && doMergedCellRangesIntersect(sortRange, sheet.filter.range),
     );
     const filterDataRange = sheet.filter ? getFilterDataRange(sheet.filter.range) : null;
     return {
-      activeCell: { ...activeAddress.value },
+      activeCell: { ...selection.activeAddress },
       sortEnabled: Boolean(
         sortRange &&
         !sheet.mergedCells.some((merged) => doMergedCellRangesIntersect(merged, sortRange)) &&
@@ -274,8 +297,9 @@ export function useSpreadsheetWorkspaceController(
   });
   const mergeState = computed<MergeCellsState>(() => {
     const sheet = activeSheet.value;
-    const range = activeSelectionRange.value;
-    const cellSelection = getSelectionModeValue() === "cells";
+    const selection = toolbarSelection.value;
+    const range = selection.range;
+    const cellSelection = selection.mode === "cells";
     const intersectsMerge = sheet.mergedCells.some((merged) =>
       doMergedCellRangesIntersect(merged, range),
     );
@@ -291,7 +315,7 @@ export function useSpreadsheetWorkspaceController(
     const canUseModes =
       cellSelection &&
       hasMultipleCells &&
-      isFormattingSupported.value &&
+      isCellStyleRangeSupported(range) &&
       !sheet.properties.protected;
     const availableModes: Record<CellMergeMode, boolean> = {
       all:
@@ -433,25 +457,31 @@ export function useSpreadsheetWorkspaceController(
     };
   }
 
-  function getFilterTargetRange(): CellRange | null {
-    if (getSelectionModeValue() !== "cells") return null;
+  function getFilterTargetRange(
+    selectionRange = activeSelectionRange.value,
+    selectionAddress = activeAddress.value,
+    selectionMode = getSelectionModeValue(),
+  ): CellRange | null {
+    if (selectionMode !== "cells") return null;
     const filter = activeSheet.value.filter;
-    if (filter && isAddressInRange(activeAddress.value, filter.range)) {
+    if (filter && isAddressInRange(selectionAddress, filter.range)) {
       return filter.range;
     }
-    const range = activeSelectionRange.value;
-    return range.end.row > range.start.row ? range : null;
+    return selectionRange.end.row > selectionRange.start.row ? selectionRange : null;
   }
 
-  function getSortTargetRange(): CellRange | null {
-    if (getSelectionModeValue() !== "cells") return null;
+  function getSortTargetRange(
+    selectionRange = activeSelectionRange.value,
+    selectionAddress = activeAddress.value,
+    selectionMode = getSelectionModeValue(),
+  ): CellRange | null {
+    if (selectionMode !== "cells") return null;
     const filter = activeSheet.value.filter;
-    if (filter && isAddressInRange(activeAddress.value, filter.range)) {
+    if (filter && isAddressInRange(selectionAddress, filter.range)) {
       const range = getFilterDataRange(filter.range);
       return range.end.row > range.start.row ? range : null;
     }
-    const range = activeSelectionRange.value;
-    return range.end.row > range.start.row ? range : null;
+    return selectionRange.end.row > selectionRange.start.row ? selectionRange : null;
   }
 
   function formatFilterValueLabel(value: SheetFilterValue): string {
@@ -1209,6 +1239,10 @@ export function useSpreadsheetWorkspaceController(
     gridRef.value?.fitSelectionToViewport?.();
   }
 
+  function setSelectionDragging(dragging: boolean): void {
+    selectionDragging.value = dragging;
+  }
+
   onScopeDispose(clearWorkspaceStatus);
 
   return {
@@ -1235,6 +1269,7 @@ export function useSpreadsheetWorkspaceController(
     activeCellInput,
     activeSheetEvaluator,
     activeSelectionRange,
+    setSelectionDragging,
     isFormattingSupported,
     activeSelectionStyle,
     activeSelectionSummary,

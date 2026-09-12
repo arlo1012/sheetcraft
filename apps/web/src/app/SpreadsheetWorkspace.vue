@@ -85,6 +85,7 @@ const {
   activeSelectionStyle,
   formatPainterActive,
   activeSelectionSummary,
+  setSelectionDragging,
   dataToolState,
   mergeState,
   commitCell,
@@ -500,6 +501,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @undo="undo"
         @redo="redo"
         @view-state-change="updateActiveSheetViewState"
+        @selection-dragging-change="setSelectionDragging"
         @horizontal-scroll-change="updateHorizontalScrollState"
       />
     </div>

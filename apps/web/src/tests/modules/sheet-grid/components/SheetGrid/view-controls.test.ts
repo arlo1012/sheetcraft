@@ -1,7 +1,7 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { DEFAULT_COLUMN_WIDTH, getColumnWidth } from "@idea10/core/workbook";
-import { activeCell, mountSheetGrid } from "./fixture";
+import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
 
 function dispatchMouse(type: string, options: MouseEventInit): void {
   window.dispatchEvent(new MouseEvent(type, options));
@@ -30,7 +30,7 @@ describe("SheetGrid view controls", () => {
       const { session, wrapper } = mountSheetGrid();
       await wrapper.setProps({ zoom });
 
-      await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", {
+      await triggerCell(wrapper, { row: 0, column: 0 }, "mousedown", {
         button: 0,
         buttons: 1,
         clientX: 10 * (zoom / 100),
@@ -91,7 +91,7 @@ describe("SheetGrid view controls", () => {
     expect(activeCell(wrapper)).toBe("A1");
     const mergedBandStyles = bands.map((band) => band.attributes("style"));
 
-    await wrapper.get('[data-row="2"][data-column="2"]').trigger("mousedown", { button: 0 });
+    await triggerCell(wrapper, { row: 2, column: 2 }, "mousedown", { button: 0 });
     await nextTick();
     expect(activeCell(wrapper)).toBe("C3");
     const movedBands = wrapper.findAll(".sheet-reading-highlight__band");
@@ -104,7 +104,7 @@ describe("SheetGrid view controls", () => {
     const { wrapper } = mountSheetGrid();
     await wrapper.setProps({ highlightEnabled: true });
 
-    await wrapper.get('[data-row="0"][data-column="0"]').trigger("mousedown", {
+    await triggerCell(wrapper, { row: 0, column: 0 }, "mousedown", {
       button: 0,
       buttons: 1,
       clientX: 10,
