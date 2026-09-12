@@ -151,6 +151,15 @@ export type Workbook = {
   dateSystem: ExcelDateSystem;
   sheets: Map<string, Sheet>;
   activeSheetId: string;
+  definedNames: Map<string, DefinedName>;
+};
+
+/** A workbook- or sheet-scoped name that points at one rectangular range. */
+export type DefinedName = {
+  id: string;
+  name: string;
+  scopeSheetId?: string;
+  reference: CellRange & { sheetId: string };
 };
 
 export type RemovedSheet = {
@@ -203,7 +212,18 @@ export function createWorkbook(options?: {
     dateSystem: normalizeExcelDateSystem(options?.dateSystem ?? "1900"),
     sheets: new Map([[sheet.id, sheet]]),
     activeSheetId: sheet.id,
+    definedNames: new Map(),
   };
+}
+
+export function getDefinedName(workbook: Workbook, name: string, sheetId: string): DefinedName | null {
+  const normalized = name.toUpperCase();
+  const local = [...workbook.definedNames.values()].find(
+    (item) => item.scopeSheetId === sheetId && item.name.toUpperCase() === normalized,
+  );
+  return local ?? [...workbook.definedNames.values()].find(
+    (item) => item.scopeSheetId === undefined && item.name.toUpperCase() === normalized,
+  ) ?? null;
 }
 
 function createRequiredId(prefix: string, idFactory: IdFactory | undefined): string {
@@ -582,6 +602,95 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
     return valueFor(target);
   };
   return { getComputedValue: resolve };
+}
+
+/**
+ * Evaluates formulas in a workbook, resolving qualified A1 references and
+ * workbook/sheet scoped names. The existing sheet evaluator remains available
+ * for consumers that own an isolated sheet (such as the canvas adapter).
+ */
+export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): SheetEvaluator {
+  if (!workbook.sheets.has(sheetId)) throw new Error(`Sheet ${sheetId} does not exist.`);
+  const anchoredSheet = workbook.sheets.get(sheetId);
+  if (
+    anchoredSheet &&
+    workbook.definedNames.size === 0 &&
+    [...anchoredSheet.cells.values()].every(
+      (cell) => cell.content?.kind !== "formula" || !cell.content.formula.source.includes("!"),
+    )
+  )
+    return createSheetEvaluator(anchoredSheet);
+  const memo = new Map<string, FormulaValue>();
+  const state = new Set<string>();
+  const indexes = new Map<string, SparseRangeIndex>();
+  const indexFor = (id: string): SparseRangeIndex => {
+    const cached = indexes.get(id);
+    if (cached) return cached;
+    const sheet = workbook.sheets.get(id);
+    if (!sheet) return { rows: [], byRow: new Map() };
+    const byRow = new Map<number, CellAddress[]>();
+    for (const address of [...sheet.cells.keys()].map(parseCellKey)) {
+      const row = byRow.get(address.row) ?? [];
+      row.push(address);
+      byRow.set(address.row, row);
+    }
+    for (const row of byRow.values()) row.sort((left, right) => left.column - right.column);
+    const index = { rows: [...byRow.keys()].sort((left, right) => left - right), byRow };
+    indexes.set(id, index);
+    return index;
+  };
+  const resolveSheetId = (name: string | undefined, fallback: string): string | null => {
+    if (!name) return fallback;
+    return getWorkbookSheets(workbook).find((sheet) => sheet.name.toLowerCase() === name.toLowerCase())
+      ?.id ?? null;
+  };
+  const valueFor = (targetSheetId: string, address: CellAddress): FormulaValue => {
+    if (!isCellAddressInBounds(address)) return createFormulaError("REF");
+    const targetSheet = workbook.sheets.get(targetSheetId);
+    if (!targetSheet) return createFormulaError("REF");
+    const content = targetSheet.cells.get(createCellKey(address))?.content;
+    if (!content) return null;
+    if (content.kind === "literal") return content.value;
+    if (content.kind === "error") return createFormulaError(content.error.code);
+    if (content.kind === "image") return createFormulaError("VALUE");
+    return resolve(targetSheetId, address);
+  };
+  const resolve = (currentSheetId: string, address: CellAddress): FormulaValue => {
+    if (!isCellAddressInBounds(address)) return createFormulaError("REF");
+    const key = `${currentSheetId}|${createCellKey(address)}`;
+    const cached = memo.get(key);
+    if (cached !== undefined) return cached;
+    if (state.has(key)) return createFormulaError("CYCLE");
+    const currentSheet = workbook.sheets.get(currentSheetId);
+    const content = currentSheet?.cells.get(createCellKey(address))?.content;
+    if (!content || content.kind !== "formula") return valueFor(currentSheetId, address);
+    state.add(key);
+    const value = evaluateFormula(content.formula.source, {
+      resolveCell: (target) => {
+        const targetSheetId = resolveSheetId(target.sheetName, currentSheetId);
+        return targetSheetId ? valueFor(targetSheetId, target) : createFormulaError("REF");
+      },
+      resolveRange: (bounds) => {
+        const targetSheetId = resolveSheetId(bounds.sheetName, currentSheetId);
+        if (!targetSheetId) return [createFormulaError("REF")];
+        return resolveSparseRange(indexFor(targetSheetId), bounds.start, bounds.end, (target) =>
+          valueFor(targetSheetId, target),
+        );
+      },
+      resolveName: (name) => {
+        const defined = getDefinedName(workbook, name, currentSheetId);
+        if (!defined) return undefined;
+        const referenceSheet = workbook.sheets.get(defined.reference.sheetId);
+        return referenceSheet
+          ? { start: defined.reference.start, end: defined.reference.end, sheetName: referenceSheet.name }
+          : createFormulaError("REF");
+      },
+    }, { dateSystem: workbook.dateSystem });
+    state.delete(key);
+    memo.set(key, value);
+    return value;
+  };
+  return { getComputedValue: (address) => valueFor(sheetId, address) };
 }
 
 export function getCellComputedValue(sheet: Sheet, address: CellAddress): FormulaValue {

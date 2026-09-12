@@ -20,6 +20,7 @@ import {
   type SheetSparseDimension,
   type SheetSparseState,
   type Workbook,
+  type DefinedName,
 } from "./workbook.js";
 import { createFormulaError, isFormulaErrorCode, type CellContent } from "./formula/types.js";
 
@@ -110,10 +111,15 @@ export type WorkbookSnapshotV7 = Omit<WorkbookSnapshotV6, "version" | "sheets"> 
   version: 7;
   sheets: SheetSnapshotV7[];
 };
-/** Current write format. V1 through V6 types remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV7;
+export type DefinedNameSnapshot = DefinedName;
+export type WorkbookSnapshotV8 = Omit<WorkbookSnapshotV7, "version"> & {
+  version: 8;
+  definedNames: DefinedNameSnapshot[];
+};
+/** Current write format. Earlier versions remain available for migration inputs. */
+export type WorkbookSnapshot = WorkbookSnapshotV8;
 export type SheetSnapshot = SheetSnapshotV7;
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -495,11 +501,19 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 7,
+    version: 8,
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
     activeSheetId: workbook.activeSheetId,
     sheets: getWorkbookSheets(workbook).map(serializeSheet),
+    definedNames: [...workbook.definedNames.values()].map((definition) => ({
+      ...definition,
+      reference: {
+        sheetId: definition.reference.sheetId,
+        start: { ...definition.reference.start },
+        end: { ...definition.reference.end },
+      },
+    })),
   };
 }
 
@@ -512,7 +526,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 4 &&
     record.version !== 5 &&
     record.version !== 6 &&
-    record.version !== 7
+    record.version !== 7 &&
+    record.version !== 8
   ) {
     throw new WorkbookDomainError(
       {
@@ -570,10 +585,40 @@ export function deserializeWorkbook(value: unknown): Workbook {
   if (sheets.find((sheet) => sheet.id === activeSheetId)?.properties.hidden)
     return fail("$.activeSheetId", "The active sheet cannot be hidden.");
 
+  const definedNames = version >= 8 ? parseDefinedNames(record.definedNames, sheetIds) : new Map();
   return {
     id,
     dateSystem,
     activeSheetId,
     sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
+    definedNames,
   };
+}
+
+function parseDefinedNames(value: unknown, sheetIds: Set<string>): Map<string, DefinedName> {
+  const names = new Map<string, DefinedName>();
+  const keys = new Set<string>();
+  for (const [index, candidate] of asArray(value, "$.definedNames").entries()) {
+    const path = `$.definedNames[${index}]`;
+    const record = asRecord(candidate, path);
+    const id = asIdentifier(record.id, `${path}.id`);
+    const name = asIdentifier(record.name, `${path}.name`);
+    if (!/^[\p{L}_][\p{L}\p{N}_]*$/u.test(name)) return fail(`${path}.name`, "Invalid name.");
+    const scopeSheetId = record.scopeSheetId === undefined ? undefined : asIdentifier(record.scopeSheetId, `${path}.scopeSheetId`);
+    if (scopeSheetId && !sheetIds.has(scopeSheetId)) return fail(`${path}.scopeSheetId`, "Sheet does not exist.");
+    const reference = asRecord(record.reference, `${path}.reference`);
+    const referenceSheetId = asIdentifier(reference.sheetId, `${path}.reference.sheetId`);
+    if (!sheetIds.has(referenceSheetId)) return fail(`${path}.reference.sheetId`, "Sheet does not exist.");
+    const definition: DefinedName = {
+      id,
+      name,
+      ...(scopeSheetId ? { scopeSheetId } : {}),
+      reference: { sheetId: referenceSheetId, start: parseAddress(reference.start, `${path}.reference.start`), end: parseAddress(reference.end, `${path}.reference.end`) },
+    };
+    const key = `${scopeSheetId ?? "workbook"}:${name.toUpperCase()}`;
+    if (names.has(id) || keys.has(key)) return fail(path, "Duplicate defined name.");
+    names.set(id, definition);
+    keys.add(key);
+  }
+  return names;
 }

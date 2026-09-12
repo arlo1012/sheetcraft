@@ -42,6 +42,7 @@ import {
 } from "./images.js";
 import type { WorkbookCommand } from "./contracts.js";
 import { applySetWorkbookDateSystemCommand } from "./workbook-settings.js";
+import { applyDeleteDefinedNameCommand, applyUpsertDefinedNameCommand } from "./names.js";
 import {
   applyClearCellRangeCommand,
   applyMoveCellRangeCommand,
@@ -109,6 +110,10 @@ export function applyWorkbookCommand(
     switch (command.type) {
       case "setWorkbookDateSystem":
         return applySetWorkbookDateSystemCommand(workbook, command);
+      case "upsertDefinedName":
+        return applyUpsertDefinedNameCommand(workbook, command);
+      case "deleteDefinedName":
+        return applyDeleteDefinedNameCommand(workbook, command);
       case "setCellContents":
         return applySetCellContentsCommand(workbook, command);
       case "clearCellRange":

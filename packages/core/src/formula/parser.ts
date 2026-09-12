@@ -10,9 +10,10 @@ import {
 import { parseA1FormulaReference } from "./reference-model.js";
 
 const NUMBER_PATTERN = /^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i;
-const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*/;
+const IDENTIFIER_PATTERN = /^[\p{L}_][\p{L}\p{N}_]*/u;
 const REFERENCE_PATTERN = /^\$?[A-Za-z]+\$?[1-9]\d*/;
 const CELL_LIKE_PATTERN = /^\$?[A-Za-z]+\$?\d+/;
+const QUALIFIED_REFERENCE_PATTERN = /^(?:(?:'(?:[^']|'')*'|[A-Za-z0-9_.]+)!)?\$?[A-Za-z]+\$?[1-9]\d*/;
 
 class FormulaParser {
   private offset = 1;
@@ -158,7 +159,17 @@ class FormulaParser {
       const operand = this.parseUnary();
       return operand ? { kind: "unary", operator, operand, start, end: operand.end } : null;
     }
-    return this.parsePrimary();
+    return this.parsePower();
+  }
+
+  private parsePower(): FormulaExpression | null {
+    const left = this.parsePrimary();
+    if (!left) return null;
+    this.skipWhitespace();
+    if (this.peek() !== "^") return left;
+    this.offset += 1;
+    const right = this.parseUnary();
+    return right ? { kind: "binary", operator: "^", left, right, start: left.start, end: right.end } : null;
   }
 
   private parsePrimary(): FormulaExpression | null {
@@ -180,23 +191,40 @@ class FormulaParser {
     const numeric = NUMBER_PATTERN.exec(remainder)?.[0];
     if (numeric) {
       this.offset += numeric.length;
-      return { kind: "number", value: Number(numeric), start, end: this.offset };
+      const value = Number(numeric);
+      if (this.peek() === "%") {
+        this.offset += 1;
+        return { kind: "number", value: value / 100, start, end: this.offset };
+      }
+      return { kind: "number", value, start, end: this.offset };
     }
     if (this.peek() === '"') {
       return this.parseString();
     }
 
-    const referenceText = REFERENCE_PATTERN.exec(remainder)?.[0];
+    const identifierCandidate = IDENTIFIER_PATTERN.exec(remainder)?.[0];
+    const isFunction = Boolean(
+      identifierCandidate && /^\s*\(/.test(remainder.slice(identifierCandidate.length)),
+    );
+    const qualifiedReferenceText = isFunction ? undefined : QUALIFIED_REFERENCE_PATTERN.exec(remainder)?.[0];
+    const referenceText = qualifiedReferenceText?.includes("!")
+      ? qualifiedReferenceText
+      : isFunction
+        ? undefined
+        : REFERENCE_PATTERN.exec(remainder)?.[0];
     if (referenceText) {
-      const reference = parseA1FormulaReference(referenceText, this.offset);
+      const qualifier = splitSheetQualifier(referenceText, this.offset);
+      const reference = parseA1FormulaReference(qualifier.referenceText, qualifier.offset);
       if (!reference) return null;
       this.offset += referenceText.length;
+      if (qualifier.sheetName) reference.sheetName = qualifier.sheetName;
       this.skipWhitespace();
       if (!this.consume(":")) {
         return { kind: "reference", reference, start: reference.start, end: reference.end };
       }
       const rangeEnd = this.parseReference();
       if (!rangeEnd) return null;
+      if (qualifier.sheetName) rangeEnd.sheetName = qualifier.sheetName;
       const range: FormulaRange = {
         start: reference,
         end: rangeEnd,
@@ -205,7 +233,7 @@ class FormulaParser {
       };
       return { kind: "range", range, start: range.startOffset, end: range.endOffset };
     }
-    if (CELL_LIKE_PATTERN.test(remainder)) return null;
+    if (!isFunction && CELL_LIKE_PATTERN.test(remainder)) return null;
 
     const identifier = IDENTIFIER_PATTERN.exec(remainder)?.[0];
     if (!identifier) return null;
@@ -268,6 +296,19 @@ class FormulaParser {
     this.offset += text.length;
     return reference;
   }
+}
+
+function splitSheetQualifier(
+  text: string,
+  start: number,
+): { sheetName: string | null; referenceText: string; offset: number } {
+  const separator = text.lastIndexOf("!");
+  if (separator < 0) return { sheetName: null, referenceText: text, offset: start };
+  const rawName = text.slice(0, separator);
+  const sheetName = rawName.startsWith("'")
+    ? rawName.slice(1, -1).replaceAll("''", "'")
+    : rawName;
+  return { sheetName, referenceText: text.slice(separator + 1), offset: start + separator + 1 };
 }
 
 export function parseFormula(source: string): FormulaParseResult {

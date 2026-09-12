@@ -182,6 +182,7 @@ export function translateFormulaForCopy(source: string, offset: FormulaCopyOffse
   const ast = getFormulaAst(source);
   if (!ast) return source;
   return replaceTransformedRanges(ast, (reference) => {
+    if (reference.sheetName) return { row: reference.row, column: reference.column };
     const address = {
       row: reference.row + (reference.rowAbsolute ? 0 : offset.row),
       column: reference.column + (reference.columnAbsolute ? 0 : offset.column),
@@ -214,6 +215,7 @@ export function transformFormulaForMove(
   const replacements: Replacement[] = [];
   walkExpression(ast.expression, (expression) => {
     if (expression.kind === "reference") {
+      if (expression.reference.sheetName) return;
       const address = map(expression.reference);
       if (address)
         replacements.push({
@@ -222,6 +224,7 @@ export function transformFormulaForMove(
           text: formatReference(expression.reference, address),
         });
     } else if (expression.kind === "range") {
+      if (expression.range.start.sheetName) return;
       const start = map(expression.range.start);
       const end = map(expression.range.end);
       const rangeMinRow = Math.min(expression.range.start.row, expression.range.end.row);
@@ -312,7 +315,10 @@ function transformAxisRange(
   };
 }
 
-export function transformFormulaForAxis(source: string, transform: FormulaAxisTransform): string {
+export function transformFormulaForAxis(
+  source: string,
+  transform: FormulaAxisTransform,
+): string {
   const maximum = transform.axis === "row" ? MAX_FORMULA_ROWS : MAX_FORMULA_COLUMNS;
   if (
     !Number.isSafeInteger(transform.index) ||
@@ -329,6 +335,7 @@ export function transformFormulaForAxis(source: string, transform: FormulaAxisTr
   const replacements: Replacement[] = [];
   walkExpression(parsed.ast.expression, (expression) => {
     if (expression.kind === "reference") {
+      if (expression.reference.sheetName) return;
       const address = transformAxisReference(expression.reference, transform);
       replacements.push({
         start: expression.reference.start,
@@ -336,6 +343,7 @@ export function transformFormulaForAxis(source: string, transform: FormulaAxisTr
         text: address ? formatReference(expression.reference, address) : "#REF!",
       });
     } else if (expression.kind === "range") {
+      if (expression.range.start.sheetName) return;
       const range = transformAxisRange(expression.range, transform);
       if (!range) {
         replacements.push({
@@ -404,12 +412,14 @@ export function transformFormulaForAxisMove(
   const replacements: Replacement[] = [];
   walkExpression(parsed.ast.expression, (expression) => {
     if (expression.kind === "reference") {
+      if (expression.reference.sheetName) return;
       replacements.push({
         start: expression.reference.start,
         end: expression.reference.end,
         text: formatReference(expression.reference, mapReference(expression.reference)),
       });
     } else if (expression.kind === "range") {
+      if (expression.range.start.sheetName) return;
       const start = mapReference(expression.range.start);
       const end = mapReference(expression.range.end);
       replacements.push({

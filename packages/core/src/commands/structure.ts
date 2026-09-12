@@ -22,6 +22,7 @@ import {
   transformFormulaForAxis,
   transformFormulaForAxisMove,
 } from "../formula/references.js";
+import { rewriteQualifiedReferencesForSheet } from "../formula/workbook-references.js";
 import {
   transformMergedCellRangesForAxisDelete,
   transformMergedCellRangesForAxisInsert,
@@ -111,6 +112,23 @@ function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
           formulaSources: slice.formulaSources.map((formula) => ({
             address: { ...formula.address },
             source: formula.source,
+          })),
+        }
+      : {}),
+    ...(slice.workbookFormulaSources
+      ? {
+          workbookFormulaSources: slice.workbookFormulaSources.map((formula) => ({
+            sheetId: formula.sheetId,
+            address: { ...formula.address },
+            source: formula.source,
+          })),
+        }
+      : {}),
+    ...(slice.definedNames
+      ? {
+          definedNames: slice.definedNames.map((definition) => ({
+            ...definition,
+            reference: { sheetId: definition.reference.sheetId, start: { ...definition.reference.start }, end: { ...definition.reference.end } },
           })),
         }
       : {}),
@@ -774,6 +792,23 @@ export function applyRestoreSheetStateCommand(
     );
     const metadataTransformed = setSheetMetadata(sheet, nextMetadata);
     const restored = restoreSheetAxisSlice(sheet, command.axis, command.slice);
+    for (const formula of command.slice.workbookFormulaSources ?? []) {
+      const targetSheet = workbook.sheets.get(formula.sheetId);
+      const cell = targetSheet?.cells.get(createCellKey(formula.address));
+      if (targetSheet && cell?.content?.kind === "formula")
+        targetSheet.cells.set(createCellKey(formula.address), {
+          ...cell,
+          content: { kind: "formula", formula: { source: formula.source } },
+        });
+    }
+    if (command.slice.definedNames) {
+      workbook.definedNames.clear();
+      for (const definition of command.slice.definedNames)
+        workbook.definedNames.set(definition.id, {
+          ...definition,
+          reference: { sheetId: definition.reference.sheetId, start: { ...definition.reference.start }, end: { ...definition.reference.end } },
+        });
+    }
     if (!transformed && !metadataTransformed && !restored) return null;
     return command.operation === "insert"
       ? createInsertSheetAxisCommand(command.sheetId, command.axis, command.index, command.count)
@@ -801,6 +836,17 @@ export function applySheetAxisCommand(
     operation === "insert" ? maximum - command.count : command.index,
     operation === "insert" ? maximum : command.index + command.count,
   );
+  slice.workbookFormulaSources = [...workbook.sheets.values()].flatMap((sourceSheet) =>
+    [...sourceSheet.cells.entries()].flatMap(([key, cell]) =>
+      sourceSheet.id === command.sheetId || cell.content?.kind !== "formula"
+        ? []
+        : [{ sheetId: sourceSheet.id, address: parseCellKey(key), source: cell.content.formula.source }],
+    ),
+  );
+  slice.definedNames = [...workbook.definedNames.values()].map((definition) => ({
+    ...definition,
+    reference: { sheetId: definition.reference.sheetId, start: { ...definition.reference.start }, end: { ...definition.reference.end } },
+  }));
   const nextMetadata = transformSheetMetadataForAxis(
     getSheetMetadata(sheet),
     command.axis,
@@ -818,6 +864,32 @@ export function applySheetAxisCommand(
     operation,
   );
   const metadataChanged = setSheetMetadata(sheet, nextMetadata);
+  rewriteQualifiedReferencesForSheet(workbook, command.sheetId, (address) => {
+    const value = command.axis === "row" ? address.row : address.column;
+    let next = value;
+    if (operation === "insert") next = value >= command.index ? value + command.count : value;
+    else if (value >= command.index && value < command.index + command.count) return null;
+    else if (value >= command.index + command.count) next = value - command.count;
+    return command.axis === "row"
+      ? { row: next, column: address.column }
+      : { row: address.row, column: next };
+  });
+  for (const [id, definition] of workbook.definedNames) {
+    if (definition.reference.sheetId !== command.sheetId) continue;
+    const reference = transformRangeForAxis(
+      definition.reference,
+      command.axis,
+      command.index,
+      command.count,
+      maximum,
+      operation,
+    );
+    if (!reference) {
+      workbook.definedNames.delete(id);
+      continue;
+    }
+    workbook.definedNames.set(id, { ...definition, reference: { ...reference, sheetId: command.sheetId } });
+  }
   return changed || metadataChanged
     ? createRestoreSheetAxisSliceCommand(
         command.sheetId,

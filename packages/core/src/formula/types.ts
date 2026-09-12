@@ -51,6 +51,8 @@ export type FormulaAddress = {
 };
 
 export type FormulaReference = FormulaAddress & {
+  /** Written sheet qualifier, when the reference targets another sheet. */
+  sheetName?: string;
   rowAbsolute: boolean;
   columnAbsolute: boolean;
   start: number;
@@ -91,7 +93,7 @@ export type FormulaExpression =
     }
   | {
       kind: "binary";
-      operator: "+" | "-" | "*" | "/" | "&" | "=" | "<>" | "<" | "<=" | ">" | ">=";
+      operator: "+" | "-" | "*" | "/" | "^" | "&" | "=" | "<>" | "<" | "<=" | ">" | ">=";
       left: FormulaExpression;
       right: FormulaExpression;
       start: number;
@@ -126,8 +128,11 @@ export type FormulaParseResult = FormulaParseSuccess | FormulaParseFailure;
 export type FormulaResolver = (address: FormulaAddress) => FormulaValue;
 
 export type FormulaEvaluationResolver = {
-  resolveCell: (address: FormulaAddress) => FormulaValue;
-  resolveRange: (bounds: FormulaRangeBounds) => Iterable<FormulaValue>;
+  resolveCell: (address: FormulaAddress & { sheetName?: string }) => FormulaValue;
+  resolveRange: (bounds: FormulaRangeBounds & { sheetName?: string }) => Iterable<FormulaValue>;
+  resolveName?: (
+    name: string,
+  ) => FormulaValue | (FormulaRangeBounds & { sheetName?: string }) | undefined;
 };
 
 export type FormulaAxis = "row" | "column";

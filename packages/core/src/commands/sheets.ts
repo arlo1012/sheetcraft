@@ -2,6 +2,10 @@ import { WorkbookDomainError, toWorkbookErrorData, toWorkbookErrorDetail } from 
 import type { IdFactory } from "../runtime.js";
 import { deserializeSheet, serializeSheet } from "../serialization.js";
 import {
+  renameQualifiedReferencesForSheet,
+  rewriteQualifiedReferencesForSheet,
+} from "../formula/workbook-references.js";
+import {
   createSheet,
   getNextDuplicateSheetName,
   getNextSheetName,
@@ -267,6 +271,22 @@ export function applyAddSheetCommand(
   const previousActiveSheetId = workbook.activeSheetId;
   insertSheet(workbook, sheet, command.index);
   workbook.activeSheetId = command.activeSheetId;
+  for (const definition of command.definedNames ?? []) {
+    workbook.definedNames.set(definition.id, {
+      ...definition,
+      reference: { sheetId: definition.reference.sheetId, start: { ...definition.reference.start }, end: { ...definition.reference.end } },
+    });
+  }
+  for (const formula of command.formulaSources ?? []) {
+    const target = workbook.sheets.get(formula.sheetId);
+    const cell = target?.cells.get(`${formula.address.row}:${formula.address.column}`);
+    if (target && cell?.content?.kind === "formula") {
+      target.cells.set(`${formula.address.row}:${formula.address.column}`, {
+        ...cell,
+        content: { kind: "formula", formula: { source: formula.source } },
+      });
+    }
+  }
   return {
     type: "deleteSheet",
     sheetId: sheet.id,
@@ -301,6 +321,22 @@ export function applyDeleteSheetCommand(
   if (nextActiveSheet.properties.hidden)
     throw invalidCommandPayload("activeSheetId", command.activeSheetId);
   const previousActiveSheetId = workbook.activeSheetId;
+  const definedNames = [...workbook.definedNames.values()]
+    .filter((definition) => definition.scopeSheetId === command.sheetId || definition.reference.sheetId === command.sheetId)
+    .map((definition) => ({ ...definition, reference: { sheetId: definition.reference.sheetId, start: { ...definition.reference.start }, end: { ...definition.reference.end } } }));
+  const formulaSources = [...workbook.sheets.values()].flatMap((sourceSheet) =>
+    [...sourceSheet.cells.entries()].flatMap(([key, cell]) => {
+      if (sourceSheet.id === command.sheetId || cell.content?.kind !== "formula") return [];
+      const [rawRow, rawColumn] = key.split(":");
+      const row = Number(rawRow);
+      const column = Number(rawColumn);
+      return Number.isInteger(row) && Number.isInteger(column)
+        ? [{ sheetId: sourceSheet.id, address: { row, column }, source: cell.content.formula.source }]
+        : [];
+    }),
+  );
+  rewriteQualifiedReferencesForSheet(workbook, command.sheetId, null);
+  for (const definition of definedNames) workbook.definedNames.delete(definition.id);
   const { sheet, index } = removeSheet(workbook, command.sheetId);
   setActiveSheet(workbook, command.activeSheetId);
   return {
@@ -308,6 +344,8 @@ export function applyDeleteSheetCommand(
     sheet: serializeSheet(sheet),
     index,
     activeSheetId: previousActiveSheetId,
+    formulaSources,
+    definedNames,
   };
 }
 
@@ -373,7 +411,9 @@ export function applyRenameSheetCommand(
   const name = normalizeCommandSheetName(command.name);
   assertSheetNameAvailable(workbook, name, command.sheetId);
   const previousName = sheet.name;
-  return renameSheet(workbook, command.sheetId, name)
+  const changed = renameSheet(workbook, command.sheetId, name);
+  if (changed) renameQualifiedReferencesForSheet(workbook, previousName, name);
+  return changed
     ? createRenameSheetCommand(command.sheetId, previousName)
     : null;
 }

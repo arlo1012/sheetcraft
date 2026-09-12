@@ -19,6 +19,7 @@ import type {
   SheetSparseDimension,
   SheetSparseState,
   FloatingImage,
+  DefinedName,
 } from "../workbook.js";
 
 export type CellContentChange = {
@@ -149,6 +150,9 @@ export type AddSheetCommand = {
   sheet: SheetSnapshot;
   index: number;
   activeSheetId: string;
+  /** Formula text on surviving sheets restored by a delete-sheet inverse. */
+  formulaSources?: Array<{ sheetId: string; address: CellAddress; source: string }>;
+  definedNames?: DefinedName[];
 };
 
 export type SetFloatingImageCommand = {
@@ -214,6 +218,16 @@ export type RenameSheetCommand = {
   name: string;
 };
 
+export type UpsertDefinedNameCommand = {
+  type: "upsertDefinedName";
+  definition: DefinedName;
+};
+
+export type DeleteDefinedNameCommand = {
+  type: "deleteDefinedName";
+  id: string;
+};
+
 export type MoveSheetCommand = {
   type: "moveSheet";
   sheetId: string;
@@ -263,6 +277,8 @@ export type SheetAxisSparseSlice = {
   floatingImages: Array<{ image: FloatingImage; index: number }>;
   /** Exact raw formula sources before the structural change, for lossless undo. */
   formulaSources?: Array<{ address: CellAddress; source: string }>;
+  workbookFormulaSources?: Array<{ sheetId: string; address: CellAddress; source: string }>;
+  definedNames?: DefinedName[];
   /** Exact sheet metadata before the structural change. */
   metadata: SheetMetadata;
 };
@@ -315,6 +331,8 @@ export type WorkbookCommand =
   | DeleteSheetCommand
   | SetSheetPropertiesCommand
   | RenameSheetCommand
+  | UpsertDefinedNameCommand
+  | DeleteDefinedNameCommand
   | MoveSheetCommand
   | InsertSheetAxisCommand
   | DeleteSheetAxisCommand
@@ -344,6 +362,7 @@ export type WorkbookOperation =
   | "sheets.properties"
   | "sheets.rename"
   | "sheets.move"
+  | "formulas.names"
   | "structure.insert"
   | "structure.delete"
   | "structure.move"
@@ -402,6 +421,9 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "sheets.rename";
     case "moveSheet":
       return "sheets.move";
+    case "upsertDefinedName":
+    case "deleteDefinedName":
+      return "formulas.names";
     case "insertSheetAxis":
       return "structure.insert";
     case "deleteSheetAxis":
