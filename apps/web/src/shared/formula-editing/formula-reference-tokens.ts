@@ -1,4 +1,8 @@
-import { MAX_FORMULA_COLUMNS, MAX_FORMULA_ROWS, parseA1FormulaReference } from "@idea10/core/formula";
+import {
+  MAX_FORMULA_COLUMNS,
+  MAX_FORMULA_ROWS,
+  parseA1FormulaReference,
+} from "@idea10/core/formula";
 import type { CellRange } from "@idea10/core/workbook";
 
 export type FormulaReferenceRangeKind = "cells" | "row-axis" | "column-axis" | "spill";
@@ -75,7 +79,9 @@ export function getFormulaReferenceTokens(source: string): readonly FormulaRefer
   return tokens;
 }
 
-function parseLocalRange(text: string): { range: CellRange; rangeKind: FormulaReferenceRangeKind } | null {
+function parseLocalRange(
+  text: string,
+): { range: CellRange; rangeKind: FormulaReferenceRangeKind } | null {
   const spill = text.endsWith("#");
   const referenceText = spill ? text.slice(0, -1) : text;
   const [startText, endText] = referenceText.split(":").map((part) => part.trim());
@@ -84,12 +90,18 @@ function parseLocalRange(text: string): { range: CellRange; rangeKind: FormulaRe
   const end = endText ? parseA1FormulaReference(endText) : start;
   if (start && end && !spill && (!endText || end))
     return {
-      range: { start: { row: start.row, column: start.column }, end: { row: end.row, column: end.column } },
+      range: {
+        start: { row: start.row, column: start.column },
+        end: { row: end.row, column: end.column },
+      },
       rangeKind: "cells",
     };
   if (start && !endText && spill)
     return {
-      range: { start: { row: start.row, column: start.column }, end: { row: start.row, column: start.column } },
+      range: {
+        start: { row: start.row, column: start.column },
+        end: { row: start.row, column: start.column },
+      },
       rangeKind: "spill",
     };
   if (!endText || spill) return null;

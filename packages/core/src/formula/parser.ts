@@ -17,7 +17,8 @@ const REFERENCE_PATTERN = /^\$?[A-Za-z]+\$?[1-9]\d*/;
 const CELL_LIKE_PATTERN = /^\$?[A-Za-z]+\$?\d+/;
 const QUALIFIED_REFERENCE_PATTERN =
   /^(?:(?:'(?:[^']|'')*'|[\p{L}\p{N}_.]+)!)?\$?[A-Za-z]+\$?[1-9]\d*/u;
-const AXIS_RANGE_PATTERN = /^(?:(?:'(?:[^']|'')*'|[\p{L}\p{N}_.]+)!)?(\$?[A-Za-z]+|\$?[1-9]\d*)\s*:\s*(\$?[A-Za-z]+|\$?[1-9]\d*)/u;
+const AXIS_RANGE_PATTERN =
+  /^(?:(?:'(?:[^']|'')*'|[\p{L}\p{N}_.]+)!)?(\$?[A-Za-z]+|\$?[1-9]\d*)\s*:\s*(\$?[A-Za-z]+|\$?[1-9]\d*)/u;
 
 class FormulaParser {
   private offset = 1;
@@ -205,12 +206,13 @@ class FormulaParser {
       const qualifier = splitSheetQualifier(axisRangeText, this.offset);
       const body = qualifier.referenceText;
       const match = /^(\$?)([A-Za-z]+|[1-9]\d*)\s*:\s*(\$?)([A-Za-z]+|[1-9]\d*)$/.exec(body);
-      if (!match || (/[A-Za-z]/.test(match[2]!) !== /[A-Za-z]/.test(match[4]!))) return null;
+      if (!match || /[A-Za-z]/.test(match[2]!) !== /[A-Za-z]/.test(match[4]!)) return null;
       const column = /[A-Za-z]/.test(match[2]!);
       const toIndex = (value: string) => {
         if (!column) return Number(value) - 1;
         let result = 0;
-        for (const character of value.toUpperCase()) result = result * 26 + character.charCodeAt(0) - 64;
+        for (const character of value.toUpperCase())
+          result = result * 26 + character.charCodeAt(0) - 64;
         return result - 1;
       };
       const first = toIndex(match[2]!);
@@ -218,10 +220,14 @@ class FormulaParser {
       const maximum = column ? 16_384 : 1_048_576;
       if (first < 0 || last < 0 || first >= maximum || last >= maximum) return null;
       const range: FormulaAxisRange = {
-        axis: column ? "column" : "row", start: first, end: last,
-        startAbsolute: match[1] === "$", endAbsolute: match[3] === "$",
+        axis: column ? "column" : "row",
+        start: first,
+        end: last,
+        startAbsolute: match[1] === "$",
+        endAbsolute: match[3] === "$",
         ...(qualifier.sheetName ? { sheetName: qualifier.sheetName } : {}),
-        startOffset: qualifier.offset, endOffset: this.offset + axisRangeText.length,
+        startOffset: qualifier.offset,
+        endOffset: this.offset + axisRangeText.length,
       };
       this.offset += axisRangeText.length;
       return { kind: "axis-range", range, start, end: this.offset };
@@ -354,12 +360,26 @@ class FormulaParser {
     let row: FormulaExpression[] = [];
     while (true) {
       const item = this.parseComparison();
-      if (!item || !isArrayConstantItem(item) || this.source.slice(item.start, item.end).includes("%")) return null;
+      if (
+        !item ||
+        !isArrayConstantItem(item) ||
+        this.source.slice(item.start, item.end).includes("%")
+      )
+        return null;
       row.push(item);
       this.skipWhitespace();
       const next = this.peek();
-      if (next === ",") { this.offset += 1; continue; }
-      if (next === ";") { if (!row.length) return null; rows.push(row); row = []; this.offset += 1; continue; }
+      if (next === ",") {
+        this.offset += 1;
+        continue;
+      }
+      if (next === ";") {
+        if (!row.length) return null;
+        rows.push(row);
+        row = [];
+        this.offset += 1;
+        continue;
+      }
       if (next !== "}") return null;
       this.offset += 1;
       rows.push(row);

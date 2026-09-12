@@ -1,8 +1,5 @@
 import { isFormulaError, type FormulaValue } from "../types.js";
-import type {
-  FormulaFunctionArgument,
-  FormulaFunctionDefinition,
-} from "./contracts.js";
+import type { FormulaFunctionArgument, FormulaFunctionDefinition } from "./contracts.js";
 import {
   defineFunction,
   finiteNumber,
@@ -12,9 +9,7 @@ import {
   values,
 } from "./helpers.js";
 
-function directNumber(
-  argument: FormulaFunctionArgument,
-): number | ReturnType<typeof formulaError> {
+function directNumber(argument: FormulaFunctionArgument): number | ReturnType<typeof formulaError> {
   return finiteNumber(scalar(argument));
 }
 function aggregate(
@@ -29,26 +24,16 @@ function aggregate(
       if (typeof value === "number") {
         if (!Number.isFinite(value)) return formulaError("VALUE");
         result = operation === "sum" ? result + value : result * value;
-        if (!Number.isFinite(result))
-          return formulaError(operation === "sum" ? "VALUE" : "NUM");
-      } else if (
-        argument.kind === "scalar" &&
-        argument.source !== "reference"
-      ) {
+        if (!Number.isFinite(result)) return formulaError(operation === "sum" ? "VALUE" : "NUM");
+      } else if (argument.kind === "scalar" && argument.source !== "reference") {
         if (typeof value === "boolean") {
-          result =
-            operation === "sum"
-              ? result + Number(value)
-              : result * Number(value);
+          result = operation === "sum" ? result + Number(value) : result * Number(value);
         } else if (
           typeof value === "string" &&
           value.trim() !== "" &&
           Number.isFinite(Number(value))
         ) {
-          result =
-            operation === "sum"
-              ? result + Number(value)
-              : result * Number(value);
+          result = operation === "sum" ? result + Number(value) : result * Number(value);
         }
       }
     }
@@ -117,10 +102,7 @@ export const MATH_FUNCTIONS = [
     },
     (context) => {
       const n = directNumber(context.evaluateArgument(0));
-      const d =
-        context.argumentCount === 2
-          ? directNumber(context.evaluateArgument(1))
-          : 0;
+      const d = context.argumentCount === 2 ? directNumber(context.evaluateArgument(1)) : 0;
       if (isFormulaError(n)) return n;
       if (isFormulaError(d)) return d;
       const digits = Math.trunc(d);
@@ -143,11 +125,7 @@ export const MATH_FUNCTIONS = [
     (context) => {
       const n = directNumber(context.evaluateArgument(0));
       const d = directNumber(context.evaluateArgument(1));
-      return isFormulaError(n)
-        ? n
-        : isFormulaError(d)
-          ? d
-          : roundAwayFromZero(n, d);
+      return isFormulaError(n) ? n : isFormulaError(d) ? d : roundAwayFromZero(n, d);
     },
   ),
   defineFunction(
@@ -189,9 +167,7 @@ export const MATH_FUNCTIONS = [
       if (d === 0) return formulaError("DIV0");
       const remainder = n % d;
       if (!Number.isFinite(remainder)) return formulaError("NUM");
-      return remainder === 0 || Math.sign(remainder) === Math.sign(d)
-        ? remainder
-        : remainder + d;
+      return remainder === 0 || Math.sign(remainder) === Math.sign(d) ? remainder : remainder + d;
     },
   ),
   defineFunction(
@@ -436,11 +412,7 @@ export const MATH_FUNCTIONS = [
       lazy: false,
     },
     (context) =>
-      integerFold(
-        context,
-        (a, b) => (a === 0 || b === 0 ? 0 : Math.abs(a * b) / gcd(a, b)),
-        1,
-      ),
+      integerFold(context, (a, b) => (a === 0 || b === 0 ? 0 : Math.abs(a * b) / gcd(a, b)), 1),
   ),
   defineFunction(
     {
@@ -480,8 +452,7 @@ export const MATH_FUNCTIONS = [
       if (isFormulaError(k)) return k;
       const integerN = Math.trunc(n);
       const integerK = Math.trunc(k);
-      if (integerN < 0 || integerK < 0 || integerK > integerN)
-        return formulaError("NUM");
+      if (integerN < 0 || integerK < 0 || integerK > integerN) return formulaError("NUM");
       let r = 1;
       for (let i = 1; i <= Math.min(integerK, integerN - integerK); i += 1)
         r = (r * (integerN - Math.min(integerK, integerN - integerK) + i)) / i;
@@ -494,11 +465,7 @@ export const MATH_FUNCTIONS = [
       category: "Math",
       minArgs: 2,
       maxArgs: null,
-      arguments: [
-        { name: "function_num" },
-        { name: "ref1" },
-        { name: "ref2", optional: true },
-      ],
+      arguments: [{ name: "function_num" }, { name: "ref1" }, { name: "ref2", optional: true }],
       lazy: false,
     },
     (context) => subtotal(context, false),
@@ -578,10 +545,7 @@ export const MATH_FUNCTIONS = [
     },
     (context) => {
       const value = directNumber(context.evaluateArgument(0));
-      const base =
-        context.argumentCount === 2
-          ? directNumber(context.evaluateArgument(1))
-          : 10;
+      const base = context.argumentCount === 2 ? directNumber(context.evaluateArgument(1)) : 10;
       if (isFormulaError(value)) return value;
       if (isFormulaError(base)) return base;
       if (value <= 0 || base <= 0 || base === 1) return formulaError("NUM");
@@ -628,26 +592,22 @@ function subtotal(
   )
     return formulaError("VALUE");
   const start = aggregateMode ? 2 : 1;
-  const ignoreHidden = aggregateMode
-    ? [1, 3, 5, 7].includes(optionCode)
-    : code >= 101;
+  const ignoreHidden = aggregateMode ? [1, 3, 5, 7].includes(optionCode) : code >= 101;
   const ignoreErrors = aggregateMode && [2, 3, 6, 7].includes(optionCode);
   const numbers: number[] = [];
   let counta = 0;
   let product = 1;
-  const end =
-    aggregateMode && operation >= 14 ? start + 1 : context.argumentCount;
+  const end = aggregateMode && operation >= 14 ? start + 1 : context.argumentCount;
   for (let index = start; index < end; index += 1) {
     const argument = context.evaluateArgument(index);
-    const entries =
-      argument.kind === "range" && argument.entries
-        ? argument.entries
-        : [...values(argument)].map((value) => ({
-            value,
-            hidden: false,
-            filtered: false,
-            nestedSubtotal: false,
-          }));
+    const entries = argument.entries
+      ? argument.entries
+      : [...values(argument)].map((value) => ({
+          value,
+          hidden: false,
+          filtered: false,
+          nestedSubtotal: false,
+        }));
     for (const entry of entries) {
       if (entry.nestedSubtotal && (!aggregateMode || optionCode < 4)) continue;
       if (entry.filtered || (ignoreHidden && entry.hidden)) continue;
@@ -671,14 +631,11 @@ function subtotal(
     if (!numbers.length) return formulaError("NUM");
     const ordered = [...numbers].sort((a, b) => a - b);
     const middle = Math.floor(ordered.length / 2);
-    return ordered.length % 2
-      ? ordered[middle]!
-      : (ordered[middle - 1]! + ordered[middle]!) / 2;
+    return ordered.length % 2 ? ordered[middle]! : (ordered[middle - 1]! + ordered[middle]!) / 2;
   }
   if (operation === 13) {
     const counts = new Map<number, number>();
-    for (const value of numbers)
-      counts.set(value, (counts.get(value) ?? 0) + 1);
+    for (const value of numbers) counts.set(value, (counts.get(value) ?? 0) + 1);
     let result = 0,
       count = 1;
     for (const [value, frequency] of counts)
@@ -699,23 +656,13 @@ function subtotal(
       if (k < 1 || k > ordered.length) return formulaError("NUM");
       return operation === 14 ? ordered[ordered.length - k]! : ordered[k - 1]!;
     }
-    const k =
-      operation === 17 || operation === 19
-        ? Math.trunc(parameter) / 4
-        : parameter;
+    const k = operation === 17 || operation === 19 ? Math.trunc(parameter) / 4 : parameter;
     const exclusive = operation === 18 || operation === 19;
-    if (k < 0 || k > 1 || (exclusive && (k <= 0 || k >= 1)))
-      return formulaError("NUM");
-    const position = exclusive
-      ? k * (ordered.length + 1) - 1
-      : k * (ordered.length - 1);
-    if (position < 0 || position > ordered.length - 1)
-      return formulaError("NUM");
+    if (k < 0 || k > 1 || (exclusive && (k <= 0 || k >= 1))) return formulaError("NUM");
+    const position = exclusive ? k * (ordered.length + 1) - 1 : k * (ordered.length - 1);
+    if (position < 0 || position > ordered.length - 1) return formulaError("NUM");
     const lower = Math.floor(position);
-    return (
-      ordered[lower]! +
-      (ordered[Math.ceil(position)]! - ordered[lower]!) * (position - lower)
-    );
+    return ordered[lower]! + (ordered[Math.ceil(position)]! - ordered[lower]!) * (position - lower);
   }
   if (operation === 2) return numbers.length;
   if (operation === 3) return counta;
@@ -723,12 +670,10 @@ function subtotal(
   if (operation === 5) return numbers.length ? Math.min(...numbers) : 0;
   if (operation === 6) return product;
   if (operation === 9) return numbers.reduce((sum, value) => sum + value, 0);
-  if (numbers.length < (operation === 8 || operation === 10 ? 2 : 1))
-    return formulaError("DIV0");
+  if (numbers.length < (operation === 8 || operation === 10 ? 2 : 1)) return formulaError("DIV0");
   const mean = numbers.reduce((sum, value) => sum + value, 0) / numbers.length;
   const square = numbers.reduce((sum, value) => sum + (value - mean) ** 2, 0);
-  const variance =
-    square / (numbers.length - (operation === 8 || operation === 10 ? 1 : 0));
+  const variance = square / (numbers.length - (operation === 8 || operation === 10 ? 1 : 0));
   return operation === 7 || operation === 8 ? Math.sqrt(variance) : variance;
 }
 
@@ -738,13 +683,10 @@ function unaryMath(
 ): FormulaValue {
   const value = directNumber(context.evaluateArgument(0));
   if (isFormulaError(value)) return value;
-  if ((name === "ASIN" || name === "ACOS") && (value < -1 || value > 1))
-    return formulaError("NUM");
+  if ((name === "ASIN" || name === "ACOS") && (value < -1 || value > 1)) return formulaError("NUM");
   if (name === "ACOSH" && value < 1) return formulaError("NUM");
-  if (name === "ATANH" && (value <= -1 || value >= 1))
-    return formulaError("NUM");
-  if ((name === "LN" || name === "LOG10") && value <= 0)
-    return formulaError("NUM");
+  if (name === "ATANH" && (value <= -1 || value >= 1)) return formulaError("NUM");
+  if ((name === "LN" || name === "LOG10") && value <= 0) return formulaError("NUM");
   const operation: Record<string, (input: number) => number> = {
     SIN: Math.sin,
     COS: Math.cos,
@@ -773,10 +715,8 @@ function mathCeiling(
   direction: "ceiling" | "floor",
 ): FormulaValue {
   const n = directNumber(context.evaluateArgument(0));
-  const significance =
-    context.argumentCount >= 2 ? directNumber(context.evaluateArgument(1)) : 1;
-  const mode =
-    context.argumentCount === 3 ? directNumber(context.evaluateArgument(2)) : 0;
+  const significance = context.argumentCount >= 2 ? directNumber(context.evaluateArgument(1)) : 1;
+  const mode = context.argumentCount === 3 ? directNumber(context.evaluateArgument(2)) : 0;
   if (isFormulaError(n)) return n;
   if (isFormulaError(significance)) return significance;
   if (isFormulaError(mode)) return mode;
@@ -784,8 +724,7 @@ function mathCeiling(
   if (s === 0) return 0;
   const away = n >= 0 ? direction === "ceiling" : direction === "floor";
   const useAway = n >= 0 || mode === 0 ? away : !away;
-  const value =
-    (useAway ? Math.ceil : Math.floor)(Math.abs(n) / s) * s * Math.sign(n);
+  const value = (useAway ? Math.ceil : Math.floor)(Math.abs(n) / s) * s * Math.sign(n);
   return Number.isFinite(value) ? value : formulaError("NUM");
 }
 function parityRound(
@@ -795,9 +734,7 @@ function parityRound(
   const n = directNumber(context.evaluateArgument(0));
   if (isFormulaError(n)) return n;
   const magnitude = Math.ceil(Math.abs(n));
-  const value =
-    (magnitude % 2 === (even ? 0 : 1) ? magnitude : magnitude + 1) *
-    Math.sign(n);
+  const value = (magnitude % 2 === (even ? 0 : 1) ? magnitude : magnitude + 1) * Math.sign(n);
   return Number.isFinite(value) ? value : formulaError("NUM");
 }
 function numericFold(
@@ -878,16 +815,13 @@ function multipleRound(
     Math.sign(n);
   return Number.isFinite(result) ? result : formulaError("NUM");
 }
-function sumProduct(
-  context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
-): FormulaValue {
+function sumProduct(context: Parameters<FormulaFunctionDefinition["evaluate"]>[0]): FormulaValue {
   const arrays = Array.from({ length: context.argumentCount }, (_, index) => {
     const argument = context.evaluateArgument(index);
     return [...values(argument)];
   });
   const size = arrays[0]?.length ?? 0;
-  if (!arrays.every((item) => item.length === size))
-    return formulaError("VALUE");
+  if (!arrays.every((item) => item.length === size)) return formulaError("VALUE");
   let total = 0;
   for (let index = 0; index < size; index += 1) {
     let product = 1;

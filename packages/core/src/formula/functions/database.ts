@@ -1,8 +1,5 @@
 import { isFormulaError, type FormulaValue } from "../types.js";
-import type {
-  FormulaFunctionArgument,
-  FormulaFunctionDefinition,
-} from "./contracts.js";
+import type { FormulaFunctionArgument, FormulaFunctionDefinition } from "./contracts.js";
 import {
   compareValues,
   defineFunction,
@@ -17,30 +14,21 @@ type Database = { headers: FormulaValue[]; rows: FormulaValue[][] };
 function matrix(
   argument: FormulaFunctionArgument,
 ): FormulaValue[][] | ReturnType<typeof formulaError> {
-  if (argument.kind !== "range" || !argument.bounds)
-    return formulaError("VALUE");
+  if (argument.kind !== "range" || !argument.bounds) return formulaError("VALUE");
   const rows = argument.bounds.end.row - argument.bounds.start.row + 1;
   const columns = argument.bounds.end.column - argument.bounds.start.column + 1;
-  if (rows < 1 || columns < 1 || rows * columns > 100_000)
-    return formulaError("VALUE");
+  if (rows < 1 || columns < 1 || rows * columns > 100_000) return formulaError("VALUE");
   if (!argument.getValue) return formulaError("VALUE");
   return Array.from({ length: rows }, (_, row) =>
     Array.from({ length: columns }, (_, column) =>
-      argument.getValue!(
-        argument.bounds!.start.row + row,
-        argument.bounds!.start.column + column,
-      ),
+      argument.getValue!(argument.bounds!.start.row + row, argument.bounds!.start.column + column),
     ),
   );
 }
-function criteriaMatches(
-  value: FormulaValue,
-  criterion: FormulaValue,
-): boolean | FormulaValue {
+function criteriaMatches(value: FormulaValue, criterion: FormulaValue): boolean | FormulaValue {
   if (isFormulaError(value)) return value;
   if (isFormulaError(criterion)) return criterion;
-  if (criterion === null || criterion === "")
-    return value === null || value === "";
+  if (criterion === null || criterion === "") return value === null || value === "";
   if (typeof criterion !== "string") {
     const comparison = compareValues(value, criterion);
     return isFormulaError(comparison) ? comparison : comparison === 0;
@@ -48,8 +36,7 @@ function criteriaMatches(
   const found = criterion.match(/^(<=|>=|<>|=|<|>)(.*)$/);
   const operator = found?.[1] ?? "=";
   const raw = found?.[2] ?? criterion;
-  const parsed =
-    raw.trim() !== "" && Number.isFinite(Number(raw)) ? Number(raw) : raw;
+  const parsed = raw.trim() !== "" && Number.isFinite(Number(raw)) ? Number(raw) : raw;
   const comparison = compareValues(value, parsed);
   if (isFormulaError(comparison)) return comparison;
   const equals = /[*?~]/.test(raw)
@@ -73,15 +60,12 @@ function fieldIndex(
   field: FormulaValue,
 ): number | ReturnType<typeof formulaError> {
   if (typeof field === "number")
-    return Number.isInteger(field) &&
-      field >= 1 &&
-      field <= database.headers.length
+    return Number.isInteger(field) && field >= 1 && field <= database.headers.length
       ? field - 1
       : formulaError("VALUE");
   if (typeof field !== "string") return formulaError("VALUE");
   const index = database.headers.findIndex(
-    (header) =>
-      String(header).toLocaleUpperCase() === field.toLocaleUpperCase(),
+    (header) => String(header).toLocaleUpperCase() === field.toLocaleUpperCase(),
   );
   return index < 0 ? formulaError("VALUE") : index;
 }
@@ -99,9 +83,7 @@ function records(
   const [headers, ...data] = source;
   if (!headers || !criteria.length) return formulaError("VALUE");
   const database = { headers, rows: data };
-  const index = isOmittedArgument(context.evaluateArgument(1))
-    ? null
-    : fieldIndex(database, field);
+  const index = isOmittedArgument(context.evaluateArgument(1)) ? null : fieldIndex(database, field);
   if (isFormulaError(index)) return index;
   const matches = data.filter((row) => {
     for (const criterionRow of criteria.slice(1)) {
@@ -109,26 +91,15 @@ function records(
       for (let column = 0; column < criteria[0]!.length; column += 1) {
         const header = criteria[0]![column];
         const criterion = criterionRow![column];
-        if (
-          header === null ||
-          header === "" ||
-          criterion === null ||
-          criterion === ""
-        )
-          continue;
+        if (header === null || header === "" || criterion === null || criterion === "") continue;
         const dataColumn = database.headers.findIndex(
-          (item) =>
-            String(item).toLocaleUpperCase() ===
-            String(header).toLocaleUpperCase(),
+          (item) => String(item).toLocaleUpperCase() === String(header).toLocaleUpperCase(),
         );
         if (dataColumn < 0) {
           accepts = false;
           break;
         }
-        const matched = criteriaMatches(
-          row[dataColumn] ?? null,
-          criterion ?? null,
-        );
+        const matched = criteriaMatches(row[dataColumn] ?? null, criterion ?? null);
         if (isFormulaError(matched) || !matched) {
           accepts = false;
           break;
@@ -140,10 +111,7 @@ function records(
   });
   return { database, field: index, rows: matches };
 }
-function numbers(
-  rows: FormulaValue[][],
-  field: number,
-): number[] | FormulaValue {
+function numbers(rows: FormulaValue[][], field: number): number[] | FormulaValue {
   const result: number[] = [];
   for (const row of rows) {
     const value = row[field] ?? null;
@@ -158,22 +126,19 @@ function databaseAggregate(
 ): FormulaValue {
   const result = records(context);
   if ("kind" in result) return result;
-  if (result.field === null && (kind === "DCOUNT" || kind === "DCOUNTA"))
-    return result.rows.length;
+  if (result.field === null && (kind === "DCOUNT" || kind === "DCOUNTA")) return result.rows.length;
   if (result.field === null) return formulaError("VALUE");
   const field = result.field;
   const values = numbers(result.rows, field);
   if (!Array.isArray(values)) return values;
   if (kind === "DCOUNT") return values.length;
-  if (kind === "DCOUNTA")
-    return result.rows.filter((row) => row[field] !== null).length;
+  if (kind === "DCOUNTA") return result.rows.filter((row) => row[field] !== null).length;
   if (kind === "DGET")
     return result.rows.length === 1
       ? (result.rows[0]![field] ?? null)
       : formulaError(result.rows.length ? "NUM" : "VALUE");
   if (kind === "DSUM") return values.reduce((sum, value) => sum + value, 0);
-  if (kind === "DPRODUCT")
-    return values.reduce((product, value) => product * value, 1);
+  if (kind === "DPRODUCT") return values.reduce((product, value) => product * value, 1);
   if (kind === "DMAX") return values.length ? Math.max(...values) : 0;
   if (kind === "DMIN") return values.length ? Math.min(...values) : 0;
   if (!values.length) return formulaError("DIV0");

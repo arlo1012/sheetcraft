@@ -29,7 +29,10 @@ export type FormulaError = {
 export type FormulaValue = FormulaScalar | FormulaError;
 
 /** A transient rectangular result. It is never persisted as cell content. */
-export type FormulaArray = Readonly<{ kind: "formula-array"; rows: readonly (readonly FormulaValue[])[] }>;
+export type FormulaArray = Readonly<{
+  kind: "formula-array";
+  rows: readonly (readonly FormulaValue[])[];
+}>;
 /** Internal evaluation result; public cell values remain FormulaValue scalars. */
 export type FormulaRuntimeValue = FormulaValue | FormulaArray;
 
@@ -152,7 +155,9 @@ export type FormulaResolver = (address: FormulaAddress) => FormulaValue;
 export type FormulaEvaluationResolver = {
   resolveCell: (address: FormulaAddress & { sheetName?: string }) => FormulaValue;
   resolveRange: (bounds: FormulaRangeBounds & { sheetName?: string }) => Iterable<FormulaValue>;
-  resolveRangeEntries?: (bounds: FormulaRangeBounds & { sheetName?: string }) => Iterable<import("./functions/contracts.js").FormulaRangeEntry>;
+  resolveRangeEntries?: (
+    bounds: FormulaRangeBounds & { sheetName?: string },
+  ) => Iterable<import("./functions/contracts.js").FormulaRangeEntry>;
   resolveSpill?: (address: FormulaAddress & { sheetName?: string }) => FormulaRuntimeValue;
   resolveName?: (
     name: string,

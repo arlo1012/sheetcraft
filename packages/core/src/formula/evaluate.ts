@@ -1,6 +1,7 @@
 import type { ExcelDateParts, ExcelDateSystem } from "./date-system.js";
 import {
   DEFAULT_FORMULA_FUNCTION_REGISTRY,
+  normalizeFormulaFunctionName,
   type FormulaFunctionArgument,
   type FormulaFunctionRegistry,
 } from "./functions.js";
@@ -60,10 +61,24 @@ function rangeBounds(range: FormulaRange) {
   };
 }
 
-function evaluateRange(bounds: FormulaRangeBounds & { sheetName?: string }, resolver: FormulaEvaluationResolver): FormulaRuntimeValue {
-  const rows = bounds.end.row - bounds.start.row + 1, columns = bounds.end.column - bounds.start.column + 1;
+function evaluateRange(
+  bounds: FormulaRangeBounds & { sheetName?: string },
+  resolver: FormulaEvaluationResolver,
+): FormulaRuntimeValue {
+  const rows = bounds.end.row - bounds.start.row + 1,
+    columns = bounds.end.column - bounds.start.column + 1;
   if (rows * columns > 100_000) return createFormulaError("CALC");
-  return formulaArray(Array.from({ length: rows }, (_, row) => Array.from({ length: columns }, (_, column) => resolver.resolveCell({ row: bounds.start.row + row, column: bounds.start.column + column, ...(bounds.sheetName ? { sheetName: bounds.sheetName } : {}) }))));
+  return formulaArray(
+    Array.from({ length: rows }, (_, row) =>
+      Array.from({ length: columns }, (_, column) =>
+        resolver.resolveCell({
+          row: bounds.start.row + row,
+          column: bounds.start.column + column,
+          ...(bounds.sheetName ? { sheetName: bounds.sheetName } : {}),
+        }),
+      ),
+    ),
+  );
 }
 
 function compare(
@@ -118,16 +133,41 @@ function broadcast(
   const rightRows = isFormulaArray(right) ? right.rows : [[right]];
   const rows = Math.max(leftRows.length, rightRows.length);
   const columns = Math.max(leftRows[0]?.length ?? 0, rightRows[0]?.length ?? 0);
-  if ((!isFormulaArray(left) || leftRows.length === rows) && (!isFormulaArray(right) || rightRows.length === rows) &&
-      (!isFormulaArray(left) || (leftRows[0]?.length ?? 0) === columns) && (!isFormulaArray(right) || (rightRows[0]?.length ?? 0) === columns))
-    return formulaArray(Array.from({ length: rows }, (_, row) => Array.from({ length: columns }, (_, column) => operation(leftRows[isFormulaArray(left) ? row : 0]![isFormulaArray(left) ? column : 0]!, rightRows[isFormulaArray(right) ? row : 0]![isFormulaArray(right) ? column : 0]!))));
+  if (
+    (!isFormulaArray(left) || leftRows.length === rows) &&
+    (!isFormulaArray(right) || rightRows.length === rows) &&
+    (!isFormulaArray(left) || (leftRows[0]?.length ?? 0) === columns) &&
+    (!isFormulaArray(right) || (rightRows[0]?.length ?? 0) === columns)
+  )
+    return formulaArray(
+      Array.from({ length: rows }, (_, row) =>
+        Array.from({ length: columns }, (_, column) =>
+          operation(
+            leftRows[isFormulaArray(left) ? row : 0]![isFormulaArray(left) ? column : 0]!,
+            rightRows[isFormulaArray(right) ? row : 0]![isFormulaArray(right) ? column : 0]!,
+          ),
+        ),
+      ),
+    );
   return createFormulaError("VALUE");
 }
 
-function binaryScalar(operator: "+" | "-" | "*" | "/" | "^" | "&" | "=" | "<>" | "<" | "<=" | ">" | ">=", left: FormulaValue, right: FormulaValue): FormulaValue {
-  if (operator === "&") { const first = text(left), second = text(right); return isFormulaError(first) ? first : isFormulaError(second) ? second : `${first}${second}`; }
-  if (isComparison(operator)) { const value = compare(left, right); return isFormulaError(value) ? value : comparison(operator, value); }
-  const first = arithmetic(left), second = arithmetic(right);
+function binaryScalar(
+  operator: "+" | "-" | "*" | "/" | "^" | "&" | "=" | "<>" | "<" | "<=" | ">" | ">=",
+  left: FormulaValue,
+  right: FormulaValue,
+): FormulaValue {
+  if (operator === "&") {
+    const first = text(left),
+      second = text(right);
+    return isFormulaError(first) ? first : isFormulaError(second) ? second : `${first}${second}`;
+  }
+  if (isComparison(operator)) {
+    const value = compare(left, right);
+    return isFormulaError(value) ? value : comparison(operator, value);
+  }
+  const first = arithmetic(left),
+    second = arithmetic(right);
   if (isFormulaError(first)) return first;
   if (isFormulaError(second)) return second;
   if (operator === "+") return result(first + second);
@@ -145,7 +185,10 @@ function ifCondition(value: FormulaValue): boolean | FormulaValue {
 }
 
 function evaluateIfRuntime(
-  args: FormulaExpression[], resolver: FormulaEvaluationResolver, registry: FormulaFunctionRegistry, options?: FormulaEvaluationOptions,
+  args: FormulaExpression[],
+  resolver: FormulaEvaluationResolver,
+  registry: FormulaFunctionRegistry,
+  options?: FormulaEvaluationOptions,
 ): FormulaRuntimeValue {
   const condition = evaluateExpression(args[0]!, resolver, registry, options);
   if (!isFormulaArray(condition)) {
@@ -159,10 +202,29 @@ function evaluateIfRuntime(
   }
   const whenTrue = evaluateExpression(args[1]!, resolver, registry, options);
   const whenFalse = args[2] ? evaluateExpression(args[2], resolver, registry, options) : false;
-  const trueRows = isFormulaArray(whenTrue) ? whenTrue.rows : [[whenTrue]], falseRows = isFormulaArray(whenFalse) ? whenFalse.rows : [[whenFalse]];
-  const rows = condition.rows.length, columns = condition.rows[0]?.length ?? 0;
-  if ((isFormulaArray(whenTrue) && (trueRows.length !== rows || (trueRows[0]?.length ?? 0) !== columns)) || (isFormulaArray(whenFalse) && (falseRows.length !== rows || (falseRows[0]?.length ?? 0) !== columns))) return createFormulaError("VALUE");
-  return formulaArray(condition.rows.map((row, r) => row.map((item, c) => { const selected = ifCondition(item); return isFormulaError(selected) ? selected : selected ? trueRows[isFormulaArray(whenTrue) ? r : 0]![isFormulaArray(whenTrue) ? c : 0]! : falseRows[isFormulaArray(whenFalse) ? r : 0]![isFormulaArray(whenFalse) ? c : 0]!; })));
+  const trueRows = isFormulaArray(whenTrue) ? whenTrue.rows : [[whenTrue]],
+    falseRows = isFormulaArray(whenFalse) ? whenFalse.rows : [[whenFalse]];
+  const rows = condition.rows.length,
+    columns = condition.rows[0]?.length ?? 0;
+  if (
+    (isFormulaArray(whenTrue) &&
+      (trueRows.length !== rows || (trueRows[0]?.length ?? 0) !== columns)) ||
+    (isFormulaArray(whenFalse) &&
+      (falseRows.length !== rows || (falseRows[0]?.length ?? 0) !== columns))
+  )
+    return createFormulaError("VALUE");
+  return formulaArray(
+    condition.rows.map((row, r) =>
+      row.map((item, c) => {
+        const selected = ifCondition(item);
+        return isFormulaError(selected)
+          ? selected
+          : selected
+            ? trueRows[isFormulaArray(whenTrue) ? r : 0]![isFormulaArray(whenTrue) ? c : 0]!
+            : falseRows[isFormulaArray(whenFalse) ? r : 0]![isFormulaArray(whenFalse) ? c : 0]!;
+      }),
+    ),
+  );
 }
 
 function evaluateExpression(
@@ -190,15 +252,41 @@ function evaluateExpression(
     });
     return value === undefined ? createFormulaError("REF") : value;
   }
-  if (expression.kind === "range") return evaluateRange({ ...rangeBounds(expression.range), ...(expression.range.start.sheetName ? { sheetName: expression.range.start.sheetName } : {}) }, resolver);
+  if (expression.kind === "range")
+    return evaluateRange(
+      {
+        ...rangeBounds(expression.range),
+        ...(expression.range.start.sheetName
+          ? { sheetName: expression.range.start.sheetName }
+          : {}),
+      },
+      resolver,
+    );
   if (expression.kind === "axis-range") {
-    const bounds = expression.range.axis === "column"
-      ? { start: { row: 0, column: Math.min(expression.range.start, expression.range.end) }, end: { row: 1_048_575, column: Math.max(expression.range.start, expression.range.end) } }
-      : { start: { row: Math.min(expression.range.start, expression.range.end), column: 0 }, end: { row: Math.max(expression.range.start, expression.range.end), column: 16_383 } };
-    return evaluateRange({ ...bounds, ...(expression.range.sheetName ? { sheetName: expression.range.sheetName } : {}) }, resolver);
+    const bounds =
+      expression.range.axis === "column"
+        ? {
+            start: { row: 0, column: Math.min(expression.range.start, expression.range.end) },
+            end: { row: 1_048_575, column: Math.max(expression.range.start, expression.range.end) },
+          }
+        : {
+            start: { row: Math.min(expression.range.start, expression.range.end), column: 0 },
+            end: { row: Math.max(expression.range.start, expression.range.end), column: 16_383 },
+          };
+    return evaluateRange(
+      {
+        ...bounds,
+        ...(expression.range.sheetName ? { sheetName: expression.range.sheetName } : {}),
+      },
+      resolver,
+    );
   }
   if (expression.kind === "array")
-    return formulaArray(expression.rows.map((row) => row.map((item) => scalarize(evaluateExpression(item, resolver, registry, options)))));
+    return formulaArray(
+      expression.rows.map((row) =>
+        row.map((item) => scalarize(evaluateExpression(item, resolver, registry, options))),
+      ),
+    );
   if (expression.kind === "error") return createFormulaError(expression.code);
   if (expression.kind === "identifier") {
     const named = resolver.resolveName?.(expression.name);
@@ -218,14 +306,36 @@ function evaluateExpression(
   if (expression.kind === "unary") {
     const value = evaluateExpression(expression.operand, resolver, registry, options);
     return isFormulaArray(value)
-      ? formulaArray(value.rows.map((row) => row.map((item) => { const operand = arithmetic(item); return isFormulaError(operand) ? operand : result(expression.operator === "-" ? -operand : operand); })))
-      : (() => { const operand = arithmetic(value); return isFormulaError(operand) ? operand : result(expression.operator === "-" ? -operand : operand); })();
+      ? formulaArray(
+          value.rows.map((row) =>
+            row.map((item) => {
+              const operand = arithmetic(item);
+              return isFormulaError(operand)
+                ? operand
+                : result(expression.operator === "-" ? -operand : operand);
+            }),
+          ),
+        )
+      : (() => {
+          const operand = arithmetic(value);
+          return isFormulaError(operand)
+            ? operand
+            : result(expression.operator === "-" ? -operand : operand);
+        })();
   }
   if (expression.kind === "binary") {
-    return broadcast(evaluateExpression(expression.left, resolver, registry, options), evaluateExpression(expression.right, resolver, registry, options), (left, right) => binaryScalar(expression.operator, left, right));
+    return broadcast(
+      evaluateExpression(expression.left, resolver, registry, options),
+      evaluateExpression(expression.right, resolver, registry, options),
+      (left, right) => binaryScalar(expression.operator, left, right),
+    );
   }
   const definition = registry.get(expression.name);
-  if (expression.name.toUpperCase() === "IF" && expression.args.length >= 2 && expression.args.length <= 3)
+  if (
+    normalizeFormulaFunctionName(expression.name) === "IF" &&
+    expression.args.length >= 2 &&
+    expression.args.length <= 3
+  )
     return evaluateIfRuntime(expression.args, resolver, registry, options);
   if (!definition) return createFormulaError("NAME");
   const { minArgs, maxArgs } = definition.metadata;
@@ -254,6 +364,13 @@ function evaluateExpression(
   }) as FormulaRuntimeValue;
 }
 
+function* rangeEntries(
+  bounds: FormulaRangeBounds & { sheetName?: string },
+  resolver: FormulaEvaluationResolver,
+) {
+  yield* resolver.resolveRangeEntries?.(bounds) ?? [];
+}
+
 function functionArgument(
   expression: FormulaExpression,
   resolver: FormulaEvaluationResolver,
@@ -269,7 +386,7 @@ function functionArgument(
       return {
         kind: "range" as const,
         values: resolver.resolveRange(named),
-        ...(resolver.resolveRangeEntries ? { entries: resolver.resolveRangeEntries(named) } : {}),
+        ...(resolver.resolveRangeEntries ? { entries: rangeEntries(named, resolver) } : {}),
         bounds: named,
         getValue: (row, column) =>
           resolver.resolveCell({
@@ -289,19 +406,36 @@ function functionArgument(
         ...bounds,
         ...(sheetName ? { sheetName } : {}),
       }),
-      ...(resolver.resolveRangeEntries ? { entries: resolver.resolveRangeEntries({ ...bounds, ...(sheetName ? { sheetName } : {}) }) } : {}),
+      ...(resolver.resolveRangeEntries
+        ? { entries: rangeEntries({ ...bounds, ...(sheetName ? { sheetName } : {}) }, resolver) }
+        : {}),
       bounds,
       getValue: (row, column) =>
         resolver.resolveCell({ row, column, ...(sheetName ? { sheetName } : {}) }),
     };
   }
   if (expression.kind === "axis-range") {
-    const bounds = expression.range.axis === "column"
-      ? { start: { row: 0, column: Math.min(expression.range.start, expression.range.end) }, end: { row: 1_048_575, column: Math.max(expression.range.start, expression.range.end) } }
-      : { start: { row: Math.min(expression.range.start, expression.range.end), column: 0 }, end: { row: Math.max(expression.range.start, expression.range.end), column: 16_383 } };
+    const bounds =
+      expression.range.axis === "column"
+        ? {
+            start: { row: 0, column: Math.min(expression.range.start, expression.range.end) },
+            end: { row: 1_048_575, column: Math.max(expression.range.start, expression.range.end) },
+          }
+        : {
+            start: { row: Math.min(expression.range.start, expression.range.end), column: 0 },
+            end: { row: Math.max(expression.range.start, expression.range.end), column: 16_383 },
+          };
     const sheetName = expression.range.sheetName;
-    return { kind: "range", values: resolver.resolveRange({ ...bounds, ...(sheetName ? { sheetName } : {}) }), ...(resolver.resolveRangeEntries ? { entries: resolver.resolveRangeEntries({ ...bounds, ...(sheetName ? { sheetName } : {}) }) } : {}), bounds,
-      getValue: (row, column) => resolver.resolveCell({ row, column, ...(sheetName ? { sheetName } : {}) }) };
+    return {
+      kind: "range",
+      values: resolver.resolveRange({ ...bounds, ...(sheetName ? { sheetName } : {}) }),
+      ...(resolver.resolveRangeEntries
+        ? { entries: rangeEntries({ ...bounds, ...(sheetName ? { sheetName } : {}) }, resolver) }
+        : {}),
+      bounds,
+      getValue: (row, column) =>
+        resolver.resolveCell({ row, column, ...(sheetName ? { sheetName } : {}) }),
+    };
   }
   const reference = expression.kind === "reference" ? expression.reference : null;
   return {
@@ -316,6 +450,18 @@ function functionArgument(
     ...(reference
       ? {
           address: { row: reference.row, column: reference.column },
+          ...(resolver.resolveRangeEntries
+            ? {
+                entries: rangeEntries(
+                  {
+                    start: reference,
+                    end: reference,
+                    ...(reference.sheetName ? { sheetName: reference.sheetName } : {}),
+                  },
+                  resolver,
+                ),
+              }
+            : {}),
           getValue: (row: number, column: number) =>
             resolver.resolveCell({
               row,
@@ -336,21 +482,38 @@ export function evaluateFormulaAst(
   resolver: FormulaEvaluationResolver,
   options?: FormulaEvaluationOptions,
 ): FormulaValue {
-  return scalarize(evaluateExpression(
+  return scalarize(
+    evaluateExpression(
+      ast.expression,
+      resolver,
+      options?.registry ?? DEFAULT_FORMULA_FUNCTION_REGISTRY,
+      options,
+    ),
+  );
+}
+
+export function evaluateFormulaRuntimeAst(
+  ast: FormulaAst,
+  resolver: FormulaEvaluationResolver,
+  options?: FormulaEvaluationOptions,
+): FormulaRuntimeValue {
+  return evaluateExpression(
     ast.expression,
     resolver,
     options?.registry ?? DEFAULT_FORMULA_FUNCTION_REGISTRY,
     options,
-  ));
+  );
 }
 
-export function evaluateFormulaRuntimeAst(ast: FormulaAst, resolver: FormulaEvaluationResolver, options?: FormulaEvaluationOptions): FormulaRuntimeValue {
-  return evaluateExpression(ast.expression, resolver, options?.registry ?? DEFAULT_FORMULA_FUNCTION_REGISTRY, options);
-}
-
-export function evaluateFormulaRuntime(source: string, resolver: FormulaEvaluationResolver, options?: FormulaEvaluationOptions): FormulaRuntimeValue {
+export function evaluateFormulaRuntime(
+  source: string,
+  resolver: FormulaEvaluationResolver,
+  options?: FormulaEvaluationOptions,
+): FormulaRuntimeValue {
   const parsed = parseFormula(source);
-  return parsed.ok ? evaluateFormulaRuntimeAst(parsed.ast, resolver, options) : createFormulaError("PARSE");
+  return parsed.ok
+    ? evaluateFormulaRuntimeAst(parsed.ast, resolver, options)
+    : createFormulaError("PARSE");
 }
 
 export function evaluateFormula(

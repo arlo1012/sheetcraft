@@ -7,9 +7,7 @@ import {
   type FormulaValue,
 } from "../../formula/index.js";
 
-function resolver(
-  entries: readonly [string, FormulaValue][],
-): FormulaEvaluationResolver {
+function resolver(entries: readonly [string, FormulaValue][]): FormulaEvaluationResolver {
   const values = new Map(entries);
   return {
     resolveCell: ({ row, column }) => values.get(`${row}:${column}`) ?? null,
@@ -75,31 +73,19 @@ describe("math, statistical, lookup, and database functions", () => {
     expect(evaluateFormula("=RADIANS(180)", formulas)).toBeCloseTo(Math.PI);
     expect(evaluateFormula("=LOG(8,2)", formulas)).toBe(3);
     expect(evaluateFormula("=LN(EXP(2))", formulas)).toBeCloseTo(2);
-    expect(evaluateFormula("=ASIN(2)", formulas)).toEqual(
-      createFormulaError("NUM"),
-    );
-    expect(evaluateFormula("=LOG(0)", formulas)).toEqual(
-      createFormulaError("NUM"),
-    );
+    expect(evaluateFormula("=ASIN(2)", formulas)).toEqual(createFormulaError("NUM"));
+    expect(evaluateFormula("=LOG(0)", formulas)).toEqual(createFormulaError("NUM"));
   });
   test("flattens nested dynamic arrays in numeric aggregates", () => {
     const emptyResolver = { resolveCell: () => null, resolveRange: () => [] };
     expect(evaluateFormulaRuntime("=SUM(SEQUENCE(3))", emptyResolver)).toBe(6);
-    expect(
-      evaluateFormulaRuntime("=AVERAGE(SEQUENCE(2,2))", emptyResolver),
-    ).toBe(2.5);
-    expect(
-      evaluateFormulaRuntime('=COUNT(SEQUENCE(2,2),"x")', emptyResolver),
-    ).toBe(4);
-    expect(evaluateFormulaRuntime("=MIN(SEQUENCE(2,2))", emptyResolver)).toBe(
-      1,
+    expect(evaluateFormulaRuntime("=AVERAGE(SEQUENCE(2,2))", emptyResolver)).toBe(2.5);
+    expect(evaluateFormulaRuntime('=COUNT(SEQUENCE(2,2),"x")', emptyResolver)).toBe(4);
+    expect(evaluateFormulaRuntime("=MIN(SEQUENCE(2,2))", emptyResolver)).toBe(1);
+    expect(evaluateFormulaRuntime("=SUM(SEQUENCE(2),{3;4})", emptyResolver)).toBe(10);
+    expect(evaluateFormulaRuntime("=SUM(SEQUENCE(2),{3;#N/A})", emptyResolver)).toEqual(
+      createFormulaError("NA"),
     );
-    expect(
-      evaluateFormulaRuntime("=SUM(SEQUENCE(2),{3;4})", emptyResolver),
-    ).toBe(10);
-    expect(
-      evaluateFormulaRuntime("=SUM(SEQUENCE(2),{3;#N/A})", emptyResolver),
-    ).toEqual(createFormulaError("NA"));
   });
   test("calculates subtotal and aggregate reference operations", () => {
     expect(evaluateFormula("=SUBTOTAL(9,A1:A4)", formulas)).toBe(10);
@@ -137,9 +123,7 @@ describe("math, statistical, lookup, and database functions", () => {
     };
     expect(evaluateFormula("=SUBTOTAL(9,A1:A3)", visibilityResolver)).toBe(4);
     expect(evaluateFormula("=SUBTOTAL(109,A1:A3)", visibilityResolver)).toBe(1);
-    expect(evaluateFormula("=AGGREGATE(9,5,A1:A3)", visibilityResolver)).toBe(
-      1,
-    );
+    expect(evaluateFormula("=AGGREGATE(9,5,A1:A3)", visibilityResolver)).toBe(1);
   });
 
   test("handles compatibility dispersion and rank boundaries", () => {

@@ -5,9 +5,7 @@ import {
   type FormulaValue,
 } from "../../formula/index.js";
 
-function resolver(
-  entries: readonly [string, FormulaValue][],
-): FormulaEvaluationResolver {
+function resolver(entries: readonly [string, FormulaValue][]): FormulaEvaluationResolver {
   const cells = new Map(entries);
   return {
     resolveCell: ({ row, column }) => cells.get(`${row}:${column}`) ?? null,

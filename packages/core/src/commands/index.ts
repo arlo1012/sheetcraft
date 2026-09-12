@@ -7,6 +7,7 @@ export * from "./images.js";
 export * from "./filter.js";
 export * from "./metadata.js";
 export * from "./names.js";
+export * from "./names-from-selection.js";
 export * from "./sheets.js";
 export * from "./structure.js";
 export * from "./sort.js";

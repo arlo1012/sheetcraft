@@ -3,6 +3,8 @@ import { nextTick, ref, useId } from "vue";
 import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
 import FormulaToolbar from "../modules/formula-tools/components/FormulaToolbar.vue";
 import type { CellMergeMode } from "@idea10/core/commands";
+import type { DefinedNameLabelPosition } from "@idea10/core/commands";
+import type { WorkbookCalculationSettings } from "@idea10/core/workbook";
 import type { CellFormatTab } from "../modules/cell-format/components/CellFormatDialog.vue";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
@@ -24,6 +26,8 @@ defineProps<{
   formulaDisabled?: boolean;
   editSessionId?: string;
   recentFunctions?: readonly string[];
+  nameCreationEnabled?: boolean;
+  calculationSettings?: WorkbookCalculationSettings;
 }>();
 
 const emit = defineEmits<{
@@ -38,6 +42,8 @@ const emit = defineEmits<{
   insertFunction: [name: string];
   aggregate: [name: "SUM" | "AVERAGE" | "COUNT" | "MAX" | "MIN"];
   openNames: [];
+  createNamesFromSelection: [positions: readonly DefinedNameLabelPosition[]];
+  updateCalculationSettings: [settings: WorkbookCalculationSettings];
   recalculate: [];
   formulaInteractionEnd: [];
   sort: [direction: "ascending" | "descending"];
@@ -162,9 +168,13 @@ defineSlots<{ "file-actions"?: () => unknown }>();
         :disabled="formulaDisabled ?? disabled"
         :edit-session-id="editSessionId"
         :recent-functions="recentFunctions"
+        :name-creation-enabled="nameCreationEnabled"
+        :calculation-settings="calculationSettings"
         @insert-function="emit('insertFunction', $event)"
         @aggregate="emit('aggregate', $event)"
         @open-names="emit('openNames')"
+        @create-names-from-selection="emit('createNamesFromSelection', $event)"
+        @update-calculation-settings="emit('updateCalculationSettings', $event)"
         @recalculate="emit('recalculate')"
         @interaction-end="emit('formulaInteractionEnd')"
       />

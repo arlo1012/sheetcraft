@@ -109,11 +109,7 @@ export const INFORMATION_FUNCTIONS = [
     (context) => {
       const value = scalar(context.evaluateArgument(0));
       if (isFormulaError(value)) return value;
-      return typeof value === "number"
-        ? value
-        : typeof value === "boolean"
-          ? Number(value)
-          : 0;
+      return typeof value === "number" ? value : typeof value === "boolean" ? Number(value) : 0;
     },
   ),
   defineFunction(

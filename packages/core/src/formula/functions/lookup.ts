@@ -1,13 +1,6 @@
-import {
-  createFormulaError,
-  isFormulaError,
-  type FormulaValue,
-} from "../types.js";
+import { createFormulaError, isFormulaError, type FormulaValue } from "../types.js";
 import { formulaArray, isFormulaArray } from "../runtime.js";
-import type {
-  FormulaFunctionArgument,
-  FormulaFunctionDefinition,
-} from "./contracts.js";
+import type { FormulaFunctionArgument, FormulaFunctionDefinition } from "./contracts.js";
 import {
   compareValues,
   defineFunction,
@@ -23,8 +16,7 @@ function range(
   if (argument.kind === "range") {
     if (!argument.bounds || !argument.getValue) return [...argument.values];
     const rows = argument.bounds.end.row - argument.bounds.start.row + 1;
-    const columns =
-      argument.bounds.end.column - argument.bounds.start.column + 1;
+    const columns = argument.bounds.end.column - argument.bounds.start.column + 1;
     if (rows * columns > 100_000) return createFormulaError("CALC");
     return Array.from({ length: rows * columns }, (_, index) =>
       argument.getValue!(
@@ -66,9 +58,7 @@ function exactIndex(
     if (isFormulaError(comparison)) return comparison;
     if (
       comparison === 0 ||
-      (wildcard &&
-        typeof lookup === "string" &&
-        wildcardMatch(String(value ?? ""), lookup))
+      (wildcard && typeof lookup === "string" && wildcardMatch(String(value ?? ""), lookup))
     )
       return index;
   }
@@ -96,20 +86,14 @@ export const LOOKUP_FUNCTIONS = [
       category: "Lookup",
       minArgs: 2,
       maxArgs: 3,
-      arguments: [
-        { name: "array" },
-        { name: "row_num" },
-        { name: "column_num", optional: true },
-      ],
+      arguments: [{ name: "array" }, { name: "row_num" }, { name: "column_num", optional: true }],
       lazy: false,
     },
     (context) => {
       const shape = dimensions(context.evaluateArgument(0));
       const row = finiteNumber(scalar(context.evaluateArgument(1)));
       const column =
-        context.argumentCount === 3
-          ? finiteNumber(scalar(context.evaluateArgument(2)))
-          : 1;
+        context.argumentCount === 3 ? finiteNumber(scalar(context.evaluateArgument(2))) : 1;
       if (isFormulaError(shape)) return shape;
       if (isFormulaError(row)) return row;
       if (isFormulaError(column)) return column;
@@ -124,13 +108,7 @@ export const LOOKUP_FUNCTIONS = [
       )
         return formulaError("REF");
       const source = context.evaluateArgument(0);
-      if (
-        row > 0 &&
-        column > 0 &&
-        source.kind === "range" &&
-        source.bounds &&
-        source.getValue
-      )
+      if (row > 0 && column > 0 && source.kind === "range" && source.bounds && source.getValue)
         return source.getValue(
           source.bounds.start.row + row - 1,
           source.bounds.start.column + column - 1,
@@ -150,9 +128,7 @@ export const LOOKUP_FUNCTIONS = [
           ]),
         );
       if (column === 0)
-        return formulaArray([
-          array.slice((row - 1) * shape.columns, row * shape.columns),
-        ]);
+        return formulaArray([array.slice((row - 1) * shape.columns, row * shape.columns)]);
       return array[(row - 1) * shape.columns + column - 1] ?? null;
     },
   ),
@@ -173,17 +149,13 @@ export const LOOKUP_FUNCTIONS = [
       const lookup = scalar(context.evaluateArgument(0));
       const array = range(context.evaluateArgument(1));
       const type =
-        context.argumentCount === 3
-          ? finiteNumber(scalar(context.evaluateArgument(2)))
-          : 1;
+        context.argumentCount === 3 ? finiteNumber(scalar(context.evaluateArgument(2))) : 1;
       if (isFormulaError(lookup)) return lookup;
       if (isFormulaError(array)) return array;
       if (isFormulaError(type) || ![1, 0, -1].includes(type))
         return isFormulaError(type) ? type : formulaError("NUM");
       const index =
-        type === 0
-          ? exactIndex(lookup, array, true)
-          : approximateIndex(lookup, array, type === -1);
+        type === 0 ? exactIndex(lookup, array, true) : approximateIndex(lookup, array, type === -1);
       return isFormulaError(index) ? index : index + 1;
     },
   ),
@@ -274,19 +246,13 @@ export const LOOKUP_FUNCTIONS = [
       category: "Lookup",
       minArgs: 2,
       maxArgs: null,
-      arguments: [
-        { name: "index_num" },
-        { name: "value1" },
-        { name: "value2", optional: true },
-      ],
+      arguments: [{ name: "index_num" }, { name: "value1" }, { name: "value2", optional: true }],
       lazy: false,
     },
     (context) => {
       const index = finiteNumber(scalar(context.evaluateArgument(0)));
       if (isFormulaError(index)) return index;
-      return !Number.isInteger(index) ||
-        index < 1 ||
-        index >= context.argumentCount
+      return !Number.isInteger(index) || index < 1 || index >= context.argumentCount
         ? formulaError("VALUE")
         : scalar(context.evaluateArgument(index));
     },
@@ -371,19 +337,12 @@ export const LOOKUP_FUNCTIONS = [
   ),
 ] as const satisfies readonly FormulaFunctionDefinition[];
 
-function xmatch(
-  context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
-): FormulaValue {
+function xmatch(context: Parameters<FormulaFunctionDefinition["evaluate"]>[0]): FormulaValue {
   const lookupValue = scalar(context.evaluateArgument(0));
   const array = range(context.evaluateArgument(1));
-  const mode =
-    context.argumentCount >= 3
-      ? finiteNumber(scalar(context.evaluateArgument(2)))
-      : 0;
+  const mode = context.argumentCount >= 3 ? finiteNumber(scalar(context.evaluateArgument(2))) : 0;
   const search =
-    context.argumentCount === 4
-      ? finiteNumber(scalar(context.evaluateArgument(3)))
-      : 1;
+    context.argumentCount === 4 ? finiteNumber(scalar(context.evaluateArgument(3))) : 1;
   if (isFormulaError(lookupValue)) return lookupValue;
   if (isFormulaError(array)) return array;
   if (
@@ -399,9 +358,7 @@ function xmatch(
       : linearLookup(lookupValue, array, mode, search === -1);
   return isFormulaError(found) ? found : found + 1;
 }
-function lookup(
-  context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
-): FormulaValue {
+function lookup(context: Parameters<FormulaFunctionDefinition["evaluate"]>[0]): FormulaValue {
   const lookupValue = scalar(context.evaluateArgument(0));
   if (isFormulaError(lookupValue)) return lookupValue;
   const lookupArgument = context.evaluateArgument(1);
@@ -413,10 +370,7 @@ function lookup(
   let returns: FormulaValue[];
   if (context.argumentCount === 2) {
     if (shape.rows >= shape.columns) {
-      keys = Array.from(
-        { length: shape.rows },
-        (_, row) => table[row * shape.columns]!,
-      );
+      keys = Array.from({ length: shape.rows }, (_, row) => table[row * shape.columns]!);
       returns = Array.from(
         { length: shape.rows },
         (_, row) => table[(row + 1) * shape.columns - 1]!,
@@ -456,23 +410,15 @@ function coordinate(
   if (context.argumentCount === 0)
     return context.address ? context.address[part] + 1 : formulaError("VALUE");
   const argument = context.evaluateArgument(0);
-  const address =
-    argument.kind === "range" ? argument.bounds?.start : argument.address;
+  const address = argument.kind === "range" ? argument.bounds?.start : argument.address;
   return address ? address[part] + 1 : formulaError("VALUE");
 }
-function address(
-  context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
-): FormulaValue {
+function address(context: Parameters<FormulaFunctionDefinition["evaluate"]>[0]): FormulaValue {
   const row = finiteNumber(scalar(context.evaluateArgument(0)));
   const column = finiteNumber(scalar(context.evaluateArgument(1)));
-  const abs =
-    context.argumentCount >= 3
-      ? finiteNumber(scalar(context.evaluateArgument(2)))
-      : 1;
-  const a1 =
-    context.argumentCount >= 4 ? scalar(context.evaluateArgument(3)) : true;
-  const sheet =
-    context.argumentCount === 5 ? scalar(context.evaluateArgument(4)) : null;
+  const abs = context.argumentCount >= 3 ? finiteNumber(scalar(context.evaluateArgument(2))) : 1;
+  const a1 = context.argumentCount >= 4 ? scalar(context.evaluateArgument(3)) : true;
+  const sheet = context.argumentCount === 5 ? scalar(context.evaluateArgument(4)) : null;
   if (isFormulaError(row)) return row;
   if (isFormulaError(column)) return column;
   if (isFormulaError(abs)) return abs;
@@ -507,8 +453,7 @@ function vertical(
   const table = range(context.evaluateArgument(1));
   const shape = dimensions(context.evaluateArgument(1));
   const index = finiteNumber(scalar(context.evaluateArgument(2)));
-  const approximate =
-    context.argumentCount === 4 ? scalar(context.evaluateArgument(3)) : true;
+  const approximate = context.argumentCount === 4 ? scalar(context.evaluateArgument(3)) : true;
   if (isFormulaError(lookup)) return lookup;
   if (isFormulaError(table)) return table;
   if (isFormulaError(shape)) return shape;
@@ -519,8 +464,7 @@ function vertical(
       : typeof approximate === "number"
         ? approximate !== 0
         : null;
-  if (approximateMatch === null || !Number.isInteger(index))
-    return formulaError("VALUE");
+  if (approximateMatch === null || !Number.isInteger(index)) return formulaError("VALUE");
   const max = direction === "VLOOKUP" ? shape.columns : shape.rows;
   if (index < 1 || index > max) return formulaError("REF");
   const candidates =
@@ -535,9 +479,7 @@ function vertical(
     ? table[found * shape.columns + index - 1]!
     : table[(index - 1) * shape.columns + found]!;
 }
-function xlookup(
-  context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
-): FormulaValue {
+function xlookup(context: Parameters<FormulaFunctionDefinition["evaluate"]>[0]): FormulaValue {
   const lookup = scalar(context.evaluateArgument(0));
   const keys = range(context.evaluateArgument(1));
   const returns = range(context.evaluateArgument(2));
@@ -546,17 +488,9 @@ function xlookup(
   if (isFormulaError(returns)) return returns;
   if (keys.length !== returns.length) return formulaError("VALUE");
   const ifMissing =
-    context.argumentCount >= 4
-      ? scalar(context.evaluateArgument(3))
-      : formulaError("NA");
-  const mode =
-    context.argumentCount >= 5
-      ? finiteNumber(scalar(context.evaluateArgument(4)))
-      : 0;
-  const search =
-    context.argumentCount >= 6
-      ? finiteNumber(scalar(context.evaluateArgument(5)))
-      : 1;
+    context.argumentCount >= 4 ? scalar(context.evaluateArgument(3)) : formulaError("NA");
+  const mode = context.argumentCount >= 5 ? finiteNumber(scalar(context.evaluateArgument(4))) : 0;
+  const search = context.argumentCount >= 6 ? finiteNumber(scalar(context.evaluateArgument(5))) : 1;
   if (
     isFormulaError(mode) ||
     isFormulaError(search) ||
@@ -576,16 +510,14 @@ function linearLookup(
   mode: number,
   reverse: boolean,
 ): number | ReturnType<typeof formulaError> {
-  if (mode === 0 || mode === 2)
-    return exactIndex(lookup, values, mode === 2, reverse);
+  if (mode === 0 || mode === 2) return exactIndex(lookup, values, mode === 2, reverse);
   const indexes = reverse ? [...values.keys()].reverse() : [...values.keys()];
   let closest = -1;
   for (const index of indexes) {
     const comparison = compareValues(values[index]!, lookup);
     if (isFormulaError(comparison)) return comparison;
     if (comparison === 0) return index;
-    if ((mode === -1 && comparison <= 0) || (mode === 1 && comparison >= 0))
-      closest = index;
+    if ((mode === -1 && comparison <= 0) || (mode === 1 && comparison >= 0)) closest = index;
   }
   return closest < 0 ? formulaError("NA") : closest;
 }
@@ -603,8 +535,7 @@ function binaryLookup(
     const comparison = compareValues(values[middle]!, lookup);
     if (isFormulaError(comparison)) return comparison;
     if (comparison === 0) return middle;
-    if ((mode === -1 && comparison < 0) || (mode === 1 && comparison > 0))
-      closest = middle;
+    if ((mode === -1 && comparison < 0) || (mode === 1 && comparison > 0)) closest = middle;
     const ordered = descending ? -comparison : comparison;
     if (ordered < 0) low = middle + 1;
     else high = middle - 1;

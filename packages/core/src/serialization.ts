@@ -1,4 +1,9 @@
 import { WorkbookDomainError } from "./errors.js";
+import {
+  DEFAULT_WORKBOOK_CALCULATION_SETTINGS,
+  normalizeWorkbookCalculationSettings,
+  type WorkbookCalculationSettings,
+} from "./calculation.js";
 import { normalizeExcelDateSystem, type ExcelDateSystem } from "./formula/date-system.js";
 import { parseA1FormulaReference } from "./formula/reference-model.js";
 import { normalizeCellStyle, type CellStyle } from "./style.js";
@@ -117,10 +122,14 @@ export type WorkbookSnapshotV8 = Omit<WorkbookSnapshotV7, "version"> & {
   version: 8;
   definedNames: DefinedNameSnapshot[];
 };
+export type WorkbookSnapshotV9 = Omit<WorkbookSnapshotV8, "version"> & {
+  version: 9;
+  calculation: WorkbookCalculationSettings;
+};
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV8;
+export type WorkbookSnapshot = WorkbookSnapshotV9;
 export type SheetSnapshot = SheetSnapshotV7;
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -502,7 +511,8 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 8,
+    version: 9,
+    calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
     activeSheetId: workbook.activeSheetId,
@@ -528,7 +538,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 5 &&
     record.version !== 6 &&
     record.version !== 7 &&
-    record.version !== 8
+    record.version !== 8 &&
+    record.version !== 9
   ) {
     throw new WorkbookDomainError(
       {
@@ -587,9 +598,22 @@ export function deserializeWorkbook(value: unknown): Workbook {
     return fail("$.activeSheetId", "The active sheet cannot be hidden.");
 
   const definedNames = version >= 8 ? parseDefinedNames(record.definedNames, sheetIds) : new Map();
+  let calculation = { ...DEFAULT_WORKBOOK_CALCULATION_SETTINGS };
+  if (version >= 9) {
+    const settings = asRecord(record.calculation, "$.calculation");
+    try {
+      calculation = normalizeWorkbookCalculationSettings(settings as WorkbookCalculationSettings);
+    } catch (error) {
+      return fail(
+        "$.calculation",
+        error instanceof Error ? error.message : "Invalid calculation settings.",
+      );
+    }
+  }
   return {
     id,
     dateSystem,
+    calculation,
     activeSheetId,
     sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
     definedNames,

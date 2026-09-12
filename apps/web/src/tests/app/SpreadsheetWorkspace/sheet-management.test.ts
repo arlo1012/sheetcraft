@@ -86,6 +86,7 @@ describe("sheet management workspace integration", () => {
     const persisted = serializeWorkbook({
       id: "roundtrip",
       dateSystem: "1900",
+      calculation: { mode: "automatic", iterative: false, maxIterations: 100, maxChange: 0.001 },
       activeSheetId: firstId,
       sheets: new Map([[firstId, sheet]]),
       definedNames: new Map(),

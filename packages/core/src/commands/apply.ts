@@ -41,8 +41,12 @@ import {
   applySetFloatingImageCommand,
 } from "./images.js";
 import type { WorkbookCommand } from "./contracts.js";
-import { applySetWorkbookDateSystemCommand } from "./workbook-settings.js";
+import {
+  applySetWorkbookDateSystemCommand,
+  applySetWorkbookCalculationCommand,
+} from "./workbook-settings.js";
 import { applyDeleteDefinedNameCommand, applyUpsertDefinedNameCommand } from "./names.js";
+import { applySetDefinedNamesCommand } from "./names-from-selection.js";
 import {
   applyClearCellRangeCommand,
   applyMoveCellRangeCommand,
@@ -110,6 +114,10 @@ export function applyWorkbookCommand(
     switch (command.type) {
       case "setWorkbookDateSystem":
         return applySetWorkbookDateSystemCommand(workbook, command);
+      case "setWorkbookCalculation":
+        return applySetWorkbookCalculationCommand(workbook, command);
+      case "setDefinedNames":
+        return applySetDefinedNamesCommand(workbook, command);
       case "upsertDefinedName":
         return applyUpsertDefinedNameCommand(workbook, command);
       case "deleteDefinedName":

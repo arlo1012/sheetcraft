@@ -7,6 +7,7 @@ import { parseFormula } from "@idea10/core/formula";
  */
 export function completeFormulaForCommit(source: string): string {
   if (!source.startsWith("=")) return source;
+  if (/[,;]\s*$/.test(source)) return source;
   let quote: '"' | "'" | null = null;
   let openings = 0;
   for (let index = 0; index < source.length; index += 1) {

@@ -157,12 +157,15 @@ describe("formula input lexical assistance", () => {
       replaceStart: 5,
       replaceEnd: 8,
     });
-    expect(cycleFormulaReferenceAbsoluteMarkers("=A:A", { replaceStart: 1, replaceEnd: 4 }))
-      .toMatchObject({ value: "=$A:$A" });
-    expect(cycleFormulaReferenceAbsoluteMarkers("=$1:$3", { replaceStart: 1, replaceEnd: 6 }))
-      .toMatchObject({ value: "=1:3" });
-    expect(cycleFormulaReferenceAbsoluteMarkers("=A1#", { replaceStart: 1, replaceEnd: 4 }))
-      .toMatchObject({ value: "=$A$1#" });
+    expect(
+      cycleFormulaReferenceAbsoluteMarkers("=A:A", { replaceStart: 1, replaceEnd: 4 }),
+    ).toMatchObject({ value: "=$A:$A" });
+    expect(
+      cycleFormulaReferenceAbsoluteMarkers("=$1:$3", { replaceStart: 1, replaceEnd: 6 }),
+    ).toMatchObject({ value: "=1:3" });
+    expect(
+      cycleFormulaReferenceAbsoluteMarkers("=A1#", { replaceStart: 1, replaceEnd: 4 }),
+    ).toMatchObject({ value: "=$A$1#" });
     expect(
       replaceFormulaReference(
         "=SUM(",

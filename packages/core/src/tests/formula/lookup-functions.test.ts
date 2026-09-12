@@ -7,9 +7,7 @@ import {
 } from "../../formula/index.js";
 import { isFormulaArray } from "../../formula/runtime.js";
 
-function resolver(
-  entries: readonly [string, FormulaValue][],
-): FormulaEvaluationResolver {
+function resolver(entries: readonly [string, FormulaValue][]): FormulaEvaluationResolver {
   const cells = new Map(entries);
   return {
     resolveCell: ({ row, column }) => cells.get(`${row}:${column}`) ?? null,
@@ -75,20 +73,14 @@ describe("lookup compatibility arguments", () => {
     expect(evaluateFormula("=ADDRESS(2,28,1,0)", formulas)).toBe("R2C28");
     expect(evaluateFormula("=ADDRESS(2,28,2,FALSE)", formulas)).toBe("R2C[28]");
     expect(evaluateFormula("=ADDRESS(2,28,3,FALSE)", formulas)).toBe("R[2]C28");
-    expect(evaluateFormula("=ADDRESS(2,28,4,FALSE)", formulas)).toBe(
-      "R[2]C[28]",
-    );
+    expect(evaluateFormula("=ADDRESS(2,28,4,FALSE)", formulas)).toBe("R[2]C[28]");
   });
 });
 
 test("ROW and COLUMN use the formula address when no reference is supplied", () => {
   const resolver = { resolveCell: () => null, resolveRange: () => [] };
-  expect(
-    evaluateFormula("=ROW()", resolver, { address: { row: 4, column: 27 } }),
-  ).toBe(5);
-  expect(
-    evaluateFormula("=COLUMN()", resolver, { address: { row: 4, column: 27 } }),
-  ).toBe(28);
+  expect(evaluateFormula("=ROW()", resolver, { address: { row: 4, column: 27 } })).toBe(5);
+  expect(evaluateFormula("=COLUMN()", resolver, { address: { row: 4, column: 27 } })).toBe(28);
 });
 
 test("lookup functions preserve sparse worksheet range coordinates", () => {

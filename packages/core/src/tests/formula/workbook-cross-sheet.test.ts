@@ -62,6 +62,36 @@ describe("workbook formula evaluation", () => {
     ).toMatchObject({ code: "CYCLE" });
   });
 
+  test("shares one calculation memo across sheet evaluator views", () => {
+    const workbook = createTestWorkbook();
+    const data = createSheet("Data", "data");
+    insertSheet(workbook, data);
+    setCellContent(
+      data,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=SEQUENCE(2)" } },
+    );
+    setCellContent(
+      getActiveSheet(workbook),
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=Data!A2" } },
+    );
+
+    const evaluator = createWorkbookEvaluator(workbook, workbook.activeSheetId);
+    expect(evaluator.getComputedValue({ row: 0, column: 0 })).toBe(2);
+    const dataEvaluator = evaluator.forSheet!(data.id);
+    expect(dataEvaluator.getComputedValue({ row: 1, column: 0 })).toBe(2);
+    expect([...dataEvaluator.getSpillProjections!()]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          address: { row: 1, column: 0 },
+          root: { row: 0, column: 0 },
+          value: 2,
+        }),
+      ]),
+    );
+  });
+
   test("evaluates a deep cross-sheet direct-reference chain without recursion", () => {
     const workbook = createTestWorkbook();
     const data = createSheet("Data", "data");

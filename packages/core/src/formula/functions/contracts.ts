@@ -6,7 +6,13 @@ import type {
   FormulaValue,
 } from "../types.js";
 
-export type FormulaRangeEntry = Readonly<{ address: FormulaAddress; value: FormulaValue; hidden: boolean; filtered: boolean; nestedSubtotal: boolean }>;
+export type FormulaRangeEntry = Readonly<{
+  address: FormulaAddress;
+  value: FormulaValue;
+  hidden: boolean;
+  filtered: boolean;
+  nestedSubtotal: boolean;
+}>;
 
 export type FormulaFunctionArgumentMetadata = Readonly<{ name: string; optional?: boolean }>;
 
@@ -18,6 +24,8 @@ export type FormulaFunctionMetadata = Readonly<{
   maxArgs: number | null;
   arguments: readonly FormulaFunctionArgumentMetadata[];
   lazy: boolean;
+  /** The function can return a dynamic array without an array input. */
+  arrayResult?: boolean;
 }>;
 
 /** A range is enumerated in row-major order. getValue uses sheet coordinates. */
@@ -34,6 +42,7 @@ export type FormulaFunctionArgument =
       /** Present for a direct cell reference when a function needs its anchor. */
       address?: FormulaAddress;
       getValue?: (row: number, column: number) => FormulaValue;
+      entries?: Iterable<FormulaRangeEntry>;
     }>
   | Readonly<{
       kind: "range";

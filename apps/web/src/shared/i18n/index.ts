@@ -67,9 +67,10 @@ export function createAppI18n(locale = resolveInitialLocale()) {
     legacy: false,
     locale,
     fallbackLocale: "en-US",
+    flatJson: true,
     messages: {
-      "zh-CN": zhCN,
-      "en-US": enUS,
+      "zh-CN": structuredClone(zhCN),
+      "en-US": structuredClone(enUS),
     },
   });
 }

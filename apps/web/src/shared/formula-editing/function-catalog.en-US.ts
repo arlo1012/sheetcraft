@@ -205,8 +205,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=SUMPRODUCT(A1:A3,B1:B3)",
     },
     IF: {
-      description:
-        "Returns one value when a condition is true and another when it is false.",
+      description: "Returns one value when a condition is true and another when it is false.",
       example: '=IF(A1>0,"Yes","No")',
     },
     IFERROR: {
@@ -243,8 +242,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: '=IFS(A1>0,"positive",A1<0,"negative")',
     },
     SWITCH: {
-      description:
-        "Matches an expression to values and returns the matching result.",
+      description: "Matches an expression to values and returns the matching result.",
       example: '=SWITCH(A1,1,"one","other")',
     },
     AVERAGE: {
@@ -289,8 +287,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: '=AVERAGEIF(A1:A10,">0")',
     },
     AVERAGEIFS: {
-      description:
-        "Returns the average of values that meet multiple conditions.",
+      description: "Returns the average of values that meet multiple conditions.",
       example: '=AVERAGEIFS(B1:B10,A1:A10,">0")',
     },
     MEDIAN: {
@@ -347,18 +344,15 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=MATCH(A1,A1:A10,0)",
     },
     VLOOKUP: {
-      description:
-        "Looks up a value in the first column and returns a value from that row.",
+      description: "Looks up a value in the first column and returns a value from that row.",
       example: "=VLOOKUP(A1,A1:C10,2,FALSE)",
     },
     HLOOKUP: {
-      description:
-        "Looks up a value in the first row and returns a value from that column.",
+      description: "Looks up a value in the first row and returns a value from that column.",
       example: "=HLOOKUP(A1,A1:C3,2,FALSE)",
     },
     XLOOKUP: {
-      description:
-        "Looks up a value and returns the matching value from another array.",
+      description: "Looks up a value and returns the matching value from another array.",
       example: "=XLOOKUP(A1,A1:A10,B1:B10)",
     },
     LEN: {
@@ -439,8 +433,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=DATE(2026,9,12)",
     },
     TIME: {
-      description:
-        "Returns a time serial number from hours, minutes, and seconds.",
+      description: "Returns a time serial number from hours, minutes, and seconds.",
       example: "=TIME(12,30,0)",
     },
     YEAR: {
@@ -472,13 +465,11 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=DAYS(DATE(2026,9,12),DATE(2026,9,1))",
     },
     EDATE: {
-      description:
-        "Returns a date a number of months before or after a start date.",
+      description: "Returns a date a number of months before or after a start date.",
       example: "=EDATE(DATE(2026,1,1),1)",
     },
     EOMONTH: {
-      description:
-        "Returns the last day of a month before or after a start date.",
+      description: "Returns the last day of a month before or after a start date.",
       example: "=EOMONTH(DATE(2026,1,1),0)",
     },
     WEEKDAY: {
@@ -633,8 +624,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=SUBTOTAL(9,A1:A10)",
     },
     AGGREGATE: {
-      description:
-        "Calculates an aggregate while optionally ignoring errors and hidden rows.",
+      description: "Calculates an aggregate while optionally ignoring errors and hidden rows.",
       example: "=AGGREGATE(9,5,A1:A10)",
     },
     "RANK.EQ": {
@@ -795,8 +785,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=DSTDEV(A1:B3,2,D1:D2)",
     },
     DSTDEVP: {
-      description:
-        "Returns the population standard deviation for database values.",
+      description: "Returns the population standard deviation for database values.",
       example: "=DSTDEVP(A1:B3,2,D1:D2)",
     },
     DSUM: {
@@ -860,8 +849,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=IRR(A1:A4)",
     },
     MIRR: {
-      description:
-        "Returns the modified internal rate of return for cash flows.",
+      description: "Returns the modified internal rate of return for cash flows.",
       example: "=MIRR(A1:A4,0.1,0.12)",
     },
     SLN: {
@@ -873,8 +861,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=SYD(1000,100,5,1)",
     },
     DDB: {
-      description:
-        "Returns double-declining balance depreciation for a period.",
+      description: "Returns double-declining balance depreciation for a period.",
       example: "=DDB(1000,100,5,1)",
     },
     CHAR: {
@@ -946,8 +933,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=STDEV(1,2,3)",
     },
     STDEVP: {
-      description:
-        "Returns the population standard deviation for compatibility.",
+      description: "Returns the population standard deviation for compatibility.",
       example: "=STDEVP(1,2,3)",
     },
     VAR: {
@@ -1063,8 +1049,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=TANH(0)",
     },
     XNPV: {
-      description:
-        "Returns the net present value for cash flows on scheduled dates.",
+      description: "Returns the net present value for cash flows on scheduled dates.",
       example: "=XNPV(0.1,A1:A3,B1:B3)",
     },
     XIRR: {
@@ -1080,13 +1065,11 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=CUMPRINC(0.1,12,1000,1,3,0)",
     },
     "NETWORKDAYS.INTL": {
-      description:
-        "Returns working days between two dates using custom weekends.",
+      description: "Returns working days between two dates using custom weekends.",
       example: "=NETWORKDAYS.INTL(DATE(2026,1,1),DATE(2026,1,10))",
     },
     "WORKDAY.INTL": {
-      description:
-        "Returns a workday before or after a date using custom weekends.",
+      description: "Returns a workday before or after a date using custom weekends.",
       example: "=WORKDAY.INTL(DATE(2026,1,1),5)",
     },
     TEXTBEFORE: {

@@ -22,7 +22,9 @@ type Component = readonly string[];
  * for a deterministic dependency-map insertion order while avoiding a second
  * value map for every iteration.
  */
-export function calculateIterativeComponents(options: IterativeCalculationOptions): Map<string, FormulaValue> {
+export function calculateIterativeComponents(
+  options: IterativeCalculationOptions,
+): Map<string, FormulaValue> {
   validateOptions(options);
 
   const nodes = [...options.dependencies.keys()];
@@ -31,7 +33,9 @@ export function calculateIterativeComponents(options: IterativeCalculationOption
   const reverse = new Map<string, string[]>();
   for (const key of nodes) reverse.set(key, []);
   for (const key of nodes) {
-    const edges = [...(options.dependencies.get(key) ?? [])].filter((dependency) => nodeSet.has(dependency));
+    const edges = [...(options.dependencies.get(key) ?? [])].filter((dependency) =>
+      nodeSet.has(dependency),
+    );
     forward.set(key, edges);
     for (const dependency of edges) reverse.get(dependency)?.push(key);
   }
@@ -62,12 +66,14 @@ export function calculateIterativeComponents(options: IterativeCalculationOption
     const component = components[componentIndex]!;
     if (!isCyclicComponent(component, forward)) {
       const key = component[0]!;
-      resolved.set(key, normalizeValue(options.evaluate(key, (dependency) => readResolved(
-        dependency,
-        new Map(),
-        resolved,
-        options.initialValue,
-      ))));
+      resolved.set(
+        key,
+        normalizeValue(
+          options.evaluate(key, (dependency) =>
+            readResolved(dependency, new Map(), resolved, options.initialValue),
+          ),
+        ),
+      );
       continue;
     }
     const values = new Map<string, FormulaValue>();
@@ -77,9 +83,11 @@ export function calculateIterativeComponents(options: IterativeCalculationOption
       let converged = true;
       for (const key of component) {
         const previous = values.get(key) as FormulaValue;
-        const next = normalizeValue(options.evaluate(key, (dependency) =>
-          readResolved(dependency, values, resolved, options.initialValue),
-        ));
+        const next = normalizeValue(
+          options.evaluate(key, (dependency) =>
+            readResolved(dependency, values, resolved, options.initialValue),
+          ),
+        );
         values.set(key, next);
         if (!hasConverged(previous, next, options.maxChange)) converged = false;
       }
@@ -130,7 +138,10 @@ function hasConverged(previous: FormulaValue, next: FormulaValue, maxChange: num
   return Object.is(previous, next);
 }
 
-function isCyclicComponent(component: Component, forward: ReadonlyMap<string, readonly string[]>): boolean {
+function isCyclicComponent(
+  component: Component,
+  forward: ReadonlyMap<string, readonly string[]>,
+): boolean {
   const onlyKey = component[0]!;
   return component.length > 1 || (forward.get(onlyKey) ?? []).includes(onlyKey);
 }
@@ -201,7 +212,11 @@ function dependencyFirstOrder(dependencies: readonly ReadonlySet<number>[]): num
         const dependency = frame.dependencies[frame.cursor++]!;
         if (!visited.has(dependency)) {
           visited.add(dependency);
-          stack.push({ index: dependency, dependencies: [...dependencies[dependency]!], cursor: 0 });
+          stack.push({
+            index: dependency,
+            dependencies: [...dependencies[dependency]!],
+            cursor: 0,
+          });
         }
         continue;
       }

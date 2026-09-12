@@ -23,14 +23,21 @@ function initial(_key: string): FormulaValue {
 
 describe("iterative calculation", () => {
   test("converges a self-referencing formula from zero", () => {
-    const values = calculate(new Map([["x", new Set(["x"])]]), (_key, read) => (read("x") as number + 1) / 2);
+    const values = calculate(
+      new Map([["x", new Set(["x"])]]),
+      (_key, read) => ((read("x") as number) + 1) / 2,
+    );
     expect(values.get("x")).toBeCloseTo(1, 5);
   });
 
   test("converges a mutual cycle", () => {
     const values = calculate(
-      new Map([["a", new Set(["b"])], ["b", new Set(["a"])]]),
-      (key, read) => key === "a" ? ((read("b") as number) + 2) / 2 : ((read("a") as number) + 2) / 2,
+      new Map([
+        ["a", new Set(["b"])],
+        ["b", new Set(["a"])],
+      ]),
+      (key, read) =>
+        key === "a" ? ((read("b") as number) + 2) / 2 : ((read("a") as number) + 2) / 2,
     );
     expect(values.get("a")).toBeCloseTo(2, 5);
     expect(values.get("b")).toBeCloseTo(2, 5);
@@ -42,7 +49,10 @@ describe("iterative calculation", () => {
         ["a", new Set(["a"])],
         ["b", new Set(["b", "a"])],
       ]),
-      (key, read) => key === "a" ? ((read("a") as number) + 1) / 2 : ((read("b") as number) + (read("a") as number)) / 2,
+      (key, read) =>
+        key === "a"
+          ? ((read("a") as number) + 1) / 2
+          : ((read("b") as number) + (read("a") as number)) / 2,
     );
     expect(values.get("a")).toBeCloseTo(1, 5);
     expect(values.get("b")).toBeCloseTo(1, 5);
@@ -90,8 +100,11 @@ describe("iterative calculation", () => {
 
   test("keeps calculated acyclic nodes internal to the result", () => {
     const values = calculate(
-      new Map([["a", new Set(["b"])], ["b", new Set()]]),
-      (key, read) => key === "a" ? (read("b") as number) + 1 : 1,
+      new Map([
+        ["a", new Set(["b"])],
+        ["b", new Set()],
+      ]),
+      (key, read) => (key === "a" ? (read("b") as number) + 1 : 1),
     );
     expect(values).toEqual(new Map());
   });

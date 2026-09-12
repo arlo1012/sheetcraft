@@ -61,7 +61,11 @@ import {
 } from "@idea10/core/input";
 import { isTextCellNumberFormat } from "@idea10/core/number-format";
 import type { ExcelDateSystem } from "@idea10/core/formula";
-import { createAutoSumFormula, createFormulaError } from "@idea10/core/formula";
+import {
+  createAutoSumFormula,
+  createFormulaError,
+  createWorkbookCalculationSession,
+} from "@idea10/core/formula";
 import { doMergedCellRangesIntersect } from "@idea10/core";
 import { WorkbookDomainError } from "@idea10/core/errors";
 import type { IdFactory } from "@idea10/core/runtime";
@@ -78,7 +82,6 @@ import {
 } from "@idea10/core/style-state";
 import {
   getActiveSheet,
-  createWorkbookEvaluator,
   getCellContent,
   getCellStyle,
   getWorkbookSheets,
@@ -181,6 +184,7 @@ export function useSpreadsheetWorkspaceController(
   const { t, locale } = useAppI18n();
   const idFactory = options.idFactory ?? createBrowserIdFactory();
   const session = reactive(createWorkbookSession({ idFactory })) as WorkbookSession;
+  let calculation = createWorkbookCalculationSession(session.workbook);
   const viewStates = reactive(new Map<string, SheetGridViewState>());
   const gridRef = shallowRef<SheetGridNavigator>();
   const workbookVersion = ref(0);
@@ -211,7 +215,7 @@ export function useSpreadsheetWorkspaceController(
   const activeSheetEvaluator = computed(() => {
     void workbookVersion.value;
     void calculationVersion.value;
-    return createWorkbookEvaluator(session.workbook, activeSheet.value.id);
+    return calculation.getEvaluator(activeSheet.value.id);
   });
   const activeSelectionRange = computed<CellRange>(() => {
     const selection = activeSheetViewState.value?.selection;
@@ -395,6 +399,9 @@ export function useSpreadsheetWorkspaceController(
   function execute(command: WorkbookCommand, operation?: WorkbookOperation): boolean {
     let changed: boolean;
     try {
+      calculation.prepareMutation(
+        command.type === "setWorkbookCalculation" ? command.calculation.mode : undefined,
+      );
       changed = executeWorkbookCommand(session, command, operation);
     } catch (error) {
       if (error instanceof WorkbookDomainError && error.data.code === "sheet_protected") {
@@ -403,6 +410,7 @@ export function useSpreadsheetWorkspaceController(
       throw error;
     }
     if (changed) {
+      calculation.invalidate();
       workbookVersion.value += 1;
       pruneViewStates();
     }
@@ -1132,6 +1140,7 @@ export function useSpreadsheetWorkspaceController(
   function replaceWorkbook(workbook: Workbook): void {
     gridRef.value?.clearClipboard?.();
     session.workbook = workbook;
+    calculation = createWorkbookCalculationSession(session.workbook);
     session.history = createWorkbookHistory(session.history.maxEntries);
     viewStates.clear();
     searchQuery.value = "";
@@ -1207,8 +1216,13 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function undo(): boolean {
+    const command = session.history.undoStack.at(-1)?.command;
+    calculation.prepareMutation(
+      command?.type === "setWorkbookCalculation" ? command.calculation.mode : undefined,
+    );
     const changed = undoWorkbookCommand(session);
     if (changed) {
+      calculation.invalidate();
       workbookVersion.value += 1;
       pruneViewStates();
     }
@@ -1216,8 +1230,13 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function redo(): boolean {
+    const command = session.history.redoStack.at(-1)?.command;
+    calculation.prepareMutation(
+      command?.type === "setWorkbookCalculation" ? command.calculation.mode : undefined,
+    );
     const changed = redoWorkbookCommand(session);
     if (changed) {
+      calculation.invalidate();
       workbookVersion.value += 1;
       pruneViewStates();
     }
@@ -1249,6 +1268,7 @@ export function useSpreadsheetWorkspaceController(
     session,
     executeCommand: execute,
     recalculate: () => {
+      calculation.recalculate();
       calculationVersion.value += 1;
     },
     workbookRevision: readonly(workbookVersion),

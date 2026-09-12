@@ -1,7 +1,10 @@
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellRange } from "@idea10/core/workbook";
 import { formatCellAddress } from "@idea10/core/coordinates";
 import { getFormulaFunctionMetadata, type FormulaFunctionMetadata } from "@idea10/core/formula";
-import { getFormulaReferenceTokens, type FormulaReferenceRangeKind } from "./formula-reference-tokens";
+import {
+  getFormulaReferenceTokens,
+  type FormulaReferenceRangeKind,
+} from "./formula-reference-tokens";
 
 export type FormulaFunctionCandidate = FormulaFunctionMetadata & Readonly<{ id: string }>;
 
@@ -217,9 +220,11 @@ function cycleSingleReference(reference: string): string {
 }
 
 function inferReferenceRangeKind(range: CellRange): Exclude<FormulaReferenceRangeKind, "spill"> {
-  const rows = Math.min(range.start.row, range.end.row) === 0 &&
+  const rows =
+    Math.min(range.start.row, range.end.row) === 0 &&
     Math.max(range.start.row, range.end.row) === MAX_SHEET_ROWS - 1;
-  const columns = Math.min(range.start.column, range.end.column) === 0 &&
+  const columns =
+    Math.min(range.start.column, range.end.column) === 0 &&
     Math.max(range.start.column, range.end.column) === MAX_SHEET_COLUMNS - 1;
   if (rows && !columns) return "column-axis";
   if (columns && !rows) return "row-axis";

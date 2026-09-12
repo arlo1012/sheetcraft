@@ -1,4 +1,10 @@
-import { createFormulaError, isFormulaError, type FormulaArray, type FormulaRuntimeValue, type FormulaValue } from "./types.js";
+import {
+  createFormulaError,
+  isFormulaError,
+  type FormulaArray,
+  type FormulaRuntimeValue,
+  type FormulaValue,
+} from "./types.js";
 
 export function formulaArray(rows: readonly (readonly FormulaValue[])[]): FormulaArray {
   const width = rows[0]?.length ?? 0;
@@ -8,7 +14,9 @@ export function formulaArray(rows: readonly (readonly FormulaValue[])[]): Formul
 }
 
 export function isFormulaArray(value: FormulaRuntimeValue): value is FormulaArray {
-  return typeof value === "object" && value !== null && "kind" in value && value.kind === "formula-array";
+  return (
+    typeof value === "object" && value !== null && "kind" in value && value.kind === "formula-array"
+  );
 }
 
 export function scalarize(value: FormulaRuntimeValue): FormulaValue {

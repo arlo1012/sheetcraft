@@ -1,5 +1,6 @@
 import type { SheetSnapshot } from "../serialization.js";
 import type { ExcelDateSystem } from "../formula/date-system.js";
+import type { WorkbookCalculationSettings } from "../calculation.js";
 import type { CellContent } from "../formula/types.js";
 import type {
   CellBorderAction,
@@ -239,6 +240,12 @@ export type DeleteDefinedNameCommand = {
   id: string;
 };
 
+/** Adds or removes names as one history entry, without renaming existing definitions. */
+export type SetDefinedNamesCommand = {
+  type: "setDefinedNames";
+  changes: Array<{ id: string; definition: DefinedName | null }>;
+};
+
 export type MoveSheetCommand = {
   type: "moveSheet";
   sheetId: string;
@@ -316,8 +323,15 @@ export type SetWorkbookDateSystemCommand = {
   dateSystem: ExcelDateSystem;
 };
 
+export type SetWorkbookCalculationCommand = {
+  type: "setWorkbookCalculation";
+  calculation: WorkbookCalculationSettings;
+};
+
 export type WorkbookCommand =
   | SetWorkbookDateSystemCommand
+  | SetWorkbookCalculationCommand
+  | SetDefinedNamesCommand
   | SetCellContentsCommand
   | ClearCellRangeCommand
   | MoveCellRangeCommand
@@ -352,6 +366,7 @@ export type WorkbookCommand =
 
 export type WorkbookOperation =
   | "workbook.dateSystem"
+  | "workbook.calculation"
   | "cells.edit"
   | "cells.paste"
   | "cells.move"
@@ -383,6 +398,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
   switch (command.type) {
     case "setWorkbookDateSystem":
       return "workbook.dateSystem";
+    case "setWorkbookCalculation":
+      return "workbook.calculation";
     case "setCellContents":
       return "cells.edit";
     case "clearCellRange":
@@ -434,6 +451,7 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "sheets.move";
     case "upsertDefinedName":
     case "deleteDefinedName":
+    case "setDefinedNames":
       return "formulas.names";
     case "insertSheetAxis":
       return "structure.insert";

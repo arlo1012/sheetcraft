@@ -16,7 +16,10 @@ import {
   type FormulaReferenceEditContext,
 } from "./formula-input-lexical";
 import type { FormulaReferenceEditor, FormulaReferencePickPhase } from "./formula-editor-contract";
-import { getFormulaReferenceTokens, type FormulaReferenceRangeKind } from "./formula-reference-tokens";
+import {
+  getFormulaReferenceTokens,
+  type FormulaReferenceRangeKind,
+} from "./formula-reference-tokens";
 
 const props = defineProps<{
   value: string;

@@ -1,4 +1,14 @@
-import { createFormulaError, isFormulaError, type FormulaValue } from "../formula/types.js";
+import { createFormulaError } from "../formula/types.js";
+import {
+  getSheetFilterValue,
+  getSheetFilterValueKey,
+  areSheetFilterValuesEqual,
+} from "../filter-values.js";
+export {
+  getSheetFilterValue,
+  getSheetFilterValueKey,
+  areSheetFilterValuesEqual,
+} from "../filter-values.js";
 import {
   createSheetEvaluator,
   createSheetSparseState,
@@ -20,29 +30,6 @@ import {
 } from "./helpers.js";
 
 export type HiddenRowInterval = { start: number; end: number };
-
-export function getSheetFilterValue(value: FormulaValue): SheetFilterValue {
-  if (value === null) return { kind: "blank" };
-  if (isFormulaError(value)) return { kind: "error", code: value.code };
-  if (typeof value === "number") return { kind: "number", value };
-  if (typeof value === "string") return { kind: "string", value };
-  return { kind: "boolean", value };
-}
-
-export function getSheetFilterValueKey(value: SheetFilterValue): string {
-  return value.kind === "blank"
-    ? "blank"
-    : value.kind === "error"
-      ? `error:${value.code}`
-      : `${value.kind}:${String(value.value)}`;
-}
-
-export function areSheetFilterValuesEqual(
-  left: SheetFilterValue,
-  right: SheetFilterValue,
-): boolean {
-  return getSheetFilterValueKey(left) === getSheetFilterValueKey(right);
-}
 
 function cloneFilter(filter: SheetFilter): SheetFilter {
   return {
