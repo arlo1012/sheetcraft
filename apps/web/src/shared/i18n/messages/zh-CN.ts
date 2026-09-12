@@ -162,7 +162,7 @@ export const zhCN = {
     formulaInsertionUnavailable: "请将光标放到公式的参数或运算符之后，再插入函数。",
     recalculated: "已重新计算工作簿。",
     nameInvalid: "请检查名称、作用域和引用区域；同一作用域内名称不能重复。",
-    nameSaved: "已保存名称 {name}。",
+    nameSaved: "已保存名称 {name}",
     nameDeleted: "已删除名称。",
     filterUnavailable: "当前选区无法应用筛选。",
     sortUnavailable: "当前选区无法排序。",
