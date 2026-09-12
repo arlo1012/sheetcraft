@@ -61,6 +61,46 @@ function textJoin(context: FormulaFunctionContext): FormulaValue {
   return items.join(delimiter);
 }
 
+function numberValue(context: FormulaFunctionContext): FormulaValue {
+  const source = text(direct(context, 0));
+  const decimal = context.argumentCount > 1 ? text(direct(context, 1)) : ".";
+  const group = context.argumentCount > 2 ? text(direct(context, 2)) : ",";
+  if (isFormulaError(source) || isFormulaError(decimal) || isFormulaError(group))
+    return isFormulaError(source) ? source : isFormulaError(decimal) ? decimal : group;
+  if (decimal.length !== 1 || group.length > 1 || decimal === group) return formulaError("VALUE");
+  const trimmed = source.trim();
+  if (trimmed === "") return formulaError("VALUE");
+  const normalized = group === "" ? trimmed : trimmed.split(group).join("");
+  const expression = decimal === "." ? normalized : normalized.split(decimal).join(".");
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(expression))
+    return formulaError("VALUE");
+  const result = Number(expression);
+  return Number.isFinite(result) ? result : formulaError("VALUE");
+}
+
+function fixedText(context: FormulaFunctionContext, currency: boolean): FormulaValue {
+  const value = finiteNumber(direct(context, 0));
+  const decimals = context.argumentCount > 1 ? count(context, 1) : 2;
+  const noCommas = !currency && context.argumentCount > 2 ? direct(context, 2) : false;
+  if (isFormulaError(value) || isFormulaError(decimals) || isFormulaError(noCommas))
+    return isFormulaError(value) ? value : isFormulaError(decimals) ? decimals : noCommas;
+  if (typeof noCommas !== "boolean" || decimals < -127 || decimals > 127)
+    return formulaError("VALUE");
+  const precision = Math.max(0, decimals);
+  const rounded =
+    decimals < 0
+      ? Math.round(value / 10 ** -decimals) * 10 ** -decimals
+      : Number(value.toFixed(precision));
+  if (!Number.isFinite(rounded)) return formulaError("NUM");
+  const magnitude = Math.abs(rounded).toFixed(precision);
+  const [integer, fraction] = magnitude.split(".");
+  const grouped = noCommas ? integer! : integer!.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const result =
+    decimals < 0 ? grouped : fraction === undefined ? grouped : `${grouped}.${fraction}`;
+  if (currency) return value < 0 ? `($${result})` : `$${result}`;
+  return value < 0 ? `-${result}` : result;
+}
+
 export const TEXT_FUNCTIONS = [
   defineFunction(
     {
@@ -75,6 +115,120 @@ export const TEXT_FUNCTIONS = [
       const value = text(direct(context, 0));
       return isFormulaError(value) ? value : [...value].length;
     },
+  ),
+  defineFunction(
+    {
+      name: "CHAR",
+      category: "Text",
+      minArgs: 1,
+      maxArgs: 1,
+      arguments: [{ name: "number" }],
+      lazy: false,
+    },
+    (context) => {
+      const code = count(context, 0);
+      return isFormulaError(code) || code < 1 || code > 255
+        ? formulaError("VALUE")
+        : String.fromCharCode(code);
+    },
+  ),
+  defineFunction(
+    {
+      name: "CODE",
+      category: "Text",
+      minArgs: 1,
+      maxArgs: 1,
+      arguments: [{ name: "text" }],
+      lazy: false,
+    },
+    (context) => {
+      const value = text(direct(context, 0));
+      return isFormulaError(value)
+        ? value
+        : value === ""
+          ? formulaError("VALUE")
+          : value.charCodeAt(0);
+    },
+  ),
+  defineFunction(
+    {
+      name: "UNICHAR",
+      category: "Text",
+      minArgs: 1,
+      maxArgs: 1,
+      arguments: [{ name: "number" }],
+      lazy: false,
+    },
+    (context) => {
+      const code = count(context, 0);
+      if (
+        isFormulaError(code) ||
+        code <= 0 ||
+        code > 0x10ffff ||
+        (code >= 0xd800 && code <= 0xdfff)
+      )
+        return formulaError("VALUE");
+      return String.fromCodePoint(code);
+    },
+  ),
+  defineFunction(
+    {
+      name: "UNICODE",
+      category: "Text",
+      minArgs: 1,
+      maxArgs: 1,
+      arguments: [{ name: "text" }],
+      lazy: false,
+    },
+    (context) => {
+      const value = text(direct(context, 0));
+      return isFormulaError(value)
+        ? value
+        : value === ""
+          ? formulaError("VALUE")
+          : value.codePointAt(0)!;
+    },
+  ),
+  defineFunction(
+    {
+      name: "NUMBERVALUE",
+      category: "Text",
+      minArgs: 1,
+      maxArgs: 3,
+      arguments: [
+        { name: "text" },
+        { name: "decimal_separator", optional: true },
+        { name: "group_separator", optional: true },
+      ],
+      lazy: false,
+    },
+    numberValue,
+  ),
+  defineFunction(
+    {
+      name: "DOLLAR",
+      category: "Text",
+      minArgs: 1,
+      maxArgs: 2,
+      arguments: [{ name: "number" }, { name: "decimals", optional: true }],
+      lazy: false,
+    },
+    (context) => fixedText(context, true),
+  ),
+  defineFunction(
+    {
+      name: "FIXED",
+      category: "Text",
+      minArgs: 1,
+      maxArgs: 3,
+      arguments: [
+        { name: "number" },
+        { name: "decimals", optional: true },
+        { name: "no_commas", optional: true },
+      ],
+      lazy: false,
+    },
+    (context) => fixedText(context, false),
   ),
   defineFunction(
     {

@@ -27,3 +27,26 @@ describe("financial function payment type", () => {
     expect(evaluateFormula("=PMT(1%,12,100,0,2)", resolver)).toEqual(createFormulaError("NUM"));
   });
 });
+
+describe("expanded financial functions", () => {
+  test("solves rates and separates interest and principal payments", () => {
+    expect(evaluateFormula("=RATE(12,-100,1000)", resolver)).toBeCloseTo(0.0292285, 6);
+    expect(evaluateFormula("=IPMT(1%,1,12,1000)", resolver)).toBeCloseTo(-10, 8);
+    expect(evaluateFormula("=PPMT(1%,1,12,1000)", resolver)).toBeCloseTo(-78.8488, 3);
+  });
+
+  test("calculates periodic-return functions", () => {
+    const cashflowResolver: FormulaEvaluationResolver = {
+      resolveCell: ({ column }) => [-100, 60, 60][column] ?? null,
+      resolveRange: () => [-100, 60, 60],
+    };
+    expect(evaluateFormula("=IRR(A1:C1)", cashflowResolver)).toBeCloseTo(0.130662, 5);
+    expect(evaluateFormula("=MIRR(A1:C1,10%,12%)", cashflowResolver)).toBeCloseTo(0.12783, 4);
+  });
+
+  test("calculates common depreciation schedules", () => {
+    expect(evaluateFormula("=SLN(1000,100,3)", resolver)).toBe(300);
+    expect(evaluateFormula("=SYD(1000,100,3,1)", resolver)).toBe(450);
+    expect(evaluateFormula("=DDB(1000,100,5,1)", resolver)).toBe(400);
+  });
+});

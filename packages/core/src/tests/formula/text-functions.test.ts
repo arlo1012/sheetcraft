@@ -25,3 +25,26 @@ describe("FIND and SEARCH character positions", () => {
     expect(evaluateFormula('=FIND("a","abc",4)', resolver)).toEqual(createFormulaError("VALUE"));
   });
 });
+
+describe("expanded text conversion functions", () => {
+  test("converts legacy character codes and Unicode code points", () => {
+    expect(evaluateFormula("=CHAR(65)", resolver)).toBe("A");
+    expect(evaluateFormula('=CODE("A")', resolver)).toBe(65);
+    expect(evaluateFormula("=UNICHAR(128578)", resolver)).toBe("🙂");
+    expect(evaluateFormula('=UNICODE("🙂")', resolver)).toBe(128578);
+    expect(evaluateFormula("=CHAR(0)", resolver)).toEqual(createFormulaError("VALUE"));
+  });
+
+  test("parses explicit decimal and group separators", () => {
+    expect(evaluateFormula('=NUMBERVALUE("1.234,5",",",".")', resolver)).toBe(1234.5);
+    expect(evaluateFormula('=NUMBERVALUE("not a number")', resolver)).toEqual(
+      createFormulaError("VALUE"),
+    );
+  });
+
+  test("formats fixed decimal and currency text", () => {
+    expect(evaluateFormula("=DOLLAR(-1234.567,2)", resolver)).toBe("($1,234.57)");
+    expect(evaluateFormula("=FIXED(1234.567,1,TRUE)", resolver)).toBe("1234.6");
+    expect(evaluateFormula("=FIXED(1234.567,-2)", resolver)).toBe("1,200");
+  });
+});

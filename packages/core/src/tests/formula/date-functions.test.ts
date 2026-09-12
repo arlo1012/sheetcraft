@@ -30,3 +30,20 @@ describe("date function bounds", () => {
     );
   });
 });
+
+describe("expanded date functions", () => {
+  test("calculates business days, workdays, and week numbers", () => {
+    expect(evaluateFormula("=NETWORKDAYS(DATE(2024,1,1),DATE(2024,1,7))", resolver)).toBe(5);
+    expect(
+      evaluateFormula("=NETWORKDAYS(DATE(2024,1,1),DATE(2024,1,7),DATE(2024,1,1))", resolver),
+    ).toBe(4);
+    expect(evaluateFormula("=WORKDAY(DATE(2024,1,5),1)", resolver)).toBe(45299);
+    expect(evaluateFormula("=ISOWEEKNUM(DATE(2024,1,1))", resolver)).toBe(1);
+    expect(evaluateFormula("=WEEKNUM(DATE(2024,1,1),21)", resolver)).toBe(1);
+  });
+
+  test("uses requested day count convention", () => {
+    expect(evaluateFormula("=DAYS360(DATE(2024,1,31),DATE(2024,2,29))", resolver)).toBe(30);
+    expect(evaluateFormula("=YEARFRAC(DATE(2024,1,1),DATE(2025,1,1),3)", resolver)).toBe(366 / 365);
+  });
+});

@@ -68,6 +68,71 @@ function decimalTo(context: FormulaFunctionContext, base: 2 | 16): FormulaValue 
   return requested === 0 ? result : result.padStart(requested, "0");
 }
 
+const MAX_BIT = 2 ** 48 - 1;
+
+function bitOperand(
+  context: FormulaFunctionContext,
+  index: number,
+): number | ReturnType<typeof formulaError> {
+  const result = integer(context, index);
+  return isFormulaError(result) || result < 0 || result > MAX_BIT ? formulaError("NUM") : result;
+}
+
+function bitwise(
+  context: FormulaFunctionContext,
+  operator: (left: bigint, right: bigint) => bigint,
+): FormulaValue {
+  const left = bitOperand(context, 0);
+  const right = bitOperand(context, 1);
+  if (isFormulaError(left) || isFormulaError(right)) return isFormulaError(left) ? left : right;
+  return Number(operator(BigInt(left), BigInt(right)));
+}
+
+function shift(context: FormulaFunctionContext, direction: 1 | -1): FormulaValue {
+  const value = bitOperand(context, 0);
+  const amount = integer(context, 1);
+  if (isFormulaError(value) || isFormulaError(amount))
+    return isFormulaError(value) ? value : amount;
+  if (Math.abs(amount) > 53) return formulaError("NUM");
+  const effective = amount * direction;
+  const result =
+    effective >= 0 ? BigInt(value) << BigInt(effective) : BigInt(value) >> BigInt(-effective);
+  return result > BigInt(MAX_BIT) ? formulaError("NUM") : Number(result);
+}
+
+type Unit = Readonly<{ dimension: string; scale: number; offset?: number }>;
+
+const UNITS: Readonly<Record<string, Unit>> = {
+  m: { dimension: "length", scale: 1 },
+  km: { dimension: "length", scale: 1_000 },
+  cm: { dimension: "length", scale: 0.01 },
+  mm: { dimension: "length", scale: 0.001 },
+  in: { dimension: "length", scale: 0.0254 },
+  ft: { dimension: "length", scale: 0.3048 },
+  yd: { dimension: "length", scale: 0.9144 },
+  mi: { dimension: "length", scale: 1_609.344 },
+  g: { dimension: "mass", scale: 1 },
+  kg: { dimension: "mass", scale: 1_000 },
+  lbm: { dimension: "mass", scale: 453.59237 },
+  ozm: { dimension: "mass", scale: 28.349523125 },
+  s: { dimension: "time", scale: 1 },
+  min: { dimension: "time", scale: 60 },
+  hr: { dimension: "time", scale: 3_600 },
+  day: { dimension: "time", scale: 86_400 },
+  C: { dimension: "temperature", scale: 1, offset: 0 },
+  F: { dimension: "temperature", scale: 5 / 9, offset: -32 },
+  K: { dimension: "temperature", scale: 1, offset: -273.15 },
+};
+
+function unitText(
+  context: FormulaFunctionContext,
+  index: number,
+): string | ReturnType<typeof formulaError> {
+  const source = value(context, index);
+  if (isFormulaError(source)) return source;
+  return typeof source === "string" ? source : formulaError("VALUE");
+}
+
 export const ENGINEERING_FUNCTIONS = [
   defineFunction(
     {
@@ -112,5 +177,123 @@ export const ENGINEERING_FUNCTIONS = [
       lazy: false,
     },
     (context) => decimalTo(context, 16),
+  ),
+  defineFunction(
+    {
+      name: "BITAND",
+      category: "Engineering",
+      minArgs: 2,
+      maxArgs: 2,
+      arguments: [{ name: "number1" }, { name: "number2" }],
+      lazy: false,
+    },
+    (context) => bitwise(context, (left, right) => left & right),
+  ),
+  defineFunction(
+    {
+      name: "BITOR",
+      category: "Engineering",
+      minArgs: 2,
+      maxArgs: 2,
+      arguments: [{ name: "number1" }, { name: "number2" }],
+      lazy: false,
+    },
+    (context) => bitwise(context, (left, right) => left | right),
+  ),
+  defineFunction(
+    {
+      name: "BITXOR",
+      category: "Engineering",
+      minArgs: 2,
+      maxArgs: 2,
+      arguments: [{ name: "number1" }, { name: "number2" }],
+      lazy: false,
+    },
+    (context) => bitwise(context, (left, right) => left ^ right),
+  ),
+  defineFunction(
+    {
+      name: "BITLSHIFT",
+      category: "Engineering",
+      minArgs: 2,
+      maxArgs: 2,
+      arguments: [{ name: "number" }, { name: "shift_amount" }],
+      lazy: false,
+    },
+    (context) => shift(context, 1),
+  ),
+  defineFunction(
+    {
+      name: "BITRSHIFT",
+      category: "Engineering",
+      minArgs: 2,
+      maxArgs: 2,
+      arguments: [{ name: "number" }, { name: "shift_amount" }],
+      lazy: false,
+    },
+    (context) => shift(context, -1),
+  ),
+  defineFunction(
+    {
+      name: "DELTA",
+      category: "Engineering",
+      minArgs: 1,
+      maxArgs: 2,
+      arguments: [{ name: "number1" }, { name: "number2", optional: true }],
+      lazy: false,
+    },
+    (context) => {
+      const first = finiteNumber(value(context, 0));
+      const second = context.argumentCount === 1 ? 0 : finiteNumber(value(context, 1));
+      return isFormulaError(first)
+        ? first
+        : isFormulaError(second)
+          ? second
+          : first === second
+            ? 1
+            : 0;
+    },
+  ),
+  defineFunction(
+    {
+      name: "GESTEP",
+      category: "Engineering",
+      minArgs: 1,
+      maxArgs: 2,
+      arguments: [{ name: "number" }, { name: "step", optional: true }],
+      lazy: false,
+    },
+    (context) => {
+      const number = finiteNumber(value(context, 0));
+      const step = context.argumentCount === 1 ? 0 : finiteNumber(value(context, 1));
+      return isFormulaError(number) ? number : isFormulaError(step) ? step : number >= step ? 1 : 0;
+    },
+  ),
+  defineFunction(
+    {
+      name: "CONVERT",
+      category: "Engineering",
+      minArgs: 3,
+      maxArgs: 3,
+      arguments: [{ name: "number" }, { name: "from_unit" }, { name: "to_unit" }],
+      lazy: false,
+    },
+    (context) => {
+      const amount = finiteNumber(value(context, 0));
+      const fromName = unitText(context, 1);
+      const toName = unitText(context, 2);
+      if (isFormulaError(amount) || isFormulaError(fromName) || isFormulaError(toName))
+        return isFormulaError(amount) ? amount : isFormulaError(fromName) ? fromName : toName;
+      const from = UNITS[fromName];
+      const to = UNITS[toName];
+      if (!from || !to || from.dimension !== to.dimension) return formulaError("NA");
+      const base =
+        from.dimension === "temperature"
+          ? (amount + from.offset!) * from.scale
+          : amount * from.scale;
+      const result =
+        to.dimension === "temperature" ? base / to.scale - to.offset! : base / to.scale;
+      return Number.isFinite(result) ? result : formulaError("NUM");
+    },
   ),
 ] as const satisfies readonly FormulaFunctionDefinition[];
