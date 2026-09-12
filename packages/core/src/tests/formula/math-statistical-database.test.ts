@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   createFormulaError,
   evaluateFormula,
+  evaluateFormulaRuntime,
   type FormulaEvaluationResolver,
   type FormulaValue,
 } from "../../formula/index.js";
@@ -72,6 +73,26 @@ describe("math, statistical, lookup, and database functions", () => {
       createFormulaError("NUM"),
     );
   });
+  test("flattens nested dynamic arrays in numeric aggregates", () => {
+    const emptyResolver = { resolveCell: () => null, resolveRange: () => [] };
+    expect(evaluateFormulaRuntime("=SUM(SEQUENCE(3))", emptyResolver)).toBe(6);
+    expect(
+      evaluateFormulaRuntime("=AVERAGE(SEQUENCE(2,2))", emptyResolver),
+    ).toBe(2.5);
+    expect(
+      evaluateFormulaRuntime('=COUNT(SEQUENCE(2,2),"x")', emptyResolver),
+    ).toBe(4);
+    expect(evaluateFormulaRuntime("=MIN(SEQUENCE(2,2))", emptyResolver)).toBe(
+      1,
+    );
+    expect(
+      evaluateFormulaRuntime("=SUM(SEQUENCE(2),{3;4})", emptyResolver),
+    ).toBe(10);
+    expect(
+      evaluateFormulaRuntime("=SUM(SEQUENCE(2),{3;#N/A})", emptyResolver),
+    ).toEqual(createFormulaError("NA"));
+  });
+
   test("handles compatibility dispersion and rank boundaries", () => {
     expect(evaluateFormula("=AVEDEV(A1:A4)", formulas)).toBe(1);
     expect(evaluateFormula("=VAR(A1:A4)", formulas)).toBeCloseTo(1.6666667);

@@ -9,6 +9,7 @@ import {
   formulaError,
   roundAwayFromZero,
   scalar,
+  values,
 } from "./helpers.js";
 
 function directNumber(
@@ -23,9 +24,7 @@ function aggregate(
   let result = operation === "sum" ? 0 : 1;
   for (let index = 0; index < context.argumentCount; index += 1) {
     const argument = context.evaluateArgument(index);
-    for (const value of argument.kind === "range"
-      ? argument.values
-      : [argument.value]) {
+    for (const value of values(argument)) {
       if (isFormulaError(value)) return value;
       if (typeof value === "number") {
         if (!Number.isFinite(value)) return formulaError("VALUE");
@@ -657,9 +656,7 @@ function numericFold(
   let result = initial;
   for (let i = 0; i < context.argumentCount; i += 1) {
     const argument = context.evaluateArgument(i);
-    for (const value of argument.kind === "range"
-      ? argument.values
-      : [argument.value]) {
+    for (const value of values(argument)) {
       if (isFormulaError(value)) return value;
       if (typeof value === "number") {
         result = operation(result, value);
@@ -680,17 +677,15 @@ function integerFold(
   operation: (a: number, b: number) => number,
   initial: number,
 ): FormulaValue {
-  const values = numericFold(context, initial, operation);
-  if (isFormulaError(values)) return values;
+  const result = numericFold(context, initial, operation);
+  if (isFormulaError(result)) return result;
   for (let i = 0; i < context.argumentCount; i += 1) {
     const argument = context.evaluateArgument(i);
-    for (const value of argument.kind === "range"
-      ? argument.values
-      : [argument.value])
+    for (const value of values(argument))
       if (typeof value === "number" && (!Number.isInteger(value) || value < 0))
         return formulaError("NUM");
   }
-  return values;
+  return result;
 }
 function roundWith(
   context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
@@ -731,9 +726,7 @@ function sumProduct(
 ): FormulaValue {
   const arrays = Array.from({ length: context.argumentCount }, (_, index) => {
     const argument = context.evaluateArgument(index);
-    return [
-      ...(argument.kind === "range" ? argument.values : [argument.value]),
-    ];
+    return [...values(argument)];
   });
   const size = arrays[0]?.length ?? 0;
   if (!arrays.every((item) => item.length === size))

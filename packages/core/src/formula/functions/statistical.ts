@@ -9,6 +9,7 @@ import {
   finiteNumber,
   formulaError,
   scalar,
+  values,
   wildcardMatch,
 } from "./helpers.js";
 
@@ -19,9 +20,7 @@ function aggregateNumbers(
   const result: number[] = [];
   for (let index = 0; index < context.argumentCount; index += 1) {
     const argument = context.evaluateArgument(index);
-    for (const value of argument.kind === "range"
-      ? argument.values
-      : [argument.value]) {
+    for (const value of values(argument)) {
       if (isFormulaError(value)) return value;
       if (typeof value === "number") {
         if (!Number.isFinite(value)) return formulaError("VALUE");
@@ -63,7 +62,7 @@ function numericAggregate(
     : 0;
 }
 function argumentValues(argument: FormulaFunctionArgument): FormulaValue[] {
-  return argument.kind === "range" ? [...argument.values] : [argument.value];
+  return [...values(argument)];
 }
 function criteriaMatch(
   value: FormulaValue,
