@@ -488,6 +488,37 @@ export const MATH_FUNCTIONS = [
       return Number.isFinite(r) ? r : formulaError("NUM");
     },
   ),
+  defineFunction(
+    {
+      name: "SUBTOTAL",
+      category: "Math",
+      minArgs: 2,
+      maxArgs: null,
+      arguments: [
+        { name: "function_num" },
+        { name: "ref1" },
+        { name: "ref2", optional: true },
+      ],
+      lazy: false,
+    },
+    (context) => subtotal(context, false),
+  ),
+  defineFunction(
+    {
+      name: "AGGREGATE",
+      category: "Math",
+      minArgs: 3,
+      maxArgs: null,
+      arguments: [
+        { name: "function_num" },
+        { name: "options" },
+        { name: "ref1" },
+        { name: "ref2", optional: true },
+      ],
+      lazy: false,
+    },
+    (context) => subtotal(context, true),
+  ),
   ...[
     "SIN",
     "COS",
@@ -576,6 +607,78 @@ export const MATH_FUNCTIONS = [
     },
   ),
 ] as const satisfies readonly FormulaFunctionDefinition[];
+
+function subtotal(
+  context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
+  aggregateMode: boolean,
+): FormulaValue {
+  const functionNumber = directNumber(context.evaluateArgument(0));
+  const option = aggregateMode ? directNumber(context.evaluateArgument(1)) : 0;
+  if (isFormulaError(functionNumber)) return functionNumber;
+  if (isFormulaError(option)) return option;
+  const code = Math.trunc(functionNumber);
+  const optionCode = Math.trunc(option);
+  const operation = code >= 100 ? code - 100 : code;
+  if (
+    !Number.isInteger(functionNumber) ||
+    !Number.isInteger(option) ||
+    operation < 1 ||
+    operation > 11 ||
+    (aggregateMode && (optionCode < 0 || optionCode > 7))
+  )
+    return formulaError("VALUE");
+  const start = aggregateMode ? 2 : 1;
+  const ignoreHidden = aggregateMode
+    ? [1, 3, 5, 7].includes(optionCode)
+    : code >= 101;
+  const ignoreErrors = aggregateMode && [2, 3, 6, 7].includes(optionCode);
+  const numbers: number[] = [];
+  let counta = 0;
+  let product = 1;
+  for (let index = start; index < context.argumentCount; index += 1) {
+    const argument = context.evaluateArgument(index);
+    const entries =
+      argument.kind === "range" && argument.entries
+        ? argument.entries
+        : [...values(argument)].map((value) => ({
+            value,
+            hidden: false,
+            filtered: false,
+            nestedSubtotal: false,
+          }));
+    for (const entry of entries) {
+      if (entry.nestedSubtotal && (!aggregateMode || optionCode < 4)) continue;
+      if (entry.filtered || (ignoreHidden && entry.hidden)) continue;
+      const value = entry.value;
+      if (isFormulaError(value)) {
+        if (ignoreErrors) continue;
+        return value;
+      }
+      if (value !== null) counta += 1;
+      if (typeof value === "number") {
+        numbers.push(value);
+        product *= value;
+      }
+    }
+  }
+  if (operation === 1)
+    return numbers.length
+      ? numbers.reduce((sum, value) => sum + value, 0) / numbers.length
+      : formulaError("DIV0");
+  if (operation === 2) return numbers.length;
+  if (operation === 3) return counta;
+  if (operation === 4) return numbers.length ? Math.max(...numbers) : 0;
+  if (operation === 5) return numbers.length ? Math.min(...numbers) : 0;
+  if (operation === 6) return product;
+  if (operation === 9) return numbers.reduce((sum, value) => sum + value, 0);
+  if (numbers.length < (operation === 8 || operation === 10 ? 2 : 1))
+    return formulaError("DIV0");
+  const mean = numbers.reduce((sum, value) => sum + value, 0) / numbers.length;
+  const square = numbers.reduce((sum, value) => sum + (value - mean) ** 2, 0);
+  const variance =
+    square / (numbers.length - (operation === 8 || operation === 10 ? 1 : 0));
+  return operation === 7 || operation === 8 ? Math.sqrt(variance) : variance;
+}
 
 function unaryMath(
   context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],

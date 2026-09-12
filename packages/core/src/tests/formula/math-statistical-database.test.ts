@@ -101,6 +101,46 @@ describe("math, statistical, lookup, and database functions", () => {
       evaluateFormulaRuntime("=SUM(SEQUENCE(2),{3;#N/A})", emptyResolver),
     ).toEqual(createFormulaError("NA"));
   });
+  test("calculates subtotal and aggregate reference operations", () => {
+    expect(evaluateFormula("=SUBTOTAL(9,A1:A4)", formulas)).toBe(10);
+    expect(evaluateFormula("=SUBTOTAL(1,A1:A4)", formulas)).toBe(2.5);
+    expect(evaluateFormula("=AGGREGATE(9,6,{1;#N/A;3})", formulas)).toBe(4);
+    expect(evaluateFormula("=AGGREGATE(4,6,{1;#N/A;3})", formulas)).toBe(3);
+  });
+  test("uses range visibility entries for subtotal and aggregate", () => {
+    const visibilityResolver = {
+      resolveCell: () => null,
+      resolveRange: () => [1, 2, 3],
+      resolveRangeEntries: () => [
+        {
+          address: { row: 0, column: 0 },
+          value: 1,
+          hidden: false,
+          filtered: false,
+          nestedSubtotal: false,
+        },
+        {
+          address: { row: 1, column: 0 },
+          value: 2,
+          hidden: false,
+          filtered: true,
+          nestedSubtotal: false,
+        },
+        {
+          address: { row: 2, column: 0 },
+          value: 3,
+          hidden: true,
+          filtered: false,
+          nestedSubtotal: false,
+        },
+      ],
+    };
+    expect(evaluateFormula("=SUBTOTAL(9,A1:A3)", visibilityResolver)).toBe(4);
+    expect(evaluateFormula("=SUBTOTAL(109,A1:A3)", visibilityResolver)).toBe(1);
+    expect(evaluateFormula("=AGGREGATE(9,5,A1:A3)", visibilityResolver)).toBe(
+      1,
+    );
+  });
 
   test("handles compatibility dispersion and rank boundaries", () => {
     expect(evaluateFormula("=AVEDEV(A1:A4)", formulas)).toBe(1);
