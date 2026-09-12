@@ -623,7 +623,7 @@ function subtotal(
     !Number.isInteger(functionNumber) ||
     !Number.isInteger(option) ||
     operation < 1 ||
-    operation > 11 ||
+    operation > (aggregateMode ? 19 : 11) ||
     (aggregateMode && (optionCode < 0 || optionCode > 7))
   )
     return formulaError("VALUE");
@@ -635,7 +635,9 @@ function subtotal(
   const numbers: number[] = [];
   let counta = 0;
   let product = 1;
-  for (let index = start; index < context.argumentCount; index += 1) {
+  const end =
+    aggregateMode && operation >= 14 ? start + 1 : context.argumentCount;
+  for (let index = start; index < end; index += 1) {
     const argument = context.evaluateArgument(index);
     const entries =
       argument.kind === "range" && argument.entries
@@ -665,6 +667,56 @@ function subtotal(
     return numbers.length
       ? numbers.reduce((sum, value) => sum + value, 0) / numbers.length
       : formulaError("DIV0");
+  if (operation === 12) {
+    if (!numbers.length) return formulaError("NUM");
+    const ordered = [...numbers].sort((a, b) => a - b);
+    const middle = Math.floor(ordered.length / 2);
+    return ordered.length % 2
+      ? ordered[middle]!
+      : (ordered[middle - 1]! + ordered[middle]!) / 2;
+  }
+  if (operation === 13) {
+    const counts = new Map<number, number>();
+    for (const value of numbers)
+      counts.set(value, (counts.get(value) ?? 0) + 1);
+    let result = 0,
+      count = 1;
+    for (const [value, frequency] of counts)
+      if (frequency > count) {
+        result = value;
+        count = frequency;
+      }
+    return count === 1 ? formulaError("NA") : result;
+  }
+  if (operation >= 14) {
+    if (context.argumentCount !== 4) return formulaError("VALUE");
+    const parameter = directNumber(context.evaluateArgument(3));
+    if (isFormulaError(parameter)) return parameter;
+    const ordered = [...numbers].sort((a, b) => a - b);
+    if (!ordered.length) return formulaError("NUM");
+    if (operation === 14 || operation === 15) {
+      const k = Math.trunc(parameter);
+      if (k < 1 || k > ordered.length) return formulaError("NUM");
+      return operation === 14 ? ordered[ordered.length - k]! : ordered[k - 1]!;
+    }
+    const k =
+      operation === 17 || operation === 19
+        ? Math.trunc(parameter) / 4
+        : parameter;
+    const exclusive = operation === 18 || operation === 19;
+    if (k < 0 || k > 1 || (exclusive && (k <= 0 || k >= 1)))
+      return formulaError("NUM");
+    const position = exclusive
+      ? k * (ordered.length + 1) - 1
+      : k * (ordered.length - 1);
+    if (position < 0 || position > ordered.length - 1)
+      return formulaError("NUM");
+    const lower = Math.floor(position);
+    return (
+      ordered[lower]! +
+      (ordered[Math.ceil(position)]! - ordered[lower]!) * (position - lower)
+    );
+  }
   if (operation === 2) return numbers.length;
   if (operation === 3) return counta;
   if (operation === 4) return numbers.length ? Math.max(...numbers) : 0;

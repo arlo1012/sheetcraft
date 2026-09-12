@@ -1,6 +1,13 @@
 import { isFormulaError, type FormulaValue } from "../types.js";
+import { isFormulaArray } from "../runtime.js";
 import type { FormulaFunctionDefinition } from "./contracts.js";
-import { condition, defineFunction, formulaError, scalar, values } from "./helpers.js";
+import {
+  condition,
+  defineFunction,
+  formulaError,
+  scalar,
+  values,
+} from "./helpers.js";
 
 function booleanAggregate(
   context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
@@ -19,7 +26,11 @@ function booleanAggregate(
     }
   }
   if (count === 0) return formulaError("VALUE");
-  return operator === "and" ? truthy === count : operator === "or" ? truthy > 0 : truthy % 2 === 1;
+  return operator === "and"
+    ? truthy === count
+    : operator === "or"
+      ? truthy > 0
+      : truthy % 2 === 1;
 }
 
 export const LOGICAL_FUNCTIONS = [
@@ -43,16 +54,7 @@ export const LOGICAL_FUNCTIONS = [
         ? false
         : scalar(context.evaluateArgument(test ? 1 : 2));
     },
-    (context) => {
-      const test = condition(scalar(context.evaluateArgument(0)));
-      return isFormulaError(test)
-        ? [0]
-        : test
-          ? [0, 1]
-          : context.argumentCount === 2
-            ? [0]
-            : [0, 2];
-    },
+    selectIfDependencies,
   ),
   defineFunction(
     {
@@ -65,9 +67,12 @@ export const LOGICAL_FUNCTIONS = [
     },
     (context) => {
       const value = scalar(context.evaluateArgument(0));
-      return isFormulaError(value) ? scalar(context.evaluateArgument(1)) : value;
+      return isFormulaError(value)
+        ? scalar(context.evaluateArgument(1))
+        : value;
     },
-    (context) => (isFormulaError(scalar(context.evaluateArgument(0))) ? [0, 1] : [0]),
+    (context) =>
+      isFormulaError(scalar(context.evaluateArgument(0))) ? [0, 1] : [0],
   ),
   defineFunction(
     {
@@ -137,11 +142,25 @@ export const LOGICAL_FUNCTIONS = [
     },
   ),
   defineFunction(
-    { name: "TRUE", category: "Logical", minArgs: 0, maxArgs: 0, arguments: [], lazy: false },
+    {
+      name: "TRUE",
+      category: "Logical",
+      minArgs: 0,
+      maxArgs: 0,
+      arguments: [],
+      lazy: false,
+    },
     () => true,
   ),
   defineFunction(
-    { name: "FALSE", category: "Logical", minArgs: 0, maxArgs: 0, arguments: [], lazy: false },
+    {
+      name: "FALSE",
+      category: "Logical",
+      minArgs: 0,
+      maxArgs: 0,
+      arguments: [],
+      lazy: false,
+    },
     () => false,
   ),
   defineFunction(
@@ -164,10 +183,14 @@ export const LOGICAL_FUNCTIONS = [
     },
     (context) => {
       if (context.argumentCount % 2 !== 0)
-        return Array.from({ length: context.argumentCount }, (_, index) => index);
+        return Array.from(
+          { length: context.argumentCount },
+          (_, index) => index,
+        );
       for (let index = 0; index < context.argumentCount; index += 2) {
         const test = condition(scalar(context.evaluateArgument(index)));
-        if (isFormulaError(test) || test) return [index, ...(test ? [index + 1] : [])];
+        if (isFormulaError(test) || test)
+          return [index, ...(test ? [index + 1] : [])];
       }
       return Array.from({ length: context.argumentCount }, (_, index) => index);
     },
@@ -190,7 +213,9 @@ export const LOGICAL_FUNCTIONS = [
       const expression = scalar(context.evaluateArgument(0));
       if (isFormulaError(expression)) return expression;
       const pairsEnd =
-        context.argumentCount % 2 === 0 ? context.argumentCount - 1 : context.argumentCount;
+        context.argumentCount % 2 === 0
+          ? context.argumentCount - 1
+          : context.argumentCount;
       for (let index = 1; index < pairsEnd; index += 2) {
         const value = scalar(context.evaluateArgument(index));
         if (isFormulaError(value)) return value;
@@ -208,7 +233,9 @@ export const LOGICAL_FUNCTIONS = [
       const expression = scalar(context.evaluateArgument(0));
       if (isFormulaError(expression)) return [0];
       const pairsEnd =
-        context.argumentCount % 2 === 0 ? context.argumentCount - 1 : context.argumentCount;
+        context.argumentCount % 2 === 0
+          ? context.argumentCount - 1
+          : context.argumentCount;
       for (let index = 1; index < pairsEnd; index += 2) {
         const value = scalar(context.evaluateArgument(index));
         if (isFormulaError(value)) return [0, index];
@@ -224,3 +251,26 @@ export const LOGICAL_FUNCTIONS = [
     },
   ),
 ] as const satisfies readonly FormulaFunctionDefinition[];
+
+function selectIfDependencies(
+  context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
+): readonly number[] {
+  const argument = context.evaluateArgument(0);
+  const items =
+    argument.kind === "scalar" && isFormulaArray(argument.value)
+      ? argument.value.rows.flat()
+      : [scalar(argument)];
+  let trueBranch = false;
+  let falseBranch = false;
+  for (const item of items) {
+    const test = condition(item);
+    if (isFormulaError(test)) continue;
+    if (test) trueBranch = true;
+    else falseBranch = true;
+  }
+  return [
+    0,
+    ...(trueBranch ? [1] : []),
+    ...(falseBranch && context.argumentCount === 3 ? [2] : []),
+  ];
+}
