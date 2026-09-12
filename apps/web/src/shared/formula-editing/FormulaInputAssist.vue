@@ -339,8 +339,8 @@ defineExpose<
         :id="`${listId}-${candidate.id}`"
         :key="candidate.id"
         class="formula-input-assist__option"
-        :class="{ 'is-active': index === activeIndex }"
         type="button"
+        tabindex="-1"
         role="option"
         :aria-selected="index === activeIndex"
         :data-formula-suggestion="candidate.id"
@@ -360,15 +360,14 @@ defineExpose<
 </template>
 
 <style scoped lang="scss">
+@use "../option-list/option-list";
+
 .formula-input-assist {
+  @include option-list.surface;
   z-index: 30;
   min-width: 210px;
   max-width: min(480px, calc(100vw - 24px));
   max-height: min(360px, calc(100vh - 40px));
-  overflow: auto;
-  background: var(--idea-surface-panel);
-  border: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-default);
   box-shadow: var(--idea-shadow-menu);
 
   // Argument help may overlap the grid but must not intercept reference picks.
@@ -377,24 +376,13 @@ defineExpose<
   }
 
   &__option {
+    @include option-list.item;
     display: grid;
     grid-template-columns: 100px minmax(0, 1fr);
     gap: var(--idea-space-2);
-    width: 100%;
-    padding: 7px 10px;
-    color: var(--idea-text-primary);
-    text-align: left;
-    background: transparent;
-    border: 0;
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
 
     strong {
       font-weight: var(--idea-font-weight-medium);
-    }
-
-    &.is-active {
-      background: var(--idea-surface-hover);
     }
 
     span {
@@ -410,8 +398,8 @@ defineExpose<
   &__help {
     display: grid;
     gap: 3px;
-    margin: 0;
-    padding: 5px 10px;
+    margin: 4px 0 0;
+    padding: 8px;
     color: var(--idea-text-secondary);
     font-size: var(--idea-font-size-body-small);
     line-height: var(--idea-line-height-body-small);

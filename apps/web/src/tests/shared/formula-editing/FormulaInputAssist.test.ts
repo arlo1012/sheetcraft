@@ -15,6 +15,7 @@ type AssistHandle = {
     phase: "start" | "update" | "end",
   ): boolean;
   readonly referenceActive: boolean;
+  readonly inputAria: Readonly<Record<string, string | boolean | undefined>>;
 };
 
 function mountAssist(value = "=s", composing = false) {
@@ -104,6 +105,43 @@ describe("FormulaInputAssist", () => {
     expect(document.activeElement).toBe(fixture.input);
     expect(fixture.wrapper.emitted("textEdit")?.[0]).toEqual([{ value: "=SUM(", caret: 5 }]);
     fixture.dispose();
+  });
+
+  test("keeps keyboard focus and active-descendant navigation on the input until Tab completes", async () => {
+    const fixture = mountAssist("=if");
+    try {
+      fixture.input.focus();
+      await nextTick();
+      const assist = fixture.wrapper.vm as unknown as AssistHandle;
+      const options = Array.from(
+        document.querySelectorAll<HTMLButtonElement>("[data-formula-suggestion]"),
+      );
+      expect(options.length).toBeGreaterThan(1);
+      expect(options.every((option) => option.tabIndex === -1)).toBe(true);
+      const initialId = assist.inputAria["aria-activedescendant"];
+      expect(initialId).toBe(options[0]?.id);
+
+      const down = new KeyboardEvent("keydown", { key: "ArrowDown", cancelable: true });
+      expect(assist.handleKeydown(down)).toBe(true);
+      await nextTick();
+      expect(down.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(fixture.input);
+      expect(assist.inputAria["aria-activedescendant"]).toBe(options[1]?.id);
+      expect(options[1]?.getAttribute("aria-selected")).toBe("true");
+
+      const tab = new KeyboardEvent("keydown", { key: "Tab", cancelable: true });
+      expect(assist.handleKeydown(tab)).toBe(true);
+      await nextTick();
+      expect(tab.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(fixture.input);
+      const name = options[1]?.getAttribute("data-formula-suggestion");
+      expect(fixture.wrapper.emitted("textEdit")?.at(-1)).toEqual([
+        { value: `=${name}(`, caret: name!.length + 2 },
+      ]);
+      expect(assist.inputAria["aria-expanded"]).toBe(false);
+    } finally {
+      fixture.dispose();
+    }
   });
 
   test("uses the first registered candidate by keyboard and lets a pointer choose its own candidate", async () => {

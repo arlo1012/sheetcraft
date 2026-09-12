@@ -107,42 +107,10 @@ function confirmOption(value: Option["value"]): void {
   </div>
 </template>
 <style scoped lang="scss">
+@use "./option-list";
+
 .option-list {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  padding: 4px;
-  border: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-default);
-  background: var(--idea-surface-panel);
-
-  &::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  &::-webkit-scrollbar-track,
-  &::-webkit-scrollbar-corner {
-    background: transparent;
-  }
-  &::-webkit-scrollbar-thumb {
-    border: 1px solid transparent;
-    border-radius: 999px;
-    background: var(--idea-scrollbar-thumb);
-    background-clip: padding-box;
-
-    &:hover {
-      background-color: var(--idea-scrollbar-thumb-hover);
-    }
-  }
-  &::-webkit-scrollbar-button {
-    display: none;
-    width: 0;
-    height: 0;
-  }
-  @supports not selector(::-webkit-scrollbar) {
-    scrollbar-width: thin;
-    scrollbar-color: var(--idea-scrollbar-thumb) transparent;
-  }
+  @include option-list.surface;
 
   &__items {
     width: max-content;
@@ -150,36 +118,7 @@ function confirmOption(value: Option["value"]): void {
   }
 
   button {
-    display: block;
-    width: 100%;
-    min-height: 24px;
-    padding: 2px 8px;
-    border: 0;
-    border-radius: var(--idea-radius-small);
-    background: transparent;
-    color: var(--idea-text-primary);
-    font: inherit;
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
-    text-align: left;
-    white-space: nowrap;
-    cursor: pointer;
-
-    &:hover:not([aria-selected="true"]) {
-      background: var(--idea-surface-secondary);
-    }
-    &[aria-selected="true"] {
-      background: var(--idea-surface-active);
-    }
-    &.is-located:not([aria-selected="true"]) {
-      background: var(--idea-surface-secondary);
-      outline: 1px solid var(--idea-border-control);
-      outline-offset: -1px;
-    }
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
-      outline-offset: -2px;
-    }
+    @include option-list.item;
   }
   &.is-ellipsis {
     .option-list__items {

@@ -4,9 +4,9 @@ import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { Menu as TMenu, MenuItem as TMenuItem } from "tdesign-vue-next/es/menu";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { useAppI18n } from "../../../shared/i18n";
+import OptionList from "../../../shared/option-list/OptionList.vue";
 
 export type NamedRangeRow = Readonly<{
   id: string;
@@ -50,6 +50,9 @@ const workbookScopeValue = "__idea10_workbook_scope__";
 const selectedId = ref<string | undefined>();
 const draft = ref<NamedRangeDraft>({ name: "", reference: "" });
 const selectedRange = computed(() => props.ranges.find((range) => range.id === selectedId.value));
+const rangeOptions = computed(() =>
+  props.ranges.map((range) => ({ value: range.id, label: range.name, reference: range.reference })),
+);
 const scopeOptions = computed(() => [
   { label: t("formulaTools.workbook"), value: workbookScopeValue },
   ...props.sheets.map((sheet) => ({ label: sheet.name, value: sheet.id })),
@@ -77,9 +80,6 @@ function resetDraft(): void {
 function selectRange(id: string): void {
   selectedId.value = id;
   resetDraft();
-}
-function selectMenuRange(value: string | number): void {
-  if (typeof value === "string") selectRange(value);
 }
 function createRange(): void {
   selectedId.value = undefined;
@@ -148,24 +148,22 @@ if (props.visible) createRange();
             {{ t("formulaTools.deleteName") }}
           </TButton>
         </div>
-        <TMenu
+        <OptionList
           class="named-ranges-dialog__range-menu"
-          width="100%"
           :model-value="selectedId"
-          @change="selectMenuRange"
+          :options="rangeOptions"
+          :label="t('formulaTools.namedRanges')"
+          variant="navigation"
+          item-data-attribute="data-named-range"
+          @select="selectRange"
         >
-          <TMenuItem
-            v-for="range in ranges"
-            :key="range.id"
-            class="named-ranges-dialog__row"
-            :value="range.id"
-          >
+          <template #option="{ option }">
             <span class="named-ranges-dialog__row-content"
-              ><strong>{{ range.name }}</strong
-              ><span>{{ range.reference }}</span></span
+              ><strong>{{ option.label }}</strong
+              ><span>{{ option.reference }}</span></span
             >
-          </TMenuItem>
-        </TMenu>
+          </template>
+        </OptionList>
       </section>
       <TForm class="named-ranges-dialog__form" layout="vertical" @submit="save">
         <TFormItem :label="t('formulaTools.name')">
@@ -218,10 +216,11 @@ if (props.visible) createRange();
   }
   &__list {
     display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
     align-content: start;
     padding: 8px;
     border-right: 1px solid var(--idea-border-subtle);
-    overflow: auto;
+    min-height: 0;
   }
   &__list-actions {
     display: flex;
@@ -230,10 +229,7 @@ if (props.visible) createRange();
   }
   &__range-menu {
     min-width: 0;
-  }
-  &__row {
-    min-height: 44px;
-    height: auto;
+    min-height: 0;
   }
   &__row-content {
     display: grid;
