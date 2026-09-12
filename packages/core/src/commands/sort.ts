@@ -2,7 +2,7 @@ import { translateFormulaForCopy } from "../formula/references.js";
 import { isFormulaError, type CellContent, type FormulaValue } from "../formula/types.js";
 import {
   cloneCellContent,
-  createSheetEvaluator,
+  createWorkbookEvaluator,
   getCellContent,
   getCellStyle,
   setCellContent,
@@ -175,7 +175,7 @@ export function applySortSheetRangeCommand(
 ): SetCellContentsCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const range = validateSortCommand(command, sheet);
-  const evaluator = createSheetEvaluator(sheet);
+  const evaluator = createWorkbookEvaluator(workbook, sheet.id);
   const sortedRows = Array.from(
     { length: range.end.row - range.start.row + 1 },
     (_, offset): SortEntry => {

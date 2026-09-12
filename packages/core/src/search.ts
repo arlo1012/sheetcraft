@@ -1,5 +1,10 @@
 import { formatComputedValueForDisplay } from "./input.js";
-import { createSheetEvaluator, type CellAddress, type Sheet } from "./workbook.js";
+import {
+  createSheetEvaluator,
+  type CellAddress,
+  type Sheet,
+  type SheetEvaluator,
+} from "./workbook.js";
 
 export type SheetSearchDirection = "forward" | "backward";
 
@@ -23,6 +28,7 @@ export function findCellByText(
   query: string,
   from: CellAddress,
   direction: SheetSearchDirection = "forward",
+  evaluator: SheetEvaluator = createSheetEvaluator(sheet),
 ): CellAddress | null {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) {
@@ -31,7 +37,6 @@ export function findCellByText(
 
   let nearest: CellAddress | null = null;
   let wrap: CellAddress | null = null;
-  const evaluator = createSheetEvaluator(sheet);
   for (const [key] of sheet.cells) {
     const address = parseCellKey(key);
     if (

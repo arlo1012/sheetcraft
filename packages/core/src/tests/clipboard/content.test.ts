@@ -5,7 +5,12 @@ import {
   tileCellMatrix,
   translateCellContentMatrixForCopy,
 } from "../../clipboard.js";
-import { getActiveSheet, setCellContent } from "../../workbook.js";
+import {
+  createSheet,
+  createWorkbookEvaluator,
+  getActiveSheet,
+  setCellContent,
+} from "../../workbook.js";
 import { createTestWorkbook } from "../helpers.js";
 
 describe("content clipboard", () => {
@@ -37,5 +42,29 @@ describe("content clipboard", () => {
     expect(
       getCellRangeValues(sheet, { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }),
     ).toEqual([["#DIV/0!"]]);
+  });
+
+  test("projects cross-sheet formula results with a workbook evaluator", () => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    const inputs = createSheet("Inputs", "inputs");
+    workbook.sheets.set(inputs.id, inputs);
+    setCellContent(inputs, { row: 0, column: 0 }, { kind: "literal", value: 42 });
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=Inputs!A1" },
+      },
+    );
+
+    expect(
+      getCellRangeValues(
+        sheet,
+        { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+        createWorkbookEvaluator(workbook, sheet.id),
+      ),
+    ).toEqual([[42]]);
   });
 });

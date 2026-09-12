@@ -6,6 +6,7 @@ import {
   setCellContent,
   setCellStyle,
   setCellValue,
+  type SheetEvaluator,
 } from "@idea10/core/workbook";
 import { createCellSelection, type CellSelection } from "@idea10/sheet-engine/selection";
 import type {
@@ -43,7 +44,7 @@ function createNativeClipboardWriteEvent(type: "copy" | "cut"): {
   return { event, data };
 }
 
-function createFixture() {
+function createFixture(options?: { evaluator?: SheetEvaluator }) {
   const sheet = getActiveSheet(createWorkbook({ id: "workbook-1", sheetId: "sheet-1" }));
   const currentSheet = shallowRef(sheet);
   let selection: CellSelection = createCellSelection({ row: 0, column: 0 });
@@ -60,6 +61,7 @@ function createFixture() {
   };
   const clipboard = useGridClipboard({
     getSheet: () => currentSheet.value,
+    getEvaluator: options?.evaluator ? () => options.evaluator! : undefined,
     getSelection: () => selection,
     isEditing: () => false,
     isComposing: () => false,
@@ -177,6 +179,24 @@ describe("useGridClipboard menu commands", () => {
     });
     expect(fixture.pastes[0]).not.toHaveProperty("moveSource");
     expect(fixture.feedback).toEqual(["copied", "pasted"]);
+  });
+
+  test("uses an injected workbook evaluator for formula copy values", async () => {
+    const evaluator: SheetEvaluator = { getComputedValue: vi.fn(() => 42) };
+    const fixture = createFixture({ evaluator });
+    setCellContent(
+      fixture.sheet,
+      { row: 0, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=Inputs!A1" },
+      },
+    );
+
+    await fixture.clipboard.copySelection();
+
+    expect(evaluator.getComputedValue).toHaveBeenCalledWith({ row: 0, column: 0 });
+    expect(vi.mocked(fixture.port.write).mock.calls[0]?.[0].text).toBe("42");
   });
 
   test("uses an internal copy repeatedly when clipboard reads fail after document changes", async () => {

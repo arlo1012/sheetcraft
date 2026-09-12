@@ -16,6 +16,7 @@ import {
   getCellContent,
   type CellRange,
   type Sheet,
+  type SheetEvaluator,
 } from "@idea10/core/workbook";
 import { isFormulaError } from "@idea10/core/formula";
 import { formatComputedValueForDisplay } from "@idea10/core/input";
@@ -127,6 +128,8 @@ export function getCellRangeStyles(sheet: Sheet, range: CellRange): CellStyleMat
 
 export function useGridClipboard(options: {
   getSheet: () => Sheet;
+  /** Uses workbook-scoped calculation when the caller owns a workbook. */
+  getEvaluator?: () => SheetEvaluator;
   getSelection: () => CellSelection;
   getRevision?: () => number;
   isEditing: () => boolean;
@@ -200,7 +203,7 @@ export function useGridClipboard(options: {
     const contents: CellContentMatrix = [];
     const values: CellValueMatrix = [];
     const styles: CellStyleMatrix = [];
-    const evaluator = createSheetEvaluator(sheet);
+    const evaluator = options.getEvaluator?.() ?? createSheetEvaluator(sheet);
     for (const row of rows) {
       const rowRange = {
         start: { row, column: range.start.column },

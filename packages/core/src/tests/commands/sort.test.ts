@@ -3,6 +3,7 @@ import { createSortSheetRangeCommand, tryApplyWorkbookCommand } from "../../comm
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import {
   createSheetSparseState,
+  createSheet,
   getActiveSheet,
   getCellContent,
   getCellStyle,
@@ -76,6 +77,48 @@ describe("sheet range sorting", () => {
     expect(undoWorkbookCommand(session)).toBe(true);
     expect(createSheetSparseState(sheet)).toEqual(before);
     expect(redoWorkbookCommand(session)).toBe(true);
+  });
+
+  test("sorts by cross-sheet formula results", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const inputs = createSheet("Inputs", "inputs");
+    session.workbook.sheets.set(inputs.id, inputs);
+    setCellContent(inputs, { row: 0, column: 0 }, { kind: "literal", value: 2 });
+    setCellContent(inputs, { row: 1, column: 0 }, { kind: "literal", value: 1 });
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=Inputs!A1" },
+      },
+    );
+    setCellContent(
+      sheet,
+      { row: 1, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=Inputs!A2" },
+      },
+    );
+    setCellContent(sheet, { row: 0, column: 1 }, { kind: "literal", value: "two" });
+    setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: "one" });
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createSortSheetRangeCommand(
+          sheet.id,
+          { start: { row: 0, column: 0 }, end: { row: 1, column: 1 } },
+          0,
+        ),
+      ),
+    ).toBe(true);
+    expect(getCellContent(sheet, { row: 0, column: 1 })).toEqual({
+      kind: "literal",
+      value: "one",
+    });
   });
 
   test("keeps the sort inverse compact when the sheet has unrelated sparse cells", () => {

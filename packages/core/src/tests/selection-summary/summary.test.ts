@@ -1,7 +1,15 @@
 import { describe, expect, test, vi } from "vitest";
-import { createTestSheet } from "../helpers.js";
+import { createTestSheet, createTestWorkbook } from "../helpers.js";
 import { getSelectionSummary } from "../../selection-summary.js";
-import { MAX_SHEET_ROWS, setCellStyle, setCellValue } from "../../workbook.js";
+import {
+  MAX_SHEET_ROWS,
+  createSheet,
+  createWorkbookEvaluator,
+  getActiveSheet,
+  setCellContent,
+  setCellStyle,
+  setCellValue,
+} from "../../workbook.js";
 
 describe("selection summary", () => {
   test("summarizes populated and numeric cells inside a reversed range", () => {
@@ -72,5 +80,29 @@ describe("selection summary", () => {
       sum: 7,
     });
     expect(iteratorSpy).toHaveBeenCalledOnce();
+  });
+
+  test("summarizes cross-sheet formula results with an injected evaluator", () => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    const inputs = createSheet("Inputs", "inputs");
+    workbook.sheets.set(inputs.id, inputs);
+    setCellValue(inputs, { row: 0, column: 0 }, 21);
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=Inputs!A1 * 2" },
+      },
+    );
+
+    expect(
+      getSelectionSummary(
+        sheet,
+        { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+        createWorkbookEvaluator(workbook, sheet.id),
+      ),
+    ).toMatchObject({ count: 1, numericCount: 1, sum: 42, average: 42 });
   });
 });

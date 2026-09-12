@@ -1,4 +1,9 @@
-import { createSheetEvaluator, type CellRange, type Sheet } from "./workbook.js";
+import {
+  createSheetEvaluator,
+  type CellRange,
+  type Sheet,
+  type SheetEvaluator,
+} from "./workbook.js";
 import { isFormulaError, type FormulaValue } from "./formula/types.js";
 
 export type SelectionSummary = {
@@ -32,14 +37,17 @@ function parseCellKey(key: string): { row: number; column: number } {
   };
 }
 
-export function getSelectionSummary(sheet: Sheet, range: CellRange): SelectionSummary {
+export function getSelectionSummary(
+  sheet: Sheet,
+  range: CellRange,
+  evaluator: SheetEvaluator = createSheetEvaluator(sheet),
+): SelectionSummary {
   const normalized = normalizeRange(range);
   let count = 0;
   let numericCount = 0;
   let sum = 0;
   let minimum = 0;
   let maximum = 0;
-  const evaluator = createSheetEvaluator(sheet);
 
   const addValue = (value: FormulaValue): void => {
     if (value === null || isFormulaError(value)) {

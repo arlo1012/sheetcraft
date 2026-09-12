@@ -15,6 +15,7 @@ import {
   type CellRange,
   type CellValue,
   type Sheet,
+  type SheetEvaluator,
 } from "./workbook.js";
 
 export type CellValueMatrix = CellValue[][];
@@ -77,9 +78,9 @@ export function getCellRangeContents(sheet: Sheet, range: CellRange): CellConten
 export function getCellRangeComputedValues(
   sheet: Sheet,
   range: CellRange,
+  evaluator: SheetEvaluator = createSheetEvaluator(sheet),
 ): CellComputedValueMatrix {
   const normalized = normalizeRange(range);
-  const evaluator = createSheetEvaluator(sheet);
   const values: CellComputedValueMatrix = [];
   for (let row = normalized.start.row; row <= normalized.end.row; row += 1) {
     const rowValues: FormulaValue[] = [];
@@ -92,9 +93,13 @@ export function getCellRangeComputedValues(
 }
 
 /** Values-only clipboard projection. Formula errors become their display token text. */
-export function getCellRangeValues(sheet: Sheet, range: CellRange): CellValueMatrix {
+export function getCellRangeValues(
+  sheet: Sheet,
+  range: CellRange,
+  evaluator?: SheetEvaluator,
+): CellValueMatrix {
   const normalized = normalizeRange(range);
-  return getCellRangeComputedValues(sheet, range).map((row, rowIndex) =>
+  return getCellRangeComputedValues(sheet, range, evaluator).map((row, rowIndex) =>
     row.map((value, columnIndex) =>
       getCellContent(sheet, {
         row: normalized.start.row + rowIndex,
