@@ -24,6 +24,7 @@ export type FormulaToolsMessageSchema = {
     recalculate: string;
     functionBrowser: string;
     searchFunctions: string;
+    selectFunction: string;
     recent: string;
     allFunctions: string;
     noFunctions: string;

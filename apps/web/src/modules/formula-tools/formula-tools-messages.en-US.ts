@@ -30,6 +30,7 @@ export const formulaToolsEnUS = {
     recalculate: "Recalculate",
     functionBrowser: "Insert function",
     searchFunctions: "Search functions",
+    selectFunction: "Select a function",
     recent: "Recently used",
     allFunctions: "All functions",
     noFunctions: "No matching functions",

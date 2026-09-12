@@ -30,6 +30,7 @@ export const formulaToolsZhCN = {
     recalculate: "重新计算",
     functionBrowser: "插入函数",
     searchFunctions: "搜索函数",
+    selectFunction: "选择函数",
     recent: "最近使用",
     allFunctions: "全部函数",
     noFunctions: "没有匹配的函数",
