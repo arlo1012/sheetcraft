@@ -253,7 +253,11 @@ class FormulaParser {
     this.offset += identifier.length;
     const identifierEnd = this.offset;
     const normalizedIdentifier = identifier.toUpperCase();
-    if (normalizedIdentifier === "TRUE" || normalizedIdentifier === "FALSE") {
+    this.skipWhitespace();
+    if (
+      (normalizedIdentifier === "TRUE" || normalizedIdentifier === "FALSE") &&
+      this.peek() !== "("
+    ) {
       return {
         kind: "boolean",
         value: normalizedIdentifier === "TRUE",
@@ -261,7 +265,6 @@ class FormulaParser {
         end: identifierEnd,
       };
     }
-    this.skipWhitespace();
     if (!this.consume("(")) {
       return { kind: "identifier", name: identifier, start, end: identifierEnd };
     }

@@ -38,6 +38,12 @@ describe("formula parser", () => {
     expect(result.ok).toBe(true);
   });
 
+  test("parses boolean constants and their function forms", () => {
+    expect(parseFormula("=TRUE").ok).toBe(true);
+    expect(parseFormula("=FALSE()").ok).toBe(true);
+    expect(parseFormula("=TRUE()").ok).toBe(true);
+  });
+
   test("preserves exact source spans for parenthesized expressions and bare identifiers", () => {
     const parenthesized = parseFormula("= ( A1 )");
     expect(parenthesized).toEqual({
