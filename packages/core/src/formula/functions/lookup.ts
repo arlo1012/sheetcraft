@@ -422,7 +422,7 @@ function address(
   if (isFormulaError(row)) return row;
   if (isFormulaError(column)) return column;
   if (isFormulaError(abs)) return abs;
-  if (isFormulaError(a1) || typeof a1 !== "boolean")
+  if (isFormulaError(a1) || (typeof a1 !== "boolean" && typeof a1 !== "number"))
     return formulaError("VALUE");
   if (isFormulaError(sheet) || (sheet !== null && typeof sheet !== "string"))
     return formulaError("VALUE");
@@ -434,11 +434,13 @@ function address(
     ![1, 2, 3, 4].includes(abs)
   )
     return formulaError("VALUE");
-  if (!a1) return formulaError("VALUE");
+  const useA1 = typeof a1 === "boolean" ? a1 : a1 !== 0;
   let letters = "";
   for (let index = column; index; index = Math.floor((index - 1) / 26))
     letters = String.fromCharCode(65 + ((index - 1) % 26)) + letters;
-  const reference = `${abs === 1 || abs === 3 ? "$" : ""}${letters}${abs === 1 || abs === 2 ? "$" : ""}${row}`;
+  const reference = useA1
+    ? `${abs === 1 || abs === 3 ? "$" : ""}${letters}${abs === 1 || abs === 2 ? "$" : ""}${row}`
+    : `${abs === 1 || abs === 2 ? "R" + row : "R[" + row + "]"}${abs === 1 || abs === 3 ? "C" + column : "C[" + column + "]"}`;
   return sheet === null
     ? reference
     : `${sheet.includes(" ") ? `'${sheet.replaceAll("'", "''")}'` : sheet}!${reference}`;
@@ -457,7 +459,13 @@ function vertical(
   if (isFormulaError(table)) return table;
   if (isFormulaError(shape)) return shape;
   if (isFormulaError(index)) return index;
-  if (typeof approximate !== "boolean" || !Number.isInteger(index))
+  const approximateMatch =
+    typeof approximate === "boolean"
+      ? approximate
+      : typeof approximate === "number"
+        ? approximate !== 0
+        : null;
+  if (approximateMatch === null || !Number.isInteger(index))
     return formulaError("VALUE");
   const max = direction === "VLOOKUP" ? shape.columns : shape.rows;
   if (index < 1 || index > max) return formulaError("REF");
@@ -465,7 +473,7 @@ function vertical(
     direction === "VLOOKUP"
       ? Array.from({ length: shape.rows }, (_, r) => table[r * shape.columns]!)
       : table.slice(0, shape.columns);
-  const found = approximate
+  const found = approximateMatch
     ? approximateIndex(lookup, candidates)
     : exactIndex(lookup, candidates);
   if (isFormulaError(found)) return found;
