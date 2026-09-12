@@ -47,7 +47,13 @@ function criteriaMatches(
   if (isFormulaError(comparison)) return comparison;
   const equals = /[*?~]/.test(raw)
     ? wildcardMatch(String(value ?? ""), raw)
-    : comparison === 0;
+    : found
+      ? comparison === 0
+      : typeof parsed === "string"
+        ? String(value ?? "")
+            .toLocaleUpperCase()
+            .startsWith(parsed.toLocaleUpperCase())
+        : comparison === 0;
   if (operator === "=") return equals;
   if (operator === "<>") return !equals;
   if (operator === ">") return comparison > 0;
@@ -94,7 +100,13 @@ function records(
       for (let column = 0; column < criteria[0]!.length; column += 1) {
         const header = criteria[0]![column];
         const criterion = criterionRow![column];
-        if (header === null || header === "" || criterion === null) continue;
+        if (
+          header === null ||
+          header === "" ||
+          criterion === null ||
+          criterion === ""
+        )
+          continue;
         const dataColumn = database.headers.findIndex(
           (item) =>
             String(item).toLocaleUpperCase() ===

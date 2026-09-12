@@ -350,12 +350,42 @@ function lookup(
   context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
 ): FormulaValue {
   const lookupValue = scalar(context.evaluateArgument(0));
-  const keys = range(context.evaluateArgument(1));
   if (isFormulaError(lookupValue)) return lookupValue;
-  if (isFormulaError(keys)) return keys;
-  const returns =
-    context.argumentCount === 3 ? range(context.evaluateArgument(2)) : keys;
-  if (isFormulaError(returns)) return returns;
+  const lookupArgument = context.evaluateArgument(1);
+  const table = range(lookupArgument);
+  const shape = dimensions(lookupArgument);
+  if (isFormulaError(table)) return table;
+  if (isFormulaError(shape)) return shape;
+  let keys: FormulaValue[];
+  let returns: FormulaValue[];
+  if (context.argumentCount === 2) {
+    if (shape.rows >= shape.columns) {
+      keys = Array.from(
+        { length: shape.rows },
+        (_, row) => table[row * shape.columns]!,
+      );
+      returns = Array.from(
+        { length: shape.rows },
+        (_, row) => table[(row + 1) * shape.columns - 1]!,
+      );
+    } else {
+      keys = table.slice(0, shape.columns);
+      returns = table.slice((shape.rows - 1) * shape.columns);
+    }
+  } else {
+    const returnArgument = context.evaluateArgument(2);
+    const result = range(returnArgument);
+    const resultShape = dimensions(returnArgument);
+    if (isFormulaError(result)) return result;
+    if (isFormulaError(resultShape)) return resultShape;
+    if (
+      (shape.rows !== 1 && shape.columns !== 1) ||
+      (resultShape.rows !== 1 && resultShape.columns !== 1)
+    )
+      return formulaError("NA");
+    keys = table;
+    returns = result;
+  }
   if (keys.length !== returns.length) return formulaError("NA");
   let found = -1;
   for (let i = 0; i < keys.length; i += 1) {
