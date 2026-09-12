@@ -3,7 +3,6 @@ import { computed, ref, watch } from "vue";
 import { Check, X } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { DropdownItem as TDropdownItem } from "tdesign-vue-next/es/dropdown";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
@@ -83,6 +82,10 @@ const filteredRanges = computed<NameTableRow[]>(() => {
 const filterOptions = computed(() => [
   {
     group: "",
+    children: [{ value: "clear", label: t("formulaTools.clearNameFilters") }],
+  },
+  {
+    group: "",
     children: [
       { value: "sheet", label: t("formulaTools.worksheetNames") },
       { value: "workbook", label: t("formulaTools.workbookNames") },
@@ -107,6 +110,10 @@ function changeFilters(value: SelectValue): void {
   const next = Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+  if (next.includes("clear")) {
+    clearFilters();
+    return;
+  }
   nameFilters.value = updateNamedRangeFilters(nameFilters.value, next);
 }
 function clearFilters(): void {
@@ -237,27 +244,12 @@ watch(
             :popup-props="filterPopupProps"
             :placeholder="t('formulaTools.allNames')"
             :min-collapsed-num="1"
+            :tag-input-props="{ excessTagsDisplayType: 'scroll' }"
             :tag-props="{ maxWidth: 110 }"
             :aria-label="t('formulaTools.filterNames')"
             data-name-filter
             @change="changeFilters"
-          >
-            <template #panelTopContent>
-              <ul class="named-ranges-dialog__filter-actions" role="menu">
-                <TDropdownItem
-                  :max-column-width="250"
-                  role="menuitem"
-                  tabindex="0"
-                  data-clear-name-filters
-                  @click="clearFilters"
-                  @keydown.enter.prevent="clearFilters"
-                  @keydown.space.prevent="clearFilters"
-                >
-                  {{ t("formulaTools.clearNameFilters") }}
-                </TDropdownItem>
-              </ul>
-            </template>
-          </TSelect>
+          />
         </div>
       </div>
       <TableHeightWrapper v-slot="{ height }">
@@ -369,12 +361,6 @@ watch(
     justify-content: flex-end;
     gap: 8px;
     min-width: 0;
-  }
-  &__filter-actions {
-    margin: 0;
-    padding: 0 0 var(--idea-space-2);
-    list-style: none;
-    border-bottom: 1px solid var(--idea-border-subtle);
   }
   &__search {
     width: 210px;

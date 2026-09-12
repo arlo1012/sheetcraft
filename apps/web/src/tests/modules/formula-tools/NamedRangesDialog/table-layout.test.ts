@@ -131,4 +131,9 @@ test("combines scope and error filters with keyword searches across remarks", as
   select.vm.$emit("change", ["table"]);
   await wrapper.vm.$nextTick();
   expect(wrapper.findAll("[data-named-range]")).toHaveLength(0);
+  select.vm.$emit("change", ["table", "clear"]);
+  await wrapper.vm.$nextTick();
+  expect(select.props("value")).toEqual([]);
+  expect(wrapper.get<HTMLInputElement>("[data-name-search] input").element.value).toBe("");
+  expect(wrapper.findAll("[data-named-range]")).toHaveLength(2);
 });
