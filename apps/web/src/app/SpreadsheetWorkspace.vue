@@ -239,6 +239,7 @@ const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback }
 const formulaTools = useFormulaToolsController({
   getWorkbook: () => session.workbook,
   getSelection: () => ({ address: activeAddress.value, range: activeSelectionRange.value }),
+  getSheetEvaluator: () => activeSheetEvaluator.value,
   editSession: cellEditSession,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
   execute: executeCommand,
@@ -252,6 +253,7 @@ const {
   namedRanges,
   nameSelectionReference,
   recentFunctions,
+  calculationSettings,
 } = formulaTools;
 const formulaReadOnly = computed(() => editTargetSheet.value.properties.protected);
 watch(workbookGeneration, () => {
@@ -345,6 +347,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :formula-disabled="formulaToolsDisabled"
       :edit-session-id="cellEditSession.id"
       :recent-functions="recentFunctions"
+      :name-creation-enabled="!formulaToolsDisabled"
+      :calculation-settings="calculationSettings"
       :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection || namesVisible"
       @insert-image="imageActions.requestInsert"
       @apply-borders="applyCellBorders"
@@ -358,6 +362,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @insert-function="formulaTools.insertFunction"
       @aggregate="formulaTools.aggregate"
       @open-names="formulaTools.openNames"
+      @create-names-from-selection="formulaTools.createNamesFromSelection"
+      @update-calculation-settings="formulaTools.updateCalculationSettings"
       @recalculate="formulaTools.recalculate"
       @formula-interaction-end="formulaTools.focusFormulaBar"
       @sort="sortSelection"

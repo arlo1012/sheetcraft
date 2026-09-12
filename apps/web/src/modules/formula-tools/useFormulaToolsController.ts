@@ -12,11 +12,11 @@ import {
 import { findAutoSumRange, formatFormulaAddress } from "@idea10/core/formula";
 import { formatCellContentForInput } from "@idea10/core/input";
 import {
-  createWorkbookEvaluator,
   getActiveSheet,
   getCellContent,
   type CellAddress,
   type CellRange,
+  type SheetEvaluator,
   type WorkbookCalculationSettings,
   type Workbook,
 } from "@idea10/core/workbook";
@@ -42,6 +42,7 @@ export function formatNamedRangeReference(sheetName: string, range: CellRange): 
 export function useFormulaToolsController(options: {
   getWorkbook: () => Workbook;
   getSelection: () => { address: CellAddress; range: CellRange };
+  getSheetEvaluator: () => SheetEvaluator;
   editSession: CellEditSession;
   isBusy: () => boolean;
   execute: (command: WorkbookCommand) => boolean;
@@ -142,11 +143,9 @@ export function useFormulaToolsController(options: {
       void MessagePlugin.warning(t("workspace.formulaInsertionUnavailable"));
       return;
     }
-    const workbook = options.getWorkbook();
-    const sheet = getActiveSheet(workbook);
     const range = findAutoSumRange(
       options.getSelection().address,
-      createWorkbookEvaluator(workbook, sheet.id).getComputedValue,
+      options.getSheetEvaluator().getComputedValue,
     );
     const formula = range
       ? `=${name}(${formatFormulaAddress(range.start)}:${formatFormulaAddress(range.end)})`
@@ -195,6 +194,7 @@ export function useFormulaToolsController(options: {
         sheetId: getActiveSheet(workbook).id,
         range: options.getSelection().range,
         positions,
+        evaluator: options.getSheetEvaluator(),
       });
       if (options.execute(command)) {
         void MessagePlugin.success(
