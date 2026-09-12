@@ -5,4 +5,5 @@ export * from "./functions.js";
 export * from "./parser.js";
 export * from "./reference-model.js";
 export * from "./references.js";
+export * from "./runtime.js";
 export * from "./types.js";

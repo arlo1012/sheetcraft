@@ -5,6 +5,7 @@ import {
   type FormulaFunctionRegistry,
 } from "./functions.js";
 import { parseFormula } from "./parser.js";
+import { formulaArray, scalarize } from "./runtime.js";
 import {
   createFormulaError,
   isFormulaError,
@@ -12,6 +13,7 @@ import {
   type FormulaEvaluationResolver,
   type FormulaExpression,
   type FormulaRange,
+  type FormulaRuntimeValue,
   type FormulaValue,
 } from "./types.js";
 
@@ -103,7 +105,7 @@ function evaluateExpression(
   resolver: FormulaEvaluationResolver,
   registry: FormulaFunctionRegistry,
   options?: FormulaEvaluationOptions,
-): FormulaValue {
+): FormulaRuntimeValue {
   if (expression.kind === "number" || expression.kind === "string" || expression.kind === "boolean")
     return validate(expression.value);
   if (expression.kind === "reference")
@@ -114,7 +116,9 @@ function evaluateExpression(
         ...(expression.reference.sheetName ? { sheetName: expression.reference.sheetName } : {}),
       }),
     );
-  if (expression.kind === "range") return createFormulaError("VALUE");
+  if (expression.kind === "range" || expression.kind === "axis-range") return createFormulaError("VALUE");
+  if (expression.kind === "array")
+    return formulaArray(expression.rows.map((row) => row.map((item) => scalarize(evaluateExpression(item, resolver, registry, options)))));
   if (expression.kind === "error") return createFormulaError(expression.code);
   if (expression.kind === "identifier") {
     const named = resolver.resolveName?.(expression.name);
@@ -132,13 +136,13 @@ function evaluateExpression(
     return validate(named);
   }
   if (expression.kind === "unary") {
-    const operand = arithmetic(evaluateExpression(expression.operand, resolver, registry, options));
+    const operand = arithmetic(scalarize(evaluateExpression(expression.operand, resolver, registry, options)));
     if (isFormulaError(operand)) return operand;
     return result(expression.operator === "-" ? -operand : operand);
   }
   if (expression.kind === "binary") {
-    const left = evaluateExpression(expression.left, resolver, registry, options);
-    const right = () => evaluateExpression(expression.right, resolver, registry, options);
+    const left = scalarize(evaluateExpression(expression.left, resolver, registry, options));
+    const right = () => scalarize(evaluateExpression(expression.right, resolver, registry, options));
     if (expression.operator === "&") {
       const first = text(left);
       if (isFormulaError(first)) return first;
@@ -183,7 +187,7 @@ function evaluateExpression(
       cache[index] = next;
       return next;
     },
-  });
+  }) as FormulaRuntimeValue;
 }
 
 function functionArgument(
@@ -222,10 +226,18 @@ function functionArgument(
         resolver.resolveCell({ row, column, ...(sheetName ? { sheetName } : {}) }),
     };
   }
+  if (expression.kind === "axis-range") {
+    const bounds = expression.range.axis === "column"
+      ? { start: { row: 0, column: Math.min(expression.range.start, expression.range.end) }, end: { row: 1_048_575, column: Math.max(expression.range.start, expression.range.end) } }
+      : { start: { row: Math.min(expression.range.start, expression.range.end), column: 0 }, end: { row: Math.max(expression.range.start, expression.range.end), column: 16_383 } };
+    const sheetName = expression.range.sheetName;
+    return { kind: "range", values: resolver.resolveRange({ ...bounds, ...(sheetName ? { sheetName } : {}) }), bounds,
+      getValue: (row, column) => resolver.resolveCell({ row, column, ...(sheetName ? { sheetName } : {}) }) };
+  }
   const reference = expression.kind === "reference" ? expression.reference : null;
   return {
     kind: "scalar" as const,
-    value: evaluateExpression(expression, resolver, registry, options),
+    value: evaluateExpression(expression, resolver, registry, options) as FormulaValue,
     source:
       expression.kind === "number" || expression.kind === "string" || expression.kind === "boolean"
         ? "literal"
@@ -255,12 +267,21 @@ export function evaluateFormulaAst(
   resolver: FormulaEvaluationResolver,
   options?: FormulaEvaluationOptions,
 ): FormulaValue {
-  return evaluateExpression(
+  return scalarize(evaluateExpression(
     ast.expression,
     resolver,
     options?.registry ?? DEFAULT_FORMULA_FUNCTION_REGISTRY,
     options,
-  );
+  ));
+}
+
+export function evaluateFormulaRuntimeAst(ast: FormulaAst, resolver: FormulaEvaluationResolver, options?: FormulaEvaluationOptions): FormulaRuntimeValue {
+  return evaluateExpression(ast.expression, resolver, options?.registry ?? DEFAULT_FORMULA_FUNCTION_REGISTRY, options);
+}
+
+export function evaluateFormulaRuntime(source: string, resolver: FormulaEvaluationResolver, options?: FormulaEvaluationOptions): FormulaRuntimeValue {
+  const parsed = parseFormula(source);
+  return parsed.ok ? evaluateFormulaRuntimeAst(parsed.ast, resolver, options) : createFormulaError("PARSE");
 }
 
 export function evaluateFormula(

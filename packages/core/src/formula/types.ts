@@ -28,6 +28,22 @@ export type FormulaError = {
 
 export type FormulaValue = FormulaScalar | FormulaError;
 
+/** A transient rectangular result. It is never persisted as cell content. */
+export type FormulaArray = Readonly<{ kind: "formula-array"; rows: readonly (readonly FormulaValue[])[] }>;
+/** Internal evaluation result; public cell values remain FormulaValue scalars. */
+export type FormulaRuntimeValue = FormulaValue | FormulaArray;
+
+export type FormulaAxisRange = Readonly<{
+  axis: "row" | "column";
+  start: number;
+  end: number;
+  startAbsolute: boolean;
+  endAbsolute: boolean;
+  sheetName?: string;
+  startOffset: number;
+  endOffset: number;
+}>;
+
 export type CellFormula = {
   source: string;
 };
@@ -82,6 +98,8 @@ export type FormulaExpression =
       end: number;
     }
   | { kind: "range"; range: FormulaRange; start: number; end: number }
+  | { kind: "axis-range"; range: FormulaAxisRange; start: number; end: number }
+  | { kind: "array"; rows: FormulaExpression[][]; start: number; end: number }
   | { kind: "error"; code: FormulaErrorCode; start: number; end: number }
   | { kind: "identifier"; name: string; start: number; end: number }
   | {

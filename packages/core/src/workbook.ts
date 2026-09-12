@@ -1,4 +1,5 @@
-import { evaluateFormula, evaluateFormulaAst } from "./formula/evaluate.js";
+import { evaluateFormulaRuntime, evaluateFormulaAst } from "./formula/evaluate.js";
+import { isFormulaArray, scalarize } from "./formula/runtime.js";
 import { normalizeExcelDateSystem, type ExcelDateSystem } from "./formula/date-system.js";
 import {
   DEFAULT_FORMULA_FUNCTION_REGISTRY,
@@ -13,6 +14,7 @@ import {
   type FormulaErrorCode,
   type FormulaExpression,
   type FormulaValue,
+  type FormulaRuntimeValue,
 } from "./formula/types.js";
 import { doMergedCellRangesIntersect, validateMergedCellRanges } from "./merged-cells.js";
 import type { IdFactory } from "./runtime.js";
@@ -414,6 +416,7 @@ export function getCellContent(sheet: Sheet, address: CellAddress): CellContent 
 /** Evaluates a cell against the current sparse sheet state. */
 export type SheetEvaluator = {
   getComputedValue: (address: CellAddress) => FormulaValue;
+  getSpillProjections?: () => Iterable<{ address: CellAddress; root: CellAddress; value: FormulaValue }>;
 };
 type SparseRangeIndex = { rows: number[]; byRow: Map<number, CellAddress[]> };
 
@@ -446,6 +449,9 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
   type Dependency = { sheetId: string; address: CellAddress };
   type Frame = Dependency & { stage: "prepare" | "select" | "evaluate" };
   const memo = new Map<string, FormulaValue>();
+  const runtimeMemo = new Map<string, FormulaRuntimeValue>();
+  const spills = new Map<string, { root: CellAddress; value: FormulaValue }>();
+  const discovering = new Set<string>();
   const state = new Map<string, "visiting" | "done">();
   const indexes = new Map<string, SparseRangeIndex>();
   const keyFor = (targetSheetId: string, address: CellAddress) =>
@@ -480,11 +486,43 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
     if (!isCellAddressInBounds(address) || !workbook.sheets.has(targetSheetId))
       return createFormulaError("REF");
     const content = contentFor(targetSheetId, address);
+    const spill = spills.get(keyFor(targetSheetId, address));
+    if (!content && spill) return spill.value;
+    if (!content) discoverSpillAt(targetSheetId, address);
+    const discovered = spills.get(keyFor(targetSheetId, address));
+    if (!content && discovered) return discovered.value;
     if (!content) return null;
     if (content.kind === "literal") return content.value;
     if (content.kind === "error") return createFormulaError(content.error.code);
     if (content.kind === "image") return createFormulaError("VALUE");
     return memo.get(keyFor(targetSheetId, address)) ?? createFormulaError("CYCLE");
+  };
+  const registerSpill = (targetSheetId: string, root: CellAddress, value: FormulaRuntimeValue): FormulaValue => {
+    if (!isFormulaArray(value)) return scalarize(value);
+    const rows = value.rows.length, columns = value.rows[0]?.length ?? 0;
+    if (!rows || !columns || root.row + rows > MAX_SHEET_ROWS || root.column + columns > MAX_SHEET_COLUMNS) return createFormulaError("SPILL");
+    for (let row = 0; row < rows; row += 1) for (let column = 0; column < columns; column += 1) {
+      if (row === 0 && column === 0) continue;
+      const address = { row: root.row + row, column: root.column + column };
+      if (contentFor(targetSheetId, address) || spills.has(keyFor(targetSheetId, address))) return createFormulaError("SPILL");
+    }
+    for (let row = 0; row < rows; row += 1) for (let column = 0; column < columns; column += 1) {
+      if (row === 0 && column === 0) continue;
+      spills.set(keyFor(targetSheetId, { row: root.row + row, column: root.column + column }), { root, value: value.rows[row]![column]! });
+    }
+    return scalarize(value);
+  };
+  const discoverSpillAt = (targetSheetId: string, address: CellAddress): void => {
+    const marker = keyFor(targetSheetId, address);
+    if (discovering.has(marker)) return;
+    discovering.add(marker);
+    for (const [key, cell] of workbook.sheets.get(targetSheetId)?.cells ?? []) {
+      if (cell.content?.kind !== "formula") continue;
+      const root = parseCellKey(key);
+      if (root.row <= address.row && root.column <= address.column && !memo.has(keyFor(targetSheetId, root))) resolve(targetSheetId, root);
+      if (spills.has(marker)) break;
+    }
+    discovering.delete(marker);
   };
   const nameReference = (name: string, fromSheetId: string) => {
     const defined = getDefinedName(workbook, name, fromSheetId);
@@ -561,6 +599,18 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
               dependencies.push({ sheetId: targetSheetId, address: dependency });
           return;
         }
+        if (current.kind === "axis-range") {
+          const targetSheetId = sheetForName(current.range.sheetName, fromSheetId);
+          const start = current.range.axis === "column"
+            ? { row: 0, column: Math.min(current.range.start, current.range.end) }
+            : { row: Math.min(current.range.start, current.range.end), column: 0 };
+          const end = current.range.axis === "column"
+            ? { row: MAX_SHEET_ROWS - 1, column: Math.max(current.range.start, current.range.end) }
+            : { row: Math.max(current.range.start, current.range.end), column: MAX_SHEET_COLUMNS - 1 };
+          if (targetSheetId) for (const dependency of getSparseRangeAddresses(indexFor(targetSheetId), start, end)) dependencies.push({ sheetId: targetSheetId, address: dependency });
+          return;
+        }
+        if (current.kind === "array") { for (const row of current.rows) for (const item of row) visit(item); return; }
         if (current.kind === "identifier") {
           const named = nameReference(current.name, fromSheetId);
           if (named)
@@ -698,17 +748,21 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
         }
         continue;
       }
-      memo.set(
-        frameKey,
-        evaluateFormula(content.formula.source, resolverFor(frame.sheetId), {
+      const runtime = evaluateFormulaRuntime(content.formula.source, resolverFor(frame.sheetId), {
           dateSystem: workbook.dateSystem,
-        }),
-      );
+        });
+      runtimeMemo.set(frameKey, runtime);
+      memo.set(frameKey, registerSpill(frame.sheetId, frame.address, runtime));
       state.set(frameKey, "done");
     }
     return valueFor(targetSheetId, target);
   };
-  return { getComputedValue: (address) => resolve(sheetId, address) };
+  return { getComputedValue: (address) => resolve(sheetId, address), getSpillProjections: function* () {
+    for (const [key, projection] of spills) {
+      const divider = key.indexOf("|");
+      if (key.slice(0, divider) === sheetId) yield { address: parseCellKey(key.slice(divider + 1)), ...projection };
+    }
+  } };
 }
 
 export function getCellComputedValue(sheet: Sheet, address: CellAddress): FormulaValue {
