@@ -1,9 +1,11 @@
 import { describe, expect, test } from "vitest";
 import {
   evaluateFormula,
+  evaluateFormulaRuntime,
   type FormulaEvaluationResolver,
   type FormulaValue,
 } from "../../formula/index.js";
+import { isFormulaArray } from "../../formula/runtime.js";
 
 function resolver(
   entries: readonly [string, FormulaValue][],
@@ -40,6 +42,21 @@ describe("LOOKUP array form", () => {
       ["1:2", 30],
     ]);
     expect(evaluateFormula("=LOOKUP(2,A1:C2)", formulas)).toBe(20);
+  });
+});
+
+describe("INDEX row and column array returns", () => {
+  const formulas = resolver([
+    ["0:0", 1],
+    ["0:1", 10],
+    ["1:0", 2],
+    ["1:1", 20],
+  ]);
+  test("returns a dynamic column or row for zero coordinates", () => {
+    const column = evaluateFormulaRuntime("=INDEX(A1:B2,0,2)", formulas);
+    const row = evaluateFormulaRuntime("=INDEX(A1:B2,2,0)", formulas);
+    expect(isFormulaArray(column) && column.rows).toEqual([[10], [20]]);
+    expect(isFormulaArray(row) && row.rows).toEqual([[2, 20]]);
   });
 });
 

@@ -1,4 +1,5 @@
 import { isFormulaError, type FormulaValue } from "../types.js";
+import { formulaArray } from "../runtime.js";
 import type {
   FormulaFunctionArgument,
   FormulaFunctionDefinition,
@@ -94,12 +95,29 @@ export const LOOKUP_FUNCTIONS = [
       if (
         !Number.isInteger(row) ||
         !Number.isInteger(column) ||
-        row < 1 ||
-        column < 1 ||
+        row < 0 ||
+        column < 0 ||
         row > shape.rows ||
-        column > shape.columns
+        column > shape.columns ||
+        (row === 0 && column === 0 && shape.rows === 0)
       )
         return formulaError("REF");
+      if (row === 0 && column === 0)
+        return formulaArray(
+          Array.from({ length: shape.rows }, (_, index) =>
+            array.slice(index * shape.columns, (index + 1) * shape.columns),
+          ),
+        );
+      if (row === 0)
+        return formulaArray(
+          Array.from({ length: shape.rows }, (_, index) => [
+            array[index * shape.columns + column - 1] ?? null,
+          ]),
+        );
+      if (column === 0)
+        return formulaArray([
+          array.slice((row - 1) * shape.columns, row * shape.columns),
+        ]);
       return array[(row - 1) * shape.columns + column - 1] ?? null;
     },
   ),

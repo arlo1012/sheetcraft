@@ -122,7 +122,7 @@ function anchoredValue(
   const row = origin.row + Math.floor(index / width);
   const column = origin.column + (index % width);
   if (read) return read(row, column);
-  if (target.kind === "scalar") return index === 0 ? target.value : null;
+  if (target.kind === "scalar") return index === 0 ? scalar(target) : null;
   if (!target.bounds) return argumentValues(target)[index] ?? null;
   const targetWidth = target.bounds.end.column - target.bounds.start.column + 1;
   return row <= target.bounds.end.row && column <= target.bounds.end.column
