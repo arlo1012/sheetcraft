@@ -111,7 +111,8 @@ export type SetSheetFreezePanesCommand = {
   freezePanes: FreezePanes;
 };
 
-export type CellMergeMode = "all" | "center" | "same-columns" | "same-rows" | "content" | "across";
+export type CellMergeMode =
+  "all" | "center" | "same-columns" | "same-rows" | "content" | "across";
 
 export type MergeCellsCommand = {
   type: "mergeCells";
@@ -151,7 +152,7 @@ export type AddSheetCommand = {
   index: number;
   activeSheetId: string;
   /** Formula text on surviving sheets restored by a delete-sheet inverse. */
-  formulaSources?: Array<{ sheetId: string; address: CellAddress; source: string }>;
+  formulaSources?: FormulaSourceRestore[];
   definedNames?: DefinedName[];
 };
 
@@ -216,11 +217,22 @@ export type RenameSheetCommand = {
   type: "renameSheet";
   sheetId: string;
   name: string;
+  /** Exact raw formula sources restored by a rename inverse. */
+  formulaSources?: FormulaSourceRestore[];
+};
+
+/** Exact formula source associated with a command inverse. */
+export type FormulaSourceRestore = {
+  sheetId: string;
+  address: CellAddress;
+  source: string;
 };
 
 export type UpsertDefinedNameCommand = {
   type: "upsertDefinedName";
   definition: DefinedName;
+  /** Exact raw formula sources restored by a defined-name rename inverse. */
+  formulaSources?: FormulaSourceRestore[];
 };
 
 export type DeleteDefinedNameCommand = {
@@ -277,7 +289,7 @@ export type SheetAxisSparseSlice = {
   floatingImages: Array<{ image: FloatingImage; index: number }>;
   /** Exact raw formula sources before the structural change, for lossless undo. */
   formulaSources?: Array<{ address: CellAddress; source: string }>;
-  workbookFormulaSources?: Array<{ sheetId: string; address: CellAddress; source: string }>;
+  workbookFormulaSources?: FormulaSourceRestore[];
   definedNames?: DefinedName[];
   /** Exact sheet metadata before the structural change. */
   metadata: SheetMetadata;
@@ -298,7 +310,8 @@ export type RestoreSheetAxisSliceCommand = {
   slice: SheetAxisSparseSlice;
 };
 
-export type RestoreSheetStateCommand = RestoreFullSheetStateCommand | RestoreSheetAxisSliceCommand;
+export type RestoreSheetStateCommand =
+  RestoreFullSheetStateCommand | RestoreSheetAxisSliceCommand;
 
 export type SetWorkbookDateSystemCommand = {
   type: "setWorkbookDateSystem";
@@ -368,7 +381,9 @@ export type WorkbookOperation =
   | "structure.move"
   | "history.restore";
 
-export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperation {
+export function getWorkbookOperation(
+  command: WorkbookCommand,
+): WorkbookOperation {
   switch (command.type) {
     case "setWorkbookDateSystem":
       return "workbook.dateSystem";
