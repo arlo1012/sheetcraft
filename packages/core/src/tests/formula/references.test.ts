@@ -4,6 +4,7 @@ import {
   MAX_FORMULA_COLUMNS,
   MAX_FORMULA_ROWS,
   transformFormulaForAxis,
+  transformFormulaForAxisMove,
   translateFormulaForCopy,
 } from "../../formula/index.js";
 
@@ -36,6 +37,44 @@ describe("formula references", () => {
   test("translates relative whole-axis ranges", () => {
     expect(translateFormulaForCopy("=SUM(A:A)", { row: 1, column: 1 })).toBe("=SUM(B:B)");
     expect(translateFormulaForCopy("=SUM(2:4)", { row: 1, column: 0 })).toBe("=SUM(3:5)");
+  });
+
+  test("rewrites whole-axis ranges for insert, delete, and moves while retaining absolute markers", () => {
+    expect(
+      transformFormulaForAxis("=SUM($A:$C)", {
+        axis: "column",
+        operation: "insert",
+        index: 1,
+        count: 1,
+      }),
+    ).toBe("=SUM($A:$D)");
+    expect(
+      transformFormulaForAxis("=SUM($A:$C)", {
+        axis: "column",
+        operation: "delete",
+        index: 1,
+        count: 1,
+      }),
+    ).toBe("=SUM($A:$B)");
+    expect(
+      transformFormulaForAxis("=SUM($B:$B)", {
+        axis: "column",
+        operation: "delete",
+        index: 1,
+        count: 1,
+      }),
+    ).toBe("=SUM(#REF!)");
+    expect(
+      transformFormulaForAxisMove("=SUM($A:$A)+SUM(1:1)", {
+        axis: "column",
+        index: 0,
+        count: 1,
+        toIndex: 2,
+      }),
+    ).toBe("=SUM($C:$C)+SUM(1:1)");
+    expect(
+      transformFormulaForAxisMove("=SUM(2:2)", { axis: "row", index: 1, count: 1, toIndex: 3 }),
+    ).toBe("=SUM(4:4)");
   });
 
   test("turns an out-of-bounds copied range into a reference error", () => {

@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   applyWorkbookCommand,
   createDeleteSheetAxisCommand,
+  createInsertSheetAxisCommand,
   createRenameSheetCommand,
 } from "../../commands/index.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
@@ -121,4 +122,48 @@ test("renaming through history restores only formulas actually transformed", () 
   expect(redoWorkbookCommand(session)).toBe(true);
   expect(sheet.cells.get("0:0")?.content).toMatchObject({ formula: { source: "=Next!A1" } });
   expect(sheet.cells.get("1:0")?.content).toMatchObject({ formula: { source: "=Next!A1" } });
+});
+
+test("renames qualified whole-axis references without touching text", () => {
+  const workbook = createTestWorkbook();
+  const data = createSheet("Data", "data");
+  insertSheet(workbook, data);
+  const sheet = getActiveSheet(workbook);
+  setCellContent(
+    sheet,
+    { row: 0, column: 0 },
+    { kind: "formula", formula: { source: "=SUM(Data!$A:A)+SUM(Data!1:$2)" } },
+  );
+  setCellContent(
+    sheet,
+    { row: 1, column: 0 },
+    { kind: "formula", formula: { source: '="Data!A:A"' } },
+  );
+
+  applyWorkbookCommand(workbook, createRenameSheetCommand(data.id, "Renamed"));
+  expect(sheet.cells.get("0:0")?.content).toMatchObject({
+    formula: { source: "=SUM(Renamed!$A:A)+SUM(Renamed!1:$2)" },
+  });
+  expect(sheet.cells.get("1:0")?.content).toMatchObject({ formula: { source: '="Data!A:A"' } });
+});
+
+test("rewrites qualified whole-axis references during axis changes", () => {
+  const workbook = createTestWorkbook();
+  const data = createSheet("Data", "data");
+  insertSheet(workbook, data);
+  const sheet = getActiveSheet(workbook);
+  setCellContent(
+    sheet,
+    { row: 0, column: 0 },
+    { kind: "formula", formula: { source: "=SUM(Data!$A:$B)+SUM(Data!1:2)" } },
+  );
+
+  applyWorkbookCommand(workbook, createInsertSheetAxisCommand(data.id, "column", 0));
+  applyWorkbookCommand(workbook, createDeleteSheetAxisCommand(data.id, "column", 1));
+  applyWorkbookCommand(workbook, createInsertSheetAxisCommand(data.id, "row", 0));
+  applyWorkbookCommand(workbook, createDeleteSheetAxisCommand(data.id, "row", 1));
+
+  expect(sheet.cells.get("0:0")?.content).toMatchObject({
+    formula: { source: "=SUM(Data!$B:$B)+SUM(Data!2:2)" },
+  });
 });

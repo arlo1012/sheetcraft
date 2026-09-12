@@ -20,6 +20,34 @@ export function rewriteQualifiedReferencesForSheet(
       const source = cell.content.formula.source;
       const replacements: Array<{ start: number; end: number; value: string }> = [];
       for (const candidate of qualifiedReferenceCandidates(source)) {
+        if (candidate.kind === "axis") {
+          if (sheetsByName().get(candidate.sheetName.toLowerCase()) !== targetSheetId) continue;
+          if (!transform) {
+            replacements.push({ start: candidate.start, end: candidate.end, value: "#REF!" });
+            continue;
+          }
+          const addressFor = (value: number): FormulaAddress =>
+            candidate.axis === "row" ? { row: value, column: 0 } : { row: 0, column: value };
+          const start = transform(addressFor(candidate.rangeStart));
+          const end = transform(addressFor(candidate.rangeEnd));
+          if (!start && !end) {
+            replacements.push({ start: candidate.start, end: candidate.end, value: "#REF!" });
+            continue;
+          }
+          const startValue =
+            candidate.axis === "row" ? (start ?? end)!.row : (start ?? end)!.column;
+          const endValue = candidate.axis === "row" ? (end ?? start)!.row : (end ?? start)!.column;
+          const format = (value: number, absolute: boolean) =>
+            `${absolute ? "$" : ""}${candidate.axis === "column" ? columnIndexToLabel(value) : value + 1}`;
+          const sheetName = workbook.sheets.get(targetSheetId)?.name;
+          if (!sheetName) continue;
+          replacements.push({
+            start: candidate.start,
+            end: candidate.end,
+            value: `${formatSheetName(sheetName)}!${format(startValue, candidate.startAbsolute)}:${format(endValue, candidate.endAbsolute)}`,
+          });
+          continue;
+        }
         const reference = parseFormulaReference(source.slice(candidate.start, candidate.end), {
           currentSheetId: sheet.id,
           resolveSheetId: (name) => sheetsByName().get(name.toLowerCase()),
@@ -101,12 +129,26 @@ function parseCellAddress(key: string): CellAddress {
   return { row: Number(rawRow), column: Number(rawColumn) };
 }
 
-type QualifiedReferenceCandidate = {
-  start: number;
-  end: number;
-  referenceStart: number;
-  sheetName: string;
-};
+type QualifiedReferenceCandidate =
+  | {
+      kind: "a1";
+      start: number;
+      end: number;
+      referenceStart: number;
+      sheetName: string;
+    }
+  | {
+      kind: "axis";
+      start: number;
+      end: number;
+      referenceStart: number;
+      sheetName: string;
+      axis: "row" | "column";
+      rangeStart: number;
+      rangeEnd: number;
+      startAbsolute: boolean;
+      endAbsolute: boolean;
+    };
 
 /**
  * AST spans identify only formula references, so strings and function text are
@@ -120,6 +162,24 @@ function qualifiedReferenceCandidates(source: string): QualifiedReferenceCandida
   const visit = (expression: FormulaExpression): void => {
     if (expression.kind === "reference") {
       add(expression.reference, expression.reference.end);
+      return;
+    }
+    if (expression.kind === "axis-range") {
+      if (!expression.range.sheetName) return;
+      const start = qualifiedReferenceStart(source, expression.range.startOffset);
+      if (start !== null)
+        candidates.push({
+          kind: "axis",
+          start,
+          end: expression.range.endOffset,
+          referenceStart: expression.range.startOffset,
+          sheetName: expression.range.sheetName,
+          axis: expression.range.axis,
+          rangeStart: expression.range.start,
+          rangeEnd: expression.range.end,
+          startAbsolute: expression.range.startAbsolute,
+          endAbsolute: expression.range.endAbsolute,
+        });
       return;
     }
     if (expression.kind === "range") {
@@ -150,6 +210,7 @@ function qualifiedReferenceCandidates(source: string): QualifiedReferenceCandida
     const start = qualifiedReferenceStart(source, reference.start);
     if (start !== null)
       candidates.push({
+        kind: "a1",
         start,
         end,
         referenceStart: reference.start,
@@ -187,6 +248,21 @@ function qualifiedReferenceStart(source: string, referenceStart: number): number
     if (offset === bang - 1) return start;
   }
   return null;
+}
+
+function columnIndexToLabel(column: number): string {
+  let value = column + 1;
+  let label = "";
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    label = String.fromCharCode(65 + remainder) + label;
+    value = Math.floor((value - 1) / 26);
+  }
+  return label;
+}
+
+function formatSheetName(name: string): string {
+  return /^[\p{L}\p{N}_.]+$/u.test(name) ? name : `'${name.replaceAll("'", "''")}'`;
 }
 
 function replaceFormulaReferences(

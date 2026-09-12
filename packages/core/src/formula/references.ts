@@ -46,8 +46,7 @@ function walkExpression(
     walkExpression(expression.left, visit);
     walkExpression(expression.right, visit);
   } else if (expression.kind === "array") {
-    for (const row of expression.rows)
-      for (const item of row) walkExpression(item, visit);
+    for (const row of expression.rows) for (const item of row) walkExpression(item, visit);
   } else if (expression.kind === "function") {
     for (const argument of expression.args) walkExpression(argument, visit);
   }
@@ -170,24 +169,46 @@ export function translateFormulaForCopy(source: string, offset: FormulaCopyOffse
       const start = expression.range.start + (expression.range.startAbsolute ? 0 : delta);
       const end = expression.range.end + (expression.range.endAbsolute ? 0 : delta);
       const maximum = expression.range.axis === "row" ? MAX_FORMULA_ROWS : MAX_FORMULA_COLUMNS;
-      replacements.push({ start: expression.range.startOffset, end: expression.range.endOffset, text:
-        start < 0 || end < 0 || start >= maximum || end >= maximum ? "#REF!" : formatAxisRange(expression.range, start, end) });
+      replacements.push({
+        start: expression.range.startOffset,
+        end: expression.range.endOffset,
+        text:
+          start < 0 || end < 0 || start >= maximum || end >= maximum
+            ? "#REF!"
+            : formatAxisRange(expression.range, start, end),
+      });
       return;
     }
     if (expression.kind === "range") {
       if (expression.range.start.sheetName) return;
-      const translate = (reference: FormulaReference) => ({ row: reference.row + (reference.rowAbsolute ? 0 : offset.row), column: reference.column + (reference.columnAbsolute ? 0 : offset.column) });
-      const start = translate(expression.range.start), end = translate(expression.range.end);
-      replacements.push({ start: expression.range.startOffset, end: expression.range.endOffset, text:
-        isAddressInBounds(start) && isAddressInBounds(end)
-          ? `${formatReference(expression.range.start, start)}:${formatReference(expression.range.end, end)}`
-          : "#REF!" });
+      const translate = (reference: FormulaReference) => ({
+        row: reference.row + (reference.rowAbsolute ? 0 : offset.row),
+        column: reference.column + (reference.columnAbsolute ? 0 : offset.column),
+      });
+      const start = translate(expression.range.start),
+        end = translate(expression.range.end);
+      replacements.push({
+        start: expression.range.startOffset,
+        end: expression.range.endOffset,
+        text:
+          isAddressInBounds(start) && isAddressInBounds(end)
+            ? `${formatReference(expression.range.start, start)}:${formatReference(expression.range.end, end)}`
+            : "#REF!",
+      });
       return;
     }
-    const reference = expression.kind === "reference" || expression.kind === "spill" ? expression.reference : null;
+    const reference =
+      expression.kind === "reference" || expression.kind === "spill" ? expression.reference : null;
     if (!reference || reference.sheetName) return;
-    const address = { row: reference.row + (reference.rowAbsolute ? 0 : offset.row), column: reference.column + (reference.columnAbsolute ? 0 : offset.column) };
-    replacements.push({ start: reference.start, end: reference.end, text: isAddressInBounds(address) ? formatReference(reference, address) : "#REF!" });
+    const address = {
+      row: reference.row + (reference.rowAbsolute ? 0 : offset.row),
+      column: reference.column + (reference.columnAbsolute ? 0 : offset.column),
+    };
+    replacements.push({
+      start: reference.start,
+      end: reference.end,
+      text: isAddressInBounds(address) ? formatReference(reference, address) : "#REF!",
+    });
   });
   return applyReplacements(ast.source, replacements);
 }
@@ -276,7 +297,7 @@ export function transformFormulaForMove(
 }
 
 function transformAxisReference(
-  reference: FormulaReference,
+  reference: Pick<FormulaReference, "row" | "column">,
   transform: FormulaAxisTransform,
 ): FormulaAddress | null {
   const axisValue = transform.axis === "row" ? reference.row : reference.column;
@@ -357,6 +378,37 @@ export function transformFormulaForAxis(source: string, transform: FormulaAxisTr
         end: expression.reference.end,
         text: address ? formatReference(expression.reference, address) : "#REF!",
       });
+    } else if (expression.kind === "axis-range") {
+      if (expression.range.sheetName || expression.range.axis !== transform.axis) return;
+      const start = transformAxisReference(
+        transform.axis === "row"
+          ? { row: expression.range.start, column: 0 }
+          : { row: 0, column: expression.range.start },
+        transform,
+      );
+      const end = transformAxisReference(
+        transform.axis === "row"
+          ? { row: expression.range.end, column: 0 }
+          : { row: 0, column: expression.range.end },
+        transform,
+      );
+      if (!start || !end) {
+        replacements.push({
+          start: expression.range.startOffset,
+          end: expression.range.endOffset,
+          text: "#REF!",
+        });
+      } else {
+        replacements.push({
+          start: expression.range.startOffset,
+          end: expression.range.endOffset,
+          text: formatAxisRange(
+            expression.range,
+            transform.axis === "row" ? start.row : start.column,
+            transform.axis === "row" ? end.row : end.column,
+          ),
+        });
+      }
     } else if (expression.kind === "range") {
       if (expression.range.start.sheetName) return;
       const range = transformAxisRange(expression.range, transform);
@@ -425,6 +477,12 @@ export function transformFormulaForAxisMove(
       ? { row: mapAxis(reference.row), column: reference.column }
       : { row: reference.row, column: mapAxis(reference.column) };
   const replacements: Replacement[] = [];
+  const mapAxisRange = (
+    range: Extract<FormulaExpression, { kind: "axis-range" }>["range"],
+  ): { start: number; end: number } => ({
+    start: mapAxis(range.start),
+    end: mapAxis(range.end),
+  });
   walkExpression(parsed.ast.expression, (expression) => {
     if (expression.kind === "reference") {
       if (expression.reference.sheetName) return;
@@ -439,6 +497,14 @@ export function transformFormulaForAxisMove(
         start: expression.reference.start,
         end: expression.reference.end,
         text: formatReference(expression.reference, mapReference(expression.reference)),
+      });
+    } else if (expression.kind === "axis-range") {
+      if (expression.range.sheetName || expression.range.axis !== transform.axis) return;
+      const range = mapAxisRange(expression.range);
+      replacements.push({
+        start: expression.range.startOffset,
+        end: expression.range.endOffset,
+        text: formatAxisRange(expression.range, range.start, range.end),
       });
     } else if (expression.kind === "range") {
       if (expression.range.start.sheetName) return;
