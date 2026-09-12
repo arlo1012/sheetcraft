@@ -213,6 +213,7 @@ function functionArgument(
           resolver.resolveCell({ row, column, ...(sheetName ? { sheetName } : {}) }),
       };
   }
+  const reference = expression.kind === "reference" ? expression.reference : null;
   return {
     kind: "scalar" as const,
     value: evaluateExpression(expression, resolver, registry, options),
@@ -222,6 +223,13 @@ function functionArgument(
         : expression.kind === "reference"
           ? "reference"
           : "expression",
+    ...(reference
+      ? {
+          address: { row: reference.row, column: reference.column },
+          getValue: (row: number, column: number) =>
+            resolver.resolveCell({ row, column, ...(reference.sheetName ? { sheetName: reference.sheetName } : {}) }),
+        }
+      : {}),
   };
 }
 

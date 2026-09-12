@@ -655,6 +655,52 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
     if (content.kind === "image") return createFormulaError("VALUE");
     return resolve(targetSheetId, address);
   };
+  const resolveDirectReferenceChain = (
+    initialSheetId: string,
+    initialAddress: CellAddress,
+  ): { handled: boolean; value: FormulaValue } => {
+    const path: Array<{ sheetId: string; address: CellAddress; key: string }> = [];
+    const pathKeys = new Set<string>();
+    let currentSheetId = initialSheetId;
+    let currentAddress = initialAddress;
+    while (true) {
+      const key = `${currentSheetId}|${createCellKey(currentAddress)}`;
+      const cached = memo.get(key);
+      if (cached !== undefined) {
+        for (const item of path) memo.set(item.key, cached);
+        return { handled: path.length > 0, value: cached };
+      }
+      const content = workbook.sheets.get(currentSheetId)?.cells.get(createCellKey(currentAddress))?.content;
+      if (content?.kind !== "formula") {
+        const value = valueFor(currentSheetId, currentAddress);
+        for (const item of path) memo.set(item.key, value);
+        return { handled: path.length > 0, value };
+      }
+      const ast = getFormulaAst(content.formula.source);
+      if (ast?.expression.kind !== "reference") {
+        if (path.length === 0) return { handled: false, value: createFormulaError("VALUE") };
+        const value = valueFor(currentSheetId, currentAddress);
+        for (const item of path) memo.set(item.key, value);
+        return { handled: true, value };
+      }
+      if (pathKeys.has(key)) {
+        const value = createFormulaError("CYCLE");
+        for (const item of path) memo.set(item.key, value);
+        return { handled: true, value };
+      }
+      path.push({ sheetId: currentSheetId, address: currentAddress, key });
+      pathKeys.add(key);
+      const next = ast.expression.reference;
+      const nextSheetId = resolveSheetId(next.sheetName, currentSheetId);
+      if (!nextSheetId) {
+        const value = createFormulaError("REF");
+        for (const item of path) memo.set(item.key, value);
+        return { handled: true, value };
+      }
+      currentSheetId = nextSheetId;
+      currentAddress = { row: next.row, column: next.column };
+    }
+  };
   const resolve = (currentSheetId: string, address: CellAddress): FormulaValue => {
     if (!isCellAddressInBounds(address)) return createFormulaError("REF");
     const key = `${currentSheetId}|${createCellKey(address)}`;
@@ -664,6 +710,8 @@ export function createWorkbookEvaluator(workbook: Workbook, sheetId: string): Sh
     const currentSheet = workbook.sheets.get(currentSheetId);
     const content = currentSheet?.cells.get(createCellKey(address))?.content;
     if (!content || content.kind !== "formula") return valueFor(currentSheetId, address);
+    const direct = resolveDirectReferenceChain(currentSheetId, address);
+    if (direct.handled) return direct.value;
     state.add(key);
     const value = evaluateFormula(content.formula.source, {
       resolveCell: (target) => {

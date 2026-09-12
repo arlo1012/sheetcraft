@@ -40,6 +40,19 @@ describe("workbook formula evaluation", () => {
     expect(createWorkbookEvaluator(workbook, workbook.activeSheetId).getComputedValue({ row: 0, column: 0 })).toMatchObject({ code: "CYCLE" });
   });
 
+  test("evaluates a deep cross-sheet direct-reference chain without recursion", () => {
+    const workbook = createTestWorkbook();
+    const data = createSheet("Data", "data");
+    insertSheet(workbook, data);
+    setCellContent(data, { row: 0, column: 0 }, { kind: "literal", value: 1 });
+    for (let row = 0; row < 15_000; row += 1) {
+      const source = row === 0 ? "=Data!A1" : `=Sheet1!A${row}`;
+      setCellContent(data, { row: row + 1, column: 0 }, { kind: "formula", formula: { source } });
+      setCellContent(getActiveSheet(workbook), { row, column: 0 }, { kind: "formula", formula: { source: `=Data!A${row + 2}` } });
+    }
+    expect(createWorkbookEvaluator(workbook, data.id).getComputedValue({ row: 15_000, column: 0 })).toBe(1);
+  });
+
   test("persists names and gives a local name precedence over a workbook name", () => {
     const workbook = createTestWorkbook();
     const data = createSheet("Data", "data");
