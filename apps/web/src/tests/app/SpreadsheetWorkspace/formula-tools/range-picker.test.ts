@@ -14,6 +14,41 @@ import {
 
 registerFormulaToolsCleanup();
 
+test("picks a reference from the manager list and saves only after applying the draft", async () => {
+  const wrapper = await mountFormulaToolsWorkspace(createFormulaToolsStore().store);
+  wrapper.getComponent(SpreadsheetRibbon).vm.$emit("openNames");
+  await flushPromises();
+  const manager = wrapper.getComponent(NamedRangesDialog);
+  expect(manager.get("[data-select-formula-reference]").attributes("disabled")).toBeDefined();
+  manager.vm.$emit("save", { name: "Revenue", reference: "=Summary!$B$1:$C$1" });
+  await flushPromises();
+  await manager.get("[data-named-range]").trigger("click");
+  const reference = manager.get<HTMLInputElement>("[data-name-reference] input");
+  await manager.get("[data-select-formula-reference]").trigger("click");
+  await flushPromises();
+  expect(manager.props("suspended")).toBe(true);
+  expect(manager.findComponent(NamedRangeEditorDialog).exists()).toBe(false);
+  await triggerCanvasCell(wrapper, { row: 0, column: 1 }, "mousedown", { button: 0, buttons: 1 });
+  await triggerCanvasCell(wrapper, { row: 2, column: 3 }, "mousemove", { buttons: 1 });
+  await triggerCanvasCell(wrapper, { row: 2, column: 3 }, "mouseup", { button: 0 });
+  wrapper.getComponent(NamedRangePicker).vm.$emit("confirm");
+  await flushPromises();
+  expect(manager.props("suspended")).toBe(false);
+  expect(reference.element.value).toBe("=Summary!$B$1:$D$3");
+  expect(manager.props("ranges")[0]?.reference).toBe("=Summary!$B$1:$C$1");
+
+  await manager.get("[data-select-formula-reference]").trigger("click");
+  await triggerCanvasCell(wrapper, { row: 4, column: 0 }, "mousedown", { button: 0 });
+  await triggerCanvasCell(wrapper, { row: 4, column: 0 }, "mouseup", { button: 0 });
+  wrapper.getComponent(NamedRangePicker).vm.$emit("cancel");
+  await flushPromises();
+  expect(reference.element.value).toBe("=Summary!$B$1:$D$3");
+  await manager.get("[data-name-reference-save]").trigger("click");
+  await flushPromises();
+  expect(manager.props("visible")).toBe(true);
+  expect(manager.props("ranges")[0]?.reference).toBe("=Summary!$B$1:$D$3");
+});
+
 test("suspends both dialogs, drags a range and restores the name draft without changing a formula draft", async () => {
   const wrapper = await mountFormulaToolsWorkspace(createFormulaToolsStore().store);
   const formula = wrapper

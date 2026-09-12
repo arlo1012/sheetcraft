@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { SquareMousePointer } from "lucide-vue-next";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -9,6 +7,7 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
 import { useAppI18n } from "../../../shared/i18n";
 import type { NamedRangeDraft, NamedRangeSheet } from "../named-range-types";
+import NamedRangeReferenceInput from "./NamedRangeReferenceInput.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -78,11 +77,6 @@ function save(): void {
   });
 }
 
-async function selectReference(): Promise<void> {
-  const reference = await props.selectReference?.(draft.value.reference);
-  if (reference !== undefined) draft.value = { ...draft.value, reference };
-}
-
 watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
 </script>
 
@@ -139,26 +133,11 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
           />
         </TFormItem>
         <TFormItem :label="t('formulaTools.reference')">
-          <TInput
+          <NamedRangeReferenceInput
             v-model="draft.reference"
-            :aria-label="t('formulaTools.reference')"
+            :select-reference="selectReference"
             data-formula-reference
-            autocomplete="off"
-          >
-            <template #suffix>
-              <TButton
-                class="named-range-editor-dialog__range-picker"
-                variant="text"
-                shape="square"
-                :aria-label="t('formulaTools.selectRange')"
-                :title="t('formulaTools.selectRange')"
-                data-select-formula-reference
-                @click="selectReference"
-              >
-                <SquareMousePointer :size="16" aria-hidden="true" />
-              </TButton>
-            </template>
-          </TInput>
+          />
         </TFormItem>
         <TFormItem :label="t('formulaTools.comment')">
           <TTextarea
@@ -177,10 +156,6 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
 .named-range-editor-dialog {
   &__content {
     min-width: 0;
-  }
-
-  &__range-picker:hover {
-    --td-bg-color-container-hover: transparent;
   }
 }
 </style>
