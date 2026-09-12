@@ -16,9 +16,7 @@ registerFormulaToolsCleanup();
 
 describe("SpreadsheetWorkspace cross-sheet formula authoring", () => {
   test("keeps an unfinished formula-bar draft when recalculating", async () => {
-    const wrapper = await mountFormulaToolsWorkspace(
-      createFormulaToolsStore().store,
-    );
+    const wrapper = await mountFormulaToolsWorkspace(createFormulaToolsStore().store);
     const formula = wrapper.findComponent(WorkbookFormulaBar);
     const ribbon = wrapper.findComponent(SpreadsheetRibbon);
     const input = formula.get<HTMLTextAreaElement>("[data-formula-input]");
@@ -42,9 +40,7 @@ describe("SpreadsheetWorkspace cross-sheet formula authoring", () => {
   });
 
   test("keeps the formula target while picking on another sheet, then returns to it on Enter", async () => {
-    const wrapper = await mountFormulaToolsWorkspace(
-      createFormulaToolsStore().store,
-    );
+    const wrapper = await mountFormulaToolsWorkspace(createFormulaToolsStore().store);
     const formula = wrapper.findComponent(WorkbookFormulaBar);
     const input = formula.get<HTMLTextAreaElement>("[data-formula-input]");
 
@@ -84,9 +80,7 @@ describe("SpreadsheetWorkspace cross-sheet formula authoring", () => {
   });
 
   test("returns to the original formula target on Escape without writing a cross-sheet draft", async () => {
-    const wrapper = await mountFormulaToolsWorkspace(
-      createFormulaToolsStore().store,
-    );
+    const wrapper = await mountFormulaToolsWorkspace(createFormulaToolsStore().store);
     const formula = wrapper.findComponent(WorkbookFormulaBar);
     const input = formula.get<HTMLTextAreaElement>("[data-formula-input]");
 

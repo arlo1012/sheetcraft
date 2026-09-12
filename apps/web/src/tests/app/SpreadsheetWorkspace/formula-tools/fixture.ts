@@ -1,10 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, vi } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
-import {
-  serializeWorkbook,
-  type WorkbookSnapshot,
-} from "@idea10/core/serialization";
+import { serializeWorkbook, type WorkbookSnapshot } from "@idea10/core/serialization";
 import {
   createSheet,
   createWorkbook,
@@ -39,18 +36,14 @@ export function createFormulaToolsSnapshot(): WorkbookSnapshot {
   return serializeWorkbook(workbook);
 }
 
-export function createFormulaToolsStore(
-  snapshot = createFormulaToolsSnapshot(),
-) {
+export function createFormulaToolsStore(snapshot = createFormulaToolsSnapshot()) {
   let record = { revision: 1, savedAt: 1, snapshot };
   const store = {
     load: vi.fn(async () => record),
-    save: vi.fn(
-      async (next: WorkbookSnapshot, revision: number | undefined) => {
-        record = { revision: (revision ?? 0) + 1, savedAt: 2, snapshot: next };
-        return { revision: record.revision, savedAt: record.savedAt };
-      },
-    ),
+    save: vi.fn(async (next: WorkbookSnapshot, revision: number | undefined) => {
+      record = { revision: (revision ?? 0) + 1, savedAt: 2, snapshot: next };
+      return { revision: record.revision, savedAt: record.savedAt };
+    }),
     replace: vi.fn(async (next: WorkbookSnapshot) => {
       record = { revision: record.revision + 1, savedAt: 2, snapshot: next };
       return { revision: record.revision, savedAt: record.savedAt };

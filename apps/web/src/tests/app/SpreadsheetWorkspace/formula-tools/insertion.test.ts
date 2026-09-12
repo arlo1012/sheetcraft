@@ -1,11 +1,7 @@
 import { flushPromises } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import { deserializeWorkbook } from "@idea10/core/serialization";
-import {
-  getActiveSheet,
-  getCellComputedValue,
-  getCellContent,
-} from "@idea10/core/workbook";
+import { getActiveSheet, getCellComputedValue, getCellContent } from "@idea10/core/workbook";
 import SpreadsheetRibbon from "../../../../app/SpreadsheetRibbon.vue";
 import WorkbookFormulaBar from "../../../../modules/workbook/components/WorkbookFormulaBar.vue";
 import SheetGrid from "../../../../modules/sheet-grid/components/SheetGrid.vue";
@@ -19,9 +15,7 @@ registerFormulaToolsCleanup();
 
 describe("SpreadsheetWorkspace formula tools insertion", () => {
   test("keeps a Home AutoSum click from committing an unfinished formula-bar draft", async () => {
-    const wrapper = await mountFormulaToolsWorkspace(
-      createFormulaToolsStore().store,
-    );
+    const wrapper = await mountFormulaToolsWorkspace(createFormulaToolsStore().store);
     const formula = wrapper.findComponent(WorkbookFormulaBar);
     const input = formula.get<HTMLTextAreaElement>("[data-formula-input]");
     const autoSum = wrapper.get('[data-ribbon-action="auto-sum"]');
@@ -48,17 +42,13 @@ describe("SpreadsheetWorkspace formula tools insertion", () => {
     const formula = wrapper.findComponent(WorkbookFormulaBar);
 
     await ribbon.get('[data-ribbon-category="formulas"]').trigger("click");
-    expect(
-      ribbon
-        .get('[data-ribbon-category="formulas"]')
-        .attributes("aria-selected"),
-    ).toBe("true");
+    expect(ribbon.get('[data-ribbon-category="formulas"]').attributes("aria-selected")).toBe(
+      "true",
+    );
     ribbon.vm.$emit("insertFunction", "SUM");
     await flushPromises();
 
-    expect(
-      formula.get<HTMLTextAreaElement>("[data-formula-input]").element.value,
-    ).toBe("=SUM(");
+    expect(formula.get<HTMLTextAreaElement>("[data-formula-input]").element.value).toBe("=SUM(");
     expect(
       getCellContent(wrapper.findComponent(SheetGrid).props("sheet"), {
         row: 0,
@@ -94,10 +84,10 @@ describe("SpreadsheetWorkspace formula tools insertion", () => {
     await input.trigger("keydown", { key: "s", ctrlKey: true });
     await flushPromises();
     expect(
-      getCellContent(
-        getActiveSheet(deserializeWorkbook(memory.record().snapshot)),
-        { row: 0, column: 0 },
-      ),
+      getCellContent(getActiveSheet(deserializeWorkbook(memory.record().snapshot)), {
+        row: 0,
+        column: 0,
+      }),
     ).toEqual({
       kind: "formula",
       formula: { source: "=SUM(B1:C1)" },

@@ -40,14 +40,11 @@ describe("WorkbookFormulaBar formula autocomplete", () => {
     const suggestions = getAutocomplete();
     expect(suggestions.get('[role="option"]').text()).toContain("SUM");
     expect(suggestions.findAll('[role="option"]')).toHaveLength(
-      getFormulaFunctionMetadata().filter((item) => item.name.startsWith("S"))
-        .length,
+      getFormulaFunctionMetadata().filter((item) => item.name.startsWith("S")).length,
     );
-    expect(
-      suggestions
-        .get('[data-formula-suggestion="SUM"]')
-        .attributes("aria-selected"),
-    ).toBe("true");
+    expect(suggestions.get('[data-formula-suggestion="SUM"]').attributes("aria-selected")).toBe(
+      "true",
+    );
   });
 
   test.each(["Enter", "Tab"])(
@@ -64,9 +61,7 @@ describe("WorkbookFormulaBar formula autocomplete", () => {
       expect(wrapper.emitted("commitCell")).toBeUndefined();
       expect(wrapper.emitted("traverse")).toBeUndefined();
       expect(document.body.querySelector('[role="listbox"]')).toBeNull();
-      expect(
-        new DOMWrapper(document.body).get("[data-formula-help]").text(),
-      ).toContain("SUM");
+      expect(new DOMWrapper(document.body).get("[data-formula-help]").text()).toContain("SUM");
     },
   );
 

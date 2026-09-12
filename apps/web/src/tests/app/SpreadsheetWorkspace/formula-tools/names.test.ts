@@ -32,9 +32,7 @@ describe("SpreadsheetWorkspace defined names", () => {
 
     ribbon.vm.$emit("openNames");
     await flushPromises();
-    const created = (
-      dialog.props("ranges") as readonly { id: string; name: string }[]
-    )[0]!;
+    const created = (dialog.props("ranges") as readonly { id: string; name: string }[])[0]!;
     expect(created.name).toBe("Revenue");
     dialog.vm.$emit("save", {
       id: created.id,
@@ -46,9 +44,7 @@ describe("SpreadsheetWorkspace defined names", () => {
 
     ribbon.vm.$emit("openNames");
     await flushPromises();
-    const updated = (
-      dialog.props("ranges") as readonly { id: string; reference: string }[]
-    )[0]!;
+    const updated = (dialog.props("ranges") as readonly { id: string; reference: string }[])[0]!;
     expect(updated.reference).toBe("=Details!$A$1");
     dialog.vm.$emit("delete", updated.id);
     await flushPromises();
@@ -59,15 +55,11 @@ describe("SpreadsheetWorkspace defined names", () => {
       .get<HTMLTextAreaElement>("[data-formula-input]");
     await input.trigger("keydown", { key: "s", ctrlKey: true });
     await flushPromises();
-    expect(
-      deserializeWorkbook(memory.record().snapshot).definedNames.size,
-    ).toBe(0);
+    expect(deserializeWorkbook(memory.record().snapshot).definedNames.size).toBe(0);
   });
 
   test("keeps an unfinished formula-bar draft while opening and closing the name manager", async () => {
-    const wrapper = await mountFormulaToolsWorkspace(
-      createFormulaToolsStore().store,
-    );
+    const wrapper = await mountFormulaToolsWorkspace(createFormulaToolsStore().store);
     const ribbon = wrapper.findComponent(SpreadsheetRibbon);
     const dialog = wrapper.findComponent(NamedRangesDialog);
     const input = wrapper

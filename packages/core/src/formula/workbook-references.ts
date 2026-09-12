@@ -79,7 +79,10 @@ export function renameQualifiedReferencesForSheet(
 export type FormulaSource = { sheetId: string; address: CellAddress; source: string };
 
 /** Restores only the formula texts transformed by an inverse command. */
-export function restoreFormulaSources(workbook: Workbook, formulaSources: readonly FormulaSource[]): void {
+export function restoreFormulaSources(
+  workbook: Workbook,
+  formulaSources: readonly FormulaSource[],
+): void {
   for (const formula of formulaSources) {
     const sheet = workbook.sheets.get(formula.sheetId);
     const key = `${formula.address.row}:${formula.address.column}`;
@@ -137,7 +140,13 @@ function qualifiedReferenceCandidates(source: string): QualifiedReferenceCandida
   const add = (reference: FormulaReference, end: number) => {
     if (!reference.sheetName) return;
     const start = qualifiedReferenceStart(source, reference.start);
-    if (start !== null) candidates.push({ start, end, referenceStart: reference.start, sheetName: reference.sheetName });
+    if (start !== null)
+      candidates.push({
+        start,
+        end,
+        referenceStart: reference.start,
+        sheetName: reference.sheetName,
+      });
   };
   visit(ast.expression);
   return candidates;
@@ -182,5 +191,8 @@ function replaceFormulaReferences(
   let next = source;
   for (const replacement of [...replacements].sort((left, right) => right.start - left.start))
     next = `${next.slice(0, replacement.start)}${replacement.value}${next.slice(replacement.end)}`;
-  sheet.cells.set(key, { ...sheet.cells.get(key)!, content: { kind: "formula", formula: { source: next } } });
+  sheet.cells.set(key, {
+    ...sheet.cells.get(key)!,
+    content: { kind: "formula", formula: { source: next } },
+  });
 }

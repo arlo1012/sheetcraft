@@ -67,24 +67,14 @@ describe("FormulaToolbar", () => {
 
   test("focuses search, supports result keys, and closes on Escape", async () => {
     const wrapper = mountToolbar();
-    await wrapper
-      .findAll(".formula-toolbar__group--actions button")[0]!
-      .trigger("click");
-    const search = document.querySelector<HTMLInputElement>(
-      ".formula-function-browser input",
-    );
+    await wrapper.findAll(".formula-toolbar__group--actions button")[0]!.trigger("click");
+    const search = document.querySelector<HTMLInputElement>(".formula-function-browser input");
     expect(document.activeElement).toBe(search);
-    const result = document.querySelector<HTMLButtonElement>(
-      "[data-formula-browser-result]",
-    );
+    const result = document.querySelector<HTMLButtonElement>("[data-formula-browser-result]");
     result?.focus();
-    result?.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
-    );
+    result?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     await nextTick();
-    expect(
-      document.activeElement?.getAttribute("data-formula-browser-result"),
-    ).toBeTruthy();
+    expect(document.activeElement?.getAttribute("data-formula-browser-result")).toBeTruthy();
     document.querySelector(".formula-function-browser")?.dispatchEvent(
       new KeyboardEvent("keydown", {
         key: "Escape",
@@ -100,40 +90,24 @@ describe("FormulaToolbar", () => {
 
 test("provides localized function copy for every Core formula function", () => {
   const names = getFormulaFunctionMetadata().map((metadata) => metadata.name);
-  expect(Object.keys(formulaFunctionCopyEnUS).sort()).toEqual(
-    [...names].sort(),
-  );
-  expect(Object.keys(formulaFunctionCopyZhCN).sort()).toEqual(
-    [...names].sort(),
-  );
+  expect(Object.keys(formulaFunctionCopyEnUS).sort()).toEqual([...names].sort());
+  expect(Object.keys(formulaFunctionCopyZhCN).sort()).toEqual([...names].sort());
   for (const name of names) {
     expect(formulaFunctionCopyEnUS[name]?.description).toBeTruthy();
-    expect(formulaFunctionCopyEnUS[name]?.signature).toMatch(
-      new RegExp(`^${name}\\(`),
-    );
+    expect(formulaFunctionCopyEnUS[name]?.signature).toMatch(new RegExp(`^${name}\\(`));
     expect(formulaFunctionCopyEnUS[name]?.example).toMatch(/^=/);
     expect(formulaFunctionCopyZhCN[name]?.description).toBeTruthy();
-    expect(formulaFunctionCopyZhCN[name]?.signature).toMatch(
-      new RegExp(`^${name}\\(`),
-    );
+    expect(formulaFunctionCopyZhCN[name]?.signature).toMatch(new RegExp(`^${name}\\(`));
     expect(formulaFunctionCopyZhCN[name]?.example).toMatch(/^=/);
-    expect(parseFormula(formulaFunctionCopyEnUS[name]!.example).ok, name).toBe(
-      true,
-    );
-    expect(parseFormula(formulaFunctionCopyZhCN[name]!.example).ok, name).toBe(
-      true,
-    );
+    expect(parseFormula(formulaFunctionCopyEnUS[name]!.example).ok, name).toBe(true);
+    expect(parseFormula(formulaFunctionCopyZhCN[name]!.example).ok, name).toBe(true);
   }
-  for (const argument of getFormulaFunctionMetadata().flatMap(
-    (metadata) => metadata.arguments,
-  )) {
+  for (const argument of getFormulaFunctionMetadata().flatMap((metadata) => metadata.arguments)) {
     expect(formulaArgumentLabelsEnUS[argument.name]).toBeTruthy();
     expect(formulaArgumentLabelsZhCN[argument.name]).toBeTruthy();
   }
   expect(
-    getFormulaArgumentLabel("number", (key) =>
-      key === "formulaArguments.number" ? "数值" : "",
-    ),
+    getFormulaArgumentLabel("number", (key) => (key === "formulaArguments.number" ? "数值" : "")),
   ).toBe("数值");
 });
 
@@ -154,27 +128,13 @@ test("function examples evaluate against a concrete sheet resolver", () => {
       return result;
     },
   };
-  expect(evaluateFormula(formulaFunctionCopyEnUS.SUM!.example, resolver)).toBe(
-    3,
-  );
-  expect(evaluateFormula(formulaFunctionCopyEnUS.IF!.example, resolver)).toBe(
-    "Yes",
-  );
-  expect(
-    evaluateFormula(formulaFunctionCopyEnUS.AVERAGE!.example, resolver),
-  ).toBe(2);
-  expect(evaluateFormula(formulaFunctionCopyEnUS.LEN!.example, resolver)).toBe(
-    4,
-  );
-  expect(
-    evaluateFormula(formulaFunctionCopyEnUS.DATE!.example, resolver),
-  ).toBeTypeOf("number");
-  expect(
-    evaluateFormula(formulaFunctionCopyEnUS.FV!.example, resolver),
-  ).toBeTypeOf("number");
-  expect(
-    evaluateFormula(formulaFunctionCopyEnUS.BIN2DEC!.example, resolver),
-  ).toBe(5);
+  expect(evaluateFormula(formulaFunctionCopyEnUS.SUM!.example, resolver)).toBe(3);
+  expect(evaluateFormula(formulaFunctionCopyEnUS.IF!.example, resolver)).toBe("Yes");
+  expect(evaluateFormula(formulaFunctionCopyEnUS.AVERAGE!.example, resolver)).toBe(2);
+  expect(evaluateFormula(formulaFunctionCopyEnUS.LEN!.example, resolver)).toBe(4);
+  expect(evaluateFormula(formulaFunctionCopyEnUS.DATE!.example, resolver)).toBeTypeOf("number");
+  expect(evaluateFormula(formulaFunctionCopyEnUS.FV!.example, resolver)).toBeTypeOf("number");
+  expect(evaluateFormula(formulaFunctionCopyEnUS.BIN2DEC!.example, resolver)).toBe(5);
 });
 
 describe("NamedRangesDialog", () => {

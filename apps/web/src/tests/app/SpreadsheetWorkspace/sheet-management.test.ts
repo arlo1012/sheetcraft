@@ -1,10 +1,7 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
-import {
-  deserializeWorkbook,
-  serializeWorkbook,
-} from "@idea10/core/serialization";
+import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
 import {
   createSheet,
   createWorkbook,
@@ -57,9 +54,7 @@ async function action(
   await wrapper
     .get(`[role="tab"][title="${sheetName} (double-click to rename)"]`)
     .trigger("contextmenu");
-  await new DOMWrapper(document.body)
-    .get(`[data-sheet-tab-action="${command}"]`)
-    .trigger("click");
+  await new DOMWrapper(document.body).get(`[data-sheet-tab-action="${command}"]`).trigger("click");
 }
 
 describe("sheet management workspace integration", () => {
@@ -95,9 +90,7 @@ describe("sheet management workspace integration", () => {
       sheets: new Map([[firstId, sheet]]),
       definedNames: new Map(),
     });
-    expect(
-      getActiveSheet(deserializeWorkbook(persisted)).properties.pinned,
-    ).toBe(true);
+    expect(getActiveSheet(deserializeWorkbook(persisted)).properties.pinned).toBe(true);
   });
 
   test("protection reaches the grid, formula bar and ribbon, while unprotect and duplicate remain available", async () => {
@@ -108,9 +101,7 @@ describe("sheet management workspace integration", () => {
     expect(wrapper.findComponent(SheetGrid).props("readOnly")).toBe(true);
     const formula = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
     expect(formula.element.readOnly).toBe(true);
-    expect(
-      wrapper.get('[data-ribbon-action="auto-sum"]').attributes("disabled"),
-    ).toBe("");
+    expect(wrapper.get('[data-ribbon-action="auto-sum"]').attributes("disabled")).toBe("");
     await formula.setValue("999");
     await formula.trigger("keydown", { key: "Enter" });
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBe(12);
@@ -123,9 +114,7 @@ describe("sheet management workspace integration", () => {
     expect(wrapper.findComponent(SheetGrid).props("sheet").id).toBe(sheet.id);
     await wrapper.get('[data-ribbon-action="protect"]').trigger("click");
     expect(sheet.properties.protected).toBe(false);
-    expect(
-      wrapper.get<HTMLTextAreaElement>("[data-formula-input]").element.readOnly,
-    ).toBe(false);
+    expect(wrapper.get<HTMLTextAreaElement>("[data-formula-input]").element.readOnly).toBe(false);
   });
 
   test("commits a shared formula draft before protection and restoring a hidden sheet", async () => {
@@ -141,9 +130,7 @@ describe("sheet management workspace integration", () => {
 
     await action(wrapper, "Overview", "hide");
     const details = wrapper.findComponent(SheetGrid).props("sheet");
-    const detailsFormula = wrapper.get<HTMLTextAreaElement>(
-      "[data-formula-input]",
-    );
+    const detailsFormula = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
     await detailsFormula.trigger("focus");
     await detailsFormula.setValue("34");
     await wrapper.get('[aria-label="All sheets"]').trigger("click");

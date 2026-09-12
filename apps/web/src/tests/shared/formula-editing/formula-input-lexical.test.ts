@@ -19,21 +19,17 @@ function completion(value: string, start = value.length, end = start) {
 describe("formula input lexical assistance", () => {
   test("offers the complete Core registry while keeping SUM first for an =s prefix", () => {
     const context = completion("=s");
-    const candidates = getSupportedFormulaCandidates(context).map(
-      (item) => item.id,
-    );
+    const candidates = getSupportedFormulaCandidates(context).map((item) => item.id);
     const registered = getFormulaFunctionMetadata().map((item) => item.name);
     expect(candidates[0]).toBe("SUM");
-    expect(candidates).toEqual(
-      registered.filter((name) => name.startsWith("S")),
-    );
+    expect(candidates).toEqual(registered.filter((name) => name.startsWith("S")));
     expect(applyFunctionCompletion("=s", context, "SUM")).toEqual({
       value: "=SUM(",
       caret: 5,
     });
-    expect(
-      getSupportedFormulaCandidates(completion("=i")).map((item) => item.id),
-    ).toEqual(registered.filter((name) => name.startsWith("I")));
+    expect(getSupportedFormulaCandidates(completion("=i")).map((item) => item.id)).toEqual(
+      registered.filter((name) => name.startsWith("I")),
+    );
   });
 
   test("replaces a prefix in the middle or a whole selected identifier without duplicate parentheses", () => {
@@ -76,9 +72,7 @@ describe("formula input lexical assistance", () => {
   test("allows reference insertion after supported comparison and concatenation operators", () => {
     for (const operator of ["<", ">", "=", "&"]) {
       const value = `=A1${operator}`;
-      expect(
-        getFormulaReferenceEditContext(value, value.length, value.length),
-      ).toEqual({
+      expect(getFormulaReferenceEditContext(value, value.length, value.length)).toEqual({
         replaceStart: value.length,
         replaceEnd: value.length,
       });
@@ -125,9 +119,7 @@ describe("formula input lexical assistance", () => {
 
   test("cycles absolute markers for every endpoint in a range", () => {
     const context = { replaceStart: 1, replaceEnd: 6 };
-    expect(
-      cycleFormulaReferenceAbsoluteMarkers("=A1:B2", context),
-    ).toMatchObject({
+    expect(cycleFormulaReferenceAbsoluteMarkers("=A1:B2", context)).toMatchObject({
       value: "=$A$1:$B$2",
     });
     expect(

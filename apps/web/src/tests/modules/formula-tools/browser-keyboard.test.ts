@@ -20,15 +20,11 @@ describe("FormulaFunctionBrowser keyboard flow", () => {
     mounted.push(wrapper);
     await nextTick();
     const results = Array.from(
-      document.querySelectorAll<HTMLButtonElement>(
-        "[data-formula-browser-result]",
-      ),
+      document.querySelectorAll<HTMLButtonElement>("[data-formula-browser-result]"),
     );
     expect(results.filter((result) => result.tabIndex === 0)).toHaveLength(1);
     results[0]?.focus();
-    results[0]?.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
-    );
+    results[0]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     await nextTick();
     document.activeElement?.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
