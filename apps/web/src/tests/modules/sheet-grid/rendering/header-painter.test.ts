@@ -45,6 +45,22 @@ function createFrame(gutter = 0) {
 }
 
 describe("header painter", () => {
+  test("keeps header labels and corner geometry stable while quick tools are disabled for a drag", () => {
+    const enabled = createContext();
+    const disabled = createContext();
+    const state = {
+      frame: createFrame(16),
+      selection: { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0, mode: "cells" as const },
+      palette: DEFAULT_SHEET_HEADER_PALETTE,
+    };
+    paintSheetHeaders(enabled, { ...state, quickTools: { enabled: true, gutter: 16 } });
+    paintSheetHeaders(disabled, { ...state, quickTools: { enabled: false, gutter: 16 } });
+
+    expect(vi.mocked(disabled.fillText).mock.calls).toEqual(vi.mocked(enabled.fillText).mock.calls);
+    expect(vi.mocked(disabled.fillRect).mock.calls).toEqual(vi.mocked(enabled.fillRect).mock.calls);
+    expect(vi.mocked(disabled.moveTo).mock.calls).toEqual(vi.mocked(enabled.moveTo).mock.calls);
+  });
+
   test("draws row and column labels from frame panes without clearing sibling layers", () => {
     const context = createContext();
     paintSheetHeaders(context, {

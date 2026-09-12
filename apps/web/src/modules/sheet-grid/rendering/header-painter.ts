@@ -28,7 +28,9 @@ export type HeaderSelectionState = Readonly<{
 }>;
 
 export type HeaderQuickToolsState = Readonly<{
+  /** Whether controls can be used; dragging may temporarily disable them. */
   enabled: boolean;
+  /** Reserved layout space, independent of the current interaction state. */
   gutter: number;
 }>;
 
@@ -188,7 +190,7 @@ function paintAxisItem(
   state: HeaderPaintState,
 ): void {
   const { palette, quickTools, selection, hovered, focused } = state;
-  const gutter = quickTools.enabled ? quickTools.gutter : 0;
+  const gutter = quickTools.gutter;
   const rect =
     axis === "row"
       ? {
@@ -304,10 +306,10 @@ export function paintSheetHeaders(
   paintAxisHeaders(context, "row", frame.rowHeaders, state);
 
   const corner = {
-    x: quickTools.enabled ? quickTools.gutter : 0,
-    y: quickTools.enabled ? quickTools.gutter : 0,
-    width: Math.max(0, frame.headerSize.width - (quickTools.enabled ? quickTools.gutter : 0)),
-    height: Math.max(0, frame.headerSize.height - (quickTools.enabled ? quickTools.gutter : 0)),
+    x: quickTools.gutter,
+    y: quickTools.gutter,
+    width: Math.max(0, frame.headerSize.width - quickTools.gutter),
+    height: Math.max(0, frame.headerSize.height - quickTools.gutter),
   };
   context.fillStyle =
     selection.mode === "all"

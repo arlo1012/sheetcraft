@@ -9,6 +9,7 @@ import { useHeaderInteraction } from "../../../../modules/sheet-grid/input/useHe
 function createFixture(options?: {
   hiddenRows?: number[];
   quickTools?: boolean;
+  gutter?: number;
   canFocus?: boolean;
 }) {
   const geometry = createSheetGeometry({
@@ -47,7 +48,10 @@ function createFixture(options?: {
       endColumn: 0,
       mode: "cells",
     }),
-    getQuickTools: () => ({ enabled: options?.quickTools ?? false, gutter: 16 }),
+    getQuickTools: () => ({
+      enabled: options?.quickTools ?? false,
+      gutter: options?.gutter ?? (options?.quickTools ? 16 : 0),
+    }),
     getGeometry: () => geometry,
     callbacks,
     canFocus: () => options?.canFocus ?? true,
@@ -80,6 +84,16 @@ const trigger = {
 } as unknown as HTMLElement;
 
 describe("useHeaderInteraction", () => {
+  test("does not expand header hit areas into the reserved gutter when controls are disabled", () => {
+    const { interaction } = createFixture({ quickTools: false, gutter: 16 });
+
+    expect(interaction.hitTest({ x: 8, y: 12 })).toBeUndefined();
+    expect(interaction.hitTest({ x: 8, y: 32 })).toBeUndefined();
+    expect(interaction.hitTest({ x: 50, y: 8 })).toBeUndefined();
+    expect(interaction.hitTest({ x: 24, y: 32 })).toMatchObject({ axis: "row", action: "axis" });
+    expect(interaction.hitTest({ x: 50, y: 20 })).toMatchObject({ axis: "column", action: "axis" });
+  });
+
   test("uses the render frame for row and column hits", () => {
     const { interaction } = createFixture();
 

@@ -110,7 +110,7 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
     const frame = options.getFrame();
     if (!frame) return undefined;
     const quickTools = options.getQuickTools();
-    const gutter = quickTools.enabled ? quickTools.gutter : 0;
+    const gutter = quickTools.gutter;
     if (
       point.x >= gutter &&
       point.y >= gutter &&
@@ -266,7 +266,7 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
       .flatMap((pane) => pane.items)
       .find((candidate) => candidate.index === focused.index);
     if (!item) return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
-    const gutter = options.getQuickTools().enabled ? options.getQuickTools().gutter : 0;
+    const gutter = options.getQuickTools().gutter;
     const point =
       focused.axis === "row"
         ? { x: gutter + (frame.headerSize.width - gutter) / 2, y: item.offset + item.size / 2 }
