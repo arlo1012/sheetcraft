@@ -1,4 +1,4 @@
-import { isFormulaError } from "../types.js";
+import { isFormulaError, type FormulaValue } from "../types.js";
 import type { FormulaFunctionDefinition } from "./contracts.js";
 import { defineFunction, formulaError, scalar } from "./helpers.js";
 
@@ -203,9 +203,11 @@ export const INFORMATION_FUNCTIONS = [
 function parity(
   context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
   even: boolean,
-) {
+): FormulaValue {
   const value = scalar(context.evaluateArgument(0));
   return typeof value === "number" && Number.isFinite(value)
     ? Math.abs(Math.trunc(value)) % 2 === (even ? 0 : 1)
-    : false;
+    : isFormulaError(value)
+      ? value
+      : formulaError("VALUE");
 }

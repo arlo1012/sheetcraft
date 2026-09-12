@@ -712,7 +712,7 @@ function percentile(
   const kValue = finiteNumber(scalar(context.evaluateArgument(1)));
   if (!Array.isArray(values)) return values;
   if (isFormulaError(kValue)) return kValue;
-  const k = quartile ? kValue / 4 : kValue;
+  const k = quartile ? Math.trunc(kValue) / 4 : kValue;
   if (!values.length || k < 0 || k > 1 || (exclusive && (k <= 0 || k >= 1)))
     return formulaError("NUM");
   values.sort((a, b) => a - b);

@@ -424,7 +424,7 @@ export const MATH_FUNCTIONS = [
       arguments: [{ name: "number1" }, { name: "number2", optional: true }],
       lazy: false,
     },
-    (context) => integerFold(context, gcd, 0),
+    (context) => integerFold(context, gcd, 0, true),
   ),
   defineFunction(
     {
@@ -454,9 +454,10 @@ export const MATH_FUNCTIONS = [
     (context) => {
       const n = directNumber(context.evaluateArgument(0));
       if (isFormulaError(n)) return n;
-      if (!Number.isInteger(n) || n < 0) return formulaError("NUM");
+      const integer = Math.trunc(n);
+      if (integer < 0) return formulaError("NUM");
       let result = 1;
-      for (let i = 2; i <= n; i += 1) {
+      for (let i = 2; i <= integer; i += 1) {
         result *= i;
         if (!Number.isFinite(result)) return formulaError("NUM");
       }
@@ -477,17 +478,13 @@ export const MATH_FUNCTIONS = [
       const k = directNumber(context.evaluateArgument(1));
       if (isFormulaError(n)) return n;
       if (isFormulaError(k)) return k;
-      if (
-        !Number.isInteger(n) ||
-        !Number.isInteger(k) ||
-        n < 0 ||
-        k < 0 ||
-        k > n
-      )
+      const integerN = Math.trunc(n);
+      const integerK = Math.trunc(k);
+      if (integerN < 0 || integerK < 0 || integerK > integerN)
         return formulaError("NUM");
       let r = 1;
-      for (let i = 1; i <= Math.min(k, n - k); i += 1)
-        r = (r * (n - Math.min(k, n - k) + i)) / i;
+      for (let i = 1; i <= Math.min(integerK, integerN - integerK); i += 1)
+        r = (r * (integerN - Math.min(integerK, integerN - integerK) + i)) / i;
       return Number.isFinite(r) ? r : formulaError("NUM");
     },
   ),
@@ -676,14 +673,19 @@ function integerFold(
   context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
   operation: (a: number, b: number) => number,
   initial: number,
+  rejectUnsafe = false,
 ): FormulaValue {
-  const result = numericFold(context, initial, operation);
-  if (isFormulaError(result)) return result;
+  let result = initial;
   for (let i = 0; i < context.argumentCount; i += 1) {
     const argument = context.evaluateArgument(i);
-    for (const value of values(argument))
-      if (typeof value === "number" && (!Number.isInteger(value) || value < 0))
+    for (const value of values(argument)) {
+      if (isFormulaError(value)) return value;
+      if (typeof value !== "number") continue;
+      if (value < 0 || (rejectUnsafe && value >= Number.MAX_SAFE_INTEGER))
         return formulaError("NUM");
+      result = operation(result, Math.trunc(value));
+      if (!Number.isFinite(result)) return formulaError("NUM");
+    }
   }
   return result;
 }

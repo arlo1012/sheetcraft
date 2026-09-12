@@ -58,6 +58,15 @@ describe("math, statistical, lookup, and database functions", () => {
     expect(evaluateFormula('=XMATCH("b",B1:B3,0)', formulas)).toBe(2);
     expect(evaluateFormula("=ADDRESS(2,28)", formulas)).toBe("$AB$2");
   });
+  test("truncates integer-function operands and rejects unsafe GCD inputs", () => {
+    expect(evaluateFormula("=GCD(5.9,2)", formulas)).toBe(1);
+    expect(evaluateFormula("=LCM(5.9,2)", formulas)).toBe(10);
+    expect(evaluateFormula("=FACT(5.9)", formulas)).toBe(120);
+    expect(evaluateFormula("=COMBIN(5.9,2.1)", formulas)).toBe(10);
+    expect(evaluateFormula("=GCD(9007199254740992,2)", formulas)).toEqual(
+      createFormulaError("NUM"),
+    );
+  });
   test("handles trigonometry, exponential and logarithmic domains", () => {
     expect(evaluateFormula("=SIN(PI()/2)", formulas)).toBeCloseTo(1);
     expect(evaluateFormula("=COS(0)", formulas)).toBe(1);
@@ -99,6 +108,7 @@ describe("math, statistical, lookup, and database functions", () => {
     expect(evaluateFormula("=PERCENTILE(A1:A4,0.25)", formulas)).toBe(1.75);
     expect(evaluateFormula("=QUARTILE(A1:A4,4)", formulas)).toBe(4);
     expect(evaluateFormula("=RANK(2,A1:A4)", formulas)).toBe(3);
+    expect(evaluateFormula("=QUARTILE.INC(A1:A4,1.9)", formulas)).toBe(1.75);
   });
   test("matches criteria rows with AND, OR, and wildcards", () => {
     expect(evaluateFormula('=DSUM(D1:F4,"Amount",H1:I3)', formulas)).toBe(10);
