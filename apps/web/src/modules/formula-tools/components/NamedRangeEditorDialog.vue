@@ -138,6 +138,7 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
           >
             <template #suffix>
               <TButton
+                class="named-range-editor-dialog__range-picker"
                 variant="text"
                 shape="square"
                 :aria-label="t('formulaTools.selectRange')"
@@ -167,6 +168,10 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
 .named-range-editor-dialog {
   &__content {
     min-width: 0;
+  }
+
+  &__range-picker:hover {
+    --td-bg-color-container-hover: transparent;
   }
 
   &__form {
