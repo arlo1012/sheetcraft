@@ -14,7 +14,7 @@ const IDENTIFIER_PATTERN = /^[\p{L}_][\p{L}\p{N}_]*/u;
 const REFERENCE_PATTERN = /^\$?[A-Za-z]+\$?[1-9]\d*/;
 const CELL_LIKE_PATTERN = /^\$?[A-Za-z]+\$?\d+/;
 const QUALIFIED_REFERENCE_PATTERN =
-  /^(?:(?:'(?:[^']|'')*'|[A-Za-z0-9_.]+)!)?\$?[A-Za-z]+\$?[1-9]\d*/;
+  /^(?:(?:'(?:[^']|'')*'|[\p{L}\p{N}_.]+)!)?\$?[A-Za-z]+\$?[1-9]\d*/u;
 
 class FormulaParser {
   private offset = 1;

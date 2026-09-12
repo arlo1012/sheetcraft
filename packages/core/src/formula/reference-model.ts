@@ -216,7 +216,7 @@ function formatSheetName(sheetName: string): string {
 }
 
 function isUnquotedSheetName(sheetName: string): boolean {
-  return isSupportedSheetName(sheetName) && /^[A-Za-z0-9_.]+$/.test(sheetName);
+  return isSupportedSheetName(sheetName) && /^[\p{L}\p{N}_.]+$/u.test(sheetName);
 }
 
 function isSupportedSheetName(value: unknown): value is string {
