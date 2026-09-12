@@ -56,7 +56,6 @@ export type FormulaToolsMessageSchema = {
     definedNames: string;
     tableNames: string;
     clearNameFilters: string;
-    activeNameFilters: string;
     noMatchingNames: string;
 
     allNames: string;

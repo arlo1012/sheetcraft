@@ -61,7 +61,6 @@ export const formulaToolsZhCN = {
     definedNames: "定义的名称",
     tableNames: "表名称",
     clearNameFilters: "清除筛选器",
-    activeNameFilters: "已选 {count} 项筛选",
     noMatchingNames: "没有符合筛选条件的名称",
     filterNames: "筛选名称",
     allNames: "全部名称",

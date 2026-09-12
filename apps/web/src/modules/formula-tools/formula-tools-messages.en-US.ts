@@ -61,7 +61,6 @@ export const formulaToolsEnUS = {
     definedNames: "Defined names",
     tableNames: "Table names",
     clearNameFilters: "Clear filters",
-    activeNameFilters: "{count} filters selected",
     noMatchingNames: "No matching names",
     filterNames: "Filter names",
     allNames: "All names",

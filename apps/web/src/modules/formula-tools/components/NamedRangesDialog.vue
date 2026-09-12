@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { Check, X } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { DropdownItem as TDropdownItem } from "tdesign-vue-next/es/dropdown";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
@@ -80,12 +81,27 @@ const filteredRanges = computed<NameTableRow[]>(() => {
     );
 });
 const filterOptions = computed(() => [
-  { value: "sheet", label: t("formulaTools.worksheetNames") },
-  { value: "workbook", label: t("formulaTools.workbookNames") },
-  { value: "errors", label: t("formulaTools.namesWithErrors") },
-  { value: "no-errors", label: t("formulaTools.namesWithoutErrors") },
-  { value: "defined", label: t("formulaTools.definedNames") },
-  { value: "table", label: t("formulaTools.tableNames") },
+  {
+    group: "",
+    children: [
+      { value: "sheet", label: t("formulaTools.worksheetNames") },
+      { value: "workbook", label: t("formulaTools.workbookNames") },
+    ],
+  },
+  {
+    group: "",
+    children: [
+      { value: "errors", label: t("formulaTools.namesWithErrors") },
+      { value: "no-errors", label: t("formulaTools.namesWithoutErrors") },
+    ],
+  },
+  {
+    group: "",
+    children: [
+      { value: "defined", label: t("formulaTools.definedNames") },
+      { value: "table", label: t("formulaTools.tableNames") },
+    ],
+  },
 ]);
 function changeFilters(value: SelectValue): void {
   const next = Array.isArray(value)
@@ -220,19 +236,26 @@ watch(
             :options="filterOptions"
             :popup-props="filterPopupProps"
             :placeholder="t('formulaTools.allNames')"
-            :value-display="
-              nameFilters.length
-                ? t('formulaTools.activeNameFilters', { count: nameFilters.length })
-                : undefined
-            "
+            :min-collapsed-num="1"
+            :tag-props="{ maxWidth: 110 }"
             :aria-label="t('formulaTools.filterNames')"
             data-name-filter
             @change="changeFilters"
           >
             <template #panelTopContent>
-              <TButton variant="text" block data-clear-name-filters @click="clearFilters">
-                {{ t("formulaTools.clearNameFilters") }}
-              </TButton>
+              <ul class="named-ranges-dialog__filter-actions" role="menu">
+                <TDropdownItem
+                  :max-column-width="250"
+                  role="menuitem"
+                  tabindex="0"
+                  data-clear-name-filters
+                  @click="clearFilters"
+                  @keydown.enter.prevent="clearFilters"
+                  @keydown.space.prevent="clearFilters"
+                >
+                  {{ t("formulaTools.clearNameFilters") }}
+                </TDropdownItem>
+              </ul>
             </template>
           </TSelect>
         </div>
@@ -346,6 +369,12 @@ watch(
     justify-content: flex-end;
     gap: 8px;
     min-width: 0;
+  }
+  &__filter-actions {
+    margin: 0;
+    padding: 0 0 var(--idea-space-2);
+    list-style: none;
+    border-bottom: 1px solid var(--idea-border-subtle);
   }
   &__search {
     width: 210px;
