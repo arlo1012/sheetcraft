@@ -135,7 +135,7 @@ if (props.visible) createRange();
         <label>{{ t("formulaTools.name") }}<input v-model="draft.name" autocomplete="off" /></label>
         <label
           >{{ t("formulaTools.scope")
-          }}<select v-model="draft.scopeSheetId">
+          }}<select v-model="draft.scopeSheetId" :disabled="Boolean(selectedId)">
             <option :value="undefined">{{ t("formulaTools.workbook") }}</option>
             <option v-for="sheet in sheets" :key="sheet.id" :value="sheet.id">
               {{ sheet.name }}
