@@ -5,7 +5,14 @@ import type {
   FormulaFunctionContext,
   FormulaFunctionDefinition,
 } from "./contracts.js";
-import { defineFunction, finiteNumber, formulaError, scalar, values } from "./helpers.js";
+import {
+  defineFunction,
+  finiteNumber,
+  formulaError,
+  isOmittedArgument,
+  scalar,
+  values,
+} from "./helpers.js";
 
 function direct(context: FormulaFunctionContext, index: number): FormulaValue {
   return scalar(context.evaluateArgument(index));
@@ -27,6 +34,25 @@ function count(
   const value = finiteNumber(direct(context, index));
   if (isFormulaError(value)) return value;
   return Math.trunc(value);
+}
+
+function optionalValue(
+  context: FormulaFunctionContext,
+  index: number,
+  defaultValue: FormulaValue,
+): FormulaValue {
+  if (context.argumentCount <= index) return defaultValue;
+  const argument = context.evaluateArgument(index);
+  return isOmittedArgument(argument) ? defaultValue : scalar(argument);
+}
+
+function optionalCount(
+  context: FormulaFunctionContext,
+  index: number,
+  defaultValue: number,
+): number | ReturnType<typeof formulaError> {
+  const value = finiteNumber(optionalValue(context, index, defaultValue));
+  return isFormulaError(value) ? value : Math.trunc(value);
 }
 
 function joinValues(
@@ -63,8 +89,8 @@ function textJoin(context: FormulaFunctionContext): FormulaValue {
 
 function numberValue(context: FormulaFunctionContext): FormulaValue {
   const source = text(direct(context, 0));
-  const decimal = context.argumentCount > 1 ? text(direct(context, 1)) : ".";
-  const group = context.argumentCount > 2 ? text(direct(context, 2)) : ",";
+  const decimal = text(optionalValue(context, 1, "."));
+  const group = text(optionalValue(context, 2, ","));
   if (isFormulaError(source) || isFormulaError(decimal) || isFormulaError(group))
     return isFormulaError(source) ? source : isFormulaError(decimal) ? decimal : group;
   if (decimal.length !== 1 || group.length > 1 || decimal === group) return formulaError("VALUE");
@@ -80,8 +106,8 @@ function numberValue(context: FormulaFunctionContext): FormulaValue {
 
 function fixedText(context: FormulaFunctionContext, currency: boolean): FormulaValue {
   const value = finiteNumber(direct(context, 0));
-  const decimals = context.argumentCount > 1 ? count(context, 1) : 2;
-  const noCommas = !currency && context.argumentCount > 2 ? direct(context, 2) : false;
+  const decimals = optionalCount(context, 1, 2);
+  const noCommas = currency ? false : optionalValue(context, 2, false);
   if (isFormulaError(value) || isFormulaError(decimals) || isFormulaError(noCommas))
     return isFormulaError(value) ? value : isFormulaError(decimals) ? decimals : noCommas;
   if (typeof noCommas !== "boolean" || decimals < -127 || decimals > 127)
@@ -105,9 +131,9 @@ function fixedText(context: FormulaFunctionContext, currency: boolean): FormulaV
 function textAround(context: FormulaFunctionContext, before: boolean): FormulaValue {
   const source = text(direct(context, 0));
   const delimiter = text(direct(context, 1));
-  const instance = context.argumentCount > 2 ? count(context, 2) : 1;
-  const matchMode = context.argumentCount > 3 ? count(context, 3) : 0;
-  const matchEnd = context.argumentCount > 4 ? count(context, 4) : 0;
+  const instance = optionalCount(context, 2, 1);
+  const matchMode = optionalCount(context, 3, 0);
+  const matchEnd = optionalCount(context, 4, 0);
   if (
     isFormulaError(source) ||
     isFormulaError(delimiter) ||
@@ -144,7 +170,7 @@ function textAround(context: FormulaFunctionContext, before: boolean): FormulaVa
   const position = occurrences[instance > 0 ? instance - 1 : occurrences.length + instance];
   if (position === undefined) {
     if (matchEnd === 1) return before ? source : "";
-    return context.argumentCount > 5 ? direct(context, 5) : formulaError("NA");
+    return optionalValue(context, 5, formulaError("NA"));
   }
   return before ? source.slice(0, position) : source.slice(position + delimiter.length);
 }
@@ -310,7 +336,7 @@ export const TEXT_FUNCTIONS = [
     (context) => {
       const value = text(direct(context, 0));
       if (isFormulaError(value)) return value;
-      const length = context.argumentCount === 1 ? 1 : count(context, 1);
+      const length = optionalCount(context, 1, 1);
       return isFormulaError(length) || length < 0
         ? formulaError("VALUE")
         : [...value].slice(0, length).join("");
@@ -328,7 +354,7 @@ export const TEXT_FUNCTIONS = [
     (context) => {
       const value = text(direct(context, 0));
       if (isFormulaError(value)) return value;
-      const length = context.argumentCount === 1 ? 1 : count(context, 1);
+      const length = optionalCount(context, 1, 1);
       return isFormulaError(length) || length < 0
         ? formulaError("VALUE")
         : length === 0
@@ -491,7 +517,8 @@ export const TEXT_FUNCTIONS = [
       if (isFormulaError(source) || isFormulaError(oldText) || isFormulaError(newText))
         return isFormulaError(source) ? source : isFormulaError(oldText) ? oldText : newText;
       if (oldText === "") return source;
-      if (context.argumentCount === 3) return source.split(oldText).join(newText);
+      if (context.argumentCount === 3 || isOmittedArgument(context.evaluateArgument(3)))
+        return source.split(oldText).join(newText);
       const instance = count(context, 3);
       if (isFormulaError(instance) || instance < 1) return formulaError("VALUE");
       let seen = 0;
@@ -648,7 +675,7 @@ function find(context: FormulaFunctionContext, insensitive: boolean): FormulaVal
   const haystack = text(direct(context, 1));
   if (isFormulaError(needle) || isFormulaError(haystack))
     return isFormulaError(needle) ? needle : haystack;
-  const start = context.argumentCount === 2 ? 1 : count(context, 2);
+  const start = optionalCount(context, 2, 1);
   if (isFormulaError(start) || start < 1) return formulaError("VALUE");
   const source = Array.from(insensitive ? haystack.toLocaleLowerCase() : haystack);
   const target = Array.from(insensitive ? needle.toLocaleLowerCase() : needle);

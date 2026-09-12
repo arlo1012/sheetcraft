@@ -55,6 +55,7 @@ describe("expanded text conversion functions", () => {
     expect(evaluateFormula("=FIXED(1234.567,-2)", resolver)).toBe("1,200");
     expect(evaluateFormula("=DOLLAR(-150,-2)", resolver)).toBe("($200)");
     expect(evaluateFormula("=FIXED(-150,-2)", resolver)).toBe("-200");
+    expect(evaluateFormula("=FIXED(1234,,TRUE)", resolver)).toBe("1234.00");
   });
 
   test("extracts text around selected delimiters", () => {
@@ -62,5 +63,6 @@ describe("expanded text conversion functions", () => {
     expect(evaluateFormula('=TEXTAFTER("a-b-c","-",-1)', resolver)).toBe("c");
     expect(evaluateFormula('=TEXTBEFORE("Alpha","a",1,1)', resolver)).toBe("");
     expect(evaluateFormula('=TEXTAFTER("value","/",1,0,0,"none")', resolver)).toBe("none");
+    expect(evaluateFormula('=TEXTAFTER("value","/",,,,"none")', resolver)).toBe("none");
   });
 });

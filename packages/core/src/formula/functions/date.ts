@@ -5,7 +5,14 @@ import {
 } from "../date-system.js";
 import { isFormulaError, type FormulaValue } from "../types.js";
 import type { FormulaFunctionContext, FormulaFunctionDefinition } from "./contracts.js";
-import { defineFunction, finiteNumber, formulaError, scalar, values } from "./helpers.js";
+import {
+  defineFunction,
+  finiteNumber,
+  formulaError,
+  isOmittedArgument,
+  scalar,
+  values,
+} from "./helpers.js";
 
 function number(
   context: FormulaFunctionContext,
@@ -19,6 +26,18 @@ function whole(
   index: number,
 ): number | ReturnType<typeof formulaError> {
   const value = number(context, index);
+  return isFormulaError(value) ? value : Math.trunc(value);
+}
+
+function optionalWhole(
+  context: FormulaFunctionContext,
+  index: number,
+  defaultValue: number,
+): number | ReturnType<typeof formulaError> {
+  if (context.argumentCount <= index) return defaultValue;
+  const argument = context.evaluateArgument(index);
+  if (isOmittedArgument(argument)) return defaultValue;
+  const value = finiteNumber(scalar(argument));
   return isFormulaError(value) ? value : Math.trunc(value);
 }
 
@@ -100,7 +119,7 @@ function shiftedMonth(context: FormulaFunctionContext, endOfMonth: boolean): For
 
 function weekday(context: FormulaFunctionContext): FormulaValue {
   const value = serialDay(context, 0);
-  const returnType = context.argumentCount === 1 ? 1 : whole(context, 1);
+  const returnType = optionalWhole(context, 1, 1);
   if (isFormulaError(value) || isFormulaError(returnType))
     return isFormulaError(value) ? value : returnType;
   const sundayZero = (((value + (system(context) === "1900" ? 6 : 5)) % 7) + 7) % 7;
@@ -387,7 +406,7 @@ export const DATE_FUNCTIONS = [
     (context) => {
       const startDay = serialDay(context, 0);
       const endDay = serialDay(context, 1);
-      const basis = context.argumentCount === 2 ? 0 : whole(context, 2);
+      const basis = optionalWhole(context, 2, 0);
       if (isFormulaError(startDay) || isFormulaError(endDay) || isFormulaError(basis))
         return isFormulaError(startDay) ? startDay : isFormulaError(endDay) ? endDay : basis;
       if (basis < 0 || basis > 4) return formulaError("NUM");
@@ -526,7 +545,7 @@ export const DATE_FUNCTIONS = [
     (context) => {
       const start = dateParts(context, 0);
       const end = dateParts(context, 1);
-      const method = context.argumentCount === 2 ? 0 : whole(context, 2);
+      const method = optionalWhole(context, 2, 0);
       if (isFormulaError(start) || isFormulaError(end) || isFormulaError(method))
         return isFormulaError(start) ? start : isFormulaError(end) ? end : method;
       return days360(start, end, method !== 0);
@@ -585,7 +604,7 @@ export const DATE_FUNCTIONS = [
     },
     (context) => {
       const day = serialDay(context, 0);
-      const returnType = context.argumentCount === 1 ? 1 : whole(context, 1);
+      const returnType = optionalWhole(context, 1, 1);
       if (isFormulaError(day) || isFormulaError(returnType))
         return isFormulaError(day) ? day : returnType;
       const parts = datePartsFromSerial(day, context);

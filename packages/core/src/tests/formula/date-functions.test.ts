@@ -64,6 +64,10 @@ describe("expanded date functions", () => {
   test("uses requested day count convention", () => {
     expect(evaluateFormula("=DAYS360(DATE(2024,1,31),DATE(2024,2,29))", resolver)).toBe(30);
     expect(evaluateFormula("=YEARFRAC(DATE(2024,1,1),DATE(2025,1,1),3)", resolver)).toBe(366 / 365);
+    expect(evaluateFormula("=YEARFRAC(DATE(2024,1,1),DATE(2025,1,1),)", resolver)).toBeCloseTo(
+      1,
+      10,
+    );
   });
 
   test("supports custom workweek patterns", () => {
