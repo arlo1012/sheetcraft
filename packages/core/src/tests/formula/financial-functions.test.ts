@@ -33,6 +33,7 @@ describe("expanded financial functions", () => {
     expect(evaluateFormula("=RATE(12,-100,1000)", resolver)).toBeCloseTo(0.0292285, 6);
     expect(evaluateFormula("=IPMT(1%,1,12,1000)", resolver)).toBeCloseTo(-10, 8);
     expect(evaluateFormula("=PPMT(1%,1,12,1000)", resolver)).toBeCloseTo(-78.8488, 3);
+    expect(evaluateFormula("=PMT(0,10,100,,0)", resolver)).toBe(-10);
   });
 
   test("solves the zero-rate limit and rejects unsolvable rates", () => {

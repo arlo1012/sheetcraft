@@ -1,7 +1,14 @@
 import { isFormulaError, type FormulaValue } from "../types.js";
 import { excelSerialToDateParts } from "../date-system.js";
 import type { FormulaFunctionContext, FormulaFunctionDefinition } from "./contracts.js";
-import { defineFunction, finiteNumber, formulaError, scalar, values } from "./helpers.js";
+import {
+  defineFunction,
+  finiteNumber,
+  formulaError,
+  isOmittedArgument,
+  scalar,
+  values,
+} from "./helpers.js";
 
 function number(
   context: FormulaFunctionContext,
@@ -15,9 +22,21 @@ function paymentType(
   index: number,
 ): 0 | 1 | ReturnType<typeof formulaError> {
   if (context.argumentCount <= index) return 0;
-  const value = number(context, index);
+  const argument = context.evaluateArgument(index);
+  if (isOmittedArgument(argument)) return 0;
+  const value = finiteNumber(scalar(argument));
   if (isFormulaError(value)) return value;
   return value !== 0 && value !== 1 ? formulaError("NUM") : value;
+}
+
+function optionalNumber(
+  context: FormulaFunctionContext,
+  index: number,
+  defaultValue: number,
+): number | ReturnType<typeof formulaError> {
+  if (context.argumentCount <= index) return defaultValue;
+  const argument = context.evaluateArgument(index);
+  return isOmittedArgument(argument) ? defaultValue : finiteNumber(scalar(argument));
 }
 
 function argumentsFor(
@@ -346,7 +365,7 @@ export const FINANCIAL_FUNCTIONS = [
     (context) => {
       const values = argumentsFor(context, 3);
       if (isFormulaError(values)) return values;
-      const present = context.argumentCount > 3 ? number(context, 3) : 0;
+      const present = optionalNumber(context, 3, 0);
       const type = paymentType(context, 4);
       return isFormulaError(present)
         ? present
@@ -422,7 +441,7 @@ export const FINANCIAL_FUNCTIONS = [
     (context) => {
       const cashflows = rangeNumbers(context, 0);
       const dates = dateSerials(context, 1);
-      const guess = context.argumentCount === 2 ? 0.1 : number(context, 2);
+      const guess = optionalNumber(context, 2, 0.1);
       return isFormulaError(cashflows)
         ? cashflows
         : isFormulaError(dates)
@@ -483,7 +502,7 @@ export const FINANCIAL_FUNCTIONS = [
     },
     (context) => {
       const values = depreciationArguments(context, 4);
-      const factor = context.argumentCount === 4 ? 2 : number(context, 4);
+      const factor = optionalNumber(context, 4, 2);
       if (isFormulaError(values) || isFormulaError(factor))
         return isFormulaError(values) ? values : factor;
       const [cost, salvage, life, period] = values;
@@ -518,9 +537,9 @@ export const FINANCIAL_FUNCTIONS = [
     },
     (context) => {
       const required = argumentsFor(context, 3);
-      const future = context.argumentCount > 3 ? number(context, 3) : 0;
+      const future = optionalNumber(context, 3, 0);
       const type = paymentType(context, 4);
-      const guess = context.argumentCount > 5 ? number(context, 5) : 0.1;
+      const guess = optionalNumber(context, 5, 0.1);
       if (
         isFormulaError(required) ||
         isFormulaError(future) ||
@@ -555,7 +574,7 @@ export const FINANCIAL_FUNCTIONS = [
     },
     (context) => {
       const required = argumentsFor(context, 4);
-      const future = context.argumentCount > 4 ? number(context, 4) : 0;
+      const future = optionalNumber(context, 4, 0);
       const type = paymentType(context, 5);
       if (isFormulaError(required) || isFormulaError(future) || isFormulaError(type))
         return isFormulaError(required) ? required : isFormulaError(future) ? future : type;
@@ -591,7 +610,7 @@ export const FINANCIAL_FUNCTIONS = [
     },
     (context) => {
       const required = argumentsFor(context, 4);
-      const future = context.argumentCount > 4 ? number(context, 4) : 0;
+      const future = optionalNumber(context, 4, 0);
       const type = paymentType(context, 5);
       if (isFormulaError(required) || isFormulaError(future) || isFormulaError(type))
         return isFormulaError(required) ? required : isFormulaError(future) ? future : type;
@@ -620,7 +639,7 @@ export const FINANCIAL_FUNCTIONS = [
     },
     (context) => {
       const cashflows = irrNumbers(context, 0);
-      const guess = context.argumentCount === 1 ? 0.1 : number(context, 1);
+      const guess = optionalNumber(context, 1, 0.1);
       return isFormulaError(cashflows)
         ? cashflows
         : isFormulaError(guess)
@@ -674,7 +693,7 @@ export const FINANCIAL_FUNCTIONS = [
     (context) => {
       const values = argumentsFor(context, 3);
       if (isFormulaError(values)) return values;
-      const future = context.argumentCount > 3 ? number(context, 3) : 0;
+      const future = optionalNumber(context, 3, 0);
       const type = paymentType(context, 4);
       return isFormulaError(future)
         ? future
@@ -701,7 +720,7 @@ export const FINANCIAL_FUNCTIONS = [
     (context) => {
       const values = argumentsFor(context, 3);
       if (isFormulaError(values)) return values;
-      const future = context.argumentCount > 3 ? number(context, 3) : 0;
+      const future = optionalNumber(context, 3, 0);
       const type = paymentType(context, 4);
       return isFormulaError(future)
         ? future
@@ -728,7 +747,7 @@ export const FINANCIAL_FUNCTIONS = [
     (context) => {
       const values = argumentsFor(context, 3);
       if (isFormulaError(values)) return values;
-      const future = context.argumentCount > 3 ? number(context, 3) : 0;
+      const future = optionalNumber(context, 3, 0);
       const type = paymentType(context, 4);
       return isFormulaError(future)
         ? future
