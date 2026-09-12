@@ -155,7 +155,7 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
           <TTextarea
             v-model="draft.comment"
             :aria-label="t('formulaTools.comment')"
-            :autosize="{ minRows: 1, maxRows: 2 }"
+            :autosize="{ minRows: 3, maxRows: 5 }"
             :maxlength="255"
           />
         </TFormItem>
