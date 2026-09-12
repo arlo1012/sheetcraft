@@ -27,24 +27,27 @@ export function createUpsertDefinedNameCommand(
   workbook: Workbook,
   draft: DefinedNameDraft,
 ): UpsertDefinedNameCommand {
-  if (!isName(draft.name))
-    throw invalidCommandPayload("name", draft.name);
+  if (!isName(draft.name)) throw invalidCommandPayload("name", draft.name);
   if (draft.scopeSheetId !== undefined && !workbook.sheets.has(draft.scopeSheetId))
     throw invalidCommandPayload("scopeSheetId", draft.scopeSheetId);
   if (
     draft.id === undefined &&
     [...workbook.definedNames.values()].some(
-      (item) => item.scopeSheetId === draft.scopeSheetId && item.name.toUpperCase() === draft.name.toUpperCase(),
+      (item) =>
+        item.scopeSheetId === draft.scopeSheetId &&
+        item.name.toUpperCase() === draft.name.toUpperCase(),
     )
   )
     throw invalidCommandPayload("name", draft.name);
-  const source = typeof draft.reference === "string" && draft.reference.startsWith("=")
-    ? draft.reference.slice(1)
-    : draft.reference;
+  const source =
+    typeof draft.reference === "string" && draft.reference.startsWith("=")
+      ? draft.reference.slice(1)
+      : draft.reference;
   const reference = parseFormulaReference(source, {
     currentSheetId: draft.scopeSheetId ?? workbook.activeSheetId,
     resolveSheetId: (name) =>
-      [...workbook.sheets.values()].find((sheet) => sheet.name.toLowerCase() === name.toLowerCase())?.id,
+      [...workbook.sheets.values()].find((sheet) => sheet.name.toLowerCase() === name.toLowerCase())
+        ?.id,
   });
   if (!reference) throw invalidCommandPayload("reference", draft.reference);
   const id = draft.id ?? `${draft.scopeSheetId ?? "workbook"}:${draft.name.toUpperCase()}`;
@@ -63,7 +66,10 @@ export function createUpsertDefinedNameCommand(
   };
 }
 
-export function createDeleteDefinedNameCommand(workbook: Workbook, id: string): DeleteDefinedNameCommand {
+export function createDeleteDefinedNameCommand(
+  workbook: Workbook,
+  id: string,
+): DeleteDefinedNameCommand {
   if (!workbook.definedNames.has(id)) throw invalidCommandPayload("id", id);
   return { type: "deleteDefinedName", id };
 }
@@ -73,7 +79,11 @@ export function applyUpsertDefinedNameCommand(
   command: UpsertDefinedNameCommand,
 ): UpsertDefinedNameCommand | DeleteDefinedNameCommand {
   const definition = command.definition;
-  if (!definition.id || !isName(definition.name) || !workbook.sheets.has(definition.reference.sheetId))
+  if (
+    !definition.id ||
+    !isName(definition.name) ||
+    !workbook.sheets.has(definition.reference.sheetId)
+  )
     throw invalidCommandPayload("definition", definition);
   if (definition.scopeSheetId !== undefined && !workbook.sheets.has(definition.scopeSheetId))
     throw invalidCommandPayload("definition.scopeSheetId", definition.scopeSheetId);

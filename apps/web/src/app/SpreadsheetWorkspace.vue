@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { nextTick, ref, shallowRef, shallowReactive, useId, watch } from "vue";
+import { computed, nextTick, ref, shallowRef, shallowReactive, useId, watch } from "vue";
 import type { CellFormatChange } from "@idea10/core/commands";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { useWorkbookFullscreen } from "../modules/workbook/composables/useWorkbookFullscreen";
 import { useEyeComfortMode } from "../modules/workbook/composables/useEyeComfortMode";
 import { normalizeSheetZoom, SHEET_ZOOM_STEP } from "../shared/sheet-view/zoom";
 import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
+import { useFormulaToolsController } from "../modules/formula-tools/useFormulaToolsController";
+import NamedRangesDialog from "../modules/formula-tools/components/NamedRangesDialog.vue";
 import {
   createIndexedDbImageAssetStore,
   type ImageAssetStore,
@@ -61,6 +63,8 @@ function updateHorizontalScrollState(state: SheetHorizontalScrollState): void {
 
 const {
   session,
+  executeCommand,
+  recalculate,
   workbookRevision,
   workbookGeneration,
   replaceWorkbook,
@@ -75,6 +79,8 @@ const {
   activeAddress,
   activeAddressLabel,
   activeCellInput,
+  activeSelectionRange,
+  activeSheetEvaluator,
   isFormattingSupported,
   activeSelectionStyle,
   formatPainterActive,
@@ -89,7 +95,6 @@ const {
   convertCellImageToFloating,
   pasteCells,
   clearCells,
-  autoSum,
   sortSelection,
   applyFilter,
   clearFilter,
@@ -158,7 +163,31 @@ function confirmCellFormat(change: CellFormatChange): void {
 }
 
 function onSelectSheet(sheetId: string): void {
+  if (cellEditSession.state.composing) return;
+  if (cellEditSession.state.active && cellEditSession.state.draft.startsWith("=")) {
+    cellEditSession.activateSurface("formula-bar");
+    selectSheet(sheetId);
+    void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
+    return;
+  }
   if (cellEditSession.finish()) selectSheet(sheetId);
+}
+
+async function onTraverseFromFormulaBar(payload: {
+  address: { row: number; column: number };
+  direction: "up" | "down" | "left" | "right";
+  sheetId?: string;
+}): Promise<void> {
+  if (payload.sheetId && payload.sheetId !== activeSheet.value.id) {
+    selectSheet(payload.sheetId);
+    await nextTick();
+  }
+  traverseFromFormulaBar(payload);
+}
+
+function onCancelFormulaEdit(sheetId?: string): void {
+  if (sheetId && sheetId !== activeSheet.value.id) selectSheet(sheetId);
+  void nextTick(focusCellEditor);
 }
 
 const assetStore = props.imageAssetStore ?? createIndexedDbImageAssetStore();
@@ -205,6 +234,29 @@ const xlsxActions = useWorkbookXlsxActions({
   isBlocked: () => fileBusy.value || confirmation.value !== undefined || imageBusy.value,
 });
 const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback } = xlsxActions;
+
+const formulaTools = useFormulaToolsController({
+  getWorkbook: () => session.workbook,
+  getSelection: () => ({ address: activeAddress.value, range: activeSelectionRange.value }),
+  editSession: cellEditSession,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
+  execute: executeCommand,
+  focusFormulaBar: () => formulaBarRef.value?.focus({ preserveSelection: true }),
+  recalculate,
+});
+const {
+  disabled: formulaToolsDisabled,
+  editTargetSheet,
+  namesVisible,
+  namedRanges,
+  nameSelectionReference,
+  recentFunctions,
+} = formulaTools;
+const formulaReadOnly = computed(() => editTargetSheet.value.properties.protected);
+watch(workbookGeneration, () => {
+  namesVisible.value = false;
+  recentFunctions.value = [];
+});
 
 function changeSheetProperties(payload: {
   sheetId: string;
@@ -289,7 +341,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :format-painter-active="formatPainterActive"
       :data-state="dataToolState"
       :merge-state="mergeState"
-      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection"
+      :formula-disabled="formulaToolsDisabled"
+      :edit-session-id="cellEditSession.id"
+      :recent-functions="recentFunctions"
+      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection || namesVisible"
       @insert-image="imageActions.requestInsert"
       @apply-borders="applyCellBorders"
       @update-border-format="updateBorderFormat"
@@ -298,7 +353,12 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @adjust-decimals="adjustNumberFormatDecimals"
       @adjust-indent="adjustIndent"
       @activate-format-painter="activateFormatPainter"
-      @auto-sum="autoSum"
+      @auto-sum="formulaTools.aggregate('SUM')"
+      @insert-function="formulaTools.insertFunction"
+      @aggregate="formulaTools.aggregate"
+      @open-names="formulaTools.openNames"
+      @recalculate="formulaTools.recalculate"
+      @formula-interaction-end="formulaTools.focusFormulaBar"
       @sort="sortSelection"
       @apply-filter="applyFilter"
       @clear-filter="clearFilter"
@@ -330,6 +390,18 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         </WorkbookFileActions>
       </template>
     </SpreadsheetRibbon>
+    <NamedRangesDialog
+      :edit-session-id="cellEditSession.id"
+      :visible="namesVisible"
+      :ranges="namedRanges"
+      :sheets="sheets"
+      :active-sheet-id="activeSheet.id"
+      :selection-reference="nameSelectionReference"
+      @close="formulaTools.closeNames"
+      @save="formulaTools.saveName"
+      @delete="formulaTools.deleteName"
+      @create-from-selection="formulaTools.captureNameSelection"
+    />
     <CellFormatDialog
       v-if="cellFormatSelection"
       :state="cellFormatSelection.state"
@@ -361,12 +433,14 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       />
     </div>
     <WorkbookFormulaBar
-      :read-only="activeSheet.properties.protected"
+      :read-only="formulaReadOnly"
       :key="workbookGeneration"
       ref="formulaBarRef"
       :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection"
       :address="activeAddress"
       :sheet-id="activeSheet.id"
+      :sheet-name="activeSheet.name"
+      :edit-target-sheet-name="editTargetSheet.name"
       :address-label="activeAddressLabel"
       :input-value="activeCellInput"
       :edit-session="cellEditSession"
@@ -374,7 +448,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :search-query="searchQuery"
       @navigate="navigateToAddress"
       @commit-cell="commitCell"
-      @traverse="traverseFromFormulaBar"
+      @traverse="onTraverseFromFormulaBar"
+      @cancel-edit="onCancelFormulaEdit"
       @update-search-query="updateSearchQuery"
       @find="findCell"
     />
@@ -396,6 +471,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :key="workbookGeneration"
         :ref="setGridNavigator"
         :sheet="activeSheet"
+        :evaluator="activeSheetEvaluator"
         :date-system="session.workbook.dateSystem"
         :reference-editor="formulaBarRef"
         :edit-session="cellEditSession"
@@ -428,6 +504,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       />
     </div>
     <WorkbookStatusBar
+      :edit-session-id="
+        cellEditSession.state.draft.startsWith('=') ? cellEditSession.id : undefined
+      "
       v-model:zoom="zoom"
       @fit-selection="fitSelectionToViewport"
       v-model:show-headers="showHeaders"

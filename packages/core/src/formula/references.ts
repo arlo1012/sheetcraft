@@ -315,10 +315,7 @@ function transformAxisRange(
   };
 }
 
-export function transformFormulaForAxis(
-  source: string,
-  transform: FormulaAxisTransform,
-): string {
+export function transformFormulaForAxis(source: string, transform: FormulaAxisTransform): string {
   const maximum = transform.axis === "row" ? MAX_FORMULA_ROWS : MAX_FORMULA_COLUMNS;
   if (
     !Number.isSafeInteger(transform.index) ||

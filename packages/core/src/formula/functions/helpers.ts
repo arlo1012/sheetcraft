@@ -1,9 +1,19 @@
 import { createFormulaError, isFormulaError, type FormulaValue } from "../types.js";
-import type { FormulaFunctionArgument, FormulaFunctionContext, FormulaFunctionDefinition, FormulaFunctionMetadata } from "./contracts.js";
+import type {
+  FormulaFunctionArgument,
+  FormulaFunctionContext,
+  FormulaFunctionDefinition,
+  FormulaFunctionMetadata,
+} from "./contracts.js";
 
-export const formulaError = (code: "DIV0" | "VALUE" | "NUM" | "NA" | "REF") => createFormulaError(code);
+export const formulaError = (code: "DIV0" | "VALUE" | "NUM" | "NA" | "REF") =>
+  createFormulaError(code);
 
-export function defineFunction(metadata: FormulaFunctionMetadata, evaluate: FormulaFunctionDefinition["evaluate"], selectDependencyArguments?: FormulaFunctionDefinition["selectDependencyArguments"]): FormulaFunctionDefinition {
+export function defineFunction(
+  metadata: FormulaFunctionMetadata,
+  evaluate: FormulaFunctionDefinition["evaluate"],
+  selectDependencyArguments?: FormulaFunctionDefinition["selectDependencyArguments"],
+): FormulaFunctionDefinition {
   return { metadata, evaluate, selectDependencyArguments };
 }
 
@@ -25,7 +35,8 @@ export function condition(value: FormulaValue): boolean | ReturnType<typeof form
   if (isFormulaError(value)) return value;
   if (value === null) return false;
   if (typeof value === "boolean") return value;
-  if (typeof value === "number") return Number.isFinite(value) ? value !== 0 : formulaError("VALUE");
+  if (typeof value === "number")
+    return Number.isFinite(value) ? value !== 0 : formulaError("VALUE");
   return formulaError("VALUE");
 }
 
@@ -33,18 +44,30 @@ export function values(argument: FormulaFunctionArgument): Iterable<FormulaValue
   return argument.kind === "range" ? argument.values : [argument.value];
 }
 
-export function argumentsValues(context: FormulaFunctionContext): Iterable<[FormulaFunctionArgument, FormulaValue]> {
-  return (function* () { for (let index = 0; index < context.argumentCount; index += 1) { const argument = context.evaluateArgument(index); for (const value of values(argument)) yield [argument, value] as [FormulaFunctionArgument, FormulaValue]; } })();
+export function argumentsValues(
+  context: FormulaFunctionContext,
+): Iterable<[FormulaFunctionArgument, FormulaValue]> {
+  return (function* () {
+    for (let index = 0; index < context.argumentCount; index += 1) {
+      const argument = context.evaluateArgument(index);
+      for (const value of values(argument))
+        yield [argument, value] as [FormulaFunctionArgument, FormulaValue];
+    }
+  })();
 }
 
 export function flatten(context: FormulaFunctionContext): FormulaValue[] {
   return [...argumentsValues(context)].map(([, value]) => value);
 }
 
-export function compareValues(left: FormulaValue, right: FormulaValue): number | ReturnType<typeof formulaError> {
+export function compareValues(
+  left: FormulaValue,
+  right: FormulaValue,
+): number | ReturnType<typeof formulaError> {
   if (isFormulaError(left)) return left;
   if (isFormulaError(right)) return right;
-  if (typeof left === "number" && typeof right === "number") return left === right ? 0 : left < right ? -1 : 1;
+  if (typeof left === "number" && typeof right === "number")
+    return left === right ? 0 : left < right ? -1 : 1;
   const a = left === null ? "" : String(left).toLocaleUpperCase();
   const b = right === null ? "" : String(right).toLocaleUpperCase();
   return a === b ? 0 : a < b ? -1 : 1;

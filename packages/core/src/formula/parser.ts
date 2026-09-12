@@ -13,7 +13,8 @@ const NUMBER_PATTERN = /^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i;
 const IDENTIFIER_PATTERN = /^[\p{L}_][\p{L}\p{N}_]*/u;
 const REFERENCE_PATTERN = /^\$?[A-Za-z]+\$?[1-9]\d*/;
 const CELL_LIKE_PATTERN = /^\$?[A-Za-z]+\$?\d+/;
-const QUALIFIED_REFERENCE_PATTERN = /^(?:(?:'(?:[^']|'')*'|[A-Za-z0-9_.]+)!)?\$?[A-Za-z]+\$?[1-9]\d*/;
+const QUALIFIED_REFERENCE_PATTERN =
+  /^(?:(?:'(?:[^']|'')*'|[A-Za-z0-9_.]+)!)?\$?[A-Za-z]+\$?[1-9]\d*/;
 
 class FormulaParser {
   private offset = 1;
@@ -182,7 +183,9 @@ class FormulaParser {
     if (this.peek() !== "^") return left;
     this.offset += 1;
     const right = this.parseUnary();
-    return right ? { kind: "binary", operator: "^", left, right, start: left.start, end: right.end } : null;
+    return right
+      ? { kind: "binary", operator: "^", left, right, start: left.start, end: right.end }
+      : null;
   }
 
   private parsePrimary(): FormulaExpression | null {
@@ -219,7 +222,9 @@ class FormulaParser {
     const isFunction = Boolean(
       identifierCandidate && /^\s*\(/.test(remainder.slice(identifierCandidate.length)),
     );
-    const qualifiedReferenceText = isFunction ? undefined : QUALIFIED_REFERENCE_PATTERN.exec(remainder)?.[0];
+    const qualifiedReferenceText = isFunction
+      ? undefined
+      : QUALIFIED_REFERENCE_PATTERN.exec(remainder)?.[0];
     const referenceText = qualifiedReferenceText?.includes("!")
       ? qualifiedReferenceText
       : isFunction
@@ -321,9 +326,7 @@ function splitSheetQualifier(
   const separator = text.lastIndexOf("!");
   if (separator < 0) return { sheetName: null, referenceText: text, offset: start };
   const rawName = text.slice(0, separator);
-  const sheetName = rawName.startsWith("'")
-    ? rawName.slice(1, -1).replaceAll("''", "'")
-    : rawName;
+  const sheetName = rawName.startsWith("'") ? rawName.slice(1, -1).replaceAll("''", "'") : rawName;
   return { sheetName, referenceText: text.slice(separator + 1), offset: start + separator + 1 };
 }
 

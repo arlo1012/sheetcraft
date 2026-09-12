@@ -7,6 +7,7 @@ import {
 import {
   createSheetSparseState,
   createSheetEvaluator,
+  createWorkbookEvaluator,
   getCellContent,
   getCellStyle,
   MAX_SHEET_COLUMNS,
@@ -16,6 +17,7 @@ import {
   type CellRange,
   type FreezePanes,
   type Sheet,
+  type SheetEvaluator,
   type SheetSparseState,
   type Workbook,
 } from "../workbook.js";
@@ -215,7 +217,12 @@ export function applyMergeCellsCommand(
     normalizeContentLocale(command.locale),
   );
   assertSupportedMergeModeRange(normalized, mode);
-  const ranges = getCellMergeModeRanges(sheet, normalized, mode);
+  const ranges = getCellMergeModeRanges(
+    sheet,
+    normalized,
+    mode,
+    createWorkbookEvaluator(workbook, sheet.id),
+  );
   if (!ranges.length) return null;
   const previous = createSheetSparseState(sheet);
   validateMergePlan(sheet, ranges, command.range);
@@ -258,12 +265,13 @@ export function getCellMergeModeAvailability(
   sheet: Sheet,
   range: CellRange,
   mode: CellMergeMode,
+  evaluator: SheetEvaluator = createSheetEvaluator(sheet),
 ): boolean {
   try {
     const normalized = normalizeMergedCellRange(normalizeRange(range));
     const normalizedMode = normalizeCellMergeMode(mode);
     assertSupportedMergeModeRange(normalized, normalizedMode);
-    const ranges = getCellMergeModeRanges(sheet, normalized, normalizedMode);
+    const ranges = getCellMergeModeRanges(sheet, normalized, normalizedMode, evaluator);
     if (!ranges.length) return false;
     validateMergePlan(sheet, ranges, range);
     return true;
@@ -272,7 +280,12 @@ export function getCellMergeModeAvailability(
   }
 }
 
-function getCellMergeModeRanges(sheet: Sheet, range: CellRange, mode: CellMergeMode): CellRange[] {
+function getCellMergeModeRanges(
+  sheet: Sheet,
+  range: CellRange,
+  mode: CellMergeMode,
+  evaluator: SheetEvaluator,
+): CellRange[] {
   if (mode === "all" || mode === "center" || mode === "content") {
     if (mode === "content") assertNoCellImages(sheet, range);
     return [range];
@@ -289,7 +302,6 @@ function getCellMergeModeRanges(sheet: Sheet, range: CellRange, mode: CellMergeM
   if (vertical ? range.start.row === range.end.row : range.start.column === range.end.column)
     return [];
   assertNoCellImages(sheet, range);
-  const evaluator = createSheetEvaluator(sheet);
   const ranges: CellRange[] = [];
   const outerStart = vertical ? range.start.column : range.start.row;
   const outerEnd = vertical ? range.end.column : range.end.row;
@@ -429,7 +441,7 @@ function getMergedContentText(
   range: CellRange,
   locale: string | undefined,
 ): string {
-  const evaluator = createSheetEvaluator(sheet);
+  const evaluator = createWorkbookEvaluator(workbook, sheet.id);
   const values: string[] = [];
   for (let row = range.start.row; row <= range.end.row; row += 1) {
     for (let column = range.start.column; column <= range.end.column; column += 1) {

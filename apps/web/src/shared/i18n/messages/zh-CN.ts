@@ -1,6 +1,8 @@
 import type { MessageSchema } from "../schema";
+import { formulaToolsZhCN } from "../../../modules/formula-tools/formula-tools-messages.zh-CN";
 
 export const zhCN = {
+  ...formulaToolsZhCN,
   xlsx: {
     actions: {
       import: "导入 XLSX",
@@ -74,6 +76,8 @@ export const zhCN = {
     categories: "功能区分类",
     home: "开始",
     homeTools: "开始工具",
+    formulas: "公式",
+    formulaTools: "公式工具",
     historyTools: "历史操作",
     fontTools: "字体和颜色",
     alignmentTools: "对齐方式",
@@ -155,6 +159,11 @@ export const zhCN = {
     noMatches: "未找到匹配内容",
     autoSumUnavailable: "没有可用于求和的相邻数值单元格。",
     autoSumApplied: "已插入 {formula}",
+    formulaInsertionUnavailable: "请将光标放到公式的参数或运算符之后，再插入函数。",
+    recalculated: "已重新计算工作簿。",
+    nameInvalid: "请检查名称、作用域和引用区域；同一作用域内名称不能重复。",
+    nameSaved: "已保存名称 {name}。",
+    nameDeleted: "已删除名称。",
     filterUnavailable: "当前选区无法应用筛选。",
     sortUnavailable: "当前选区无法排序。",
     freezeUnavailable: "冻结窗格不能穿过合并单元格。",

@@ -26,14 +26,22 @@ describe("formula-aware merge commands", () => {
       session,
       createUpsertDefinedNameCommand(session.workbook, { name: "Base", reference: "=Data!A1" }),
     );
-    setCellContent(sheet, { row: 0, column: 0 }, {
-      kind: "formula",
-      formula: { source: "=Data!A1*3" },
-    });
-    setCellContent(sheet, { row: 1, column: 0 }, {
-      kind: "formula",
-      formula: { source: "=SUM(Base)*4" },
-    });
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=Data!A1*3" },
+      },
+    );
+    setCellContent(
+      sheet,
+      { row: 1, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=SUM(Base)*4" },
+      },
+    );
 
     expect(
       executeWorkbookCommand(
@@ -72,14 +80,22 @@ describe("formula-aware merge commands", () => {
       session,
       createUpsertDefinedNameCommand(session.workbook, { name: "Base", reference: "=Data!A1" }),
     );
-    setCellContent(sheet, { row: 0, column: 0 }, {
-      kind: "formula",
-      formula: { source: "=Data!A1" },
-    });
-    setCellContent(sheet, { row: 1, column: 0 }, {
-      kind: "formula",
-      formula: { source: "=SUM(Base)" },
-    });
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=Data!A1" },
+      },
+    );
+    setCellContent(
+      sheet,
+      { row: 1, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=SUM(Base)" },
+      },
+    );
     setCellContent(sheet, { row: 2, column: 0 }, { kind: "literal", value: 6 });
     const range = { start: { row: 0, column: 0 }, end: { row: 2, column: 0 } };
 

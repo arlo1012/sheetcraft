@@ -7,7 +7,7 @@ import FreezeMenu from "./FreezeMenu.vue";
 import RibbonIconAction from "./RibbonIconAction.vue";
 import SortMenu from "./SortMenu.vue";
 
-defineProps<{ state: HomeDataToolState; readOnly?: boolean }>();
+defineProps<{ state: HomeDataToolState; readOnly?: boolean; editSessionId?: string }>();
 
 const { t } = useAppI18n();
 
@@ -61,6 +61,7 @@ const emit = defineEmits<{
         :label="t('ribbon.autoSum')"
         :text="t('ribbon.autoSum')"
         data-ribbon-action="auto-sum"
+        :data-cell-edit-session="editSessionId"
         :disabled="readOnly"
         data-ribbon-row="1"
         @activate="emit('autoSum')"

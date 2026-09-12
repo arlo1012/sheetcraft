@@ -147,9 +147,7 @@ function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBu
   const worksheetPart = /^xl\/worksheets\/[^/]+\.xml$/i.test(name);
   if (
     workbookPart &&
-    ["workbookProtection", "fileSharing"].some((feature) =>
-      hasXmlElement(xml, feature),
-    )
+    ["workbookProtection", "fileSharing"].some((feature) => hasXmlElement(xml, feature))
   )
     report.add("feature-omitted", "warning", name);
   if (

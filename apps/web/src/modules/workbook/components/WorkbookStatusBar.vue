@@ -14,6 +14,7 @@ const props = withDefaults(
   defineProps<{
     sheets: readonly Sheet[];
     activeSheetId: string;
+    editSessionId?: string;
     selectionSummary: SelectionSummary;
     zoom?: number;
     showHeaders?: boolean;
@@ -98,7 +99,11 @@ function formatNumber(value: number): string {
       class="workbook-status-bar__top-row"
       :style="{ '--sheet-tabs-width': `${sheetsWidth}px` }"
     >
-      <div :id="sheetsRegionId" class="workbook-status-bar__sheets">
+      <div
+        :id="sheetsRegionId"
+        class="workbook-status-bar__sheets"
+        :data-cell-edit-session="editSessionId"
+      >
         <WorkbookSheetTabs
           :sheets="sheets"
           :active-sheet-id="activeSheetId"

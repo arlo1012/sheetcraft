@@ -28,6 +28,7 @@ const props = defineProps<{
   state: SelectionCellStyleState;
   disabled: boolean;
   readOnly?: boolean;
+  editSessionId?: string;
   formatPainterActive?: boolean;
   dataState?: HomeDataToolState;
   mergeState?: MergeCellsState;
@@ -293,6 +294,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
         />
         <HomeStylesGroup />
         <HomeDataGroup
+          :edit-session-id="editSessionId"
           :state="dataState"
           :read-only="readOnly"
           @toggle-protection="emit('toggleProtection')"

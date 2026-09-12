@@ -41,9 +41,7 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 const selectedId = ref<string | undefined>();
 const draft = ref<NamedRangeDraft>({ name: "", reference: "" });
-const selectedRange = computed(() =>
-  props.ranges.find((range) => range.id === selectedId.value),
-);
+const selectedRange = computed(() => props.ranges.find((range) => range.id === selectedId.value));
 
 function resetDraft(): void {
   const range = selectedRange.value;
@@ -92,8 +90,7 @@ watch(
 watch(
   () => props.selectionReference,
   (reference) => {
-    if (!selectedId.value && reference)
-      draft.value = { ...draft.value, reference };
+    if (!selectedId.value && reference) draft.value = { ...draft.value, reference };
   },
 );
 if (props.visible) createRange();
@@ -113,14 +110,8 @@ if (props.visible) createRange();
     @close="emit('close')"
     @cancel="emit('close')"
   >
-    <div
-      class="named-ranges-dialog__content"
-      :data-cell-edit-session="editSessionId"
-    >
-      <section
-        class="named-ranges-dialog__list"
-        :aria-label="t('formulaTools.namedRanges')"
-      >
+    <div class="named-ranges-dialog__content" :data-cell-edit-session="editSessionId">
+      <section class="named-ranges-dialog__list" :aria-label="t('formulaTools.namedRanges')">
         <div class="named-ranges-dialog__list-actions">
           <button type="button" @click="createRange">
             {{ t("formulaTools.newName") }}</button
@@ -141,10 +132,7 @@ if (props.visible) createRange();
         </button>
       </section>
       <form class="named-ranges-dialog__form" @submit.prevent="save">
-        <label
-          >{{ t("formulaTools.name")
-          }}<input v-model="draft.name" autocomplete="off"
-        /></label>
+        <label>{{ t("formulaTools.name") }}<input v-model="draft.name" autocomplete="off" /></label>
         <label
           >{{ t("formulaTools.scope")
           }}<select v-model="draft.scopeSheetId">
@@ -155,14 +143,9 @@ if (props.visible) createRange();
           </select></label
         >
         <label
-          >{{ t("formulaTools.reference")
-          }}<input v-model="draft.reference" autocomplete="off"
+          >{{ t("formulaTools.reference") }}<input v-model="draft.reference" autocomplete="off"
         /></label>
-        <button
-          type="button"
-          class="named-ranges-dialog__selection"
-          @click="createFromSelection"
-        >
+        <button type="button" class="named-ranges-dialog__selection" @click="createFromSelection">
           {{ t("formulaTools.createFromSelection")
           }}<span v-if="selectionReference">{{ selectionReference }}</span>
         </button>

@@ -1,11 +1,15 @@
 import type { CellRange } from "@idea10/core/workbook";
 import { formatCellAddress } from "@idea10/core/coordinates";
 import { getFormulaFunctionMetadata, type FormulaFunctionMetadata } from "@idea10/core/formula";
+import { getFormulaReferenceTokens } from "./formula-reference-tokens";
 
 export type FormulaFunctionCandidate = FormulaFunctionMetadata & Readonly<{ id: string }>;
 
 const SUPPORTED_FORMULA_FUNCTIONS: readonly FormulaFunctionCandidate[] =
-  getFormulaFunctionMetadata().map((metadata) => ({ ...metadata, id: metadata.name }));
+  getFormulaFunctionMetadata().map((metadata) => ({
+    ...metadata,
+    id: metadata.name,
+  }));
 
 export type FormulaCompletionContext = {
   replaceStart: number;
@@ -23,7 +27,6 @@ type Range = { start: number; end: number };
 
 const IDENTIFIER = /[A-Za-z_]/;
 const IDENTIFIER_PART = /[A-Za-z0-9_]/;
-const REFERENCE = /^\$?[A-Za-z]+\$?[1-9]\d*(?::\$?[A-Za-z]+\$?[1-9]\d*)?$/;
 
 export function getFormulaCompletionContext(
   value: string,
@@ -80,9 +83,9 @@ export function getFormulaReferenceEditContext(
 ): FormulaReferenceEditContext | null {
   if (!isFormula(value)) return null;
   const selection = normalizeSelection(value, selectionStart, selectionEnd);
-  if (isInsideQuotedText(value, selection.start)) return null;
   const token = referenceRangeAt(value, selection);
   if (token) return { replaceStart: token.start, replaceEnd: token.end };
+  if (isInsideQuotedText(value, selection.start)) return null;
   if (selection.start !== selection.end) return null;
   const previous = previousNonWhitespace(value, selection.start);
   return previous === "=" ||
@@ -92,6 +95,7 @@ export function getFormulaReferenceEditContext(
     previous === "-" ||
     previous === "*" ||
     previous === "/" ||
+    previous === "^" ||
     previous === "<" ||
     previous === ">" ||
     previous === "=" ||
@@ -100,7 +104,7 @@ export function getFormulaReferenceEditContext(
     : null;
 }
 
-export function formatFormulaReferenceRange(range: CellRange): string {
+export function formatFormulaReferenceRange(range: CellRange, sheetName?: string): string {
   const start = formatCellAddress({
     row: Math.min(range.start.row, range.end.row),
     column: Math.min(range.start.column, range.end.column),
@@ -109,15 +113,23 @@ export function formatFormulaReferenceRange(range: CellRange): string {
     row: Math.max(range.start.row, range.end.row),
     column: Math.max(range.start.column, range.end.column),
   });
-  return start === end ? start : `${start}:${end}`;
+  const reference = start === end ? start : `${start}:${end}`;
+  return sheetName ? `${quoteFormulaSheetName(sheetName)}!${reference}` : reference;
+}
+
+export function quoteFormulaSheetName(sheetName: string): string {
+  return /^[A-Za-z_][A-Za-z0-9_.]*$/.test(sheetName)
+    ? sheetName
+    : `'${sheetName.replaceAll("'", "''")}'`;
 }
 
 export function replaceFormulaReference(
   value: string,
   context: FormulaReferenceEditContext,
   range: CellRange,
+  sheetName?: string,
 ): { value: string; caret: number; context: FormulaReferenceEditContext } {
-  const insertion = formatFormulaReferenceRange(range);
+  const insertion = formatFormulaReferenceRange(range, sheetName);
   const edit = replaceRange(value, context.replaceStart, context.replaceEnd, insertion);
   return {
     ...edit,
@@ -131,10 +143,22 @@ export function replaceFormulaReference(
 export function cycleFormulaReferenceAbsoluteMarkers(
   value: string,
   context: FormulaReferenceEditContext,
-): { value: string; caret: number; context: FormulaReferenceEditContext } | null {
+): {
+  value: string;
+  caret: number;
+  context: FormulaReferenceEditContext;
+} | null {
   const text = value.slice(context.replaceStart, context.replaceEnd);
-  if (!REFERENCE.test(text)) return null;
-  const insertion = text.split(":").map(cycleSingleReference).join(":");
+  const token = getFormulaReferenceTokens(`=${text}`)[0];
+  if (!token || token.text.length !== text.length) return null;
+  const qualifierEnd = text.lastIndexOf("!") + 1;
+  const insertion =
+    text.slice(0, qualifierEnd) +
+    text
+      .slice(qualifierEnd)
+      .split(":")
+      .map((part) => cycleSingleReference(part.trim()))
+      .join(":");
   const edit = replaceRange(value, context.replaceStart, context.replaceEnd, insertion);
   return {
     ...edit,
@@ -161,18 +185,18 @@ export function getFormulaArgumentContext(
   limit: number,
 ): FormulaCompletionContext["argument"] {
   const calls: Array<{ functionName: string; index: number }> = [];
-  let quoted = false;
+  let quote: '"' | "'" | null = null;
   for (let index = 1; index < limit; index += 1) {
     const character = value[index];
-    if (character === '"') {
-      if (quoted && value[index + 1] === '"') {
-        index += 1;
-      } else {
-        quoted = !quoted;
-      }
+    if (quote) {
+      if (character === quote && value[index + 1] === quote) index += 1;
+      else if (character === quote) quote = null;
       continue;
     }
-    if (quoted) continue;
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
     if (character === "(") {
       const before = value.slice(0, index).replace(/\s+$/, "");
       const name = /([A-Za-z_][A-Za-z0-9_]*)$/.exec(before)?.[1];
@@ -197,13 +221,10 @@ function identifierRangeAt(value: string, caret: number): Range | null {
 }
 
 function referenceRangeAt(value: string, selection: Range): Range | null {
-  let start = selection.start;
-  let end = selection.end;
-  while (start > 0 && /[A-Za-z0-9$:]/.test(value[start - 1] ?? "")) start -= 1;
-  while (end < value.length && /[A-Za-z0-9$:]/.test(value[end] ?? "")) end += 1;
-  const text = value.slice(start, end);
-  if (!REFERENCE.test(text)) return null;
-  return selection.start >= start && selection.end <= end ? { start, end } : null;
+  const token = getFormulaReferenceTokens(value).find(
+    (reference) => selection.start >= reference.start && selection.end <= reference.end,
+  );
+  return token ? { start: token.start, end: token.end } : null;
 }
 
 function isFunctionPosition(value: string, start: number): boolean {
@@ -216,6 +237,7 @@ function isFunctionPosition(value: string, start: number): boolean {
     previous === "-" ||
     previous === "*" ||
     previous === "/" ||
+    previous === "^" ||
     previous === "<" ||
     previous === ">" ||
     previous === "=" ||
@@ -232,16 +254,17 @@ function previousNonWhitespace(value: string, offset: number): string | null {
 }
 
 function isInsideQuotedText(value: string, limit: number): boolean {
-  let quoted = false;
+  let quote: '"' | "'" | null = null;
   for (let index = 0; index < limit; index += 1) {
-    if (value[index] !== '"') continue;
-    if (quoted && value[index + 1] === '"') {
-      index += 1;
-    } else {
-      quoted = !quoted;
+    const character = value[index];
+    if (quote) {
+      if (character === quote && value[index + 1] === quote) index += 1;
+      else if (character === quote) quote = null;
+    } else if (character === '"' || character === "'") {
+      quote = character;
     }
   }
-  return quoted;
+  return quote !== null;
 }
 
 function isFormula(value: string): boolean {

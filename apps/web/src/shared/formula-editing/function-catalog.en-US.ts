@@ -140,8 +140,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=SUMPRODUCT(A1:A3,B1:B3)",
     },
     IF: {
-      description:
-        "Returns one value when a condition is true and another when it is false.",
+      description: "Returns one value when a condition is true and another when it is false.",
       example: '=IF(A1>0,"Yes","No")',
     },
     IFERROR: {
@@ -178,8 +177,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: '=IFS(A1>0,"positive",A1<0,"negative")',
     },
     SWITCH: {
-      description:
-        "Matches an expression to values and returns the matching result.",
+      description: "Matches an expression to values and returns the matching result.",
       example: '=SWITCH(A1,1,"one","other")',
     },
     AVERAGE: {
@@ -224,8 +222,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: '=AVERAGEIF(A1:A10,">0")',
     },
     AVERAGEIFS: {
-      description:
-        "Returns the average of values that meet multiple conditions.",
+      description: "Returns the average of values that meet multiple conditions.",
       example: '=AVERAGEIFS(B1:B10,A1:A10,">0")',
     },
     MEDIAN: {
@@ -282,18 +279,15 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=MATCH(A1,A1:A10,0)",
     },
     VLOOKUP: {
-      description:
-        "Looks up a value in the first column and returns a value from that row.",
+      description: "Looks up a value in the first column and returns a value from that row.",
       example: "=VLOOKUP(A1,A1:C10,2,FALSE)",
     },
     HLOOKUP: {
-      description:
-        "Looks up a value in the first row and returns a value from that column.",
+      description: "Looks up a value in the first row and returns a value from that column.",
       example: "=HLOOKUP(A1,A1:C3,2,FALSE)",
     },
     XLOOKUP: {
-      description:
-        "Looks up a value and returns the matching value from another array.",
+      description: "Looks up a value and returns the matching value from another array.",
       example: "=XLOOKUP(A1,A1:A10,B1:B10)",
     },
     LEN: {
@@ -374,8 +368,7 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=DATE(2026,9,12)",
     },
     TIME: {
-      description:
-        "Returns a time serial number from hours, minutes, and seconds.",
+      description: "Returns a time serial number from hours, minutes, and seconds.",
       example: "=TIME(12,30,0)",
     },
     YEAR: {
@@ -407,13 +400,11 @@ export const formulaFunctionCopyEnUS = createFormulaFunctionCopy(
       example: "=DAYS(DATE(2026,9,12),DATE(2026,9,1))",
     },
     EDATE: {
-      description:
-        "Returns a date a number of months before or after a start date.",
+      description: "Returns a date a number of months before or after a start date.",
       example: "=EDATE(DATE(2026,1,1),1)",
     },
     EOMONTH: {
-      description:
-        "Returns the last day of a month before or after a start date.",
+      description: "Returns the last day of a month before or after a start date.",
       example: "=EOMONTH(DATE(2026,1,1),0)",
     },
     WEEKDAY: {

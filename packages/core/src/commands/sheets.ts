@@ -274,7 +274,11 @@ export function applyAddSheetCommand(
   for (const definition of command.definedNames ?? []) {
     workbook.definedNames.set(definition.id, {
       ...definition,
-      reference: { sheetId: definition.reference.sheetId, start: { ...definition.reference.start }, end: { ...definition.reference.end } },
+      reference: {
+        sheetId: definition.reference.sheetId,
+        start: { ...definition.reference.start },
+        end: { ...definition.reference.end },
+      },
     });
   }
   for (const formula of command.formulaSources ?? []) {
@@ -322,8 +326,19 @@ export function applyDeleteSheetCommand(
     throw invalidCommandPayload("activeSheetId", command.activeSheetId);
   const previousActiveSheetId = workbook.activeSheetId;
   const definedNames = [...workbook.definedNames.values()]
-    .filter((definition) => definition.scopeSheetId === command.sheetId || definition.reference.sheetId === command.sheetId)
-    .map((definition) => ({ ...definition, reference: { sheetId: definition.reference.sheetId, start: { ...definition.reference.start }, end: { ...definition.reference.end } } }));
+    .filter(
+      (definition) =>
+        definition.scopeSheetId === command.sheetId ||
+        definition.reference.sheetId === command.sheetId,
+    )
+    .map((definition) => ({
+      ...definition,
+      reference: {
+        sheetId: definition.reference.sheetId,
+        start: { ...definition.reference.start },
+        end: { ...definition.reference.end },
+      },
+    }));
   const formulaSources = [...workbook.sheets.values()].flatMap((sourceSheet) =>
     [...sourceSheet.cells.entries()].flatMap(([key, cell]) => {
       if (sourceSheet.id === command.sheetId || cell.content?.kind !== "formula") return [];
@@ -331,7 +346,13 @@ export function applyDeleteSheetCommand(
       const row = Number(rawRow);
       const column = Number(rawColumn);
       return Number.isInteger(row) && Number.isInteger(column)
-        ? [{ sheetId: sourceSheet.id, address: { row, column }, source: cell.content.formula.source }]
+        ? [
+            {
+              sheetId: sourceSheet.id,
+              address: { row, column },
+              source: cell.content.formula.source,
+            },
+          ]
         : [];
     }),
   );
@@ -413,9 +434,7 @@ export function applyRenameSheetCommand(
   const previousName = sheet.name;
   const changed = renameSheet(workbook, command.sheetId, name);
   if (changed) renameQualifiedReferencesForSheet(workbook, previousName, name);
-  return changed
-    ? createRenameSheetCommand(command.sheetId, previousName)
-    : null;
+  return changed ? createRenameSheetCommand(command.sheetId, previousName) : null;
 }
 
 export function applyMoveSheetCommand(

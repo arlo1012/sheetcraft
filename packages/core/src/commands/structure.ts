@@ -128,7 +128,11 @@ function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
       ? {
           definedNames: slice.definedNames.map((definition) => ({
             ...definition,
-            reference: { sheetId: definition.reference.sheetId, start: { ...definition.reference.start }, end: { ...definition.reference.end } },
+            reference: {
+              sheetId: definition.reference.sheetId,
+              start: { ...definition.reference.start },
+              end: { ...definition.reference.end },
+            },
           })),
         }
       : {}),
@@ -806,7 +810,11 @@ export function applyRestoreSheetStateCommand(
       for (const definition of command.slice.definedNames)
         workbook.definedNames.set(definition.id, {
           ...definition,
-          reference: { sheetId: definition.reference.sheetId, start: { ...definition.reference.start }, end: { ...definition.reference.end } },
+          reference: {
+            sheetId: definition.reference.sheetId,
+            start: { ...definition.reference.start },
+            end: { ...definition.reference.end },
+          },
         });
     }
     if (!transformed && !metadataTransformed && !restored) return null;
@@ -840,12 +848,22 @@ export function applySheetAxisCommand(
     [...sourceSheet.cells.entries()].flatMap(([key, cell]) =>
       sourceSheet.id === command.sheetId || cell.content?.kind !== "formula"
         ? []
-        : [{ sheetId: sourceSheet.id, address: parseCellKey(key), source: cell.content.formula.source }],
+        : [
+            {
+              sheetId: sourceSheet.id,
+              address: parseCellKey(key),
+              source: cell.content.formula.source,
+            },
+          ],
     ),
   );
   slice.definedNames = [...workbook.definedNames.values()].map((definition) => ({
     ...definition,
-    reference: { sheetId: definition.reference.sheetId, start: { ...definition.reference.start }, end: { ...definition.reference.end } },
+    reference: {
+      sheetId: definition.reference.sheetId,
+      start: { ...definition.reference.start },
+      end: { ...definition.reference.end },
+    },
   }));
   const nextMetadata = transformSheetMetadataForAxis(
     getSheetMetadata(sheet),
@@ -888,12 +906,19 @@ export function applySheetAxisCommand(
       workbook.definedNames.delete(id);
       continue;
     }
-    workbook.definedNames.set(id, { ...definition, reference: { ...reference, sheetId: command.sheetId } });
+    workbook.definedNames.set(id, {
+      ...definition,
+      reference: { ...reference, sheetId: command.sheetId },
+    });
   }
-  const externalChanged = (slice.workbookFormulaSources ?? []).some((formula) => {
-    const current = workbook.sheets.get(formula.sheetId)?.cells.get(createCellKey(formula.address))?.content;
-    return current?.kind === "formula" && current.formula.source !== formula.source;
-  }) || JSON.stringify(slice.definedNames) !== JSON.stringify([...workbook.definedNames.values()]);
+  const externalChanged =
+    (slice.workbookFormulaSources ?? []).some((formula) => {
+      const current = workbook.sheets
+        .get(formula.sheetId)
+        ?.cells.get(createCellKey(formula.address))?.content;
+      return current?.kind === "formula" && current.formula.source !== formula.source;
+    }) ||
+    JSON.stringify(slice.definedNames) !== JSON.stringify([...workbook.definedNames.values()]);
   return changed || metadataChanged || externalChanged
     ? createRestoreSheetAxisSliceCommand(
         command.sheetId,

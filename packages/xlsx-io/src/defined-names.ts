@@ -22,14 +22,20 @@ function decodeXmlEntities(value: string): string {
 }
 
 function escapeXml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character]!);
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character]!,
+  );
 }
 
 function columnIndex(label: string): number {
-  return [...label.toUpperCase()].reduce(
-    (result, character) => result * 26 + character.charCodeAt(0) - 64,
-    0,
-  ) - 1;
+  return (
+    [...label.toUpperCase()].reduce(
+      (result, character) => result * 26 + character.charCodeAt(0) - 64,
+      0,
+    ) - 1
+  );
 }
 
 function parseRange(value: string): CellRange | null {
@@ -40,16 +46,27 @@ function parseRange(value: string): CellRange | null {
     column: columnIndex(match[3] ?? match[1] ?? ""),
     row: Number(match[4] ?? match[2]) - 1,
   };
-  return start.row >= 0 && end.row < MAX_SHEET_ROWS && start.column >= 0 && end.column < MAX_SHEET_COLUMNS
+  return start.row >= 0 &&
+    end.row < MAX_SHEET_ROWS &&
+    start.column >= 0 &&
+    end.column < MAX_SHEET_COLUMNS
     ? { start, end }
     : null;
 }
 
-function parseReference(value: string, sheets: readonly Sheet[]): { sheetId: string; range: CellRange } | null {
-  const match = /^(?:'((?:[^']|'')+)'|([^'!]+))!(\$?[A-Z]+\$?[1-9]\d*(?::\$?[A-Z]+\$?[1-9]\d*)?)$/i.exec(value.trim());
+function parseReference(
+  value: string,
+  sheets: readonly Sheet[],
+): { sheetId: string; range: CellRange } | null {
+  const match =
+    /^(?:'((?:[^']|'')+)'|([^'!]+))!(\$?[A-Z]+\$?[1-9]\d*(?::\$?[A-Z]+\$?[1-9]\d*)?)$/i.exec(
+      value.trim(),
+    );
   if (!match) return null;
   const sheetName = (match[1] ?? match[2] ?? "").replace(/''/g, "'");
-  const sheet = sheets.find((candidate) => candidate.name.toLocaleLowerCase() === sheetName.toLocaleLowerCase());
+  const sheet = sheets.find(
+    (candidate) => candidate.name.toLocaleLowerCase() === sheetName.toLocaleLowerCase(),
+  );
   const range = parseRange(match[3] ?? "");
   return sheet && range ? { sheetId: sheet.id, range } : null;
 }
@@ -69,31 +86,35 @@ export function readDefinedNames(
 ): Map<string, DefinedName> {
   const workbookXml = unzipSync(bytes)["xl/workbook.xml"];
   if (!workbookXml) return new Map();
-  const container = /<(?:\w+:)?definedNames\b[^>]*>([\s\S]*?)<\/(?:\w+:)?definedNames\s*>/i.exec(strFromU8(workbookXml));
+  const container = /<(?:\w+:)?definedNames\b[^>]*>([\s\S]*?)<\/(?:\w+:)?definedNames\s*>/i.exec(
+    strFromU8(workbookXml),
+  );
   if (!container) return new Map();
   const definitions = new Map<string, DefinedName>();
   const keys = new Set<string>();
   let index = 0;
-  for (const match of (container[1] ?? "").matchAll(/<(?:\w+:)?definedName\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?definedName\s*>)/gi)) {
+  for (const match of (container[1] ?? "").matchAll(
+    /<(?:\w+:)?definedName\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?definedName\s*>)/gi,
+  )) {
     const attrs = attributes(match[1] ?? "");
     const name = attrs.name;
     const localSheetId = attrs.localSheetId === undefined ? undefined : Number(attrs.localSheetId);
     const reference = parseReference(decodeXmlEntities(match[2] ?? "").trim(), sheets);
     const scopeSheet = localSheetId === undefined ? undefined : sheets[localSheetId];
-    const location = `definedName:${name ?? index + 1}`;
+    const reportLocation = `definedName:${name ?? index + 1}`;
     if (
       !name ||
       !NAME_PATTERN.test(name) ||
       (localSheetId !== undefined && (!Number.isInteger(localSheetId) || !scopeSheet)) ||
       !reference
     ) {
-      report.add("feature-omitted", "warning", location);
+      report.add("feature-omitted", "warning", reportLocation);
       index += 1;
       continue;
     }
     const key = `${scopeSheet?.id ?? "workbook"}:${name.toUpperCase()}`;
     if (keys.has(key)) {
-      report.add("feature-omitted", "warning", location);
+      report.add("feature-omitted", "warning", reportLocation);
       index += 1;
       continue;
     }
@@ -103,7 +124,11 @@ export function readDefinedNames(
       id,
       name,
       ...(scopeSheet ? { scopeSheetId: scopeSheet.id } : {}),
-      reference: { sheetId: reference.sheetId, start: reference.range.start, end: reference.range.end },
+      reference: {
+        sheetId: reference.sheetId,
+        start: reference.range.start,
+        end: reference.range.end,
+      },
     });
     index += 1;
   }
@@ -126,16 +151,23 @@ function quoteSheetName(name: string): string {
 }
 
 function formatReference(sheet: Sheet, range: CellRange): string {
-  const cell = (address: { row: number; column: number }) => `$${columnLabel(address.column)}$${address.row + 1}`;
+  const cell = (address: { row: number; column: number }) =>
+    `$${columnLabel(address.column)}$${address.row + 1}`;
   return `${quoteSheetName(sheet.name)}!${cell(range.start)}:${cell(range.end)}`;
 }
 
-export function collectDefinedNames(workbook: Workbook, report: CompatibilityReportBuilder): XlsxDefinedName[] {
+export function collectDefinedNames(
+  workbook: Workbook,
+  report: CompatibilityReportBuilder,
+): XlsxDefinedName[] {
   const sheets = [...workbook.sheets.values()];
   const result: XlsxDefinedName[] = [];
   const keys = new Set<string>();
   for (const definition of workbook.definedNames.values()) {
-    const scopeIndex = definition.scopeSheetId === undefined ? undefined : sheets.findIndex((sheet) => sheet.id === definition.scopeSheetId);
+    const scopeIndex =
+      definition.scopeSheetId === undefined
+        ? undefined
+        : sheets.findIndex((sheet) => sheet.id === definition.scopeSheetId);
     const targetSheet = sheets.find((sheet) => sheet.id === definition.reference.sheetId);
     const key = `${definition.scopeSheetId ?? "workbook"}:${definition.name.toUpperCase()}`;
     if (!NAME_PATTERN.test(definition.name) || scopeIndex === -1 || !targetSheet || keys.has(key)) {
@@ -152,15 +184,30 @@ export function collectDefinedNames(workbook: Workbook, report: CompatibilityRep
   return result;
 }
 
-export function writeDefinedNames(entries: Unzipped, definitions: readonly XlsxDefinedName[]): void {
+export function writeDefinedNames(
+  entries: Unzipped,
+  definitions: readonly XlsxDefinedName[],
+): void {
   if (definitions.length === 0) return;
   const workbook = entries["xl/workbook.xml"];
   if (!workbook) throw new Error("Missing generated XLSX workbook.");
   const xml = strFromU8(workbook);
   const content = definitions
-    .map((definition) => `<definedName name="${escapeXml(definition.name)}"${definition.localSheetId === undefined ? "" : ` localSheetId="${definition.localSheetId}"`}>${escapeXml(definition.reference)}</definedName>`)
+    .map(
+      (definition) =>
+        `<definedName name="${escapeXml(definition.name)}"${definition.localSheetId === undefined ? "" : ` localSheetId="${definition.localSheetId}"`}>${escapeXml(definition.reference)}</definedName>`,
+    )
     .join("");
-  const withoutExisting = xml.replace(/<(?:\w+:)?definedNames\b[^>]*>[\s\S]*?<\/(?:\w+:)?definedNames\s*>/i, "");
-  if (!/<\/(?:\w+:)?workbook\s*>/i.test(withoutExisting)) throw new Error("Unexpected generated XLSX workbook.");
-  entries["xl/workbook.xml"] = strToU8(withoutExisting.replace(/<\/(?:\w+:)?workbook\s*>/i, `<definedNames>${content}</definedNames></workbook>`));
+  const withoutExisting = xml.replace(
+    /<(?:\w+:)?definedNames\b[^>]*>[\s\S]*?<\/(?:\w+:)?definedNames\s*>/i,
+    "",
+  );
+  if (!/<\/(?:\w+:)?workbook\s*>/i.test(withoutExisting))
+    throw new Error("Unexpected generated XLSX workbook.");
+  entries["xl/workbook.xml"] = strToU8(
+    withoutExisting.replace(
+      /<\/(?:\w+:)?workbook\s*>/i,
+      `<definedNames>${content}</definedNames></workbook>`,
+    ),
+  );
 }

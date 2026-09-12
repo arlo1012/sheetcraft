@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { nextTick, ref, useId } from "vue";
 import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
+import FormulaToolbar from "../modules/formula-tools/components/FormulaToolbar.vue";
 import type { CellMergeMode } from "@idea10/core/commands";
 import type { CellFormatTab } from "../modules/cell-format/components/CellFormatDialog.vue";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
@@ -19,6 +21,9 @@ defineProps<{
   formatPainterActive?: boolean;
   dataState?: HomeDataToolState;
   mergeState?: MergeCellsState;
+  formulaDisabled?: boolean;
+  editSessionId?: string;
+  recentFunctions?: readonly string[];
 }>();
 
 const emit = defineEmits<{
@@ -30,6 +35,11 @@ const emit = defineEmits<{
   adjustIndent: [delta: -1 | 1];
   activateFormatPainter: [];
   autoSum: [];
+  insertFunction: [name: string];
+  aggregate: [name: "SUM" | "AVERAGE" | "COUNT" | "MAX" | "MIN"];
+  openNames: [];
+  recalculate: [];
+  formulaInteractionEnd: [];
   sort: [direction: "ascending" | "descending"];
   applyFilter: [includedKeys: FilterValueKey[]];
   clearFilter: [];
@@ -44,6 +54,24 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
+const activeCategory = ref<"home" | "formulas">("home");
+const homeTab = ref<HTMLButtonElement>();
+const formulaTab = ref<HTMLButtonElement>();
+const tabId = useId();
+
+function onCategoryKeydown(event: KeyboardEvent): void {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  activeCategory.value =
+    event.key === "Home"
+      ? "home"
+      : event.key === "End"
+        ? "formulas"
+        : activeCategory.value === "home"
+          ? "formulas"
+          : "home";
+  void nextTick(() => (activeCategory.value === "home" ? homeTab : formulaTab).value?.focus());
+}
 
 defineSlots<{ "file-actions"?: () => unknown }>();
 </script>
@@ -52,15 +80,57 @@ defineSlots<{ "file-actions"?: () => unknown }>();
   <header class="spreadsheet-ribbon" :aria-label="t('ribbon.label')">
     <div class="spreadsheet-ribbon__categories">
       <nav class="spreadsheet-ribbon__category-list" :aria-label="t('ribbon.categories')">
-        <span class="spreadsheet-ribbon__category" data-ribbon-category="home">
-          {{ t("ribbon.home") }}
-        </span>
+        <div
+          class="spreadsheet-ribbon__tabs"
+          role="tablist"
+          :aria-label="t('ribbon.categories')"
+          :data-cell-edit-session="editSessionId"
+          @keydown="onCategoryKeydown"
+        >
+          <button
+            :id="`${tabId}-home`"
+            ref="homeTab"
+            class="spreadsheet-ribbon__category"
+            :class="{ 'is-active': activeCategory === 'home' }"
+            data-ribbon-category="home"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'home'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'home' ? 0 : -1"
+            @click="activeCategory = 'home'"
+          >
+            {{ t("ribbon.home") }}
+          </button>
+          <button
+            :id="`${tabId}-formulas`"
+            ref="formulaTab"
+            class="spreadsheet-ribbon__category"
+            :class="{ 'is-active': activeCategory === 'formulas' }"
+            data-ribbon-category="formulas"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'formulas'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'formulas' ? 0 : -1"
+            @click="activeCategory = 'formulas'"
+          >
+            {{ t("ribbon.formulas") }}
+          </button>
+        </div>
         <slot name="file-actions" />
       </nav>
       <LocaleSwitcher />
     </div>
-    <section class="spreadsheet-ribbon__panel" :aria-label="t('ribbon.homeTools')">
+    <section
+      :id="`${tabId}-panel`"
+      class="spreadsheet-ribbon__panel"
+      role="tabpanel"
+      :aria-labelledby="`${tabId}-${activeCategory}`"
+    >
       <HomeFormatToolbar
+        v-if="activeCategory === 'home'"
+        :edit-session-id="editSessionId"
         :state="state"
         :disabled="disabled"
         :read-only="readOnly"
@@ -86,6 +156,17 @@ defineSlots<{ "file-actions"?: () => unknown }>();
         @undo="emit('undo')"
         @redo="emit('redo')"
         @toggle-protection="emit('toggleProtection')"
+      />
+      <FormulaToolbar
+        v-else
+        :disabled="formulaDisabled ?? disabled"
+        :edit-session-id="editSessionId"
+        :recent-functions="recentFunctions"
+        @insert-function="emit('insertFunction', $event)"
+        @aggregate="emit('aggregate', $event)"
+        @open-names="emit('openNames')"
+        @recalculate="emit('recalculate')"
+        @interaction-end="emit('formulaInteractionEnd')"
       />
     </section>
   </header>
@@ -114,18 +195,36 @@ defineSlots<{ "file-actions"?: () => unknown }>();
     padding-left: 4px;
   }
 
+  &__tabs {
+    display: flex;
+    align-items: stretch;
+  }
+
   &__category {
     position: relative;
     display: inline-flex;
     align-items: center;
     padding: 0 10px;
-    color: var(--idea-action-primary);
+    border: 0;
+    background: transparent;
+    color: var(--idea-text-primary);
+    font: inherit;
+    cursor: pointer;
     font-size: var(--idea-font-size-body-medium);
     font-weight: var(--idea-font-weight-medium);
     line-height: var(--idea-line-height-body-medium);
     white-space: nowrap;
 
-    &::after {
+    &:focus-visible {
+      outline: 1px solid var(--idea-action-primary);
+      outline-offset: -3px;
+    }
+
+    &.is-active {
+      color: var(--idea-action-primary);
+    }
+
+    &.is-active::after {
       position: absolute;
       right: 8px;
       bottom: -1px;

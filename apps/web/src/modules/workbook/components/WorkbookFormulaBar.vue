@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
+import { isCellEditSessionTarget } from "../../../shared/cell-editing/cell-edit-focus";
 import type { CellAddress, CellRange } from "@idea10/core/workbook";
 import { getCellAddressLabel } from "@idea10/core/coordinates";
 import FormulaInputAssist from "../../../shared/formula-editing/FormulaInputAssist.vue";
@@ -20,6 +21,8 @@ const props = defineProps<{
   inputValue: string;
   searchQuery: string;
   sheetId?: string;
+  sheetName?: string;
+  editTargetSheetName?: string;
   editSession?: CellEditSession;
   handleReferenceKeydown?: (event: KeyboardEvent) => boolean;
   readOnly?: boolean;
@@ -37,6 +40,7 @@ const emit = defineEmits<{
   ];
   updateSearchQuery: [query: string];
   find: [direction: "forward" | "backward"];
+  cancelEdit: [sheetId: string | undefined];
 }>();
 
 const { t } = useAppI18n();
@@ -48,6 +52,10 @@ const editSession =
 const editingThisSheet = computed(
   () => editSession.state.active && editSession.state.owner?.sheetId === props.sheetId,
 );
+const editingFormulaSession = computed(
+  () => editSession.state.active && editSession.state.draft.startsWith("="),
+);
+const showsSessionDraft = computed(() => editingThisSheet.value || editingFormulaSession.value);
 const editingThisCell = computed(
   () =>
     editingThisSheet.value &&
@@ -59,16 +67,18 @@ const formulaOwnsSession = computed(
     formulaFocused.value && editSession.state.active && editSession.state.surface === "formula-bar",
 );
 const formulaDraft = computed(() =>
-  editingThisSheet.value ? editSession.state.draft : props.inputValue,
+  showsSessionDraft.value ? editSession.state.draft : props.inputValue,
 );
 const formulaTarget = computed(() => editSession.state.owner?.address ?? props.address);
 const formulaTargetSheetId = computed(() => editSession.state.owner?.sheetId);
 const formulaTargetLabel = computed(() =>
-  editingThisSheet.value ? getCellAddressLabel(formulaTarget.value) : props.addressLabel,
+  showsSessionDraft.value
+    ? `${!editingThisSheet.value && props.editTargetSheetName ? `${props.editTargetSheetName}!` : ""}${getCellAddressLabel(formulaTarget.value)}`
+    : props.addressLabel,
 );
-const isComposing = computed(() => editingThisSheet.value && editSession.state.composing);
+const isComposing = computed(() => showsSessionDraft.value && editSession.state.composing);
 const showFormulaColors = computed(
-  () => editingThisSheet.value && !isComposing.value && formulaDraft.value.startsWith("="),
+  () => showsSessionDraft.value && !isComposing.value && formulaDraft.value.startsWith("="),
 );
 const coloredReferences = computed(() =>
   showFormulaColors.value ? getFormulaReferenceTokens(formulaDraft.value) : [],
@@ -103,10 +113,11 @@ function onFormulaFocus(): void {
   if (props.readOnly) return;
   formulaFocused.value = true;
   finishAfterComposition = false;
-  if (!formulaOwnsSession.value && !editingThisCell.value) {
+  if (!formulaOwnsSession.value && !editingThisCell.value && !editingFormulaSession.value) {
     editSession.begin(context(), { surface: "formula-bar", mode: "append" });
   }
-  if (editingThisCell.value) editSession.activateSurface("formula-bar");
+  if (editingThisCell.value || editingFormulaSession.value)
+    editSession.activateSurface("formula-bar");
 }
 
 function onFormulaInput(event: Event): void {
@@ -212,11 +223,13 @@ function onFormulaKeydown(event: KeyboardEvent): void {
     formulaInput.value?.blur();
   } else if (event.key === "Escape") {
     event.preventDefault();
+    const ownerSheetId = editSession.state.owner?.sheetId;
     editSession.cancel();
     compositionStartedHere = false;
     finishAfterComposition = false;
     formulaFocused.value = false;
     formulaInput.value?.blur();
+    emit("cancelEdit", ownerSheetId);
   }
 }
 
@@ -229,7 +242,7 @@ function onFormulaBlur(event: FocusEvent): void {
   const ownedBeforeBlur = formulaOwnsSession.value;
   formulaFocused.value = false;
   const next = event.relatedTarget;
-  if (next instanceof HTMLElement && next.dataset.cellEditSession === editSession.id) return;
+  if (isCellEditSessionTarget(next, editSession.id)) return;
   if (!ownedBeforeBlur) return;
   if (isComposing.value) {
     finishAfterComposition = true;
@@ -274,7 +287,7 @@ function focus(options: { preserveSelection?: boolean } = {}): void {
   if (!input) return;
   input.focus({ preventScroll: true });
   const selection =
-    options.preserveSelection && editingThisSheet.value
+    options.preserveSelection && showsSessionDraft.value
       ? editSession.state.selection
       : {
           start: input.value.length,
@@ -289,28 +302,20 @@ defineExpose({
   hasPendingEdit,
   focus,
   get references() {
-    return formulaTargetSheetId.value === props.sheetId
-      ? (formulaAssistRef.value?.references ?? [])
-      : [];
+    return (formulaAssistRef.value?.references ?? []).filter((reference) =>
+      reference.sheetName
+        ? reference.sheetName.toLowerCase() === props.sheetName?.toLowerCase()
+        : formulaTargetSheetId.value === props.sheetId,
+    );
   },
   get editingFormula() {
-    return (
-      formulaTargetSheetId.value === props.sheetId &&
-      (formulaAssistRef.value?.editingFormula ?? false)
-    );
+    return formulaAssistRef.value?.editingFormula ?? false;
   },
-  canPickReference: () =>
-    formulaTargetSheetId.value === props.sheetId &&
-    (formulaAssistRef.value?.canPickReference() ?? false),
+  canPickReference: () => formulaAssistRef.value?.canPickReference() ?? false,
   pickReference: (range: CellRange, phase: "start" | "update" | "end") =>
-    formulaTargetSheetId.value === props.sheetId &&
-    (formulaAssistRef.value?.pickReference(range, phase) ?? false),
+    formulaAssistRef.value?.pickReference(range, phase) ?? false,
   get referenceActive() {
-    return (
-      formulaFocused.value &&
-      formulaTargetSheetId.value === props.sheetId &&
-      (formulaAssistRef.value?.referenceActive ?? false)
-    );
+    return formulaFocused.value && (formulaAssistRef.value?.referenceActive ?? false);
   },
   get referenceRange() {
     return formulaAssistRef.value?.referenceRange ?? null;
@@ -389,6 +394,7 @@ defineExpose({
           editSession.state.surface === 'formula-bar'
         "
         :composing="isComposing"
+        :reference-sheet-name="formulaTargetSheetId !== sheetId ? sheetName : undefined"
         @text-edit="applyFormulaTextEdit"
       />
     </label>

@@ -614,16 +614,25 @@ function parseDefinedNames(value: unknown, sheetIds: Set<string>): Map<string, D
     const id = asIdentifier(record.id, `${path}.id`);
     const name = asIdentifier(record.name, `${path}.name`);
     if (!isSnapshotDefinedName(name)) return fail(`${path}.name`, "Invalid name.");
-    const scopeSheetId = record.scopeSheetId === undefined ? undefined : asIdentifier(record.scopeSheetId, `${path}.scopeSheetId`);
-    if (scopeSheetId && !sheetIds.has(scopeSheetId)) return fail(`${path}.scopeSheetId`, "Sheet does not exist.");
+    const scopeSheetId =
+      record.scopeSheetId === undefined
+        ? undefined
+        : asIdentifier(record.scopeSheetId, `${path}.scopeSheetId`);
+    if (scopeSheetId && !sheetIds.has(scopeSheetId))
+      return fail(`${path}.scopeSheetId`, "Sheet does not exist.");
     const reference = asRecord(record.reference, `${path}.reference`);
     const referenceSheetId = asIdentifier(reference.sheetId, `${path}.reference.sheetId`);
-    if (!sheetIds.has(referenceSheetId)) return fail(`${path}.reference.sheetId`, "Sheet does not exist.");
+    if (!sheetIds.has(referenceSheetId))
+      return fail(`${path}.reference.sheetId`, "Sheet does not exist.");
     const definition: DefinedName = {
       id,
       name,
       ...(scopeSheetId ? { scopeSheetId } : {}),
-      reference: { sheetId: referenceSheetId, start: parseAddress(reference.start, `${path}.reference.start`), end: parseAddress(reference.end, `${path}.reference.end`) },
+      reference: {
+        sheetId: referenceSheetId,
+        start: parseAddress(reference.start, `${path}.reference.start`),
+        end: parseAddress(reference.end, `${path}.reference.end`),
+      },
     };
     const key = `${scopeSheetId ?? "workbook"}:${name.toUpperCase()}`;
     if (names.has(id) || keys.has(key)) return fail(path, "Duplicate defined name.");

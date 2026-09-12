@@ -6,13 +6,15 @@ export type FormulaReferenceToken = Readonly<{
   end: number;
   text: string;
   range: CellRange;
+  sheetName?: string;
   colorIndex: number;
   key: string;
 }>;
 
-const REFERENCE_AT_START = /^\$?[A-Za-z]+\$?[1-9]\d*(?:\s*:\s*\$?[A-Za-z]+\$?[1-9]\d*)?/;
+const REFERENCE_AT_START =
+  /^(?:(?<sheet>'(?:[^']|'')+'|[\p{L}\p{N}_.]+)!)?(?<range>\$?[A-Za-z]+\$?[1-9]\d*(?:\s*:\s*\$?[A-Za-z]+\$?[1-9]\d*)?)/u;
 
-/** Finds local A1 references without requiring the incomplete formula to parse. */
+/** Finds A1 references without requiring the incomplete formula to parse. */
 export function getFormulaReferenceTokens(source: string): readonly FormulaReferenceToken[] {
   if (!source.startsWith("=")) return [];
   const tokens: FormulaReferenceToken[] = [];
@@ -26,7 +28,7 @@ export function getFormulaReferenceTokens(source: string): readonly FormulaRefer
       else if (character === quote) quote = null;
       continue;
     }
-    if (character === '"' || character === "'") {
+    if (character === '"') {
       quote = character;
       continue;
     }
@@ -37,16 +39,23 @@ export function getFormulaReferenceTokens(source: string): readonly FormulaRefer
     }
     if (bracketDepth > 0) continue;
     if (!hasReferenceBoundaryBefore(source, start)) continue;
-    const text = REFERENCE_AT_START.exec(source.slice(start))?.[0];
-    if (!text) continue;
+    const match = REFERENCE_AT_START.exec(source.slice(start));
+    if (!match) {
+      if (character === "'") quote = character;
+      continue;
+    }
+    const text = match[0];
     const end = start + text.length;
     if (!hasReferenceBoundaryAfter(source, end) || /^\s*\(/.test(source.slice(end))) continue;
-    const range = parseLocalRange(text);
+    const range = parseLocalRange(match.groups!.range!);
     if (!range) continue;
-    const key = normalizedRangeKey(range);
+    const sheet = match.groups?.sheet;
+    const sheetName = sheet?.startsWith("'") ? sheet.slice(1, -1).replaceAll("''", "'") : sheet;
+    if (sheetName?.includes("[")) continue;
+    const key = `${sheetName ? `${sheetName.toLowerCase()}!` : ""}${normalizedRangeKey(range)}`;
     const colorIndex = colors.get(key) ?? colors.size;
     colors.set(key, colorIndex);
-    tokens.push({ start, end, text, range, colorIndex, key });
+    tokens.push({ start, end, text, range, colorIndex, key, ...(sheetName ? { sheetName } : {}) });
     start = end - 1;
   }
   return tokens;

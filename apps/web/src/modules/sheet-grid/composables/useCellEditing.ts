@@ -2,6 +2,7 @@ import { computed, nextTick, ref } from "vue";
 import type { CellAddress } from "@idea10/core/workbook";
 import type { CellSelection } from "@idea10/sheet-engine/selection";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
+import { isCellEditSessionTarget } from "../../../shared/cell-editing/cell-edit-focus";
 import {
   useCellEditSession,
   type CellEditSession,
@@ -158,7 +159,7 @@ export function useCellEditing(options: {
   function onBlur(event?: FocusEvent): void {
     if (!isEditing.value) return;
     const next = event?.relatedTarget;
-    if (next instanceof HTMLElement && next.dataset.cellEditSession === editSession.id) return;
+    if (isCellEditSessionTarget(next ?? null, editSession.id)) return;
     if (isComposing.value) {
       shouldFinishAfterComposition = true;
       return;

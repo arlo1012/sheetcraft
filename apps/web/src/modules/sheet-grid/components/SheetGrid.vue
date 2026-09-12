@@ -142,6 +142,7 @@ const CLIPBOARD_MESSAGE_KEYS: Record<GridClipboardFeedback, MessageKey> = {
 const props = withDefaults(
   defineProps<{
     sheet: Sheet;
+    evaluator?: SheetEvaluator;
     workbookRevision?: number;
     applyPaste?: (payload: GridPastePayload) => GridPasteResult;
     applyAxisMove?: (payload: AxisMovePayload) => boolean;
@@ -248,6 +249,7 @@ function openImagePreview(
 }
 
 function closeImagePreview(): void {
+  if (!imagePreview.value) return;
   const trigger = imagePreview.value?.trigger;
   imagePreview.value = undefined;
   void nextTick(() =>
@@ -401,6 +403,7 @@ const effectiveColumnWidths = computed(() => {
 });
 
 const sheetEvaluator = computed<SheetEvaluator>(() => {
+  if (props.evaluator) return props.evaluator;
   // Value iteration also invalidates an existing sparse cell whose content changes in place.
   for (const cell of props.sheet.cells.values()) {
     void cell;
@@ -633,6 +636,8 @@ const formulaReferenceGroups = computed<readonly FormulaReferenceOverlayGroup[]>
   if (!editor?.editingFormula) return [];
   const groups = new Map<string, { token: FormulaReferenceToken; active: boolean }>();
   for (const token of editor.references) {
+    if (token.sheetName && token.sheetName.toLowerCase() !== props.sheet.name.toLowerCase())
+      continue;
     const existing = groups.get(token.key);
     if (existing) continue;
     groups.set(token.key, { token, active: isActiveFormulaReference(editor, token) });
@@ -722,6 +727,7 @@ const {
   },
   onReadUnavailable: (targetSelection) => floatingClipboard.pastePending(targetSelection.active),
   getSheet: () => props.sheet,
+  getEvaluator: () => sheetEvaluator.value,
   getSelection: () => selection.value,
   getRevision: () => props.workbookRevision ?? 0,
   isEditing: () => isEditing.value,
@@ -1655,7 +1661,9 @@ watch(
   () => {
     autoRowHeightCalculator.clear();
     restoreViewState(props.viewState);
-    focusEditor();
+    if (!(editSession.state.active && editSession.state.surface === "formula-bar")) {
+      focusEditor();
+    }
   },
 );
 

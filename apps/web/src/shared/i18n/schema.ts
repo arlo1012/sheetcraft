@@ -1,6 +1,8 @@
+import type { FormulaToolsMessageSchema } from "../../modules/formula-tools/formula-tools-messages";
+
 export type AppLocale = "zh-CN" | "en-US";
 
-export type MessageSchema = {
+export type MessageSchema = FormulaToolsMessageSchema & {
   xlsx: {
     actions: { import: string; export: string; selectFile: string };
     feedback: {
@@ -67,6 +69,8 @@ export type MessageSchema = {
     categories: string;
     home: string;
     homeTools: string;
+    formulas: string;
+    formulaTools: string;
     historyTools: string;
     fontTools: string;
     alignmentTools: string;
@@ -148,6 +152,11 @@ export type MessageSchema = {
     noMatches: string;
     autoSumUnavailable: string;
     autoSumApplied: string;
+    formulaInsertionUnavailable: string;
+    recalculated: string;
+    nameInvalid: string;
+    nameSaved: string;
+    nameDeleted: string;
     filterUnavailable: string;
     sortUnavailable: string;
     freezeUnavailable: string;

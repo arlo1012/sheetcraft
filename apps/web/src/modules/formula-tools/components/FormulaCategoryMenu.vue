@@ -28,25 +28,16 @@ const open = ref(false);
 const panelId = `formula-category-${props.category.toLowerCase()}-${Math.random().toString(36).slice(2)}`;
 const translate = ((key) => t(key)) as FormulaCatalogTranslator;
 const functions = computed(() =>
-  getFormulaCatalogEntries(translate).filter(
-    (entry) => entry.category === props.category,
-  ),
+  getFormulaCatalogEntries(translate).filter((entry) => entry.category === props.category),
 );
-const label = computed(() =>
-  getFormulaCategoryLabel(props.category, (key) => t(key)),
-);
-const { floatingStyles } = useDismissibleFloatingPanel(
-  triggerRef,
-  panelRef,
-  open,
-  {
-    placement: "bottom-start",
-    offset: 4,
-    onDismiss: () => {
-      open.value = false;
-    },
+const label = computed(() => getFormulaCategoryLabel(props.category, (key) => t(key)));
+const { floatingStyles } = useDismissibleFloatingPanel(triggerRef, panelRef, open, {
+  placement: "bottom-start",
+  offset: 4,
+  onDismiss: () => {
+    open.value = false;
   },
-);
+});
 function toggle(): void {
   if (!props.disabled && functions.value.length) open.value = !open.value;
 }

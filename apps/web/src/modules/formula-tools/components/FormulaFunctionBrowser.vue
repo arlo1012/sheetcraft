@@ -32,9 +32,7 @@ const visibleCategories = computed(() =>
 );
 const filteredEntries = computed(() => {
   const search = query.value.trim().toLowerCase();
-  const recent = new Set(
-    props.recentFunctions.map((name) => name.toUpperCase()),
-  );
+  const recent = new Set(props.recentFunctions.map((name) => name.toUpperCase()));
   return entries.value.filter((entry) => {
     const inCategory =
       selectedCategory.value === "all" ||
@@ -44,9 +42,7 @@ const filteredEntries = computed(() => {
     return (
       inCategory &&
       (!search ||
-        `${entry.name} ${entry.description} ${entry.signature}`
-          .toLowerCase()
-          .includes(search))
+        `${entry.name} ${entry.description} ${entry.signature}`.toLowerCase().includes(search))
     );
   });
 });
@@ -58,9 +54,7 @@ const selectedEntry = computed(
 const selectedIndex = computed(() =>
   Math.max(
     0,
-    filteredEntries.value.findIndex(
-      (entry) => entry.name === selectedEntry.value?.name,
-    ),
+    filteredEntries.value.findIndex((entry) => entry.name === selectedEntry.value?.name),
   ),
 );
 
@@ -85,9 +79,7 @@ function moveResult(direction: -1 | 1): void {
   selectedName.value = filteredEntries.value[index]?.name;
   void nextTick(() =>
     document
-      .querySelector<HTMLButtonElement>(
-        `[data-formula-browser-result="${selectedName.value}"]`,
-      )
+      .querySelector<HTMLButtonElement>(`[data-formula-browser-result="${selectedName.value}"]`)
       ?.focus(),
   );
 }
@@ -122,11 +114,7 @@ function onKeydown(event: KeyboardEvent): void {
     >
       <header class="formula-function-browser__header">
         <h2>{{ t("formulaTools.functionBrowser") }}</h2>
-        <button
-          type="button"
-          :aria-label="t('formulaTools.cancel')"
-          @click="emit('close')"
-        >
+        <button type="button" :aria-label="t('formulaTools.cancel')" @click="emit('close')">
           <X :size="16" />
         </button>
       </header>
@@ -198,11 +186,7 @@ function onKeydown(event: KeyboardEvent): void {
             <dt>{{ t("formulaTools.example") }}</dt>
             <dd>{{ selectedEntry.example }}</dd>
           </dl>
-          <button
-            type="button"
-            class="formula-function-browser__insert"
-            @click="insert()"
-          >
+          <button type="button" class="formula-function-browser__insert" @click="insert()">
             {{ t("formulaTools.insertFunction") }}
           </button>
         </section>
@@ -371,7 +355,7 @@ function onKeydown(event: KeyboardEvent): void {
     background: var(--idea-action-primary);
     border: 1px solid var(--idea-action-primary);
     border-radius: var(--idea-radius-default);
-    color: var(--idea-text-on-primary);
+    color: var(--idea-text-inverse);
     font: inherit;
   }
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useFloatingPanel } from "../floating/useFloatingPanel";
-import { useAppI18n, type MessageKey } from "../i18n";
+import { useAppI18n } from "../i18n";
 import type { CellRange } from "@idea10/core/workbook";
 import {
   applyFunctionCompletion,
@@ -23,6 +23,7 @@ const props = defineProps<{
   input: HTMLTextAreaElement | null | undefined;
   active: boolean;
   composing: boolean;
+  referenceSheetName?: string;
 }>();
 
 const emit = defineEmits<{
@@ -30,41 +31,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const FUNCTION_COPY: Record<string, { description: MessageKey; signature: MessageKey }> = {
-  SUM: { description: "formulaAssist.sumDescription", signature: "formulaAssist.sumSignature" },
-  IF: { description: "formulaAssist.ifDescription", signature: "formulaAssist.ifSignature" },
-  IFERROR: {
-    description: "formulaAssist.iferrorDescription",
-    signature: "formulaAssist.iferrorSignature",
-  },
-  AVERAGE: {
-    description: "formulaAssist.averageDescription",
-    signature: "formulaAssist.averageSignature",
-  },
-  COUNT: {
-    description: "formulaAssist.countDescription",
-    signature: "formulaAssist.countSignature",
-  },
-  MIN: { description: "formulaAssist.minDescription", signature: "formulaAssist.minSignature" },
-  MAX: { description: "formulaAssist.maxDescription", signature: "formulaAssist.maxSignature" },
-  ROUND: {
-    description: "formulaAssist.roundDescription",
-    signature: "formulaAssist.roundSignature",
-  },
-};
-const ARGUMENT_COPY: Record<string, MessageKey> = {
-  logical_test: "formulaAssist.argLogicalTest",
-  value_if_true: "formulaAssist.argValueIfTrue",
-  value_if_false: "formulaAssist.argValueIfFalse",
-  value: "formulaAssist.argValue",
-  value_if_error: "formulaAssist.argValueIfError",
-  number: "formulaAssist.argNumber",
-  number1: "formulaAssist.argNumber1",
-  number2: "formulaAssist.argNumber2",
-  value1: "formulaAssist.argValue1",
-  value2: "formulaAssist.argValue2",
-  num_digits: "formulaAssist.argNumDigits",
-};
 const listboxRef = ref<HTMLElement | null>(null);
 const listId = `formula-suggestions-${Math.random().toString(36).slice(2)}`;
 const activeIndex = ref(0);
@@ -100,7 +66,11 @@ const isOpen = computed(
 );
 const activeCandidate = computed(() => candidates.value[activeIndex.value] ?? null);
 const helpCandidate = computed(() => {
-  const argument = completionContext.value?.argument;
+  void selectionVersion.value;
+  const argument =
+    props.active && props.input
+      ? getFormulaArgumentContext(props.value, props.input.selectionStart)
+      : null;
   return argument ? getSupportedFormulaFunction(argument.functionName) : activeCandidate.value;
 });
 const activeId = computed(() =>
@@ -129,7 +99,7 @@ const argumentHint = computed(() => {
   return t("formulaAssist.argument", {
     function: candidate.name,
     index: argument.index + 1,
-    name: t(ARGUMENT_COPY[metadata.name] ?? "formulaAssist.argValue"),
+    name: t(`formulaArguments.${metadata.name}`),
   });
 });
 const visible = computed(() => isOpen.value || Boolean(argumentHint.value));
@@ -233,6 +203,9 @@ function handleKeydown(event: KeyboardEvent): boolean {
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     const length = candidates.value.length;
     activeIndex.value = (activeIndex.value + (event.key === "ArrowDown" ? 1 : length - 1)) % length;
+    void nextTick(() =>
+      document.getElementById(activeId.value ?? "")?.scrollIntoView({ block: "nearest" }),
+    );
     return handleEvent(event);
   }
   if (event.key === "Enter" || event.key === "Tab") {
@@ -280,7 +253,7 @@ function pickReference(range: CellRange, phase: FormulaReferencePickPhase): bool
   }
   if (!referenceContext) return false;
   const source = expectedReferenceValue ?? props.value;
-  const edit = replaceFormulaReference(source, referenceContext, range);
+  const edit = replaceFormulaReference(source, referenceContext, range, props.referenceSheetName);
   referenceContext = edit.context;
   referenceRangeState.value = { start: { ...range.start }, end: { ...range.end } };
   referenceActiveState.value = true;
@@ -361,10 +334,12 @@ defineExpose<
         @pointerdown="onOptionPointerDown($event, candidate)"
       >
         <strong>{{ candidate.id }}</strong>
-        <span>{{ t(FUNCTION_COPY[candidate.name]!.description) }}</span>
+        <span>{{ t(`formulaFunctions.${candidate.name}.description`) }}</span>
       </button>
       <p :id="`${listId}-help`" class="formula-input-assist__help" data-formula-help>
-        <code v-if="helpCandidate">{{ t(FUNCTION_COPY[helpCandidate.name]!.signature) }}</code>
+        <code v-if="helpCandidate">{{
+          t(`formulaFunctions.${helpCandidate.name}.signature`)
+        }}</code>
         <span v-if="argumentHint">{{ argumentHint }}</span>
       </p>
     </section>
@@ -375,7 +350,9 @@ defineExpose<
 .formula-input-assist {
   z-index: 30;
   min-width: 210px;
-  overflow: hidden;
+  max-width: min(480px, calc(100vw - 24px));
+  max-height: min(360px, calc(100vh - 40px));
+  overflow: auto;
   background: var(--idea-surface-panel);
   border: 1px solid var(--idea-border-subtle);
   border-radius: var(--idea-radius-default);
@@ -388,7 +365,7 @@ defineExpose<
 
   &__option {
     display: grid;
-    grid-template-columns: 54px minmax(0, 1fr);
+    grid-template-columns: 100px minmax(0, 1fr);
     gap: var(--idea-space-2);
     width: 100%;
     padding: 7px 10px;

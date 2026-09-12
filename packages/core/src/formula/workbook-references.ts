@@ -2,7 +2,8 @@ import { formatFormulaReference, parseFormulaReference } from "./reference-model
 import type { FormulaAddress } from "./types.js";
 import type { Workbook } from "../workbook.js";
 
-const REFERENCE_PATTERN = /(?:'(?:[^']|'')*'|[A-Za-z0-9_.]+)!\$?[A-Za-z]+\$?[1-9]\d*(?::\$?[A-Za-z]+\$?[1-9]\d*)?/g;
+const REFERENCE_PATTERN =
+  /(?:'(?:[^']|'')*'|[A-Za-z0-9_.]+)!\$?[A-Za-z]+\$?[1-9]\d*(?::\$?[A-Za-z]+\$?[1-9]\d*)?/g;
 
 /** Rewrites qualified references to one sheet while retaining sparse cell storage. */
 export function rewriteQualifiedReferencesForSheet(
@@ -11,7 +12,10 @@ export function rewriteQualifiedReferencesForSheet(
   transform: ((address: FormulaAddress) => FormulaAddress | null) | null,
 ): void {
   const sheetsByName = () =>
-    [...workbook.sheets.values()].reduce((result, sheet) => result.set(sheet.name.toLowerCase(), sheet.id), new Map<string, string>());
+    [...workbook.sheets.values()].reduce(
+      (result, sheet) => result.set(sheet.name.toLowerCase(), sheet.id),
+      new Map<string, string>(),
+    );
   for (const sheet of workbook.sheets.values()) {
     for (const [key, cell] of sheet.cells) {
       if (cell.content?.kind !== "formula") continue;
@@ -25,13 +29,21 @@ export function rewriteQualifiedReferencesForSheet(
         });
         if (!reference || reference.target.sheetId !== targetSheetId) continue;
         if (!transform) {
-          replacements.push({ start: match.index, end: match.index + match[0].length, value: "#REF!" });
+          replacements.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            value: "#REF!",
+          });
           continue;
         }
         const start = transform(reference.target.range.start);
         const end = transform(reference.target.range.end);
         if (!start || !end) {
-          replacements.push({ start: match.index, end: match.index + match[0].length, value: "#REF!" });
+          replacements.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            value: "#REF!",
+          });
           continue;
         }
         const value = formatFormulaReference(
@@ -41,7 +53,8 @@ export function rewriteQualifiedReferencesForSheet(
           },
           (id) => workbook.sheets.get(id)?.name,
         );
-        if (value) replacements.push({ start: match.index, end: match.index + match[0].length, value });
+        if (value)
+          replacements.push({ start: match.index, end: match.index + match[0].length, value });
       }
       if (!replacements.length) continue;
       let source = cell.content.formula.source;

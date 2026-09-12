@@ -121,7 +121,12 @@ function evaluateExpression(
     if (!named) return createFormulaError("NAME");
     if (typeof named === "object" && named !== null && "start" in named) {
       return named.start.row === named.end.row && named.start.column === named.end.column
-        ? validate(resolver.resolveCell({ ...named.start, ...(named.sheetName ? { sheetName: named.sheetName } : {}) }))
+        ? validate(
+            resolver.resolveCell({
+              ...named.start,
+              ...(named.sheetName ? { sheetName: named.sheetName } : {}),
+            }),
+          )
         : createFormulaError("VALUE");
     }
     return validate(named);
@@ -195,7 +200,11 @@ function functionArgument(
         values: resolver.resolveRange(named),
         bounds: named,
         getValue: (row, column) =>
-          resolver.resolveCell({ row, column, ...(named.sheetName ? { sheetName: named.sheetName } : {}) }),
+          resolver.resolveCell({
+            row,
+            column,
+            ...(named.sheetName ? { sheetName: named.sheetName } : {}),
+          }),
       };
     }
   }
@@ -203,15 +212,15 @@ function functionArgument(
     const bounds = rangeBounds(expression.range);
     const sheetName = expression.range.start.sheetName;
     return {
-        kind: "range" as const,
-        values: resolver.resolveRange({
-          ...bounds,
-          ...(sheetName ? { sheetName } : {}),
-        }),
-        bounds,
-        getValue: (row, column) =>
-          resolver.resolveCell({ row, column, ...(sheetName ? { sheetName } : {}) }),
-      };
+      kind: "range" as const,
+      values: resolver.resolveRange({
+        ...bounds,
+        ...(sheetName ? { sheetName } : {}),
+      }),
+      bounds,
+      getValue: (row, column) =>
+        resolver.resolveCell({ row, column, ...(sheetName ? { sheetName } : {}) }),
+    };
   }
   const reference = expression.kind === "reference" ? expression.reference : null;
   return {
@@ -227,7 +236,11 @@ function functionArgument(
       ? {
           address: { row: reference.row, column: reference.column },
           getValue: (row: number, column: number) =>
-            resolver.resolveCell({ row, column, ...(reference.sheetName ? { sheetName: reference.sheetName } : {}) }),
+            resolver.resolveCell({
+              row,
+              column,
+              ...(reference.sheetName ? { sheetName: reference.sheetName } : {}),
+            }),
         }
       : {}),
   };

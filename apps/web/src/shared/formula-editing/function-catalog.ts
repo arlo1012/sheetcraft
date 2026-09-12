@@ -1,7 +1,4 @@
-import {
-  getFormulaFunctionMetadata,
-  type FormulaFunctionMetadata,
-} from "@idea10/core/formula";
+import { getFormulaFunctionMetadata, type FormulaFunctionMetadata } from "@idea10/core/formula";
 
 export const FORMULA_CATEGORY_ORDER = [
   "Math",
@@ -28,9 +25,7 @@ export type FormulaCatalogTranslator = (
 export type FormulaCategoryTranslator = (
   key: `formulaTools.${"math" | "logical" | "statistical" | "text" | "dateTime" | "financial" | "information" | "lookup" | "engineering"}`,
 ) => string;
-export type FormulaArgumentTranslator = (
-  key: `formulaArguments.${string}`,
-) => string;
+export type FormulaArgumentTranslator = (key: `formulaArguments.${string}`) => string;
 
 const categoryKeys: Record<
   FormulaCategory,
@@ -47,10 +42,7 @@ const categoryKeys: Record<
   Engineering: "formulaTools.engineering",
 };
 
-function localCopy(
-  name: string,
-  t: FormulaCatalogTranslator,
-): FormulaFunctionCopy {
+function localCopy(name: string, t: FormulaCatalogTranslator): FormulaFunctionCopy {
   const description = t(`formulaFunctions.${name}.description`);
   const signature = t(`formulaFunctions.${name}.signature`);
   const example = t(`formulaFunctions.${name}.example`);
@@ -68,22 +60,14 @@ export function getFormulaCatalogEntry(
   name: string,
   t: FormulaCatalogTranslator,
 ): FormulaCatalogEntry | undefined {
-  return getFormulaCatalogEntries(t).find(
-    (item) => item.name === name.toUpperCase(),
-  );
+  return getFormulaCatalogEntries(t).find((item) => item.name === name.toUpperCase());
 }
 
-export function getFormulaCategoryLabel(
-  category: string,
-  t: FormulaCategoryTranslator,
-): string {
+export function getFormulaCategoryLabel(category: string, t: FormulaCategoryTranslator): string {
   const key = categoryKeys[category as FormulaCategory];
   return key ? t(key) : category;
 }
 
-export function getFormulaArgumentLabel(
-  name: string,
-  t: FormulaArgumentTranslator,
-): string {
+export function getFormulaArgumentLabel(name: string, t: FormulaArgumentTranslator): string {
   return t(`formulaArguments.${name}`);
 }

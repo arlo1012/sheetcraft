@@ -78,10 +78,9 @@ import {
 } from "@idea10/core/style-state";
 import {
   getActiveSheet,
-  createSheetEvaluator,
+  createWorkbookEvaluator,
   getCellContent,
   getCellStyle,
-  getCellComputedValue,
   getWorkbookSheets,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
@@ -180,6 +179,7 @@ export function useSpreadsheetWorkspaceController(
   const viewStates = reactive(new Map<string, SheetGridViewState>());
   const gridRef = shallowRef<SheetGridNavigator>();
   const workbookVersion = ref(0);
+  const calculationVersion = ref(0);
   const workbookGeneration = ref(0);
   const searchQuery = ref("");
   const formatPainterSource = ref<FormatPainterSource>();
@@ -202,6 +202,11 @@ export function useSpreadsheetWorkspaceController(
   const activeCellInput = computed(() =>
     formatCellContentForInput(getCellContent(activeSheet.value, activeAddress.value)),
   );
+  const activeSheetEvaluator = computed(() => {
+    void workbookVersion.value;
+    void calculationVersion.value;
+    return createWorkbookEvaluator(session.workbook, activeSheet.value.id);
+  });
   const activeSelectionRange = computed<CellRange>(() => {
     const selection = activeSheetViewState.value?.selection;
     return selection
@@ -217,7 +222,7 @@ export function useSpreadsheetWorkspaceController(
       : createDefaultSelectionCellStyleState(),
   );
   const activeSelectionSummary = computed(() =>
-    getSelectionSummary(activeSheet.value, activeSelectionRange.value),
+    getSelectionSummary(activeSheet.value, activeSelectionRange.value, activeSheetEvaluator.value),
   );
   const dataToolState = computed<HomeDataToolState>(() => {
     const sheet = activeSheet.value;
@@ -231,7 +236,7 @@ export function useSpreadsheetWorkspaceController(
           sheet,
           filterRange!,
           activeAddress.value.column,
-          createSheetEvaluator(sheet),
+          activeSheetEvaluator.value,
         ).map((key) => ({ key, label: formatFilterValueLabel(key) }))
       : [];
     const activeFilter =
@@ -289,12 +294,24 @@ export function useSpreadsheetWorkspaceController(
       isFormattingSupported.value &&
       !sheet.properties.protected;
     const availableModes: Record<CellMergeMode, boolean> = {
-      all: canUseModes && getCellMergeModeAvailability(sheet, range, "all"),
-      center: canUseModes && getCellMergeModeAvailability(sheet, range, "center"),
-      "same-columns": canUseModes && getCellMergeModeAvailability(sheet, range, "same-columns"),
-      "same-rows": canUseModes && getCellMergeModeAvailability(sheet, range, "same-rows"),
-      content: canUseModes && getCellMergeModeAvailability(sheet, range, "content"),
-      across: canUseModes && getCellMergeModeAvailability(sheet, range, "across"),
+      all:
+        canUseModes &&
+        getCellMergeModeAvailability(sheet, range, "all", activeSheetEvaluator.value),
+      center:
+        canUseModes &&
+        getCellMergeModeAvailability(sheet, range, "center", activeSheetEvaluator.value),
+      "same-columns":
+        canUseModes &&
+        getCellMergeModeAvailability(sheet, range, "same-columns", activeSheetEvaluator.value),
+      "same-rows":
+        canUseModes &&
+        getCellMergeModeAvailability(sheet, range, "same-rows", activeSheetEvaluator.value),
+      content:
+        canUseModes &&
+        getCellMergeModeAvailability(sheet, range, "content", activeSheetEvaluator.value),
+      across:
+        canUseModes &&
+        getCellMergeModeAvailability(sheet, range, "across", activeSheetEvaluator.value),
     };
     return {
       canMerge:
@@ -558,7 +575,7 @@ export function useSpreadsheetWorkspaceController(
 
   function autoSum(): void {
     const target = activeAddress.value;
-    const evaluator = createSheetEvaluator(activeSheet.value);
+    const evaluator = activeSheetEvaluator.value;
     const formula = createAutoSumFormula(target, evaluator.getComputedValue);
     if (!formula) {
       showWorkspaceStatus({ key: "workspace.autoSumUnavailable" });
@@ -736,7 +753,7 @@ export function useSpreadsheetWorkspaceController(
     if (!isFormattingSupported.value || activeSheet.value.properties.protected) return;
     const sheet = activeSheet.value;
     const range = activeSelectionRange.value;
-    const value = getCellComputedValue(sheet, activeAddress.value);
+    const value = activeSheetEvaluator.value.getComputedValue(activeAddress.value);
     return {
       sheetId: sheet.id,
       range: { start: { ...range.start }, end: { ...range.end } },
@@ -1149,6 +1166,7 @@ export function useSpreadsheetWorkspaceController(
       searchQuery.value,
       activeAddress.value,
       direction,
+      activeSheetEvaluator.value,
     );
     if (!match) {
       showWorkspaceStatus({ key: "workspace.noMatches" });
@@ -1195,6 +1213,10 @@ export function useSpreadsheetWorkspaceController(
 
   return {
     session,
+    executeCommand: execute,
+    recalculate: () => {
+      calculationVersion.value += 1;
+    },
     workbookRevision: readonly(workbookVersion),
     workbookGeneration: readonly(workbookGeneration),
     replaceWorkbook,
@@ -1211,6 +1233,7 @@ export function useSpreadsheetWorkspaceController(
     activeAddress,
     activeAddressLabel,
     activeCellInput,
+    activeSheetEvaluator,
     activeSelectionRange,
     isFormattingSupported,
     activeSelectionStyle,

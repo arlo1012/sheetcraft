@@ -7,23 +7,26 @@ import { parseFormula } from "@idea10/core/formula";
  */
 export function completeFormulaForCommit(source: string): string {
   if (!source.startsWith("=")) return source;
-  let quoted = false;
+  let quote: '"' | "'" | null = null;
   let openings = 0;
   for (let index = 0; index < source.length; index += 1) {
     const character = source[index];
-    if (character === '"') {
-      if (quoted && source[index + 1] === '"') index += 1;
-      else quoted = !quoted;
+    if (quote) {
+      if (character === quote && source[index + 1] === quote) index += 1;
+      else if (character === quote) quote = null;
       continue;
     }
-    if (quoted) continue;
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
     if (character === "(") openings += 1;
     if (character === ")") {
       openings -= 1;
       if (openings < 0) return source;
     }
   }
-  if (quoted || openings === 0) return source;
+  if (quote || openings === 0) return source;
   const completed = `${source}${")".repeat(openings)}`;
   return parseFormula(completed).ok ? completed : source;
 }

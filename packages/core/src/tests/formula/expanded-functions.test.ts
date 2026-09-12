@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { createFormulaError, evaluateFormula, type FormulaEvaluationResolver, type FormulaValue } from "../../formula/index.js";
+import {
+  createFormulaError,
+  evaluateFormula,
+  type FormulaEvaluationResolver,
+  type FormulaValue,
+} from "../../formula/index.js";
 
 function resolver(entries: readonly [string, FormulaValue][] = []): FormulaEvaluationResolver {
   const values = new Map(entries);
@@ -26,7 +31,12 @@ describe("expanded formula functions", () => {
   });
 
   test("handles common rounding, arithmetic, and pairwise math", () => {
-    const formulas = resolver([["0:0", 2], ["0:1", 3], ["1:0", 4], ["1:1", 5]]);
+    const formulas = resolver([
+      ["0:0", 2],
+      ["0:1", 3],
+      ["1:0", 4],
+      ["1:1", 5],
+    ]);
     expect(evaluateFormula("=ROUNDUP(-12.31,1)", formulas)).toBe(-12.4);
     expect(evaluateFormula("=ROUNDDOWN(-12.39,1)", formulas)).toBe(-12.3);
     expect(evaluateFormula("=MOD(-3,2)", formulas)).toBe(1);
@@ -37,8 +47,15 @@ describe("expanded formula functions", () => {
 
   test("evaluates conditional aggregation with comparisons and wildcards", () => {
     const formulas = resolver([
-      ["0:0", "apple"], ["1:0", "apricot"], ["2:0", "berry"],
-      ["0:1", 2], ["1:1", 3], ["2:1", 5], ["0:2", "x"], ["1:2", "x"], ["2:2", "y"],
+      ["0:0", "apple"],
+      ["1:0", "apricot"],
+      ["2:0", "berry"],
+      ["0:1", 2],
+      ["1:1", 3],
+      ["2:1", 5],
+      ["0:2", "x"],
+      ["1:2", "x"],
+      ["2:2", "y"],
     ]);
     expect(evaluateFormula('=COUNTIF(A1:A3,"ap*")', formulas)).toBe(2);
     expect(evaluateFormula('=SUMIF(A1:A3,"ap*",B1:B3)', formulas)).toBe(5);
@@ -48,8 +65,15 @@ describe("expanded formula functions", () => {
 
   test("implements information and two-dimensional lookup functions", () => {
     const formulas = resolver([
-      ["0:0", "key"], ["0:1", "one"], ["0:2", "two"],
-      ["1:0", "a"], ["1:1", 10], ["1:2", 20], ["2:0", "b"], ["2:1", 30], ["2:2", 40],
+      ["0:0", "key"],
+      ["0:1", "one"],
+      ["0:2", "two"],
+      ["1:0", "a"],
+      ["1:1", 10],
+      ["1:2", 20],
+      ["2:0", "b"],
+      ["2:1", 30],
+      ["2:2", 40],
     ]);
     expect(evaluateFormula("=ISERR(#DIV/0!)", formulas)).toBe(true);
     expect(evaluateFormula("=INDEX(B2:C3,2,1)", formulas)).toBe(30);

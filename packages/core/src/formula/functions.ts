@@ -1,4 +1,8 @@
-import type { FormulaFunctionDefinition, FormulaFunctionMetadata, FormulaFunctionRegistry } from "./functions/contracts.js";
+import type {
+  FormulaFunctionDefinition,
+  FormulaFunctionMetadata,
+  FormulaFunctionRegistry,
+} from "./functions/contracts.js";
 import { DATE_FUNCTIONS } from "./functions/date.js";
 import { ENGINEERING_FUNCTIONS } from "./functions/engineering.js";
 import { FINANCIAL_FUNCTIONS } from "./functions/financial.js";

@@ -1,6 +1,8 @@
 import type { MessageSchema } from "../schema";
+import { formulaToolsEnUS } from "../../../modules/formula-tools/formula-tools-messages.en-US";
 
 export const enUS = {
+  ...formulaToolsEnUS,
   xlsx: {
     actions: {
       import: "Import XLSX",
@@ -79,6 +81,8 @@ export const enUS = {
     categories: "Ribbon categories",
     home: "Home",
     homeTools: "Home tools",
+    formulas: "Formulas",
+    formulaTools: "Formula tools",
     historyTools: "History",
     fontTools: "Font and color",
     alignmentTools: "Alignment",
@@ -160,6 +164,12 @@ export const enUS = {
     noMatches: "No matches",
     autoSumUnavailable: "No adjacent numeric cells to sum.",
     autoSumApplied: "Inserted {formula}",
+    formulaInsertionUnavailable:
+      "Place the cursor at a formula argument or after an operator to insert a function.",
+    recalculated: "Workbook recalculated.",
+    nameInvalid: "Check the name, scope, and reference. Names must be unique within their scope.",
+    nameSaved: "Saved the name {name}.",
+    nameDeleted: "Name deleted.",
     filterUnavailable: "Filter cannot be applied to the current selection.",
     sortUnavailable: "The current selection cannot be sorted.",
     freezeUnavailable: "Frozen panes cannot cross a merged cell.",

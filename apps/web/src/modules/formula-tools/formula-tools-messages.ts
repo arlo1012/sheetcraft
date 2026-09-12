@@ -38,10 +38,7 @@ export type FormulaToolsMessageSchema = {
     saveName: string;
     cancel: string;
   };
-  formulaFunctions: Record<
-    string,
-    { description: string; signature: string; example: string }
-  >;
+  formulaFunctions: Record<string, { description: string; signature: string; example: string }>;
   formulaArguments: Record<string, string>;
 };
 

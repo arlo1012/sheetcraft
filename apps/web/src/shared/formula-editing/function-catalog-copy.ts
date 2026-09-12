@@ -19,13 +19,8 @@ export function createFormulaFunctionCopy(
         })
         .join(", ");
       const variadic =
-        metadata.maxArgs === null
-          ? [argumentsText, "…"].filter(Boolean).join(", ")
-          : argumentsText;
-      return [
-        metadata.name,
-        { ...localized!, signature: `${metadata.name}(${variadic})` },
-      ];
+        metadata.maxArgs === null ? [argumentsText, "…"].filter(Boolean).join(", ") : argumentsText;
+      return [metadata.name, { ...localized!, signature: `${metadata.name}(${variadic})` }];
     }),
   );
 }

@@ -800,7 +800,11 @@ export async function encodeWithExcelJs(
   }
   const bytes = await target.xlsx.writeBuffer();
   return {
-    bytes: finalizeXlsxExport(new Uint8Array(bytes), cellImages, collectDefinedNames(workbook, report)),
+    bytes: finalizeXlsxExport(
+      new Uint8Array(bytes),
+      cellImages,
+      collectDefinedNames(workbook, report),
+    ),
     report: report.build(),
   };
 }

@@ -43,24 +43,17 @@ const aggregates: ReadonlyArray<{
   { name: "MAX", label: "MAX" },
   { name: "MIN", label: "MIN" },
 ];
-const { floatingStyles } = useDismissibleFloatingPanel(
-  sumTriggerRef,
-  sumPanelRef,
-  sumMenuOpen,
-  {
-    placement: "bottom-start",
-    offset: 4,
-    onDismiss: () => {
-      sumMenuOpen.value = false;
-    },
+const { floatingStyles } = useDismissibleFloatingPanel(sumTriggerRef, sumPanelRef, sumMenuOpen, {
+  placement: "bottom-start",
+  offset: 4,
+  onDismiss: () => {
+    sumMenuOpen.value = false;
   },
-);
+});
 function toggleSumMenu(): void {
   if (!props.disabled) sumMenuOpen.value = !sumMenuOpen.value;
 }
-function chooseAggregate(
-  name: "SUM" | "AVERAGE" | "COUNT" | "MAX" | "MIN",
-): void {
+function chooseAggregate(name: "SUM" | "AVERAGE" | "COUNT" | "MAX" | "MIN"): void {
   sumMenuOpen.value = false;
   emit("aggregate", name);
 }

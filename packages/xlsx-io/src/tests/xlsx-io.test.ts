@@ -172,10 +172,14 @@ describe("XLSX IO", () => {
     const summary = createSheet("Summary", "summary");
     workbook.sheets.set(summary.id, summary);
     setCellContent(data, { row: 0, column: 0 }, { kind: "literal", value: 41 });
-    setCellContent(summary, { row: 0, column: 0 }, {
-      kind: "formula",
-      formula: { source: "=Data!A1+1" },
-    });
+    setCellContent(
+      summary,
+      { row: 0, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=Data!A1+1" },
+      },
+    );
     workbook.definedNames.set("sales", {
       id: "sales",
       name: "Sales",
@@ -199,7 +203,9 @@ describe("XLSX IO", () => {
     const encoded = await encodeXlsx(workbook);
     const xml = xlsxEntryText(encoded.bytes, "xl/workbook.xml");
     expect(xml).toContain('<definedName name="Sales">&apos;Data&apos;!$A$1:$A$2</definedName>');
-    expect(xml).toContain('<definedName name="Sales" localSheetId="1">&apos;Data&apos;!$A$1:$A$1</definedName>');
+    expect(xml).toContain(
+      '<definedName name="Sales" localSheetId="1">&apos;Data&apos;!$A$1:$A$1</definedName>',
+    );
 
     const restored = await decodeXlsx(encoded.bytes);
     const restoredSheets = [...restored.workbook.sheets.values()];
