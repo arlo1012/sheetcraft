@@ -194,30 +194,35 @@ function functionArgument(
         kind: "range" as const,
         values: resolver.resolveRange(named),
         bounds: named,
+        getValue: (row, column) =>
+          resolver.resolveCell({ row, column, ...(named.sheetName ? { sheetName: named.sheetName } : {}) }),
       };
     }
   }
-  return expression.kind === "range"
-    ? {
+  if (expression.kind === "range") {
+    const bounds = rangeBounds(expression.range);
+    const sheetName = expression.range.start.sheetName;
+    return {
         kind: "range" as const,
         values: resolver.resolveRange({
-          ...rangeBounds(expression.range),
-          ...(expression.range.start.sheetName ? { sheetName: expression.range.start.sheetName } : {}),
+          ...bounds,
+          ...(sheetName ? { sheetName } : {}),
         }),
-        bounds: rangeBounds(expression.range),
-      }
-    : {
-        kind: "scalar" as const,
-        value: evaluateExpression(expression, resolver, registry, options),
-        source:
-          expression.kind === "number" ||
-          expression.kind === "string" ||
-          expression.kind === "boolean"
-            ? "literal"
-            : expression.kind === "reference"
-              ? "reference"
-              : "expression",
+        bounds,
+        getValue: (row, column) =>
+          resolver.resolveCell({ row, column, ...(sheetName ? { sheetName } : {}) }),
       };
+  }
+  return {
+    kind: "scalar" as const,
+    value: evaluateExpression(expression, resolver, registry, options),
+    source:
+      expression.kind === "number" || expression.kind === "string" || expression.kind === "boolean"
+        ? "literal"
+        : expression.kind === "reference"
+          ? "reference"
+          : "expression",
+  };
 }
 
 function result(value: number): FormulaValue {
