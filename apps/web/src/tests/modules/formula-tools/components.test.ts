@@ -193,6 +193,7 @@ describe("NamedRangesDialog", () => {
       },
     });
     mounted.push(wrapper);
+    await wrapper.get('[data-name-action="new"]').trigger("click");
     await wrapper.get("[data-formula-name] input").setValue("Revenue");
     await wrapper.get("[data-formula-reference] input").setValue("Budget!A1:A5");
     await wrapper.find("form").trigger("submit");

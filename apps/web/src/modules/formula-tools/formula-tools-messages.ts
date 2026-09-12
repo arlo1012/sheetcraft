@@ -45,6 +45,15 @@ export type FormulaToolsMessageSchema = {
     example: string;
     namedRanges: string;
     newName: string;
+    editName: string;
+    filterNames: string;
+    allNames: string;
+    workbookNames: string;
+    currentSheetNames: string;
+    noNames: string;
+    resetReference: string;
+    saveReference: string;
+    close: string;
     name: string;
     scope: string;
     workbook: string;

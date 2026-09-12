@@ -1,27 +1,22 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Check, X } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { BaseTable as TTable } from "tdesign-vue-next/es/table";
+import type {
+  BaseTableCol,
+  RowEventContext,
+  TableRowAttributes,
+  TableRowData,
+} from "tdesign-vue-next/es/table/type";
 import { useAppI18n } from "../../../shared/i18n";
-import OptionList from "../../../shared/option-list/OptionList.vue";
+import type { NamedRangeDraft, NamedRangeRow, NamedRangeSheet } from "../named-range-types";
+import NamedRangeEditorDialog from "./NamedRangeEditorDialog.vue";
 
-export type NamedRangeRow = Readonly<{
-  id: string;
-  name: string;
-  scopeSheetId?: string;
-  reference: string;
-}>;
-export type NamedRangeDraft = Readonly<{
-  id?: string;
-  name: string;
-  scopeSheetId?: string;
-  reference: string;
-}>;
-export type NamedRangeSheet = Readonly<{ id: string; name: string }>;
-
+type NameTableRow = NamedRangeRow & { scopeLabel: string };
 const props = withDefaults(
   defineProps<{
     visible: boolean;
@@ -31,11 +26,7 @@ const props = withDefaults(
     selectionReference?: string;
     editSessionId?: string;
   }>(),
-  {
-    activeSheetId: undefined,
-    selectionReference: undefined,
-    editSessionId: undefined,
-  },
+  { activeSheetId: undefined, selectionReference: undefined, editSessionId: undefined },
 );
 const emit = defineEmits<{
   close: [];
@@ -45,79 +36,97 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 const contentRef = ref<HTMLElement | null>(null);
-const scopePopupProps = { attach: () => contentRef.value ?? document.body };
-const workbookScopeValue = "__idea10_workbook_scope__";
+const filterPopupProps = { attach: () => contentRef.value ?? document.body };
+const nameFilter = ref("all");
 const selectedId = ref<string | undefined>();
-const draft = ref<NamedRangeDraft>({ name: "", reference: "" });
+const editorDraft = ref<NamedRangeDraft>();
+const referenceDraft = ref("");
 const selectedRange = computed(() => props.ranges.find((range) => range.id === selectedId.value));
-const rangeOptions = computed(() =>
-  props.ranges.map((range) => ({ value: range.id, label: range.name, reference: range.reference })),
+const filteredRanges = computed<NameTableRow[]>(() =>
+  props.ranges
+    .filter((range) =>
+      nameFilter.value === "workbook"
+        ? range.scopeSheetId === undefined
+        : nameFilter.value === "sheet"
+          ? range.scopeSheetId === props.activeSheetId
+          : true,
+    )
+    .map((range) => ({
+      ...range,
+      scopeLabel: range.scopeSheetId
+        ? (props.sheets.find((sheet) => sheet.id === range.scopeSheetId)?.name ??
+          range.scopeSheetId)
+        : t("formulaTools.workbook"),
+    })),
 );
-const scopeOptions = computed(() => [
-  { label: t("formulaTools.workbook"), value: workbookScopeValue },
-  ...props.sheets.map((sheet) => ({ label: sheet.name, value: sheet.id })),
+const filterOptions = computed(() => [
+  { value: "all", label: t("formulaTools.allNames") },
+  { value: "workbook", label: t("formulaTools.workbookNames") },
+  { value: "sheet", label: t("formulaTools.currentSheetNames"), disabled: !props.activeSheetId },
 ]);
-const scopeSelectValue = computed({
-  get: () => draft.value.scopeSheetId ?? workbookScopeValue,
-  set: (value: string) => {
-    draft.value = {
-      ...draft.value,
-      scopeSheetId: value === workbookScopeValue ? undefined : value,
-    };
-  },
+const columns = computed<BaseTableCol[]>(() => [
+  { colKey: "name", title: t("formulaTools.name"), width: 170, ellipsis: true },
+  { colKey: "reference", title: t("formulaTools.reference"), ellipsis: true },
+  { colKey: "scopeLabel", title: t("formulaTools.scope"), width: 140, ellipsis: true },
+]);
+const rowAttributes: TableRowAttributes<TableRowData> = ({ row, rowIndex }) => ({
+  "data-named-range": String(row.id),
+  "aria-selected": String(selectedId.value === row.id),
+  tabindex: selectedId.value === row.id || (!selectedId.value && rowIndex === 0) ? "0" : "-1",
 });
+const referenceChanged = computed(() =>
+  Boolean(selectedRange.value && referenceDraft.value !== selectedRange.value.reference),
+);
 
-function resetDraft(): void {
-  const range = selectedRange.value;
-  draft.value = range
-    ? { ...range }
-    : {
-        name: "",
-        scopeSheetId: props.activeSheetId,
-        reference: props.selectionReference ?? "",
-      };
-}
-function selectRange(id: string): void {
-  selectedId.value = id;
-  resetDraft();
+function selectRows(keys: Array<string | number>): void {
+  selectedId.value = typeof keys[0] === "string" ? keys[0] : undefined;
 }
 function createRange(): void {
-  selectedId.value = undefined;
-  resetDraft();
+  editorDraft.value = {
+    name: "",
+    scopeSheetId: props.activeSheetId,
+    reference: props.selectionReference ?? "",
+  };
 }
-function save(): void {
-  if (draft.value.name.trim() && draft.value.reference.trim())
-    emit("save", {
-      ...draft.value,
-      name: draft.value.name.trim(),
-      reference: draft.value.reference.trim(),
-    });
+function editRange(range = selectedRange.value): void {
+  if (!range) return;
+  selectedId.value = range.id;
+  editorDraft.value = {
+    id: range.id,
+    name: range.name,
+    scopeSheetId: range.scopeSheetId,
+    reference: range.reference,
+  };
+}
+function editRow({ row }: RowEventContext<TableRowData>): void {
+  const range = props.ranges.find((range) => range.id === row.id);
+  if (range) editRange(range);
 }
 function remove(): void {
-  if (selectedId.value) {
-    emit("delete", selectedId.value);
-    createRange();
-  }
+  if (!selectedId.value) return;
+  emit("delete", selectedId.value);
+  selectedId.value = undefined;
 }
-function createFromSelection(): void {
-  emit("createFromSelection");
-  if (!selectedId.value && props.selectionReference)
-    draft.value = { ...draft.value, reference: props.selectionReference };
+function resetReference(): void {
+  referenceDraft.value = selectedRange.value?.reference ?? "";
 }
-
+function saveReference(): void {
+  if (!selectedRange.value || !referenceChanged.value || !referenceDraft.value.trim()) return;
+  emit("save", { ...selectedRange.value, reference: referenceDraft.value.trim() });
+}
+watch(selectedRange, resetReference);
+watch(filteredRanges, (ranges) => {
+  if (!ranges.some((range) => range.id === selectedId.value)) selectedId.value = undefined;
+});
 watch(
   () => props.visible,
-  (visible) => {
-    if (visible) createRange();
+  () => {
+    selectedId.value = undefined;
+    nameFilter.value = "all";
+    editorDraft.value = undefined;
+    resetReference();
   },
 );
-watch(
-  () => props.selectionReference,
-  (reference) => {
-    if (!selectedId.value && reference) draft.value = { ...draft.value, reference };
-  },
-);
-if (props.visible) createRange();
 </script>
 
 <template>
@@ -126,140 +135,161 @@ if (props.visible) createRange();
     class="named-ranges-dialog"
     :visible="visible"
     :header="t('formulaTools.namedRanges')"
-    :confirm-btn="{ content: t('formulaTools.saveName') }"
-    :cancel-btn="t('formulaTools.cancel')"
-    :width="650"
+    width="min(720px, calc(100vw - 32px))"
+    placement="center"
+    :close-on-overlay-click="false"
+    :close-on-esc-keydown="!editorDraft"
+    :confirm-on-enter="false"
     :data-cell-edit-session="editSessionId"
-    @confirm="save"
     @close="emit('close')"
-    @cancel="emit('close')"
   >
     <div
       ref="contentRef"
       class="named-ranges-dialog__content"
       :data-cell-edit-session="editSessionId"
     >
-      <section class="named-ranges-dialog__list" :aria-label="t('formulaTools.namedRanges')">
-        <div class="named-ranges-dialog__list-actions">
-          <TButton variant="outline" @click="createRange">
-            {{ t("formulaTools.newName") }}
-          </TButton>
-          <TButton theme="danger" variant="outline" :disabled="!selectedId" @click="remove">
-            {{ t("formulaTools.deleteName") }}
-          </TButton>
-        </div>
-        <OptionList
-          class="named-ranges-dialog__range-menu"
-          :model-value="selectedId"
-          :options="rangeOptions"
-          :label="t('formulaTools.namedRanges')"
-          variant="navigation"
-          item-data-attribute="data-named-range"
-          @select="selectRange"
-        >
-          <template #option="{ option }">
-            <span class="named-ranges-dialog__row-content"
-              ><strong>{{ option.label }}</strong
-              ><span>{{ option.reference }}</span></span
-            >
-          </template>
-        </OptionList>
-      </section>
-      <TForm class="named-ranges-dialog__form" layout="vertical" @submit="save">
-        <TFormItem :label="t('formulaTools.name')">
-          <TInput
-            v-model="draft.name"
-            :aria-label="t('formulaTools.name')"
-            data-formula-name
-            autocomplete="off"
-          />
-        </TFormItem>
-        <TFormItem :label="t('formulaTools.scope')">
-          <TSelect
-            v-model="scopeSelectValue"
-            :options="scopeOptions"
-            :popup-props="scopePopupProps"
-            :aria-label="t('formulaTools.scope')"
-            :disabled="Boolean(selectedId)"
-          />
-        </TFormItem>
-        <TFormItem :label="t('formulaTools.reference')">
-          <TInput
-            v-model="draft.reference"
-            :aria-label="t('formulaTools.reference')"
-            data-formula-reference
-            autocomplete="off"
-          />
-        </TFormItem>
-        <TButton
-          class="named-ranges-dialog__selection"
-          variant="outline"
-          @click="createFromSelection"
-        >
-          <span class="named-ranges-dialog__selection-content"
-            >{{ t("formulaTools.createFromSelection")
-            }}<span v-if="selectionReference">{{ selectionReference }}</span></span
+      <div class="named-ranges-dialog__toolbar">
+        <div class="named-ranges-dialog__actions">
+          <TButton variant="outline" data-name-action="new" @click="createRange">{{
+            t("formulaTools.newName")
+          }}</TButton>
+          <TButton
+            variant="outline"
+            data-name-action="edit"
+            :disabled="!selectedRange"
+            @click="editRange()"
+            >{{ t("formulaTools.editName") }}</TButton
           >
-        </TButton>
-      </TForm>
+          <TButton
+            variant="outline"
+            data-name-action="delete"
+            :disabled="!selectedRange"
+            @click="remove"
+            >{{ t("formulaTools.deleteName") }}</TButton
+          >
+        </div>
+        <TSelect
+          v-model="nameFilter"
+          class="named-ranges-dialog__filter"
+          :options="filterOptions"
+          :popup-props="filterPopupProps"
+          :aria-label="t('formulaTools.filterNames')"
+          data-name-filter
+        />
+      </div>
+      <TTable
+        class="named-ranges-dialog__table"
+        row-key="id"
+        :data="filteredRanges"
+        :columns="columns"
+        :row-attributes="rowAttributes"
+        :active-row-keys="selectedId ? [selectedId] : []"
+        active-row-type="single"
+        :disable-space-inactive-row="true"
+        size="small"
+        table-layout="fixed"
+        height="min(330px, 42vh)"
+        bordered
+        hover
+        :empty="t('formulaTools.noNames')"
+        :aria-label="t('formulaTools.namedRanges')"
+        @active-change="selectRows"
+        @row-dblclick="editRow"
+      />
+      <div
+        class="named-ranges-dialog__reference"
+        role="group"
+        :aria-label="t('formulaTools.reference')"
+      >
+        <span>{{ t("formulaTools.reference") }}</span>
+        <div class="named-ranges-dialog__reference-controls">
+          <TButton
+            variant="outline"
+            shape="square"
+            :disabled="!referenceChanged"
+            :aria-label="t('formulaTools.resetReference')"
+            :title="t('formulaTools.resetReference')"
+            data-name-reference-reset
+            @click="resetReference"
+            ><X :size="15"
+          /></TButton>
+          <TButton
+            variant="outline"
+            shape="square"
+            :disabled="!referenceChanged || !referenceDraft.trim()"
+            :aria-label="t('formulaTools.saveReference')"
+            :title="t('formulaTools.saveReference')"
+            data-name-reference-save
+            @click="saveReference"
+            ><Check :size="15"
+          /></TButton>
+          <TInput
+            v-model="referenceDraft"
+            :disabled="!selectedRange"
+            :aria-label="t('formulaTools.reference')"
+            data-name-reference
+            @enter="saveReference"
+          />
+        </div>
+      </div>
     </div>
+    <template #footer>
+      <TButton variant="outline" data-name-action="close" @click="emit('close')">{{
+        t("formulaTools.close")
+      }}</TButton>
+    </template>
   </Dialog>
+  <NamedRangeEditorDialog
+    v-if="visible && editorDraft"
+    :initial-draft="editorDraft"
+    :sheets="sheets"
+    :selection-reference="selectionReference"
+    :edit-session-id="editSessionId"
+    @close="editorDraft = undefined"
+    @save="emit('save', $event)"
+    @create-from-selection="emit('createFromSelection')"
+  />
 </template>
 
 <style scoped lang="scss">
 .named-ranges-dialog {
   &__content {
     display: grid;
-    grid-template-columns: 225px minmax(0, 1fr);
-    min-height: 270px;
-    border: 1px solid var(--idea-border-subtle);
+    gap: 12px;
+    color: var(--idea-text-primary);
   }
-  &__list {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    align-content: start;
-    padding: 8px;
-    border-right: 1px solid var(--idea-border-subtle);
-    min-height: 0;
-  }
-  &__list-actions {
+  &__toolbar {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  &__actions {
+    display: flex;
+    gap: 8px;
+  }
+  &__filter {
+    width: 170px;
+  }
+  &__table {
+    min-width: 0;
+  }
+  &__reference {
+    display: grid;
     gap: 4px;
-    margin-bottom: 6px;
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
   }
-  &__range-menu {
-    min-width: 0;
-    min-height: 0;
-  }
-  &__row-content {
+  &__reference-controls {
     display: grid;
-    gap: 1px;
-    min-width: 0;
-    > span {
-      overflow: hidden;
-      color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-body-small);
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
   }
-  &__form {
-    display: grid;
-    align-content: start;
-    padding: var(--idea-tool-panel-padding);
-  }
-  &__selection {
-    height: auto;
-  }
-  &__selection-content {
-    display: grid;
-    justify-items: start;
-    gap: 1px;
-    text-align: left;
-    > span {
-      color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-body-small);
-    }
+}
+@media (max-width: 480px) {
+  .named-ranges-dialog__toolbar {
+    flex-wrap: wrap;
   }
 }
 </style>
