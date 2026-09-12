@@ -1,15 +1,15 @@
 import { getFormulaFunctionMetadata, type FormulaFunctionMetadata } from "@idea10/core/formula";
 
 export const FORMULA_CATEGORY_ORDER = [
-  "Math",
+  "Financial",
   "Logical",
-  "Statistical",
   "Text",
   "Date",
-  "Financial",
+  "Statistical",
+  "Engineering",
   "Information",
   "Lookup",
-  "Engineering",
+  "Math",
 ] as const;
 export type FormulaCategory = (typeof FORMULA_CATEGORY_ORDER)[number];
 

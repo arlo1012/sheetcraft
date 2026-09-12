@@ -74,8 +74,9 @@ watch(
       @click="toggle"
       @keydown="onKeydown"
     >
-      <span>{{ label }}</span
-      ><ChevronDown :size="13" aria-hidden="true" />
+      <span class="formula-category-menu__icon" aria-hidden="true"><slot name="icon" /></span>
+      <span class="formula-category-menu__label">{{ label }}</span>
+      <ChevronDown :size="13" aria-hidden="true" />
     </button>
     <Teleport to="body"
       ><div
@@ -111,10 +112,9 @@ watch(
   &__trigger {
     display: inline-flex;
     align-items: center;
-    justify-content: space-between;
     width: 100%;
     min-height: 26px;
-    gap: 2px;
+    gap: 5px;
     padding: 0 4px;
     background: transparent;
     border: 1px solid transparent;
@@ -132,6 +132,16 @@ watch(
       border-color: var(--idea-action-primary);
       outline: none;
     }
+  }
+  &__icon {
+    display: inline-flex;
+    flex: 0 0 16px;
+    align-items: center;
+    justify-content: center;
+  }
+  &__label {
+    flex: 1;
+    white-space: nowrap;
   }
   &__panel {
     z-index: 40;

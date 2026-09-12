@@ -1,5 +1,19 @@
 <script setup lang="ts">
-import { Calculator, FunctionSquare, Sigma, Tags } from "lucide-vue-next";
+import {
+  Banknote,
+  Calculator,
+  CalendarDays,
+  CaseSensitive,
+  ChartColumn,
+  FunctionSquare,
+  GitBranch,
+  Info,
+  Radical,
+  Search,
+  Sigma,
+  Tags,
+  Wrench,
+} from "lucide-vue-next";
 import { computed, nextTick, ref } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
@@ -135,16 +149,39 @@ function insertFunction(name: string): void {
       >
         <div class="formula-toolbar__category-column">
           <FormulaCategoryMenu
-            category="Math"
+            category="Financial"
             :disabled="disabled"
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
-          /><FormulaCategoryMenu
+          >
+            <template #icon><Banknote :size="16" /></template>
+          </FormulaCategoryMenu>
+          <FormulaCategoryMenu
             category="Logical"
             :disabled="disabled"
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
-          />
+          >
+            <template #icon><GitBranch :size="16" /></template>
+          </FormulaCategoryMenu>
+        </div>
+        <div class="formula-toolbar__category-column">
+          <FormulaCategoryMenu
+            category="Text"
+            :disabled="disabled"
+            :edit-session-id="editSessionId"
+            @insert-function="emit('insertFunction', $event)"
+          >
+            <template #icon><CaseSensitive :size="16" /></template>
+          </FormulaCategoryMenu>
+          <FormulaCategoryMenu
+            category="Date"
+            :disabled="disabled"
+            :edit-session-id="editSessionId"
+            @insert-function="emit('insertFunction', $event)"
+          >
+            <template #icon><CalendarDays :size="16" /></template>
+          </FormulaCategoryMenu>
         </div>
         <div class="formula-toolbar__category-column">
           <FormulaCategoryMenu
@@ -152,25 +189,17 @@ function insertFunction(name: string): void {
             :disabled="disabled"
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
-          /><FormulaCategoryMenu
-            category="Text"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          />
-        </div>
-        <div class="formula-toolbar__category-column">
+          >
+            <template #icon><ChartColumn :size="16" /></template>
+          </FormulaCategoryMenu>
           <FormulaCategoryMenu
-            category="Date"
+            category="Engineering"
             :disabled="disabled"
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
-          /><FormulaCategoryMenu
-            category="Financial"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          />
+          >
+            <template #icon><Wrench :size="16" /></template>
+          </FormulaCategoryMenu>
         </div>
         <div class="formula-toolbar__category-column">
           <FormulaCategoryMenu
@@ -178,20 +207,27 @@ function insertFunction(name: string): void {
             :disabled="disabled"
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
-          /><FormulaCategoryMenu
+          >
+            <template #icon><Info :size="16" /></template>
+          </FormulaCategoryMenu>
+        </div>
+        <div class="formula-toolbar__category-column">
+          <FormulaCategoryMenu
             category="Lookup"
             :disabled="disabled"
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
-          />
-        </div>
-        <div class="formula-toolbar__category-column">
+          >
+            <template #icon><Search :size="16" /></template>
+          </FormulaCategoryMenu>
           <FormulaCategoryMenu
-            category="Engineering"
+            category="Math"
             :disabled="disabled"
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
-          />
+          >
+            <template #icon><Radical :size="16" /></template>
+          </FormulaCategoryMenu>
         </div>
       </section>
       <section
@@ -200,14 +236,6 @@ function insertFunction(name: string): void {
         role="group"
         :aria-label="t('formulaTools.toolbar')"
       >
-        <RibbonIconAction
-          variant="tall"
-          :label="t('formulaTools.insertFunction')"
-          :text="t('formulaTools.insertFunction')"
-          :disabled="disabled"
-          @activate="browserOpen = true"
-          ><FunctionSquare :size="18"
-        /></RibbonIconAction>
         <RibbonIconAction
           variant="tall"
           :label="t('formulaTools.nameManager')"
@@ -223,6 +251,14 @@ function insertFunction(name: string): void {
           :disabled="disabled"
           @activate="emit('recalculate')"
           ><Calculator :size="18"
+        /></RibbonIconAction>
+        <RibbonIconAction
+          variant="tall"
+          :label="t('formulaTools.insertFunction')"
+          :text="t('formulaTools.insertFunction')"
+          :disabled="disabled"
+          @activate="browserOpen = true"
+          ><FunctionSquare :size="18"
         /></RibbonIconAction>
       </section>
     </div>
@@ -271,9 +307,8 @@ function insertFunction(name: string): void {
     padding-inline: 8px;
   }
   &__category-column {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    display: grid;
+    grid-template-rows: repeat(2, 26px);
     min-width: 86px;
     gap: 1px;
   }
