@@ -5,7 +5,7 @@ import type {
   FormulaFunctionContext,
   FormulaFunctionDefinition,
 } from "./contracts.js";
-import { defineFunction, finiteNumber, formulaError, scalar } from "./helpers.js";
+import { defineFunction, finiteNumber, formulaError, scalar, values } from "./helpers.js";
 
 function direct(context: FormulaFunctionContext, index: number): FormulaValue {
   return scalar(context.evaluateArgument(index));
@@ -33,7 +33,7 @@ function joinValues(
   argument: FormulaFunctionArgument,
   ignoreEmpty: boolean,
 ): string | ReturnType<typeof formulaError> {
-  const source = argument.kind === "range" ? argument.values : [argument.value];
+  const source = values(argument);
   let result = "";
   for (const value of source) {
     const next = text(value);
@@ -51,7 +51,7 @@ function textJoin(context: FormulaFunctionContext): FormulaValue {
   const items: string[] = [];
   for (let index = 2; index < context.argumentCount; index += 1) {
     const argument = context.evaluateArgument(index);
-    const source = argument.kind === "range" ? argument.values : [argument.value];
+    const source = values(argument);
     for (const item of source) {
       const value = text(item);
       if (isFormulaError(value)) return value;
@@ -87,10 +87,11 @@ function fixedText(context: FormulaFunctionContext, currency: boolean): FormulaV
   if (typeof noCommas !== "boolean" || decimals < -127 || decimals > 127)
     return formulaError("VALUE");
   const precision = Math.max(0, decimals);
+  const scale = 10 ** precision;
   const rounded =
     decimals < 0
-      ? Math.round(value / 10 ** -decimals) * 10 ** -decimals
-      : Number(value.toFixed(precision));
+      ? Math.sign(value) * Math.round(Math.abs(value) / 10 ** -decimals) * 10 ** -decimals
+      : (Math.sign(value) * Math.round(Math.abs(value) * scale)) / scale;
   if (!Number.isFinite(rounded)) return formulaError("NUM");
   const magnitude = Math.abs(rounded).toFixed(precision);
   const [integer, fraction] = magnitude.split(".");
@@ -652,8 +653,52 @@ function find(context: FormulaFunctionContext, insensitive: boolean): FormulaVal
   const source = Array.from(insensitive ? haystack.toLocaleLowerCase() : haystack);
   const target = Array.from(insensitive ? needle.toLocaleLowerCase() : needle);
   if (start > source.length) return formulaError("VALUE");
-  const index = findCharacters(source, target, start - 1);
+  const index = insensitive
+    ? findWildcardCharacters(source, target, start - 1)
+    : findCharacters(source, target, start - 1);
   return index < 0 ? formulaError("VALUE") : index + 1;
+}
+
+function findWildcardCharacters(
+  source: readonly string[],
+  pattern: readonly string[],
+  start: number,
+): number {
+  for (let index = start; index <= source.length; index += 1)
+    if (wildcardMatches(source, pattern, index, 0)) return index;
+  return -1;
+}
+
+function wildcardMatches(
+  source: readonly string[],
+  pattern: readonly string[],
+  sourceIndex: number,
+  patternIndex: number,
+): boolean {
+  while (patternIndex < pattern.length) {
+    const character = pattern[patternIndex]!;
+    if (character === "~") {
+      const literal = pattern[patternIndex + 1] ?? "~";
+      if (source[sourceIndex] !== literal) return false;
+      sourceIndex += 1;
+      patternIndex += patternIndex + 1 < pattern.length ? 2 : 1;
+    } else if (character === "?") {
+      if (sourceIndex >= source.length) return false;
+      sourceIndex += 1;
+      patternIndex += 1;
+    } else if (character === "*") {
+      while (pattern[patternIndex + 1] === "*") patternIndex += 1;
+      if (patternIndex + 1 === pattern.length) return true;
+      for (let next = sourceIndex; next <= source.length; next += 1)
+        if (wildcardMatches(source, pattern, next, patternIndex + 1)) return true;
+      return false;
+    } else {
+      if (source[sourceIndex] !== character) return false;
+      sourceIndex += 1;
+      patternIndex += 1;
+    }
+  }
+  return true;
 }
 
 function findCharacters(

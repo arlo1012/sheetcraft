@@ -1,4 +1,5 @@
 import { isFormulaError, type FormulaValue } from "../types.js";
+import { excelSerialToDateParts } from "../date-system.js";
 import type { FormulaFunctionContext, FormulaFunctionDefinition } from "./contracts.js";
 import { defineFunction, finiteNumber, formulaError, scalar, values } from "./helpers.js";
 
@@ -95,12 +96,20 @@ function rate(
 ): FormulaValue {
   if (periods <= 0 || guess <= -1) return formulaError("NUM");
   let current = guess;
-  const cashFlow = (value: number) =>
-    present * (1 + value) ** periods +
-    payment * (1 + value * type) * (((1 + value) ** periods - 1) / value) +
-    future;
+  const cashFlow = (value: number) => {
+    if (value <= -1) return Number.NaN;
+    const growth = (1 + value) ** periods;
+    const annuity =
+      value === 0
+        ? periods
+        : Math.abs(value) < 1e-7
+          ? periods + (periods * (periods - 1) * value) / 2
+          : Math.expm1(periods * Math.log1p(value)) / value;
+    return present * growth + payment * (1 + value * type) * annuity + future;
+  };
   for (let iteration = 0; iteration < 100; iteration += 1) {
     const result = cashFlow(current);
+    if (Math.abs(result) < 1e-10) return current;
     const h = Math.max(1e-7, Math.abs(current) * 1e-6);
     const derivative = (cashFlow(current + h) - cashFlow(current - h)) / (2 * h);
     if (!Number.isFinite(result) || !Number.isFinite(derivative) || derivative === 0)
@@ -138,6 +147,25 @@ function rangeNumbers(
   return result;
 }
 
+function dateSerials(
+  context: FormulaFunctionContext,
+  index: number,
+): number[] | ReturnType<typeof formulaError> {
+  const result: number[] = [];
+  for (const value of values(context.evaluateArgument(index))) {
+    const date = finiteNumber(value);
+    if (isFormulaError(date)) return date;
+    const day = Math.trunc(date);
+    try {
+      excelSerialToDateParts(day, context.dateSystem ?? "1900");
+    } catch {
+      return formulaError("VALUE");
+    }
+    result.push(day);
+  }
+  return result;
+}
+
 function irr(cashflows: readonly number[], guess: number): FormulaValue {
   if (
     cashflows.length === 0 ||
@@ -171,6 +199,7 @@ function xnpv(
   if (rateValue <= -1 || cashflows.length === 0 || cashflows.length !== dates.length)
     return formulaError("NUM");
   const first = dates[0]!;
+  if (dates.some((date) => date < first)) return formulaError("NUM");
   const result = cashflows.reduce(
     (total, value, index) => total + value / (1 + rateValue) ** ((dates[index]! - first) / 365),
     0,
@@ -189,6 +218,7 @@ function xirr(cashflows: readonly number[], dates: readonly number[], guess: num
     return formulaError("NUM");
   let current = guess;
   const first = dates[0]!;
+  if (dates.some((date) => date < first)) return formulaError("NUM");
   for (let iteration = 0; iteration < 100; iteration += 1) {
     let result = 0;
     let derivative = 0;
@@ -328,7 +358,7 @@ export const FINANCIAL_FUNCTIONS = [
     (context) => {
       const rateValue = number(context, 0);
       const cashflows = rangeNumbers(context, 1);
-      const dates = rangeNumbers(context, 2);
+      const dates = dateSerials(context, 2);
       return isFormulaError(rateValue)
         ? rateValue
         : isFormulaError(cashflows)
@@ -349,7 +379,7 @@ export const FINANCIAL_FUNCTIONS = [
     },
     (context) => {
       const cashflows = rangeNumbers(context, 0);
-      const dates = rangeNumbers(context, 1);
+      const dates = dateSerials(context, 1);
       const guess = context.argumentCount === 2 ? 0.1 : number(context, 2);
       return isFormulaError(cashflows)
         ? cashflows

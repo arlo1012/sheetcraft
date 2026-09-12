@@ -29,6 +29,11 @@ describe("date function bounds", () => {
       createFormulaError("NUM"),
     );
   });
+
+  test("uses a local clock when no deterministic clock is injected", () => {
+    expect(typeof evaluateFormula("=TODAY()", resolver)).toBe("number");
+    expect(typeof evaluateFormula("=NOW()", resolver)).toBe("number");
+  });
 });
 
 describe("expanded date functions", () => {

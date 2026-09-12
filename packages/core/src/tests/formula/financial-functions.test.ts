@@ -35,6 +35,14 @@ describe("expanded financial functions", () => {
     expect(evaluateFormula("=PPMT(1%,1,12,1000)", resolver)).toBeCloseTo(-78.8488, 3);
   });
 
+  test("solves the zero-rate limit and rejects unsolvable rates", () => {
+    expect(evaluateFormula("=RATE(10,-100,1000)", resolver)).toBeCloseTo(0, 10);
+    expect(evaluateFormula("=RATE(10,-100,1000,0,0,0)", resolver)).toBe(0);
+    expect(evaluateFormula("=RATE(10,-110,1000)>0", resolver)).toBe(true);
+    expect(evaluateFormula("=RATE(10,-90,1000)<0", resolver)).toBe(true);
+    expect(evaluateFormula("=RATE(10,0,1000,1000)", resolver)).toEqual(createFormulaError("NUM"));
+  });
+
   test("calculates periodic-return functions", () => {
     const cashflowResolver: FormulaEvaluationResolver = {
       resolveCell: ({ column }) => [-100, 60, 60][column] ?? null,
@@ -51,6 +59,26 @@ describe("expanded financial functions", () => {
     };
     expect(evaluateFormula("=XNPV(10%,A1:B1,A2:B2)", datedCashflowResolver)).toBeCloseTo(0, 8);
     expect(evaluateFormula("=XIRR(A1:B1,A2:B2)", datedCashflowResolver)).toBeCloseTo(0.1, 8);
+  });
+
+  test("normalizes valid date serials and rejects invalid dated cash flows", () => {
+    const invalidDateResolver: FormulaEvaluationResolver = {
+      resolveCell: () => null,
+      resolveRange: ({ start }) => (start.row === 0 ? [-100, 110] : [10.9, 9.1]),
+    };
+    expect(evaluateFormula("=XNPV(10%,A1:B1,A2:B2)", invalidDateResolver)).toEqual(
+      createFormulaError("NUM"),
+    );
+    expect(evaluateFormula("=XIRR(A1:B1,A2:B2)", invalidDateResolver)).toEqual(
+      createFormulaError("NUM"),
+    );
+    const outOfRangeDateResolver: FormulaEvaluationResolver = {
+      resolveCell: () => null,
+      resolveRange: ({ start }) => (start.row === 0 ? [-100, 110] : [-1, 1]),
+    };
+    expect(evaluateFormula("=XNPV(10%,A1:B1,A2:B2)", outOfRangeDateResolver)).toEqual(
+      createFormulaError("VALUE"),
+    );
   });
 
   test("calculates common depreciation schedules", () => {

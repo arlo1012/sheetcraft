@@ -24,6 +24,13 @@ describe("FIND and SEARCH character positions", () => {
     expect(evaluateFormula('=SEARCH("a",#N/A)', resolver)).toEqual(createFormulaError("NA"));
     expect(evaluateFormula('=FIND("a","abc",4)', resolver)).toEqual(createFormulaError("VALUE"));
   });
+
+  test("uses Excel wildcards for SEARCH while FIND remains literal", () => {
+    expect(evaluateFormula('=SEARCH("a?c","abc")', resolver)).toBe(1);
+    expect(evaluateFormula('=SEARCH("a*c","abbbc")', resolver)).toBe(1);
+    expect(evaluateFormula('=SEARCH("a~*c","a*c")', resolver)).toBe(1);
+    expect(evaluateFormula('=FIND("a*c","abbbc")', resolver)).toEqual(createFormulaError("VALUE"));
+  });
 });
 
 describe("expanded text conversion functions", () => {
@@ -46,6 +53,8 @@ describe("expanded text conversion functions", () => {
     expect(evaluateFormula("=DOLLAR(-1234.567,2)", resolver)).toBe("($1,234.57)");
     expect(evaluateFormula("=FIXED(1234.567,1,TRUE)", resolver)).toBe("1234.6");
     expect(evaluateFormula("=FIXED(1234.567,-2)", resolver)).toBe("1,200");
+    expect(evaluateFormula("=DOLLAR(-150,-2)", resolver)).toBe("($200)");
+    expect(evaluateFormula("=FIXED(-150,-2)", resolver)).toBe("-200");
   });
 
   test("extracts text around selected delimiters", () => {

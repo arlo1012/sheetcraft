@@ -116,7 +116,17 @@ function weekday(context: FormulaFunctionContext): FormulaValue {
 }
 
 function clock(context: FormulaFunctionContext): ExcelDateParts | ReturnType<typeof formulaError> {
-  return context.now?.() ?? formulaError("VALUE");
+  if (context.now) return context.now();
+  const now = new Date();
+  return {
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
+    day: now.getDate(),
+    hour: now.getHours(),
+    minute: now.getMinutes(),
+    second: now.getSeconds(),
+    millisecond: now.getMilliseconds(),
+  };
 }
 
 function serialDay(
