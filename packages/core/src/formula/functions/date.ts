@@ -154,6 +154,32 @@ function isWeekend(day: number, context: FormulaFunctionContext): boolean {
   return weekday === 0 || weekday === 6;
 }
 
+function weekendDays(
+  context: FormulaFunctionContext,
+  index: number,
+): Set<number> | ReturnType<typeof formulaError> {
+  if (context.argumentCount <= index) return new Set([0, 6]);
+  const source = scalar(context.evaluateArgument(index));
+  if (isFormulaError(source)) return source;
+  if (typeof source === "number" && Number.isFinite(source)) {
+    const code = Math.trunc(source);
+    if (code >= 1 && code <= 7) return new Set([(code + 5) % 7, (code + 6) % 7]);
+    if (code >= 11 && code <= 17) return new Set([(code - 11) % 7]);
+    return formulaError("NUM");
+  }
+  if (typeof source !== "string" || !/^[01]{7}$/.test(source) || source === "1111111")
+    return formulaError("VALUE");
+  return new Set([...source].flatMap((value, index) => (value === "1" ? [(index + 1) % 7] : [])));
+}
+
+function isWeekendIntl(
+  day: number,
+  context: FormulaFunctionContext,
+  weekend: ReadonlySet<number>,
+): boolean {
+  return weekend.has(sundayZero(day, context));
+}
+
 function days360(start: ExcelDateParts, end: ExcelDateParts, european: boolean): number {
   let startDay = start.day;
   let endDay = end.day;
@@ -228,6 +254,70 @@ export const DATE_FUNCTIONS = [
           : isFormulaError(day)
             ? day
             : normalizedDate(year, month, day, context);
+    },
+  ),
+  defineFunction(
+    {
+      name: "NETWORKDAYS.INTL",
+      category: "Date",
+      minArgs: 2,
+      maxArgs: null,
+      arguments: [
+        { name: "start_date" },
+        { name: "end_date" },
+        { name: "weekend", optional: true },
+        { name: "holidays", optional: true },
+      ],
+      lazy: false,
+    },
+    (context) => {
+      const start = serialDay(context, 0);
+      const end = serialDay(context, 1);
+      const weekend = weekendDays(context, 2);
+      const offDays = holidays(context, 3);
+      if (isFormulaError(start)) return start;
+      if (isFormulaError(end)) return end;
+      if (isFormulaError(weekend)) return weekend;
+      if (isFormulaError(offDays)) return offDays;
+      const direction = start <= end ? 1 : -1;
+      let result = 0;
+      for (let day = start; direction > 0 ? day <= end : day >= end; day += direction)
+        if (!isWeekendIntl(day, context, weekend) && !offDays.has(day)) result += direction;
+      return result;
+    },
+  ),
+  defineFunction(
+    {
+      name: "WORKDAY.INTL",
+      category: "Date",
+      minArgs: 2,
+      maxArgs: null,
+      arguments: [
+        { name: "start_date" },
+        { name: "days" },
+        { name: "weekend", optional: true },
+        { name: "holidays", optional: true },
+      ],
+      lazy: false,
+    },
+    (context) => {
+      const start = serialDay(context, 0);
+      const count = whole(context, 1);
+      const weekend = weekendDays(context, 2);
+      const offDays = holidays(context, 3);
+      if (isFormulaError(start)) return start;
+      if (isFormulaError(count)) return count;
+      if (isFormulaError(weekend)) return weekend;
+      if (isFormulaError(offDays)) return offDays;
+      const direction = count < 0 ? -1 : 1;
+      let remaining = Math.abs(count);
+      let day = start;
+      while (remaining > 0) {
+        day += direction;
+        if (day < 0 || day > 2_958_465) return formulaError("NUM");
+        if (!isWeekendIntl(day, context, weekend) && !offDays.has(day)) remaining -= 1;
+      }
+      return day;
     },
   ),
   defineFunction(

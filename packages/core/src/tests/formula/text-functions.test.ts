@@ -47,4 +47,11 @@ describe("expanded text conversion functions", () => {
     expect(evaluateFormula("=FIXED(1234.567,1,TRUE)", resolver)).toBe("1234.6");
     expect(evaluateFormula("=FIXED(1234.567,-2)", resolver)).toBe("1,200");
   });
+
+  test("extracts text around selected delimiters", () => {
+    expect(evaluateFormula('=TEXTBEFORE("a-b-c","-",2)', resolver)).toBe("a-b");
+    expect(evaluateFormula('=TEXTAFTER("a-b-c","-",-1)', resolver)).toBe("c");
+    expect(evaluateFormula('=TEXTBEFORE("Alpha","a",1,1)', resolver)).toBe("");
+    expect(evaluateFormula('=TEXTAFTER("value","/",1,0,0,"none")', resolver)).toBe("none");
+  });
 });

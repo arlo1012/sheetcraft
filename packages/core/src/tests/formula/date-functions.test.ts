@@ -46,4 +46,14 @@ describe("expanded date functions", () => {
     expect(evaluateFormula("=DAYS360(DATE(2024,1,31),DATE(2024,2,29))", resolver)).toBe(30);
     expect(evaluateFormula("=YEARFRAC(DATE(2024,1,1),DATE(2025,1,1),3)", resolver)).toBe(366 / 365);
   });
+
+  test("supports custom workweek patterns", () => {
+    expect(evaluateFormula("=NETWORKDAYS.INTL(DATE(2024,1,1),DATE(2024,1,7),11)", resolver)).toBe(
+      6,
+    );
+    expect(
+      evaluateFormula('=NETWORKDAYS.INTL(DATE(2024,1,1),DATE(2024,1,7),"0000011")', resolver),
+    ).toBe(5);
+    expect(evaluateFormula("=WORKDAY.INTL(DATE(2024,1,5),1,11)", resolver)).toBe(45297);
+  });
 });

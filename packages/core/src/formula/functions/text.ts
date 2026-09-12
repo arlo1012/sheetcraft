@@ -101,6 +101,53 @@ function fixedText(context: FormulaFunctionContext, currency: boolean): FormulaV
   return value < 0 ? `-${result}` : result;
 }
 
+function textAround(context: FormulaFunctionContext, before: boolean): FormulaValue {
+  const source = text(direct(context, 0));
+  const delimiter = text(direct(context, 1));
+  const instance = context.argumentCount > 2 ? count(context, 2) : 1;
+  const matchMode = context.argumentCount > 3 ? count(context, 3) : 0;
+  const matchEnd = context.argumentCount > 4 ? count(context, 4) : 0;
+  if (
+    isFormulaError(source) ||
+    isFormulaError(delimiter) ||
+    isFormulaError(instance) ||
+    isFormulaError(matchMode) ||
+    isFormulaError(matchEnd)
+  )
+    return isFormulaError(source)
+      ? source
+      : isFormulaError(delimiter)
+        ? delimiter
+        : isFormulaError(instance)
+          ? instance
+          : isFormulaError(matchMode)
+            ? matchMode
+            : matchEnd;
+  if (
+    delimiter === "" ||
+    instance === 0 ||
+    (matchMode !== 0 && matchMode !== 1) ||
+    (matchEnd !== 0 && matchEnd !== 1)
+  )
+    return formulaError("VALUE");
+  const haystack = matchMode === 1 ? source.toLocaleLowerCase() : source;
+  const needle = matchMode === 1 ? delimiter.toLocaleLowerCase() : delimiter;
+  const occurrences: number[] = [];
+  let offset = 0;
+  while (offset <= haystack.length) {
+    const found = haystack.indexOf(needle, offset);
+    if (found < 0) break;
+    occurrences.push(found);
+    offset = found + needle.length;
+  }
+  const position = occurrences[instance > 0 ? instance - 1 : occurrences.length + instance];
+  if (position === undefined) {
+    if (matchEnd === 1) return before ? source : "";
+    return context.argumentCount > 5 ? direct(context, 5) : formulaError("NA");
+  }
+  return before ? source.slice(0, position) : source.slice(position + delimiter.length);
+}
+
 export const TEXT_FUNCTIONS = [
   defineFunction(
     {
@@ -229,6 +276,26 @@ export const TEXT_FUNCTIONS = [
       lazy: false,
     },
     (context) => fixedText(context, false),
+  ),
+  ...(["TEXTBEFORE", "TEXTAFTER"] as const).map((name) =>
+    defineFunction(
+      {
+        name,
+        category: "Text",
+        minArgs: 2,
+        maxArgs: 6,
+        arguments: [
+          { name: "text" },
+          { name: "delimiter" },
+          { name: "instance_num", optional: true },
+          { name: "match_mode", optional: true },
+          { name: "match_end", optional: true },
+          { name: "if_not_found", optional: true },
+        ],
+        lazy: false,
+      },
+      (context) => textAround(context, name === "TEXTBEFORE"),
+    ),
   ),
   defineFunction(
     {
