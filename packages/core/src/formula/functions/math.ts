@@ -492,7 +492,130 @@ export const MATH_FUNCTIONS = [
       return Number.isFinite(r) ? r : formulaError("NUM");
     },
   ),
+  ...[
+    "SIN",
+    "COS",
+    "TAN",
+    "ASIN",
+    "ACOS",
+    "ATAN",
+    "SINH",
+    "COSH",
+    "TANH",
+    "ASINH",
+    "ACOSH",
+    "ATANH",
+    "EXP",
+    "LN",
+    "LOG10",
+    "DEGREES",
+    "RADIANS",
+  ].map((name) =>
+    defineFunction(
+      {
+        name,
+        category: "Math",
+        minArgs: 1,
+        maxArgs: 1,
+        arguments: [{ name: "number" }],
+        lazy: false,
+      },
+      (context) => unaryMath(context, name),
+    ),
+  ),
+  defineFunction(
+    {
+      name: "ATAN2",
+      category: "Math",
+      minArgs: 2,
+      maxArgs: 2,
+      arguments: [{ name: "x_num" }, { name: "y_num" }],
+      lazy: false,
+    },
+    (context) => {
+      const x = directNumber(context.evaluateArgument(0));
+      const y = directNumber(context.evaluateArgument(1));
+      if (isFormulaError(x)) return x;
+      if (isFormulaError(y)) return y;
+      return x === 0 && y === 0 ? formulaError("DIV0") : Math.atan2(y, x);
+    },
+  ),
+  defineFunction(
+    {
+      name: "LOG",
+      category: "Math",
+      minArgs: 1,
+      maxArgs: 2,
+      arguments: [{ name: "number" }, { name: "base", optional: true }],
+      lazy: false,
+    },
+    (context) => {
+      const value = directNumber(context.evaluateArgument(0));
+      const base =
+        context.argumentCount === 2
+          ? directNumber(context.evaluateArgument(1))
+          : 10;
+      if (isFormulaError(value)) return value;
+      if (isFormulaError(base)) return base;
+      if (value <= 0 || base <= 0 || base === 1) return formulaError("NUM");
+      return Math.log(value) / Math.log(base);
+    },
+  ),
+  defineFunction(
+    {
+      name: "SQRTPI",
+      category: "Math",
+      minArgs: 1,
+      maxArgs: 1,
+      arguments: [{ name: "number" }],
+      lazy: false,
+    },
+    (context) => {
+      const value = directNumber(context.evaluateArgument(0));
+      return isFormulaError(value)
+        ? value
+        : value < 0
+          ? formulaError("NUM")
+          : Math.sqrt(value * Math.PI);
+    },
+  ),
 ] as const satisfies readonly FormulaFunctionDefinition[];
+
+function unaryMath(
+  context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],
+  name: string,
+): FormulaValue {
+  const value = directNumber(context.evaluateArgument(0));
+  if (isFormulaError(value)) return value;
+  if ((name === "ASIN" || name === "ACOS") && (value < -1 || value > 1))
+    return formulaError("NUM");
+  if (name === "ACOSH" && value < 1) return formulaError("NUM");
+  if (name === "ATANH" && (value <= -1 || value >= 1))
+    return formulaError("NUM");
+  if ((name === "LN" || name === "LOG10") && value <= 0)
+    return formulaError("NUM");
+  const operation: Record<string, (input: number) => number> = {
+    SIN: Math.sin,
+    COS: Math.cos,
+    TAN: Math.tan,
+    ASIN: Math.asin,
+    ACOS: Math.acos,
+    ATAN: Math.atan,
+    SINH: Math.sinh,
+    COSH: Math.cosh,
+    TANH: Math.tanh,
+    ASINH: Math.asinh,
+    ACOSH: Math.acosh,
+    ATANH: Math.atanh,
+    EXP: Math.exp,
+    LN: Math.log,
+    LOG10: Math.log10,
+    DEGREES: (input) => (input * 180) / Math.PI,
+    RADIANS: (input) => (input * Math.PI) / 180,
+  };
+  const result = operation[name]!(value);
+  return Number.isFinite(result) ? result : formulaError("NUM");
+}
 
 function mathCeiling(
   context: Parameters<FormulaFunctionDefinition["evaluate"]>[0],

@@ -57,6 +57,21 @@ describe("math, statistical, lookup, and database functions", () => {
     expect(evaluateFormula('=XMATCH("b",B1:B3,0)', formulas)).toBe(2);
     expect(evaluateFormula("=ADDRESS(2,28)", formulas)).toBe("$AB$2");
   });
+  test("handles trigonometry, exponential and logarithmic domains", () => {
+    expect(evaluateFormula("=SIN(PI()/2)", formulas)).toBeCloseTo(1);
+    expect(evaluateFormula("=COS(0)", formulas)).toBe(1);
+    expect(evaluateFormula("=ATAN2(0,1)", formulas)).toBeCloseTo(Math.PI / 2);
+    expect(evaluateFormula("=DEGREES(PI())", formulas)).toBeCloseTo(180);
+    expect(evaluateFormula("=RADIANS(180)", formulas)).toBeCloseTo(Math.PI);
+    expect(evaluateFormula("=LOG(8,2)", formulas)).toBe(3);
+    expect(evaluateFormula("=LN(EXP(2))", formulas)).toBeCloseTo(2);
+    expect(evaluateFormula("=ASIN(2)", formulas)).toEqual(
+      createFormulaError("NUM"),
+    );
+    expect(evaluateFormula("=LOG(0)", formulas)).toEqual(
+      createFormulaError("NUM"),
+    );
+  });
   test("handles compatibility dispersion and rank boundaries", () => {
     expect(evaluateFormula("=AVEDEV(A1:A4)", formulas)).toBe(1);
     expect(evaluateFormula("=VAR(A1:A4)", formulas)).toBeCloseTo(1.6666667);
