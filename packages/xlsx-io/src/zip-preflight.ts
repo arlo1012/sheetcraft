@@ -147,7 +147,7 @@ function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBu
   const worksheetPart = /^xl\/worksheets\/[^/]+\.xml$/i.test(name);
   if (
     workbookPart &&
-    ["definedNames", "workbookProtection", "fileSharing"].some((feature) =>
+    ["workbookProtection", "fileSharing"].some((feature) =>
       hasXmlElement(xml, feature),
     )
   )

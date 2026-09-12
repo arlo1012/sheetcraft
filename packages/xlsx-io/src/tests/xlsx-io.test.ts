@@ -1,6 +1,7 @@
 import ExcelJSImport from "exceljs/dist/exceljs.min.js";
 import { inflateRawSync } from "node:zlib";
 import {
+  createSheet,
   createWorkbook,
   getActiveSheet,
   getCellContent,
@@ -163,6 +164,78 @@ describe("XLSX IO", () => {
         expect.objectContaining({ code: "formula-cache-discarded", count: 2 }),
       ]),
     );
+  });
+
+  test("roundtrips workbook and sheet scoped names with cross-sheet formulas", async () => {
+    const workbook = createWorkbook({ id: "workbook", sheetId: "data", sheetName: "Data" });
+    const data = getActiveSheet(workbook);
+    const summary = createSheet("Summary", "summary");
+    workbook.sheets.set(summary.id, summary);
+    setCellContent(data, { row: 0, column: 0 }, { kind: "literal", value: 41 });
+    setCellContent(summary, { row: 0, column: 0 }, {
+      kind: "formula",
+      formula: { source: "=Data!A1+1" },
+    });
+    workbook.definedNames.set("sales", {
+      id: "sales",
+      name: "Sales",
+      reference: {
+        sheetId: data.id,
+        start: { row: 0, column: 0 },
+        end: { row: 1, column: 0 },
+      },
+    });
+    workbook.definedNames.set("summary-sales", {
+      id: "summary-sales",
+      name: "Sales",
+      scopeSheetId: summary.id,
+      reference: {
+        sheetId: data.id,
+        start: { row: 0, column: 0 },
+        end: { row: 0, column: 0 },
+      },
+    });
+
+    const encoded = await encodeXlsx(workbook);
+    const xml = xlsxEntryText(encoded.bytes, "xl/workbook.xml");
+    expect(xml).toContain('<definedName name="Sales">&apos;Data&apos;!$A$1:$A$2</definedName>');
+    expect(xml).toContain('<definedName name="Sales" localSheetId="1">&apos;Data&apos;!$A$1:$A$1</definedName>');
+
+    const restored = await decodeXlsx(encoded.bytes);
+    const restoredSheets = [...restored.workbook.sheets.values()];
+    expect(restored.workbook.definedNames).toEqual(
+      new Map([
+        [
+          "xlsx-defined-name-workbook-SALES",
+          {
+            id: "xlsx-defined-name-workbook-SALES",
+            name: "Sales",
+            reference: {
+              sheetId: restoredSheets[0]!.id,
+              start: { row: 0, column: 0 },
+              end: { row: 1, column: 0 },
+            },
+          },
+        ],
+        [
+          `xlsx-defined-name-${restoredSheets[1]!.id}-SALES`,
+          {
+            id: `xlsx-defined-name-${restoredSheets[1]!.id}-SALES`,
+            name: "Sales",
+            scopeSheetId: restoredSheets[1]!.id,
+            reference: {
+              sheetId: restoredSheets[0]!.id,
+              start: { row: 0, column: 0 },
+              end: { row: 0, column: 0 },
+            },
+          },
+        ],
+      ]),
+    );
+    expect(getCellContent(restoredSheets[1]!, { row: 0, column: 0 })).toMatchObject({
+      kind: "formula",
+      formula: { source: "=Data!A1+1" },
+    });
   });
 
   test("roundtrips canonical number formats and representable borders", async () => {

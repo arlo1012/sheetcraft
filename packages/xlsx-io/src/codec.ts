@@ -35,6 +35,7 @@ import {
 } from "@idea10/core/workbook";
 import { CompatibilityReportBuilder } from "./report.js";
 import { finalizeXlsxExport } from "./export-finalizer.js";
+import { collectDefinedNames, readDefinedNames } from "./defined-names.js";
 import {
   readRawWorksheetNumericValues,
   readRawWorksheetTextDirections,
@@ -577,6 +578,7 @@ export async function decodeWithExcelJs(
       dateSystem,
       activeSheetId: sheets[activeSheetIndex]?.id ?? sheets[0]?.id ?? "",
       sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
+      definedNames: readDefinedNames(bytes, sheets, report),
     },
     report: report.build(),
   };
@@ -798,7 +800,7 @@ export async function encodeWithExcelJs(
   }
   const bytes = await target.xlsx.writeBuffer();
   return {
-    bytes: finalizeXlsxExport(new Uint8Array(bytes), cellImages),
+    bytes: finalizeXlsxExport(new Uint8Array(bytes), cellImages, collectDefinedNames(workbook, report)),
     report: report.build(),
   };
 }
