@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { undoWorkbookCommand } from "@idea10/core/history";
 import { getCellValue, setCellValue } from "@idea10/core/workbook";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
 import { createTestClipboardEvent } from "./clipboard-fixture";
@@ -71,17 +72,43 @@ describe("SheetGrid axis selection", () => {
     expect(scroller.scrollLeft).toBe(800);
   });
 
-  test("rejects copy, cut, and paste for whole-axis selections", async () => {
-    const { sheet, wrapper } = mountSheetGrid();
-    await triggerAxisHeader(wrapper, "column", 1);
+  test("copies and pastes a whole row through its bounded used extent", async () => {
+    const { session, sheet, wrapper } = mountSheetGrid();
+    setCellValue(sheet, { row: 2, column: 1 }, "row value");
+    await triggerAxisHeader(wrapper, "row", 2);
     const copied = createTestClipboardEvent("copy");
     wrapper.get("textarea.cell-editor").element.dispatchEvent(copied.event);
     expect(copied.event.defaultPrevented).toBe(true);
-    expect(copied.data.get("text/plain")).toBeUndefined();
-    const pasted = createTestClipboardEvent("paste", new Map([["text/plain", "1"]]));
+    expect(copied.data.get("text/plain")).toBe("\trow value");
+
+    await triggerAxisHeader(wrapper, "row", 5);
+    const pasted = createTestClipboardEvent("paste", copied.data);
     wrapper.get("textarea.cell-editor").element.dispatchEvent(pasted.event);
     expect(pasted.event.defaultPrevented).toBe(true);
-    expect(sheet.cells.size).toBe(0);
+    expect(getCellValue(sheet, { row: 5, column: 1 })).toBe("row value");
+    expect(session.history.undoStack).toHaveLength(1);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellValue(sheet, { row: 5, column: 1 })).toBeNull();
+  });
+
+  test("cuts and moves a whole column through its bounded used extent", async () => {
+    const { session, sheet, wrapper } = mountSheetGrid();
+    setCellValue(sheet, { row: 2, column: 1 }, "column value");
+    await triggerAxisHeader(wrapper, "column", 1);
+    const cut = createTestClipboardEvent("cut");
+    wrapper.get("textarea.cell-editor").element.dispatchEvent(cut.event);
+    expect(cut.event.defaultPrevented).toBe(true);
+    expect(cut.data.get("text/plain")).toBe("\r\n\r\ncolumn value");
+
+    await triggerAxisHeader(wrapper, "column", 4);
+    const pasted = createTestClipboardEvent("paste", cut.data);
+    wrapper.get("textarea.cell-editor").element.dispatchEvent(pasted.event);
+    expect(getCellValue(sheet, { row: 2, column: 1 })).toBeNull();
+    expect(getCellValue(sheet, { row: 2, column: 4 })).toBe("column value");
+    expect(session.history.undoStack).toHaveLength(1);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellValue(sheet, { row: 2, column: 1 })).toBe("column value");
+    expect(getCellValue(sheet, { row: 2, column: 4 })).toBeNull();
   });
 
   test("clears a selected row through the sparse range command", async () => {

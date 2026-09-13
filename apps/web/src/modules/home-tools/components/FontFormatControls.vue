@@ -29,6 +29,11 @@ const fontSizePopupProps = {
 const props = defineProps<{
   state: SelectionCellStyleState;
   disabled: boolean;
+  /**
+   * Lets an embedded toolbar keep its Select popup in the same dismissal
+   * boundary. Omitted in the ribbon, so its current body attachment remains.
+   */
+  popupAttach?: () => HTMLElement;
 }>();
 
 const emit = defineEmits<{
@@ -64,12 +69,22 @@ const fontSizeOptions = computed(() => {
       value,
     }));
 });
+const resolvedFontFamilyPopupProps = computed(() => ({
+  ...fontFamilyPopupProps,
+  ...(props.popupAttach ? { attach: props.popupAttach } : {}),
+}));
+const resolvedFontSizePopupProps = computed(() => ({
+  ...fontSizePopupProps,
+  ...(props.popupAttach ? { attach: props.popupAttach } : {}),
+}));
 
 function setFontFamily(value: SelectValue): void {
   if (typeof value !== "string" || !value) {
     return;
   }
-  emit("applyStyle", { fontFamily: value === DEFAULT_CELL_FONT_FAMILY ? null : value });
+  emit("applyStyle", {
+    fontFamily: value === DEFAULT_CELL_FONT_FAMILY ? null : value,
+  });
 }
 
 function setFontSize(value: SelectValue): void {
@@ -111,7 +126,7 @@ function setFontSize(value: SelectValue): void {
         borderless
         :model-value="fontFamilyValue"
         :options="fontFamilyOptions"
-        :popup-props="fontFamilyPopupProps"
+        :popup-props="resolvedFontFamilyPopupProps"
         :placeholder="state.fontFamily.mixed ? '' : undefined"
         :disabled="disabled"
         @change="setFontFamily"
@@ -134,7 +149,7 @@ function setFontSize(value: SelectValue): void {
         :model-value="fontSizeValue"
         :options="fontSizeOptions"
         :input-props="{ align: 'center' }"
-        :popup-props="fontSizePopupProps"
+        :popup-props="resolvedFontSizePopupProps"
         :placeholder="state.fontSize.mixed ? '' : undefined"
         :disabled="disabled"
         @change="setFontSize"

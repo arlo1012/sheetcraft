@@ -17,6 +17,11 @@ import {
 import { useImageAssetUrls } from "../modules/image-assets/useImageAssetUrls";
 import { useSheetImageActions } from "../modules/sheet-images/useSheetImageActions";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
+import { useSheetContextActions } from "./composables/useSheetContextActions";
+import type { SheetContextMenuState } from "../modules/sheet-grid/context-menu-contracts";
+import SheetColumnStatisticsDialog from "../modules/sheet-grid/components/SheetColumnStatisticsDialog.vue";
+import SheetColumnChoiceDialog from "../modules/sheet-grid/components/SheetColumnChoiceDialog.vue";
+import SheetContextFilterDialog from "../modules/sheet-grid/components/SheetContextFilterDialog.vue";
 import { createAxisToolActions } from "../modules/sheet-grid/axis-tool-actions";
 import { createCellOperationActions } from "../modules/sheet-grid/cell-operation-actions";
 import { browserCellTextMeasurer } from "../shared/cell-text/text-metrics";
@@ -171,6 +176,77 @@ const cellOperationActions = createCellOperationActions({
     void MessagePlugin.warning(t("axisMenu.operationFailed"));
   },
 });
+const contextMenuState = computed<SheetContextMenuState>(() => ({
+  format: activeSelectionStyle.value,
+  formattingDisabled: !isFormattingSupported.value || activeSheet.value.properties.protected,
+  data: dataToolState.value,
+  merge: mergeState.value,
+}));
+const contextActions = useSheetContextActions({
+  getSheet: () => activeSheet.value,
+  getRange: () => activeSelectionRange.value,
+  getAddress: () => activeAddress.value,
+  getState: () => contextMenuState.value,
+  getGeneration: () => workbookGeneration.value,
+  flush: () => cellEditSession.finish(),
+  execute: executeCommand,
+  axis: axisTools,
+  cells: cellOperationActions,
+  focus: focusCellEditor,
+  onError: () => {
+    void MessagePlugin.warning(t("axisMenu.operationFailed"));
+  },
+  applyFilter,
+  runExisting: ({ action, range }) => {
+    switch (action.type) {
+      case "insert": {
+        const address = action.direction === "before" ? range.start : range.end;
+        const index =
+          (action.axis === "row" ? address.row : address.column) +
+          (action.direction === "after" ? 1 : 0);
+        insertAxis({ axis: action.axis, index, count: action.count });
+        break;
+      }
+      case "delete": {
+        const index = action.axis === "row" ? range.start.row : range.start.column;
+        const count = (action.axis === "row" ? range.end.row : range.end.column) - index + 1;
+        deleteAxis({ axis: action.axis, index, count });
+        break;
+      }
+      case "formatCells":
+        openCellFormat("number");
+        break;
+      case "formatPainter":
+        activateFormatPainter();
+        break;
+      case "sort":
+        sortSelection(action.direction);
+        break;
+      case "clearFilter":
+        clearFilter();
+        break;
+      case "applyStyle":
+        applyCellStyle(action.patch);
+        break;
+      case "applyBorders":
+        applyCellBorders(action.action);
+        break;
+      case "updateBorderFormat":
+        updateBorderFormat(action.patch);
+        break;
+      case "merge":
+        mergeSelection(action.mode);
+        break;
+      case "unmerge":
+        unmergeSelection();
+        break;
+      case "autoSum":
+        formulaTools.aggregate("SUM");
+        break;
+    }
+  },
+});
+const { statisticsRange, choiceAddress, filterState: contextFilterState } = contextActions;
 watch(workbookGeneration, () => cellEditSession.cancel(), { flush: "sync" });
 const cellFormatSelection = shallowRef<CellFormatSelection>();
 const cellFormatInitialTab = ref<CellFormatTab>("border");
@@ -568,6 +644,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :ref="setGridNavigator"
         :sheet="activeSheet"
         :evaluator="activeSheetEvaluator"
+        :context-menu-state="contextMenuState"
+        @context-action="contextActions.request"
         :date-system="session.workbook.dateSystem"
         :reference-editor="pickingNameRange ? nameRangePicker.editor : formulaBarRef"
         :edit-session="cellEditSession"
@@ -600,6 +678,31 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @horizontal-scroll-change="updateHorizontalScrollState"
       />
     </div>
+    <SheetColumnStatisticsDialog
+      v-if="statisticsRange"
+      :sheet="activeSheet"
+      :evaluator="activeSheetEvaluator"
+      :range="statisticsRange"
+      :locale="locale"
+      @close="contextActions.closePanels()"
+    />
+    <SheetColumnChoiceDialog
+      v-if="choiceAddress"
+      :sheet="activeSheet"
+      :evaluator="activeSheetEvaluator"
+      :address="choiceAddress"
+      :read-only="activeSheet.properties.protected"
+      @choose="contextActions.choose"
+      @close="contextActions.closePanels()"
+    />
+    <SheetContextFilterDialog
+      v-if="contextFilterState"
+      :options="contextFilterState.options"
+      :applied-keys="contextFilterState.appliedKeys"
+      :disabled="activeSheet.properties.protected"
+      @apply="contextActions.confirmFilter"
+      @close="contextActions.closePanels()"
+    />
     <WorkbookStatusBar
       :edit-session-id="
         cellEditSession.state.draft.startsWith('=') ? cellEditSession.id : undefined

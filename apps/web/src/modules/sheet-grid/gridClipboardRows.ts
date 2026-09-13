@@ -13,6 +13,8 @@ import type { GridPastePlan } from "./useGridClipboard";
 
 export const MAX_GRID_CLIPBOARD_CELLS = 100_000;
 
+export type GridClipboardAxis = "rows" | "columns";
+
 function normalizeRange(range: CellRange): CellRange {
   return {
     start: {
@@ -149,6 +151,69 @@ export function rangeTouchesHiddenClipboardRows(
   const startIndex = visibility.getVisibleIndex(start);
   const endIndex = visibility.getVisibleIndex(end);
   return startIndex === null || endIndex === null || endIndex - startIndex + 1 !== end - start + 1;
+}
+
+/** True when the range itself contains a filter-hidden row (adjacent rows do not count). */
+export function rangeContainsHiddenClipboardRows(
+  visibility: RowVisibilityIndex,
+  range: CellRange,
+): boolean {
+  if (!isRangeInBounds(range)) return true;
+  const normalized = normalizeRange(range);
+  const startIndex = visibility.getVisibleIndex(normalized.start.row);
+  const endIndex = visibility.getVisibleIndex(normalized.end.row);
+  return (
+    startIndex === null ||
+    endIndex === null ||
+    endIndex - startIndex + 1 !== normalized.end.row - normalized.start.row + 1
+  );
+}
+
+/**
+ * Projects a whole-axis selection into the finite rectangle that can actually
+ * be represented on a clipboard. A row keeps its column-zero offset; a column
+ * keeps its row-zero offset. Styles live in `sheet.cells`, so styled blank
+ * cells extend the projection too.
+ */
+export function getAxisClipboardRange(
+  sheet: Sheet,
+  axis: GridClipboardAxis,
+  selectionRange: CellRange,
+): CellRange | null {
+  const selected = normalizeRange(selectionRange);
+  if (axis === "rows") {
+    let endColumn = 0;
+    for (const key of sheet.cells.keys()) {
+      const separator = key.indexOf(":");
+      const row = Number(key.slice(0, separator));
+      const column = Number(key.slice(separator + 1));
+      if (row >= selected.start.row && row <= selected.end.row)
+        endColumn = Math.max(endColumn, column);
+    }
+    const rowCount = selected.end.row - selected.start.row + 1;
+    return isWithinCellLimit(rowCount, endColumn + 1)
+      ? {
+          start: { row: selected.start.row, column: 0 },
+          end: { row: selected.end.row, column: endColumn },
+        }
+      : null;
+  }
+
+  let endRow = 0;
+  for (const key of sheet.cells.keys()) {
+    const separator = key.indexOf(":");
+    const row = Number(key.slice(0, separator));
+    const column = Number(key.slice(separator + 1));
+    if (column >= selected.start.column && column <= selected.end.column)
+      endRow = Math.max(endRow, row);
+  }
+  const columnCount = selected.end.column - selected.start.column + 1;
+  return isWithinCellLimit(endRow + 1, columnCount)
+    ? {
+        start: { row: 0, column: selected.start.column },
+        end: { row: endRow, column: selected.end.column },
+      }
+    : null;
 }
 
 export function createVisibleGridPastePlan(

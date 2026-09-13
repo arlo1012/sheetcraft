@@ -1,3 +1,4 @@
+import { DOMWrapper } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import { getCellValue, setCellValue } from "@idea10/core/workbook";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
@@ -36,6 +37,11 @@ describe("SheetGrid cell context menu", () => {
     expect(activeCell(wrapper)).toBe("A1");
     expect(rangeWidth(wrapper)).toBe(192);
     await menu.get('[data-cell-action="clear"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    await new DOMWrapper(document.body)
+      .get('ul[aria-label="Clear"]')
+      .get('[data-cell-action="clear-contents"]')
+      .trigger("click");
 
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBeNull();
     expect(getCellValue(sheet, { row: 1, column: 1 })).toBeNull();
@@ -56,6 +62,11 @@ describe("SheetGrid cell context menu", () => {
     expect(activeCell(wrapper)).toBe("C3");
     expect(rangeWidth(wrapper)).toBe(96);
     await getFloatingMenu().get('[data-cell-action="clear"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    await new DOMWrapper(document.body)
+      .get('ul[aria-label="Clear"]')
+      .get('[data-cell-action="clear-contents"]')
+      .trigger("click");
 
     expect(getCellValue(sheet, { row: 0, column: 0 })).toBe("keep");
     expect(getCellValue(sheet, { row: 2, column: 2 })).toBeNull();
@@ -70,7 +81,7 @@ describe("SheetGrid cell context menu", () => {
       editor.element.focus();
       await editor.trigger("keydown", { key: "ContextMenu" });
       let menu = getFloatingMenu();
-      expect(document.activeElement).toBe(menu.get('[data-cell-action="cut"]').element);
+      expect(document.activeElement).toBe(menu.get('[data-cell-action="insert"]').element);
       await menu.trigger("keydown", { key: "Escape" });
       await wrapper.vm.$nextTick();
       expect(hasFloatingMenu()).toBe(false);

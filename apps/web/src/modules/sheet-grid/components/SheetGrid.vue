@@ -9,6 +9,11 @@ import {
   shallowRef,
   watch,
 } from "vue";
+import type {
+  SheetContextAction,
+  SheetContextMenuState,
+  SheetContextRequest,
+} from "../context-menu-contracts";
 import { formatCellContentForInput } from "@idea10/core/input";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import { columnIndexToLabel, getCellAddressLabel } from "@idea10/core/coordinates";
@@ -152,6 +157,7 @@ const CLIPBOARD_MESSAGE_KEYS: Record<GridClipboardFeedback, MessageKey> = {
 
 const props = withDefaults(
   defineProps<{
+    contextMenuState?: SheetContextMenuState;
     sheet: Sheet;
     evaluator?: SheetEvaluator;
     workbookRevision?: number;
@@ -201,6 +207,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
+  contextAction: [request: SheetContextRequest];
   updateFloatingImage: [image: FloatingImage];
   deleteFloatingImage: [id: string];
   convertFloatingImageToCell: [id: string];
@@ -1670,6 +1677,45 @@ async function requestCellClipboard(
   focusEditor();
 }
 
+async function requestAxisClipboard(
+  action: "cut" | "copy" | "paste" | "paste-values" | "paste-formats",
+): Promise<void> {
+  if (!axisContextMenu.value || (props.readOnly && action !== "copy")) return;
+  axisContextMenu.value = undefined;
+  floatingClipboard.clear();
+  if (action === "cut") await cutSelection();
+  else if (action === "copy") await copySelection();
+  else if (action === "paste-values") await pasteValuesSelection();
+  else if (action === "paste-formats") await pasteFormatsSelection();
+  else await pasteSelection();
+  focusEditor();
+}
+
+function requestContextAction(action: SheetContextAction): void {
+  if (!axisContextMenu.value && !cellContextMenu.value) return;
+  if (props.readOnly && action.type !== "columnStatistics") return;
+  const range = getSelectionRange(selection.value);
+  const keepOpen =
+    action.type === "applyStyle" ||
+    action.type === "applyBorders" ||
+    action.type === "updateBorderFormat" ||
+    action.type === "merge" ||
+    action.type === "unmerge";
+  if (!keepOpen) {
+    axisContextMenu.value = undefined;
+    cellContextMenu.value = undefined;
+  }
+  if (
+    action.type !== "columnStatistics" &&
+    action.type !== "chooseFromColumn" &&
+    action.type !== "filter" &&
+    action.type !== "formatCells" &&
+    action.type !== "formatPainter"
+  )
+    clearPendingClipboard();
+  emit("contextAction", { action, range: { start: { ...range.start }, end: { ...range.end } } });
+}
+
 function requestCellImageAction(action: "preview" | "float"): void {
   if (props.readOnly && action === "float") return;
   const address = cellContextMenu.value?.imageAddress;
@@ -1778,6 +1824,22 @@ function onEditorKeydown(event: KeyboardEvent): void {
     return;
   }
 
+  if (
+    event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    event.key === "ArrowDown" &&
+    !isEditing.value &&
+    !props.readOnly &&
+    getSelectionMode(selection.value) === "cells"
+  ) {
+    event.preventDefault();
+    emit("contextAction", {
+      action: { type: "chooseFromColumn" },
+      range: getSelectionRange(selection.value),
+    });
+    return;
+  }
   if (props.formatPainterActive && !props.readOnly && event.key === "Enter") {
     event.preventDefault();
     event.stopPropagation();
@@ -2163,6 +2225,20 @@ defineExpose({
     <SheetAxisContextMenu
       v-if="axisContextMenu"
       :axis="axisContextMenu.axis"
+      :state="contextMenuState"
+      :sheet="sheet"
+      :range="selectedRange"
+      :paste-special-disabled="clipboardMode === 'cut'"
+      :paste-formats-disabled="!canPasteFormats"
+      :cut-disabled-reason="
+        cutDisabledReason ? t(CLIPBOARD_MESSAGE_KEYS[cutDisabledReason]) : undefined
+      "
+      @action="requestContextAction"
+      @cut="requestAxisClipboard('cut')"
+      @copy="requestAxisClipboard('copy')"
+      @paste="requestAxisClipboard('paste')"
+      @paste-values="requestAxisClipboard('paste-values')"
+      @paste-formats="requestAxisClipboard('paste-formats')"
       :selection-count="axisContextMenu.count"
       :max-before-count="getAxisMaximum(axisContextMenu.axis) - axisContextMenu.index"
       :max-after-count="
@@ -2188,6 +2264,10 @@ defineExpose({
     <SheetCellContextMenu
       v-if="cellContextMenu"
       :anchor="cellContextMenu.anchor"
+      :state="contextMenuState"
+      :sheet="sheet"
+      :range="selectedRange"
+      @action="requestContextAction"
       :has-image="Boolean(cellContextMenu.imageAddress)"
       :read-only="readOnly"
       :paste-special-disabled="clipboardMode === 'cut'"

@@ -8,7 +8,11 @@ import {
   setCellValue,
   type SheetEvaluator,
 } from "@idea10/core/workbook";
-import { createCellSelection, type CellSelection } from "@idea10/sheet-engine/selection";
+import {
+  createAxisSelection,
+  createCellSelection,
+  type CellSelection,
+} from "@idea10/sheet-engine/selection";
 import type {
   GridClipboardPort,
   GridClipboardTransfer,
@@ -95,6 +99,96 @@ function createFixture(options?: { evaluator?: SheetEvaluator }) {
 }
 
 describe("useGridClipboard menu commands", () => {
+  test("copies selected rows through their finite used column extent", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 3, column: 2 }, "row value");
+    fixture.setSelection(createAxisSelection("rows", { row: 3, column: 0 }));
+
+    await fixture.clipboard.copySelection();
+
+    expect(vi.mocked(fixture.port.write).mock.calls[0]?.[0].text).toBe("\t\trow value");
+    expect(fixture.clipboard.clipboardRange.value).toEqual({
+      start: { row: 3, column: 0 },
+      end: { row: 3, column: 2 },
+    });
+  });
+
+  test("copies selected columns through their finite used row extent", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 3, column: 2 }, "column value");
+    fixture.setSelection(createAxisSelection("columns", { row: 0, column: 2 }));
+
+    await fixture.clipboard.copySelection();
+
+    expect(vi.mocked(fixture.port.write).mock.calls[0]?.[0].text).toBe("\r\n\r\n\r\ncolumn value");
+    expect(fixture.clipboard.clipboardRange.value).toEqual({
+      start: { row: 0, column: 2 },
+      end: { row: 3, column: 2 },
+    });
+  });
+
+  test("pastes a row selection from column zero and tiles across selected rows", async () => {
+    const fixture = createFixture();
+    fixture.setTransfer({ text: "A\tB" });
+    fixture.setSelection({
+      ...createAxisSelection("rows", { row: 5, column: 0 }),
+      focus: { row: 6, column: 0 },
+    });
+
+    await fixture.clipboard.pasteSelection();
+
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "all",
+      plan: {
+        anchor: { row: 5, column: 0 },
+        range: { start: { row: 5, column: 0 }, end: { row: 6, column: 1 } },
+        values: [
+          ["A", "B"],
+          ["A", "B"],
+        ],
+      },
+    });
+  });
+
+  test("moves a cut column to the destination column while preserving row-zero offsets", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 2, column: 1 }, "move");
+    fixture.setSelection(createAxisSelection("columns", { row: 0, column: 1 }));
+    await fixture.clipboard.cutSelection();
+    fixture.setSelection(createAxisSelection("columns", { row: 0, column: 4 }));
+
+    await fixture.clipboard.pasteSelection();
+
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "all",
+      moveSource: { start: { row: 0, column: 1 }, end: { row: 2, column: 1 } },
+      plan: {
+        anchor: { row: 0, column: 4 },
+        range: { start: { row: 0, column: 4 }, end: { row: 2, column: 4 } },
+      },
+    });
+  });
+
+  test("extends a copied column through sparse destination tail cells so they are cleared", async () => {
+    const fixture = createFixture();
+    setCellValue(fixture.sheet, { row: 2, column: 1 }, "source");
+    setCellValue(fixture.sheet, { row: 5, column: 4 }, "tail");
+    fixture.setSelection(createAxisSelection("columns", { row: 0, column: 1 }));
+    await fixture.clipboard.copySelection();
+    fixture.setSelection(createAxisSelection("columns", { row: 0, column: 4 }));
+
+    await fixture.clipboard.pasteSelection();
+
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "all",
+      sourceRange: { start: { row: 0, column: 1 }, end: { row: 5, column: 1 } },
+      plan: {
+        range: { start: { row: 0, column: 4 }, end: { row: 5, column: 4 } },
+        values: [[null], [null], ["source"], [null], [null], [null]],
+      },
+    });
+  });
+
   test("uses the guarded pending cut when menu clipboard reads are unavailable", async () => {
     const fixture = createFixture();
     setCellValue(fixture.sheet, { row: 0, column: 0 }, "move");

@@ -3,189 +3,165 @@ import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import SheetCellContextMenu from "../../../../../modules/sheet-grid/components/SheetCellContextMenu.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
-
+const anchor = (host: HTMLElement) => ({
+  contextElement: host,
+  getBoundingClientRect: () => new DOMRect(16, 16, 0, 0),
+});
 describe("SheetCellContextMenu", () => {
-  test("renders compact clipboard actions and supports roving keyboard focus", async () => {
+  test("opens insert submenu with keyboard and reports a cell shift action", async () => {
     const host = document.createElement("div");
     document.body.append(host);
     const wrapper = mount(SheetCellContextMenu, {
       attachTo: host,
       global: { plugins: [createAppI18n("en-US")] },
-      props: {
-        anchor: {
-          contextElement: host,
-          getBoundingClientRect: () => new DOMRect(16, 16, 0, 0),
-        },
-      },
+      props: { anchor: anchor(host) },
     });
-
     try {
       await nextTick();
-      const menu = new DOMWrapper(document.body).get('ul[role="menu"]');
-      const actions = menu.findAll<HTMLElement>("[data-cell-action]");
-      expect(menu.attributes("aria-label")).toBe("Cell actions");
-      expect(menu.find("button").exists()).toBe(false);
-      expect(actions.map((action) => action.text())).toEqual([
-        "Cut Ctrl+X",
-        "Copy Ctrl+C",
-        "Paste Ctrl+V",
-        "Paste special",
-        "Clear contents",
+      const body = new DOMWrapper(document.body);
+      const insert = body.get<HTMLElement>('[data-cell-action="insert"]');
+      await insert.trigger("keydown", { key: "ArrowRight" });
+      await nextTick();
+      const submenu = body.get('ul[aria-label="Insert"]');
+      expect(document.activeElement).toBe(submenu.get('[data-cell-action="insert-right"]').element);
+      await submenu.get('[data-cell-action="insert-right"]').trigger("click");
+      expect(wrapper.emitted("action")).toEqual([
+        [{ type: "cellOperation", operation: "insert", direction: "right" }],
       ]);
-      expect(actions[0]?.attributes("aria-keyshortcuts")).toBe("Control+X Meta+X");
-      expect(document.activeElement).toBe(actions[0]?.element);
-
-      await actions[0]?.trigger("keydown", { key: "ArrowDown" });
-      expect(document.activeElement).toBe(actions[1]?.element);
-      await actions[1]?.trigger("keydown", { key: "End" });
-      expect(document.activeElement).toBe(actions[4]?.element);
-      await actions[4]?.trigger("keydown", { key: "Home" });
-      expect(document.activeElement).toBe(actions[0]?.element);
-
-      await actions[1]?.trigger("keydown", { key: "Enter" });
-      expect(wrapper.emitted("copy")).toHaveLength(1);
-      await actions[1]?.trigger("keydown", { key: "c", ctrlKey: true });
-      expect(wrapper.emitted("copy")).toHaveLength(2);
-      await menu.trigger("keydown", { key: "Escape" });
-      expect(wrapper.emitted("close")).toEqual([[true]]);
     } finally {
       wrapper.unmount();
       host.remove();
     }
   });
-
-  test("opens a keyboard-accessible paste-special submenu and restores parent focus", async () => {
+  test("uses compact clipboard controls and keeps mutation actions read-only", async () => {
     const host = document.createElement("div");
     document.body.append(host);
     const wrapper = mount(SheetCellContextMenu, {
       attachTo: host,
       global: { plugins: [createAppI18n("en-US")] },
-      props: {
-        anchor: {
-          contextElement: host,
-          getBoundingClientRect: () => new DOMRect(16, 16, 0, 0),
-        },
-        pasteFormatsDisabled: true,
-      },
+      props: { anchor: anchor(host), readOnly: true },
     });
-
     try {
       await nextTick();
       const body = new DOMWrapper(document.body);
-      const parent = body.get<HTMLElement>('[data-cell-action="paste-special"]');
-      expect(parent.attributes("aria-haspopup")).toBe("menu");
-      expect(parent.attributes("aria-expanded")).toBe("false");
-
-      await parent.trigger("keydown", { key: "ArrowRight" });
-      await nextTick();
-      let submenu = body.get('ul[aria-label="Paste special"]');
-      const values = submenu.get<HTMLElement>('[data-cell-action="paste-values"]');
-      const formats = submenu.get<HTMLElement>('[data-cell-action="paste-formats"]');
-      expect(parent.attributes("aria-expanded")).toBe("true");
-      expect(parent.attributes("aria-controls")).toBe(submenu.attributes("id"));
-      expect(document.activeElement).toBe(values.element);
-      expect(formats.attributes("aria-disabled")).toBe("true");
-
-      await values.trigger("keydown", { key: "ArrowDown" });
-      expect(document.activeElement).toBe(values.element);
-      await values.trigger("keydown", { key: "ArrowLeft" });
-      await nextTick();
-      expect(body.find('ul[aria-label="Paste special"]').exists()).toBe(false);
-      expect(document.activeElement).toBe(parent.element);
-
-      await wrapper.setProps({ pasteFormatsDisabled: false });
-      await parent.trigger("keydown", { key: "Enter" });
-      await nextTick();
-      submenu = body.get('ul[aria-label="Paste special"]');
-      const enabledFormats = submenu.get<HTMLElement>('[data-cell-action="paste-formats"]');
-      await submenu.get<HTMLElement>('[data-cell-action="paste-values"]').trigger("keydown", {
-        key: "ArrowDown",
-      });
-      expect(document.activeElement).toBe(enabledFormats.element);
-      await enabledFormats.trigger("keydown", { key: "Enter" });
-      expect(wrapper.emitted("pasteFormats")).toHaveLength(1);
-
-      await enabledFormats.trigger("keydown", { key: "Escape" });
-      await nextTick();
-      expect(body.find('ul[aria-label="Paste special"]').exists()).toBe(false);
-      expect(document.activeElement).toBe(parent.element);
-      await parent.trigger("keydown", { key: "Escape" });
-      expect(wrapper.emitted("close")).toEqual([[true]]);
-    } finally {
-      wrapper.unmount();
-      host.remove();
-    }
-  });
-
-  test("skips a disabled paste-special parent item", async () => {
-    const host = document.createElement("div");
-    document.body.append(host);
-    const wrapper = mount(SheetCellContextMenu, {
-      attachTo: host,
-      global: { plugins: [createAppI18n("en-US")] },
-      props: {
-        anchor: {
-          contextElement: host,
-          getBoundingClientRect: () => new DOMRect(16, 16, 0, 0),
-        },
-        pasteSpecialDisabled: true,
-      },
-    });
-
-    try {
-      await nextTick();
-      const body = new DOMWrapper(document.body);
-      const parent = body.get<HTMLElement>('[data-cell-action="paste-special"]');
-      expect(parent.attributes("aria-disabled")).toBe("true");
-      await parent.trigger("keydown", { key: "ArrowRight" });
-      expect(body.find('ul[aria-label="Paste special"]').exists()).toBe(false);
-
-      const paste = body.get<HTMLElement>('[data-cell-action="paste"]');
-      paste.element.focus();
-      await paste.trigger("keydown", { key: "ArrowDown" });
-      expect(document.activeElement).toBe(
-        body.get<HTMLElement>('[data-cell-action="clear"]').element,
+      expect(body.get('[data-context-clipboard-action="copy"]').attributes("aria-label")).toBe(
+        "Copy",
+      );
+      expect(body.get('[data-cell-action="insert"]').attributes("aria-disabled")).toBe("true");
+      expect(body.get('[data-cell-action="format-cells"]').attributes("aria-disabled")).toBe(
+        "true",
       );
     } finally {
       wrapper.unmount();
       host.remove();
     }
   });
-
-  test("stacks the paste-special submenu below the parent menu on narrow viewports", async () => {
-    const previousWidth = window.innerWidth;
+  test("handles clipboard shortcuts while respecting read-only and cut constraints", async () => {
     const host = document.createElement("div");
     document.body.append(host);
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    const wrapper = mount(SheetCellContextMenu, {
+      attachTo: host,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { anchor: anchor(host), cutDisabledReason: "Filtered rows" },
+    });
+    try {
+      await nextTick();
+      const menu = new DOMWrapper(document.body).get('ul[role="menu"]');
+      await menu.trigger("keydown", { key: "c", ctrlKey: true });
+      await menu.trigger("keydown", { key: "x", metaKey: true });
+      await menu.trigger("keydown", { key: "v", ctrlKey: true });
+      expect(wrapper.emitted("copy")).toHaveLength(1);
+      expect(wrapper.emitted("cut")).toBeUndefined();
+      expect(wrapper.emitted("paste")).toHaveLength(1);
+      await wrapper.setProps({ readOnly: true });
+      await menu.trigger("keydown", { key: "v", metaKey: true });
+      expect(wrapper.emitted("paste")).toHaveLength(1);
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
+  });
+  test("returns from a submenu with Escape and keeps left-arrow editing inside count inputs", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
     const wrapper = mount(SheetCellContextMenu, {
       attachTo: host,
       global: { plugins: [createAppI18n("en-US")] },
       props: {
-        anchor: {
-          contextElement: host,
-          getBoundingClientRect: () => new DOMRect(300, 16, 0, 0),
-        },
+        anchor: anchor(host),
+        range: { start: { row: 2, column: 2 }, end: { row: 2, column: 2 } },
       },
     });
-
     try {
       await nextTick();
       const body = new DOMWrapper(document.body);
-      await body.get('[data-cell-action="paste-special"]').trigger("click");
+      const insert = body.get<HTMLElement>('[data-cell-action="insert"]');
+      await insert.trigger("keydown", { key: "ArrowRight" });
       await nextTick();
-      expect(body.find('[data-paste-special-layout="stacked"]').exists()).toBe(true);
-
-      Object.defineProperty(window, "innerWidth", { configurable: true, value: 800 });
-      window.dispatchEvent(new Event("resize"));
+      const submenu = body.get('ul[aria-label="Insert"]');
+      const input = submenu.get<HTMLInputElement>(
+        '[data-axis-insert-count="cell-insert-above"] input',
+      );
+      input.element.focus();
+      await input.trigger("keydown", { key: "ArrowLeft" });
+      expect(body.find('ul[aria-label="Insert"]').exists()).toBe(true);
+      await submenu.trigger("keydown", { key: "Escape" });
       await nextTick();
-      expect(body.find('[data-paste-special-layout="side"]').exists()).toBe(true);
+      expect(body.find('ul[aria-label="Insert"]').exists()).toBe(false);
+      expect(document.activeElement).toBe(insert.element);
     } finally {
       wrapper.unmount();
       host.remove();
-      Object.defineProperty(window, "innerWidth", {
-        configurable: true,
-        value: previousWidth,
-      });
+    }
+  });
+  test("allows inserting rows and columns before a selection at A1", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const wrapper = mount(SheetCellContextMenu, {
+      attachTo: host,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: {
+        anchor: anchor(host),
+        range: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+      },
+    });
+    try {
+      await nextTick();
+      const body = new DOMWrapper(document.body);
+      await body.get('[data-cell-action="insert"]').trigger("click");
+      await nextTick();
+      const submenu = body.get('ul[aria-label="Insert"]');
+      expect(
+        submenu.get('[data-row-column-action="cell-insert-above"]').attributes("aria-disabled"),
+      ).toBe("false");
+      expect(
+        submenu.get('[data-row-column-action="cell-insert-left"]').attributes("aria-disabled"),
+      ).toBe("false");
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
+  });
+  test("opens a submenu on hover without moving keyboard focus", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const wrapper = mount(SheetCellContextMenu, {
+      attachTo: host,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { anchor: anchor(host) },
+    });
+    try {
+      await nextTick();
+      const body = new DOMWrapper(document.body);
+      const insert = body.get<HTMLElement>('[data-cell-action="insert"]');
+      insert.element.focus();
+      await body.get('[data-cell-action="delete"]').trigger("mouseenter");
+      await nextTick();
+      expect(body.find('ul[aria-label="Delete"]').exists()).toBe(true);
+      expect(document.activeElement).toBe(insert.element);
+    } finally {
+      wrapper.unmount();
+      host.remove();
     }
   });
 });

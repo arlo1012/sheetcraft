@@ -24,13 +24,12 @@ describe("SheetCellContextMenu filtered selection", () => {
     try {
       await nextTick();
       const body = new DOMWrapper(document.body);
-      const menu = body.get('ul[role="menu"]');
-      const cut = menu.get<HTMLElement>('[data-cell-action="cut"]');
-      expect(cut.attributes("aria-disabled")).toBe("true");
+      const cut = body.get<HTMLElement>('[data-context-clipboard-action="cut"]');
+      expect(cut.attributes("disabled")).toBe("");
       expect(cut.attributes("title")).toBe(reason);
       expect(cut.attributes("aria-description")).toBe(reason);
 
-      await menu.trigger("keydown", { key: "x", ctrlKey: true });
+      await body.get('ul[role="menu"]').trigger("keydown", { key: "x", ctrlKey: true });
       await cut.trigger("click");
       expect(wrapper.emitted("cut")).toBeUndefined();
     } finally {

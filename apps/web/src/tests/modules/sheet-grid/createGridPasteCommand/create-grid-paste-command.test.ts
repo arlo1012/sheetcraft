@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import type { CellContentMatrix } from "@idea10/core/clipboard";
 import {
   executeWorkbookCommand,
   redoWorkbookCommand,
@@ -59,6 +60,73 @@ function filteredPlan(rows: number[], rowCount = rows.length) {
 }
 
 describe("createGridPasteCommand", () => {
+  test("clears sparse destination column tail cells represented by a whole-column copy", () => {
+    const sheet = getActiveSheet(createWorkbook({ idFactory: createSequentialIdFactory() }));
+    setCellValue(sheet, { row: 2, column: 1 }, "source");
+    setCellValue(sheet, { row: 5, column: 4 }, "destination tail");
+    setCellStyle(sheet, { row: 5, column: 4 }, { italic: true });
+    const emptyRows: CellContentMatrix = Array.from({ length: 6 }, () => [null]);
+    emptyRows[2] = [{ kind: "literal", value: "source" }];
+
+    const session = execute(sheet, {
+      kind: "all",
+      plan: {
+        anchor: { row: 0, column: 4 },
+        range: { start: { row: 0, column: 4 }, end: { row: 5, column: 4 } },
+        values: [[null], [null], ["source"], [null], [null], [null]],
+      },
+      contents: emptyRows,
+      styles: [[null], [null], [null], [null], [null], [null]],
+      sourceRange: { start: { row: 0, column: 1 }, end: { row: 5, column: 1 } },
+    });
+
+    expect(getCellContent(sheet, { row: 2, column: 4 })).toEqual({
+      kind: "literal",
+      value: "source",
+    });
+    expect(getCellContent(sheet, { row: 5, column: 4 })).toBeNull();
+    expect(getCellStyle(sheet, { row: 5, column: 4 })).toBeUndefined();
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellContent(sheet, { row: 5, column: 4 })).toEqual({
+      kind: "literal",
+      value: "destination tail",
+    });
+  });
+
+  test("moves a finite whole-column clipboard rectangle atomically and supports undo", () => {
+    const sheet = getActiveSheet(createWorkbook({ idFactory: createSequentialIdFactory() }));
+    setCellValue(sheet, { row: 2, column: 1 }, "move");
+    setCellStyle(sheet, { row: 2, column: 1 }, { bold: true });
+
+    const session = execute(sheet, {
+      kind: "all",
+      moveSource: { start: { row: 0, column: 1 }, end: { row: 2, column: 1 } },
+      plan: {
+        anchor: { row: 0, column: 4 },
+        range: { start: { row: 0, column: 4 }, end: { row: 2, column: 4 } },
+        values: [[null], [null], ["move"]],
+      },
+    });
+
+    expect(getCellContent(sheet, { row: 2, column: 1 })).toBeNull();
+    expect(getCellContent(sheet, { row: 2, column: 4 })).toEqual({
+      kind: "literal",
+      value: "move",
+    });
+    expect(getCellStyle(sheet, { row: 2, column: 4 })).toEqual({ bold: true });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellContent(sheet, { row: 2, column: 1 })).toEqual({
+      kind: "literal",
+      value: "move",
+    });
+    expect(getCellStyle(sheet, { row: 2, column: 1 })).toEqual({ bold: true });
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getCellContent(sheet, { row: 2, column: 4 })).toEqual({
+      kind: "literal",
+      value: "move",
+    });
+  });
+
   test("uses raw external TSV fields for Text-format targets while preserving ordinary values", () => {
     const sheet = getActiveSheet(createWorkbook({ idFactory: createSequentialIdFactory() }));
     const textTarget = { row: 0, column: 0 };

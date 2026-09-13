@@ -14,6 +14,8 @@ import {
   createSheetEvaluator,
   getCellStyle,
   getCellContent,
+  MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
   type CellRange,
   type Sheet,
   type SheetEvaluator,
@@ -37,8 +39,10 @@ import {
 import {
   createGridClipboardRowVisibility,
   createVisibleGridPastePlan,
+  getAxisClipboardRange,
   getVisibleClipboardRows,
   MAX_GRID_CLIPBOARD_CELLS,
+  rangeContainsHiddenClipboardRows,
   rangeIntersectsMergedCells,
   rangeTouchesHiddenClipboardRows,
 } from "./gridClipboardRows";
@@ -156,8 +160,17 @@ export function useGridClipboard(options: {
     return pending?.sheetId === options.getSheet().id ? pending.mode : null;
   });
   const cutDisabledReason = computed<GridClipboardFeedback | undefined>(() => {
-    if (getSelectionMode(options.getSelection()) !== "cells") return "axisCopyUnsupported";
-    const range = getSelectionRange(options.getSelection());
+    const selection = options.getSelection();
+    const mode = getSelectionMode(selection);
+    if (mode === "all") return "axisCopyUnsupported";
+    const range =
+      mode === "cells"
+        ? getSelectionRange(selection)
+        : getAxisClipboardRange(options.getSheet(), mode, getSelectionRange(selection));
+    if (!range) return "rangeTooLarge";
+    if (mode !== "cells" && rangeTouchesHiddenClipboardRows(rowVisibility.value, range)) {
+      return "filteredCutUnsupported";
+    }
     const rows = getVisibleClipboardRows(rowVisibility.value, range);
     if (!rows) return "rangeTooLarge";
     if (!rows.length) return "noVisibleCells";
@@ -179,13 +192,30 @@ export function useGridClipboard(options: {
       return undefined;
     }
 
-    if (getSelectionMode(options.getSelection()) !== "cells") {
+    const selection = options.getSelection();
+    const selectionMode = getSelectionMode(selection);
+    if (selectionMode === "all") {
       options.onFeedback("axisCopyUnsupported");
       return undefined;
     }
 
-    const range = getSelectionRange(options.getSelection());
     const sheet = options.getSheet();
+    const range =
+      selectionMode === "cells"
+        ? getSelectionRange(selection)
+        : getAxisClipboardRange(sheet, selectionMode, getSelectionRange(selection));
+    if (!range) {
+      options.onFeedback("rangeTooLarge");
+      return undefined;
+    }
+    if (selectionMode !== "cells" && rangeContainsHiddenClipboardRows(rowVisibility.value, range)) {
+      options.onFeedback("filteredCutUnsupported");
+      return undefined;
+    }
+    if (mode === "cut" && rangeTouchesHiddenClipboardRows(rowVisibility.value, range)) {
+      options.onFeedback("filteredCutUnsupported");
+      return undefined;
+    }
     const rows = getVisibleClipboardRows(rowVisibility.value, range);
     if (!rows || rows.length === 0) {
       options.onFeedback(rows ? "noVisibleCells" : "rangeTooLarge");
@@ -196,10 +226,6 @@ export function useGridClipboard(options: {
       return undefined;
     }
     const compressed = rows.length !== range.end.row - range.start.row + 1;
-    if (mode === "cut" && rangeTouchesHiddenClipboardRows(rowVisibility.value, range)) {
-      options.onFeedback("filteredCutUnsupported");
-      return undefined;
-    }
     const contents: CellContentMatrix = [];
     const values: CellValueMatrix = [];
     const styles: CellStyleMatrix = [];
@@ -316,7 +342,7 @@ export function useGridClipboard(options: {
     if (options.isEditing() || options.isComposing()) {
       return false;
     }
-    if (getSelectionMode(options.getSelection()) !== "cells") {
+    if (getSelectionMode(options.getSelection()) === "all") {
       options.onFeedback("axisPasteUnsupported");
       return false;
     }
@@ -330,6 +356,116 @@ export function useGridClipboard(options: {
       focus: { ...selection.focus },
       mode: selection.mode,
     };
+  }
+
+  function getAxisPasteTarget(
+    selection: CellSelection,
+    size: { rowCount: number; columnCount: number },
+    isLocalCut: boolean,
+  ): { range: CellRange; active: { row: number; column: number } } | null {
+    const selected = getSelectionRange(selection);
+    const mode = getSelectionMode(selection);
+    if (mode === "cells") return { range: selected, active: selection.active };
+    if (mode === "all") return null;
+
+    if (mode === "rows") {
+      const selectedCount = selected.end.row - selected.start.row + 1;
+      const rowCount = isLocalCut || selectedCount === 1 ? size.rowCount : selectedCount;
+      if (
+        (!isLocalCut && selectedCount > 1 && selectedCount % size.rowCount !== 0) ||
+        rowCount * size.columnCount > MAX_GRID_CLIPBOARD_CELLS ||
+        selected.start.row + rowCount > MAX_SHEET_ROWS ||
+        size.columnCount > MAX_SHEET_COLUMNS
+      ) {
+        return null;
+      }
+      const range: CellRange = {
+        start: { row: selected.start.row, column: 0 },
+        end: { row: selected.start.row + rowCount - 1, column: size.columnCount - 1 },
+      };
+      for (const key of options.getSheet().cells.keys()) {
+        const separator = key.indexOf(":");
+        const row = Number(key.slice(0, separator));
+        const column = Number(key.slice(separator + 1));
+        if (row >= range.start.row && row <= range.end.row)
+          range.end.column = Math.max(range.end.column, column);
+      }
+      if (
+        range.end.column >= MAX_SHEET_COLUMNS ||
+        rowCount * (range.end.column - range.start.column + 1) > MAX_GRID_CLIPBOARD_CELLS
+      ) {
+        return null;
+      }
+      return {
+        range,
+        active: { row: selected.start.row, column: 0 },
+      };
+    }
+
+    const selectedCount = selected.end.column - selected.start.column + 1;
+    const columnCount = isLocalCut || selectedCount === 1 ? size.columnCount : selectedCount;
+    if (
+      (!isLocalCut && selectedCount > 1 && selectedCount % size.columnCount !== 0) ||
+      size.rowCount * columnCount > MAX_GRID_CLIPBOARD_CELLS ||
+      size.rowCount > MAX_SHEET_ROWS ||
+      selected.start.column + columnCount > MAX_SHEET_COLUMNS
+    ) {
+      return null;
+    }
+    const range: CellRange = {
+      start: { row: 0, column: selected.start.column },
+      end: { row: size.rowCount - 1, column: selected.start.column + columnCount - 1 },
+    };
+    for (const key of options.getSheet().cells.keys()) {
+      const separator = key.indexOf(":");
+      const row = Number(key.slice(0, separator));
+      const column = Number(key.slice(separator + 1));
+      if (column >= range.start.column && column <= range.end.column)
+        range.end.row = Math.max(range.end.row, row);
+    }
+    if (
+      range.end.row >= MAX_SHEET_ROWS ||
+      (range.end.row - range.start.row + 1) * columnCount > MAX_GRID_CLIPBOARD_CELLS
+    ) {
+      return null;
+    }
+    return {
+      range,
+      active: { row: 0, column: selected.start.column },
+    };
+  }
+
+  function extendAxisMatrix<Value>(
+    matrix: readonly (readonly Value[])[],
+    axis: "rows" | "columns",
+    target: CellRange,
+    empty: Value,
+  ): Value[][] {
+    if (axis === "rows") {
+      const width = target.end.column + 1;
+      return matrix.map((row) => [
+        ...row,
+        ...Array.from({ length: width - row.length }, () => empty),
+      ]);
+    }
+    const width = matrix[0]?.length ?? 0;
+    const height = target.end.row + 1;
+    return [
+      ...matrix.map((row) => [...row]),
+      ...Array.from({ length: height - matrix.length }, () =>
+        Array.from({ length: width }, () => empty),
+      ),
+    ];
+  }
+
+  function extendAxisRange(
+    source: CellRange,
+    axis: "rows" | "columns",
+    target: CellRange,
+  ): CellRange {
+    return axis === "rows"
+      ? { start: { ...source.start }, end: { row: source.end.row, column: target.end.column } }
+      : { start: { ...source.start }, end: { row: target.end.row, column: source.end.column } };
   }
 
   function pasteTransfer(
@@ -378,7 +514,40 @@ export function useGridClipboard(options: {
       options.onFeedback("rangeTooLarge");
       return;
     }
-    const targetRange = getSelectionRange(selection);
+    const target = getAxisPasteTarget(selection, size, isLocalCut);
+    if (!target) {
+      options.onFeedback("rangeMismatch");
+      return;
+    }
+    const targetRange = target.range;
+    const selectionMode = getSelectionMode(selection);
+    const axis =
+      selectionMode === "rows" || selectionMode === "columns" ? selectionMode : undefined;
+    const plannedValues = axis ? extendAxisMatrix(values, axis, targetRange, null) : values;
+    const plannedRawTextValues = rawTextValues
+      ? axis
+        ? extendAxisMatrix(rawTextValues, axis, targetRange, "")
+        : rawTextValues
+      : undefined;
+    const plannedContents =
+      axis && isMatchingLocalClipboard && pending
+        ? extendAxisMatrix(pending.contents, axis, targetRange, null)
+        : pending?.contents;
+    const plannedStyles =
+      axis && isMatchingLocalClipboard && pending
+        ? extendAxisMatrix(pending.styles, axis, targetRange, null)
+        : pending?.styles;
+    const plannedSourceRange =
+      axis && isMatchingLocalClipboard && pending
+        ? extendAxisRange(pending.range, axis, targetRange)
+        : pending?.range;
+    if (
+      getSelectionMode(selection) !== "cells" &&
+      rangeContainsHiddenClipboardRows(rowVisibility.value, targetRange)
+    ) {
+      options.onFeedback("filteredCutUnsupported");
+      return;
+    }
     if (!isLocalCut) {
       const targetRows = getVisibleClipboardRows(rowVisibility.value, targetRange);
       if (!targetRows || targetRows.length === 0) {
@@ -387,9 +556,9 @@ export function useGridClipboard(options: {
       }
     }
     const plan = createVisibleGridPastePlan(
-      values,
+      plannedValues,
       targetRange,
-      selection.active,
+      target.active,
       rowVisibility.value,
       { pasteFromActiveCell: isLocalCut },
     );
@@ -401,12 +570,12 @@ export function useGridClipboard(options: {
       options.onFeedback("mergedRangeUnsupported");
       return;
     }
-    const targetRawTextValues = rawTextValues
-      ? tileCellMatrix(rawTextValues, getCellMatrixSize(plan.values))
+    const targetRawTextValues = plannedRawTextValues
+      ? tileCellMatrix(plannedRawTextValues, getCellMatrixSize(plan.values))
       : undefined;
     if (isLocalCut && pending) {
       if (
-        rangeTouchesHiddenClipboardRows(rowVisibility.value, pending.range) ||
+        rangeTouchesHiddenClipboardRows(rowVisibility.value, plannedSourceRange ?? pending.range) ||
         rangeTouchesHiddenClipboardRows(rowVisibility.value, plan.range)
       ) {
         options.onFeedback("filteredCutUnsupported");
@@ -419,7 +588,10 @@ export function useGridClipboard(options: {
       payload = {
         kind,
         plan,
-        styles: tileCellMatrix(matchingFormatSource.styles, getCellMatrixSize(plan.values)),
+        styles: tileCellMatrix(
+          plannedStyles ?? matchingFormatSource.styles,
+          getCellMatrixSize(plan.values),
+        ),
       };
     } else if (kind === "values") {
       payload = {
@@ -429,19 +601,19 @@ export function useGridClipboard(options: {
       };
     } else {
       if (isLocalCut && pending) {
-        payload = { kind: "all", plan, moveSource: pending.range };
+        payload = { kind: "all", plan, moveSource: plannedSourceRange ?? pending.range };
       } else {
         payload = {
           kind: "all",
           plan,
-          contents: isMatchingLocalClipboard && pending ? pending.contents : undefined,
-          sourceRange: isMatchingLocalClipboard && pending ? pending.range : undefined,
+          contents: isMatchingLocalClipboard && pending ? plannedContents : undefined,
+          sourceRange: isMatchingLocalClipboard && pending ? plannedSourceRange : undefined,
           ...(isMatchingLocalClipboard && pending?.sourceRows
             ? { sourceRows: pending.sourceRows }
             : {}),
           styles:
             isMatchingLocalClipboard && pending
-              ? tileCellMatrix(pending.styles, getCellMatrixSize(plan.values))
+              ? tileCellMatrix(plannedStyles ?? pending.styles, getCellMatrixSize(plan.values))
               : undefined,
           ...(targetRawTextValues ? { rawTextValues: targetRawTextValues } : {}),
         };
