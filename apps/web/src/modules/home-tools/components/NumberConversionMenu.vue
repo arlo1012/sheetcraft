@@ -32,19 +32,16 @@ function convert(mode: CellValueConversionMode): void {
   <div class="number-conversion-menu">
     <RibbonMenuButton
       ref="buttonRef"
-      variant="tall"
       :label="t('ribbon.convertDataType')"
       :text="t('ribbon.convert')"
       :disabled="disabled"
       :expanded="open"
       :menu-id="menuId"
       data-ribbon-action="convert-number"
-      data-ribbon-layout="tall"
-      data-ribbon-span="2"
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
     >
-      <ArrowRightLeft :size="17" aria-hidden="true" />
+      <ArrowRightLeft :size="15" aria-hidden="true" />
     </RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface

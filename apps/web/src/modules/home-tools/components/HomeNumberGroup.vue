@@ -58,6 +58,7 @@ function selectFormat(choice: NumberFormatPresetChoice): void {
         @select="selectFormat"
         @open-cell-format="emit('openCellFormat')"
       />
+      <NumberConversionMenu :disabled="isConversionDisabled" @convert="emit('convert', $event)" />
     </div>
     <div class="home-number-group__row" data-ribbon-row="2">
       <RibbonButton
@@ -93,9 +94,6 @@ function selectFormat(choice: NumberFormatPresetChoice): void {
         <MoveRight :size="15" aria-hidden="true" />
       </RibbonButton>
     </div>
-    <div class="home-number-group__conversion">
-      <NumberConversionMenu :disabled="isConversionDisabled" @convert="emit('convert', $event)" />
-    </div>
     <RibbonDialogLauncher
       :label="`${t('cellFormat.title')} · ${t('cellFormat.number')}`"
       :disabled="disabled"
@@ -109,27 +107,11 @@ function selectFormat(choice: NumberFormatPresetChoice): void {
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
 
 .home-number-group {
-  @include ribbon.shell;
-
-  display: grid;
-  grid-template-columns: auto max-content;
-  grid-template-rows: repeat(2, var(--ribbon-control-height, 26px));
-  align-content: center;
-  column-gap: 4px;
-  row-gap: 1px;
+  @include ribbon.compact;
   @include ribbon.dialog-launcher-anchor;
 
   &__row {
     @include ribbon.row;
-
-    grid-column: 1;
-  }
-
-  &__conversion {
-    display: flex;
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    align-items: center;
   }
 }
 </style>
