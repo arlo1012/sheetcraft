@@ -17,6 +17,8 @@ import {
 import { useImageAssetUrls } from "../modules/image-assets/useImageAssetUrls";
 import { useSheetImageActions } from "../modules/sheet-images/useSheetImageActions";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
+import RowColumnOperationsMenu from "../modules/sheet-grid/components/RowColumnOperationsMenu.vue";
+import WorksheetOperationsMenu from "../modules/workbook/components/WorksheetOperationsMenu.vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
 import SheetHorizontalScrollbar from "../modules/sheet-grid/components/SheetHorizontalScrollbar.vue";
 import type { SheetHorizontalScrollState } from "../modules/sheet-grid/horizontal-scroll";
@@ -394,6 +396,32 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @undo="undo"
       @redo="redo"
     >
+      <template #row-column-tools>
+        <RowColumnOperationsMenu
+          :sheet="activeSheet"
+          :range="activeSelectionRange"
+          :edit-session-id="cellEditSession.id"
+          :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
+          @resize="cellEditSession.finish() && resizeDimension($event)"
+          @insert="cellEditSession.finish() && insertAxis($event)"
+          @delete="cellEditSession.finish() && deleteAxis($event)"
+          @clear="cellEditSession.finish() && clearCells($event)"
+        />
+      </template>
+      <template #worksheet-tools>
+        <WorksheetOperationsMenu
+          :sheets="sheets"
+          :active-sheet-id="activeSheet.id"
+          :disabled="loading || fileBusy || xlsxBusy"
+          @add="cellEditSession.finish() && addSheet()"
+          @duplicate="cellEditSession.finish() && duplicateSheet($event)"
+          @rename="cellEditSession.finish() && renameSheet($event)"
+          @move="cellEditSession.finish() && moveSheet($event)"
+          @delete="cellEditSession.finish() && deleteSheet($event)"
+          @update-properties="changeSheetProperties"
+          @restore="cellEditSession.finish() && restoreSheet($event)"
+        />
+      </template>
       <template #file-actions>
         <WorkbookFileActions
           :status="saveStatus"

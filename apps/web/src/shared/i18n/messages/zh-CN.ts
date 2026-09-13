@@ -72,6 +72,9 @@ export const zhCN = {
     unavailableFeature: "{feature}，暂未开放",
   },
   ribbon: {
+    rowColumnTools: "行和列",
+    worksheetTools: "工作表",
+    structureTools: "行列和工作表操作",
     label: "工作簿工具",
     categories: "功能区分类",
     home: "开始",

@@ -77,6 +77,9 @@ export const enUS = {
     unavailableFeature: "{feature}, not available yet",
   },
   ribbon: {
+    rowColumnTools: "Rows and columns",
+    worksheetTools: "Worksheet",
+    structureTools: "Row, column, and worksheet operations",
     label: "Workbook tools",
     categories: "Ribbon categories",
     home: "Home",

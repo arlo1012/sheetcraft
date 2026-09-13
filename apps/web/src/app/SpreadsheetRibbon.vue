@@ -80,7 +80,11 @@ function onCategoryKeydown(event: KeyboardEvent): void {
   void nextTick(() => (activeCategory.value === "home" ? homeTab : formulaTab).value?.focus());
 }
 
-defineSlots<{ "file-actions"?: () => unknown }>();
+defineSlots<{
+  "file-actions"?: () => unknown;
+  "row-column-tools"?: () => unknown;
+  "worksheet-tools"?: () => unknown;
+}>();
 </script>
 
 <template>
@@ -164,7 +168,14 @@ defineSlots<{ "file-actions"?: () => unknown }>();
         @undo="emit('undo')"
         @redo="emit('redo')"
         @toggle-protection="emit('toggleProtection')"
-      />
+      >
+        <template v-if="$slots['row-column-tools']" #row-column-tools>
+          <slot name="row-column-tools" />
+        </template>
+        <template v-if="$slots['worksheet-tools']" #worksheet-tools>
+          <slot name="worksheet-tools" />
+        </template>
+      </HomeFormatToolbar>
       <FormulaToolbar
         v-else
         :disabled="formulaDisabled ?? disabled"

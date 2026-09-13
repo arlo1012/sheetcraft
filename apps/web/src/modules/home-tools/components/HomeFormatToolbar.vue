@@ -34,6 +34,8 @@ const props = defineProps<{
   mergeState?: MergeCellsState;
 }>();
 
+defineSlots<{ "row-column-tools"?: () => unknown; "worksheet-tools"?: () => unknown }>();
+
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
   applyBorders: [action: CellBorderAction];
@@ -295,6 +297,20 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           @adjust-decimals="emit('adjustDecimals', $event)"
           @open-cell-format="emit('openCellFormat', 'number')"
         />
+        <section
+          v-if="$slots['row-column-tools'] || $slots['worksheet-tools']"
+          class="home-format-toolbar__structure"
+          data-ribbon-group="structure"
+          role="group"
+          :aria-label="t('ribbon.structureTools')"
+        >
+          <div class="home-format-toolbar__structure-row" data-ribbon-row="1">
+            <slot name="row-column-tools" />
+          </div>
+          <div class="home-format-toolbar__structure-row" data-ribbon-row="2">
+            <slot name="worksheet-tools" />
+          </div>
+        </section>
         <HomeStylesGroup />
         <HomeDataGroup
           :edit-session-id="editSessionId"
@@ -317,12 +333,21 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/ribbon/ribbon-layout" as ribbon;
 .home-format-toolbar {
   position: relative;
   min-width: 0;
   height: 68px;
   overflow: hidden;
   background: var(--idea-surface-panel);
+
+  &__structure {
+    @include ribbon.compact;
+  }
+
+  &__structure-row {
+    @include ribbon.row;
+  }
 
   &__viewport {
     width: 100%;

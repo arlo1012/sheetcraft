@@ -65,6 +65,9 @@ export type MessageSchema = FormulaToolsMessageSchema & {
     unavailableFeature: string;
   };
   ribbon: {
+    rowColumnTools: string;
+    worksheetTools: string;
+    structureTools: string;
     label: string;
     categories: string;
     home: string;
