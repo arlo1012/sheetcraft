@@ -255,6 +255,57 @@ describe("spreadsheet workspace controller", () => {
     expect(controller.dataToolState.value).not.toBe(initialDataToolState);
   });
 
+  test.each([false, true])(
+    "shows the initial cell format while applying changes to the whole selection (reverse: %s)",
+    (reverse) => {
+      const controller = mountController();
+      const sheet = controller.activeSheet.value;
+      const topLeft = { row: 0, column: 0 };
+      const bottomRight = { row: 1, column: 1 };
+      setCellStyle(sheet, topLeft, {
+        fontFamily: "Arial",
+        fontSize: 10,
+        bold: true,
+        numberFormat: { kind: "text" },
+      });
+      setCellStyle(sheet, bottomRight, {
+        fontFamily: "Cambria",
+        fontSize: 18,
+        numberFormat: { kind: "percent", fractionDigits: 2 },
+      });
+      const first = reverse ? bottomRight : topLeft;
+      controller.updateActiveSheetViewState(
+        createSheetGridViewState({
+          selection: {
+            active: first,
+            anchor: first,
+            focus: reverse ? topLeft : bottomRight,
+            mode: "cells",
+          },
+        }),
+      );
+
+      expect(controller.activeSelectionStyle.value).toMatchObject({
+        fontFamily: { value: reverse ? "Cambria" : "Arial", mixed: false },
+        fontSize: { value: reverse ? 18 : 10, mixed: false },
+        bold: reverse ? "off" : "on",
+        numberFormat: { value: getCellStyle(sheet, first)?.numberFormat, mixed: false },
+      });
+      expect(controller.captureCellFormatSelection()?.state.fontSize.mixed).toBe(true);
+
+      controller.applyCellStyle({ fontSize: 22 });
+      for (const row of [0, 1]) {
+        for (const column of [0, 1]) {
+          expect(getCellStyle(sheet, { row, column })?.fontSize).toBe(22);
+        }
+      }
+      expect(getCellStyle(sheet, { row: 2, column: 2 })).toBeUndefined();
+      expect(controller.activeSelectionStyle.value.fontSize.value).toBe(22);
+      controller.undo();
+      expect(controller.activeSelectionStyle.value.fontSize.value).toBe(reverse ? 18 : 10);
+    },
+  );
+
   test("freezes toolbar aggregates only during a drag and keeps the command range live", () => {
     const controller = mountController();
     const sheet = controller.activeSheet.value;

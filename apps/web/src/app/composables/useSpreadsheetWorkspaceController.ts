@@ -73,7 +73,6 @@ import { findCellByText, type SheetSearchDirection } from "@idea10/core/search";
 import { getSelectionSummary } from "@idea10/core/selection-summary";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import {
-  createDefaultSelectionCellStyleState,
   getSelectionCellStyleState,
   getSelectionBorderState,
   isCellStyleRangeSupported,
@@ -234,11 +233,10 @@ export function useSpreadsheetWorkspaceController(
   const isFormattingSupported = computed(() =>
     isCellStyleRangeSupported(activeSelectionRange.value),
   );
-  const activeSelectionStyle = computed(() =>
-    isCellStyleRangeSupported(toolbarSelection.value.range)
-      ? getSelectionCellStyleState(activeSheet.value, toolbarSelection.value.range)
-      : createDefaultSelectionCellStyleState(),
-  );
+  const activeSelectionStyle = computed(() => {
+    const address = toolbarSelection.value.activeAddress;
+    return getSelectionCellStyleState(activeSheet.value, { start: address, end: address });
+  });
   const activeSelectionSummary = computed(() =>
     getSelectionSummary(
       activeSheet.value,
