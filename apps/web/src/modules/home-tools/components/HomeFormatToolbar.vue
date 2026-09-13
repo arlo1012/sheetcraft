@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import type { CellMergeMode } from "@idea10/core/commands";
+import type { CellMergeMode, CellValueConversionMode } from "@idea10/core/commands";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import type { CellFormatTab } from "../../cell-format/components/CellFormatDialog.vue";
@@ -40,6 +40,7 @@ const emit = defineEmits<{
   updateBorderFormat: [patch: CellBorderFormatPatch];
   openCellFormat: [tab: CellFormatTab];
   adjustDecimals: [delta: -1 | 1];
+  convertNumberType: [mode: CellValueConversionMode];
   adjustIndent: [delta: -1 | 1];
   activateFormatPainter: [];
   autoSum: [];
@@ -288,6 +289,8 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
         <HomeNumberGroup
           :state="state"
           :disabled="disabled"
+          :conversion-disabled="readOnly"
+          @convert="emit('convertNumberType', $event)"
           @apply-style="emit('applyStyle', $event)"
           @adjust-decimals="emit('adjustDecimals', $event)"
           @open-cell-format="emit('openCellFormat', 'number')"

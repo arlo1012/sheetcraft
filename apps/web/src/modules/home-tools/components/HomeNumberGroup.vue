@@ -1,18 +1,28 @@
 <script setup lang="ts">
 import { DollarSign, MoveLeft, MoveRight, Percent } from "lucide-vue-next";
 import { computed } from "vue";
+import type { CellValueConversionMode } from "@idea10/core/commands";
 import type { CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonDialogLauncher from "../../../shared/ribbon/RibbonDialogLauncher.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import NumberFormatMenu from "./NumberFormatMenu.vue";
+import NumberConversionMenu from "./NumberConversionMenu.vue";
+import { createNumberFormatPreset, type NumberFormatPresetChoice } from "../number-format-presets";
 
-type NumberFormatShortcut = "number" | "percent" | "currency";
-const props = defineProps<{ state: SelectionCellStyleState; disabled: boolean }>();
+const props = withDefaults(
+  defineProps<{
+    state: SelectionCellStyleState;
+    disabled: boolean;
+    conversionDisabled?: boolean;
+  }>(),
+  { conversionDisabled: undefined },
+);
 const emit = defineEmits<{
   applyStyle: [patch: CellStylePatch];
   adjustDecimals: [delta: -1 | 1];
+  convert: [mode: CellValueConversionMode];
   openCellFormat: [];
 }>();
 const { locale, t } = useAppI18n();
@@ -22,29 +32,13 @@ const canAdjustDecimals = computed(() => {
   return !kind || ["number", "percent", "currency", "accounting", "scientific"].includes(kind);
 });
 
-function defaultCurrency(): "CNY" | "USD" {
-  return locale.value === "zh-CN" ? "CNY" : "USD";
-}
+const isConversionDisabled = computed(() => props.conversionDisabled ?? props.disabled);
 
-function selectedCurrency(): string {
-  return currentFormat.value?.kind === "currency"
-    ? currentFormat.value.currency
-    : defaultCurrency();
-}
-
-function formatPatch(choice: NumberFormatShortcut): CellStylePatch {
-  if (choice === "number") {
-    return { numberFormat: { kind: "number", fractionDigits: 2 } };
-  }
-  if (choice === "percent") {
-    return { numberFormat: { kind: "percent", fractionDigits: 0 } };
-  }
-  return { numberFormat: { kind: "currency", currency: selectedCurrency(), fractionDigits: 2 } };
-}
-
-function selectFormat(choice: "general" | NumberFormatShortcut): void {
+function selectFormat(choice: NumberFormatPresetChoice): void {
   if (props.disabled) return;
-  emit("applyStyle", choice === "general" ? { numberFormat: null } : formatPatch(choice));
+  emit("applyStyle", {
+    numberFormat: createNumberFormatPreset(choice, props.state.numberFormat, locale.value) ?? null,
+  });
 }
 </script>
 
@@ -54,11 +48,16 @@ function selectFormat(choice: "general" | NumberFormatShortcut): void {
     data-ribbon-group="number"
     role="group"
     :aria-label="t('ribbon.numberTools')"
-    :aria-disabled="disabled"
-    :title="disabled ? t('format.selectionTooLarge') : undefined"
+    :aria-disabled="disabled && isConversionDisabled"
+    :title="disabled && isConversionDisabled ? t('format.selectionTooLarge') : undefined"
   >
     <div class="home-number-group__row" data-ribbon-row="1">
-      <NumberFormatMenu :state="state.numberFormat" :disabled="disabled" @select="selectFormat" />
+      <NumberFormatMenu
+        :state="state.numberFormat"
+        :disabled="disabled"
+        @select="selectFormat"
+        @open-cell-format="emit('openCellFormat')"
+      />
     </div>
     <div class="home-number-group__row" data-ribbon-row="2">
       <RibbonButton
@@ -94,6 +93,9 @@ function selectFormat(choice: "general" | NumberFormatShortcut): void {
         <MoveRight :size="15" aria-hidden="true" />
       </RibbonButton>
     </div>
+    <div class="home-number-group__conversion">
+      <NumberConversionMenu :disabled="isConversionDisabled" @convert="emit('convert', $event)" />
+    </div>
     <RibbonDialogLauncher
       :label="`${t('cellFormat.title')} · ${t('cellFormat.number')}`"
       :disabled="disabled"
@@ -107,11 +109,27 @@ function selectFormat(choice: "general" | NumberFormatShortcut): void {
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
 
 .home-number-group {
-  @include ribbon.compact;
+  @include ribbon.shell;
+
+  display: grid;
+  grid-template-columns: auto max-content;
+  grid-template-rows: repeat(2, var(--ribbon-control-height, 26px));
+  align-content: center;
+  column-gap: 4px;
+  row-gap: 1px;
   @include ribbon.dialog-launcher-anchor;
 
   &__row {
     @include ribbon.row;
+
+    grid-column: 1;
+  }
+
+  &__conversion {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-items: center;
   }
 }
 </style>

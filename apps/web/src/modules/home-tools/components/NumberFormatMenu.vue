@@ -1,27 +1,33 @@
 <script setup lang="ts">
 import { Check, Hash } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
-import type { CellNumberFormat } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import { useRibbonMenu } from "../../../shared/ribbon/useRibbonMenu";
+import {
+  NUMBER_FORMAT_PRESET_CHOICES,
+  isNumberFormatPresetSelected,
+  type NumberFormatPresetChoice,
+} from "../number-format-presets";
 
-type NumberFormatChoice = "general" | CellNumberFormat["kind"];
 const props = defineProps<{
   state: SelectionCellStyleState["numberFormat"];
   disabled: boolean;
 }>();
-const emit = defineEmits<{ select: [choice: "general" | "number" | "percent" | "currency"] }>();
-const { t } = useAppI18n();
+const emit = defineEmits<{
+  select: [choice: NumberFormatPresetChoice];
+  openCellFormat: [];
+}>();
+const { locale, t } = useAppI18n();
 const buttonRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const triggerRef = computed(() => buttonRef.value?.rootElement ?? null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `number-format-menu-${useId().replaceAll(":", "")}`;
-const currentChoice = computed<NumberFormatChoice>(() => props.state.value?.kind ?? "general");
-const currentFormatLabel = computed(() => formatLabel(currentChoice.value));
+const currentFormatLabel = computed(() => currentLabel());
 const triggerLabel = computed(() =>
   props.state.mixed
     ? t("format.numberFormatMixed")
@@ -33,27 +39,44 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useRibbo
   disabled: computed(() => props.disabled),
 });
 
-function formatLabel(choice: NumberFormatChoice): string {
+function formatLabel(choice: NumberFormatPresetChoice): string {
   if (choice === "general") return t("ribbon.generalFormat");
-  if (choice === "number") return t("ribbon.numberFormat");
-  if (choice === "percent") return t("ribbon.percentFormat");
+  if (choice === "number") return t("cellFormat.numeric");
   if (choice === "currency") return t("ribbon.currencyFormat");
-  if (choice === "accounting") return t("cellFormat.accounting");
-  if (choice === "date") return t("cellFormat.date");
-  if (choice === "time") return t("cellFormat.time");
-  if (choice === "fraction") return t("cellFormat.fraction");
-  if (choice === "scientific") return t("cellFormat.scientific");
-  if (choice === "text") return t("cellFormat.text");
-  if (choice === "special") return t("cellFormat.special");
-  return t("cellFormat.custom");
+  if (choice === "accounting") return t("ribbon.accountingFormat");
+  if (choice === "shortDate") return t("ribbon.shortDateFormat");
+  if (choice === "longDate") return t("ribbon.longDateFormat");
+  if (choice === "time") return t("ribbon.timeFormat");
+  if (choice === "percent") return t("ribbon.percentFormat");
+  if (choice === "fraction") return t("ribbon.fractionFormat");
+  if (choice === "scientific") return t("ribbon.scientificFormat");
+  return t("ribbon.textFormat");
 }
 
-function isSelected(choice: NumberFormatChoice): boolean {
-  return !props.state.mixed && currentChoice.value === choice;
+function currentLabel(): string {
+  if (!props.state.value) return formatLabel("general");
+  const currentChoice = NUMBER_FORMAT_PRESET_CHOICES.find((choice) =>
+    isNumberFormatPresetSelected(choice, props.state, locale.value),
+  );
+  if (currentChoice) return formatLabel(currentChoice);
+  if (props.state.value.kind === "date") return t("cellFormat.date");
+  if (props.state.value.kind === "custom") return t("cellFormat.custom");
+  if (props.state.value.kind === "special") return t("cellFormat.special");
+  return formatLabel(props.state.value.kind);
 }
-function select(choice: "general" | "number" | "percent" | "currency"): void {
+
+function isSelected(choice: NumberFormatPresetChoice): boolean {
+  return isNumberFormatPresetSelected(choice, props.state, locale.value);
+}
+
+function select(choice: NumberFormatPresetChoice): void {
   emit("select", choice);
   dismiss();
+}
+
+function openCellFormat(): void {
+  dismiss("programmatic", false);
+  emit("openCellFormat");
 }
 </script>
 
@@ -84,7 +107,7 @@ function select(choice: "general" | "number" | "percent" | "currency"): void {
         :label="t('ribbon.numberFormat')"
       >
         <MenuItem
-          v-for="choice in ['general', 'number', 'percent', 'currency'] as const"
+          v-for="choice in NUMBER_FORMAT_PRESET_CHOICES"
           :key="choice"
           :data-number-format-option="choice"
           :aria-checked="isSelected(choice)"
@@ -95,6 +118,10 @@ function select(choice: "general" | "number" | "percent" | "currency"): void {
           <template #icon>
             <Check v-if="isSelected(choice)" :size="15" aria-hidden="true" />
           </template>
+        </MenuItem>
+        <MenuSeparator />
+        <MenuItem data-number-format-more @select="openCellFormat">
+          {{ t("ribbon.moreNumberFormats") }}
         </MenuItem>
       </MenuSurface>
     </Teleport>
@@ -108,6 +135,7 @@ function select(choice: "general" | "number" | "percent" | "currency"): void {
   &__surface {
     z-index: 80;
     min-width: 150px;
+    max-height: min(480px, calc(100vh - var(--idea-space-4) - var(--idea-space-4)));
   }
 }
 </style>

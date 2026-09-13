@@ -2,7 +2,7 @@
 import { nextTick, ref, useId } from "vue";
 import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
 import FormulaToolbar from "../modules/formula-tools/components/FormulaToolbar.vue";
-import type { CellMergeMode } from "@idea10/core/commands";
+import type { CellMergeMode, CellValueConversionMode } from "@idea10/core/commands";
 import type { DefinedNameLabelPosition } from "@idea10/core/commands";
 import type { WorkbookCalculationSettings } from "@idea10/core/workbook";
 import type { CellFormatTab } from "../modules/cell-format/components/CellFormatDialog.vue";
@@ -36,6 +36,7 @@ const emit = defineEmits<{
   openCellFormat: [tab: CellFormatTab];
   applyStyle: [patch: CellStylePatch];
   adjustDecimals: [delta: -1 | 1];
+  convertNumberType: [mode: CellValueConversionMode];
   adjustIndent: [delta: -1 | 1];
   activateFormatPainter: [];
   autoSum: [];
@@ -148,6 +149,7 @@ defineSlots<{ "file-actions"?: () => unknown }>();
         @open-cell-format="emit('openCellFormat', $event)"
         @apply-style="emit('applyStyle', $event)"
         @adjust-decimals="emit('adjustDecimals', $event)"
+        @convert-number-type="emit('convertNumberType', $event)"
         @adjust-indent="emit('adjustIndent', $event)"
         @activate-format-painter="emit('activateFormatPainter')"
         @auto-sum="emit('autoSum')"

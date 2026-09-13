@@ -135,6 +135,18 @@ export type MessageSchema = FormulaToolsMessageSchema & {
     textOrientation: string;
     strikethrough: string;
     currencyFormat: string;
+    accountingFormat: string;
+    shortDateFormat: string;
+    longDateFormat: string;
+    timeFormat: string;
+    fractionFormat: string;
+    scientificFormat: string;
+    textFormat: string;
+    moreNumberFormats: string;
+    convert: string;
+    convertDataType: string;
+    textToNumber: string;
+    numberToText: string;
     decreaseDecimal: string;
     increaseDecimal: string;
     generateIcon: string;
@@ -161,6 +173,9 @@ export type MessageSchema = FormulaToolsMessageSchema & {
     sortUnavailable: string;
     freezeUnavailable: string;
     mergeUnavailable: string;
+    conversionUnavailable: string;
+    conversionNoMatch: string;
+    conversionCompleted: string;
     found: string;
     renameFailed: string;
     sheetNameEmpty: string;

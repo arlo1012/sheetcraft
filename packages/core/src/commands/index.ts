@@ -1,4 +1,5 @@
 export * from "./apply.js";
+export * from "./cell-value-conversion.js";
 export * from "./contracts.js";
 export * from "./dimensions.js";
 export * from "./formatting.js";

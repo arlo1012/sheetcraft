@@ -1,7 +1,7 @@
 import { formatCellNumberValue, getNumberFormatLocaleId } from "@idea10/core/number-format";
 import type { CellNumberFormat } from "@idea10/core/style";
 import type { MessageKey } from "../../../shared/i18n";
-import { getDateFormatPresets } from "./date-presets";
+import { getDateFormatPresets } from "../../../shared/number-format/date-presets";
 
 export type NumberFormatCategory = "general" | CellNumberFormat["kind"];
 export type NumberFormatPreset = Readonly<{

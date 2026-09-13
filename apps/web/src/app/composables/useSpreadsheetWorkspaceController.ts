@@ -15,6 +15,7 @@ import {
   createApplyCellFormatCommand,
   createApplyCellStyleCommand,
   createClearCellRangeCommand,
+  createConvertCellValueTypeCommand,
   createClearSheetFilterCommand,
   createDeleteSheetAxisCommand,
   createDeleteSheetCommand,
@@ -41,6 +42,7 @@ import {
   type SortDirection,
   type CellFormatChange,
   type CellMergeMode,
+  type CellValueConversionMode,
   type WorkbookCommand,
   type WorkbookOperation,
 } from "@idea10/core/commands";
@@ -773,6 +775,29 @@ export function useSpreadsheetWorkspaceController(
     clearWorkspaceStatus();
   }
 
+  function convertNumberType(mode: CellValueConversionMode): void {
+    if (activeSheet.value.properties.protected || !flushPendingGridEdit()) return;
+    try {
+      const command = createConvertCellValueTypeCommand(
+        activeSheet.value,
+        activeSelectionRange.value,
+        mode,
+      );
+      if (command.changes.length === 0) {
+        showWorkspaceStatus({ key: "workspace.conversionNoMatch" });
+        return;
+      }
+      if (execute(command, "cells.edit")) {
+        showWorkspaceStatus({
+          key: "workspace.conversionCompleted",
+          params: { count: command.changes.length },
+        });
+      }
+    } catch {
+      showWorkspaceStatus({ key: "workspace.conversionUnavailable" });
+    }
+  }
+
   function applyCellBorders(action: CellBorderAction): void {
     if (!isFormattingSupported.value) {
       showWorkspaceStatus({ key: "format.selectionTooLarge" });
@@ -1314,6 +1339,7 @@ export function useSpreadsheetWorkspaceController(
     mergeSelection,
     unmergeSelection,
     applyCellStyle,
+    convertNumberType,
     applyCellBorders,
     captureCellFormatSelection,
     applyCellFormat,

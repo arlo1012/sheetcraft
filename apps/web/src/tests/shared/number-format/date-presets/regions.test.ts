@@ -3,7 +3,7 @@ import { validateCellNumberFormatCode } from "@idea10/core/number-format";
 import {
   getDateFormatPresets,
   supportsDateFormatLocale,
-} from "../../../../modules/cell-format/number-format/date-presets";
+} from "../../../../shared/number-format/date-presets";
 
 describe("date format presets", () => {
   test("uses the selected locale's order and LCID for date formats", () => {

@@ -37,8 +37,8 @@ describe("HomeNumberGroup", () => {
 
     await wrapper.get("[data-number-format-trigger]").trigger("click");
     const menu = new DOMWrapper(document.body).get('ul[aria-label="Number format"]');
-    expect(menu.findAll("[data-number-format-option]")).toHaveLength(4);
-    expect(menu.findAll('[role="menuitemradio"]')).toHaveLength(4);
+    expect(menu.findAll("[data-number-format-option]")).toHaveLength(11);
+    expect(menu.findAll('[role="menuitemradio"]')).toHaveLength(11);
     expect(menu.get('[data-number-format-option="general"]').attributes("aria-checked")).toBe(
       "true",
     );
@@ -55,10 +55,10 @@ describe("HomeNumberGroup", () => {
     trigger.element.focus();
 
     await trigger.trigger("keydown", { key: "ArrowUp" });
-    const options = new DOMWrapper(document.body).findAll<HTMLElement>('[role="menuitemradio"]');
-    expect(document.activeElement).toBe(options.at(-1)?.element);
+    const more = new DOMWrapper(document.body).get<HTMLElement>("[data-number-format-more]");
+    expect(document.activeElement).toBe(more.element);
 
-    await options.at(-1)?.trigger("keydown", { key: "Escape" });
+    await more.trigger("keydown", { key: "Escape" });
     expect(document.activeElement).toBe(trigger.element);
   });
 
@@ -125,5 +125,29 @@ describe("HomeNumberGroup", () => {
     expect(
       new DOMWrapper(document.body).find('[data-number-format-option="general"]').exists(),
     ).toBe(true);
+  });
+  test("forwards conversion and more-format actions, keeping conversion enabled for large selections", async () => {
+    const wrapper = mountNumberGroup();
+    await wrapper.get("[data-number-format-trigger]").trigger("click");
+    await new DOMWrapper(document.body).get("[data-number-format-more]").trigger("click");
+    expect(wrapper.emitted("openCellFormat")).toEqual([[]]);
+
+    await wrapper.setProps({ disabled: true, conversionDisabled: false });
+    expect(wrapper.get("[data-number-format-trigger]").attributes("disabled")).toBeDefined();
+    const trigger = wrapper.get<HTMLElement>('[data-ribbon-action="convert-number"]');
+    expect(trigger.attributes("disabled")).toBeUndefined();
+    await trigger.trigger("keydown", { key: "ArrowUp" });
+    const last = new DOMWrapper(document.body).get<HTMLElement>(
+      '[data-number-conversion="number-to-text"]',
+    );
+    expect(document.activeElement).toBe(last.element);
+    await last.trigger("click");
+    expect(wrapper.emitted("convert")).toEqual([["number-to-text"]]);
+    expect(document.activeElement).toBe(trigger.element);
+
+    await trigger.trigger("click");
+    await wrapper.setProps({ conversionDisabled: true });
+    expect(document.body.querySelector("[data-number-conversion]")).toBeNull();
+    expect(trigger.attributes("disabled")).toBeDefined();
   });
 });

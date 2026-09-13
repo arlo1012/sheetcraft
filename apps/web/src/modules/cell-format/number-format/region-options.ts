@@ -1,5 +1,5 @@
 import { NUMBER_FORMAT_LOCALES } from "@idea10/core/number-format";
-import { supportsDateFormatLocale } from "./date-presets";
+import { supportsDateFormatLocale } from "../../../shared/number-format/date-presets";
 
 export type NumberFormatRegionOption = Readonly<{ value: string; label: string }>;
 

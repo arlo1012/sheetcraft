@@ -1,5 +1,5 @@
 import { getNumberFormatLocaleCurrency, toCellNumberFormatCode } from "@idea10/core/number-format";
-import { getDateFormatPresets } from "./date-presets";
+import { getDateFormatPresets } from "../../../shared/number-format/date-presets";
 
 /**
  * Returns the built-in starting points shown by the Custom category.

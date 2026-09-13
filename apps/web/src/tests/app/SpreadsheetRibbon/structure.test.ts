@@ -23,14 +23,16 @@ function mountRibbon(
 }
 
 describe("SpreadsheetRibbon", () => {
-  test("exposes only the implemented Home category and its concrete tools", async () => {
+  test("exposes implemented categories and concrete Home tools", async () => {
     const wrapper = mountRibbon();
 
     expect(wrapper.get("header").attributes("aria-label")).toBe("Workbook tools");
     expect(wrapper.get("nav").attributes("aria-label")).toBe("Ribbon categories");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("Home");
-    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(1);
-    expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-label")).toBe("Home tools");
+    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(2);
+    expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-labelledby")).toBe(
+      wrapper.get('[data-ribbon-category="home"]').attributes("id"),
+    );
     expect(wrapper.get(".home-format-toolbar").attributes("aria-label")).toBe("Cell formatting");
     expect(
       wrapper.get(
@@ -96,6 +98,20 @@ describe("SpreadsheetRibbon", () => {
 
     await new DOMWrapper(document.body).get('[data-border-menu-row="settings"]').trigger("click");
     expect(wrapper.emitted("openCellFormat")).toEqual([["border"]]);
+  });
+
+  test("forwards number conversion for large selections and blocks it in read-only mode", async () => {
+    const wrapper = mountRibbon();
+    await wrapper.setProps({ disabled: true, readOnly: false });
+    const convert = wrapper.get('[data-ribbon-action="convert-number"]');
+    expect(convert.attributes("disabled")).toBeUndefined();
+    await convert.trigger("click");
+    await new DOMWrapper(document.body)
+      .get('[data-number-conversion="text-to-number"]')
+      .trigger("click");
+    expect(wrapper.emitted("convertNumberType")).toEqual([["text-to-number"]]);
+    await wrapper.setProps({ readOnly: true });
+    expect(convert.attributes("disabled")).toBe("");
   });
 
   test("keeps concrete history actions and unavailable placeholders in the ribbon", async () => {
@@ -193,7 +209,9 @@ describe("SpreadsheetRibbon", () => {
 
     expect(wrapper.get("header").attributes("aria-label")).toBe("工作簿工具");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("开始");
-    expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-label")).toBe("开始工具");
+    expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-labelledby")).toBe(
+      wrapper.get('[data-ribbon-category="home"]').attributes("id"),
+    );
     expect(wrapper.get('[data-ribbon-action="clear-formatting"]').attributes("aria-label")).toBe(
       "清除格式",
     );

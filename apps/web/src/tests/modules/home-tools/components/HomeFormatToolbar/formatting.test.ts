@@ -79,6 +79,7 @@ describe("HomeFormatToolbar", () => {
   test("keeps history and unprotect available while protecting all data tools", async () => {
     const wrapper = mountToolbar(createStyleState(), true);
     await wrapper.setProps({ readOnly: true });
+    expect(wrapper.get('[data-ribbon-action="convert-number"]').attributes("disabled")).toBe("");
     expect(wrapper.get('[data-ribbon-action="auto-sum"]').attributes("disabled")).toBe("");
     const protection = wrapper.get('[data-ribbon-action="protect"]');
     expect(protection.attributes("aria-label")).toBe("Unprotect");
@@ -291,7 +292,11 @@ describe("HomeFormatToolbar", () => {
     for (const control of wrapper.findAll(
       '[data-ribbon-group]:not([data-ribbon-group="history"]) button, input',
     )) {
-      if (["auto-sum", "protect"].includes(control.attributes("data-ribbon-action") ?? ""))
+      if (
+        ["auto-sum", "protect", "convert-number"].includes(
+          control.attributes("data-ribbon-action") ?? "",
+        )
+      )
         continue;
       expect((control.element as HTMLButtonElement | HTMLInputElement).disabled).toBe(true);
     }

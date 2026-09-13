@@ -107,6 +107,7 @@ const {
   mergeSelection,
   unmergeSelection,
   applyCellStyle,
+  convertNumberType,
   applyCellBorders,
   captureCellFormatSelection,
   applyCellFormat,
@@ -371,6 +372,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @update-border-format="updateBorderFormat"
       @open-cell-format="openCellFormat"
       @apply-style="applyCellStyle"
+      @convert-number-type="convertNumberType"
       @adjust-decimals="adjustNumberFormatDecimals"
       @adjust-indent="adjustIndent"
       @activate-format-painter="activateFormatPainter"
