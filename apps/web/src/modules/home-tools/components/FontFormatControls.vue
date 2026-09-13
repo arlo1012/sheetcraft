@@ -11,7 +11,7 @@ import {
 } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
-import RibbonDropdownArrow from "./RibbonDropdownArrow.vue";
+import RibbonDropdownArrow from "../../../shared/ribbon/RibbonDropdownArrow.vue";
 import {
   CELL_FONT_FAMILY_PRESETS,
   CELL_FONT_SIZE_PRESETS,
@@ -152,13 +152,13 @@ function setFontSize(value: SelectValue): void {
   flex: 0 0 auto;
   gap: var(--cell-format-gap, 4px);
   align-items: stretch;
-  height: var(--cell-format-control-height, 26px);
+  height: var(--ribbon-control-height, 26px);
 
   &__field {
     display: inline-flex;
     flex: 0 0 auto;
     min-width: 0;
-    height: var(--cell-format-control-height, 26px);
+    height: var(--ribbon-control-height, 26px);
     overflow: hidden;
     border-radius: 2px;
 
@@ -167,7 +167,7 @@ function setFontSize(value: SelectValue): void {
     }
 
     &--size {
-      width: var(--ribbon-compact-action-width, 40px);
+      width: var(--cell-format-font-size-width, 40px);
     }
   }
 

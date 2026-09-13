@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { ArrowDownRight } from "lucide-vue-next";
 
 const props = withDefaults(
@@ -9,9 +10,9 @@ const props = withDefaults(
   { disabled: false },
 );
 
-const emit = defineEmits<{
-  activate: [];
-}>();
+const emit = defineEmits<{ activate: [] }>();
+const rootElement = ref<HTMLButtonElement | null>(null);
+defineExpose({ rootElement });
 
 function activate(): void {
   if (!props.disabled) emit("activate");
@@ -20,6 +21,7 @@ function activate(): void {
 
 <template>
   <button
+    ref="rootElement"
     class="ribbon-dialog-launcher"
     type="button"
     :disabled="disabled"
@@ -32,6 +34,8 @@ function activate(): void {
 </template>
 
 <style scoped lang="scss">
+@use "./ribbon-actions" as ribbon;
+
 .ribbon-dialog-launcher {
   display: inline-flex;
   align-items: center;
@@ -47,17 +51,14 @@ function activate(): void {
   cursor: pointer;
   outline: none;
 
+  @include ribbon.focus-ring;
+
   > svg {
     pointer-events: none;
   }
 
   &:hover:not(:disabled) {
     background: var(--idea-icon-button-hover-bg);
-  }
-
-  &:focus-visible {
-    border-color: var(--idea-action-primary);
-    box-shadow: 0 0 0 2px var(--idea-action-focus);
   }
 
   &:disabled {

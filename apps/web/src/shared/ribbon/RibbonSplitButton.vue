@@ -13,6 +13,7 @@ const props = withDefaults(
     menuId?: string;
     popupRole?: "menu" | "dialog";
     variant?: "compact" | "tall";
+    fullWidth?: boolean;
   }>(),
   {
     text: undefined,
@@ -22,8 +23,10 @@ const props = withDefaults(
     menuId: undefined,
     popupRole: "menu",
     variant: "compact",
+    fullWidth: false,
   },
 );
+
 const emit = defineEmits<{
   activate: [];
   toggleMenu: [];
@@ -46,17 +49,18 @@ function toggleMenu(): void {
 <template>
   <div
     ref="rootElement"
-    class="ribbon-split-action"
+    class="ribbon-split-button ribbon-split-action"
     :class="{
       'has-text': text,
       'is-expanded': expanded,
       'is-disabled': disabled && menuDisabled,
       'is-tall': variant === 'tall',
+      'is-full-width': fullWidth,
     }"
   >
     <button
       ref="mainElement"
-      class="ribbon-split-action__main"
+      class="ribbon-split-button__main ribbon-split-action__main"
       type="button"
       data-ribbon-split-main
       :disabled="disabled"
@@ -64,12 +68,19 @@ function toggleMenu(): void {
       :title="label"
       @click="activate"
     >
-      <span class="ribbon-split-action__icon" aria-hidden="true"><slot /></span>
-      <span v-if="text" class="ribbon-split-action__text" aria-hidden="true">{{ text }}</span>
+      <span class="ribbon-split-button__icon ribbon-split-action__icon" aria-hidden="true"
+        ><slot
+      /></span>
+      <span
+        v-if="text"
+        class="ribbon-split-button__text ribbon-split-action__text"
+        aria-hidden="true"
+        >{{ text }}</span
+      >
     </button>
     <button
       ref="menuElement"
-      class="ribbon-split-action__menu"
+      class="ribbon-split-button__menu ribbon-split-action__menu"
       type="button"
       data-ribbon-split-menu
       :disabled="menuDisabled"
@@ -87,12 +98,14 @@ function toggleMenu(): void {
 </template>
 
 <style scoped lang="scss">
-.ribbon-split-action {
+@use "./ribbon-actions" as ribbon;
+
+.ribbon-split-button {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: stretch;
-  width: var(--ribbon-compact-action-width, 40px);
-  height: var(--cell-format-control-height, 26px);
+  width: var(--ribbon-split-button-width, 40px);
+  height: var(--ribbon-control-height, 26px);
   padding: 1px;
   border-radius: var(--idea-radius-default);
 
@@ -100,7 +113,7 @@ function toggleMenu(): void {
   &.is-expanded {
     background: color-mix(in srgb, var(--idea-icon-button-hover-bg) 50%, transparent);
 
-    .ribbon-split-action__menu {
+    .ribbon-split-button__menu {
       background: var(--idea-icon-button-hover-bg);
     }
   }
@@ -108,7 +121,7 @@ function toggleMenu(): void {
   &:has(> button:focus-visible) {
     background: color-mix(in srgb, var(--idea-action-primary-subtle) 50%, transparent);
 
-    .ribbon-split-action__menu {
+    .ribbon-split-button__menu {
       background: var(--idea-action-primary-subtle);
     }
   }
@@ -118,19 +131,28 @@ function toggleMenu(): void {
     min-width: 40px;
   }
 
+  &.is-full-width {
+    width: 100%;
+  }
+
   &.is-tall {
     align-self: stretch;
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 58px);
     height: 54px;
 
-    .ribbon-split-action__main {
+    &.is-full-width {
+      width: 100%;
+    }
+
+    .ribbon-split-button__main {
       flex-direction: column;
+      justify-content: center;
       gap: 3px;
       padding: 1px 2px;
     }
 
-    .ribbon-split-action__menu {
+    .ribbon-split-button__menu {
       align-items: flex-end;
       padding-bottom: 5px;
     }
@@ -146,24 +168,25 @@ function toggleMenu(): void {
     padding: 0;
     appearance: none;
     background: transparent;
-    border: 0;
+    border: 1px solid transparent;
     color: var(--idea-text-primary);
     cursor: pointer;
     font: inherit;
     outline: none;
 
+    @include ribbon.focus-ring;
+
     &:disabled {
       color: var(--idea-text-secondary);
       cursor: default;
-      opacity: 0.45;
     }
   }
 
   &__main {
     flex: 1 1 auto;
-    justify-content: var(--ribbon-labeled-action-justify, center);
+    justify-content: var(--ribbon-labeled-action-justify, flex-start);
     gap: 2px;
-    padding: 0 var(--ribbon-labeled-action-padding, 2px);
+    padding: 0 3px;
   }
 
   &__menu {
@@ -172,16 +195,11 @@ function toggleMenu(): void {
   }
 
   &__icon {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
+    @include ribbon.icon-slot;
   }
 
   &__text {
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
-    white-space: nowrap;
+    @include ribbon.action-text;
   }
 }
 </style>

@@ -60,3 +60,23 @@ Use four typography levels for Web interface text. Sizes are CSS pixels at
   shared TDesign adapter, not feature-level `.t-*` overrides.
 - Icon-button hover feedback uses `--idea-icon-button-hover-bg` across ribbon
   and status-bar controls. Keep the icon's foreground color stable on hover.
+
+## Ribbon controls
+
+- Reuse the controls in `apps/web/src/shared/ribbon` across toolbar modules:
+  `RibbonButton` for actions and pressed states, `RibbonMenuButton` for a single
+  popup trigger, and `RibbonSplitButton` for an action with a separate popup
+  trigger. Compact and tall layouts are presentation variants of these controls.
+- Controls own their icon, text, arrow, focus, and disabled presentation. Groups
+  own spacing and column widths through their own DOM containers. Use
+  `fullWidth` when a control fills a layout slot; do not position a nested tool
+  by forwarding a parent's scoped class through multiple component roots.
+- Keep a tool's trigger and teleported popup under one local root when the tool
+  participates in group layout. Forward trigger attributes deliberately so
+  keyboard and accessibility attributes remain on the interactive element.
+- Use `useRibbonMenu` with the existing `MenuSurface` for list-menu opening,
+  keyboard entry, dismissal, and focus restoration. Form panels and cascading
+  submenus retain their own focus rules and domain-specific state.
+- Keep each business tool concrete and compose it explicitly in Vue templates.
+  Font selectors continue to use TDesign's public Select API and the shared
+  adapter styles.

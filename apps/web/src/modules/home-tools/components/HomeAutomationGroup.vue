@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import {
   AppWindow,
   FileImage,
@@ -8,7 +9,7 @@ import {
   WandSparkles,
 } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
-import RibbonIconAction from "./RibbonIconAction.vue";
+import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 
 const { t } = useAppI18n();
 </script>
@@ -20,19 +21,18 @@ const { t } = useAppI18n();
     role="group"
     :aria-label="t('ribbon.automationTools')"
   >
-    <RibbonIconAction
+    <RibbonMenuButton
       variant="tall"
       :label="t('app.unavailableFeature', { feature: t('ribbon.quickTools') })"
       :text="t('ribbon.quickTools')"
       disabled
-      disclosure
       data-ribbon-layout="tall"
       data-ribbon-placeholder="quick-tools"
       data-ribbon-span="2"
     >
       <WandSparkles :size="17" aria-hidden="true" />
-    </RibbonIconAction>
-    <RibbonIconAction
+    </RibbonMenuButton>
+    <RibbonButton
       variant="tall"
       :label="t('app.unavailableFeature', { feature: t('ribbon.generateIcon') })"
       :text="t('ribbon.generateIcon')"
@@ -42,9 +42,9 @@ const { t } = useAppI18n();
       data-ribbon-span="2"
     >
       <Shapes :size="17" aria-hidden="true" />
-    </RibbonIconAction>
+    </RibbonButton>
     <div class="home-automation-group__stack" data-ribbon-stack="smart-table-pdf">
-      <RibbonIconAction
+      <RibbonButton
         :label="t('app.unavailableFeature', { feature: t('ribbon.smartTable') })"
         :text="t('ribbon.smartTable')"
         disabled
@@ -52,8 +52,8 @@ const { t } = useAppI18n();
         data-ribbon-row="1"
       >
         <TableProperties :size="15" aria-hidden="true" />
-      </RibbonIconAction>
-      <RibbonIconAction
+      </RibbonButton>
+      <RibbonButton
         :label="t('app.unavailableFeature', { feature: t('ribbon.pdfToEditable') })"
         :text="t('ribbon.pdfToEditable')"
         disabled
@@ -61,10 +61,10 @@ const { t } = useAppI18n();
         data-ribbon-row="2"
       >
         <FilePenLine :size="15" aria-hidden="true" />
-      </RibbonIconAction>
+      </RibbonButton>
     </div>
     <div class="home-automation-group__stack" data-ribbon-stack="app-generator-pdf">
-      <RibbonIconAction
+      <RibbonButton
         :label="t('app.unavailableFeature', { feature: t('ribbon.appGenerator') })"
         :text="t('ribbon.appGenerator')"
         disabled
@@ -72,8 +72,8 @@ const { t } = useAppI18n();
         data-ribbon-row="1"
       >
         <AppWindow :size="15" aria-hidden="true" />
-      </RibbonIconAction>
-      <RibbonIconAction
+      </RibbonButton>
+      <RibbonButton
         :label="t('app.unavailableFeature', { feature: t('ribbon.pdfToImage') })"
         :text="t('ribbon.pdfToImage')"
         disabled
@@ -81,13 +81,13 @@ const { t } = useAppI18n();
         data-ribbon-row="2"
       >
         <FileImage :size="15" aria-hidden="true" />
-      </RibbonIconAction>
+      </RibbonButton>
     </div>
   </section>
 </template>
 
 <style scoped lang="scss">
-@use "../styles/ribbon-groups" as ribbon;
+@use "../../../shared/ribbon/ribbon-layout" as ribbon;
 
 .home-automation-group {
   @include ribbon.columns;

@@ -53,7 +53,7 @@ describe("ImageInsertMenu", () => {
 
     expect(trigger.attributes("aria-label")).toBe("插入图片");
     expect((trigger.element as HTMLButtonElement).disabled).toBe(true);
-    expect(trigger.find(".ribbon-icon-action__disclosure").exists()).toBe(true);
+    expect(trigger.find(".ribbon-menu-button__arrow").exists()).toBe(true);
     await trigger.trigger("click");
     expect(document.body.querySelector('[role="menu"]')).toBeNull();
   });

@@ -5,7 +5,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import CellColorControl from "./CellColorControl.vue";
 import CellBorderMenu from "./CellBorderMenu.vue";
 import FontFormatControls from "./FontFormatControls.vue";
-import RibbonDialogLauncher from "./RibbonDialogLauncher.vue";
+import RibbonDialogLauncher from "../../../shared/ribbon/RibbonDialogLauncher.vue";
 import TextFormatControls from "./TextFormatControls.vue";
 
 defineProps<{
@@ -77,16 +77,16 @@ const { t } = useAppI18n();
 </template>
 
 <style scoped lang="scss">
-@use "../styles/ribbon-groups" as ribbon;
+@use "../../../shared/ribbon/ribbon-layout" as ribbon;
 
 .home-cell-format-group {
   @include ribbon.compact;
   @include ribbon.dialog-launcher-anchor;
 
   --cell-format-font-width: 126px;
-  --ribbon-compact-action-width: 40px;
+  --cell-format-font-size-width: 40px;
   --cell-format-gap: 4px;
-  --cell-format-control-height: 26px;
+  --ribbon-control-height: 26px;
 
   &__row {
     @include ribbon.row;

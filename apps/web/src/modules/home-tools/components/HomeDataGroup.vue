@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import { Database, LockKeyhole, Sigma } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import type { FilterValueKey, HomeDataToolState } from "./data-tool-state";
 import FilterValueMenu from "./FilterValueMenu.vue";
 import FreezeMenu from "./FreezeMenu.vue";
-import RibbonIconAction from "./RibbonIconAction.vue";
+import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import SortMenu from "./SortMenu.vue";
 
 defineProps<{ state: HomeDataToolState; readOnly?: boolean; editSessionId?: string }>();
@@ -57,7 +58,7 @@ const emit = defineEmits<{
     </div>
 
     <div class="home-data-group__stack" data-ribbon-stack="sum-data">
-      <RibbonIconAction
+      <RibbonButton
         :label="t('ribbon.autoSum')"
         :text="t('ribbon.autoSum')"
         data-ribbon-action="auto-sum"
@@ -67,20 +68,19 @@ const emit = defineEmits<{
         @activate="emit('autoSum')"
       >
         <Sigma :size="15" aria-hidden="true" />
-      </RibbonIconAction>
-      <RibbonIconAction
+      </RibbonButton>
+      <RibbonMenuButton
         :label="t('app.unavailableFeature', { feature: t('ribbon.data') })"
         :text="t('ribbon.data')"
         disabled
-        disclosure
         data-ribbon-placeholder="data"
         data-ribbon-row="2"
       >
         <Database :size="15" aria-hidden="true" />
-      </RibbonIconAction>
+      </RibbonMenuButton>
     </div>
 
-    <RibbonIconAction
+    <RibbonButton
       variant="tall"
       :label="readOnly ? t('sheetTabs.unprotectAction') : t('sheetTabs.protectAction')"
       :text="readOnly ? t('sheetTabs.unprotectAction') : t('ribbon.protect')"
@@ -91,12 +91,12 @@ const emit = defineEmits<{
       @activate="emit('toggleProtection')"
     >
       <LockKeyhole :size="17" aria-hidden="true" />
-    </RibbonIconAction>
+    </RibbonButton>
   </section>
 </template>
 
 <style scoped lang="scss">
-@use "../styles/ribbon-groups" as ribbon;
+@use "../../../shared/ribbon/ribbon-layout" as ribbon;
 
 .home-data-group {
   @include ribbon.columns;

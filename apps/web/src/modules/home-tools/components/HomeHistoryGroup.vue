@@ -2,7 +2,7 @@
 import { Eraser, Paintbrush, Redo2, Undo2 } from "lucide-vue-next";
 import { createClearCellStylePatch, type CellStylePatch } from "@idea10/core/style";
 import { useAppI18n } from "../../../shared/i18n";
-import RibbonIconAction from "./RibbonIconAction.vue";
+import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 
 defineProps<{
   disabled: boolean;
@@ -27,23 +27,15 @@ const { t } = useAppI18n();
     :aria-label="t('ribbon.historyTools')"
   >
     <div class="home-history-group__row" data-ribbon-row="1">
-      <RibbonIconAction
-        :label="t('ribbon.undo')"
-        data-ribbon-action="undo"
-        @activate="emit('undo')"
-      >
+      <RibbonButton :label="t('ribbon.undo')" data-ribbon-action="undo" @activate="emit('undo')">
         <Undo2 :size="16" aria-hidden="true" />
-      </RibbonIconAction>
-      <RibbonIconAction
-        :label="t('ribbon.redo')"
-        data-ribbon-action="redo"
-        @activate="emit('redo')"
-      >
+      </RibbonButton>
+      <RibbonButton :label="t('ribbon.redo')" data-ribbon-action="redo" @activate="emit('redo')">
         <Redo2 :size="16" aria-hidden="true" />
-      </RibbonIconAction>
+      </RibbonButton>
     </div>
     <div class="home-history-group__row" data-ribbon-row="2">
-      <RibbonIconAction
+      <RibbonButton
         :label="t('ribbon.formatPainter')"
         :disabled="disabled"
         :pressed="formatPainterActive"
@@ -51,21 +43,21 @@ const { t } = useAppI18n();
         @activate="emit('activateFormatPainter')"
       >
         <Paintbrush :size="15" aria-hidden="true" />
-      </RibbonIconAction>
-      <RibbonIconAction
+      </RibbonButton>
+      <RibbonButton
         :label="t('ribbon.clearFormatting')"
         :disabled="disabled"
         data-ribbon-action="clear-formatting"
         @activate="emit('applyStyle', createClearCellStylePatch())"
       >
         <Eraser :size="15" aria-hidden="true" />
-      </RibbonIconAction>
+      </RibbonButton>
     </div>
   </section>
 </template>
 
 <style scoped lang="scss">
-@use "../styles/ribbon-groups" as ribbon;
+@use "../../../shared/ribbon/ribbon-layout" as ribbon;
 
 .home-history-group {
   @include ribbon.compact;

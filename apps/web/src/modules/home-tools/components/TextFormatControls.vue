@@ -3,7 +3,7 @@ import { Bold, Italic, Strikethrough, Underline } from "lucide-vue-next";
 import type { CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState, ToggleStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
-import RibbonIconAction from "./RibbonIconAction.vue";
+import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -30,7 +30,7 @@ function toggle(
 
 <template>
   <div class="text-format-controls" role="group" :aria-label="t('format.emphasis')">
-    <RibbonIconAction
+    <RibbonButton
       class="text-format-controls__button"
       :disabled="disabled"
       :label="t('format.bold')"
@@ -38,8 +38,8 @@ function toggle(
       @activate="toggle('bold', state.bold)"
     >
       <Bold :size="17" :stroke-width="2.2" aria-hidden="true" />
-    </RibbonIconAction>
-    <RibbonIconAction
+    </RibbonButton>
+    <RibbonButton
       class="text-format-controls__button"
       :disabled="disabled"
       :label="t('format.italic')"
@@ -47,8 +47,8 @@ function toggle(
       @activate="toggle('italic', state.italic)"
     >
       <Italic :size="17" :stroke-width="2.2" aria-hidden="true" />
-    </RibbonIconAction>
-    <RibbonIconAction
+    </RibbonButton>
+    <RibbonButton
       class="text-format-controls__button"
       :disabled="disabled"
       :label="t('format.underline')"
@@ -56,8 +56,8 @@ function toggle(
       @activate="toggle('underline', state.underline)"
     >
       <Underline :size="17" :stroke-width="2.2" aria-hidden="true" />
-    </RibbonIconAction>
-    <RibbonIconAction
+    </RibbonButton>
+    <RibbonButton
       class="text-format-controls__button"
       :label="t('ribbon.strikethrough')"
       :disabled="disabled"
@@ -65,7 +65,7 @@ function toggle(
       @activate="toggle('strikethrough', state.strikethrough)"
     >
       <Strikethrough :size="15" aria-hidden="true" />
-    </RibbonIconAction>
+    </RibbonButton>
   </div>
 </template>
 
@@ -75,7 +75,7 @@ function toggle(
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: var(--cell-format-control-height, 26px);
+  height: var(--ribbon-control-height, 26px);
 
   &__button {
     position: relative;

@@ -10,23 +10,23 @@ import {
   TableCellsMerge,
   TextAlignCenter,
 } from "lucide-vue-next";
-import { computed, nextTick, ref, useId, watch } from "vue";
+import { computed, nextTick, ref, useId } from "vue";
 import type { CellMergeMode } from "@idea10/core/commands";
-import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
+import { useRibbonMenu } from "../../../shared/ribbon/useRibbonMenu";
 import type { MergeCellsState } from "./data-tool-state";
-import RibbonSplitAction from "./RibbonSplitAction.vue";
 
 defineOptions({ inheritAttrs: false });
 
 const props = defineProps<{ state: MergeCellsState; disabled: boolean }>();
 const emit = defineEmits<{ merge: [mode: CellMergeMode]; unmerge: [] }>();
 const { t } = useAppI18n();
-const splitActionRef = ref<InstanceType<typeof RibbonSplitAction> | null>(null);
+const splitActionRef = ref<InstanceType<typeof RibbonSplitButton> | null>(null);
 const triggerRef = computed(() => splitActionRef.value?.menuElement ?? null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const sameSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
@@ -35,7 +35,6 @@ const sameRef = computed<HTMLElement | null>(() => sameSurfaceRef.value?.rootEle
 const sameAnchorRef = computed<HTMLElement | null>(
   () => menuRef.value?.querySelector<HTMLElement>('[data-merge-action="same"]') ?? null,
 );
-const open = ref(false);
 const sameOpen = ref(false);
 const menuId = `merge-cells-menu-${useId().replaceAll(":", "")}`;
 const sameMenuId = `merge-cells-same-${useId().replaceAll(":", "")}`;
@@ -56,12 +55,16 @@ const menuDisabled = computed(
       !props.state.canUnmerge),
 );
 const mainDisabled = computed(() => props.disabled || !isModeAvailable("all"));
-const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, menuRef, open, {
-  offset: 4,
+const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useRibbonMenu({
+  triggerRef,
+  menuSurfaceRef,
+  disabled: menuDisabled,
   additionalInside: () => [splitActionRef.value?.rootElement, sameRef.value],
   onDismiss: () => {
     sameOpen.value = false;
-    open.value = false;
+  },
+  onOpen: () => {
+    sameOpen.value = false;
   },
 });
 const { floatingStyles: sameStyles } = useFloatingPanel(sameAnchorRef, sameRef, sameOpen, {
@@ -71,22 +74,6 @@ const { floatingStyles: sameStyles } = useFloatingPanel(sameAnchorRef, sameRef, 
 
 function closeAll(restoreFocus: boolean): void {
   dismiss("programmatic", restoreFocus);
-}
-
-function openMenu(focus: "first" | "last" = "first"): void {
-  if (menuDisabled.value) return;
-  sameOpen.value = false;
-  open.value = true;
-  void nextTick(() =>
-    focus === "last"
-      ? menuSurfaceRef.value?.focusLastItem()
-      : menuSurfaceRef.value?.focusFirstItem(),
-  );
-}
-
-function toggleMenu(): void {
-  if (open.value) closeAll(true);
-  else openMenu();
 }
 
 function openSameMenu(): void {
@@ -110,12 +97,6 @@ function unmerge(): void {
   if (props.disabled || !props.state.canUnmerge) return;
   emit("unmerge");
   closeAll(true);
-}
-
-function onTriggerKeydown(event: KeyboardEvent): void {
-  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-  event.preventDefault();
-  openMenu(event.key === "ArrowDown" ? "first" : "last");
 }
 
 function onMenuKeydown(event: KeyboardEvent): void {
@@ -143,126 +124,134 @@ function onSameMenuKeydown(event: KeyboardEvent): void {
   event.stopPropagation();
   closeSameMenu(true);
 }
-
-watch(menuDisabled, (disabled) => {
-  if (disabled) closeAll(false);
-});
 </script>
 
 <template>
-  <RibbonSplitAction
-    ref="splitActionRef"
-    v-bind="$attrs"
-    :label="t('ribbon.mergeCells')"
-    :menu-label="t('ribbon.moreOptions', { tool: t('ribbon.mergeCells') })"
-    :text="t('ribbon.merge')"
-    :disabled="mainDisabled"
-    :menu-disabled="menuDisabled"
-    :expanded="open"
-    :menu-id="menuId"
-    data-ribbon-action="merge-cells"
-    @activate="merge('all', false)"
-    @toggle-menu="toggleMenu"
-    @menu-keydown="onTriggerKeydown"
-  >
-    <TableCellsMerge :size="17" aria-hidden="true" />
-  </RibbonSplitAction>
-
-  <Teleport to="body">
-    <MenuSurface
-      v-if="open"
-      :id="menuId"
-      ref="menuSurfaceRef"
-      class="merge-cells-menu"
-      :style="floatingStyles"
+  <span v-bind="$attrs" class="ribbon-menu-tool ribbon-menu-tool--full-width">
+    <RibbonSplitButton
+      ref="splitActionRef"
       :label="t('ribbon.mergeCells')"
-      @focusin="onMenuFocusin"
-      @keydown="onMenuKeydown"
+      :menu-label="t('ribbon.moreOptions', { tool: t('ribbon.mergeCells') })"
+      :text="t('ribbon.merge')"
+      :disabled="mainDisabled"
+      :menu-disabled="menuDisabled"
+      :expanded="open"
+      :menu-id="menuId"
+      data-ribbon-action="merge-cells"
+      full-width
+      @activate="merge('all', false)"
+      @toggle-menu="toggleMenu"
+      @menu-keydown="onTriggerKeydown"
     >
-      <MenuItem
-        data-merge-action="center"
-        :disabled="!isModeAvailable('center')"
-        @select="merge('center')"
-      >
-        <template #icon><TextAlignCenter :size="15" /></template>
-        {{ t("ribbon.mergeCenter") }}
-      </MenuItem>
-      <MenuItem
-        data-merge-action="merge"
-        :disabled="!isModeAvailable('all')"
-        @select="merge('all')"
-      >
-        <template #icon><TableCellsMerge :size="15" :stroke-width="1.5" /></template>
-        {{ t("ribbon.mergeCells") }}
-      </MenuItem>
-      <MenuItem
-        data-merge-action="same"
-        aria-haspopup="menu"
-        :aria-expanded="sameOpen"
-        :aria-controls="sameOpen ? sameMenuId : undefined"
-        :disabled="!sameEnabled"
-        @select="openSameMenu"
-      >
-        <template #icon><Equal :size="15" /></template>
-        {{ t("ribbon.mergeSame") }}
-        <template #shortcut><ChevronRight :size="15" aria-hidden="true" /></template>
-      </MenuItem>
-      <MenuItem
-        data-merge-action="content"
-        :disabled="!isModeAvailable('content')"
-        @select="merge('content')"
-      >
-        <template #icon><Combine :size="15" /></template>
-        {{ t("ribbon.mergeContent") }}
-      </MenuItem>
-      <MenuItem
-        data-merge-action="across"
-        :disabled="!isModeAvailable('across')"
-        :title="t('ribbon.mergeAcrossDescription')"
-        :aria-description="t('ribbon.mergeAcrossDescription')"
-        @select="merge('across')"
-      >
-        <template #icon><Rows3 :size="15" /></template>
-        {{ t("ribbon.mergeAcross") }}
-      </MenuItem>
-      <MenuSeparator />
-      <MenuItem data-merge-action="unmerge" :disabled="!state.canUnmerge" @select="unmerge">
-        <template #icon><SplitSquareVertical :size="15" :stroke-width="1.5" /></template>
-        {{ t("ribbon.unmergeCells") }}
-      </MenuItem>
-    </MenuSurface>
+      <TableCellsMerge :size="17" aria-hidden="true" />
+    </RibbonSplitButton>
 
-    <MenuSurface
-      v-if="sameOpen"
-      :id="sameMenuId"
-      ref="sameSurfaceRef"
-      class="merge-cells-menu merge-cells-menu--same"
-      :style="sameStyles"
-      :label="t('ribbon.mergeSame')"
-      data-merge-submenu="same"
-      @keydown="onSameMenuKeydown"
-    >
-      <MenuItem
-        data-merge-action="same-columns"
-        :disabled="!isModeAvailable('same-columns')"
-        @select="merge('same-columns')"
+    <Teleport to="body">
+      <MenuSurface
+        v-if="open"
+        :id="menuId"
+        ref="menuSurfaceRef"
+        class="merge-cells-menu"
+        :style="floatingStyles"
+        :label="t('ribbon.mergeCells')"
+        @focusin="onMenuFocusin"
+        @keydown="onMenuKeydown"
       >
-        <template #icon><ArrowDown :size="15" /></template>
-        {{ t("ribbon.mergeSameColumns") }}
-      </MenuItem>
-      <MenuItem
-        data-merge-action="same-rows"
-        :disabled="!isModeAvailable('same-rows')"
-        @select="merge('same-rows')"
+        <MenuItem
+          data-merge-action="center"
+          :disabled="!isModeAvailable('center')"
+          @select="merge('center')"
+        >
+          <template #icon><TextAlignCenter :size="15" /></template>
+          {{ t("ribbon.mergeCenter") }}
+        </MenuItem>
+        <MenuItem
+          data-merge-action="merge"
+          :disabled="!isModeAvailable('all')"
+          @select="merge('all')"
+        >
+          <template #icon><TableCellsMerge :size="15" :stroke-width="1.5" /></template>
+          {{ t("ribbon.mergeCells") }}
+        </MenuItem>
+        <MenuItem
+          data-merge-action="same"
+          aria-haspopup="menu"
+          :aria-expanded="sameOpen"
+          :aria-controls="sameOpen ? sameMenuId : undefined"
+          :disabled="!sameEnabled"
+          @select="openSameMenu"
+        >
+          <template #icon><Equal :size="15" /></template>
+          {{ t("ribbon.mergeSame") }}
+          <template #shortcut><ChevronRight :size="15" aria-hidden="true" /></template>
+        </MenuItem>
+        <MenuItem
+          data-merge-action="content"
+          :disabled="!isModeAvailable('content')"
+          @select="merge('content')"
+        >
+          <template #icon><Combine :size="15" /></template>
+          {{ t("ribbon.mergeContent") }}
+        </MenuItem>
+        <MenuItem
+          data-merge-action="across"
+          :disabled="!isModeAvailable('across')"
+          :title="t('ribbon.mergeAcrossDescription')"
+          :aria-description="t('ribbon.mergeAcrossDescription')"
+          @select="merge('across')"
+        >
+          <template #icon><Rows3 :size="15" /></template>
+          {{ t("ribbon.mergeAcross") }}
+        </MenuItem>
+        <MenuSeparator />
+        <MenuItem data-merge-action="unmerge" :disabled="!state.canUnmerge" @select="unmerge">
+          <template #icon><SplitSquareVertical :size="15" :stroke-width="1.5" /></template>
+          {{ t("ribbon.unmergeCells") }}
+        </MenuItem>
+      </MenuSurface>
+
+      <MenuSurface
+        v-if="sameOpen"
+        :id="sameMenuId"
+        ref="sameSurfaceRef"
+        class="merge-cells-menu merge-cells-menu--same"
+        :style="sameStyles"
+        :label="t('ribbon.mergeSame')"
+        data-merge-submenu="same"
+        @keydown="onSameMenuKeydown"
       >
-        <template #icon><ArrowRight :size="15" /></template>
-        {{ t("ribbon.mergeSameRows") }}
-      </MenuItem>
-    </MenuSurface>
-  </Teleport>
+        <MenuItem
+          data-merge-action="same-columns"
+          :disabled="!isModeAvailable('same-columns')"
+          @select="merge('same-columns')"
+        >
+          <template #icon><ArrowDown :size="15" /></template>
+          {{ t("ribbon.mergeSameColumns") }}
+        </MenuItem>
+        <MenuItem
+          data-merge-action="same-rows"
+          :disabled="!isModeAvailable('same-rows')"
+          @select="merge('same-rows')"
+        >
+          <template #icon><ArrowRight :size="15" /></template>
+          {{ t("ribbon.mergeSameRows") }}
+        </MenuItem>
+      </MenuSurface>
+    </Teleport>
+  </span>
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/ribbon/ribbon-layout" as ribbon;
+
+.ribbon-menu-tool {
+  @include ribbon.tool;
+
+  &--full-width {
+    width: 100%;
+  }
+}
+
 .merge-cells-menu {
   position: fixed;
   z-index: 80;

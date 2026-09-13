@@ -67,7 +67,7 @@ function applyColor(color: string | null): void {
   display: inline-flex;
   align-items: center;
   width: 100%;
-  height: var(--cell-format-control-height, 26px);
+  height: var(--ribbon-control-height, 26px);
 
   &__icon {
     display: inline-flex;

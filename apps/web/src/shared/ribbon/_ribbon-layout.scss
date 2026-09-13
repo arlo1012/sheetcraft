@@ -35,7 +35,7 @@
   justify-content: flex-start;
   gap: 2px;
   min-width: 0;
-  min-height: 26px;
+  min-height: var(--ribbon-control-height, 26px);
 }
 
 @mixin columns {
@@ -44,4 +44,10 @@
   display: flex;
   align-items: center;
   gap: 2px;
+}
+
+@mixin tool {
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 0;
 }

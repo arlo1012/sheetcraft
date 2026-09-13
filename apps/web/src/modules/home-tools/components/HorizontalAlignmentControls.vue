@@ -10,7 +10,7 @@ import { computed } from "vue";
 import type { CellStylePatch, HorizontalCellAlignment } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
-import RibbonIconAction from "./RibbonIconAction.vue";
+import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -49,7 +49,7 @@ function align(alignment: HorizontalCellAlignment): void {
     role="group"
     :aria-label="groupLabel"
   >
-    <RibbonIconAction
+    <RibbonButton
       class="horizontal-alignment-controls__button"
       :disabled="disabled"
       :label="t('format.alignLeft')"
@@ -58,8 +58,8 @@ function align(alignment: HorizontalCellAlignment): void {
       @activate="align('left')"
     >
       <TextAlignStart :size="17" aria-hidden="true" />
-    </RibbonIconAction>
-    <RibbonIconAction
+    </RibbonButton>
+    <RibbonButton
       class="horizontal-alignment-controls__button"
       :disabled="disabled"
       :label="t('format.alignCenter')"
@@ -68,8 +68,8 @@ function align(alignment: HorizontalCellAlignment): void {
       @activate="align('center')"
     >
       <TextAlignCenter :size="17" aria-hidden="true" />
-    </RibbonIconAction>
-    <RibbonIconAction
+    </RibbonButton>
+    <RibbonButton
       class="horizontal-alignment-controls__button"
       :disabled="disabled"
       :label="t('format.alignRight')"
@@ -78,8 +78,8 @@ function align(alignment: HorizontalCellAlignment): void {
       @activate="align('right')"
     >
       <TextAlignEnd :size="17" aria-hidden="true" />
-    </RibbonIconAction>
-    <RibbonIconAction
+    </RibbonButton>
+    <RibbonButton
       class="horizontal-alignment-controls__button"
       :disabled="disabled"
       :label="t('cellFormat.horizontalJustify')"
@@ -88,8 +88,8 @@ function align(alignment: HorizontalCellAlignment): void {
       @activate="align('justify')"
     >
       <TextAlignJustify :size="17" :stroke-width="1.5" aria-hidden="true" />
-    </RibbonIconAction>
-    <RibbonIconAction
+    </RibbonButton>
+    <RibbonButton
       class="horizontal-alignment-controls__button"
       :disabled="disabled"
       :label="t('cellFormat.horizontalDistributed')"
@@ -98,7 +98,7 @@ function align(alignment: HorizontalCellAlignment): void {
       @activate="align('distributed')"
     >
       <AlignHorizontalSpaceBetween :size="17" :stroke-width="1.5" aria-hidden="true" />
-    </RibbonIconAction>
+    </RibbonButton>
   </div>
 </template>
 

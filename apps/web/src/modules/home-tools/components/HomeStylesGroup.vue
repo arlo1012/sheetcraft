@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import { Sparkles, TableProperties } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
-import RibbonIconAction from "./RibbonIconAction.vue";
 
 const { t } = useAppI18n();
 </script>
@@ -14,39 +14,35 @@ const { t } = useAppI18n();
     :aria-label="t('format.styleRuleTools')"
   >
     <div class="home-styles-group__row" data-ribbon-row="1">
-      <RibbonIconAction
+      <RibbonMenuButton
+        full-width
         :label="t('app.unavailableFeature', { feature: t('ribbon.tableStyles') })"
         :text="t('ribbon.tableStyles')"
         disabled
-        disclosure
         data-ribbon-placeholder="table-styles"
       >
         <TableProperties :size="15" aria-hidden="true" />
-      </RibbonIconAction>
+      </RibbonMenuButton>
     </div>
     <div class="home-styles-group__row" data-ribbon-row="2">
-      <RibbonIconAction
+      <RibbonMenuButton
+        full-width
         :label="t('app.unavailableFeature', { feature: t('ribbon.conditionalFormatting') })"
         :text="t('ribbon.conditionalFormatting')"
         disabled
-        disclosure
         data-ribbon-placeholder="conditional-formatting"
       >
         <Sparkles :size="15" aria-hidden="true" />
-      </RibbonIconAction>
+      </RibbonMenuButton>
     </div>
   </section>
 </template>
 
 <style scoped lang="scss">
-@use "../styles/ribbon-groups" as ribbon;
+@use "../../../shared/ribbon/ribbon-layout" as ribbon;
 
 .home-styles-group {
   @include ribbon.compact;
-
-  --ribbon-labeled-action-width: 100%;
-  --ribbon-labeled-action-justify: flex-start;
-  --ribbon-labeled-action-padding: 3px;
 
   &__row {
     @include ribbon.row;

@@ -3,7 +3,7 @@ import { ArrowDownToLine, ArrowUpToLine, FoldVertical } from "lucide-vue-next";
 import type { CellStylePatch, VerticalCellAlignment } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
-import RibbonIconAction from "./RibbonIconAction.vue";
+import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState["verticalAlign"];
@@ -29,7 +29,7 @@ function align(alignment: "top" | "middle" | "bottom"): void {
 
 <template>
   <div class="vertical-alignment-controls" role="group" :aria-label="t('format.verticalAlignment')">
-    <RibbonIconAction
+    <RibbonButton
       class="vertical-alignment-controls__button"
       :disabled="disabled"
       :label="t('format.alignTop')"
@@ -38,8 +38,8 @@ function align(alignment: "top" | "middle" | "bottom"): void {
       @activate="align('top')"
     >
       <ArrowUpToLine :size="17" :stroke-width="1.5" aria-hidden="true" />
-    </RibbonIconAction>
-    <RibbonIconAction
+    </RibbonButton>
+    <RibbonButton
       class="vertical-alignment-controls__button"
       :disabled="disabled"
       :label="t('format.alignMiddle')"
@@ -48,8 +48,8 @@ function align(alignment: "top" | "middle" | "bottom"): void {
       @activate="align('middle')"
     >
       <FoldVertical :size="17" :stroke-width="1.5" aria-hidden="true" />
-    </RibbonIconAction>
-    <RibbonIconAction
+    </RibbonButton>
+    <RibbonButton
       class="vertical-alignment-controls__button"
       :disabled="disabled"
       :label="t('format.alignBottom')"
@@ -58,7 +58,7 @@ function align(alignment: "top" | "middle" | "bottom"): void {
       @activate="align('bottom')"
     >
       <ArrowDownToLine :size="17" :stroke-width="1.5" aria-hidden="true" />
-    </RibbonIconAction>
+    </RibbonButton>
   </div>
 </template>
 

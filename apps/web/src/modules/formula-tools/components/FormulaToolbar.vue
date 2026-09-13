@@ -30,8 +30,9 @@ import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismiss
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
-import RibbonIconAction from "../../home-tools/components/RibbonIconAction.vue";
-import RibbonSplitAction from "../../home-tools/components/RibbonSplitAction.vue";
+import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
+import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
+import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
 import FormulaCategoryMenu from "./FormulaCategoryMenu.vue";
 import FormulaFunctionBrowser from "./FormulaFunctionBrowser.vue";
 
@@ -61,17 +62,17 @@ const emit = defineEmits<{
   interactionEnd: [];
 }>();
 const { t } = useAppI18n();
-const sumSplitRef = ref<InstanceType<typeof RibbonSplitAction> | null>(null);
+const sumSplitRef = ref<InstanceType<typeof RibbonSplitButton> | null>(null);
 const sumTriggerRef = computed(() => sumSplitRef.value?.menuElement ?? null);
 const sumPanelRef = ref<HTMLElement | null>(null);
 const sumMenuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const sumMenuOpen = ref(false);
 const browserOpen = ref(false);
-const nameQuickCreateRef = ref<InstanceType<typeof RibbonIconAction> | null>(null);
+const nameQuickCreateRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const nameTriggerRef = computed(() => nameQuickCreateRef.value?.rootElement ?? null);
 const namePanelRef = ref<HTMLElement | null>(null);
 const nameMenuOpen = ref(false);
-const calculationSplitRef = ref<InstanceType<typeof RibbonSplitAction> | null>(null);
+const calculationSplitRef = ref<InstanceType<typeof RibbonSplitButton> | null>(null);
 const calculationTriggerRef = computed(() => calculationSplitRef.value?.menuElement ?? null);
 const calculationPanelRef = ref<HTMLElement | null>(null);
 const calculationMenuOpen = ref(false);
@@ -144,9 +145,12 @@ function closeBrowser(): void {
   emit("interactionEnd");
 }
 function openNameMenu(): void {
-  if (!props.disabled && props.nameCreationEnabled) {
+  if (props.disabled || !props.nameCreationEnabled) return;
+  if (!nameMenuOpen.value) {
     namePositions.value = { top: true, left: false, bottom: false, right: false };
     nameMenuOpen.value = true;
+  } else {
+    nameMenuOpen.value = false;
   }
 }
 function createNamesFromSelection(): void {
@@ -199,7 +203,7 @@ function insertFunction(name: string): void {
         role="group"
         :aria-label="t('formulaTools.autoSum')"
       >
-        <RibbonSplitAction
+        <RibbonSplitButton
           ref="sumSplitRef"
           variant="tall"
           :label="t('formulaTools.autoSum')"
@@ -213,7 +217,7 @@ function insertFunction(name: string): void {
           @toggle-menu="toggleSumMenu"
           @menu-keydown="openSumMenuFromKeyboard"
           ><Sigma :size="19"
-        /></RibbonSplitAction>
+        /></RibbonSplitButton>
         <Teleport to="body"
           ><div
             v-if="sumMenuOpen"
@@ -350,23 +354,26 @@ function insertFunction(name: string): void {
         role="group"
         :aria-label="t('formulaTools.toolbar')"
       >
-        <RibbonIconAction
+        <RibbonButton
           variant="tall"
           :label="t('formulaTools.nameManager')"
           :text="t('formulaTools.nameManager')"
           :disabled="disabled"
           @activate="emit('openNames')"
           ><Tags :size="18"
-        /></RibbonIconAction>
-        <RibbonIconAction
+        /></RibbonButton>
+        <RibbonMenuButton
           ref="nameQuickCreateRef"
           variant="tall"
           :label="t('formulaTools.quickCreateNames')"
           :text="t('formulaTools.quickCreateNames')"
           :disabled="disabled || !nameCreationEnabled"
+          :expanded="nameMenuOpen"
+          :menu-id="nameMenuId"
+          popup-role="dialog"
           @activate="openNameMenu"
           ><Plus :size="18"
-        /></RibbonIconAction>
+        /></RibbonMenuButton>
         <Teleport to="body"
           ><section
             v-if="nameMenuOpen"
@@ -406,7 +413,7 @@ function insertFunction(name: string): void {
             </div>
           </section></Teleport
         >
-        <RibbonSplitAction
+        <RibbonSplitButton
           ref="calculationSplitRef"
           variant="tall"
           :label="t('formulaTools.recalculate')"
@@ -420,7 +427,7 @@ function insertFunction(name: string): void {
           @activate="emit('recalculate')"
           @toggle-menu="toggleCalculationMenu"
           ><Calculator :size="18"
-        /></RibbonSplitAction>
+        /></RibbonSplitButton>
         <Teleport to="body"
           ><section
             v-if="calculationMenuOpen && calculationSettings"
@@ -491,14 +498,14 @@ function insertFunction(name: string): void {
               />
             </div></section
         ></Teleport>
-        <RibbonIconAction
+        <RibbonButton
           variant="tall"
           :label="t('formulaTools.insertFunction')"
           :text="t('formulaTools.insertFunction')"
           :disabled="disabled"
           @activate="browserOpen = true"
           ><FunctionSquare :size="18"
-        /></RibbonIconAction>
+        /></RibbonButton>
       </section>
     </div>
     <FormulaFunctionBrowser

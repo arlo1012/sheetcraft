@@ -266,7 +266,7 @@ describe("HomeFormatToolbar", () => {
 
     expect(wrapper.findAll("[data-cell-color-control] [data-ribbon-split-menu]")).toHaveLength(2);
     expect(
-      wrapper.get('[data-ribbon-action="image"]').find(".ribbon-icon-action__disclosure").exists(),
+      wrapper.get('[data-ribbon-action="image"]').find(".ribbon-dropdown-arrow").exists(),
     ).toBe(true);
   });
 
@@ -370,13 +370,19 @@ describe("HomeFormatToolbar", () => {
         `[data-ribbon-group="${groupName}"] [data-ribbon-layout="tall"]`,
       );
       expect(
-        actions.map(
-          (action) =>
-            action.attributes("data-ribbon-action") ?? action.attributes("data-ribbon-placeholder"),
-        ),
+        actions.map((slot) => {
+          const action =
+            slot.attributes("data-ribbon-action") || slot.attributes("data-ribbon-placeholder")
+              ? slot
+              : slot.get("[data-ribbon-action], [data-ribbon-placeholder]");
+          return (
+            action.attributes("data-ribbon-action") ?? action.attributes("data-ribbon-placeholder")
+          );
+        }),
       ).toEqual(actionNames);
       for (const action of actions) {
-        expect(action.classes()).toContain("is-tall");
+        const button = action.element.matches("button") ? action : action.get("button");
+        expect(button.classes()).toContain("is-tall");
         expect(action.attributes("data-ribbon-span")).toBe("2");
       }
     }
@@ -391,10 +397,15 @@ describe("HomeFormatToolbar", () => {
         .get(`[data-ribbon-stack="${stackName}"]`)
         .findAll("[data-ribbon-row]");
       expect(
-        actions.map(
-          (action) =>
-            action.attributes("data-ribbon-action") ?? action.attributes("data-ribbon-placeholder"),
-        ),
+        actions.map((slot) => {
+          const action =
+            slot.attributes("data-ribbon-action") || slot.attributes("data-ribbon-placeholder")
+              ? slot
+              : slot.get("[data-ribbon-action], [data-ribbon-placeholder]");
+          return (
+            action.attributes("data-ribbon-action") ?? action.attributes("data-ribbon-placeholder")
+          );
+        }),
       ).toEqual(actionNames);
       expect(actions.map((action) => action.attributes("data-ribbon-row"))).toEqual(["1", "2"]);
     }

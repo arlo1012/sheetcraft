@@ -3,7 +3,7 @@ import { ListIndentDecrease, ListIndentIncrease } from "lucide-vue-next";
 import { MAX_CELL_INDENT, MIN_CELL_INDENT } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
-import RibbonIconAction from "./RibbonIconAction.vue";
+import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState["indent"];
@@ -27,7 +27,7 @@ function canAdjust(delta: -1 | 1): boolean {
 
 <template>
   <div class="indentation-controls" role="group" :aria-label="t('cellFormat.indent')">
-    <RibbonIconAction
+    <RibbonButton
       class="indentation-controls__button"
       :disabled="!canAdjust(-1)"
       :label="t('ribbon.decreaseIndent')"
@@ -35,8 +35,8 @@ function canAdjust(delta: -1 | 1): boolean {
       @activate="emit('adjustIndent', -1)"
     >
       <ListIndentDecrease :size="17" :stroke-width="1.5" aria-hidden="true" />
-    </RibbonIconAction>
-    <RibbonIconAction
+    </RibbonButton>
+    <RibbonButton
       class="indentation-controls__button"
       :disabled="!canAdjust(1)"
       :label="t('ribbon.increaseIndent')"
@@ -44,7 +44,7 @@ function canAdjust(delta: -1 | 1): boolean {
       @activate="emit('adjustIndent', 1)"
     >
       <ListIndentIncrease :size="17" :stroke-width="1.5" aria-hidden="true" />
-    </RibbonIconAction>
+    </RibbonButton>
   </div>
 </template>
 

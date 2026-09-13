@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Printer } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
-import RibbonIconAction from "./RibbonIconAction.vue";
+import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 
 const { t } = useAppI18n();
 </script>
@@ -13,7 +13,7 @@ const { t } = useAppI18n();
     role="group"
     :aria-label="t('ribbon.utilityTools')"
   >
-    <RibbonIconAction
+    <RibbonButton
       variant="tall"
       :label="t('app.unavailableFeature', { feature: t('ribbon.print') })"
       :text="t('ribbon.print')"
@@ -23,12 +23,12 @@ const { t } = useAppI18n();
       data-ribbon-span="2"
     >
       <Printer :size="17" aria-hidden="true" />
-    </RibbonIconAction>
+    </RibbonButton>
   </section>
 </template>
 
 <style scoped lang="scss">
-@use "../styles/ribbon-groups" as ribbon;
+@use "../../../shared/ribbon/ribbon-layout" as ribbon;
 
 .home-utility-group {
   @include ribbon.columns;

@@ -1,0 +1,60 @@
+@mixin focus-ring {
+  &:focus-visible {
+    border-color: var(--idea-action-primary);
+    box-shadow: 0 0 0 2px var(--idea-action-focus);
+  }
+}
+
+@mixin action-button($width) {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: $width;
+  height: var(--ribbon-control-height, 26px);
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: var(--idea-text-primary);
+  cursor: pointer;
+  font: inherit;
+  outline: none;
+
+  @include focus-ring;
+
+  &:hover:not(:disabled),
+  &.is-expanded {
+    background: var(--idea-icon-button-hover-bg);
+  }
+
+  &.is-pressed {
+    background: var(--idea-action-primary-subtle);
+    color: var(--idea-action-primary);
+  }
+
+  &:disabled {
+    cursor: default;
+    color: var(--idea-text-secondary);
+  }
+}
+
+@mixin icon-slot {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+
+  &:empty {
+    display: none;
+  }
+}
+
+@mixin action-text {
+  overflow: hidden;
+  font-size: var(--idea-font-size-body-medium);
+  line-height: var(--idea-line-height-body-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

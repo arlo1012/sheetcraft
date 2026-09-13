@@ -101,10 +101,15 @@ describe("FormulaToolbar", () => {
 
   test("creates names from selected label edges and sends actual calculation settings", async () => {
     const wrapper = mountToolbar();
-    await wrapper.get('[aria-label="Quick create"]').trigger("click");
+    const quickCreate = wrapper.get('[aria-label="Quick create"]');
+    expect(quickCreate.attributes("aria-haspopup")).toBe("dialog");
+    expect(quickCreate.attributes("aria-expanded")).toBe("false");
+    await quickCreate.trigger("click");
     await vi.waitFor(() =>
       expect(document.querySelector("[data-formula-name-confirm]")).not.toBeNull(),
     );
+    expect(quickCreate.attributes("aria-expanded")).toBe("true");
+    expect(quickCreate.attributes("aria-controls")).toBeTruthy();
     const left = document.querySelector<HTMLInputElement>(
       "[data-formula-name-position='left'] input",
     );

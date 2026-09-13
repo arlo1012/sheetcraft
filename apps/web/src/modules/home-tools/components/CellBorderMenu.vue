@@ -17,7 +17,9 @@ import BorderColorPanel from "./BorderColorPanel.vue";
 import BorderLineStylePanel from "../../../shared/borders/BorderLineStylePanel.vue";
 import BorderPresetGrid from "./BorderPresetGrid.vue";
 import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
-import RibbonSplitAction from "./RibbonSplitAction.vue";
+import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
+
+defineOptions({ inheritAttrs: false });
 
 type BorderSubmenu = "color" | "style";
 
@@ -32,7 +34,7 @@ const emit = defineEmits<{
   redo: [];
 }>();
 const { t } = useAppI18n();
-const splitActionRef = ref<InstanceType<typeof RibbonSplitAction> | null>(null);
+const splitActionRef = ref<InstanceType<typeof RibbonSplitButton> | null>(null);
 const triggerRef = computed(() => splitActionRef.value?.menuElement ?? null);
 const menuRef = ref<HTMLDivElement | null>(null);
 const submenuRef = ref<HTMLDivElement | null>(null);
@@ -271,118 +273,126 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <RibbonSplitAction
-    ref="splitActionRef"
-    class="cell-border-menu"
-    data-cell-border-control
-    :label="lastPresetLabel"
-    :menu-label="t('ribbon.moreOptions', { tool: t('ribbon.borders') })"
-    :disabled="disabled"
-    :menu-disabled="disabled"
-    :expanded="open"
-    :menu-id="menuId"
-    @activate="applyLastPreset"
-    @toggle-menu="toggleMenu"
-    @menu-keydown="onTriggerKeydown"
-  >
-    <CellBorderPresetIcon :preset="lastPreset" />
-  </RibbonSplitAction>
-
-  <Teleport to="body">
-    <div
-      v-if="open"
-      :id="menuId"
-      ref="menuRef"
-      class="cell-border-menu__panel"
-      :style="menuStyles"
-      role="menu"
-      :aria-label="t('format.cellBorders')"
-      data-cell-border-panel
-      @keydown="onMenuKeydown"
+  <span v-bind="$attrs" class="ribbon-menu-tool">
+    <RibbonSplitButton
+      ref="splitActionRef"
+      class="cell-border-menu"
+      data-cell-border-control
+      :label="lastPresetLabel"
+      :menu-label="t('ribbon.moreOptions', { tool: t('ribbon.borders') })"
+      :disabled="disabled"
+      :menu-disabled="disabled"
+      :expanded="open"
+      :menu-id="menuId"
+      @activate="applyLastPreset"
+      @toggle-menu="toggleMenu"
+      @menu-keydown="onTriggerKeydown"
     >
-      <BorderPresetGrid
-        :border="{ style: lineStyle ?? DEFAULT_BORDER.style, color }"
-        @select="selectPreset"
-      />
-      <div class="cell-border-menu__rows">
-        <button
-          ref="colorRowRef"
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-menu-row="color"
-          aria-haspopup="dialog"
-          :aria-expanded="activeSubmenu === 'color'"
-          :aria-controls="activeSubmenu === 'color' ? submenuId : undefined"
-          @click="openSubmenu('color')"
-        >
-          <PencilLine :size="16" aria-hidden="true" />
-          <span>{{ t("format.borderColor") }}</span>
-          <ChevronRight :size="15" aria-hidden="true" />
-        </button>
-        <button
-          ref="styleRowRef"
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-menu-row="style"
-          aria-haspopup="menu"
-          :aria-expanded="activeSubmenu === 'style'"
-          :aria-controls="activeSubmenu === 'style' ? submenuId : undefined"
-          @click="openSubmenu('style')"
-        >
-          <List :size="16" aria-hidden="true" />
-          <span>{{ t("format.borderLineStyle") }}</span>
-          <ChevronRight :size="15" aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-border-menu-item
-          data-border-menu-row="settings"
-          @click="openCellFormat"
-        >
-          <Settings2 :size="16" aria-hidden="true" />
-          <span>{{ t("format.borderMoreSettings") }}</span>
-        </button>
+      <CellBorderPresetIcon :preset="lastPreset" />
+    </RibbonSplitButton>
+
+    <Teleport to="body">
+      <div
+        v-if="open"
+        :id="menuId"
+        ref="menuRef"
+        class="cell-border-menu__panel"
+        :style="menuStyles"
+        role="menu"
+        :aria-label="t('format.cellBorders')"
+        data-cell-border-panel
+        @keydown="onMenuKeydown"
+      >
+        <BorderPresetGrid
+          :border="{ style: lineStyle ?? DEFAULT_BORDER.style, color }"
+          @select="selectPreset"
+        />
+        <div class="cell-border-menu__rows">
+          <button
+            ref="colorRowRef"
+            type="button"
+            role="menuitem"
+            data-border-menu-item
+            data-border-menu-row="color"
+            aria-haspopup="dialog"
+            :aria-expanded="activeSubmenu === 'color'"
+            :aria-controls="activeSubmenu === 'color' ? submenuId : undefined"
+            @click="openSubmenu('color')"
+          >
+            <PencilLine :size="16" aria-hidden="true" />
+            <span>{{ t("format.borderColor") }}</span>
+            <ChevronRight :size="15" aria-hidden="true" />
+          </button>
+          <button
+            ref="styleRowRef"
+            type="button"
+            role="menuitem"
+            data-border-menu-item
+            data-border-menu-row="style"
+            aria-haspopup="menu"
+            :aria-expanded="activeSubmenu === 'style'"
+            :aria-controls="activeSubmenu === 'style' ? submenuId : undefined"
+            @click="openSubmenu('style')"
+          >
+            <List :size="16" aria-hidden="true" />
+            <span>{{ t("format.borderLineStyle") }}</span>
+            <ChevronRight :size="15" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            data-border-menu-item
+            data-border-menu-row="settings"
+            @click="openCellFormat"
+          >
+            <Settings2 :size="16" aria-hidden="true" />
+            <span>{{ t("format.borderMoreSettings") }}</span>
+          </button>
+        </div>
       </div>
-    </div>
 
-    <div
-      v-if="activeSubmenu"
-      :id="submenuId"
-      ref="submenuRef"
-      class="cell-border-menu__submenu"
-      :class="`is-${activeSubmenu}`"
-      :style="submenuStyles"
-      :role="activeSubmenu === 'style' ? 'menu' : 'dialog'"
-      :aria-label="
-        activeSubmenu === 'color'
-          ? t('format.borderColor')
-          : activeSubmenu === 'style'
-            ? t('format.borderLineStyle')
-            : t('format.borderLineStyle')
-      "
-      :data-border-submenu="activeSubmenu"
-      :data-border-submenu-layout="stackedSubmenu ? 'stacked' : 'side'"
-      @keydown="onSubmenuKeydown"
-    >
-      <BorderColorPanel
-        v-if="activeSubmenu === 'color'"
-        :model-value="color"
-        @update="selectPaletteColor"
-      />
-      <BorderLineStylePanel
-        v-else-if="activeSubmenu === 'style'"
-        :model-value="lineStyle"
-        :color="color"
-        @select="selectLineStyle"
-      />
-    </div>
-  </Teleport>
+      <div
+        v-if="activeSubmenu"
+        :id="submenuId"
+        ref="submenuRef"
+        class="cell-border-menu__submenu"
+        :class="`is-${activeSubmenu}`"
+        :style="submenuStyles"
+        :role="activeSubmenu === 'style' ? 'menu' : 'dialog'"
+        :aria-label="
+          activeSubmenu === 'color'
+            ? t('format.borderColor')
+            : activeSubmenu === 'style'
+              ? t('format.borderLineStyle')
+              : t('format.borderLineStyle')
+        "
+        :data-border-submenu="activeSubmenu"
+        :data-border-submenu-layout="stackedSubmenu ? 'stacked' : 'side'"
+        @keydown="onSubmenuKeydown"
+      >
+        <BorderColorPanel
+          v-if="activeSubmenu === 'color'"
+          :model-value="color"
+          @update="selectPaletteColor"
+        />
+        <BorderLineStylePanel
+          v-else-if="activeSubmenu === 'style'"
+          :model-value="lineStyle"
+          :color="color"
+          @select="selectLineStyle"
+        />
+      </div>
+    </Teleport>
+  </span>
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/ribbon/ribbon-layout" as ribbon;
+
+.ribbon-menu-tool {
+  @include ribbon.tool;
+}
+
 .cell-border-menu {
   &__panel,
   &__submenu {
