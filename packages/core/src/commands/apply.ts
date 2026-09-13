@@ -1,3 +1,4 @@
+import { applyBatchDeleteSheetAxesCommand } from "./batch.js";
 import {
   WorkbookDomainError,
   toWorkbookErrorData,
@@ -35,6 +36,7 @@ import {
   applyRenameSheetCommand,
   applySetSheetPropertiesCommand,
 } from "./sheets.js";
+import { applyCellShiftCommand, applyRestoreCellShiftCommand } from "./cell-shift.js";
 import {
   applyMoveSheetAxisCommand,
   applyRestoreSheetStateCommand,
@@ -82,6 +84,9 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "setCellContents":
     case "clearCellRange":
     case "moveCellRange":
+    case "insertCells":
+    case "deleteCells":
+    case "restoreCellShift":
     case "applyCellStyle":
     case "applyCellBorders":
     case "applyCellFormat":
@@ -107,6 +112,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "restoreFloatingImageToCell":
     case "insertSheetAxis":
     case "deleteSheetAxis":
+    case "batchDeleteSheetAxes":
     case "moveSheetAxis":
     case "restoreSheetState":
       throw new WorkbookDomainError(
@@ -142,6 +148,13 @@ export function applyWorkbookCommand(
         return applyClearCellRangeCommand(workbook, command);
       case "moveCellRange":
         return applyMoveCellRangeCommand(workbook, command);
+      case "insertCells":
+      case "deleteCells":
+        return applyCellShiftCommand(workbook, command);
+      case "restoreCellShift":
+        return applyRestoreCellShiftCommand(workbook, command);
+      case "batchDeleteSheetAxes":
+        return applyBatchDeleteSheetAxesCommand(workbook, command);
       case "applyCellStyle":
         return applyCellStyleCommand(workbook, command);
       case "applyCellBorders":

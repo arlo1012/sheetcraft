@@ -18,6 +18,7 @@ import { useImageAssetUrls } from "../modules/image-assets/useImageAssetUrls";
 import { useSheetImageActions } from "../modules/sheet-images/useSheetImageActions";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
 import { createAxisToolActions } from "../modules/sheet-grid/axis-tool-actions";
+import { createCellOperationActions } from "../modules/sheet-grid/cell-operation-actions";
 import { browserCellTextMeasurer } from "../shared/cell-text/text-metrics";
 import { useAppI18n } from "../shared/i18n";
 import RowColumnOperationsMenu from "../modules/sheet-grid/components/RowColumnOperationsMenu.vue";
@@ -45,7 +46,10 @@ import XlsxFileFeedback from "../modules/workbook-xlsx/components/XlsxFileFeedba
 import { useWorkbookXlsxActions } from "../modules/workbook-xlsx/useWorkbookXlsxActions";
 import type { SheetProperties } from "@idea10/core/workbook";
 
-const props = defineProps<{ workbookStore?: WorkbookStore; imageAssetStore?: ImageAssetStore }>();
+const props = defineProps<{
+  workbookStore?: WorkbookStore;
+  imageAssetStore?: ImageAssetStore;
+}>();
 const formulaBarRef = ref<InstanceType<typeof WorkbookFormulaBar> | null>(null);
 const gridId = `workbook-grid-${useId()}`;
 const zoom = ref(100);
@@ -159,6 +163,14 @@ const axisTools = createAxisToolActions({
     void MessagePlugin.warning(t("axisMenu.operationFailed"));
   },
 });
+const cellOperationActions = createCellOperationActions({
+  getSheet: () => activeSheet.value,
+  flushPendingEdits: () => cellEditSession.finish(),
+  execute: executeCommand,
+  onError: () => {
+    void MessagePlugin.warning(t("axisMenu.operationFailed"));
+  },
+});
 watch(workbookGeneration, () => cellEditSession.cancel(), { flush: "sync" });
 const cellFormatSelection = shallowRef<CellFormatSelection>();
 const cellFormatInitialTab = ref<CellFormatTab>("border");
@@ -259,7 +271,10 @@ const { busy: xlsxBusy, confirmation: xlsxConfirmation, feedback: xlsxFeedback }
 
 const formulaTools = useFormulaToolsController({
   getWorkbook: () => session.workbook,
-  getSelection: () => ({ address: activeAddress.value, range: activeSelectionRange.value }),
+  getSelection: () => ({
+    address: activeAddress.value,
+    range: activeSelectionRange.value,
+  }),
   getSheetEvaluator: () => activeSheetEvaluator.value,
   editSession: cellEditSession,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
@@ -422,6 +437,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @auto-fit="axisTools.autoFit"
           @standard-width="axisTools.standardWidth"
           @visibility="axisTools.visibility"
+          @cell-operation="cellOperationActions.cellOperation"
+          @delete-empty-rows="cellOperationActions.deleteEmptyRows"
           @insert="cellEditSession.finish() && insertAxis($event)"
           @delete="cellEditSession.finish() && deleteAxis($event)"
         />

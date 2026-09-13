@@ -435,6 +435,67 @@ export function transformFormulaForAxis(source: string, transform: FormulaAxisTr
   return applyReplacements(parsed.ast.source, replacements);
 }
 
+/** Rewrites unqualified A1 references through a rectangular structural mapping. */
+export function transformFormulaReferences(
+  source: string,
+  transform: (address: FormulaAddress) => FormulaAddress | null,
+  transformRange?: (range: { start: FormulaAddress; end: FormulaAddress }) => {
+    start: FormulaAddress;
+    end: FormulaAddress;
+  } | null,
+): string {
+  const parsed = parseFormula(source);
+  if (!parsed.ok) return source;
+  const replacements: Replacement[] = [];
+  const rewrite = (reference: FormulaReference) => {
+    const address = transform(reference);
+    return address ? formatReference(reference, address) : "#REF!";
+  };
+  walkExpression(parsed.ast.expression, (expression) => {
+    if (expression.kind === "reference" && !expression.reference.sheetName) {
+      replacements.push({
+        start: expression.reference.start,
+        end: expression.reference.end,
+        text: rewrite(expression.reference),
+      });
+    } else if (expression.kind === "spill" && !expression.reference.sheetName) {
+      replacements.push({
+        start: expression.reference.start,
+        end: expression.reference.end,
+        text: rewrite(expression.reference),
+      });
+    } else if (expression.kind === "range" && !expression.range.start.sheetName) {
+      const range = transformRange?.({
+        start: expression.range.start,
+        end: expression.range.end,
+      });
+      if (transformRange && !range) {
+        replacements.push({
+          start: expression.range.startOffset,
+          end: expression.range.endOffset,
+          text: "#REF!",
+        });
+        return;
+      }
+      replacements.push({
+        start: expression.range.start.start,
+        end: expression.range.start.end,
+        text: range
+          ? formatReference(expression.range.start, range.start)
+          : rewrite(expression.range.start),
+      });
+      replacements.push({
+        start: expression.range.end.start,
+        end: expression.range.end.end,
+        text: range
+          ? formatReference(expression.range.end, range.end)
+          : rewrite(expression.range.end),
+      });
+    }
+  });
+  return applyReplacements(parsed.ast.source, replacements);
+}
+
 /**
  * Rewrites references after an entire row or column band is repositioned.
  * `toIndex` is the band's final start index, rather than an insertion cursor.

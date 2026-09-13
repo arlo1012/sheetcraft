@@ -49,6 +49,39 @@ export type MoveCellRangeCommand = {
   destination: CellAddress;
 };
 
+export type InsertCellsCommand = {
+  type: "insertCells";
+  sheetId: string;
+  range: CellRange;
+  direction: "right" | "down";
+};
+
+export type DeleteCellsCommand = {
+  type: "deleteCells";
+  sheetId: string;
+  range: CellRange;
+  direction: "left" | "up";
+};
+
+/** Internal lossless inverse for a rectangular cell shift. */
+export type RestoreCellShiftCommand = {
+  type: "restoreCellShift";
+  sheetId: string;
+  state: SheetSparseState;
+  direction: InsertCellsCommand["direction"] | DeleteCellsCommand["direction"];
+  range: CellRange;
+  operation: "insert" | "delete";
+  workbookFormulaSources: FormulaSourceRestore[];
+  definedNames: DefinedName[];
+};
+
+/** One history entry for disjoint deletions from a single sheet axis. */
+export type BatchDeleteSheetAxesCommand = {
+  type: "batchDeleteSheetAxes";
+  sheetId: string;
+  commands: Array<DeleteSheetAxisCommand | RestoreSheetAxisSliceCommand>;
+};
+
 export type ApplyCellStyleCommand = {
   type: "applyCellStyle";
   sheetId: string;
@@ -385,6 +418,10 @@ export type WorkbookCommand =
   | SetCellContentsCommand
   | ClearCellRangeCommand
   | MoveCellRangeCommand
+  | InsertCellsCommand
+  | DeleteCellsCommand
+  | RestoreCellShiftCommand
+  | BatchDeleteSheetAxesCommand
   | ApplyCellStyleCommand
   | ApplyCellBordersCommand
   | ApplyCellFormatCommand
@@ -426,6 +463,8 @@ export type WorkbookOperation =
   | "cells.edit"
   | "cells.paste"
   | "cells.move"
+  | "cells.insert"
+  | "cells.delete"
   | "cells.clear"
   | "format.cells"
   | "format.borders"
@@ -465,6 +504,14 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "cells.clear";
     case "moveCellRange":
       return "cells.move";
+    case "insertCells":
+      return "cells.insert";
+    case "deleteCells":
+      return "cells.delete";
+    case "restoreCellShift":
+      return "history.restore";
+    case "batchDeleteSheetAxes":
+      return "history.restore";
     case "applyCellStyle":
     case "adjustCellNumberFormatDecimals":
     case "adjustCellIndent":

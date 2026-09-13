@@ -206,4 +206,127 @@ describe("RowColumnOperationsMenu", () => {
 
     expect(wrapper.emitted("resize")).toEqual([[{ axis: "row", index: 2, count: 2, size: 20 }]]);
   });
+
+  test("keeps independent insert counts for every direction and confirms them by button or Enter", async () => {
+    const wrapper = mountMenu({
+      range: {
+        start: { row: 2, column: 3 },
+        end: { row: 3, column: 4 },
+      },
+    });
+    await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await nextTick();
+    await rootMenu().get('[data-row-column-action="insert"]').trigger("click");
+    await nextTick();
+
+    const counts = [
+      ["insert-rows-above", "3"],
+      ["insert-rows-below", "4"],
+      ["insert-columns-before", "5"],
+      ["insert-columns-after", "6"],
+    ] as const;
+    for (const [action, count] of counts) {
+      await submenu().get(`[data-axis-insert-count="${action}"] input`).setValue(count);
+    }
+
+    for (const [action, count] of counts) {
+      expect(
+        (submenu().get(`[data-axis-insert-count="${action}"] input`).element as HTMLInputElement)
+          .value,
+      ).toBe(count);
+    }
+
+    await submenu().get('[data-axis-insert-confirm="insert-columns-after"]').trigger("click");
+    expect(wrapper.emitted("insert")).toEqual([[{ axis: "column", index: 5, count: 6 }]]);
+
+    await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await nextTick();
+    await rootMenu().get('[data-row-column-action="insert"]').trigger("click");
+    await nextTick();
+    const rowInput = submenu().get('[data-axis-insert-count="insert-rows-above"] input');
+    await rowInput.setValue("7");
+    await rowInput.trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("insert")).toEqual([
+      [{ axis: "column", index: 5, count: 6 }],
+      [{ axis: "row", index: 2, count: 7 }],
+    ]);
+  });
+
+  test("rejects invalid insert counts without trapping recovery in the submenu", async () => {
+    const wrapper = mountMenu();
+    await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await nextTick();
+    await rootMenu().get('[data-row-column-action="insert"]').trigger("click");
+    await nextTick();
+
+    const input = submenu().get<HTMLInputElement>(
+      '[data-axis-insert-count="insert-rows-above"] input',
+    );
+    const confirm = submenu().get('[data-axis-insert-confirm="insert-rows-above"]');
+    await input.setValue("0");
+    expect(confirm.attributes("disabled")).toBeDefined();
+    await confirm.trigger("click");
+    expect(wrapper.emitted("insert")).toBeUndefined();
+
+    await input.setValue("3");
+    expect(confirm.attributes("disabled")).toBeUndefined();
+    await confirm.trigger("click");
+    expect(wrapper.emitted("insert")).toEqual([[{ axis: "row", index: 2, count: 3 }]]);
+  });
+
+  test("captures a cell-operation target range and emits its selected direction", async () => {
+    const openingRange: CellRange = {
+      start: { row: 2, column: 3 },
+      end: { row: 3, column: 4 },
+    };
+    const wrapper = mountMenu({ range: openingRange });
+    await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await nextTick();
+    await rootMenu().get('[data-row-column-action="insert"]').trigger("click");
+    await nextTick();
+    await submenu().get('[data-row-column-action="insert-cells"]').trigger("click");
+    await nextTick();
+
+    await wrapper.setProps({
+      range: { start: { row: 8, column: 8 }, end: { row: 8, column: 8 } },
+    });
+    await new DOMWrapper(document.body).get(".t-dialog__confirm").trigger("click");
+    expect(wrapper.emitted("cellOperation")).toEqual([
+      [{ operation: "insert", range: openingRange, direction: "down" }],
+    ]);
+  });
+
+  test("emits deleting empty rows for the selected range", async () => {
+    const wrapper = mountMenu();
+    await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await nextTick();
+    await rootMenu().get('[data-row-column-action="delete"]').trigger("click");
+    await nextTick();
+    await submenu().get('[data-row-column-action="delete-empty-rows"]').trigger("click");
+    expect(wrapper.emitted("deleteEmptyRows")).toEqual([[rowRange]]);
+  });
+
+  test("leaves ArrowLeft to a focused count input and closes the submenu on Escape", async () => {
+    const wrapper = mountMenu();
+    const trigger = wrapper.get('[data-ribbon-action="row-column-operations"]');
+    await trigger.trigger("click");
+    await nextTick();
+    const insert = rootMenu().get('[data-row-column-action="insert"]');
+    await insert.trigger("click");
+    await nextTick();
+
+    const input = submenu().get<HTMLInputElement>(
+      '[data-axis-insert-count="insert-rows-above"] input',
+    );
+    input.element.focus();
+    input.element.setSelectionRange(1, 1);
+    await input.trigger("keydown", { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(input.element);
+    expect(document.body.querySelector('[id^="row-column-operations-submenu-"]')).not.toBeNull();
+
+    await input.trigger("keydown", { key: "Escape" });
+    await nextTick();
+    expect(document.activeElement).toBe(insert.element);
+    expect(document.body.querySelector('[id^="row-column-operations-submenu-"]')).toBeNull();
+  });
 });

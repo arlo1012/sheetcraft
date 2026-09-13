@@ -655,6 +655,19 @@ export type MessageSchema = FormulaToolsMessageSchema & {
     pasteShortcut: string;
   };
   axisMenu: {
+    insertCellsDialog: string;
+    deleteCellsDialog: string;
+    insertRowsAboveAction: string;
+    insertRowsBelowAction: string;
+    insertColumnsBeforeAction: string;
+    insertColumnsAfterAction: string;
+    deleteEmptyRows: string;
+    shiftRight: string;
+    shiftDown: string;
+    shiftLeft: string;
+    shiftUp: string;
+    entireRow: string;
+    entireColumn: string;
     autoFitRowHeight: string;
     autoFitColumnWidth: string;
     standardColumnWidth: string;

@@ -1,5 +1,17 @@
 <script setup lang="ts">
-import { ChevronRight, Columns3, EyeOff, Maximize2, Rows3, Scaling } from "lucide-vue-next";
+import {
+  ChevronRight,
+  Columns3,
+  EyeOff,
+  Maximize2,
+  Rows3,
+  Scaling,
+  TableCellsMerge,
+  TableCellsSplit,
+  Rows2,
+  TableRowsSplit,
+  TableColumnsSplit,
+} from "lucide-vue-next";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
@@ -17,6 +29,8 @@ import {
   type Sheet,
   type SheetDimensionAxis,
 } from "@idea10/core/workbook";
+import AxisInsertMenuItem from "./AxisInsertMenuItem.vue";
+import CellOperationDialog from "./CellOperationDialog.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -33,6 +47,14 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  cellOperation: [
+    payload: {
+      operation: "insert" | "delete";
+      range: CellRange;
+      direction: "right" | "down" | "left" | "up" | "row" | "column";
+    },
+  ];
+  deleteEmptyRows: [range: CellRange];
   resize: [payload: { axis: SheetDimensionAxis; index: number; count: number; size: number }];
   insert: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
   delete: [payload: { axis: SheetDimensionAxis; index: number; count: number }];
@@ -58,6 +80,7 @@ const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const submenuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `row-column-operations-${useId().replaceAll(":", "")}`;
 const submenuId = `row-column-operations-submenu-${useId().replaceAll(":", "")}`;
+const cellTarget = ref<{ operation: "insert" | "delete"; range: CellRange }>();
 const sizeTarget = ref<AxisSizeTarget>();
 const sizeDraft = ref<InputNumberValue>();
 const standardWidthDraft = ref<InputNumberValue>();
@@ -82,16 +105,12 @@ const { floatingStyles: submenuStyles } = useFloatingPanel(submenuAnchor, submen
 });
 const rowSizeEnabled = computed(() => !props.disabled && rowCount.value > 0);
 const columnSizeEnabled = computed(() => !props.disabled && columnCount.value > 0);
-const canInsertRowsAbove = computed(() => rowCount.value <= MAX_SHEET_ROWS - props.range.start.row);
-const canInsertRowsBelow = computed(
-  () => rowCount.value <= MAX_SHEET_ROWS - props.range.end.row - 1,
-);
-const canInsertColumnsBefore = computed(
-  () => columnCount.value <= MAX_SHEET_COLUMNS - props.range.start.column,
-);
-const canInsertColumnsAfter = computed(
-  () => columnCount.value <= MAX_SHEET_COLUMNS - props.range.end.column - 1,
-);
+function maximumInsertCount(axis: SheetDimensionAxis, direction: "before" | "after"): number {
+  const maximum = axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
+  const address = direction === "before" ? props.range.start : props.range.end;
+  const index = axis === "row" ? address.row : address.column;
+  return maximum - index - (direction === "after" ? 1 : 0);
+}
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useRibbonMenu({
   triggerRef,
   menuSurfaceRef,
@@ -124,24 +143,6 @@ function getAxisSizeRange(axis: SheetDimensionAxis): { minimum: number; maximum:
     : { minimum: MIN_COLUMN_WIDTH, maximum: MAX_COLUMN_WIDTH };
 }
 
-function getInsertLabel(axis: SheetDimensionAxis, direction: "before" | "after"): string {
-  const count = axis === "row" ? rowCount.value : columnCount.value;
-  if (axis === "row") {
-    if (direction === "before") {
-      return t(count === 1 ? "axisMenu.insertRowAboveOne" : "axisMenu.insertRowsAbove", { count });
-    }
-    return t(count === 1 ? "axisMenu.insertRowBelowOne" : "axisMenu.insertRowsBelow", { count });
-  }
-  if (direction === "before") {
-    return t(count === 1 ? "axisMenu.insertColumnBeforeOne" : "axisMenu.insertColumnsBefore", {
-      count,
-    });
-  }
-  return t(count === 1 ? "axisMenu.insertColumnAfterOne" : "axisMenu.insertColumnsAfter", {
-    count,
-  });
-}
-
 function getDeleteLabel(axis: SheetDimensionAxis): string {
   const count = axis === "row" ? rowCount.value : columnCount.value;
   if (axis === "row")
@@ -149,9 +150,12 @@ function getDeleteLabel(axis: SheetDimensionAxis): string {
   return t(count === 1 ? "axisMenu.deleteColumnOne" : "axisMenu.deleteColumns", { count });
 }
 
-function requestInsert(axis: SheetDimensionAxis, direction: "before" | "after"): void {
-  if (props.disabled) return;
-  const count = axis === "row" ? rowCount.value : columnCount.value;
+function requestInsert(
+  axis: SheetDimensionAxis,
+  direction: "before" | "after",
+  count: number,
+): void {
+  if (props.disabled || !Number.isInteger(count)) return;
   const start = axis === "row" ? props.range.start.row : props.range.start.column;
   const end = axis === "row" ? props.range.end.row : props.range.end.column;
   const maximum = axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
@@ -167,6 +171,35 @@ function requestDelete(axis: SheetDimensionAxis): void {
   const count = axis === "row" ? rowCount.value : columnCount.value;
   if (count < 1) return;
   emit("delete", { axis, index, count });
+  dismiss();
+}
+
+function closeCellDialog(restoreFocus = true): void {
+  cellTarget.value = undefined;
+  if (restoreFocus)
+    void nextTick(() => buttonRef.value?.rootElement?.focus({ preventScroll: true }));
+}
+
+function openCellDialog(operation: "insert" | "delete"): void {
+  if (props.disabled) return;
+  cellTarget.value = {
+    operation,
+    range: { start: { ...props.range.start }, end: { ...props.range.end } },
+  };
+  dismiss("programmatic", false);
+}
+
+function confirmCellOperation(
+  direction: "right" | "down" | "left" | "up" | "row" | "column",
+): void {
+  if (props.disabled || !cellTarget.value) return;
+  emit("cellOperation", { ...cellTarget.value, direction });
+  closeCellDialog();
+}
+
+function requestDeleteEmptyRows(): void {
+  if (props.disabled) return;
+  emit("deleteEmptyRows", props.range);
   dismiss();
 }
 
@@ -272,6 +305,7 @@ function onMenuFocusin(event: FocusEvent): void {
 }
 
 function onSubmenuKeydown(event: KeyboardEvent): void {
+  if (event.key === "ArrowLeft" && event.target instanceof HTMLInputElement) return;
   if (event.key === "Escape" || event.key === "ArrowLeft") {
     event.preventDefault();
     event.stopPropagation();
@@ -282,6 +316,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
 watch(
   () => props.sheet.id,
   () => {
+    closeCellDialog(false);
     closeSizeDialog(false);
     closeStandardWidthDialog(false);
     dismiss("programmatic", false);
@@ -291,6 +326,7 @@ watch(
   () => props.disabled,
   (disabled) => {
     if (disabled) {
+      closeCellDialog(false);
       closeSizeDialog(false);
       closeStandardWidthDialog(false);
     }
@@ -376,6 +412,9 @@ watch(
           @select="openSubmenu('insert')"
           @mouseenter="openSubmenu('insert', false)"
         >
+          <template #icon
+            ><TableCellsSplit class="row-column-operations-menu__insert-icon" :size="15"
+          /></template>
           {{ t("axisMenu.insertCells") }}
           <template #shortcut><ChevronRight :size="15" /></template>
         </MenuItem>
@@ -388,6 +427,9 @@ watch(
           @select="openSubmenu('delete')"
           @mouseenter="openSubmenu('delete', false)"
         >
+          <template #icon
+            ><TableCellsMerge class="row-column-operations-menu__delete-icon" :size="15"
+          /></template>
           {{ t("axisMenu.deleteCells") }}
           <template #shortcut><ChevronRight :size="15" /></template>
         </MenuItem>
@@ -417,41 +459,66 @@ watch(
       >
         <template v-if="activeSubmenu === 'insert'">
           <MenuItem
-            data-row-column-action="insert-rows-above"
-            :disabled="disabled || !canInsertRowsAbove"
-            @select="requestInsert('row', 'before')"
+            data-row-column-action="insert-cells"
+            :disabled="disabled"
+            @select="openCellDialog('insert')"
           >
-            <template #icon><Rows3 :size="15" /></template>
-            {{ getInsertLabel("row", "before") }}
+            <template #icon
+              ><TableCellsSplit class="row-column-operations-menu__insert-icon" :size="15"
+            /></template>
+            {{ t("axisMenu.insertCellsDialog") }}
           </MenuItem>
-          <MenuItem
-            data-row-column-action="insert-rows-below"
-            :disabled="disabled || !canInsertRowsBelow"
-            @select="requestInsert('row', 'after')"
-          >
-            <template #icon><Rows3 :size="15" /></template>
-            {{ getInsertLabel("row", "after") }}
-          </MenuItem>
-          <MenuItem
-            data-row-column-action="insert-columns-before"
-            :disabled="disabled || !canInsertColumnsBefore"
-            @select="requestInsert('column', 'before')"
-          >
-            <template #icon><Columns3 :size="15" /></template>
-            {{ getInsertLabel("column", "before") }}
-          </MenuItem>
-          <MenuItem
-            data-row-column-action="insert-columns-after"
-            :disabled="disabled || !canInsertColumnsAfter"
-            @select="requestInsert('column', 'after')"
-          >
-            <template #icon><Columns3 :size="15" /></template>
-            {{ getInsertLabel("column", "after") }}
-          </MenuItem>
+          <MenuSeparator />
+          <AxisInsertMenuItem
+            action="insert-rows-above"
+            :label="t('axisMenu.insertRowsAboveAction')"
+            :initial-count="rowCount"
+            :maximum="maximumInsertCount('row', 'before')"
+            :disabled="disabled"
+            @insert="requestInsert('row', 'before', $event)"
+            ><TableRowsSplit class="row-column-operations-menu__insert-icon" :size="15"
+          /></AxisInsertMenuItem>
+          <AxisInsertMenuItem
+            action="insert-rows-below"
+            :label="t('axisMenu.insertRowsBelowAction')"
+            :initial-count="rowCount"
+            :maximum="maximumInsertCount('row', 'after')"
+            :disabled="disabled"
+            @insert="requestInsert('row', 'after', $event)"
+            ><TableRowsSplit class="row-column-operations-menu__insert-icon" :size="15"
+          /></AxisInsertMenuItem>
+          <AxisInsertMenuItem
+            action="insert-columns-before"
+            :label="t('axisMenu.insertColumnsBeforeAction')"
+            :initial-count="columnCount"
+            :maximum="maximumInsertCount('column', 'before')"
+            :disabled="disabled"
+            @insert="requestInsert('column', 'before', $event)"
+            ><TableColumnsSplit class="row-column-operations-menu__insert-icon" :size="15"
+          /></AxisInsertMenuItem>
+          <AxisInsertMenuItem
+            action="insert-columns-after"
+            :label="t('axisMenu.insertColumnsAfterAction')"
+            :initial-count="columnCount"
+            :maximum="maximumInsertCount('column', 'after')"
+            :disabled="disabled"
+            @insert="requestInsert('column', 'after', $event)"
+            ><TableColumnsSplit class="row-column-operations-menu__insert-icon" :size="15"
+          /></AxisInsertMenuItem>
         </template>
         <template v-else-if="activeSubmenu === 'delete'">
           <MenuItem
-            danger
+            data-row-column-action="delete-cells"
+            :disabled="disabled"
+            @select="openCellDialog('delete')"
+          >
+            <template #icon
+              ><TableCellsMerge class="row-column-operations-menu__delete-icon" :size="15"
+            /></template>
+            {{ t("axisMenu.deleteCellsDialog") }}
+          </MenuItem>
+          <MenuSeparator />
+          <MenuItem
             data-row-column-action="delete-rows"
             :disabled="disabled"
             @select="requestDelete('row')"
@@ -460,13 +527,23 @@ watch(
             {{ getDeleteLabel("row") }}
           </MenuItem>
           <MenuItem
-            danger
             data-row-column-action="delete-columns"
             :disabled="disabled"
             @select="requestDelete('column')"
           >
             <template #icon><Columns3 :size="15" /></template>
             {{ getDeleteLabel("column") }}
+          </MenuItem>
+          <MenuSeparator />
+          <MenuItem
+            data-row-column-action="delete-empty-rows"
+            :disabled="disabled"
+            @select="requestDeleteEmptyRows"
+          >
+            <template #icon
+              ><Rows2 class="row-column-operations-menu__delete-icon" :size="15"
+            /></template>
+            {{ t("axisMenu.deleteEmptyRows") }}
           </MenuItem>
         </template>
         <template v-else>
@@ -501,6 +578,14 @@ watch(
         </template>
       </MenuSurface>
     </Teleport>
+    <CellOperationDialog
+      v-if="cellTarget"
+      :operation="cellTarget.operation"
+      :range="cellTarget.range"
+      :disabled="disabled"
+      @confirm="confirmCellOperation"
+      @close="closeCellDialog()"
+    />
     <Dialog
       role="dialog"
       aria-modal="true"
@@ -593,6 +678,17 @@ watch(
   &__surface {
     z-index: 80;
     min-width: 210px;
+  }
+
+  &__submenu:has([data-axis-insert-count]) {
+    min-width: 284px;
+  }
+
+  &__insert-icon {
+    color: var(--idea-status-success);
+  }
+  &__delete-icon {
+    color: var(--idea-status-error);
   }
 
   &__size-field {
