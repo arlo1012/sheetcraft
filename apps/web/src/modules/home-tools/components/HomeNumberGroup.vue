@@ -142,7 +142,7 @@ watch(
         data-number-format-trigger
         :disabled="disabled"
         :aria-label="triggerLabel"
-        :title="triggerLabel"
+        :title="state.numberFormat.mixed ? t('ribbon.numberFormat') : triggerLabel"
         aria-haspopup="menu"
         :aria-expanded="open"
         :aria-controls="open ? menuId : undefined"
@@ -151,7 +151,7 @@ watch(
       >
         <Hash :size="15" aria-hidden="true" />
         <span class="home-number-group__format-label" aria-hidden="true">
-          {{ state.numberFormat.mixed ? t("format.mixed") : currentFormatLabel }}
+          {{ state.numberFormat.mixed ? "" : currentFormatLabel }}
         </span>
         <RibbonDropdownArrow :expanded="open" />
       </button>
