@@ -13,7 +13,15 @@ import {
   applyCellStyleCommand,
   applyRestoreCellStylesCommand,
 } from "./formatting.js";
-import { applyResizeSheetDimensionCommand } from "./dimensions.js";
+import {
+  applyResetSheetDimensionSizesCommand,
+  applyResizeSheetDimensionCommand,
+  applyResizeSheetDimensionsCommand,
+  applyRestoreSheetDimensionStateCommand,
+  applySetSheetDefaultColumnWidthCommand,
+  applySetSheetDimensionHiddenCommand,
+  applySetSheetDimensionSizesCommand,
+} from "./dimensions.js";
 import { applySetSheetFilterCommand } from "./filter.js";
 import {
   applyMergeCellsCommand,
@@ -81,6 +89,12 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "adjustCellIndent":
     case "restoreCellStyles":
     case "resizeSheetDimension":
+    case "resizeSheetDimensions":
+    case "setSheetDimensionSizes":
+    case "setSheetDimensionHidden":
+    case "resetSheetDimensionSizes":
+    case "setSheetDefaultColumnWidth":
+    case "restoreSheetDimensionState":
     case "setSheetFreezePanes":
     case "mergeCells":
     case "unmergeCells":
@@ -142,6 +156,18 @@ export function applyWorkbookCommand(
         return applyRestoreCellStylesCommand(workbook, command);
       case "resizeSheetDimension":
         return applyResizeSheetDimensionCommand(workbook, command);
+      case "resizeSheetDimensions":
+        return applyResizeSheetDimensionsCommand(workbook, command);
+      case "setSheetDimensionSizes":
+        return applySetSheetDimensionSizesCommand(workbook, command);
+      case "setSheetDimensionHidden":
+        return applySetSheetDimensionHiddenCommand(workbook, command);
+      case "resetSheetDimensionSizes":
+        return applyResetSheetDimensionSizesCommand(workbook, command);
+      case "setSheetDefaultColumnWidth":
+        return applySetSheetDefaultColumnWidthCommand(workbook, command);
+      case "restoreSheetDimensionState":
+        return applyRestoreSheetDimensionStateCommand(workbook, command);
       case "setSheetFreezePanes":
         return applySetSheetFreezePanesCommand(workbook, command);
       case "mergeCells":

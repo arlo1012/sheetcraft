@@ -46,6 +46,8 @@ export type AutoRowHeightInput = {
    */
   formatValue?: (address: CellAddress, cell: Readonly<Cell>, value: FormulaValue) => string;
   columnWidths: ReadonlyMap<number, number>;
+  /** Width used by columns without a stored manual dimension. */
+  defaultColumnWidth?: number;
   rowCount: number;
   columnCount: number;
   defaultFontFamily?: string;
@@ -285,7 +287,10 @@ export function createAutoRowHeightCalculator(measurer: TextMeasurer): AutoRowHe
         }
 
         currentCellKeys.add(key);
-        const columnWidth = input.columnWidths.get(address.column) ?? DEFAULT_COLUMN_WIDTH;
+        const columnWidth =
+          input.columnWidths.get(address.column) ??
+          input.defaultColumnWidth ??
+          DEFAULT_COLUMN_WIDTH;
         const font = getCellFont(cell.style, defaultFontFamily);
         const fingerprint = JSON.stringify([
           text,

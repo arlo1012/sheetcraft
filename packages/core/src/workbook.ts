@@ -136,6 +136,11 @@ export type Sheet = {
   cells: Map<string, Cell>;
   rowHeights: Map<number, number>;
   columnWidths: Map<number, number>;
+  /** Hidden axes retain their manual dimensions so unhiding is lossless. */
+  hiddenRows?: Set<number>;
+  hiddenColumns?: Set<number>;
+  /** Sparse column widths fall back to this value. */
+  defaultColumnWidth?: number;
   freezePanes: FreezePanes;
   filter: SheetFilter | null;
   mergedCells: CellRange[];
@@ -157,6 +162,9 @@ export type SheetSparseState = {
   cells: SheetSparseCell[];
   rowHeights: SheetSparseDimension[];
   columnWidths: SheetSparseDimension[];
+  hiddenRows?: number[];
+  hiddenColumns?: number[];
+  defaultColumnWidth?: number;
   freezePanes: FreezePanes;
   filter: SheetFilter | null;
   mergedCells: CellRange[];
@@ -200,6 +208,9 @@ export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory)
     cells: new Map(),
     rowHeights: new Map(),
     columnWidths: new Map(),
+    hiddenRows: new Set(),
+    hiddenColumns: new Set(),
+    defaultColumnWidth: DEFAULT_COLUMN_WIDTH,
     freezePanes: { rows: 0, columns: 0 },
     filter: null,
     mergedCells: [],
@@ -708,7 +719,7 @@ export function createWorkbookEvaluator(
       return {
         address,
         value: read(targetSheetId, address),
-        hidden: targetSheet.rowHeights.get(address.row) === 0,
+        hidden: targetSheet.hiddenRows?.has(address.row) ?? false,
         filtered: isSheetRowFiltered(targetSheet, address.row, (target) =>
           read(targetSheetId, target),
         ),
@@ -781,7 +792,7 @@ export function createWorkbookEvaluator(
         for (const target of getSparseRangeAddresses(indexFor(targetSheetId), start, end)) {
           if (exclusions) {
             const targetContent = contentFor(targetSheetId, target);
-            if (exclusions.hidden && sheet.rowHeights.get(target.row) === 0) continue;
+            if (exclusions.hidden && (sheet.hiddenRows?.has(target.row) ?? false)) continue;
             if (
               exclusions.nested &&
               targetContent?.kind === "formula" &&
@@ -1353,12 +1364,18 @@ function setDimension(
 
 export function getRowHeight(sheet: Sheet, row: number): number {
   assertDimensionIndex(row, MAX_SHEET_ROWS, "Row");
+  if (sheet.hiddenRows?.has(row)) return 0;
   return sheet.rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
 }
 
 export function getColumnWidth(sheet: Sheet, column: number): number {
   assertDimensionIndex(column, MAX_SHEET_COLUMNS, "Column");
-  return sheet.columnWidths.get(column) ?? DEFAULT_COLUMN_WIDTH;
+  if (sheet.hiddenColumns?.has(column)) return 0;
+  return sheet.columnWidths.get(column) ?? getDefaultColumnWidth(sheet);
+}
+
+export function getDefaultColumnWidth(sheet: Sheet): number {
+  return sheet.defaultColumnWidth ?? DEFAULT_COLUMN_WIDTH;
 }
 
 export function setRowHeight(sheet: Sheet, row: number, height: number): boolean {
@@ -1370,7 +1387,34 @@ export function setRowHeight(sheet: Sheet, row: number, height: number): boolean
 export function setColumnWidth(sheet: Sheet, column: number, width: number): boolean {
   assertDimensionIndex(column, MAX_SHEET_COLUMNS, "Column");
   assertDimensionSize(width, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH, "Column width");
-  return setDimension(sheet.columnWidths, column, width, DEFAULT_COLUMN_WIDTH);
+  return setDimension(sheet.columnWidths, column, width, getDefaultColumnWidth(sheet));
+}
+
+export function setDefaultColumnWidth(sheet: Sheet, width: number): boolean {
+  assertDimensionSize(width, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH, "Default column width");
+  const previous = getDefaultColumnWidth(sheet);
+  if (previous === width) return false;
+  sheet.defaultColumnWidth = width;
+  for (const [index, current] of sheet.columnWidths) {
+    if (current === width) sheet.columnWidths.delete(index);
+  }
+  return true;
+}
+
+export function setSheetDimensionHidden(
+  sheet: Sheet,
+  axis: SheetDimensionAxis,
+  index: number,
+  hidden: boolean,
+): boolean {
+  const maximum = axis === "row" ? MAX_SHEET_ROWS : MAX_SHEET_COLUMNS;
+  assertDimensionIndex(index, maximum, axis === "row" ? "Row" : "Column");
+  const property = axis === "row" ? "hiddenRows" : "hiddenColumns";
+  const dimensions = sheet[property];
+  if ((dimensions?.has(index) ?? false) === hidden) return false;
+  if (hidden) (dimensions ?? (sheet[property] = new Set<number>())).add(index);
+  else dimensions?.delete(index);
+  return true;
 }
 
 function compareCellAddresses(left: CellAddress, right: CellAddress): number {
@@ -1578,7 +1622,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
   const columnWidths = state.columnWidths.map((dimension) => {
     assertDimensionIndex(dimension.index, MAX_SHEET_COLUMNS, "Column");
     assertDimensionSize(dimension.size, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH, "Column width");
-    if (dimension.size === DEFAULT_COLUMN_WIDTH) {
+    if (dimension.size === (state.defaultColumnWidth ?? DEFAULT_COLUMN_WIDTH)) {
       throw new Error("Sparse state cannot store a default column width.");
     }
     if (columnIndexes.has(dimension.index)) {
@@ -1587,6 +1631,30 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     columnIndexes.add(dimension.index);
     return { ...dimension };
   });
+
+  const normalizeHiddenIndexes = (
+    indexes: readonly number[] | undefined,
+    maximum: number,
+    axis: string,
+  ) => {
+    const seen = new Set<number>();
+    for (const index of indexes ?? []) {
+      assertDimensionIndex(index, maximum, axis);
+      if (seen.has(index))
+        throw new Error(`Sparse state contains duplicate hidden ${axis.toLowerCase()} ${index}.`);
+      seen.add(index);
+    }
+    return [...seen].sort((left, right) => left - right);
+  };
+  const defaultColumnWidth = state.defaultColumnWidth ?? DEFAULT_COLUMN_WIDTH;
+  assertDimensionSize(
+    defaultColumnWidth,
+    MIN_COLUMN_WIDTH,
+    MAX_COLUMN_WIDTH,
+    "Default column width",
+  );
+  const hiddenRows = normalizeHiddenIndexes(state.hiddenRows, MAX_SHEET_ROWS, "Row");
+  const hiddenColumns = normalizeHiddenIndexes(state.hiddenColumns, MAX_SHEET_COLUMNS, "Column");
 
   cells.sort((left, right) => compareCellAddresses(left.address, right.address));
   rowHeights.sort((left, right) => left.index - right.index);
@@ -1599,6 +1667,9 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     cells,
     rowHeights,
     columnWidths,
+    hiddenRows,
+    hiddenColumns,
+    defaultColumnWidth,
     freezePanes: cloneFreezePanes(metadata.freezePanes),
     filter: metadata.filter ? cloneSheetFilter(metadata.filter) : null,
     mergedCells: metadata.mergedCells.map((range) => ({
@@ -1614,6 +1685,9 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
     left.cells.length !== right.cells.length ||
     left.rowHeights.length !== right.rowHeights.length ||
     left.columnWidths.length !== right.columnWidths.length ||
+    left.hiddenRows?.length !== right.hiddenRows?.length ||
+    left.hiddenColumns?.length !== right.hiddenColumns?.length ||
+    left.defaultColumnWidth !== right.defaultColumnWidth ||
     !areSheetMetadataEqual(left, right) ||
     left.floatingImages.length !== right.floatingImages.length
   ) {
@@ -1637,6 +1711,8 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
         dimension.index === right.columnWidths[index]?.index &&
         dimension.size === right.columnWidths[index]?.size,
     ) &&
+    left.hiddenRows!.every((index, position) => index === right.hiddenRows?.[position]) &&
+    left.hiddenColumns!.every((index, position) => index === right.hiddenColumns?.[position]) &&
     left.floatingImages.every((image, index) =>
       areFloatingImagesEqual(image, right.floatingImages[index]),
     )
@@ -1661,6 +1737,9 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
       index,
       size,
     })),
+    hiddenRows: [...(sheet.hiddenRows ?? [])],
+    hiddenColumns: [...(sheet.hiddenColumns ?? [])],
+    defaultColumnWidth: getDefaultColumnWidth(sheet),
     freezePanes: cloneFreezePanes(sheet.freezePanes),
     filter: sheet.filter ? cloneSheetFilter(sheet.filter) : null,
     mergedCells: sheet.mergedCells.map((range) => ({
@@ -1681,6 +1760,8 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   sheet.cells.clear();
   sheet.rowHeights.clear();
   sheet.columnWidths.clear();
+  sheet.hiddenRows?.clear();
+  sheet.hiddenColumns?.clear();
   for (const cell of nextState.cells) {
     sheet.cells.set(createCellKey(cell.address), {
       ...(cell.content === undefined ? {} : { content: cloneCellContent(cell.content) }),
@@ -1693,6 +1774,9 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   for (const dimension of nextState.columnWidths) {
     sheet.columnWidths.set(dimension.index, dimension.size);
   }
+  sheet.hiddenRows = new Set(nextState.hiddenRows);
+  sheet.hiddenColumns = new Set(nextState.hiddenColumns);
+  sheet.defaultColumnWidth = nextState.defaultColumnWidth;
   sheet.freezePanes = cloneFreezePanes(nextState.freezePanes);
   sheet.filter = nextState.filter ? cloneSheetFilter(nextState.filter) : null;
   sheet.mergedCells = nextState.mergedCells.map((range) => ({

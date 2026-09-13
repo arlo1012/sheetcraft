@@ -86,16 +86,29 @@ function createSparseAxisMetrics(
   count: number,
   defaultSize: number,
   overrides: ReadonlyMap<number, number>,
+  hiddenIndexes: Iterable<number> = [],
 ): SparseAxisMetrics {
-  const entries = [...overrides]
-    .filter(([index, size]) => {
-      if (!Number.isInteger(index) || index < 0) {
-        throw new RangeError(`Dimension index ${index} is invalid.`);
-      }
-      if (!Number.isInteger(size) || size <= 0) {
-        throw new RangeError(`Dimension size ${size} must be a positive integer.`);
-      }
-      return index < count && size !== defaultSize;
+  const hidden = new Set<number>();
+  for (const index of hiddenIndexes) {
+    if (!Number.isInteger(index) || index < 0) {
+      throw new RangeError(`Dimension index ${index} is invalid.`);
+    }
+    if (index < count) hidden.add(index);
+  }
+  const entriesByIndex = new Map<number, number>();
+  for (const [index, size] of overrides) {
+    if (!Number.isInteger(index) || index < 0) {
+      throw new RangeError(`Dimension index ${index} is invalid.`);
+    }
+    if (!Number.isInteger(size) || size <= 0) {
+      throw new RangeError(`Dimension size ${size} must be a positive integer.`);
+    }
+    if (index < count && size !== defaultSize) entriesByIndex.set(index, size);
+  }
+  for (const index of hidden) entriesByIndex.set(index, 0);
+  const entries = [...entriesByIndex]
+    .filter(([, size]) => {
+      return size !== defaultSize;
     })
     .sort(([left], [right]) => left - right);
   const indexes: number[] = [];
@@ -167,6 +180,8 @@ export function createSheetGeometry(options?: {
   columnWidth?: number;
   rowHeights?: ReadonlyMap<number, number>;
   columnWidths?: ReadonlyMap<number, number>;
+  hiddenRows?: Iterable<number>;
+  hiddenColumns?: Iterable<number>;
 }): SheetGeometry {
   const rowCount = options?.rowCount ?? MAX_SHEET_ROWS;
   const columnCount = options?.columnCount ?? MAX_SHEET_COLUMNS;
@@ -181,11 +196,17 @@ export function createSheetGeometry(options?: {
     throw new RangeError("Sheet geometry dimensions exceed the sheet limits.");
   }
 
-  const rowMetrics = createSparseAxisMetrics(rowCount, rowHeight, options?.rowHeights ?? new Map());
+  const rowMetrics = createSparseAxisMetrics(
+    rowCount,
+    rowHeight,
+    options?.rowHeights ?? new Map(),
+    options?.hiddenRows,
+  );
   const columnMetrics = createSparseAxisMetrics(
     columnCount,
     columnWidth,
     options?.columnWidths ?? new Map(),
+    options?.hiddenColumns,
   );
   const totalSize = {
     width: columnMetrics.getTotalSize(),

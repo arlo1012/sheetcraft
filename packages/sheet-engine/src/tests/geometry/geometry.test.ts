@@ -50,6 +50,31 @@ describe("sheet geometry", () => {
     expect(variableGeometry.getTotalSize()).toEqual({ width: 380, height: 100 });
   });
 
+  test("collapses hidden axes without discarding their stored dimensions", () => {
+    const hiddenGeometry = createSheetGeometry({
+      rowCount: 5,
+      columnCount: 5,
+      rowHeight: 20,
+      columnWidth: 80,
+      rowHeights: new Map([[1, 36]]),
+      columnWidths: new Map([[2, 120]]),
+      hiddenRows: [1],
+      hiddenColumns: [2],
+    });
+
+    expect(hiddenGeometry.getRowHeight(1)).toBe(0);
+    expect(hiddenGeometry.getColumnWidth(2)).toBe(0);
+    expect(hiddenGeometry.getCellRect({ row: 2, column: 3 })).toEqual({
+      x: 160,
+      y: 20,
+      width: 80,
+      height: 20,
+    });
+    expect(hiddenGeometry.getCellAtPoint({ x: 159, y: 19 })).toEqual({ row: 0, column: 1 });
+    expect(hiddenGeometry.getCellAtPoint({ x: 160, y: 20 })).toEqual({ row: 2, column: 3 });
+    expect(hiddenGeometry.getTotalSize()).toEqual({ width: 320, height: 80 });
+  });
+
   test("ignores valid dimension overrides outside the allocated grid extent", () => {
     const geometryWithFutureDimensions = createSheetGeometry({
       rowCount: 10,

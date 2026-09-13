@@ -655,6 +655,17 @@ export type MessageSchema = FormulaToolsMessageSchema & {
     pasteShortcut: string;
   };
   axisMenu: {
+    autoFitRowHeight: string;
+    autoFitColumnWidth: string;
+    standardColumnWidth: string;
+    insertCells: string;
+    deleteCells: string;
+    hideAndUnhide: string;
+    hideRows: string;
+    unhideRows: string;
+    hideColumns: string;
+    unhideColumns: string;
+    operationFailed: string;
     rowActions: string;
     columnActions: string;
     insertCount: string;

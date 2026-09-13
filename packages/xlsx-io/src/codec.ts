@@ -12,6 +12,7 @@ import {
 } from "@idea10/core/formula";
 import {
   createSheetEvaluator,
+  getDefaultColumnWidth,
   replaceSheetSparseState,
   type CellRange,
   type Workbook,
@@ -72,14 +73,19 @@ type BrowserWorksheet = XlsxImageWorksheet & {
   name: string;
   properties: { defaultRowHeight?: number; defaultColWidth?: number; tabColor?: { argb: string } };
   views?: Array<Record<string, unknown>> | null;
-  columns?: Array<{ number?: number; width?: number }>;
+  columns?: Array<{ number?: number; width?: number; hidden?: boolean }>;
   autoFilter?: unknown;
   model?: {
     merges?: string[];
-    rows?: Array<{ number?: number; height?: number; cells?: Array<{ address?: string }> }>;
+    rows?: Array<{
+      number?: number;
+      height?: number;
+      hidden?: boolean;
+      cells?: Array<{ address?: string }>;
+    }>;
   };
-  getColumn: (index: number) => { width?: number };
-  getRow: (index: number) => { height?: number };
+  getColumn: (index: number) => { width?: number; hidden?: boolean };
+  getRow: (index: number) => { height?: number; hidden?: boolean };
   eachRow: (
     options: { includeEmpty: boolean },
     callback: (row: BrowserRow, rowNumber: number) => void,
@@ -467,10 +473,21 @@ export async function decodeWithExcelJs(
     }> = [];
     const rowHeights: Array<{ index: number; size: number }> = [];
     const columnWidths: Array<{ index: number; size: number }> = [];
+    const hiddenRows: number[] = [];
+    const hiddenColumns: number[] = [];
+    const sourceDefaultColumnWidth = sourceSheet.properties.defaultColWidth;
+    const defaultColumnWidth =
+      typeof sourceDefaultColumnWidth === "number" && Number.isFinite(sourceDefaultColumnWidth)
+        ? Math.max(
+            MIN_COLUMN_WIDTH,
+            Math.min(MAX_COLUMN_WIDTH, excelColumnWidthToPixels(sourceDefaultColumnWidth)),
+          )
+        : DEFAULT_COLUMN_WIDTH;
     for (const row of sourceSheet.model?.rows ?? []) {
       const rowNumber = row.number;
       if (typeof rowNumber !== "number" || !Number.isInteger(rowNumber) || rowNumber < 1) continue;
       const rowIndex = rowNumber - 1;
+      if (row.hidden === true) hiddenRows.push(rowIndex);
       if (typeof row.height === "number") {
         const coreHeight = (row.height * 4) / 3;
         const roundedHeight = Math.round(coreHeight);
@@ -524,12 +541,13 @@ export async function decodeWithExcelJs(
     for (const column of sourceSheet.columns ?? []) {
       const index = column.number;
       const width = column.width;
-      if (typeof index !== "number" || !Number.isInteger(index) || index < 1 || width === undefined)
-        continue;
+      if (typeof index !== "number" || !Number.isInteger(index) || index < 1) continue;
       const columnIndex = index;
+      if (column.hidden === true) hiddenColumns.push(columnIndex - 1);
+      if (width === undefined) continue;
       const pixels = excelColumnWidthToPixels(width);
       const size = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, pixels));
-      if (size !== DEFAULT_COLUMN_WIDTH) columnWidths.push({ index: columnIndex - 1, size });
+      if (size !== defaultColumnWidth) columnWidths.push({ index: columnIndex - 1, size });
       add(report, "dimension-approximated", `${sourceSheet.name}!${columnLabel(columnIndex - 1)}`);
     }
     const view = (sourceSheet.views ?? []).find((candidate) => candidate.state === "frozen");
@@ -557,6 +575,9 @@ export async function decodeWithExcelJs(
       cells,
       rowHeights,
       columnWidths,
+      hiddenRows,
+      hiddenColumns,
+      defaultColumnWidth,
       freezePanes,
       filter: null,
       mergedCells,
@@ -723,7 +744,7 @@ export async function encodeWithExcelJs(
           : undefined,
     });
     output.properties.defaultRowHeight = (DEFAULT_ROW_HEIGHT * 3) / 4;
-    output.properties.defaultColWidth = pixelsToExcelColumnWidth(DEFAULT_COLUMN_WIDTH);
+    output.properties.defaultColWidth = pixelsToExcelColumnWidth(getDefaultColumnWidth(sheet));
     if (sheet.properties.tabColor) {
       output.properties.tabColor = {
         argb: `FF${sheet.properties.tabColor.slice(1).toUpperCase()}`,
@@ -732,8 +753,14 @@ export async function encodeWithExcelJs(
     for (const [index, size] of sheet.rowHeights) {
       output.getRow(index + 1).height = (size * 3) / 4;
     }
+    for (const index of sheet.hiddenRows ?? []) {
+      output.getRow(index + 1).hidden = true;
+    }
     for (const [index, size] of sheet.columnWidths) {
       output.getColumn(index + 1).width = pixelsToExcelColumnWidth(size);
+    }
+    for (const index of sheet.hiddenColumns ?? []) {
+      output.getColumn(index + 1).hidden = true;
     }
     if (sheet.filter) add(report, "filter-omitted", sheet.name);
     for (const [key, cell] of sheet.cells) {

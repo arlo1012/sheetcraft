@@ -37,6 +37,7 @@ describe("ribbon structure tools", () => {
     await formula.trigger("focus");
     await formula.setValue("21");
     await workspace.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await new DOMWrapper(document.body).get('[data-row-column-action="insert"]').trigger("click");
     await new DOMWrapper(document.body)
       .get('[data-row-column-action="insert-rows-above"]')
       .trigger("click");

@@ -93,6 +93,9 @@ function trackSheetDisplayDocument(sheet: Sheet): void {
     void index;
     void size;
   }
+  void sheet.defaultColumnWidth;
+  for (const row of sheet.hiddenRows ?? []) void row;
+  for (const column of sheet.hiddenColumns ?? []) void column;
   void sheet.mergedCells;
   void sheet.freezePanes;
   void sheet.filter;

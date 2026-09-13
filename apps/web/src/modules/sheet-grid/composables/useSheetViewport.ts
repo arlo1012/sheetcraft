@@ -22,6 +22,7 @@ import { createSheetGridViewState, type SheetGridViewState } from "@idea10/sheet
 import { MergedCellRangeResolver } from "@idea10/core";
 import {
   DEFAULT_ROW_HEIGHT,
+  DEFAULT_COLUMN_WIDTH,
   MAX_SHEET_ROWS,
   type CellAddress,
   type CellRange,
@@ -36,6 +37,9 @@ export function useSheetViewport(options: {
   initialExtent: GridExtent;
   getGridExtentPolicy: () => GridExtentPolicy;
   getColumnWidths: () => ReadonlyMap<number, number>;
+  getDefaultColumnWidth?: () => number;
+  getHiddenRows?: () => ReadonlySet<number> | undefined;
+  getHiddenColumns?: () => ReadonlySet<number> | undefined;
   getContentExtent: () => GridExtent;
   getRowHeights: () => ReadonlyMap<number, number>;
   getFreezePanes: () => { rows: number; columns: number };
@@ -83,6 +87,9 @@ export function useSheetViewport(options: {
       columnCount: gridExtent.columnCount,
       rowHeights: options.getRowHeights(),
       columnWidths: options.getColumnWidths(),
+      columnWidth: options.getDefaultColumnWidth?.() ?? DEFAULT_COLUMN_WIDTH,
+      hiddenRows: options.getHiddenRows?.(),
+      hiddenColumns: options.getHiddenColumns?.(),
     }),
   );
   const rowVisibility = computed(() =>
@@ -91,6 +98,7 @@ export function useSheetViewport(options: {
       defaultRowHeight: DEFAULT_ROW_HEIGHT,
       rowHeights: options.getRowHeights(),
       hiddenIntervals: options.getHiddenRowIntervals(),
+      hiddenRows: options.getHiddenRows?.(),
     }),
   );
   // Sparse full-sheet metrics resolve a viewport past the current allocation without
@@ -99,6 +107,9 @@ export function useSheetViewport(options: {
     createSheetGeometry({
       rowHeights: options.getRowHeights(),
       columnWidths: options.getColumnWidths(),
+      columnWidth: options.getDefaultColumnWidth?.() ?? DEFAULT_COLUMN_WIDTH,
+      hiddenRows: options.getHiddenRows?.(),
+      hiddenColumns: options.getHiddenColumns?.(),
     }),
   );
   const extentRows = computed(() =>
@@ -107,6 +118,7 @@ export function useSheetViewport(options: {
       defaultRowHeight: DEFAULT_ROW_HEIGHT,
       rowHeights: options.getRowHeights(),
       hiddenIntervals: options.getHiddenRowIntervals(),
+      hiddenRows: options.getHiddenRows?.(),
     }),
   );
   const mergeResolver = computed(() => {
@@ -452,6 +464,7 @@ export function useSheetViewport(options: {
     onWheel,
     restore,
     rowVisibility,
+    navigationRows: extentRows,
     scrollPosition,
     scrollHorizontally,
     scrollerRef,

@@ -112,6 +112,11 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
     })),
     rowHeights: state.rowHeights.map((dimension) => ({ ...dimension })),
     columnWidths: state.columnWidths.map((dimension) => ({ ...dimension })),
+    ...(state.hiddenRows ? { hiddenRows: [...state.hiddenRows] } : {}),
+    ...(state.hiddenColumns ? { hiddenColumns: [...state.hiddenColumns] } : {}),
+    ...(state.defaultColumnWidth === undefined
+      ? {}
+      : { defaultColumnWidth: state.defaultColumnWidth }),
     freezePanes: { ...state.freezePanes },
     filter: state.filter
       ? {

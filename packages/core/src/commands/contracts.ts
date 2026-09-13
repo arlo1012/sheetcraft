@@ -106,6 +106,54 @@ export type ResizeSheetDimensionCommand = {
   size: number;
 };
 
+export type ResizeSheetDimensionsCommand = {
+  type: "resizeSheetDimensions";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  indexes: number[];
+  size: number;
+};
+
+/** Applies potentially different explicit sizes in one atomic history action. */
+export type SetSheetDimensionSizesCommand = {
+  type: "setSheetDimensionSizes";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  changes: SheetSparseDimension[];
+};
+
+export type SetSheetDimensionHiddenCommand = {
+  type: "setSheetDimensionHidden";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  indexes: number[];
+  hidden: boolean;
+};
+
+/** Removes explicit axis sizes, restoring automatic/default dimensions. */
+export type ResetSheetDimensionSizesCommand = {
+  type: "resetSheetDimensionSizes";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  indexes: number[];
+};
+
+export type SetSheetDefaultColumnWidthCommand = {
+  type: "setSheetDefaultColumnWidth";
+  sheetId: string;
+  width: number;
+};
+
+/** Internal exact sparse axis state used for lossless history inverses. */
+export type RestoreSheetDimensionStateCommand = {
+  type: "restoreSheetDimensionState";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  dimensions: SheetSparseDimension[];
+  hiddenIndexes: number[];
+  defaultColumnWidth?: number;
+};
+
 export type SetSheetFreezePanesCommand = {
   type: "setSheetFreezePanes";
   sheetId: string;
@@ -291,6 +339,8 @@ export type RestoreFullSheetStateCommand = {
 export type SheetAxisSparseSlice = {
   cells: SheetSparseCell[];
   dimensions: SheetSparseDimension[];
+  /** Hidden indexes removed by the structural operation. */
+  hiddenIndexes?: number[];
   /** Images removed from the structural operation, preserving their sheet order. */
   floatingImages: Array<{ image: FloatingImage; index: number }>;
   /** Exact raw formula sources before the structural change, for lossless undo. */
@@ -342,6 +392,12 @@ export type WorkbookCommand =
   | AdjustCellIndentCommand
   | RestoreCellStylesCommand
   | ResizeSheetDimensionCommand
+  | ResizeSheetDimensionsCommand
+  | SetSheetDimensionSizesCommand
+  | SetSheetDimensionHiddenCommand
+  | ResetSheetDimensionSizesCommand
+  | SetSheetDefaultColumnWidthCommand
+  | RestoreSheetDimensionStateCommand
   | SetSheetFreezePanesCommand
   | MergeCellsCommand
   | UnmergeCellsCommand
@@ -374,6 +430,9 @@ export type WorkbookOperation =
   | "format.cells"
   | "format.borders"
   | "dimensions.resize"
+  | "dimensions.hide"
+  | "dimensions.reset"
+  | "dimensions.defaultWidth"
   | "view.freeze"
   | "cells.merge"
   | "cells.unmerge"
@@ -418,7 +477,17 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "restoreSheetState":
       return "history.restore";
     case "resizeSheetDimension":
+    case "resizeSheetDimensions":
+    case "setSheetDimensionSizes":
       return "dimensions.resize";
+    case "setSheetDimensionHidden":
+      return "dimensions.hide";
+    case "resetSheetDimensionSizes":
+      return "dimensions.reset";
+    case "setSheetDefaultColumnWidth":
+      return "dimensions.defaultWidth";
+    case "restoreSheetDimensionState":
+      return "history.restore";
     case "setSheetFreezePanes":
       return "view.freeze";
     case "mergeCells":

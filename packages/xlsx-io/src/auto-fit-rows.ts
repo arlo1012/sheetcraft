@@ -31,7 +31,7 @@ export function getAutoFitRowNumbers(sheet: Sheet): ReadonlySet<number> {
     if (!cell.content || cell.content.kind === "image" || cell.style?.wrapText !== true) continue;
     const separator = key.indexOf(":");
     const row = Number(key.slice(0, separator));
-    if (!Number.isInteger(row) || sheet.rowHeights.has(row)) continue;
+    if (!Number.isInteger(row) || sheet.rowHeights.has(row) || sheet.hiddenRows?.has(row)) continue;
     candidates.add(row);
   }
 

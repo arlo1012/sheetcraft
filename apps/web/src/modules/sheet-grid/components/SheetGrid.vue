@@ -32,6 +32,7 @@ import {
   createSheetEvaluator,
   getCellContent,
   getCellStyle,
+  getDefaultColumnWidth,
   type FloatingImage,
   type CellAddress,
   type ImageTransform,
@@ -324,6 +325,7 @@ const {
   onWheel,
   restore: restoreViewport,
   rowVisibility,
+  navigationRows,
   scrollPosition,
   scrollHorizontally,
   scrollerRef,
@@ -349,6 +351,9 @@ const {
     },
   }),
   getColumnWidths: () => effectiveColumnWidths.value,
+  getDefaultColumnWidth: () => getDefaultColumnWidth(props.sheet),
+  getHiddenRows: () => props.sheet.hiddenRows,
+  getHiddenColumns: () => props.sheet.hiddenColumns,
   getContentExtent: () => contentExtent.value,
   getRowHeights: () => effectiveRowHeights.value,
   getFreezePanes: () => props.sheet.freezePanes,
@@ -435,6 +440,7 @@ const automaticRowHeights = computed(() => {
     formatValue: (_address, cell, value) =>
       formatCellValueForGrid(value, cell.style, locale.value, props.dateSystem),
     columnWidths: effectiveColumnWidths.value,
+    defaultColumnWidth: props.sheet.defaultColumnWidth,
     rowCount: gridExtent.rowCount,
     columnCount: gridExtent.columnCount,
     defaultFontFamily: defaultFontFamily.value,
@@ -1216,8 +1222,9 @@ const { handleReferenceKeydown } = useFormulaReferenceNavigation({
   getActiveAddress: () => activeCell.value,
   getVisibleRow: (row, direction) =>
     direction > 0
-      ? rowVisibility.value.getNextVisibleRow(row)
-      : rowVisibility.value.getPreviousVisibleRow(row),
+      ? navigationRows.value.getNextVisibleRow(row)
+      : navigationRows.value.getPreviousVisibleRow(row),
+  getVisibleColumn: getNextVisibleColumn,
   ensureVisible: (address) => {
     ensureGridExtentContains(address);
     ensureSelectionVisible(address, "cells");
@@ -1239,16 +1246,33 @@ function startReferencePick(address: CellAddress, event: MouseEvent): boolean {
   return true;
 }
 
-watch(rowVisibility, () => {
-  if (rowVisibility.value.isRowVisible(selection.value.active.row)) return;
-  const column = selection.value.active.column;
-  const replacement =
-    rowVisibility.value.getNextVisibleRow(selection.value.active.row) ??
-    rowVisibility.value.getPreviousVisibleRow(selection.value.active.row) ??
-    props.sheet.filter?.range.start.row ??
-    0;
-  setSelection(createCellSelection({ row: replacement, column }));
-});
+function getNextVisibleColumn(column: number, direction: -1 | 1): number | null {
+  let next = column + direction;
+  while (next >= 0 && next < MAX_SHEET_COLUMNS) {
+    if (!props.sheet.hiddenColumns?.has(next)) return next;
+    next += direction;
+  }
+  return null;
+}
+
+watch(
+  [navigationRows, () => props.sheet.hiddenColumns],
+  () => {
+    const current = selection.value.active;
+    const rows = navigationRows.value;
+    const row = rows.isRowVisible(current.row)
+      ? current.row
+      : (rows.getNextVisibleRow(current.row) ?? rows.getPreviousVisibleRow(current.row));
+    const column = !props.sheet.hiddenColumns?.has(current.column)
+      ? current.column
+      : (getNextVisibleColumn(current.column, 1) ?? getNextVisibleColumn(current.column, -1));
+    if (row === null || column === null || (row === current.row && column === current.column))
+      return;
+    ensureGridExtentContains({ row, column });
+    setSelection(createCellSelection({ row, column }));
+  },
+  { deep: true },
+);
 
 watch(
   () => props.sheet.mergedCells,
@@ -1292,12 +1316,24 @@ function moveSelection(
     const source = extend ? selection.value.focus : selection.value.active;
     const row =
       delta.rows > 0
-        ? rowVisibility.value.getNextVisibleRow(source.row)
-        : rowVisibility.value.getPreviousVisibleRow(source.row);
-    if (row !== null) {
-      if (!extend) destination.active.row = row;
-      destination.focus.row = row;
+        ? navigationRows.value.getNextVisibleRow(source.row)
+        : navigationRows.value.getPreviousVisibleRow(source.row);
+    if (row === null) return;
+    if (!extend) {
+      destination.active.row = row;
+      destination.anchor.row = row;
     }
+    destination.focus.row = row;
+  }
+  if (delta.columns) {
+    const source = extend ? selection.value.focus : selection.value.active;
+    const column = getNextVisibleColumn(source.column, delta.columns > 0 ? 1 : -1);
+    if (column === null) return;
+    if (!extend) {
+      destination.active.column = column;
+      destination.anchor.column = column;
+    }
+    destination.focus.column = column;
   }
   const visibleAddress = extend ? destination.focus : destination.active;
   ensureGridExtentContains(visibleAddress);
@@ -1711,7 +1747,14 @@ function traverseSelection(key: "Enter" | "Tab", reverse: boolean, commitEdit: b
         : reverse
           ? "backward-column"
           : "forward-column";
-    const destination = moveActiveCellWithinSelection(selection.value, direction);
+    const destination = moveActiveCellWithinSelection(selection.value, direction, {
+      isRowVisible: (row) => navigationRows.value.isRowVisible(row),
+      getNextVisibleRow: (row) => navigationRows.value.getNextVisibleRow(row),
+      getPreviousVisibleRow: (row) => navigationRows.value.getPreviousVisibleRow(row),
+      isColumnVisible: (column) => !props.sheet.hiddenColumns?.has(column),
+      getNextVisibleColumn: (column) => getNextVisibleColumn(column, 1),
+      getPreviousVisibleColumn: (column) => getNextVisibleColumn(column, -1),
+    });
     if (commitEdit) {
       finishEdit(destination);
     } else {

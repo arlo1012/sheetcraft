@@ -8,6 +8,7 @@ export function useFormulaReferenceNavigation(options: {
   getEditor: () => FormulaReferenceEditor | null;
   getActiveAddress: () => CellAddress;
   getVisibleRow: (row: number, direction: -1 | 1) => number | null;
+  getVisibleColumn?: (column: number, direction: -1 | 1) => number | null;
   ensureVisible: (address: CellAddress) => void;
 }) {
   function handleReferenceKeydown(event: KeyboardEvent): boolean {
@@ -40,7 +41,10 @@ export function useFormulaReferenceNavigation(options: {
       row: delta.rows
         ? (options.getVisibleRow(source.row, delta.rows > 0 ? 1 : -1) ?? source.row)
         : source.row,
-      column: Math.max(0, Math.min(MAX_SHEET_COLUMNS - 1, source.column + delta.columns)),
+      column:
+        delta.columns && options.getVisibleColumn
+          ? (options.getVisibleColumn(source.column, delta.columns > 0 ? 1 : -1) ?? source.column)
+          : Math.max(0, Math.min(MAX_SHEET_COLUMNS - 1, source.column + delta.columns)),
     };
     destination.row = Math.max(0, Math.min(MAX_SHEET_ROWS - 1, destination.row));
     const range: CellRange = {

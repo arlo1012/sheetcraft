@@ -27,10 +27,24 @@ import {
   setCellStyle,
   setColumnWidth,
   setSheetMetadata,
+  setSheetDimensionHidden,
   setRowHeight,
 } from "../../workbook.js";
 
 describe("sheet axis structure commands", () => {
+  test("moves and restores hidden dimensions with their manual sizes", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setRowHeight(sheet, 2, 48);
+    setSheetDimensionHidden(sheet, "row", 2, true);
+    executeWorkbookCommand(session, createMoveSheetAxisCommand(sheet.id, "row", 2, 1, 5));
+    expect(sheet.hiddenRows).toEqual(new Set([5]));
+    expect(sheet.rowHeights.get(5)).toBe(48);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(sheet.hiddenRows).toEqual(new Set([2]));
+    expect(sheet.rowHeights.get(2)).toBe(48);
+  });
+
   test("reorders complete rows with styles, dimensions, images, metadata, formulas, and history", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);

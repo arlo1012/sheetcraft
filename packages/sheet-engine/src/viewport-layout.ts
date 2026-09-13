@@ -269,10 +269,12 @@ export function createSheetViewportLayout(options: {
     const end = Math.min(range.endColumn, bounds.end - 1);
     const columns: ViewportAxisItem[] = [];
     for (let column = start; column <= end; column += 1) {
+      const size = geometry.getColumnWidth(column);
+      if (size === 0) continue;
       columns.push({
         index: column,
         offset: geometry.getColumnOffset(column),
-        size: geometry.getColumnWidth(column),
+        size,
       });
     }
     return columns;
@@ -332,11 +334,12 @@ export function createSheetViewportLayout(options: {
   function getCellRect(address: CellAddress): Rect | null {
     assertAddress(address);
     const row = rows.getVisibleRow(address.row);
-    if (!row) return null;
+    const width = geometry.getColumnWidth(address.column);
+    if (!row || width === 0) return null;
     return {
       x: geometry.getColumnOffset(address.column),
       y: row.offset,
-      width: geometry.getColumnWidth(address.column),
+      width,
       height: row.height,
     };
   }
@@ -443,6 +446,7 @@ export function createSheetViewportLayout(options: {
     const x = geometry.getColumnOffset(range.start.column);
     const right =
       geometry.getColumnOffset(range.end.column) + geometry.getColumnWidth(range.end.column);
+    if (right <= x) return null;
     return {
       x,
       y: firstRow.offset,

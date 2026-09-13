@@ -10,6 +10,7 @@ import { normalizeCellStyle, type CellStyle } from "./style.js";
 import { normalizeImageTransform, type ImageTransform } from "./image-transform.js";
 import {
   createSheet,
+  DEFAULT_COLUMN_WIDTH,
   createSheetSparseState,
   getWorkbookSheets,
   normalizeSheetName,
@@ -128,7 +129,11 @@ export type WorkbookSnapshotV9 = Omit<WorkbookSnapshotV8, "version"> & {
 };
 /** Current write format. Earlier versions remain available for migration inputs. */
 export type WorkbookSnapshot = WorkbookSnapshotV9;
-export type SheetSnapshot = SheetSnapshotV7;
+export type SheetSnapshot = SheetSnapshotV7 & {
+  hiddenRows?: number[];
+  hiddenColumns?: number[];
+  defaultColumnWidth?: number;
+};
 type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 type UnknownRecord = Record<string, unknown>;
@@ -431,6 +436,19 @@ function parseSparseState(
     columnWidths: asArray(record.columnWidths, `${path}.columnWidths`).map((dimension, index) =>
       parseDimension(dimension, `${path}.columnWidths[${index}]`),
     ),
+    ...(Object.hasOwn(record, "hiddenRows") ||
+    Object.hasOwn(record, "hiddenColumns") ||
+    Object.hasOwn(record, "defaultColumnWidth")
+      ? {
+          hiddenRows: asArray(record.hiddenRows, `${path}.hiddenRows`).map((index, position) =>
+            asInteger(index, `${path}.hiddenRows[${position}]`),
+          ),
+          hiddenColumns: asArray(record.hiddenColumns, `${path}.hiddenColumns`).map(
+            (index, position) => asInteger(index, `${path}.hiddenColumns[${position}]`),
+          ),
+          defaultColumnWidth: asInteger(record.defaultColumnWidth, `${path}.defaultColumnWidth`),
+        }
+      : {}),
     freezePanes:
       version !== 1 && Object.hasOwn(record, "freezePanes")
         ? parseFreezePanes(record.freezePanes, `${path}.freezePanes`)
@@ -497,11 +515,15 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
 }
 
 export function serializeSheet(sheet: Sheet): SheetSnapshot {
+  const state = createSheetSparseState(sheet);
   return {
     id: sheet.id,
     name: sheet.name,
     properties: { ...sheet.properties },
-    ...createSheetSparseState(sheet),
+    ...state,
+    hiddenRows: state.hiddenRows ?? [],
+    hiddenColumns: state.hiddenColumns ?? [],
+    defaultColumnWidth: state.defaultColumnWidth ?? DEFAULT_COLUMN_WIDTH,
   };
 }
 

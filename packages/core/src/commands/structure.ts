@@ -103,6 +103,7 @@ function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
     })),
     dimensions: slice.dimensions.map((dimension) => ({ ...dimension })),
+    ...(slice.hiddenIndexes ? { hiddenIndexes: [...slice.hiddenIndexes] } : {}),
     floatingImages: slice.floatingImages.map(({ image, index }) => ({
       image: cloneFloatingImage(image),
       index,
@@ -421,9 +422,11 @@ function transformSheetAxis(
     return sourceIndex >= index ? [{ key, cell, address, index: sourceIndex }] : [];
   });
   const dimensions = axis === "row" ? sheet.rowHeights : sheet.columnWidths;
+  const hiddenIndexes = axis === "row" ? sheet.hiddenRows : sheet.hiddenColumns;
   const dimensionEntries = [...dimensions].flatMap(([dimensionIndex, size]) =>
     dimensionIndex >= index ? [{ index: dimensionIndex, size }] : [],
   );
+  const hiddenEntries = [...(hiddenIndexes ?? [])].filter((hiddenIndex) => hiddenIndex >= index);
 
   let changed = false;
 
@@ -437,6 +440,12 @@ function transformSheetAxis(
     for (const entry of dimensionEntries) {
       if (entry.index < index + count) {
         dimensions.delete(entry.index);
+        changed = true;
+      }
+    }
+    for (const hiddenIndex of hiddenEntries) {
+      if (hiddenIndex < index + count) {
+        hiddenIndexes?.delete(hiddenIndex);
         changed = true;
       }
     }
@@ -470,6 +479,20 @@ function transformSheetAxis(
     if (targetIndex !== entry.index) {
       dimensions.set(targetIndex, entry.size);
       dimensions.delete(entry.index);
+      changed = true;
+    }
+  }
+  hiddenEntries.sort((left, right) => (operation === "insert" ? right - left : left - right));
+  for (const hiddenIndex of hiddenEntries) {
+    const targetIndex = transformAxisIndex(hiddenIndex, index, count, maximum, operation);
+    if (targetIndex === null) {
+      hiddenIndexes?.delete(hiddenIndex);
+      changed = true;
+      continue;
+    }
+    if (targetIndex !== hiddenIndex) {
+      hiddenIndexes?.add(targetIndex);
+      hiddenIndexes?.delete(hiddenIndex);
       changed = true;
     }
   }
@@ -531,8 +554,12 @@ function captureSheetAxisSlice(
       : [];
   });
   const dimensions = axis === "row" ? sheet.rowHeights : sheet.columnWidths;
+  const hiddenIndexes = axis === "row" ? sheet.hiddenRows : sheet.hiddenColumns;
   const capturedDimensions = [...dimensions].flatMap(([dimensionIndex, size]) =>
     dimensionIndex >= start && dimensionIndex < end ? [{ index: dimensionIndex, size }] : [],
+  );
+  const capturedHiddenIndexes = [...(hiddenIndexes ?? [])].filter(
+    (hiddenIndex) => hiddenIndex >= start && hiddenIndex < end,
   );
   cells.sort(
     (left, right) =>
@@ -559,6 +586,7 @@ function captureSheetAxisSlice(
   return {
     cells,
     dimensions: capturedDimensions,
+    hiddenIndexes: capturedHiddenIndexes,
     floatingImages,
     formulaSources,
     metadata: getSheetMetadata(sheet),
@@ -584,11 +612,17 @@ function restoreSheetAxisSlice(
     changed = true;
   }
   const dimensions = axis === "row" ? sheet.rowHeights : sheet.columnWidths;
+  const hiddenIndexes = axis === "row" ? sheet.hiddenRows : sheet.hiddenColumns;
   for (const dimension of slice.dimensions) {
     if (dimensions.get(dimension.index) === dimension.size) {
       continue;
     }
     dimensions.set(dimension.index, dimension.size);
+    changed = true;
+  }
+  for (const hiddenIndex of slice.hiddenIndexes ?? []) {
+    if (hiddenIndexes?.has(hiddenIndex)) continue;
+    hiddenIndexes?.add(hiddenIndex);
     changed = true;
   }
   for (const { image, index } of slice.floatingImages) {
@@ -655,6 +689,11 @@ function validateSheetAxisSlice(
         dimension.index,
         `Axis restore dimension ${dimension.index} is outside the restored slice.`,
       );
+    }
+  }
+  for (const hiddenIndex of command.slice.hiddenIndexes ?? []) {
+    if (!Number.isInteger(hiddenIndex) || hiddenIndex < start || hiddenIndex >= end) {
+      throw invalidCommandPayload("slice.hiddenIndexes", hiddenIndex);
     }
   }
   for (const entry of command.slice.floatingImages) {
@@ -1060,6 +1099,13 @@ export function applyMoveSheetAxisCommand(
       ...dimension,
       ...(command.axis === "column" ? { index: mapIndex(dimension.index) } : {}),
     })),
+    hiddenRows: previousState.hiddenRows?.map((index) =>
+      command.axis === "row" ? mapIndex(index) : index,
+    ),
+    hiddenColumns: previousState.hiddenColumns?.map((index) =>
+      command.axis === "column" ? mapIndex(index) : index,
+    ),
+    defaultColumnWidth: previousState.defaultColumnWidth,
     freezePanes: metadata.freezePanes,
     filter: metadata.filter,
     mergedCells: metadata.mergedCells,

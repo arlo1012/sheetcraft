@@ -1,9 +1,9 @@
 import type { CellImage } from "@idea10/core/formula";
 import {
-  DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
+  getDefaultColumnWidth,
   normalizeImageTransform,
   type FloatingImage,
   type Sheet,
@@ -60,14 +60,18 @@ function imageAnchor(
     column,
     offsetX,
     0,
-    (index) => sheet.columnWidths.get(index) ?? DEFAULT_COLUMN_WIDTH,
+    (index) =>
+      sheet.hiddenColumns?.has(index)
+        ? 0
+        : (sheet.columnWidths.get(index) ?? getDefaultColumnWidth(sheet)),
     MAX_SHEET_COLUMNS,
   );
   const startRow = advanceAxis(
     row,
     offsetY,
     0,
-    (index) => sheet.rowHeights.get(index) ?? DEFAULT_ROW_HEIGHT,
+    (index) =>
+      sheet.hiddenRows?.has(index) ? 0 : (sheet.rowHeights.get(index) ?? DEFAULT_ROW_HEIGHT),
     MAX_SHEET_ROWS,
   );
   // Store physical size, not a second grid-dependent endpoint. The finalizer
@@ -95,7 +99,8 @@ function advanceAxis(
   let nextIndex = index;
   let nextOffset = offset + length;
   while (nextOffset >= sizeAt(nextIndex)) {
-    nextOffset -= sizeAt(nextIndex);
+    const size = sizeAt(nextIndex);
+    nextOffset -= size;
     nextIndex += 1;
     if (nextIndex >= limit) throw new RangeError("The XLSX image exceeds sheet bounds.");
   }

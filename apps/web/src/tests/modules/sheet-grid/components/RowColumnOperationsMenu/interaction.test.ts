@@ -31,8 +31,14 @@ function mountMenu(
   return wrapper;
 }
 
-function menu() {
+function rootMenu() {
   return new DOMWrapper(document.body).get('ul[role="menu"]');
+}
+
+function submenu() {
+  return new DOMWrapper(document.body).get(
+    '#row-column-operations-submenu-v-0[role="menu"], [id^="row-column-operations-submenu-"]',
+  );
 }
 
 afterEach(() => {
@@ -43,33 +49,40 @@ afterEach(() => {
 });
 
 describe("RowColumnOperationsMenu", () => {
-  test("uses the selected row count for structural commands and clears a complete row span", async () => {
+  test("groups structural operations into screenshot-matching cascading menus", async () => {
     const wrapper = mountMenu();
     await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
     await nextTick();
 
-    await menu().get('[data-row-column-action="insert-rows-above"]').trigger("click");
+    expect(
+      rootMenu()
+        .findAll("[data-row-column-action]")
+        .map((item) => item.attributes("data-row-column-action")),
+    ).toEqual([
+      "row-height",
+      "auto-fit-row-height",
+      "column-width",
+      "auto-fit-column-width",
+      "standard-column-width",
+      "insert",
+      "delete",
+      "visibility",
+    ]);
+
+    await rootMenu().get('[data-row-column-action="insert"]').trigger("click");
+    await nextTick();
+    await submenu().get('[data-row-column-action="insert-rows-above"]').trigger("click");
     expect(wrapper.emitted("insert")).toEqual([[{ axis: "row", index: 2, count: 2 }]]);
 
     await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
     await nextTick();
-    await menu().get('[data-row-column-action="delete-rows"]').trigger("click");
-    expect(wrapper.emitted("delete")).toEqual([[{ axis: "row", index: 2, count: 2 }]]);
-
-    await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await rootMenu().get('[data-row-column-action="delete"]').trigger("click");
     await nextTick();
-    await menu().get('[data-row-column-action="clear-rows"]').trigger("click");
-    expect(wrapper.emitted("clear")).toEqual([
-      [
-        {
-          start: { row: 2, column: 0 },
-          end: { row: 3, column: 16_383 },
-        },
-      ],
-    ]);
+    await submenu().get('[data-row-column-action="delete-rows"]').trigger("click");
+    expect(wrapper.emitted("delete")).toEqual([[{ axis: "row", index: 2, count: 2 }]]);
   });
 
-  test("uses the selected column count and clears a complete column span", async () => {
+  test("uses the selected column count for structural and visibility commands", async () => {
     const wrapper = mountMenu({
       range: {
         start: { row: 4, column: 3 },
@@ -79,23 +92,22 @@ describe("RowColumnOperationsMenu", () => {
     await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
     await nextTick();
 
-    await menu().get('[data-row-column-action="insert-columns-after"]').trigger("click");
+    await rootMenu().get('[data-row-column-action="insert"]').trigger("click");
+    await nextTick();
+    await submenu().get('[data-row-column-action="insert-columns-after"]').trigger("click");
     expect(wrapper.emitted("insert")).toEqual([[{ axis: "column", index: 5, count: 2 }]]);
 
     await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
     await nextTick();
-    await menu().get('[data-row-column-action="clear-columns"]').trigger("click");
-    expect(wrapper.emitted("clear")).toEqual([
-      [
-        {
-          start: { row: 0, column: 3 },
-          end: { row: 1_048_575, column: 4 },
-        },
-      ],
+    await rootMenu().get('[data-row-column-action="visibility"]').trigger("click");
+    await nextTick();
+    await submenu().get('[data-row-column-action="hide-columns"]').trigger("click");
+    expect(wrapper.emitted("visibility")).toEqual([
+      [{ axis: "column", index: 3, count: 2, hidden: true }],
     ]);
   });
 
-  test("disables protected-sheet operations and dimension actions for multi-axis selections", async () => {
+  test("disables protected-sheet operations while retaining multi-axis dimension actions", async () => {
     const wrapper = mountMenu({ disabled: true });
     expect(wrapper.get('[data-ribbon-action="row-column-operations"]').attributes("disabled")).toBe(
       "",
@@ -106,9 +118,9 @@ describe("RowColumnOperationsMenu", () => {
     await wrapper.setProps({ disabled: false });
     await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
     await nextTick();
-    expect(menu().get('[data-row-column-action="row-height"]').attributes("aria-disabled")).toBe(
-      "true",
-    );
+    expect(
+      rootMenu().get('[data-row-column-action="row-height"]').attributes("aria-disabled"),
+    ).toBe("false");
   });
 
   test("keeps a row-height dialog bound to its opening target and restores trigger focus", async () => {
@@ -121,7 +133,7 @@ describe("RowColumnOperationsMenu", () => {
     const trigger = wrapper.get('[data-ribbon-action="row-column-operations"]');
     await trigger.trigger("click");
     await nextTick();
-    await menu().get('[data-row-column-action="row-height"]').trigger("click");
+    await rootMenu().get('[data-row-column-action="row-height"]').trigger("click");
     await nextTick();
 
     wrapper.getComponent({ name: "TInputNumber" }).vm.$emit("change", 44);
@@ -134,7 +146,64 @@ describe("RowColumnOperationsMenu", () => {
     await new DOMWrapper(document.body).get(".t-dialog__confirm").trigger("click");
     await nextTick();
 
-    expect(wrapper.emitted("resize")).toEqual([[{ axis: "row", index: 2, size: 44 }]]);
+    expect(wrapper.emitted("resize")).toEqual([[{ axis: "row", index: 2, count: 1, size: 44 }]]);
     expect(document.activeElement).toBe(trigger.element);
+  });
+
+  test("resizes and auto-fits every selected axis, then keeps submenu keyboard navigation", async () => {
+    const wrapper = mountMenu({
+      range: {
+        start: { row: 2, column: 3 },
+        end: { row: 3, column: 4 },
+      },
+    });
+    await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await nextTick();
+    await rootMenu().get('[data-row-column-action="auto-fit-row-height"]').trigger("click");
+    expect(wrapper.emitted("autoFit")).toEqual([
+      [
+        {
+          axis: "row",
+          range: { start: { row: 2, column: 3 }, end: { row: 3, column: 4 } },
+        },
+      ],
+    ]);
+
+    await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await nextTick();
+    await rootMenu().get('[data-row-column-action="row-height"]').trigger("click");
+    wrapper.getComponent({ name: "TInputNumber" }).vm.$emit("change", 44);
+    await new DOMWrapper(document.body).get(".t-dialog__confirm").trigger("click");
+    expect(wrapper.emitted("resize")).toEqual([[{ axis: "row", index: 2, count: 2, size: 44 }]]);
+
+    await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await nextTick();
+    const insert = rootMenu().get('[data-row-column-action="insert"]');
+    await insert.trigger("keydown", { key: "ArrowRight" });
+    await nextTick();
+    expect(document.body.querySelector('[id^="row-column-operations-submenu-"]')).not.toBeNull();
+    await submenu().trigger("keydown", { key: "ArrowLeft" });
+    await nextTick();
+    expect(document.activeElement).toBe(insert.element);
+    expect(document.body.querySelector('[id^="row-column-operations-submenu-"]')).toBeNull();
+    await insert.trigger("keydown", { key: "ArrowRight" });
+    await submenu().trigger("keydown", { key: "Escape" });
+    await nextTick();
+    expect(document.activeElement).toBe(insert.element);
+    expect(document.body.querySelector('[id^="row-column-operations-submenu-"]')).toBeNull();
+  });
+
+  test("applies a multi-row size even when the opening row already has that size", async () => {
+    const sheet = createSheet("Sheet1", "sheet-1");
+    sheet.rowHeights.set(2, 20);
+    sheet.rowHeights.set(3, 50);
+    const wrapper = mountMenu({ sheet });
+    await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await nextTick();
+    await rootMenu().get('[data-row-column-action="row-height"]').trigger("click");
+    wrapper.getComponent({ name: "TInputNumber" }).vm.$emit("change", 20);
+    await new DOMWrapper(document.body).get(".t-dialog__confirm").trigger("click");
+
+    expect(wrapper.emitted("resize")).toEqual([[{ axis: "row", index: 2, count: 2, size: 20 }]]);
   });
 });

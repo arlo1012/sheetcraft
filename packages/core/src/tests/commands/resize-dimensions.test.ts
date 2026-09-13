@@ -1,13 +1,20 @@
 import { describe, expect, test } from "vitest";
 import { createTestWorkbookSession } from "../helpers.js";
 import { WorkbookDomainError } from "../../errors.js";
-import { createResizeSheetDimensionCommand } from "../../commands/index.js";
+import {
+  createResetSheetDimensionSizesCommand,
+  createResizeSheetDimensionCommand,
+  createSetSheetDefaultColumnWidthCommand,
+  createSetSheetDimensionHiddenCommand,
+  createSetSheetDimensionSizesCommand,
+} from "../../commands/index.js";
 import {
   DEFAULT_COLUMN_WIDTH,
   DEFAULT_ROW_HEIGHT,
   MIN_ROW_HEIGHT,
   getActiveSheet,
   getColumnWidth,
+  getDefaultColumnWidth,
   getRowHeight,
 } from "../../workbook.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
@@ -65,5 +72,84 @@ describe("resize sheet dimension command", () => {
     );
     expect(getRowHeight(sheet, 4)).toBe(DEFAULT_ROW_HEIGHT);
     expect(session.history.undoStack).toHaveLength(0);
+  });
+
+  test("applies varying sizes as one reversible history action", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    expect(
+      executeWorkbookCommand(
+        session,
+        createSetSheetDimensionSizesCommand(sheet.id, "row", [
+          { index: 2, size: 40 },
+          { index: 3, size: 48 },
+        ]),
+      ),
+    ).toBe(true);
+    expect(session.history.undoStack).toHaveLength(1);
+    expect(getRowHeight(sheet, 2)).toBe(40);
+    expect(getRowHeight(sheet, 3)).toBe(48);
+    undoWorkbookCommand(session);
+    expect(getRowHeight(sheet, 2)).toBe(DEFAULT_ROW_HEIGHT);
+    expect(getRowHeight(sheet, 3)).toBe(DEFAULT_ROW_HEIGHT);
+  });
+
+  test("hides without losing manual dimensions and restores them on undo or unhide", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    executeWorkbookCommand(session, createResizeSheetDimensionCommand(sheet.id, "column", 4, 180));
+    expect(
+      executeWorkbookCommand(
+        session,
+        createSetSheetDimensionHiddenCommand(sheet.id, "column", [4], true),
+      ),
+    ).toBe(true);
+    expect(getColumnWidth(sheet, 4)).toBe(0);
+    expect(sheet.columnWidths.get(4)).toBe(180);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getColumnWidth(sheet, 4)).toBe(180);
+    executeWorkbookCommand(
+      session,
+      createSetSheetDimensionHiddenCommand(sheet.id, "column", [4], true),
+    );
+    executeWorkbookCommand(
+      session,
+      createSetSheetDimensionHiddenCommand(sheet.id, "column", [4], false),
+    );
+    expect(getColumnWidth(sheet, 4)).toBe(180);
+  });
+
+  test("undoes a single resize on a hidden axis using its underlying size", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    executeWorkbookCommand(session, createResizeSheetDimensionCommand(sheet.id, "row", 6, 40));
+    executeWorkbookCommand(
+      session,
+      createSetSheetDimensionHiddenCommand(sheet.id, "row", [6], true),
+    );
+    expect(getRowHeight(sheet, 6)).toBe(0);
+    executeWorkbookCommand(session, createResizeSheetDimensionCommand(sheet.id, "row", 6, 48));
+    expect(sheet.rowHeights.get(6)).toBe(48);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getRowHeight(sheet, 6)).toBe(0);
+    expect(sheet.rowHeights.get(6)).toBe(40);
+  });
+
+  test("changes the sparse default column width and resets explicit dimensions", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    executeWorkbookCommand(session, createSetSheetDefaultColumnWidthCommand(sheet.id, 120));
+    expect(getDefaultColumnWidth(sheet)).toBe(120);
+    expect(getColumnWidth(sheet, 16_383)).toBe(120);
+    expect(sheet.columnWidths).toHaveLength(0);
+    executeWorkbookCommand(session, createResizeSheetDimensionCommand(sheet.id, "column", 3, 180));
+    executeWorkbookCommand(session, createSetSheetDefaultColumnWidthCommand(sheet.id, 180));
+    expect(sheet.columnWidths.has(3)).toBe(false);
+    undoWorkbookCommand(session);
+    expect(getDefaultColumnWidth(sheet)).toBe(120);
+    expect(getColumnWidth(sheet, 3)).toBe(180);
+    executeWorkbookCommand(session, createResetSheetDimensionSizesCommand(sheet.id, "column", [3]));
+    expect(getColumnWidth(sheet, 3)).toBe(120);
+    expect(sheet.columnWidths.has(3)).toBe(false);
   });
 });

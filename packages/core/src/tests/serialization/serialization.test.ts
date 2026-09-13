@@ -23,9 +23,27 @@ import {
   setColumnWidth,
   setRowHeight,
   setSheetMetadata,
+  setSheetDimensionHidden,
+  setDefaultColumnWidth,
 } from "../../workbook.js";
 
 describe("workbook snapshots", () => {
+  test("round trips hidden axes and a sparse default column width", () => {
+    const sheet = createSheet("Dimensions", "dimensions");
+    setRowHeight(sheet, 2, 40);
+    setColumnWidth(sheet, 3, 180);
+    setSheetDimensionHidden(sheet, "row", 2, true);
+    setSheetDimensionHidden(sheet, "column", 3, true);
+    setDefaultColumnWidth(sheet, 120);
+
+    const restored = deserializeSheet(serializeSheet(sheet));
+    expect(restored.hiddenRows).toEqual(new Set([2]));
+    expect(restored.hiddenColumns).toEqual(new Set([3]));
+    expect(restored.rowHeights.get(2)).toBe(40);
+    expect(restored.columnWidths.get(3)).toBe(180);
+    expect(restored.defaultColumnWidth).toBe(120);
+  });
+
   test("rejects V8 names that collide with formula tokens and A1 references", () => {
     const snapshot = serializeWorkbook(createWorkbook({ id: "workbook", sheetId: "sheet" }));
     for (const name of ["A1", "TRUE", "false", "R1C1"]) {

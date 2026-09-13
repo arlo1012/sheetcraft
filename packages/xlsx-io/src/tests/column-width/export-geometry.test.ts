@@ -1,17 +1,68 @@
-import { strFromU8, unzipSync } from "fflate/browser";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
 import {
   createWorkbook,
   getActiveSheet,
+  getColumnWidth,
+  getDefaultColumnWidth,
+  getRowHeight,
   setCellContent,
   setCellStyle,
   setColumnWidth,
+  setDefaultColumnWidth,
   setRowHeight,
+  setSheetDimensionHidden,
 } from "@idea10/core/workbook";
 import { serializeWorkbook } from "@idea10/core/serialization";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../../index.js";
 
 describe("XLSX export geometry", () => {
+  test("round-trips hidden axes and a sheet default width without materializing default columns", async () => {
+    const workbook = createWorkbook({ id: "hidden-geometry", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    setDefaultColumnWidth(sheet, 120);
+    setColumnWidth(sheet, 2, 144);
+    setRowHeight(sheet, 3, 48);
+    setSheetDimensionHidden(sheet, "column", 2, true);
+    setSheetDimensionHidden(sheet, "column", 3, true);
+    setSheetDimensionHidden(sheet, "row", 3, true);
+
+    const archive = unzipSync((await encodeXlsx(workbook)).bytes);
+    const xml = strFromU8(archive["xl/worksheets/sheet1.xml"]!);
+    expect(xml).toContain('defaultColWidth="17.140625"');
+    expect(xml).toContain('<col min="3" max="3" width="20.57421875" hidden="1" customWidth="1"/>');
+    expect(xml).toMatch(/<row\b(?=[^>]*\br="4")(?=[^>]*\bht="36")(?=[^>]*\bhidden="1")/);
+    expect(xml.match(/<col\b/g) ?? []).toHaveLength(2);
+
+    const encoded = await encodeXlsx(workbook);
+    const modifiedArchive = unzipSync(encoded.bytes);
+    const source = strFromU8(modifiedArchive["xl/worksheets/sheet1.xml"]!);
+    const explicitDefaultArchive = unzipSync(encoded.bytes);
+    explicitDefaultArchive["xl/worksheets/sheet1.xml"] = strToU8(
+      source.replace(
+        /<col min="4" max="4"[^>]*\/>/,
+        '<col min="4" max="4" width="17.140625" hidden="1" customWidth="1"/>',
+      ),
+    );
+    const explicitDefault = getActiveSheet(
+      (await decodeXlsx(zipSync(explicitDefaultArchive))).workbook,
+    );
+    expect(explicitDefault.hiddenColumns?.has(3)).toBe(true);
+    expect(explicitDefault.columnWidths.has(3)).toBe(false);
+
+    modifiedArchive["xl/worksheets/sheet1.xml"] = strToU8(
+      source.replace(/<col min="4" max="4"[^>]*\/>/, '<col min="4" max="4" hidden="1"/>'),
+    );
+    const restored = getActiveSheet((await decodeXlsx(zipSync(modifiedArchive))).workbook);
+    expect(getDefaultColumnWidth(restored)).toBe(120);
+    expect(getColumnWidth(restored, 2)).toBe(0);
+    expect(restored.columnWidths.get(2)).toBe(144);
+    expect(getColumnWidth(restored, 3)).toBe(0);
+    expect(restored.hiddenColumns?.has(3)).toBe(true);
+    expect(getRowHeight(restored, 3)).toBe(0);
+    expect(restored.rowHeights.get(3)).toBe(48);
+  });
+
   test("pins Normal independently of the theme and retains the calibrated column widths", async () => {
     const workbook = createWorkbook({ id: "geometry", sheetId: "sheet" });
     const sheet = getActiveSheet(workbook);

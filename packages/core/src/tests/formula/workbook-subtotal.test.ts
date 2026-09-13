@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { createWorkbookEvaluator, getActiveSheet, setCellContent } from "../../workbook.js";
+import {
+  createWorkbookEvaluator,
+  getActiveSheet,
+  setCellContent,
+  setSheetDimensionHidden,
+} from "../../workbook.js";
 import { createTestWorkbook } from "../helpers.js";
 
 describe("worksheet subtotal and aggregate visibility", () => {
@@ -38,7 +43,7 @@ describe("worksheet subtotal and aggregate visibility", () => {
       sheet = getActiveSheet(workbook);
     setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: 10 });
     setCellContent(sheet, { row: 1, column: 0 }, { kind: "formula", formula: { source: "=D1" } });
-    sheet.rowHeights.set(1, 0);
+    setSheetDimensionHidden(sheet, "row", 1, true);
     setCellContent(
       sheet,
       { row: 2, column: 0 },

@@ -46,6 +46,8 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
   }
   for (const row of sheet.rowHeights.keys()) rowCount = Math.max(rowCount, row + 1);
   for (const column of sheet.columnWidths.keys()) columnCount = Math.max(columnCount, column + 1);
+  for (const row of sheet.hiddenRows ?? []) rowCount = Math.max(rowCount, row + 1);
+  for (const column of sheet.hiddenColumns ?? []) columnCount = Math.max(columnCount, column + 1);
   for (const range of sheet.mergedCells) {
     include(range.start);
     include(range.end);
@@ -55,6 +57,9 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
     const geometry = createSheetGeometry({
       rowHeights: sheet.rowHeights,
       columnWidths: sheet.columnWidths,
+      columnWidth: sheet.defaultColumnWidth,
+      hiddenRows: sheet.hiddenRows,
+      hiddenColumns: sheet.hiddenColumns,
     });
     const total = geometry.getTotalSize();
     for (const image of sheet.floatingImages) {

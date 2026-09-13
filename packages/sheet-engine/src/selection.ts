@@ -177,6 +177,7 @@ export function moveCellSelection(
 export function moveActiveCellWithinSelection(
   selection: CellSelection,
   direction: "forward-row" | "backward-row" | "forward-column" | "backward-column",
+  visibility?: SelectionAxisVisibility,
 ): CellSelection {
   if (getSelectionMode(selection) !== "cells") {
     return createCellSelection(selection.active);
@@ -184,26 +185,188 @@ export function moveActiveCellWithinSelection(
   const range = getSelectionRange(selection);
   const rowCount = range.end.row - range.start.row + 1;
   const columnCount = range.end.column - range.start.column + 1;
-  const rowOffset = selection.active.row - range.start.row;
-  const columnOffset = selection.active.column - range.start.column;
-  const isRowOrder = direction === "forward-row" || direction === "backward-row";
-  const length = rowCount * columnCount;
-  const currentIndex = isRowOrder
-    ? rowOffset * columnCount + columnOffset
-    : columnOffset * rowCount + rowOffset;
-  const step = direction === "forward-row" || direction === "forward-column" ? 1 : -1;
-  const nextIndex = (currentIndex + step + length) % length;
-  const nextAddress = isRowOrder
-    ? {
-        row: range.start.row + Math.floor(nextIndex / columnCount),
-        column: range.start.column + (nextIndex % columnCount),
-      }
-    : {
-        row: range.start.row + (nextIndex % rowCount),
-        column: range.start.column + Math.floor(nextIndex / rowCount),
-      };
+  if (!visibility) {
+    const rowOffset = selection.active.row - range.start.row;
+    const columnOffset = selection.active.column - range.start.column;
+    const isRowOrder = direction === "forward-row" || direction === "backward-row";
+    const length = rowCount * columnCount;
+    const currentIndex = isRowOrder
+      ? rowOffset * columnCount + columnOffset
+      : columnOffset * rowCount + rowOffset;
+    const step = direction === "forward-row" || direction === "forward-column" ? 1 : -1;
+    const nextIndex = (currentIndex + step + length) % length;
+    const nextAddress = isRowOrder
+      ? {
+          row: range.start.row + Math.floor(nextIndex / columnCount),
+          column: range.start.column + (nextIndex % columnCount),
+        }
+      : {
+          row: range.start.row + (nextIndex % rowCount),
+          column: range.start.column + Math.floor(nextIndex / rowCount),
+        };
 
-  return { ...selection, active: nextAddress };
+    return { ...selection, active: nextAddress };
+  }
+
+  const firstVisibleRow = firstVisibleIndex(
+    range.start.row,
+    range.end.row,
+    visibility.isRowVisible,
+    visibility.getNextVisibleRow,
+  );
+  const lastVisibleRow = lastVisibleIndex(
+    range.start.row,
+    range.end.row,
+    visibility.isRowVisible,
+    visibility.getPreviousVisibleRow,
+  );
+  const firstVisibleColumn = firstVisibleIndex(
+    range.start.column,
+    range.end.column,
+    visibility.isColumnVisible,
+    visibility.getNextVisibleColumn,
+  );
+  const lastVisibleColumn = lastVisibleIndex(
+    range.start.column,
+    range.end.column,
+    visibility.isColumnVisible,
+    visibility.getPreviousVisibleColumn,
+  );
+  if (
+    firstVisibleRow === null ||
+    lastVisibleRow === null ||
+    firstVisibleColumn === null ||
+    lastVisibleColumn === null
+  ) {
+    return { ...selection, active: { ...selection.active } };
+  }
+
+  const forward = direction === "forward-row" || direction === "forward-column";
+  const isRowOrder = direction === "forward-row" || direction === "backward-row";
+  let row = selection.active.row;
+  let column = selection.active.column;
+
+  if (isRowOrder) {
+    const nextColumn = forward
+      ? nextVisibleIndex(
+          column,
+          range.end.column,
+          visibility.isColumnVisible,
+          visibility.getNextVisibleColumn,
+        )
+      : previousVisibleIndex(
+          column,
+          range.start.column,
+          visibility.isColumnVisible,
+          visibility.getPreviousVisibleColumn,
+        );
+    if (nextColumn !== null && (visibility.isRowVisible?.(row) ?? true)) {
+      column = nextColumn;
+    } else {
+      row = forward
+        ? (nextVisibleIndex(
+            row,
+            range.end.row,
+            visibility.isRowVisible,
+            visibility.getNextVisibleRow,
+          ) ?? firstVisibleRow)
+        : (previousVisibleIndex(
+            row,
+            range.start.row,
+            visibility.isRowVisible,
+            visibility.getPreviousVisibleRow,
+          ) ?? lastVisibleRow);
+      column = forward ? firstVisibleColumn : lastVisibleColumn;
+    }
+  } else {
+    const nextRow = forward
+      ? nextVisibleIndex(row, range.end.row, visibility.isRowVisible, visibility.getNextVisibleRow)
+      : previousVisibleIndex(
+          row,
+          range.start.row,
+          visibility.isRowVisible,
+          visibility.getPreviousVisibleRow,
+        );
+    if (nextRow !== null && (visibility.isColumnVisible?.(column) ?? true)) {
+      row = nextRow;
+    } else {
+      column = forward
+        ? (nextVisibleIndex(
+            column,
+            range.end.column,
+            visibility.isColumnVisible,
+            visibility.getNextVisibleColumn,
+          ) ?? firstVisibleColumn)
+        : (previousVisibleIndex(
+            column,
+            range.start.column,
+            visibility.isColumnVisible,
+            visibility.getPreviousVisibleColumn,
+          ) ?? lastVisibleColumn);
+      row = forward ? firstVisibleRow : lastVisibleRow;
+    }
+  }
+
+  return { ...selection, active: { row, column } };
+}
+
+export type SelectionAxisVisibility = {
+  isRowVisible?: (row: number) => boolean;
+  isColumnVisible?: (column: number) => boolean;
+  getNextVisibleRow?: (row: number) => number | null;
+  getPreviousVisibleRow?: (row: number) => number | null;
+  getNextVisibleColumn?: (column: number) => number | null;
+  getPreviousVisibleColumn?: (column: number) => number | null;
+};
+
+function nextVisibleIndex(
+  index: number,
+  end: number,
+  isVisible: ((index: number) => boolean) | undefined,
+  getNext: ((index: number) => number | null) | undefined,
+): number | null {
+  const candidate = getNext ? getNext(index) : index + 1;
+  return candidate !== null &&
+    candidate > index &&
+    candidate <= end &&
+    (isVisible?.(candidate) ?? true)
+    ? candidate
+    : null;
+}
+
+function previousVisibleIndex(
+  index: number,
+  start: number,
+  isVisible: ((index: number) => boolean) | undefined,
+  getPrevious: ((index: number) => number | null) | undefined,
+): number | null {
+  const candidate = getPrevious ? getPrevious(index) : index - 1;
+  return candidate !== null &&
+    candidate < index &&
+    candidate >= start &&
+    (isVisible?.(candidate) ?? true)
+    ? candidate
+    : null;
+}
+
+function firstVisibleIndex(
+  start: number,
+  end: number,
+  isVisible: ((index: number) => boolean) | undefined,
+  getNext: ((index: number) => number | null) | undefined,
+): number | null {
+  if (isVisible?.(start) ?? true) return start;
+  return nextVisibleIndex(start, end, isVisible, getNext);
+}
+
+function lastVisibleIndex(
+  start: number,
+  end: number,
+  isVisible: ((index: number) => boolean) | undefined,
+  getPrevious: ((index: number) => number | null) | undefined,
+): number | null {
+  if (isVisible?.(end) ?? true) return end;
+  return previousVisibleIndex(end, start, isVisible, getPrevious);
 }
 
 function getAxisAutoScrollDelta(position: number, start: number, end: number): number {

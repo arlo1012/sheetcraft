@@ -105,4 +105,46 @@ describe("sheet selection", () => {
     });
     expect(getSelectionRange(tabbed)).toEqual(getSelectionRange(selection));
   });
+
+  test("cycles through visible cells when dimensions are hidden", () => {
+    const selection = {
+      active: { row: 0, column: 0 },
+      anchor: { row: 0, column: 0 },
+      focus: { row: 2, column: 2 },
+      mode: "cells" as const,
+    };
+    const hiddenRows = new Set([1]);
+    const hiddenColumns = new Set([1]);
+    const nextVisible = (hidden: ReadonlySet<number>, maximum: number) => (index: number) => {
+      for (let candidate = index + 1; candidate <= maximum; candidate += 1) {
+        if (!hidden.has(candidate)) return candidate;
+      }
+      return null;
+    };
+    const previousVisible = (hidden: ReadonlySet<number>) => (index: number) => {
+      for (let candidate = index - 1; candidate >= 0; candidate -= 1) {
+        if (!hidden.has(candidate)) return candidate;
+      }
+      return null;
+    };
+    const visibility = {
+      isRowVisible: (index: number) => !hiddenRows.has(index),
+      isColumnVisible: (index: number) => !hiddenColumns.has(index),
+      getNextVisibleRow: nextVisible(hiddenRows, 2),
+      getPreviousVisibleRow: previousVisible(hiddenRows),
+      getNextVisibleColumn: nextVisible(hiddenColumns, 2),
+      getPreviousVisibleColumn: previousVisible(hiddenColumns),
+    };
+
+    const tabbed = moveActiveCellWithinSelection(selection, "forward-row", visibility);
+    expect(tabbed.active).toEqual({ row: 0, column: 2 });
+    expect(moveActiveCellWithinSelection(tabbed, "forward-row", visibility).active).toEqual({
+      row: 2,
+      column: 0,
+    });
+    expect(moveActiveCellWithinSelection(selection, "backward-column", visibility).active).toEqual({
+      row: 2,
+      column: 2,
+    });
+  });
 });

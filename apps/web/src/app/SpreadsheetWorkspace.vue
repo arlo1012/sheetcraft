@@ -17,6 +17,9 @@ import {
 import { useImageAssetUrls } from "../modules/image-assets/useImageAssetUrls";
 import { useSheetImageActions } from "../modules/sheet-images/useSheetImageActions";
 import SpreadsheetRibbon from "./SpreadsheetRibbon.vue";
+import { createAxisToolActions } from "../modules/sheet-grid/axis-tool-actions";
+import { browserCellTextMeasurer } from "../shared/cell-text/text-metrics";
+import { useAppI18n } from "../shared/i18n";
 import RowColumnOperationsMenu from "../modules/sheet-grid/components/RowColumnOperationsMenu.vue";
 import WorksheetOperationsMenu from "../modules/workbook/components/WorksheetOperationsMenu.vue";
 import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
@@ -143,6 +146,19 @@ const {
 } = useSpreadsheetWorkspaceController();
 
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
+const { locale } = useAppI18n();
+const axisTools = createAxisToolActions({
+  getSheet: () => activeSheet.value,
+  getEvaluator: () => activeSheetEvaluator.value,
+  getLocale: () => locale.value,
+  getDateSystem: () => session.workbook.dateSystem,
+  measurer: browserCellTextMeasurer,
+  flushPendingEdits: () => cellEditSession.finish(),
+  execute: executeCommand,
+  onError: () => {
+    void MessagePlugin.warning(t("axisMenu.operationFailed"));
+  },
+});
 watch(workbookGeneration, () => cellEditSession.cancel(), { flush: "sync" });
 const cellFormatSelection = shallowRef<CellFormatSelection>();
 const cellFormatInitialTab = ref<CellFormatTab>("border");
@@ -402,10 +418,12 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           :range="activeSelectionRange"
           :edit-session-id="cellEditSession.id"
           :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
-          @resize="cellEditSession.finish() && resizeDimension($event)"
+          @resize="axisTools.resize"
+          @auto-fit="axisTools.autoFit"
+          @standard-width="axisTools.standardWidth"
+          @visibility="axisTools.visibility"
           @insert="cellEditSession.finish() && insertAxis($event)"
           @delete="cellEditSession.finish() && deleteAxis($event)"
-          @clear="cellEditSession.finish() && clearCells($event)"
         />
       </template>
       <template #worksheet-tools>
