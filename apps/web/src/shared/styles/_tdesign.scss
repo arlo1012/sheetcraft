@@ -367,10 +367,17 @@
   }
 }
 
-// Shared column stepper appearance; TDesign exposes neither persistent controls
-// nor their resting background and icon size as public props.
+// Shared compact number input appearance; TDesign exposes neither the column
+// stepper width nor persistent controls and their resting appearance as public props.
 .idea-input-number--persistent-controls.t-input-number.t-is-controls-right {
   --idea-input-number-icon-size: var(--idea-control-icon-size);
+  --idea-input-number-padding: 4px;
+  --idea-input-number-stepper-width: 16px;
+
+  .t-input {
+    padding-left: var(--idea-input-number-padding);
+    padding-right: calc(var(--idea-input-number-stepper-width) + var(--idea-input-number-padding));
+  }
 
   &.t-size-s {
     --idea-input-number-icon-size: 12px;
@@ -382,6 +389,7 @@
 
   .t-input-number__decrease,
   .t-input-number__increase {
+    width: var(--idea-input-number-stepper-width);
     visibility: visible;
     opacity: 1;
     background: transparent;
