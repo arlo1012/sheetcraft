@@ -220,14 +220,14 @@ function getPopupAttach(): HTMLElement {
 
 <style scoped lang="scss">
 .sheet-context-format-toolbar {
-  --cell-format-font-width: 126px;
+  --cell-format-font-width: 148px;
   --cell-format-font-size-width: 40px;
   --cell-format-gap: 4px;
   --ribbon-control-height: 26px;
 
   position: relative;
   display: grid;
-  width: 328px;
+  width: 320px;
   gap: 4px;
   padding: 6px 8px;
   background: var(--idea-surface-panel);
@@ -242,7 +242,7 @@ function getPopupAttach(): HTMLElement {
   }
 
   &__row--font {
-    justify-content: space-between;
+    justify-content: flex-start;
   }
 
   &__emphasis {

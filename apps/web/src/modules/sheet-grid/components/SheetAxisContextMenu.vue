@@ -277,7 +277,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
 <style scoped lang="scss">
 .sheet-axis-context-menu-panel {
   z-index: 100;
-  width: 328px;
+  width: 320px;
 }
 .sheet-axis-context-menu {
   width: 236px;
