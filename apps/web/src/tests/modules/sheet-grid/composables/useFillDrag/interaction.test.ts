@@ -82,14 +82,15 @@ describe("useFillDrag", () => {
     expect(commit).toHaveBeenCalledWith(expect.anything(), { copy: false });
   });
 
-  test("locks to the first axis while allowing the drag to reverse direction", () => {
+  test("switches between vertical and horizontal fills during the same drag", () => {
     const previews: string[] = [];
+    const commit = vi.fn();
     const drag = useFillDrag({
       getBounds: () => ({ rowCount: 20, columnCount: 10 }),
       getCaptureTarget: () => document.body,
-      getCellAtClientPoint: (_x, y) => ({
+      getCellAtClientPoint: (x, y) => ({
         row: Math.floor(y / 10),
-        column: 1,
+        column: Math.floor(x / 10),
       }),
       getSourceRange: () => ({
         start: { row: 2, column: 1 },
@@ -97,7 +98,7 @@ describe("useFillDrag", () => {
       }),
       getScroller: () => null,
       getViewportSize: () => ({ width: 320, height: 240 }),
-      onCommit: vi.fn(),
+      onCommit: commit,
       onEnsureGridExtentContains: vi.fn(),
       onEnsureGridExtentCoversViewport: vi.fn(),
       onPreviewChange: (fill) => {
@@ -105,12 +106,23 @@ describe("useFillDrag", () => {
       },
       onScrollPositionChange: vi.fn(),
     });
-    drag.start(event("mousedown", { buttons: 1, clientX: 25, clientY: 25 }));
-    window.dispatchEvent(event("mousemove", { buttons: 1, clientX: 25, clientY: 65 }));
-    window.dispatchEvent(event("mousemove", { buttons: 1, clientX: 25, clientY: 15 }));
-    drag.stop();
+    drag.start(event("mousedown", { buttons: 1, clientX: 15, clientY: 35 }));
+    window.dispatchEvent(event("mousemove", { buttons: 1, clientX: 15, clientY: 65 }));
+    window.dispatchEvent(event("mousemove", { buttons: 1, clientX: 55, clientY: 25 }));
+    window.dispatchEvent(event("mousemove", { buttons: 1, clientX: 5, clientY: 25 }));
+    window.dispatchEvent(event("mousemove", { buttons: 1, clientX: 15, clientY: 5 }));
+    expect(previews).toEqual(["down", "right", "left", "up"]);
+    expect(commit).not.toHaveBeenCalled();
 
-    expect(previews).toEqual(["down", "up"]);
+    window.dispatchEvent(event("mouseup", { buttons: 0, clientX: 15, clientY: 5 }));
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(commit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        direction: "up",
+        target: { start: { row: 0, column: 1 }, end: { row: 1, column: 1 } },
+      }),
+      { copy: false },
+    );
   });
 
   test("Esc cancels without committing", () => {

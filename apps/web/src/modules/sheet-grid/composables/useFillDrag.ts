@@ -3,7 +3,6 @@ import {
   getFillRange,
   getSelectionAutoScrollDelta,
   type FillBounds,
-  type FillAxis,
   type FillRange,
 } from "@idea10/sheet-engine";
 import type { Point, Size } from "@idea10/sheet-engine/geometry";
@@ -23,7 +22,6 @@ type FillDragState = {
   pointerY: number;
   moved: boolean;
   copy: boolean;
-  axis?: FillAxis;
 };
 
 /** Owns the fill-handle drag only; grid rendering and commands stay with its caller. */
@@ -101,10 +99,7 @@ export function useFillDrag(options: {
     options.onEnsureGridExtentContains(address);
     const next = getFillRange(drag.source, address, {
       bounds: options.getBounds(),
-      axis: drag.axis,
     });
-    if (next && !drag.axis)
-      drag.axis = next.direction === "up" || next.direction === "down" ? "rows" : "columns";
     setPreview(next ?? undefined);
   }
 
