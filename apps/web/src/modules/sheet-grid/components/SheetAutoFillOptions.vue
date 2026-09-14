@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ChevronDown, Table2 } from "lucide-vue-next";
+import { Radio as TRadio } from "tdesign-vue-next/es/radio";
 import type { CellFillMode } from "@idea10/core/cell-autofill";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
@@ -135,122 +136,130 @@ function onTriggerKeydown(event: KeyboardEvent): void {
     >
       <MenuItem
         v-if="isAvailable('copy')"
-        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('copy')"
         data-sheet-auto-fill-mode="copy"
         @select="selectMode('copy')"
       >
         <template #icon
-          ><span
-            class="sheet-auto-fill-options__radio"
-            :class="{ 'is-selected': isSelected('copy') }"
-        /></template>
+          ><span inert
+            ><TRadio
+              class="sheet-auto-fill-options__radio"
+              :checked="isSelected('copy')"
+              readonly /></span
+        ></template>
         {{ t("autoFill.copy") }}
       </MenuItem>
       <MenuItem
         v-if="isAvailable('series')"
-        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('series')"
         data-sheet-auto-fill-mode="series"
         @select="selectMode('series')"
       >
         <template #icon
-          ><span
-            class="sheet-auto-fill-options__radio"
-            :class="{ 'is-selected': isSelected('series') }"
-        /></template>
+          ><span inert
+            ><TRadio
+              class="sheet-auto-fill-options__radio"
+              :checked="isSelected('series')"
+              readonly /></span
+        ></template>
         {{ t("autoFill.series") }}
       </MenuItem>
       <MenuItem
         v-if="isAvailable('fillFormatsOnly')"
-        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('fillFormatsOnly')"
         data-sheet-auto-fill-mode="fillFormatsOnly"
         @select="selectMode('fillFormatsOnly')"
       >
         <template #icon
-          ><span
-            class="sheet-auto-fill-options__radio"
-            :class="{ 'is-selected': isSelected('fillFormatsOnly') }"
-        /></template>
+          ><span inert
+            ><TRadio
+              class="sheet-auto-fill-options__radio"
+              :checked="isSelected('fillFormatsOnly')"
+              readonly /></span
+        ></template>
         {{ t("autoFill.fillFormatsOnly") }}
       </MenuItem>
       <MenuItem
         v-if="isAvailable('fillWithoutFormatting')"
-        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('fillWithoutFormatting')"
         data-sheet-auto-fill-mode="fillWithoutFormatting"
         @select="selectMode('fillWithoutFormatting')"
       >
         <template #icon
-          ><span
-            class="sheet-auto-fill-options__radio"
-            :class="{ 'is-selected': isSelected('fillWithoutFormatting') }"
-        /></template>
+          ><span inert
+            ><TRadio
+              class="sheet-auto-fill-options__radio"
+              :checked="isSelected('fillWithoutFormatting')"
+              readonly /></span
+        ></template>
         {{ t("autoFill.fillWithoutFormatting") }}
       </MenuItem>
       <MenuItem
         v-if="isAvailable('dateDay')"
-        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('dateDay')"
         data-sheet-auto-fill-mode="dateDay"
         @select="selectMode('dateDay')"
       >
         <template #icon
-          ><span
-            class="sheet-auto-fill-options__radio"
-            :class="{ 'is-selected': isSelected('dateDay') }"
-        /></template>
+          ><span inert
+            ><TRadio
+              class="sheet-auto-fill-options__radio"
+              :checked="isSelected('dateDay')"
+              readonly /></span
+        ></template>
         {{ t("autoFill.dateDay") }}
       </MenuItem>
       <MenuItem
         v-if="isAvailable('dateWeekday')"
-        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('dateWeekday')"
         data-sheet-auto-fill-mode="dateWeekday"
         @select="selectMode('dateWeekday')"
       >
         <template #icon
-          ><span
-            class="sheet-auto-fill-options__radio"
-            :class="{ 'is-selected': isSelected('dateWeekday') }"
-        /></template>
+          ><span inert
+            ><TRadio
+              class="sheet-auto-fill-options__radio"
+              :checked="isSelected('dateWeekday')"
+              readonly /></span
+        ></template>
         {{ t("autoFill.dateWeekday") }}
       </MenuItem>
       <MenuItem
         v-if="isAvailable('dateMonth')"
-        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('dateMonth')"
         data-sheet-auto-fill-mode="dateMonth"
         @select="selectMode('dateMonth')"
       >
         <template #icon
-          ><span
-            class="sheet-auto-fill-options__radio"
-            :class="{ 'is-selected': isSelected('dateMonth') }"
-        /></template>
+          ><span inert
+            ><TRadio
+              class="sheet-auto-fill-options__radio"
+              :checked="isSelected('dateMonth')"
+              readonly /></span
+        ></template>
         {{ t("autoFill.dateMonth") }}
       </MenuItem>
       <MenuItem
         v-if="isAvailable('dateYear')"
-        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('dateYear')"
         data-sheet-auto-fill-mode="dateYear"
         @select="selectMode('dateYear')"
       >
         <template #icon
-          ><span
-            class="sheet-auto-fill-options__radio"
-            :class="{ 'is-selected': isSelected('dateYear') }"
-        /></template>
+          ><span inert
+            ><TRadio
+              class="sheet-auto-fill-options__radio"
+              :checked="isSelected('dateYear')"
+              readonly /></span
+        ></template>
         {{ t("autoFill.dateYear") }}
       </MenuItem>
     </MenuSurface>
@@ -293,34 +302,15 @@ function onTriggerKeydown(event: KeyboardEvent): void {
     }
   }
 
-  &__item {
-    grid-template-columns: 16px minmax(0, 1fr);
-    min-height: 32px;
-    padding-inline: 14px 20px;
-  }
-
   &__radio {
-    display: grid;
-    width: 13px;
-    height: 13px;
-    place-items: center;
-    border: 1px solid var(--idea-border-control);
-    border-radius: 50%;
-
-    &.is-selected::after {
-      width: 5px;
-      height: 5px;
-      content: "";
-      background: var(--idea-text-secondary);
-      border-radius: 50%;
-    }
+    --td-comp-margin-s: 0px;
+    display: inline-flex;
+    align-items: center;
   }
 
   &__menu {
     z-index: 96;
     min-width: 156px;
-    border-radius: var(--idea-radius-medium);
-    box-shadow: 0 2px 6px color-mix(in srgb, var(--idea-text-primary) 8%, transparent);
     outline: none;
   }
 }
