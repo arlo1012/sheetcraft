@@ -38,7 +38,7 @@ import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
-import { useRibbonMenu } from "../../../shared/ribbon/useRibbonMenu";
+import { useMenu } from "../../../shared/menu/useMenu";
 
 const props = defineProps<{
   sheet: Sheet;
@@ -112,7 +112,7 @@ function maximumInsertCount(axis: SheetDimensionAxis, direction: "before" | "aft
   const index = axis === "row" ? address.row : address.column;
   return maximum - index - (direction === "after" ? 1 : 0);
 }
-const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useRibbonMenu({
+const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
   disabled: computed(() => props.disabled),

@@ -2,11 +2,12 @@
 import { ChevronDown, ChevronUp, Maximize2 } from "lucide-vue-next";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
-import { computed, nextTick, ref, useId } from "vue";
-import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import { ref, useId } from "vue";
+import { useMenu } from "../../../shared/menu/useMenu";
 import { useAppI18n } from "../../../shared/i18n";
 import { MAX_SHEET_ZOOM, MIN_SHEET_ZOOM } from "../../../shared/sheet-view/zoom";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 
 const props = defineProps<{ zoom: number }>();
@@ -14,41 +15,21 @@ const emit = defineEmits<{ select: [zoom: number]; fitSelection: [] }>();
 const { t } = useAppI18n();
 const triggerRef = ref<HTMLButtonElement | null>(null);
 const menuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
-const open = ref(false);
 const customZoom = ref<InputNumberValue>(props.zoom);
 const menuId = `workbook-zoom-menu-${useId().replaceAll(":", "")}`;
-const menuElement = computed(() => menuRef.value?.rootElement ?? null);
-const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, menuElement, open, {
+const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
+  triggerRef,
+  menuSurfaceRef: menuRef,
   offset: 6,
   placement: "top-end",
-  onDismiss: () => {
-    open.value = false;
+  defaultFocus: "selected",
+  onOpen: () => {
+    customZoom.value = props.zoom;
   },
 });
 
 function isSelected(value: number): boolean {
   return props.zoom === value;
-}
-function openMenu(): void {
-  customZoom.value = props.zoom;
-  open.value = true;
-  void nextTick(() => {
-    const selected = menuElement.value?.querySelector<HTMLElement>(
-      '[role="menuitemradio"][aria-checked="true"]',
-    );
-    if (selected) selected.focus();
-    else menuRef.value?.focusFirstItem();
-  });
-}
-function toggleMenu(): void {
-  if (open.value) dismiss("programmatic", true);
-  else openMenu();
-}
-function onTriggerKeydown(event: KeyboardEvent): void {
-  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-    event.preventDefault();
-    openMenu();
-  }
 }
 function selectZoom(value: number): void {
   emit("select", value);
@@ -94,60 +75,20 @@ function fitSelection(): void {
       :style="floatingStyles"
       :label="t('statusBar.zoomMenu')"
     >
-      <MenuItem
-        role="menuitemradio"
-        :aria-checked="isSelected(200)"
-        data-zoom-preset="200"
-        @select="selectZoom(200)"
-        ><template #icon
-          ><span
-            class="workbook-zoom-menu__radio"
-            :class="{ 'is-selected': isSelected(200) }" /></template
-        >200%</MenuItem
+      <MenuRadioItem :checked="isSelected(200)" data-zoom-preset="200" @select="selectZoom(200)"
+        >200%</MenuRadioItem
       >
-      <MenuItem
-        role="menuitemradio"
-        :aria-checked="isSelected(100)"
-        data-zoom-preset="100"
-        @select="selectZoom(100)"
-        ><template #icon
-          ><span
-            class="workbook-zoom-menu__radio"
-            :class="{ 'is-selected': isSelected(100) }" /></template
-        >100%</MenuItem
+      <MenuRadioItem :checked="isSelected(100)" data-zoom-preset="100" @select="selectZoom(100)"
+        >100%</MenuRadioItem
       >
-      <MenuItem
-        role="menuitemradio"
-        :aria-checked="isSelected(75)"
-        data-zoom-preset="75"
-        @select="selectZoom(75)"
-        ><template #icon
-          ><span
-            class="workbook-zoom-menu__radio"
-            :class="{ 'is-selected': isSelected(75) }" /></template
-        >75%</MenuItem
+      <MenuRadioItem :checked="isSelected(75)" data-zoom-preset="75" @select="selectZoom(75)"
+        >75%</MenuRadioItem
       >
-      <MenuItem
-        role="menuitemradio"
-        :aria-checked="isSelected(50)"
-        data-zoom-preset="50"
-        @select="selectZoom(50)"
-        ><template #icon
-          ><span
-            class="workbook-zoom-menu__radio"
-            :class="{ 'is-selected': isSelected(50) }" /></template
-        >50%</MenuItem
+      <MenuRadioItem :checked="isSelected(50)" data-zoom-preset="50" @select="selectZoom(50)"
+        >50%</MenuRadioItem
       >
-      <MenuItem
-        role="menuitemradio"
-        :aria-checked="isSelected(25)"
-        data-zoom-preset="25"
-        @select="selectZoom(25)"
-        ><template #icon
-          ><span
-            class="workbook-zoom-menu__radio"
-            :class="{ 'is-selected': isSelected(25) }" /></template
-        >25%</MenuItem
+      <MenuRadioItem :checked="isSelected(25)" data-zoom-preset="25" @select="selectZoom(25)"
+        >25%</MenuRadioItem
       >
       <MenuItem data-zoom-fit-selection @select="fitSelection"
         ><template #icon><Maximize2 :size="15" /></template
@@ -207,27 +148,6 @@ function fitSelection(): void {
     &:focus-visible {
       outline: 1px solid var(--idea-action-primary);
       outline-offset: -1px;
-    }
-  }
-
-  &__radio {
-    display: grid;
-    place-items: center;
-    width: 13px;
-    height: 13px;
-    border: 1px solid var(--idea-text-muted);
-    border-radius: 50%;
-
-    &.is-selected {
-      border-color: var(--idea-action-primary);
-
-      &::after {
-        width: 7px;
-        height: 7px;
-        background: var(--idea-action-primary);
-        border-radius: 50%;
-        content: "";
-      }
     }
   }
 

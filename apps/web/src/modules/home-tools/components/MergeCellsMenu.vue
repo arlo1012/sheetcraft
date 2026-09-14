@@ -18,7 +18,7 @@ import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
-import { useRibbonMenu } from "../../../shared/ribbon/useRibbonMenu";
+import { useMenu } from "../../../shared/menu/useMenu";
 import type { MergeCellsState } from "./data-tool-state";
 
 defineOptions({ inheritAttrs: false });
@@ -55,7 +55,7 @@ const menuDisabled = computed(
       !props.state.canUnmerge),
 );
 const mainDisabled = computed(() => props.disabled || !isModeAvailable("all"));
-const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useRibbonMenu({
+const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
   disabled: menuDisabled,

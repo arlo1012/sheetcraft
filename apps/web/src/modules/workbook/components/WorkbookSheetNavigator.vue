@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { Check, EyeOff, Layers, Pin } from "lucide-vue-next";
+import { EyeOff, Layers, Pin } from "lucide-vue-next";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import type { Sheet } from "@idea10/core/workbook";
@@ -121,29 +122,30 @@ watch(open, (isOpen) => {
           />
         </div>
       </li>
-      <MenuItem
+      <MenuRadioItem
         v-for="sheet in visibleSheets"
         :key="sheet.id"
         class="workbook-sheet-navigator__item"
-        :class="{ 'is-active': sheet.id === activeSheetId }"
-        role="menuitemradio"
-        :aria-checked="sheet.id === activeSheetId"
+        :checked="sheet.id === activeSheetId"
         :title="sheet.name"
         :data-workbook-sheet-id="sheet.id"
         @select="selectSheet(sheet.id)"
       >
-        <template #icon>
-          <Check v-if="sheet.id === activeSheetId" :size="15" />
-          <Pin v-else-if="sheet.properties.pinned" :size="13" />
-        </template>
         {{ sheet.name }}
-        <template v-if="sheet.properties.tabColor" #shortcut>
+        <template
+          v-if="
+            sheet.properties.tabColor || (sheet.properties.pinned && sheet.id !== activeSheetId)
+          "
+          #shortcut
+        >
+          <Pin v-if="sheet.properties.pinned && sheet.id !== activeSheetId" :size="13" />
           <span
+            v-if="sheet.properties.tabColor"
             class="workbook-sheet-navigator__color"
             :style="{ background: sheet.properties.tabColor }"
           />
         </template>
-      </MenuItem>
+      </MenuRadioItem>
       <template v-if="hiddenSheets.length">
         <MenuSeparator v-if="visibleSheets.length" />
         <li class="workbook-sheet-navigator__hidden-heading" role="presentation">
@@ -249,16 +251,6 @@ watch(open, (isOpen) => {
   &__item {
     flex: 0 0 auto;
     min-width: 0;
-
-    :deep(.idea-menu-item__label) {
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    &.is-active {
-      background: var(--idea-action-primary-subtle);
-      color: var(--idea-action-primary);
-    }
   }
 
   &__empty {

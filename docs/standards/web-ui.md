@@ -74,9 +74,16 @@ Use four typography levels for Web interface text. Sizes are CSS pixels at
 - Keep a tool's trigger and teleported popup under one local root when the tool
   participates in group layout. Forward trigger attributes deliberately so
   keyboard and accessibility attributes remain on the interactive element.
-- Use `useRibbonMenu` with the existing `MenuSurface` for list-menu opening,
-  keyboard entry, dismissal, and focus restoration. Form panels and cascading
-  submenus retain their own focus rules and domain-specific state.
+- Use `shared/menu/useMenu` with `MenuSurface` for list-menu opening,
+  keyboard entry, dismissal, and focus restoration. This applies to ribbon,
+  status-bar, and in-sheet menus. Form panels and cascading submenus retain
+  their domain-specific focus and state rules.
+- Use `MenuItem` for commands and `MenuRadioItem` for single-choice options.
+  `MenuRadioItem` owns the TDesign radio indicator and menu keyboard semantics;
+  feature components supply `checked`, labels, and actions.
+- Keep list-menu padding, row height, indicator styling, corner radius, and
+  shadow in the shared menu components. Consumers may set menu width, height
+  limits, stacking, and placement; do not restyle the shared menu internals.
 - Keep each business tool concrete and compose it explicitly in Vue templates.
   Font selectors continue to use TDesign's public Select API and the shared
   adapter styles.

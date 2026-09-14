@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { Check, Hash } from "lucide-vue-next";
+import { Hash } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
-import { useRibbonMenu } from "../../../shared/ribbon/useRibbonMenu";
+import { useMenu } from "../../../shared/menu/useMenu";
 import {
   NUMBER_FORMAT_PRESET_CHOICES,
   isNumberFormatPresetSelected,
@@ -33,7 +34,7 @@ const triggerLabel = computed(() =>
     ? t("format.numberFormatMixed")
     : t("format.numberFormatValue", { value: currentFormatLabel.value }),
 );
-const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useRibbonMenu({
+const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
   disabled: computed(() => props.disabled),
@@ -106,19 +107,15 @@ function openCellFormat(): void {
         :style="floatingStyles"
         :label="t('ribbon.numberFormat')"
       >
-        <MenuItem
+        <MenuRadioItem
           v-for="choice in NUMBER_FORMAT_PRESET_CHOICES"
           :key="choice"
           :data-number-format-option="choice"
-          :aria-checked="isSelected(choice)"
-          role="menuitemradio"
+          :checked="isSelected(choice)"
           @select="select(choice)"
         >
           {{ formatLabel(choice) }}
-          <template #icon>
-            <Check v-if="isSelected(choice)" :size="15" aria-hidden="true" />
-          </template>
-        </MenuItem>
+        </MenuRadioItem>
         <MenuSeparator />
         <MenuItem data-number-format-more @select="openCellFormat">
           {{ t("ribbon.moreNumberFormats") }}

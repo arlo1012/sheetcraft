@@ -21,7 +21,7 @@ import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
-import { useRibbonMenu } from "../../../shared/ribbon/useRibbonMenu";
+import { useMenu } from "../../../shared/menu/useMenu";
 import SheetTabColorPanel from "./SheetTabColorPanel.vue";
 
 const props = withDefaults(
@@ -57,7 +57,7 @@ const renameInputRef = ref<ComponentPublicInstance | null>(null);
 const unhideDialogOpen = ref(false);
 const menuId = `worksheet-operations-menu-${useId().replaceAll(":", "")}`;
 
-const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useRibbonMenu({
+const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef: triggerElement,
   menuSurfaceRef,
   disabled: isDisabled,

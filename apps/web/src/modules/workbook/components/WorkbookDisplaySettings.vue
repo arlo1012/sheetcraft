@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { Check, Settings, Table2 } from "lucide-vue-next";
-import { computed, nextTick, ref, useId } from "vue";
-import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import { ref, useId } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import { useMenu } from "../../../shared/menu/useMenu";
 
 defineProps<{
   showHeaders: boolean;
@@ -20,36 +20,13 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 const triggerRef = ref<HTMLButtonElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
-const menuRef = computed(() => menuSurfaceRef.value?.rootElement ?? null);
-const open = ref(false);
 const menuId = `workbook-display-settings-${useId().replaceAll(":", "")}`;
-const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, menuRef, open, {
+const { open, floatingStyles, toggleMenu, onTriggerKeydown } = useMenu({
+  triggerRef,
+  menuSurfaceRef,
   offset: 6,
   placement: "top-end",
-  onDismiss: () => {
-    open.value = false;
-  },
 });
-
-function openMenu(focus: "first" | "last" = "first"): void {
-  open.value = true;
-  void nextTick(() =>
-    focus === "last"
-      ? menuSurfaceRef.value?.focusLastItem()
-      : menuSurfaceRef.value?.focusFirstItem(),
-  );
-}
-
-function toggleMenu(): void {
-  if (open.value) dismiss("programmatic", true);
-  else openMenu();
-}
-
-function onTriggerKeydown(event: KeyboardEvent): void {
-  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-  event.preventDefault();
-  openMenu(event.key === "ArrowDown" ? "first" : "last");
-}
 </script>
 
 <template>

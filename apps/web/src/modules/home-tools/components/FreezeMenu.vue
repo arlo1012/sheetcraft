@@ -6,7 +6,7 @@ import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
-import { useRibbonMenu } from "../../../shared/ribbon/useRibbonMenu";
+import { useMenu } from "../../../shared/menu/useMenu";
 
 defineOptions({ inheritAttrs: false });
 
@@ -26,7 +26,7 @@ const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `freeze-menu-${useId().replaceAll(":", "")}`;
 const hasFrozenPanes = computed(() => props.freeze.rows > 0 || props.freeze.columns > 0);
 const canFreezePanes = computed(() => props.activeCell.row > 0 || props.activeCell.column > 0);
-const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useRibbonMenu({
+const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
   disabled: computed(() => props.disabled),

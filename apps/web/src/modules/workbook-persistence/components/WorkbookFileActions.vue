@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ChevronDown, Download, RotateCcw, Save, Upload } from "lucide-vue-next";
-import { computed, nextTick, ref, useId, watch } from "vue";
-import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import { computed, ref, useId } from "vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import { useMenu } from "../../../shared/menu/useMenu";
 import type { WorkbookPersistenceStatus } from "../useWorkbookPersistence";
 
 const props = defineProps<{ status: WorkbookPersistenceStatus; disabled: boolean }>();
@@ -22,8 +22,6 @@ const { t } = useAppI18n();
 const triggerRef = ref<HTMLButtonElement | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
-const menuRef = computed(() => menuSurfaceRef.value?.rootElement ?? null);
-const open = ref(false);
 const opened = ref(false);
 const menuId = `workbook-file-menu-${useId().replaceAll(":", "")}`;
 const statusKeys: Record<WorkbookPersistenceStatus, MessageKey> = {
@@ -34,34 +32,15 @@ const statusKeys: Record<WorkbookPersistenceStatus, MessageKey> = {
   saved: "persistence.saved",
   error: "persistence.saveError",
 };
-const { floatingStyles, dismiss } = useDismissibleFloatingPanel(triggerRef, menuRef, open, {
+const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
+  triggerRef,
+  menuSurfaceRef,
+  disabled: computed(() => props.disabled),
   offset: 4,
-  onDismiss: () => {
-    open.value = false;
+  onOpen: () => {
+    opened.value = true;
   },
 });
-
-function openMenu(focus: "first" | "last" = "first"): void {
-  if (props.disabled) return;
-  opened.value = true;
-  open.value = true;
-  void nextTick(() =>
-    focus === "last"
-      ? menuSurfaceRef.value?.focusLastItem()
-      : menuSurfaceRef.value?.focusFirstItem(),
-  );
-}
-
-function toggleMenu(): void {
-  if (open.value) dismiss("programmatic", true);
-  else openMenu();
-}
-
-function onTriggerKeydown(event: KeyboardEvent): void {
-  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-  event.preventDefault();
-  openMenu(event.key === "ArrowDown" ? "first" : "last");
-}
 
 function select(action: "save" | "exportJson" | "reload"): void {
   closeMenu();
@@ -85,13 +64,6 @@ function onFileChange(event: Event): void {
   input.value = "";
   if (file) emit("importJson", file);
 }
-
-watch(
-  () => props.disabled,
-  (disabled) => {
-    if (disabled) dismiss("programmatic", false);
-  },
-);
 </script>
 
 <template>

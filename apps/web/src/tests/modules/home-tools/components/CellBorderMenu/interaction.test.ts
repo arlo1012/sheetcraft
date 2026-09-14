@@ -178,7 +178,7 @@ describe("CellBorderMenu interaction", () => {
     ]);
 
     const styleRow = menu.get('[data-border-menu-row="style"]');
-    await styleRow.trigger("click");
+    await styleRow.get(".idea-menu-item__trailing").trigger("click");
     const style = getSubmenu("style");
     expect(style.findAll('[role="menuitemradio"]')).toHaveLength(14);
     expect(style.get('[data-border-line-option="thin"]').attributes("aria-checked")).toBe("true");

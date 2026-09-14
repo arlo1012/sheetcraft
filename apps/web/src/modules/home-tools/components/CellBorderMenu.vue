@@ -13,6 +13,9 @@ import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import { useRovingFocus } from "../../../shared/focus/useRovingFocus";
 import { useAppI18n } from "../../../shared/i18n";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
+import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
+import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import BorderColorPanel from "./BorderColorPanel.vue";
 import BorderLineStylePanel from "../../../shared/borders/BorderLineStylePanel.vue";
 import BorderPresetGrid from "./BorderPresetGrid.vue";
@@ -36,10 +39,9 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 const splitActionRef = ref<InstanceType<typeof RibbonSplitButton> | null>(null);
 const triggerRef = computed(() => splitActionRef.value?.menuElement ?? null);
-const menuRef = ref<HTMLDivElement | null>(null);
+const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
+const menuRef = computed(() => menuSurfaceRef.value?.rootElement ?? null);
 const submenuRef = ref<HTMLDivElement | null>(null);
-const colorRowRef = ref<HTMLButtonElement | null>(null);
-const styleRowRef = ref<HTMLButtonElement | null>(null);
 const open = ref(false);
 const activeSubmenu = ref<BorderSubmenu | null>(null);
 const stackedSubmenu = ref(false);
@@ -49,11 +51,14 @@ const lastPreset = ref<CellBorderPreset>("bottom");
 const menuId = `cell-border-menu-${useId().replaceAll(":", "")}`;
 const submenuId = `cell-border-submenu-${useId().replaceAll(":", "")}`;
 const submenuOpen = computed(() => activeSubmenu.value !== null);
+function menuRow(row: "color" | "style"): HTMLElement | null {
+  return menuRef.value?.querySelector<HTMLElement>(`[data-border-menu-row="${row}"]`) ?? null;
+}
 const submenuAnchorRef = computed(() => {
   if (stackedSubmenu.value) return menuRef.value;
-  if (activeSubmenu.value === "color") return colorRowRef.value;
-  if (activeSubmenu.value === "style") return styleRowRef.value;
-  return styleRowRef.value;
+  if (activeSubmenu.value === "color") return menuRow("color");
+  if (activeSubmenu.value === "style") return menuRow("style");
+  return menuRow("style");
 });
 const submenuPlacement = computed(() =>
   stackedSubmenu.value ? ("bottom-end" as const) : ("right-start" as const),
@@ -87,10 +92,8 @@ const DOCUMENT_FOCUS_TARGET_SELECTOR = [
   '[tabindex]:not([tabindex="-1"]):not([aria-disabled="true"])',
 ].join(", ");
 
-function menuItems(): HTMLButtonElement[] {
-  return Array.from(
-    menuRef.value?.querySelectorAll<HTMLButtonElement>("[data-border-menu-item]") ?? [],
-  );
+function menuItems(): HTMLElement[] {
+  return Array.from(menuRef.value?.querySelectorAll<HTMLElement>("[data-border-menu-item]") ?? []);
 }
 function submenuItems(): HTMLElement[] {
   return Array.from(
@@ -109,10 +112,10 @@ function closeAll(restoreFocus: boolean): void {
 function closeSubmenu(restoreFocus: boolean): void {
   const row =
     activeSubmenu.value === "color"
-      ? colorRowRef.value
+      ? menuRow("color")
       : activeSubmenu.value === "style"
-        ? styleRowRef.value
-        : styleRowRef.value;
+        ? menuRow("style")
+        : menuRow("style");
   activeSubmenu.value = null;
   if (restoreFocus) void nextTick(() => row?.focus());
 }
@@ -230,11 +233,14 @@ function onMenuKeydown(event: KeyboardEvent): void {
     return;
   }
   if (event.key === "ArrowRight") {
-    if (document.activeElement === colorRowRef.value) openSubmenu("color");
-    else if (document.activeElement === styleRowRef.value) openSubmenu("style");
+    if (document.activeElement === menuRow("color")) openSubmenu("color");
+    else if (document.activeElement === menuRow("style")) openSubmenu("style");
     return;
   }
-  moveRovingFocus(event, menuItems());
+  if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+    event.stopPropagation();
+    moveRovingFocus(event, menuItems());
+  }
 }
 function onSubmenuKeydown(event: KeyboardEvent): void {
   if (handleHistoryShortcut(event)) return;
@@ -252,7 +258,9 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
     moveFocusFromTrigger(event.shiftKey ? -1 : 1);
     return;
   }
-  moveRovingFocus(event, submenuItems());
+  if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+    moveRovingFocus(event, submenuItems());
+  }
 }
 function updateSubmenuLayout(): void {
   stackedSubmenu.value = window.innerWidth < STACKED_SUBMENU_BREAKPOINT;
@@ -292,64 +300,62 @@ onBeforeUnmount(() => {
     </RibbonSplitButton>
 
     <Teleport to="body">
-      <div
+      <MenuSurface
         v-if="open"
         :id="menuId"
-        ref="menuRef"
+        ref="menuSurfaceRef"
         class="cell-border-menu__panel"
         :style="menuStyles"
-        role="menu"
-        :aria-label="t('format.cellBorders')"
+        :label="t('format.cellBorders')"
         data-cell-border-panel
-        @keydown="onMenuKeydown"
+        @keydown.capture="onMenuKeydown"
       >
-        <BorderPresetGrid
-          :border="{ style: lineStyle ?? DEFAULT_BORDER.style, color }"
-          @select="selectPreset"
-        />
-        <div class="cell-border-menu__rows">
-          <button
-            ref="colorRowRef"
-            type="button"
-            role="menuitem"
-            data-border-menu-item
-            data-border-menu-row="color"
-            aria-haspopup="dialog"
-            :aria-expanded="activeSubmenu === 'color'"
-            :aria-controls="activeSubmenu === 'color' ? submenuId : undefined"
-            @click="openSubmenu('color')"
-          >
+        <li class="cell-border-menu__presets" role="none">
+          <BorderPresetGrid
+            :border="{ style: lineStyle ?? DEFAULT_BORDER.style, color }"
+            @select="selectPreset"
+          />
+        </li>
+        <MenuSeparator />
+        <MenuItem
+          data-border-menu-item
+          data-border-menu-row="color"
+          aria-haspopup="dialog"
+          :aria-expanded="activeSubmenu === 'color'"
+          :aria-controls="activeSubmenu === 'color' ? submenuId : undefined"
+          @select="openSubmenu('color')"
+        >
+          <template #icon>
             <PencilLine :size="16" aria-hidden="true" />
-            <span>{{ t("format.borderColor") }}</span>
+          </template>
+          {{ t("format.borderColor") }}
+          <template #shortcut>
             <ChevronRight :size="15" aria-hidden="true" />
-          </button>
-          <button
-            ref="styleRowRef"
-            type="button"
-            role="menuitem"
-            data-border-menu-item
-            data-border-menu-row="style"
-            aria-haspopup="menu"
-            :aria-expanded="activeSubmenu === 'style'"
-            :aria-controls="activeSubmenu === 'style' ? submenuId : undefined"
-            @click="openSubmenu('style')"
-          >
+          </template>
+        </MenuItem>
+        <MenuItem
+          data-border-menu-item
+          data-border-menu-row="style"
+          aria-haspopup="menu"
+          :aria-expanded="activeSubmenu === 'style'"
+          :aria-controls="activeSubmenu === 'style' ? submenuId : undefined"
+          @select="openSubmenu('style')"
+        >
+          <template #icon>
             <List :size="16" aria-hidden="true" />
-            <span>{{ t("format.borderLineStyle") }}</span>
+          </template>
+          {{ t("format.borderLineStyle") }}
+          <template #shortcut>
             <ChevronRight :size="15" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            data-border-menu-item
-            data-border-menu-row="settings"
-            @click="openCellFormat"
-          >
+          </template>
+        </MenuItem>
+        <MenuItem data-border-menu-item data-border-menu-row="settings" @select="openCellFormat">
+          <template #icon>
             <Settings2 :size="16" aria-hidden="true" />
-            <span>{{ t("format.borderMoreSettings") }}</span>
-          </button>
-        </div>
-      </div>
+          </template>
+          {{ t("format.borderMoreSettings") }}
+        </MenuItem>
+      </MenuSurface>
 
       <div
         v-if="activeSubmenu"
@@ -394,7 +400,11 @@ onBeforeUnmount(() => {
 }
 
 .cell-border-menu {
-  &__panel,
+  &__panel {
+    z-index: 100;
+    width: 174px;
+    max-height: calc(100vh - 16px);
+  }
   &__submenu {
     z-index: 100;
     max-height: calc(100vh - 16px);
@@ -404,52 +414,9 @@ onBeforeUnmount(() => {
     border-radius: var(--idea-radius-medium);
     box-shadow: var(--idea-shadow-floating);
   }
-  &__panel {
-    width: 174px;
-    padding: var(--idea-tool-panel-padding);
-  }
-  &__rows {
-    display: grid;
-    gap: 1px;
-    padding-top: 5px;
-    border-top: 1px solid var(--idea-border-subtle);
-    > button {
-      display: grid;
-      grid-template-columns: 18px minmax(0, 1fr) 16px;
-      align-items: center;
-      width: 100%;
-      height: 29px;
-      gap: 6px;
-      padding: 0 5px;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 2px;
-      color: var(--idea-text-primary);
-      cursor: pointer;
-      font: inherit;
-      font-size: var(--idea-font-size-body-medium);
-      line-height: var(--idea-line-height-body-medium);
-      text-align: left;
-      > svg:last-child {
-        color: var(--idea-text-muted);
-      }
-      > span {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      &:hover,
-      &[aria-expanded="true"] {
-        background: var(--idea-surface-hover);
-        outline: none;
-      }
-      &:focus-visible {
-        background: var(--idea-surface-hover);
-        outline: none;
-        box-shadow: 0 0 0 2px var(--idea-action-focus);
-      }
-    }
+  &__presets {
+    padding: 0 var(--idea-tool-panel-padding);
+    list-style: none;
   }
   &__submenu {
     width: 178px;

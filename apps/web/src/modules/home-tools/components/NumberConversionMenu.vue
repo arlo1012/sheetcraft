@@ -6,7 +6,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
-import { useRibbonMenu } from "../../../shared/ribbon/useRibbonMenu";
+import { useMenu } from "../../../shared/menu/useMenu";
 
 const props = defineProps<{ disabled: boolean }>();
 const emit = defineEmits<{ convert: [mode: CellValueConversionMode] }>();
@@ -15,7 +15,7 @@ const buttonRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const triggerRef = computed(() => buttonRef.value?.rootElement ?? null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `number-conversion-${useId().replaceAll(":", "")}`;
-const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useRibbonMenu({
+const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
   disabled: computed(() => props.disabled),

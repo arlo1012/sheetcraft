@@ -46,7 +46,7 @@ describe("WorkbookSheetNavigator", () => {
     );
   });
 
-  test("opens an upward sheet list with search and an active checkmark", async () => {
+  test("opens an upward sheet list with search and a selected radio", async () => {
     const wrapper = mountNavigator();
     const trigger = wrapper.get('[data-workbook-sheet-navigator="trigger"]');
 
@@ -57,13 +57,12 @@ describe("WorkbookSheetNavigator", () => {
       "Search sheets",
     );
     const active = menu().get('[data-workbook-sheet-id="sheet-budget"]');
-    expect(active.classes()).toContain("is-active");
     expect(active.attributes()).toMatchObject({
       role: "menuitemradio",
       "aria-checked": "true",
       title: "Budget 2026",
     });
-    expect(active.find("svg").exists()).toBe(true);
+    expect((active.get('input[type="radio"]').element as HTMLInputElement).checked).toBe(true);
     expect(menu().attributes("style")).toContain("position: fixed");
 
     document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
