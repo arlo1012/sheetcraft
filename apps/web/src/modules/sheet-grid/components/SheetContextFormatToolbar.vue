@@ -159,7 +159,6 @@ function getPopupAttach(): HTMLElement {
         <ColorPalette
           v-if="activePanel === 'text-color'"
           class="sheet-context-format-toolbar__panel"
-          compact
           :model-value="currentTextColor"
           :default-color="DEFAULT_CELL_TEXT_COLOR"
           :default-label="t('cellFormat.automatic')"
@@ -185,7 +184,6 @@ function getPopupAttach(): HTMLElement {
         <ColorPalette
           v-if="activePanel === 'fill-color'"
           class="sheet-context-format-toolbar__panel"
-          compact
           :model-value="currentFillColor"
           :default-color="DEFAULT_CELL_FILL_COLOR"
           :default-label="t('cellFormat.noFill')"
