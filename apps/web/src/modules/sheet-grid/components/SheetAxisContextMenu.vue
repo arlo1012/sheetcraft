@@ -2,6 +2,9 @@
 import {
   BarChart3,
   Columns3,
+  Delete,
+  Eraser,
+  RemoveFormatting,
   Eye,
   EyeOff,
   Paintbrush,
@@ -246,17 +249,19 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           data-axis-action="clear-contents"
           :disabled="readOnly"
           @select="requestClear('contents')"
+          ><template #icon><Delete :size="16" /></template
           >{{ t("contextMenu.clearContents") }}</MenuItem
         >
         <MenuItem
           data-axis-action="clear-formats"
           :disabled="readOnly"
           @select="requestClear('formats')"
+          ><template #icon><RemoveFormatting :size="16" /></template
           >{{ t("contextMenu.clearFormats") }}</MenuItem
         >
-        <MenuItem data-axis-action="clear-all" :disabled="readOnly" @select="requestClear('all')">{{
-          t("contextMenu.clearAll")
-        }}</MenuItem>
+        <MenuItem data-axis-action="clear-all" :disabled="readOnly" @select="requestClear('all')"
+          ><template #icon><Eraser :size="16" /></template>{{ t("contextMenu.clearAll") }}</MenuItem
+        >
         <MenuSeparator />
         <MenuItem
           data-axis-action="format-painter"
@@ -283,7 +288,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
   width: 328px;
 }
 .sheet-axis-context-menu {
-  width: 195px;
+  width: 236px;
   border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
   &--unframed {
     border-radius: var(--idea-radius-default);

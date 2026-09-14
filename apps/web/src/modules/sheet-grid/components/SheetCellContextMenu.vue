@@ -1,5 +1,29 @@
 <script setup lang="ts">
-import { ChevronRight, Eraser, Filter, Paintbrush, Settings2, Trash2 } from "lucide-vue-next";
+import {
+  ArrowDown,
+  ArrowDownAZ,
+  ArrowDownUp,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowUpAZ,
+  ChevronRight,
+  Columns3,
+  Delete,
+  Eraser,
+  Filter,
+  FunnelX,
+  Image as ImageIcon,
+  ListChecks,
+  ListMinus,
+  MoveUpRight,
+  Paintbrush,
+  Plus,
+  RemoveFormatting,
+  Rows3,
+  Settings2,
+  Trash2,
+} from "lucide-vue-next";
 import { computed, nextTick, onMounted, ref, useId } from "vue";
 import {
   MAX_SHEET_COLUMNS,
@@ -190,7 +214,8 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :disabled="readOnly"
           @mouseenter="openSubmenuOnHover('insert')"
           @select="openSubmenu('insert')"
-          >{{ t("contextMenu.insert") }}<template #shortcut><ChevronRight :size="15" /></template
+          ><template #icon><Plus :size="16" /></template>{{ t("contextMenu.insert")
+          }}<template #shortcut><ChevronRight :size="15" /></template
         ></MenuItem>
         <MenuItem
           data-cell-action="delete"
@@ -220,6 +245,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           data-cell-action="choose-from-column"
           :disabled="readOnly"
           @select="dispatch({ type: 'chooseFromColumn' })"
+          ><template #icon><ListChecks :size="16" /></template
           >{{ t("contextMenu.chooseFromColumn") }}</MenuItem
         >
         <MenuItem
@@ -232,6 +258,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           data-cell-action="clear-filter"
           :disabled="readOnly || !state?.data.filter.active"
           @select="dispatch({ type: 'clearFilter' })"
+          ><template #icon><FunnelX :size="16" /></template
           >{{ t("contextMenu.clearFilter") }}</MenuItem
         >
         <MenuItem
@@ -242,17 +269,18 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :disabled="!state?.data.sortEnabled || readOnly"
           @mouseenter="openSubmenuOnHover('sort')"
           @select="openSubmenu('sort')"
-          >{{ t("contextMenu.sort") }}<template #shortcut><ChevronRight :size="15" /></template
+          ><template #icon><ArrowDownUp :size="16" /></template>{{ t("contextMenu.sort")
+          }}<template #shortcut><ChevronRight :size="15" /></template
         ></MenuItem>
         <MenuSeparator />
         <template v-if="hasImage"
-          ><MenuItem data-cell-action="preview-image" @select="emit('previewImage')">{{
-            t("image.preview")
-          }}</MenuItem
+          ><MenuItem data-cell-action="preview-image" @select="emit('previewImage')"
+            ><template #icon><ImageIcon :size="16" /></template>{{ t("image.preview") }}</MenuItem
           ><MenuItem
             data-cell-action="convert-image-to-floating"
             :disabled="readOnly"
             @select="emit('convertImageToFloating')"
+            ><template #icon><MoveUpRight :size="16" /></template
             >{{ t("image.convertToFloating") }}</MenuItem
           ><MenuSeparator
         /></template>
@@ -286,10 +314,12 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
         ><MenuItem
           data-cell-action="insert-right"
           @select="dispatch({ type: 'cellOperation', operation: 'insert', direction: 'right' })"
+          ><template #icon><ArrowRight :size="16" /></template
           >{{ t("axisMenu.shiftRight") }}</MenuItem
         ><MenuItem
           data-cell-action="insert-down"
           @select="dispatch({ type: 'cellOperation', operation: 'insert', direction: 'down' })"
+          ><template #icon><ArrowDown :size="16" /></template
           >{{ t("axisMenu.shiftDown") }}</MenuItem
         ><MenuSeparator /><AxisInsertMenuItem
           data-cell-action="insert-above"
@@ -298,27 +328,27 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :initial-count="insertRowCount"
           :maximum="maximumRowsBefore"
           :disabled="Boolean(readOnly)"
-          @insert="
-            dispatch({ type: 'insert', axis: 'row', direction: 'before', count: $event })
-          " /><AxisInsertMenuItem
+          @insert="dispatch({ type: 'insert', axis: 'row', direction: 'before', count: $event })"
+          ><Rows3 :size="16" /></AxisInsertMenuItem
+        ><AxisInsertMenuItem
           data-cell-action="insert-below"
           action="cell-insert-below"
           :label="t('axisMenu.insertRowsBelowAction')"
           :initial-count="insertRowCount"
           :maximum="maximumRowsAfter"
           :disabled="Boolean(readOnly)"
-          @insert="
-            dispatch({ type: 'insert', axis: 'row', direction: 'after', count: $event })
-          " /><AxisInsertMenuItem
+          @insert="dispatch({ type: 'insert', axis: 'row', direction: 'after', count: $event })"
+          ><Rows3 :size="16" /></AxisInsertMenuItem
+        ><AxisInsertMenuItem
           data-cell-action="insert-left"
           action="cell-insert-left"
           :label="t('axisMenu.insertColumnsBeforeAction')"
           :initial-count="insertColumnCount"
           :maximum="maximumColumnsBefore"
           :disabled="Boolean(readOnly)"
-          @insert="
-            dispatch({ type: 'insert', axis: 'column', direction: 'before', count: $event })
-          " /><AxisInsertMenuItem
+          @insert="dispatch({ type: 'insert', axis: 'column', direction: 'before', count: $event })"
+          ><Columns3 :size="16" /></AxisInsertMenuItem
+        ><AxisInsertMenuItem
           data-cell-action="insert-column"
           action="cell-insert-right"
           :label="t('axisMenu.insertColumnsAfterAction')"
@@ -326,32 +356,36 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :maximum="maximumColumnsAfter"
           :disabled="Boolean(readOnly)"
           @insert="dispatch({ type: 'insert', axis: 'column', direction: 'after', count: $event })"
-      /></template>
+          ><Columns3 :size="16" /></AxisInsertMenuItem
+      ></template>
       <template v-else-if="activeSubmenu === 'delete'"
         ><MenuItem
           data-cell-action="delete-left"
           danger
           @select="dispatch({ type: 'cellOperation', operation: 'delete', direction: 'left' })"
+          ><template #icon><ArrowLeft :size="16" /></template
           >{{ t("axisMenu.shiftLeft") }}</MenuItem
         ><MenuItem
           data-cell-action="delete-up"
           danger
           @select="dispatch({ type: 'cellOperation', operation: 'delete', direction: 'up' })"
-          >{{ t("axisMenu.shiftUp") }}</MenuItem
+          ><template #icon><ArrowUp :size="16" /></template>{{ t("axisMenu.shiftUp") }}</MenuItem
         ><MenuSeparator /><MenuItem
           data-cell-action="delete-row"
           danger
           @select="dispatch({ type: 'cellOperation', operation: 'delete', direction: 'row' })"
-          >{{ t("axisMenu.entireRow") }}</MenuItem
+          ><template #icon><Rows3 :size="16" /></template>{{ t("axisMenu.entireRow") }}</MenuItem
         ><MenuItem
           data-cell-action="delete-column"
           danger
           @select="dispatch({ type: 'cellOperation', operation: 'delete', direction: 'column' })"
+          ><template #icon><Columns3 :size="16" /></template
           >{{ t("axisMenu.entireColumn") }}</MenuItem
         ><MenuItem
           data-cell-action="delete-empty-rows"
           danger
           @select="dispatch({ type: 'deleteEmptyRows' })"
+          ><template #icon><ListMinus :size="16" /></template
           >{{ t("axisMenu.deleteEmptyRows") }}</MenuItem
         ></template
       >
@@ -360,27 +394,28 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           data-cell-action="clear-contents"
           :disabled="readOnly"
           @select="requestClear('contents')"
+          ><template #icon><Delete :size="16" /></template
           >{{ t("contextMenu.clearContents") }}</MenuItem
         ><MenuItem
           data-cell-action="clear-formats"
           :disabled="readOnly"
           @select="requestClear('formats')"
+          ><template #icon><RemoveFormatting :size="16" /></template
           >{{ t("contextMenu.clearFormats") }}</MenuItem
-        ><MenuItem
-          data-cell-action="clear-all"
-          :disabled="readOnly"
-          @select="requestClear('all')"
-          >{{ t("contextMenu.clearAll") }}</MenuItem
+        ><MenuItem data-cell-action="clear-all" :disabled="readOnly" @select="requestClear('all')"
+          ><template #icon><Eraser :size="16" /></template>{{ t("contextMenu.clearAll") }}</MenuItem
         ></template
       >
       <template v-else
         ><MenuItem
           data-cell-action="sort-ascending"
           @select="dispatch({ type: 'sort', direction: 'ascending' })"
+          ><template #icon><ArrowDownAZ :size="16" /></template
           >{{ t("contextMenu.sortAscending") }}</MenuItem
         ><MenuItem
           data-cell-action="sort-descending"
           @select="dispatch({ type: 'sort', direction: 'descending' })"
+          ><template #icon><ArrowUpAZ :size="16" /></template
           >{{ t("contextMenu.sortDescending") }}</MenuItem
         ></template
       >
@@ -397,11 +432,11 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
   }
 }
 .sheet-cell-context-menu {
-  width: 195px;
+  width: 236px;
   border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
   &--submenu {
     z-index: 101;
-    width: 190px;
+    width: 236px;
     border-radius: var(--idea-radius-default);
   }
   &--counted {
