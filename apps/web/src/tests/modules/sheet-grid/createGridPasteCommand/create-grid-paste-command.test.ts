@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { CellContentMatrix } from "@idea10/core/clipboard";
 import {
+  createWorkbookHistory,
   executeWorkbookCommand,
   redoWorkbookCommand,
   undoWorkbookCommand,
@@ -42,7 +43,7 @@ function execute(sheet: Sheet, payload: GridPastePayload) {
   };
   const session = {
     workbook,
-    history: { undoStack: [], redoStack: [], maxEntries: 100 },
+    history: createWorkbookHistory(),
     idFactory: createSequentialIdFactory(),
   };
   expect(executeWorkbookCommand(session, createGridPasteCommand(sheet, payload))).toBe(true);
@@ -339,7 +340,7 @@ describe("createGridPasteCommand", () => {
     };
     const session = {
       workbook,
-      history: { undoStack: [], redoStack: [], maxEntries: 100 },
+      history: createWorkbookHistory(),
       idFactory: createSequentialIdFactory(),
     };
     const before = serializeWorkbook(workbook);

@@ -31,6 +31,10 @@
       "types": "./dist/floating-image-transform.d.ts",
       "import": "./dist/floating-image-transform.js"
     },
+    "./fill-selection": {
+      "types": "./dist/fill-selection.d.ts",
+      "import": "./dist/fill-selection.js"
+    },
     "./frozen-layout": {
       "types": "./dist/frozen-layout.d.ts",
       "import": "./dist/frozen-layout.js"

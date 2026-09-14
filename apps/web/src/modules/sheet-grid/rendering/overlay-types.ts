@@ -42,6 +42,7 @@ export type SheetOverlayState = Readonly<{
   referenceGroups?: readonly FormulaReferenceOverlay[];
   clipboardRects?: readonly SheetViewportRangeFragment[];
   clipboardMode?: "copy" | "cut" | null;
+  fillPreviewRects?: readonly SheetViewportRangeFragment[];
   readingRects?: readonly SheetViewportRangeFragment[];
   readingColor?: string;
   freezeDrag?: SheetFreezeDragOverlay | null;

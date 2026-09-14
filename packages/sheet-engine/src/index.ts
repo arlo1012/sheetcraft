@@ -3,6 +3,7 @@ export * from "./axis-interactions.js";
 export * from "./extent.js";
 export * from "./floating-image-layout.js";
 export * from "./floating-image-transform.js";
+export * from "./fill-selection.js";
 export * from "./frozen-layout.js";
 export * from "./geometry.js";
 export * from "./row-height.js";

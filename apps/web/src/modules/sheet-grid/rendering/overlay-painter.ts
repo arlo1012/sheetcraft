@@ -194,6 +194,10 @@ export function paintSheetForeground(
       -(time / 60),
     );
   }
+  if (state.fillPreviewRects?.length) {
+    paintRangeFill(context, frame, state.fillPreviewRects, palette.actionPrimary, 0.06);
+    paintRangeOutline(context, frame, state.fillPreviewRects, palette.actionPrimary, 2, [4, 3]);
+  }
 }
 
 function isHandleActive(state: SheetOverlayState, target: FreezeHandleTarget): boolean {

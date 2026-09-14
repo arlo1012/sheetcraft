@@ -187,6 +187,28 @@ export type MessageSchema = FormulaToolsMessageSchema & {
     sheetDuplicated: string;
     sheetMoved: string;
   };
+  autoFill: {
+    options: string;
+    handle: string;
+    preview: string;
+    copy: string;
+    series: string;
+    fillFormatsOnly: string;
+    fillWithoutFormatting: string;
+    dateDay: string;
+    dateWeekday: string;
+    dateMonth: string;
+    dateYear: string;
+    failed: string;
+    documentChanged: string;
+    noAdjacentData: string;
+    unsupportedContent: string;
+    rangeTooLarge: string;
+    readOnly: string;
+    mergedCells: string;
+    hiddenCells: string;
+    outOfBounds: string;
+  };
   navigation: {
     sheet: string;
     goToCell: string;

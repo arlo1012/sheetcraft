@@ -83,6 +83,8 @@ import { getViewportAxisBoundaryOffset } from "@idea10/sheet-engine/axis-interac
 import { useCellEditing } from "../composables/useCellEditing";
 import { useFormulaReferenceNavigation } from "../composables/useFormulaReferenceNavigation";
 import { useDragSelection } from "../composables/useDragSelection";
+import { useSheetAutoFill } from "../composables/useSheetAutoFill";
+import type { GridFillFeedback, GridFillRequest, GridFillResult } from "../auto-fill-contracts";
 import { useSheetViewport } from "../composables/useSheetViewport";
 import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 import type { ImageInsertMode } from "../../sheet-images/useSheetImageActions";
@@ -96,6 +98,7 @@ import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
 import SheetCellContextMenu from "./SheetCellContextMenu.vue";
 import SheetSurface from "./SheetSurface.vue";
+import SheetAutoFillOptions from "./SheetAutoFillOptions.vue";
 import {
   createFloatingImageCanvasCache,
   paintFloatingImages,
@@ -163,6 +166,7 @@ const props = withDefaults(
     workbookRevision?: number;
     applyPaste?: (payload: GridPastePayload) => GridPasteResult;
     applyAxisMove?: (payload: AxisMovePayload) => boolean;
+    applyFill?: (request: GridFillRequest) => GridFillResult;
     initialRowCount?: number;
     initialColumnCount?: number;
     rowExpansionStep?: number;
@@ -228,6 +232,8 @@ const emit = defineEmits<{
   redo: [];
   viewStateChange: [viewState: SheetGridViewState];
   selectionDraggingChange: [dragging: boolean];
+  fillFeedback: [feedback: GridFillFeedback];
+  endFill: [];
   horizontalScrollChange: [state: SheetHorizontalScrollState];
   "update:zoom": [zoom: number];
 }>();
@@ -506,7 +512,10 @@ const quickToolsAvailable = computed(
     !dimensionResize.value,
 );
 const freezeDragging = ref(false);
-const quickInsertHover = shallowRef<{ axis: SheetDimensionAxis; index: number }>();
+const quickInsertHover = shallowRef<{
+  axis: SheetDimensionAxis;
+  index: number;
+}>();
 const {
   drag: axisMoveDrag,
   start: startAxisMoveDrag,
@@ -627,7 +636,10 @@ const surfaceRef = ref<InstanceType<typeof SheetSurface>>();
 const emptyImageUrls: ReadonlyMap<string, string> = new Map();
 const resolvedImageUrls = computed(() => props.imageAssetUrls ?? emptyImageUrls);
 const imageLayerRef = ref<InstanceType<typeof SheetFloatingImageLayer>>();
-const imagePaintState = shallowRef<FloatingImagePaintState>({ images: [], revision: 0 });
+const imagePaintState = shallowRef<FloatingImagePaintState>({
+  images: [],
+  revision: 0,
+});
 const floatingImageCache = createFloatingImageCanvasCache(() => surfaceRef.value?.invalidate());
 const paintSurfaceImages = computed(() => {
   const state = imagePaintState.value;
@@ -702,7 +714,9 @@ const headerLabel = computed(() => {
   if (focused.axis === "corner") return t("grid.selectAll");
   return focused.axis === "row"
     ? t("grid.selectRow", { row: (focused.index ?? 0) + 1 })
-    : t("grid.selectColumn", { column: columnIndexToLabel(focused.index ?? 0) });
+    : t("grid.selectColumn", {
+        column: columnIndexToLabel(focused.index ?? 0),
+      });
 });
 const headerPaintState = computed(() => ({
   selection: headerSelection.value,
@@ -734,6 +748,7 @@ const overlayState = computed<SheetOverlayState>(() => {
     referenceGroups: formulaReferenceGroups.value,
     clipboardRects: clipboardRangeRects.value,
     clipboardMode: clipboardMode.value,
+    fillPreviewRects: fillPreviewRects.value,
     readingRects,
     readingColor: props.highlightColor,
     axisOperationPreview: axisOperationPreview.value,
@@ -802,7 +817,13 @@ function onSurfaceKeydown(event: KeyboardEvent): void {
 }
 
 const activeCellRect = computed(
-  () => layout.value.getCellViewportRect(activeCell.value) ?? { x: 0, y: 0, width: 0, height: 0 },
+  () =>
+    layout.value.getCellViewportRect(activeCell.value) ?? {
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+    },
 );
 const selectedRangeRects = computed(() => layout.value.getRangeFragments(selectedRange.value));
 
@@ -851,7 +872,10 @@ const formulaReferenceGroups = computed<readonly FormulaReferenceOverlayGroup[]>
       continue;
     const existing = groups.get(token.key);
     if (existing) continue;
-    groups.set(token.key, { token, active: isActiveFormulaReference(editor, token) });
+    groups.set(token.key, {
+      token,
+      active: isActiveFormulaReference(editor, token),
+    });
   }
   return [...groups.values()].map(({ token, active }) => ({
     key: token.key,
@@ -950,7 +974,10 @@ const {
   isEditing: () => isEditing.value,
   isComposing: () => isComposing.value,
   onPaste: (payload) => {
-    const result = props.applyPaste?.(payload) ?? { ok: false, reason: "pasteRejected" as const };
+    const result = props.applyPaste?.(payload) ?? {
+      ok: false,
+      reason: "pasteRejected" as const,
+    };
     if (!result.ok) return result;
     ensureGridExtentContains(payload.plan.range.end);
     setSelection(
@@ -980,6 +1007,73 @@ const floatingClipboard = useFloatingImageClipboard({
 const clipboardRangeRects = computed(() =>
   clipboardRange.value ? layout.value.getRangeFragments(clipboardRange.value) : [],
 );
+
+const {
+  state: fillSession,
+  handlePoint: fillHandlePoint,
+  handleStyle: fillHandleStyle,
+  optionsPosition: fillOptionsPosition,
+  previewRects: fillPreviewRects,
+  previewLabel: fillPreviewLabel,
+  start: startFillDrag,
+  doubleClick: doubleClickFill,
+  selectMode: selectFillMode,
+  fillSelection,
+} = useSheetAutoFill({
+  getSheet: () => props.sheet,
+  getRevision: () => props.workbookRevision ?? 0,
+  getRange: () => selectedRange.value,
+  getCanFill: () =>
+    Boolean(props.applyFill) &&
+    !props.readOnly &&
+    !isEditing.value &&
+    !isComposing.value &&
+    !props.formatPainterActive &&
+    !getReferenceEditor() &&
+    !selectedImageId.value &&
+    !dimensionResize.value &&
+    !freezeDragging.value &&
+    !axisMoveDrag.value &&
+    getSelectionMode(selection.value) === "cells",
+  getLayout: () => layout.value,
+  getHeaderSize: () => headerSize.value,
+  getRoot: () => rootRef.value,
+  getScroller: () => scrollerRef.value,
+  getViewportSize: () => viewportSize,
+  getScale: () => scale.value,
+  getContentRowCount: () => contentExtent.value.rowCount,
+  getCellAtClientPoint,
+  apply: (request) => props.applyFill?.(request) ?? { ok: false, reason: "failed" },
+  onBeforeStart: () => {
+    stopDragSelection();
+    stopFormulaReferenceDrag();
+    axisContextMenu.value = undefined;
+    cellContextMenu.value = undefined;
+  },
+  onResult: (range, _source, visibleAddress) => {
+    clearPendingClipboard();
+    ensureGridExtentContains(range.end);
+    setSelection(
+      {
+        active: selection.value.active,
+        anchor: range.start,
+        focus: range.end,
+        mode: "cells",
+      },
+      visibleAddress,
+    );
+  },
+  onFeedback: (feedback) => emit("fillFeedback", feedback),
+  onEndSession: () => emit("endFill"),
+  onEnsureGridExtentContains: ensureGridExtentContains,
+  onEnsureGridExtentCoversViewport: ensureGridExtentCoversViewport,
+  onScrollPositionChange: (position) => {
+    scrollPosition.x = position.x;
+    scrollPosition.y = position.y;
+    emitViewState();
+  },
+  focusGrid: focusEditor,
+});
 
 function selectFloatingImage(id: string | null): void {
   if (isComposing.value) return;
@@ -1713,7 +1807,10 @@ function requestContextAction(action: SheetContextAction): void {
     action.type !== "formatPainter"
   )
     clearPendingClipboard();
-  emit("contextAction", { action, range: { start: { ...range.start }, end: { ...range.end } } });
+  emit("contextAction", {
+    action,
+    range: { start: { ...range.start }, end: { ...range.end } },
+  });
 }
 
 function requestCellImageAction(action: "preview" | "float"): void {
@@ -1774,7 +1871,9 @@ function handleHistoryShortcut(event: KeyboardEvent): boolean {
   if (isEditing.value) {
     return false;
   }
-  const action = getWorkbookHistoryShortcut(event, { allowEditableTarget: true });
+  const action = getWorkbookHistoryShortcut(event, {
+    allowEditableTarget: true,
+  });
   if (!action) return false;
   event.preventDefault();
   clearPendingClipboard();
@@ -1920,6 +2019,18 @@ function onEditorKeydown(event: KeyboardEvent): void {
       editingValue.value = completeFormulaForCommit(editingValue.value);
       traverseSelection("Tab", event.shiftKey, true);
     }
+    return;
+  }
+
+  if (
+    !props.readOnly &&
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    (event.key.toLowerCase() === "d" || event.key.toLowerCase() === "r")
+  ) {
+    event.preventDefault();
+    fillSelection(event.key.toLowerCase() === "d" ? "down" : "right");
     return;
   }
 
@@ -2135,7 +2246,9 @@ defineExpose({
       ref="scrollerRef"
       :id="gridId"
       class="sheet-grid__scroller"
-      :class="{ 'has-external-horizontal-scrollbar': externalHorizontalScrollbar }"
+      :class="{
+        'has-external-horizontal-scrollbar': externalHorizontalScrollbar,
+      }"
       @scroll="onScroll"
     >
       <div class="sheet-grid__canvas" :style="gridCanvasStyle" />
@@ -2192,6 +2305,31 @@ defineExpose({
         />
       </template>
     </SheetSurface>
+    <button
+      v-if="fillHandlePoint"
+      type="button"
+      class="sheet-grid__fill-handle"
+      :style="fillHandleStyle"
+      :aria-label="t('autoFill.handle')"
+      :title="t('autoFill.handle')"
+      tabindex="-1"
+      data-sheet-fill-handle
+      @pointerdown="startFillDrag"
+      @dblclick="doubleClickFill"
+      @contextmenu.prevent.stop
+    />
+    <SheetAutoFillOptions
+      v-if="fillSession && fillOptionsPosition"
+      :position="fillOptionsPosition"
+      :visible="true"
+      :current-mode="fillSession.mode"
+      :available-modes="fillSession.availableModes"
+      :scale="scale"
+      @select="selectFillMode"
+    />
+    <span v-if="fillPreviewLabel" class="ui-visually-hidden" role="status">{{
+      fillPreviewLabel
+    }}</span>
     <div
       class="sheet-grid__image-controls"
       :style="{
@@ -2362,6 +2500,28 @@ defineExpose({
     position: absolute;
     z-index: 6;
     pointer-events: none;
+  }
+
+  &__fill-handle {
+    position: absolute;
+    z-index: 8;
+    display: grid;
+    place-items: center;
+    width: calc(12px / var(--sheet-scale, 1));
+    height: calc(12px / var(--sheet-scale, 1));
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: crosshair;
+    touch-action: none;
+
+    &::after {
+      width: calc(6px / var(--sheet-scale, 1));
+      height: calc(6px / var(--sheet-scale, 1));
+      border: calc(1px / var(--sheet-scale, 1)) solid var(--idea-surface-panel);
+      background: var(--idea-action-primary);
+      content: "";
+    }
   }
 }
 </style>

@@ -23,6 +23,7 @@ import SheetColumnStatisticsDialog from "../modules/sheet-grid/components/SheetC
 import SheetColumnChoiceDialog from "../modules/sheet-grid/components/SheetColumnChoiceDialog.vue";
 import SheetContextFilterDialog from "../modules/sheet-grid/components/SheetContextFilterDialog.vue";
 import { createAxisToolActions } from "../modules/sheet-grid/axis-tool-actions";
+import { createCellFillActions } from "../modules/sheet-grid/cell-fill-actions";
 import { createCellOperationActions } from "../modules/sheet-grid/cell-operation-actions";
 import { browserCellTextMeasurer } from "../shared/cell-text/text-metrics";
 import { useAppI18n } from "../shared/i18n";
@@ -80,6 +81,7 @@ function updateHorizontalScrollState(state: SheetHorizontalScrollState): void {
 const {
   session,
   executeCommand,
+  executeReplaceableCommand,
   recalculate,
   workbookRevision,
   workbookGeneration,
@@ -156,6 +158,12 @@ const {
 
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
 const { locale } = useAppI18n();
+const fillActions = createCellFillActions({
+  getWorkbook: () => session.workbook,
+  getSheetId: () => activeSheet.value.id,
+  getRevision: () => workbookRevision.value,
+  execute: executeReplaceableCommand,
+});
 const axisTools = createAxisToolActions({
   getSheet: () => activeSheet.value,
   getEvaluator: () => activeSheetEvaluator.value,
@@ -661,6 +669,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :workbook-revision="workbookRevision"
         :apply-paste="pasteCells"
         :apply-axis-move="moveAxis"
+        :apply-fill="fillActions.apply"
+        @end-fill="fillActions.clear"
+        @fill-feedback="MessagePlugin.warning(t(`autoFill.${$event}`))"
         :view-state="activeSheetViewState"
         :format-painter-active="formatPainterActive"
         @clear-cells="clearCells"

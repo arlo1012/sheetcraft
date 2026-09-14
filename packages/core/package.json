@@ -35,6 +35,10 @@
       "types": "./dist/clipboard.d.ts",
       "import": "./dist/clipboard.js"
     },
+    "./cell-autofill": {
+      "types": "./dist/cell-autofill.d.ts",
+      "import": "./dist/cell-autofill.js"
+    },
     "./commands": {
       "types": "./dist/commands/index.d.ts",
       "import": "./dist/commands/index.js"

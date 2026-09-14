@@ -52,9 +52,11 @@ import {
   createWorkbookSession,
   createWorkbookHistory,
   executeWorkbookCommand,
+  executeReplaceableWorkbookCommand,
   redoWorkbookCommand,
   undoWorkbookCommand,
   type WorkbookSession,
+  type ReplaceableWorkbookCommandToken,
 } from "@idea10/core/history";
 import {
   formatCellContentForInput,
@@ -415,6 +417,20 @@ export function useSpreadsheetWorkspaceController(
       pruneViewStates();
     }
     return changed;
+  }
+
+  function executeReplaceableCommand(
+    command: WorkbookCommand,
+    token?: ReplaceableWorkbookCommandToken,
+  ) {
+    calculation.prepareMutation();
+    const result = executeReplaceableWorkbookCommand(session, token, command);
+    if (result.changed) {
+      calculation.invalidate();
+      workbookVersion.value += 1;
+      pruneViewStates();
+    }
+    return result;
   }
 
   function clearWorkspaceStatus(): void {
@@ -1290,6 +1306,7 @@ export function useSpreadsheetWorkspaceController(
   return {
     session,
     executeCommand: execute,
+    executeReplaceableCommand,
     recalculate: () => {
       calculation.recalculate();
       calculationVersion.value += 1;
