@@ -12,6 +12,7 @@ const props = defineProps<{
   initialCount: number;
   maximum: number;
   disabled: boolean;
+  stacked?: boolean;
 }>();
 const emit = defineEmits<{ insert: [count: number] }>();
 const { t } = useAppI18n();
@@ -37,7 +38,12 @@ function insert(): void {
 </script>
 
 <template>
-  <MenuItem :data-row-column-action="action" :disabled="disabled || !valid" @select="insert">
+  <MenuItem
+    :data-row-column-action="action"
+    :disabled="disabled || !valid"
+    :style="stacked ? { gridTemplateColumns: 'minmax(0, 1fr)', rowGap: '0' } : undefined"
+    @select="insert"
+  >
     <template #icon><slot /></template>
     {{ label }}
     <template #trailing>

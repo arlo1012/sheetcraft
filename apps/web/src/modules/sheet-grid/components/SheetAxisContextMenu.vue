@@ -161,6 +161,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
         :label="t(axis === 'row' ? 'axisMenu.rowActions' : 'axisMenu.columnActions')"
       >
         <AxisInsertMenuItem
+          stacked
           data-axis-action="insert-before"
           :action="axis === 'row' ? 'insert-above' : 'insert-before'"
           :label="insertBeforeLabel"
@@ -172,6 +173,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
             ><Rows3 v-if="axis === 'row'" :size="16" /><Columns3 v-else :size="16" /></template
         ></AxisInsertMenuItem>
         <AxisInsertMenuItem
+          stacked
           data-axis-action="insert-after"
           :action="axis === 'row' ? 'insert-below' : 'insert-after'"
           :label="insertAfterLabel"
@@ -273,7 +275,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
   width: 328px;
 }
 .sheet-axis-context-menu {
-  width: 100%;
+  width: 195px;
   border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
   &--unframed {
     border-radius: var(--idea-radius-default);

@@ -397,7 +397,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
   }
 }
 .sheet-cell-context-menu {
-  width: 100%;
+  width: 195px;
   border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
   &--submenu {
     z-index: 101;
