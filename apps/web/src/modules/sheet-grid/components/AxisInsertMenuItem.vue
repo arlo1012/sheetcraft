@@ -41,7 +41,7 @@ function insert(): void {
   <MenuItem
     :data-row-column-action="action"
     :disabled="disabled || !valid"
-    :style="stacked ? { gridTemplateColumns: 'minmax(0, 1fr)', rowGap: '0' } : undefined"
+    :stacked="stacked"
     @select="insert"
   >
     <template #icon><slot /></template>
@@ -56,6 +56,7 @@ function insert(): void {
         <TInputNumber
           v-model="draft"
           class="axis-insert-menu-item__count idea-input-number--persistent-controls"
+          :style="{ width: stacked ? '48px' : '64px', minWidth: '0' }"
           :min="1"
           :max="Math.max(1, maximum)"
           :decimal-places="0"
@@ -88,9 +89,6 @@ function insert(): void {
     align-items: center;
     gap: 4px;
     padding: 4px 0;
-  }
-  &__count {
-    width: 64px;
   }
   &__confirm {
     display: grid;

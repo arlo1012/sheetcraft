@@ -10,6 +10,8 @@ import {
   Trash2,
 } from "lucide-vue-next";
 import { computed, nextTick, onMounted, ref } from "vue";
+import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
+import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import type { CellRange, Sheet, SheetDimensionAxis } from "@idea10/core/workbook";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
@@ -55,7 +57,7 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 const panelRef = ref<HTMLElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
-const sizeDraft = ref(props.currentSize === undefined ? "" : String(props.currentSize));
+const sizeDraft = ref<InputNumberValue>(props.currentSize ?? "");
 const isOpen = ref(true);
 const menuAnchor = computed(() => props.anchor);
 const { floatingStyles: menuStyle } = useDismissibleFloatingPanel(menuAnchor, panelRef, isOpen, {
@@ -103,11 +105,11 @@ function requestInsert(direction: "before" | "after", count: number): void {
   dispatch({ type: "insert", axis: props.axis, direction, count });
 }
 function normalizeSize(): number | undefined {
-  if (sizeDraft.value === "") return undefined;
+  if (sizeDraft.value === "" || sizeDraft.value === undefined) return undefined;
   const numeric = Number(sizeDraft.value);
   if (!Number.isFinite(numeric)) return undefined;
   const size = Math.min(props.maximumSize, Math.max(props.minimumSize, Math.round(numeric)));
-  sizeDraft.value = String(size);
+  sizeDraft.value = size;
   return size;
 }
 function requestResize(): void {
@@ -115,6 +117,10 @@ function requestResize(): void {
   if (props.readOnly || size === undefined || size === props.currentSize) return;
   if (!props.state) emit("resize", size);
   dispatch({ type: "resize", axis: props.axis, size });
+}
+function commitSize(value: InputNumberValue): void {
+  sizeDraft.value = value;
+  requestResize();
 }
 function requestDelete(): void {
   if (props.readOnly) return;
@@ -202,23 +208,25 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
         >
         <MenuSeparator />
         <li v-if="currentSize !== undefined" class="sheet-axis-context-menu__size-row" role="none">
-          <span>{{ sizeLabel }}</span
-          ><label class="sheet-axis-context-menu__size-field"
-            ><input
-              class="sheet-axis-context-menu__number-input sheet-axis-context-menu__number-input--size"
-              type="number"
-              inputmode="numeric"
-              :value="sizeDraft"
+          <span>{{ sizeLabel }}</span>
+          <div class="sheet-axis-context-menu__size-field" role="group" :aria-label="sizeLabel">
+            <TInputNumber
+              v-model="sizeDraft"
+              class="idea-input-number--persistent-controls"
+              :style="{ width: '64px', minWidth: '0' }"
               :min="minimumSize"
               :max="maximumSize"
-              step="1"
+              :decimal-places="0"
+              :step="1"
               :disabled="readOnly"
               :aria-label="sizeLabel"
-              @input="sizeDraft = ($event.currentTarget as HTMLInputElement).value"
-              @blur="requestResize"
-              @keydown.enter.prevent="($event.currentTarget as HTMLInputElement).blur()"
-            /><span>{{ t("axisMenu.pixels") }}</span></label
-          >
+              size="small"
+              theme="column"
+              @blur="commitSize"
+              @enter="commitSize"
+            />
+            <span>{{ t("axisMenu.pixels") }}</span>
+          </div>
         </li>
         <MenuItem
           data-axis-action="auto-fit"
@@ -279,25 +287,6 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
   border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
   &--unframed {
     border-radius: var(--idea-radius-default);
-  }
-  &__number-input {
-    width: 52px;
-    height: 24px;
-    padding: 0 4px;
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-small);
-    color: var(--idea-text-primary);
-    font: inherit;
-    text-align: center;
-    &:focus {
-      border-color: var(--idea-action-primary);
-      outline: none;
-    }
-    &:disabled {
-      color: var(--idea-text-disabled);
-      background: var(--idea-surface-disabled);
-    }
   }
   &__size-row {
     display: grid;

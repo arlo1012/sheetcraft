@@ -5,6 +5,7 @@ const props = withDefaults(
   defineProps<{
     danger?: boolean;
     disabled?: boolean;
+    stacked?: boolean;
     role?: "menuitem" | "menuitemcheckbox" | "menuitemradio";
   }>(),
   {
@@ -46,6 +47,7 @@ function onKeydown(event: KeyboardEvent): void {
       'idea-menu-item--disabled': disabled,
       'idea-menu-item--with-icon': $slots.icon,
       'idea-menu-item--compound': $slots.trailing,
+      'idea-menu-item--stacked': stacked,
     }"
     role="none"
   >
@@ -120,6 +122,11 @@ function onKeydown(event: KeyboardEvent): void {
 
     &.idea-menu-item--with-icon {
       grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    &.idea-menu-item--stacked {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: 0;
     }
   }
 
