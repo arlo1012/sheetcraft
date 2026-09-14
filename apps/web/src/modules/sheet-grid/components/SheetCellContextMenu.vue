@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import {
+  PanelTopDashed,
+  PanelBottomDashed,
+  PanelLeftDashed,
+  PanelRightDashed,
   ArrowDown,
   ArrowDownAZ,
   ArrowDownUp,
@@ -331,7 +335,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :maximum="maximumRowsBefore"
           :disabled="Boolean(readOnly)"
           @insert="dispatch({ type: 'insert', axis: 'row', direction: 'before', count: $event })"
-          ><Rows3 :size="16" /></AxisInsertMenuItem
+          ><PanelTopDashed :size="16" /></AxisInsertMenuItem
         ><AxisInsertMenuItem
           data-cell-action="insert-below"
           action="cell-insert-below"
@@ -340,7 +344,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :maximum="maximumRowsAfter"
           :disabled="Boolean(readOnly)"
           @insert="dispatch({ type: 'insert', axis: 'row', direction: 'after', count: $event })"
-          ><Rows3 :size="16" /></AxisInsertMenuItem
+          ><PanelBottomDashed :size="16" /></AxisInsertMenuItem
         ><AxisInsertMenuItem
           data-cell-action="insert-left"
           action="cell-insert-left"
@@ -349,7 +353,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :maximum="maximumColumnsBefore"
           :disabled="Boolean(readOnly)"
           @insert="dispatch({ type: 'insert', axis: 'column', direction: 'before', count: $event })"
-          ><Columns3 :size="16" /></AxisInsertMenuItem
+          ><PanelLeftDashed :size="16" /></AxisInsertMenuItem
         ><AxisInsertMenuItem
           data-cell-action="insert-column"
           action="cell-insert-right"
@@ -358,7 +362,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :maximum="maximumColumnsAfter"
           :disabled="Boolean(readOnly)"
           @insert="dispatch({ type: 'insert', axis: 'column', direction: 'after', count: $event })"
-          ><Columns3 :size="16" /></AxisInsertMenuItem
+          ><PanelRightDashed :size="16" /></AxisInsertMenuItem
       ></template>
       <template v-else-if="activeSubmenu === 'delete'"
         ><MenuItem

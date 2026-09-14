@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import {
+  PanelTopDashed,
+  PanelBottomDashed,
+  PanelLeftDashed,
+  PanelRightDashed,
   ChevronRight,
   Columns3,
   EyeOff,
@@ -9,8 +13,6 @@ import {
   TableCellsMerge,
   TableCellsSplit,
   Rows2,
-  TableRowsSplit,
-  TableColumnsSplit,
 } from "lucide-vue-next";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { computed, nextTick, ref, useId, watch } from "vue";
@@ -471,7 +473,7 @@ watch(
             :maximum="maximumInsertCount('row', 'before')"
             :disabled="disabled"
             @insert="requestInsert('row', 'before', $event)"
-            ><TableRowsSplit class="row-column-operations-menu__insert-icon" :size="15"
+            ><PanelTopDashed class="row-column-operations-menu__insert-icon" :size="15"
           /></AxisInsertMenuItem>
           <AxisInsertMenuItem
             action="insert-rows-below"
@@ -480,7 +482,7 @@ watch(
             :maximum="maximumInsertCount('row', 'after')"
             :disabled="disabled"
             @insert="requestInsert('row', 'after', $event)"
-            ><TableRowsSplit class="row-column-operations-menu__insert-icon" :size="15"
+            ><PanelBottomDashed class="row-column-operations-menu__insert-icon" :size="15"
           /></AxisInsertMenuItem>
           <AxisInsertMenuItem
             action="insert-columns-before"
@@ -489,7 +491,7 @@ watch(
             :maximum="maximumInsertCount('column', 'before')"
             :disabled="disabled"
             @insert="requestInsert('column', 'before', $event)"
-            ><TableColumnsSplit class="row-column-operations-menu__insert-icon" :size="15"
+            ><PanelLeftDashed class="row-column-operations-menu__insert-icon" :size="15"
           /></AxisInsertMenuItem>
           <AxisInsertMenuItem
             action="insert-columns-after"
@@ -498,7 +500,7 @@ watch(
             :maximum="maximumInsertCount('column', 'after')"
             :disabled="disabled"
             @insert="requestInsert('column', 'after', $event)"
-            ><TableColumnsSplit class="row-column-operations-menu__insert-icon" :size="15"
+            ><PanelRightDashed class="row-column-operations-menu__insert-icon" :size="15"
           /></AxisInsertMenuItem>
         </template>
         <template v-else-if="activeSubmenu === 'delete'">

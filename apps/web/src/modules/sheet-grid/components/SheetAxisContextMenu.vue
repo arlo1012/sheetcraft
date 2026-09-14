@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import {
+  PanelTopDashed,
+  PanelBottomDashed,
+  PanelLeftDashed,
+  PanelRightDashed,
   BarChart3,
-  Columns3,
   Delete,
   Eraser,
   RemoveFormatting,
   Eye,
   EyeOff,
   Paintbrush,
-  Rows3,
   Settings2,
   Trash2,
 } from "lucide-vue-next";
@@ -174,7 +176,9 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :disabled="Boolean(readOnly)"
           @insert="requestInsert('before', $event)"
           ><template #default
-            ><Rows3 v-if="axis === 'row'" :size="16" /><Columns3 v-else :size="16" /></template
+            ><PanelTopDashed v-if="axis === 'row'" :size="16" /><PanelLeftDashed
+              v-else
+              :size="16" /></template
         ></AxisInsertMenuItem>
         <AxisInsertMenuItem
           compact
@@ -186,7 +190,9 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           :disabled="Boolean(readOnly)"
           @insert="requestInsert('after', $event)"
           ><template #default
-            ><Rows3 v-if="axis === 'row'" :size="16" /><Columns3 v-else :size="16" /></template
+            ><PanelBottomDashed v-if="axis === 'row'" :size="16" /><PanelRightDashed
+              v-else
+              :size="16" /></template
         ></AxisInsertMenuItem>
         <MenuSeparator />
         <MenuItem data-axis-action="delete" danger :disabled="readOnly" @select="requestDelete"
