@@ -13,8 +13,6 @@ import {
   Trash2,
 } from "lucide-vue-next";
 import { computed, nextTick, onMounted, ref } from "vue";
-import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
-import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import type { CellRange, Sheet, SheetDimensionAxis } from "@idea10/core/workbook";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
@@ -24,6 +22,7 @@ import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import type { SheetContextAction, SheetContextMenuState } from "../context-menu-contracts";
 import AxisInsertMenuItem from "./AxisInsertMenuItem.vue";
+import SheetDimensionInput from "./SheetDimensionInput.vue";
 import ContextClipboardActions from "./ContextClipboardActions.vue";
 import SheetContextFormatToolbar from "./SheetContextFormatToolbar.vue";
 
@@ -60,7 +59,6 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 const panelRef = ref<HTMLElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
-const sizeDraft = ref<InputNumberValue>(props.currentSize ?? "");
 const isOpen = ref(true);
 const menuAnchor = computed(() => props.anchor);
 const { floatingStyles: menuStyle } = useDismissibleFloatingPanel(menuAnchor, panelRef, isOpen, {
@@ -107,23 +105,17 @@ function requestInsert(direction: "before" | "after", count: number): void {
   if (!props.state) emit("insert", { direction, count });
   dispatch({ type: "insert", axis: props.axis, direction, count });
 }
-function normalizeSize(): number | undefined {
-  if (sizeDraft.value === "" || sizeDraft.value === undefined) return undefined;
-  const numeric = Number(sizeDraft.value);
-  if (!Number.isFinite(numeric)) return undefined;
-  const size = Math.min(props.maximumSize, Math.max(props.minimumSize, Math.round(numeric)));
-  sizeDraft.value = size;
-  return size;
-}
-function requestResize(): void {
-  const size = normalizeSize();
-  if (props.readOnly || size === undefined || size === props.currentSize) return;
+function requestResize(size: number): void {
+  if (
+    props.readOnly ||
+    !Number.isInteger(size) ||
+    size < props.minimumSize ||
+    size > props.maximumSize ||
+    (size === props.currentSize && props.selectionCount === 1)
+  )
+    return;
   if (!props.state) emit("resize", size);
   dispatch({ type: "resize", axis: props.axis, size });
-}
-function commitSize(value: InputNumberValue): void {
-  sizeDraft.value = value;
-  requestResize();
 }
 function requestDelete(): void {
   if (props.readOnly) return;
@@ -210,26 +202,17 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
           ><template #icon><Eye :size="16" /></template>{{ t("contextMenu.unhide") }}</MenuItem
         >
         <MenuSeparator />
-        <li v-if="currentSize !== undefined" class="sheet-axis-context-menu__size-row" role="none">
+        <li class="sheet-axis-context-menu__size-row" role="none">
           <span>{{ sizeLabel }}</span>
-          <div class="sheet-axis-context-menu__size-field" role="group" :aria-label="sizeLabel">
-            <TInputNumber
-              v-model="sizeDraft"
-              class="idea-input-number--persistent-controls"
-              :style="{ width: '64px', minWidth: '0' }"
-              :min="minimumSize"
-              :max="maximumSize"
-              :decimal-places="0"
-              :step="1"
-              :disabled="readOnly"
-              :aria-label="sizeLabel"
-              size="small"
-              theme="column"
-              @blur="commitSize"
-              @enter="commitSize"
-            />
-            <span>{{ t("axisMenu.pixels") }}</span>
-          </div>
+          <SheetDimensionInput
+            :model-value="currentSize"
+            :axis="axis"
+            :minimum="minimumSize"
+            :maximum="maximumSize"
+            :disabled="readOnly"
+            compact
+            @commit="requestResize"
+          />
         </li>
         <MenuItem
           data-axis-action="auto-fit"
@@ -301,12 +284,6 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
     gap: 8px;
     padding: 0 14px;
     list-style: none;
-  }
-  &__size-field {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--idea-text-secondary);
   }
 }
 </style>

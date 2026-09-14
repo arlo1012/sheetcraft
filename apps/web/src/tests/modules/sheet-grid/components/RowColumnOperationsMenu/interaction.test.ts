@@ -2,6 +2,7 @@ import { DOMWrapper, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, describe, expect, test } from "vitest";
 import { createSheet, type CellRange } from "@idea10/core/workbook";
+import SheetDimensionInput from "../../../../../modules/sheet-grid/components/SheetDimensionInput.vue";
 import RowColumnOperationsMenu from "../../../../../modules/sheet-grid/components/RowColumnOperationsMenu.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 
@@ -136,7 +137,7 @@ describe("RowColumnOperationsMenu", () => {
     await rootMenu().get('[data-row-column-action="row-height"]').trigger("click");
     await nextTick();
 
-    wrapper.getComponent({ name: "TInputNumber" }).vm.$emit("change", 44);
+    wrapper.getComponent({ name: "TInputNumber" }).vm.$emit("change", 33);
     await wrapper.setProps({
       range: {
         start: { row: 7, column: 0 },
@@ -172,7 +173,7 @@ describe("RowColumnOperationsMenu", () => {
     await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
     await nextTick();
     await rootMenu().get('[data-row-column-action="row-height"]').trigger("click");
-    wrapper.getComponent({ name: "TInputNumber" }).vm.$emit("change", 44);
+    wrapper.getComponent({ name: "TInputNumber" }).vm.$emit("change", 33);
     await new DOMWrapper(document.body).get(".t-dialog__confirm").trigger("click");
     expect(wrapper.emitted("resize")).toEqual([[{ axis: "row", index: 2, count: 2, size: 44 }]]);
 
@@ -201,7 +202,7 @@ describe("RowColumnOperationsMenu", () => {
     await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
     await nextTick();
     await rootMenu().get('[data-row-column-action="row-height"]').trigger("click");
-    wrapper.getComponent({ name: "TInputNumber" }).vm.$emit("change", 20);
+    wrapper.getComponent({ name: "TInputNumber" }).vm.$emit("change", 15);
     await new DOMWrapper(document.body).get(".t-dialog__confirm").trigger("click");
 
     expect(wrapper.emitted("resize")).toEqual([[{ axis: "row", index: 2, count: 2, size: 20 }]]);
@@ -328,5 +329,56 @@ describe("RowColumnOperationsMenu", () => {
     await nextTick();
     expect(document.activeElement).toBe(insert.element);
     expect(document.body.querySelector('[id^="row-column-operations-submenu-"]')).toBeNull();
+  });
+  test("uses the same unit conversions for standard width without writing on unit-only confirmation", async () => {
+    const wrapper = mountMenu();
+    const trigger = wrapper.get('[data-ribbon-action="row-column-operations"]');
+    await trigger.trigger("click");
+    await nextTick();
+    await rootMenu().get('[data-row-column-action="standard-column-width"]').trigger("click");
+    await nextTick();
+    let field = wrapper.getComponent(SheetDimensionInput);
+    expect(field.getComponent({ name: "TInputNumber" }).props("modelValue")).toBe(13);
+    field.getComponent({ name: "TSelect" }).vm.$emit("change", "in");
+    await nextTick();
+    expect(field.getComponent({ name: "TInputNumber" }).props("modelValue")).toBe(1);
+    await new DOMWrapper(document.body)
+      .get('[role="dialog"][aria-label="Standard column width"] .t-dialog__confirm')
+      .trigger("click");
+    expect(wrapper.emitted("standardWidth")).toBeUndefined();
+
+    await trigger.trigger("click");
+    await nextTick();
+    await rootMenu().get('[data-row-column-action="standard-column-width"]').trigger("click");
+    await nextTick();
+    field = wrapper.getComponent(SheetDimensionInput);
+    field.getComponent({ name: "TSelect" }).vm.$emit("change", "cm");
+    await nextTick();
+    field.getComponent({ name: "TInputNumber" }).vm.$emit("change", 5.08);
+    await nextTick();
+    await new DOMWrapper(document.body)
+      .get('[role="dialog"][aria-label="Standard column width"] .t-dialog__confirm')
+      .trigger("click");
+    expect(field.props("modelValue")).toBe(192);
+    expect(wrapper.emitted("standardWidth")).toEqual([[{ size: 192 }]]);
+  });
+
+  test("cancels a pending dimension edit and disables confirmation for invalid input", async () => {
+    const wrapper = mountMenu();
+    await wrapper.get('[data-ribbon-action="row-column-operations"]').trigger("click");
+    await nextTick();
+    await rootMenu().get('[data-row-column-action="row-height"]').trigger("click");
+    await nextTick();
+    const number = wrapper.getComponent(SheetDimensionInput).getComponent({ name: "TInputNumber" });
+    number.vm.$emit("change", 9999);
+    await nextTick();
+    expect(
+      new DOMWrapper(document.body).get(".t-dialog__confirm").attributes("disabled"),
+    ).toBeDefined();
+    number.vm.$emit("change", 36);
+    await nextTick();
+    expect(wrapper.emitted("resize")).toBeUndefined();
+    await new DOMWrapper(document.body).get(".t-dialog__cancel").trigger("click");
+    expect(wrapper.emitted("resize")).toBeUndefined();
   });
 });

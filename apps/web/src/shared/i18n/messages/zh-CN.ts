@@ -704,6 +704,15 @@ export const zhCN = {
     clipboardActions: "剪贴板操作",
     formatToolbar: "快捷格式",
   },
+  dimensionUnits: {
+    unit: "尺寸单位",
+    px: "像素",
+    pt: "磅",
+    in: "英寸",
+    cm: "厘米",
+    mm: "毫米",
+    char: "字符",
+  },
   axisMenu: {
     insertCellsDialog: "插入单元格…",
     deleteCellsDialog: "删除单元格…",

@@ -717,6 +717,15 @@ export const enUS = {
     clipboardActions: "Clipboard actions",
     formatToolbar: "Quick formatting",
   },
+  dimensionUnits: {
+    unit: "Dimension unit",
+    px: "px",
+    pt: "pt",
+    in: "in",
+    cm: "cm",
+    mm: "mm",
+    char: "char",
+  },
   axisMenu: {
     insertCellsDialog: "Insert cells…",
     deleteCellsDialog: "Delete cells…",

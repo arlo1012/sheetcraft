@@ -697,6 +697,15 @@ export type MessageSchema = FormulaToolsMessageSchema & {
     clipboardActions: string;
     formatToolbar: string;
   };
+  dimensionUnits: {
+    unit: string;
+    px: string;
+    pt: string;
+    in: string;
+    cm: string;
+    mm: string;
+    char: string;
+  };
   axisMenu: {
     insertCellsDialog: string;
     deleteCellsDialog: string;

@@ -13,8 +13,6 @@ import {
   TableColumnsSplit,
 } from "lucide-vue-next";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
-import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import {
   DEFAULT_ROW_HEIGHT,
@@ -30,6 +28,7 @@ import {
   type SheetDimensionAxis,
 } from "@idea10/core/workbook";
 import AxisInsertMenuItem from "./AxisInsertMenuItem.vue";
+import SheetDimensionInput from "./SheetDimensionInput.vue";
 import CellOperationDialog from "./CellOperationDialog.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
@@ -82,8 +81,8 @@ const menuId = `row-column-operations-${useId().replaceAll(":", "")}`;
 const submenuId = `row-column-operations-submenu-${useId().replaceAll(":", "")}`;
 const cellTarget = ref<{ operation: "insert" | "delete"; range: CellRange }>();
 const sizeTarget = ref<AxisSizeTarget>();
-const sizeDraft = ref<InputNumberValue>();
-const standardWidthDraft = ref<InputNumberValue>();
+const sizeDraft = ref<number>();
+const standardWidthDraft = ref<number>();
 const isStandardWidthDialogOpen = ref(false);
 const activeSubmenu = ref<AxisOperationSubmenu | null>(null);
 const isSizeDialogOpen = computed(() => sizeTarget.value !== undefined);
@@ -217,10 +216,6 @@ function openSizeDialog(axis: SheetDimensionAxis): void {
   sizeDraft.value = size;
   activeSubmenu.value = null;
   dismiss("programmatic", false);
-}
-
-function updateSize(value: InputNumberValue): void {
-  sizeDraft.value = value;
 }
 
 function confirmSize(): void {
@@ -592,7 +587,10 @@ watch(
       :aria-label="t(sizeTarget?.axis === 'row' ? 'axisMenu.rowHeight' : 'axisMenu.columnWidth')"
       :visible="isSizeDialogOpen"
       :header="t(sizeTarget?.axis === 'row' ? 'axisMenu.rowHeight' : 'axisMenu.columnWidth')"
-      :confirm-btn="{ content: t('cellFormat.confirm'), disabled }"
+      :confirm-btn="{
+        content: t('cellFormat.confirm'),
+        disabled: disabled || sizeDraft === undefined,
+      }"
       :cancel-btn="t('cellFormat.cancel')"
       :close-on-overlay-click="false"
       :destroy-on-close="true"
@@ -611,20 +609,15 @@ watch(
         <span>{{
           t(sizeTarget?.axis === "row" ? "axisMenu.rowHeight" : "axisMenu.columnWidth")
         }}</span>
-        <TInputNumber
-          class="idea-input-number--persistent-controls"
-          :model-value="sizeDraft"
-          :min="sizeTarget ? getAxisSizeRange(sizeTarget.axis).minimum : undefined"
-          :max="sizeTarget ? getAxisSizeRange(sizeTarget.axis).maximum : undefined"
-          :decimal-places="0"
-          :step="1"
-          theme="column"
-          :suffix="t('axisMenu.pixels')"
-          :aria-label="
-            t(sizeTarget?.axis === 'row' ? 'axisMenu.rowHeight' : 'axisMenu.columnWidth')
-          "
+        <SheetDimensionInput
+          v-if="sizeTarget"
+          v-model="sizeDraft"
+          :axis="sizeTarget.axis"
+          :minimum="getAxisSizeRange(sizeTarget.axis).minimum"
+          :maximum="getAxisSizeRange(sizeTarget.axis).maximum"
+          :disabled="disabled"
           data-row-column-size-input
-          @change="updateSize"
+          @enter="confirmSize"
         />
       </div>
     </Dialog>
@@ -634,7 +627,10 @@ watch(
       :aria-label="t('axisMenu.standardColumnWidth')"
       :visible="isStandardWidthDialogOpen"
       :header="t('axisMenu.standardColumnWidth')"
-      :confirm-btn="{ content: t('cellFormat.confirm'), disabled }"
+      :confirm-btn="{
+        content: t('cellFormat.confirm'),
+        disabled: disabled || standardWidthDraft === undefined,
+      }"
       :cancel-btn="t('cellFormat.cancel')"
       :close-on-overlay-click="false"
       :destroy-on-close="true"
@@ -651,18 +647,16 @@ watch(
         :aria-label="t('axisMenu.standardColumnWidth')"
       >
         <span>{{ t("axisMenu.standardColumnWidth") }}</span>
-        <TInputNumber
-          class="idea-input-number--persistent-controls"
-          :model-value="standardWidthDraft"
-          :min="MIN_COLUMN_WIDTH"
-          :max="MAX_COLUMN_WIDTH"
-          :decimal-places="0"
-          :step="1"
-          theme="column"
-          :suffix="t('axisMenu.pixels')"
-          :aria-label="t('axisMenu.standardColumnWidth')"
+        <SheetDimensionInput
+          v-if="isStandardWidthDialogOpen"
+          v-model="standardWidthDraft"
+          axis="column"
+          :minimum="MIN_COLUMN_WIDTH"
+          :maximum="MAX_COLUMN_WIDTH"
+          :disabled="disabled"
+          :label="t('axisMenu.standardColumnWidth')"
           data-standard-column-width-input
-          @change="standardWidthDraft = $event"
+          @enter="confirmStandardWidth"
         />
       </div>
     </Dialog>
@@ -693,7 +687,7 @@ watch(
 
   &__size-field {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 146px;
+    grid-template-columns: minmax(0, 1fr) 200px;
     align-items: center;
     gap: 8px;
     color: var(--idea-text-primary);

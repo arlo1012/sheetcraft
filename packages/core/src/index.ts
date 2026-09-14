@@ -1,6 +1,7 @@
 export * from "./clipboard.js";
 export * from "./commands/index.js";
 export * from "./coordinates.js";
+export * from "./dimension-units.js";
 export * from "./errors.js";
 export * from "./formula/index.js";
 export * from "./history.js";
