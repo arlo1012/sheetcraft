@@ -410,6 +410,18 @@
   }
 }
 
+// Opt-in spacing for selects embedded in compact menus and controls.
+.idea-select--compact {
+  .t-input {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .t-input__suffix {
+    margin-left: 2px;
+  }
+}
+
 // The ribbon requires a compact select density that TDesign does not expose as
 // a public prop. Scope this internal override to the explicit product variant.
 .idea-ribbon-select {
