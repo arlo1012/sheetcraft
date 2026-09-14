@@ -86,10 +86,7 @@ const { t } = useAppI18n();
   gap: 2px;
   align-items: center;
   min-height: 28px;
-  padding: 0 2px;
-  background: var(--idea-surface-panel);
-  border-bottom: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-default) var(--idea-radius-default) 0 0;
+  padding: 0 8px;
 
   :deep(.ribbon-button) {
     width: 28px;

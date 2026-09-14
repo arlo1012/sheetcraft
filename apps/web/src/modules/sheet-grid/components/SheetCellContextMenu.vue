@@ -188,23 +188,25 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
         :read-only="readOnly"
         @action="dispatch"
       />
-      <ContextClipboardActions
-        :read-only="readOnly"
-        :cut-disabled-reason="cutDisabledReason"
-        :paste-special-disabled="pasteSpecialDisabled"
-        :paste-formats-disabled="pasteFormatsDisabled"
-        @cut="emit('cut')"
-        @copy="emit('copy')"
-        @paste="emit('paste')"
-        @paste-values="emit('pasteValues')"
-        @paste-formats="emit('pasteFormats')"
-      />
       <MenuSurface
         ref="menuSurfaceRef"
         class="sheet-cell-context-menu"
         :label="t('cellMenu.actions')"
         @keydown="onMenuKeydown"
       >
+        <li role="none">
+          <ContextClipboardActions
+            :read-only="readOnly"
+            :cut-disabled-reason="cutDisabledReason"
+            :paste-special-disabled="pasteSpecialDisabled"
+            :paste-formats-disabled="pasteFormatsDisabled"
+            @cut="emit('cut')"
+            @copy="emit('copy')"
+            @paste="emit('paste')"
+            @paste-values="emit('pasteValues')"
+            @paste-formats="emit('pasteFormats')"
+          />
+        </li>
         <MenuSeparator />
         <MenuItem
           data-cell-action="insert"

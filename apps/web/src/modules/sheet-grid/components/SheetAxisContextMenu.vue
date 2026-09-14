@@ -144,23 +144,26 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
         :read-only="readOnly"
         @action="dispatch"
       />
-      <ContextClipboardActions
-        :read-only="readOnly"
-        :cut-disabled-reason="cutDisabledReason"
-        :paste-special-disabled="pasteSpecialDisabled"
-        :paste-formats-disabled="pasteFormatsDisabled"
-        @cut="emit('cut')"
-        @copy="emit('copy')"
-        @paste="emit('paste')"
-        @paste-values="emit('pasteValues')"
-        @paste-formats="emit('pasteFormats')"
-      />
       <MenuSurface
         ref="menuSurfaceRef"
         class="sheet-axis-context-menu"
         :class="{ 'sheet-axis-context-menu--unframed': !state }"
         :label="t(axis === 'row' ? 'axisMenu.rowActions' : 'axisMenu.columnActions')"
       >
+        <li role="none">
+          <ContextClipboardActions
+            :read-only="readOnly"
+            :cut-disabled-reason="cutDisabledReason"
+            :paste-special-disabled="pasteSpecialDisabled"
+            :paste-formats-disabled="pasteFormatsDisabled"
+            @cut="emit('cut')"
+            @copy="emit('copy')"
+            @paste="emit('paste')"
+            @paste-values="emit('pasteValues')"
+            @paste-formats="emit('pasteFormats')"
+          />
+        </li>
+        <MenuSeparator />
         <AxisInsertMenuItem
           compact
           data-axis-action="insert-before"
