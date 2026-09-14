@@ -53,8 +53,8 @@ const unitOptions = computed(() =>
 );
 const unitMinimum = computed(() => pixelsToDimensionValue(props.minimum, unit.value));
 const unitMaximum = computed(() => pixelsToDimensionValue(props.maximum, unit.value));
-const inputWidth = computed(() => (props.compact ? "80px" : "112px"));
-const selectWidth = computed(() => (props.compact ? "52px" : "80px"));
+const inputWidth = computed(() => (props.compact ? "72px" : "112px"));
+const selectWidth = computed(() => (props.compact ? "58px" : "80px"));
 const popupProps = computed(() => ({ attach: () => rootRef.value ?? document.body }));
 
 watch(
