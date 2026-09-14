@@ -432,6 +432,8 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
 <style scoped lang="scss">
 .sheet-cell-context-menu-panel {
   z-index: 100;
+  display: grid;
+  gap: 6px;
   width: 236px;
   &--formatted {
     width: 302px;
@@ -439,7 +441,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
 }
 .sheet-cell-context-menu {
   width: 236px;
-  border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
+  border-radius: var(--idea-radius-default);
   &--submenu {
     z-index: 101;
     width: max-content;

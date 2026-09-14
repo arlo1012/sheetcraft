@@ -277,11 +277,13 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
 <style scoped lang="scss">
 .sheet-axis-context-menu-panel {
   z-index: 100;
+  display: grid;
+  gap: 6px;
   width: 302px;
 }
 .sheet-axis-context-menu {
   width: 236px;
-  border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
+  border-radius: var(--idea-radius-default);
   &--unframed {
     border-radius: var(--idea-radius-default);
   }

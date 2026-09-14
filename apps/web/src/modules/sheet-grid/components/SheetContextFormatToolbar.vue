@@ -235,7 +235,7 @@ function getPopupAttach(): HTMLElement {
   padding: 6px 8px;
   background: var(--idea-surface-panel);
   border-bottom: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-default) var(--idea-radius-default) 0 0;
+  border-radius: var(--idea-radius-default);
 
   &__row {
     display: grid;
