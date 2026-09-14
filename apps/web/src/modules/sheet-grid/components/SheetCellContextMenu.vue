@@ -438,11 +438,12 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
   border-radius: 0 0 var(--idea-radius-default) var(--idea-radius-default);
   &--submenu {
     z-index: 101;
-    width: 236px;
+    width: max-content;
+    min-width: 210px;
     border-radius: var(--idea-radius-default);
   }
   &--counted {
-    width: 328px;
+    min-width: 248px;
   }
 }
 </style>

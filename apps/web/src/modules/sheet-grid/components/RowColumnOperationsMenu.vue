@@ -674,8 +674,12 @@ watch(
     min-width: 210px;
   }
 
-  &__submenu:has([data-axis-insert-count]) {
-    min-width: 284px;
+  &__submenu {
+    width: max-content;
+
+    &:has([data-axis-insert-count]) {
+      min-width: 248px;
+    }
   }
 
   &__insert-icon {
