@@ -18,8 +18,8 @@ defineSlots<{ default(): unknown; shortcut?(): unknown }>();
   >
     <template #icon>
       <!-- The menu row owns focus and activation; the radio supplies its visual state. -->
-      <span inert>
-        <TRadio class="idea-menu-radio" :checked="checked" :disabled="disabled" readonly />
+      <span class="idea-menu-radio" inert>
+        <TRadio class="idea-menu-radio__control" :checked="checked" :disabled="disabled" readonly />
       </span>
     </template>
     <slot />
@@ -29,8 +29,13 @@ defineSlots<{ default(): unknown; shortcut?(): unknown }>();
 
 <style scoped lang="scss">
 .idea-menu-radio {
-  --td-comp-margin-s: 0px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
+
+  &__control {
+    --td-comp-margin-s: 0px;
+    display: inline-flex;
+    align-items: center;
+  }
 }
 </style>
