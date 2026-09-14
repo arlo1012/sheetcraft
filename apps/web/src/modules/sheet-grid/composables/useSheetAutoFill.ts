@@ -238,11 +238,11 @@ export function useSheetAutoFill(options: {
     return {
       x: Math.max(
         header.width,
-        Math.min(point.x + 5 / scale, header.width + viewport.width - 26 / scale),
+        Math.min(point.x + 5 / scale, header.width + viewport.width - 38 / scale),
       ),
       y: Math.max(
         header.height,
-        Math.min(point.y + 5 / scale, header.height + viewport.height - 22 / scale),
+        Math.min(point.y + 5 / scale, header.height + viewport.height - 26 / scale),
       ),
     };
   });

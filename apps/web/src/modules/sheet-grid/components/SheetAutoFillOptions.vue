@@ -1,13 +1,5 @@
 <script setup lang="ts">
-import {
-  CalendarDays,
-  Check,
-  ChevronDown,
-  Clipboard,
-  Copy,
-  ListOrdered,
-  Paintbrush,
-} from "lucide-vue-next";
+import { ChevronDown, Table2 } from "lucide-vue-next";
 import type { CellFillMode } from "@idea10/core/cell-autofill";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
@@ -49,8 +41,8 @@ const { floatingStyles: menuStyles, dismiss } = useDismissibleFloatingPanel(
   menuElement,
   menuOpen,
   {
-    placement: "bottom-end",
-    offset: 4,
+    placement: "bottom-start",
+    offset: 2,
     padding: 8,
     onDismiss: () => closeMenu(),
   },
@@ -71,19 +63,19 @@ function isSelected(mode: CellFillMode): boolean {
   return props.currentMode === mode;
 }
 
-function openMenu(): void {
+function openMenu(keyboard = false): void {
   open.value = true;
   void nextTick(() => {
     const selected = menuElement.value?.querySelector<HTMLElement>(
       '[role="menuitemradio"][aria-checked="true"]',
     );
-    (selected ?? menuSurfaceRef.value?.rootElement)?.focus();
+    (keyboard ? (selected ?? menuElement.value) : menuElement.value)?.focus();
   });
 }
 
-function toggleMenu(): void {
+function toggleMenu(event: MouseEvent): void {
   if (open.value) dismiss("programmatic", false);
-  else openMenu();
+  else openMenu(event.detail === 0);
 }
 
 function closeMenu(): void {
@@ -99,7 +91,7 @@ function selectMode(mode: CellFillMode): void {
 function onTriggerKeydown(event: KeyboardEvent): void {
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
-    openMenu();
+    openMenu(true);
   }
 }
 </script>
@@ -121,8 +113,13 @@ function onTriggerKeydown(event: KeyboardEvent): void {
     @click.stop="toggleMenu"
     @keydown.stop="onTriggerKeydown"
   >
-    <Clipboard :size="iconSize" aria-hidden="true" />
-    <ChevronDown :size="chevronSize" aria-hidden="true" />
+    <Table2 :size="iconSize" aria-hidden="true" />
+    <ChevronDown
+      class="sheet-auto-fill-options__chevron"
+      :class="{ 'is-open': menuOpen }"
+      :size="chevronSize"
+      aria-hidden="true"
+    />
   </button>
   <Teleport to="body">
     <MenuSurface
@@ -132,98 +129,129 @@ function onTriggerKeydown(event: KeyboardEvent): void {
       class="sheet-auto-fill-options__menu"
       :style="menuStyles"
       :label="t('autoFill.options')"
+      tabindex="-1"
       @pointerdown.stop
       @click.stop
     >
       <MenuItem
         v-if="isAvailable('copy')"
+        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('copy')"
         data-sheet-auto-fill-mode="copy"
         @select="selectMode('copy')"
       >
-        <template #icon><Copy :size="15" /></template>
+        <template #icon
+          ><span
+            class="sheet-auto-fill-options__radio"
+            :class="{ 'is-selected': isSelected('copy') }"
+        /></template>
         {{ t("autoFill.copy") }}
-        <template #shortcut><Check v-if="isSelected('copy')" :size="15" /></template>
       </MenuItem>
       <MenuItem
         v-if="isAvailable('series')"
+        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('series')"
         data-sheet-auto-fill-mode="series"
         @select="selectMode('series')"
       >
-        <template #icon><ListOrdered :size="15" /></template>
+        <template #icon
+          ><span
+            class="sheet-auto-fill-options__radio"
+            :class="{ 'is-selected': isSelected('series') }"
+        /></template>
         {{ t("autoFill.series") }}
-        <template #shortcut><Check v-if="isSelected('series')" :size="15" /></template>
       </MenuItem>
       <MenuItem
         v-if="isAvailable('fillFormatsOnly')"
+        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('fillFormatsOnly')"
         data-sheet-auto-fill-mode="fillFormatsOnly"
         @select="selectMode('fillFormatsOnly')"
       >
-        <template #icon><Paintbrush :size="15" /></template>
+        <template #icon
+          ><span
+            class="sheet-auto-fill-options__radio"
+            :class="{ 'is-selected': isSelected('fillFormatsOnly') }"
+        /></template>
         {{ t("autoFill.fillFormatsOnly") }}
-        <template #shortcut><Check v-if="isSelected('fillFormatsOnly')" :size="15" /></template>
       </MenuItem>
       <MenuItem
         v-if="isAvailable('fillWithoutFormatting')"
+        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('fillWithoutFormatting')"
         data-sheet-auto-fill-mode="fillWithoutFormatting"
         @select="selectMode('fillWithoutFormatting')"
       >
-        <template #icon><Clipboard :size="15" /></template>
-        {{ t("autoFill.fillWithoutFormatting") }}
-        <template #shortcut
-          ><Check v-if="isSelected('fillWithoutFormatting')" :size="15"
+        <template #icon
+          ><span
+            class="sheet-auto-fill-options__radio"
+            :class="{ 'is-selected': isSelected('fillWithoutFormatting') }"
         /></template>
+        {{ t("autoFill.fillWithoutFormatting") }}
       </MenuItem>
       <MenuItem
         v-if="isAvailable('dateDay')"
+        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('dateDay')"
         data-sheet-auto-fill-mode="dateDay"
         @select="selectMode('dateDay')"
       >
-        <template #icon><CalendarDays :size="15" /></template>
+        <template #icon
+          ><span
+            class="sheet-auto-fill-options__radio"
+            :class="{ 'is-selected': isSelected('dateDay') }"
+        /></template>
         {{ t("autoFill.dateDay") }}
-        <template #shortcut><Check v-if="isSelected('dateDay')" :size="15" /></template>
       </MenuItem>
       <MenuItem
         v-if="isAvailable('dateWeekday')"
+        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('dateWeekday')"
         data-sheet-auto-fill-mode="dateWeekday"
         @select="selectMode('dateWeekday')"
       >
-        <template #icon><CalendarDays :size="15" /></template>
+        <template #icon
+          ><span
+            class="sheet-auto-fill-options__radio"
+            :class="{ 'is-selected': isSelected('dateWeekday') }"
+        /></template>
         {{ t("autoFill.dateWeekday") }}
-        <template #shortcut><Check v-if="isSelected('dateWeekday')" :size="15" /></template>
       </MenuItem>
       <MenuItem
         v-if="isAvailable('dateMonth')"
+        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('dateMonth')"
         data-sheet-auto-fill-mode="dateMonth"
         @select="selectMode('dateMonth')"
       >
-        <template #icon><CalendarDays :size="15" /></template>
+        <template #icon
+          ><span
+            class="sheet-auto-fill-options__radio"
+            :class="{ 'is-selected': isSelected('dateMonth') }"
+        /></template>
         {{ t("autoFill.dateMonth") }}
-        <template #shortcut><Check v-if="isSelected('dateMonth')" :size="15" /></template>
       </MenuItem>
       <MenuItem
         v-if="isAvailable('dateYear')"
+        class="sheet-auto-fill-options__item"
         role="menuitemradio"
         :aria-checked="isSelected('dateYear')"
         data-sheet-auto-fill-mode="dateYear"
         @select="selectMode('dateYear')"
       >
-        <template #icon><CalendarDays :size="15" /></template>
+        <template #icon
+          ><span
+            class="sheet-auto-fill-options__radio"
+            :class="{ 'is-selected': isSelected('dateYear') }"
+        /></template>
         {{ t("autoFill.dateYear") }}
-        <template #shortcut><Check v-if="isSelected('dateYear')" :size="15" /></template>
       </MenuItem>
     </MenuSurface>
   </Teleport>
@@ -237,22 +265,20 @@ function onTriggerKeydown(event: KeyboardEvent): void {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: calc(24px / var(--sheet-scale, 1));
-    height: calc(20px / var(--sheet-scale, 1));
-    gap: 0;
+    width: calc(36px / var(--sheet-scale, 1));
+    height: calc(24px / var(--sheet-scale, 1));
+    gap: calc(3px / var(--sheet-scale, 1));
     padding: 0;
     color: var(--idea-text-secondary);
     background: var(--idea-surface-panel);
     border: 1px solid var(--idea-border-control);
-    border-radius: 2px;
-    box-shadow: var(--idea-shadow-menu);
+    border-radius: var(--idea-radius-default);
+    box-shadow: none;
     cursor: pointer;
 
     &:hover,
     &[aria-expanded="true"] {
-      color: var(--idea-action-primary);
       background: var(--idea-surface-hover);
-      border-color: var(--idea-action-primary);
     }
 
     &:focus-visible {
@@ -261,9 +287,41 @@ function onTriggerKeydown(event: KeyboardEvent): void {
     }
   }
 
+  &__chevron {
+    &.is-open {
+      transform: rotate(180deg);
+    }
+  }
+
+  &__item {
+    grid-template-columns: 16px minmax(0, 1fr);
+    min-height: 32px;
+    padding-inline: 14px 20px;
+  }
+
+  &__radio {
+    display: grid;
+    width: 13px;
+    height: 13px;
+    place-items: center;
+    border: 1px solid var(--idea-border-control);
+    border-radius: 50%;
+
+    &.is-selected::after {
+      width: 5px;
+      height: 5px;
+      content: "";
+      background: var(--idea-text-secondary);
+      border-radius: 50%;
+    }
+  }
+
   &__menu {
     z-index: 96;
-    min-width: 188px;
+    min-width: 156px;
+    border-radius: var(--idea-radius-medium);
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--idea-text-primary) 8%, transparent);
+    outline: none;
   }
 }
 </style>
