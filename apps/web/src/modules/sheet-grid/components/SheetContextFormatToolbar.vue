@@ -105,6 +105,7 @@ function getPopupAttach(): HTMLElement {
   >
     <div class="sheet-context-format-toolbar__row sheet-context-format-toolbar__row--font">
       <FontFormatControls
+        class="sheet-context-format-toolbar__font"
         :state="state.format"
         :disabled="disabled"
         :popup-attach="getPopupAttach"
@@ -119,6 +120,7 @@ function getPopupAttach(): HTMLElement {
     </div>
     <div class="sheet-context-format-toolbar__row sheet-context-format-toolbar__row--actions">
       <VerticalAlignmentControls
+        class="sheet-context-format-toolbar__vertical"
         :state="state.format.verticalAlign"
         :disabled="disabled"
         @apply-style="applyStyle"
@@ -220,14 +222,15 @@ function getPopupAttach(): HTMLElement {
 
 <style scoped lang="scss">
 .sheet-context-format-toolbar {
-  --cell-format-font-width: 148px;
-  --cell-format-font-size-width: 40px;
-  --cell-format-gap: 4px;
+  --cell-format-font-width: 130px;
+  --cell-format-font-size-width: 52px;
+  --cell-format-gap: 0px;
+  --ribbon-button-width: 26px;
   --ribbon-control-height: 26px;
 
   position: relative;
   display: grid;
-  width: 320px;
+  width: 302px;
   gap: 4px;
   padding: 6px 8px;
   background: var(--idea-surface-panel);
@@ -235,22 +238,24 @@ function getPopupAttach(): HTMLElement {
   border-radius: var(--idea-radius-default) var(--idea-radius-default) 0 0;
 
   &__row {
-    display: flex;
-    gap: 4px;
+    display: grid;
+    grid-template-columns: repeat(11, 26px);
     align-items: center;
     min-height: 26px;
   }
 
-  &__row--font {
-    justify-content: flex-start;
+  &__font {
+    grid-column: span 7;
   }
 
   &__emphasis {
-    width: 108px;
+    grid-column: span 4;
+    width: auto;
   }
 
-  &__row--actions {
-    gap: 1px;
+  &__vertical,
+  &__horizontal {
+    grid-column: span 3;
   }
 
   &__horizontal :deep(.horizontal-alignment-controls__button:nth-child(n + 4)) {
