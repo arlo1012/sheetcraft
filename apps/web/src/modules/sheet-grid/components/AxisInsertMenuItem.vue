@@ -12,7 +12,7 @@ const props = defineProps<{
   initialCount: number;
   maximum: number;
   disabled: boolean;
-  stacked?: boolean;
+  compact?: boolean;
 }>();
 const emit = defineEmits<{ insert: [count: number] }>();
 const { t } = useAppI18n();
@@ -38,12 +38,7 @@ function insert(): void {
 </script>
 
 <template>
-  <MenuItem
-    :data-row-column-action="action"
-    :disabled="disabled || !valid"
-    :stacked="stacked"
-    @select="insert"
-  >
+  <MenuItem :data-row-column-action="action" :disabled="disabled || !valid" @select="insert">
     <template #icon><slot /></template>
     {{ label }}
     <template #trailing>
@@ -56,7 +51,7 @@ function insert(): void {
         <TInputNumber
           v-model="draft"
           class="axis-insert-menu-item__count idea-input-number--persistent-controls"
-          :style="{ width: stacked ? '48px' : '64px', minWidth: '0' }"
+          :style="{ width: compact ? '48px' : '64px', minWidth: '0' }"
           :min="1"
           :max="Math.max(1, maximum)"
           :decimal-places="0"

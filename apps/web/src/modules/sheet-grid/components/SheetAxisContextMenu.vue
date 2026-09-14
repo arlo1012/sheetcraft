@@ -170,7 +170,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
         :label="t(axis === 'row' ? 'axisMenu.rowActions' : 'axisMenu.columnActions')"
       >
         <AxisInsertMenuItem
-          stacked
+          compact
           data-axis-action="insert-before"
           :action="axis === 'row' ? 'insert-above' : 'insert-before'"
           :label="insertBeforeLabel"
@@ -182,7 +182,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
             ><Rows3 v-if="axis === 'row'" :size="16" /><Columns3 v-else :size="16" /></template
         ></AxisInsertMenuItem>
         <AxisInsertMenuItem
-          stacked
+          compact
           data-axis-action="insert-after"
           :action="axis === 'row' ? 'insert-below' : 'insert-after'"
           :label="insertAfterLabel"
