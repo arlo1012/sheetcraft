@@ -54,6 +54,10 @@ const notice = computed(() => {
   if (props.feedback?.error) return props.feedback.key;
   return props.error ? errorKeys[props.error] : undefined;
 });
+const noticeLabel = computed(() => {
+  if (notice.value === "persistence.finishEditing") return t("persistence.finishEditingShort");
+  return t(props.feedback?.error ? "persistence.fileActionError" : "persistence.autosavePaused");
+});
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
@@ -110,13 +114,13 @@ function onFileChange(event: Event): void {
       <TButton
         variant="text"
         theme="danger"
-        shape="square"
         size="small"
         :aria-label="t(notice)"
         :data-save-status="status"
         data-workbook-file="feedback"
       >
-        <Info :size="14" aria-hidden="true" />
+        <template #icon><Info :size="14" aria-hidden="true" /></template>
+        {{ noticeLabel }}
       </TButton>
     </TTooltip>
     <span

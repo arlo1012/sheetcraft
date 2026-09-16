@@ -42,6 +42,9 @@ export const enUS = {
     saving: "Saving…",
     saved: "Saved locally",
     saveError: "Not saved",
+    autosavePaused: "Autosave paused",
+    fileActionError: "File operation failed",
+    finishEditingShort: "Finish editing first",
     localOnly: "Saved in this browser. Export a JSON file to keep a separate backup.",
     unavailable:
       "Local storage is unavailable. Your edits are still here; export a JSON file to keep them.",

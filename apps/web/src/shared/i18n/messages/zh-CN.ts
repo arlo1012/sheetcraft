@@ -40,6 +40,9 @@ export const zhCN = {
     saving: "正在保存…",
     saved: "已保存到本地",
     saveError: "尚未保存",
+    autosavePaused: "自动保存已暂停",
+    fileActionError: "文件操作失败",
+    finishEditingShort: "请先完成输入",
     localOnly: "数据保存在当前浏览器中，可导出 JSON 文件另行备份。",
     unavailable: "本地存储暂不可用，当前编辑仍保留在页面中，请导出 JSON 文件备份。",
     invalidSnapshot:
