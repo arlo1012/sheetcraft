@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ChevronDown, Download, Info, RotateCcw, Save, Upload } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Tooltip as TTooltip } from "tdesign-vue-next/es/tooltip";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -111,17 +110,16 @@ function onFileChange(event: Event): void {
       <ChevronDown :size="12" aria-hidden="true" />
     </button>
     <TTooltip v-if="notice" :content="t(notice)" placement="bottom-left">
-      <TButton
-        variant="text"
-        theme="danger"
-        size="small"
+      <span
+        class="workbook-file-actions__notice"
+        role="status"
         :aria-label="t(notice)"
         :data-save-status="status"
         data-workbook-file="feedback"
       >
-        <template #icon><Info :size="14" aria-hidden="true" /></template>
+        <Info :size="14" aria-hidden="true" />
         {{ noticeLabel }}
-      </TButton>
+      </span>
     </TTooltip>
     <span
       v-else
@@ -213,6 +211,16 @@ function onFileChange(event: Event): void {
       color: var(--idea-text-disabled);
       cursor: default;
     }
+  }
+
+  &__notice {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--idea-status-warning);
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
+    white-space: nowrap;
   }
 
   &__status {
