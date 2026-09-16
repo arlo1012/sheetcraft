@@ -436,18 +436,22 @@ function parseSparseState(
     columnWidths: asArray(record.columnWidths, `${path}.columnWidths`).map((dimension, index) =>
       parseDimension(dimension, `${path}.columnWidths[${index}]`),
     ),
-    ...(Object.hasOwn(record, "hiddenRows") ||
-    Object.hasOwn(record, "hiddenColumns") ||
-    Object.hasOwn(record, "defaultColumnWidth")
+    ...(Object.hasOwn(record, "hiddenRows")
       ? {
           hiddenRows: asArray(record.hiddenRows, `${path}.hiddenRows`).map((index, position) =>
             asInteger(index, `${path}.hiddenRows[${position}]`),
           ),
+        }
+      : {}),
+    ...(Object.hasOwn(record, "hiddenColumns")
+      ? {
           hiddenColumns: asArray(record.hiddenColumns, `${path}.hiddenColumns`).map(
             (index, position) => asInteger(index, `${path}.hiddenColumns[${position}]`),
           ),
-          defaultColumnWidth: asInteger(record.defaultColumnWidth, `${path}.defaultColumnWidth`),
         }
+      : {}),
+    ...(Object.hasOwn(record, "defaultColumnWidth")
+      ? { defaultColumnWidth: asInteger(record.defaultColumnWidth, `${path}.defaultColumnWidth`) }
       : {}),
     freezePanes:
       version !== 1 && Object.hasOwn(record, "freezePanes")
