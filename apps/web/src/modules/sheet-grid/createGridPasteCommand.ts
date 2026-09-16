@@ -16,6 +16,7 @@ import {
   type CellAddress,
   type CellRange,
   type Sheet,
+  type SheetEvaluator,
 } from "@idea10/core/workbook";
 import {
   createGridClipboardRowVisibility,
@@ -241,9 +242,13 @@ function isPhysicalRectangle(plan: GridPastePlan, rows: readonly number[]): bool
   return rows.every((row, index) => row === plan.anchor.row + index);
 }
 
-export function createGridPasteCommand(sheet: Sheet, payload: GridPastePayload): WorkbookCommand {
+export function createGridPasteCommand(
+  sheet: Sheet,
+  payload: GridPastePayload,
+  evaluator?: SheetEvaluator,
+): WorkbookCommand {
   const plan = validatePlan(payload.plan);
-  const visibility = createGridClipboardRowVisibility(sheet);
+  const visibility = createGridClipboardRowVisibility(sheet, evaluator);
   ensureVisibleTargets(visibility, plan.rows);
   ensureNoMergedRange(sheet, payload.plan.range);
   if (payload.kind !== "formats" && payload.rawTextValues) {
@@ -349,7 +354,12 @@ export function createGridPasteCommand(sheet: Sheet, payload: GridPastePayload):
     payload.styles.flatMap((row, rowIndex) =>
       row.map((style, columnIndex) => {
         const address = targetAddress(payload.plan, plan.rows, rowIndex, columnIndex);
-        return { sheetId: sheet.id, address, content: getCellContent(sheet, address), style };
+        return {
+          sheetId: sheet.id,
+          address,
+          content: getCellContent(sheet, address),
+          style,
+        };
       }),
     ),
   );

@@ -71,6 +71,10 @@ import {
   createWorkbookCalculationSession,
 } from "@idea10/core/formula";
 import { doMergedCellRangesIntersect } from "@idea10/core";
+import {
+  getCellDataValidation,
+  resolveDataValidationListValues,
+} from "@idea10/core/data-validation";
 import { WorkbookDomainError } from "@idea10/core/errors";
 import type { IdFactory } from "@idea10/core/runtime";
 import { findCellByText, type SheetSearchDirection } from "@idea10/core/search";
@@ -129,6 +133,7 @@ import {
 import { useAppI18n, type MessageKey, type MessageParams } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { useDeferredSelectionSnapshot } from "../../modules/workbook/composables/useDeferredSelectionSnapshot";
+import { useDataValidationInput } from "../../modules/data-tools/useDataValidationInput";
 import type {
   FilterValueKey,
   HomeDataToolState,
@@ -239,7 +244,10 @@ export function useSpreadsheetWorkspaceController(
   );
   const activeSelectionStyle = computed(() => {
     const address = toolbarSelection.value.activeAddress;
-    return getSelectionCellStyleState(activeSheet.value, { start: address, end: address });
+    return getSelectionCellStyleState(activeSheet.value, {
+      start: address,
+      end: address,
+    });
   });
   const activeSelectionSummary = computed(() =>
     getSelectionSummary(
@@ -373,6 +381,32 @@ export function useSpreadsheetWorkspaceController(
     workspaceStatus.value ? t(workspaceStatus.value.key, workspaceStatus.value.params) : "",
   );
   const formatPainterActive = computed(() => formatPainterSource.value !== undefined);
+  const validationInput = useDataValidationInput({
+    getWorkbook: () => session.workbook,
+    getGeneration: () => workbookGeneration.value,
+    execute: (command) => execute(command, "cells.edit"),
+  });
+  const activeValidationInfo = computed(() => {
+    void workbookVersion.value;
+    const sheet = activeSheet.value;
+    const address = activeAddress.value;
+    const rule = getCellDataValidation(sheet, address);
+    if (!rule) return undefined;
+    return {
+      values:
+        rule.type === "list" && rule.showDropdown !== false
+          ? resolveDataValidationListValues(rule, {
+              workbook: session.workbook,
+              sheet,
+              address,
+            })
+          : [],
+      prompt:
+        rule.prompt && rule.showInput !== false
+          ? { title: rule.promptTitle, message: rule.prompt }
+          : undefined,
+    };
+  });
 
   function collectCommandSheetIds(command: WorkbookCommand, sheetIds: Set<string>): void {
     if (command.type === "setCellContents") {
@@ -531,21 +565,32 @@ export function useSpreadsheetWorkspaceController(
     }
   }
 
-  function commitCell(payload: { address: CellAddress; input: string; sheetId?: string }): void {
+  function commitCell(payload: { address: CellAddress; input: string; sheetId?: string }): boolean {
     const sheetId = payload.sheetId ?? activeSheet.value.id;
     const sheet = session.workbook.sheets.get(sheetId);
-    if (!sheet) return;
-    execute(
-      createSetCellContentCommand(
-        sheetId,
-        payload.address,
+    if (!sheet) return false;
+    const accepted = validationInput.commit({
+      sheetId,
+      address: payload.address,
+      content:
         parseCellContent(payload.input, {
           asText: isTextCellNumberFormat(getCellStyle(sheet, payload.address)?.numberFormat),
-        }),
-      ),
-      "cells.edit",
-    );
-    clearWorkspaceStatus();
+        }) ?? null,
+    });
+    if (accepted) clearWorkspaceStatus();
+    return accepted;
+  }
+
+  function commitCellValue(payload: {
+    address: CellAddress;
+    value: string | number | boolean;
+    sheetId?: string;
+  }): boolean {
+    return validationInput.commit({
+      sheetId: payload.sheetId ?? activeSheet.value.id,
+      address: payload.address,
+      content: { kind: "literal", value: payload.value },
+    });
   }
 
   function setCellImage(payload: {
@@ -606,7 +651,7 @@ export function useSpreadsheetWorkspaceController(
     if (activeSheet.value.properties.protected) return { ok: false, reason: "pasteRejected" };
     try {
       execute(
-        createGridPasteCommand(activeSheet.value, payload),
+        createGridPasteCommand(activeSheet.value, payload, activeSheetEvaluator.value),
         payload.kind === "all" && payload.moveSource ? "cells.move" : "cells.paste",
       );
       clearWorkspaceStatus();
@@ -644,7 +689,10 @@ export function useSpreadsheetWorkspaceController(
         "cells.edit",
       )
     ) {
-      showWorkspaceStatus({ key: "workspace.autoSumApplied", params: { formula } });
+      showWorkspaceStatus({
+        key: "workspace.autoSumApplied",
+        params: { formula },
+      });
     }
   }
 
@@ -692,7 +740,10 @@ export function useSpreadsheetWorkspaceController(
             .filter((criterion) => criterion.column !== column)
             .map((criterion) => ({
               column: criterion.column,
-              allowedValues: criterion.allowedValues.map((value) => ({ ...value })),
+              allowedValues: criterion.allowedValues.map((value) => ({
+                ...value,
+              })),
+              ...(criterion.condition ? { condition: { ...criterion.condition } } : {}),
             }))
         : [];
     if (!allSelected) columns.push({ column, allowedValues });
@@ -717,7 +768,10 @@ export function useSpreadsheetWorkspaceController(
         ? { rows: 1, columns: 0 }
         : mode === "first-column"
           ? { rows: 0, columns: 1 }
-          : { rows: activeAddress.value.row, columns: activeAddress.value.column };
+          : {
+              rows: activeAddress.value.row,
+              columns: activeAddress.value.column,
+            };
     executeFeature(
       () => createSetSheetFreezePanesCommand(activeSheet.value.id, freezePanes),
       "view.freeze",
@@ -727,7 +781,11 @@ export function useSpreadsheetWorkspaceController(
 
   function unfreeze(): void {
     executeFeature(
-      () => createSetSheetFreezePanesCommand(activeSheet.value.id, { rows: 0, columns: 0 }),
+      () =>
+        createSetSheetFreezePanesCommand(activeSheet.value.id, {
+          rows: 0,
+          columns: 0,
+        }),
       "view.freeze",
       "workspace.freezeUnavailable",
     );
@@ -932,7 +990,10 @@ export function useSpreadsheetWorkspaceController(
     }
     const sheet = activeSheet.value;
     const range = activeSelectionRange.value;
-    const rows = getVisibleClipboardRows(createGridClipboardRowVisibility(sheet), range);
+    const rows = getVisibleClipboardRows(
+      createGridClipboardRowVisibility(sheet, activeSheetEvaluator.value),
+      range,
+    );
     if (!rows?.length || rangeIntersectsMergedCells(sheet, range)) {
       showWorkspaceStatus({
         key: rows?.length ? "clipboard.mergedRangeUnsupported" : "clipboard.noVisibleCells",
@@ -970,7 +1031,7 @@ export function useSpreadsheetWorkspaceController(
       source.values,
       range,
       range.start,
-      createGridClipboardRowVisibility(activeSheet.value),
+      createGridClipboardRowVisibility(activeSheet.value, activeSheetEvaluator.value),
     );
     if (!plan) {
       showWorkspaceStatus({ key: "workspace.formatPainterRangeMismatch" });
@@ -1251,7 +1312,10 @@ export function useSpreadsheetWorkspaceController(
       return;
     }
     gridRef.value?.navigateToCell(match);
-    showWorkspaceStatus({ key: "workspace.found", params: { address: formatCellAddress(match) } });
+    showWorkspaceStatus({
+      key: "workspace.found",
+      params: { address: formatCellAddress(match) },
+    });
   }
 
   function undo(): boolean {
@@ -1334,10 +1398,15 @@ export function useSpreadsheetWorkspaceController(
     activeSelectionStyle,
     activeSelectionSummary,
     dataToolState,
+    activeValidationInfo,
+    validationFeedback: validationInput.feedback,
+    acceptValidationInput: validationInput.accept,
+    dismissValidationInput: validationInput.dismiss,
     mergeState,
     workspaceStatusText,
     formatPainterActive,
     commitCell,
+    commitCellValue,
     setCellImage,
     setFloatingImage,
     deleteFloatingImage,
@@ -1386,6 +1455,7 @@ export function useSpreadsheetWorkspaceController(
     undo,
     redo,
     setGridNavigator,
+    clearGridClipboard: () => gridRef.value?.clearClipboard?.(),
     fitSelectionToViewport,
     scrollGridHorizontally,
   };

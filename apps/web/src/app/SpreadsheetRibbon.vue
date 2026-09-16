@@ -61,29 +61,32 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const activeCategory = ref<"home" | "formulas">("home");
+const activeCategory = ref<"home" | "formulas" | "data">("home");
 const homeTab = ref<HTMLButtonElement>();
 const formulaTab = ref<HTMLButtonElement>();
+const dataTab = ref<HTMLButtonElement>();
 const tabId = useId();
 
 function onCategoryKeydown(event: KeyboardEvent): void {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
-  activeCategory.value =
+  const categories = ["home", "formulas", "data"] as const;
+  const current = categories.indexOf(activeCategory.value);
+  const index =
     event.key === "Home"
-      ? "home"
+      ? 0
       : event.key === "End"
-        ? "formulas"
-        : activeCategory.value === "home"
-          ? "formulas"
-          : "home";
-  void nextTick(() => (activeCategory.value === "home" ? homeTab : formulaTab).value?.focus());
+        ? categories.length - 1
+        : (current + (event.key === "ArrowRight" ? 1 : -1) + categories.length) % categories.length;
+  activeCategory.value = categories[index]!;
+  void nextTick(() => [homeTab, formulaTab, dataTab][index]?.value?.focus());
 }
 
 defineSlots<{
   "file-actions"?: () => unknown;
   "row-column-tools"?: () => unknown;
   "worksheet-tools"?: () => unknown;
+  "data-tools"?: () => unknown;
 }>();
 </script>
 
@@ -128,6 +131,21 @@ defineSlots<{
           >
             {{ t("ribbon.formulas") }}
           </button>
+          <button
+            :id="`${tabId}-data`"
+            ref="dataTab"
+            class="spreadsheet-ribbon__category"
+            :class="{ 'is-active': activeCategory === 'data' }"
+            data-ribbon-category="data"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'data'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'data' ? 0 : -1"
+            @click="activeCategory = 'data'"
+          >
+            {{ t("ribbon.data") }}
+          </button>
         </div>
         <slot name="file-actions" />
       </nav>
@@ -168,6 +186,7 @@ defineSlots<{
         @undo="emit('undo')"
         @redo="emit('redo')"
         @toggle-protection="emit('toggleProtection')"
+        @open-data-tools="activeCategory = 'data'"
       >
         <template v-if="$slots['row-column-tools']" #row-column-tools>
           <slot name="row-column-tools" />
@@ -177,7 +196,7 @@ defineSlots<{
         </template>
       </HomeFormatToolbar>
       <FormulaToolbar
-        v-else
+        v-else-if="activeCategory === 'formulas'"
         :disabled="formulaDisabled ?? disabled"
         :edit-session-id="editSessionId"
         :recent-functions="recentFunctions"
@@ -191,6 +210,7 @@ defineSlots<{
         @recalculate="emit('recalculate')"
         @interaction-end="emit('formulaInteractionEnd')"
       />
+      <slot v-else name="data-tools" />
     </section>
   </header>
 </template>

@@ -88,19 +88,23 @@ export function useCellEditing(options: {
     pendingSelectionAfterComposition = undefined;
   }
 
-  function finishEdit(destination?: CellSelection, restoreFocus = true): void {
+  function finishEdit(destination?: CellSelection, restoreFocus = true): boolean {
     if (isEditing.value) {
       if (isComposing.value) {
         shouldFinishAfterComposition = true;
         pendingSelectionAfterComposition = destination;
-        return;
+        return false;
       }
       options.onClearClipboard();
-      editSession.finish();
+      if (!editSession.finish()) {
+        if (restoreFocus) focusEditor();
+        return false;
+      }
     }
     clearDeferredComposition();
     if (destination) options.onSelectionChange(destination);
     else if (restoreFocus) focusEditor();
+    return true;
   }
 
   function cancelEdit(restoreFocus = true): void {

@@ -1,0 +1,702 @@
+import { computed, ref } from "vue";
+import { MessagePlugin } from "tdesign-vue-next/es/message";
+import {
+  createAddSheetOutlineGroupCommand,
+  createApplySubtotalsCommand,
+  createClearSheetDataValidationsCommand,
+  createClearSheetFilterCommand,
+  createMultiKeySortSheetRangeCommand,
+  createRemoveDuplicatesCommand,
+  createRemoveSubtotalsCommand,
+  createRemoveSheetOutlineGroupCommand,
+  createSetSheetDataValidationsCommand,
+  createSetSheetFilterCriteriaCommand,
+  createSetSheetOutlineGroupCollapsedCommand,
+  createSplitColumnCommand,
+  getRemoveDuplicatesCount,
+  getSheetFilterColumnDistinctValues,
+  previewSplitColumn,
+  subtractSheetDataValidation,
+  type WorkbookCommand,
+} from "@idea10/core/commands";
+import { resolveDataRange } from "@idea10/core/data-range";
+import { WorkbookDomainError } from "@idea10/core/errors";
+import { translateFormulaForCopy } from "@idea10/core/formula";
+import {
+  getActiveSheet,
+  type CellAddress,
+  type CellRange,
+  type SheetDataValidation,
+  type SheetEvaluator,
+  type Workbook,
+} from "@idea10/core/workbook";
+import { useAppI18n } from "../../shared/i18n";
+import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
+import { isValidationDraftComplete } from "./validation-draft";
+import type {
+  DataToolAxis,
+  DataToolColumn,
+  DataToolFilterAnchor,
+  DataToolFilterCriteria,
+  DataToolFilterValueOption,
+  DataToolRangeSnapshot,
+  DataValidationDraft,
+  DataValidationInitial,
+  RemoveDuplicatesDraft,
+  SortDraft,
+  SubtotalDraft,
+  TextToColumnsDraft,
+} from "./data-tools-types";
+
+type Target = DataToolRangeSnapshot;
+type Options = {
+  getWorkbook: () => Workbook;
+  getSelection: () => { address: CellAddress; range: CellRange };
+  getSheetEvaluator: () => SheetEvaluator;
+  getGeneration: () => number;
+  isBusy: () => boolean;
+  execute: (command: WorkbookCommand) => boolean;
+  flush: () => boolean;
+  focusSheet: () => void;
+  recalculate?: () => void;
+};
+
+function columnName(column: number): string {
+  let value = column + 1;
+  let result = "";
+  while (value > 0) {
+    result = String.fromCharCode(65 + ((value - 1) % 26)) + result;
+    value = Math.floor((value - 1) / 26);
+  }
+  return result;
+}
+function cloneRange(range: CellRange): CellRange {
+  return { start: { ...range.start }, end: { ...range.end } };
+}
+function intersects(left: CellRange, right: CellRange): boolean {
+  return (
+    left.start.row <= right.end.row &&
+    left.end.row >= right.start.row &&
+    left.start.column <= right.end.column &&
+    left.end.column >= right.start.column
+  );
+}
+function rangeLabel(range: CellRange): string {
+  return `${columnName(range.start.column)}${range.start.row + 1}:${columnName(range.end.column)}${range.end.row + 1}`;
+}
+
+export function useDataToolsController(options: Options) {
+  const { t } = useAppI18n();
+  const createId = createBrowserIdFactory();
+  const sortVisible = ref(false);
+  const textToColumnsVisible = ref(false);
+  const removeDuplicatesVisible = ref(false);
+  const validationVisible = ref(false);
+  const subtotalVisible = ref(false);
+  const sortTarget = ref<Target>();
+  const sortInitial = ref({
+    hasHeader: true,
+    column: 0,
+    direction: "ascending" as "ascending" | "descending",
+  });
+  const textTarget = ref<Target>();
+  const duplicateTarget = ref<Target>();
+  const validationTarget = ref<Target>();
+  const subtotalTarget = ref<Target>();
+  const splitDraft = ref<TextToColumnsDraft>();
+  const duplicateDraft = ref<RemoveDuplicatesDraft>();
+  const validationInitial = ref<DataValidationInitial>();
+  const filterPanel = ref<{ column: number; anchor?: DataToolFilterAnchor; target: Target }>();
+  const activeSheet = computed(() => getActiveSheet(options.getWorkbook()));
+  const disabled = computed(() => options.isBusy() || activeSheet.value.properties.protected);
+  function error(message = t("dataTools.common.operationFailed")): void {
+    void MessagePlugin.warning(message);
+  }
+  function capture(dataRegion = true): Target | undefined {
+    if (options.isBusy() || !options.flush()) return undefined;
+    const sheet = activeSheet.value;
+    if (sheet.properties.protected) return undefined;
+    const selection = options.getSelection();
+    const range = dataRegion
+      ? sheet.filter && intersects(sheet.filter.range, selection.range)
+        ? sheet.filter.range
+        : resolveDataRange(sheet, selection.range)
+      : selection.range;
+    return { sheetId: sheet.id, generation: options.getGeneration(), range: cloneRange(range) };
+  }
+  function valid(target: Target | undefined): target is Target {
+    return Boolean(
+      target &&
+      !options.isBusy() &&
+      options.getGeneration() === target.generation &&
+      activeSheet.value.id === target.sheetId &&
+      !activeSheet.value.properties.protected,
+    );
+  }
+  function execute(target: Target | undefined, command: () => WorkbookCommand): boolean {
+    if (!valid(target)) {
+      error(t("dataTools.common.rangeChanged"));
+      return false;
+    }
+    try {
+      options.execute(command());
+      return true;
+    } catch (cause) {
+      error(
+        cause instanceof WorkbookDomainError && cause.data.details?.field === "overwrite"
+          ? t("dataTools.textToColumns.overwriteRequired")
+          : undefined,
+      );
+      return false;
+    }
+  }
+  function columnsFor(target?: Target): DataToolColumn[] {
+    const range =
+      target?.range ??
+      activeSheet.value.filter?.range ??
+      resolveDataRange(activeSheet.value, options.getSelection().range);
+    const evaluator = options.getSheetEvaluator();
+    return Array.from({ length: range.end.column - range.start.column + 1 }, (_, offset) => {
+      const column = range.start.column + offset;
+      const value = evaluator.getComputedValue({ row: range.start.row, column });
+      return {
+        column,
+        label: columnName(column),
+        ...(value === null || typeof value === "object" ? {} : { header: String(value) }),
+      };
+    });
+  }
+  function filterColumns(): DataToolColumn[] {
+    return columnsFor(filterPanel.value?.target);
+  }
+  const filterState = computed(() => {
+    const panel = filterPanel.value;
+    const filter = activeSheet.value.filter;
+    if (!panel || !filter || panel.target.sheetId !== activeSheet.value.id) return undefined;
+    const existing = filter.columns.find((item) => item.column === panel.column);
+    const values = getSheetFilterColumnDistinctValues(
+      activeSheet.value,
+      filter.range,
+      panel.column,
+      options.getSheetEvaluator(),
+    ).map((key) => ({
+      key,
+      label:
+        key.kind === "blank"
+          ? t("dataTools.filter.blank")
+          : key.kind === "error"
+            ? `#${key.code}!`
+            : String(key.value),
+    }));
+    return {
+      visible: true,
+      anchor: panel.anchor,
+      column: panel.column,
+      columnLabel:
+        filterColumns().find((item) => item.column === panel.column)?.label ??
+        columnName(panel.column),
+      values,
+      appliedKeys: existing?.allowedValues ?? values.map((item) => item.key),
+      criteria: existing?.condition,
+      disabled: disabled.value,
+    };
+  });
+  const filterActive = computed(() => Boolean(activeSheet.value.filter));
+  const visibleDialogTarget = computed(() =>
+    sortVisible.value
+      ? sortTarget.value
+      : textToColumnsVisible.value
+        ? textTarget.value
+        : removeDuplicatesVisible.value
+          ? duplicateTarget.value
+          : validationVisible.value
+            ? validationTarget.value
+            : subtotalVisible.value
+              ? subtotalTarget.value
+              : undefined,
+  );
+  const dialogColumns = computed(() =>
+    visibleDialogTarget.value ? columnsFor(visibleDialogTarget.value) : [],
+  );
+  const dialogRangeLabel = computed(() => {
+    const target = visibleDialogTarget.value;
+    return target ? rangeLabel(target.range) : "";
+  });
+  const splitPreview = computed(() => {
+    const target = textTarget.value;
+    const draft = splitDraft.value;
+    if (!target || !draft || !valid(target)) return [];
+    const address = { row: target.range.start.row, column: target.range.start.column };
+    const value = options.getSheetEvaluator().getComputedValue(address);
+    const text = value === null || typeof value === "object" ? "" : String(value);
+    try {
+      return previewSplitColumn(text, {
+        mode: draft.mode === "fixed-width" ? "fixedWidth" : "delimiter",
+        ...(draft.mode === "delimiter"
+          ? {
+              delimiter:
+                [...draft.delimiters, draft.otherDelimiter].filter(Boolean).join("") || ",",
+            }
+          : { fixedWidths: draft.fixedWidths }),
+      });
+    } catch {
+      return [];
+    }
+  });
+  const duplicateCount = computed(() => {
+    const target = duplicateTarget.value;
+    if (!target || !valid(target)) return undefined;
+    try {
+      return getRemoveDuplicatesCount(
+        options.getWorkbook(),
+        createRemoveDuplicatesCommand(
+          target.sheetId,
+          target.range,
+          duplicateDraft.value?.columns ?? [target.range.start.column],
+          { hasHeader: duplicateDraft.value?.hasHeader },
+        ),
+      );
+    } catch {
+      return undefined;
+    }
+  });
+  function toggleFilter(): void {
+    const target = capture();
+    if (!target) return;
+    execute(target, () =>
+      activeSheet.value.filter
+        ? createClearSheetFilterCommand(target.sheetId)
+        : createSetSheetFilterCriteriaCommand(target.sheetId, target.range, []),
+    );
+  }
+  function clearFilter(): void {
+    const target = capture();
+    if (target && activeSheet.value.filter)
+      execute(target, () =>
+        createSetSheetFilterCriteriaCommand(target.sheetId, activeSheet.value.filter!.range, []),
+      );
+  }
+  function reapplyFilter(): void {
+    const target = capture();
+    const filter = activeSheet.value.filter;
+    if (!target || !filter) return;
+    execute(target, () =>
+      createSetSheetFilterCriteriaCommand(target.sheetId, filter.range, filter.columns),
+    );
+    options.recalculate?.();
+  }
+  function sort(direction: "ascending" | "descending"): void {
+    const target = capture();
+    if (!target) return;
+    const hasHeader = inferHeader(target);
+    const column = options.getSelection().address.column;
+    if (hasHeader === undefined) {
+      sortTarget.value = target;
+      sortInitial.value = { hasHeader: true, column, direction };
+      sortVisible.value = true;
+      return;
+    }
+    execute(target, () =>
+      createMultiKeySortSheetRangeCommand(target.sheetId, target.range, [{ column, direction }], {
+        hasHeader,
+      }),
+    );
+  }
+  function inferHeader(target: Target): boolean | undefined {
+    if (activeSheet.value.filter && intersects(activeSheet.value.filter.range, target.range))
+      return true;
+    const evaluator = options.getSheetEvaluator();
+    let hasTypedBody = false;
+    for (let column = target.range.start.column; column <= target.range.end.column; column++) {
+      const first = evaluator.getComputedValue({ row: target.range.start.row, column });
+      if (typeof first !== "string" || !first.trim()) return false;
+      const second = evaluator.getComputedValue({ row: target.range.start.row + 1, column });
+      if (typeof second === "number" || typeof second === "boolean") hasTypedBody = true;
+    }
+    // All-text ranges need the user's header choice before moving any row.
+    return hasTypedBody ? true : undefined;
+  }
+  function openSort(): void {
+    const target = capture();
+    if (target) {
+      sortTarget.value = target;
+      sortInitial.value = {
+        hasHeader: inferHeader(target) ?? true,
+        column: options.getSelection().address.column,
+        direction: "ascending",
+      };
+      sortVisible.value = true;
+    }
+  }
+  function applySort(draft: SortDraft): void {
+    if (
+      execute(sortTarget.value, () =>
+        createMultiKeySortSheetRangeCommand(
+          sortTarget.value!.sheetId,
+          sortTarget.value!.range,
+          draft.levels,
+          {
+            hasHeader:
+              draft.hasHeader ||
+              Boolean(
+                activeSheet.value.filter &&
+                intersects(activeSheet.value.filter.range, sortTarget.value!.range),
+              ),
+          },
+        ),
+      )
+    ) {
+      sortVisible.value = false;
+      options.focusSheet();
+    }
+  }
+  function openTextToColumns(): void {
+    const target = capture(false);
+    if (target && target.range.start.column !== target.range.end.column) {
+      error(t("dataTools.textToColumns.selectSingleColumn"));
+      return;
+    }
+    if (target) {
+      textTarget.value = target;
+      splitDraft.value = undefined;
+      textToColumnsVisible.value = true;
+    }
+  }
+  function applyTextToColumns(draft: TextToColumnsDraft): void {
+    const target = textTarget.value;
+    const delimiter = [...draft.delimiters, draft.otherDelimiter].filter(Boolean).join("");
+    if (
+      !target ||
+      (draft.mode === "delimiter" && !delimiter) ||
+      (draft.mode === "fixed-width" && !draft.fixedWidths.length)
+    ) {
+      error();
+      return;
+    }
+    const sourceColumn = target.range.start.column;
+    if (!/^[A-Z]+$/iu.test(draft.destination.trim())) {
+      error(t("dataTools.textToColumns.invalidDestination"));
+      return;
+    }
+    const destination =
+      [...draft.destination.trim().toUpperCase()].reduce(
+        (total, letter) => total * 26 + letter.charCodeAt(0) - 64,
+        0,
+      ) - 1;
+    if (
+      execute(target, () =>
+        createSplitColumnCommand(target.sheetId, sourceColumn, target.range, {
+          destinationColumn: destination,
+          mode: draft.mode === "fixed-width" ? "fixedWidth" : "delimiter",
+          ...(draft.mode === "fixed-width" ? { fixedWidths: draft.fixedWidths } : { delimiter }),
+          overwrite: draft.overwrite,
+          columnTypes: draft.columnTypes,
+        }),
+      )
+    )
+      textToColumnsVisible.value = false;
+  }
+  function openRemoveDuplicates(): void {
+    const target = capture();
+    if (target) {
+      duplicateTarget.value = target;
+      duplicateDraft.value = undefined;
+      removeDuplicatesVisible.value = true;
+    }
+  }
+  function applyRemoveDuplicates(draft: RemoveDuplicatesDraft): void {
+    const target = duplicateTarget.value;
+    if (!draft.columns.length) {
+      error();
+      return;
+    }
+    if (
+      execute(target, () =>
+        createRemoveDuplicatesCommand(target!.sheetId, target!.range, draft.columns, {
+          hasHeader: draft.hasHeader,
+        }),
+      )
+    )
+      removeDuplicatesVisible.value = false;
+  }
+  function openValidation(): void {
+    const target = capture(false);
+    if (!target) return;
+    validationTarget.value = target;
+    const existing = activeSheet.value.dataValidations?.find(
+      (rule) =>
+        rule.range.start.row <= target.range.start.row &&
+        rule.range.end.row >= target.range.end.row &&
+        rule.range.start.column <= target.range.start.column &&
+        rule.range.end.column >= target.range.end.column,
+    );
+    const delta = existing && {
+      row: target.range.start.row - existing.range.start.row,
+      column: target.range.start.column - existing.range.start.column,
+    };
+    validationInitial.value =
+      existing && delta
+        ? {
+            ...existing,
+            ...(existing.formula1 === undefined
+              ? {}
+              : { formula1: translateFormulaForCopy(existing.formula1, delta) }),
+            ...(existing.formula2 === undefined
+              ? {}
+              : { formula2: translateFormulaForCopy(existing.formula2, delta) }),
+          }
+        : undefined;
+    validationVisible.value = true;
+  }
+  function applyValidation(draft: DataValidationDraft): void {
+    const target = validationTarget.value;
+    if (!target || !isValidationDraftComplete(draft, options.getWorkbook().dateSystem)) return;
+    if (draft.type === "any") {
+      clearValidation();
+      return;
+    }
+    const type = draft.type === "text-length" ? "textLength" : draft.type;
+    const list =
+      type === "list" && !draft.source.trim().startsWith("=")
+        ? draft.source
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : undefined;
+    const rule: SheetDataValidation = {
+      id: createId("validation"),
+      range: target.range,
+      type,
+      allowBlank: draft.ignoreBlank,
+      showInput: draft.showInputMessage,
+      showError: draft.showErrorAlert,
+      showDropdown: draft.showDropdown,
+      promptTitle: draft.inputTitle,
+      prompt: draft.inputMessage,
+      errorTitle: draft.errorTitle,
+      error: draft.errorMessage,
+      errorStyle: draft.errorStyle,
+      ...(list
+        ? { list }
+        : {
+            formula1:
+              draft.type === "list" || draft.type === "custom" ? draft.source : draft.minimum,
+            ...(draft.maximum ? { formula2: draft.maximum } : {}),
+            ...(draft.type === "custom" || draft.type === "list"
+              ? {}
+              : { operator: draft.operator }),
+          }),
+    };
+    const rules = activeSheet.value.dataValidations ?? [];
+    const ids = new Set([...rules.map((item) => item.id), rule.id]);
+    const existing = rules.flatMap((item) => subtractSheetDataValidation(item, target.range, ids));
+    if (
+      execute(target, () =>
+        createSetSheetDataValidationsCommand(target.sheetId, [...existing, rule]),
+      )
+    )
+      validationVisible.value = false;
+  }
+  function clearValidation(): void {
+    if (
+      execute(validationTarget.value, () =>
+        createClearSheetDataValidationsCommand(
+          validationTarget.value!.sheetId,
+          validationTarget.value!.range,
+        ),
+      )
+    )
+      validationVisible.value = false;
+  }
+  function group(axis: DataToolAxis): void {
+    const target = capture(false);
+    if (target)
+      execute(target, () =>
+        createAddSheetOutlineGroupCommand(target.sheetId, {
+          id: createId("outline"),
+          axis: axis === "rows" ? "row" : "column",
+          start: axis === "rows" ? target.range.start.row : target.range.start.column,
+          end: axis === "rows" ? target.range.end.row : target.range.end.column,
+          collapsed: false,
+        }),
+      );
+  }
+  function ungroup(axis: DataToolAxis): void {
+    const target = capture(false);
+    if (!target) return;
+    const index = axis === "rows" ? target.range.start.row : target.range.start.column;
+    const group = activeSheet.value.outlineGroups
+      ?.filter(
+        (item) =>
+          item.axis === (axis === "rows" ? "row" : "column") &&
+          item.start <= index &&
+          item.end >= index,
+      )
+      .sort((left, right) => left.end - left.start - (right.end - right.start))[0];
+    if (group)
+      execute(target, () => createRemoveSheetOutlineGroupCommand(target.sheetId, group.id));
+  }
+  function setGroupsCollapsed(collapsed: boolean): void {
+    const target = capture(false);
+    if (!target) return;
+    const row = target.range.start.row;
+    const column = target.range.start.column;
+    const group = activeSheet.value.outlineGroups?.find((item) =>
+      item.axis === "row"
+        ? item.start <= row && item.end >= row
+        : item.start <= column && item.end >= column,
+    );
+    if (group)
+      execute(target, () =>
+        createSetSheetOutlineGroupCollapsedCommand(target.sheetId, group.id, collapsed),
+      );
+  }
+  function openSubtotal(): void {
+    const target = capture();
+    if (target) {
+      subtotalTarget.value = target;
+      subtotalVisible.value = true;
+    }
+  }
+  function applySubtotal(draft: SubtotalDraft): void {
+    const target = subtotalTarget.value;
+    if (!draft.valueColumns.length) {
+      error();
+      return;
+    }
+    if (
+      execute(target, () =>
+        createApplySubtotalsCommand(
+          target!.sheetId,
+          target!.range,
+          [draft.groupColumn],
+          draft.valueColumns,
+          draft.function,
+          {
+            hasHeader: true,
+            labels: {
+              subtotal: t("dataTools.outline.subtotalLabel"),
+              grandTotal: t("dataTools.outline.grandTotalLabel"),
+            },
+          },
+        ),
+      )
+    )
+      subtotalVisible.value = false;
+  }
+  function removeSubtotals(): void {
+    const target = subtotalTarget.value;
+    if (execute(target, () => createRemoveSubtotalsCommand(target!.sheetId)))
+      subtotalVisible.value = false;
+  }
+  function openColumnFilter(column: number, anchor?: DataToolFilterAnchor): void {
+    const target = capture();
+    if (target && activeSheet.value.filter) filterPanel.value = { column, anchor, target };
+  }
+  function applyColumnFilter(payload: {
+    includedKeys: DataToolFilterValueOption["key"][];
+    criteria?: DataToolFilterCriteria;
+  }): void {
+    const panel = filterPanel.value;
+    const filter = activeSheet.value.filter;
+    if (!panel || !filter) return;
+    const nextColumns = filter.columns.filter((item) => item.column !== panel.column);
+    nextColumns.push({
+      column: panel.column,
+      allowedValues: payload.includedKeys.map((key) => ({ ...key })),
+      ...(payload.criteria ? { condition: payload.criteria } : {}),
+    });
+    if (
+      execute(panel.target, () =>
+        createSetSheetFilterCriteriaCommand(panel.target.sheetId, filter.range, nextColumns),
+      )
+    )
+      filterPanel.value = undefined;
+  }
+  function clearColumnFilter(): void {
+    const panel = filterPanel.value;
+    const filter = activeSheet.value.filter;
+    if (
+      panel &&
+      filter &&
+      execute(panel.target, () =>
+        createSetSheetFilterCriteriaCommand(
+          panel.target.sheetId,
+          filter.range,
+          filter.columns.filter((item) => item.column !== panel.column),
+        ),
+      )
+    )
+      filterPanel.value = undefined;
+  }
+  return {
+    disabled,
+    columns: dialogColumns,
+    sortInitial,
+    rangeLabel: dialogRangeLabel,
+    splitPreview,
+    duplicateCount,
+    validationInitial,
+    hasSubtotals: computed(() => Boolean(activeSheet.value.subtotalMetadata?.length)),
+    filterActive,
+    filterState,
+    sortVisible,
+    textToColumnsVisible,
+    removeDuplicatesVisible,
+    validationVisible,
+    subtotalVisible,
+    toggleFilter,
+    clearFilter,
+    reapplyFilter,
+    sort,
+    applySort,
+    openSort,
+    openTextToColumns,
+    applyTextToColumns,
+    updateTextToColumnsDraft: (draft: TextToColumnsDraft) => {
+      splitDraft.value = draft;
+    },
+    updateRemoveDuplicatesDraft: (draft: RemoveDuplicatesDraft) => {
+      duplicateDraft.value = draft;
+    },
+    openRemoveDuplicates,
+    applyRemoveDuplicates,
+    openValidation,
+    applyValidation,
+    clearValidation,
+    group,
+    ungroup,
+    setGroupsCollapsed,
+    openSubtotal,
+    applySubtotal,
+    removeSubtotals,
+    openColumnFilter,
+    applyColumnFilter,
+    clearColumnFilter,
+    closeColumnFilter: () => {
+      filterPanel.value = undefined;
+    },
+    closeSort: () => {
+      sortVisible.value = false;
+      sortTarget.value = undefined;
+    },
+    closeTextToColumns: () => {
+      textToColumnsVisible.value = false;
+      textTarget.value = undefined;
+      splitDraft.value = undefined;
+    },
+    closeRemoveDuplicates: () => {
+      removeDuplicatesVisible.value = false;
+      duplicateTarget.value = undefined;
+    },
+    closeValidation: () => {
+      validationVisible.value = false;
+      validationTarget.value = undefined;
+      validationInitial.value = undefined;
+    },
+    closeSubtotal: () => {
+      subtotalVisible.value = false;
+      subtotalTarget.value = undefined;
+    },
+  };
+}

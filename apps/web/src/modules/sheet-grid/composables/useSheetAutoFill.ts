@@ -1,5 +1,4 @@
 import type { CellFillMode } from "@idea10/core/cell-autofill";
-import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import { formatCellAddress } from "@idea10/core/coordinates";
 import {
   getCellContent,
@@ -8,6 +7,7 @@ import {
   type CellAddress,
   type CellRange,
   type Sheet,
+  type SheetEvaluator,
 } from "@idea10/core/workbook";
 import {
   getDoubleClickFillRange,
@@ -25,6 +25,7 @@ import type {
   GridFillSession,
 } from "../auto-fill-contracts";
 import { useFillDrag } from "./useFillDrag";
+import { createSheetHiddenRowIntervals } from "../data-visibility";
 
 function sameRange(left: CellRange, right: CellRange): boolean {
   return (
@@ -38,6 +39,7 @@ function sameRange(left: CellRange, right: CellRange): boolean {
 /** Connects a temporary fill gesture and its options to the grid's existing geometry. */
 export function useSheetAutoFill(options: {
   getSheet: () => Sheet;
+  getEvaluator?: () => SheetEvaluator;
   getRevision: () => number;
   getRange: () => CellRange;
   getCanFill: () => boolean;
@@ -146,7 +148,7 @@ export function useSheetAutoFill(options: {
     options.onBeforeStart();
     const sheet = options.getSheet();
     const source = options.getRange();
-    const filterHiddenRows = createSheetFilterHiddenRowIntervals(sheet);
+    const hiddenRows = createSheetHiddenRowIntervals(sheet, options.getEvaluator?.());
     const fill = getDoubleClickFillRange(source, {
       rowCount: Math.min(MAX_SHEET_ROWS, options.getContentRowCount()),
       columnCount: MAX_SHEET_COLUMNS,
@@ -158,7 +160,7 @@ export function useSheetAutoFill(options: {
       // This avoids computing a distant end only for Core to reject it afterwards.
       isRowFillable: (row) =>
         !sheet.hiddenRows?.has(row) &&
-        !filterHiddenRows.some((interval) => row >= interval.start && row <= interval.end) &&
+        !hiddenRows.some((interval) => row >= interval.start && row <= interval.end) &&
         !sheet.mergedCells.some(
           (merge) =>
             row >= merge.start.row &&

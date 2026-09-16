@@ -56,7 +56,9 @@ function clampSelectionOffset(offset: number, length: number): number {
   return Math.max(0, Math.min(Math.trunc(offset), length));
 }
 
-export function useCellEditSession(options: { onCommit: (payload: CellEditCommit) => void }) {
+export function useCellEditSession(options: {
+  onCommit: (payload: CellEditCommit) => void | boolean;
+}) {
   const id = `cell-edit-${++sessionSequence}`;
   const mutableState = reactive<CellEditState>({
     active: false,
@@ -152,7 +154,11 @@ export function useCellEditSession(options: { onCommit: (payload: CellEditCommit
       );
     }
     if (mutableState.draft !== mutableState.source) {
-      options.onCommit({ ...copyTarget(mutableState.owner), input: mutableState.draft });
+      const accepted = options.onCommit({
+        ...copyTarget(mutableState.owner),
+        input: mutableState.draft,
+      });
+      if (accepted === false) return false;
       mutableState.source = mutableState.draft;
     }
     if (flushOptions.end) reset();

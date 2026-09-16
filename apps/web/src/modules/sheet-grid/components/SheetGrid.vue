@@ -47,7 +47,6 @@ import {
   type SheetDimensionAxis,
 } from "@idea10/core/workbook";
 import { expandSelectionToMergedCellRanges } from "@idea10/core";
-import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import {
   DEFAULT_GRID_EXTENT_POLICY,
   DEFAULT_INITIAL_GRID_EXTENT,
@@ -99,6 +98,11 @@ import SheetFreezeHandles from "./SheetFreezeHandles.vue";
 import SheetCellContextMenu from "./SheetCellContextMenu.vue";
 import SheetSurface from "./SheetSurface.vue";
 import SheetAutoFillOptions from "./SheetAutoFillOptions.vue";
+import SheetDataControls, { type ActiveCellValidationInfo } from "./SheetDataControls.vue";
+import {
+  createSheetHiddenColumnIntervals,
+  createSheetHiddenRowIntervals,
+} from "../data-visibility";
 import {
   createFloatingImageCanvasCache,
   paintFloatingImages,
@@ -190,6 +194,8 @@ const props = withDefaults(
     showGridLines?: boolean;
     showAxisQuickTools?: boolean;
     dateSystem?: ExcelDateSystem;
+    /** Resolved for the active cell by the Web data-tools adapter. */
+    validationInfo?: ActiveCellValidationInfo;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -235,6 +241,15 @@ const emit = defineEmits<{
   fillFeedback: [feedback: GridFillFeedback];
   endFill: [];
   horizontalScrollChange: [state: SheetHorizontalScrollState];
+  filterColumnRequest: [payload: { column: number; anchor: DOMRect }];
+  validationChoose: [
+    payload: {
+      address: CellAddress;
+      value: string | number | boolean;
+    },
+  ];
+  outlineToggle: [payload: { id: string; collapsed: boolean }];
+  outlineLevel: [payload: { axis: SheetDimensionAxis; level: number }];
   "update:zoom": [zoom: number];
 }>();
 
@@ -249,6 +264,18 @@ const headerSize = computed(() => ({
   width: props.showHeaders ? ROW_HEADER_WIDTH + quickToolsGutter.value : 0,
   height: props.showHeaders ? COLUMN_HEADER_HEIGHT + quickToolsGutter.value : 0,
 }));
+
+const outlineHiddenRows = computed(() =>
+  createSheetHiddenRowIntervals(props.sheet, sheetEvaluator.value),
+);
+const outlineHiddenColumns = computed(() => createSheetHiddenColumnIntervals(props.sheet));
+const outlineHiddenColumnSet = computed(() => {
+  const hidden = new Set(props.sheet.hiddenColumns ?? []);
+  for (const interval of outlineHiddenColumns.value) {
+    for (let column = interval.start; column <= interval.end; column += 1) hidden.add(column);
+  }
+  return hidden;
+});
 
 const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
@@ -366,13 +393,12 @@ const {
   getColumnWidths: () => effectiveColumnWidths.value,
   getDefaultColumnWidth: () => getDefaultColumnWidth(props.sheet),
   getHiddenRows: () => props.sheet.hiddenRows,
-  getHiddenColumns: () => props.sheet.hiddenColumns,
+  getHiddenColumns: () => outlineHiddenColumnSet.value,
   getContentExtent: () => contentExtent.value,
   getRowHeights: () => effectiveRowHeights.value,
   getFreezePanes: () => props.sheet.freezePanes,
   getMergedCells: () => props.sheet.mergedCells,
-  getHiddenRowIntervals: () =>
-    createSheetFilterHiddenRowIntervals(props.sheet, sheetEvaluator.value),
+  getHiddenRowIntervals: () => outlineHiddenRows.value,
   getSelection: () => selection.value,
   onScrollStart: () => {
     axisContextMenu.value = undefined;
@@ -1021,6 +1047,7 @@ const {
   fillSelection,
 } = useSheetAutoFill({
   getSheet: () => props.sheet,
+  getEvaluator: () => sheetEvaluator.value,
   getRevision: () => props.workbookRevision ?? 0,
   getRange: () => selectedRange.value,
   getCanFill: () =>
@@ -1302,9 +1329,9 @@ function stopFormulaReferenceDrag(): void {
   formulaReferenceDragEditor = undefined;
 }
 
-function finishEdit(destination?: CellSelection, restoreFocus = true): void {
+function finishEdit(destination?: CellSelection, restoreFocus = true): boolean {
   stopFormulaReferenceDrag();
-  finishCellEdit(destination, restoreFocus);
+  return finishCellEdit(destination, restoreFocus);
 }
 
 function cancelEdit(restoreFocus = true): void {
@@ -1350,21 +1377,21 @@ function startReferencePick(address: CellAddress, event: MouseEvent): boolean {
 function getNextVisibleColumn(column: number, direction: -1 | 1): number | null {
   let next = column + direction;
   while (next >= 0 && next < MAX_SHEET_COLUMNS) {
-    if (!props.sheet.hiddenColumns?.has(next)) return next;
+    if (!outlineHiddenColumnSet.value.has(next)) return next;
     next += direction;
   }
   return null;
 }
 
 watch(
-  [navigationRows, () => props.sheet.hiddenColumns],
+  [navigationRows, outlineHiddenColumnSet],
   () => {
     const current = selection.value.active;
     const rows = navigationRows.value;
     const row = rows.isRowVisible(current.row)
       ? current.row
       : (rows.getNextVisibleRow(current.row) ?? rows.getPreviousVisibleRow(current.row));
-    const column = !props.sheet.hiddenColumns?.has(current.column)
+    const column = !outlineHiddenColumnSet.value.has(current.column)
       ? current.column
       : (getNextVisibleColumn(current.column, 1) ?? getNextVisibleColumn(current.column, -1));
     if (row === null || column === null || (row === current.row && column === current.column))
@@ -1393,7 +1420,7 @@ function navigateToCell(address: CellAddress): void {
   }
 
   if (isEditing.value) {
-    finishEdit(nextSelection);
+    if (!finishEdit(nextSelection)) return;
   } else {
     setSelection(nextSelection, address);
   }
@@ -1440,7 +1467,7 @@ function moveSelection(
   ensureGridExtentContains(visibleAddress);
 
   if (commitEdit) {
-    finishEdit(destination);
+    if (!finishEdit(destination)) return;
   } else {
     setSelection(destination, visibleAddress);
   }
@@ -1507,7 +1534,7 @@ function onCellMouseDown(address: CellAddress, event: MouseEvent): void {
   }
 
   if (isEditing.value) {
-    finishEdit(nextSelection);
+    if (!finishEdit(nextSelection)) return;
   } else {
     setSelection(nextSelection, address);
   }
@@ -1529,7 +1556,7 @@ function selectAxis(
     return;
   }
   if (isEditing.value) {
-    finishEdit(nextSelection, restoreFocus);
+    if (!finishEdit(nextSelection, restoreFocus)) return;
   } else {
     setSelection(nextSelection, address, restoreFocus);
   }
@@ -1896,7 +1923,7 @@ function traverseSelection(key: "Enter" | "Tab", reverse: boolean, commitEdit: b
       isRowVisible: (row) => navigationRows.value.isRowVisible(row),
       getNextVisibleRow: (row) => navigationRows.value.getNextVisibleRow(row),
       getPreviousVisibleRow: (row) => navigationRows.value.getPreviousVisibleRow(row),
-      isColumnVisible: (column) => !props.sheet.hiddenColumns?.has(column),
+      isColumnVisible: (column) => !outlineHiddenColumnSet.value.has(column),
       getNextVisibleColumn: (column) => getNextVisibleColumn(column, 1),
       getPreviousVisibleColumn: (column) => getNextVisibleColumn(column, -1),
     });
@@ -2123,7 +2150,7 @@ function flushPendingEdit(): boolean {
     return false;
   }
   if (isEditing.value) {
-    finishEdit(undefined, false);
+    return finishEdit(undefined, false);
   }
   return true;
 }
@@ -2305,6 +2332,20 @@ defineExpose({
         />
       </template>
     </SheetSurface>
+    <SheetDataControls
+      :frame="renderFrame"
+      :filter-range="sheet.filter?.range"
+      :filtered-columns="sheet.filter?.columns.map((entry) => entry.column)"
+      :active-cell="activeCell"
+      :validation-info="validationInfo"
+      :outline-groups="sheet.outlineGroups ?? []"
+      :show-outline="showHeaders"
+      :read-only="readOnly"
+      @filter-column-request="emit('filterColumnRequest', $event)"
+      @validation-choose="emit('validationChoose', $event)"
+      @outline-toggle="emit('outlineToggle', $event)"
+      @outline-level="emit('outlineLevel', $event)"
+    />
     <button
       v-if="fillHandlePoint"
       type="button"

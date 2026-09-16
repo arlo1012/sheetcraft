@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import { Database, LockKeyhole, Sigma } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import type { FilterValueKey, HomeDataToolState } from "./data-tool-state";
@@ -20,6 +19,7 @@ const emit = defineEmits<{
   freeze: [mode: "panes" | "top-row" | "first-column"];
   unfreeze: [];
   toggleProtection: [];
+  openDataTools: [];
 }>();
 </script>
 
@@ -69,15 +69,15 @@ const emit = defineEmits<{
       >
         <Sigma :size="15" aria-hidden="true" />
       </RibbonButton>
-      <RibbonMenuButton
-        :label="t('app.unavailableFeature', { feature: t('ribbon.data') })"
+      <RibbonButton
+        :label="t('ribbon.data')"
         :text="t('ribbon.data')"
-        disabled
-        data-ribbon-placeholder="data"
+        data-ribbon-action="open-data-tools"
         data-ribbon-row="2"
+        @activate="emit('openDataTools')"
       >
         <Database :size="15" aria-hidden="true" />
-      </RibbonMenuButton>
+      </RibbonButton>
     </div>
 
     <RibbonButton

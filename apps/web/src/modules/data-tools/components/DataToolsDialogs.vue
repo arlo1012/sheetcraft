@@ -1,0 +1,102 @@
+<script setup lang="ts">
+import DataValidationDialog from "./DataValidationDialog.vue";
+import RemoveDuplicatesDialog from "./RemoveDuplicatesDialog.vue";
+import SortDialog from "./SortDialog.vue";
+import SubtotalDialog from "./SubtotalDialog.vue";
+import TextToColumnsDialog from "./TextToColumnsDialog.vue";
+import type { ExcelDateSystem } from "@idea10/core/formula";
+import type {
+  DataToolColumn,
+  DataValidationDraft,
+  DataValidationInitial,
+  RemoveDuplicatesDraft,
+  SortDraft,
+  SubtotalDraft,
+  TextToColumnsDraft,
+} from "../data-tools-types";
+
+withDefaults(
+  defineProps<{
+    sortVisible: boolean;
+    textToColumnsVisible: boolean;
+    removeDuplicatesVisible: boolean;
+    validationVisible: boolean;
+    subtotalVisible: boolean;
+    columns: readonly DataToolColumn[];
+    sortInitial?: { hasHeader: boolean; column: number; direction: "ascending" | "descending" };
+    dateSystem?: ExcelDateSystem;
+    rangeLabel?: string;
+    splitPreview?: readonly string[];
+    duplicateCount?: number;
+    validationInitial?: DataValidationInitial;
+    hasSubtotals?: boolean;
+  }>(),
+  {
+    rangeLabel: "",
+    dateSystem: "1900",
+    sortInitial: undefined,
+    splitPreview: () => [],
+    duplicateCount: undefined,
+    validationInitial: undefined,
+    hasSubtotals: false,
+  },
+);
+const emit = defineEmits<{
+  closeSort: [];
+  sort: [draft: SortDraft];
+  closeTextToColumns: [];
+  textToColumns: [draft: TextToColumnsDraft];
+  textToColumnsDraftChange: [draft: TextToColumnsDraft];
+  closeRemoveDuplicates: [];
+  removeDuplicates: [draft: RemoveDuplicatesDraft];
+  removeDuplicatesDraftChange: [draft: RemoveDuplicatesDraft];
+  closeValidation: [];
+  validation: [draft: DataValidationDraft];
+  clearValidation: [];
+  closeSubtotal: [];
+  subtotal: [draft: SubtotalDraft];
+  removeSubtotals: [];
+}>();
+</script>
+<template>
+  <SortDialog
+    :visible="sortVisible"
+    :columns="columns"
+    :range-label="rangeLabel"
+    :initial="sortInitial"
+    @close="emit('closeSort')"
+    @apply="emit('sort', $event)"
+  />
+  <TextToColumnsDialog
+    :visible="textToColumnsVisible"
+    :preview="splitPreview"
+    :destination-label="columns[0]?.label"
+    @close="emit('closeTextToColumns')"
+    @apply="emit('textToColumns', $event)"
+    @draft-change="emit('textToColumnsDraftChange', $event)"
+  />
+  <RemoveDuplicatesDialog
+    :visible="removeDuplicatesVisible"
+    :columns="columns"
+    :removal-count="duplicateCount"
+    @close="emit('closeRemoveDuplicates')"
+    @apply="emit('removeDuplicates', $event)"
+    @draft-change="emit('removeDuplicatesDraftChange', $event)"
+  />
+  <DataValidationDialog
+    :visible="validationVisible"
+    :initial="validationInitial"
+    :date-system="dateSystem"
+    @close="emit('closeValidation')"
+    @apply="emit('validation', $event)"
+    @clear="emit('clearValidation')"
+  />
+  <SubtotalDialog
+    :visible="subtotalVisible"
+    :columns="columns"
+    :has-subtotals="hasSubtotals"
+    @close="emit('closeSubtotal')"
+    @apply="emit('subtotal', $event)"
+    @remove-all="emit('removeSubtotals')"
+  />
+</template>

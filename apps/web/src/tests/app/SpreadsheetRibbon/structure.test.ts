@@ -29,7 +29,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get("header").attributes("aria-label")).toBe("Workbook tools");
     expect(wrapper.get("nav").attributes("aria-label")).toBe("Ribbon categories");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("Home");
-    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(2);
+    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(3);
     expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-labelledby")).toBe(
       wrapper.get('[data-ribbon-category="home"]').attributes("id"),
     );
@@ -130,7 +130,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
       "false",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(13);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(12);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({
@@ -209,6 +209,7 @@ describe("SpreadsheetRibbon", () => {
 
     expect(wrapper.get("header").attributes("aria-label")).toBe("工作簿工具");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("开始");
+    expect(wrapper.get('[data-ribbon-category="data"]').text()).toBe("数据");
     expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-labelledby")).toBe(
       wrapper.get('[data-ribbon-category="home"]').attributes("id"),
     );
@@ -230,5 +231,21 @@ describe("SpreadsheetRibbon", () => {
       "value",
       "默认字体",
     );
+  });
+
+  test("navigates all categories with the keyboard and opens Data from Home", async () => {
+    const wrapper = mountRibbon();
+    await wrapper.get('[data-ribbon-action="open-data-tools"]').trigger("click");
+    expect(wrapper.get('[data-ribbon-category="data"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="data"]').trigger("keydown", { key: "ArrowRight" });
+    expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="home"]').trigger("keydown", { key: "End" });
+    expect(wrapper.get('[data-ribbon-category="data"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="data"]').trigger("keydown", { key: "ArrowLeft" });
+    expect(wrapper.get('[data-ribbon-category="formulas"]').attributes("aria-selected")).toBe(
+      "true",
+    );
+    await wrapper.get('[data-ribbon-category="formulas"]').trigger("keydown", { key: "Home" });
+    expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
   });
 });

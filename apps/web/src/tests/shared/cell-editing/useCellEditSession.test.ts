@@ -52,7 +52,11 @@ describe("useCellEditSession", () => {
 
   test("flushes each changed draft once, snapshots the owner, and finish closes the session", () => {
     const commits: unknown[] = [];
-    const session = useCellEditSession({ onCommit: (payload) => commits.push(payload) });
+    const session = useCellEditSession({
+      onCommit: (payload) => {
+        commits.push(payload);
+      },
+    });
     const context = { ...firstTarget, input: "old" };
     session.begin(context, { surface: "grid", mode: "append" });
     context.address.row = 99;
@@ -68,7 +72,11 @@ describe("useCellEditSession", () => {
 
   test("clamps selection and completes a formula while closing", () => {
     const commits: unknown[] = [];
-    const session = useCellEditSession({ onCommit: (payload) => commits.push(payload) });
+    const session = useCellEditSession({
+      onCommit: (payload) => {
+        commits.push(payload);
+      },
+    });
     session.begin(
       { ...firstTarget, input: "" },
       { surface: "formula-bar", mode: "replace", initialValue: "=SUM(A1" },
@@ -83,7 +91,11 @@ describe("useCellEditSession", () => {
 
   test("blocks flush during IME composition, then accepts its result", () => {
     const commits: unknown[] = [];
-    const session = useCellEditSession({ onCommit: (payload) => commits.push(payload) });
+    const session = useCellEditSession({
+      onCommit: (payload) => {
+        commits.push(payload);
+      },
+    });
     session.begin({ ...firstTarget, input: "" }, { surface: "grid", mode: "replace" });
     session.startComposition();
 
@@ -94,9 +106,35 @@ describe("useCellEditSession", () => {
     expect(commits).toEqual([{ ...firstTarget, input: "input" }]);
   });
 
+  test("retains an invalid draft and its owner until the commit is accepted", () => {
+    let accept = false;
+    const session = useCellEditSession({ onCommit: () => accept });
+    session.begin(
+      { sheetId: "sheet-a", address: { row: 0, column: 0 }, input: "valid" },
+      { surface: "grid", mode: "append" },
+    );
+    session.setDraft("invalid");
+
+    expect(session.finish()).toBe(false);
+    expect(session.state).toMatchObject({
+      active: true,
+      source: "valid",
+      draft: "invalid",
+      owner: { sheetId: "sheet-a", address: { row: 0, column: 0 } },
+    });
+    expect(session.hasPendingEdit()).toBe(true);
+    accept = true;
+    expect(session.finish()).toBe(true);
+    expect(session.state.active).toBe(false);
+  });
+
   test("cancel clears an uncommitted edit", () => {
     const commits: unknown[] = [];
-    const session = useCellEditSession({ onCommit: (payload) => commits.push(payload) });
+    const session = useCellEditSession({
+      onCommit: (payload) => {
+        commits.push(payload);
+      },
+    });
     session.begin({ ...firstTarget, input: "before" }, { surface: "grid", mode: "append" });
     session.setDraft("discard me");
 

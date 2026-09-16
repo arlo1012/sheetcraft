@@ -2,6 +2,7 @@ import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { DEFAULT_ROW_HEIGHT, getCellValue, setCellValue } from "@idea10/core/workbook";
 import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
+import { useCellEditSession } from "../../../../../shared/cell-editing/useCellEditSession";
 
 describe("cell editor", () => {
   test("replaces content with printable input and commits with Enter", async () => {
@@ -95,6 +96,23 @@ describe("cell editor", () => {
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "c" });
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Tab", shiftKey: true });
     expect(activeCell(wrapper)).toBe("D3");
+  });
+
+  test("does not move after Tab when the shared edit session rejects validation", async () => {
+    const editSession = useCellEditSession({ onCommit: () => false });
+    const { wrapper } = mountSheetGrid({ editSession });
+    const editor = wrapper.get("textarea.cell-editor");
+
+    await editor.trigger("keydown", { key: "i" });
+    await editor.setValue("invalid");
+    await editor.trigger("keydown", { key: "Tab" });
+
+    expect(activeCell(wrapper)).toBe("A1");
+    expect((editor.element as HTMLTextAreaElement).value).toBe("invalid");
+    expect(editor.classes()).toContain("is-editing");
+    expect((wrapper.vm as unknown as { flushPendingEdit: () => boolean }).flushPendingEdit()).toBe(
+      false,
+    );
   });
 
   test("keeps editing when the editor itself receives a pointer event", async () => {

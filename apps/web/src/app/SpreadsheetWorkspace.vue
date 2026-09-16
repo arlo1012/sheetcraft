@@ -1,12 +1,21 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, shallowRef, shallowReactive, useId, watch } from "vue";
-import type { CellFormatChange } from "@idea10/core/commands";
+import {
+  createSetSheetOutlineGroupCollapsedCommand,
+  createSetSheetOutlineLevelCommand,
+  type CellFormatChange,
+} from "@idea10/core/commands";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { useWorkbookFullscreen } from "../modules/workbook/composables/useWorkbookFullscreen";
 import { useEyeComfortMode } from "../modules/workbook/composables/useEyeComfortMode";
 import { normalizeSheetZoom, SHEET_ZOOM_STEP } from "../shared/sheet-view/zoom";
 import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import { useFormulaToolsController } from "../modules/formula-tools/useFormulaToolsController";
+import { useDataToolsController } from "../modules/data-tools/useDataToolsController";
+import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
+import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
+import FilterColumnPanel from "../modules/data-tools/components/FilterColumnPanel.vue";
+import DataValidationFeedbackDialog from "../modules/data-tools/components/DataValidationFeedbackDialog.vue";
 import NamedRangePicker from "../modules/formula-tools/components/NamedRangePicker.vue";
 import { useNamedRangePicker } from "../modules/formula-tools/useNamedRangePicker";
 import NamedRangesDialog from "../modules/formula-tools/components/NamedRangesDialog.vue";
@@ -50,7 +59,7 @@ import type { WorkbookStore } from "../modules/workbook-persistence/workbookStor
 import XlsxFileActions from "../modules/workbook-xlsx/components/XlsxFileActions.vue";
 import XlsxFileFeedback from "../modules/workbook-xlsx/components/XlsxFileFeedback.vue";
 import { useWorkbookXlsxActions } from "../modules/workbook-xlsx/useWorkbookXlsxActions";
-import type { SheetProperties } from "@idea10/core/workbook";
+import type { CellAddress, SheetDimensionAxis, SheetProperties } from "@idea10/core/workbook";
 
 const props = defineProps<{
   workbookStore?: WorkbookStore;
@@ -105,8 +114,13 @@ const {
   activeSelectionSummary,
   setSelectionDragging,
   dataToolState,
+  activeValidationInfo,
+  validationFeedback,
+  acceptValidationInput,
+  dismissValidationInput,
   mergeState,
   commitCell,
+  commitCellValue,
   setCellImage,
   setFloatingImage,
   deleteFloatingImage,
@@ -153,6 +167,7 @@ const {
   undo,
   redo,
   setGridNavigator,
+  clearGridClipboard,
   scrollGridHorizontally,
 } = useSpreadsheetWorkspaceController();
 
@@ -366,6 +381,89 @@ const formulaTools = useFormulaToolsController({
   focusFormulaBar: () => formulaBarRef.value?.focus({ preserveSelection: true }),
   recalculate,
 });
+const dataTools = useDataToolsController({
+  getWorkbook: () => session.workbook,
+  getSelection: () => ({ address: activeAddress.value, range: activeSelectionRange.value }),
+  getSheetEvaluator: () => activeSheetEvaluator.value,
+  getGeneration: () => workbookGeneration.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
+  execute: (command) => {
+    const changed = executeCommand(command);
+    if (changed) clearGridClipboard();
+    return changed;
+  },
+  flush: () => cellEditSession.finish(),
+  focusSheet: focusCellEditor,
+  recalculate,
+});
+const {
+  disabled: dataToolsDisabled,
+  filterActive: dataFilterActive,
+  columns: dataToolColumns,
+  sortInitial: dataSortInitial,
+  rangeLabel: dataToolRangeLabel,
+  splitPreview: dataSplitPreview,
+  duplicateCount: dataDuplicateCount,
+  validationInitial: dataValidationInitial,
+  hasSubtotals: dataHasSubtotals,
+  filterState: dataFilterState,
+  sortVisible: dataSortVisible,
+  textToColumnsVisible: dataTextToColumnsVisible,
+  removeDuplicatesVisible: dataRemoveDuplicatesVisible,
+  validationVisible: dataValidationVisible,
+  subtotalVisible: dataSubtotalVisible,
+} = dataTools;
+const dataToolsModalOpen = computed(
+  () =>
+    dataTools.sortVisible.value ||
+    dataTools.textToColumnsVisible.value ||
+    dataTools.removeDuplicatesVisible.value ||
+    dataTools.validationVisible.value ||
+    dataTools.subtotalVisible.value,
+);
+
+function chooseValidationValue(payload: {
+  address: CellAddress;
+  value: string | number | boolean;
+}): void {
+  if (!cellEditSession.finish()) return;
+  commitCellValue(payload);
+  void nextTick(focusCellEditor);
+}
+
+function retryValidationInput(): void {
+  dismissValidationInput();
+  void nextTick(() =>
+    cellEditSession.state.surface === "formula-bar"
+      ? formulaBarRef.value?.focus({ preserveSelection: true })
+      : focusCellEditor(),
+  );
+}
+
+function cancelValidationInput(): void {
+  dismissValidationInput();
+  cellEditSession.cancel();
+  void nextTick(focusCellEditor);
+}
+
+function confirmValidationInput(): void {
+  if (acceptValidationInput()) cellEditSession.cancel();
+  void nextTick(focusCellEditor);
+}
+
+function toggleOutline(payload: { id: string; collapsed: boolean }): void {
+  if (dataToolsDisabled.value || !cellEditSession.finish()) return;
+  executeCommand(
+    createSetSheetOutlineGroupCollapsedCommand(activeSheet.value.id, payload.id, payload.collapsed),
+  );
+}
+
+function showOutlineLevel(payload: { axis: SheetDimensionAxis; level: number }): void {
+  if (dataToolsDisabled.value || !cellEditSession.finish()) return;
+  executeCommand(
+    createSetSheetOutlineLevelCommand(activeSheet.value.id, payload.axis, payload.level),
+  );
+}
 const {
   disabled: formulaToolsDisabled,
   editTargetSheet,
@@ -483,7 +581,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :recent-functions="recentFunctions"
       :name-creation-enabled="!formulaToolsDisabled"
       :calculation-settings="calculationSettings"
-      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection || namesVisible"
+      :inert="
+        loading ||
+        fileBusy ||
+        xlsxBusy ||
+        !!cellFormatSelection ||
+        namesVisible ||
+        dataToolsModalOpen ||
+        !!validationFeedback
+      "
       @insert-image="imageActions.requestInsert"
       @apply-borders="applyCellBorders"
       @update-border-format="updateBorderFormat"
@@ -511,6 +617,26 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @undo="undo"
       @redo="redo"
     >
+      <template #data-tools>
+        <DataToolbar
+          :disabled="dataToolsDisabled"
+          :filter-active="dataFilterActive"
+          :edit-session-id="cellEditSession.id"
+          @sort="dataTools.sort"
+          @open-sort="dataTools.openSort"
+          @toggle-filter="dataTools.toggleFilter"
+          @clear-filter="dataTools.clearFilter"
+          @reapply-filter="dataTools.reapplyFilter"
+          @open-text-to-columns="dataTools.openTextToColumns"
+          @open-remove-duplicates="dataTools.openRemoveDuplicates"
+          @open-validation="dataTools.openValidation"
+          @group="dataTools.group"
+          @ungroup="dataTools.ungroup"
+          @expand="dataTools.setGroupsCollapsed(false)"
+          @collapse="dataTools.setGroupsCollapsed(true)"
+          @open-subtotal="dataTools.openSubtotal"
+        />
+      </template>
       <template #row-column-tools>
         <RowColumnOperationsMenu
           :sheet="activeSheet"
@@ -564,6 +690,50 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         </WorkbookFileActions>
       </template>
     </SpreadsheetRibbon>
+    <DataToolsDialogs
+      :sort-visible="dataSortVisible"
+      :text-to-columns-visible="dataTextToColumnsVisible"
+      :remove-duplicates-visible="dataRemoveDuplicatesVisible"
+      :validation-visible="dataValidationVisible"
+      :subtotal-visible="dataSubtotalVisible"
+      :columns="dataToolColumns"
+      :sort-initial="dataSortInitial"
+      :date-system="session.workbook.dateSystem"
+      :range-label="dataToolRangeLabel"
+      :split-preview="dataSplitPreview"
+      :duplicate-count="dataDuplicateCount"
+      :validation-initial="dataValidationInitial"
+      :has-subtotals="dataHasSubtotals"
+      @close-sort="dataTools.closeSort"
+      @sort="dataTools.applySort"
+      @close-text-to-columns="dataTools.closeTextToColumns"
+      @text-to-columns="dataTools.applyTextToColumns"
+      @text-to-columns-draft-change="dataTools.updateTextToColumnsDraft"
+      @close-remove-duplicates="dataTools.closeRemoveDuplicates"
+      @remove-duplicates="dataTools.applyRemoveDuplicates"
+      @remove-duplicates-draft-change="dataTools.updateRemoveDuplicatesDraft"
+      @close-validation="dataTools.closeValidation"
+      @validation="dataTools.applyValidation"
+      @clear-validation="dataTools.clearValidation"
+      @close-subtotal="dataTools.closeSubtotal"
+      @subtotal="dataTools.applySubtotal"
+      @remove-subtotals="dataTools.removeSubtotals"
+    />
+    <FilterColumnPanel
+      v-if="dataFilterState"
+      v-bind="dataFilterState"
+      :date-system="session.workbook.dateSystem"
+      @apply="dataTools.applyColumnFilter"
+      @clear="dataTools.clearColumnFilter"
+      @close="dataTools.closeColumnFilter"
+    />
+    <DataValidationFeedbackDialog
+      v-if="validationFeedback"
+      :feedback="validationFeedback"
+      @retry="retryValidationInput"
+      @accept="confirmValidationInput"
+      @cancel="cancelValidationInput"
+    />
     <NamedRangesDialog
       :edit-session-id="cellEditSession.id"
       :visible="namesVisible"
@@ -616,7 +786,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :read-only="formulaReadOnly"
       :key="workbookGeneration"
       ref="formulaBarRef"
-      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection || pickingNameRange"
+      :inert="
+        loading ||
+        fileBusy ||
+        xlsxBusy ||
+        !!cellFormatSelection ||
+        pickingNameRange ||
+        dataToolsModalOpen ||
+        !!validationFeedback
+      "
       :address="activeAddress"
       :sheet-id="activeSheet.id"
       :sheet-name="activeSheet.name"
@@ -636,7 +814,14 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     <div
       class="spreadsheet-workspace__grid"
       :class="{ 'is-eye-comfort': eyeComfortEnabled }"
-      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection"
+      :inert="
+        loading ||
+        fileBusy ||
+        xlsxBusy ||
+        !!cellFormatSelection ||
+        dataToolsModalOpen ||
+        !!validationFeedback
+      "
     >
       <SheetGrid
         v-model:zoom="zoom"
@@ -653,6 +838,11 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :sheet="activeSheet"
         :evaluator="activeSheetEvaluator"
         :context-menu-state="contextMenuState"
+        :validation-info="activeValidationInfo"
+        @filter-column-request="dataTools.openColumnFilter($event.column, $event.anchor)"
+        @validation-choose="chooseValidationValue"
+        @outline-toggle="toggleOutline"
+        @outline-level="showOutlineLevel"
         @context-action="contextActions.request"
         :date-system="session.workbook.dateSystem"
         :reference-editor="pickingNameRange ? nameRangePicker.editor : formulaBarRef"

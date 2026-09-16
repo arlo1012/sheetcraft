@@ -57,6 +57,7 @@ const emit = defineEmits<{
   undo: [];
   redo: [];
   toggleProtection: [];
+  openDataTools: [];
 }>();
 
 const { t } = useAppI18n();
@@ -317,6 +318,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           :state="dataState"
           :read-only="readOnly"
           @toggle-protection="emit('toggleProtection')"
+          @open-data-tools="emit('openDataTools')"
           @auto-sum="emit('autoSum')"
           @sort="emit('sort', $event)"
           @apply-filter="emit('applyFilter', $event)"

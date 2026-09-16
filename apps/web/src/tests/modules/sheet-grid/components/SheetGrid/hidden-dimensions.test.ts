@@ -1,6 +1,7 @@
 import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import {
+  createAddSheetOutlineGroupCommand,
   createSetSheetDefaultColumnWidthCommand,
   createSetSheetDimensionHiddenCommand,
 } from "@idea10/core/commands";
@@ -44,6 +45,49 @@ describe("hidden axis rendering and navigation", () => {
     executeWorkbookCommand(session, createSetSheetDefaultColumnWidthCommand(sheet.id, 75));
     await nextTick();
     expect(getCanvasLayout(wrapper).getCellViewportRect({ row: 0, column: 1 })?.width).toBe(75);
+    wrapper.unmount();
+  });
+
+  test("skips collapsed outline columns with arrows and Tab", async () => {
+    const { wrapper, session, sheet } = mountSheetGrid();
+    executeWorkbookCommand(
+      session,
+      createAddSheetOutlineGroupCommand(sheet.id, {
+        id: "collapsed-columns",
+        axis: "column",
+        start: 1,
+        end: 2,
+        collapsed: true,
+      }),
+    );
+    await nextTick();
+
+    const editor = wrapper.get("textarea.cell-editor");
+    await editor.trigger("keydown", { key: "ArrowRight" });
+    expect(activeCell(wrapper)).toBe("D1");
+    await editor.trigger("keydown", { key: "ArrowLeft" });
+    expect(activeCell(wrapper)).toBe("A1");
+    await editor.trigger("keydown", { key: "Tab" });
+    expect(activeCell(wrapper)).toBe("D1");
+    wrapper.unmount();
+  });
+
+  test("keeps row outline navigation on the shared visible-row index", async () => {
+    const { wrapper, session, sheet } = mountSheetGrid();
+    executeWorkbookCommand(
+      session,
+      createAddSheetOutlineGroupCommand(sheet.id, {
+        id: "collapsed-rows",
+        axis: "row",
+        start: 1,
+        end: 2,
+        collapsed: true,
+      }),
+    );
+    await nextTick();
+
+    await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "ArrowDown" });
+    expect(activeCell(wrapper)).toBe("A4");
     wrapper.unmount();
   });
 });
