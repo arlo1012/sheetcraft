@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ChevronDown, Download, RotateCcw, Save, Upload } from "lucide-vue-next";
+import { ChevronDown, Download, Info, RotateCcw, Save, Upload } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
+import { Button as TButton } from "tdesign-vue-next/es/button";
+import { Tooltip as TTooltip } from "tdesign-vue-next/es/tooltip";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
@@ -51,12 +53,6 @@ const errorKeys: Record<WorkbookPersistenceError, MessageKey> = {
 const notice = computed(() => {
   if (props.feedback?.error) return props.feedback.key;
   return props.error ? errorKeys[props.error] : undefined;
-});
-const statusLabel = computed(() => {
-  if (notice.value === "persistence.finishEditing") return t("persistence.finishEditingShort");
-  if (props.feedback?.error) return t("persistence.fileActionError");
-  if (props.error) return t("persistence.autosavePaused");
-  return t(statusKeys[props.status]);
 });
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
@@ -110,16 +106,28 @@ function onFileChange(event: Event): void {
       {{ t("persistence.file") }}
       <ChevronDown :size="12" aria-hidden="true" />
     </button>
+    <TTooltip v-if="notice" :content="t(notice)" placement="bottom-left">
+      <TButton
+        variant="text"
+        theme="danger"
+        shape="square"
+        size="small"
+        :aria-label="t(notice)"
+        :data-save-status="status"
+        data-workbook-file="feedback"
+      >
+        <Info :size="14" aria-hidden="true" />
+      </TButton>
+    </TTooltip>
     <span
+      v-else
       class="workbook-file-actions__status"
-      :class="{ 'workbook-file-actions__status--error': !!notice || status === 'error' }"
-      :title="t(notice ?? 'persistence.localOnly')"
-      :aria-label="notice ? t(notice) : undefined"
-      :role="notice ? 'alert' : 'status'"
+      :class="{ 'workbook-file-actions__status--error': status === 'error' }"
+      :title="t('persistence.localOnly')"
+      role="status"
       aria-live="polite"
-      :data-workbook-file="notice ? 'feedback' : undefined"
       :data-save-status="status"
-      >{{ statusLabel }}</span
+      >{{ t(statusKeys[status]) }}</span
     >
     <input
       ref="fileInputRef"

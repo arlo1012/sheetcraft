@@ -36,9 +36,6 @@ export type MessageSchema = FormulaToolsMessageSchema & {
     saving: string;
     saved: string;
     saveError: string;
-    autosavePaused: string;
-    fileActionError: string;
-    finishEditingShort: string;
     localOnly: string;
     unavailable: string;
     invalidSnapshot: string;
