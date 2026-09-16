@@ -6,9 +6,18 @@ import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
-import type { WorkbookPersistenceStatus } from "../useWorkbookPersistence";
+import type {
+  WorkbookPersistenceError,
+  WorkbookPersistenceStatus,
+} from "../useWorkbookPersistence";
+import type { WorkbookFileFeedback } from "../useWorkbookFileActions";
 
-const props = defineProps<{ status: WorkbookPersistenceStatus; disabled: boolean }>();
+const props = defineProps<{
+  status: WorkbookPersistenceStatus;
+  disabled: boolean;
+  error?: WorkbookPersistenceError;
+  feedback?: WorkbookFileFeedback;
+}>();
 const emit = defineEmits<{
   save: [];
   importJson: [file: File];
@@ -32,6 +41,23 @@ const statusKeys: Record<WorkbookPersistenceStatus, MessageKey> = {
   saved: "persistence.saved",
   error: "persistence.saveError",
 };
+const errorKeys: Record<WorkbookPersistenceError, MessageKey> = {
+  unavailable: "persistence.unavailable",
+  "invalid-record": "persistence.invalidSnapshot",
+  "invalid-snapshot": "persistence.invalidSnapshot",
+  conflict: "persistence.conflict",
+  quota: "persistence.quota",
+};
+const notice = computed(() => {
+  if (props.feedback?.error) return props.feedback.key;
+  return props.error ? errorKeys[props.error] : undefined;
+});
+const statusLabel = computed(() => {
+  if (notice.value === "persistence.finishEditing") return t("persistence.finishEditingShort");
+  if (props.feedback?.error) return t("persistence.fileActionError");
+  if (props.error) return t("persistence.autosavePaused");
+  return t(statusKeys[props.status]);
+});
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef,
@@ -86,12 +112,14 @@ function onFileChange(event: Event): void {
     </button>
     <span
       class="workbook-file-actions__status"
-      :class="{ 'workbook-file-actions__status--error': status === 'error' }"
-      :title="t('persistence.localOnly')"
-      role="status"
+      :class="{ 'workbook-file-actions__status--error': !!notice || status === 'error' }"
+      :title="t(notice ?? 'persistence.localOnly')"
+      :aria-label="notice ? t(notice) : undefined"
+      :role="notice ? 'alert' : 'status'"
       aria-live="polite"
+      :data-workbook-file="notice ? 'feedback' : undefined"
       :data-save-status="status"
-      >{{ t(statusKeys[status]) }}</span
+      >{{ statusLabel }}</span
     >
     <input
       ref="fileInputRef"

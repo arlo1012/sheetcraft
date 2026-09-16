@@ -78,7 +78,9 @@ describe("workspace persistence integration", () => {
     await flushPromises();
 
     expect(store.save).not.toHaveBeenCalled();
-    expect(wrapper.get('[data-workbook-file="feedback"]').text()).toContain("composition");
+    expect(wrapper.get('[data-workbook-file="feedback"]').attributes("title")).toContain(
+      "composition",
+    );
 
     await formula.trigger("compositionend", { data: "中文" });
     await formula.trigger("keydown", { key: "s", metaKey: true });
@@ -122,6 +124,8 @@ describe("workspace persistence integration", () => {
     expect(store.replace).not.toHaveBeenCalled();
     expect(wrapper.findComponent(WorkbookFileFeedback).props("confirmation")).toBeUndefined();
     expect(wrapper.get<HTMLTextAreaElement>("[data-formula-input]").element.value).toBe("safe");
-    expect(wrapper.get('[data-workbook-file="feedback"]').text()).toContain("unsupported version");
+    expect(wrapper.get('[data-workbook-file="feedback"]').attributes("title")).toContain(
+      "unsupported version",
+    );
   });
 });

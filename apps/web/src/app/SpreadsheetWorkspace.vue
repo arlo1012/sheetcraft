@@ -544,6 +544,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       <template #file-actions>
         <WorkbookFileActions
           :status="saveStatus"
+          :error="saveError"
+          :feedback="feedback"
           :disabled="loading || fileBusy || xlsxBusy || !!xlsxConfirmation"
           @save="fileActions.save"
           @import-json="fileActions.importJson"
@@ -596,8 +598,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     />
     <div class="spreadsheet-workspace__file-feedback">
       <WorkbookFileFeedback
-        :error="saveError"
-        :feedback="feedback"
         :confirmation="confirmation"
         :busy="fileBusy"
         @confirm="fileActions.confirm"

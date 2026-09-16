@@ -1,36 +1,17 @@
 <script setup lang="ts">
-import { computed } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { useAppI18n, type MessageKey } from "../../../shared/i18n";
-import type { WorkbookPersistenceError } from "../useWorkbookPersistence";
-import type { WorkbookFileConfirmation, WorkbookFileFeedback } from "../useWorkbookFileActions";
+import { useAppI18n } from "../../../shared/i18n";
+import type { WorkbookFileConfirmation } from "../useWorkbookFileActions";
 
-const props = defineProps<{
-  error?: WorkbookPersistenceError;
-  feedback?: WorkbookFileFeedback;
+defineProps<{
   confirmation?: WorkbookFileConfirmation;
   busy: boolean;
 }>();
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
 const { t } = useAppI18n();
-const errorKeys: Record<WorkbookPersistenceError, MessageKey> = {
-  unavailable: "persistence.unavailable",
-  "invalid-record": "persistence.invalidSnapshot",
-  "invalid-snapshot": "persistence.invalidSnapshot",
-  conflict: "persistence.conflict",
-  quota: "persistence.quota",
-};
-const notice = computed(() => {
-  if (props.feedback?.error) return props.feedback;
-  if (props.error) return { key: errorKeys[props.error], error: true };
-  return undefined;
-});
 </script>
 
 <template>
-  <p v-if="notice" class="workbook-file-feedback" role="alert" data-workbook-file="feedback">
-    {{ t(notice.key) }}
-  </p>
   <Dialog
     :visible="confirmation !== undefined"
     :header="t(confirmation === 'import' ? 'persistence.importTitle' : 'persistence.reloadTitle')"
@@ -57,15 +38,3 @@ const notice = computed(() => {
     @close="emit('cancel')"
   />
 </template>
-
-<style scoped lang="scss">
-.workbook-file-feedback {
-  padding: 6px 12px;
-  margin: 0;
-  color: var(--idea-status-error);
-  font-size: var(--idea-font-size-body-small);
-  line-height: var(--idea-line-height-body-small);
-  background: var(--idea-surface-secondary);
-  border-bottom: 1px solid var(--idea-border-subtle);
-}
-</style>
