@@ -5,6 +5,7 @@ export const enUS = {
   ...formulaToolsEnUS,
   dataTools: {
     toolbar: "Data tools",
+    groups: { sortFilter: "Sort and filter", cleanup: "Data preparation", outline: "Outline" },
     sort: {
       ascending: "Sort ascending",
       descending: "Sort descending",
@@ -21,6 +22,19 @@ export const enUS = {
       confirm: "Sort",
     },
     filter: {
+      showAll: "Show all",
+      content: "By content",
+      searchKeywords: "Match all keywords, separated by spaces",
+      invert: "Invert",
+      duplicates: "Duplicates",
+      name: "Name",
+      count: "Count",
+      noMatches: "No matching values",
+      loadMore: "Show more ({count} remaining)",
+      selectionSummary: "{selected} of {total} selected",
+      searchSelectionSummary: "Search results: {selected} of {total}",
+      listOrder: "Value list order",
+      filterType: "Filter type",
       toggle: "Filter",
       clear: "Clear filter",
       reapply: "Reapply",

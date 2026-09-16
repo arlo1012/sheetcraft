@@ -5,6 +5,7 @@ export type AppLocale = "zh-CN" | "en-US";
 export type MessageSchema = FormulaToolsMessageSchema & {
   dataTools: {
     toolbar: string;
+    groups: { sortFilter: string; cleanup: string; outline: string };
     sort: {
       ascending: string;
       descending: string;
@@ -21,6 +22,19 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       confirm: string;
     };
     filter: {
+      showAll: string;
+      content: string;
+      searchKeywords: string;
+      invert: string;
+      duplicates: string;
+      name: string;
+      count: string;
+      noMatches: string;
+      loadMore: string;
+      selectionSummary: string;
+      searchSelectionSummary: string;
+      listOrder: string;
+      filterType: string;
       toggle: string;
       clear: string;
       reapply: string;

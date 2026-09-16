@@ -5,6 +5,7 @@ export const zhCN = {
   ...formulaToolsZhCN,
   dataTools: {
     toolbar: "数据工具",
+    groups: { sortFilter: "排序与筛选", cleanup: "数据整理", outline: "分级汇总" },
     sort: {
       ascending: "升序",
       descending: "降序",
@@ -21,6 +22,19 @@ export const zhCN = {
       confirm: "排序",
     },
     filter: {
+      showAll: "全部显示",
+      content: "按内容",
+      searchKeywords: "同时包含所有关键词，空格分隔",
+      invert: "反选",
+      duplicates: "重复项",
+      name: "名称",
+      count: "计数",
+      noMatches: "没有匹配的值",
+      loadMore: "显示更多（剩余 {count} 项）",
+      selectionSummary: "已选 {selected} / {total} 项",
+      searchSelectionSummary: "当前搜索结果：{selected} / {total} 项",
+      listOrder: "候选值排序",
+      filterType: "筛选类型",
       toggle: "筛选",
       clear: "清除筛选",
       reapply: "重新应用",

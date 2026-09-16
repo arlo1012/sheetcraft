@@ -1,22 +1,25 @@
 <script setup lang="ts">
 import {
-  ArrowDownAZ,
-  ArrowUpAZ,
   ChevronDown,
   ChevronUp,
   Columns3,
   Database,
   Filter,
-  ListFilter,
-  Rows3,
   ShieldCheck,
   TableProperties,
-  Ungroup,
 } from "lucide-vue-next";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import type { DataToolCapabilities } from "../data-tools-types";
+import DataOutlineTools from "./DataOutlineTools.vue";
+import DataSortTool from "./DataSortTool.vue";
 const props = withDefaults(
-  defineProps<{ disabled?: boolean; filterActive?: boolean; editSessionId?: string }>(),
+  defineProps<{
+    disabled?: boolean;
+    filterActive?: boolean;
+    editSessionId?: string;
+    capabilities: DataToolCapabilities;
+  }>(),
   { disabled: false, filterActive: false, editSessionId: undefined },
 );
 const emit = defineEmits<{
@@ -44,130 +47,103 @@ const { t } = useAppI18n();
     :aria-label="t('dataTools.toolbar')"
     :data-cell-edit-session="editSessionId"
   >
-    <section class="data-toolbar__group" role="group" :aria-label="t('dataTools.sort.title')">
-      <RibbonButton
-        :disabled="disabled"
-        :label="t('dataTools.sort.ascending')"
-        :text="t('dataTools.sort.ascending')"
-        @activate="emit('sort', 'ascending')"
-        ><ArrowUpAZ :size="17" /></RibbonButton
-      ><RibbonButton
-        :disabled="disabled"
-        :label="t('dataTools.sort.descending')"
-        :text="t('dataTools.sort.descending')"
-        @activate="emit('sort', 'descending')"
-        ><ArrowDownAZ :size="17" /></RibbonButton
-      ><RibbonButton
-        :disabled="disabled"
-        :label="t('dataTools.sort.custom')"
-        :text="t('dataTools.sort.custom')"
-        @activate="emit('openSort')"
-        ><ListFilter :size="17"
-      /></RibbonButton>
-    </section>
-    <section class="data-toolbar__group" role="group" :aria-label="t('dataTools.filter.toggle')">
-      <RibbonButton
+    <section
+      class="data-toolbar__group"
+      role="group"
+      :aria-label="t('dataTools.groups.sortFilter')"
+    >
+      <DataSortTool
+        :disabled="disabled || !capabilities.sort"
+        @sort="emit('sort', $event)"
+        @custom="emit('openSort')"
+      /><RibbonButton
+        variant="tall"
         :disabled="disabled"
         :pressed="filterActive"
         :label="t('dataTools.filter.toggle')"
         :text="t('dataTools.filter.toggle')"
+        data-data-action="filter"
         @activate="emit('toggleFilter')"
         ><Filter :size="18"
       /></RibbonButton>
       <div class="data-toolbar__stack">
         <RibbonButton
-          :disabled="disabled || !filterActive"
-          :label="t('dataTools.filter.clear')"
-          :text="t('dataTools.filter.clear')"
+          :disabled="disabled || !filterActive || !capabilities.clearFilter"
+          :label="t('dataTools.filter.showAll')"
+          :text="t('dataTools.filter.showAll')"
+          data-data-action="clear-filter"
           @activate="emit('clearFilter')"
           ><Filter :size="14" /></RibbonButton
         ><RibbonButton
           :disabled="disabled || !filterActive"
           :label="t('dataTools.filter.reapply')"
           :text="t('dataTools.filter.reapply')"
+          data-data-action="reapply-filter"
           @activate="emit('reapplyFilter')"
           ><Database :size="14"
         /></RibbonButton>
       </div>
     </section>
-    <section
-      class="data-toolbar__group"
-      role="group"
-      :aria-label="t('dataTools.textToColumns.title')"
-    >
+    <section class="data-toolbar__group" role="group" :aria-label="t('dataTools.groups.cleanup')">
       <RibbonButton
-        :disabled="disabled"
+        variant="tall"
+        :disabled="disabled || !capabilities.split"
         :label="t('dataTools.textToColumns.title')"
         :text="t('dataTools.textToColumns.title')"
+        data-data-action="split"
         @activate="emit('openTextToColumns')"
         ><Columns3 :size="18" /></RibbonButton
       ><RibbonButton
-        :disabled="disabled"
+        variant="tall"
+        :disabled="disabled || !capabilities.removeDuplicates"
         :label="t('dataTools.removeDuplicates.title')"
         :text="t('dataTools.removeDuplicates.title')"
+        data-data-action="remove-duplicates"
         @activate="emit('openRemoveDuplicates')"
         ><TableProperties :size="18" /></RibbonButton
       ><RibbonButton
+        variant="tall"
         :disabled="disabled"
         :label="t('dataTools.validation.title')"
         :text="t('dataTools.validation.title')"
+        data-data-action="validation"
         @activate="emit('openValidation')"
         ><ShieldCheck :size="18"
       /></RibbonButton>
     </section>
-    <section class="data-toolbar__group" role="group" :aria-label="t('dataTools.outline.group')">
+    <section class="data-toolbar__group" role="group" :aria-label="t('dataTools.groups.outline')">
+      <RibbonButton
+        variant="tall"
+        :disabled="disabled || !capabilities.subtotal"
+        :label="t('dataTools.outline.subtotal')"
+        :text="t('dataTools.outline.subtotal')"
+        data-data-action="subtotal"
+        @activate="emit('openSubtotal')"
+        ><Database :size="18" /></RibbonButton
+      ><DataOutlineTools
+        :disabled="disabled"
+        :ungroup-rows="capabilities.ungroupRows"
+        :ungroup-columns="capabilities.ungroupColumns"
+        @group="emit('group', $event)"
+        @ungroup="emit('ungroup', $event)"
+      />
       <div class="data-toolbar__stack">
         <RibbonButton
-          :disabled="disabled"
-          :label="`${t('dataTools.outline.group')} ${t('dataTools.outline.rows')}`"
-          :text="t('dataTools.outline.group')"
-          @activate="emit('group', 'rows')"
-          ><Rows3 :size="14" /></RibbonButton
-        ><RibbonButton
-          :disabled="disabled"
-          :label="`${t('dataTools.outline.group')} ${t('dataTools.outline.columns')}`"
-          :text="t('dataTools.outline.group')"
-          @activate="emit('group', 'columns')"
-          ><Columns3 :size="14"
-        /></RibbonButton>
-      </div>
-      <div class="data-toolbar__stack">
-        <RibbonButton
-          :disabled="disabled"
-          :label="`${t('dataTools.outline.ungroup')} ${t('dataTools.outline.rows')}`"
-          :text="t('dataTools.outline.ungroup')"
-          @activate="emit('ungroup', 'rows')"
-          ><Ungroup :size="14" /></RibbonButton
-        ><RibbonButton
-          :disabled="disabled"
-          :label="`${t('dataTools.outline.ungroup')} ${t('dataTools.outline.columns')}`"
-          :text="t('dataTools.outline.ungroup')"
-          @activate="emit('ungroup', 'columns')"
-          ><Ungroup :size="14"
-        /></RibbonButton>
-      </div>
-      <div class="data-toolbar__stack">
-        <RibbonButton
-          :disabled="disabled"
+          :disabled="disabled || !capabilities.expand"
           :label="t('dataTools.outline.expand')"
           :text="t('dataTools.outline.expand')"
+          data-data-action="expand"
           @activate="emit('expand')"
           ><ChevronDown :size="14" /></RibbonButton
         ><RibbonButton
-          :disabled="disabled"
+          :disabled="disabled || !capabilities.collapse"
           :label="t('dataTools.outline.collapse')"
           :text="t('dataTools.outline.collapse')"
+          data-data-action="collapse"
           @activate="emit('collapse')"
           ><ChevronUp :size="14"
         /></RibbonButton>
       </div>
-      <RibbonButton
-        :disabled="disabled"
-        :label="t('dataTools.outline.subtotal')"
-        :text="t('dataTools.outline.subtotal')"
-        @activate="emit('openSubtotal')"
-        ><Database :size="18"
-      /></RibbonButton>
     </section>
   </div>
 </template>
@@ -179,11 +155,14 @@ const { t } = useAppI18n();
     @include ribbon.columns;
     gap: var(--idea-space-1);
     padding-right: var(--idea-space-2);
-    border-right: 1px solid var(--idea-border);
+    border-right: 1px solid var(--idea-border-subtle);
+    &:last-child {
+      border-right: 0;
+    }
   }
   &__stack {
     @include ribbon.stack;
-    min-width: 70px;
+    min-width: 64px;
   }
 }
 </style>

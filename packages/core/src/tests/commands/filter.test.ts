@@ -5,6 +5,7 @@ import {
   createSetSheetFilterCommand,
   createSheetFilterHiddenRowIntervals,
   getSheetFilterColumnDistinctValues,
+  getSheetFilterColumnValueCounts,
   tryApplyWorkbookCommand,
 } from "../../commands/index.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
@@ -12,6 +13,57 @@ import { MAX_SHEET_ROWS, getActiveSheet, setCellContent } from "../../workbook.j
 import { createTestWorkbookSession } from "../helpers.js";
 
 describe("sheet filter commands", () => {
+  test("counts computed duplicates and sparse blanks without scanning a million empty rows", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: 10 });
+    setCellContent(sheet, { row: 2, column: 0 }, { kind: "literal", value: 2 });
+    setCellContent(sheet, { row: 3, column: 0 }, { kind: "formula", formula: { source: "=A2" } });
+    setCellContent(sheet, { row: 4, column: 0 }, { kind: "literal", value: "2" });
+    const values = getSheetFilterColumnValueCounts(
+      sheet,
+      {
+        start: { row: 0, column: 0 },
+        end: { row: MAX_SHEET_ROWS - 1, column: 0 },
+      },
+      0,
+    );
+    expect(values.map(({ value, count }) => ({ value, count }))).toEqual([
+      { value: { kind: "number", value: 2 }, count: 1 },
+      { value: { kind: "number", value: 10 }, count: 2 },
+      { value: { kind: "string", value: "2" }, count: 1 },
+      { value: { kind: "blank" }, count: MAX_SHEET_ROWS - 5 },
+    ]);
+  });
+  test("counts typed values and blanks while ignoring this column's active criterion", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: 10 });
+    setCellContent(sheet, { row: 2, column: 0 }, { kind: "literal", value: 2 });
+    setCellContent(sheet, { row: 3, column: 0 }, { kind: "literal", value: "1" });
+    setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: "keep" });
+    setCellContent(sheet, { row: 2, column: 1 }, { kind: "literal", value: "drop" });
+    setCellContent(sheet, { row: 3, column: 1 }, { kind: "literal", value: "keep" });
+    executeWorkbookCommand(
+      session,
+      createSetSheetFilterCommand(sheet.id, {
+        range: { start: { row: 0, column: 0 }, end: { row: 4, column: 1 } },
+        columns: [
+          { column: 0, allowedValues: [{ kind: "number", value: 10 }] },
+          { column: 1, allowedValues: [{ kind: "string", value: "keep" }] },
+        ],
+      }),
+    );
+    expect(
+      getSheetFilterColumnValueCounts(sheet, sheet.filter!.range, 0).map(({ value, count }) => [
+        value,
+        count,
+      ]),
+    ).toEqual([
+      [{ kind: "number", value: 10 }, 1],
+      [{ kind: "string", value: "1" }, 1],
+    ]);
+  });
   test("stores filter criteria with a full-state inverse and transport-safe command", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
@@ -231,7 +283,10 @@ describe("sheet filter commands", () => {
       undefined,
       false,
       {},
-      { range: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }, columns: [] },
+      {
+        range: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+        columns: [],
+      },
     ];
     for (const filter of malformedFilters) {
       const result = tryApplyWorkbookCommand(session.workbook, {
@@ -239,7 +294,10 @@ describe("sheet filter commands", () => {
         sheetId: sheet.id,
         filter,
       } as never);
-      expect(result).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
+      expect(result).toMatchObject({
+        ok: false,
+        error: { code: "invalid_command_payload" },
+      });
       expect(sheet.filter).toEqual(before);
     }
   });

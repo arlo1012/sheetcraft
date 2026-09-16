@@ -44,13 +44,95 @@ function cloneFilter(filter: SheetFilter): SheetFilter {
 
 function parseCellKey(key: string): CellAddress {
   const separator = key.indexOf(":");
-  return { row: Number(key.slice(0, separator)), column: Number(key.slice(separator + 1)) };
+  return {
+    row: Number(key.slice(0, separator)),
+    column: Number(key.slice(separator + 1)),
+  };
 }
 
 function compareFilterValues(left: SheetFilterValue, right: SheetFilterValue): number {
   const leftKey = getSheetFilterValueKey(left);
   const rightKey = getSheetFilterValueKey(right);
   return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+}
+function compareCountValues(left: SheetFilterValue, right: SheetFilterValue): number {
+  const rank = (value: SheetFilterValue) =>
+    value.kind === "number"
+      ? 0
+      : value.kind === "string"
+        ? 1
+        : value.kind === "boolean"
+          ? 2
+          : value.kind === "error"
+            ? 3
+            : 4;
+  const rankDifference = rank(left) - rank(right);
+  if (rankDifference !== 0) return rankDifference;
+  if (left.kind === "number" && right.kind === "number") return left.value - right.value;
+  return compareFilterValues(left, right);
+}
+
+/** Counts values visible to a column's filter menu, applying every other active criterion. */
+export function getSheetFilterColumnValueCounts(
+  sheet: Sheet,
+  filterRange: SheetFilter["range"],
+  column: number,
+  evaluator: SheetEvaluator = createSheetEvaluator(sheet),
+): Array<{ value: SheetFilterValue; count: number; address?: CellAddress }> {
+  const range = normalizeRange(filterRange);
+  assertCellRange(range);
+  if (!Number.isInteger(column) || column < range.start.column || column > range.end.column)
+    throw new RangeError("Filter column is outside the filter range.");
+  const active = sheet.filter;
+  const sameFilterRange =
+    active?.range.start.row === range.start.row &&
+    active.range.end.row === range.end.row &&
+    active.range.start.column === range.start.column &&
+    active.range.end.column === range.end.column;
+  const otherColumns = sameFilterRange
+    ? active.columns.filter((entry) => entry.column !== column)
+    : [];
+  const relevant = new Set([column, ...otherColumns.map((entry) => entry.column)]);
+  const rows = new Set<number>();
+  for (const key of sheet.cells.keys()) {
+    const address = parseCellKey(key);
+    if (
+      address.row > range.start.row &&
+      address.row <= range.end.row &&
+      relevant.has(address.column)
+    )
+      rows.add(address.row);
+  }
+  const entries = new Map<
+    string,
+    { value: SheetFilterValue; count: number; address?: CellAddress }
+  >();
+  const add = (value: SheetFilterValue, count: number, address?: CellAddress) => {
+    if (!count) return;
+    const key = getSheetFilterValueKey(value);
+    const current = entries.get(key);
+    if (current) current.count += count;
+    else entries.set(key, { value, count, ...(address ? { address } : {}) });
+  };
+  const matchesOther = (row: number) =>
+    otherColumns.every((entry) =>
+      doesSheetFilterColumnMatch(
+        entry,
+        getSheetFilterValue(evaluator.getComputedValue({ row, column: entry.column })),
+      ),
+    );
+  for (const row of rows)
+    if (matchesOther(row)) {
+      const address = { row, column };
+      add(getSheetFilterValue(evaluator.getComputedValue(address)), 1, address);
+    }
+  const implicitBlankRows = range.end.row - range.start.row - rows.size;
+  if (
+    implicitBlankRows &&
+    otherColumns.every((entry) => doesSheetFilterColumnMatch(entry, { kind: "blank" }))
+  )
+    add({ kind: "blank" }, implicitBlankRows);
+  return [...entries.values()].sort((left, right) => compareCountValues(left.value, right.value));
 }
 
 /** Returns computed, canonical distinct values for a data column, excluding its header row. */
@@ -158,7 +240,11 @@ export function createSetSheetFilterCommand(
   sheetId: string,
   filter: SheetFilter | null,
 ): SetSheetFilterCommand {
-  return { type: "setSheetFilter", sheetId, filter: filter === null ? null : cloneFilter(filter) };
+  return {
+    type: "setSheetFilter",
+    sheetId,
+    filter: filter === null ? null : cloneFilter(filter),
+  };
 }
 
 export function createSetSheetFilterCriteriaCommand(

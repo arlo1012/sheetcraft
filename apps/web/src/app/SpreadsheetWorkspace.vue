@@ -398,6 +398,7 @@ const dataTools = useDataToolsController({
 });
 const {
   disabled: dataToolsDisabled,
+  capabilities: dataToolCapabilities,
   filterActive: dataFilterActive,
   columns: dataToolColumns,
   sortInitial: dataSortInitial,
@@ -620,6 +621,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       <template #data-tools>
         <DataToolbar
           :disabled="dataToolsDisabled"
+          :capabilities="dataToolCapabilities"
           :filter-active="dataFilterActive"
           :edit-session-id="cellEditSession.id"
           @sort="dataTools.sort"
@@ -723,6 +725,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       v-if="dataFilterState"
       v-bind="dataFilterState"
       :date-system="session.workbook.dateSystem"
+      @sort="dataTools.sortFilterColumn"
       @apply="dataTools.applyColumnFilter"
       @clear="dataTools.clearColumnFilter"
       @close="dataTools.closeColumnFilter"

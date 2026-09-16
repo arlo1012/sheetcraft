@@ -11,6 +11,15 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
 - Filter from column headers using searched values or text, number, and date
   conditions. Clear removes conditions and retains the buttons; Filter toggles
   the complete filter. Reapply recalculates the sheet.
+  The column menu also offers table sorting, typed value ordering, occurrence
+  counts, invert selection and duplicate-value selection. Counts honor other
+  columns' criteria while ignoring the current column's criterion. List ordering
+  only rearranges the menu; its top sorting actions move the table's rows.
+  Search matches every whitespace-separated keyword. Apply commits checked
+  search results; clearing the search restores the remaining draft selections.
+  Selecting every available value clears that column's restriction, so later
+  values remain visible. Long lists render in batches, while bulk selection
+  always applies to every matching value.
 - Split a selected single column using multiple delimiters or fixed widths.
   Preview the result, select General/Text for each output column, choose a
   destination column, and explicitly allow overwriting populated destinations.
@@ -63,6 +72,9 @@ Use the File menu to import a workbook containing:
 
 1. Select B2 and sort ascending; Amount stays in B1 and B2 becomes 10. Enable
    Filter, apply Amount greater than 20, clear the condition, then turn it off.
+   In the column menu, check the value counts, select duplicates and invert them.
+   Search for a value and apply it; clear that column's condition, then use the
+   top sort action while the active cell is outside the filtered range.
 2. Select C2:C6 and split on comma into E. Set the first result column to Text;
    its leading zeros remain. Undo the operation once to restore the source state.
 3. Select the table and remove duplicates using all columns; one row is removed.

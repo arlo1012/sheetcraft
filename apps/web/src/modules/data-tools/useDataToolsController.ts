@@ -14,7 +14,8 @@ import {
   createSetSheetOutlineGroupCollapsedCommand,
   createSplitColumnCommand,
   getRemoveDuplicatesCount,
-  getSheetFilterColumnDistinctValues,
+  getSheetFilterColumnValueCounts,
+  getSheetFilterValueKey,
   previewSplitColumn,
   subtractSheetDataValidation,
   type WorkbookCommand,
@@ -22,8 +23,10 @@ import {
 import { resolveDataRange } from "@idea10/core/data-range";
 import { WorkbookDomainError } from "@idea10/core/errors";
 import { translateFormulaForCopy } from "@idea10/core/formula";
+import { formatCellNumberValue } from "@idea10/core/number-format";
 import {
   getActiveSheet,
+  getCellStyle,
   type CellAddress,
   type CellRange,
   type SheetDataValidation,
@@ -35,6 +38,7 @@ import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory"
 import { isValidationDraftComplete } from "./validation-draft";
 import type {
   DataToolAxis,
+  DataToolCapabilities,
   DataToolColumn,
   DataToolFilterAnchor,
   DataToolFilterCriteria,
@@ -86,7 +90,7 @@ function rangeLabel(range: CellRange): string {
 }
 
 export function useDataToolsController(options: Options) {
-  const { t } = useAppI18n();
+  const { t, locale } = useAppI18n();
   const createId = createBrowserIdFactory();
   const sortVisible = ref(false);
   const textToColumnsVisible = ref(false);
@@ -109,6 +113,42 @@ export function useDataToolsController(options: Options) {
   const filterPanel = ref<{ column: number; anchor?: DataToolFilterAnchor; target: Target }>();
   const activeSheet = computed(() => getActiveSheet(options.getWorkbook()));
   const disabled = computed(() => options.isBusy() || activeSheet.value.properties.protected);
+  const selectedGroups = computed(() => {
+    const { address } = options.getSelection();
+    return (activeSheet.value.outlineGroups ?? [])
+      .filter((group) => {
+        const index = group.axis === "row" ? address.row : address.column;
+        return group.start <= index && group.end >= index;
+      })
+      .sort((left, right) => left.end - left.start - (right.end - right.start));
+  });
+  const capabilities = computed<DataToolCapabilities>(() => {
+    const sheet = activeSheet.value;
+    const selection = options.getSelection();
+    const range =
+      sheet.filter && intersects(sheet.filter.range, selection.range)
+        ? sheet.filter.range
+        : resolveDataRange(sheet, selection.range);
+    const rows = range.end.row - range.start.row;
+    const merged = sheet.mergedCells.some((item) => intersects(item, range));
+    const filtered = Boolean(sheet.filter && intersects(sheet.filter.range, range));
+    return {
+      sort: rows > (filtered ? 1 : 0) && !merged,
+      split:
+        selection.range.start.column === selection.range.end.column &&
+        !sheet.mergedCells.some((item) => intersects(item, selection.range)) &&
+        !(sheet.filter && intersects(sheet.filter.range, selection.range)),
+      removeDuplicates: rows > 0 && !filtered && !merged,
+      subtotal:
+        (rows > 1 && range.end.column > range.start.column && !filtered && !merged) ||
+        Boolean(sheet.subtotalMetadata?.length),
+      ungroupRows: selectedGroups.value.some((group) => group.axis === "row"),
+      ungroupColumns: selectedGroups.value.some((group) => group.axis === "column"),
+      expand: selectedGroups.value.some((group) => group.collapsed),
+      collapse: selectedGroups.value.some((group) => !group.collapsed),
+      clearFilter: Boolean(sheet.filter?.columns.length),
+    };
+  });
   function error(message = t("dataTools.common.operationFailed")): void {
     void MessagePlugin.warning(message);
   }
@@ -166,38 +206,60 @@ export function useDataToolsController(options: Options) {
       };
     });
   }
-  function filterColumns(): DataToolColumn[] {
-    return columnsFor(filterPanel.value?.target);
-  }
   const filterState = computed(() => {
     const panel = filterPanel.value;
     const filter = activeSheet.value.filter;
     if (!panel || !filter || panel.target.sheetId !== activeSheet.value.id) return undefined;
     const existing = filter.columns.find((item) => item.column === panel.column);
-    const values = getSheetFilterColumnDistinctValues(
+    const counts = getSheetFilterColumnValueCounts(
       activeSheet.value,
       filter.range,
       panel.column,
       options.getSheetEvaluator(),
-    ).map((key) => ({
+    );
+    const values = counts.map(({ value: key, count, address }) => ({
       key,
+      count,
       label:
         key.kind === "blank"
           ? t("dataTools.filter.blank")
           : key.kind === "error"
             ? `#${key.code}!`
-            : String(key.value),
+            : formatCellNumberValue(
+                key.value,
+                address ? getCellStyle(activeSheet.value, address)?.numberFormat : undefined,
+                { locale: locale.value, dateSystem: options.getWorkbook().dateSystem },
+              ).text,
     }));
+    const header = options.getSheetEvaluator().getComputedValue({
+      row: filter.range.start.row,
+      column: panel.column,
+    });
+    const columnLabel = columnName(panel.column);
+    const numeric = counts.filter((item) => item.value.kind === "number");
+    const preferredKind = numeric.some(
+      (item) =>
+        item.address &&
+        getCellStyle(activeSheet.value, item.address)?.numberFormat?.kind === "date",
+    )
+      ? ("date" as const)
+      : numeric.length > 0
+        ? ("number" as const)
+        : ("text" as const);
     return {
       visible: true,
       anchor: panel.anchor,
       column: panel.column,
       columnLabel:
-        filterColumns().find((item) => item.column === panel.column)?.label ??
-        columnName(panel.column),
+        header !== null && typeof header !== "object" && String(header).trim()
+          ? `${header} (${columnLabel})`
+          : columnLabel,
       values,
       appliedKeys: existing?.allowedValues ?? values.map((item) => item.key),
       criteria: existing?.condition,
+      preferredKind,
+      hasCriteria: Boolean(existing),
+      canSort: filter.range.end.row - filter.range.start.row > 1,
       disabled: disabled.value,
     };
   });
@@ -524,28 +586,16 @@ export function useDataToolsController(options: Options) {
   function ungroup(axis: DataToolAxis): void {
     const target = capture(false);
     if (!target) return;
-    const index = axis === "rows" ? target.range.start.row : target.range.start.column;
-    const group = activeSheet.value.outlineGroups
-      ?.filter(
-        (item) =>
-          item.axis === (axis === "rows" ? "row" : "column") &&
-          item.start <= index &&
-          item.end >= index,
-      )
-      .sort((left, right) => left.end - left.start - (right.end - right.start))[0];
+    const group = selectedGroups.value.find(
+      (item) => item.axis === (axis === "rows" ? "row" : "column"),
+    );
     if (group)
       execute(target, () => createRemoveSheetOutlineGroupCommand(target.sheetId, group.id));
   }
   function setGroupsCollapsed(collapsed: boolean): void {
     const target = capture(false);
     if (!target) return;
-    const row = target.range.start.row;
-    const column = target.range.start.column;
-    const group = activeSheet.value.outlineGroups?.find((item) =>
-      item.axis === "row"
-        ? item.start <= row && item.end >= row
-        : item.start <= column && item.end >= column,
-    );
+    const group = selectedGroups.value.find((item) => Boolean(item.collapsed) !== collapsed);
     if (group)
       execute(target, () =>
         createSetSheetOutlineGroupCollapsedCommand(target.sheetId, group.id, collapsed),
@@ -590,8 +640,30 @@ export function useDataToolsController(options: Options) {
       subtotalVisible.value = false;
   }
   function openColumnFilter(column: number, anchor?: DataToolFilterAnchor): void {
-    const target = capture();
-    if (target && activeSheet.value.filter) filterPanel.value = { column, anchor, target };
+    if (options.isBusy() || !options.flush() || activeSheet.value.properties.protected) return;
+    const filter = activeSheet.value.filter;
+    if (!filter) return;
+    const target = {
+      sheetId: activeSheet.value.id,
+      generation: options.getGeneration(),
+      range: cloneRange(filter.range),
+    };
+    filterPanel.value = { column, anchor, target };
+  }
+  function sortFilterColumn(direction: "ascending" | "descending"): void {
+    const panel = filterPanel.value;
+    if (
+      panel &&
+      execute(panel.target, () =>
+        createMultiKeySortSheetRangeCommand(
+          panel.target.sheetId,
+          panel.target.range,
+          [{ column: panel.column, direction }],
+          { hasHeader: true },
+        ),
+      )
+    )
+      filterPanel.value = undefined;
   }
   function applyColumnFilter(payload: {
     includedKeys: DataToolFilterValueOption["key"][];
@@ -601,11 +673,18 @@ export function useDataToolsController(options: Options) {
     const filter = activeSheet.value.filter;
     if (!panel || !filter) return;
     const nextColumns = filter.columns.filter((item) => item.column !== panel.column);
-    nextColumns.push({
-      column: panel.column,
-      allowedValues: payload.includedKeys.map((key) => ({ ...key })),
-      ...(payload.criteria ? { condition: payload.criteria } : {}),
-    });
+    const selected = new Set(payload.includedKeys.map(getSheetFilterValueKey));
+    const available = filterState.value?.values ?? [];
+    const allSelected =
+      !payload.criteria &&
+      available.length > 0 &&
+      available.every((option) => selected.has(getSheetFilterValueKey(option.key)));
+    if (!allSelected)
+      nextColumns.push({
+        column: panel.column,
+        allowedValues: payload.includedKeys.map((key) => ({ ...key })),
+        ...(payload.criteria ? { condition: payload.criteria } : {}),
+      });
     if (
       execute(panel.target, () =>
         createSetSheetFilterCriteriaCommand(panel.target.sheetId, filter.range, nextColumns),
@@ -631,6 +710,7 @@ export function useDataToolsController(options: Options) {
   }
   return {
     disabled,
+    capabilities,
     columns: dialogColumns,
     sortInitial,
     rangeLabel: dialogRangeLabel,
@@ -671,6 +751,7 @@ export function useDataToolsController(options: Options) {
     applySubtotal,
     removeSubtotals,
     openColumnFilter,
+    sortFilterColumn,
     applyColumnFilter,
     clearColumnFilter,
     closeColumnFilter: () => {

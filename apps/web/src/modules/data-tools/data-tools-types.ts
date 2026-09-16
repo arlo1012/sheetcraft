@@ -8,7 +8,18 @@ import type {
 
 export type DataToolAxis = "rows" | "columns";
 export type DataToolSortDirection = "ascending" | "descending";
-export type DataToolFilterValueOption = { key: SheetFilterValue; label: string; count?: number };
+export type DataToolFilterValueOption = { key: SheetFilterValue; label: string; count: number };
+export type DataToolCapabilities = {
+  sort: boolean;
+  split: boolean;
+  removeDuplicates: boolean;
+  subtotal: boolean;
+  ungroupRows: boolean;
+  ungroupColumns: boolean;
+  expand: boolean;
+  collapse: boolean;
+  clearFilter: boolean;
+};
 export type DataToolFilterCriteria = SheetFilterColumn["condition"];
 export type DataToolFilterAnchor = { x: number; y: number; width?: number; height?: number };
 export type DataToolColumn = { column: number; label: string; header?: string };

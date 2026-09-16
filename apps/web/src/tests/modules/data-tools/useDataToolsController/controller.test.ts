@@ -1,4 +1,4 @@
-import { defineComponent } from "vue";
+import { defineComponent, reactive } from "vue";
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import {
@@ -17,7 +17,7 @@ function fixture(
     range: { start: { row: 1, column: 1 }, end: { row: 1, column: 1 } },
   },
 ) {
-  const session = createWorkbookSession({ idFactory: createSequentialIdFactory() });
+  const session = reactive(createWorkbookSession({ idFactory: createSequentialIdFactory() }));
   const sheet = getActiveSheet(session.workbook);
   let generation = 0;
   let recalculate = 0;
@@ -62,6 +62,78 @@ function fixture(
 }
 
 describe("useDataToolsController", () => {
+  test("counts other-column matches and normalizes all selected values to no column restriction", () => {
+    const f = fixture();
+    f.set(0, 0, "Team");
+    f.set(0, 1, "Amount");
+    f.set(1, 0, "East");
+    f.set(1, 1, 10);
+    f.set(2, 0, "East");
+    f.set(2, 1, 2);
+    f.set(3, 0, "West");
+    f.set(3, 1, 2);
+    f.controller.toggleFilter();
+    f.controller.openColumnFilter(0);
+    f.controller.applyColumnFilter({ includedKeys: [{ kind: "string", value: "East" }] });
+    f.controller.openColumnFilter(1);
+    expect(f.controller.filterState.value).toMatchObject({
+      columnLabel: "Amount (B)",
+      preferredKind: "number",
+      values: [
+        { key: { kind: "number", value: 2 }, count: 1 },
+        { key: { kind: "number", value: 10 }, count: 1 },
+      ],
+    });
+    f.controller.applyColumnFilter({
+      includedKeys: f.controller.filterState.value!.values.map((item) => item.key),
+    });
+    expect(f.sheet.filter?.columns).toEqual([
+      { column: 0, allowedValues: [{ kind: "string", value: "East" }] },
+    ]);
+    f.set(1, 1, 99);
+    f.controller.openColumnFilter(1);
+    expect(f.controller.filterState.value?.appliedKeys).toContainEqual({
+      kind: "number",
+      value: 99,
+    });
+    f.controller.applyColumnFilter({ includedKeys: [] });
+    expect(f.sheet.filter?.columns.find((item) => item.column === 1)?.allowedValues).toEqual([]);
+  });
+  test("sorts the opened filter column and its full table when the active cell is elsewhere", () => {
+    const f = fixture();
+    f.set(0, 0, "Name");
+    f.set(0, 1, "Amount");
+    f.set(1, 0, "A");
+    f.set(1, 1, 20);
+    f.set(2, 0, "Z");
+    f.set(2, 1, 10);
+    f.controller.toggleFilter();
+    f.selection.address = { row: 20, column: 5 };
+    f.selection.range = { start: { row: 20, column: 5 }, end: { row: 20, column: 5 } };
+    f.controller.openColumnFilter(1);
+    f.controller.sortFilterColumn("ascending");
+    const evaluator = createSheetEvaluator(f.sheet);
+    expect(evaluator.getComputedValue({ row: 0, column: 1 })).toBe("Amount");
+    expect(evaluator.getComputedValue({ row: 1, column: 1 })).toBe(10);
+    expect(evaluator.getComputedValue({ row: 1, column: 0 })).toBe("Z");
+  });
+  test("enables outline actions only for eligible groups at the active cell", () => {
+    const f = fixture();
+    expect(f.controller.capabilities.value).toMatchObject({
+      ungroupRows: false,
+      expand: false,
+      collapse: false,
+      clearFilter: false,
+    });
+    f.controller.group("rows");
+    expect(f.controller.capabilities.value).toMatchObject({
+      ungroupRows: true,
+      expand: false,
+      collapse: true,
+    });
+    f.controller.setGroupsCollapsed(true);
+    expect(f.controller.capabilities.value).toMatchObject({ expand: true, collapse: false });
+  });
   test("quick-sorts a B2 single cell over its data region while retaining the text header", () => {
     const f = fixture();
     f.set(0, 1, "Name");

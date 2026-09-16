@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { ArrowDownAZ, ArrowUpAZ, FilterX } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
-import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { getSheetFilterValueKey } from "@idea10/core/commands";
 import type { SheetFilterValue } from "@idea10/core/workbook";
 import type { ExcelDateSystem } from "@idea10/core/formula";
@@ -17,7 +18,9 @@ import {
   TEXT_FILTER_OPERATORS,
   type FilterConditionOperator,
 } from "../filter-conditions";
+import { getMatchingFilterValues } from "../filter-value-options";
 import type { DataToolFilterCriteria, DataToolFilterValueOption } from "../data-tools-types";
+import FilterValueList from "./FilterValueList.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -27,6 +30,9 @@ const props = withDefaults(
     values: readonly DataToolFilterValueOption[];
     appliedKeys: readonly SheetFilterValue[];
     criteria?: DataToolFilterCriteria;
+    preferredKind: "text" | "number" | "date";
+    hasCriteria: boolean;
+    canSort: boolean;
     disabled?: boolean;
     dateSystem?: ExcelDateSystem;
   }>(),
@@ -34,6 +40,7 @@ const props = withDefaults(
 );
 const emit = defineEmits<{
   apply: [payload: { includedKeys: SheetFilterValue[]; criteria?: DataToolFilterCriteria }];
+  sort: [direction: "ascending" | "descending"];
   clear: [];
   close: [];
 }>();
@@ -42,6 +49,7 @@ const root = ref<HTMLElement | null>(null);
 const query = ref("");
 const selected = ref<SheetFilterValue[]>([]);
 const draft = ref(createFilterConditionDraft(props.criteria, props.dateSystem));
+const tab = ref<"values" | "condition">("values");
 let opener: HTMLElement | null = null;
 const open = computed(() => props.visible);
 const reference = computed<FloatingReference>(() => ({
@@ -63,11 +71,13 @@ const { floatingStyles } = useDismissibleFloatingPanel(reference, root, open, {
 });
 const attachToPanel = () => root.value ?? document.body;
 const kindOptions = computed(() => [
-  { value: "values", label: t("dataTools.filter.filterValues") },
   { value: "text", label: t("dataTools.filter.textFilters") },
   { value: "number", label: t("dataTools.filter.numberFilters") },
   { value: "date", label: t("dataTools.filter.dateFilters") },
 ]);
+const conditionLabel = computed(
+  () => kindOptions.value.find((option) => option.value === draft.value.kind)?.label,
+);
 const operatorLabels: Record<FilterConditionOperator, MessageKey> = {
   equals: "dataTools.filter.equals",
   notEquals: "dataTools.filter.notEquals",
@@ -92,31 +102,29 @@ const condition = computed(() => buildFilterCondition(draft.value, props.dateSys
 const between = computed(
   () => draft.value.operator === "between" || draft.value.operator === "notBetween",
 );
-const matchingValues = computed(() => {
-  const text = query.value.trim().toLocaleLowerCase();
-  return text
-    ? props.values.filter((option) => option.label.toLocaleLowerCase().includes(text))
-    : props.values;
+const matchingValues = computed(() => getMatchingFilterValues(props.values, query.value));
+const includedKeys = computed(() => {
+  const keys = new Set(selected.value.map(getSheetFilterValueKey));
+  return matchingValues.value
+    .filter((option) => keys.has(getSheetFilterValueKey(option.key)))
+    .map((option) => option.key);
 });
-const selectedSet = computed(() => new Set(selected.value.map(getSheetFilterValueKey)));
-const allMatchingSelected = computed(
-  () =>
-    matchingValues.value.length > 0 &&
-    matchingValues.value.every((option) =>
-      selectedSet.value.has(getSheetFilterValueKey(option.key)),
-    ),
+const canApply = computed(
+  () => !props.disabled && (tab.value === "values" || condition.value.valid),
 );
-const someMatchingSelected = computed(() =>
-  matchingValues.value.some((option) => selectedSet.value.has(getSheetFilterValueKey(option.key))),
-);
-
 watch(
   () => [props.visible, props.columnLabel, props.appliedKeys, props.criteria] as const,
   () => {
     if (!props.visible) return;
     query.value = "";
-    selected.value = props.appliedKeys.map((value) => ({ ...value }));
+    selected.value = (
+      props.criteria && props.appliedKeys.length === 0
+        ? props.values.map((option) => option.key)
+        : props.appliedKeys
+    ).map((value) => ({ ...value }));
     draft.value = createFilterConditionDraft(props.criteria, props.dateSystem);
+    if (draft.value.kind === "values") draft.value.kind = props.preferredKind;
+    tab.value = props.criteria ? "condition" : "values";
   },
   { immediate: true },
 );
@@ -127,33 +135,28 @@ watch(
       draft.value.operator = "equals";
   },
 );
-
-function toggle(option: DataToolFilterValueOption, checked: boolean): void {
-  const key = getSheetFilterValueKey(option.key);
-  selected.value = selected.value.filter((value) => getSheetFilterValueKey(value) !== key);
-  if (checked) selected.value.push({ ...option.key });
-}
-function toggleAll(checked: boolean): void {
-  const keys = new Set(matchingValues.value.map((option) => getSheetFilterValueKey(option.key)));
-  selected.value = selected.value.filter((value) => !keys.has(getSheetFilterValueKey(value)));
-  if (checked) selected.value.push(...matchingValues.value.map((option) => ({ ...option.key })));
-}
 function apply(): void {
-  if (props.disabled || !condition.value.valid) return;
-  emit("apply", {
-    includedKeys: draft.value.kind === "values" ? selected.value : [],
-    criteria: condition.value.condition,
-  });
+  if (!canApply.value) return;
+  if (tab.value === "values") emit("apply", { includedKeys: includedKeys.value });
+  else if (condition.value.valid)
+    emit("apply", { includedKeys: [], criteria: condition.value.condition });
+}
+function onSearchEnter(event: KeyboardEvent): void {
+  if (event.target instanceof HTMLInputElement && !event.isComposing) {
+    event.preventDefault();
+    apply();
+  }
 }
 onMounted(() => {
   opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  void nextTick(() => root.value?.querySelector<HTMLInputElement>("input")?.focus());
+  void nextTick(() =>
+    root.value?.querySelector<HTMLInputElement>("input:not([readonly])")?.focus(),
+  );
 });
 onBeforeUnmount(() => {
   if (document.activeElement && root.value?.contains(document.activeElement)) opener?.focus();
 });
 </script>
-
 <template>
   <Teleport to="body">
     <section
@@ -164,109 +167,176 @@ onBeforeUnmount(() => {
       :aria-label="t('dataTools.filter.filterValues') + ' ' + columnLabel"
       :style="floatingStyles"
     >
-      <strong>{{ columnLabel }}</strong>
-      <TSelect
-        v-model="draft.kind"
-        :options="kindOptions"
-        :popup-props="{ attach: attachToPanel }"
-        :aria-label="t('dataTools.filter.condition')"
-      />
-      <template v-if="draft.kind !== 'values'">
-        <TSelect
-          v-model="draft.operator"
-          :options="operatorOptions"
-          :popup-props="{ attach: attachToPanel }"
-          :aria-label="t('dataTools.filter.condition')"
-        />
-        <TInput
-          v-model="draft.first"
-          :aria-label="t('dataTools.filter.condition')"
-          :placeholder="draft.kind === 'date' ? 'YYYY-MM-DD' : ''"
-          :status="!condition.valid && draft.first !== '' ? 'error' : undefined"
-        />
-        <TInput
-          v-if="between"
-          v-model="draft.second"
-          :aria-label="t('dataTools.filter.and')"
-          :placeholder="draft.kind === 'date' ? 'YYYY-MM-DD' : ''"
-        />
-        <p v-if="!condition.valid" role="status" class="filter-column-panel__error">
-          {{ t("dataTools.filter.invalidCondition") }}
-        </p>
-      </template>
-      <template v-else>
-        <TInput
-          v-model="query"
-          :placeholder="t('dataTools.filter.searchValues')"
-          :aria-label="t('dataTools.filter.searchValues')"
-        />
-        <label class="filter-column-panel__all"
-          ><TCheckbox
-            :checked="allMatchingSelected"
-            :indeterminate="someMatchingSelected && !allMatchingSelected"
-            @change="toggleAll(Boolean($event))"
-          />{{ t("dataTools.filter.selectAll") }}</label
+      <div class="filter-column-panel__heading">
+        <strong :title="columnLabel">{{ columnLabel }}</strong>
+        <TButton
+          variant="text"
+          size="small"
+          :disabled="disabled || !hasCriteria"
+          @click="emit('clear')"
         >
-        <div
-          class="filter-column-panel__values"
-          role="group"
-          :aria-label="t('dataTools.filter.filterValues')"
+          <template #icon><FilterX :size="14" /></template>{{ t("dataTools.filter.clear") }}
+        </TButton>
+      </div>
+      <div class="filter-column-panel__sort" role="group" :aria-label="t('dataTools.sort.title')">
+        <TButton
+          variant="text"
+          size="small"
+          :disabled="disabled || !canSort"
+          @click="emit('sort', 'ascending')"
         >
-          <label v-for="option in matchingValues" :key="getSheetFilterValueKey(option.key)"
-            ><TCheckbox
-              :checked="selectedSet.has(getSheetFilterValueKey(option.key))"
-              @change="toggle(option, Boolean($event))"
-            />{{ option.label }}</label
-          >
-        </div>
-      </template>
+          <template #icon><ArrowUpAZ :size="15" /></template>{{ t("dataTools.sort.ascending") }}
+        </TButton>
+        <TButton
+          variant="text"
+          size="small"
+          :disabled="disabled || !canSort"
+          @click="emit('sort', 'descending')"
+        >
+          <template #icon><ArrowDownAZ :size="15" /></template>{{ t("dataTools.sort.descending") }}
+        </TButton>
+      </div>
+      <TTabs v-model="tab" size="medium">
+        <TTabPanel value="values" :disabled="disabled" :label="t('dataTools.filter.content')">
+          <FilterValueList
+            v-model="selected"
+            v-model:query="query"
+            :values="values"
+            :disabled="disabled"
+            @keydown.enter="onSearchEnter"
+          />
+        </TTabPanel>
+        <TTabPanel value="condition" :disabled="disabled" :label="conditionLabel">
+          <div class="filter-column-panel__condition">
+            <label
+              >{{ t("dataTools.filter.filterType") }}
+              <TSelect
+                v-model="draft.kind"
+                :disabled="disabled"
+                :options="kindOptions"
+                :popup-props="{ attach: attachToPanel }"
+                :aria-label="t('dataTools.filter.filterType')"
+              />
+            </label>
+            <label
+              >{{ t("dataTools.filter.condition") }}
+              <TSelect
+                v-model="draft.operator"
+                :disabled="disabled"
+                :options="operatorOptions"
+                :popup-props="{ attach: attachToPanel }"
+                :aria-label="t('dataTools.filter.condition')"
+              />
+            </label>
+            <TInput
+              :value="draft.first"
+              :disabled="disabled"
+              :type="draft.kind === 'number' ? 'number' : 'text'"
+              :aria-label="t('dataTools.filter.condition')"
+              :placeholder="draft.kind === 'date' ? 'YYYY-MM-DD' : ''"
+              :status="!condition.valid && draft.first !== '' ? 'error' : undefined"
+              @update:value="draft.first = String($event)"
+              @enter="apply"
+            />
+            <template v-if="between">
+              <span>{{ t("dataTools.filter.and") }}</span>
+              <TInput
+                :value="draft.second"
+                :disabled="disabled"
+                :type="draft.kind === 'number' ? 'number' : 'text'"
+                :aria-label="t('dataTools.filter.and')"
+                :placeholder="draft.kind === 'date' ? 'YYYY-MM-DD' : ''"
+                @update:value="draft.second = String($event)"
+                @enter="apply"
+              />
+            </template>
+            <p
+              v-if="!condition.valid && (draft.first || draft.second)"
+              role="status"
+              class="filter-column-panel__error"
+            >
+              {{ t("dataTools.filter.invalidCondition") }}
+            </p>
+          </div>
+        </TTabPanel>
+      </TTabs>
       <footer>
-        <TButton variant="text" :disabled="disabled" @click="emit('clear')">{{
-          t("dataTools.filter.clear")
-        }}</TButton>
-        <TButton variant="outline" @click="emit('close')">{{
-          t("dataTools.filter.cancel")
-        }}</TButton>
-        <TButton theme="primary" :disabled="disabled || !condition.valid" @click="apply">{{
+        <span v-if="tab === 'values'" class="filter-column-panel__summary" role="status">
+          {{
+            t(
+              query.trim()
+                ? "dataTools.filter.searchSelectionSummary"
+                : "dataTools.filter.selectionSummary",
+              { selected: includedKeys.length, total: matchingValues.length },
+            )
+          }}
+        </span>
+        <TButton theme="primary" size="small" :disabled="!canApply" @click="apply">{{
           t("dataTools.filter.apply")
+        }}</TButton>
+        <TButton variant="outline" size="small" @click="emit('close')">{{
+          t("dataTools.filter.cancel")
         }}</TButton>
       </footer>
     </section>
   </Teleport>
 </template>
-
 <style scoped lang="scss">
 .filter-column-panel {
   z-index: 2200;
   display: grid;
   gap: 8px;
-  width: min(310px, calc(100vw - 16px));
+  width: min(390px, calc(100vw - 16px));
   padding: var(--idea-tool-panel-padding);
   background: var(--idea-surface-panel);
   border: 1px solid var(--idea-border-subtle);
   border-radius: var(--idea-radius-default);
   box-shadow: var(--idea-shadow-menu);
-
-  &__all,
-  &__values label {
+  &__heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    strong {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+  }
+  &__sort {
     display: flex;
     gap: 8px;
-    align-items: center;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--idea-border-subtle);
   }
-  &__values {
+  &__condition {
     display: grid;
-    gap: 4px;
-    max-height: min(220px, 35vh);
-    overflow: auto;
+    align-content: start;
+    gap: 8px;
+    min-height: 260px;
+    padding-top: 8px;
+    label {
+      display: grid;
+      gap: 4px;
+    }
   }
   &__error {
     margin: 0;
-    color: var(--idea-text-danger, #c9353f);
+    color: var(--idea-text-danger);
+  }
+  &__summary {
+    margin-right: auto;
+    color: var(--idea-text-secondary);
   }
   footer {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
     gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--idea-border-subtle);
   }
 }
 </style>
