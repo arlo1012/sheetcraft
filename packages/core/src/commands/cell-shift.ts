@@ -299,6 +299,30 @@ export function applyCellShiftCommand(
       range,
       "Cell shifts inside an active filter are not supported.",
     );
+  if (
+    (sheet.dataValidations ?? []).some((rule) => intersects(rule.range, movement)) ||
+    (sheet.subtotalMetadata ?? []).some((entry) => intersects(entry.range, movement))
+  )
+    throw invalidCommandPayload(
+      "range",
+      range,
+      "Cell shifts intersecting data validation or subtotal ranges are not supported.",
+    );
+  const outlineAxis =
+    command.direction === "left" || command.direction === "right" ? "column" : "row";
+  const outlineStart = outlineAxis === "row" ? movement.start.row : movement.start.column;
+  const outlineEnd = outlineAxis === "row" ? movement.end.row : movement.end.column;
+  if (
+    (sheet.outlineGroups ?? []).some(
+      (group) =>
+        group.axis === outlineAxis && group.start <= outlineEnd && outlineStart <= group.end,
+    )
+  )
+    throw invalidCommandPayload(
+      "range",
+      range,
+      "Cell shifts intersecting outline groups are not supported.",
+    );
   assertFormulaRangesAreSafe(workbook, sheet.id, range, movement, command.direction);
 
   const map = createMap(range, command.direction);

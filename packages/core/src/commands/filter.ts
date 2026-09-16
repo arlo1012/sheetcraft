@@ -2,12 +2,12 @@ import { createFormulaError } from "../formula/types.js";
 import {
   getSheetFilterValue,
   getSheetFilterValueKey,
-  areSheetFilterValuesEqual,
+  doesSheetFilterColumnMatch,
 } from "../filter-values.js";
 export {
   getSheetFilterValue,
   getSheetFilterValueKey,
-  areSheetFilterValuesEqual,
+  doesSheetFilterColumnMatch,
 } from "../filter-values.js";
 import {
   createSheetEvaluator,
@@ -37,6 +37,7 @@ function cloneFilter(filter: SheetFilter): SheetFilter {
     columns: filter.columns.map((column) => ({
       column: column.column,
       allowedValues: column.allowedValues.map((value) => ({ ...value })),
+      ...(column.condition ? { condition: { ...column.condition } } : {}),
     })),
   };
 }
@@ -112,7 +113,7 @@ function addHiddenInterval(intervals: HiddenRowInterval[], start: number, end: n
 function doesRowMatchFilter(filter: SheetFilter, row: number, evaluator: SheetEvaluator): boolean {
   return filter.columns.every((column) => {
     const value = getSheetFilterValue(evaluator.getComputedValue({ row, column: column.column }));
-    return column.allowedValues.some((allowed) => areSheetFilterValuesEqual(allowed, value));
+    return doesSheetFilterColumnMatch(column, value);
   });
 }
 
@@ -128,7 +129,7 @@ export function createSheetFilterHiddenRowIntervals(
   if (!filter || filter.columns.length === 0) return [];
   const dataStart = filter.range.start.row + 1;
   const dataEnd = filter.range.end.row;
-  if (filter.columns.some((column) => column.allowedValues.length === 0)) {
+  if (filter.columns.some((column) => column.allowedValues.length === 0 && !column.condition)) {
     return [{ start: dataStart, end: dataEnd }];
   }
   const columnSet = new Set(filter.columns.map((column) => column.column));
@@ -140,7 +141,7 @@ export function createSheetFilterHiddenRowIntervals(
     }
   }
   const blankRowMatches = filter.columns.every((column) =>
-    column.allowedValues.some((value) => value.kind === "blank"),
+    doesSheetFilterColumnMatch(column, { kind: "blank" }),
   );
   const hidden: HiddenRowInterval[] = [];
   let cursor = dataStart;

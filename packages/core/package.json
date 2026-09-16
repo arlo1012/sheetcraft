@@ -78,6 +78,14 @@
     "./workbook": {
       "types": "./dist/workbook.d.ts",
       "import": "./dist/workbook.js"
+    },
+    "./data-validation": {
+      "types": "./dist/data-validation.d.ts",
+      "import": "./dist/data-validation.js"
+    },
+    "./data-outline": {
+      "types": "./dist/data-outline.d.ts",
+      "import": "./dist/data-outline.js"
     }
   },
   "scripts": {

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { createSortSheetRangeCommand, tryApplyWorkbookCommand } from "../../commands/index.js";
+import {
+  createMultiKeySortSheetRangeCommand,
+  createSortSheetRangeCommand,
+  tryApplyWorkbookCommand,
+} from "../../commands/index.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import {
   createSheetSparseState,
@@ -14,6 +18,41 @@ import {
 import { createTestWorkbookSession } from "../helpers.js";
 
 describe("sheet range sorting", () => {
+  test("keeps a header fixed and resolves equal primary keys by a second key", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    for (const [row, values] of [
+      [0, ["Name", "Score"]],
+      [1, ["B", 1]],
+      [2, ["A", 1]],
+      [3, ["C", 2]],
+    ] as const) {
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value: values[0] });
+      setCellContent(sheet, { row, column: 1 }, { kind: "literal", value: values[1] });
+    }
+    expect(
+      executeWorkbookCommand(
+        session,
+        createMultiKeySortSheetRangeCommand(
+          sheet.id,
+          { start: { row: 0, column: 0 }, end: { row: 3, column: 1 } },
+          [
+            { column: 1, direction: "ascending" },
+            { column: 0, direction: "ascending" },
+          ],
+          { hasHeader: true },
+        ),
+      ),
+    ).toBe(true);
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "Name",
+    });
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toEqual({ kind: "literal", value: "A" });
+    expect(getCellContent(sheet, { row: 2, column: 0 })).toEqual({ kind: "literal", value: "B" });
+    expect(getCellContent(sheet, { row: 3, column: 0 })).toEqual({ kind: "literal", value: "C" });
+  });
+
   test("orders computed keys deterministically by type and keeps blanks last in descending order", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);

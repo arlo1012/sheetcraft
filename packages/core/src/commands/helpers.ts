@@ -127,6 +127,7 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
           columns: state.filter.columns.map((column) => ({
             column: column.column,
             allowedValues: column.allowedValues.map((value) => ({ ...value })),
+            ...(column.condition ? { condition: { ...column.condition } } : {}),
           })),
         }
       : null,
@@ -134,6 +135,27 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
       start: { ...range.start },
       end: { ...range.end },
     })),
+    ...(state.dataValidations
+      ? {
+          dataValidations: state.dataValidations.map((rule) => ({
+            ...rule,
+            range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+            ...(rule.list ? { list: [...rule.list] } : {}),
+          })),
+        }
+      : {}),
+    ...(state.outlineGroups
+      ? { outlineGroups: state.outlineGroups.map((group) => ({ ...group })) }
+      : {}),
+    ...(state.subtotalMetadata
+      ? {
+          subtotalMetadata: state.subtotalMetadata.map((entry) => ({
+            ...entry,
+            range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
+            generatedRows: [...entry.generatedRows],
+          })),
+        }
+      : {}),
     floatingImages: state.floatingImages.map(cloneFloatingImage),
   };
 }

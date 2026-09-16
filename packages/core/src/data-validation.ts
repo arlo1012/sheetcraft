@@ -1,0 +1,205 @@
+import {
+  createCellKey,
+  createWorkbookEvaluator,
+  getDefinedName,
+  type CellAddress,
+  type CellRange,
+  type CellValue,
+  type Sheet,
+  type SheetDataValidation,
+  type Workbook,
+} from "./workbook.js";
+import type { CellContent } from "./formula/types.js";
+import { parseFormulaReference } from "./formula/reference-model.js";
+import { translateFormulaForCopy } from "./formula/references.js";
+import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./workbook.js";
+
+export type DataValidationResult =
+  | { valid: true }
+  | { valid: false; reason: "blank" | "type" | "operator" | "list" | "custom" };
+export type DataValidationEvaluationContext = {
+  workbook?: Workbook;
+  sheet?: Sheet;
+  address: CellAddress;
+  /** Values are supplied by the caller when formulas need calculation. */
+  resolveReference?: (reference: string, origin: CellAddress) => CellValue | null;
+  evaluateCustom?: (formula: string, origin: CellAddress, value: CellValue) => boolean | undefined;
+};
+
+function inRange(address: CellAddress, range: CellRange): boolean {
+  const top = Math.min(range.start.row, range.end.row),
+    bottom = Math.max(range.start.row, range.end.row);
+  const left = Math.min(range.start.column, range.end.column),
+    right = Math.max(range.start.column, range.end.column);
+  return (
+    address.row >= top && address.row <= bottom && address.column >= left && address.column <= right
+  );
+}
+export function getCellDataValidation(
+  sheet: Sheet,
+  address: CellAddress,
+): SheetDataValidation | undefined {
+  return sheet.dataValidations?.find((rule) => inRange(address, rule.range));
+}
+export function getCellDataValidations(sheet: Sheet, address: CellAddress): SheetDataValidation[] {
+  return (sheet.dataValidations ?? []).filter((rule) => inRange(address, rule.range));
+}
+export function resolveDataValidationListValues(
+  rule: SheetDataValidation,
+  context: DataValidationEvaluationContext,
+): string[] {
+  if (rule.list) return [...rule.list];
+  if (!rule.formula1) return [];
+  if (context.workbook && context.sheet) {
+    const reference = parseFormulaReference(rule.formula1.replace(/^=/, ""), {
+      currentSheetId: context.sheet.id,
+      resolveSheetId: (name) =>
+        [...context.workbook!.sheets.values()].find(
+          (sheet) => sheet.name.toLowerCase() === name.toLowerCase(),
+        )?.id ?? null,
+    });
+    const named = getDefinedName(
+      context.workbook,
+      rule.formula1.replace(/^=/, ""),
+      context.sheet.id,
+    )?.reference;
+    const target =
+      reference?.target ??
+      (named
+        ? { sheetId: named.sheetId, range: { start: named.start, end: named.end } }
+        : undefined);
+    if (target) {
+      const targetSheet = context.workbook.sheets.get(target.sheetId);
+      if (!targetSheet) return [];
+      const evaluator = createWorkbookEvaluator(context.workbook, targetSheet.id);
+      const values: string[] = [];
+      for (let row = target.range.start.row; row <= target.range.end.row; row++)
+        for (let column = target.range.start.column; column <= target.range.end.column; column++) {
+          const value = evaluator.getComputedValue({ row, column });
+          if (value !== null && typeof value !== "object") values.push(String(value));
+        }
+      return values;
+    }
+  }
+  const value = context.resolveReference?.(rule.formula1, context.address);
+  return value == null
+    ? []
+    : String(value)
+        .split(",")
+        .map((entry) => entry.trim());
+}
+function compare(
+  operator: NonNullable<SheetDataValidation["operator"]>,
+  value: number,
+  first: number,
+  second?: number,
+): boolean {
+  switch (operator) {
+    case "between":
+      return (
+        second !== undefined && value >= Math.min(first, second) && value <= Math.max(first, second)
+      );
+    case "notBetween":
+      return (
+        second !== undefined && (value < Math.min(first, second) || value > Math.max(first, second))
+      );
+    case "equal":
+      return value === first;
+    case "notEqual":
+      return value !== first;
+    case "greaterThan":
+      return value > first;
+    case "greaterThanOrEqual":
+      return value >= first;
+    case "lessThan":
+      return value < first;
+    case "lessThanOrEqual":
+      return value <= first;
+  }
+}
+export function validateCellDataValidation(
+  rule: SheetDataValidation,
+  value: CellValue,
+  context: DataValidationEvaluationContext,
+): DataValidationResult {
+  if ((value === null || value === "") && rule.allowBlank) return { valid: true };
+  if (value === null || value === "") return { valid: false, reason: "blank" };
+  if (rule.type === "list")
+    return resolveDataValidationListValues(rule, context).includes(String(value))
+      ? { valid: true }
+      : { valid: false, reason: "list" };
+  if (rule.type === "custom")
+    return context.evaluateCustom?.(rule.formula1 ?? "", context.address, value)
+      ? { valid: true }
+      : { valid: false, reason: "custom" };
+  const numeric =
+    rule.type === "textLength"
+      ? String(value).length
+      : typeof value === "number"
+        ? value
+        : Number(value);
+  if (!Number.isFinite(numeric) || (rule.type === "whole" && !Number.isInteger(numeric)))
+    return { valid: false, reason: "type" };
+  const first = Number(rule.formula1);
+  const second = rule.formula2 === undefined ? undefined : Number(rule.formula2);
+  if (
+    rule.operator &&
+    (!Number.isFinite(first) || (second !== undefined && !Number.isFinite(second)))
+  )
+    return { valid: false, reason: "type" };
+  return !rule.operator || compare(rule.operator, numeric, first, second)
+    ? { valid: true }
+    : { valid: false, reason: "operator" };
+}
+/** Validates a pending literal edit without mutating the workbook. Formula results must be supplied by the caller. */
+export function validateCellContentDataValidation(
+  rule: SheetDataValidation,
+  content: CellContent | null,
+  context: DataValidationEvaluationContext,
+): DataValidationResult {
+  if ((content === null || (content.kind === "literal" && content.value === "")) && rule.allowBlank)
+    return { valid: true };
+  if (!context.workbook || !context.sheet)
+    return content?.kind === "literal"
+      ? validateCellDataValidation(rule, content.value, context)
+      : { valid: false, reason: "type" };
+  const target = context.address;
+  const shadowSheet: Sheet = { ...context.sheet, cells: new Map(context.sheet.cells) };
+  const candidate = content === null ? undefined : content;
+  const current = shadowSheet.cells.get(createCellKey(target)) ?? {};
+  if (candidate) shadowSheet.cells.set(createCellKey(target), { ...current, content: candidate });
+  else {
+    const { content: _content, ...withoutContent } = current;
+    shadowSheet.cells.set(createCellKey(target), withoutContent);
+  }
+  const shadowWorkbook: Workbook = {
+    ...context.workbook,
+    sheets: new Map(context.workbook.sheets),
+  };
+  shadowWorkbook.sheets.set(shadowSheet.id, shadowSheet);
+  const evaluator = createWorkbookEvaluator(shadowWorkbook, shadowSheet.id);
+  const value =
+    candidate?.kind === "formula"
+      ? evaluator.getComputedValue(target)
+      : candidate?.kind === "literal"
+        ? candidate.value
+        : null;
+  if (rule.type === "custom" && rule.formula1) {
+    const probe = { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 };
+    const source = rule.formula1.startsWith("=") ? rule.formula1 : `=${rule.formula1}`;
+    shadowSheet.cells.set(createCellKey(probe), {
+      content: {
+        kind: "formula",
+        formula: {
+          source: translateFormulaForCopy(source, {
+            row: target.row - rule.range.start.row,
+            column: target.column - rule.range.start.column,
+          }),
+        },
+      },
+    });
+    const result = createWorkbookEvaluator(shadowWorkbook, shadowSheet.id).getComputedValue(probe);
+    return result === true ? { valid: true } : { valid: false, reason: "custom" };
+  }
+  return validateCellDataValidation(rule, typeof value === "object" ? null : value, context);
+}

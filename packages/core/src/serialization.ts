@@ -26,6 +26,9 @@ import {
   type SheetProperties,
   type SheetSparseDimension,
   type SheetSparseState,
+  type SheetDataValidation,
+  type SheetOutlineGroup,
+  type SheetSubtotalMetadata,
   type Workbook,
   type DefinedName,
 } from "./workbook.js";
@@ -127,14 +130,18 @@ export type WorkbookSnapshotV9 = Omit<WorkbookSnapshotV8, "version"> & {
   version: 9;
   calculation: WorkbookCalculationSettings;
 };
+export type WorkbookSnapshotV10 = Omit<WorkbookSnapshotV9, "version"> & { version: 10 };
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV9;
+export type WorkbookSnapshot = WorkbookSnapshotV10;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
   defaultColumnWidth?: number;
+  dataValidations?: SheetDataValidation[];
+  outlineGroups?: SheetOutlineGroup[];
+  subtotalMetadata?: SheetSubtotalMetadata[];
 };
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -349,6 +356,7 @@ function parseFilter(value: unknown, path: string, version: SnapshotVersion): Sh
     range: parseRange(record.range, `${path}.range`),
     columns: asArray(record.columns, `${path}.columns`).map((column, index) => {
       const columnRecord = asRecord(column, `${path}.columns[${index}]`);
+      const condition = columnRecord.condition;
       return {
         column: asInteger(columnRecord.column, `${path}.columns[${index}].column`),
         allowedValues: asArray(
@@ -361,6 +369,9 @@ function parseFilter(value: unknown, path: string, version: SnapshotVersion): Sh
             version,
           ),
         ),
+        ...(condition === undefined
+          ? {}
+          : { condition: condition as SheetFilter["columns"][number]["condition"] }),
       };
     }),
   };
@@ -465,6 +476,18 @@ function parseSparseState(
             parseRange(range, `${path}.mergedCells[${index}]`),
           )
         : [],
+    dataValidations:
+      version >= 10 && Object.hasOwn(record, "dataValidations")
+        ? (asArray(record.dataValidations, `${path}.dataValidations`) as SheetDataValidation[])
+        : [],
+    outlineGroups:
+      version >= 10 && Object.hasOwn(record, "outlineGroups")
+        ? (asArray(record.outlineGroups, `${path}.outlineGroups`) as SheetOutlineGroup[])
+        : [],
+    subtotalMetadata:
+      version >= 10 && Object.hasOwn(record, "subtotalMetadata")
+        ? (asArray(record.subtotalMetadata, `${path}.subtotalMetadata`) as SheetSubtotalMetadata[])
+        : [],
     floatingImages:
       version >= 4
         ? asArray(record.floatingImages, `${path}.floatingImages`).map((image, index) =>
@@ -533,7 +556,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 9,
+    version: 10,
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
@@ -561,7 +584,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 6 &&
     record.version !== 7 &&
     record.version !== 8 &&
-    record.version !== 9
+    record.version !== 9 &&
+    record.version !== 10
   ) {
     throw new WorkbookDomainError(
       {

@@ -42,6 +42,7 @@ import {
   normalizeImageTransform,
   type ImageTransform,
 } from "./image-transform.js";
+import { normalizeOutlineGroups } from "./data-outline.js";
 
 export {
   areImageTransformsEqual,
@@ -90,7 +91,28 @@ export type SheetFilterValue =
 export type SheetFilterColumn = {
   column: number;
   allowedValues: SheetFilterValue[];
+  condition?: SheetFilterCondition;
 };
+export type SheetFilterCondition =
+  | {
+      kind: "text";
+      operator: "contains" | "doesNotContain" | "beginsWith" | "endsWith" | "equals" | "notEquals";
+      value: string;
+    }
+  | {
+      kind: "number" | "date";
+      operator:
+        | "equals"
+        | "notEquals"
+        | "greaterThan"
+        | "greaterThanOrEqual"
+        | "lessThan"
+        | "lessThanOrEqual"
+        | "between"
+        | "notBetween";
+      value: number;
+      value2?: number;
+    };
 
 /** Persisted filter criteria. Visibility is derived by the sheet-engine layer. */
 export type SheetFilter = {
@@ -102,7 +124,54 @@ export type SheetMetadata = {
   freezePanes: FreezePanes;
   filter: SheetFilter | null;
   mergedCells: CellRange[];
+  dataValidations?: SheetDataValidation[];
+  outlineGroups?: SheetOutlineGroup[];
+  subtotalMetadata?: SheetSubtotalMetadata[];
 };
+
+export type DataValidationType =
+  | "whole"
+  | "decimal"
+  | "list"
+  | "date"
+  | "time"
+  | "textLength"
+  | "custom";
+export type DataValidationOperator =
+  | "between"
+  | "notBetween"
+  | "equal"
+  | "notEqual"
+  | "greaterThan"
+  | "lessThan"
+  | "greaterThanOrEqual"
+  | "lessThanOrEqual";
+export type SheetDataValidation = {
+  id: string;
+  range: CellRange;
+  type: DataValidationType;
+  operator?: DataValidationOperator;
+  formula1?: string;
+  formula2?: string;
+  list?: string[];
+  allowBlank: boolean;
+  showInput?: boolean;
+  showError?: boolean;
+  showDropdown?: boolean;
+  promptTitle?: string;
+  prompt?: string;
+  errorTitle?: string;
+  error?: string;
+  errorStyle?: "stop" | "warning" | "information";
+};
+export type SheetOutlineGroup = {
+  id: string;
+  axis: SheetDimensionAxis;
+  start: number;
+  end: number;
+  collapsed: boolean;
+};
+export type SheetSubtotalMetadata = { id: string; range: CellRange; generatedRows: number[] };
 
 /** A positioned image that is anchored to a sheet cell without owning its binary data. */
 export type FloatingImage = {
@@ -144,6 +213,9 @@ export type Sheet = {
   freezePanes: FreezePanes;
   filter: SheetFilter | null;
   mergedCells: CellRange[];
+  dataValidations?: SheetDataValidation[];
+  outlineGroups?: SheetOutlineGroup[];
+  subtotalMetadata?: SheetSubtotalMetadata[];
   floatingImages: FloatingImage[];
 };
 
@@ -168,6 +240,9 @@ export type SheetSparseState = {
   freezePanes: FreezePanes;
   filter: SheetFilter | null;
   mergedCells: CellRange[];
+  dataValidations?: SheetDataValidation[];
+  outlineGroups?: SheetOutlineGroup[];
+  subtotalMetadata?: SheetSubtotalMetadata[];
   floatingImages: FloatingImage[];
 };
 
@@ -214,6 +289,9 @@ export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory)
     freezePanes: { rows: 0, columns: 0 },
     filter: null,
     mergedCells: [],
+    dataValidations: [],
+    outlineGroups: [],
+    subtotalMetadata: [],
     floatingImages: [],
   };
 }
@@ -1439,6 +1517,7 @@ function cloneSheetFilter(filter: SheetFilter): SheetFilter {
     columns: filter.columns.map((column) => ({
       column: column.column,
       allowedValues: column.allowedValues.map(cloneFilterValue),
+      ...(column.condition ? { condition: { ...column.condition } } : {}),
     })),
   };
 }
@@ -1523,7 +1602,38 @@ function normalizeSheetFilter(filter: SheetFilter | null): SheetFilter | null {
       const rightKey = filterValueKey(right);
       return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
     });
-    return { column: column.column, allowedValues };
+    const condition = column.condition;
+    if (condition !== undefined) {
+      const text =
+        condition.kind === "text" &&
+        typeof condition.value === "string" &&
+        ["contains", "doesNotContain", "beginsWith", "endsWith", "equals", "notEquals"].includes(
+          condition.operator,
+        );
+      const numeric =
+        (condition.kind === "number" || condition.kind === "date") &&
+        typeof condition.value === "number" &&
+        Number.isFinite(condition.value) &&
+        [
+          "equals",
+          "notEquals",
+          "greaterThan",
+          "greaterThanOrEqual",
+          "lessThan",
+          "lessThanOrEqual",
+          "between",
+          "notBetween",
+        ].includes(condition.operator) &&
+        (condition.value2 === undefined ||
+          (typeof condition.value2 === "number" && Number.isFinite(condition.value2))) &&
+        (!["between", "notBetween"].includes(condition.operator) || condition.value2 !== undefined);
+      if (!text && !numeric) throw new TypeError("Invalid filter condition.");
+    }
+    return {
+      column: column.column,
+      allowedValues,
+      ...(condition ? { condition: { ...condition } } : {}),
+    };
   });
   columns.sort((left, right) => left.column - right.column);
   if (columns.some((column, index) => column.column === columns[index - 1]?.column)) {
@@ -1533,7 +1643,15 @@ function normalizeSheetFilter(filter: SheetFilter | null): SheetFilter | null {
 }
 
 function normalizeSheetMetadata(
-  state: Pick<SheetSparseState, "freezePanes" | "filter" | "mergedCells">,
+  state: Pick<
+    SheetSparseState,
+    | "freezePanes"
+    | "filter"
+    | "mergedCells"
+    | "dataValidations"
+    | "outlineGroups"
+    | "subtotalMetadata"
+  >,
 ): SheetMetadata {
   const freezePanes = normalizeFreezePanes(state.freezePanes);
   const mergedCells = validateMergedCellRanges(state.mergedCells);
@@ -1550,7 +1668,64 @@ function normalizeSheetMetadata(
   if (filter && mergedCells.some((range) => doMergedCellRangesIntersect(range, filter.range))) {
     throw new RangeError("A filter range cannot intersect merged cells.");
   }
-  return { freezePanes, filter, mergedCells };
+  const dataValidations = (state.dataValidations ?? []).map((rule) => {
+    if (
+      !rule ||
+      typeof rule.id !== "string" ||
+      !rule.id.trim() ||
+      !isCellAddressInBounds(rule.range.start) ||
+      !isCellAddressInBounds(rule.range.end) ||
+      !["whole", "decimal", "list", "date", "time", "textLength", "custom"].includes(rule.type) ||
+      typeof rule.allowBlank !== "boolean" ||
+      (rule.list !== undefined &&
+        (!Array.isArray(rule.list) || rule.list.some((value) => typeof value !== "string"))) ||
+      (rule.formula1 !== undefined && typeof rule.formula1 !== "string") ||
+      (rule.formula2 !== undefined && typeof rule.formula2 !== "string") ||
+      (rule.operator !== undefined &&
+        ![
+          "between",
+          "notBetween",
+          "equal",
+          "notEqual",
+          "greaterThan",
+          "lessThan",
+          "greaterThanOrEqual",
+          "lessThanOrEqual",
+        ].includes(rule.operator)) ||
+      (rule.errorStyle !== undefined &&
+        !["stop", "warning", "information"].includes(rule.errorStyle)) ||
+      [rule.showInput, rule.showError, rule.showDropdown].some(
+        (value) => value !== undefined && typeof value !== "boolean",
+      )
+    )
+      throw new TypeError("Invalid data validation rule.");
+    return {
+      ...rule,
+      range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+      ...(rule.list ? { list: [...rule.list] } : {}),
+    };
+  });
+  if (new Set(dataValidations.map((rule) => rule.id)).size !== dataValidations.length)
+    throw new Error("Duplicate data validation ID.");
+  const outlineGroups = normalizeOutlineGroups(state.outlineGroups ?? []);
+  const subtotalMetadata = (state.subtotalMetadata ?? []).map((entry) => {
+    if (
+      !entry ||
+      typeof entry.id !== "string" ||
+      !entry.id ||
+      !isCellAddressInBounds(entry.range.start) ||
+      !isCellAddressInBounds(entry.range.end) ||
+      !Array.isArray(entry.generatedRows) ||
+      entry.generatedRows.some((row) => !Number.isInteger(row) || row < 0 || row >= MAX_SHEET_ROWS)
+    )
+      throw new TypeError("Invalid subtotal metadata.");
+    return {
+      ...entry,
+      range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
+      generatedRows: [...entry.generatedRows],
+    };
+  });
+  return { freezePanes, filter, mergedCells, dataValidations, outlineGroups, subtotalMetadata };
 }
 
 export function getSheetMetadata(sheet: Sheet): SheetMetadata {
@@ -1566,6 +1741,17 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
   sheet.mergedCells = normalized.mergedCells.map((range) => ({
     start: { ...range.start },
     end: { ...range.end },
+  }));
+  sheet.dataValidations = (normalized.dataValidations ?? []).map((rule) => ({
+    ...rule,
+    range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+    ...(rule.list ? { list: [...rule.list] } : {}),
+  }));
+  sheet.outlineGroups = (normalized.outlineGroups ?? []).map((group) => ({ ...group }));
+  sheet.subtotalMetadata = (normalized.subtotalMetadata ?? []).map((entry) => ({
+    ...entry,
+    range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
+    generatedRows: [...entry.generatedRows],
   }));
   return true;
 }
@@ -1676,6 +1862,9 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
       start: { ...range.start },
       end: { ...range.end },
     })),
+    dataValidations: metadata.dataValidations ?? [],
+    outlineGroups: metadata.outlineGroups ?? [],
+    subtotalMetadata: metadata.subtotalMetadata ?? [],
     floatingImages,
   };
 }
@@ -1689,6 +1878,7 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
     left.hiddenColumns?.length !== right.hiddenColumns?.length ||
     left.defaultColumnWidth !== right.defaultColumnWidth ||
     !areSheetMetadataEqual(left, right) ||
+    JSON.stringify(left.subtotalMetadata ?? []) !== JSON.stringify(right.subtotalMetadata ?? []) ||
     left.floatingImages.length !== right.floatingImages.length
   ) {
     return false;
@@ -1746,6 +1936,17 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
       start: { ...range.start },
       end: { ...range.end },
     })),
+    dataValidations: (sheet.dataValidations ?? []).map((rule) => ({
+      ...rule,
+      range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+      ...(rule.list ? { list: [...rule.list] } : {}),
+    })),
+    outlineGroups: (sheet.outlineGroups ?? []).map((group) => ({ ...group })),
+    subtotalMetadata: (sheet.subtotalMetadata ?? []).map((entry) => ({
+      ...entry,
+      range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
+      generatedRows: [...entry.generatedRows],
+    })),
     floatingImages: sheet.floatingImages.map(cloneFloatingImage),
   });
 }
@@ -1782,6 +1983,17 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   sheet.mergedCells = nextState.mergedCells.map((range) => ({
     start: { ...range.start },
     end: { ...range.end },
+  }));
+  sheet.dataValidations = (nextState.dataValidations ?? []).map((rule) => ({
+    ...rule,
+    range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+    ...(rule.list ? { list: [...rule.list] } : {}),
+  }));
+  sheet.outlineGroups = (nextState.outlineGroups ?? []).map((group) => ({ ...group }));
+  sheet.subtotalMetadata = (nextState.subtotalMetadata ?? []).map((entry) => ({
+    ...entry,
+    range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
+    generatedRows: [...entry.generatedRows],
   }));
   sheet.floatingImages = nextState.floatingImages.map(cloneFloatingImage);
   return true;

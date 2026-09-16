@@ -34,7 +34,7 @@ import {
   assertCellRange,
 } from "./helpers.js";
 
-type SortEntry = { row: number; value: FormulaValue };
+type SortEntry = { row: number; values: FormulaValue[] };
 
 function cloneRange(range: CellRange): CellRange {
   return { start: { ...range.start }, end: { ...range.end } };
@@ -83,11 +83,32 @@ function compareSameRank(left: FormulaValue, right: FormulaValue): number {
   return 0;
 }
 
-function compareSortEntries(left: SortEntry, right: SortEntry, direction: SortDirection): number {
-  const rankDifference = getValueRank(left.value) - getValueRank(right.value);
+function compareSortValues(
+  left: FormulaValue,
+  right: FormulaValue,
+  direction: SortDirection,
+): number {
+  const rankDifference = getValueRank(left) - getValueRank(right);
   if (rankDifference !== 0) return rankDifference;
-  const sameRank = compareSameRank(left.value, right.value);
+  const sameRank = compareSameRank(left, right);
   if (sameRank !== 0) return direction === "descending" ? -sameRank : sameRank;
+  return 0;
+}
+
+function compareSortEntries(
+  left: SortEntry,
+  right: SortEntry,
+  keys: readonly { column: number; direction: SortDirection }[],
+): number {
+  for (let index = 0; index < keys.length; index += 1) {
+    const key = keys[index];
+    const leftValue = left.values[index];
+    const rightValue = right.values[index];
+    if (!key || leftValue === undefined || rightValue === undefined) continue;
+    const compared = compareSortValues(leftValue, rightValue, key.direction);
+    if (compared !== 0) return compared;
+  }
+  // Stable even if the JS engine implementation changes.
   return left.row - right.row;
 }
 
@@ -127,19 +148,23 @@ function validateSortCommand(
   if (range.end.row <= range.start.row) {
     throw invalidCommandPayload("range", command.range, "Sorting requires at least two rows.");
   }
-  if (
-    !Number.isInteger(command.keyColumn) ||
-    command.keyColumn < range.start.column ||
-    command.keyColumn > range.end.column
-  ) {
-    throw invalidCommandPayload(
-      "keyColumn",
-      command.keyColumn,
-      "Sort key column is outside the range.",
-    );
-  }
-  if (command.direction !== "ascending" && command.direction !== "descending") {
-    throw invalidCommandPayload("direction", command.direction);
+  const keys = command.sortKeys?.length
+    ? command.sortKeys
+    : [{ column: command.keyColumn, direction: command.direction }];
+  if (!keys.length) throw invalidCommandPayload("sortKeys", command.sortKeys);
+  for (const key of keys) {
+    if (
+      !Number.isInteger(key.column) ||
+      key.column < range.start.column ||
+      key.column > range.end.column
+    )
+      throw invalidCommandPayload(
+        "sortKeys",
+        command.sortKeys,
+        "Sort key column is outside the range.",
+      );
+    if (key.direction !== "ascending" && key.direction !== "descending")
+      throw invalidCommandPayload("sortKeys", command.sortKeys);
   }
   if (sheet.mergedCells.some((merged) => rangesIntersect(range, merged))) {
     throw invalidCommandPayload("range", command.range, "Sorting merged cells is not supported.");
@@ -147,7 +172,8 @@ function validateSortCommand(
   const filter = sheet.filter;
   if (filter && rangesIntersect(range, filter.range)) {
     const dataRange = getFilterDataRange(filter);
-    if (!areRangesEqual(range, dataRange)) {
+    const completeFilterRange = areRangesEqual(range, filter.range) && command.hasHeader === true;
+    if (!completeFilterRange && !areRangesEqual(range, dataRange)) {
       throw invalidCommandPayload(
         "range",
         command.range,
@@ -169,24 +195,56 @@ export function createSortSheetRangeCommand(
   return { type: "sortSheetRange", sheetId, range: cloneRange(normalized), keyColumn, direction };
 }
 
+/** Creates a stable, multi-column sort while retaining the legacy single-key factory. */
+export function createMultiKeySortSheetRangeCommand(
+  sheetId: string,
+  range: CellRange,
+  sortKeys: readonly { column: number; direction: SortDirection }[],
+  options?: { hasHeader?: boolean },
+): SortSheetRangeCommand {
+  const normalized = normalizeRange(range);
+  assertCellRange(normalized);
+  const first = sortKeys[0];
+  if (!first) throw new RangeError("Sorting requires at least one key.");
+  return {
+    type: "sortSheetRange",
+    sheetId,
+    range: cloneRange(normalized),
+    // These two fields preserve transport compatibility with old snapshots.
+    keyColumn: first.column,
+    direction: first.direction,
+    sortKeys: sortKeys.map((key) => ({ ...key })),
+    ...(options?.hasHeader ? { hasHeader: true } : {}),
+  };
+}
+
 export function applySortSheetRangeCommand(
   workbook: Workbook,
   command: SortSheetRangeCommand,
 ): SetCellContentsCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const range = validateSortCommand(command, sheet);
+  const keys = command.sortKeys?.length
+    ? command.sortKeys
+    : [{ column: command.keyColumn, direction: command.direction }];
+  const dataStart = range.start.row + (command.hasHeader ? 1 : 0);
+  if (dataStart >= range.end.row + 1) return null;
+  const sortableRange = { ...range, start: { ...range.start, row: dataStart } };
   const evaluator = createWorkbookEvaluator(workbook, sheet.id);
   const sortedRows = Array.from(
-    { length: range.end.row - range.start.row + 1 },
+    { length: range.end.row - dataStart + 1 },
     (_, offset): SortEntry => {
-      const row = range.start.row + offset;
-      return { row, value: evaluator.getComputedValue({ row, column: command.keyColumn }) };
+      const row = dataStart + offset;
+      return {
+        row,
+        values: keys.map((key) => evaluator.getComputedValue({ row, column: key.column })),
+      };
     },
-  ).sort((left, right) => compareSortEntries(left, right, command.direction));
+  ).sort((left, right) => compareSortEntries(left, right, keys));
   const destinationBySourceRow = new Map<number, number>();
   for (let offset = 0; offset < sortedRows.length; offset += 1) {
     const source = sortedRows[offset];
-    if (source) destinationBySourceRow.set(source.row, range.start.row + offset);
+    if (source) destinationBySourceRow.set(source.row, dataStart + offset);
   }
   if ([...destinationBySourceRow].every(([source, destination]) => source === destination))
     return null;
@@ -199,7 +257,7 @@ export function applySortSheetRangeCommand(
       row: Number(key.slice(0, separator)),
       column: Number(key.slice(separator + 1)),
     };
-    if (!isInsideRange(address, range)) return [];
+    if (!isInsideRange(address, sortableRange)) return [];
     return [
       {
         address,

@@ -20,6 +20,8 @@ import type {
   SheetSparseDimension,
   SheetSparseState,
   FloatingImage,
+  SheetDataValidation,
+  SheetOutlineGroup,
   DefinedName,
 } from "../workbook.js";
 
@@ -225,6 +227,76 @@ export type SortSheetRangeCommand = {
   range: CellRange;
   keyColumn: number;
   direction: SortDirection;
+  sortKeys?: Array<{ column: number; direction: SortDirection }>;
+  hasHeader?: boolean;
+};
+export type SplitColumnCommand = {
+  type: "splitColumn";
+  sheetId: string;
+  sourceColumn: number;
+  range?: CellRange;
+  destinationColumn: number;
+  mode: "delimiter" | "fixedWidth";
+  delimiter?: string;
+  fixedWidths?: number[];
+  parseQuoted?: boolean;
+  columnTypes?: Array<"general" | "text">;
+  overwrite?: boolean;
+};
+export type RemoveDuplicatesCommand = {
+  type: "removeDuplicates";
+  sheetId: string;
+  range: CellRange;
+  keyColumns: number[];
+  hasHeader?: boolean;
+};
+export type ApplySubtotalsCommand = {
+  type: "applySubtotals";
+  sheetId: string;
+  range: CellRange;
+  groupByColumns: number[];
+  summaryColumns: number[];
+  operation: "sum" | "count" | "average" | "min" | "max";
+  hasHeader?: boolean;
+  subtotalId?: string;
+};
+export type RemoveSubtotalsCommand = {
+  type: "removeSubtotals";
+  sheetId: string;
+  subtotalId?: string;
+};
+
+export type SetSheetDataValidationsCommand = {
+  type: "setSheetDataValidations";
+  sheetId: string;
+  rules: SheetDataValidation[];
+};
+export type ClearSheetDataValidationsCommand = {
+  type: "clearSheetDataValidations";
+  sheetId: string;
+  range?: CellRange;
+};
+export type AddSheetOutlineGroupCommand = {
+  type: "addSheetOutlineGroup";
+  sheetId: string;
+  group: SheetOutlineGroup;
+};
+export type RemoveSheetOutlineGroupCommand = {
+  type: "removeSheetOutlineGroup";
+  sheetId: string;
+  id: string;
+};
+export type SetSheetOutlineGroupCollapsedCommand = {
+  type: "setSheetOutlineGroupCollapsed";
+  sheetId: string;
+  id: string;
+  collapsed: boolean;
+};
+export type SetSheetOutlineLevelCommand = {
+  type: "setSheetOutlineLevel";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  level: number;
 };
 
 export type AddSheetCommand = {
@@ -440,6 +512,16 @@ export type WorkbookCommand =
   | UnmergeCellsCommand
   | SetSheetFilterCommand
   | SortSheetRangeCommand
+  | SplitColumnCommand
+  | RemoveDuplicatesCommand
+  | ApplySubtotalsCommand
+  | RemoveSubtotalsCommand
+  | SetSheetDataValidationsCommand
+  | ClearSheetDataValidationsCommand
+  | AddSheetOutlineGroupCommand
+  | RemoveSheetOutlineGroupCommand
+  | SetSheetOutlineGroupCollapsedCommand
+  | SetSheetOutlineLevelCommand
   | SetFloatingImageCommand
   | DeleteFloatingImageCommand
   | ConvertFloatingImageToCellCommand
@@ -477,6 +559,10 @@ export type WorkbookOperation =
   | "cells.unmerge"
   | "data.filter"
   | "data.sort"
+  | "data.validation"
+  | "data.outline"
+  | "data.transform"
+  | "data.subtotal"
   | "images.floating.set"
   | "images.floating.delete"
   | "images.floating.convert"
@@ -545,6 +631,20 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "data.filter";
     case "sortSheetRange":
       return "data.sort";
+    case "splitColumn":
+    case "removeDuplicates":
+      return "data.transform";
+    case "applySubtotals":
+    case "removeSubtotals":
+      return "data.subtotal";
+    case "setSheetDataValidations":
+    case "clearSheetDataValidations":
+      return "data.validation";
+    case "addSheetOutlineGroup":
+    case "removeSheetOutlineGroup":
+    case "setSheetOutlineGroupCollapsed":
+    case "setSheetOutlineLevel":
+      return "data.outline";
     case "setFloatingImage":
       return "images.floating.set";
     case "deleteFloatingImage":

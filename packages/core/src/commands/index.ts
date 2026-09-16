@@ -15,4 +15,8 @@ export * from "./sheets.js";
 export * from "./structure.js";
 export * from "./sort.js";
 export * from "./values.js";
+export * from "./validation.js";
+export * from "./outline.js";
+export * from "./data-transforms.js";
+export * from "./subtotal.js";
 export * from "./workbook-settings.js";

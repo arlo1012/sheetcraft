@@ -24,6 +24,18 @@ import {
   applySetSheetDimensionSizesCommand,
 } from "./dimensions.js";
 import { applySetSheetFilterCommand } from "./filter.js";
+import { applySplitColumnCommand, applyRemoveDuplicatesCommand } from "./data-transforms.js";
+import { applyApplySubtotalsCommand, applyRemoveSubtotalsCommand } from "./subtotal.js";
+import {
+  applyClearSheetDataValidationsCommand,
+  applySetSheetDataValidationsCommand,
+} from "./validation.js";
+import {
+  applyAddSheetOutlineGroupCommand,
+  applyRemoveSheetOutlineGroupCommand,
+  applySetSheetOutlineGroupCollapsedCommand,
+  applySetSheetOutlineLevelCommand,
+} from "./outline.js";
 import {
   applyMergeCellsCommand,
   applySetSheetFreezePanesCommand,
@@ -105,6 +117,16 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "unmergeCells":
     case "setSheetFilter":
     case "sortSheetRange":
+    case "splitColumn":
+    case "removeDuplicates":
+    case "applySubtotals":
+    case "removeSubtotals":
+    case "setSheetDataValidations":
+    case "clearSheetDataValidations":
+    case "addSheetOutlineGroup":
+    case "removeSheetOutlineGroup":
+    case "setSheetOutlineGroupCollapsed":
+    case "setSheetOutlineLevel":
     case "setFloatingImage":
     case "deleteFloatingImage":
     case "convertFloatingImageToCell":
@@ -191,6 +213,26 @@ export function applyWorkbookCommand(
         return applySetSheetFilterCommand(workbook, command);
       case "sortSheetRange":
         return applySortSheetRangeCommand(workbook, command);
+      case "splitColumn":
+        return applySplitColumnCommand(workbook, command);
+      case "removeDuplicates":
+        return applyRemoveDuplicatesCommand(workbook, command);
+      case "applySubtotals":
+        return applyApplySubtotalsCommand(workbook, command);
+      case "removeSubtotals":
+        return applyRemoveSubtotalsCommand(workbook, command);
+      case "setSheetDataValidations":
+        return applySetSheetDataValidationsCommand(workbook, command);
+      case "clearSheetDataValidations":
+        return applyClearSheetDataValidationsCommand(workbook, command);
+      case "addSheetOutlineGroup":
+        return applyAddSheetOutlineGroupCommand(workbook, command);
+      case "removeSheetOutlineGroup":
+        return applyRemoveSheetOutlineGroupCommand(workbook, command);
+      case "setSheetOutlineGroupCollapsed":
+        return applySetSheetOutlineGroupCollapsedCommand(workbook, command);
+      case "setSheetOutlineLevel":
+        return applySetSheetOutlineLevelCommand(workbook, command);
       case "setFloatingImage":
         return applySetFloatingImageCommand(workbook, command);
       case "deleteFloatingImage":
