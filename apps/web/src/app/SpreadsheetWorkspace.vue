@@ -546,11 +546,13 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           :status="saveStatus"
           :error="saveError"
           :feedback="feedback"
+          :can-reset="fileActions.canReset.value"
           :disabled="loading || fileBusy || xlsxBusy || !!xlsxConfirmation"
           @save="fileActions.save"
           @import-json="fileActions.importJson"
           @export-json="fileActions.exportJson"
           @reload="fileActions.requestReload"
+          @reset="fileActions.requestReset"
         >
           <template #extra-menu-actions="{ close }">
             <XlsxFileActions

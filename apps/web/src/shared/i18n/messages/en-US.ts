@@ -36,6 +36,17 @@ export const enUS = {
     importJson: "Import JSON",
     exportJson: "Export JSON",
     reloadSaved: "Reload local copy",
+    recoveryActions: "Resolve local document",
+    retryOpen: "Retry opening",
+    importBackup: "Import backup",
+    resetBlank: "Discard old data and start blank",
+    resetTitle: "Discard old data and start blank?",
+    resetDescription:
+      "This will replace the current workbook and its saved local copy, including changes saved by other tabs, with a blank document and clear undo history. This cannot be undone.",
+    resetConfirm: "Discard and start blank",
+    resetDone: "A blank document was created. Automatic saving has resumed.",
+    resetFailed:
+      "Could not create a blank document. The saved local copy and current content have not been replaced. Retry or import a backup.",
     loading: "Opening local copy…",
     idle: "Local autosave",
     pending: "Unsaved changes",
@@ -49,7 +60,7 @@ export const enUS = {
     unavailable:
       "Local storage is unavailable. Your edits are still here; export a JSON file to keep them.",
     invalidSnapshot:
-      "The local copy could not be opened. It has been preserved, and automatic saving is paused. Import a valid JSON backup and confirm replacement to recover.",
+      "The local document could not be opened. Your saved data is preserved and automatic saving is paused. Retry, import a backup, or discard the old data and start blank.",
     conflict:
       "Another tab saved a newer copy. Your edits are still here. Export them before reloading the local copy.",
     quota: "There is not enough browser storage to save. Export a JSON file to keep your changes.",

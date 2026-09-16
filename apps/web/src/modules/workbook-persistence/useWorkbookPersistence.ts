@@ -1,7 +1,8 @@
 import { computed, onScopeDispose, ref, watch, type ComputedRef, type Ref } from "vue";
 import { WorkbookDomainError } from "@idea10/core/errors";
 import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
-import type { Workbook } from "@idea10/core/workbook";
+import { createWorkbook, type Workbook } from "@idea10/core/workbook";
+import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { WorkbookStoreError, type PersistedWorkbook, type WorkbookStore } from "./workbookStore";
 
 export type WorkbookPersistenceError =
@@ -76,6 +77,7 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
   saveNow: () => Promise<boolean>;
   reload: () => Promise<boolean>;
   replaceDocument: (workbook: Workbook) => Promise<void>;
+  resetDocument: () => Promise<boolean>;
 } {
   const loading = ref(true);
   const dirty = ref(false);
@@ -373,6 +375,33 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
     });
   }
 
+  async function resetDocument(): Promise<boolean> {
+    return queueDocumentOperation(async () => {
+      if (disposed) return false;
+      loading.value = true;
+      cancelQueuedSave();
+      await waitForActiveSave();
+      try {
+        if (disposed) return false;
+        const workbook = createWorkbook({ idFactory: createBrowserIdFactory() });
+        const receipt = await options.store.replace(serializeWorkbook(workbook));
+        if (disposed) return false;
+        replaceFromPersistence(workbook);
+        expectedRevision = receipt.revision;
+        savedAt.value = receipt.savedAt;
+        error.value = undefined;
+        automaticSavingBlocked = false;
+        dirty.value = false;
+        return true;
+      } catch (cause) {
+        if (!disposed) blockAutomaticSaving(toPersistenceError(cause, "unavailable"));
+        return false;
+      } finally {
+        if (!disposed) loading.value = false;
+      }
+    });
+  }
+
   onScopeDispose(() => {
     disposed = true;
     cancelQueuedSave();
@@ -388,5 +417,6 @@ export function useWorkbookPersistence(options: UseWorkbookPersistenceOptions): 
     saveNow,
     reload,
     replaceDocument,
+    resetDocument,
   };
 }

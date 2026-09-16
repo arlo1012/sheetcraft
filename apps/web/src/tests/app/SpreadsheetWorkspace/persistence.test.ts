@@ -6,7 +6,10 @@ import { createWorkbook, getActiveSheet, setCellValue } from "@idea10/core/workb
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import WorkbookFileActions from "../../../modules/workbook-persistence/components/WorkbookFileActions.vue";
 import WorkbookFileFeedback from "../../../modules/workbook-persistence/components/WorkbookFileFeedback.vue";
-import type { WorkbookStore } from "../../../modules/workbook-persistence/workbookStore";
+import {
+  WorkbookStoreError,
+  type WorkbookStore,
+} from "../../../modules/workbook-persistence/workbookStore";
 import { createAppI18n } from "../../../shared/i18n";
 
 const mounted: Array<{ unmount(): void }> = [];
@@ -50,6 +53,41 @@ afterEach(() => {
 });
 
 describe("workspace persistence integration", () => {
+  test("offers confirmed blank recovery without a JSON file and resumes saving", async () => {
+    const store = createStore();
+    store.load.mockRejectedValue(new WorkbookStoreError("invalid-record"));
+    const wrapper = await mountWorkspace(store);
+    const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
+    await editor.trigger("keydown", { key: "k" });
+    await editor.setValue("keep until confirmed");
+
+    await wrapper.get('[data-workbook-file="recover"]').trigger("click");
+    await flushPromises();
+    const resetItem = document.querySelector<HTMLElement>('[data-workbook-file="reset"]');
+    expect(resetItem?.textContent).toContain("Discard old data and start blank");
+    resetItem!.click();
+    await flushPromises();
+    expect(wrapper.findComponent(WorkbookFileFeedback).props("confirmation")).toBe("reset");
+    expect(document.body.textContent).toContain("This cannot be undone.");
+    expect(store.replace).not.toHaveBeenCalled();
+    wrapper.findComponent(WorkbookFileFeedback).vm.$emit("cancel");
+    await flushPromises();
+    expect(store.replace).not.toHaveBeenCalled();
+    expect(wrapper.get<HTMLTextAreaElement>("[data-formula-input]").element.value).toBe(
+      "keep until confirmed",
+    );
+
+    wrapper.findComponent(WorkbookFileActions).vm.$emit("reset");
+    await flushPromises();
+    wrapper.findComponent(WorkbookFileFeedback).vm.$emit("confirm");
+    await flushPromises();
+    expect(store.replace).toHaveBeenCalledOnce();
+    expect(store.replace.mock.calls[0]![0]).toMatchObject({ sheets: [{ cells: [] }] });
+    expect(wrapper.get<HTMLTextAreaElement>("[data-formula-input]").element.value).toBe("");
+    expect(wrapper.find('[data-workbook-file="recover"]').exists()).toBe(false);
+    expect(wrapper.get("[data-save-status]").attributes("data-save-status")).toBe("saved");
+  });
+
   test("saves the pending grid draft with Ctrl+S without moving the selection", async () => {
     const store = createStore();
     const wrapper = await mountWorkspace(store);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown, Download, Info, RotateCcw, Save, Upload } from "lucide-vue-next";
+import { ChevronDown, Download, FilePlus2, Info, RotateCcw, Save, Upload } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
 import { Tooltip as TTooltip } from "tdesign-vue-next/es/tooltip";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
@@ -18,12 +18,14 @@ const props = defineProps<{
   disabled: boolean;
   error?: WorkbookPersistenceError;
   feedback?: WorkbookFileFeedback;
+  canReset?: boolean;
 }>();
 const emit = defineEmits<{
   save: [];
   importJson: [file: File];
   exportJson: [];
   reload: [];
+  reset: [];
 }>();
 defineSlots<{
   "extra-menu-actions"?: (props: { close: () => void }) => unknown;
@@ -67,10 +69,11 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   },
 });
 
-function select(action: "save" | "exportJson" | "reload"): void {
+function select(action: "save" | "exportJson" | "reload" | "reset"): void {
   closeMenu();
   if (action === "save") emit("save");
   else if (action === "exportJson") emit("exportJson");
+  else if (action === "reset") emit("reset");
   else emit("reload");
 }
 
@@ -121,8 +124,22 @@ function onFileChange(event: Event): void {
         {{ noticeLabel }}
       </span>
     </TTooltip>
+    <button
+      v-if="canReset"
+      type="button"
+      class="workbook-file-actions__trigger"
+      :disabled="disabled"
+      aria-haspopup="menu"
+      :aria-expanded="open"
+      :aria-controls="open ? menuId : undefined"
+      data-workbook-file="recover"
+      @click="toggleMenu"
+      @keydown="onTriggerKeydown"
+    >
+      {{ t("persistence.recoveryActions") }}
+    </button>
     <span
-      v-else
+      v-if="!notice"
       class="workbook-file-actions__status"
       :class="{ 'workbook-file-actions__status--error': status === 'error' }"
       :title="t('persistence.localOnly')"
@@ -153,12 +170,27 @@ function onFileChange(event: Event): void {
       :label="t('persistence.fileActions')"
       :aria-hidden="!open"
     >
-      <MenuItem data-workbook-file="save" @select="select('save')">
+      <template v-if="canReset">
+        <MenuItem data-workbook-file="reload" @select="select('reload')">
+          <template #icon><RotateCcw :size="15" /></template>
+          {{ t("persistence.retryOpen") }}
+        </MenuItem>
+        <MenuItem data-workbook-file="import" @select="chooseFile">
+          <template #icon><Upload :size="15" /></template>
+          {{ t("persistence.importBackup") }}
+        </MenuItem>
+        <MenuItem danger data-workbook-file="reset" @select="select('reset')">
+          <template #icon><FilePlus2 :size="15" /></template>
+          {{ t("persistence.resetBlank") }}
+        </MenuItem>
+        <MenuSeparator />
+      </template>
+      <MenuItem v-if="!canReset" data-workbook-file="save" @select="select('save')">
         <template #icon><Save :size="15" /></template>
         {{ t("persistence.save") }}
       </MenuItem>
-      <MenuSeparator />
-      <MenuItem data-workbook-file="import" @select="chooseFile">
+      <MenuSeparator v-if="!canReset" />
+      <MenuItem v-if="!canReset" data-workbook-file="import" @select="chooseFile">
         <template #icon><Upload :size="15" /></template>
         {{ t("persistence.importJson") }}
       </MenuItem>
@@ -167,8 +199,8 @@ function onFileChange(event: Event): void {
         {{ t("persistence.exportJson") }}
       </MenuItem>
       <slot name="extra-menu-actions" :close="closeMenu" />
-      <MenuSeparator />
-      <MenuItem data-workbook-file="reload" @select="select('reload')">
+      <MenuSeparator v-if="!canReset" />
+      <MenuItem v-if="!canReset" data-workbook-file="reload" @select="select('reload')">
         <template #icon><RotateCcw :size="15" /></template>
         {{ t("persistence.reloadSaved") }}
       </MenuItem>

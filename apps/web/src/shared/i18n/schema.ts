@@ -30,6 +30,15 @@ export type MessageSchema = FormulaToolsMessageSchema & {
     importJson: string;
     exportJson: string;
     reloadSaved: string;
+    recoveryActions: string;
+    retryOpen: string;
+    importBackup: string;
+    resetBlank: string;
+    resetTitle: string;
+    resetDescription: string;
+    resetConfirm: string;
+    resetDone: string;
+    resetFailed: string;
     loading: string;
     idle: string;
     pending: string;

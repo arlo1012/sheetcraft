@@ -4,7 +4,10 @@ import { vi } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { createWorkbook, type Workbook } from "@idea10/core/workbook";
 import { useWorkbookFileActions } from "../../../../modules/workbook-persistence/useWorkbookFileActions";
-import type { useWorkbookPersistence } from "../../../../modules/workbook-persistence/useWorkbookPersistence";
+import type {
+  WorkbookPersistenceError,
+  useWorkbookPersistence,
+} from "../../../../modules/workbook-persistence/useWorkbookPersistence";
 
 type Persistence = ReturnType<typeof useWorkbookPersistence>;
 
@@ -31,11 +34,15 @@ export function mountFileActions(options?: {
   const workbook = options?.workbook ?? createWorkbook({ idFactory: createSequentialIdFactory() });
   const loading = ref(false);
   const dirty = ref(false);
+  const error = ref<WorkbookPersistenceError>();
+  const resetDocument = vi.fn(async () => true);
   const saveNow = vi.fn(async () => true);
   const reload = vi.fn(async () => false);
   const replaceDocument = vi.fn(async (_workbook: Workbook) => {});
   const persistence = {
     loading,
+    error,
+    resetDocument,
     dirty,
     saveNow,
     reload,
@@ -67,7 +74,7 @@ export function mountFileActions(options?: {
     dirty,
     flushPendingEdits,
     hasPendingEdits,
-    persistence: { loading, saveNow, reload, replaceDocument },
+    persistence: { loading, error, resetDocument, saveNow, reload, replaceDocument },
     workbook,
     wrapper,
   };

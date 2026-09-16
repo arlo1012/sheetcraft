@@ -19,7 +19,8 @@ export type WorkbookStore = {
   ) => Promise<WorkbookSaveReceipt>;
   /**
    * Replaces the browser recovery record after the UI has explicitly confirmed
-   * importing a document. Normal automatic and manual saves must use `save`.
+   * importing a document or discarding the old copy to start blank.
+   * Normal automatic and manual saves must use `save`.
    */
   replace: (snapshot: WorkbookSnapshot) => Promise<WorkbookSaveReceipt>;
 };
