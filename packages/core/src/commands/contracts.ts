@@ -259,6 +259,7 @@ export type ApplySubtotalsCommand = {
   operation: "sum" | "count" | "average" | "min" | "max";
   hasHeader?: boolean;
   subtotalId?: string;
+  labels?: { subtotal: string; grandTotal: string };
 };
 export type RemoveSubtotalsCommand = {
   type: "removeSubtotals";

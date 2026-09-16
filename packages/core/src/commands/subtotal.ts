@@ -65,7 +65,11 @@ export function createApplySubtotalsCommand(
   groupByColumns: readonly number[],
   summaryColumns: readonly number[],
   operation: ApplySubtotalsCommand["operation"],
-  options?: { hasHeader?: boolean; subtotalId?: string },
+  options?: {
+    hasHeader?: boolean;
+    subtotalId?: string;
+    labels?: { subtotal: string; grandTotal: string };
+  },
 ): ApplySubtotalsCommand {
   return {
     type: "applySubtotals",
@@ -76,6 +80,7 @@ export function createApplySubtotalsCommand(
     operation,
     ...(options?.hasHeader ? { hasHeader: true } : {}),
     ...(options?.subtotalId ? { subtotalId: options.subtotalId } : {}),
+    ...(options?.labels ? { labels: { ...options.labels } } : {}),
   };
 }
 
@@ -141,6 +146,23 @@ export function applyApplySubtotalsCommand(
         },
       );
     }
+    const labelColumn = command.groupByColumns.find(
+      (column) => !command.summaryColumns.includes(column),
+    );
+    if (command.labels && labelColumn !== undefined) {
+      const value = createWorkbookEvaluator(workbook, command.sheetId).getComputedValue({
+        row: startWithShifts,
+        column: labelColumn,
+      });
+      setCellContent(
+        sheet,
+        { row: insertAt, column: labelColumn },
+        {
+          kind: "literal",
+          value: `${value === null ? "" : String(value)} ${command.labels.subtotal}`.trim(),
+        },
+      );
+    }
     insertedBelow += 1;
   }
   const grandTotalRow = range.end.row + insertedBelow + 1;
@@ -163,6 +185,15 @@ export function applyApplySubtotalsCommand(
       },
     );
   }
+  const grandLabelColumn = command.groupByColumns.find(
+    (column) => !command.summaryColumns.includes(column),
+  );
+  if (command.labels && grandLabelColumn !== undefined)
+    setCellContent(
+      sheet,
+      { row: grandTotalRow, column: grandLabelColumn },
+      { kind: "literal", value: command.labels.grandTotal },
+    );
   insertedBelow += 1;
   // Insertions were made bottom-up; stored row coordinates are already final.
   const metadata: SubtotalMetadata = {

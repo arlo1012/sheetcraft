@@ -86,6 +86,10 @@
     "./data-outline": {
       "types": "./dist/data-outline.d.ts",
       "import": "./dist/data-outline.js"
+    },
+    "./data-range": {
+      "types": "./dist/data-range.d.ts",
+      "import": "./dist/data-range.js"
     }
   },
   "scripts": {

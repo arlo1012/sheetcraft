@@ -153,7 +153,11 @@ describe("data transforms", () => {
           [0],
           [1],
           "sum",
-          { hasHeader: true, subtotalId: "test" },
+          {
+            hasHeader: true,
+            subtotalId: "test",
+            labels: { subtotal: "小计", grandTotal: "总计" },
+          },
         ),
       ),
     ).toBe(true);
@@ -164,6 +168,14 @@ describe("data transforms", () => {
     expect(getCellContent(sheet, { row: 5, column: 1 })).toEqual({
       kind: "formula",
       formula: { source: "=SUBTOTAL(9,B5:B5)" },
+    });
+    expect(getCellContent(sheet, { row: 3, column: 0 })).toEqual({
+      kind: "literal",
+      value: "A 小计",
+    });
+    expect(getCellContent(sheet, { row: 6, column: 0 })).toEqual({
+      kind: "literal",
+      value: "总计",
     });
     expect(getCellContent(sheet, { row: 8, column: 2 })).toEqual({
       kind: "formula",

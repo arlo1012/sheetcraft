@@ -11,6 +11,7 @@ import type {
   SetSheetDataValidationsCommand,
 } from "./contracts.js";
 import { getSheetOrThrow, normalizeRange, validateCommandPayload } from "./helpers.js";
+import { translateFormulaForCopy } from "../formula/references.js";
 function restore(sheetId: string, workbook: Workbook): RestoreFullSheetStateCommand {
   return {
     type: "restoreSheetState",
@@ -68,7 +69,8 @@ function intersects(a: CellRange, b: CellRange): boolean {
     x.end.column >= y.start.column
   );
 }
-function subtract(
+/** Splits a validation around a cleared range, rebasing relative formulas for each fragment. */
+export function subtractSheetDataValidation(
   rule: SheetDataValidation,
   cut: CellRange,
   ids: Set<string>,
@@ -100,7 +102,19 @@ function subtract(
       suffix = index;
     while (ids.has(id)) id = `${rule.id}:clear:${++suffix}`;
     ids.add(id);
-    return { ...rule, id, range };
+    const delta = {
+      row: range.start.row - a.start.row,
+      column: range.start.column - a.start.column,
+    };
+    const translate = (formula: string | undefined) =>
+      formula === undefined ? undefined : translateFormulaForCopy(formula, delta);
+    return {
+      ...rule,
+      id,
+      range,
+      ...(rule.formula1 === undefined ? {} : { formula1: translate(rule.formula1)! }),
+      ...(rule.formula2 === undefined ? {} : { formula2: translate(rule.formula2)! }),
+    };
   });
 }
 export function applyClearSheetDataValidationsCommand(
@@ -115,7 +129,7 @@ export function applyClearSheetDataValidationsCommand(
   const next = command.range
     ? rules.flatMap((rule) => {
         ids.delete(rule.id);
-        return subtract(rule, command.range!, ids);
+        return subtractSheetDataValidation(rule, command.range!, ids);
       })
     : [];
   if (JSON.stringify(next) === JSON.stringify(rules)) return null;

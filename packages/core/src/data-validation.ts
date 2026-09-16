@@ -184,6 +184,8 @@ export function validateCellContentDataValidation(
       : candidate?.kind === "literal"
         ? candidate.value
         : null;
+  if (value === null || value === "")
+    return rule.allowBlank ? { valid: true } : { valid: false, reason: "blank" };
   if (rule.type === "custom" && rule.formula1) {
     const probe = { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 };
     const source = rule.formula1.startsWith("=") ? rule.formula1 : `=${rule.formula1}`;
@@ -200,6 +202,45 @@ export function validateCellContentDataValidation(
     });
     const result = createWorkbookEvaluator(shadowWorkbook, shadowSheet.id).getComputedValue(probe);
     return result === true ? { valid: true } : { valid: false, reason: "custom" };
+  }
+  if (rule.operator && rule.formula1) {
+    const evaluateBound = (formula: string): number | undefined => {
+      const probe = { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 };
+      const source = formula.startsWith("=") ? formula : `=${formula}`;
+      shadowSheet.cells.set(createCellKey(probe), {
+        content: {
+          kind: "formula",
+          formula: {
+            source: translateFormulaForCopy(source, {
+              row: target.row - rule.range.start.row,
+              column: target.column - rule.range.start.column,
+            }),
+          },
+        },
+      });
+      const result = createWorkbookEvaluator(shadowWorkbook, shadowSheet.id).getComputedValue(
+        probe,
+      );
+      return typeof result === "number" && Number.isFinite(result) ? result : undefined;
+    };
+    const first = evaluateBound(rule.formula1);
+    const second = rule.formula2 === undefined ? undefined : evaluateBound(rule.formula2);
+    const numeric =
+      rule.type === "textLength"
+        ? String(value).length
+        : typeof value === "number"
+          ? value
+          : Number(value);
+    if (
+      !Number.isFinite(numeric) ||
+      (rule.type === "whole" && !Number.isInteger(numeric)) ||
+      first === undefined ||
+      (rule.formula2 !== undefined && second === undefined)
+    )
+      return { valid: false, reason: "type" };
+    return compare(rule.operator, numeric, first, second)
+      ? { valid: true }
+      : { valid: false, reason: "operator" };
   }
   return validateCellDataValidation(rule, typeof value === "object" ? null : value, context);
 }

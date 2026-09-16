@@ -19,3 +19,4 @@ export * from "./style-state.js";
 export * from "./workbook.js";
 export * from "./data-validation.js";
 export * from "./data-outline.js";
+export * from "./data-range.js";
