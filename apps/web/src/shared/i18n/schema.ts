@@ -156,7 +156,6 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       countTitle: string;
       rejectTitle: string;
       range: string;
-      header: string;
       fillColor: string;
       destination: string;
       overwrite: string;
@@ -173,7 +172,6 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       rangeChanged: string;
       duplicateRejected: string;
       rejectionTitle: string;
-      countHeader: string;
       colors: { lightRed: string; yellow: string; green: string };
     };
     validation: {

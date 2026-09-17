@@ -101,9 +101,6 @@ watch(
           ></template>
         </TInput>
       </label>
-      <TCheckbox v-model="draft.hasHeader" :disabled="busy">{{
-        t("dataTools.duplicates.header")
-      }}</TCheckbox>
       <div v-if="mode === 'highlight'" class="duplicate-values-dialog__field">
         <span>{{ t("dataTools.duplicates.fillColor") }}</span>
         <TRadioGroup

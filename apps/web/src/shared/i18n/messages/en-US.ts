@@ -164,7 +164,6 @@ export const enUS = {
       countTitle: "Count Duplicate Values",
       rejectTitle: "Reject Duplicate Entries",
       range: "Range",
-      header: "My data has headers",
       fillColor: "Fill color",
       destination: "Destination",
       overwrite: "Overwrite existing data",
@@ -182,7 +181,6 @@ export const enUS = {
       rangeChanged: "The data range changed. Select it again.",
       duplicateRejected: "Duplicate values are not allowed.",
       rejectionTitle: "Reject Duplicate Entries",
-      countHeader: "Count",
       colors: { lightRed: "Light red", yellow: "Yellow", green: "Green" },
     },
     validation: {

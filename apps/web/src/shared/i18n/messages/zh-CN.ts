@@ -160,7 +160,6 @@ export const zhCN = {
       countTitle: "统计重复次数",
       rejectTitle: "拒绝录入重复项",
       range: "数据区域",
-      header: "我的数据包含标题",
       fillColor: "填充颜色",
       destination: "输出位置",
       overwrite: "覆盖已有数据",
@@ -177,7 +176,6 @@ export const zhCN = {
       rangeChanged: "数据区域已变更，请重新选择。",
       duplicateRejected: "不允许录入重复值。",
       rejectionTitle: "拒绝录入重复项",
-      countHeader: "次数",
       colors: { lightRed: "浅红", yellow: "黄色", green: "绿色" },
     },
     validation: {

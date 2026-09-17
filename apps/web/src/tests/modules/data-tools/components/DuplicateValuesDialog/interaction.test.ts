@@ -5,7 +5,6 @@ import { createAppI18n } from "../../../../../shared/i18n";
 
 const initial = {
   range: "A1:A4",
-  hasHeader: true,
   fillColor: "#ffc7ce",
   destination: "C1",
   overwrite: false,

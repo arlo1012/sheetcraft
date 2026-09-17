@@ -33,7 +33,6 @@ type Options = {
 
 const emptyDraft = (): DuplicateToolDraft => ({
   range: "",
-  hasHeader: false,
   fillColor: "#ffc7ce",
   destination: "",
   overwrite: false,
@@ -105,7 +104,7 @@ export function useDuplicateToolsController(options: Options) {
     if (options.isBusy() || !options.flush()) return;
     const workbook = options.getWorkbook();
     const source = resolveRangeReference(workbook, draft.range, target.sheetId);
-    if (!source || (draft.hasHeader && source.range.start.row === source.range.end.row)) {
+    if (!source) {
       duplicateValuesError.value = t("dataTools.duplicates.invalidRange");
       return;
     }
@@ -143,18 +142,13 @@ export function useDuplicateToolsController(options: Options) {
               address: destination.range.start,
             },
             {
-              hasHeader: draft.hasHeader,
               overwrite: draft.overwrite,
-              headerLabel: t("dataTools.duplicates.countHeader"),
             },
           ),
         );
       } else {
         const range = {
-          start: {
-            row: source.range.start.row + (draft.hasHeader ? 1 : 0),
-            column: source.range.start.column,
-          },
+          start: { ...source.range.start },
           end: { ...source.range.end },
         };
         const existing = sourceSheet.duplicateRules ?? [];

@@ -45,17 +45,14 @@ function fixture() {
 }
 
 describe("duplicate tools controller", () => {
-  test("adds header-excluding highlight rules without changing base fills and clears only highlights", () => {
+  test("adds full-selection highlight rules without changing base fills and clears only highlights", () => {
     const f = fixture();
     setCellStyle(f.sheet, { row: 1, column: 0 }, { fillColor: "#0000ff" });
     f.controller.openDuplicateValues("highlight");
-    f.controller.applyDuplicateValues({
-      ...f.controller.duplicateValuesDraft.value,
-      hasHeader: true,
-    });
+    f.controller.applyDuplicateValues(f.controller.duplicateValuesDraft.value);
     expect(f.sheet.duplicateRules).toHaveLength(1);
     expect(f.sheet.duplicateRules![0]!.range).toEqual({
-      start: { row: 1, column: 0 },
+      start: { row: 0, column: 0 },
       end: { row: 4, column: 0 },
     });
     expect(f.sheet.cells.get("1:0")?.style?.fillColor).toBe("#0000ff");
@@ -70,20 +67,13 @@ describe("duplicate tools controller", () => {
     f.wrapper.unmount();
   });
 
-  test("writes header and per-value frequencies to a separate column and preserves source", () => {
+  test("writes per-value frequencies including the first selected row to a separate column and preserves source", () => {
     const f = fixture();
     f.controller.openDuplicateValues("count");
-    f.controller.applyDuplicateValues({
-      ...f.controller.duplicateValuesDraft.value,
-      hasHeader: true,
-    });
+    f.controller.applyDuplicateValues(f.controller.duplicateValuesDraft.value);
     const evaluator = createSheetEvaluator(f.sheet);
     expect([0, 1, 2, 3, 4].map((row) => evaluator.getComputedValue({ row, column: 1 }))).toEqual([
-      "Count",
-      2,
-      2,
-      2,
-      2,
+      1, 2, 2, 2, 2,
     ]);
     expect(evaluator.getComputedValue({ row: 1, column: 0 })).toBe("a");
     expect(f.controller.duplicateValuesVisible.value).toBe(false);
