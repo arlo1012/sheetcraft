@@ -173,19 +173,29 @@ function apply(): void {
               :disabled="!canSaveChanges"
               data-sort-list-save
               @click="saveChanges"
-              ><Check :size="15" />{{ t("dataTools.customSort.saveChanges") }}</TButton
             >
+              <template #icon><Check :size="15" aria-hidden="true" /></template>
+              {{ t("dataTools.customSort.saveChanges") }}
+            </TButton>
             <TButton
               v-else
               variant="text"
               :disabled="selectedId !== NEW_LIST_ID || !parsedEntries.length"
               data-sort-list-add
               @click="addList"
-              ><Plus :size="15" />{{ t("dataTools.customSort.add") }}</TButton
             >
-            <TButton variant="text" :disabled="!canDelete" data-sort-list-delete @click="deleteList"
-              ><Trash2 :size="15" />{{ t("dataTools.customSort.delete") }}</TButton
+              <template #icon><Plus :size="15" aria-hidden="true" /></template>
+              {{ t("dataTools.customSort.add") }}
+            </TButton>
+            <TButton
+              variant="text"
+              :disabled="!canDelete"
+              data-sort-list-delete
+              @click="deleteList"
             >
+              <template #icon><Trash2 :size="15" aria-hidden="true" /></template>
+              {{ t("dataTools.customSort.delete") }}
+            </TButton>
           </div>
         </div>
       </div>
