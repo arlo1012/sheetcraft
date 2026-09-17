@@ -11,7 +11,8 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   supports cell values, fill colors and font colors. Color levels place a chosen
   color at the top or bottom. Value levels also support custom sequences through
   Order > Custom list: choose a built-in sequence or enter one item per line,
-  add/delete user lists, and confirm. User lists are versioned local preferences;
+  add/edit/delete user lists, and confirm. Built-in lists remain read-only.
+  User lists are versioned local preferences;
   cancelling the list editor discards library changes. Each sort level captures
   its own sequence, with forward/reverse order and the case-sensitivity option.
   Unlisted values follow listed ones and use normal ordering among themselves.

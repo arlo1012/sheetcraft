@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Plus, Trash2 } from "lucide-vue-next";
+import { Check, Plus, Trash2 } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
@@ -38,11 +38,33 @@ const listOptions = computed(() => [
 ]);
 const selectedList = computed(() => allLists.value.find((list) => list.id === selectedId.value));
 const parsedEntries = computed(() => parseCustomSortList(entries.value));
-const canDelete = computed(() => customLists.value.some((list) => list.id === selectedId.value));
+const selectedCustomList = computed(() =>
+  customLists.value.find((list) => list.id === selectedId.value),
+);
+const canDelete = computed(() => Boolean(selectedCustomList.value));
+const canSaveChanges = computed(() => {
+  const list = selectedCustomList.value;
+  const values = parsedEntries.value;
+  return Boolean(
+    list &&
+    values.length &&
+    (list.values.length !== values.length ||
+      list.values.some((value, index) => value !== values[index])),
+  );
+});
+function saveChanges(): void {
+  if (canSaveChanges.value && selectedCustomList.value) {
+    selectedCustomList.value.values = [...parsedEntries.value];
+    entries.value = selectedCustomList.value.values.join("\n");
+  }
+}
 const canConfirm = computed(() =>
-  selectedId.value === NEW_LIST_ID ? parsedEntries.value.length > 0 : Boolean(selectedList.value),
+  selectedId.value === NEW_LIST_ID || selectedCustomList.value
+    ? parsedEntries.value.length > 0
+    : Boolean(selectedList.value),
 );
 function selectList(id: string): void {
+  saveChanges();
   selectedId.value = id;
   entries.value = allLists.value.find((list) => list.id === id)?.values.join("\n") ?? "";
 }
@@ -50,6 +72,8 @@ watch(
   () => props.visible,
   (visible) => {
     if (!visible) return;
+    selectedId.value = NEW_LIST_ID;
+    entries.value = "";
     customLists.value = readCustomSortLists();
     originalLists = JSON.stringify(customLists.value);
     const initial = props.initialOrder;
@@ -90,6 +114,7 @@ function deleteList(): void {
 function apply(): void {
   if (!canConfirm.value) return;
   if (selectedId.value === NEW_LIST_ID) addList();
+  else saveChanges();
   const values = selectedList.value?.values;
   if (!values?.length) return;
   if (
@@ -134,7 +159,7 @@ function apply(): void {
           <TTextarea
             v-model="entries"
             class="custom-sort-list-dialog__input"
-            :readonly="selectedId !== NEW_LIST_ID"
+            :readonly="selectedId !== NEW_LIST_ID && !selectedCustomList"
             :aria-label="t('dataTools.customSort.entries')"
             :placeholder="t('dataTools.customSort.placeholder')"
             :autosize="false"
@@ -143,6 +168,15 @@ function apply(): void {
           />
           <div class="custom-sort-list-dialog__actions">
             <TButton
+              v-if="selectedCustomList"
+              variant="text"
+              :disabled="!canSaveChanges"
+              data-sort-list-save
+              @click="saveChanges"
+              ><Check :size="15" />{{ t("dataTools.customSort.saveChanges") }}</TButton
+            >
+            <TButton
+              v-else
               variant="text"
               :disabled="selectedId !== NEW_LIST_ID || !parsedEntries.length"
               data-sort-list-add

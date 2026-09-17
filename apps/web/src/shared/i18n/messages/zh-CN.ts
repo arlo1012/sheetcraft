@@ -44,6 +44,7 @@ export const zhCN = {
       newList: "新序列",
       entries: "输入序列",
       placeholder: "每行输入一项",
+      saveChanges: "保存修改",
       add: "添加",
       delete: "删除",
       storageUnavailable: "序列已应用，但未能保存到本机。",

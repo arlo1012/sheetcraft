@@ -27,10 +27,55 @@ function fixture(initialOrder?: string[]) {
 }
 
 describe("CustomSortListDialog", () => {
+  test("edits an existing list in place, retains edits across selection changes, and saves on confirm", async () => {
+    writeCustomSortLists([{ id: "priority", values: ["High", "Low"] }]);
+    const { wrapper, click, confirm } = fixture(["High", "Low"]);
+    const input = () => new DOMWrapper(document.querySelector("textarea")!);
+    expect(wrapper.findComponent({ name: "TTextarea" }).props("readonly")).toBe(false);
+    await input().setValue("High\nMedium\nLow");
+    await click("[data-sort-list-save]");
+    expect(readCustomSortLists()).toEqual([{ id: "priority", values: ["High", "Low"] }]);
+    await input().setValue("Urgent\nHigh\nMedium\nLow");
+    await click('[data-sort-list="builtin:weekday-short-en"]');
+    await click('[data-sort-list="priority"]');
+    expect(wrapper.findComponent({ name: "TTextarea" }).props("modelValue")).toBe(
+      "Urgent\nHigh\nMedium\nLow",
+    );
+    await input().setValue("Urgent\nNormal\nLow");
+    confirm();
+    expect(wrapper.emitted("apply")?.[0]?.[0]).toEqual(["Urgent", "Normal", "Low"]);
+    expect(readCustomSortLists()).toEqual([
+      { id: "priority", values: ["Urgent", "Normal", "Low"] },
+    ]);
+    await wrapper.setProps({ visible: false, initialOrder: ["Urgent", "Normal", "Low"] });
+    await wrapper.setProps({ visible: true });
+    expect(wrapper.findComponent({ name: "TTextarea" }).props("modelValue")).toBe(
+      "Urgent\nNormal\nLow",
+    );
+  });
+
+  test("cancels edits and does not replace a saved list with empty entries", async () => {
+    const original = [{ id: "priority", values: ["High", "Low"] }];
+    writeCustomSortLists(original);
+    const { wrapper, click, confirm } = fixture(["High", "Low"]);
+    await new DOMWrapper(document.querySelector("textarea")!).setValue("First\nLast");
+    await click("[data-sort-list-save]");
+    wrapper.findComponent({ name: "TDialog" }).vm.$emit("close");
+    await wrapper.setProps({ visible: false });
+    await wrapper.setProps({ visible: true });
+    expect(wrapper.findComponent({ name: "TTextarea" }).props("modelValue")).toBe("High\nLow");
+    await new DOMWrapper(document.querySelector("textarea")!).setValue(" \n");
+    expect(wrapper.findComponent({ name: "TDialog" }).props("confirmBtn")).toMatchObject({
+      disabled: true,
+    });
+    confirm();
+    expect(wrapper.emitted("apply")).toBeUndefined();
+    expect(readCustomSortLists()).toEqual(original);
+  });
   test("keeps a stored list named new distinct from the new-list entry", async () => {
     writeCustomSortLists([{ id: "new", values: ["First", "Last"] }]);
     const { wrapper, click, confirm } = fixture(["First", "Last"]);
-    expect(wrapper.findComponent({ name: "TTextarea" }).props("readonly")).toBe(true);
+    expect(wrapper.findComponent({ name: "TTextarea" }).props("readonly")).toBe(false);
     expect(document.querySelectorAll('[data-sort-list="new"]')).toHaveLength(1);
     expect(document.querySelector('[data-sort-list="builtin:new"]')).not.toBeNull();
     await click("[data-sort-list-delete]");

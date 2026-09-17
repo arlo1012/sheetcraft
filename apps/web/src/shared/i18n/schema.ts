@@ -44,6 +44,7 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       newList: string;
       entries: string;
       placeholder: string;
+      saveChanges: string;
       add: string;
       delete: string;
       storageUnavailable: string;

@@ -44,6 +44,7 @@ export const enUS = {
       newList: "New list",
       entries: "List entries",
       placeholder: "Enter one item per line",
+      saveChanges: "Save changes",
       add: "Add",
       delete: "Delete",
       storageUnavailable: "The list was applied but could not be saved on this device.",
