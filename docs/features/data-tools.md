@@ -61,6 +61,14 @@ the hidden-result rows and reports loss of advanced-filter semantics: criteria
 cannot be reapplied after import, and formulas distinguishing filtered rows from
 manually hidden rows (such as SUBTOTAL/AGGREGATE) can recalculate differently.
 
+## TODO
+
+- [ ] Support sorting by conditional formatting icons (条件格式图标).
+      The Sort On selector shows this as a disabled TODO option until icon-set
+      rules and their evaluated cell icons are available. Then offer icons from
+      the selected column, support placing the chosen icon on top or bottom, and
+      integrate with multi-level priorities, header protection and undo/redo.
+
 ## Integration boundaries
 
 `packages/core` owns the runtime-neutral data model, operations, validation and

@@ -60,6 +60,7 @@ const basisOptions = computed(() => [
   { label: t("dataTools.sort.values"), value: "value" },
   { label: t("dataTools.sort.cellColor"), value: "cellColor" },
   { label: t("dataTools.sort.fontColor"), value: "fontColor" },
+  { label: t("dataTools.sort.iconTodo"), value: "icon", disabled: true },
 ]);
 const positionOptions = computed(() => [
   { label: t("dataTools.sort.onTop"), value: "ascending" },

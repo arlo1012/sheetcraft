@@ -28,6 +28,7 @@ export const enUS = {
       sortOn: "Sort on",
       cellColor: "Cell color",
       fontColor: "Font color",
+      iconTodo: "Conditional formatting icon (TODO)",
       onTop: "On top",
       onBottom: "On bottom",
       selectColor: "Choose color",

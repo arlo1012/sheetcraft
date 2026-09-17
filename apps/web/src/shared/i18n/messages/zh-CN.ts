@@ -28,6 +28,7 @@ export const zhCN = {
       sortOn: "排序依据",
       cellColor: "单元格颜色",
       fontColor: "字体颜色",
+      iconTodo: "条件格式图标（TODO）",
       onTop: "置于顶端",
       onBottom: "置于底端",
       selectColor: "选择颜色",

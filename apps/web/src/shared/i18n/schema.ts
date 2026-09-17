@@ -28,6 +28,7 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       sortOn: string;
       cellColor: string;
       fontColor: string;
+      iconTodo: string;
       onTop: string;
       onBottom: string;
       selectColor: string;
