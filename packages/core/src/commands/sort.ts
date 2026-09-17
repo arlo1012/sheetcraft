@@ -105,6 +105,52 @@ function compareSortValues(
   return 0;
 }
 
+type CustomOrderRanks = ReadonlyMap<string, number>;
+
+function normalizeCustomOrderValue(value: string, caseSensitive: boolean): string {
+  return caseSensitive ? value : value.toLowerCase();
+}
+
+function createCustomOrderRanks(
+  customOrder: readonly string[],
+  caseSensitive: boolean,
+): CustomOrderRanks {
+  const ranks = new Map<string, number>();
+  for (const [index, value] of customOrder.entries()) {
+    const normalized = normalizeCustomOrderValue(value, caseSensitive);
+    if (!ranks.has(normalized)) ranks.set(normalized, index);
+  }
+  return ranks;
+}
+
+function getCustomOrderRank(
+  value: FormulaValue,
+  ranks: CustomOrderRanks,
+  caseSensitive: boolean,
+): number | undefined {
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
+    return undefined;
+  return ranks.get(normalizeCustomOrderValue(String(value), caseSensitive));
+}
+
+function compareCustomSortValues(
+  left: FormulaValue,
+  right: FormulaValue,
+  direction: SortDirection,
+  caseSensitive: boolean,
+  ranks: CustomOrderRanks,
+): number {
+  const leftRank = getCustomOrderRank(left, ranks, caseSensitive);
+  const rightRank = getCustomOrderRank(right, ranks, caseSensitive);
+  if (leftRank !== undefined || rightRank !== undefined) {
+    if (leftRank === undefined) return 1;
+    if (rightRank === undefined) return -1;
+    const difference = leftRank - rightRank;
+    return direction === "descending" ? -difference : difference;
+  }
+  return compareSortValues(left, right, direction, caseSensitive);
+}
+
 function normalizeSortColor(color: string): string {
   return color.toLowerCase();
 }
@@ -149,19 +195,29 @@ function compareSortEntries(
   right: SortEntry,
   keys: readonly SortKey[],
   caseSensitive: boolean,
+  customOrderRanks: readonly (CustomOrderRanks | undefined)[],
 ): number {
   for (let index = 0; index < keys.length; index += 1) {
     const key = keys[index];
     if (!key) continue;
+    const customRanks = customOrderRanks[index];
     const compared =
       key.sortOn === "cellColor" || key.sortOn === "fontColor"
         ? compareColorSortValues(left.colors[index], right.colors[index], key)
-        : compareSortValues(
-            left.values[index]!,
-            right.values[index]!,
-            key.direction,
-            caseSensitive,
-          );
+        : customRanks
+          ? compareCustomSortValues(
+              left.values[index]!,
+              right.values[index]!,
+              key.direction,
+              caseSensitive,
+              customRanks,
+            )
+          : compareSortValues(
+              left.values[index]!,
+              right.values[index]!,
+              key.direction,
+              caseSensitive,
+            );
     if (compared !== 0) return compared;
   }
   // Stable even if the JS engine implementation changes.
@@ -232,6 +288,23 @@ function validateSortCommand(
     )
       throw invalidCommandPayload("sortKeys", command.sortKeys);
     const isColorSort = key.sortOn === "cellColor" || key.sortOn === "fontColor";
+    if (isColorSort && key.customOrder !== undefined)
+      throw invalidCommandPayload(
+        "sortKeys",
+        command.sortKeys,
+        "Custom orders are only supported for value sorts.",
+      );
+    if (
+      key.customOrder !== undefined &&
+      (!Array.isArray(key.customOrder) ||
+        key.customOrder.length === 0 ||
+        key.customOrder.some((value) => typeof value !== "string" || value.trim().length === 0))
+    )
+      throw invalidCommandPayload(
+        "sortKeys",
+        command.sortKeys,
+        "Custom orders must contain at least one non-blank string.",
+      );
     if (!isColorSort && "color" in key) throw invalidCommandPayload("sortKeys", command.sortKeys);
     if (isColorSort) {
       if (!("color" in key)) throw invalidCommandPayload("sortKeys", command.sortKeys);
@@ -306,7 +379,9 @@ export function createMultiKeySortSheetRangeCommand(
     // These two fields preserve transport compatibility with old snapshots.
     keyColumn: first.column,
     direction: first.direction,
-    sortKeys: sortKeys.map((key) => ({ ...key })),
+    sortKeys: sortKeys.map((key) =>
+      key.customOrder === undefined ? { ...key } : { ...key, customOrder: [...key.customOrder] },
+    ),
     ...(options?.hasHeader ? { hasHeader: true } : {}),
     ...(options?.caseSensitive !== undefined ? { caseSensitive: options.caseSensitive } : {}),
   };
@@ -322,6 +397,9 @@ export function applySortSheetRangeCommand(
     ? command.sortKeys
     : [{ column: command.keyColumn, direction: command.direction }];
   const caseSensitive = command.caseSensitive ?? true;
+  const customOrderRanks = keys.map((key) =>
+    key.customOrder ? createCustomOrderRanks(key.customOrder, caseSensitive) : undefined,
+  );
   const dataStart = range.start.row + (command.hasHeader ? 1 : 0);
   if (dataStart >= range.end.row + 1) return null;
   const sortableRange = { ...range, start: { ...range.start, row: dataStart } };
@@ -340,7 +418,7 @@ export function applySortSheetRangeCommand(
         ),
       };
     },
-  ).sort((left, right) => compareSortEntries(left, right, keys, caseSensitive));
+  ).sort((left, right) => compareSortEntries(left, right, keys, caseSensitive, customOrderRanks));
   const destinationBySourceRow = new Map<number, number>();
   for (let offset = 0; offset < sortedRows.length; offset += 1) {
     const source = sortedRows[offset];

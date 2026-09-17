@@ -62,6 +62,24 @@ function fixture(
 }
 
 describe("useDataToolsController", () => {
+  test("sorts by a custom sequence with unlisted values after the sequence", () => {
+    const f = fixture();
+    f.set(0, 1, "Priority");
+    f.set(1, 1, "Low");
+    f.set(2, 1, "Other");
+    f.set(3, 1, "High");
+    f.set(4, 1, "Medium");
+    f.controller.openSort();
+    f.controller.applySort({
+      range: "B1:B5",
+      hasHeader: true,
+      levels: [{ column: 1, direction: "ascending", customOrder: ["High", "Medium", "Low"] }],
+    });
+    const values = [0, 1, 2, 3, 4].map((row) =>
+      createSheetEvaluator(f.sheet).getComputedValue({ row, column: 1 }),
+    );
+    expect(values).toEqual(["Priority", "High", "Medium", "Low", "Other"]);
+  });
   test("discovers column colors and applies selected color placement through Core", () => {
     const f = fixture();
     f.set(0, 1, "Name");

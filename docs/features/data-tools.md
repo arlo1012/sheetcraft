@@ -7,7 +7,15 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
 
 - Sort ascending/descending or use several sort keys. A single cell resolves to
   its contiguous data region. Active filter headers stay fixed. Ambiguous all-text
-  regions open the header setting before a quick sort moves rows.
+  regions open the header setting before a quick sort moves rows. Custom sorting
+  supports cell values, fill colors and font colors. Color levels place a chosen
+  color at the top or bottom. Value levels also support custom sequences through
+  Order > Custom list: choose a built-in sequence or enter one item per line,
+  add/delete user lists, and confirm. User lists are versioned local preferences;
+  cancelling the list editor discards library changes. Each sort level captures
+  its own sequence, with forward/reverse order and the case-sensitivity option.
+  Unlisted values follow listed ones and use normal ordering among themselves.
+  Sorting moves cell content and styles through the existing undo/redo command.
 - Filter from column headers using searched values or text, number, and date
   conditions. Clear removes conditions and retains the buttons; Filter toggles
   the complete filter. Reapply recalculates the sheet.

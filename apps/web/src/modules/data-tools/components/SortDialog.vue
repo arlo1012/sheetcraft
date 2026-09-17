@@ -12,6 +12,7 @@ import type {
   TableRowData,
 } from "tdesign-vue-next/es/table/type";
 import { useAppI18n } from "../../../shared/i18n";
+import CustomSortListDialog from "./CustomSortListDialog.vue";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import type {
   DataToolColumn,
@@ -41,6 +42,8 @@ const selectedId = ref<number>();
 const hasHeader = ref(true);
 const caseSensitive = ref(false);
 const optionsVisible = ref(false);
+const customListRowId = ref<number>();
+const customListRow = computed(() => rows.value.find((row) => row.id === customListRowId.value));
 const optionCaseSensitive = ref(false);
 let nextId = 0;
 const maxLevels = 64;
@@ -56,6 +59,52 @@ const directionOptions = computed(() => [
   { label: t("dataTools.sort.ascending"), value: "ascending" },
   { label: t("dataTools.sort.descending"), value: "descending" },
 ]);
+function orderOptions(row: SortRow) {
+  if (isColorLevel(row)) return positionOptions.value;
+  return [
+    ...directionOptions.value,
+    ...(row.customOrder
+      ? [
+          { value: "selected-custom", label: row.customOrder.join(", ") },
+          ...(row.customOrder.length > 1
+            ? [
+                {
+                  value: "selected-custom-reversed",
+                  label: [...row.customOrder].reverse().join(", "),
+                },
+              ]
+            : []),
+        ]
+      : []),
+    { value: "custom", label: t("dataTools.sort.customList") },
+  ];
+}
+function orderValue(row: SortRow): string {
+  return !isColorLevel(row) && row.customOrder
+    ? row.direction === "ascending"
+      ? "selected-custom"
+      : "selected-custom-reversed"
+    : row.direction;
+}
+function changeOrder(row: SortRow, value: unknown): void {
+  if (value === "custom" && !isColorLevel(row)) {
+    selectedId.value = row.id;
+    customListRowId.value = row.id;
+  } else if (value === "selected-custom" || value === "selected-custom-reversed") {
+    row.direction = value === "selected-custom" ? "ascending" : "descending";
+  } else if (value === "ascending" || value === "descending") {
+    row.direction = value;
+    delete row.customOrder;
+  }
+}
+function applyCustomList(values: string[]): void {
+  const row = customListRow.value;
+  if (row) {
+    row.customOrder = [...values];
+    row.direction = "ascending";
+  }
+  customListRowId.value = undefined;
+}
 const basisOptions = computed(() => [
   { label: t("dataTools.sort.values"), value: "value" },
   { label: t("dataTools.sort.cellColor"), value: "cellColor" },
@@ -105,6 +154,7 @@ function changeColumn(row: SortRow, value: unknown): void {
 function changeBasis(row: SortRow, value: unknown): void {
   if (value !== "value" && value !== "cellColor" && value !== "fontColor") return;
   row.sortOn = value;
+  if (value !== "value") delete row.customOrder;
   delete row.color;
   syncColor(row);
 }
@@ -133,6 +183,7 @@ watch(
   () => props.visible,
   (visible) => {
     optionsVisible.value = false;
+    customListRowId.value = undefined;
     if (!visible) return;
     hasHeader.value = props.initial?.headerLocked || (props.initial?.hasHeader ?? true);
     caseSensitive.value = false;
@@ -155,7 +206,11 @@ function selectRows(keys: Array<string | number>): void {
   if (typeof keys[0] === "number") selectedId.value = keys[0];
 }
 function insertLevel(level: SortLevel): void {
-  const row = { ...level, id: ++nextId };
+  const row = {
+    ...level,
+    ...(level.customOrder ? { customOrder: [...level.customOrder] } : {}),
+    id: ++nextId,
+  };
   rows.value.splice(selectedIndex.value + 1, 0, row);
   selectedId.value = row.id;
 }
@@ -199,7 +254,11 @@ function apply(): void {
     levels: rows.value.map((row) => ({
       column: row.column,
       direction: row.direction,
-      ...(isColorLevel(row) ? { sortOn: row.sortOn, color: row.color } : {}),
+      ...(isColorLevel(row)
+        ? { sortOn: row.sortOn, color: row.color }
+        : row.customOrder
+          ? { customOrder: [...row.customOrder] }
+          : {}),
     })),
   });
 }
@@ -207,7 +266,7 @@ function apply(): void {
 
 <template>
   <Dialog
-    :visible="visible && !optionsVisible"
+    :visible="visible && !optionsVisible && customListRowId === undefined"
     :header="t('dataTools.sort.title')"
     width="min(900px, calc(100vw - 32px))"
     placement="center"
@@ -358,9 +417,10 @@ function apply(): void {
                 </template>
               </TSelect>
               <TSelect
-                v-model="row.direction"
+                :value="orderValue(row)"
                 data-sort-field="direction"
-                :options="isColorLevel(row) ? positionOptions : directionOptions"
+                :options="orderOptions(row)"
+                @update:model-value="changeOrder(row, $event)"
                 :popup-props="popupProps"
                 :aria-label="t('dataTools.sort.order')"
                 @focus="selectedId = row.id"
@@ -371,6 +431,13 @@ function apply(): void {
       </TableHeightWrapper>
     </div>
   </Dialog>
+  <CustomSortListDialog
+    v-if="visible && customListRowId !== undefined"
+    :visible="true"
+    :initial-order="customListRow?.customOrder"
+    @close="customListRowId = undefined"
+    @apply="applyCustomList"
+  />
   <Dialog
     :visible="visible && optionsVisible"
     :header="t('dataTools.sort.optionsTitle')"

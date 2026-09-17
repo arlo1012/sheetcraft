@@ -226,6 +226,8 @@ export type SortKey = {
   direction: SortDirection;
   /** Omitted retains value sorting for saved commands created before color sorting. */
   sortOn?: "value" | "cellColor" | "fontColor";
+  /** Explicit value order for value sorts. Unlisted values use the ordinary value comparison. */
+  customOrder?: string[];
   /** Required by color sorts. `null` selects cells without a fill for `cellColor`. */
   color?: string | null;
 };

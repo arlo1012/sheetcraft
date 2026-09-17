@@ -1,5 +1,6 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
+import CustomSortListDialog from "../../../../modules/data-tools/components/CustomSortListDialog.vue";
 import SortDialog from "../../../../modules/data-tools/components/SortDialog.vue";
 import { createAppI18n } from "../../../../shared/i18n";
 
@@ -41,6 +42,41 @@ function fixture(headerLocked = false) {
 }
 
 describe("SortDialog", () => {
+  test("applies custom order, reverses it, and preserves row draft when its editor is cancelled", async () => {
+    const { wrapper, action, confirm } = fixture();
+    const order = () =>
+      wrapper
+        .findAllComponents({ name: "TSelect" })
+        .filter((item) => item.attributes("data-sort-field") === "direction");
+    order()[0]!.vm.$emit("update:modelValue", "custom");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.findAllComponents({ name: "TDialog" })[0]!.props("visible")).toBe(false);
+    wrapper.getComponent(CustomSortListDialog).vm.$emit("apply", ["High", "Medium", "Low"]);
+    await wrapper.vm.$nextTick();
+    expect(order()[0]!.props("value")).toBe("selected-custom");
+    order()[0]!.vm.$emit("update:modelValue", "selected-custom-reversed");
+    await wrapper.vm.$nextTick();
+    await action("copy");
+    order()[1]!.vm.$emit("update:modelValue", "custom");
+    await wrapper.vm.$nextTick();
+    wrapper.getComponent(CustomSortListDialog).vm.$emit("close");
+    await wrapper.vm.$nextTick();
+    confirm();
+    expect(wrapper.emitted("apply")?.at(-1)?.[0]).toMatchObject({
+      levels: [
+        { customOrder: ["High", "Medium", "Low"], direction: "descending" },
+        { customOrder: ["High", "Medium", "Low"], direction: "descending" },
+      ],
+    });
+    order()[1]!.vm.$emit("update:modelValue", "ascending");
+    await wrapper.vm.$nextTick();
+    confirm();
+    const draft = wrapper.emitted("apply")!.at(-1)![0] as {
+      levels: Array<{ customOrder?: string[] }>;
+    };
+    expect(draft.levels[0]?.customOrder).toEqual(["High", "Medium", "Low"]);
+    expect(draft.levels[1]?.customOrder).toBeUndefined();
+  });
   test("switches basis, color and placement, and copies color levels independently", async () => {
     const { wrapper, action, confirm } = fixture();
     const fields = (field: string) =>

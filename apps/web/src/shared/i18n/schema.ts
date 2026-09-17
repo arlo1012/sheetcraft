@@ -20,6 +20,7 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       moveDown: string;
       options: string;
       optionsTitle: string;
+      customList: string;
       caseSensitive: string;
       primaryKey: string;
       thenBy: string;
@@ -36,6 +37,16 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       noColors: string;
       values: string;
       confirm: string;
+    };
+    customSort: {
+      title: string;
+      lists: string;
+      newList: string;
+      entries: string;
+      placeholder: string;
+      add: string;
+      delete: string;
+      storageUnavailable: string;
     };
     filter: {
       showAll: string;

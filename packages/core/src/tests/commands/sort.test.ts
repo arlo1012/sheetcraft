@@ -573,4 +573,181 @@ describe("sheet range sorting", () => {
     ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
     expect(createSheetSparseState(sheet)).toEqual(before);
   });
+
+  test("sorts listed values in custom order while keeping unlisted values after them", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    for (const [row, value] of ["Zulu", "Medium", "Low", "Alpha", "High"].entries()) {
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value });
+    }
+    const before = createSheetSparseState(sheet);
+    const range = { start: { row: 0, column: 0 }, end: { row: 4, column: 0 } };
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createMultiKeySortSheetRangeCommand(sheet.id, range, [
+          {
+            column: 0,
+            direction: "ascending",
+            customOrder: ["High", "Medium", "Low"],
+          },
+        ]),
+      ),
+    ).toBe(true);
+    expect([0, 1, 2, 3, 4].map((row) => getCellContent(sheet, { row, column: 0 }))).toEqual([
+      { kind: "literal", value: "High" },
+      { kind: "literal", value: "Medium" },
+      { kind: "literal", value: "Low" },
+      { kind: "literal", value: "Alpha" },
+      { kind: "literal", value: "Zulu" },
+    ]);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(before);
+    expect(redoWorkbookCommand(session)).toBe(true);
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(
+      executeWorkbookCommand(
+        session,
+        createMultiKeySortSheetRangeCommand(sheet.id, range, [
+          {
+            column: 0,
+            direction: "descending",
+            customOrder: ["High", "Medium", "Low"],
+          },
+        ]),
+      ),
+    ).toBe(true);
+    expect([0, 1, 2, 3, 4].map((row) => getCellContent(sheet, { row, column: 0 }))).toEqual([
+      { kind: "literal", value: "Low" },
+      { kind: "literal", value: "Medium" },
+      { kind: "literal", value: "High" },
+      { kind: "literal", value: "Zulu" },
+      { kind: "literal", value: "Alpha" },
+    ]);
+  });
+
+  test("matches primitive custom values and applies the command case-sensitivity option", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    for (const [row, value] of ["alpha", 2, true, "ALPHA"].entries()) {
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value });
+    }
+    const range = { start: { row: 0, column: 0 }, end: { row: 3, column: 0 } };
+
+    executeWorkbookCommand(
+      session,
+      createMultiKeySortSheetRangeCommand(
+        sheet.id,
+        range,
+        [{ column: 0, direction: "ascending", customOrder: ["true", "2", "ALPHA", "alpha"] }],
+        { caseSensitive: false },
+      ),
+    );
+    expect([0, 1, 2, 3].map((row) => getCellContent(sheet, { row, column: 0 }))).toEqual([
+      { kind: "literal", value: true },
+      { kind: "literal", value: 2 },
+      { kind: "literal", value: "alpha" },
+      { kind: "literal", value: "ALPHA" },
+    ]);
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    executeWorkbookCommand(
+      session,
+      createMultiKeySortSheetRangeCommand(sheet.id, range, [
+        { column: 0, direction: "ascending", customOrder: ["true", "2", "ALPHA", "alpha"] },
+      ]),
+    );
+    expect([0, 1, 2, 3].map((row) => getCellContent(sheet, { row, column: 0 }))).toEqual([
+      { kind: "literal", value: true },
+      { kind: "literal", value: 2 },
+      { kind: "literal", value: "ALPHA" },
+      { kind: "literal", value: "alpha" },
+    ]);
+  });
+
+  test("uses subsequent sort keys for equal custom ranks and remains stable for complete ties", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    for (const [row, [priority, label, id]] of [
+      ["Later", "later-2", "later"],
+      ["Soon", "soon-2", "soon-2"],
+      ["Soon", "soon-1", "soon-1"],
+      ["Other", "other", "other-first"],
+      ["Other", "other", "other-second"],
+    ].entries()) {
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value: priority! });
+      setCellContent(sheet, { row, column: 1 }, { kind: "literal", value: label! });
+      setCellContent(sheet, { row, column: 2 }, { kind: "literal", value: id! });
+    }
+
+    executeWorkbookCommand(
+      session,
+      createMultiKeySortSheetRangeCommand(
+        sheet.id,
+        { start: { row: 0, column: 0 }, end: { row: 4, column: 2 } },
+        [
+          { column: 0, direction: "ascending", customOrder: ["Soon", "Later"] },
+          { column: 1, direction: "ascending" },
+        ],
+      ),
+    );
+    expect([0, 1, 2, 3, 4].map((row) => getCellContent(sheet, { row, column: 2 }))).toEqual([
+      { kind: "literal", value: "soon-1" },
+      { kind: "literal", value: "soon-2" },
+      { kind: "literal", value: "later" },
+      { kind: "literal", value: "other-first" },
+      { kind: "literal", value: "other-second" },
+    ]);
+  });
+
+  test("clones custom order arrays in the multi-key factory", () => {
+    const customOrder = ["High", "Low"];
+    const command = createMultiKeySortSheetRangeCommand(
+      "sheet",
+      { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      [{ column: 0, direction: "ascending", customOrder }],
+    );
+    customOrder[0] = "Changed";
+    expect(command.sortKeys?.[0]?.customOrder).toEqual(["High", "Low"]);
+  });
+
+  test("rejects invalid custom orders and custom orders on color sorts without changing the sheet", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: 2 });
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: 1 });
+    const before = createSheetSparseState(sheet);
+    const command = {
+      type: "sortSheetRange" as const,
+      sheetId: sheet.id,
+      range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      keyColumn: 0,
+      direction: "ascending" as const,
+    };
+    for (const customOrder of [[], ["  "], [1]] as unknown[]) {
+      expect(
+        tryApplyWorkbookCommand(session.workbook, {
+          ...command,
+          sortKeys: [{ column: 0, direction: "ascending", customOrder }],
+        } as never),
+      ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
+    }
+    expect(
+      tryApplyWorkbookCommand(session.workbook, {
+        ...command,
+        sortKeys: [
+          {
+            column: 0,
+            direction: "ascending",
+            sortOn: "cellColor",
+            color: "#ff0000",
+            customOrder: ["red"],
+          },
+        ],
+      }),
+    ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
+    expect(createSheetSparseState(sheet)).toEqual(before);
+  });
 });
