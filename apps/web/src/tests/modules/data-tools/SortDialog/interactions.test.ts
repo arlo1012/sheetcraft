@@ -42,6 +42,45 @@ function fixture(headerLocked = false) {
 }
 
 describe("SortDialog", () => {
+  test("restores applied levels and options without mutating them when draft changes are cancelled", async () => {
+    const { wrapper, confirm } = fixture();
+    const initial = {
+      hasHeader: true,
+      column: 0,
+      direction: "descending" as const,
+      caseSensitive: true,
+      levels: [
+        { column: 0, direction: "descending" as const, customOrder: ["High", "Low"] },
+        {
+          column: 1,
+          direction: "ascending" as const,
+          sortOn: "cellColor" as const,
+          color: "#ffff00",
+        },
+      ],
+    };
+    await wrapper.setProps({ visible: false, initial });
+    await wrapper.setProps({ visible: true });
+    confirm();
+    expect(wrapper.emitted("apply")?.at(-1)?.[0]).toMatchObject({
+      levels: initial.levels,
+      caseSensitive: true,
+    });
+    const order = wrapper
+      .findAllComponents({ name: "TSelect" })
+      .find((item) => item.attributes("data-sort-field") === "direction")!;
+    expect(order.props("value")).toBe("selected-custom-reversed");
+    order.vm.$emit("update:value", "ascending");
+    await wrapper.vm.$nextTick();
+    expect(initial.levels[0]?.customOrder).toEqual(["High", "Low"]);
+    await wrapper.setProps({ visible: false });
+    await wrapper.setProps({ visible: true });
+    confirm();
+    expect(wrapper.emitted("apply")?.at(-1)?.[0]).toMatchObject({
+      levels: initial.levels,
+      caseSensitive: true,
+    });
+  });
   test("updates every sort row dropdown from its visible options and opens custom lists", async () => {
     const { wrapper } = fixture();
     const field = (name: string) =>

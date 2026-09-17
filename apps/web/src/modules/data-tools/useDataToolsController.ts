@@ -52,6 +52,7 @@ import type {
   RemoveDuplicatesDraft,
   SortDraft,
   SortInitial,
+  SortLevel,
   SubtotalDraft,
   TextToColumnsDraft,
 } from "./data-tools-types";
@@ -92,6 +93,23 @@ function intersects(left: CellRange, right: CellRange): boolean {
 function rangeLabel(range: CellRange): string {
   return `${columnName(range.start.column)}${range.start.row + 1}:${columnName(range.end.column)}${range.end.row + 1}`;
 }
+function sortRangeKey(target: Target): string {
+  const startRow = Math.min(target.range.start.row, target.range.end.row);
+  const endRow = Math.max(target.range.start.row, target.range.end.row);
+  const startColumn = Math.min(target.range.start.column, target.range.end.column);
+  const endColumn = Math.max(target.range.start.column, target.range.end.column);
+  return JSON.stringify([target.sheetId, startRow, startColumn, endRow, endColumn]);
+}
+function cloneSortLevels(levels: readonly SortLevel[] | undefined): SortLevel[] | undefined {
+  return levels?.map((level) =>
+    level.customOrder === undefined
+      ? { ...level }
+      : { ...level, customOrder: [...level.customOrder] },
+  );
+}
+function cloneSortInitial(initial: SortInitial): SortInitial {
+  return { ...initial, levels: cloneSortLevels(initial.levels) };
+}
 
 export function useDataToolsController(options: Options) {
   const { t, locale } = useAppI18n();
@@ -108,6 +126,8 @@ export function useDataToolsController(options: Options) {
     column: 0,
     direction: "ascending" as "ascending" | "descending",
   });
+  let sortSettingsGeneration: number | undefined;
+  const sortSettings = new Map<string, SortInitial>();
   const textTarget = ref<Target>();
   const duplicateTarget = ref<Target>();
   const validationTarget = ref<Target>();
@@ -194,6 +214,21 @@ export function useDataToolsController(options: Options) {
       );
       return false;
     }
+  }
+  function sortSettingsFor(target: Target): SortInitial | undefined {
+    if (sortSettingsGeneration !== target.generation) {
+      sortSettings.clear();
+      sortSettingsGeneration = target.generation;
+    }
+    const settings = sortSettings.get(sortRangeKey(target));
+    return settings && cloneSortInitial(settings);
+  }
+  function rememberSortSettings(target: Target, settings: SortInitial): void {
+    if (sortSettingsGeneration !== target.generation) {
+      sortSettings.clear();
+      sortSettingsGeneration = target.generation;
+    }
+    sortSettings.set(sortRangeKey(target), cloneSortInitial(settings));
   }
   function columnsFor(target?: Target): DataToolColumn[] {
     const range =
@@ -376,11 +411,21 @@ export function useDataToolsController(options: Options) {
       sortVisible.value = true;
       return;
     }
-    execute(target, () =>
-      createMultiKeySortSheetRangeCommand(target.sheetId, target.range, [{ column, direction }], {
+    if (
+      execute(target, () =>
+        createMultiKeySortSheetRangeCommand(target.sheetId, target.range, [{ column, direction }], {
+          hasHeader,
+        }),
+      )
+    )
+      rememberSortSettings(target, {
         hasHeader,
-      }),
-    );
+        column,
+        direction,
+        levels: [{ column, direction }],
+        // The Core command defaults this omitted option to case-sensitive comparisons.
+        caseSensitive: true,
+      });
   }
   function inferHeader(target: Target): boolean | undefined {
     if (activeSheet.value.filter && intersects(activeSheet.value.filter.range, target.range))
@@ -400,36 +445,45 @@ export function useDataToolsController(options: Options) {
     const target = capture();
     if (target) {
       sortTarget.value = target;
+      const restored = sortSettingsFor(target);
       sortInitial.value = {
-        hasHeader: inferHeader(target) ?? true,
+        ...restored,
+        hasHeader: restored?.hasHeader ?? inferHeader(target) ?? true,
         headerLocked: Boolean(
           activeSheet.value.filter && intersects(activeSheet.value.filter.range, target.range),
         ),
-        column: options.getSelection().address.column,
-        direction: "ascending",
+        column: restored?.column ?? options.getSelection().address.column,
+        direction: restored?.direction ?? "ascending",
       };
+      if (sortInitial.value.headerLocked) sortInitial.value.hasHeader = true;
       sortVisible.value = true;
     }
   }
   function applySort(draft: SortDraft): void {
+    const target = sortTarget.value;
+    const hasHeader =
+      draft.hasHeader ||
+      Boolean(
+        activeSheet.value.filter &&
+        target &&
+        intersects(activeSheet.value.filter.range, target.range),
+      );
     if (
-      execute(sortTarget.value, () =>
-        createMultiKeySortSheetRangeCommand(
-          sortTarget.value!.sheetId,
-          sortTarget.value!.range,
-          draft.levels,
-          {
-            caseSensitive: draft.caseSensitive ?? false,
-            hasHeader:
-              draft.hasHeader ||
-              Boolean(
-                activeSheet.value.filter &&
-                intersects(activeSheet.value.filter.range, sortTarget.value!.range),
-              ),
-          },
-        ),
+      execute(target, () =>
+        createMultiKeySortSheetRangeCommand(target!.sheetId, target!.range, draft.levels, {
+          caseSensitive: draft.caseSensitive ?? false,
+          hasHeader,
+        }),
       )
     ) {
+      if (target)
+        rememberSortSettings(target, {
+          hasHeader,
+          column: draft.levels[0]?.column ?? target.range.start.column,
+          direction: draft.levels[0]?.direction ?? "ascending",
+          levels: cloneSortLevels(draft.levels),
+          caseSensitive: draft.caseSensitive ?? false,
+        });
       sortVisible.value = false;
       options.focusSheet();
     }

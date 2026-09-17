@@ -186,18 +186,19 @@ watch(
     customListRowId.value = undefined;
     if (!visible) return;
     hasHeader.value = props.initial?.headerLocked || (props.initial?.hasHeader ?? true);
-    caseSensitive.value = false;
+    caseSensitive.value = props.initial?.caseSensitive ?? false;
     const column =
       props.columns.find((item) => item.column === props.initial?.column) ?? props.columns[0];
-    rows.value = column
-      ? [
-          {
-            id: ++nextId,
-            column: column.column,
-            direction: props.initial?.direction ?? "ascending",
-          },
-        ]
-      : [];
+    const initialLevels = props.initial?.levels?.length
+      ? props.initial.levels
+      : column
+        ? [{ column: column.column, direction: props.initial?.direction ?? "ascending" }]
+        : [];
+    rows.value = initialLevels.map((level) => ({
+      ...level,
+      ...(level.customOrder ? { customOrder: [...level.customOrder] } : {}),
+      id: ++nextId,
+    }));
     selectedId.value = rows.value[0]?.id;
   },
   { immediate: true },

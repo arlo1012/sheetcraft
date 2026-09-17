@@ -38,6 +38,8 @@ export type SortInitial = {
   headerLocked?: boolean;
   column: number;
   direction: "ascending" | "descending";
+  levels?: SortLevel[];
+  caseSensitive?: boolean;
 };
 export type SortDraft = {
   range: string;

@@ -2,12 +2,18 @@ import { defineComponent, reactive } from "vue";
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import {
+  createAddSheetCommand,
   createSetCellContentCommand,
   createSetSheetDataValidationsCommand,
 } from "@idea10/core/commands";
 import { executeWorkbookCommand, createWorkbookSession } from "@idea10/core/history";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createSheetEvaluator, getActiveSheet, setCellStyle } from "@idea10/core/workbook";
+import {
+  createSheetEvaluator,
+  getActiveSheet,
+  setActiveSheet,
+  setCellStyle,
+} from "@idea10/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useDataToolsController } from "../../../../modules/data-tools/useDataToolsController";
 
@@ -33,7 +39,7 @@ function fixture(
         controller = useDataToolsController({
           getWorkbook: () => session.workbook,
           getSelection: () => selection,
-          getSheetEvaluator: () => createSheetEvaluator(sheet),
+          getSheetEvaluator: () => createSheetEvaluator(getActiveSheet(session.workbook)),
           getGeneration: () => generation,
           isBusy: () => false,
           execute: (command) => executeWorkbookCommand(session, command),
@@ -79,6 +85,67 @@ describe("useDataToolsController", () => {
       createSheetEvaluator(f.sheet).getComputedValue({ row, column: 1 }),
     );
     expect(values).toEqual(["Priority", "High", "Medium", "Low", "Other"]);
+  });
+  test("restores the last applied custom sort without retaining cancelled draft edits", () => {
+    const f = fixture();
+    f.set(0, 1, "Priority");
+    f.set(0, 2, "Name");
+    f.set(1, 1, "High");
+    f.set(1, 2, "Zed");
+    f.set(2, 1, "Low");
+    f.set(2, 2, "Ada");
+    const applied = {
+      range: "B1:C3",
+      hasHeader: true,
+      caseSensitive: true,
+      levels: [
+        { column: 1, direction: "ascending" as const, customOrder: ["High", "Low"] },
+        { column: 2, direction: "descending" as const },
+      ],
+    };
+    f.controller.openSort();
+    f.controller.applySort(applied);
+    f.controller.openSort();
+    expect(f.controller.sortInitial.value).toMatchObject({
+      hasHeader: true,
+      caseSensitive: true,
+      levels: applied.levels,
+    });
+    f.controller.sortInitial.value.levels![0]!.customOrder!.push("Cancelled");
+    f.controller.sortInitial.value.levels![1]!.direction = "ascending";
+    f.controller.closeSort();
+    f.controller.openSort();
+    expect(f.controller.sortInitial.value.levels).toEqual(applied.levels);
+  });
+  test("keeps remembered sort settings isolated by range, sheet, and workbook generation", () => {
+    const f = fixture();
+    f.set(0, 1, "Name");
+    f.set(1, 1, "B");
+    f.set(2, 1, "A");
+    f.controller.openSort();
+    f.controller.applySort({
+      range: "B1:B3",
+      hasHeader: true,
+      caseSensitive: true,
+      levels: [{ column: 1, direction: "descending", customOrder: ["B", "A"] }],
+    });
+    f.selection.address = { row: 10, column: 5 };
+    f.selection.range = { start: { row: 10, column: 5 }, end: { row: 10, column: 5 } };
+    f.controller.openSort();
+    expect(f.controller.sortInitial.value.levels).toBeUndefined();
+    executeWorkbookCommand(f.session, createAddSheetCommand(f.session.workbook, { id: "other" }));
+    f.controller.openSort();
+    expect(f.controller.sortInitial.value.levels).toBeUndefined();
+    setActiveSheet(f.session.workbook, f.sheet.id);
+    f.selection.address = { row: 1, column: 1 };
+    f.selection.range = { start: { row: 1, column: 1 }, end: { row: 1, column: 1 } };
+    f.controller.openSort();
+    expect(f.controller.sortInitial.value.levels).toEqual([
+      { column: 1, direction: "descending", customOrder: ["B", "A"] },
+    ]);
+    f.changeGeneration();
+    f.controller.openSort();
+    expect(f.controller.sortInitial.value.levels).toBeUndefined();
   });
   test("discovers column colors and applies selected color placement through Core", () => {
     const f = fixture();
