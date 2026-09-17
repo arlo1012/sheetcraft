@@ -1,11 +1,11 @@
 import { computed, onBeforeUnmount, ref } from "vue";
 import type { CellRange } from "@idea10/core/workbook";
-import type { FormulaReferenceEditor } from "../../shared/formula-editing/formula-editor-contract";
-import { getFormulaReferenceTokens } from "../../shared/formula-editing/formula-reference-tokens";
-import { formatNamedRangeReference } from "./useFormulaToolsController";
+import type { FormulaReferenceEditor } from "../formula-editing/formula-editor-contract";
+import { getFormulaReferenceTokens } from "../formula-editing/formula-reference-tokens";
+import { formatRangeReference } from "./formatRangeReference";
 
 /** An independent reference draft: grid picking never changes the cell edit session. */
-export function useNamedRangePicker(getSheetName: () => string) {
+export function useRangeReferencePicker(getSheetName: () => string) {
   const active = ref(false);
   const reference = ref("");
   const tokens = computed(() => getFormulaReferenceTokens(reference.value));
@@ -30,7 +30,7 @@ export function useNamedRangePicker(getSheetName: () => string) {
     canPickReference: () => active.value,
     pickReference(range: CellRange) {
       if (!active.value) return false;
-      reference.value = formatNamedRangeReference(getSheetName(), {
+      reference.value = formatRangeReference(getSheetName(), {
         start: {
           row: Math.min(range.start.row, range.end.row),
           column: Math.min(range.start.column, range.end.column),

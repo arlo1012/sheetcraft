@@ -276,6 +276,16 @@ export function applyCellShiftCommand(
   command: CellShiftCommand,
 ): RestoreCellShiftCommand | null {
   const range = validate(command);
+  if (
+    [...workbook.sheets.values()].some(
+      (entry) => entry.filter?.advanced?.criteria?.sheetId === command.sheetId,
+    )
+  )
+    throw invalidCommandPayload(
+      "sheetId",
+      command.sheetId,
+      "Cell shifts on a sheet used by active advanced filter criteria are not supported.",
+    );
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const movement: Range =
     command.direction === "right" || command.direction === "left"

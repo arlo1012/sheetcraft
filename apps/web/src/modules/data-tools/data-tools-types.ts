@@ -36,6 +36,14 @@ export type TextToColumnsDraft = {
   overwrite: boolean;
 };
 export type RemoveDuplicatesDraft = { hasHeader: boolean; columns: number[] };
+export type AdvancedFilterDraft = {
+  mode: "inPlace" | "copy";
+  listRange: string;
+  criteriaRange: string;
+  destination: string;
+  uniqueOnly: boolean;
+  overwrite: boolean;
+};
 export type DataValidationDraft = {
   type: "any" | "whole" | "decimal" | "list" | "date" | "time" | "text-length" | "custom";
   operator: DataValidationOperator;

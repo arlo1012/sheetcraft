@@ -2334,7 +2334,7 @@ defineExpose({
     </SheetSurface>
     <SheetDataControls
       :frame="renderFrame"
-      :filter-range="sheet.filter?.range"
+      :filter-range="sheet.filter?.advanced ? undefined : sheet.filter?.range"
       :filtered-columns="sheet.filter?.columns.map((entry) => entry.column)"
       :active-cell="activeCell"
       :validation-info="validationInfo"

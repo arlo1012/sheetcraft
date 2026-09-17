@@ -36,4 +36,15 @@ describe("DataToolbar", () => {
     });
     expect(wrapper.get('[data-data-action="ungroup"]').attributes("disabled")).toBe("");
   });
+  test("opens the Filter split menu and forwards Advanced Filter", async () => {
+    const wrapper = mount(DataToolbar, {
+      attachTo: document.body,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { capabilities },
+    });
+    await wrapper.get('[data-data-action="filter"] [data-ribbon-split-menu]').trigger("click");
+    await new DOMWrapper(document.body).get('[data-data-filter="advanced"]').trigger("click");
+    expect(wrapper.emitted("advancedFilter")).toEqual([[]]);
+    wrapper.unmount();
+  });
 });

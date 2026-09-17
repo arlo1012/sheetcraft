@@ -66,6 +66,33 @@ export const enUS = {
       condition: "Condition",
       invalidCondition: "Enter a valid filter condition.",
     },
+    advanced: {
+      title: "Advanced Filter",
+      autoFilter: "Filter",
+      inPlace: "Filter the list, in-place",
+      copy: "Copy to another location",
+      listRange: "List range",
+      criteriaRange: "Criteria range",
+      copyTo: "Copy to",
+      pickRange: "Select range",
+      uniqueOnly: "Unique records only",
+      overwrite: "Replace existing data",
+      criteriaHint:
+        "Criteria on the same row use AND; different rows use OR. Include headers, or leave the range empty to match all records.",
+      copyHint: "Copy results, including headers, starting at the destination's top-left cell.",
+      apply: "OK",
+      invalidList: "Choose a valid list range containing a header row and data rows.",
+      invalidCriteria:
+        "Choose a criteria range with a header row and criteria rows; headers must match the list fields.",
+      invalidDestination: "Enter a valid copy destination.",
+      staleTarget: "The workbook changed. Open Advanced Filter again.",
+      overwriteRequired:
+        "The copy destination contains data. Enable Replace existing data to continue.",
+      invalidHeaders: "The list and criteria ranges need valid headers.",
+      invalidOperation: "Advanced Filter could not be applied to this range.",
+      protectedDestination: "The worksheet to be changed is protected.",
+      overlappingRanges: "The copy destination cannot overlap the source range.",
+    },
     textToColumns: {
       title: "Text to Columns",
       delimiter: "Delimited",

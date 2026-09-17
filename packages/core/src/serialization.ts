@@ -352,6 +352,42 @@ function parseFilterValue(
 
 function parseFilter(value: unknown, path: string, version: SnapshotVersion): SheetFilter {
   const record = asRecord(value, path);
+  const advancedRecord =
+    record.advanced === undefined ? undefined : asRecord(record.advanced, `${path}.advanced`);
+  const advanced =
+    advancedRecord === undefined
+      ? undefined
+      : (() => {
+          if (typeof advancedRecord.uniqueOnly !== "boolean")
+            return fail(`${path}.advanced.uniqueOnly`, "Expected a boolean.");
+          const criteriaRecord =
+            advancedRecord.criteria === undefined
+              ? undefined
+              : asRecord(advancedRecord.criteria, `${path}.advanced.criteria`);
+          return {
+            ...(criteriaRecord === undefined
+              ? {}
+              : {
+                  criteria: {
+                    sheetId: asIdentifier(
+                      criteriaRecord.sheetId,
+                      `${path}.advanced.criteria.sheetId`,
+                    ),
+                    range: parseRange(criteriaRecord.range, `${path}.advanced.criteria.range`),
+                  },
+                }),
+            uniqueOnly: advancedRecord.uniqueOnly,
+            hiddenRows: asArray(advancedRecord.hiddenRows, `${path}.advanced.hiddenRows`).map(
+              (interval, index) => {
+                const item = asRecord(interval, `${path}.advanced.hiddenRows[${index}]`);
+                return {
+                  start: asInteger(item.start, `${path}.advanced.hiddenRows[${index}].start`),
+                  end: asInteger(item.end, `${path}.advanced.hiddenRows[${index}].end`),
+                };
+              },
+            ),
+          };
+        })();
   return {
     range: parseRange(record.range, `${path}.range`),
     columns: asArray(record.columns, `${path}.columns`).map((column, index) => {
@@ -374,6 +410,7 @@ function parseFilter(value: unknown, path: string, version: SnapshotVersion): Sh
           : { condition: condition as SheetFilter["columns"][number]["condition"] }),
       };
     }),
+    ...(advanced ? { advanced } : {}),
   };
 }
 

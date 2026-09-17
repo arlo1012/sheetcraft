@@ -2,6 +2,7 @@ import { computed, ref } from "vue";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import {
   createAddSheetOutlineGroupCommand,
+  createAdvancedFilterCommand,
   createApplySubtotalsCommand,
   createClearSheetDataValidationsCommand,
   createClearSheetFilterCommand,
@@ -36,6 +37,7 @@ import {
 import { useAppI18n } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { isValidationDraftComplete } from "./validation-draft";
+import { useAdvancedFilterController } from "./useAdvancedFilterController";
 import type {
   DataToolAxis,
   DataToolCapabilities,
@@ -91,6 +93,7 @@ function rangeLabel(range: CellRange): string {
 
 export function useDataToolsController(options: Options) {
   const { t, locale } = useAppI18n();
+  const advancedFilter = useAdvancedFilterController(options);
   const createId = createBrowserIdFactory();
   const sortVisible = ref(false);
   const textToColumnsVisible = ref(false);
@@ -133,7 +136,7 @@ export function useDataToolsController(options: Options) {
     const merged = sheet.mergedCells.some((item) => intersects(item, range));
     const filtered = Boolean(sheet.filter && intersects(sheet.filter.range, range));
     return {
-      sort: rows > (filtered ? 1 : 0) && !merged,
+      sort: rows > (filtered ? 1 : 0) && !merged && !(filtered && sheet.filter?.advanced),
       split:
         selection.range.start.column === selection.range.end.column &&
         !sheet.mergedCells.some((item) => intersects(item, selection.range)) &&
@@ -146,7 +149,7 @@ export function useDataToolsController(options: Options) {
       ungroupColumns: selectedGroups.value.some((group) => group.axis === "column"),
       expand: selectedGroups.value.some((group) => group.collapsed),
       collapse: selectedGroups.value.some((group) => !group.collapsed),
-      clearFilter: Boolean(sheet.filter?.columns.length),
+      clearFilter: Boolean(sheet.filter?.columns.length || sheet.filter?.advanced),
     };
   });
   function error(message = t("dataTools.common.operationFailed")): void {
@@ -343,7 +346,14 @@ export function useDataToolsController(options: Options) {
     const filter = activeSheet.value.filter;
     if (!target || !filter) return;
     execute(target, () =>
-      createSetSheetFilterCriteriaCommand(target.sheetId, filter.range, filter.columns),
+      filter.advanced
+        ? createAdvancedFilterCommand(target.sheetId, filter.range, {
+            mode: "inPlace",
+            ...(filter.advanced.criteria ? { criteria: filter.advanced.criteria } : {}),
+            uniqueOnly: filter.advanced.uniqueOnly,
+            overwrite: false,
+          })
+        : createSetSheetFilterCriteriaCommand(target.sheetId, filter.range, filter.columns),
     );
     options.recalculate?.();
   }
@@ -709,6 +719,7 @@ export function useDataToolsController(options: Options) {
       filterPanel.value = undefined;
   }
   return {
+    ...advancedFilter,
     disabled,
     capabilities,
     columns: dialogColumns,

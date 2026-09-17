@@ -78,6 +78,8 @@ export type XlsxOutlineGroup = {
 
 export type XlsxDataMetadata = {
   filter: XlsxFilter | null;
+  /** Rows hidden to preserve an already-applied advanced filter result. */
+  hiddenRows: number[];
   dataValidations: XlsxDataValidation[];
   outlineGroups: XlsxOutlineGroup[];
   unsupportedFilters: boolean;
@@ -499,6 +501,7 @@ export function readXlsxDataMetadata(bytes: Uint8Array): XlsxDataMetadata[] {
     const validations = readDataValidations(xml);
     return {
       filter: filter.value,
+      hiddenRows: [],
       dataValidations: validations.values,
       outlineGroups: readOutlineGroups(xml),
       unsupportedFilters: filter.unsupported,
@@ -706,6 +709,47 @@ function writeOutlineGroups(xml: string, groups: readonly XlsxOutlineGroup[]): s
   return output;
 }
 
+/**
+ * Excel AutoFilter cannot represent Advanced Filter criteria. The generated
+ * workbook still needs to open with the same rows visible, including blank
+ * rows which ExcelJS does not materialize when only `row.hidden` is assigned.
+ */
+function writeHiddenRows(xml: string, rows: readonly number[]): string {
+  const hiddenRows = [...new Set(rows)]
+    .filter(Number.isInteger)
+    .filter((value) => value >= 0 && value < 1_048_576)
+    .sort((left, right) => left - right);
+  if (hiddenRows.length === 0) return xml;
+  const sheetData = /<sheetData\b([^>]*?)(?:\/>|>([\s\S]*?)<\/sheetData>)/i.exec(xml);
+  if (!sheetData) return xml;
+  const attributes = sheetData[1] ?? "";
+  const content = sheetData[2] ?? "";
+  const rowElements = /<row\b[^>]*(?:\/>|>[\s\S]*?<\/row>)/gi;
+  let nextHidden = 0;
+  const patched = content.replace(rowElements, (element) => {
+    const opening = /<row\b([^>]*?)(\/?)>/i.exec(element);
+    const rowNumber = opening ? Number(attribute(opening[1] ?? "", "r")) : Number.NaN;
+    const rowIndex = rowNumber - 1;
+    let additions = "";
+    while (nextHidden < hiddenRows.length && hiddenRows[nextHidden]! < rowIndex) {
+      additions += `<row r="${hiddenRows[nextHidden]! + 1}" hidden="1"/>`;
+      nextHidden += 1;
+    }
+    if (hiddenRows[nextHidden] !== rowIndex || !opening) return `${additions}${element}`;
+    nextHidden += 1;
+    const original = opening[1] ?? "";
+    const normalized = original.replace(/\shidden\s*=\s*(["'])[^"']*\1/gi, "");
+    const replacement = `<row${normalized} hidden="1"${opening[2] ?? ""}>`;
+    return `${additions}${element.replace(opening[0], replacement)}`;
+  });
+  const trailing = hiddenRows
+    .slice(nextHidden)
+    .map((row) => `<row r="${row + 1}" hidden="1"/>`)
+    .join("");
+  const replacement = `<sheetData${attributes}>${patched}${trailing}</sheetData>`;
+  return xml.replace(sheetData[0], replacement);
+}
+
 export function writeXlsxDataMetadata(
   entries: Record<string, Uint8Array>,
   sheets: readonly Omit<XlsxDataMetadata, "unsupportedFilters" | "unsupportedValidations">[],
@@ -733,6 +777,7 @@ export function writeXlsxDataMetadata(
         after,
       );
     }
+    xml = writeHiddenRows(xml, metadata.hiddenRows);
     xml = writeOutlineGroups(xml, metadata.outlineGroups);
     entries[path] = strToU8(xml);
   }

@@ -95,6 +95,10 @@ export function isSheetRowFiltered(
 ): boolean {
   const filter = sheet.filter;
   if (!filter || row <= filter.range.start.row || row > filter.range.end.row) return false;
+  if (filter.advanced)
+    return filter.advanced.hiddenRows.some(
+      (interval) => row >= interval.start && row <= interval.end,
+    );
   return filter.columns.some((column) => {
     const value = getSheetFilterValue(getValue({ row, column: column.column }));
     return !doesSheetFilterColumnMatch(column, value);

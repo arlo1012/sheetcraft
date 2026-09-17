@@ -24,6 +24,7 @@ import {
   applySetSheetDimensionSizesCommand,
 } from "./dimensions.js";
 import { applySetSheetFilterCommand } from "./filter.js";
+import { applyAdvancedFilterCommand } from "./advanced-filter.js";
 import { applySplitColumnCommand, applyRemoveDuplicatesCommand } from "./data-transforms.js";
 import { applyApplySubtotalsCommand, applyRemoveSubtotalsCommand } from "./subtotal.js";
 import {
@@ -87,9 +88,11 @@ function assertCommandDoesNotModifyProtectedSheet(
   const sheetIds =
     command.type === "setCellContents"
       ? command.changes.map((change) => change.sheetId)
-      : "sheetId" in command
-        ? [command.sheetId]
-        : [];
+      : command.type === "advancedFilter" && command.mode === "copy" && command.destination
+        ? [command.destination.sheetId]
+        : "sheetId" in command
+          ? [command.sheetId]
+          : [];
   const blocked = sheetIds.find((sheetId) => workbook.sheets.get(sheetId)?.properties.protected);
   if (!blocked) return;
   switch (command.type) {
@@ -116,6 +119,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "mergeCells":
     case "unmergeCells":
     case "setSheetFilter":
+    case "advancedFilter":
     case "sortSheetRange":
     case "splitColumn":
     case "removeDuplicates":
@@ -211,6 +215,8 @@ export function applyWorkbookCommand(
         return applyUnmergeCellsCommand(workbook, command);
       case "setSheetFilter":
         return applySetSheetFilterCommand(workbook, command);
+      case "advancedFilter":
+        return applyAdvancedFilterCommand(workbook, command);
       case "sortSheetRange":
         return applySortSheetRangeCommand(workbook, command);
       case "splitColumn":

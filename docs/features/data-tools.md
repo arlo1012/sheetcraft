@@ -20,6 +20,22 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   Selecting every available value clears that column's restriction, so later
   values remain visible. Long lists render in batches, while bulk selection
   always applies to every matching value.
+- Advanced Filter is available from the Filter split menu. Choose in-place
+  filtering or copy results (including headers) to another location, optionally
+  retaining only unique complete records. All three reference fields support
+  grid picking, qualified sheet references and defined names. A copied result
+  starts at the destination's top-left cell; overwriting requires explicit opt-in.
+  Criteria headers match list headers; conditions in a row use AND and separate
+  rows use OR. Repeated headers support multiple bounds for one column.
+  Comparison operators and `*`, `?`, `~` wildcards are supported; plain text is
+  a case-insensitive prefix, while `=text` is an exact match. A blank criteria
+  row matches everything. An omitted criteria range allows unique-only filtering.
+  In-place results are a saved snapshot: Reapply reads the criteria again;
+  Show All clears the result while preserving manually hidden rows. Both modes
+  participate in undo/redo. Formula criteria are currently rejected explicitly;
+  formulas in the source list are evaluated. List and criteria rectangles are
+  limited to 1,000,000 cells. Clear advanced filtering before structural edits
+  to the filtered sheet or a sheet containing its criteria.
 - Split a selected single column using multiple delimiters or fixed widths.
   Preview the result, select General/Text for each output column, choose a
   destination column, and explicitly allow overwriting populated destinations.
@@ -40,6 +56,10 @@ subtotal metadata. XLSX import/export handles the supported filter conditions,
 standard validation settings, and row/column outlines. Unsupported XLSX filter
 forms retain import diagnostics. Subtotal formulas remain ordinary formulas in
 XLSX; generated-row ownership is an idea10 snapshot feature.
+Advanced filter rules and result intervals persist in JSON. XLSX export retains
+the hidden-result rows and reports loss of advanced-filter semantics: criteria
+cannot be reapplied after import, and formulas distinguishing filtered rows from
+manually hidden rows (such as SUBTOTAL/AGGREGATE) can recalculate differently.
 
 ## Integration boundaries
 
@@ -84,6 +104,12 @@ Use the File menu to import a workbook containing:
 5. Select rows and group, collapse, navigate past the hidden rows, and expand.
    Sort by Team, add subtotals for Amount, remove them and undo removal.
 6. Save/reload JSON and export/import XLSX to inspect supported persistent state.
+7. Enter `Amount` in E1 and `>=20` in E2. Open Filter > Advanced Filter with
+   A1:C6 as the list and E1:E2 as criteria. Select unique records: the 10 row
+   and second identical 20 row are hidden. Change the criterion to `>=30` and
+   Reapply. Show All restores the rows. Repeat in copy mode to H1, verify the
+   header plus matching records, then undo. Use each field's picker and cancel
+   a pick to confirm its prior draft remains unchanged.
 
 ## Verification notes (2026-09-16)
 

@@ -170,6 +170,13 @@ function validateSortCommand(
     throw invalidCommandPayload("range", command.range, "Sorting merged cells is not supported.");
   }
   const filter = sheet.filter;
+  if (filter?.advanced && rangesIntersect(range, filter.range)) {
+    throw invalidCommandPayload(
+      "range",
+      command.range,
+      "Sorting an active advanced filter range is not supported.",
+    );
+  }
   if (filter && rangesIntersect(range, filter.range)) {
     const dataRange = getFilterDataRange(filter);
     const completeFilterRange = areRangesEqual(range, filter.range) && command.hasHeader === true;

@@ -89,6 +89,36 @@ describe("sheet filter commands", () => {
     });
   });
 
+  test("keeps advanced filter metadata isolated when setting a filter", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const filter = {
+      range: { start: { row: 0, column: 0 }, end: { row: 3, column: 0 } },
+      columns: [],
+      advanced: {
+        criteria: {
+          sheetId: "criteria",
+          range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+        },
+        uniqueOnly: true,
+        hiddenRows: [{ start: 2, end: 3 }],
+      },
+    };
+    expect(executeWorkbookCommand(session, createSetSheetFilterCommand(sheet.id, filter))).toBe(
+      true,
+    );
+    filter.advanced.hiddenRows[0]!.start = 1;
+    filter.advanced.criteria!.range.start.row = 4;
+    expect(sheet.filter?.advanced).toEqual({
+      criteria: {
+        sheetId: "criteria",
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      },
+      uniqueOnly: true,
+      hiddenRows: [{ start: 2, end: 3 }],
+    });
+  });
+
   test("matches computed values with OR-within-column, AND-across-columns, errors, and blanks", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);

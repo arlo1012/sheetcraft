@@ -8,6 +8,7 @@ const props = withDefaults(
     menuLabel: string;
     text?: string;
     disabled?: boolean;
+    pressed?: boolean;
     menuDisabled?: boolean;
     expanded?: boolean;
     menuId?: string;
@@ -18,6 +19,7 @@ const props = withDefaults(
   {
     text: undefined,
     disabled: false,
+    pressed: undefined,
     menuDisabled: false,
     expanded: false,
     menuId: undefined,
@@ -54,6 +56,7 @@ function toggleMenu(): void {
       'has-text': text,
       'is-expanded': expanded,
       'is-disabled': disabled && menuDisabled,
+      'is-pressed': pressed,
       'is-tall': variant === 'tall',
       'is-full-width': fullWidth,
     }"
@@ -65,6 +68,7 @@ function toggleMenu(): void {
       data-ribbon-split-main
       :disabled="disabled"
       :aria-label="label"
+      :aria-pressed="pressed"
       :title="label"
       @click="activate"
     >
@@ -129,6 +133,11 @@ function toggleMenu(): void {
   &.has-text {
     width: var(--ribbon-labeled-action-width, max-content);
     min-width: 40px;
+  }
+
+  &.is-pressed {
+    background: var(--idea-action-primary-subtle);
+    color: var(--idea-action-primary);
   }
 
   &.is-full-width {

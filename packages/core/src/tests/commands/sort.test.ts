@@ -18,6 +18,30 @@ import {
 import { createTestWorkbookSession } from "../helpers.js";
 
 describe("sheet range sorting", () => {
+  test("rejects sorting across an active advanced filter range", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setSheetMetadata(sheet, {
+      freezePanes: { rows: 0, columns: 0 },
+      filter: {
+        range: { start: { row: 0, column: 0 }, end: { row: 2, column: 0 } },
+        columns: [],
+        advanced: { uniqueOnly: false, hiddenRows: [{ start: 1, end: 1 }] },
+      },
+      mergedCells: [],
+    });
+    expect(() =>
+      executeWorkbookCommand(
+        session,
+        createSortSheetRangeCommand(
+          sheet.id,
+          { start: { row: 0, column: 0 }, end: { row: 2, column: 0 } },
+          0,
+        ),
+      ),
+    ).toThrow("advanced filter");
+  });
+
   test("keeps a header fixed and resolves equal primary keys by a second key", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);

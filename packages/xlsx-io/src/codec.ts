@@ -15,6 +15,7 @@ import {
   getDefaultColumnWidth,
   replaceSheetSparseState,
   type CellRange,
+  type SheetFilter,
   type Workbook,
 } from "@idea10/core/workbook";
 import {
@@ -108,6 +109,20 @@ type BrowserWorkbook = XlsxImageWorkbook & {
     writeBuffer: () => Promise<ArrayBuffer | Uint8Array>;
   };
 };
+
+function advancedHiddenRows(filter: SheetFilter | null): number[] {
+  const rows: number[] = [];
+  for (const interval of filter?.advanced?.hiddenRows ?? []) {
+    const start = Math.max(0, interval.start);
+    const end = Math.min(MAX_SHEET_ROWS - 1, interval.end);
+    for (let row = start; row <= end; row += 1) {
+      rows.push(row);
+      if (rows.length > MAX_SPARSE_CELLS)
+        throw new RangeError("The workbook exceeds the XLSX v1 hidden-row export limit.");
+    }
+  }
+  return rows;
+}
 type BrowserExcelJs = { Workbook: new () => BrowserWorkbook };
 const ExcelJS = ExcelJSImport as BrowserExcelJs;
 const EXCEL_FILL_PATTERNS = new Set<string>(CELL_FILL_PATTERNS);
@@ -790,7 +805,8 @@ export async function encodeWithExcelJs(
     for (const [index, size] of sheet.rowHeights) {
       output.getRow(index + 1).height = (size * 3) / 4;
     }
-    for (const index of sheet.hiddenRows ?? []) {
+    const advancedRows = advancedHiddenRows(sheet.filter);
+    for (const index of new Set([...(sheet.hiddenRows ?? []), ...advancedRows])) {
       output.getRow(index + 1).hidden = true;
     }
     for (const [index, size] of sheet.columnWidths) {
@@ -800,7 +816,12 @@ export async function encodeWithExcelJs(
       output.getColumn(index + 1).hidden = true;
     }
     dataMetadata.push({
-      filter: sheet.filter as unknown as XlsxDataMetadata["filter"],
+      // Advanced Filter has different criteria semantics. Do not serialize its
+      // list range as an ordinary AutoFilter and imply that it is equivalent.
+      filter: sheet.filter?.advanced
+        ? null
+        : (sheet.filter as unknown as XlsxDataMetadata["filter"]),
+      hiddenRows: [...new Set([...(sheet.hiddenRows ?? []), ...advancedRows])],
       dataValidations: (sheet.dataValidations ?? []).map((validation) => {
         const { id: _id, ...value } = validation as { id?: unknown } & Record<string, unknown>;
         return value as XlsxDataMetadata["dataValidations"][number];
@@ -810,6 +831,8 @@ export async function encodeWithExcelJs(
         return value as XlsxDataMetadata["outlineGroups"][number];
       }),
     });
+    if (sheet.filter?.advanced)
+      add(report, "advanced-filter-criteria-omitted", `${sheet.name}.advancedFilter`);
     for (const [key, cell] of sheet.cells) {
       encodedCells += 1;
       if (encodedCells > MAX_SPARSE_CELLS)

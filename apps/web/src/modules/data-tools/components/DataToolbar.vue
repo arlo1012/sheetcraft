@@ -12,6 +12,7 @@ import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { DataToolCapabilities } from "../data-tools-types";
 import DataOutlineTools from "./DataOutlineTools.vue";
+import DataFilterTool from "./DataFilterTool.vue";
 import DataSortTool from "./DataSortTool.vue";
 const props = withDefaults(
   defineProps<{
@@ -26,6 +27,7 @@ const emit = defineEmits<{
   sort: [direction: "ascending" | "descending"];
   openSort: [];
   toggleFilter: [];
+  advancedFilter: [];
   clearFilter: [];
   reapplyFilter: [];
   openTextToColumns: [];
@@ -56,16 +58,12 @@ const { t } = useAppI18n();
         :disabled="disabled || !capabilities.sort"
         @sort="emit('sort', $event)"
         @custom="emit('openSort')"
-      /><RibbonButton
-        variant="tall"
+      /><DataFilterTool
         :disabled="disabled"
-        :pressed="filterActive"
-        :label="t('dataTools.filter.toggle')"
-        :text="t('dataTools.filter.toggle')"
-        data-data-action="filter"
-        @activate="emit('toggleFilter')"
-        ><Filter :size="18"
-      /></RibbonButton>
+        :active="filterActive"
+        @toggle="emit('toggleFilter')"
+        @advanced="emit('advancedFilter')"
+      />
       <div class="data-toolbar__stack">
         <RibbonButton
           :disabled="disabled || !filterActive || !capabilities.clearFilter"

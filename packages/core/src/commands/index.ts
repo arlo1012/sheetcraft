@@ -8,6 +8,7 @@ export * from "./formatting.js";
 export * from "./images.js";
 export * from "./images.js";
 export * from "./filter.js";
+export * from "./advanced-filter.js";
 export * from "./metadata.js";
 export * from "./names.js";
 export * from "./names-from-selection.js";

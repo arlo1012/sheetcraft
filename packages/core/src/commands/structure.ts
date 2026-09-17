@@ -82,6 +82,19 @@ export function createRestoreSheetStateCommand(
   return { type: "restoreSheetState", sheetId, state: cloneSparseState(state) };
 }
 
+function assertNoAdvancedCriteriaReferencesSheet(workbook: Workbook, sheetId: string): void {
+  if (
+    [...workbook.sheets.values()].some(
+      (sheet) => sheet.filter?.advanced?.criteria?.sheetId === sheetId,
+    )
+  )
+    throw invalidCommandPayload(
+      "sheetId",
+      sheetId,
+      "Changing a sheet used by an active advanced filter criteria range is not supported.",
+    );
+}
+
 function getAxisIndex(address: SheetSparseCell["address"], axis: SheetDimensionAxis): number {
   return axis === "row" ? address.row : address.column;
 }
@@ -376,7 +389,35 @@ function transformFilterForAxis(
               ];
         });
   if (range.end.row <= range.start.row) return null;
-  return { range, columns };
+  if (filter.advanced && axis === "row")
+    throw invalidCommandPayload(
+      "axis",
+      axis,
+      "Changing rows while an advanced filter is active is not supported.",
+    );
+  return {
+    range,
+    columns,
+    ...(filter.advanced
+      ? {
+          advanced: {
+            ...(filter.advanced.criteria
+              ? {
+                  criteria: {
+                    sheetId: filter.advanced.criteria.sheetId,
+                    range: {
+                      start: { ...filter.advanced.criteria.range.start },
+                      end: { ...filter.advanced.criteria.range.end },
+                    },
+                  },
+                }
+              : {}),
+            uniqueOnly: filter.advanced.uniqueOnly,
+            hiddenRows: filter.advanced.hiddenRows.map((interval) => ({ ...interval })),
+          },
+        }
+      : {}),
+  };
 }
 
 function transformSheetMetadataForAxis(
@@ -934,6 +975,7 @@ export function applySheetAxisCommand(
   workbook: Workbook,
   command: InsertSheetAxisCommand | DeleteSheetAxisCommand,
 ): RestoreSheetAxisSliceCommand | null {
+  assertNoAdvancedCriteriaReferencesSheet(workbook, command.sheetId);
   const maximum = assertSheetAxisRange(command.axis, command.index, command.count);
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const operation = command.type === "insertSheetAxis" ? "insert" : "delete";
@@ -1179,6 +1221,7 @@ export function applyMoveSheetAxisCommand(
   command: MoveSheetAxisCommand,
 ): RestoreFullSheetStateCommand | null {
   assertSheetAxisMove(command);
+  assertNoAdvancedCriteriaReferencesSheet(workbook, command.sheetId);
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   if (command.index === command.toIndex) return null;
 

@@ -118,6 +118,11 @@ export type SheetFilterCondition =
 export type SheetFilter = {
   range: CellRange;
   columns: SheetFilterColumn[];
+  advanced?: {
+    criteria?: { sheetId: string; range: CellRange };
+    uniqueOnly: boolean;
+    hiddenRows: Array<{ start: number; end: number }>;
+  };
 };
 
 export type SheetMetadata = {
@@ -1519,6 +1524,25 @@ function cloneSheetFilter(filter: SheetFilter): SheetFilter {
       allowedValues: column.allowedValues.map(cloneFilterValue),
       ...(column.condition ? { condition: { ...column.condition } } : {}),
     })),
+    ...(filter.advanced
+      ? {
+          advanced: {
+            ...(filter.advanced.criteria
+              ? {
+                  criteria: {
+                    sheetId: filter.advanced.criteria.sheetId,
+                    range: {
+                      start: { ...filter.advanced.criteria.range.start },
+                      end: { ...filter.advanced.criteria.range.end },
+                    },
+                  },
+                }
+              : {}),
+            uniqueOnly: filter.advanced.uniqueOnly,
+            hiddenRows: filter.advanced.hiddenRows.map((interval) => ({ ...interval })),
+          },
+        }
+      : {}),
   };
 }
 
@@ -1639,7 +1663,64 @@ function normalizeSheetFilter(filter: SheetFilter | null): SheetFilter | null {
   if (columns.some((column, index) => column.column === columns[index - 1]?.column)) {
     throw new Error("Filter columns must be unique.");
   }
-  return { range: normalizedRange, columns };
+  let advanced: SheetFilter["advanced"];
+  if (filter.advanced !== undefined) {
+    const source = filter.advanced;
+    if (
+      !source ||
+      typeof source !== "object" ||
+      typeof source.uniqueOnly !== "boolean" ||
+      !Array.isArray(source.hiddenRows)
+    )
+      throw new TypeError("Invalid advanced filter.");
+    const hiddenRows = source.hiddenRows.map((interval) => {
+      if (
+        !interval ||
+        !Number.isInteger(interval.start) ||
+        !Number.isInteger(interval.end) ||
+        interval.start < normalizedRange.start.row + 1 ||
+        interval.end < interval.start ||
+        interval.end > normalizedRange.end.row
+      )
+        throw new RangeError("Invalid advanced filter hidden rows.");
+      return { start: interval.start, end: interval.end };
+    });
+    if (
+      hiddenRows.some(
+        (interval, index) => index > 0 && interval.start <= hiddenRows[index - 1]!.end,
+      )
+    )
+      throw new RangeError("Advanced filter hidden rows must not overlap.");
+    if (source.criteria !== undefined) {
+      const criteria = source.criteria;
+      if (
+        !criteria ||
+        typeof criteria.sheetId !== "string" ||
+        !criteria.sheetId ||
+        !isCellAddressInBounds(criteria.range?.start) ||
+        !isCellAddressInBounds(criteria.range?.end)
+      )
+        throw new TypeError("Invalid advanced filter criteria.");
+      advanced = {
+        criteria: {
+          sheetId: criteria.sheetId,
+          range: {
+            start: {
+              row: Math.min(criteria.range.start.row, criteria.range.end.row),
+              column: Math.min(criteria.range.start.column, criteria.range.end.column),
+            },
+            end: {
+              row: Math.max(criteria.range.start.row, criteria.range.end.row),
+              column: Math.max(criteria.range.start.column, criteria.range.end.column),
+            },
+          },
+        },
+        uniqueOnly: source.uniqueOnly,
+        hiddenRows,
+      };
+    } else advanced = { uniqueOnly: source.uniqueOnly, hiddenRows };
+  }
+  return { range: normalizedRange, columns, ...(advanced ? { advanced } : {}) };
 }
 
 function normalizeSheetMetadata(

@@ -24,20 +24,12 @@ import { getNamedRangeValue } from "./named-range-values";
 import type { CellEditSession } from "../../shared/cell-editing/useCellEditSession";
 import { useAppI18n } from "../../shared/i18n";
 import { insertFormulaFunction } from "../../shared/formula-editing/formula-function-insertion";
-import { quoteFormulaSheetName } from "../../shared/formula-editing/formula-input-lexical";
+import { formatRangeReference } from "../../shared/range-reference/formatRangeReference";
 
 export type AggregateFunction = "SUM" | "AVERAGE" | "COUNT" | "MAX" | "MIN";
 
-export function formatNamedRangeReference(sheetName: string, range: CellRange): string {
-  const absolute = (address: CellAddress) =>
-    formatFormulaAddress(address).replace(
-      /^([A-Z]+)(\d+)$/,
-      (_match, column: string, row: string) => `$${column}$${row}`,
-    );
-  const start = absolute(range.start);
-  const end = absolute(range.end);
-  return `=${quoteFormulaSheetName(sheetName)}!${start}${start === end ? "" : `:${end}`}`;
-}
+/** Formula-tools alias for the shared range formatter. */
+export const formatNamedRangeReference = formatRangeReference;
 
 /** Formula tools share the editor draft and the workspace's command/history port. */
 export function useFormulaToolsController(options: {
@@ -80,7 +72,7 @@ export function useFormulaToolsController(options: {
       name: definition.name,
       scopeSheetId: definition.scopeSheetId,
       reference: workbook.sheets.has(definition.reference.sheetId)
-        ? formatNamedRangeReference(
+        ? formatRangeReference(
             workbook.sheets.get(definition.reference.sheetId)!.name,
             definition.reference,
           )
@@ -166,7 +158,7 @@ export function useFormulaToolsController(options: {
   }
 
   function captureNameSelection(): void {
-    nameSelectionReference.value = formatNamedRangeReference(
+    nameSelectionReference.value = formatRangeReference(
       getActiveSheet(options.getWorkbook()).name,
       options.getSelection().range,
     );

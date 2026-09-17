@@ -129,6 +129,25 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
             allowedValues: column.allowedValues.map((value) => ({ ...value })),
             ...(column.condition ? { condition: { ...column.condition } } : {}),
           })),
+          ...(state.filter.advanced
+            ? {
+                advanced: {
+                  ...(state.filter.advanced.criteria
+                    ? {
+                        criteria: {
+                          sheetId: state.filter.advanced.criteria.sheetId,
+                          range: {
+                            start: { ...state.filter.advanced.criteria.range.start },
+                            end: { ...state.filter.advanced.criteria.range.end },
+                          },
+                        },
+                      }
+                    : {}),
+                  uniqueOnly: state.filter.advanced.uniqueOnly,
+                  hiddenRows: state.filter.advanced.hiddenRows.map((interval) => ({ ...interval })),
+                },
+              }
+            : {}),
         }
       : null,
     mergedCells: state.mergedCells.map((range) => ({

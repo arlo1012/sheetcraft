@@ -39,6 +39,25 @@ function cloneFilter(filter: SheetFilter): SheetFilter {
       allowedValues: column.allowedValues.map((value) => ({ ...value })),
       ...(column.condition ? { condition: { ...column.condition } } : {}),
     })),
+    ...(filter.advanced
+      ? {
+          advanced: {
+            ...(filter.advanced.criteria
+              ? {
+                  criteria: {
+                    sheetId: filter.advanced.criteria.sheetId,
+                    range: {
+                      start: { ...filter.advanced.criteria.range.start },
+                      end: { ...filter.advanced.criteria.range.end },
+                    },
+                  },
+                }
+              : {}),
+            uniqueOnly: filter.advanced.uniqueOnly,
+            hiddenRows: filter.advanced.hiddenRows.map((interval) => ({ ...interval })),
+          },
+        }
+      : {}),
   };
 }
 
@@ -208,7 +227,9 @@ export function createSheetFilterHiddenRowIntervals(
   evaluator: SheetEvaluator = createSheetEvaluator(sheet),
 ): HiddenRowInterval[] {
   const filter = sheet.filter;
-  if (!filter || filter.columns.length === 0) return [];
+  if (!filter) return [];
+  if (filter.advanced) return filter.advanced.hiddenRows.map((interval) => ({ ...interval }));
+  if (filter.columns.length === 0) return [];
   const dataStart = filter.range.start.row + 1;
   const dataEnd = filter.range.end.row;
   if (filter.columns.some((column) => column.allowedValues.length === 0 && !column.condition)) {

@@ -66,6 +66,30 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       condition: string;
       invalidCondition: string;
     };
+    advanced: {
+      title: string;
+      autoFilter: string;
+      inPlace: string;
+      copy: string;
+      listRange: string;
+      criteriaRange: string;
+      copyTo: string;
+      pickRange: string;
+      uniqueOnly: string;
+      overwrite: string;
+      criteriaHint: string;
+      copyHint: string;
+      apply: string;
+      invalidList: string;
+      invalidCriteria: string;
+      invalidDestination: string;
+      staleTarget: string;
+      overwriteRequired: string;
+      invalidHeaders: string;
+      invalidOperation: string;
+      protectedDestination: string;
+      overlappingRanges: string;
+    };
     textToColumns: {
       title: string;
       delimiter: string;

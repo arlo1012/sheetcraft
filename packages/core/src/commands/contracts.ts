@@ -230,6 +230,16 @@ export type SortSheetRangeCommand = {
   sortKeys?: Array<{ column: number; direction: SortDirection }>;
   hasHeader?: boolean;
 };
+export type AdvancedFilterCommand = {
+  type: "advancedFilter";
+  sheetId: string;
+  listRange: CellRange;
+  criteria?: { sheetId: string; range: CellRange };
+  mode: "inPlace" | "copy";
+  destination?: { sheetId: string; address: CellAddress };
+  uniqueOnly: boolean;
+  overwrite: boolean;
+};
 export type SplitColumnCommand = {
   type: "splitColumn";
   sheetId: string;
@@ -513,6 +523,7 @@ export type WorkbookCommand =
   | UnmergeCellsCommand
   | SetSheetFilterCommand
   | SortSheetRangeCommand
+  | AdvancedFilterCommand
   | SplitColumnCommand
   | RemoveDuplicatesCommand
   | ApplySubtotalsCommand
@@ -632,6 +643,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "data.filter";
     case "sortSheetRange":
       return "data.sort";
+    case "advancedFilter":
+      return "data.filter";
     case "splitColumn":
     case "removeDuplicates":
       return "data.transform";

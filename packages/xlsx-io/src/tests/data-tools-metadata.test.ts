@@ -188,4 +188,40 @@ describe("XLSX data-tool metadata", () => {
       '<dataValidations count="1"><dataValidation type="list" sqref="A1:A2"><formula1>&quot;yes,no&quot;</formula1></dataValidation></dataValidations>',
     );
   });
+
+  test("preserves applied advanced-filter visibility without exporting it as an AutoFilter", async () => {
+    const workbook = createWorkbook({ id: "book", sheetId: "data", sheetName: "Data" });
+    const sheet = [...workbook.sheets.values()][0]!;
+    for (const row of [0, 1, 4])
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value: `row-${row}` });
+    (sheet as unknown as { filter: unknown }).filter = {
+      range: { start: { row: 0, column: 0 }, end: { row: 4, column: 0 } },
+      columns: [],
+      advanced: {
+        criteria: {
+          sheetId: sheet.id,
+          range: { start: { row: 0, column: 2 }, end: { row: 1, column: 2 } },
+        },
+        uniqueOnly: true,
+        hiddenRows: [{ start: 2, end: 3 }],
+      },
+    };
+
+    const encoded = await encodeXlsx(workbook);
+    const xml = strFromU8(unzipSync(encoded.bytes)["xl/worksheets/sheet1.xml"]!);
+    expect(xml).not.toContain("<autoFilter");
+    expect(xml).toMatch(/<row[^>]*r="3"[^>]*hidden="1"/);
+    expect(xml).toMatch(/<row[^>]*r="4"[^>]*hidden="1"/);
+    expect([...xml.matchAll(/<row\b[^>]*\br="(\d+)"/g)].map((match) => Number(match[1]))).toEqual([
+      1, 2, 3, 4, 5,
+    ]);
+    expect(encoded.report.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "advanced-filter-criteria-omitted",
+          locations: ["Data.advancedFilter"],
+        }),
+      ]),
+    );
+  });
 });

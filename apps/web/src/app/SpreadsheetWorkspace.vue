@@ -14,10 +14,12 @@ import { useFormulaToolsController } from "../modules/formula-tools/useFormulaTo
 import { useDataToolsController } from "../modules/data-tools/useDataToolsController";
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
+import AdvancedFilterDialog from "../modules/data-tools/components/AdvancedFilterDialog.vue";
+import type { AdvancedFilterDraft } from "../modules/data-tools/data-tools-types";
 import FilterColumnPanel from "../modules/data-tools/components/FilterColumnPanel.vue";
 import DataValidationFeedbackDialog from "../modules/data-tools/components/DataValidationFeedbackDialog.vue";
-import NamedRangePicker from "../modules/formula-tools/components/NamedRangePicker.vue";
-import { useNamedRangePicker } from "../modules/formula-tools/useNamedRangePicker";
+import RangeReferencePicker from "../shared/range-reference/RangeReferencePicker.vue";
+import { useRangeReferencePicker } from "../shared/range-reference/useRangeReferencePicker";
 import NamedRangesDialog from "../modules/formula-tools/components/NamedRangesDialog.vue";
 import {
   createIndexedDbImageAssetStore,
@@ -413,14 +415,33 @@ const {
   removeDuplicatesVisible: dataRemoveDuplicatesVisible,
   validationVisible: dataValidationVisible,
   subtotalVisible: dataSubtotalVisible,
+  advancedFilterVisible: dataAdvancedFilterVisible,
+  advancedFilterDraft: dataAdvancedFilterDraft,
+  advancedFilterError: dataAdvancedFilterError,
 } = dataTools;
+const advancedRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingAdvancedRange, reference: pickedAdvancedReference } = advancedRangePicker;
+const advancedRangeField = ref<"listRange" | "criteriaRange" | "destination">();
+async function pickAdvancedFilterRange(field: "listRange" | "criteriaRange" | "destination") {
+  advancedRangeField.value = field;
+  const selected = await advancedRangePicker.selectReference(dataAdvancedFilterDraft.value[field]);
+  advancedRangeField.value = undefined;
+  if (selected !== undefined && dataAdvancedFilterVisible.value) {
+    const draft: AdvancedFilterDraft = { ...dataAdvancedFilterDraft.value, [field]: selected };
+    dataTools.updateAdvancedFilterDraft(draft);
+  }
+}
+watch(dataAdvancedFilterVisible, (visible) => {
+  if (!visible) advancedRangePicker.cancel();
+});
 const dataToolsModalOpen = computed(
   () =>
     dataTools.sortVisible.value ||
     dataTools.textToColumnsVisible.value ||
     dataTools.removeDuplicatesVisible.value ||
     dataTools.validationVisible.value ||
-    dataTools.subtotalVisible.value,
+    dataTools.subtotalVisible.value ||
+    (dataAdvancedFilterVisible.value && !pickingAdvancedRange.value),
 );
 
 function chooseValidationValue(payload: {
@@ -480,8 +501,9 @@ watch(workbookGeneration, () => {
   recentFunctions.value = [];
 });
 
-const nameRangePicker = useNamedRangePicker(() => activeSheet.value.name);
+const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
+const pickingReferenceRange = computed(() => pickingNameRange.value || pickingAdvancedRange.value);
 watch(namesVisible, (visible) => {
   if (!visible) nameRangePicker.cancel();
 });
@@ -504,9 +526,10 @@ function onWorkspaceWheel(event: WheelEvent): void {
 }
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
-  if (pickingNameRange.value) {
-    if (event.key === "Escape") nameRangePicker.cancel();
-    else if (event.key === "Enter") nameRangePicker.confirm();
+  if (pickingReferenceRange.value) {
+    const picker = pickingAdvancedRange.value ? advancedRangePicker : nameRangePicker;
+    if (event.key === "Escape") picker.cancel();
+    else if (event.key === "Enter") picker.confirm();
     else if (event.key === "Tab") return;
     event.preventDefault();
     event.stopPropagation();
@@ -588,6 +611,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         xlsxBusy ||
         !!cellFormatSelection ||
         namesVisible ||
+        pickingReferenceRange ||
         dataToolsModalOpen ||
         !!validationFeedback
       "
@@ -627,6 +651,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @sort="dataTools.sort"
           @open-sort="dataTools.openSort"
           @toggle-filter="dataTools.toggleFilter"
+          @advanced-filter="dataTools.openAdvancedFilter"
           @clear-filter="dataTools.clearFilter"
           @reapply-filter="dataTools.reapplyFilter"
           @open-text-to-columns="dataTools.openTextToColumns"
@@ -721,6 +746,24 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @subtotal="dataTools.applySubtotal"
       @remove-subtotals="dataTools.removeSubtotals"
     />
+    <AdvancedFilterDialog
+      :visible="dataAdvancedFilterVisible"
+      :initial="dataAdvancedFilterDraft"
+      :error="dataAdvancedFilterError"
+      :busy="loading || fileBusy || xlsxBusy || imageBusy"
+      :picking="advancedRangeField"
+      @close="dataTools.closeAdvancedFilter"
+      @apply="dataTools.applyAdvancedFilter"
+      @draft-change="dataTools.updateAdvancedFilterDraft"
+      @pick-range="pickAdvancedFilterRange"
+    />
+    <RangeReferencePicker
+      v-if="pickingAdvancedRange"
+      :reference="pickedAdvancedReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="advancedRangePicker.confirm"
+      @cancel="advancedRangePicker.cancel"
+    />
     <FilterColumnPanel
       v-if="dataFilterState"
       v-bind="dataFilterState"
@@ -750,7 +793,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @save="formulaTools.saveName"
       @delete="formulaTools.deleteName"
     />
-    <NamedRangePicker
+    <RangeReferencePicker
       v-if="pickingNameRange"
       :reference="pickedNameReference"
       :edit-session-id="cellEditSession.id"
@@ -794,7 +837,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         fileBusy ||
         xlsxBusy ||
         !!cellFormatSelection ||
-        pickingNameRange ||
+        pickingReferenceRange ||
         dataToolsModalOpen ||
         !!validationFeedback
       "
@@ -848,7 +891,13 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @outline-level="showOutlineLevel"
         @context-action="contextActions.request"
         :date-system="session.workbook.dateSystem"
-        :reference-editor="pickingNameRange ? nameRangePicker.editor : formulaBarRef"
+        :reference-editor="
+          pickingAdvancedRange
+            ? advancedRangePicker.editor
+            : pickingNameRange
+              ? nameRangePicker.editor
+              : formulaBarRef
+        "
         :edit-session="cellEditSession"
         :image-asset-urls="imageAssetUrls"
         :loading-image-asset-ids="loadingImageAssetIds"

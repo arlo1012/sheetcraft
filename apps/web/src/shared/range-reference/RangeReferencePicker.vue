@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { useAppI18n } from "../../../shared/i18n";
+import { useAppI18n } from "../i18n";
 
 defineProps<{ reference: string; editSessionId?: string }>();
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
@@ -20,26 +20,26 @@ const { t } = useAppI18n();
     :close-on-esc-keydown="true"
     :prevent-scroll-through="false"
     :show-overlay="false"
-    dialog-class-name="named-range-picker-dialog"
+    dialog-class-name="range-reference-picker-dialog"
     width="min(460px, calc(100vw - 32px))"
     :data-cell-edit-session="editSessionId"
     @confirm="emit('confirm')"
     @close="emit('cancel')"
   >
     <div
-      class="named-range-picker"
+      class="range-reference-picker"
       :data-cell-edit-session="editSessionId"
       @keydown.enter.stop.prevent="emit('confirm')"
       @keydown.esc.stop.prevent="emit('cancel')"
     >
       <TInput :value="reference" readonly :aria-label="t('formulaTools.reference')" />
-      <p class="named-range-picker__hint">{{ t("formulaTools.selectRangeHint") }}</p>
+      <p class="range-reference-picker__hint">{{ t("formulaTools.selectRangeHint") }}</p>
     </div>
   </Dialog>
 </template>
 
 <style scoped lang="scss">
-.named-range-picker {
+.range-reference-picker {
   &__hint {
     margin: var(--idea-space-2) 0 0;
     color: var(--idea-text-secondary);
