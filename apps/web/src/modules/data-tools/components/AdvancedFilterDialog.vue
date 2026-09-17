@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Crosshair } from "lucide-vue-next";
+import { SquareMousePointer } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
@@ -83,12 +83,14 @@ const canApply = computed(() =>
         >
           <template #suffix
             ><TButton
+              class="advanced-filter-dialog__range-picker"
               variant="text"
               shape="square"
               :disabled="busy"
               :aria-label="`${t('dataTools.advanced.pickRange')}：${t('dataTools.advanced.listRange')}`"
+              :title="t('formulaTools.selectRange')"
               @click="emit('pickRange', 'listRange')"
-              ><Crosshair :size="16" /></TButton
+              ><SquareMousePointer :size="16" aria-hidden="true" /></TButton
           ></template>
         </TInput>
       </label>
@@ -103,12 +105,14 @@ const canApply = computed(() =>
         >
           <template #suffix
             ><TButton
+              class="advanced-filter-dialog__range-picker"
               variant="text"
               shape="square"
               :disabled="busy"
               :aria-label="`${t('dataTools.advanced.pickRange')}：${t('dataTools.advanced.criteriaRange')}`"
+              :title="t('formulaTools.selectRange')"
               @click="emit('pickRange', 'criteriaRange')"
-              ><Crosshair :size="16" /></TButton
+              ><SquareMousePointer :size="16" aria-hidden="true" /></TButton
           ></template>
         </TInput>
       </label>
@@ -125,12 +129,14 @@ const canApply = computed(() =>
         >
           <template #suffix
             ><TButton
+              class="advanced-filter-dialog__range-picker"
               variant="text"
               shape="square"
               :disabled="busy || draft.mode === 'inPlace'"
               :aria-label="`${t('dataTools.advanced.pickRange')}：${t('dataTools.advanced.copyTo')}`"
+              :title="t('formulaTools.selectRange')"
               @click="emit('pickRange', 'destination')"
-              ><Crosshair :size="16" /></TButton
+              ><SquareMousePointer :size="16" aria-hidden="true" /></TButton
           ></template>
         </TInput>
       </label>
@@ -170,6 +176,9 @@ const canApply = computed(() =>
     margin: 0;
     color: var(--idea-text-secondary);
     font-size: var(--idea-font-size-body-small);
+  }
+  &__range-picker:hover {
+    --td-bg-color-container-hover: transparent;
   }
   &__error {
     margin: 0;
