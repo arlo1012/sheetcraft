@@ -237,7 +237,6 @@ function apply(): void {
   }
   &__actions {
     display: flex;
-    gap: 8px;
   }
 }
 </style>
