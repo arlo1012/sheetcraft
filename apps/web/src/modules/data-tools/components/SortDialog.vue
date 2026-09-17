@@ -355,7 +355,7 @@ function apply(): void {
               <TSelect
                 data-sort-field="column"
                 :value="row.column"
-                @update:model-value="changeColumn(row, $event)"
+                @update:value="changeColumn(row, $event)"
                 :options="columnOptions"
                 :popup-props="popupProps"
                 :aria-label="t('dataTools.sort.column')"
@@ -370,7 +370,7 @@ function apply(): void {
               :options="basisOptions"
               :popup-props="popupProps"
               :aria-label="t('dataTools.sort.sortOn')"
-              @update:model-value="changeBasis(row, $event)"
+              @update:value="changeBasis(row, $event)"
               @focus="selectedId = row.id"
             />
           </template>
@@ -385,7 +385,7 @@ function apply(): void {
                 :placeholder="t('dataTools.sort.selectColor')"
                 :empty="t('dataTools.sort.noColors')"
                 :disabled="!colorsFor(row).length"
-                @update:model-value="changeColor(row, $event)"
+                @update:value="changeColor(row, $event)"
                 @focus="selectedId = row.id"
               >
                 <TOption
@@ -420,7 +420,7 @@ function apply(): void {
                 :value="orderValue(row)"
                 data-sort-field="direction"
                 :options="orderOptions(row)"
-                @update:model-value="changeOrder(row, $event)"
+                @update:value="changeOrder(row, $event)"
                 :popup-props="popupProps"
                 :aria-label="t('dataTools.sort.order')"
                 @focus="selectedId = row.id"
