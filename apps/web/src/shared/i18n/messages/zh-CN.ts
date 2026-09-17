@@ -7,6 +7,7 @@ export const zhCN = {
     toolbar: "数据工具",
     groups: { sortFilter: "排序与筛选", cleanup: "数据整理", outline: "分级汇总" },
     sort: {
+      storageUnavailable: "排序已应用，但未能保存排序设置，刷新后将无法恢复。",
       ascending: "升序",
       descending: "降序",
       custom: "自定义排序",

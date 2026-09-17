@@ -7,6 +7,7 @@ export type MessageSchema = FormulaToolsMessageSchema & {
     toolbar: string;
     groups: { sortFilter: string; cleanup: string; outline: string };
     sort: {
+      storageUnavailable: string;
       ascending: string;
       descending: string;
       custom: string;

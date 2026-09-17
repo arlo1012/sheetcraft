@@ -1,6 +1,7 @@
 import { defineComponent, reactive } from "vue";
 import { mount } from "@vue/test-utils";
-import { describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test } from "vitest";
+import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
 import {
   createAddSheetCommand,
   createSetCellContentCommand,
@@ -13,6 +14,7 @@ import {
   getActiveSheet,
   setActiveSheet,
   setCellStyle,
+  type Workbook,
 } from "@idea10/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useDataToolsController } from "../../../../modules/data-tools/useDataToolsController";
@@ -22,8 +24,11 @@ function fixture(
     address: { row: 1, column: 1 },
     range: { start: { row: 1, column: 1 }, end: { row: 1, column: 1 } },
   },
+  workbook?: Workbook,
 ) {
-  const session = reactive(createWorkbookSession({ idFactory: createSequentialIdFactory() }));
+  const session = reactive(
+    createWorkbookSession({ workbook, idFactory: createSequentialIdFactory() }),
+  );
   const sheet = getActiveSheet(session.workbook);
   let generation = 0;
   let recalculate = 0;
@@ -68,6 +73,27 @@ function fixture(
 }
 
 describe("useDataToolsController", () => {
+  beforeEach(() => localStorage.clear());
+
+  test("restores applied sort settings after reloading the serialized workbook", () => {
+    const f = fixture();
+    f.set(0, 1, "Priority");
+    f.set(1, 1, "Low");
+    f.set(2, 1, "High");
+    const levels = [{ column: 1, direction: "descending" as const, customOrder: ["High", "Low"] }];
+    f.controller.openSort();
+    f.controller.applySort({ range: "B1:B3", hasHeader: true, caseSensitive: true, levels });
+    f.controller.openSort();
+    f.controller.sortInitial.value.levels![0]!.customOrder!.reverse();
+    f.controller.closeSort();
+    const restored = fixture(undefined, deserializeWorkbook(serializeWorkbook(f.session.workbook)));
+    restored.controller.openSort();
+    expect(restored.controller.sortInitial.value).toMatchObject({
+      hasHeader: true,
+      caseSensitive: true,
+      levels,
+    });
+  });
   test("sorts by a custom sequence with unlisted values after the sequence", () => {
     const f = fixture();
     f.set(0, 1, "Priority");
@@ -143,6 +169,10 @@ describe("useDataToolsController", () => {
     expect(f.controller.sortInitial.value.levels).toEqual([
       { column: 1, direction: "descending", customOrder: ["B", "A"] },
     ]);
+    f.changeGeneration();
+    f.controller.openSort();
+    expect(f.controller.sortInitial.value.levels?.[0]?.customOrder).toEqual(["B", "A"]);
+    f.session.workbook.id = "different-document";
     f.changeGeneration();
     f.controller.openSort();
     expect(f.controller.sortInitial.value.levels).toBeUndefined();

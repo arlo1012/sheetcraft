@@ -36,6 +36,7 @@ import {
 } from "@idea10/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
+import { readSortSettings, writeSortSettings } from "./sort-settings";
 import { getSortColorColumns } from "./sort-color-options";
 import { isValidationDraftComplete } from "./validation-draft";
 import { useAdvancedFilterController } from "./useAdvancedFilterController";
@@ -220,7 +221,8 @@ export function useDataToolsController(options: Options) {
       sortSettings.clear();
       sortSettingsGeneration = target.generation;
     }
-    const settings = sortSettings.get(sortRangeKey(target));
+    const settings =
+      sortSettings.get(sortRangeKey(target)) ?? readSortSettings(options.getWorkbook().id, target);
     return settings && cloneSortInitial(settings);
   }
   function rememberSortSettings(target: Target, settings: SortInitial): void {
@@ -229,6 +231,8 @@ export function useDataToolsController(options: Options) {
       sortSettingsGeneration = target.generation;
     }
     sortSettings.set(sortRangeKey(target), cloneSortInitial(settings));
+    if (!writeSortSettings(options.getWorkbook().id, target, settings))
+      void MessagePlugin.warning(t("dataTools.sort.storageUnavailable"));
   }
   function columnsFor(target?: Target): DataToolColumn[] {
     const range =

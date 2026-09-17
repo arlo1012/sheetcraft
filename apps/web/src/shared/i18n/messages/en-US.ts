@@ -7,6 +7,8 @@ export const enUS = {
     toolbar: "Data tools",
     groups: { sortFilter: "Sort and filter", cleanup: "Data preparation", outline: "Outline" },
     sort: {
+      storageUnavailable:
+        "The sort was applied, but its settings could not be saved for the next reload.",
       ascending: "Sort ascending",
       descending: "Sort descending",
       custom: "Custom sort",
