@@ -26,7 +26,6 @@ describe("AdvancedFilterDialog", () => {
       props: { visible: true, initial },
     });
     mounted.push(wrapper);
-    expect(document.body.textContent).toContain("Criteria on the same row use AND");
     const inputs = wrapper.findAllComponents({ name: "TInput" });
     expect(inputs[2]!.props("disabled")).toBe(true);
     wrapper.findComponent({ name: "TRadioGroup" }).vm.$emit("update:modelValue", "copy");

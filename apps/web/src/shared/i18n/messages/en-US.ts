@@ -77,8 +77,6 @@ export const enUS = {
       pickRange: "Select range",
       uniqueOnly: "Unique records only",
       overwrite: "Replace existing data",
-      criteriaHint:
-        "Criteria on the same row use AND; different rows use OR. Include headers, or leave the range empty to match all records.",
       copyHint: "Copy results, including headers, starting at the destination's top-left cell.",
       apply: "OK",
       invalidList: "Choose a valid list range containing a header row and data rows.",

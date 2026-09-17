@@ -77,7 +77,6 @@ export const zhCN = {
       pickRange: "选择区域",
       uniqueOnly: "选择不重复的记录",
       overwrite: "覆盖已有数据",
-      criteriaHint: "条件区域包含标题。同一行条件为“并且”，不同行为“或者”；留空则匹配所有记录。",
       copyHint: "从目标区域的左上角开始复制结果，包含标题行。",
       apply: "确定",
       invalidList: "请选择包含标题行和数据行的有效列表区域。",

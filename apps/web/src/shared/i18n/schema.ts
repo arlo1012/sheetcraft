@@ -77,7 +77,6 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       pickRange: string;
       uniqueOnly: string;
       overwrite: string;
-      criteriaHint: string;
       copyHint: string;
       apply: string;
       invalidList: string;

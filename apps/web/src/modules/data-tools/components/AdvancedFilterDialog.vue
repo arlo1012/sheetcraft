@@ -146,7 +146,6 @@ const canApply = computed(() =>
       <TCheckbox v-model="draft.overwrite" :disabled="busy || draft.mode === 'inPlace'">{{
         t("dataTools.advanced.overwrite")
       }}</TCheckbox>
-      <p class="advanced-filter-dialog__hint">{{ t("dataTools.advanced.criteriaHint") }}</p>
       <p v-if="draft.mode === 'copy'" class="advanced-filter-dialog__hint">
         {{ t("dataTools.advanced.copyHint") }}
       </p>
