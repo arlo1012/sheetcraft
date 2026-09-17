@@ -29,6 +29,7 @@ import {
   type SheetDataValidation,
   type SheetOutlineGroup,
   type SheetSubtotalMetadata,
+  type SheetDuplicateRule,
   type Workbook,
   type DefinedName,
 } from "./workbook.js";
@@ -131,8 +132,9 @@ export type WorkbookSnapshotV9 = Omit<WorkbookSnapshotV8, "version"> & {
   calculation: WorkbookCalculationSettings;
 };
 export type WorkbookSnapshotV10 = Omit<WorkbookSnapshotV9, "version"> & { version: 10 };
+export type WorkbookSnapshotV11 = Omit<WorkbookSnapshotV10, "version"> & { version: 11 };
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV10;
+export type WorkbookSnapshot = WorkbookSnapshotV11;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -140,8 +142,9 @@ export type SheetSnapshot = SheetSnapshotV7 & {
   dataValidations?: SheetDataValidation[];
   outlineGroups?: SheetOutlineGroup[];
   subtotalMetadata?: SheetSubtotalMetadata[];
+  duplicateRules?: SheetDuplicateRule[];
 };
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -525,6 +528,10 @@ function parseSparseState(
       version >= 10 && Object.hasOwn(record, "subtotalMetadata")
         ? (asArray(record.subtotalMetadata, `${path}.subtotalMetadata`) as SheetSubtotalMetadata[])
         : [],
+    duplicateRules:
+      version >= 11 && Object.hasOwn(record, "duplicateRules")
+        ? (asArray(record.duplicateRules, `${path}.duplicateRules`) as SheetDuplicateRule[])
+        : [],
     floatingImages:
       version >= 4
         ? asArray(record.floatingImages, `${path}.floatingImages`).map((image, index) =>
@@ -593,7 +600,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 10,
+    version: 11,
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
@@ -622,7 +629,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 7 &&
     record.version !== 8 &&
     record.version !== 9 &&
-    record.version !== 10
+    record.version !== 10 &&
+    record.version !== 11
   ) {
     throw new WorkbookDomainError(
       {

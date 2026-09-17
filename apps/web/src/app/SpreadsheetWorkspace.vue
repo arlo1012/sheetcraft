@@ -14,6 +14,7 @@ import { useFormulaToolsController } from "../modules/formula-tools/useFormulaTo
 import { useDataToolsController } from "../modules/data-tools/useDataToolsController";
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
+import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
 import AdvancedFilterDialog from "../modules/data-tools/components/AdvancedFilterDialog.vue";
 import type { AdvancedFilterDraft } from "../modules/data-tools/data-tools-types";
 import FilterColumnPanel from "../modules/data-tools/components/FilterColumnPanel.vue";
@@ -418,6 +419,10 @@ const {
   advancedFilterVisible: dataAdvancedFilterVisible,
   advancedFilterDraft: dataAdvancedFilterDraft,
   advancedFilterError: dataAdvancedFilterError,
+  duplicateValuesVisible,
+  duplicateValuesMode,
+  duplicateValuesDraft,
+  duplicateValuesError,
 } = dataTools;
 const advancedRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingAdvancedRange, reference: pickedAdvancedReference } = advancedRangePicker;
@@ -434,6 +439,20 @@ async function pickAdvancedFilterRange(field: "listRange" | "criteriaRange" | "d
 watch(dataAdvancedFilterVisible, (visible) => {
   if (!visible) advancedRangePicker.cancel();
 });
+const duplicateRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingDuplicateRange, reference: pickedDuplicateReference } = duplicateRangePicker;
+const duplicateRangeField = ref<"range" | "destination">();
+async function pickDuplicateRange(field: "range" | "destination") {
+  duplicateRangeField.value = field;
+  const selected = await duplicateRangePicker.selectReference(duplicateValuesDraft.value[field]);
+  duplicateRangeField.value = undefined;
+  if (selected !== undefined && duplicateValuesVisible.value) {
+    dataTools.updateDuplicateValuesDraft({ ...duplicateValuesDraft.value, [field]: selected });
+  }
+}
+watch(duplicateValuesVisible, (visible) => {
+  if (!visible) duplicateRangePicker.cancel();
+});
 const dataToolsModalOpen = computed(
   () =>
     dataTools.sortVisible.value ||
@@ -441,7 +460,8 @@ const dataToolsModalOpen = computed(
     dataTools.removeDuplicatesVisible.value ||
     dataTools.validationVisible.value ||
     dataTools.subtotalVisible.value ||
-    (dataAdvancedFilterVisible.value && !pickingAdvancedRange.value),
+    (dataAdvancedFilterVisible.value && !pickingAdvancedRange.value) ||
+    (duplicateValuesVisible.value && !pickingDuplicateRange.value),
 );
 
 function chooseValidationValue(payload: {
@@ -503,7 +523,9 @@ watch(workbookGeneration, () => {
 
 const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
-const pickingReferenceRange = computed(() => pickingNameRange.value || pickingAdvancedRange.value);
+const pickingReferenceRange = computed(
+  () => pickingNameRange.value || pickingAdvancedRange.value || pickingDuplicateRange.value,
+);
 watch(namesVisible, (visible) => {
   if (!visible) nameRangePicker.cancel();
 });
@@ -527,7 +549,11 @@ function onWorkspaceWheel(event: WheelEvent): void {
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (pickingReferenceRange.value) {
-    const picker = pickingAdvancedRange.value ? advancedRangePicker : nameRangePicker;
+    const picker = pickingDuplicateRange.value
+      ? duplicateRangePicker
+      : pickingAdvancedRange.value
+        ? advancedRangePicker
+        : nameRangePicker;
     if (event.key === "Escape") picker.cancel();
     else if (event.key === "Enter") picker.confirm();
     else if (event.key === "Tab") return;
@@ -656,6 +682,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @reapply-filter="dataTools.reapplyFilter"
           @open-text-to-columns="dataTools.openTextToColumns"
           @open-remove-duplicates="dataTools.openRemoveDuplicates"
+          @open-duplicate-values="dataTools.openDuplicateValues"
+          @clear-duplicate-highlights="dataTools.clearDuplicateHighlights"
+          @clear-duplicate-rejections="dataTools.clearDuplicateRejections"
           @open-validation="dataTools.openValidation"
           @group="dataTools.group"
           @ungroup="dataTools.ungroup"
@@ -746,6 +775,25 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @close-subtotal="dataTools.closeSubtotal"
       @subtotal="dataTools.applySubtotal"
       @remove-subtotals="dataTools.removeSubtotals"
+    />
+    <DuplicateValuesDialog
+      :visible="duplicateValuesVisible"
+      :mode="duplicateValuesMode"
+      :initial="duplicateValuesDraft"
+      :error="duplicateValuesError"
+      :busy="loading || fileBusy || xlsxBusy || imageBusy"
+      :picking="duplicateRangeField"
+      @close="dataTools.closeDuplicateValues"
+      @apply="dataTools.applyDuplicateValues"
+      @draft-change="dataTools.updateDuplicateValuesDraft"
+      @pick-range="pickDuplicateRange"
+    />
+    <RangeReferencePicker
+      v-if="pickingDuplicateRange"
+      :reference="pickedDuplicateReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="duplicateRangePicker.confirm"
+      @cancel="duplicateRangePicker.cancel"
     />
     <AdvancedFilterDialog
       :visible="dataAdvancedFilterVisible"
@@ -893,11 +941,13 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @context-action="contextActions.request"
         :date-system="session.workbook.dateSystem"
         :reference-editor="
-          pickingAdvancedRange
-            ? advancedRangePicker.editor
-            : pickingNameRange
-              ? nameRangePicker.editor
-              : formulaBarRef
+          pickingDuplicateRange
+            ? duplicateRangePicker.editor
+            : pickingAdvancedRange
+              ? advancedRangePicker.editor
+              : pickingNameRange
+                ? nameRangePicker.editor
+                : formulaBarRef
         "
         :edit-session="cellEditSession"
         :image-asset-urls="imageAssetUrls"
@@ -914,7 +964,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :apply-axis-move="moveAxis"
         :apply-fill="fillActions.apply"
         @end-fill="fillActions.clear"
-        @fill-feedback="MessagePlugin.warning(t(`autoFill.${$event}`))"
+        @fill-feedback="
+          MessagePlugin.warning(
+            t(
+              $event === 'duplicate'
+                ? 'dataTools.duplicates.duplicateRejected'
+                : `autoFill.${$event}`,
+            ),
+          )
+        "
         :view-state="activeSheetViewState"
         :format-painter-active="formatPainterActive"
         @clear-cells="clearCells"

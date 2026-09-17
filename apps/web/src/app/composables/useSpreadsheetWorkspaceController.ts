@@ -75,6 +75,7 @@ import {
   getCellDataValidation,
   resolveDataValidationListValues,
 } from "@idea10/core/data-validation";
+import { validateDuplicateEntries } from "@idea10/core/duplicate-values";
 import { WorkbookDomainError } from "@idea10/core/errors";
 import type { IdFactory } from "@idea10/core/runtime";
 import { findCellByText, type SheetSearchDirection } from "@idea10/core/search";
@@ -385,6 +386,10 @@ export function useSpreadsheetWorkspaceController(
     getWorkbook: () => session.workbook,
     getGeneration: () => workbookGeneration.value,
     execute: (command) => execute(command, "cells.edit"),
+    getDuplicateRejectionFeedback: () => ({
+      title: t("dataTools.duplicates.rejectionTitle"),
+      message: t("dataTools.duplicates.duplicateRejected"),
+    }),
   });
   const activeValidationInfo = computed(() => {
     void workbookVersion.value;
@@ -435,6 +440,7 @@ export function useSpreadsheetWorkspaceController(
   function execute(command: WorkbookCommand, operation?: WorkbookOperation): boolean {
     let changed: boolean;
     try {
+      assertDuplicateEntriesAreAllowed(command);
       calculation.prepareMutation(
         command.type === "setWorkbookCalculation" ? command.calculation.mode : undefined,
       );
@@ -457,6 +463,7 @@ export function useSpreadsheetWorkspaceController(
     command: WorkbookCommand,
     token?: ReplaceableWorkbookCommandToken,
   ) {
+    assertDuplicateEntriesAreAllowed(command);
     calculation.prepareMutation();
     const result = executeReplaceableWorkbookCommand(session, token, command);
     if (result.changed) {
@@ -465,6 +472,21 @@ export function useSpreadsheetWorkspaceController(
       pruneViewStates();
     }
     return result;
+  }
+
+  /** Reject entire value mutations before history can record a partial duplicate entry. */
+  function assertDuplicateEntriesAreAllowed(command: WorkbookCommand): void {
+    if (command.type !== "setCellContents") return;
+    const result = validateDuplicateEntries(session.workbook, command.changes);
+    if (!result.valid) {
+      throw new WorkbookDomainError(
+        {
+          code: "invalid_command_payload",
+          details: { field: "duplicate", sheetId: result.sheetId, ruleId: result.ruleId },
+        },
+        "A duplicate value is not allowed in this range.",
+      );
+    }
   }
 
   function clearWorkspaceStatus(): void {
@@ -657,6 +679,9 @@ export function useSpreadsheetWorkspaceController(
       clearWorkspaceStatus();
       return { ok: true };
     } catch (error) {
+      if (isDuplicateEntryError(error)) {
+        showWorkspaceStatus({ key: "dataTools.duplicates.duplicateRejected" });
+      }
       return {
         ok: false,
         reason: error instanceof GridPasteError ? error.reason : "pasteRejected",
@@ -665,7 +690,20 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function showClipboardFeedback(feedback: GridClipboardFeedback): void {
+    if (
+      feedback === "pasteRejected" &&
+      workspaceStatus.value?.key === "dataTools.duplicates.duplicateRejected"
+    )
+      return;
     showWorkspaceStatus({ key: `clipboard.${feedback}` });
+  }
+
+  function isDuplicateEntryError(error: unknown): boolean {
+    return (
+      error instanceof WorkbookDomainError &&
+      error.data.code === "invalid_command_payload" &&
+      error.data.details?.field === "duplicate"
+    );
   }
 
   function clearCells(range: CellRange): void {

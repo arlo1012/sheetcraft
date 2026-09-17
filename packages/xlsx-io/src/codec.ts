@@ -833,6 +833,11 @@ export async function encodeWithExcelJs(
     });
     if (sheet.filter?.advanced)
       add(report, "advanced-filter-criteria-omitted", `${sheet.name}.advancedFilter`);
+    // Duplicate highlighting and duplicate-entry rejection are product-owned
+    // rules. Do not serialize them as ordinary XLSX conditional formatting or
+    // validation, because that would imply equivalent behavior after import.
+    if (sheet.duplicateRules?.length)
+      add(report, "feature-omitted", `${sheet.name}.duplicateRules`);
     for (const [key, cell] of sheet.cells) {
       encodedCells += 1;
       if (encodedCells > MAX_SPARSE_CELLS)

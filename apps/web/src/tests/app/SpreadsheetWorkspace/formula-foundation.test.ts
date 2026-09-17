@@ -125,7 +125,7 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     await flushPromises();
 
     const savedSnapshot = store.save.mock.calls[0]?.[0];
-    expect(savedSnapshot).toMatchObject({ version: 10, dateSystem: "1904" });
+    expect(savedSnapshot).toMatchObject({ version: 11, dateSystem: "1904" });
     const restored = deserializeWorkbook(savedSnapshot);
     const sheet = getActiveSheet(restored);
     expect(restored.dateSystem).toBe("1904");
@@ -205,7 +205,7 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     expect(store.replace).not.toHaveBeenCalled();
     expect(wrapper.find("[data-sheet-canvas]").exists()).toBe(true);
 
-    expect(wrapper.get('[data-workbook-file="feedback"]').text()).toContain(
+    expect(wrapper.get('[data-workbook-file="feedback"]').attributes("aria-label")).toContain(
       "not a valid idea10 workbook",
     );
   });

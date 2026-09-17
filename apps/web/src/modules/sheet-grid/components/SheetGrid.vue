@@ -36,7 +36,6 @@ import {
   MIN_ROW_HEIGHT,
   createSheetEvaluator,
   getCellContent,
-  getCellStyle,
   getDefaultColumnWidth,
   type FloatingImage,
   type CellAddress,
@@ -948,23 +947,23 @@ const activeCellDisplayValue = computed(() =>
     ? t("image.cellAlt")
     : formatCellValueForGrid(
         sheetEvaluator.value.getComputedValue(activeCell.value),
-        getCellStyle(props.sheet, activeCell.value),
+        display.value.getCellStyle(activeCell.value),
         locale.value,
         props.dateSystem,
       ),
 );
 const activeCellEditorStyle = computed(() =>
   getCellEditorStyle(
-    getCellStyle(props.sheet, activeCell.value),
+    display.value.getCellStyle(activeCell.value),
     sheetEvaluator.value.getComputedValue(activeCell.value),
     isEditing.value ? editingValue.value : activeCellDisplayValue.value,
   ),
 );
 const activeCellEditorFrameStyle = computed(() =>
-  getCellEditorFrameStyle(getCellStyle(props.sheet, activeCell.value)),
+  getCellEditorFrameStyle(display.value.getCellStyle(activeCell.value)),
 );
 const activeCellWrapText = computed(() =>
-  isCellTextWrapped(getCellStyle(props.sheet, activeCell.value)),
+  isCellTextWrapped(display.value.getCellStyle(activeCell.value)),
 );
 const browserClipboard = createBrowserGridClipboardPort();
 const {

@@ -50,6 +50,18 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   destination column, and explicitly allow overwriting populated destinations.
 - Remove duplicate rows using chosen key columns and a header setting. The dialog
   previews the number of rows to remove.
+- Duplicate items is a selection-scoped menu with six operations. Set Highlight
+  Duplicates creates a dynamic duplicate-owned overlay, using evaluated nonblank
+  values in the selection and preserving the cells' base fill and text styles.
+  Clear Highlight Duplicates removes only those duplicate-owned highlight rules.
+  Count Repetitions accepts one source column and writes each nonblank row's
+  selection-wide frequency to a separate destination column; populated targets
+  require explicit overwrite approval. Reject Duplicate Entries creates a
+  duplicate-owned selection rule that rejects a direct edit, paste, or fill when
+  its prospective batch would contain an already-present nonblank value. Clear
+  Reject Limit removes only those duplicate-owned rejection rules. Remove
+  Duplicates retains the first matching row according to the selected key
+  columns and removes later matches.
 - Set or edit cell validation: whole/decimal numbers, dates, times, text length,
   literal or range/named-range lists, and custom formulas. Input messages,
   in-cell dropdowns, Stop/Warning/Information feedback, and partial rule removal
@@ -60,11 +72,15 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   Remove All removes their generated rows. Sort by the grouping column first
   when equal keys are not adjacent.
 
-JSON snapshots use version 10 and retain filters, validation, outlines, and
-subtotal metadata. XLSX import/export handles the supported filter conditions,
-standard validation settings, and row/column outlines. Unsupported XLSX filter
-forms retain import diagnostics. Subtotal formulas remain ordinary formulas in
-XLSX; generated-row ownership is an idea10 snapshot feature.
+JSON snapshots use version 11 and retain filters, validation, outlines,
+subtotal metadata, and duplicate-owned rules. Every duplicate operation is
+undoable. XLSX import/export handles the supported filter conditions, standard
+validation settings, and row/column outlines. XLSX export reports that
+duplicate-owned highlight/rejection rules were omitted because it does not map
+them to a superficially similar conditional-formatting or validation rule.
+Unsupported XLSX filter forms retain import diagnostics. Subtotal formulas
+remain ordinary formulas in XLSX; generated-row ownership is an idea10 snapshot
+feature.
 Advanced filter rules and result intervals persist in JSON. XLSX export retains
 the hidden-result rows and reports loss of advanced-filter semantics: criteria
 cannot be reapplied after import, and formulas distinguishing filtered rows from

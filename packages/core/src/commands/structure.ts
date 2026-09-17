@@ -181,6 +181,10 @@ function cloneSheetMetadata(metadata: SheetMetadata): SheetMetadata {
       ...(rule.list ? { list: [...rule.list] } : {}),
     })),
     outlineGroups: (metadata.outlineGroups ?? []).map((group) => ({ ...group })),
+    duplicateRules: (metadata.duplicateRules ?? []).map((rule) => ({
+      ...rule,
+      range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+    })),
   };
 }
 
@@ -497,6 +501,10 @@ function transformSheetMetadataForAxis(
             })
           : [...entry.generatedRows];
       return [{ ...entry, range, generatedRows: rows }];
+    }),
+    duplicateRules: (metadata.duplicateRules ?? []).flatMap((rule) => {
+      const range = transformRangeForAxis(rule.range, axis, index, count, maximum, operation);
+      return range ? [{ ...rule, range }] : [];
     }),
   };
 }
@@ -1183,6 +1191,16 @@ function transformSheetMetadataForAxisMove(
         generatedRows: axis === "row" ? entry.generatedRows.map(map) : [...entry.generatedRows],
       };
     }),
+    duplicateRules: (metadata.duplicateRules ?? []).map((rule) => {
+      const range = moveRange(rule.range);
+      if (!range)
+        throw invalidCommandPayload(
+          "axis",
+          axis,
+          "Moving this row or column band would split a duplicate rule range.",
+        );
+      return { ...rule, range };
+    }),
   };
 }
 
@@ -1286,6 +1304,7 @@ export function applyMoveSheetAxisCommand(
     dataValidations: metadata.dataValidations,
     outlineGroups: metadata.outlineGroups,
     subtotalMetadata: metadata.subtotalMetadata,
+    duplicateRules: metadata.duplicateRules,
     floatingImages: previousState.floatingImages.map((image) => ({
       ...image,
       anchor:

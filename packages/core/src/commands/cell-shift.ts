@@ -311,12 +311,13 @@ export function applyCellShiftCommand(
     );
   if (
     (sheet.dataValidations ?? []).some((rule) => intersects(rule.range, movement)) ||
-    (sheet.subtotalMetadata ?? []).some((entry) => intersects(entry.range, movement))
+    (sheet.subtotalMetadata ?? []).some((entry) => intersects(entry.range, movement)) ||
+    (sheet.duplicateRules ?? []).some((rule) => intersects(rule.range, movement))
   )
     throw invalidCommandPayload(
       "range",
       range,
-      "Cell shifts intersecting data validation or subtotal ranges are not supported.",
+      "Cell shifts intersecting data validation, duplicate, or subtotal ranges are not supported.",
     );
   const outlineAxis =
     command.direction === "left" || command.direction === "right" ? "column" : "row";

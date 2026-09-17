@@ -4,6 +4,8 @@ import {
   getCellDataValidation,
   validateCellContentDataValidation,
 } from "@idea10/core/data-validation";
+import { validateDuplicateEntries } from "@idea10/core/duplicate-values";
+import { WorkbookDomainError } from "@idea10/core/errors";
 import type { CellContent } from "@idea10/core/formula";
 import type { CellAddress, SheetDataValidation, Workbook } from "@idea10/core/workbook";
 
@@ -24,6 +26,7 @@ export function useDataValidationInput(options: {
   getWorkbook: () => Workbook;
   getGeneration: () => number;
   execute: (command: WorkbookCommand) => boolean;
+  getDuplicateRejectionFeedback: () => { title: string; message: string };
 }) {
   const feedback = shallowRef<DataValidationFeedback>();
   let pending:
@@ -40,10 +43,35 @@ export function useDataValidationInput(options: {
     feedback.value = undefined;
   }
 
+  function rejectDuplicate(workbook: Workbook, candidate: Candidate): false {
+    pending = {
+      workbook,
+      generation: options.getGeneration(),
+      candidate: {
+        ...candidate,
+        address: { ...candidate.address },
+        content: candidate.content ? structuredClone(candidate.content) : null,
+      },
+      ruleSignature: "duplicate-rejection",
+    };
+    feedback.value = { style: "stop", ...options.getDuplicateRejectionFeedback() };
+    return false;
+  }
+
+  function isDuplicateRejection(error: unknown): boolean {
+    return (
+      error instanceof WorkbookDomainError &&
+      error.data.code === "invalid_command_payload" &&
+      error.data.details?.field === "duplicate"
+    );
+  }
+
   function commit(candidate: Candidate): boolean {
     const workbook = options.getWorkbook();
     const sheet = workbook.sheets.get(candidate.sheetId);
     if (!sheet || sheet.properties.protected) return false;
+    if (!validateDuplicateEntries(workbook, [candidate]).valid)
+      return rejectDuplicate(workbook, candidate);
     const rule = getCellDataValidation(sheet, candidate.address);
     if (
       rule &&
@@ -72,9 +100,14 @@ export function useDataValidationInput(options: {
       return false;
     }
     dismiss();
-    options.execute(
-      createSetCellContentCommand(candidate.sheetId, candidate.address, candidate.content),
-    );
+    try {
+      options.execute(
+        createSetCellContentCommand(candidate.sheetId, candidate.address, candidate.content),
+      );
+    } catch (error) {
+      if (isDuplicateRejection(error)) return rejectDuplicate(workbook, candidate);
+      throw error;
+    }
     // An unchanged valid value is also a successful editor commit.
     return true;
   }
@@ -96,13 +129,18 @@ export function useDataValidationInput(options: {
       dismiss();
       return false;
     }
-    options.execute(
-      createSetCellContentCommand(
-        request.candidate.sheetId,
-        request.candidate.address,
-        request.candidate.content,
-      ),
-    );
+    try {
+      options.execute(
+        createSetCellContentCommand(
+          request.candidate.sheetId,
+          request.candidate.address,
+          request.candidate.content,
+        ),
+      );
+    } catch (error) {
+      if (isDuplicateRejection(error)) return rejectDuplicate(workbook, request.candidate);
+      throw error;
+    }
     dismiss();
     return true;
   }

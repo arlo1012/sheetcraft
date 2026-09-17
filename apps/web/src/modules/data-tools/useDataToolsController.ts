@@ -39,6 +39,7 @@ import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory"
 import { readSortSettings, writeSortSettings } from "./sort-settings";
 import { getSortColorColumns } from "./sort-color-options";
 import { isValidationDraftComplete } from "./validation-draft";
+import { useDuplicateToolsController } from "./useDuplicateToolsController";
 import { useAdvancedFilterController } from "./useAdvancedFilterController";
 import type {
   DataToolAxis,
@@ -115,6 +116,7 @@ function cloneSortInitial(initial: SortInitial): SortInitial {
 export function useDataToolsController(options: Options) {
   const { t, locale } = useAppI18n();
   const advancedFilter = useAdvancedFilterController(options);
+  const duplicates = useDuplicateToolsController(options);
   const createId = createBrowserIdFactory();
   const sortVisible = ref(false);
   const textToColumnsVisible = ref(false);
@@ -790,6 +792,7 @@ export function useDataToolsController(options: Options) {
   }
   return {
     ...advancedFilter,
+    ...duplicates,
     disabled,
     capabilities,
     columns: dialogColumns,

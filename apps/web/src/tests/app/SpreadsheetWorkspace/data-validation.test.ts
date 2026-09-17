@@ -2,7 +2,7 @@ import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { getCellContent, type SheetDataValidation } from "@idea10/core/workbook";
+import { getCellContent, setCellContent, type SheetDataValidation } from "@idea10/core/workbook";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { createAppI18n } from "../../../shared/i18n";
 
@@ -43,6 +43,119 @@ afterEach(() => {
 });
 
 describe("workspace data validation", () => {
+  test("rejects duplicate direct input while retaining the pending editor request", () => {
+    const controller = setup();
+    const sheet = controller.activeSheet.value;
+    sheet.dataValidations = [];
+    sheet.duplicateRules = [
+      {
+        id: "reject-duplicates",
+        kind: "reject",
+        range: { start: { row: 0, column: 0 }, end: { row: 2, column: 0 } },
+      },
+    ];
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "Taken" });
+
+    expect(controller.commitCell({ address: { row: 1, column: 0 }, input: "Taken" })).toBe(false);
+    expect(controller.validationFeedback.value).toMatchObject({ style: "stop" });
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toBeNull();
+    expect(controller.commitCell({ address: { row: 1, column: 0 }, input: "Available" })).toBe(
+      true,
+    );
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toEqual({
+      kind: "literal",
+      value: "Available",
+    });
+    expect(controller.commitCell({ address: { row: 1, column: 0 }, input: "" })).toBe(true);
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toBeNull();
+  });
+
+  test("rejects a duplicate paste atomically", () => {
+    const controller = setup();
+    const sheet = controller.activeSheet.value;
+    sheet.dataValidations = [];
+    sheet.duplicateRules = [
+      {
+        id: "reject-duplicates",
+        kind: "reject",
+        range: { start: { row: 0, column: 0 }, end: { row: 2, column: 0 } },
+      },
+    ];
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "Taken" });
+
+    expect(
+      controller.pasteCells({
+        kind: "values",
+        plan: {
+          anchor: { row: 1, column: 0 },
+          range: { start: { row: 1, column: 0 }, end: { row: 2, column: 0 } },
+          values: [["Unique"], ["Taken"]],
+        },
+      }),
+    ).toEqual({ ok: false, reason: "pasteRejected" });
+    expect(controller.workspaceStatusText.value).toBe("Duplicate values are not allowed.");
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toBeNull();
+    expect(getCellContent(sheet, { row: 2, column: 0 })).toBeNull();
+  });
+
+  test("allows undo when a rejection rule is added after the original edit", () => {
+    const controller = setup();
+    const sheet = controller.activeSheet.value;
+    sheet.dataValidations = [];
+    expect(controller.commitCell({ address, input: "Taken" })).toBe(true);
+    sheet.duplicateRules = [
+      {
+        id: "reject-duplicates",
+        kind: "reject",
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      },
+    ];
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: "Taken" });
+
+    expect(controller.undo()).toBe(true);
+    expect(getCellContent(sheet, address)).toBeNull();
+  });
+
+  test("keeps a warning draft and switches to duplicate rejection when the candidate becomes stale", () => {
+    const controller = setup({ errorStyle: "warning" });
+    const sheet = controller.activeSheet.value;
+    sheet.duplicateRules = [
+      {
+        id: "reject-duplicates",
+        kind: "reject",
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      },
+    ];
+
+    expect(controller.commitCell({ address, input: "12" })).toBe(false);
+    expect(controller.validationFeedback.value?.style).toBe("warning");
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: 12 });
+
+    expect(controller.acceptValidationInput()).toBe(false);
+    expect(controller.validationFeedback.value).toMatchObject({
+      style: "stop",
+      message: "Duplicate values are not allowed.",
+    });
+    expect(getCellContent(sheet, address)).toBeNull();
+  });
+
+  test("rejects formula input whose evaluated value duplicates the configured range", () => {
+    const controller = setup();
+    const sheet = controller.activeSheet.value;
+    sheet.dataValidations = [];
+    sheet.duplicateRules = [
+      {
+        id: "reject-duplicates",
+        kind: "reject",
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      },
+    ];
+    setCellContent(sheet, address, { kind: "literal", value: 7 });
+
+    expect(controller.commitCell({ address: { row: 1, column: 0 }, input: "=A1" })).toBe(false);
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toBeNull();
+  });
+
   test("rejects invalid direct input without recording history, then accepts a correction", () => {
     const controller = setup();
     expect(controller.commitCell({ address, input: "12" })).toBe(false);

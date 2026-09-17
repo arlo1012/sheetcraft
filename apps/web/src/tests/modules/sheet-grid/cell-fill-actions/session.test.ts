@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { WorkbookDomainError } from "@idea10/core/errors";
 import { reactive } from "vue";
 import {
   createWorkbookSession,
@@ -43,6 +44,33 @@ function setup() {
 }
 
 describe("auto fill sessions", () => {
+  test("reports a duplicate rejection without changing the fill target", () => {
+    const session = createWorkbookSession({ idFactory: createSequentialIdFactory() });
+    const sheet = getActiveSheet(session.workbook);
+    setCellValue(sheet, { row: 0, column: 0 }, "Ada");
+    const actions = createCellFillActions({
+      getWorkbook: () => session.workbook,
+      getSheetId: () => sheet.id,
+      getRevision: () => 0,
+      execute: () => {
+        throw new WorkbookDomainError({
+          code: "invalid_command_payload",
+          details: { field: "duplicate" },
+        });
+      },
+    });
+    expect(
+      actions.apply({
+        type: "fill",
+        sheetId: sheet.id,
+        revision: 0,
+        source: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+        range: { start: { row: 0, column: 0 }, end: { row: 2, column: 0 } },
+      }),
+    ).toEqual({ ok: false, reason: "duplicate" });
+    expect(getCellValue(sheet, { row: 1, column: 0 })).toBeNull();
+  });
+
   test("mode changes from a Vue session preserve target content and one undo entry", () => {
     const { session, sheet, actions, fill } = setup();
     setCellValue(sheet, { row: 0, column: 0 }, 1);

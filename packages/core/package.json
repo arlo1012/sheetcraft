@@ -90,6 +90,10 @@
     "./data-range": {
       "types": "./dist/data-range.d.ts",
       "import": "./dist/data-range.js"
+    },
+    "./duplicate-values": {
+      "types": "./dist/duplicate-values.d.ts",
+      "import": "./dist/duplicate-values.js"
     }
   },
   "scripts": {

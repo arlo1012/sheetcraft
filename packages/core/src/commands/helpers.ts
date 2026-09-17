@@ -175,6 +175,14 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
           })),
         }
       : {}),
+    ...(state.duplicateRules
+      ? {
+          duplicateRules: state.duplicateRules.map((rule) => ({
+            ...rule,
+            range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+          })),
+        }
+      : {}),
     floatingImages: state.floatingImages.map(cloneFloatingImage),
   };
 }

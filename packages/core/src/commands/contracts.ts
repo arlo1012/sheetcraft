@@ -464,6 +464,24 @@ export type RestoreFullSheetStateCommand = {
   sheetId: string;
   state: SheetSparseState;
 };
+export type SetSheetDuplicateRulesCommand = {
+  type: "setSheetDuplicateRules";
+  sheetId: string;
+  rules: import("../workbook.js").SheetDuplicateRule[];
+};
+export type ClearSheetDuplicateRulesCommand = {
+  type: "clearSheetDuplicateRules";
+  sheetId: string;
+  kind: "highlight" | "reject";
+  range?: CellRange;
+};
+export type CountDuplicateValuesCommand = {
+  type: "countDuplicateValues";
+  sheetId: string;
+  sourceRange: CellRange;
+  destination: { sheetId: string; address: CellAddress };
+  options?: { hasHeader?: boolean; overwrite?: boolean; headerLabel?: string };
+};
 
 export type SheetAxisSparseSlice = {
   cells: SheetSparseCell[];
@@ -542,6 +560,9 @@ export type WorkbookCommand =
   | ApplySubtotalsCommand
   | RemoveSubtotalsCommand
   | SetSheetDataValidationsCommand
+  | SetSheetDuplicateRulesCommand
+  | ClearSheetDuplicateRulesCommand
+  | CountDuplicateValuesCommand
   | ClearSheetDataValidationsCommand
   | AddSheetOutlineGroupCommand
   | RemoveSheetOutlineGroupCommand
@@ -667,6 +688,11 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "setSheetDataValidations":
     case "clearSheetDataValidations":
       return "data.validation";
+    case "setSheetDuplicateRules":
+    case "clearSheetDuplicateRules":
+      return "data.validation";
+    case "countDuplicateValues":
+      return "data.transform";
     case "addSheetOutlineGroup":
     case "removeSheetOutlineGroup":
     case "setSheetOutlineGroupCollapsed":

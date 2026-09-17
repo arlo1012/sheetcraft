@@ -224,4 +224,29 @@ describe("XLSX data-tool metadata", () => {
       ]),
     );
   });
+
+  test("reports product-owned duplicate rules omitted from XLSX", async () => {
+    const workbook = createWorkbook({ id: "book", sheetId: "data", sheetName: "Data" });
+    const sheet = [...workbook.sheets.values()][0]!;
+    sheet.duplicateRules = [
+      {
+        id: "duplicate-highlight",
+        kind: "highlight",
+        range: { start: { row: 1, column: 0 }, end: { row: 4, column: 0 } },
+        fillColor: "#fce4d6",
+      },
+    ];
+
+    const encoded = await encodeXlsx(workbook);
+
+    expect(encoded.report.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "feature-omitted",
+          count: 1,
+          locations: ["Data.duplicateRules"],
+        }),
+      ]),
+    );
+  });
 });

@@ -20,3 +20,4 @@ export * from "./workbook.js";
 export * from "./data-validation.js";
 export * from "./data-outline.js";
 export * from "./data-range.js";
+export * from "./duplicate-values.js";

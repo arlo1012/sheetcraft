@@ -132,6 +132,7 @@ export type SheetMetadata = {
   dataValidations?: SheetDataValidation[];
   outlineGroups?: SheetOutlineGroup[];
   subtotalMetadata?: SheetSubtotalMetadata[];
+  duplicateRules?: SheetDuplicateRule[];
 };
 
 export type DataValidationType =
@@ -177,6 +178,13 @@ export type SheetOutlineGroup = {
   collapsed: boolean;
 };
 export type SheetSubtotalMetadata = { id: string; range: CellRange; generatedRows: number[] };
+export type SheetDuplicateRule = {
+  id: string;
+  kind: "highlight" | "reject";
+  range: CellRange;
+  fillColor?: string;
+  textColor?: string;
+};
 
 /** A positioned image that is anchored to a sheet cell without owning its binary data. */
 export type FloatingImage = {
@@ -221,6 +229,7 @@ export type Sheet = {
   dataValidations?: SheetDataValidation[];
   outlineGroups?: SheetOutlineGroup[];
   subtotalMetadata?: SheetSubtotalMetadata[];
+  duplicateRules?: SheetDuplicateRule[];
   floatingImages: FloatingImage[];
 };
 
@@ -248,6 +257,7 @@ export type SheetSparseState = {
   dataValidations?: SheetDataValidation[];
   outlineGroups?: SheetOutlineGroup[];
   subtotalMetadata?: SheetSubtotalMetadata[];
+  duplicateRules?: SheetDuplicateRule[];
   floatingImages: FloatingImage[];
 };
 
@@ -297,6 +307,7 @@ export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory)
     dataValidations: [],
     outlineGroups: [],
     subtotalMetadata: [],
+    duplicateRules: [],
     floatingImages: [],
   };
 }
@@ -1732,6 +1743,7 @@ function normalizeSheetMetadata(
     | "dataValidations"
     | "outlineGroups"
     | "subtotalMetadata"
+    | "duplicateRules"
   >,
 ): SheetMetadata {
   const freezePanes = normalizeFreezePanes(state.freezePanes);
@@ -1786,6 +1798,42 @@ function normalizeSheetMetadata(
       ...(rule.list ? { list: [...rule.list] } : {}),
     };
   });
+  const duplicateRuleIds = new Set<string>();
+  const duplicateRules = (state.duplicateRules ?? []).map((rule) => {
+    if (
+      !rule ||
+      typeof rule.id !== "string" ||
+      !rule.id.trim() ||
+      (rule.kind !== "highlight" && rule.kind !== "reject") ||
+      !isCellAddressInBounds(rule.range.start) ||
+      !isCellAddressInBounds(rule.range.end)
+    )
+      throw new TypeError("Invalid duplicate rule.");
+    if (duplicateRuleIds.has(rule.id)) throw new TypeError("Duplicate rule IDs must be unique.");
+    duplicateRuleIds.add(rule.id);
+    if (
+      (rule.fillColor !== undefined && typeof rule.fillColor !== "string") ||
+      (rule.textColor !== undefined && typeof rule.textColor !== "string")
+    )
+      throw new TypeError("Duplicate highlight colors must be strings.");
+    normalizeCellStyle({
+      ...(rule.fillColor === undefined ? {} : { fillColor: rule.fillColor }),
+      ...(rule.textColor === undefined ? {} : { textColor: rule.textColor }),
+    });
+    return {
+      ...rule,
+      range: {
+        start: {
+          row: Math.min(rule.range.start.row, rule.range.end.row),
+          column: Math.min(rule.range.start.column, rule.range.end.column),
+        },
+        end: {
+          row: Math.max(rule.range.start.row, rule.range.end.row),
+          column: Math.max(rule.range.start.column, rule.range.end.column),
+        },
+      },
+    };
+  });
   if (new Set(dataValidations.map((rule) => rule.id)).size !== dataValidations.length)
     throw new Error("Duplicate data validation ID.");
   const outlineGroups = normalizeOutlineGroups(state.outlineGroups ?? []);
@@ -1806,7 +1854,15 @@ function normalizeSheetMetadata(
       generatedRows: [...entry.generatedRows],
     };
   });
-  return { freezePanes, filter, mergedCells, dataValidations, outlineGroups, subtotalMetadata };
+  return {
+    freezePanes,
+    filter,
+    mergedCells,
+    dataValidations,
+    outlineGroups,
+    subtotalMetadata,
+    duplicateRules,
+  };
 }
 
 export function getSheetMetadata(sheet: Sheet): SheetMetadata {
@@ -1833,6 +1889,10 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
     ...entry,
     range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
     generatedRows: [...entry.generatedRows],
+  }));
+  sheet.duplicateRules = (normalized.duplicateRules ?? []).map((rule) => ({
+    ...rule,
+    range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
   }));
   return true;
 }
@@ -1946,6 +2006,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     dataValidations: metadata.dataValidations ?? [],
     outlineGroups: metadata.outlineGroups ?? [],
     subtotalMetadata: metadata.subtotalMetadata ?? [],
+    duplicateRules: metadata.duplicateRules ?? [],
     floatingImages,
   };
 }
@@ -1960,6 +2021,7 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
     left.defaultColumnWidth !== right.defaultColumnWidth ||
     !areSheetMetadataEqual(left, right) ||
     JSON.stringify(left.subtotalMetadata ?? []) !== JSON.stringify(right.subtotalMetadata ?? []) ||
+    JSON.stringify(left.duplicateRules ?? []) !== JSON.stringify(right.duplicateRules ?? []) ||
     left.floatingImages.length !== right.floatingImages.length
   ) {
     return false;
@@ -2028,6 +2090,10 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
       range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
       generatedRows: [...entry.generatedRows],
     })),
+    duplicateRules: (sheet.duplicateRules ?? []).map((rule) => ({
+      ...rule,
+      range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+    })),
     floatingImages: sheet.floatingImages.map(cloneFloatingImage),
   });
 }
@@ -2075,6 +2141,10 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
     ...entry,
     range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
     generatedRows: [...entry.generatedRows],
+  }));
+  sheet.duplicateRules = (nextState.duplicateRules ?? []).map((rule) => ({
+    ...rule,
+    range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
   }));
   sheet.floatingImages = nextState.floatingImages.map(cloneFloatingImage);
   return true;

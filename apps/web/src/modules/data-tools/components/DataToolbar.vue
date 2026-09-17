@@ -1,19 +1,13 @@
 <script setup lang="ts">
-import {
-  ChevronDown,
-  ChevronUp,
-  Columns3,
-  Database,
-  Filter,
-  ShieldCheck,
-  TableProperties,
-} from "lucide-vue-next";
+import { ChevronDown, ChevronUp, Columns3, Database, Filter, ShieldCheck } from "lucide-vue-next";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { DataToolCapabilities } from "../data-tools-types";
 import DataOutlineTools from "./DataOutlineTools.vue";
 import DataFilterTool from "./DataFilterTool.vue";
+import DataDuplicatesTool from "./DataDuplicatesTool.vue";
 import DataSortTool from "./DataSortTool.vue";
+import type { DuplicateToolMode } from "../duplicate-tools-types";
 const props = withDefaults(
   defineProps<{
     disabled?: boolean;
@@ -32,6 +26,9 @@ const emit = defineEmits<{
   reapplyFilter: [];
   openTextToColumns: [];
   openRemoveDuplicates: [];
+  openDuplicateValues: [mode: DuplicateToolMode];
+  clearDuplicateHighlights: [];
+  clearDuplicateRejections: [];
   openValidation: [];
   group: [axis: "rows" | "columns"];
   ungroup: [axis: "rows" | "columns"];
@@ -91,15 +88,15 @@ const { t } = useAppI18n();
         data-data-action="split"
         @activate="emit('openTextToColumns')"
         ><Columns3 :size="18" /></RibbonButton
-      ><RibbonButton
-        variant="tall"
-        :disabled="disabled || !capabilities.removeDuplicates"
-        :label="t('dataTools.removeDuplicates.title')"
-        :text="t('dataTools.removeDuplicates.title')"
-        data-data-action="remove-duplicates"
-        @activate="emit('openRemoveDuplicates')"
-        ><TableProperties :size="18" /></RibbonButton
-      ><RibbonButton
+      ><DataDuplicatesTool
+        :disabled="disabled"
+        :remove-duplicates="capabilities.removeDuplicates"
+        @open="emit('openDuplicateValues', $event)"
+        @clear-highlights="emit('clearDuplicateHighlights')"
+        @clear-rejections="emit('clearDuplicateRejections')"
+        @remove="emit('openRemoveDuplicates')"
+      />
+      <RibbonButton
         variant="tall"
         :disabled="disabled"
         :label="t('dataTools.validation.title')"

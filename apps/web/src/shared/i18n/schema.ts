@@ -144,6 +144,38 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       confirm: string;
       removed: string;
     };
+    duplicates: {
+      title: string;
+      highlight: string;
+      clearHighlights: string;
+      count: string;
+      reject: string;
+      clearRejections: string;
+      remove: string;
+      highlightTitle: string;
+      countTitle: string;
+      rejectTitle: string;
+      range: string;
+      header: string;
+      fillColor: string;
+      destination: string;
+      overwrite: string;
+      pickRange: string;
+      countHint: string;
+      apply: string;
+      empty: string;
+      invalidRange: string;
+      oneColumn: string;
+      invalidDestination: string;
+      overwriteRequired: string;
+      protectedRange: string;
+      invalidOperation: string;
+      rangeChanged: string;
+      duplicateRejected: string;
+      rejectionTitle: string;
+      countHeader: string;
+      colors: { lightRed: string; yellow: string; green: string };
+    };
     validation: {
       title: string;
       openList: string;

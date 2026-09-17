@@ -10,6 +10,7 @@ export type GridFillFeedback =
   | "documentChanged"
   | "unsupportedContent"
   | "noAdjacentData"
+  | "duplicate"
   | "failed";
 
 export type GridFillSession = Readonly<{
