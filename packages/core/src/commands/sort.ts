@@ -73,10 +73,13 @@ function getValueRank(value: FormulaValue): number {
   return 4;
 }
 
-function compareSameRank(left: FormulaValue, right: FormulaValue): number {
+function compareSameRank(left: FormulaValue, right: FormulaValue, caseSensitive: boolean): number {
   if (typeof left === "number" && typeof right === "number") return left - right;
-  if (typeof left === "string" && typeof right === "string")
-    return left < right ? -1 : left > right ? 1 : 0;
+  if (typeof left === "string" && typeof right === "string") {
+    const comparableLeft = caseSensitive ? left : left.toLowerCase();
+    const comparableRight = caseSensitive ? right : right.toLowerCase();
+    return comparableLeft < comparableRight ? -1 : comparableLeft > comparableRight ? 1 : 0;
+  }
   if (typeof left === "boolean" && typeof right === "boolean") return Number(left) - Number(right);
   if (isFormulaError(left) && isFormulaError(right))
     return left.code < right.code ? -1 : left.code > right.code ? 1 : 0;
@@ -87,10 +90,11 @@ function compareSortValues(
   left: FormulaValue,
   right: FormulaValue,
   direction: SortDirection,
+  caseSensitive: boolean,
 ): number {
   const rankDifference = getValueRank(left) - getValueRank(right);
   if (rankDifference !== 0) return rankDifference;
-  const sameRank = compareSameRank(left, right);
+  const sameRank = compareSameRank(left, right, caseSensitive);
   if (sameRank !== 0) return direction === "descending" ? -sameRank : sameRank;
   return 0;
 }
@@ -99,13 +103,14 @@ function compareSortEntries(
   left: SortEntry,
   right: SortEntry,
   keys: readonly { column: number; direction: SortDirection }[],
+  caseSensitive: boolean,
 ): number {
   for (let index = 0; index < keys.length; index += 1) {
     const key = keys[index];
     const leftValue = left.values[index];
     const rightValue = right.values[index];
     if (!key || leftValue === undefined || rightValue === undefined) continue;
-    const compared = compareSortValues(leftValue, rightValue, key.direction);
+    const compared = compareSortValues(leftValue, rightValue, key.direction, caseSensitive);
     if (compared !== 0) return compared;
   }
   // Stable even if the JS engine implementation changes.
@@ -148,6 +153,8 @@ function validateSortCommand(
   if (range.end.row <= range.start.row) {
     throw invalidCommandPayload("range", command.range, "Sorting requires at least two rows.");
   }
+  if (command.caseSensitive !== undefined && typeof command.caseSensitive !== "boolean")
+    throw invalidCommandPayload("caseSensitive", command.caseSensitive);
   const keys = command.sortKeys?.length
     ? command.sortKeys
     : [{ column: command.keyColumn, direction: command.direction }];
@@ -207,7 +214,7 @@ export function createMultiKeySortSheetRangeCommand(
   sheetId: string,
   range: CellRange,
   sortKeys: readonly { column: number; direction: SortDirection }[],
-  options?: { hasHeader?: boolean },
+  options?: { hasHeader?: boolean; caseSensitive?: boolean },
 ): SortSheetRangeCommand {
   const normalized = normalizeRange(range);
   assertCellRange(normalized);
@@ -222,6 +229,7 @@ export function createMultiKeySortSheetRangeCommand(
     direction: first.direction,
     sortKeys: sortKeys.map((key) => ({ ...key })),
     ...(options?.hasHeader ? { hasHeader: true } : {}),
+    ...(options?.caseSensitive !== undefined ? { caseSensitive: options.caseSensitive } : {}),
   };
 }
 
@@ -234,6 +242,7 @@ export function applySortSheetRangeCommand(
   const keys = command.sortKeys?.length
     ? command.sortKeys
     : [{ column: command.keyColumn, direction: command.direction }];
+  const caseSensitive = command.caseSensitive ?? true;
   const dataStart = range.start.row + (command.hasHeader ? 1 : 0);
   if (dataStart >= range.end.row + 1) return null;
   const sortableRange = { ...range, start: { ...range.start, row: dataStart } };
@@ -247,7 +256,7 @@ export function applySortSheetRangeCommand(
         values: keys.map((key) => evaluator.getComputedValue({ row, column: key.column })),
       };
     },
-  ).sort((left, right) => compareSortEntries(left, right, keys));
+  ).sort((left, right) => compareSortEntries(left, right, keys, caseSensitive));
   const destinationBySourceRow = new Map<number, number>();
   for (let offset = 0; offset < sortedRows.length; offset += 1) {
     const source = sortedRows[offset];

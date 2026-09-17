@@ -77,6 +77,108 @@ describe("sheet range sorting", () => {
     expect(getCellContent(sheet, { row: 3, column: 0 })).toEqual({ kind: "literal", value: "C" });
   });
 
+  test("sorts text without case sensitivity in both directions while keeping equal values stable", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    for (const [row, value] of ["a", "B", "A", "b"].entries()) {
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value });
+    }
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createMultiKeySortSheetRangeCommand(
+          sheet.id,
+          { start: { row: 0, column: 0 }, end: { row: 3, column: 0 } },
+          [{ column: 0, direction: "ascending" }],
+          { caseSensitive: false },
+        ),
+      ),
+    ).toBe(true);
+    expect([0, 1, 2, 3].map((row) => getCellContent(sheet, { row, column: 0 }))).toEqual([
+      { kind: "literal", value: "a" },
+      { kind: "literal", value: "A" },
+      { kind: "literal", value: "B" },
+      { kind: "literal", value: "b" },
+    ]);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(redoWorkbookCommand(session)).toBe(true);
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createMultiKeySortSheetRangeCommand(
+          sheet.id,
+          { start: { row: 0, column: 0 }, end: { row: 3, column: 0 } },
+          [{ column: 0, direction: "descending" }],
+          { caseSensitive: false },
+        ),
+      ),
+    ).toBe(true);
+    expect([0, 1, 2, 3].map((row) => getCellContent(sheet, { row, column: 0 }))).toEqual([
+      { kind: "literal", value: "B" },
+      { kind: "literal", value: "b" },
+      { kind: "literal", value: "a" },
+      { kind: "literal", value: "A" },
+    ]);
+  });
+
+  test("preserves case-sensitive ordering when requested explicitly", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "a" });
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: "A" });
+
+    executeWorkbookCommand(
+      session,
+      createMultiKeySortSheetRangeCommand(
+        sheet.id,
+        { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+        [{ column: 0, direction: "ascending" }],
+        { caseSensitive: true },
+      ),
+    );
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({ kind: "literal", value: "A" });
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toEqual({ kind: "literal", value: "a" });
+  });
+
+  test("uses the next sort key after case-insensitive text ties", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    for (const [row, [name, score]] of (
+      [
+        ["a", 2],
+        ["A", 1],
+        ["a", 1],
+        ["B", 1],
+      ] as const
+    ).entries()) {
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value: name });
+      setCellContent(sheet, { row, column: 1 }, { kind: "literal", value: score });
+    }
+
+    executeWorkbookCommand(
+      session,
+      createMultiKeySortSheetRangeCommand(
+        sheet.id,
+        { start: { row: 0, column: 0 }, end: { row: 3, column: 1 } },
+        [
+          { column: 0, direction: "ascending" },
+          { column: 1, direction: "ascending" },
+        ],
+        { caseSensitive: false },
+      ),
+    );
+    expect([0, 1, 2, 3].map((row) => getCellContent(sheet, { row, column: 0 }))).toEqual([
+      { kind: "literal", value: "A" },
+      { kind: "literal", value: "a" },
+      { kind: "literal", value: "a" },
+      { kind: "literal", value: "B" },
+    ]);
+    expect(getCellContent(sheet, { row: 0, column: 1 })).toEqual({ kind: "literal", value: 1 });
+    expect(getCellContent(sheet, { row: 1, column: 1 })).toEqual({ kind: "literal", value: 1 });
+  });
+
   test("orders computed keys deterministically by type and keeps blanks last in descending order", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
@@ -290,5 +392,17 @@ describe("sheet range sorting", () => {
         direction: "sideways",
       } as never),
     ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
+    const beforeInvalidCaseSensitive = createSheetSparseState(sheet);
+    expect(
+      tryApplyWorkbookCommand(session.workbook, {
+        type: "sortSheetRange",
+        sheetId: sheet.id,
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+        keyColumn: 0,
+        direction: "ascending",
+        caseSensitive: "no",
+      } as never),
+    ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
+    expect(createSheetSparseState(sheet)).toEqual(beforeInvalidCaseSensitive);
   });
 });

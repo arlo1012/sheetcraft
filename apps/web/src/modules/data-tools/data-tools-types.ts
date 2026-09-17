@@ -25,7 +25,18 @@ export type DataToolFilterAnchor = { x: number; y: number; width?: number; heigh
 export type DataToolColumn = { column: number; label: string; header?: string };
 export type DataToolRangeSnapshot = { sheetId: string; generation: number; range: CellRange };
 export type SortLevel = { column: number; direction: DataToolSortDirection };
-export type SortDraft = { range: string; hasHeader: boolean; levels: SortLevel[] };
+export type SortInitial = {
+  hasHeader: boolean;
+  headerLocked?: boolean;
+  column: number;
+  direction: "ascending" | "descending";
+};
+export type SortDraft = {
+  range: string;
+  hasHeader: boolean;
+  caseSensitive?: boolean;
+  levels: SortLevel[];
+};
 export type TextToColumnsDraft = {
   mode: "delimiter" | "fixed-width";
   delimiters: string[];

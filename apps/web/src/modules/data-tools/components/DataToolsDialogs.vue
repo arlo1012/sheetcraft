@@ -11,6 +11,7 @@ import type {
   DataValidationInitial,
   RemoveDuplicatesDraft,
   SortDraft,
+  SortInitial,
   SubtotalDraft,
   TextToColumnsDraft,
 } from "../data-tools-types";
@@ -23,7 +24,7 @@ withDefaults(
     validationVisible: boolean;
     subtotalVisible: boolean;
     columns: readonly DataToolColumn[];
-    sortInitial?: { hasHeader: boolean; column: number; direction: "ascending" | "descending" };
+    sortInitial?: SortInitial;
     dateSystem?: ExcelDateSystem;
     rangeLabel?: string;
     splitPreview?: readonly string[];

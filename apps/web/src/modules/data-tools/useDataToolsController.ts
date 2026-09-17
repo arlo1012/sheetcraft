@@ -50,6 +50,7 @@ import type {
   DataValidationInitial,
   RemoveDuplicatesDraft,
   SortDraft,
+  SortInitial,
   SubtotalDraft,
   TextToColumnsDraft,
 } from "./data-tools-types";
@@ -101,7 +102,7 @@ export function useDataToolsController(options: Options) {
   const validationVisible = ref(false);
   const subtotalVisible = ref(false);
   const sortTarget = ref<Target>();
-  const sortInitial = ref({
+  const sortInitial = ref<SortInitial>({
     hasHeader: true,
     column: 0,
     direction: "ascending" as "ascending" | "descending",
@@ -394,6 +395,9 @@ export function useDataToolsController(options: Options) {
       sortTarget.value = target;
       sortInitial.value = {
         hasHeader: inferHeader(target) ?? true,
+        headerLocked: Boolean(
+          activeSheet.value.filter && intersects(activeSheet.value.filter.range, target.range),
+        ),
         column: options.getSelection().address.column,
         direction: "ascending",
       };
@@ -408,6 +412,7 @@ export function useDataToolsController(options: Options) {
           sortTarget.value!.range,
           draft.levels,
           {
+            caseSensitive: draft.caseSensitive ?? false,
             hasHeader:
               draft.hasHeader ||
               Boolean(

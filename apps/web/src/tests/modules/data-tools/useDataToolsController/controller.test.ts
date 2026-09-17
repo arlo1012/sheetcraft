@@ -62,6 +62,27 @@ function fixture(
 }
 
 describe("useDataToolsController", () => {
+  test("custom sort forwards case options and protects an active filter header", () => {
+    const f = fixture();
+    f.set(0, 1, "Name");
+    f.set(1, 1, "a");
+    f.set(2, 1, "B");
+    f.controller.toggleFilter();
+    f.controller.openSort();
+    expect(f.controller.sortInitial.value).toMatchObject({ hasHeader: true, headerLocked: true });
+    const draft = {
+      range: "B1:B3",
+      hasHeader: false,
+      levels: [{ column: 1, direction: "ascending" as const }],
+    };
+    f.controller.applySort(draft);
+    const values = () =>
+      [0, 1, 2].map((row) => createSheetEvaluator(f.sheet).getComputedValue({ row, column: 1 }));
+    expect(values()).toEqual(["Name", "a", "B"]);
+    f.controller.openSort();
+    f.controller.applySort({ ...draft, caseSensitive: true });
+    expect(values()).toEqual(["Name", "B", "a"]);
+  });
   test("counts other-column matches and normalizes all selected values to no column restriction", () => {
     const f = fixture();
     f.set(0, 0, "Team");

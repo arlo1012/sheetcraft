@@ -229,6 +229,8 @@ export type SortSheetRangeCommand = {
   direction: SortDirection;
   sortKeys?: Array<{ column: number; direction: SortDirection }>;
   hasHeader?: boolean;
+  /** Omitted preserves the legacy case-sensitive text ordering. */
+  caseSensitive?: boolean;
 };
 export type AdvancedFilterCommand = {
   type: "advancedFilter";

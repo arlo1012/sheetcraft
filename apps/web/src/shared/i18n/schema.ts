@@ -15,6 +15,14 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       header: string;
       addLevel: string;
       deleteLevel: string;
+      copyLevel: string;
+      moveUp: string;
+      moveDown: string;
+      options: string;
+      optionsTitle: string;
+      caseSensitive: string;
+      primaryKey: string;
+      thenBy: string;
       column: string;
       order: string;
       sortOn: string;
