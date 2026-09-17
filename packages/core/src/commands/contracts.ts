@@ -221,13 +221,22 @@ export type SetSheetFilterCommand = {
 
 export type SortDirection = "ascending" | "descending";
 
+export type SortKey = {
+  column: number;
+  direction: SortDirection;
+  /** Omitted retains value sorting for saved commands created before color sorting. */
+  sortOn?: "value" | "cellColor" | "fontColor";
+  /** Required by color sorts. `null` selects cells without a fill for `cellColor`. */
+  color?: string | null;
+};
+
 export type SortSheetRangeCommand = {
   type: "sortSheetRange";
   sheetId: string;
   range: CellRange;
   keyColumn: number;
   direction: SortDirection;
-  sortKeys?: Array<{ column: number; direction: SortDirection }>;
+  sortKeys?: SortKey[];
   hasHeader?: boolean;
   /** Omitted preserves the legacy case-sensitive text ordering. */
   caseSensitive?: boolean;

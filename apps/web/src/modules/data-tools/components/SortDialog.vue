@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { Select as TSelect, Option as TOption } from "tdesign-vue-next/es/select";
 import { BaseTable as TTable } from "tdesign-vue-next/es/table";
 import type {
   BaseTableCol,
@@ -13,7 +13,13 @@ import type {
 } from "tdesign-vue-next/es/table/type";
 import { useAppI18n } from "../../../shared/i18n";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
-import type { DataToolColumn, SortDraft, SortInitial, SortLevel } from "../data-tools-types";
+import type {
+  DataToolColumn,
+  SortDraft,
+  SortInitial,
+  SortLevel,
+  SortColorColumn,
+} from "../data-tools-types";
 
 type SortRow = SortLevel & { id: number };
 const props = withDefaults(
@@ -22,8 +28,9 @@ const props = withDefaults(
     columns: readonly DataToolColumn[];
     rangeLabel?: string;
     initial?: SortInitial;
+    colorColumns?: readonly SortColorColumn[];
   }>(),
-  { rangeLabel: "", initial: undefined },
+  { rangeLabel: "", initial: undefined, colorColumns: () => [] },
 );
 const emit = defineEmits<{ close: []; apply: [draft: SortDraft] }>();
 const { t } = useAppI18n();
@@ -49,8 +56,71 @@ const directionOptions = computed(() => [
   { label: t("dataTools.sort.ascending"), value: "ascending" },
   { label: t("dataTools.sort.descending"), value: "descending" },
 ]);
+const basisOptions = computed(() => [
+  { label: t("dataTools.sort.values"), value: "value" },
+  { label: t("dataTools.sort.cellColor"), value: "cellColor" },
+  { label: t("dataTools.sort.fontColor"), value: "fontColor" },
+]);
+const positionOptions = computed(() => [
+  { label: t("dataTools.sort.onTop"), value: "ascending" },
+  { label: t("dataTools.sort.onBottom"), value: "descending" },
+]);
+function isColorLevel(row: SortLevel): boolean {
+  return row.sortOn === "cellColor" || row.sortOn === "fontColor";
+}
+function colorsFor(row: SortLevel) {
+  const column = props.colorColumns.find((item) => item.column === row.column);
+  if (!column || !isColorLevel(row)) return [];
+  const colors = new Set<string | null>(
+    row.sortOn === "cellColor" ? column.cellColors : column.fontColors,
+  );
+  if (!hasHeader.value) {
+    const headerColor =
+      row.sortOn === "cellColor" ? column.headerCellColor : column.headerFontColor;
+    if (headerColor !== undefined) colors.add(headerColor);
+  }
+  return [...colors].map((color) => ({
+    color,
+    value: color ?? "no-fill",
+    label: color === null ? t("dataTools.sort.noFill") : color.toUpperCase(),
+  }));
+}
+function syncColor(row: SortRow): void {
+  if (!isColorLevel(row)) {
+    delete row.color;
+    return;
+  }
+  const colors = colorsFor(row);
+  if (!colors.some((option) => option.color === row.color)) {
+    if (colors[0]) row.color = colors[0].color;
+    else delete row.color;
+  }
+}
+function changeColumn(row: SortRow, value: unknown): void {
+  if (typeof value !== "number") return;
+  row.column = value;
+  syncColor(row);
+}
+function changeBasis(row: SortRow, value: unknown): void {
+  if (value !== "value" && value !== "cellColor" && value !== "fontColor") return;
+  row.sortOn = value;
+  delete row.color;
+  syncColor(row);
+}
+function changeColor(row: SortRow, value: unknown): void {
+  const option = colorsFor(row).find((option) => option.value === value);
+  if (option) row.color = option.color;
+}
+watch([hasHeader, () => props.colorColumns], () => rows.value.forEach(syncColor));
+const canApply = computed(
+  () =>
+    rows.value.length > 0 &&
+    rows.value.every(
+      (row) => !isColorLevel(row) || colorsFor(row).some((option) => option.color === row.color),
+    ),
+);
 const tableColumns = computed<BaseTableCol[]>(() => [
-  { colKey: "column", title: t("dataTools.sort.column"), width: 340 },
+  { colKey: "column", title: t("dataTools.sort.column"), width: 300 },
   { colKey: "basis", title: t("dataTools.sort.sortOn"), width: 150 },
   { colKey: "direction", title: t("dataTools.sort.order") },
 ]);
@@ -120,12 +190,16 @@ function applyOptions(): void {
   optionsVisible.value = false;
 }
 function apply(): void {
-  if (!rows.value.length) return;
+  if (!canApply.value) return;
   emit("apply", {
     range: props.rangeLabel,
     hasHeader: hasHeader.value,
     caseSensitive: caseSensitive.value,
-    levels: rows.value.map(({ column, direction }) => ({ column, direction })),
+    levels: rows.value.map((row) => ({
+      column: row.column,
+      direction: row.direction,
+      ...(isColorLevel(row) ? { sortOn: row.sortOn, color: row.color } : {}),
+    })),
   });
 }
 </script>
@@ -134,11 +208,11 @@ function apply(): void {
   <Dialog
     :visible="visible && !optionsVisible"
     :header="t('dataTools.sort.title')"
-    width="min(800px, calc(100vw - 32px))"
+    width="min(900px, calc(100vw - 32px))"
     placement="center"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
-    :confirm-btn="{ content: t('dataTools.common.confirm'), disabled: !rows.length }"
+    :confirm-btn="{ content: t('dataTools.common.confirm'), disabled: !canApply }"
     :cancel-btn="t('dataTools.common.cancel')"
     @close="emit('close')"
     @confirm="apply"
@@ -219,7 +293,9 @@ function apply(): void {
                 t(rowIndex === 0 ? "dataTools.sort.primaryKey" : "dataTools.sort.thenBy")
               }}</span>
               <TSelect
-                v-model="row.column"
+                data-sort-field="column"
+                :value="row.column"
+                @update:model-value="changeColumn(row, $event)"
                 :options="columnOptions"
                 :popup-props="popupProps"
                 :aria-label="t('dataTools.sort.column')"
@@ -227,17 +303,68 @@ function apply(): void {
               />
             </div>
           </template>
-          <template #basis
-            ><span>{{ t("dataTools.sort.values") }}</span></template
-          >
-          <template #direction="{ row }">
+          <template #basis="{ row }">
             <TSelect
-              v-model="row.direction"
-              :options="directionOptions"
+              data-sort-field="basis"
+              :value="row.sortOn ?? 'value'"
+              :options="basisOptions"
               :popup-props="popupProps"
-              :aria-label="t('dataTools.sort.order')"
+              :aria-label="t('dataTools.sort.sortOn')"
+              @update:model-value="changeBasis(row, $event)"
               @focus="selectedId = row.id"
             />
+          </template>
+          <template #direction="{ row }">
+            <div class="sort-dialog__order" :class="{ 'has-color': isColorLevel(row) }">
+              <TSelect
+                v-if="isColorLevel(row)"
+                data-sort-field="color"
+                :value="row.color === null ? 'no-fill' : row.color"
+                :popup-props="popupProps"
+                :aria-label="t('dataTools.sort.selectColor')"
+                :placeholder="t('dataTools.sort.selectColor')"
+                :empty="t('dataTools.sort.noColors')"
+                :disabled="!colorsFor(row).length"
+                @update:model-value="changeColor(row, $event)"
+                @focus="selectedId = row.id"
+              >
+                <TOption
+                  v-for="option in colorsFor(row)"
+                  :key="option.value"
+                  :value="option.value"
+                  :label="option.label"
+                >
+                  <span class="sort-dialog__color-option">
+                    <span
+                      class="sort-dialog__swatch"
+                      :class="{ 'is-empty': option.color === null }"
+                      :style="{ backgroundColor: option.color ?? undefined }"
+                      aria-hidden="true"
+                    />
+                    {{ option.label }}
+                  </span>
+                </TOption>
+                <template v-if="row.color !== undefined" #valueDisplay>
+                  <span class="sort-dialog__color-option">
+                    <span
+                      class="sort-dialog__swatch"
+                      :class="{ 'is-empty': row.color === null }"
+                      :style="{ backgroundColor: row.color ?? undefined }"
+                      aria-hidden="true"
+                    />
+                    {{ row.color === null ? t("dataTools.sort.noFill") : row.color.toUpperCase() }}
+                  </span>
+                </template>
+              </TSelect>
+              <TSelect
+                v-model="row.direction"
+                data-sort-field="direction"
+                :options="isColorLevel(row) ? positionOptions : directionOptions"
+                :popup-props="popupProps"
+                :aria-label="t('dataTools.sort.order')"
+                @focus="selectedId = row.id"
+              />
+            </div>
           </template>
         </TTable>
       </TableHeightWrapper>
@@ -288,6 +415,38 @@ function apply(): void {
     grid-template-columns: 72px minmax(0, 1fr);
     align-items: center;
     gap: 8px;
+  }
+  &__order {
+    display: grid;
+    min-width: 0;
+    gap: 8px;
+
+    &.has-color {
+      grid-template-columns: minmax(0, 1fr) 108px;
+    }
+  }
+  &__color-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  &__swatch {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    border: 1px solid var(--idea-border-control);
+    border-radius: 2px;
+
+    &.is-empty {
+      background: linear-gradient(
+        135deg,
+        transparent 46%,
+        var(--idea-status-error) 48%,
+        var(--idea-status-error) 52%,
+        transparent 54%
+      );
+    }
   }
   &__priority {
     white-space: nowrap;

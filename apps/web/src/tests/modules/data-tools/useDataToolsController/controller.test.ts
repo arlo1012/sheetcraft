@@ -7,7 +7,7 @@ import {
 } from "@idea10/core/commands";
 import { executeWorkbookCommand, createWorkbookSession } from "@idea10/core/history";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createSheetEvaluator, getActiveSheet } from "@idea10/core/workbook";
+import { createSheetEvaluator, getActiveSheet, setCellStyle } from "@idea10/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useDataToolsController } from "../../../../modules/data-tools/useDataToolsController";
 
@@ -62,6 +62,31 @@ function fixture(
 }
 
 describe("useDataToolsController", () => {
+  test("discovers column colors and applies selected color placement through Core", () => {
+    const f = fixture();
+    f.set(0, 1, "Name");
+    f.set(1, 1, "Ada");
+    f.set(2, 1, "Bo");
+    f.set(3, 1, "Cy");
+    setCellStyle(f.sheet, { row: 2, column: 1 }, { fillColor: "#ff0000", textColor: "#00ff00" });
+    f.controller.openSort();
+    expect(f.controller.sortColorColumns.value[0]?.cellColors).toContain("#ff0000");
+    f.controller.applySort({
+      range: "B1:B4",
+      hasHeader: true,
+      levels: [{ column: 1, direction: "ascending", sortOn: "cellColor", color: "#ff0000" }],
+    });
+    const values = () =>
+      [0, 1, 2, 3].map((row) => createSheetEvaluator(f.sheet).getComputedValue({ row, column: 1 }));
+    expect(values()).toEqual(["Name", "Bo", "Ada", "Cy"]);
+    f.controller.openSort();
+    f.controller.applySort({
+      range: "B1:B4",
+      hasHeader: true,
+      levels: [{ column: 1, direction: "descending", sortOn: "fontColor", color: "#00ff00" }],
+    });
+    expect(values()).toEqual(["Name", "Ada", "Cy", "Bo"]);
+  });
   test("custom sort forwards case options and protects an active filter header", () => {
     const f = fixture();
     f.set(0, 1, "Name");

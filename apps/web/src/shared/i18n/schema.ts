@@ -26,6 +26,13 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       column: string;
       order: string;
       sortOn: string;
+      cellColor: string;
+      fontColor: string;
+      onTop: string;
+      onBottom: string;
+      selectColor: string;
+      noFill: string;
+      noColors: string;
       values: string;
       confirm: string;
     };

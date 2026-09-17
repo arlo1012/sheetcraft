@@ -13,7 +13,12 @@ import {
   type Workbook,
 } from "../workbook.js";
 import { MergedCellRangeResolver } from "../merged-cells.js";
-import { cloneCellStyle, mergeCellStyle, type CellStyle } from "../style.js";
+import {
+  cloneCellStyle,
+  DEFAULT_CELL_TEXT_COLOR,
+  mergeCellStyle,
+  type CellStyle,
+} from "../style.js";
 import {
   getCellBorderTargetKey,
   getExactCellBorderPatch,
@@ -24,6 +29,7 @@ import type {
   CellContentChange,
   SetCellContentsCommand,
   SortDirection,
+  SortKey,
   SortSheetRangeCommand,
 } from "./contracts.js";
 import { createBatchSetCellContentsCommand } from "./values.js";
@@ -34,7 +40,7 @@ import {
   assertCellRange,
 } from "./helpers.js";
 
-type SortEntry = { row: number; values: FormulaValue[] };
+type SortEntry = { row: number; values: FormulaValue[]; colors: Array<string | null | undefined> };
 
 function cloneRange(range: CellRange): CellRange {
   return { start: { ...range.start }, end: { ...range.end } };
@@ -99,18 +105,63 @@ function compareSortValues(
   return 0;
 }
 
+function normalizeSortColor(color: string): string {
+  return color.toLowerCase();
+}
+
+/**
+ * Returns the color represented by a cell for color-sort discovery and comparison.
+ * A gradient is deliberately `undefined`: it cannot be represented by one solid color.
+ */
+export function getSortCellColor(
+  sheet: ReturnType<typeof getSheetOrThrow>,
+  address: CellAddress,
+  sortOn: "cellColor" | "fontColor",
+): string | null | undefined {
+  const style = getCellStyle(sheet, address);
+  if (sortOn === "fontColor")
+    return normalizeSortColor(style?.textColor ?? DEFAULT_CELL_TEXT_COLOR);
+  if (style?.fillGradient) return undefined;
+  return style?.fillColor ? normalizeSortColor(style.fillColor) : null;
+}
+
+function compareColorSortValues(
+  left: string | null | undefined,
+  right: string | null | undefined,
+  key: SortKey,
+): number {
+  const selected = key.color;
+  const isSelected = (color: string | null | undefined): boolean =>
+    color === null
+      ? selected === null
+      : typeof color === "string" && typeof selected === "string"
+        ? normalizeSortColor(color) === normalizeSortColor(selected)
+        : false;
+  const leftMatches = isSelected(left);
+  const rightMatches = isSelected(right);
+  if (leftMatches === rightMatches) return 0;
+  if (key.direction === "ascending") return leftMatches ? -1 : 1;
+  return leftMatches ? 1 : -1;
+}
+
 function compareSortEntries(
   left: SortEntry,
   right: SortEntry,
-  keys: readonly { column: number; direction: SortDirection }[],
+  keys: readonly SortKey[],
   caseSensitive: boolean,
 ): number {
   for (let index = 0; index < keys.length; index += 1) {
     const key = keys[index];
-    const leftValue = left.values[index];
-    const rightValue = right.values[index];
-    if (!key || leftValue === undefined || rightValue === undefined) continue;
-    const compared = compareSortValues(leftValue, rightValue, key.direction, caseSensitive);
+    if (!key) continue;
+    const compared =
+      key.sortOn === "cellColor" || key.sortOn === "fontColor"
+        ? compareColorSortValues(left.colors[index], right.colors[index], key)
+        : compareSortValues(
+            left.values[index]!,
+            right.values[index]!,
+            key.direction,
+            caseSensitive,
+          );
     if (compared !== 0) return compared;
   }
   // Stable even if the JS engine implementation changes.
@@ -155,11 +206,12 @@ function validateSortCommand(
   }
   if (command.caseSensitive !== undefined && typeof command.caseSensitive !== "boolean")
     throw invalidCommandPayload("caseSensitive", command.caseSensitive);
-  const keys = command.sortKeys?.length
+  const keys: readonly SortKey[] = command.sortKeys?.length
     ? command.sortKeys
     : [{ column: command.keyColumn, direction: command.direction }];
   if (!keys.length) throw invalidCommandPayload("sortKeys", command.sortKeys);
   for (const key of keys) {
+    if (!key || typeof key !== "object") throw invalidCommandPayload("sortKeys", command.sortKeys);
     if (
       !Number.isInteger(key.column) ||
       key.column < range.start.column ||
@@ -172,6 +224,33 @@ function validateSortCommand(
       );
     if (key.direction !== "ascending" && key.direction !== "descending")
       throw invalidCommandPayload("sortKeys", command.sortKeys);
+    if (
+      key.sortOn !== undefined &&
+      key.sortOn !== "value" &&
+      key.sortOn !== "cellColor" &&
+      key.sortOn !== "fontColor"
+    )
+      throw invalidCommandPayload("sortKeys", command.sortKeys);
+    const isColorSort = key.sortOn === "cellColor" || key.sortOn === "fontColor";
+    if (!isColorSort && "color" in key) throw invalidCommandPayload("sortKeys", command.sortKeys);
+    if (isColorSort) {
+      if (!("color" in key)) throw invalidCommandPayload("sortKeys", command.sortKeys);
+      if (key.color === null && key.sortOn === "fontColor")
+        throw invalidCommandPayload(
+          "sortKeys",
+          command.sortKeys,
+          "Font color sorting requires a color.",
+        );
+      if (
+        key.color !== null &&
+        (typeof key.color !== "string" || !/^#[0-9a-f]{6}$/i.test(key.color))
+      )
+        throw invalidCommandPayload(
+          "sortKeys",
+          command.sortKeys,
+          "Sort colors must be six-digit hex values.",
+        );
+    }
   }
   if (sheet.mergedCells.some((merged) => rangesIntersect(range, merged))) {
     throw invalidCommandPayload("range", command.range, "Sorting merged cells is not supported.");
@@ -213,7 +292,7 @@ export function createSortSheetRangeCommand(
 export function createMultiKeySortSheetRangeCommand(
   sheetId: string,
   range: CellRange,
-  sortKeys: readonly { column: number; direction: SortDirection }[],
+  sortKeys: readonly SortKey[],
   options?: { hasHeader?: boolean; caseSensitive?: boolean },
 ): SortSheetRangeCommand {
   const normalized = normalizeRange(range);
@@ -239,7 +318,7 @@ export function applySortSheetRangeCommand(
 ): SetCellContentsCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const range = validateSortCommand(command, sheet);
-  const keys = command.sortKeys?.length
+  const keys: readonly SortKey[] = command.sortKeys?.length
     ? command.sortKeys
     : [{ column: command.keyColumn, direction: command.direction }];
   const caseSensitive = command.caseSensitive ?? true;
@@ -254,6 +333,11 @@ export function applySortSheetRangeCommand(
       return {
         row,
         values: keys.map((key) => evaluator.getComputedValue({ row, column: key.column })),
+        colors: keys.map((key) =>
+          key.sortOn === "cellColor" || key.sortOn === "fontColor"
+            ? getSortCellColor(sheet, { row, column: key.column }, key.sortOn)
+            : undefined,
+        ),
       };
     },
   ).sort((left, right) => compareSortEntries(left, right, keys, caseSensitive));

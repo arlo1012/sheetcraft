@@ -36,6 +36,7 @@ import {
 } from "@idea10/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
+import { getSortColorColumns } from "./sort-color-options";
 import { isValidationDraftComplete } from "./validation-draft";
 import { useAdvancedFilterController } from "./useAdvancedFilterController";
 import type {
@@ -284,6 +285,12 @@ export function useDataToolsController(options: Options) {
   const dialogColumns = computed(() =>
     visibleDialogTarget.value ? columnsFor(visibleDialogTarget.value) : [],
   );
+  const sortColorColumns = computed(() => {
+    const target = sortTarget.value;
+    return sortVisible.value && target && valid(target)
+      ? getSortColorColumns(activeSheet.value, target.range)
+      : [];
+  });
   const dialogRangeLabel = computed(() => {
     const target = visibleDialogTarget.value;
     return target ? rangeLabel(target.range) : "";
@@ -729,6 +736,7 @@ export function useDataToolsController(options: Options) {
     capabilities,
     columns: dialogColumns,
     sortInitial,
+    sortColorColumns,
     rangeLabel: dialogRangeLabel,
     splitPreview,
     duplicateCount,

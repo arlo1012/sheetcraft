@@ -725,6 +725,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :subtotal-visible="dataSubtotalVisible"
       :columns="dataToolColumns"
       :sort-initial="dataSortInitial"
+      :sort-color-columns="dataTools.sortColorColumns.value"
       :date-system="session.workbook.dateSystem"
       :range-label="dataToolRangeLabel"
       :split-preview="dataSplitPreview"

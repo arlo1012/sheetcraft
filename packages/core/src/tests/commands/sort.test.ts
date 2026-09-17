@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   createMultiKeySortSheetRangeCommand,
   createSortSheetRangeCommand,
+  getSortCellColor,
   tryApplyWorkbookCommand,
 } from "../../commands/index.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
@@ -404,5 +405,172 @@ describe("sheet range sorting", () => {
       } as never),
     ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
     expect(createSheetSparseState(sheet)).toEqual(beforeInvalidCaseSensitive);
+  });
+
+  test("sorts a selected solid fill to the top or bottom and preserves row styles through undo", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    for (const [row, [value, fill]] of [
+      [0, ["first", "#00FF00"]],
+      [1, ["selected", "#ff0000"]],
+      [2, ["third", null]],
+    ] as const) {
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value });
+      if (fill) setCellStyle(sheet, { row, column: 0 }, { fillColor: fill, bold: true });
+    }
+    const before = createSheetSparseState(sheet);
+    const range = { start: { row: 0, column: 0 }, end: { row: 2, column: 0 } };
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createMultiKeySortSheetRangeCommand(sheet.id, range, [
+          { column: 0, direction: "ascending", sortOn: "cellColor", color: "#FF0000" },
+        ]),
+      ),
+    ).toBe(true);
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "selected",
+    });
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toEqual({
+      fillColor: "#ff0000",
+      bold: true,
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(before);
+    expect(redoWorkbookCommand(session)).toBe(true);
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createMultiKeySortSheetRangeCommand(sheet.id, range, [
+          { column: 0, direction: "descending", sortOn: "cellColor", color: "#ff0000" },
+        ]),
+      ),
+    ).toBe(true);
+    expect(getCellContent(sheet, { row: 2, column: 0 })).toEqual({
+      kind: "literal",
+      value: "selected",
+    });
+    expect(
+      executeWorkbookCommand(
+        session,
+        createMultiKeySortSheetRangeCommand(sheet.id, range, [
+          { column: 0, direction: "ascending", sortOn: "cellColor", color: null },
+        ]),
+      ),
+    ).toBe(true);
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "third",
+    });
+  });
+
+  test("uses selected color groups as a stable multi-key sort and exposes solid sort colors", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    for (const [row, [label, score, fill]] of [
+      [0, ["green-2", 2, "#00ff00"]],
+      [1, ["red-2", 2, "#FF0000"]],
+      [2, ["red-1", 1, "#ff0000"]],
+      [3, ["none-1", 1, null]],
+    ] as const) {
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value: label });
+      setCellContent(sheet, { row, column: 1 }, { kind: "literal", value: score });
+      if (fill) setCellStyle(sheet, { row, column: 0 }, { fillColor: fill });
+    }
+    setCellStyle(
+      sheet,
+      { row: 3, column: 1 },
+      {
+        fillGradient: {
+          type: "linear",
+          angle: 0,
+          stops: [
+            { position: 0, color: "#ffffff" },
+            { position: 1, color: "#000000" },
+          ],
+        },
+      },
+    );
+    expect(getSortCellColor(sheet, { row: 0, column: 0 }, "cellColor")).toBe("#00ff00");
+    expect(getSortCellColor(sheet, { row: 3, column: 0 }, "cellColor")).toBeNull();
+    expect(getSortCellColor(sheet, { row: 3, column: 1 }, "cellColor")).toBeUndefined();
+    expect(getSortCellColor(sheet, { row: 0, column: 0 }, "fontColor")).toBe("#20242c");
+    setCellStyle(sheet, { row: 0, column: 1 }, { textColor: "#AbCdEf" });
+    expect(getSortCellColor(sheet, { row: 0, column: 1 }, "fontColor")).toBe("#abcdef");
+
+    executeWorkbookCommand(
+      session,
+      createMultiKeySortSheetRangeCommand(
+        sheet.id,
+        { start: { row: 0, column: 0 }, end: { row: 3, column: 1 } },
+        [
+          { column: 0, direction: "ascending", sortOn: "cellColor", color: "#FF0000" },
+          { column: 0, direction: "ascending", sortOn: "cellColor", color: "#00FF00" },
+          { column: 1, direction: "ascending" },
+        ],
+      ),
+    );
+    expect([0, 1, 2, 3].map((row) => getCellContent(sheet, { row, column: 0 }))).toEqual([
+      { kind: "literal", value: "red-1" },
+      { kind: "literal", value: "red-2" },
+      { kind: "literal", value: "green-2" },
+      { kind: "literal", value: "none-1" },
+    ]);
+  });
+
+  test("sorts automatic and explicit font colors by the selected normalized color", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    for (const [row, label] of ["automatic", "purple", "explicit-default"].entries()) {
+      setCellContent(sheet, { row, column: 1 }, { kind: "literal", value: label });
+    }
+    setCellStyle(sheet, { row: 1, column: 0 }, { textColor: "#A020F0" });
+    setCellStyle(sheet, { row: 2, column: 0 }, { textColor: "#20242C" });
+
+    executeWorkbookCommand(
+      session,
+      createMultiKeySortSheetRangeCommand(
+        sheet.id,
+        { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } },
+        [{ column: 0, direction: "ascending", sortOn: "fontColor", color: "#20242c" }],
+      ),
+    );
+    expect([0, 1, 2].map((row) => getCellContent(sheet, { row, column: 1 }))).toEqual([
+      { kind: "literal", value: "automatic" },
+      { kind: "literal", value: "explicit-default" },
+      { kind: "literal", value: "purple" },
+    ]);
+  });
+
+  test("rejects invalid color keys without changing the sheet", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: 2 });
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: 1 });
+    const before = createSheetSparseState(sheet);
+    const command = {
+      type: "sortSheetRange" as const,
+      sheetId: sheet.id,
+      range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      keyColumn: 0,
+      direction: "ascending" as const,
+      sortKeys: [
+        { column: 0, direction: "ascending" as const, sortOn: "fontColor" as const, color: null },
+      ],
+    };
+    expect(tryApplyWorkbookCommand(session.workbook, command)).toMatchObject({
+      ok: false,
+      error: { code: "invalid_command_payload" },
+    });
+    expect(
+      tryApplyWorkbookCommand(session.workbook, {
+        ...command,
+        sortKeys: [{ column: 0, direction: "ascending", sortOn: "cellColor", color: "#fff" }],
+      }),
+    ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
+    expect(createSheetSparseState(sheet)).toEqual(before);
   });
 });

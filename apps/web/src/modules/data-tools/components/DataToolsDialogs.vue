@@ -12,6 +12,7 @@ import type {
   RemoveDuplicatesDraft,
   SortDraft,
   SortInitial,
+  SortColorColumn,
   SubtotalDraft,
   TextToColumnsDraft,
 } from "../data-tools-types";
@@ -25,6 +26,7 @@ withDefaults(
     subtotalVisible: boolean;
     columns: readonly DataToolColumn[];
     sortInitial?: SortInitial;
+    sortColorColumns?: readonly SortColorColumn[];
     dateSystem?: ExcelDateSystem;
     rangeLabel?: string;
     splitPreview?: readonly string[];
@@ -36,6 +38,7 @@ withDefaults(
     rangeLabel: "",
     dateSystem: "1900",
     sortInitial: undefined,
+    sortColorColumns: () => [],
     splitPreview: () => [],
     duplicateCount: undefined,
     validationInitial: undefined,
@@ -65,6 +68,7 @@ const emit = defineEmits<{
     :columns="columns"
     :range-label="rangeLabel"
     :initial="sortInitial"
+    :color-columns="sortColorColumns"
     @close="emit('closeSort')"
     @apply="emit('sort', $event)"
   />

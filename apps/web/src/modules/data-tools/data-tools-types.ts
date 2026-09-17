@@ -1,3 +1,4 @@
+import type { SortKey } from "@idea10/core/commands";
 import type {
   CellRange,
   DataValidationOperator,
@@ -24,7 +25,14 @@ export type DataToolFilterCriteria = SheetFilterColumn["condition"];
 export type DataToolFilterAnchor = { x: number; y: number; width?: number; height?: number };
 export type DataToolColumn = { column: number; label: string; header?: string };
 export type DataToolRangeSnapshot = { sheetId: string; generation: number; range: CellRange };
-export type SortLevel = { column: number; direction: DataToolSortDirection };
+export type SortLevel = SortKey;
+export type SortColorColumn = {
+  column: number;
+  cellColors: Array<string | null>;
+  fontColors: string[];
+  headerCellColor?: string | null;
+  headerFontColor: string;
+};
 export type SortInitial = {
   hasHeader: boolean;
   headerLocked?: boolean;
