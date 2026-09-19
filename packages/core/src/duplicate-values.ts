@@ -7,9 +7,9 @@ import {
   type SheetEvaluator,
   type Workbook,
 } from "./workbook.js";
-import type { CellContent } from "./formula/types.js";
+import type { CellContent, FormulaValue } from "./formula/types.js";
 
-type DuplicateValue = { address: CellAddress; key: string };
+type DuplicateValue = { address: CellAddress; key: string; value: FormulaValue };
 
 /** Duplicate comparison is case-insensitive for text; numbers and text remain distinct. */
 export function getDuplicateValueKey(value: unknown): string | null {
@@ -46,8 +46,9 @@ function collectDuplicateValues(sheet: Sheet, evaluator: SheetEvaluator): Duplic
   }
   const values: DuplicateValue[] = [];
   for (const address of addresses.values()) {
-    const key = getDuplicateValueKey(evaluator.getComputedValue(address));
-    if (key !== null) values.push({ address, key });
+    const value = evaluator.getComputedValue(address);
+    const key = getDuplicateValueKey(value);
+    if (key !== null) values.push({ address, key, value });
   }
   return values;
 }
@@ -66,6 +67,34 @@ export function getDuplicateValueCounts(
 ): Map<string, number> {
   const sheet = workbook.sheets.get(sheetId);
   return sheet ? countValues(collectDuplicateValues(sheet, evaluator), range) : new Map();
+}
+
+/**
+ * Returns each non-blank compared value once, in row-major first-occurrence order.
+ * Formula cells are represented by their evaluated values so generated output never
+ * carries references back to the source sheet.
+ */
+export function getDuplicateValueSummaries(
+  workbook: Workbook,
+  sheetId: string,
+  range: CellRange,
+  evaluator = createWorkbookEvaluator(workbook, sheetId),
+): Array<{ value: FormulaValue; count: number }> {
+  const sheet = workbook.sheets.get(sheetId);
+  if (!sheet) return [];
+  const values = collectDuplicateValues(sheet, evaluator)
+    .filter((value) => inRange(value.address, range))
+    .sort(
+      (left, right) =>
+        left.address.row - right.address.row || left.address.column - right.address.column,
+    );
+  const summaries = new Map<string, { value: FormulaValue; count: number }>();
+  for (const value of values) {
+    const summary = summaries.get(value.key);
+    if (summary) summary.count += 1;
+    else summaries.set(value.key, { value: value.value, count: 1 });
+  }
+  return [...summaries.values()];
 }
 
 /** Create once per document display revision; scrolling reuses the sparse value index. */

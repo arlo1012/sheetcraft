@@ -7,12 +7,7 @@ import {
   type WorkbookCommand,
 } from "@idea10/core/commands";
 import { WorkbookDomainError } from "@idea10/core/errors";
-import {
-  getActiveSheet,
-  MAX_SHEET_COLUMNS,
-  type CellRange,
-  type Workbook,
-} from "@idea10/core/workbook";
+import { getActiveSheet, type CellRange, type Workbook } from "@idea10/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import {
@@ -34,8 +29,6 @@ type Options = {
 const emptyDraft = (): DuplicateToolDraft => ({
   range: "",
   fillColor: "#ffc7ce",
-  destination: "",
-  overwrite: false,
 });
 
 /** Selection-owned duplicate operations; reference picking may visit another sheet. */
@@ -52,7 +45,7 @@ export function useDuplicateToolsController(options: Options) {
     if (options.isBusy() || !options.flush()) return;
     const workbook = options.getWorkbook();
     const sheet = getActiveSheet(workbook);
-    if (sheet.properties.protected) return;
+    if (mode !== "count" && sheet.properties.protected) return;
     const selection = options.getSelection().range;
     const range = {
       start: {
@@ -64,16 +57,11 @@ export function useDuplicateToolsController(options: Options) {
         column: Math.max(selection.start.column, selection.end.column),
       },
     };
-    const destination = { row: range.start.row, column: range.end.column + 1 };
     target = { workbook, generation: options.getGeneration(), sheetId: sheet.id };
     duplicateValuesMode.value = mode;
     duplicateValuesDraft.value = {
       ...emptyDraft(),
       range: formatRangeReference(sheet.name, range),
-      destination:
-        destination.column < MAX_SHEET_COLUMNS
-          ? formatRangeReference(sheet.name, { start: destination, end: destination })
-          : "",
     };
     duplicateValuesError.value = "";
     duplicateValuesVisible.value = true;
@@ -116,35 +104,13 @@ export function useDuplicateToolsController(options: Options) {
     }
     try {
       if (mode === "count") {
-        if (source.range.start.column !== source.range.end.column) {
-          duplicateValuesError.value = t("dataTools.duplicates.oneColumn");
-          return;
-        }
-        const destination = resolveRangeReference(workbook, draft.destination, target.sheetId);
-        if (
-          !destination ||
-          destination.range.start.row !== destination.range.end.row ||
-          destination.range.start.column !== destination.range.end.column
-        ) {
-          duplicateValuesError.value = t("dataTools.duplicates.invalidDestination");
-          return;
-        }
-        if (workbook.sheets.get(destination.sheetId)?.properties.protected) {
-          duplicateValuesError.value = t("dataTools.duplicates.protectedRange");
-          return;
-        }
         options.execute(
-          createCountDuplicateValuesCommand(
-            source.sheetId,
-            source.range,
-            {
-              sheetId: destination.sheetId,
-              address: destination.range.start,
-            },
-            {
-              overwrite: draft.overwrite,
-            },
-          ),
+          createCountDuplicateValuesCommand(workbook, source.sheetId, source.range, {
+            idFactory: createId,
+            sheetName: t("dataTools.duplicates.countSheetName"),
+            valueLabel: t("dataTools.duplicates.valueHeader"),
+            countLabel: t("dataTools.duplicates.countHeader"),
+          }),
         );
       } else {
         const range = {
@@ -177,13 +143,11 @@ export function useDuplicateToolsController(options: Options) {
     } catch (cause) {
       const field = cause instanceof WorkbookDomainError ? cause.data.details?.field : undefined;
       duplicateValuesError.value =
-        field === "duplicate"
-          ? t("dataTools.duplicates.duplicateRejected")
-          : field === "overwrite"
-            ? t("dataTools.duplicates.overwriteRequired")
-            : field === "destination"
-              ? t("dataTools.duplicates.invalidDestination")
-              : t("dataTools.duplicates.invalidOperation");
+        field === "empty"
+          ? t("dataTools.duplicates.empty")
+          : field === "sourceRange"
+            ? t("dataTools.duplicates.invalidRange")
+            : t("dataTools.duplicates.invalidOperation");
     }
   }
 

@@ -8,9 +8,10 @@ import {
 import {
   createDuplicateHighlightResolver,
   getDuplicateValueCounts,
+  getDuplicateValueSummaries,
   validateDuplicateEntries,
 } from "../../duplicate-values.js";
-import { executeWorkbookCommand, undoWorkbookCommand } from "../../history.js";
+import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import { deserializeWorkbook, serializeWorkbook } from "../../serialization.js";
 import {
   createWorkbookEvaluator,
@@ -43,49 +44,54 @@ describe("duplicate values", () => {
     ).toBe(true);
   });
 
-  test("validates raw command bounds before mutation and skips unchanged count results", () => {
+  test("creates a row-major rectangular count summary on a new sheet and supports undo", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
-    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "x" });
+    const activeSheetId = sheet.id;
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "title1" });
+    setCellContent(sheet, { row: 0, column: 1 }, { kind: "literal", value: "title2" });
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: 3 });
+    setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: 3 });
+    setCellContent(sheet, { row: 2, column: 0 }, { kind: "literal", value: 4 });
+    setCellContent(sheet, { row: 2, column: 1 }, { kind: "formula", formula: { source: "=A3" } });
     const command = createCountDuplicateValuesCommand(
+      session.workbook,
       sheet.id,
-      { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
-      { sheetId: sheet.id, address: { row: 0, column: 1 } },
-      { overwrite: true },
+      { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } },
+      {
+        idFactory: session.idFactory,
+        sheetName: "Duplicate Values",
+        valueLabel: "Value",
+        countLabel: "Count",
+      },
     );
-    for (const address of [
-      { row: -1, column: 1 },
-      { row: 0, column: MAX_SHEET_COLUMNS },
-      { row: MAX_SHEET_ROWS - 1, column: 1 },
-      { row: NaN, column: 1 },
-    ]) {
-      expect(() =>
-        executeWorkbookCommand(session, {
-          ...command,
-          destination: { sheetId: sheet.id, address },
-        }),
-      ).toThrow();
-      expect(getCellContent(sheet, { row: 0, column: 1 })).toBeNull();
-    }
-    expect(() =>
-      executeWorkbookCommand(session, {
-        ...command,
-        sourceRange: { start: { row: 0, column: 0 }, end: { row: MAX_SHEET_ROWS, column: 0 } },
-      }),
-    ).toThrow();
-    expect(() =>
-      executeWorkbookCommand(
-        session,
-        createClearSheetDuplicateRulesCommand(sheet.id, "highlight", {
-          start: { row: -1, column: 0 },
-          end: { row: 1, column: 0 },
-        }),
-      ),
-    ).toThrow();
-    expect(session.history.undoStack).toHaveLength(0);
     expect(executeWorkbookCommand(session, command)).toBe(true);
-    expect(executeWorkbookCommand(session, command)).toBe(false);
+    const result = getActiveSheet(session.workbook);
+    expect(result.name).toBe("Duplicate Values");
+    expect(getCellContent(result, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "Value",
+    });
+    expect(getCellContent(result, { row: 0, column: 1 })).toEqual({
+      kind: "literal",
+      value: "Count",
+    });
+    expect(getCellContent(result, { row: 1, column: 0 })).toEqual({
+      kind: "literal",
+      value: "title1",
+    });
+    expect(getCellContent(result, { row: 1, column: 1 })).toEqual({ kind: "literal", value: 1 });
+    expect(getCellContent(result, { row: 3, column: 0 })).toEqual({ kind: "literal", value: 3 });
+    expect(getCellContent(result, { row: 3, column: 1 })).toEqual({ kind: "literal", value: 2 });
+    expect(getCellContent(result, { row: 4, column: 0 })).toEqual({ kind: "literal", value: 4 });
+    expect(getCellContent(result, { row: 4, column: 1 })).toEqual({ kind: "literal", value: 2 });
+    expect(result.cells.get("0:0")?.style).toEqual({ bold: true });
     expect(session.history.undoStack).toHaveLength(1);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(session.workbook.activeSheetId).toBe(activeSheetId);
+    expect(session.workbook.sheets).toHaveLength(1);
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getActiveSheet(session.workbook).id).toBe(result.id);
   });
 
   test("counts spill cells once when their root is outside the range and a spill cell has a style", () => {
@@ -126,6 +132,83 @@ describe("duplicate values", () => {
     ).toBe(false);
   });
 
+  test("summarizes sparse rectangular values without losing types or formula results", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const whole = {
+      start: { row: 0, column: 0 },
+      end: { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 },
+    };
+    const longText = "00000000000000000000000000000000000001";
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: 3 });
+    setCellContent(sheet, { row: 0, column: 1 }, { kind: "literal", value: "3" });
+    setCellContent(sheet, { row: 0, column: 2 }, { kind: "literal", value: true });
+    setCellContent(sheet, { row: 0, column: 3 }, { kind: "literal", value: longText });
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "formula", formula: { source: "=A1" } });
+    setCellContent(sheet, { row: 1, column: 1 }, { kind: "formula", formula: { source: "=1/0" } });
+    const evaluator = createWorkbookEvaluator(session.workbook, sheet.id);
+    const spy = vi.spyOn(evaluator, "getComputedValue");
+    expect(getDuplicateValueSummaries(session.workbook, sheet.id, whole, evaluator)).toEqual([
+      { value: 3, count: 2 },
+      { value: "3", count: 1 },
+      { value: true, count: 1 },
+      { value: longText, count: 1 },
+      { value: { kind: "formula-error", code: "DIV0" }, count: 1 },
+    ]);
+    expect(spy.mock.calls.length).toBeLessThan(20);
+    const command = createCountDuplicateValuesCommand(session.workbook, sheet.id, whole, {
+      idFactory: session.idFactory,
+    });
+    expect(executeWorkbookCommand(session, command)).toBe(true);
+    const result = getActiveSheet(session.workbook);
+    expect(getCellContent(result, { row: 1, column: 0 })).toEqual({ kind: "literal", value: 3 });
+    expect(getCellContent(result, { row: 2, column: 0 })).toEqual({ kind: "literal", value: "3" });
+    expect(getCellContent(result, { row: 3, column: 0 })).toEqual({ kind: "literal", value: true });
+    expect(getCellContent(result, { row: 4, column: 0 })).toEqual({
+      kind: "literal",
+      value: longText,
+    });
+    expect(getCellContent(result, { row: 5, column: 0 })).toEqual({
+      kind: "error",
+      error: { kind: "formula-error", code: "DIV0" },
+    });
+  });
+
+  test("uses unique result sheet names and restores both generated sheets through history", () => {
+    const session = createTestWorkbookSession();
+    const source = getActiveSheet(session.workbook);
+    setCellContent(source, { row: 0, column: 0 }, { kind: "literal", value: "A" });
+    const sourceId = source.id;
+    const first = createCountDuplicateValuesCommand(
+      session.workbook,
+      source.id,
+      { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+      { idFactory: session.idFactory, sheetName: "统计结果" },
+    );
+    expect(executeWorkbookCommand(session, first)).toBe(true);
+    const firstId = getActiveSheet(session.workbook).id;
+    const second = createCountDuplicateValuesCommand(
+      session.workbook,
+      source.id,
+      { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+      { idFactory: session.idFactory, sheetName: "统计结果" },
+    );
+    expect(executeWorkbookCommand(session, second)).toBe(true);
+    const secondId = getActiveSheet(session.workbook).id;
+    expect(getActiveSheet(session.workbook).name).toBe("统计结果 (2)");
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(session.workbook.activeSheetId).toBe(firstId);
+    expect(session.workbook.sheets.has(secondId)).toBe(false);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(session.workbook.activeSheetId).toBe(sourceId);
+    expect(session.workbook.sheets).toHaveLength(1);
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getActiveSheet(session.workbook).id).toBe(firstId);
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(getActiveSheet(session.workbook).id).toBe(secondId);
+    expect(getActiveSheet(session.workbook).name).toBe("统计结果 (2)");
+  });
+
   test("whole-sheet duplicate highlighting visits sparse values rather than every coordinate", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
@@ -142,31 +225,6 @@ describe("duplicate values", () => {
       createDuplicateHighlightResolver(sheet, evaluator)({ row: 0, column: 0 })?.fillColor,
     ).toBe("#ffc7ce");
     expect(spy.mock.calls.length).toBeLessThan(10);
-  });
-
-  test("rejects count output over spilled cells and protects an occupied header", () => {
-    const session = createTestWorkbookSession();
-    const sheet = getActiveSheet(session.workbook);
-    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "Header" });
-    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: "x" });
-    setCellContent(sheet, { row: 0, column: 1 }, { kind: "literal", value: "Keep" });
-    const command = createCountDuplicateValuesCommand(
-      sheet.id,
-      { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
-      { sheetId: sheet.id, address: { row: 0, column: 1 } },
-      { hasHeader: true },
-    );
-    expect(() => executeWorkbookCommand(session, command)).toThrow();
-    expect(getCellContent(sheet, { row: 1, column: 1 })).toBeNull();
-    setCellContent(
-      sheet,
-      { row: 0, column: 1 },
-      { kind: "formula", formula: { source: "=SEQUENCE(3)" } },
-    );
-    expect(() =>
-      executeWorkbookCommand(session, { ...command, options: { overwrite: true } }),
-    ).toThrow();
-    expect(getCellContent(sheet, { row: 0, column: 1 })?.kind).toBe("formula");
   });
 
   test("persists rules, clears only matching kind, and undoes", () => {
@@ -241,23 +299,17 @@ describe("duplicate values", () => {
     expect(undoWorkbookCommand(session)).toBe(true);
     expect(sheet.duplicateRules?.[0]?.range.start.row).toBe(2);
   });
-  test("preflights occupied count destinations atomically and writes counts with undo", () => {
+  test("rejects an empty source without creating a sheet", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
-    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "x" });
-    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: "x" });
-    setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: "keep" });
-    const command = createCountDuplicateValuesCommand(
-      sheet.id,
-      { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
-      { sheetId: sheet.id, address: { row: 0, column: 1 } },
-    );
-    expect(() => executeWorkbookCommand(session, command)).toThrow();
-    expect(getCellContent(sheet, { row: 0, column: 1 })).toBeNull();
-    expect(executeWorkbookCommand(session, { ...command, options: { overwrite: true } })).toBe(
-      true,
-    );
-    expect(getCellContent(sheet, { row: 0, column: 1 })).toEqual({ kind: "literal", value: 2 });
-    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(() =>
+      createCountDuplicateValuesCommand(
+        session.workbook,
+        sheet.id,
+        { start: { row: 0, column: 0 }, end: { row: 1, column: 1 } },
+        { idFactory: session.idFactory },
+      ),
+    ).toThrow(/empty/);
+    expect(session.workbook.sheets).toHaveLength(1);
   });
 });

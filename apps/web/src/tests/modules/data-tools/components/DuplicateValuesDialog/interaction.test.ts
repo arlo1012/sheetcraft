@@ -6,8 +6,6 @@ import { createAppI18n } from "../../../../../shared/i18n";
 const initial = {
   range: "A1:A4",
   fillColor: "#ffc7ce",
-  destination: "C1",
-  overwrite: false,
 };
 const wrappers: Array<{ unmount(): void }> = [];
 afterEach(() => {
@@ -30,13 +28,13 @@ function dialog() {
 }
 
 describe("DuplicateValuesDialog", () => {
-  test("keeps count inputs and reports an edited draft", async () => {
+  test("edits a multicolumn source range and explains new-sheet output", async () => {
     const wrapper = mountDialog("count");
-    expect(dialog().text()).toContain("Count each value across the selected column");
-    await dialog().get('[aria-label="Destination"] input').setValue("D1");
-    expect(wrapper.emitted("draftChange")?.at(-1)).toEqual([{ ...initial, destination: "D1" }]);
-    await dialog().get('[aria-label="Select range：Destination"]').trigger("click");
-    expect(wrapper.emitted("pickRange")).toEqual([["destination"]]);
+    expect(dialog().text()).toContain("Count each nonblank value across the selected range");
+    await dialog().get('[aria-label="Range"] input').setValue("A1:E7");
+    expect(wrapper.emitted("draftChange")?.at(-1)).toEqual([{ ...initial, range: "A1:E7" }]);
+    await dialog().get('[aria-label="Select range：Range"]').trigger("click");
+    expect(wrapper.emitted("pickRange")).toEqual([[]]);
   });
 
   test("provides highlight colors and cancellation", async () => {

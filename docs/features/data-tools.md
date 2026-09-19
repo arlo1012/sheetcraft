@@ -54,9 +54,12 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   Duplicates creates a dynamic duplicate-owned overlay, using evaluated nonblank
   values in the selection and preserving the cells' base fill and text styles.
   Clear Highlight Duplicates removes only those duplicate-owned highlight rules.
-  Count Repetitions accepts one source column and writes each nonblank row's
-  selection-wide frequency to a separate destination column; populated targets
-  require explicit overwrite approval. Reject Duplicate Entries creates a
+  Count Repetitions accepts a rectangular selection of any width and summarizes
+  each distinct nonblank value across the entire selection in a new worksheet,
+  with Value and Count columns. Values occurring once are included, including
+  titles when selected; empty cells are ignored. Results retain first-appearance
+  order, leave the source unchanged, and support one-step undo/redo.
+  Reject Duplicate Entries creates a
   duplicate-owned selection rule that rejects a direct edit, paste, or fill when
   its prospective batch would contain an already-present nonblank value. Clear
   Reject Limit removes only those duplicate-owned rejection rules. Remove

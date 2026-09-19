@@ -441,13 +441,10 @@ watch(dataAdvancedFilterVisible, (visible) => {
 });
 const duplicateRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingDuplicateRange, reference: pickedDuplicateReference } = duplicateRangePicker;
-const duplicateRangeField = ref<"range" | "destination">();
-async function pickDuplicateRange(field: "range" | "destination") {
-  duplicateRangeField.value = field;
-  const selected = await duplicateRangePicker.selectReference(duplicateValuesDraft.value[field]);
-  duplicateRangeField.value = undefined;
+async function pickDuplicateRange() {
+  const selected = await duplicateRangePicker.selectReference(duplicateValuesDraft.value.range);
   if (selected !== undefined && duplicateValuesVisible.value) {
-    dataTools.updateDuplicateValuesDraft({ ...duplicateValuesDraft.value, [field]: selected });
+    dataTools.updateDuplicateValuesDraft({ ...duplicateValuesDraft.value, range: selected });
   }
 }
 watch(duplicateValuesVisible, (visible) => {
@@ -782,7 +779,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :initial="duplicateValuesDraft"
       :error="duplicateValuesError"
       :busy="loading || fileBusy || xlsxBusy || imageBusy"
-      :picking="duplicateRangeField"
+      :picking="pickingDuplicateRange"
       @close="dataTools.closeDuplicateValues"
       @apply="dataTools.applyDuplicateValues"
       @draft-change="dataTools.updateDuplicateValuesDraft"

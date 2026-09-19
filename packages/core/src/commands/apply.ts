@@ -33,7 +33,6 @@ import {
 } from "./validation.js";
 import {
   applyClearSheetDuplicateRulesCommand,
-  applyCountDuplicateValuesCommand,
   applySetSheetDuplicateRulesCommand,
 } from "./duplicates.js";
 import {
@@ -93,13 +92,11 @@ function assertCommandDoesNotModifyProtectedSheet(
   const sheetIds =
     command.type === "setCellContents"
       ? command.changes.map((change) => change.sheetId)
-      : command.type === "countDuplicateValues"
+      : command.type === "advancedFilter" && command.mode === "copy" && command.destination
         ? [command.destination.sheetId]
-        : command.type === "advancedFilter" && command.mode === "copy" && command.destination
-          ? [command.destination.sheetId]
-          : "sheetId" in command
-            ? [command.sheetId]
-            : [];
+        : "sheetId" in command
+          ? [command.sheetId]
+          : [];
   const blocked = sheetIds.find((sheetId) => workbook.sheets.get(sheetId)?.properties.protected);
   if (!blocked) return;
   switch (command.type) {
@@ -136,7 +133,6 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "clearSheetDataValidations":
     case "setSheetDuplicateRules":
     case "clearSheetDuplicateRules":
-    case "countDuplicateValues":
     case "addSheetOutlineGroup":
     case "removeSheetOutlineGroup":
     case "setSheetOutlineGroupCollapsed":
@@ -245,8 +241,6 @@ export function applyWorkbookCommand(
         return applySetSheetDuplicateRulesCommand(workbook, command);
       case "clearSheetDuplicateRules":
         return applyClearSheetDuplicateRulesCommand(workbook, command);
-      case "countDuplicateValues":
-        return applyCountDuplicateValuesCommand(workbook, command);
       case "addSheetOutlineGroup":
         return applyAddSheetOutlineGroupCommand(workbook, command);
       case "removeSheetOutlineGroup":

@@ -2,7 +2,6 @@
 import { SquareMousePointer } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
-import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
@@ -16,14 +15,14 @@ const props = withDefaults(
     initial: DuplicateToolDraft;
     error?: string;
     busy?: boolean;
-    picking?: "range" | "destination";
+    picking?: boolean;
   }>(),
-  { error: "", busy: false, picking: undefined },
+  { error: "", busy: false, picking: false },
 );
 const emit = defineEmits<{
   apply: [draft: DuplicateToolDraft];
   close: [];
-  pickRange: [field: "range" | "destination"];
+  pickRange: [];
   draftChange: [draft: DuplicateToolDraft];
 }>();
 const { t } = useAppI18n();
@@ -34,10 +33,7 @@ const colors = [
   { value: "#c6efce", label: "green" },
 ] as const;
 const title = computed(() => t(`dataTools.duplicates.${props.mode}Title`));
-const needsDestination = computed(() => props.mode === "count");
-const canApply = computed(() =>
-  Boolean(draft.value.range.trim() && (!needsDestination.value || draft.value.destination.trim())),
-);
+const canApply = computed(() => Boolean(draft.value.range.trim()));
 watch(
   () => props.visible,
   (visible) => {
@@ -95,7 +91,7 @@ watch(
               :disabled="busy"
               :aria-label="`${t('dataTools.duplicates.pickRange')}：${t('dataTools.duplicates.range')}`"
               :title="t('formulaTools.selectRange')"
-              @click="emit('pickRange', 'range')"
+              @click="emit('pickRange')"
               ><template #icon
                 ><SquareMousePointer :size="16" aria-hidden="true" /></template></TButton
           ></template>
@@ -118,36 +114,9 @@ watch(
           >
         </TRadioGroup>
       </div>
-      <template v-if="needsDestination">
-        <label class="duplicate-values-dialog__field">
-          <span>{{ t("dataTools.duplicates.destination") }}</span>
-          <TInput
-            v-model="draft.destination"
-            :disabled="busy"
-            autocomplete="off"
-            placeholder="C1"
-            :aria-label="t('dataTools.duplicates.destination')"
-          >
-            <template #suffix
-              ><TButton
-                variant="text"
-                shape="square"
-                :disabled="busy"
-                :aria-label="`${t('dataTools.duplicates.pickRange')}：${t('dataTools.duplicates.destination')}`"
-                :title="t('formulaTools.selectRange')"
-                @click="emit('pickRange', 'destination')"
-                ><template #icon
-                  ><SquareMousePointer :size="16" aria-hidden="true" /></template></TButton
-            ></template>
-          </TInput>
-        </label>
-        <TCheckbox v-model="draft.overwrite" :disabled="busy">{{
-          t("dataTools.duplicates.overwrite")
-        }}</TCheckbox>
-        <p class="duplicate-values-dialog__hint">
-          {{ t("dataTools.duplicates.countHint") }}
-        </p>
-      </template>
+      <p v-if="mode === 'count'" class="duplicate-values-dialog__hint">
+        {{ t("dataTools.duplicates.countHint") }}
+      </p>
       <p v-if="error" class="duplicate-values-dialog__error" role="alert">
         {{ error }}
       </p>

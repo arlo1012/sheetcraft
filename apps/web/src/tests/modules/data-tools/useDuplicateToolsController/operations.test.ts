@@ -5,6 +5,7 @@ import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
+  redoWorkbookCommand,
 } from "@idea10/core/history";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import {
@@ -67,44 +68,89 @@ describe("duplicate tools controller", () => {
     f.wrapper.unmount();
   });
 
-  test("writes per-value frequencies including the first selected row to a separate column and preserves source", () => {
+  test("summarizes the entire multicolumn selection in a new sheet and restores it with undo/redo", () => {
     const f = fixture();
+    for (let column = 0; column < 5; column++) {
+      setCellValue(f.sheet, { row: 0, column }, `title${column + 1}`);
+      [3, 4, 5, 1, 2, 6].forEach((value, index) =>
+        setCellValue(f.sheet, { row: index + 1, column }, value),
+      );
+    }
+    f.selection.range.end = { row: 6, column: 4 };
     f.controller.openDuplicateValues("count");
     f.controller.applyDuplicateValues(f.controller.duplicateValuesDraft.value);
-    const evaluator = createSheetEvaluator(f.sheet);
-    expect([0, 1, 2, 3, 4].map((row) => evaluator.getComputedValue({ row, column: 1 }))).toEqual([
-      1, 2, 2, 2, 2,
+    const result = getActiveSheet(f.session.workbook);
+    expect(result.id).not.toBe(f.sheet.id);
+    expect(result.name).toBe("Duplicate counts");
+    const evaluator = createSheetEvaluator(result);
+    const rows = Array.from({ length: 12 }, (_, row) => [
+      evaluator.getComputedValue({ row, column: 0 }),
+      evaluator.getComputedValue({ row, column: 1 }),
     ]);
-    expect(evaluator.getComputedValue({ row: 1, column: 0 })).toBe("a");
+    expect(rows).toEqual([
+      ["Value", "Count"],
+      ...Array.from({ length: 5 }, (_, column) => [`title${column + 1}`, 1]),
+      ...[3, 4, 5, 1, 2, 6].map((value) => [value, 5]),
+    ]);
+    expect(f.sheet.cells.size).toBe(35);
+    expect(createSheetEvaluator(f.sheet).getComputedValue({ row: 6, column: 4 })).toBe(6);
     expect(f.controller.duplicateValuesVisible.value).toBe(false);
+    expect(f.session.history.undoStack).toHaveLength(1);
     undoWorkbookCommand(f.session);
-    expect(createSheetEvaluator(f.sheet).getComputedValue({ row: 1, column: 1 })).toBeNull();
+    expect(f.session.workbook.sheets.size).toBe(1);
+    expect(getActiveSheet(f.session.workbook).id).toBe(f.sheet.id);
+    redoWorkbookCommand(f.session);
+    expect(getActiveSheet(f.session.workbook).id).toBe(result.id);
+    expect(
+      createSheetEvaluator(getActiveSheet(f.session.workbook)).getComputedValue({
+        row: 6,
+        column: 1,
+      }),
+    ).toBe(5);
     f.wrapper.unmount();
   });
 
-  test("keeps the dialog open and writes nothing when the output contains data", () => {
+  test("leaves source neighbours intact and counts from a protected source", () => {
     const f = fixture();
     setCellValue(f.sheet, { row: 3, column: 1 }, "keep");
+    f.sheet.properties.protected = true;
     f.controller.openDuplicateValues("count");
-    f.controller.applyDuplicateValues(f.controller.duplicateValuesDraft.value);
     expect(f.controller.duplicateValuesVisible.value).toBe(true);
-    expect(f.controller.duplicateValuesError.value).toBeTruthy();
-    const evaluator = createSheetEvaluator(f.sheet);
-    expect(evaluator.getComputedValue({ row: 0, column: 1 })).toBeNull();
-    expect(evaluator.getComputedValue({ row: 3, column: 1 })).toBe("keep");
+    f.controller.applyDuplicateValues(f.controller.duplicateValuesDraft.value);
+    expect(f.session.workbook.sheets.size).toBe(2);
+    expect(createSheetEvaluator(f.sheet).getComputedValue({ row: 3, column: 1 })).toBe("keep");
+    const result = createSheetEvaluator(getActiveSheet(f.session.workbook));
+    expect(result.getComputedValue({ row: 1, column: 0 })).toBe("Item");
+    expect(result.getComputedValue({ row: 2, column: 1 })).toBe(2);
     f.wrapper.unmount();
   });
 
-  test("rejects multicolumn counts and does not apply a cancelled draft", () => {
+  test("keeps an empty selection open without creating a result sheet", () => {
     const f = fixture();
     f.controller.openDuplicateValues("count");
     f.controller.applyDuplicateValues({
       ...f.controller.duplicateValuesDraft.value,
+      range: "G1:H5",
+    });
+    expect(f.controller.duplicateValuesVisible.value).toBe(true);
+    expect(f.controller.duplicateValuesError.value).toBe(
+      "The selected range has no data to process.",
+    );
+    expect(f.session.workbook.sheets.size).toBe(1);
+    expect(f.session.history.undoStack).toHaveLength(0);
+    f.wrapper.unmount();
+  });
+
+  test("does not create a summary or change highlights when cancelled", () => {
+    const f = fixture();
+    f.controller.openDuplicateValues("count");
+    f.controller.updateDuplicateValuesDraft({
+      ...f.controller.duplicateValuesDraft.value,
       range: "A1:B5",
     });
-    expect(f.controller.duplicateValuesError.value).toBeTruthy();
-    expect(f.session.history.undoStack).toHaveLength(0);
     f.controller.closeDuplicateValues();
+    expect(f.session.workbook.sheets.size).toBe(1);
+    expect(f.session.history.undoStack).toHaveLength(0);
     f.controller.openDuplicateValues("highlight");
     f.controller.updateDuplicateValuesDraft({
       ...f.controller.duplicateValuesDraft.value,
