@@ -85,19 +85,21 @@ const overlay = computed(() => {
       aria-hidden="true"
     />
     <div class="sheet-cell-notice__content">
-      <strong v-if="title">{{ title }}</strong>
+      <div v-if="title || closeLabel" class="sheet-cell-notice__header">
+        <strong v-if="title">{{ title }}</strong>
+        <button
+          v-if="closeLabel"
+          type="button"
+          class="sheet-cell-notice__close"
+          :aria-label="closeLabel"
+          @pointerdown.prevent.stop
+          @click.stop="emit('close')"
+        >
+          <X :size="18" aria-hidden="true" />
+        </button>
+      </div>
       <p v-if="message">{{ message }}</p>
     </div>
-    <button
-      v-if="closeLabel"
-      type="button"
-      class="sheet-cell-notice__close"
-      :aria-label="closeLabel"
-      @pointerdown.prevent.stop
-      @click.stop="emit('close')"
-    >
-      <X :size="18" aria-hidden="true" />
-    </button>
   </section>
 </template>
 
@@ -124,17 +126,12 @@ const overlay = computed(() => {
     grid-template-columns: 28px minmax(0, 1fr);
     background: var(--idea-palette-warning-1);
 
-    &.sheet-cell-notice--dismissible {
-      grid-template-columns: 28px minmax(0, 1fr) 18px;
-    }
-
     .sheet-cell-notice__icon {
       color: var(--idea-status-warning);
     }
   }
 
   &--dismissible {
-    grid-template-columns: minmax(0, 1fr) 18px;
     pointer-events: auto;
   }
 
@@ -154,10 +151,6 @@ const overlay = computed(() => {
       line-height: var(--idea-line-height-body-medium);
     }
 
-    strong + p {
-      margin-top: var(--idea-space-1);
-    }
-
     p {
       margin: 0;
       color: var(--idea-text-primary);
@@ -168,7 +161,16 @@ const overlay = computed(() => {
     }
   }
 
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: var(--idea-space-4);
+    margin-bottom: var(--idea-space-1);
+  }
+
   &__close {
+    flex: none;
+    margin-left: auto;
     display: inline-grid;
     place-items: center;
     width: 18px;
