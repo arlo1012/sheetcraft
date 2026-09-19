@@ -155,7 +155,25 @@ watch(
           />
         </div>
         <section class="consolidate-dialog__field">
-          <span>{{ t("dataTools.consolidate.sources") }}</span>
+          <div class="consolidate-dialog__reference-heading">
+            <span>{{ t("dataTools.consolidate.sources") }}</span>
+            <div class="consolidate-dialog__actions">
+              <TButton
+                size="small"
+                variant="outline"
+                :disabled="busy || !canAdd"
+                @click="addSource"
+                >{{ t("dataTools.consolidate.addSource") }}</TButton
+              >
+              <TButton
+                size="small"
+                variant="outline"
+                :disabled="busy || selectedIndex < 0"
+                @click="removeSource"
+                >{{ t("dataTools.consolidate.removeSource") }}</TButton
+              >
+            </div>
+          </div>
           <OptionList
             class="consolidate-dialog__list"
             :model-value="selectedIndex >= 0 ? String(selectedIndex) : undefined"
@@ -166,22 +184,6 @@ watch(
             @select="!busy && selectSource(Number($event))"
             @keydown.delete.stop.prevent="removeSource"
           />
-          <div class="consolidate-dialog__actions">
-            <TButton
-              size="small"
-              variant="outline"
-              :disabled="busy || !canAdd"
-              @click="addSource"
-              >{{ t("dataTools.consolidate.addSource") }}</TButton
-            >
-            <TButton
-              size="small"
-              variant="outline"
-              :disabled="busy || selectedIndex < 0"
-              @click="removeSource"
-              >{{ t("dataTools.consolidate.removeSource") }}</TButton
-            >
-          </div>
         </section>
         <section class="consolidate-dialog__labels">
           <span class="consolidate-dialog__heading">{{
@@ -277,6 +279,12 @@ watch(
   }
   &__heading {
     font-weight: 600;
+  }
+  &__reference-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--idea-space-2);
   }
   &__actions,
   &__checks {
