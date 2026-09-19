@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { useAppI18n } from "../../../shared/i18n";
 import type { DataValidationFeedback } from "../useDataValidationInput";
@@ -15,7 +16,14 @@ const { t } = useAppI18n();
     aria-modal="true"
     :aria-label="feedback.title || t('dataTools.validation.title')"
     :header="feedback.title || t('dataTools.validation.title')"
-    :body="feedback.message || t('dataTools.validation.invalidValue')"
+    :body="
+      [
+        feedback.message || t('dataTools.validation.invalidValue'),
+        feedback.style === 'warning' ? t('dataTools.validation.keepValueQuestion') : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+    "
     :theme="
       feedback.style === 'stop' ? 'danger' : feedback.style === 'warning' ? 'warning' : 'info'
     "
@@ -29,5 +37,13 @@ const { t } = useAppI18n();
     placement="center"
     @confirm="feedback.style === 'stop' ? emit('retry') : emit('accept')"
     @close="emit('cancel')"
-  />
+  >
+    <template v-if="feedback.style === 'warning'" #footer>
+      <TButton theme="primary" @click="emit('accept')">{{ t("dataTools.validation.yes") }}</TButton>
+      <TButton theme="default" @click="emit('retry')">{{ t("dataTools.validation.no") }}</TButton>
+      <TButton theme="default" @click="emit('cancel')">{{
+        t("dataTools.validation.cancel")
+      }}</TButton>
+    </template>
+  </Dialog>
 </template>
