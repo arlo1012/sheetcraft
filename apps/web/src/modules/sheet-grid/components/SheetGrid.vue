@@ -293,9 +293,15 @@ function getOutlineDepth(axis: SheetDimensionAxis): number {
 }
 const rowOutlineDepth = computed(() => getOutlineDepth("row"));
 const columnOutlineDepth = computed(() => getOutlineDepth("column"));
-const rowOutlineGutter = computed(() =>
-  rowOutlineDepth.value ? (rowOutlineDepth.value + 1) * OUTLINE_HEADER_LEVEL_WIDTH : 0,
-);
+const rowOutlineGutter = computed(() => {
+  const depth = rowOutlineDepth.value;
+  if (!depth) return 0;
+  // Level buttons can share the empty corner above row labels; keep its select-all icon clear.
+  return Math.max(
+    OUTLINE_CONTROL_INSET * 2 + (depth - 1) * OUTLINE_CONTROL_STEP + OUTLINE_CONTROL_SIZE,
+    (depth + 1) * OUTLINE_HEADER_LEVEL_WIDTH - ROW_HEADER_WIDTH + 20,
+  );
+});
 const columnOutlineHeaderHeight = computed(() => {
   const depth = columnOutlineDepth.value;
   if (!depth) return 0;

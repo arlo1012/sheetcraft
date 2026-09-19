@@ -58,7 +58,7 @@ describe("SheetGrid data controls", () => {
     const levels = wrapper.findAll(".sheet-data-controls__outline-levels--rows button");
     expect(levels.map((level) => level.text())).toEqual(["1", "2", "3"]);
     expect(wrapper.get(".sheet-grid").attributes("style")).toContain(
-      "--sheet-row-header-width: 96px",
+      "--sheet-row-header-width: 80px",
     );
     await levels[0]!.trigger("click");
     await levels[1]!.trigger("click");
@@ -86,7 +86,7 @@ describe("SheetGrid data controls", () => {
     await nextTick();
 
     expect(wrapper.get(".sheet-grid").attributes("style")).toContain(
-      "--sheet-row-header-width: 116px",
+      "--sheet-row-header-width: 100px",
     );
     expect(wrapper.get(".sheet-grid").attributes("style")).toContain(
       "--sheet-column-header-height: 50px",
@@ -98,8 +98,8 @@ describe("SheetGrid data controls", () => {
       wrapper.get(".sheet-data-controls__outline-levels--columns").element.getAttribute("style"),
     ).toContain("top: 22px");
     const frame = wrapper.getComponent(SheetSurface).props("frame") as SheetRenderFrame;
-    expect(frame.headerSize).toEqual({ width: 116, height: 50 });
-    expect(frame.body).toMatchObject({ x: 116, y: 50 });
+    expect(frame.headerSize).toEqual({ width: 100, height: 50 });
+    expect(frame.body).toMatchObject({ x: 100, y: 50 });
     expect(frame.layout.freeze).toEqual({ rows: 1, columns: 1 });
     const columnControls = wrapper
       .findAll(".sheet-data-controls__outline")
