@@ -154,7 +154,7 @@ watch(
             @enter="addSource"
           />
         </div>
-        <section class="consolidate-dialog__field">
+        <section class="consolidate-dialog__field consolidate-dialog__references">
           <div class="consolidate-dialog__reference-heading">
             <span>{{ t("dataTools.consolidate.sources") }}</span>
             <div class="consolidate-dialog__actions">
@@ -264,10 +264,10 @@ watch(
     flex: 1;
   }
   &__settings {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--idea-space-2);
     min-width: 0;
-    align-content: start;
   }
   &__field,
   &__labels {
@@ -292,7 +292,13 @@ watch(
     align-items: center;
     gap: var(--idea-space-2);
   }
+  &__references {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
   &__list {
+    flex: 1 0 104px;
     height: 104px;
   }
   &__preview {
