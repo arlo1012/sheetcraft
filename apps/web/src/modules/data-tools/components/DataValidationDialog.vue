@@ -5,7 +5,8 @@ import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
+import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
+import OptionList from "../../../shared/option-list/OptionList.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import type { DataValidationDraft, DataValidationInitial } from "../data-tools-types";
@@ -84,104 +85,223 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
   <Dialog
     role="dialog"
     aria-modal="true"
+    placement="center"
+    width="min(640px, calc(100vw - 32px))"
     :aria-label="t('dataTools.validation.title')"
     :visible="visible"
     :header="t('dataTools.validation.title')"
-    :cancel-btn="t('dataTools.common.cancel')"
+    :close-on-overlay-click="false"
+    :confirm-on-enter="false"
     @close="emit('close')"
-    ><template #footer
-      ><TButton variant="text" @click="emit('clear')">{{ t("dataTools.validation.clear") }}</TButton
-      ><span class="validation-dialog__space" /><TButton variant="outline" @click="emit('close')">{{
-        t("dataTools.common.cancel")
-      }}</TButton
-      ><TButton
-        theme="primary"
-        :disabled="!canApply"
-        @click="emit('apply', serializeValidationDraft(draft, dateSystem))"
-        >{{ t("dataTools.validation.confirm") }}</TButton
-      ></template
-    ><TTabs v-model="activeTab"
-      ><TTabPanel value="settings" :label="t('dataTools.validation.settings')"
-        ><div class="validation-dialog">
-          <label
-            >{{ t("dataTools.validation.allow")
-            }}<TSelect v-model="draft.type" :options="types" /></label
-          ><template v-if="draft.type !== 'any' && draft.type !== 'list' && draft.type !== 'custom'"
-            ><label
-              >{{ t("dataTools.validation.operator")
-              }}<TSelect v-model="draft.operator" :options="operators" /></label
-            ><label
-              >{{ t("dataTools.validation.minimum")
-              }}<TInput
+  >
+    <div class="validation-dialog">
+      <OptionList
+        class="validation-dialog__navigation"
+        :model-value="activeTab"
+        :options="[
+          { value: 'settings', label: t('dataTools.validation.settings') },
+          { value: 'input', label: t('dataTools.validation.inputMessage') },
+          { value: 'error', label: t('dataTools.validation.errorAlert') },
+        ]"
+        :label="t('dataTools.validation.title')"
+        variant="navigation"
+        @select="activeTab = $event"
+      />
+      <div class="validation-dialog__content">
+        <div v-if="activeTab === 'settings'" class="validation-dialog__form">
+          <div class="validation-dialog__field">
+            <span>{{ t("dataTools.validation.allow") }}</span>
+            <TSelect
+              v-model="draft.type"
+              :options="types"
+              :aria-label="t('dataTools.validation.allow')"
+            />
+          </div>
+          <template v-if="draft.type !== 'any' && draft.type !== 'list' && draft.type !== 'custom'">
+            <div class="validation-dialog__field">
+              <span>{{ t("dataTools.validation.operator") }}</span>
+              <TSelect
+                v-model="draft.operator"
+                :options="operators"
+                :aria-label="t('dataTools.validation.operator')"
+              />
+            </div>
+            <div class="validation-dialog__field">
+              <span>{{ t("dataTools.validation.minimum") }}</span>
+              <TInput
                 v-model="draft.minimum"
+                :aria-label="t('dataTools.validation.minimum')"
                 :placeholder="
                   draft.type === 'date' ? 'YYYY-MM-DD' : draft.type === 'time' ? 'HH:mm' : ''
-                " /></label
-            ><label v-if="needsSecond"
-              >{{ t("dataTools.validation.maximum")
-              }}<TInput
+                "
+              />
+            </div>
+            <div v-if="needsSecond" class="validation-dialog__field">
+              <span>{{ t("dataTools.validation.maximum") }}</span>
+              <TInput
                 v-model="draft.maximum"
+                :aria-label="t('dataTools.validation.maximum')"
                 :placeholder="
                   draft.type === 'date' ? 'YYYY-MM-DD' : draft.type === 'time' ? 'HH:mm' : ''
-                " /></label></template
-          ><label v-if="draft.type === 'list'"
-            >{{ t("dataTools.validation.source") }}<TInput v-model="draft.source" /></label
-          ><label v-if="draft.type === 'custom'"
-            >{{ t("dataTools.validation.source") }}<TInput v-model="draft.source" /></label
-          ><label
-            ><TCheckbox v-model="draft.ignoreBlank" />{{
-              t("dataTools.validation.ignoreBlank")
-            }}</label
-          ><label v-if="draft.type === 'list'"
-            ><TCheckbox v-model="draft.showDropdown" />{{
-              t("dataTools.validation.dropdown")
-            }}</label
+                "
+              />
+            </div>
+          </template>
+          <div
+            v-if="draft.type === 'list' || draft.type === 'custom'"
+            class="validation-dialog__field"
           >
-        </div></TTabPanel
-      ><TTabPanel value="input" :label="t('dataTools.validation.inputMessage')"
-        ><div class="validation-dialog">
-          <label
-            ><TCheckbox v-model="draft.showInputMessage" />{{
-              t("dataTools.validation.showMessage")
-            }}</label
-          ><label
-            >{{ t("dataTools.validation.titleLabel") }}<TInput v-model="draft.inputTitle" /></label
-          ><label
-            >{{ t("dataTools.validation.message") }}<TInput v-model="draft.inputMessage"
-          /></label></div></TTabPanel
-      ><TTabPanel value="error" :label="t('dataTools.validation.errorAlert')"
-        ><div class="validation-dialog">
-          <label
-            ><TCheckbox v-model="draft.showErrorAlert" />{{
-              t("dataTools.validation.errorAlert")
-            }}</label
-          ><label
-            >{{ t("dataTools.validation.style")
-            }}<TSelect
+            <span>{{ t("dataTools.validation.source") }}</span>
+            <TInput v-model="draft.source" :aria-label="t('dataTools.validation.source')" />
+          </div>
+          <div class="validation-dialog__options">
+            <TCheckbox v-model="draft.ignoreBlank">{{
+              t("dataTools.validation.ignoreBlank")
+            }}</TCheckbox>
+            <TCheckbox v-if="draft.type === 'list'" v-model="draft.showDropdown">{{
+              t("dataTools.validation.dropdown")
+            }}</TCheckbox>
+          </div>
+        </div>
+        <div v-else-if="activeTab === 'input'" class="validation-dialog__form">
+          <TCheckbox v-model="draft.showInputMessage">{{
+            t("dataTools.validation.showMessage")
+          }}</TCheckbox>
+          <div class="validation-dialog__field">
+            <span>{{ t("dataTools.validation.titleLabel") }}</span>
+            <TInput v-model="draft.inputTitle" :aria-label="t('dataTools.validation.titleLabel')" />
+          </div>
+          <div class="validation-dialog__field validation-dialog__field--multiline">
+            <span>{{ t("dataTools.validation.message") }}</span>
+            <TTextarea
+              v-model="draft.inputMessage"
+              :aria-label="t('dataTools.validation.message')"
+              :autosize="{ minRows: 3, maxRows: 5 }"
+            />
+          </div>
+        </div>
+        <div v-else class="validation-dialog__form">
+          <TCheckbox v-model="draft.showErrorAlert">{{
+            t("dataTools.validation.errorAlert")
+          }}</TCheckbox>
+          <div class="validation-dialog__field">
+            <span>{{ t("dataTools.validation.style") }}</span>
+            <TSelect
               v-model="draft.errorStyle"
+              :aria-label="t('dataTools.validation.style')"
               :options="[
                 { label: t('dataTools.validation.stop'), value: 'stop' },
                 { label: t('dataTools.validation.warning'), value: 'warning' },
                 { label: t('dataTools.validation.information'), value: 'information' },
-              ]" /></label
-          ><label
-            >{{ t("dataTools.validation.titleLabel") }}<TInput v-model="draft.errorTitle" /></label
-          ><label
-            >{{ t("dataTools.validation.message") }}<TInput v-model="draft.errorMessage"
-          /></label></div></TTabPanel></TTabs
-  ></Dialog>
+              ]"
+            />
+          </div>
+          <div class="validation-dialog__field">
+            <span>{{ t("dataTools.validation.titleLabel") }}</span>
+            <TInput v-model="draft.errorTitle" :aria-label="t('dataTools.validation.titleLabel')" />
+          </div>
+          <div class="validation-dialog__field validation-dialog__field--multiline">
+            <span>{{ t("dataTools.validation.errorAlert") }}</span>
+            <TTextarea
+              v-model="draft.errorMessage"
+              :aria-label="t('dataTools.validation.errorAlert')"
+              :autosize="{ minRows: 3, maxRows: 5 }"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+    <template #footer>
+      <div class="validation-dialog__footer">
+        <TButton variant="text" @click="emit('clear')">{{
+          t("dataTools.validation.clear")
+        }}</TButton>
+        <div class="validation-dialog__actions">
+          <TButton variant="outline" @click="emit('close')">{{
+            t("dataTools.common.cancel")
+          }}</TButton>
+          <TButton
+            theme="primary"
+            :disabled="!canApply"
+            @click="emit('apply', serializeValidationDraft(draft, dateSystem))"
+            >{{ t("dataTools.validation.confirm") }}</TButton
+          >
+        </div>
+      </div>
+    </template>
+  </Dialog>
 </template>
 <style scoped lang="scss">
 .validation-dialog {
   display: grid;
-  gap: var(--idea-space-3);
-  min-width: min(440px, calc(100vw - 64px));
-  label {
-    display: grid;
-    gap: var(--idea-space-1);
+  grid-template-columns: 144px minmax(0, 1fr);
+  gap: var(--idea-space-6);
+  max-height: calc(100dvh - 192px);
+  min-height: 0;
+
+  &__navigation {
+    min-height: 0;
   }
-  &__space {
-    flex: 1;
+
+  &__content {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  &__form {
+    display: grid;
+    align-content: start;
+    gap: var(--idea-space-4);
+  }
+
+  &__field {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: center;
+    gap: var(--idea-space-4);
+    min-width: 0;
+
+    &--multiline {
+      align-items: start;
+
+      > span {
+        padding-top: var(--idea-space-2);
+      }
+    }
+  }
+
+  &__options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--idea-space-4) var(--idea-space-6);
+    padding-left: 80px;
+  }
+
+  &__footer,
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--idea-space-4);
+  }
+
+  &__footer {
+    justify-content: space-between;
+  }
+
+  @media (max-width: 560px) {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: var(--idea-space-4);
+
+    &__field {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--idea-space-2);
+    }
+
+    &__options {
+      padding-left: 0;
+    }
   }
 }
 </style>
