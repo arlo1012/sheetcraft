@@ -141,7 +141,7 @@ export const zhCN = {
     },
     removeDuplicates: {
       title: "删除重复项",
-      columns: "列",
+      column: "列 {column}",
       header: "我的数据包含标题",
       selectAll: "全选",
       selectNone: "全不选",

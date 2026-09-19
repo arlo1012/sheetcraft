@@ -137,7 +137,7 @@ export type MessageSchema = FormulaToolsMessageSchema & {
     };
     removeDuplicates: {
       title: string;
-      columns: string;
+      column: string;
       header: string;
       selectAll: string;
       selectNone: string;

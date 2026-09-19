@@ -145,7 +145,7 @@ export const enUS = {
     },
     removeDuplicates: {
       title: "Remove Duplicates",
-      columns: "Columns",
+      column: "Column {column}",
       header: "My data has headers",
       selectAll: "Select all",
       selectNone: "Select none",

@@ -59,7 +59,6 @@ function toggleAll(checked: boolean): void {
     @confirm="emit('apply', draft)"
     ><div class="remove-duplicates-dialog">
       <TCheckbox v-model="draft.hasHeader">{{ t("dataTools.removeDuplicates.header") }}</TCheckbox>
-      <strong>{{ t("dataTools.removeDuplicates.columns") }}</strong>
       <div class="remove-duplicates-dialog__columns">
         <TCheckbox
           :checked="allSelected"
@@ -73,7 +72,8 @@ function toggleAll(checked: boolean): void {
           :key="column.column"
           :checked="draft.columns.includes(column.column)"
           @change="toggle(column.column, Boolean($event))"
-          >{{ column.header ? `${column.label} (${column.header})` : column.label }}</TCheckbox
+          >{{ t("dataTools.removeDuplicates.column", { column: column.label })
+          }}{{ column.header ? ` (${column.header})` : "" }}</TCheckbox
         >
       </div>
       <p v-if="removalCount !== undefined" class="remove-duplicates-dialog__summary">
