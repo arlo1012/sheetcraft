@@ -149,6 +149,7 @@ export const enUS = {
       header: "My data has headers",
       selectAll: "Select all",
       selectNone: "Select none",
+      invert: "Invert selection",
       confirm: "Remove duplicates",
       removed: "{count} duplicate rows will be removed",
     },

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { useAppI18n } from "../../../shared/i18n";
@@ -42,6 +43,12 @@ function toggle(column: number, checked: boolean): void {
 function toggleAll(checked: boolean): void {
   draft.value.columns = checked ? props.columns.map((column) => column.column) : [];
 }
+function invertSelection(): void {
+  const selected = new Set(draft.value.columns);
+  draft.value.columns = props.columns
+    .filter((column) => !selected.has(column.column))
+    .map((column) => column.column);
+}
 </script>
 <template>
   <Dialog
@@ -60,13 +67,22 @@ function toggleAll(checked: boolean): void {
     ><div class="remove-duplicates-dialog">
       <TCheckbox v-model="draft.hasHeader">{{ t("dataTools.removeDuplicates.header") }}</TCheckbox>
       <div class="remove-duplicates-dialog__columns">
-        <TCheckbox
-          :checked="allSelected"
-          :indeterminate="partlySelected"
-          :disabled="columns.length === 0"
-          @change="toggleAll(Boolean($event))"
-          >{{ t("dataTools.removeDuplicates.selectAll") }}</TCheckbox
-        >
+        <div class="remove-duplicates-dialog__selection-actions">
+          <TCheckbox
+            :checked="allSelected"
+            :indeterminate="partlySelected"
+            :disabled="columns.length === 0"
+            @change="toggleAll(Boolean($event))"
+            >{{ t("dataTools.removeDuplicates.selectAll") }}</TCheckbox
+          >
+          <TButton
+            variant="text"
+            size="small"
+            :disabled="columns.length === 0"
+            @click="invertSelection"
+            >{{ t("dataTools.removeDuplicates.invert") }}</TButton
+          >
+        </div>
         <TCheckbox
           v-for="column in columns"
           :key="column.column"
@@ -99,9 +115,12 @@ function toggleAll(checked: boolean): void {
     gap: var(--idea-space-3);
     max-height: 220px;
     overflow: auto;
-    padding: var(--idea-tool-panel-padding);
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
+    padding: var(--idea-tool-panel-padding) 0;
+  }
+  &__selection-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--idea-space-4);
   }
 }
 </style>

@@ -141,6 +141,7 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       header: string;
       selectAll: string;
       selectNone: string;
+      invert: string;
       confirm: string;
       removed: string;
     };

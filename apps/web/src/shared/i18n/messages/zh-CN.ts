@@ -145,6 +145,7 @@ export const zhCN = {
       header: "我的数据包含标题",
       selectAll: "全选",
       selectNone: "全不选",
+      invert: "反选",
       confirm: "删除重复项",
       removed: "将删除 {count} 行重复数据",
     },
