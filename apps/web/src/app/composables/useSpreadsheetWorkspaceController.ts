@@ -385,7 +385,7 @@ export function useSpreadsheetWorkspaceController(
   const validationInput = useDataValidationInput({
     getWorkbook: () => session.workbook,
     getGeneration: () => workbookGeneration.value,
-    execute: (command) => execute(command, "cells.edit"),
+    execute: (command, options) => execute(command, "cells.edit", options),
     getDuplicateRejectionFeedback: () => ({
       title: t("dataTools.duplicates.rejectionTitle"),
       message: t("dataTools.duplicates.duplicateRejected"),
@@ -437,10 +437,21 @@ export function useSpreadsheetWorkspaceController(
     }
   }
 
-  function execute(command: WorkbookCommand, operation?: WorkbookOperation): boolean {
+  function execute(
+    command: WorkbookCommand,
+    operation?: WorkbookOperation,
+    options: { allowDuplicateEntry?: boolean } = {},
+  ): boolean {
     let changed: boolean;
     try {
-      assertDuplicateEntriesAreAllowed(command);
+      if (
+        !(
+          options.allowDuplicateEntry &&
+          command.type === "setCellContents" &&
+          command.changes.length === 1
+        )
+      )
+        assertDuplicateEntriesAreAllowed(command);
       calculation.prepareMutation(
         command.type === "setWorkbookCalculation" ? command.calculation.mode : undefined,
       );
@@ -587,18 +598,26 @@ export function useSpreadsheetWorkspaceController(
     }
   }
 
-  function commitCell(payload: { address: CellAddress; input: string; sheetId?: string }): boolean {
+  function commitCell(payload: {
+    address: CellAddress;
+    input: string;
+    sheetId?: string;
+    confirmPendingWarning?: boolean;
+  }): boolean {
     const sheetId = payload.sheetId ?? activeSheet.value.id;
     const sheet = session.workbook.sheets.get(sheetId);
     if (!sheet) return false;
-    const accepted = validationInput.commit({
-      sheetId,
-      address: payload.address,
-      content:
-        parseCellContent(payload.input, {
-          asText: isTextCellNumberFormat(getCellStyle(sheet, payload.address)?.numberFormat),
-        }) ?? null,
-    });
+    const accepted = validationInput.commit(
+      {
+        sheetId,
+        address: payload.address,
+        content:
+          parseCellContent(payload.input, {
+            asText: isTextCellNumberFormat(getCellStyle(sheet, payload.address)?.numberFormat),
+          }) ?? null,
+      },
+      { confirmPendingWarning: payload.confirmPendingWarning },
+    );
     if (accepted) clearWorkspaceStatus();
     return accepted;
   }
@@ -1407,7 +1426,8 @@ export function useSpreadsheetWorkspaceController(
 
   return {
     session,
-    executeCommand: execute,
+    executeCommand: (command: WorkbookCommand, operation?: WorkbookOperation) =>
+      execute(command, operation),
     executeReplaceableCommand,
     recalculate: () => {
       calculation.recalculate();

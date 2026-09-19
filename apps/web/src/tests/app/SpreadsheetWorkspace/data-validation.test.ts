@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 describe("workspace data validation", () => {
-  test("rejects duplicate direct input while retaining the pending editor request", () => {
+  test("requires a repeated explicit confirmation before committing a duplicate as one undoable edit", () => {
     const controller = setup();
     const sheet = controller.activeSheet.value;
     sheet.dataValidations = [];
@@ -56,14 +56,41 @@ describe("workspace data validation", () => {
     ];
     setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "Taken" });
 
-    expect(controller.commitCell({ address: { row: 1, column: 0 }, input: "Taken" })).toBe(false);
+    const candidate = { address: { row: 1, column: 0 }, input: "Taken" };
+    // The first Enter is still rejected, even when it asks for confirmation.
+    expect(controller.commitCell({ ...candidate, confirmPendingWarning: true })).toBe(false);
     expect(controller.validationFeedback.value).toMatchObject({
       style: "stop",
       source: "duplicate",
       target: { sheetId: sheet.id, address: { row: 1, column: 0 } },
     });
-    expect(controller.acceptValidationInput()).toBe(false);
     expect(getCellContent(sheet, { row: 1, column: 0 })).toBeNull();
+    expect(controller.commitCell({ ...candidate, confirmPendingWarning: true })).toBe(true);
+    expect(controller.validationFeedback.value).toBeUndefined();
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toEqual({
+      kind: "literal",
+      value: "Taken",
+    });
+    expect(sheet.duplicateRules).toHaveLength(1);
+    expect(controller.session.history.undoStack).toHaveLength(1);
+    expect(controller.undo()).toBe(true);
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toBeNull();
+    expect(controller.redo()).toBe(true);
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toEqual({
+      kind: "literal",
+      value: "Taken",
+    });
+
+    // A new duplicate attempt cannot inherit the confirmation from the prior one.
+    expect(controller.commitCell({ address: { row: 2, column: 0 }, input: "Taken" })).toBe(false);
+    controller.dismissValidationInput();
+    expect(
+      controller.commitCell({
+        address: { row: 2, column: 0 },
+        input: "Taken",
+        confirmPendingWarning: true,
+      }),
+    ).toBe(false);
     expect(controller.commitCell({ address: { row: 1, column: 0 }, input: "Available" })).toBe(
       true,
     );
@@ -167,6 +194,9 @@ describe("workspace data validation", () => {
     expect(controller.validationFeedback.value?.style).toBe("stop");
     expect(getCellContent(controller.activeSheet.value, address)).toBeNull();
     expect(controller.session.history.undoStack).toHaveLength(0);
+    expect(controller.commitCell({ address, input: "12", confirmPendingWarning: true })).toBe(
+      false,
+    );
     expect(controller.acceptValidationInput()).toBe(false);
     controller.dismissValidationInput();
     expect(controller.commitCell({ address, input: "8" })).toBe(true);

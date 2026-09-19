@@ -5,6 +5,7 @@ import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { serializeWorkbook } from "@idea10/core/serialization";
 import {
   createWorkbook,
+  getCellContent,
   getActiveSheet,
   setCellContent,
   type SheetDataValidation,
@@ -89,7 +90,7 @@ describe("duplicate input rejection notice", () => {
     expect(grid(workspace).props("inputError")).toMatchObject({
       address: { row: 1, column: 0 },
       title: "Reject Duplicate Entries",
-      message: "This value duplicates another cell in this range. Change the value and try again.",
+      message: "This value duplicates another cell in this range. Press [Enter] again to confirm.",
     });
     expect(workspace.find("[data-sheet-input-error-notice]").exists()).toBe(true);
     expect(workspace.findComponent(DataValidationFeedbackDialog).exists()).toBe(false);
@@ -111,6 +112,26 @@ describe("duplicate input rejection notice", () => {
 
     expect(grid(workspace).props("inputError")).toBeUndefined();
     expect(session.state).toMatchObject({ active: true, draft: "Taken" });
+    expect(session.finish({ confirmPendingWarning: true })).toBe(false);
+  });
+
+  test("requires a second confirmed finish for the same duplicate draft", async () => {
+    const workspace = await mountWorkspace({ duplicate: true });
+    const session = rejectDuplicate(workspace);
+    const sheet = grid(workspace).props("sheet");
+
+    // The first ordinary finish (including Tab or blur) is rejected by rejectDuplicate().
+    expect(session.state).toMatchObject({ active: true, draft: "Taken" });
+    await nextTick();
+    expect(session.finish({ confirmPendingWarning: true })).toBe(true);
+    await nextTick();
+
+    expect(session.state.active).toBe(false);
+    expect(grid(workspace).props("inputError")).toBeUndefined();
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toEqual({
+      kind: "literal",
+      value: "Taken",
+    });
   });
 
   test("clears a duplicate notice when the draft changes or editing is cancelled", async () => {
@@ -122,13 +143,10 @@ describe("duplicate input rejection notice", () => {
     await nextTick();
     expect(grid(workspace).props("inputError")).toBeUndefined();
 
-    expect(session.finish()).toBe(true);
-    const sheet = grid(workspace).props("sheet");
-    session.begin(
-      { sheetId: sheet.id, address: { row: 2, column: 0 }, input: "" },
-      { surface: "grid", mode: "replace", initialValue: "Taken" },
-    );
-    expect(session.finish()).toBe(false);
+    session.setDraft("Taken");
+    await nextTick();
+    // Editing after the warning resets its confirmation; this is a new first Enter.
+    expect(session.finish({ confirmPendingWarning: true })).toBe(false);
     await nextTick();
     expect(grid(workspace).props("inputError")).toBeDefined();
 

@@ -99,7 +99,7 @@ const overlay = computed(() => {
   width: 280px;
   padding: var(--idea-tool-panel-padding);
   color: var(--idea-text-primary);
-  background: var(--idea-surface-warning-notice);
+  background: var(--idea-palette-warning-1);
   border: 1px solid var(--idea-border-control);
   border-radius: var(--idea-radius-small);
   box-shadow: var(--idea-shadow-menu);

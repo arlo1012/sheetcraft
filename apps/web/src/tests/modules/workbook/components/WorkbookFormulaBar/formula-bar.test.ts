@@ -60,7 +60,7 @@ describe("WorkbookFormulaBar", () => {
     await input.trigger("blur");
 
     expect(wrapper.emitted("commitCell")).toEqual([
-      [{ address: { row: 0, column: 0 }, input: "001" }],
+      [{ address: { row: 0, column: 0 }, input: "001", confirmPendingWarning: true }],
     ]);
     expect(wrapper.emitted("traverse")).toEqual([
       [{ address: { row: 0, column: 0 }, direction: "down" }],
@@ -133,7 +133,13 @@ describe("WorkbookFormulaBar", () => {
     await input.trigger("keydown", { key: "Enter" });
     await input.trigger("blur");
     expect(wrapper.emitted("commitCell")).toEqual([
-      [{ address: { row: 0, column: 0 }, input: "first\nsecond" }],
+      [
+        {
+          address: { row: 0, column: 0 },
+          input: "first\nsecond",
+          confirmPendingWarning: true,
+        },
+      ],
     ]);
     expect(wrapper.emitted("traverse")).toEqual([
       [{ address: { row: 0, column: 0 }, direction: "down" }],

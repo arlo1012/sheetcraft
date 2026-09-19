@@ -128,6 +128,28 @@ describe("useCellEditSession", () => {
     expect(session.state.active).toBe(false);
   });
 
+  test("forwards warning confirmation only for that finish attempt", () => {
+    const commits: unknown[] = [];
+    const session = useCellEditSession({
+      onCommit: (payload) => {
+        commits.push(payload);
+      },
+    });
+
+    session.begin({ ...firstTarget, input: "old" }, { surface: "grid", mode: "append" });
+    session.setDraft("confirmed");
+    expect(session.finish({ confirmPendingWarning: true })).toBe(true);
+
+    session.begin({ ...firstTarget, input: "old" }, { surface: "grid", mode: "append" });
+    session.setDraft("ordinary");
+    expect(session.finish()).toBe(true);
+
+    expect(commits).toEqual([
+      { ...firstTarget, input: "confirmed", confirmPendingWarning: true },
+      { ...firstTarget, input: "ordinary" },
+    ]);
+  });
+
   test("cancel clears an uncommitted edit", () => {
     const commits: unknown[] = [];
     const session = useCellEditSession({

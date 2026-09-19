@@ -115,6 +115,39 @@ describe("cell editor", () => {
     );
   });
 
+  test("only a plain Enter marks a commit as warning confirmation", async () => {
+    const commits: Array<{ input: string; confirmPendingWarning?: boolean }> = [];
+    const editSession = useCellEditSession({
+      onCommit: (payload) => {
+        commits.push(payload);
+      },
+    });
+    const { wrapper } = mountSheetGrid({ editSession });
+    const editor = wrapper.get("textarea.cell-editor");
+
+    await editor.trigger("keydown", { key: "a" });
+    await editor.setValue("plain");
+    await editor.trigger("keydown", { key: "Enter" });
+    expect(commits).toHaveLength(1);
+    expect(commits[0]).toMatchObject({
+      address: { row: 0, column: 0 },
+      input: "plain",
+      confirmPendingWarning: true,
+    });
+
+    await editor.trigger("keydown", { key: "b" });
+    await editor.setValue("tab");
+    await editor.trigger("keydown", { key: "Tab" });
+    await editor.trigger("keydown", { key: "c" });
+    await editor.setValue("repeat");
+    await editor.trigger("keydown", { key: "Enter", repeat: true });
+    expect(commits).toHaveLength(3);
+    expect(commits[1]).toMatchObject({ address: { row: 1, column: 0 }, input: "tab" });
+    expect(commits[1]?.confirmPendingWarning).toBeUndefined();
+    expect(commits[2]).toMatchObject({ address: { row: 1, column: 1 }, input: "repeat" });
+    expect(commits[2]?.confirmPendingWarning).toBeUndefined();
+  });
+
   test("keeps editing when the editor itself receives a pointer event", async () => {
     const { session, sheet, wrapper } = mountSheetGrid();
     const editor = wrapper.get("textarea.cell-editor");

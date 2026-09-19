@@ -181,7 +181,7 @@ export const enUS = {
       duplicateRejected: "Duplicate values are not allowed.",
       rejectionTitle: "Reject Duplicate Entries",
       rejectionMessage:
-        "This value duplicates another cell in this range. Change the value and try again.",
+        "This value duplicates another cell in this range. Press [Enter] again to confirm.",
       closeRejection: "Close duplicate entry notice",
       errorChecks: {
         optionsTitle: "Options",

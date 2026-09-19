@@ -22,7 +22,11 @@ import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
 import { getSelectionFitZoom } from "../selection-zoom";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
-import type { CellEditSession } from "../../../shared/cell-editing/useCellEditSession";
+import {
+  isExplicitWarningConfirmationKey,
+  type CellEditFinishOptions,
+  type CellEditSession,
+} from "../../../shared/cell-editing/useCellEditSession";
 import { completeFormulaForCommit } from "../../../shared/formula-editing/formula-commit";
 import type { FormulaReferenceToken } from "../../../shared/formula-editing/formula-reference-tokens";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
@@ -1338,9 +1342,13 @@ function stopFormulaReferenceDrag(): void {
   formulaReferenceDragEditor = undefined;
 }
 
-function finishEdit(destination?: CellSelection, restoreFocus = true): boolean {
+function finishEdit(
+  destination?: CellSelection,
+  restoreFocus = true,
+  finishOptions: CellEditFinishOptions = {},
+): boolean {
   stopFormulaReferenceDrag();
-  return finishCellEdit(destination, restoreFocus);
+  return finishCellEdit(destination, restoreFocus, finishOptions);
 }
 
 function cancelEdit(restoreFocus = true): void {
@@ -1439,6 +1447,7 @@ function moveSelection(
   delta: { rows?: number; columns?: number },
   commitEdit: boolean,
   extend = false,
+  finishOptions: CellEditFinishOptions = {},
 ): void {
   const destination = moveCellSelection(
     selection.value,
@@ -1476,7 +1485,7 @@ function moveSelection(
   ensureGridExtentContains(visibleAddress);
 
   if (commitEdit) {
-    if (!finishEdit(destination)) return;
+    if (!finishEdit(destination, true, finishOptions)) return;
   } else {
     setSelection(destination, visibleAddress);
   }
@@ -1918,7 +1927,12 @@ function handleHistoryShortcut(event: KeyboardEvent): boolean {
   return true;
 }
 
-function traverseSelection(key: "Enter" | "Tab", reverse: boolean, commitEdit: boolean): void {
+function traverseSelection(
+  key: "Enter" | "Tab",
+  reverse: boolean,
+  commitEdit: boolean,
+  finishOptions: CellEditFinishOptions = {},
+): void {
   if (!isSingleCellSelection(selection.value)) {
     const direction =
       key === "Tab"
@@ -1937,7 +1951,7 @@ function traverseSelection(key: "Enter" | "Tab", reverse: boolean, commitEdit: b
       getPreviousVisibleColumn: (column) => getNextVisibleColumn(column, -1),
     });
     if (commitEdit) {
-      finishEdit(destination);
+      finishEdit(destination, true, finishOptions);
     } else {
       setSelection(destination);
     }
@@ -1947,6 +1961,8 @@ function traverseSelection(key: "Enter" | "Tab", reverse: boolean, commitEdit: b
   moveSelection(
     key === "Tab" ? { columns: reverse ? -1 : 1 } : { rows: reverse ? -1 : 1 },
     commitEdit,
+    false,
+    finishOptions,
   );
 }
 
@@ -2047,7 +2063,9 @@ function onEditorKeydown(event: KeyboardEvent): void {
         return;
       }
       editingValue.value = completeFormulaForCommit(editingValue.value);
-      traverseSelection("Enter", event.shiftKey, true);
+      traverseSelection("Enter", event.shiftKey, true, {
+        confirmPendingWarning: isExplicitWarningConfirmationKey(event),
+      });
       return;
     }
     if (event.key === "Tab") {

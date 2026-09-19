@@ -1,5 +1,6 @@
 import { shallowRef, watch } from "vue";
 import { createSetCellContentCommand, type WorkbookCommand } from "@idea10/core/commands";
+import { isCellInRange } from "@idea10/sheet-engine/selection";
 import {
   getCellDataValidation,
   validateCellContentDataValidation,
@@ -15,6 +16,27 @@ type Candidate = {
   content: CellContent | null;
 };
 
+type DuplicateConfirmation = {
+  workbook: Workbook;
+  generation: number;
+  candidate: Candidate;
+  ruleSignature: string;
+};
+
+type PendingRequest = {
+  workbook: Workbook;
+  generation: number;
+  candidate: Candidate;
+  ruleSignature: string;
+  source: "duplicate" | "validation";
+  confirmedDuplicate?: DuplicateConfirmation;
+};
+
+export type DataValidationCommitOptions = {
+  /** Explicitly confirms the currently displayed duplicate-entry warning. */
+  confirmPendingWarning?: boolean;
+};
+
 export type DataValidationFeedback = {
   style: NonNullable<SheetDataValidation["errorStyle"]>;
   title?: string;
@@ -28,34 +50,73 @@ export type DataValidationFeedback = {
 export function useDataValidationInput(options: {
   getWorkbook: () => Workbook;
   getGeneration: () => number;
-  execute: (command: WorkbookCommand) => boolean;
+  execute: (command: WorkbookCommand, options?: { allowDuplicateEntry?: boolean }) => boolean;
   getDuplicateRejectionFeedback: () => { title: string; message: string };
 }) {
   const feedback = shallowRef<DataValidationFeedback>();
-  let pending:
-    | {
-        workbook: Workbook;
-        generation: number;
-        candidate: Candidate;
-        ruleSignature: string;
-      }
-    | undefined;
+  let pending: PendingRequest | undefined;
 
   function dismiss(): void {
     pending = undefined;
     feedback.value = undefined;
   }
 
-  function rejectDuplicate(workbook: Workbook, candidate: Candidate): false {
-    pending = {
+  function cloneCandidate(candidate: Candidate): Candidate {
+    return {
+      ...candidate,
+      address: { ...candidate.address },
+      content: candidate.content ? structuredClone(candidate.content) : null,
+    };
+  }
+
+  function candidatesMatch(left: Candidate, right: Candidate): boolean {
+    return (
+      left.sheetId === right.sheetId &&
+      left.address.row === right.address.row &&
+      left.address.column === right.address.column &&
+      JSON.stringify(left.content) === JSON.stringify(right.content)
+    );
+  }
+
+  function duplicateRuleSignature(workbook: Workbook, candidate: Candidate): string {
+    const sheet = workbook.sheets.get(candidate.sheetId);
+    return JSON.stringify(
+      (sheet?.duplicateRules ?? []).filter(
+        (rule) => rule.kind === "reject" && isCellInRange(candidate.address, rule.range),
+      ),
+    );
+  }
+
+  function createDuplicateConfirmation(
+    workbook: Workbook,
+    candidate: Candidate,
+  ): DuplicateConfirmation {
+    return {
       workbook,
       generation: options.getGeneration(),
-      candidate: {
-        ...candidate,
-        address: { ...candidate.address },
-        content: candidate.content ? structuredClone(candidate.content) : null,
-      },
-      ruleSignature: "duplicate-rejection",
+      candidate: cloneCandidate(candidate),
+      ruleSignature: duplicateRuleSignature(workbook, candidate),
+    };
+  }
+
+  function isCurrentDuplicateConfirmation(
+    confirmation: DuplicateConfirmation | undefined,
+    workbook: Workbook,
+    candidate: Candidate,
+  ): boolean {
+    return Boolean(
+      confirmation &&
+      confirmation.workbook === workbook &&
+      confirmation.generation === options.getGeneration() &&
+      candidatesMatch(confirmation.candidate, candidate) &&
+      confirmation.ruleSignature === duplicateRuleSignature(workbook, candidate),
+    );
+  }
+
+  function rejectDuplicate(workbook: Workbook, candidate: Candidate): false {
+    pending = {
+      ...createDuplicateConfirmation(workbook, candidate),
+      source: "duplicate",
     };
     feedback.value = {
       style: "stop",
@@ -74,12 +135,18 @@ export function useDataValidationInput(options: {
     );
   }
 
-  function commit(candidate: Candidate): boolean {
+  function commit(candidate: Candidate, commitOptions: DataValidationCommitOptions = {}): boolean {
     const workbook = options.getWorkbook();
     const sheet = workbook.sheets.get(candidate.sheetId);
     if (!sheet || sheet.properties.protected) return false;
-    if (!validateDuplicateEntries(workbook, [candidate]).valid)
-      return rejectDuplicate(workbook, candidate);
+    const confirmedDuplicate =
+      commitOptions.confirmPendingWarning &&
+      pending?.source === "duplicate" &&
+      isCurrentDuplicateConfirmation(pending, workbook, candidate)
+        ? createDuplicateConfirmation(workbook, candidate)
+        : undefined;
+    const duplicateBlocked = !validateDuplicateEntries(workbook, [candidate]).valid;
+    if (duplicateBlocked && !confirmedDuplicate) return rejectDuplicate(workbook, candidate);
     const rule = getCellDataValidation(sheet, candidate.address);
     if (
       rule &&
@@ -93,12 +160,10 @@ export function useDataValidationInput(options: {
       pending = {
         workbook,
         generation: options.getGeneration(),
-        candidate: {
-          ...candidate,
-          address: { ...candidate.address },
-          content: candidate.content ? structuredClone(candidate.content) : null,
-        },
+        candidate: cloneCandidate(candidate),
         ruleSignature: JSON.stringify(rule),
+        source: "validation",
+        ...(confirmedDuplicate ? { confirmedDuplicate } : {}),
       };
       feedback.value = {
         style: rule.errorStyle ?? "stop",
@@ -111,6 +176,7 @@ export function useDataValidationInput(options: {
     try {
       options.execute(
         createSetCellContentCommand(candidate.sheetId, candidate.address, candidate.content),
+        duplicateBlocked && confirmedDuplicate ? { allowDuplicateEntry: true } : undefined,
       );
     } catch (error) {
       if (isDuplicateRejection(error)) return rejectDuplicate(workbook, candidate);
@@ -137,6 +203,13 @@ export function useDataValidationInput(options: {
       dismiss();
       return false;
     }
+    const duplicateBlocked = !validateDuplicateEntries(workbook, [request.candidate]).valid;
+    if (
+      duplicateBlocked &&
+      !isCurrentDuplicateConfirmation(request.confirmedDuplicate, workbook, request.candidate)
+    ) {
+      return rejectDuplicate(workbook, request.candidate);
+    }
     try {
       options.execute(
         createSetCellContentCommand(
@@ -144,6 +217,7 @@ export function useDataValidationInput(options: {
           request.candidate.address,
           request.candidate.content,
         ),
+        duplicateBlocked ? { allowDuplicateEntry: true } : undefined,
       );
     } catch (error) {
       if (isDuplicateRejection(error)) return rejectDuplicate(workbook, request.candidate);

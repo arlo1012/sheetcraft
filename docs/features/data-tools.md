@@ -61,12 +61,19 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   order, leave the source unchanged, and support one-step undo/redo.
   Reject Duplicate Entries creates a
   duplicate-owned selection rule that rejects a direct edit, paste, or fill when
-  its prospective batch would contain an already-present nonblank value. Clear
+  its prospective batch would contain an already-present nonblank value. Direct
+  editing shows a warning beside the cell and retains the draft. Pressing an
+  unmodified Enter again confirms only that exact pending input as one undoable
+  edit; changing the draft, closing the notice, or changing the applicable rule
+  requires a fresh warning. Tab, blur, save, paste and fill never confirm the
+  exception, and other data-validation rules still apply. The duplicate rule
+  stays in place and the entered duplicate remains eligible for an error marker. Clear
   Reject Limit removes only those duplicate-owned rejection rules. Remove
   Duplicates retains the first matching row according to the selected key
   columns and removes later matches.
   Existing violations of Reject Duplicate Entries show cell-corner markers
-  (green by default) and a warning menu for the active cell. The menu can ignore one issue,
+  (green by default) and a warning menu for the active cell. The menu can ignore
+  all issues in the current selection,
   ignore all current issues on the worksheet, focus the formula bar, or open
   error-check options. Ignoring only hides the warning; rejection remains active.
   Error-check options have a background-check master switch, an indicator-color
