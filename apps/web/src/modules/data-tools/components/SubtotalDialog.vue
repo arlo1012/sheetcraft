@@ -109,12 +109,16 @@ function apply(): void {
           >
         </div>
       </div>
-      <div class="subtotal-dialog__options">
-        <TCheckbox v-model="draft.replaceExisting">{{ t("dataTools.outline.replace") }}</TCheckbox>
-        <TCheckbox v-model="draft.pageBreaks">{{ t("dataTools.outline.pageBreaks") }}</TCheckbox>
-        <TCheckbox v-model="draft.summaryBelow">{{
-          t("dataTools.outline.summaryBelow")
-        }}</TCheckbox>
+      <div class="subtotal-dialog__field">
+        <div class="subtotal-dialog__options">
+          <TCheckbox v-model="draft.replaceExisting">{{
+            t("dataTools.outline.replace")
+          }}</TCheckbox>
+          <TCheckbox v-model="draft.pageBreaks">{{ t("dataTools.outline.pageBreaks") }}</TCheckbox>
+          <TCheckbox v-model="draft.summaryBelow">{{
+            t("dataTools.outline.summaryBelow")
+          }}</TCheckbox>
+        </div>
       </div>
     </div>
   </Dialog>
@@ -128,6 +132,9 @@ function apply(): void {
     grid-template-columns: 84px minmax(0, 1fr);
     gap: var(--idea-space-2);
     align-items: center;
+    > span {
+      text-align: right;
+    }
   }
   &__summaries {
     align-items: start;
@@ -137,11 +144,9 @@ function apply(): void {
     gap: var(--idea-space-1);
     max-height: 180px;
     overflow: auto;
-    padding: var(--idea-space-2);
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-small);
   }
   &__options {
+    grid-column: 2;
     display: grid;
     gap: var(--idea-space-1);
     margin-top: var(--idea-space-1);
