@@ -48,7 +48,7 @@ const overlay = computed(() => {
     rect.y + rect.height,
   );
   if (right <= left || bottom <= top) return { visible: false, style: {} };
-  const buttonWidth = 34;
+  const buttonWidth = 38;
   const buttonHeight = 22;
   const maxLeft = props.frame.body.x + Math.max(0, props.frame.body.width - buttonWidth);
   const maxTop = props.frame.body.y + Math.max(0, props.frame.body.height - buttonHeight);
@@ -161,24 +161,23 @@ watch(
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 4px;
     box-sizing: border-box;
-    width: 34px;
+    width: 38px;
     height: 22px;
     padding: 0 4px;
     color: var(--idea-text-secondary);
     background: var(--idea-surface-panel);
     border: 0;
+    outline: none;
+    box-shadow: none;
     border-radius: var(--idea-radius-small);
     cursor: pointer;
 
     &:hover:not(:disabled),
+    &:focus-visible,
     &[aria-expanded="true"] {
       background: var(--idea-icon-button-hover-bg);
-    }
-
-    &:focus-visible {
-      outline: 1px solid var(--idea-action-primary);
-      outline-offset: 1px;
     }
 
     &:disabled {
