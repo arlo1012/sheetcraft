@@ -1,3 +1,18 @@
+import { normalizeColor } from "../../shared/color/palette";
+
+/** User-configurable presentation and rule switches for duplicate-entry error checks. */
+export type ErrorCheckSettings = {
+  enabled: boolean;
+  indicatorColor: string | null;
+  duplicateEntries: boolean;
+};
+
+export const DEFAULT_ERROR_CHECK_SETTINGS: Readonly<ErrorCheckSettings> = {
+  enabled: true,
+  indicatorColor: null,
+  duplicateEntries: true,
+};
+
 export type DuplicateErrorIgnoredIssue = {
   workbookId: string;
   sheetId: string;
@@ -5,13 +20,12 @@ export type DuplicateErrorIgnoredIssue = {
   signature: string;
 };
 
-export type DuplicateErrorChecksPreferences = {
-  enabled: boolean;
+export type DuplicateErrorChecksPreferences = ErrorCheckSettings & {
   ignored: DuplicateErrorIgnoredIssue[];
 };
 
 export const DUPLICATE_ERROR_CHECKS_STORAGE_KEY = "idea10.duplicateErrorChecks";
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
 
 function getStorage(): Storage | undefined {
   try {
@@ -36,7 +50,10 @@ function isIgnoredIssue(value: unknown): value is DuplicateErrorIgnoredIssue {
   );
 }
 
-function isPreferences(value: unknown): value is DuplicateErrorChecksPreferences {
+function isLegacyPreferences(value: unknown): value is {
+  enabled: boolean;
+  ignored: DuplicateErrorIgnoredIssue[];
+} {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
   return (
@@ -46,11 +63,49 @@ function isPreferences(value: unknown): value is DuplicateErrorChecksPreferences
   );
 }
 
+/** Validates and normalizes the presentation settings used by browser-only checks. */
+export function normalizeErrorCheckSettings(value: unknown): ErrorCheckSettings | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  if (typeof record.enabled !== "boolean" || typeof record.duplicateEntries !== "boolean")
+    return undefined;
+  const indicatorColor =
+    record.indicatorColor === null
+      ? null
+      : typeof record.indicatorColor === "string"
+        ? normalizeColor(record.indicatorColor)
+        : undefined;
+  if (indicatorColor === undefined) return undefined;
+  return {
+    enabled: record.enabled,
+    indicatorColor,
+    duplicateEntries: record.duplicateEntries,
+  };
+}
+
+function parsePreferences(value: unknown): DuplicateErrorChecksPreferences | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const settings = normalizeErrorCheckSettings(record);
+  if (!settings || !Array.isArray(record.ignored) || !record.ignored.every(isIgnoredIssue))
+    return undefined;
+  return {
+    ...settings,
+    ignored: record.ignored.map((issue) => ({ ...issue })),
+  };
+}
+
+function defaultPreferences(): DuplicateErrorChecksPreferences {
+  return { ...DEFAULT_ERROR_CHECK_SETTINGS, ignored: [] };
+}
+
 function clonePreferences(
   preferences: DuplicateErrorChecksPreferences,
 ): DuplicateErrorChecksPreferences {
   return {
     enabled: preferences.enabled,
+    indicatorColor: preferences.indicatorColor,
+    duplicateEntries: preferences.duplicateEntries,
     ignored: preferences.ignored.map((issue) => ({ ...issue })),
   };
 }
@@ -59,23 +114,30 @@ function clonePreferences(
 export function readDuplicateErrorChecks(
   storage: Storage | undefined = getStorage(),
 ): DuplicateErrorChecksPreferences {
-  if (!storage) return { enabled: true, ignored: [] };
+  if (!storage) return defaultPreferences();
   try {
     const stored: unknown = JSON.parse(
       storage.getItem(DUPLICATE_ERROR_CHECKS_STORAGE_KEY) ?? "null",
     );
-    if (!stored || typeof stored !== "object" || Array.isArray(stored))
-      return { enabled: true, ignored: [] };
+    if (!stored || typeof stored !== "object" || Array.isArray(stored)) return defaultPreferences();
     const record = stored as Record<string, unknown>;
-    if (record.version !== STORAGE_VERSION || !isPreferences(record.preferences))
-      return { enabled: true, ignored: [] };
-    const preferences = clonePreferences(record.preferences);
+    const preferences =
+      record.version === 1 && isLegacyPreferences(record.preferences)
+        ? {
+            ...DEFAULT_ERROR_CHECK_SETTINGS,
+            enabled: record.preferences.enabled,
+            ignored: record.preferences.ignored.map((issue) => ({ ...issue })),
+          }
+        : record.version === STORAGE_VERSION
+          ? parsePreferences(record.preferences)
+          : undefined;
+    if (!preferences) return defaultPreferences();
     const keys = preferences.ignored.map(
       (issue) => `${issue.workbookId}|${issue.sheetId}|${issue.cellKey}|${issue.signature}`,
     );
-    return new Set(keys).size === keys.length ? preferences : { enabled: true, ignored: [] };
+    return new Set(keys).size === keys.length ? preferences : defaultPreferences();
   } catch {
-    return { enabled: true, ignored: [] };
+    return defaultPreferences();
   }
 }
 
@@ -84,8 +146,9 @@ export function writeDuplicateErrorChecks(
   preferences: DuplicateErrorChecksPreferences,
   storage: Storage | undefined = getStorage(),
 ): boolean {
-  if (!isPreferences(preferences) || !storage) return false;
-  const keys = preferences.ignored.map(
+  const parsed = parsePreferences(preferences);
+  if (!parsed || !storage) return false;
+  const keys = parsed.ignored.map(
     (issue) => `${issue.workbookId}|${issue.sheetId}|${issue.cellKey}|${issue.signature}`,
   );
   if (new Set(keys).size !== keys.length) return false;
@@ -94,7 +157,7 @@ export function writeDuplicateErrorChecks(
       DUPLICATE_ERROR_CHECKS_STORAGE_KEY,
       JSON.stringify({
         version: STORAGE_VERSION,
-        preferences: clonePreferences(preferences),
+        preferences: clonePreferences(parsed),
       }),
     );
     return true;

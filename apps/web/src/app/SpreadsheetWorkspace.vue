@@ -13,6 +13,7 @@ import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import { useFormulaToolsController } from "../modules/formula-tools/useFormulaToolsController";
 import { useDataToolsController } from "../modules/data-tools/useDataToolsController";
 import { useDuplicateErrorChecks } from "../modules/data-tools/useDuplicateErrorChecks";
+import type { ErrorCheckSettings } from "../modules/data-tools/duplicate-error-preferences";
 import DuplicateErrorCheckOptionsDialog from "../modules/data-tools/components/DuplicateErrorCheckOptionsDialog.vue";
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
@@ -394,7 +395,7 @@ const duplicateErrorChecks = useDuplicateErrorChecks({
 });
 const {
   errorCells: duplicateErrorCells,
-  enabled: duplicateChecksEnabled,
+  settings: duplicateCheckSettings,
   ignoredCount: ignoredDuplicateCount,
 } = duplicateErrorChecks;
 const duplicateErrorOptionsVisible = ref(false);
@@ -413,6 +414,13 @@ function closeDuplicateErrorOptions(): void {
   duplicateErrorOptionsVisible.value = false;
   void nextTick(focusCellEditor);
 }
+function confirmDuplicateErrorOptions(payload: {
+  settings: ErrorCheckSettings;
+  resetIgnored: boolean;
+}): void {
+  duplicateErrorChecks.applySettings(payload.settings, payload.resetIgnored);
+  closeDuplicateErrorOptions();
+}
 function ignoreCellDuplicateError(address: CellAddress): void {
   duplicateErrorChecks.ignoreCell(address);
   void nextTick(focusCellEditor);
@@ -426,7 +434,7 @@ function editErrorInFormulaBar(): void {
     void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
   }
 }
-watch(workbookGeneration, () => {
+watch([workbookGeneration, () => activeSheet.value.id], () => {
   duplicateErrorOptionsVisible.value = false;
 });
 const dataTools = useDataToolsController({
@@ -822,10 +830,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     />
     <DuplicateErrorCheckOptionsDialog
       :visible="duplicateErrorOptionsVisible"
-      :enabled="duplicateChecksEnabled"
+      :settings="duplicateCheckSettings"
       :ignored-count="ignoredDuplicateCount"
-      @update:enabled="duplicateErrorChecks.setEnabled"
-      @reset-ignored="duplicateErrorChecks.resetIgnored"
+      @confirm="confirmDuplicateErrorOptions"
       @close="closeDuplicateErrorOptions"
     />
     <DuplicateValuesDialog
@@ -987,6 +994,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :context-menu-state="contextMenuState"
         :validation-info="activeValidationInfo"
         :error-cells="duplicateErrorCells"
+        :error-indicator-color="duplicateCheckSettings.indicatorColor"
         @ignore-cell-error="ignoreCellDuplicateError"
         @ignore-all-cell-errors="ignoreAllDuplicateErrors"
         @edit-error-in-formula-bar="editErrorInFormulaBar"

@@ -106,6 +106,16 @@ describe("SheetSurface invalidation", () => {
     expect(createScene).not.toHaveBeenCalled();
     expect(paint).toHaveBeenCalledOnce();
     expect(paint.mock.calls[0]?.[3].errorCells).toEqual(errorCells);
+    const automaticColor = paint.mock.calls[0]?.[3].palette.errorIndicator;
+    paint.mockClear();
+    await wrapper.setProps({ errorIndicatorColor: "#ff0000" });
+    host.flush();
+    expect(createScene).not.toHaveBeenCalled();
+    expect(paint).toHaveBeenCalledOnce();
+    expect(paint.mock.calls[0]?.[3].palette.errorIndicator).toBe("#ff0000");
+    await wrapper.setProps({ errorIndicatorColor: null });
+    host.flush();
+    expect(paint.mock.calls.at(-1)?.[3].palette.errorIndicator).toBe(automaticColor);
     await wrapper.setProps({ errorCells: new Set() });
     host.flush();
     expect(paint.mock.calls.at(-1)?.[3].errorCells?.size).toBe(0);

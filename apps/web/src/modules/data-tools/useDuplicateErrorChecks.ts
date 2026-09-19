@@ -11,6 +11,8 @@ import {
   readDuplicateErrorChecks,
   writeDuplicateErrorChecks,
   type DuplicateErrorChecksPreferences,
+  type ErrorCheckSettings,
+  normalizeErrorCheckSettings,
 } from "./duplicate-error-preferences";
 
 type DuplicateIssue = ReturnType<typeof getDuplicateEntryIssues>[number];
@@ -65,12 +67,14 @@ function sameScope(
  */
 export function useDuplicateErrorChecks(options: Options): {
   errorCells: ComputedRef<ReadonlySet<string>>;
+  settings: ComputedRef<ErrorCheckSettings>;
   enabled: ComputedRef<boolean>;
   ignoredCount: ComputedRef<number>;
   ignoreCell: (address: CellAddress) => void;
   ignoreAll: () => void;
   resetIgnored: () => void;
   setEnabled: (enabled: boolean) => void;
+  applySettings: (settings: ErrorCheckSettings, resetIgnored?: boolean) => boolean;
 } {
   let preferences: DuplicateErrorChecksPreferences = readDuplicateErrorChecks(options.storage);
   let cache: CachedIssues | undefined;
@@ -128,12 +132,18 @@ export function useDuplicateErrorChecks(options: Options): {
     return preferences.enabled;
   });
 
+  const settings = computed<ErrorCheckSettings>(() => {
+    void stateVersion.value;
+    const { enabled, indicatorColor, duplicateEntries } = preferences;
+    return { enabled, indicatorColor, duplicateEntries };
+  });
+
   const errorCells = computed<ReadonlySet<string>>(() => {
     void stateVersion.value;
     // Continue diagnosing while the display is disabled. This invalidates stale
     // exceptions before the user enables warnings again.
     const snapshot = currentIssues();
-    if (!enabled.value) return new Set();
+    if (!settings.value.enabled || !settings.value.duplicateEntries) return new Set();
     const ignored = ignoredKeys(snapshot);
     return new Set(
       snapshot.issues
@@ -196,16 +206,34 @@ export function useDuplicateErrorChecks(options: Options): {
   }
 
   function setEnabled(value: boolean): void {
-    if (preferences.enabled !== value) updatePreferences({ ...preferences, enabled: value });
+    applySettings({ ...settings.value, enabled: value });
+  }
+
+  function applySettings(nextSettings: ErrorCheckSettings, resetIgnored = false): boolean {
+    const normalized = normalizeErrorCheckSettings(nextSettings);
+    if (!normalized) return false;
+    const snapshot = resetIgnored ? currentIssues() : undefined;
+    const ignored = snapshot
+      ? preferences.ignored.filter((item) => !sameScope(item, snapshot.workbook, snapshot.sheet))
+      : preferences.ignored;
+    const changed =
+      preferences.enabled !== normalized.enabled ||
+      preferences.indicatorColor !== normalized.indicatorColor ||
+      preferences.duplicateEntries !== normalized.duplicateEntries ||
+      ignored !== preferences.ignored;
+    if (changed) updatePreferences({ ...normalized, ignored });
+    return true;
   }
 
   return {
     errorCells,
+    settings,
     enabled,
     ignoredCount,
     ignoreCell,
     ignoreAll,
     resetIgnored,
     setEnabled,
+    applySettings,
   };
 }

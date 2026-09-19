@@ -197,6 +197,7 @@ const props = withDefaults(
     /** Resolved for the active cell by the Web data-tools adapter. */
     validationInfo?: ActiveCellValidationInfo;
     errorCells?: ReadonlySet<string>;
+    errorIndicatorColor?: string | null;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -2298,6 +2299,7 @@ defineExpose({
       :active-cell="activeCell"
       :editing="isEditing"
       :error-cells="errorCells"
+      :error-indicator-color="errorIndicatorColor"
       :label="headerLabel"
       :cursor="surfaceCursor"
       :show-grid-lines="showGridLines"

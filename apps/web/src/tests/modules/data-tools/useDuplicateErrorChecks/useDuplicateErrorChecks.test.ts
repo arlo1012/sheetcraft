@@ -115,6 +115,109 @@ describe("duplicate error checks", () => {
     expect([...right.checks.errorCells.value]).toEqual(["0:0", "1:0"]);
   });
 
+  test("uses the duplicate-entry setting independently from the overall error-check switch", () => {
+    const f = fixture();
+    f.checks.applySettings({
+      ...f.checks.settings.value,
+      duplicateEntries: false,
+    });
+    expect(f.checks.enabled.value).toBe(true);
+    expect(f.checks.errorCells.value).toEqual(new Set());
+    f.checks.applySettings({
+      ...f.checks.settings.value,
+      duplicateEntries: true,
+    });
+    expect([...f.checks.errorCells.value]).toEqual(["0:0", "1:0"]);
+    f.checks.setEnabled(false);
+    expect(f.checks.errorCells.value).toEqual(new Set());
+  });
+
+  test("persists a normalized indicator color and migrates version-one preferences", () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      DUPLICATE_ERROR_CHECKS_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        preferences: {
+          enabled: false,
+          ignored: [
+            {
+              workbookId: "workbook-a",
+              sheetId: "sheet-a",
+              cellKey: "0:0",
+              signature: "old-issue",
+            },
+          ],
+        },
+      }),
+    );
+    expect(readDuplicateErrorChecks(storage)).toEqual({
+      enabled: false,
+      indicatorColor: null,
+      duplicateEntries: true,
+      ignored: [
+        {
+          workbookId: "workbook-a",
+          sheetId: "sheet-a",
+          cellKey: "0:0",
+          signature: "old-issue",
+        },
+      ],
+    });
+
+    const f = fixture(storage, "workbook-b");
+    expect(
+      f.checks.applySettings({
+        ...f.checks.settings.value,
+        indicatorColor: "#ABCDEF",
+      }),
+    ).toBe(true);
+    expect(readDuplicateErrorChecks(storage).indicatorColor).toBe("#abcdef");
+    expect(f.checks.settings.value.indicatorColor).toBe("#abcdef");
+    expect(
+      f.checks.applySettings({
+        ...f.checks.settings.value,
+        indicatorColor: "not-a-color",
+      }),
+    ).toBe(false);
+  });
+
+  test("applies settings atomically and can reset only the current sheet's ignored issues", () => {
+    const storage = memoryStorage();
+    writeDuplicateErrorChecks(
+      {
+        enabled: true,
+        indicatorColor: null,
+        duplicateEntries: true,
+        ignored: [
+          {
+            workbookId: "workbook-b",
+            sheetId: "sheet-b",
+            cellKey: "0:0",
+            signature: "foreign-issue",
+          },
+        ],
+      },
+      storage,
+    );
+    const left = fixture(storage, "workbook-a");
+    left.checks.ignoreAll();
+    expect(
+      left.checks.applySettings(
+        { enabled: false, indicatorColor: "#ff0000", duplicateEntries: false },
+        true,
+      ),
+    ).toBe(true);
+    expect(left.checks.settings.value).toEqual({
+      enabled: false,
+      indicatorColor: "#ff0000",
+      duplicateEntries: false,
+    });
+    const stored = readDuplicateErrorChecks(storage);
+    expect(stored.ignored).toHaveLength(1);
+    expect(stored.ignored.every((issue) => issue.workbookId === "workbook-b")).toBe(true);
+  });
+
   test("keeps checking while disabled, so stale exceptions do not return when re-enabled", () => {
     const f = fixture();
     f.checks.ignoreAll();
@@ -135,6 +238,8 @@ describe("duplicate error checks", () => {
     storage.setItem(DUPLICATE_ERROR_CHECKS_STORAGE_KEY, "not json");
     expect(readDuplicateErrorChecks(storage)).toEqual({
       enabled: true,
+      indicatorColor: null,
+      duplicateEntries: true,
       ignored: [],
     });
     const unavailable: Storage = {
@@ -153,8 +258,20 @@ describe("duplicate error checks", () => {
     };
     expect(readDuplicateErrorChecks(unavailable)).toEqual({
       enabled: true,
+      indicatorColor: null,
+      duplicateEntries: true,
       ignored: [],
     });
-    expect(writeDuplicateErrorChecks({ enabled: false, ignored: [] }, unavailable)).toBe(false);
+    expect(
+      writeDuplicateErrorChecks(
+        {
+          enabled: false,
+          indicatorColor: null,
+          duplicateEntries: true,
+          ignored: [],
+        },
+        unavailable,
+      ),
+    ).toBe(false);
   });
 });
