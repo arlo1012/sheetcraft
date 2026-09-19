@@ -303,7 +303,6 @@ export const enUS = {
       invalidValue: "The value entered does not meet the data validation rule.",
       retry: "Retry",
       keepValue: "Keep value",
-      keepValueQuestion: "Do you want to keep this value?",
       yes: "Yes",
       no: "No",
       cancel: "Cancel",

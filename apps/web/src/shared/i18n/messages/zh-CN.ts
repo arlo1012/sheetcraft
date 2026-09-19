@@ -294,7 +294,6 @@ export const zhCN = {
       invalidValue: "输入的值不符合数据验证规则。",
       retry: "重试",
       keepValue: "仍要保留",
-      keepValueQuestion: "是否仍要保留此值？",
       yes: "是",
       no: "否",
       cancel: "取消",

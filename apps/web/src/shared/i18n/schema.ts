@@ -290,7 +290,6 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       invalidValue: string;
       retry: string;
       keepValue: string;
-      keepValueQuestion: string;
       yes: string;
       no: string;
       cancel: string;

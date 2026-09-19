@@ -90,7 +90,9 @@ describe("validation feedback actions", () => {
         "No",
         "Cancel",
       ]);
-      expect(document.body.textContent).toContain("Do you want to keep this value?");
+      expect(document.querySelector('[role="alertdialog"] .t-dialog__body')?.textContent).toBe(
+        "Choose a number from 1 to 10",
+      );
       await click("No");
       expect(session.state).toMatchObject({
         active: true,

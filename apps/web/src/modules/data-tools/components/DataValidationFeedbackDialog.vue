@@ -16,14 +16,7 @@ const { t } = useAppI18n();
     aria-modal="true"
     :aria-label="feedback.title || t('dataTools.validation.title')"
     :header="feedback.title || t('dataTools.validation.title')"
-    :body="
-      [
-        feedback.message || t('dataTools.validation.invalidValue'),
-        feedback.style === 'warning' ? t('dataTools.validation.keepValueQuestion') : '',
-      ]
-        .filter(Boolean)
-        .join(' ')
-    "
+    :body="feedback.message || t('dataTools.validation.invalidValue')"
     :theme="
       feedback.style === 'stop' ? 'danger' : feedback.style === 'warning' ? 'warning' : 'info'
     "
