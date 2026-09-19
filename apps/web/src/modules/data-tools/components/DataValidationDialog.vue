@@ -86,6 +86,7 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
     role="dialog"
     aria-modal="true"
     placement="center"
+    dialog-class-name="data-validation-dialog"
     width="min(640px, calc(100vw - 32px))"
     :aria-label="t('dataTools.validation.title')"
     :visible="visible"
@@ -204,22 +205,14 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
       </TTabPanel>
     </TTabs>
     <template #footer>
-      <div class="validation-dialog__footer">
-        <TButton variant="text" @click="emit('clear')">{{
-          t("dataTools.validation.clear")
-        }}</TButton>
-        <div class="validation-dialog__actions">
-          <TButton variant="outline" @click="emit('close')">{{
-            t("dataTools.common.cancel")
-          }}</TButton>
-          <TButton
-            theme="primary"
-            :disabled="!canApply"
-            @click="emit('apply', serializeValidationDraft(draft, dateSystem))"
-            >{{ t("dataTools.validation.confirm") }}</TButton
-          >
-        </div>
-      </div>
+      <TButton variant="text" @click="emit('clear')">{{ t("dataTools.validation.clear") }}</TButton>
+      <TButton theme="default" @click="emit('close')">{{ t("dataTools.common.cancel") }}</TButton>
+      <TButton
+        theme="primary"
+        :disabled="!canApply"
+        @click="emit('apply', serializeValidationDraft(draft, dateSystem))"
+        >{{ t("dataTools.validation.confirm") }}</TButton
+      >
     </template>
   </Dialog>
 </template>
@@ -258,17 +251,6 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
     align-items: center;
     gap: var(--idea-space-4) var(--idea-space-6);
     padding-left: 80px;
-  }
-
-  &__footer,
-  &__actions {
-    display: flex;
-    align-items: center;
-    gap: var(--idea-space-4);
-  }
-
-  &__footer {
-    justify-content: space-between;
   }
 
   @media (max-width: 560px) {

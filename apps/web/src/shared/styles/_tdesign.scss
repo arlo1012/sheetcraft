@@ -269,6 +269,10 @@
   padding: 0;
 }
 
+.data-validation-dialog > .t-dialog__body {
+  padding-top: 0;
+}
+
 .t-form__label {
   padding-right: var(--td-comp-paddingLR-s);
 }
@@ -299,6 +303,11 @@
 // Input-owned feedback needs the same space as FormItem validation feedback.
 .t-form:not(.t-form-inline) .t-form__item:has(.t-input__tips) {
   margin-bottom: var(--td-comp-margin-xl);
+}
+
+.t-tabs__header {
+  --td-comp-size-xxl: 32px;
+  --td-comp-size-xxxxl: 40px;
 }
 
 .t-tabs__nav-item.t-is-active {
