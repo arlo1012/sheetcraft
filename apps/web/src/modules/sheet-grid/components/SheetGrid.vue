@@ -293,7 +293,7 @@ function getOutlineDepth(axis: SheetDimensionAxis): number {
 }
 const rowOutlineDepth = computed(() => getOutlineDepth("row"));
 const columnOutlineDepth = computed(() => getOutlineDepth("column"));
-const rowOutlineHeaderWidth = computed(() =>
+const rowOutlineGutter = computed(() =>
   rowOutlineDepth.value ? (rowOutlineDepth.value + 1) * OUTLINE_HEADER_LEVEL_WIDTH : 0,
 );
 const columnOutlineHeaderHeight = computed(() => {
@@ -309,9 +309,7 @@ const columnOutlineHeaderHeight = computed(() => {
 });
 
 const headerSize = computed(() => ({
-  width: props.showHeaders
-    ? ROW_HEADER_WIDTH + quickToolsGutter.value + rowOutlineHeaderWidth.value
-    : 0,
+  width: props.showHeaders ? ROW_HEADER_WIDTH + quickToolsGutter.value + rowOutlineGutter.value : 0,
   height: props.showHeaders
     ? COLUMN_HEADER_HEIGHT + quickToolsGutter.value + columnOutlineHeaderHeight.value
     : 0,
@@ -770,6 +768,7 @@ const headerSelection = computed(() => ({
 const headerQuickTools = computed(() => ({
   enabled: headerQuickToolsEnabled.value,
   gutter: quickToolsGutter.value,
+  rowOutlineGutter: props.showHeaders ? rowOutlineGutter.value : 0,
 }));
 const headerInput = useHeaderInteraction({
   canFocus: () => !getReferenceEditor() && !isComposing.value,
@@ -2061,7 +2060,7 @@ function onEditorKeydown(event: KeyboardEvent): void {
       const bounds = rootRef.value!.getBoundingClientRect();
       const x =
         axis === "row"
-          ? frame.headerSize.width / 2
+          ? frame.headerSize.width - ROW_HEADER_WIDTH / 2
           : (item?.offset ?? frame.body.x) + (item?.size ?? 0) / 2;
       const y =
         axis === "column"

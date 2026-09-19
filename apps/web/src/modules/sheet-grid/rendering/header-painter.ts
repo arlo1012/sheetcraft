@@ -32,6 +32,8 @@ export type HeaderQuickToolsState = Readonly<{
   enabled: boolean;
   /** Reserved layout space, independent of the current interaction state. */
   gutter: number;
+  /** Outline controls occupy a separate lane before the fixed-width row labels. */
+  rowOutlineGutter?: number;
 }>;
 
 /** Colors and text metrics read once by the surface from its computed style. */
@@ -191,12 +193,13 @@ function paintAxisItem(
 ): void {
   const { palette, quickTools, selection, hovered, focused } = state;
   const gutter = quickTools.gutter;
+  const rowLabelStart = gutter + (quickTools.rowOutlineGutter ?? 0);
   const rect =
     axis === "row"
       ? {
-          x: gutter,
+          x: rowLabelStart,
           y: item.offset,
-          width: Math.max(0, frame.headerSize.width - gutter - 1),
+          width: Math.max(0, frame.headerSize.width - rowLabelStart - 1),
           height: item.size,
         }
       : {
@@ -305,10 +308,11 @@ export function paintSheetHeaders(
   paintAxisHeaders(context, "column", frame.columnHeaders, state);
   paintAxisHeaders(context, "row", frame.rowHeaders, state);
 
+  const rowLabelStart = quickTools.gutter + (quickTools.rowOutlineGutter ?? 0);
   const corner = {
-    x: quickTools.gutter,
+    x: rowLabelStart,
     y: quickTools.gutter,
-    width: Math.max(0, frame.headerSize.width - quickTools.gutter),
+    width: Math.max(0, frame.headerSize.width - rowLabelStart),
     height: Math.max(0, frame.headerSize.height - quickTools.gutter),
   };
   context.fillStyle =
@@ -321,6 +325,10 @@ export function paintSheetHeaders(
   context.strokeStyle = palette.border;
   context.lineWidth = 1;
   context.beginPath();
+  if (quickTools.rowOutlineGutter) {
+    context.moveTo(rowLabelStart - 0.5, 0);
+    context.lineTo(rowLabelStart - 0.5, height);
+  }
   context.moveTo(frame.headerSize.width - 0.5, corner.y);
   context.lineTo(frame.headerSize.width - 0.5, height);
   context.moveTo(corner.x, frame.headerSize.height - 0.5);

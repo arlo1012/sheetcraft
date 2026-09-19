@@ -170,8 +170,8 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   are deleted; columns containing subsequent user edits are retained.
   Each subtotal layer includes an outer total group: outline level 1 shows only
   the grand total, level 2 also shows group subtotals, and level 3 shows details.
-  The row-header area widens with outline depth and reserves separate space when
-  row/column quick tools are enabled.
+  Row labels keep their fixed width. Outline controls occupy a separate lane to
+  their left, alongside the independent row/column quick-tool gutter.
   Replace Current Subtotals is enabled by default; turn it off to retain existing
   subtotals and add a further summary layer. Generated subtotal rows do not become
   grouping keys. Summary Below Data is enabled by default; turn it off to put
