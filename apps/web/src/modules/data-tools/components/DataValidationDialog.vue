@@ -6,7 +6,7 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
-import OptionList from "../../../shared/option-list/OptionList.vue";
+import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { useAppI18n } from "../../../shared/i18n";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import type { DataValidationDraft, DataValidationInitial } from "../data-tools-types";
@@ -94,21 +94,9 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
     :confirm-on-enter="false"
     @close="emit('close')"
   >
-    <div class="validation-dialog">
-      <OptionList
-        class="validation-dialog__navigation"
-        :model-value="activeTab"
-        :options="[
-          { value: 'settings', label: t('dataTools.validation.settings') },
-          { value: 'input', label: t('dataTools.validation.inputMessage') },
-          { value: 'error', label: t('dataTools.validation.errorAlert') },
-        ]"
-        :label="t('dataTools.validation.title')"
-        variant="navigation"
-        @select="activeTab = $event"
-      />
-      <div class="validation-dialog__content">
-        <div v-if="activeTab === 'settings'" class="validation-dialog__form">
+    <TTabs v-model="activeTab" class="validation-dialog">
+      <TTabPanel value="settings" :label="t('dataTools.validation.settings')">
+        <div class="validation-dialog__form">
           <div class="validation-dialog__field">
             <span>{{ t("dataTools.validation.allow") }}</span>
             <TSelect
@@ -163,7 +151,9 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
             }}</TCheckbox>
           </div>
         </div>
-        <div v-else-if="activeTab === 'input'" class="validation-dialog__form">
+      </TTabPanel>
+      <TTabPanel value="input" :label="t('dataTools.validation.inputMessage')">
+        <div class="validation-dialog__form">
           <TCheckbox v-model="draft.showInputMessage">{{
             t("dataTools.validation.showMessage")
           }}</TCheckbox>
@@ -180,7 +170,9 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
             />
           </div>
         </div>
-        <div v-else class="validation-dialog__form">
+      </TTabPanel>
+      <TTabPanel value="error" :label="t('dataTools.validation.errorAlert')">
+        <div class="validation-dialog__form">
           <TCheckbox v-model="draft.showErrorAlert">{{
             t("dataTools.validation.errorAlert")
           }}</TCheckbox>
@@ -209,8 +201,8 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
             />
           </div>
         </div>
-      </div>
-    </div>
+      </TTabPanel>
+    </TTabs>
     <template #footer>
       <div class="validation-dialog__footer">
         <TButton variant="text" @click="emit('clear')">{{
@@ -233,24 +225,13 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
 </template>
 <style scoped lang="scss">
 .validation-dialog {
-  display: grid;
-  grid-template-columns: 144px minmax(0, 1fr);
-  gap: var(--idea-space-6);
-  max-height: calc(100dvh - 192px);
-  min-height: 0;
-
-  &__navigation {
-    min-height: 0;
-  }
-
-  &__content {
-    min-width: 0;
-    min-height: 0;
-    overflow: auto;
-  }
+  min-width: 0;
 
   &__form {
     display: grid;
+    padding-top: var(--idea-space-6);
+    max-height: calc(100dvh - 240px);
+    overflow: auto;
     align-content: start;
     gap: var(--idea-space-4);
   }
@@ -291,9 +272,6 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
   }
 
   @media (max-width: 560px) {
-    grid-template-columns: 112px minmax(0, 1fr);
-    gap: var(--idea-space-4);
-
     &__field {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--idea-space-2);
