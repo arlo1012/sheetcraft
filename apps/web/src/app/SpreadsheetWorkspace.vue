@@ -178,6 +178,33 @@ const {
 } = useSpreadsheetWorkspaceController();
 
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
+const duplicateInputError = computed(() => {
+  const feedback = validationFeedback.value;
+  if (feedback?.source !== "duplicate" || feedback.target.sheetId !== activeSheet.value.id)
+    return undefined;
+  return {
+    address: feedback.target.address,
+    title: t("dataTools.duplicates.rejectionTitle"),
+    message: t("dataTools.duplicates.rejectionMessage"),
+  };
+});
+const modalValidationFeedback = computed(() =>
+  duplicateInputError.value ? undefined : validationFeedback.value,
+);
+watch(
+  () => [
+    cellEditSession.state.active,
+    cellEditSession.state.draft,
+    cellEditSession.state.owner?.sheetId,
+    cellEditSession.state.owner?.address.row,
+    cellEditSession.state.owner?.address.column,
+    activeSheet.value.id,
+  ],
+  () => {
+    if (validationFeedback.value?.source === "duplicate") dismissValidationInput();
+  },
+  { flush: "sync" },
+);
 const { locale } = useAppI18n();
 const fillActions = createCellFillActions({
   getWorkbook: () => session.workbook,
@@ -690,7 +717,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         namesVisible ||
         pickingReferenceRange ||
         dataToolsModalOpen ||
-        !!validationFeedback
+        !!modalValidationFeedback
       "
       @insert-image="imageActions.requestInsert"
       @apply-borders="applyCellBorders"
@@ -882,8 +909,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @close="dataTools.closeColumnFilter"
     />
     <DataValidationFeedbackDialog
-      v-if="validationFeedback"
-      :feedback="validationFeedback"
+      v-if="modalValidationFeedback"
+      :feedback="modalValidationFeedback"
       @retry="retryValidationInput"
       @accept="confirmValidationInput"
       @cancel="cancelValidationInput"
@@ -947,7 +974,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!cellFormatSelection ||
         pickingReferenceRange ||
         dataToolsModalOpen ||
-        !!validationFeedback
+        !!modalValidationFeedback
       "
       :address="activeAddress"
       :sheet-id="activeSheet.id"
@@ -974,7 +1001,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         xlsxBusy ||
         !!cellFormatSelection ||
         dataToolsModalOpen ||
-        !!validationFeedback
+        !!modalValidationFeedback
       "
     >
       <SheetGrid
@@ -993,6 +1020,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :evaluator="activeSheetEvaluator"
         :context-menu-state="contextMenuState"
         :validation-info="activeValidationInfo"
+        :input-error="duplicateInputError"
+        @dismiss-input-error="retryValidationInput"
         :error-cells="duplicateErrorCells"
         :error-indicator-color="duplicateCheckSettings.indicatorColor"
         @ignore-selected-cell-errors="ignoreSelectedDuplicateErrors"

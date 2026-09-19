@@ -19,7 +19,10 @@ export type DataValidationFeedback = {
   style: NonNullable<SheetDataValidation["errorStyle"]>;
   title?: string;
   message?: string;
-};
+} & (
+  | { source: "duplicate"; target: { sheetId: string; address: CellAddress } }
+  | { source?: "validation" }
+);
 
 /** Keeps a rejected edit pending while the editor retains the user's draft. */
 export function useDataValidationInput(options: {
@@ -54,7 +57,12 @@ export function useDataValidationInput(options: {
       },
       ruleSignature: "duplicate-rejection",
     };
-    feedback.value = { style: "stop", ...options.getDuplicateRejectionFeedback() };
+    feedback.value = {
+      style: "stop",
+      source: "duplicate",
+      target: { sheetId: candidate.sheetId, address: { ...candidate.address } },
+      ...options.getDuplicateRejectionFeedback(),
+    };
     return false;
   }
 

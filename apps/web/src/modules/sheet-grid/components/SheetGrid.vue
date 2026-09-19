@@ -96,6 +96,7 @@ import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
 import SheetCellContextMenu from "./SheetCellContextMenu.vue";
 import SheetCellErrorMenu from "./SheetCellErrorMenu.vue";
+import SheetInputErrorNotice from "./SheetInputErrorNotice.vue";
 import SheetSurface from "./SheetSurface.vue";
 import SheetAutoFillOptions from "./SheetAutoFillOptions.vue";
 import SheetDataControls, { type ActiveCellValidationInfo } from "./SheetDataControls.vue";
@@ -197,6 +198,7 @@ const props = withDefaults(
     /** Resolved for the active cell by the Web data-tools adapter. */
     validationInfo?: ActiveCellValidationInfo;
     errorCells?: ReadonlySet<string>;
+    inputError?: { address: CellAddress; title: string; message: string };
     errorIndicatorColor?: string | null;
   }>(),
   {
@@ -253,6 +255,7 @@ const emit = defineEmits<{
   outlineToggle: [payload: { id: string; collapsed: boolean }];
   outlineLevel: [payload: { axis: SheetDimensionAxis; level: number }];
   ignoreSelectedCellErrors: [];
+  dismissInputError: [];
   ignoreAllCellErrors: [];
   editErrorInFormulaBar: [];
   errorCheckOptions: [];
@@ -2340,6 +2343,15 @@ defineExpose({
         />
       </template>
     </SheetSurface>
+    <SheetInputErrorNotice
+      v-if="inputError"
+      :frame="renderFrame"
+      :address="inputError.address"
+      :title="inputError.title"
+      :message="inputError.message"
+      :close-label="t('dataTools.duplicates.closeRejection')"
+      @close="emit('dismissInputError')"
+    />
     <SheetCellErrorMenu
       :frame="renderFrame"
       :active-cell="activeCell"

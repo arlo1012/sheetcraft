@@ -174,7 +174,9 @@ export const zhCN = {
       invalidOperation: "无法完成重复项操作。",
       rangeChanged: "数据区域已变更，请重新选择。",
       duplicateRejected: "不允许录入重复值。",
-      rejectionTitle: "拒绝录入重复项",
+      rejectionTitle: "拒绝重复输入",
+      rejectionMessage: "当前输入的内容与本区域中的其他单元格重复。请修改后重新输入。",
+      closeRejection: "关闭重复录入提示",
       errorChecks: {
         optionsTitle: "选项",
         category: "错误检查",

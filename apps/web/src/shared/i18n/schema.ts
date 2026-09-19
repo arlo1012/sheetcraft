@@ -171,6 +171,8 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       rangeChanged: string;
       duplicateRejected: string;
       rejectionTitle: string;
+      rejectionMessage: string;
+      closeRejection: string;
       errorChecks: {
         optionsTitle: string;
         category: string;

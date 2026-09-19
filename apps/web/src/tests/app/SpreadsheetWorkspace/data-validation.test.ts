@@ -57,7 +57,12 @@ describe("workspace data validation", () => {
     setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "Taken" });
 
     expect(controller.commitCell({ address: { row: 1, column: 0 }, input: "Taken" })).toBe(false);
-    expect(controller.validationFeedback.value).toMatchObject({ style: "stop" });
+    expect(controller.validationFeedback.value).toMatchObject({
+      style: "stop",
+      source: "duplicate",
+      target: { sheetId: sheet.id, address: { row: 1, column: 0 } },
+    });
+    expect(controller.acceptValidationInput()).toBe(false);
     expect(getCellContent(sheet, { row: 1, column: 0 })).toBeNull();
     expect(controller.commitCell({ address: { row: 1, column: 0 }, input: "Available" })).toBe(
       true,

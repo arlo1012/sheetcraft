@@ -180,6 +180,9 @@ export const enUS = {
       rangeChanged: "The data range changed. Select it again.",
       duplicateRejected: "Duplicate values are not allowed.",
       rejectionTitle: "Reject Duplicate Entries",
+      rejectionMessage:
+        "This value duplicates another cell in this range. Change the value and try again.",
+      closeRejection: "Close duplicate entry notice",
       errorChecks: {
         optionsTitle: "Options",
         category: "Error Checking",
