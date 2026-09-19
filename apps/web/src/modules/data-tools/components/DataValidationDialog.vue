@@ -236,6 +236,10 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
     gap: var(--idea-space-4);
     min-width: 0;
 
+    > span {
+      text-align: right;
+    }
+
     &--multiline {
       align-items: start;
 
