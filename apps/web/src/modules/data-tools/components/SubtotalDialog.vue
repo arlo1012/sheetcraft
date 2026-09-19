@@ -103,6 +103,7 @@ function apply(): void {
           <TCheckbox
             v-for="column in columns"
             :key="column.value"
+            class="subtotal-dialog__column"
             :checked="draft.valueColumns.includes(column.value)"
             @change="toggle(column.value, Boolean($event))"
             >{{ column.label }}</TCheckbox
@@ -124,6 +125,8 @@ function apply(): void {
   </Dialog>
 </template>
 <style scoped lang="scss">
+@use "../../../shared/option-list/option-list";
+
 .subtotal-dialog {
   display: grid;
   gap: var(--idea-space-2);
@@ -140,10 +143,16 @@ function apply(): void {
     align-items: start;
   }
   &__columns {
+    @include option-list.surface;
     display: grid;
     gap: var(--idea-space-1);
     max-height: 180px;
-    overflow: auto;
+    padding: var(--idea-space-2);
+    border-color: var(--idea-border-control);
+  }
+  &__column {
+    min-width: max-content;
+    white-space: nowrap;
   }
   &__options {
     grid-column: 2;
