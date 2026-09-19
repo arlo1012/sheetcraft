@@ -240,6 +240,9 @@ export type MessageSchema = FormulaToolsMessageSchema & {
         formulaError: string;
         numberStoredAsText: string;
         numberStoredAsTextMessage: string;
+        convertNumber: string;
+        convertNumberBatch: string;
+        correctSheet: string;
         ignoreAllNumberTextHint: string;
         twoDigitYear: string;
         inconsistentFormula: string;

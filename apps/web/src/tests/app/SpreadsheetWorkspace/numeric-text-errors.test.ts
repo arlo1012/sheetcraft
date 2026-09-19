@@ -1,8 +1,9 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { serializeWorkbook } from "@idea10/core/serialization";
-import { createWorkbook, getCellContent } from "@idea10/core/workbook";
+import { createWorkbook, getCellContent, setCellContent } from "@idea10/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import { DUPLICATE_ERROR_CHECKS_STORAGE_KEY } from "../../../modules/data-tools/duplicate-error-preferences";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
@@ -82,4 +83,61 @@ describe("numeric text cell errors", () => {
     await enter("product123");
     expect(grid.props("errorCells")).toEqual(new Set());
   });
+  test.each([
+    ["convert-number", [0]],
+    ["convert-number-batch", [0, 1]],
+    ["correct-sheet", [0, 1, 3]],
+  ] as const)(
+    "routes %s to its intended scope and preserves over-precision text",
+    async (action, convertedRows) => {
+      const { grid, sheet, enter } = await setup();
+      for (const row of [1, 3]) {
+        setCellContent(sheet, { row, column: 0 }, { kind: "literal", value: "0012" });
+      }
+      const longValue = "11111111111111111111";
+      setCellContent(sheet, { row: 4, column: 0 }, { kind: "literal", value: longValue });
+      await enter("'0012");
+      grid.vm.$emit(
+        "viewStateChange",
+        createSheetGridViewState({
+          selection: {
+            active: { row: 0, column: 0 },
+            anchor: { row: 0, column: 0 },
+            focus: { row: 1, column: 0 },
+            mode: "cells",
+          },
+        }),
+      );
+      await flushPromises();
+      await grid.get("[data-sheet-cell-error-trigger]").trigger("click");
+      const menu = new DOMWrapper(document.body).get(
+        '[role="menu"][aria-label="Numbers stored as text"]',
+      );
+      expect(
+        menu
+          .findAll("[data-sheet-cell-error-action]")
+          .map((item) => item.attributes("data-sheet-cell-error-action")),
+      ).toEqual([
+        "convert-number",
+        "convert-number-batch",
+        "correct-sheet",
+        "ignore",
+        "ignore-all",
+        "edit-formula-bar",
+        "options",
+      ]);
+      await menu.get(`[data-sheet-cell-error-action="${action}"]`).trigger("click");
+      await flushPromises();
+      for (const row of [0, 1, 3]) {
+        expect(getCellContent(sheet, { row, column: 0 })).toEqual({
+          kind: "literal",
+          value: (convertedRows as readonly number[]).includes(row) ? 12 : "0012",
+        });
+      }
+      expect(getCellContent(sheet, { row: 4, column: 0 })).toEqual({
+        kind: "literal",
+        value: longValue,
+      });
+    },
+  );
 });

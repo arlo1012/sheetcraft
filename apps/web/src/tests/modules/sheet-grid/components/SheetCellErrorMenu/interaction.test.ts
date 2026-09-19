@@ -73,4 +73,25 @@ describe("SheetCellErrorMenu", () => {
     expect(wrapper.find("[data-sheet-cell-error-trigger]").exists()).toBe(false);
     expect(new DOMWrapper(document.body).find('[role="menu"]').exists()).toBe(false);
   });
+  test("disables numeric conversion actions on a protected worksheet", async () => {
+    const wrapper = mountMenu(true);
+    await wrapper.setProps({
+      description: {
+        label: "Numbers stored as text",
+        message: "Numeric text",
+        ignoreAllHint: "Ignore numeric text",
+        numberConversion: true,
+      },
+    });
+    await wrapper.get("[data-sheet-cell-error-trigger]").trigger("click");
+    const menu = new DOMWrapper(document.body);
+    for (const action of ["convert-number", "convert-number-batch", "correct-sheet"]) {
+      const item = menu.get(`[data-sheet-cell-error-action="${action}"]`);
+      expect(item.attributes("aria-disabled")).toBe("true");
+      await item.trigger("click");
+    }
+    expect(wrapper.emitted("convertNumber")).toBeUndefined();
+    expect(wrapper.emitted("convertNumberBatch")).toBeUndefined();
+    expect(wrapper.emitted("correctSheet")).toBeUndefined();
+  });
 });

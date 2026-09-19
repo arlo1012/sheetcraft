@@ -13,6 +13,7 @@ export type CellErrorDescription = {
   label: string;
   message: string;
   ignoreAllHint: string;
+  numberConversion?: boolean;
 };
 
 const props = withDefaults(
@@ -27,13 +28,16 @@ const props = withDefaults(
   { disabled: false, readOnly: false },
 );
 const emit = defineEmits<{
+  convertNumber: [];
+  convertNumberBatch: [];
+  correctSheet: [];
   ignore: [];
   ignoreAll: [];
   editFormulaBar: [];
   options: [];
 }>();
 const { t } = useAppI18n();
-const description = computed(
+const description = computed<CellErrorDescription>(
   () =>
     props.description ?? {
       label: t("dataTools.duplicates.errorChecks.markerLabel"),
@@ -87,9 +91,21 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   pointerFocus: "menu",
 });
 
-function select(action: "ignore" | "ignoreAll" | "editFormulaBar" | "options"): void {
+function select(
+  action:
+    | "convertNumber"
+    | "convertNumberBatch"
+    | "correctSheet"
+    | "ignore"
+    | "ignoreAll"
+    | "editFormulaBar"
+    | "options",
+): void {
   dismiss("programmatic", false);
-  if (action === "ignore") emit("ignore");
+  if (action === "convertNumber") emit("convertNumber");
+  else if (action === "convertNumberBatch") emit("convertNumberBatch");
+  else if (action === "correctSheet") emit("correctSheet");
+  else if (action === "ignore") emit("ignore");
   else if (action === "ignoreAll") emit("ignoreAll");
   else if (action === "editFormulaBar") emit("editFormulaBar");
   else emit("options");
@@ -143,6 +159,27 @@ watch(
       <li class="sheet-cell-error-menu__message" role="presentation">
         <p :id="`${menuId}-message`">{{ description.message }}</p>
       </li>
+      <template v-if="description.numberConversion">
+        <MenuItem
+          :disabled="readOnly"
+          data-sheet-cell-error-action="convert-number"
+          @select="select('convertNumber')"
+          >{{ t("dataTools.duplicates.errorChecks.convertNumber") }}</MenuItem
+        >
+        <MenuItem
+          :disabled="readOnly"
+          data-sheet-cell-error-action="convert-number-batch"
+          @select="select('convertNumberBatch')"
+          >{{ t("dataTools.duplicates.errorChecks.convertNumberBatch") }}</MenuItem
+        >
+        <MenuItem
+          :disabled="readOnly"
+          data-sheet-cell-error-action="correct-sheet"
+          @select="select('correctSheet')"
+          >{{ t("dataTools.duplicates.errorChecks.correctSheet") }}</MenuItem
+        >
+        <MenuSeparator />
+      </template>
       <MenuItem data-sheet-cell-error-action="ignore" @select="select('ignore')">
         {{ t("dataTools.duplicates.errorChecks.ignore") }}
       </MenuItem>

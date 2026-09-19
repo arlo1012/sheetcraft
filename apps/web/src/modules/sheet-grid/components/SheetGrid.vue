@@ -259,6 +259,9 @@ const emit = defineEmits<{
   ];
   outlineToggle: [payload: { id: string; collapsed: boolean }];
   outlineLevel: [payload: { axis: SheetDimensionAxis; level: number }];
+  convertCellToNumber: [];
+  convertSelectionToNumber: [];
+  correctSheetErrors: [];
   ignoreSelectedCellErrors: [];
   dismissInputError: [];
   ignoreAllCellErrors: [];
@@ -2383,6 +2386,9 @@ defineExpose({
         !!errorCells?.has(`${activeCell.row}:${activeCell.column}`)
       "
       :read-only="readOnly"
+      @convert-number="emit('convertCellToNumber')"
+      @convert-number-batch="emit('convertSelectionToNumber')"
+      @correct-sheet="emit('correctSheetErrors')"
       @ignore="emit('ignoreSelectedCellErrors')"
       @ignore-all="emit('ignoreAllCellErrors')"
       @edit-formula-bar="emit('editErrorInFormulaBar')"

@@ -434,6 +434,7 @@ const activeCellErrorKind = computed(() =>
 const activeCellErrorDescription = computed(() =>
   activeCellErrorKind.value === "number-stored-as-text"
     ? {
+        numberConversion: true,
         label: t("dataTools.duplicates.errorChecks.numberStoredAsText"),
         message: t("dataTools.duplicates.errorChecks.numberStoredAsTextMessage"),
         ignoreAllHint: t("dataTools.duplicates.errorChecks.ignoreAllNumberTextHint"),
@@ -462,6 +463,12 @@ function confirmDuplicateErrorOptions(payload: {
 }): void {
   duplicateErrorChecks.applySettings(payload.settings, payload.resetIgnored);
   closeDuplicateErrorOptions();
+}
+function convertCellErrorValues(scope: "cell" | "selection" | "sheet"): void {
+  if (loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value) return;
+  if (!cellEditSession.finish()) return;
+  convertNumberType("text-to-number", scope);
+  void nextTick(focusCellEditor);
 }
 function ignoreSelectedDuplicateErrors(): void {
   duplicateErrorChecks.ignoreRange(activeSelectionRange.value);
@@ -1086,6 +1093,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :error-cells="duplicateErrorCells"
         :active-cell-error="activeCellErrorDescription"
         :error-indicator-color="duplicateCheckSettings.indicatorColor"
+        @convert-cell-to-number="convertCellErrorValues('cell')"
+        @convert-selection-to-number="convertCellErrorValues('selection')"
+        @correct-sheet-errors="convertCellErrorValues('sheet')"
         @ignore-selected-cell-errors="ignoreSelectedDuplicateErrors"
         @ignore-all-cell-errors="ignoreAllDuplicateErrors"
         @edit-error-in-formula-bar="editErrorInFormulaBar"

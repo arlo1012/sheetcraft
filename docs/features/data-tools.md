@@ -93,8 +93,13 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   Existing violations of Reject Duplicate Entries and numeric text literals show
   cell-corner markers (green by default) and a warning menu for the active cell.
   Numeric text includes long numbers retained as text to preserve all digits;
-  detection does not convert or modify their content. The menu describes the
-  active issue, with duplicate violations taking priority when both apply. The menu can ignore
+  detection does not convert or modify their content. The numeric-text menu offers
+  Convert to Number for the active cell, batch conversion for the current selection,
+  and whole-sheet correction for convertible numeric text on the current worksheet.
+  These reuse the existing conversion command and its precision protection: text
+  with more than 15 significant digits stays unchanged. Each conversion is undoable.
+  The menu describes the active issue, with duplicate violations taking priority
+  when both apply. The menu can ignore
   all issues in the current selection,
   ignore current issues of the displayed kind on the worksheet, focus the formula bar, or open
   error-check options. Ignoring only hides the warning; rejection remains active.

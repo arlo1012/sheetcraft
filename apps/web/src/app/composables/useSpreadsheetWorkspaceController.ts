@@ -906,14 +906,22 @@ export function useSpreadsheetWorkspaceController(
     clearWorkspaceStatus();
   }
 
-  function convertNumberType(mode: CellValueConversionMode): void {
+  function convertNumberType(
+    mode: CellValueConversionMode,
+    scope: "cell" | "selection" | "sheet" = "selection",
+  ): void {
     if (activeSheet.value.properties.protected || !flushPendingGridEdit()) return;
     try {
-      const command = createConvertCellValueTypeCommand(
-        activeSheet.value,
-        activeSelectionRange.value,
-        mode,
-      );
+      const range =
+        scope === "cell"
+          ? { start: activeAddress.value, end: activeAddress.value }
+          : scope === "sheet"
+            ? {
+                start: { row: 0, column: 0 },
+                end: { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 },
+              }
+            : activeSelectionRange.value;
+      const command = createConvertCellValueTypeCommand(activeSheet.value, range, mode);
       if (command.changes.length === 0) {
         showWorkspaceStatus({ key: "workspace.conversionNoMatch" });
         return;

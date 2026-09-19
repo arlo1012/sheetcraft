@@ -34,6 +34,62 @@ function mountController(): Controller {
 afterEach(() => wrapper?.unmount());
 
 describe("number conversion selection commands", () => {
+  test("converts the active cell, selection, and sparse current sheet as separate commands", () => {
+    const controller = mountController();
+    const sheet = controller.activeSheet.value;
+    const first = { row: 0, column: 0 };
+    const second = { row: 0, column: 1 };
+    const numericText = { row: 0, column: 2 };
+    const formula = { row: 0, column: 3 };
+    const distant = { row: 700, column: 500 };
+    const precisionSensitive = { row: 701, column: 500 };
+    setCellContent(sheet, first, { kind: "literal", value: "12" });
+    setCellContent(sheet, second, { kind: "literal", value: "25%" });
+    setCellContent(sheet, numericText, { kind: "literal", value: "not a number" });
+    setCellContent(sheet, formula, { kind: "formula", formula: { source: "=1+1" } });
+    setCellContent(sheet, distant, { kind: "literal", value: "3.5" });
+    setCellContent(sheet, precisionSensitive, {
+      kind: "literal",
+      value: "11111111111111111111",
+    });
+
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection: { active: first, anchor: first, focus: second, mode: "cells" },
+      }),
+    );
+    controller.convertNumberType("text-to-number", "cell");
+    expect(getCellContent(sheet, first)).toEqual({ kind: "literal", value: 12 });
+    expect(getCellContent(sheet, second)).toEqual({ kind: "literal", value: "25%" });
+    expect(controller.session.history.undoStack).toHaveLength(1);
+
+    controller.updateActiveSheetViewState(
+      createSheetGridViewState({
+        selection: { active: second, anchor: second, focus: formula, mode: "cells" },
+      }),
+    );
+    controller.convertNumberType("text-to-number", "selection");
+    expect(getCellContent(sheet, second)).toEqual({ kind: "literal", value: 0.25 });
+    expect(getCellContent(sheet, numericText)).toEqual({ kind: "literal", value: "not a number" });
+    expect(getCellContent(sheet, formula)).toEqual({
+      kind: "formula",
+      formula: { source: "=1+1" },
+    });
+    expect(controller.session.history.undoStack).toHaveLength(2);
+
+    controller.convertNumberType("text-to-number", "sheet");
+    expect(getCellContent(sheet, distant)).toEqual({ kind: "literal", value: 3.5 });
+    expect(getCellContent(sheet, precisionSensitive)).toEqual({
+      kind: "literal",
+      value: "11111111111111111111",
+    });
+    expect(controller.session.history.undoStack).toHaveLength(3);
+    controller.undo();
+    expect(getCellContent(sheet, distant)).toEqual({ kind: "literal", value: "3.5" });
+    controller.redo();
+    expect(getCellContent(sheet, distant)).toEqual({ kind: "literal", value: 3.5 });
+  });
+
   test("converts a sparse full-column selection with one undo and preserves unrelated cells", () => {
     const controller = mountController();
     const sheet = controller.activeSheet.value;
