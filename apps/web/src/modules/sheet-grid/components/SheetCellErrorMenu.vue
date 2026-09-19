@@ -69,7 +69,7 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   placement: "bottom-start",
   offset: 4,
   defaultFocus: "first",
-  pointerFocus: "first",
+  pointerFocus: "menu",
 });
 
 function select(action: "ignore" | "ignoreAll" | "editFormulaBar" | "options"): void {
