@@ -97,7 +97,8 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   Convert to Number for the active cell, batch conversion for the current selection,
   and whole-sheet correction for convertible numeric text on the current worksheet.
   These explicitly convert finite text with more than 15 significant digits to
-  numbers rounded to 15 significant digits, using scientific number formatting.
+  numbers rounded to 15 significant digits, using General number formatting so
+  converted values and formula results share the same automatic display rules.
   Ordinary text-to-number tools retain their precision protection by default.
   Each conversion is undoable, restoring the original text and formatting.
   The menu describes the active issue, with duplicate violations taking priority

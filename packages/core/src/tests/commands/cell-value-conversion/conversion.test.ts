@@ -174,7 +174,7 @@ describe("cell value type conversion", () => {
     expect(getCellContent(sheet, { row: 0, column: 3 })).toEqual({ kind: "literal", value: 0 });
   });
 
-  test("opt-in conversion rounds over-precision text and applies a scientific number format", () => {
+  test("opt-in conversion rounds over-precision text and restores General formatting", () => {
     const session = createTestWorkbookSession();
     const sheet = session.workbook.sheets.get(session.workbook.activeSheetId)!;
     const address = { row: 0, column: 0 };
@@ -203,7 +203,6 @@ describe("cell value type conversion", () => {
     expect(getCellStyle(sheet, address)).toEqual({
       bold: true,
       fillColor: "#abcdef",
-      numberFormat: { kind: "scientific", fractionDigits: 2 },
     });
 
     expect(undoWorkbookCommand(session)).toBe(true);
@@ -226,7 +225,7 @@ describe("cell value type conversion", () => {
     ["1234567890123456%", 1.23456789012346e13],
     ["1,234,567,890,123,456", 1.23456789012346e15],
   ])(
-    "rounds %s to 15 significant digits while preserving an existing scientific format",
+    "rounds %s to 15 significant digits and clears the previous number format",
     (source, value) => {
       const session = createTestWorkbookSession();
       const sheet = session.workbook.sheets.get(session.workbook.activeSheetId)!;
@@ -246,9 +245,7 @@ describe("cell value type conversion", () => {
         ),
       ).toBe(true);
       expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value });
-      expect(getCellStyle(sheet, address)).toEqual({
-        numberFormat: { kind: "scientific", fractionDigits: 5 },
-      });
+      expect(getCellStyle(sheet, address)?.numberFormat).toBeUndefined();
     },
   );
 

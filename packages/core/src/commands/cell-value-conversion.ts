@@ -29,11 +29,6 @@ function hasNonZeroMantissa(value: string): boolean {
   return /[1-9]/.test(value.replace(/e.*$/i, ""));
 }
 
-type ParsedTextNumber = {
-  value: number;
-  losesPrecision: boolean;
-};
-
 function incrementDigits(digits: string): string {
   const characters = digits.split("");
   for (let index = characters.length - 1; index >= 0; index -= 1) {
@@ -78,10 +73,7 @@ function roundToSpreadsheetPrecision(source: string, percent: boolean): number |
 }
 
 /** Parses complete, finite numeric literals, including separators, percentages, and exponents. */
-function parseTextNumber(
-  value: string,
-  options: CellValueConversionOptions,
-): ParsedTextNumber | undefined {
+function parseTextNumber(value: string, options: CellValueConversionOptions): number | undefined {
   const trimmed = value.trim();
   const isPercent = trimmed.endsWith("%");
   const source = isPercent ? trimmed.slice(0, -1) : trimmed;
@@ -94,8 +86,7 @@ function parseTextNumber(
     return undefined;
   }
   if (losesPrecision) {
-    const numeric = roundToSpreadsheetPrecision(source.replaceAll(",", ""), isPercent);
-    return numeric === undefined ? undefined : { value: numeric, losesPrecision: true };
+    return roundToSpreadsheetPrecision(source.replaceAll(",", ""), isPercent);
   }
   const numeric = Number(source.replaceAll(",", ""));
   if (!Number.isFinite(numeric)) return undefined;
@@ -103,7 +94,7 @@ function parseTextNumber(
   // Number("1e-999") is finite but silently underflows to zero. Preserve a
   // nonzero source as text rather than changing its value during conversion.
   if (!Number.isFinite(result) || (result === 0 && hasNonZeroMantissa(source))) return undefined;
-  return { value: result, losesPrecision: false };
+  return result;
 }
 
 function formatNumberForText(value: number): string {
@@ -153,22 +144,14 @@ export function createConvertCellValueTypeCommand(
     if (anchor && (anchor.row !== address.row || anchor.column !== address.column)) continue;
 
     if (mode === "text-to-number" && typeof cell.content.value === "string") {
-      const parsed = parseTextNumber(cell.content.value, options);
-      if (parsed === undefined) continue;
+      const value = parseTextNumber(cell.content.value, options);
+      if (value === undefined) continue;
       const change: CellContentChange = {
         sheetId: sheet.id,
         address,
-        content: { kind: "literal", value: parsed.value },
+        content: { kind: "literal", value },
       };
-      if (parsed.losesPrecision) {
-        const style = cloneCellStyle(cell.style) ?? {};
-        if (style.numberFormat?.kind !== "scientific") {
-          style.numberFormat = { kind: "scientific", fractionDigits: 2 };
-        }
-        change.style = style;
-      } else if (cell.style?.numberFormat) {
-        change.style = withoutNumberFormat(cell.style);
-      }
+      if (cell.style?.numberFormat) change.style = withoutNumberFormat(cell.style);
       changes.push(change);
       continue;
     }

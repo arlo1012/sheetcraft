@@ -5,6 +5,7 @@ import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { serializeWorkbook } from "@idea10/core/serialization";
 import {
   createWorkbook,
+  createSheetEvaluator,
   getCellContent,
   getCellStyle,
   setCellContent,
@@ -145,34 +146,44 @@ describe("numeric text cell errors", () => {
         value: action === "correct-sheet" ? 1.11111111111111e19 : longValue,
       });
       if (action === "correct-sheet") {
-        expect(getCellStyle(sheet, { row: 4, column: 0 })?.numberFormat).toEqual({
-          kind: "scientific",
-          fractionDigits: 2,
-        });
+        expect(getCellStyle(sheet, { row: 4, column: 0 })?.numberFormat).toBeUndefined();
       }
     },
   );
-  test("explicit conversion displays long numeric text scientifically and undo restores every original digit", async () => {
-    const { grid, sheet, enter } = await setup();
-    const address = { row: 0, column: 0 };
-    const value = "11111111111111111111";
-    await enter(value);
-    await grid.get("[data-sheet-cell-error-trigger]").trigger("click");
-    await new DOMWrapper(document.body)
-      .get('[data-sheet-cell-error-action="convert-number"]')
-      .trigger("click");
-    await flushPromises();
-    expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value: 1.11111111111111e19 });
-    expect(getCellStyle(sheet, address)?.numberFormat).toEqual({
-      kind: "scientific",
-      fractionDigits: 2,
-    });
-    expect(grid.getComponent(CellEditor).props("displayValue")).toBe("1.11E+19");
-    expect(grid.props("errorCells")).toEqual(new Set());
-    grid.vm.$emit("undo");
-    await flushPromises();
-    expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value });
-    expect(getCellStyle(sheet, address)?.numberFormat).toBeUndefined();
-    expect(grid.props("errorCells")).toEqual(new Set(["0:0"]));
-  });
+  test.each([
+    ["11111111111111111111", 1.11111111111111e19, "1.11111E+19"],
+    ["1111111111111111111111", 1.11111111111111e21, "1.11111E+21"],
+  ] as const)(
+    "conversion of %s matches its SUM display and undo restores every digit",
+    async (value, numeric, display) => {
+      const { grid, sheet, enter } = await setup();
+      const address = { row: 0, column: 0 };
+      const sumAddress = { row: 1, column: 0 };
+      setCellContent(sheet, sumAddress, { kind: "formula", formula: { source: "=SUM(A1)" } });
+      await enter(value);
+      await grid.get("[data-sheet-cell-error-trigger]").trigger("click");
+      await new DOMWrapper(document.body)
+        .get('[data-sheet-cell-error-action="convert-number"]')
+        .trigger("click");
+      await flushPromises();
+      expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value: numeric });
+      expect(getCellStyle(sheet, address)?.numberFormat).toBeUndefined();
+      expect(grid.getComponent(CellEditor).props("displayValue")).toBe(display);
+      expect(createSheetEvaluator(sheet).getComputedValue(sumAddress)).toBe(numeric);
+      grid.vm.$emit(
+        "viewStateChange",
+        createSheetGridViewState({
+          selection: { active: sumAddress, anchor: sumAddress, focus: sumAddress, mode: "cells" },
+        }),
+      );
+      await flushPromises();
+      expect(grid.getComponent(CellEditor).props("displayValue")).toBe(display);
+      expect(grid.props("errorCells")).toEqual(new Set());
+      grid.vm.$emit("undo");
+      await flushPromises();
+      expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value });
+      expect(getCellStyle(sheet, address)?.numberFormat).toBeUndefined();
+      expect(grid.props("errorCells")).toEqual(new Set(["0:0"]));
+    },
+  );
 });
