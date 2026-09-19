@@ -3,7 +3,7 @@ import { ref, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Tabs, TabPanel } from "tdesign-vue-next/es/tabs";
+import OptionList from "../../../shared/option-list/OptionList.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { ErrorCheckSettings } from "../duplicate-error-preferences";
 import ErrorIndicatorColorControl from "./ErrorIndicatorColorControl.vue";
@@ -51,7 +51,6 @@ watch(
     aria-modal="true"
     placement="center"
     width="min(640px, calc(100vw - 32px))"
-    class="error-check-options-dialog"
     :visible="visible"
     :header="t('dataTools.duplicates.errorChecks.optionsTitle')"
     :aria-label="t('dataTools.duplicates.errorChecks.title')"
@@ -59,136 +58,146 @@ watch(
     :confirm-on-enter="false"
     @close="close"
   >
-    <Tabs v-if="visible" value="error-checking" class="error-check-options-dialog__tabs">
-      <TabPanel value="error-checking" :label="t('dataTools.duplicates.errorChecks.category')">
-        <div class="duplicate-error-check-options-dialog__content">
-          <section class="duplicate-error-check-options-dialog__section">
-            <h3>{{ t("dataTools.duplicates.errorChecks.settings") }}</h3>
-            <TCheckbox
-              v-model="draft.enabled"
-              class="duplicate-error-check-options-dialog__enabled"
-              data-duplicate-error-checks-enabled
-            >
-              {{ t("dataTools.duplicates.errorChecks.enabled") }}
+    <div v-if="visible" class="duplicate-error-check-options-dialog">
+      <div class="duplicate-error-check-options-dialog__categories">
+        <h3>{{ t("cellFormat.category") }}</h3>
+        <OptionList
+          class="duplicate-error-check-options-dialog__category-list"
+          model-value="error-checking"
+          :options="[
+            { value: 'error-checking', label: t('dataTools.duplicates.errorChecks.category') },
+          ]"
+          :label="t('cellFormat.category')"
+          variant="navigation"
+        />
+      </div>
+      <div class="duplicate-error-check-options-dialog__content">
+        <section class="duplicate-error-check-options-dialog__section">
+          <h3>{{ t("dataTools.duplicates.errorChecks.settings") }}</h3>
+          <TCheckbox
+            v-model="draft.enabled"
+            class="duplicate-error-check-options-dialog__enabled"
+            data-duplicate-error-checks-enabled
+          >
+            {{ t("dataTools.duplicates.errorChecks.enabled") }}
+          </TCheckbox>
+          <div class="duplicate-error-check-options-dialog__color-row">
+            <span class="duplicate-error-check-options-dialog__field-label">
+              {{ t("dataTools.duplicates.errorChecks.indicatorColor") }}
+            </span>
+            <ErrorIndicatorColorControl
+              :model-value="draft.indicatorColor"
+              :label="t('dataTools.duplicates.errorChecks.indicatorColor')"
+              :automatic-label="t('dataTools.duplicates.errorChecks.automaticColor')"
+              :disabled="!draft.enabled"
+              @select="draft.indicatorColor = $event"
+            />
+          </div>
+        </section>
+        <section class="duplicate-error-check-options-dialog__section">
+          <h3>{{ t("dataTools.duplicates.errorChecks.rules") }}</h3>
+          <div class="duplicate-error-check-options-dialog__rules">
+            <TCheckbox v-model="draft.duplicateEntries" :disabled="!draft.enabled">
+              <span class="duplicate-error-check-options-dialog__rule-label">{{
+                t("dataTools.duplicates.errorChecks.duplicateEntries")
+              }}</span>
             </TCheckbox>
-            <div class="duplicate-error-check-options-dialog__color-row">
-              <span class="duplicate-error-check-options-dialog__field-label">
-                {{ t("dataTools.duplicates.errorChecks.indicatorColor") }}
-              </span>
-              <ErrorIndicatorColorControl
-                :model-value="draft.indicatorColor"
-                :label="t('dataTools.duplicates.errorChecks.indicatorColor')"
-                :automatic-label="t('dataTools.duplicates.errorChecks.automaticColor')"
-                :disabled="!draft.enabled"
-                @select="draft.indicatorColor = $event"
-              />
-            </div>
-          </section>
-          <section class="duplicate-error-check-options-dialog__section">
-            <h3>{{ t("dataTools.duplicates.errorChecks.rules") }}</h3>
-            <div class="duplicate-error-check-options-dialog__rules">
-              <TCheckbox v-model="draft.duplicateEntries" :disabled="!draft.enabled">
-                <span class="duplicate-error-check-options-dialog__rule-label">{{
-                  t("dataTools.duplicates.errorChecks.duplicateEntries")
-                }}</span>
-              </TCheckbox>
-              <TCheckbox disabled
-                ><span class="duplicate-error-check-options-dialog__rule-label"
-                  >{{ t("dataTools.duplicates.errorChecks.formulaError") }}
-                  <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-                ></TCheckbox
-              >
-              <TCheckbox disabled
-                ><span class="duplicate-error-check-options-dialog__rule-label"
-                  >{{ t("dataTools.duplicates.errorChecks.numberStoredAsText") }}
-                  <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-                ></TCheckbox
-              >
-              <TCheckbox disabled
-                ><span class="duplicate-error-check-options-dialog__rule-label"
-                  >{{ t("dataTools.duplicates.errorChecks.twoDigitYear") }}
-                  <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-                ></TCheckbox
-              >
-              <TCheckbox disabled
-                ><span class="duplicate-error-check-options-dialog__rule-label"
-                  >{{ t("dataTools.duplicates.errorChecks.inconsistentFormula") }}
-                  <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-                ></TCheckbox
-              >
-              <TCheckbox disabled
-                ><span class="duplicate-error-check-options-dialog__rule-label"
-                  >{{ t("dataTools.duplicates.errorChecks.formulaOmittingCells") }}
-                  <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-                ></TCheckbox
-              >
-              <TCheckbox disabled
-                ><span class="duplicate-error-check-options-dialog__rule-label"
-                  >{{ t("dataTools.duplicates.errorChecks.unlockedFormula") }}
-                  <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-                ></TCheckbox
-              >
-              <TCheckbox disabled
-                ><span class="duplicate-error-check-options-dialog__rule-label"
-                  >{{ t("dataTools.duplicates.errorChecks.formulaRefersToEmpty") }}
-                  <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-                ></TCheckbox
-              >
-              <TCheckbox disabled
-                ><span class="duplicate-error-check-options-dialog__rule-label"
-                  >{{ t("dataTools.duplicates.errorChecks.dataValidation") }}
-                  <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-                ></TCheckbox
-              >
-              <TCheckbox disabled
-                ><span class="duplicate-error-check-options-dialog__rule-label"
-                  >{{ t("dataTools.duplicates.errorChecks.leadingTrailingSpaces") }}
-                  <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-                ></TCheckbox
-              >
-              <TCheckbox disabled
-                ><span class="duplicate-error-check-options-dialog__rule-label"
-                  >{{ t("dataTools.duplicates.errorChecks.calculatedColumn") }}
-                  <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-                ></TCheckbox
-              >
-              <TCheckbox disabled
-                ><span class="duplicate-error-check-options-dialog__rule-label"
-                  >{{ t("dataTools.duplicates.errorChecks.calculationIncomplete") }}
-                  <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-                ></TCheckbox
-              >
-              <TCheckbox disabled
-                ><span class="duplicate-error-check-options-dialog__rule-label"
-                  >{{ t("dataTools.duplicates.errorChecks.irregularDate") }}
-                  <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-                ></TCheckbox
-              >
-            </div>
-          </section>
-          <section class="duplicate-error-check-options-dialog__reset">
-            <TButton
-              variant="outline"
-              :disabled="ignoredCount === 0"
-              :title="
-                ignoredCount === 0
-                  ? t('dataTools.duplicates.errorChecks.resetIgnoredHint')
-                  : undefined
-              "
-              :class="{ 'is-selected': resetIgnored }"
-              data-duplicate-error-reset-ignored
-              @click="toggleResetIgnored"
-              >{{
-                t("dataTools.duplicates.errorChecks.resetIgnored", { count: ignoredCount })
-              }}</TButton
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.formulaError") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
             >
-            <p v-if="resetIgnored">
-              {{ t("dataTools.duplicates.errorChecks.resetPending", { count: ignoredCount }) }}
-            </p>
-          </section>
-        </div>
-      </TabPanel>
-    </Tabs>
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.numberStoredAsText") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.twoDigitYear") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.inconsistentFormula") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.formulaOmittingCells") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.unlockedFormula") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.formulaRefersToEmpty") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.dataValidation") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.leadingTrailingSpaces") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.calculatedColumn") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.calculationIncomplete") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.irregularDate") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+          </div>
+        </section>
+        <section class="duplicate-error-check-options-dialog__reset">
+          <TButton
+            variant="outline"
+            :disabled="ignoredCount === 0"
+            :title="
+              ignoredCount === 0
+                ? t('dataTools.duplicates.errorChecks.resetIgnoredHint')
+                : undefined
+            "
+            :class="{ 'is-selected': resetIgnored }"
+            data-duplicate-error-reset-ignored
+            @click="toggleResetIgnored"
+            >{{
+              t("dataTools.duplicates.errorChecks.resetIgnored", { count: ignoredCount })
+            }}</TButton
+          >
+          <p v-if="resetIgnored">
+            {{ t("dataTools.duplicates.errorChecks.resetPending", { count: ignoredCount }) }}
+          </p>
+        </section>
+      </div>
+    </div>
     <template #footer>
       <div class="duplicate-error-check-options-dialog__actions">
         <TButton variant="outline" data-duplicate-error-cancel @click="close">{{
@@ -203,20 +212,36 @@ watch(
 </template>
 
 <style scoped lang="scss">
-.error-check-options-dialog__tabs {
-  display: flex;
-  flex-direction: column;
-  height: min(508px, calc(100dvh - 192px));
-}
-
 .duplicate-error-check-options-dialog {
+  display: grid;
+  grid-template-columns: 144px minmax(0, 1fr);
+  gap: 16px;
+  height: min(508px, calc(100dvh - 192px));
+  min-height: 0;
+  color: var(--idea-text-primary);
+  font-size: var(--idea-font-size-body-medium);
+  line-height: var(--idea-line-height-body-medium);
+
+  &__categories {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  &__category-list {
+    flex: 1;
+    min-height: 0;
+  }
+
   &__content {
     display: grid;
-    gap: 16px;
-    padding: 12px 2px 4px;
-    color: var(--idea-text-primary);
-    font-size: var(--idea-font-size-body-medium);
-    line-height: var(--idea-line-height-body-medium);
+    align-content: start;
+    gap: 12px;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
   }
 
   &__section {
@@ -225,17 +250,17 @@ watch(
     min-width: 0;
   }
 
-  &__content h3,
-  &__content p {
+  h3,
+  p {
     margin: 0;
   }
 
-  &__content h3 {
+  h3 {
     font-size: inherit;
     font-weight: var(--idea-font-weight-semibold);
   }
 
-  &__content p {
+  p {
     color: var(--idea-text-secondary);
     font-size: var(--idea-font-size-body-small);
     line-height: var(--idea-line-height-body-small);
