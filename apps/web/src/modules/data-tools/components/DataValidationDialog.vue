@@ -155,9 +155,11 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
       </TTabPanel>
       <TTabPanel value="input" :label="t('dataTools.validation.inputMessage')">
         <div class="validation-dialog__form">
-          <TCheckbox v-model="draft.showInputMessage">{{
-            t("dataTools.validation.showMessage")
-          }}</TCheckbox>
+          <div class="validation-dialog__options">
+            <TCheckbox v-model="draft.showInputMessage">{{
+              t("dataTools.validation.showMessage")
+            }}</TCheckbox>
+          </div>
           <div class="validation-dialog__field">
             <span>{{ t("dataTools.validation.titleLabel") }}</span>
             <TInput v-model="draft.inputTitle" :aria-label="t('dataTools.validation.titleLabel')" />
@@ -174,9 +176,11 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
       </TTabPanel>
       <TTabPanel value="error" :label="t('dataTools.validation.errorAlert')">
         <div class="validation-dialog__form">
-          <TCheckbox v-model="draft.showErrorAlert">{{
-            t("dataTools.validation.errorAlert")
-          }}</TCheckbox>
+          <div class="validation-dialog__options">
+            <TCheckbox v-model="draft.showErrorAlert">{{
+              t("dataTools.validation.errorAlert")
+            }}</TCheckbox>
+          </div>
           <div class="validation-dialog__field">
             <span>{{ t("dataTools.validation.style") }}</span>
             <TSelect
