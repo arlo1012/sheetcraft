@@ -1,94 +1,66 @@
 # idea10 Agent Protocol
 
-## Product State
+## Scope
 
-- This branch is a clean implementation with no compatibility obligation to
-  the previous frontend structure.
-- Add only behavior requested for the new implementation.
-- The `refactor/ui-style-v2` branch is an optional reference when historical
-  behavior would resolve a concrete uncertainty. It is neither required nor
-  authoritative; implement current requirements against the new architecture.
+- Implement only requested behavior against the new architecture; no compatibility
+  obligation to the previous frontend. Consult `refactor/ui-style-v2` only as an
+  optional, non-authoritative reference for concrete uncertainties.
 
 ## Technology
 
-- Vue 3 with `<script setup lang="ts">` and strict TypeScript.
-- Vite and Bun for development and builds.
-- TDesign Vue is the primary Web UI framework. Use its public APIs directly
-  when they fit the product contract; do not create one-to-one wrapper
-  components without a repeated product-level need.
-- Product-owned CSS variables and layers for stable design tokens.
-- SCSS `@use` modules for shared tokens and base styles.
-- Scoped SCSS for complex component-specific states.
-- Keep necessary TDesign theme mapping and internal overrides in the shared
-  TDesign adapter layer. Feature components must not override TDesign internals.
-- Lucide Vue is the primary icon set. Add Iconify only when a confirmed domain
-  icon cannot be expressed by Lucide.
-- Follow the concise [Web UI standards](docs/standards/web-ui.md) for operation
-  popovers, spacing ownership, and component-library integration.
+- Vue 3 (`<script setup lang="ts">`), strict TypeScript, Vite, and Bun.
+- Use TDesign Vue as the primary Web UI framework; use public APIs directly when they fit.
+  No one-to-one wrappers
+  without a repeated product need. Keep theme mapping and internal overrides in
+  the shared TDesign adapter, never in feature components.
+- Use product-owned CSS variables/layers for stable tokens, SCSS `@use` for shared
+  tokens/base styles, and scoped SCSS for complex component states.
+- Prefer Lucide Vue; add Iconify only for confirmed domain icons Lucide cannot express.
+- Follow [Web UI standards](docs/standards/web-ui.md) for operation popovers,
+  spacing ownership, and component-library integration.
 
-## Tool Composition
+## Composition
 
-- Build each tool or cohesive tool group as a concrete Vue component.
-- Import and compose tool components explicitly in the owning Vue template.
-- Do not render tools from TypeScript schema arrays, generic component
-  registries, or `<component :is>` factories.
-- TypeScript objects may model data, state, permissions, and command payloads;
-  they must not model the visual component tree.
-- Before implementing a feature, search the existing modules, components, and
-  composables for a suitable capability or abstraction to reuse.
-- Consider whether the same interaction or component will recur in later
-  features. Extract a loosely coupled common component when the repeated
-  contract is clear; keep genuinely one-off behavior inside its owning module.
-- Extract shared primitives only when they remove real duplication while
-  keeping feature components independently understandable.
+- Implement each tool or cohesive group as a concrete Vue component, explicitly
+  imported and composed in its owner's template. No schema arrays, generic
+  registries, or `<component :is>` factories. TypeScript objects model data, state,
+  permissions, and command payloads, never the visual component tree.
+- Search existing modules, components, and composables before implementing.
+  Consider future reuse; extract loosely coupled components for clear repeated
+  contracts and shared primitives for real duplication. Keep features independently
+  understandable and one-off behavior local.
+- Prefer typed props, emits, and slots. Keep files focused; avoid barrels that hide
+  ownership and implementation-heavy index files. Package entrypoints must be thin,
+  explicit public APIs. Add dependencies only for implemented requirements.
 
 ## Module Boundaries
 
-- Keep repository orchestration at the workspace root and Web application code
-  in `apps/web`.
-- `packages/core` owns runtime-neutral workbook state, commands, history,
-  serialization, and domain errors. It must not depend on Vue, DOM APIs,
-  TDesign, i18n, storage, or networking.
-- `packages/sheet-engine` owns runtime-neutral Sheet geometry, selection, view
-  state, and interaction contracts. It may depend on `@idea10/core`, never on
-  the Web application.
-- Keep Web application bootstrap and top-level composition in
-  `apps/web/src/app`.
-- Put each Web product capability in `apps/web/src/modules/<feature>`.
-- A module owns its components, state, commands, tests, and local styles.
-- Move Web code to `apps/web/src/shared` only after multiple modules need the
-  same stable contract or primitive.
-- Dependencies flow from apps to packages and from `sheet-engine` to `core`.
-  Packages must never import application code.
-- Route user document edits through Core commands so history and change
-  notification stay consistent. Persist only versioned snapshots through Web
-  storage or transport adapters.
-- Avoid barrel files that hide ownership or accumulate implementation logic.
-  Package entrypoints are allowed only as thin, explicit public API surfaces.
+- Workspace root: repository orchestration. `apps/web`: Web application.
+- `packages/core`: runtime-neutral workbook state, commands, history, serialization,
+  and domain errors; no Vue, DOM, TDesign, i18n, storage, or networking dependencies.
+- `packages/sheet-engine`: runtime-neutral Sheet geometry, selection, view state,
+  and interaction contracts. Dependencies flow apps → packages, sheet-engine → core;
+  packages never import application code.
+- Within `apps/web/src`: `app` owns bootstrap/top-level composition;
+  `modules/<feature>` owns each capability's components, state, commands, tests, and
+  local styles; `shared` accepts only stable contracts/primitives needed by multiple modules.
+- Route document edits through Core commands for consistent history/notifications.
+  Persist only versioned snapshots through Web storage/transport adapters.
 
-## Engineering
+## Verification & Delivery
 
-- Keep this file concise and limited to stable collaboration, architecture, and
-  verification rules. Do not record feature behavior, task status, business
-  checklists, or historical implementation notes here.
-- Keep files focused and avoid implementation-heavy index files.
-- Prefer typed props, emits, and slots for component contracts.
-- Add dependencies only when an implemented requirement needs them.
-- Mirror source ownership in each workspace's test tree, then split each
-  matching test directory into small scenario-focused files. Treat that
-  directory as the aggregate test entry for its source capability.
-- Test `core` and `sheet-engine` in a Node environment. Browser and DOM test
-  environments belong to the Web application only.
-- For small, localized UI or styling changes, prioritize direct implementation
-  and run only a minimal formatting or static check. Do not add or run unit
-  tests, full typechecks, builds, bundle checks, or browser/screenshot
-  verification by default.
-- Use user feedback for visual acceptance. Avoid repeated inspections and
-  verification loops; expand checks only when explicitly requested, needed to
-  investigate an observed failure, or justified by a substantial correctness risk.
-- For changes affecting shared contracts or workbook correctness, run focused
-  tests for the affected feature or module. Keep other checks scoped, and do not
-  run the full suite unless the affected boundary requires it or the user asks.
-- After completing and verifying a small, self-contained requirement, commit it
-  promptly with a conventional commit message. Keep unrelated changes out of
-  that commit.
+- Mirror source ownership in each workspace's test tree. Use small scenario-focused
+  files, with each matching directory as its capability's aggregate test entry.
+  Test core/sheet-engine in Node; browser/DOM environments belong only to Web.
+- Small, localized UI/style changes: implement directly; run only minimal formatting
+  or static checks. By default, do not add/run unit tests, full typechecks, builds,
+  bundle checks, or browser/screenshot verification.
+- Use user feedback for visual acceptance; avoid repeated verification. Expand checks
+  only on request, observed failure, or substantial correctness risk.
+- Shared-contract/workbook-correctness changes: run focused feature/module tests.
+  Keep other checks scoped; run the full suite only when the boundary requires it
+  or the user asks.
+- Promptly commit completed, verified, self-contained small requirements using
+  conventional commit messages; exclude unrelated changes.
+- Keep this file concise: stable collaboration, architecture, and verification rules
+  only; no feature behavior, task status, business checklists, or historical notes.
