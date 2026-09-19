@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { TriangleAlert, X } from "lucide-vue-next";
+import { Info, TriangleAlert, X } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import type { CellAddress } from "@idea10/core/workbook";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
 
-const props = defineProps<{
-  frame: SheetRenderFrame;
-  address: CellAddress;
-  title: string;
-  message: string;
-  closeLabel: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    frame: SheetRenderFrame;
+    address: CellAddress;
+    title?: string;
+    message: string;
+    closeLabel?: string;
+    tone?: "warning" | "information";
+  }>(),
+  { tone: "information" },
+);
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -63,21 +67,32 @@ const overlay = computed(() => {
   <section
     v-if="overlay.visible"
     ref="noticeRef"
-    class="sheet-input-error-notice"
+    class="sheet-cell-notice"
     :style="overlay.style"
-    role="alert"
-    data-sheet-input-error-notice
+    :class="{
+      'sheet-cell-notice--warning': tone === 'warning',
+      'sheet-cell-notice--dismissible': !!closeLabel,
+    }"
+    :role="tone === 'warning' ? 'alert' : 'status'"
+    data-sheet-cell-notice
     @pointerdown.prevent.stop
     @click.stop
   >
-    <TriangleAlert class="sheet-input-error-notice__icon" :size="28" aria-hidden="true" />
-    <div class="sheet-input-error-notice__content">
-      <strong>{{ title }}</strong>
-      <p>{{ message }}</p>
+    <TriangleAlert
+      v-if="tone === 'warning'"
+      class="sheet-cell-notice__icon"
+      :size="28"
+      aria-hidden="true"
+    />
+    <Info v-else class="sheet-cell-notice__icon" :size="28" aria-hidden="true" />
+    <div class="sheet-cell-notice__content">
+      <strong v-if="title">{{ title }}</strong>
+      <p v-if="message">{{ message }}</p>
     </div>
     <button
+      v-if="closeLabel"
       type="button"
-      class="sheet-input-error-notice__close"
+      class="sheet-cell-notice__close"
       :aria-label="closeLabel"
       @pointerdown.prevent.stop
       @click.stop="emit('close')"
@@ -88,25 +103,39 @@ const overlay = computed(() => {
 </template>
 
 <style scoped lang="scss">
-.sheet-input-error-notice {
+.sheet-cell-notice {
   position: absolute;
   z-index: 20;
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) 18px;
+  grid-template-columns: 28px minmax(0, 1fr);
   column-gap: var(--idea-space-4);
   align-items: start;
   box-sizing: border-box;
   width: 280px;
   padding: var(--idea-tool-panel-padding);
   color: var(--idea-text-primary);
-  background: var(--idea-palette-warning-1);
+  background: var(--idea-surface-panel);
+  pointer-events: none;
   border: 1px solid var(--idea-border-control);
   border-radius: var(--idea-radius-small);
   box-shadow: var(--idea-shadow-menu);
 
+  &--warning {
+    background: var(--idea-palette-warning-1);
+
+    .sheet-cell-notice__icon {
+      color: var(--idea-status-warning);
+    }
+  }
+
+  &--dismissible {
+    grid-template-columns: 28px minmax(0, 1fr) 18px;
+    pointer-events: auto;
+  }
+
   &__icon {
     margin-top: 2px;
-    color: var(--idea-status-warning);
+    color: var(--idea-action-primary);
   }
 
   &__content {
@@ -119,8 +148,12 @@ const overlay = computed(() => {
       line-height: var(--idea-line-height-body-medium);
     }
 
+    strong + p {
+      margin-top: var(--idea-space-1);
+    }
+
     p {
-      margin: var(--idea-space-1) 0 0;
+      margin: 0;
       color: var(--idea-text-primary);
       font-size: var(--idea-font-size-body-small);
       line-height: var(--idea-line-height-body-small);

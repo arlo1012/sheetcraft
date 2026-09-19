@@ -4,6 +4,7 @@ import { computed, ref, watch } from "vue";
 import { columnIndexToLabel } from "@idea10/core/coordinates";
 import type { CellAddress, SheetDimensionAxis } from "@idea10/core/workbook";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
+import SheetCellNotice from "./SheetCellNotice.vue";
 import { useAppI18n } from "../../../shared/i18n";
 
 type OutlineGroup = Readonly<{
@@ -25,6 +26,7 @@ const props = defineProps<{
   filteredColumns?: readonly number[];
   activeCell: CellAddress;
   validationInfo?: ActiveCellValidationInfo;
+  suppressValidationPrompt?: boolean;
   outlineGroups?: readonly OutlineGroup[];
   showOutline: boolean;
   readOnly: boolean;
@@ -105,16 +107,6 @@ const validationButtonStyle = computed(() => {
   return {
     left: `${rect.left + rect.width - 18}px`,
     top: `${rect.top + Math.max(1, (rect.height - 16) / 2)}px`,
-  };
-});
-
-const validationPromptStyle = computed(() => {
-  const rect = activeValidationRect.value;
-  if (!rect || !props.validationInfo?.prompt?.message || validationOpen.value) return;
-  return {
-    left: `${rect.left}px`,
-    top: `${rect.top + rect.height + 2}px`,
-    maxWidth: `${Math.max(180, rect.width * 2)}px`,
   };
 });
 
@@ -251,15 +243,15 @@ watch(
         </button>
       </div>
     </template>
-    <div
-      v-if="validationPromptStyle && validationInfo?.prompt"
-      class="sheet-data-controls__validation-prompt"
-      :style="validationPromptStyle"
-      role="tooltip"
-    >
-      <strong v-if="validationInfo.prompt.title">{{ validationInfo.prompt.title }}</strong>
-      <span>{{ validationInfo.prompt.message }}</span>
-    </div>
+    <SheetCellNotice
+      v-if="validationInfo?.prompt?.message && !validationOpen && !suppressValidationPrompt"
+      :frame="frame"
+      :address="activeCell"
+      :title="validationInfo.prompt.title"
+      :message="validationInfo.prompt.message"
+      tone="information"
+      data-sheet-validation-prompt
+    />
 
     <button
       v-for="control in outlineControls"
@@ -393,21 +385,6 @@ watch(
         outline: none;
       }
     }
-  }
-
-  &__validation-prompt {
-    position: absolute;
-    z-index: 1;
-    display: grid;
-    gap: 2px;
-    padding: 6px 8px;
-    border: 1px solid var(--idea-border-control);
-    border-radius: 4px;
-    color: var(--idea-text-primary);
-    background: var(--idea-surface-panel);
-    box-shadow: var(--idea-shadow-1, 0 2px 8px rgb(0 0 0 / 12%));
-    font-size: 12px;
-    pointer-events: none;
   }
 
   &__outline-levels {

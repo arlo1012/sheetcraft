@@ -100,7 +100,7 @@ import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
 import SheetCellContextMenu from "./SheetCellContextMenu.vue";
 import SheetCellErrorMenu from "./SheetCellErrorMenu.vue";
-import SheetInputErrorNotice from "./SheetInputErrorNotice.vue";
+import SheetCellNotice from "./SheetCellNotice.vue";
 import SheetSurface from "./SheetSurface.vue";
 import SheetAutoFillOptions from "./SheetAutoFillOptions.vue";
 import SheetDataControls, { type ActiveCellValidationInfo } from "./SheetDataControls.vue";
@@ -2361,8 +2361,10 @@ defineExpose({
         />
       </template>
     </SheetSurface>
-    <SheetInputErrorNotice
+    <SheetCellNotice
       v-if="inputError"
+      tone="warning"
+      data-sheet-input-error-notice
       :frame="renderFrame"
       :address="inputError.address"
       :title="inputError.title"
@@ -2390,6 +2392,7 @@ defineExpose({
       :filtered-columns="sheet.filter?.columns.map((entry) => entry.column)"
       :active-cell="activeCell"
       :validation-info="validationInfo"
+      :suppress-validation-prompt="!!inputError"
       :outline-groups="sheet.outlineGroups ?? []"
       :show-outline="showHeaders"
       :read-only="readOnly"
