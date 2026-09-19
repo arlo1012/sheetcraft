@@ -8,6 +8,7 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { useAppI18n } from "../../../shared/i18n";
+import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import type { DataValidationDraft, DataValidationInitial } from "../data-tools-types";
 import {
@@ -20,8 +21,10 @@ const props = withDefaults(
     visible: boolean;
     initial?: DataValidationInitial;
     dateSystem?: ExcelDateSystem;
+    suspended?: boolean;
+    selectReference?: (current: string) => Promise<string | undefined>;
   }>(),
-  { initial: undefined, dateSystem: "1900" },
+  { initial: undefined, dateSystem: "1900", suspended: false, selectReference: undefined },
 );
 const emit = defineEmits<{ close: []; apply: [draft: DataValidationDraft]; clear: [] }>();
 const { t } = useAppI18n();
@@ -80,6 +83,20 @@ const needsSecond = computed(
   () => draft.value.operator === "between" || draft.value.operator === "notBetween",
 );
 const canApply = computed(() => isValidationDraftComplete(draft.value, props.dateSystem));
+const boundPlaceholder = computed(() =>
+  t(
+    draft.value.type === "date"
+      ? "dataTools.validation.dateBoundPlaceholder"
+      : draft.value.type === "time"
+        ? "dataTools.validation.timeBoundPlaceholder"
+        : "dataTools.validation.boundPlaceholder",
+  ),
+);
+async function selectBoundReference(current: string): Promise<string | undefined> {
+  const original = draft.value;
+  const selected = await props.selectReference?.(current);
+  return props.visible && draft.value === original ? selected : undefined;
+}
 </script>
 <template>
   <Dialog
@@ -89,7 +106,7 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
     dialog-class-name="data-validation-dialog"
     width="min(640px, calc(100vw - 32px))"
     :aria-label="t('dataTools.validation.title')"
-    :visible="visible"
+    :visible="visible && !suspended"
     :header="t('dataTools.validation.title')"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
@@ -117,22 +134,22 @@ const canApply = computed(() => isValidationDraftComplete(draft.value, props.dat
             </div>
             <div class="validation-dialog__field">
               <span>{{ t("dataTools.validation.minimum") }}</span>
-              <TInput
+              <RangeReferenceInput
                 v-model="draft.minimum"
-                :aria-label="t('dataTools.validation.minimum')"
-                :placeholder="
-                  draft.type === 'date' ? 'YYYY-MM-DD' : draft.type === 'time' ? 'HH:mm' : ''
-                "
+                :label="t('dataTools.validation.minimum')"
+                :pick-label="t('dataTools.validation.pickMinimum')"
+                :placeholder="boundPlaceholder"
+                :select-reference="selectReference ? selectBoundReference : undefined"
               />
             </div>
             <div v-if="needsSecond" class="validation-dialog__field">
               <span>{{ t("dataTools.validation.maximum") }}</span>
-              <TInput
+              <RangeReferenceInput
                 v-model="draft.maximum"
-                :aria-label="t('dataTools.validation.maximum')"
-                :placeholder="
-                  draft.type === 'date' ? 'YYYY-MM-DD' : draft.type === 'time' ? 'HH:mm' : ''
-                "
+                :label="t('dataTools.validation.maximum')"
+                :pick-label="t('dataTools.validation.pickMaximum')"
+                :placeholder="boundPlaceholder"
+                :select-reference="selectReference ? selectBoundReference : undefined"
               />
             </div>
           </template>

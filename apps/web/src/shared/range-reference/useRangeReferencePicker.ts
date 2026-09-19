@@ -5,7 +5,10 @@ import { getFormulaReferenceTokens } from "../formula-editing/formula-reference-
 import { formatRangeReference } from "./formatRangeReference";
 
 /** An independent reference draft: grid picking never changes the cell edit session. */
-export function useRangeReferencePicker(getSheetName: () => string) {
+export function useRangeReferencePicker(
+  getSheetName: () => string,
+  options: { singleCell?: boolean } = {},
+) {
   const active = ref(false);
   const reference = ref("");
   const tokens = computed(() => getFormulaReferenceTokens(reference.value));
@@ -30,6 +33,7 @@ export function useRangeReferencePicker(getSheetName: () => string) {
     canPickReference: () => active.value,
     pickReference(range: CellRange) {
       if (!active.value) return false;
+      if (options.singleCell) range = { start: range.start, end: range.start };
       reference.value = formatRangeReference(getSheetName(), {
         start: {
           row: Math.min(range.start.row, range.end.row),

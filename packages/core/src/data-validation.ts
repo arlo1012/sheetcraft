@@ -66,7 +66,10 @@ export function resolveDataValidationListValues(
     const target =
       reference?.target ??
       (named
-        ? { sheetId: named.sheetId, range: { start: named.start, end: named.end } }
+        ? {
+            sheetId: named.sheetId,
+            range: { start: named.start, end: named.end },
+          }
         : undefined);
     if (target) {
       const targetSheet = context.workbook.sheets.get(target.sheetId);
@@ -117,6 +120,45 @@ function compare(
       return value <= first;
   }
 }
+
+function evaluateDataValidationBound(
+  formula: string,
+  rule: SheetDataValidation,
+  context: DataValidationEvaluationContext,
+  workbook = context.workbook,
+): number | undefined {
+  formula = formula.trim();
+  if (!formula) return undefined;
+  const literal = Number(formula);
+  if (Number.isFinite(literal)) return literal;
+  if (!workbook || !context.sheet) {
+    const resolved = context.resolveReference?.(formula, context.address);
+    return typeof resolved === "number" && Number.isFinite(resolved) ? resolved : undefined;
+  }
+  const source = formula.startsWith("=") ? formula : `=${formula}`;
+  const probe = { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 };
+  const sheet = workbook.sheets.get(context.sheet.id) ?? context.sheet;
+  const shadowSheet: Sheet = { ...sheet, cells: new Map(sheet.cells) };
+  shadowSheet.cells.set(createCellKey(probe), {
+    content: {
+      kind: "formula",
+      formula: {
+        source: translateFormulaForCopy(source, {
+          row: context.address.row - rule.range.start.row,
+          column: context.address.column - rule.range.start.column,
+        }),
+      },
+    },
+  });
+  const shadowWorkbook: Workbook = {
+    ...workbook,
+    sheets: new Map(workbook.sheets),
+  };
+  shadowWorkbook.sheets.set(shadowSheet.id, shadowSheet);
+  const result = createWorkbookEvaluator(shadowWorkbook, shadowSheet.id).getComputedValue(probe);
+  return typeof result === "number" && Number.isFinite(result) ? result : undefined;
+}
+
 export function validateCellDataValidation(
   rule: SheetDataValidation,
   value: CellValue,
@@ -140,14 +182,16 @@ export function validateCellDataValidation(
         : Number(value);
   if (!Number.isFinite(numeric) || (rule.type === "whole" && !Number.isInteger(numeric)))
     return { valid: false, reason: "type" };
-  const first = Number(rule.formula1);
-  const second = rule.formula2 === undefined ? undefined : Number(rule.formula2);
-  if (
-    rule.operator &&
-    (!Number.isFinite(first) || (second !== undefined && !Number.isFinite(second)))
-  )
+  if (!rule.operator) return { valid: true };
+  const first = rule.formula1
+    ? evaluateDataValidationBound(rule.formula1, rule, context)
+    : undefined;
+  const second = rule.formula2
+    ? evaluateDataValidationBound(rule.formula2, rule, context)
+    : undefined;
+  if (first === undefined || (rule.formula2 !== undefined && second === undefined))
     return { valid: false, reason: "type" };
-  return !rule.operator || compare(rule.operator, numeric, first, second)
+  return compare(rule.operator, numeric, first, second)
     ? { valid: true }
     : { valid: false, reason: "operator" };
 }
@@ -164,10 +208,17 @@ export function validateCellContentDataValidation(
       ? validateCellDataValidation(rule, content.value, context)
       : { valid: false, reason: "type" };
   const target = context.address;
-  const shadowSheet: Sheet = { ...context.sheet, cells: new Map(context.sheet.cells) };
+  const shadowSheet: Sheet = {
+    ...context.sheet,
+    cells: new Map(context.sheet.cells),
+  };
   const candidate = content === null ? undefined : content;
   const current = shadowSheet.cells.get(createCellKey(target)) ?? {};
-  if (candidate) shadowSheet.cells.set(createCellKey(target), { ...current, content: candidate });
+  if (candidate)
+    shadowSheet.cells.set(createCellKey(target), {
+      ...current,
+      content: candidate,
+    });
   else {
     const { content: _content, ...withoutContent } = current;
     shadowSheet.cells.set(createCellKey(target), withoutContent);
@@ -204,27 +255,11 @@ export function validateCellContentDataValidation(
     return result === true ? { valid: true } : { valid: false, reason: "custom" };
   }
   if (rule.operator && rule.formula1) {
-    const evaluateBound = (formula: string): number | undefined => {
-      const probe = { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 };
-      const source = formula.startsWith("=") ? formula : `=${formula}`;
-      shadowSheet.cells.set(createCellKey(probe), {
-        content: {
-          kind: "formula",
-          formula: {
-            source: translateFormulaForCopy(source, {
-              row: target.row - rule.range.start.row,
-              column: target.column - rule.range.start.column,
-            }),
-          },
-        },
-      });
-      const result = createWorkbookEvaluator(shadowWorkbook, shadowSheet.id).getComputedValue(
-        probe,
-      );
-      return typeof result === "number" && Number.isFinite(result) ? result : undefined;
-    };
-    const first = evaluateBound(rule.formula1);
-    const second = rule.formula2 === undefined ? undefined : evaluateBound(rule.formula2);
+    const first = evaluateDataValidationBound(rule.formula1, rule, context, shadowWorkbook);
+    const second =
+      rule.formula2 === undefined
+        ? undefined
+        : evaluateDataValidationBound(rule.formula2, rule, context, shadowWorkbook);
     const numeric =
       rule.type === "textLength"
         ? String(value).length

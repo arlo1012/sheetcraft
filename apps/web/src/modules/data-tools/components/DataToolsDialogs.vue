@@ -32,6 +32,8 @@ withDefaults(
     splitPreview?: readonly string[];
     duplicateCount?: number;
     validationInitial?: DataValidationInitial;
+    validationSuspended?: boolean;
+    selectValidationReference?: (current: string) => Promise<string | undefined>;
     hasSubtotals?: boolean;
   }>(),
   {
@@ -42,6 +44,8 @@ withDefaults(
     splitPreview: () => [],
     duplicateCount: undefined,
     validationInitial: undefined,
+    validationSuspended: false,
+    selectValidationReference: undefined,
     hasSubtotals: false,
   },
 );
@@ -91,6 +95,8 @@ const emit = defineEmits<{
   <DataValidationDialog
     :visible="validationVisible"
     :initial="validationInitial"
+    :suspended="validationSuspended"
+    :select-reference="selectValidationReference"
     :date-system="dateSystem"
     @close="emit('closeValidation')"
     @apply="emit('validation', $event)"

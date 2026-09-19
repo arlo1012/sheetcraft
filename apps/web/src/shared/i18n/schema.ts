@@ -280,6 +280,13 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       operator: string;
       minimum: string;
       maximum: string;
+      pickMinimum: string;
+      pickMaximum: string;
+      selectCell: string;
+      selectCellHint: string;
+      boundPlaceholder: string;
+      dateBoundPlaceholder: string;
+      timeBoundPlaceholder: string;
       source: string;
       ignoreBlank: string;
       dropdown: string;

@@ -531,6 +531,22 @@ const {
   comparisonError,
   comparisonColumns,
 } = dataTools;
+const validationRangePicker = useRangeReferencePicker(() => activeSheet.value.name, {
+  singleCell: true,
+});
+const { active: pickingValidationRange, reference: pickedValidationReference } =
+  validationRangePicker;
+async function selectValidationReference(current: string): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const sheetId = activeSheet.value.id;
+  const selected = await validationRangePicker.selectReference(current);
+  if (session.workbook !== workbook || !dataValidationVisible.value) return undefined;
+  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+  return selected;
+}
+watch(dataValidationVisible, (visible) => {
+  if (!visible) validationRangePicker.cancel();
+});
 const advancedRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingAdvancedRange, reference: pickedAdvancedReference } = advancedRangePicker;
 const advancedRangeField = ref<"listRange" | "criteriaRange" | "destination">();
@@ -575,7 +591,7 @@ const dataToolsModalOpen = computed(
     dataTools.sortVisible.value ||
     dataTools.textToColumnsVisible.value ||
     dataTools.removeDuplicatesVisible.value ||
-    dataTools.validationVisible.value ||
+    (dataValidationVisible.value && !pickingValidationRange.value) ||
     dataTools.subtotalVisible.value ||
     (dataAdvancedFilterVisible.value && !pickingAdvancedRange.value) ||
     (duplicateValuesVisible.value && !pickingDuplicateRange.value) ||
@@ -643,6 +659,7 @@ const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const pickingReferenceRange = computed(
   () =>
+    pickingValidationRange.value ||
     pickingNameRange.value ||
     pickingAdvancedRange.value ||
     pickingDuplicateRange.value ||
@@ -671,13 +688,15 @@ function onWorkspaceWheel(event: WheelEvent): void {
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (pickingReferenceRange.value) {
-    const picker = pickingComparisonRange.value
-      ? comparisonRangePicker
-      : pickingDuplicateRange.value
-        ? duplicateRangePicker
-        : pickingAdvancedRange.value
-          ? advancedRangePicker
-          : nameRangePicker;
+    const picker = pickingValidationRange.value
+      ? validationRangePicker
+      : pickingComparisonRange.value
+        ? comparisonRangePicker
+        : pickingDuplicateRange.value
+          ? duplicateRangePicker
+          : pickingAdvancedRange.value
+            ? advancedRangePicker
+            : nameRangePicker;
     if (event.key === "Escape") picker.cancel();
     else if (event.key === "Enter") picker.confirm();
     else if (event.key === "Tab") return;
@@ -887,6 +906,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :split-preview="dataSplitPreview"
       :duplicate-count="dataDuplicateCount"
       :validation-initial="dataValidationInitial"
+      :validation-suspended="pickingValidationRange"
+      :select-validation-reference="selectValidationReference"
       :has-subtotals="dataHasSubtotals"
       @close-sort="dataTools.closeSort"
       @sort="dataTools.applySort"
@@ -902,6 +923,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @close-subtotal="dataTools.closeSubtotal"
       @subtotal="dataTools.applySubtotal"
       @remove-subtotals="dataTools.removeSubtotals"
+    />
+    <RangeReferencePicker
+      v-if="pickingValidationRange"
+      :reference="pickedValidationReference"
+      :edit-session-id="cellEditSession.id"
+      :title="t('dataTools.validation.selectCell')"
+      :hint="t('dataTools.validation.selectCellHint')"
+      @confirm="validationRangePicker.confirm"
+      @cancel="validationRangePicker.cancel"
     />
     <DuplicateErrorCheckOptionsDialog
       :visible="duplicateErrorOptionsVisible"
@@ -1107,15 +1137,17 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @context-action="contextActions.request"
         :date-system="session.workbook.dateSystem"
         :reference-editor="
-          pickingComparisonRange
-            ? comparisonRangePicker.editor
-            : pickingDuplicateRange
-              ? duplicateRangePicker.editor
-              : pickingAdvancedRange
-                ? advancedRangePicker.editor
-                : pickingNameRange
-                  ? nameRangePicker.editor
-                  : formulaBarRef
+          pickingValidationRange
+            ? validationRangePicker.editor
+            : pickingComparisonRange
+              ? comparisonRangePicker.editor
+              : pickingDuplicateRange
+                ? duplicateRangePicker.editor
+                : pickingAdvancedRange
+                  ? advancedRangePicker.editor
+                  : pickingNameRange
+                    ? nameRangePicker.editor
+                    : formulaBarRef
         "
         :edit-session="cellEditSession"
         :image-asset-urls="imageAssetUrls"

@@ -3,7 +3,7 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { useAppI18n } from "../i18n";
 
-defineProps<{ reference: string; editSessionId?: string }>();
+defineProps<{ reference: string; editSessionId?: string; title?: string; hint?: string }>();
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
 const { t } = useAppI18n();
 </script>
@@ -13,7 +13,7 @@ const { t } = useAppI18n();
     visible
     mode="modeless"
     draggable
-    :header="t('formulaTools.selectRange')"
+    :header="title ?? t('formulaTools.selectRange')"
     :confirm-btn="t('formulaTools.confirmRange')"
     :cancel-btn="t('formulaTools.cancel')"
     :confirm-on-enter="false"
@@ -33,7 +33,7 @@ const { t } = useAppI18n();
       @keydown.esc.stop.prevent="emit('cancel')"
     >
       <TInput :value="reference" readonly :aria-label="t('formulaTools.reference')" />
-      <p class="range-reference-picker__hint">{{ t("formulaTools.selectRangeHint") }}</p>
+      <p class="range-reference-picker__hint">{{ hint ?? t("formulaTools.selectRangeHint") }}</p>
     </div>
   </Dialog>
 </template>

@@ -119,7 +119,13 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   discard their ignored state. Error-check options remain available from the
   Duplicate items menu when checks are off.
 - Set or edit cell validation: whole/decimal numbers, dates, times, text length,
-  literal or range/named-range lists, and custom formulas. Input messages,
+  literal or range/named-range lists, and custom formulas. Minimum/maximum bounds
+  accept typed formulas and cell references, or single-cell picking through the
+  shared reference input. Picking inserts a sheet-qualified absolute reference;
+  cross-sheet picking returns to the original validation target and preserves the
+  dialog draft. Cancel leaves the prior bound unchanged. References are evaluated
+  from current workbook values; typed relative references shift with the validated
+  cell within the rule range. Input messages,
   in-cell dropdowns, Stop/Warning/Information feedback, and partial rule removal
   are supported. Rejected direct edits retain their draft until retry/cancel;
   warning/information values require explicit acceptance.
