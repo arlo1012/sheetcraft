@@ -425,10 +425,10 @@ function assertSheetNameAvailable(
 }
 
 function replaceWorkbookSheets(workbook: Workbook, sheets: readonly Sheet[]): void {
-  workbook.sheets.clear();
-  for (const sheet of sheets) {
-    workbook.sheets.set(sheet.id, sheet);
-  }
+  // Replacing the map publishes the reordered collection in one assignment. In
+  // particular, reactive consumers never observe a transient empty map while an
+  // insertion or move is rebuilding its order.
+  workbook.sheets = new Map(sheets.map((sheet) => [sheet.id, sheet]));
 }
 
 export function insertSheet(workbook: Workbook, sheet: Sheet, index = workbook.sheets.size): void {
@@ -466,8 +466,10 @@ export function removeSheet(workbook: Workbook, sheetId: string): RemovedSheet {
   if (!sheet) {
     throw new Error(`Sheet ${sheetId} disappeared while removing it.`);
   }
-  replaceWorkbookSheets(workbook, sheets);
+  // Publish a surviving active sheet before the removed sheet disappears so a
+  // synchronous observer can resolve the active sheet at each publication.
   workbook.activeSheetId = nextActiveSheetId;
+  replaceWorkbookSheets(workbook, sheets);
   return { sheet, index };
 }
 
