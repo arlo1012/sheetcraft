@@ -172,6 +172,8 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
             ...entry,
             range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
             generatedRows: [...entry.generatedRows],
+            ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
+            ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
           })),
         }
       : {}),

@@ -383,6 +383,8 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       inputTitle: string;
     };
     outline: {
+      product: string;
+      pageBreaks: string;
       group: string;
       ungroup: string;
       rows: string;

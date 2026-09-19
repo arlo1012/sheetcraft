@@ -1,8 +1,11 @@
 import {
   createSheetSparseState,
+  createCellKey,
   createWorkbookEvaluator,
+  replaceSheetSparseState,
   setCellContent,
   type CellRange,
+  type DefinedName,
   type Workbook,
 } from "../workbook.js";
 import { applySheetAxisCommand } from "./structure.js";
@@ -16,9 +19,16 @@ import {
   getSheetOrThrow,
   invalidCommandPayload,
   normalizeRange,
+  parseCellKey,
 } from "./helpers.js";
 
-type SubtotalMetadata = { id: string; range: CellRange; generatedRows: number[] };
+type SubtotalMetadata = {
+  id: string;
+  range: CellRange;
+  generatedRows: number[];
+  summaryBelow?: boolean;
+  pageBreakRows?: number[];
+};
 type SheetWithSubtotals = ReturnType<typeof getSheetOrThrow> & {
   subtotalMetadata?: SubtotalMetadata[];
   outlineGroups?: Array<{
@@ -47,6 +57,8 @@ function functionCode(operation: ApplySubtotalsCommand["operation"]): number {
       return 4;
     case "min":
       return 5;
+    case "product":
+      return 6;
     case "sum":
       return 9;
   }
@@ -59,6 +71,35 @@ function keyForRow(workbook: Workbook, command: ApplySubtotalsCommand, row: numb
   );
 }
 
+function rollbackWorkbookChanges(
+  workbook: Workbook,
+  sheet: SheetWithSubtotals,
+  state: ReturnType<typeof createSheetSparseState>,
+  formulas: Array<{ sheetId: string; address: { row: number; column: number }; source: string }>,
+  names: DefinedName[],
+): void {
+  replaceSheetSparseState(sheet, state);
+  for (const formula of formulas) {
+    const target = workbook.sheets.get(formula.sheetId);
+    const cell = target?.cells.get(createCellKey(formula.address));
+    if (target && cell?.content?.kind === "formula")
+      target.cells.set(createCellKey(formula.address), {
+        ...cell,
+        content: { kind: "formula", formula: { source: formula.source } },
+      });
+  }
+  workbook.definedNames.clear();
+  for (const definition of names)
+    workbook.definedNames.set(definition.id, {
+      ...definition,
+      reference: {
+        sheetId: definition.reference.sheetId,
+        start: { ...definition.reference.start },
+        end: { ...definition.reference.end },
+      },
+    });
+}
+
 export function createApplySubtotalsCommand(
   sheetId: string,
   range: CellRange,
@@ -69,6 +110,9 @@ export function createApplySubtotalsCommand(
     hasHeader?: boolean;
     subtotalId?: string;
     labels?: { subtotal: string; grandTotal: string };
+    replaceExisting?: boolean;
+    pageBreaks?: boolean;
+    summaryBelow?: boolean;
   },
 ): ApplySubtotalsCommand {
   return {
@@ -81,6 +125,9 @@ export function createApplySubtotalsCommand(
     ...(options?.hasHeader ? { hasHeader: true } : {}),
     ...(options?.subtotalId ? { subtotalId: options.subtotalId } : {}),
     ...(options?.labels ? { labels: { ...options.labels } } : {}),
+    ...(options?.replaceExisting ? { replaceExisting: true } : {}),
+    ...(options?.pageBreaks ? { pageBreaks: true } : {}),
+    ...(options?.summaryBelow === false ? { summaryBelow: false } : {}),
   };
 }
 
@@ -89,7 +136,7 @@ export function applyApplySubtotalsCommand(
   command: ApplySubtotalsCommand,
 ): RestoreFullSheetStateCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId) as SheetWithSubtotals;
-  const range = normalizeRange(command.range);
+  let range = normalizeRange(command.range);
   assertCellRange(range);
   if (!command.groupByColumns.length || !command.summaryColumns.length)
     throw invalidCommandPayload("groupByColumns", command.groupByColumns);
@@ -101,109 +148,337 @@ export function applyApplySubtotalsCommand(
     )
   )
     throw invalidCommandPayload("columns", columns);
-  const subtotalId =
-    command.subtotalId ??
-    `subtotal-${range.start.row}-${range.end.row}-${(sheet.subtotalMetadata ?? []).length}`;
-  if ((sheet.subtotalMetadata ?? []).some((entry) => entry.id === subtotalId))
-    throw invalidCommandPayload("subtotalId", command.subtotalId, "Subtotal ID already exists.");
-  const firstDataRow = range.start.row + (command.hasHeader ? 1 : 0);
-  if (firstDataRow > range.end.row) return null;
-  const breaks: number[] = [];
-  const groupStarts: number[] = [firstDataRow];
-  let previousKey = keyForRow(workbook, command, firstDataRow);
-  for (let row = firstDataRow + 1; row <= range.end.row; row += 1) {
-    const key = keyForRow(workbook, command, row);
-    if (key !== previousKey) {
-      breaks.push(row - 1);
-      groupStarts.push(row);
-    }
-    previousKey = key;
-  }
-  breaks.push(range.end.row);
   const before = createSheetSparseState(sheet);
-  let insertedBelow = 0;
-  for (let groupIndex = breaks.length - 1; groupIndex >= 0; groupIndex -= 1) {
-    const endBeforeInsert = breaks[groupIndex]!;
-    const insertAt = endBeforeInsert + 1;
+  const workbookFormulaSources = [...workbook.sheets.values()].flatMap((sourceSheet) =>
+    [...sourceSheet.cells.entries()].flatMap(([key, cell]) =>
+      sourceSheet.id === command.sheetId || cell.content?.kind !== "formula"
+        ? []
+        : [
+            {
+              sheetId: sourceSheet.id,
+              address: parseCellKey(key),
+              source: cell.content.formula.source,
+            },
+          ],
+    ),
+  );
+  const definedNames = [...workbook.definedNames.values()].map((definition) => ({
+    ...definition,
+    reference: {
+      sheetId: definition.reference.sheetId,
+      start: { ...definition.reference.start },
+      end: { ...definition.reference.end },
+    },
+  }));
+  const existingIds = new Set((sheet.subtotalMetadata ?? []).map((entry) => entry.id));
+  let sequence = existingIds.size;
+  let subtotalId = command.subtotalId ?? `subtotal-${range.start.row}-${range.end.row}-${sequence}`;
+  while (!command.subtotalId && existingIds.has(subtotalId))
+    subtotalId = `subtotal-${range.start.row}-${range.end.row}-${++sequence}`;
+  if (existingIds.has(subtotalId))
+    throw invalidCommandPayload("subtotalId", command.subtotalId, "Subtotal ID already exists.");
+  try {
+    if (command.replaceExisting) {
+      const existing = (sheet.subtotalMetadata ?? []).filter(
+        (entry) =>
+          entry.range.start.row <= range.end.row &&
+          entry.range.end.row >= range.start.row &&
+          entry.range.start.column <= range.end.column &&
+          entry.range.end.column >= range.start.column,
+      );
+      const rows = [...new Set(existing.flatMap((entry) => entry.generatedRows))].sort(
+        (a, b) => b - a,
+      );
+      if (existing.length) {
+        range = {
+          start: {
+            row: Math.min(range.start.row, ...existing.map((entry) => entry.range.start.row)),
+            column: Math.min(
+              range.start.column,
+              ...existing.map((entry) => entry.range.start.column),
+            ),
+          },
+          end: {
+            row: Math.max(range.end.row, ...existing.map((entry) => entry.range.end.row)),
+            column: Math.max(range.end.column, ...existing.map((entry) => entry.range.end.column)),
+          },
+        };
+      }
+      for (const row of rows) {
+        applySheetAxisCommand(workbook, {
+          type: "deleteSheetAxis",
+          sheetId: command.sheetId,
+          axis: "row",
+          index: row,
+          count: 1,
+        });
+        range = {
+          ...range,
+          start: {
+            ...range.start,
+            row: row < range.start.row ? range.start.row - 1 : range.start.row,
+          },
+          end: { ...range.end, row: row <= range.end.row ? range.end.row - 1 : range.end.row },
+        };
+      }
+      const ids = new Set(existing.map((entry) => entry.id));
+      sheet.subtotalMetadata = (sheet.subtotalMetadata ?? []).filter((entry) => !ids.has(entry.id));
+      sheet.outlineGroups = (sheet.outlineGroups ?? []).filter(
+        (group) => !existing.some((entry) => group.id.startsWith(`${entry.id}-group-`)),
+      );
+    }
+    const ignoredGeneratedRows = new Set(
+      (sheet.subtotalMetadata ?? []).flatMap((entry) => entry.generatedRows),
+    );
+    const candidateRows = Array.from(
+      { length: range.end.row - range.start.row + 1 },
+      (_, offset) => range.start.row + offset,
+    ).filter(
+      (row) =>
+        row >= range.start.row + Number(command.hasHeader ?? false) &&
+        !ignoredGeneratedRows.has(row),
+    );
+    const firstDataRow = candidateRows[0];
+    if (firstDataRow === undefined) {
+      rollbackWorkbookChanges(workbook, sheet, before, workbookFormulaSources, definedNames);
+      return null;
+    }
+    const breaks: number[] = [];
+    const groupStarts: number[] = [firstDataRow];
+    let previousKey = keyForRow(workbook, command, firstDataRow);
+    let previousRow = firstDataRow;
+    for (const row of candidateRows.slice(1)) {
+      const key = keyForRow(workbook, command, row);
+      if (key !== previousKey) {
+        breaks.push(previousRow);
+        groupStarts.push(row);
+      }
+      previousKey = key;
+      previousRow = row;
+    }
+    breaks.push(candidateRows.at(-1)!);
+    if (command.summaryBelow === false)
+      return applyAboveSubtotals(
+        workbook,
+        command,
+        sheet,
+        range,
+        breaks,
+        groupStarts,
+        firstDataRow,
+        subtotalId,
+        before,
+        workbookFormulaSources,
+        definedNames,
+      );
+    let insertedBelow = 0;
+    for (let groupIndex = breaks.length - 1; groupIndex >= 0; groupIndex -= 1) {
+      const endBeforeInsert = breaks[groupIndex]!;
+      const insertAt = endBeforeInsert + 1;
+      applySheetAxisCommand(workbook, {
+        type: "insertSheetAxis",
+        sheetId: command.sheetId,
+        axis: "row",
+        index: insertAt,
+        count: 1,
+      });
+      const startWithShifts = groupStarts[groupIndex]!;
+      const end = insertAt - 1;
+      for (const column of command.summaryColumns) {
+        setCellContent(
+          sheet,
+          { row: insertAt, column },
+          {
+            kind: "formula",
+            formula: {
+              source: `=SUBTOTAL(${functionCode(command.operation)},${columnName(column)}${startWithShifts + 1}:${columnName(column)}${end + 1})`,
+            },
+          },
+        );
+      }
+      const labelColumn = command.groupByColumns.find(
+        (column) => !command.summaryColumns.includes(column),
+      );
+      if (command.labels && labelColumn !== undefined) {
+        const value = createWorkbookEvaluator(workbook, command.sheetId).getComputedValue({
+          row: startWithShifts,
+          column: labelColumn,
+        });
+        setCellContent(
+          sheet,
+          { row: insertAt, column: labelColumn },
+          {
+            kind: "literal",
+            value: `${value === null ? "" : String(value)} ${command.labels.subtotal}`.trim(),
+          },
+        );
+      }
+      insertedBelow += 1;
+    }
+    const grandTotalRow = range.end.row + insertedBelow + 1;
     applySheetAxisCommand(workbook, {
       type: "insertSheetAxis",
       sheetId: command.sheetId,
       axis: "row",
-      index: insertAt,
+      index: grandTotalRow,
       count: 1,
     });
-    const startWithShifts = groupStarts[groupIndex]!;
-    const end = insertAt - 1;
     for (const column of command.summaryColumns) {
       setCellContent(
         sheet,
-        { row: insertAt, column },
+        { row: grandTotalRow, column },
         {
           kind: "formula",
           formula: {
-            source: `=SUBTOTAL(${functionCode(command.operation)},${columnName(column)}${startWithShifts + 1}:${columnName(column)}${end + 1})`,
+            source: `=SUBTOTAL(${functionCode(command.operation)},${columnName(column)}${firstDataRow + 1}:${columnName(column)}${grandTotalRow})`,
           },
         },
       );
     }
+    const grandLabelColumn = command.groupByColumns.find(
+      (column) => !command.summaryColumns.includes(column),
+    );
+    if (command.labels && grandLabelColumn !== undefined)
+      setCellContent(
+        sheet,
+        { row: grandTotalRow, column: grandLabelColumn },
+        { kind: "literal", value: command.labels.grandTotal },
+      );
+    insertedBelow += 1;
+    // Insertions were made bottom-up; stored row coordinates are already final.
+    const metadata: SubtotalMetadata = {
+      id: subtotalId,
+      range: {
+        start: { ...range.start },
+        end: { row: range.end.row + insertedBelow, column: range.end.column },
+      },
+      // Earlier inserts shift all lower summary rows; persist their final rows.
+      generatedRows: [...breaks.map((end, index) => end + index + 1), grandTotalRow],
+      summaryBelow: true,
+      ...(command.pageBreaks
+        ? { pageBreakRows: groupStarts.slice(1).map((start, index) => start + index + 1) }
+        : {}),
+    };
+    sheet.subtotalMetadata = [...(sheet.subtotalMetadata ?? []), metadata];
+    sheet.outlineGroups = [
+      ...(sheet.outlineGroups ?? []),
+      ...breaks.map((end, index) => ({
+        id: `${metadata.id}-group-${index}`,
+        axis: "row" as const,
+        start: groupStarts[index]! + index,
+        end: end + index,
+        collapsed: false,
+      })),
+    ];
+    return {
+      type: "restoreSheetState",
+      sheetId: command.sheetId,
+      state: before,
+      workbookFormulaSources,
+      definedNames,
+    };
+  } catch (cause) {
+    rollbackWorkbookChanges(workbook, sheet, before, workbookFormulaSources, definedNames);
+    throw cause;
+  }
+}
+
+function applyAboveSubtotals(
+  workbook: Workbook,
+  command: ApplySubtotalsCommand,
+  sheet: SheetWithSubtotals,
+  range: CellRange,
+  breaks: number[],
+  groupStarts: number[],
+  firstDataRow: number,
+  subtotalId: string,
+  before: ReturnType<typeof createSheetSparseState>,
+  workbookFormulaSources: Array<{
+    sheetId: string;
+    address: { row: number; column: number };
+    source: string;
+  }>,
+  definedNames: DefinedName[],
+): RestoreFullSheetStateCommand {
+  for (let index = groupStarts.length - 1; index >= 0; index -= 1) {
+    const row = groupStarts[index]!;
+    applySheetAxisCommand(workbook, {
+      type: "insertSheetAxis",
+      sheetId: command.sheetId,
+      axis: "row",
+      index: row,
+      count: 1,
+    });
+    for (const column of command.summaryColumns)
+      setCellContent(
+        sheet,
+        { row, column },
+        {
+          kind: "formula",
+          formula: {
+            source: `=SUBTOTAL(${functionCode(command.operation)},${columnName(column)}${row + 2}:${columnName(column)}${breaks[index]! + 2})`,
+          },
+        },
+      );
     const labelColumn = command.groupByColumns.find(
       (column) => !command.summaryColumns.includes(column),
     );
     if (command.labels && labelColumn !== undefined) {
       const value = createWorkbookEvaluator(workbook, command.sheetId).getComputedValue({
-        row: startWithShifts,
+        row: row + 1,
         column: labelColumn,
       });
       setCellContent(
         sheet,
-        { row: insertAt, column: labelColumn },
+        { row, column: labelColumn },
         {
           kind: "literal",
           value: `${value === null ? "" : String(value)} ${command.labels.subtotal}`.trim(),
         },
       );
     }
-    insertedBelow += 1;
   }
-  const grandTotalRow = range.end.row + insertedBelow + 1;
   applySheetAxisCommand(workbook, {
     type: "insertSheetAxis",
     sheetId: command.sheetId,
     axis: "row",
-    index: grandTotalRow,
+    index: firstDataRow,
     count: 1,
   });
-  for (const column of command.summaryColumns) {
+  const grandRow = firstDataRow;
+  const totalEnd = range.end.row + groupStarts.length + 1;
+  for (const column of command.summaryColumns)
     setCellContent(
       sheet,
-      { row: grandTotalRow, column },
+      { row: grandRow, column },
       {
         kind: "formula",
         formula: {
-          source: `=SUBTOTAL(${functionCode(command.operation)},${columnName(column)}${firstDataRow + 1}:${columnName(column)}${grandTotalRow})`,
+          source: `=SUBTOTAL(${functionCode(command.operation)},${columnName(column)}${grandRow + 2}:${columnName(column)}${totalEnd + 1})`,
         },
       },
     );
-  }
-  const grandLabelColumn = command.groupByColumns.find(
+  const labelColumn = command.groupByColumns.find(
     (column) => !command.summaryColumns.includes(column),
   );
-  if (command.labels && grandLabelColumn !== undefined)
+  if (command.labels && labelColumn !== undefined)
     setCellContent(
       sheet,
-      { row: grandTotalRow, column: grandLabelColumn },
+      { row: grandRow, column: labelColumn },
       { kind: "literal", value: command.labels.grandTotal },
     );
-  insertedBelow += 1;
-  // Insertions were made bottom-up; stored row coordinates are already final.
+  const generatedRows = [grandRow, ...groupStarts.map((start, index) => start + index + 1)];
   const metadata: SubtotalMetadata = {
     id: subtotalId,
     range: {
       start: { ...range.start },
-      end: { row: range.end.row + insertedBelow, column: range.end.column },
+      end: { row: range.end.row + groupStarts.length + 1, column: range.end.column },
     },
-    // Earlier inserts shift all lower summary rows; persist their final rows.
-    generatedRows: [...breaks.map((end, index) => end + index + 1), grandTotalRow],
+    generatedRows,
+    summaryBelow: false,
+    ...(command.pageBreaks
+      ? { pageBreakRows: groupStarts.slice(1).map((start, index) => start + index + 2) }
+      : {}),
   };
   sheet.subtotalMetadata = [...(sheet.subtotalMetadata ?? []), metadata];
   sheet.outlineGroups = [
@@ -211,12 +486,18 @@ export function applyApplySubtotalsCommand(
     ...breaks.map((end, index) => ({
       id: `${metadata.id}-group-${index}`,
       axis: "row" as const,
-      start: groupStarts[index]! + index,
-      end: end + index,
+      start: groupStarts[index]! + index + 2,
+      end: end + index + 2,
       collapsed: false,
     })),
   ];
-  return { type: "restoreSheetState", sheetId: command.sheetId, state: before };
+  return {
+    type: "restoreSheetState",
+    sheetId: command.sheetId,
+    state: before,
+    workbookFormulaSources,
+    definedNames,
+  };
 }
 
 export function createRemoveSubtotalsCommand(
@@ -236,20 +517,54 @@ export function applyRemoveSubtotalsCommand(
   );
   if (!entries.length) return null;
   const before = createSheetSparseState(sheet);
-  for (const row of entries.flatMap((entry) => entry.generatedRows).sort((a, b) => b - a))
-    applySheetAxisCommand(workbook, {
-      type: "deleteSheetAxis",
+  const workbookFormulaSources = [...workbook.sheets.values()].flatMap((sourceSheet) =>
+    [...sourceSheet.cells.entries()].flatMap(([key, cell]) =>
+      sourceSheet.id === command.sheetId || cell.content?.kind !== "formula"
+        ? []
+        : [
+            {
+              sheetId: sourceSheet.id,
+              address: parseCellKey(key),
+              source: cell.content.formula.source,
+            },
+          ],
+    ),
+  );
+  const definedNames = [...workbook.definedNames.values()].map((definition) => ({
+    ...definition,
+    reference: {
+      sheetId: definition.reference.sheetId,
+      start: { ...definition.reference.start },
+      end: { ...definition.reference.end },
+    },
+  }));
+  try {
+    for (const row of [...new Set(entries.flatMap((entry) => entry.generatedRows))].sort(
+      (a, b) => b - a,
+    ))
+      applySheetAxisCommand(workbook, {
+        type: "deleteSheetAxis",
+        sheetId: command.sheetId,
+        axis: "row",
+        index: row,
+        count: 1,
+      });
+    const removeIds = new Set(entries.map((entry) => entry.id));
+    sheet.subtotalMetadata = (sheet.subtotalMetadata ?? []).filter(
+      (entry) => !removeIds.has(entry.id),
+    );
+    sheet.outlineGroups = (sheet.outlineGroups ?? []).filter(
+      (group) => !entries.some((entry) => group.id.startsWith(`${entry.id}-group-`)),
+    );
+    return {
+      type: "restoreSheetState",
       sheetId: command.sheetId,
-      axis: "row",
-      index: row,
-      count: 1,
-    });
-  const removeIds = new Set(entries.map((entry) => entry.id));
-  sheet.subtotalMetadata = (sheet.subtotalMetadata ?? []).filter(
-    (entry) => !removeIds.has(entry.id),
-  );
-  sheet.outlineGroups = (sheet.outlineGroups ?? []).filter(
-    (group) => !entries.some((entry) => group.id.startsWith(`${entry.id}-group-`)),
-  );
-  return { type: "restoreSheetState", sheetId: command.sheetId, state: before };
+      state: before,
+      workbookFormulaSources,
+      definedNames,
+    };
+  } catch (cause) {
+    rollbackWorkbookChanges(workbook, sheet, before, workbookFormulaSources, definedNames);
+    throw cause;
+  }
 }

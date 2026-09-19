@@ -500,7 +500,21 @@ function transformSheetMetadataForAxis(
               return next === null ? [] : [next];
             })
           : [...entry.generatedRows];
-      return [{ ...entry, range, generatedRows: rows }];
+      const pageBreakRows =
+        axis === "row"
+          ? (entry.pageBreakRows ?? []).flatMap((row) => {
+              const next = transformAxisIndex(row, index, count, maximum, operation);
+              return next === null ? [] : [next];
+            })
+          : [...(entry.pageBreakRows ?? [])];
+      return [
+        {
+          ...entry,
+          range,
+          generatedRows: rows,
+          ...(entry.pageBreakRows ? { pageBreakRows } : {}),
+        },
+      ];
     }),
     duplicateRules: (metadata.duplicateRules ?? []).flatMap((rule) => {
       const range = transformRangeForAxis(rule.range, axis, index, count, maximum, operation);
@@ -972,11 +986,63 @@ export function applyRestoreSheetStateCommand(
   }
 
   const previousState = createSheetSparseState(sheet);
-  return validateCommandPayload("state", command.state, () =>
+  const workbookFormulaSources = command.workbookFormulaSources
+    ? [...workbook.sheets.values()].flatMap((sourceSheet) =>
+        [...sourceSheet.cells.entries()].flatMap(([key, cell]) =>
+          sourceSheet.id === command.sheetId || cell.content?.kind !== "formula"
+            ? []
+            : [
+                {
+                  sheetId: sourceSheet.id,
+                  address: parseCellKey(key),
+                  source: cell.content.formula.source,
+                },
+              ],
+        ),
+      )
+    : undefined;
+  const definedNames = command.definedNames
+    ? [...workbook.definedNames.values()].map((definition) => ({
+        ...definition,
+        reference: {
+          sheetId: definition.reference.sheetId,
+          start: { ...definition.reference.start },
+          end: { ...definition.reference.end },
+        },
+      }))
+    : undefined;
+  const changed = validateCommandPayload("state", command.state, () =>
     replaceSheetSparseState(sheet, command.state),
-  )
-    ? createRestoreSheetStateCommand(command.sheetId, previousState)
-    : null;
+  );
+  if (!changed && !command.workbookFormulaSources && !command.definedNames) return null;
+  for (const formula of command.workbookFormulaSources ?? []) {
+    const targetSheet = workbook.sheets.get(formula.sheetId);
+    const cell = targetSheet?.cells.get(createCellKey(formula.address));
+    if (targetSheet && cell?.content?.kind === "formula")
+      targetSheet.cells.set(createCellKey(formula.address), {
+        ...cell,
+        content: { kind: "formula", formula: { source: formula.source } },
+      });
+  }
+  if (command.definedNames) {
+    workbook.definedNames.clear();
+    for (const definition of command.definedNames)
+      workbook.definedNames.set(definition.id, {
+        ...definition,
+        reference: {
+          sheetId: definition.reference.sheetId,
+          start: { ...definition.reference.start },
+          end: { ...definition.reference.end },
+        },
+      });
+  }
+  return {
+    type: "restoreSheetState",
+    sheetId: command.sheetId,
+    state: previousState,
+    ...(workbookFormulaSources ? { workbookFormulaSources } : {}),
+    ...(definedNames ? { definedNames } : {}),
+  };
 }
 
 export function applySheetAxisCommand(
@@ -1189,6 +1255,12 @@ function transformSheetMetadataForAxisMove(
         ...entry,
         range,
         generatedRows: axis === "row" ? entry.generatedRows.map(map) : [...entry.generatedRows],
+        ...(entry.pageBreakRows
+          ? {
+              pageBreakRows:
+                axis === "row" ? entry.pageBreakRows.map(map) : [...entry.pageBreakRows],
+            }
+          : {}),
       };
     }),
     duplicateRules: (metadata.duplicateRules ?? []).map((rule) => {

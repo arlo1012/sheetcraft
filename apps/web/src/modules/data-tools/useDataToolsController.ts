@@ -712,6 +712,9 @@ export function useDataToolsController(options: Options) {
           draft.function,
           {
             hasHeader: true,
+            replaceExisting: draft.replaceExisting,
+            pageBreaks: draft.pageBreaks,
+            summaryBelow: draft.summaryBelow,
             labels: {
               subtotal: t("dataTools.outline.subtotalLabel"),
               grandTotal: t("dataTools.outline.grandTotalLabel"),

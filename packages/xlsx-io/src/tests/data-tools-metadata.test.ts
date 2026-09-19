@@ -189,6 +189,47 @@ describe("XLSX data-tool metadata", () => {
     );
   });
 
+  test("writes subtotal page breaks and summary placement with OOXML row identifiers", async () => {
+    const workbook = createWorkbook({ id: "book", sheetId: "data", sheetName: "Data" });
+    const sheet = [...workbook.sheets.values()][0]!;
+    sheet.subtotalMetadata = [
+      {
+        id: "subtotal",
+        range: { start: { row: 0, column: 0 }, end: { row: 8, column: 1 } },
+        generatedRows: [3, 6, 8],
+        summaryBelow: false,
+        // These are zero-based first rows of the new printed page.
+        pageBreakRows: [6, 3, 6],
+      },
+    ];
+
+    const xml = strFromU8(
+      unzipSync((await encodeXlsx(workbook)).bytes)["xl/worksheets/sheet1.xml"]!,
+    );
+    expect(xml).toMatch(/<outlinePr\b[^>]*summaryBelow="0"/);
+    expect(xml).toContain(
+      '<rowBreaks count="2" manualBreakCount="2"><brk id="3" max="16383" man="1"/><brk id="6" max="16383" man="1"/></rowBreaks>',
+    );
+  });
+
+  test("writes the below-details outline setting when subtotal metadata requests it", async () => {
+    const workbook = createWorkbook({ id: "book", sheetId: "data", sheetName: "Data" });
+    const sheet = [...workbook.sheets.values()][0]!;
+    sheet.subtotalMetadata = [
+      {
+        id: "subtotal",
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+        generatedRows: [1],
+        summaryBelow: true,
+      },
+    ];
+
+    const xml = strFromU8(
+      unzipSync((await encodeXlsx(workbook)).bytes)["xl/worksheets/sheet1.xml"]!,
+    );
+    expect(xml).toMatch(/<outlinePr\b[^>]*summaryBelow="1"/);
+  });
+
   test("preserves applied advanced-filter visibility without exporting it as an AutoFilter", async () => {
     const workbook = createWorkbook({ id: "book", sheetId: "data", sheetName: "Data" });
     const sheet = [...workbook.sheets.values()][0]!;

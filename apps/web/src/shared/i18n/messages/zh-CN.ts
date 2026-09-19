@@ -388,6 +388,8 @@ export const zhCN = {
       inputTitle: "输入提示",
     },
     outline: {
+      product: "乘积",
+      pageBreaks: "每组数据分页",
       group: "组合",
       ungroup: "取消组合",
       rows: "行",

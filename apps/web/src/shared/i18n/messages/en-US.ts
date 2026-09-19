@@ -398,6 +398,8 @@ export const enUS = {
       inputTitle: "Input message",
     },
     outline: {
+      product: "Product",
+      pageBreaks: "Page break between groups",
       group: "Group",
       ungroup: "Ungroup",
       rows: "Rows",

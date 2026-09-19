@@ -177,7 +177,15 @@ export type SheetOutlineGroup = {
   end: number;
   collapsed: boolean;
 };
-export type SheetSubtotalMetadata = { id: string; range: CellRange; generatedRows: number[] };
+export type SheetSubtotalMetadata = {
+  id: string;
+  range: CellRange;
+  generatedRows: number[];
+  /** Omitted is the legacy below-details layout. */
+  summaryBelow?: boolean;
+  /** Zero-based rows which begin a printed page after a group boundary. */
+  pageBreakRows?: number[];
+};
 export type SheetDuplicateRule = {
   id: string;
   kind: "highlight" | "reject";
@@ -1847,13 +1855,23 @@ function normalizeSheetMetadata(
       !isCellAddressInBounds(entry.range.start) ||
       !isCellAddressInBounds(entry.range.end) ||
       !Array.isArray(entry.generatedRows) ||
-      entry.generatedRows.some((row) => !Number.isInteger(row) || row < 0 || row >= MAX_SHEET_ROWS)
+      entry.generatedRows.some(
+        (row) => !Number.isInteger(row) || row < 0 || row >= MAX_SHEET_ROWS,
+      ) ||
+      (entry.summaryBelow !== undefined && typeof entry.summaryBelow !== "boolean") ||
+      (entry.pageBreakRows !== undefined &&
+        (!Array.isArray(entry.pageBreakRows) ||
+          entry.pageBreakRows.some(
+            (row) => !Number.isInteger(row) || row < 0 || row >= MAX_SHEET_ROWS,
+          )))
     )
       throw new TypeError("Invalid subtotal metadata.");
     return {
       ...entry,
       range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
       generatedRows: [...entry.generatedRows],
+      ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
+      ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
     };
   });
   return {
@@ -1891,6 +1909,8 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
     ...entry,
     range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
     generatedRows: [...entry.generatedRows],
+    ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
+    ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
   }));
   sheet.duplicateRules = (normalized.duplicateRules ?? []).map((rule) => ({
     ...rule,
@@ -2091,6 +2111,8 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
       ...entry,
       range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
       generatedRows: [...entry.generatedRows],
+      ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
+      ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
     })),
     duplicateRules: (sheet.duplicateRules ?? []).map((rule) => ({
       ...rule,
@@ -2143,6 +2165,8 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
     ...entry,
     range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
     generatedRows: [...entry.generatedRows],
+    ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
+    ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
   }));
   sheet.duplicateRules = (nextState.duplicateRules ?? []).map((rule) => ({
     ...rule,

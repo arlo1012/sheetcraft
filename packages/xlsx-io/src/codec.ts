@@ -815,6 +815,13 @@ export async function encodeWithExcelJs(
     for (const index of sheet.hiddenColumns ?? []) {
       output.getColumn(index + 1).hidden = true;
     }
+    const subtotalMetadata = sheet.subtotalMetadata ?? [];
+    const pageBreakRows = subtotalMetadata.some((entry) => entry.pageBreakRows !== undefined)
+      ? subtotalMetadata.flatMap((entry) => entry.pageBreakRows ?? [])
+      : undefined;
+    let summaryBelow: boolean | undefined;
+    for (const entry of subtotalMetadata)
+      if (entry.summaryBelow !== undefined) summaryBelow = entry.summaryBelow;
     dataMetadata.push({
       // Advanced Filter has different criteria semantics. Do not serialize its
       // list range as an ordinary AutoFilter and imply that it is equivalent.
@@ -830,6 +837,8 @@ export async function encodeWithExcelJs(
         const { id: _id, ...value } = group as { id?: unknown } & Record<string, unknown>;
         return value as XlsxDataMetadata["outlineGroups"][number];
       }),
+      ...(pageBreakRows === undefined ? {} : { pageBreakRows }),
+      ...(summaryBelow === undefined ? {} : { summaryBelow }),
     });
     if (sheet.filter?.advanced)
       add(report, "advanced-filter-criteria-omitted", `${sheet.name}.advancedFilter`);

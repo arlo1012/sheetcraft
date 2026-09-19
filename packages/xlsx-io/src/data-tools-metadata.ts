@@ -82,6 +82,10 @@ export type XlsxDataMetadata = {
   hiddenRows: number[];
   dataValidations: XlsxDataValidation[];
   outlineGroups: XlsxOutlineGroup[];
+  /** Zero-based first rows of subsequent printed pages. */
+  pageBreakRows?: number[];
+  /** Worksheet-wide outline summary placement. */
+  summaryBelow?: boolean;
   unsupportedFilters: boolean;
   unsupportedValidations: boolean;
 };
@@ -710,6 +714,53 @@ function writeOutlineGroups(xml: string, groups: readonly XlsxOutlineGroup[]): s
 }
 
 /**
+ * `outlinePr` is worksheet-wide.  We only write it when subtotal metadata
+ * explicitly selected a placement, preserving the existing ExcelJS default for
+ * workbooks that have no subtotal layout option.
+ */
+function writeOutlineSummaryBelow(xml: string, summaryBelow: boolean | undefined): string {
+  if (summaryBelow === undefined) return xml;
+  const outline = (attributes = "") =>
+    `<outlinePr${attributes.replace(/\ssummaryBelow\s*=\s*(["'])[^"']*\1/gi, "")} summaryBelow="${summaryBelow ? "1" : "0"}"/>`;
+  const existing = /<outlinePr\b([^>]*?)(?:\/>|>[\s\S]*?<\/outlinePr>)/i;
+  if (existing.test(xml))
+    return xml.replace(existing, (_match, attributes: string) => outline(attributes));
+  const sheetPr = /<sheetPr\b([^>]*?)(?:\/>|>([\s\S]*?)<\/sheetPr>)/i;
+  if (sheetPr.test(xml))
+    return xml.replace(
+      sheetPr,
+      (_match, attributes: string, content?: string) =>
+        `<sheetPr${attributes}>${content ?? ""}${outline()}</sheetPr>`,
+    );
+  return xml.replace(/<worksheet\b[^>]*>/i, (match) => `${match}<sheetPr>${outline()}</sheetPr>`);
+}
+
+/**
+ * OOXML `brk@id` is the one-based final row of the preceding page.  Product
+ * metadata instead names the zero-based first row on the following page, so
+ * both values are numerically identical (for example, row 3 starts Excel row
+ * 4 and writes id=3).  Apache POI uses the same conversion in XSSFSheet.
+ */
+function writeRowBreaks(xml: string, rows: readonly number[] | undefined): string {
+  if (rows === undefined) return xml;
+  const output = xml.replace(/<rowBreaks\b[^>]*(?:\/>|>[\s\S]*?<\/rowBreaks>)/i, "");
+  const breaks = [...new Set(rows)]
+    .filter(Number.isInteger)
+    .filter((row) => row >= 1 && row < 1_048_576)
+    .sort((left, right) => left - right);
+  if (!breaks.length) return output;
+  const rowBreaks = `<rowBreaks count="${breaks.length}" manualBreakCount="${breaks.length}">${breaks.map((row) => `<brk id="${row}" max="16383" man="1"/>`).join("")}</rowBreaks>`;
+  const after = /<headerFooter\b[^>]*(?:\/>|>[\s\S]*?<\/headerFooter>)/i.test(output)
+    ? /<headerFooter\b[^>]*(?:\/>|>[\s\S]*?<\/headerFooter>)/i
+    : /<pageSetup\b[^>]*\/>/i.test(output)
+      ? /<pageSetup\b[^>]*\/>/i
+      : /<pageMargins\b[^>]*\/>/i.test(output)
+        ? /<pageMargins\b[^>]*\/>/i
+        : /<sheetData\b[^>]*(?:\/>|>[\s\S]*?<\/sheetData>)/i;
+  return output.replace(after, (match) => `${match}${rowBreaks}`);
+}
+
+/**
  * Excel AutoFilter cannot represent Advanced Filter criteria. The generated
  * workbook still needs to open with the same rows visible, including blank
  * rows which ExcelJS does not materialize when only `row.hidden` is assigned.
@@ -779,6 +830,8 @@ export function writeXlsxDataMetadata(
     }
     xml = writeHiddenRows(xml, metadata.hiddenRows);
     xml = writeOutlineGroups(xml, metadata.outlineGroups);
+    xml = writeOutlineSummaryBelow(xml, metadata.summaryBelow);
+    xml = writeRowBreaks(xml, metadata.pageBreakRows);
     entries[path] = strToU8(xml);
   }
 }

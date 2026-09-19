@@ -279,10 +279,13 @@ export type ApplySubtotalsCommand = {
   range: CellRange;
   groupByColumns: number[];
   summaryColumns: number[];
-  operation: "sum" | "count" | "average" | "min" | "max";
+  operation: "sum" | "count" | "average" | "min" | "max" | "product";
   hasHeader?: boolean;
   subtotalId?: string;
   labels?: { subtotal: string; grandTotal: string };
+  replaceExisting?: boolean;
+  pageBreaks?: boolean;
+  summaryBelow?: boolean;
 };
 export type RemoveSubtotalsCommand = {
   type: "removeSubtotals";
@@ -463,6 +466,8 @@ export type RestoreFullSheetStateCommand = {
   type: "restoreSheetState";
   sheetId: string;
   state: SheetSparseState;
+  workbookFormulaSources?: FormulaSourceRestore[];
+  definedNames?: DefinedName[];
 };
 export type SetSheetDuplicateRulesCommand = {
   type: "setSheetDuplicateRules";

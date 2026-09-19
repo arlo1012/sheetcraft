@@ -159,9 +159,17 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   are supported. Rejected direct edits retain their draft until retry/cancel;
   warning/information values require explicit acceptance.
 - Group rows or columns, nest groups, collapse/expand or select outline levels.
-  Subtotals insert SUBTOTAL formulas after contiguous groups and a grand total;
-  Remove All removes their generated rows. Sort by the grouping column first
-  when equal keys are not adjacent.
+  Subtotals insert SUBTOTAL formulas for contiguous groups and a grand total.
+  The dialog supports Sum, Count, Average, Maximum, Minimum and Product, with
+  labels beside the field selectors and checkbox captions beside their controls.
+  Replace Current Subtotals is enabled by default; turn it off to retain existing
+  subtotals and add a further summary layer. Generated subtotal rows do not become
+  grouping keys. Summary Below Data is enabled by default; turn it off to put
+  group totals and the grand total above the details. Page Break Between Groups
+  records manual print breaks between groups. Remove All removes generated rows
+  and their owned outline/page-break metadata. Sort by the grouping column first
+  when equal keys are not adjacent. Applying, replacing and removing subtotals are
+  undoable document edits.
 
 JSON snapshots use version 11 and retain filters, validation, outlines,
 subtotal metadata, and duplicate-owned rules. Duplicate document operations are
@@ -171,7 +179,9 @@ duplicate-owned highlight/rejection rules were omitted because it does not map
 them to a superficially similar conditional-formatting or validation rule.
 Unsupported XLSX filter forms retain import diagnostics. Subtotal formulas
 remain ordinary formulas in XLSX; generated-row ownership is an idea10 snapshot
-feature.
+feature. Subtotal page breaks and outline summary placement are written to XLSX
+for printing in Excel/WPS; XLSX import does not recreate subtotal ownership or
+these product settings. JSON snapshots preserve them.
 Advanced filter rules and result intervals persist in JSON. XLSX export retains
 the hidden-result rows and reports loss of advanced-filter semantics: criteria
 cannot be reapplied after import, and formulas distinguishing filtered rows from

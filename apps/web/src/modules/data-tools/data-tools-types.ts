@@ -83,8 +83,11 @@ export type DataValidationDraft = {
 };
 export type SubtotalDraft = {
   groupColumn: number;
-  function: "count" | "sum" | "average" | "max" | "min";
+  function: "count" | "sum" | "average" | "max" | "min" | "product";
   valueColumns: number[];
+  replaceExisting: boolean;
+  pageBreaks: boolean;
+  summaryBelow: boolean;
 };
 export type DataValidationInitial = Pick<
   SheetDataValidation,
