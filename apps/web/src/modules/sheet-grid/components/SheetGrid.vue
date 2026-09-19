@@ -2343,7 +2343,7 @@ defineExpose({
       :active-cell="activeCell"
       :visible="
         !isEditing &&
-        !referenceEditor &&
+        !referenceEditor?.editingFormula &&
         !!errorCells?.has(`${activeCell.row}:${activeCell.column}`)
       "
       :read-only="readOnly"

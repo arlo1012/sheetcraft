@@ -54,6 +54,7 @@ export type SheetGridFixtureOptions = {
   showGridLines?: boolean;
   showAxisQuickTools?: boolean;
   validationInfo?: ActiveCellValidationInfo;
+  errorCells?: ReadonlySet<string>;
   editSession?: CellEditSession;
   beforeMount?: (sheet: ReturnType<typeof getActiveSheet>) => void;
   evaluator?: (
@@ -86,6 +87,7 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
       showGridLines: options?.showGridLines,
       showAxisQuickTools: options?.showAxisQuickTools,
       validationInfo: options?.validationInfo,
+      errorCells: options?.errorCells,
       editSession: options?.editSession,
       onClearCells(range: CellRange) {
         executeWorkbookCommand(session, createClearCellRangeCommand(sheet.id, range));
