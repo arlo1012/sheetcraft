@@ -1,6 +1,12 @@
 import { ref } from "vue";
-import { describe, expect, test } from "vitest";
-import { createSheetEvaluator, getActiveSheet, setCellValue } from "@idea10/core/workbook";
+import { describe, expect, test, vi } from "vitest";
+import {
+  MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
+  createSheetEvaluator,
+  getActiveSheet,
+  setCellValue,
+} from "@idea10/core/workbook";
 import { createWorkbookSession } from "@idea10/core/history";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import {
@@ -78,6 +84,64 @@ describe("duplicate error checks", () => {
     f.checks.resetIgnored();
     expect([...f.checks.errorCells.value]).toEqual(["0:0", "1:0"]);
     expect(f.checks.ignoredCount.value).toBe(0);
+  });
+
+  test("ignores every duplicate warning in a rectangular selection, while retaining warnings outside it", () => {
+    const f = fixture();
+    setCellValue(f.sheet, { row: 2, column: 0 }, "same");
+    f.sheet.duplicateRules![0]!.range.end.row = 2;
+    setCellValue(f.sheet, { row: 0, column: 1 }, "other");
+    setCellValue(f.sheet, { row: 1, column: 1 }, "other");
+    setCellValue(f.sheet, { row: 2, column: 1 }, "other");
+    setCellValue(f.sheet, { row: 0, column: 2 }, "unique");
+    f.sheet.duplicateRules!.push({
+      id: "reject-b",
+      kind: "reject",
+      range: { start: { row: 0, column: 1 }, end: { row: 2, column: 1 } },
+    });
+    const save = vi.spyOn(f.storage, "setItem");
+
+    f.checks.ignoreRange({
+      start: { row: 0, column: 0 },
+      end: { row: 1, column: 3 },
+    });
+
+    expect([...f.checks.errorCells.value]).toEqual(["2:0", "2:1"]);
+    expect(
+      new Set(readDuplicateErrorChecks(f.storage).ignored.map((item) => item.cellKey)),
+    ).toEqual(new Set(["0:0", "1:0", "0:1", "1:1"]));
+    expect(save).toHaveBeenCalledTimes(1);
+
+    // A reversed repeat neither records blank/unique cells nor duplicates or re-saves exceptions.
+    f.checks.ignoreRange({
+      start: { row: 1, column: 3 },
+      end: { row: 0, column: 0 },
+    });
+    expect(readDuplicateErrorChecks(f.storage).ignored).toHaveLength(4);
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  test("accepts the normalized full-row and full-column selection bounds", () => {
+    const f = fixture();
+    setCellValue(f.sheet, { row: 0, column: 1 }, "other");
+    setCellValue(f.sheet, { row: 1, column: 1 }, "other");
+    f.sheet.duplicateRules!.push({
+      id: "reject-b",
+      kind: "reject",
+      range: { start: { row: 0, column: 1 }, end: { row: 1, column: 1 } },
+    });
+
+    f.checks.ignoreRange({
+      start: { row: 0, column: 0 },
+      end: { row: 0, column: MAX_SHEET_COLUMNS - 1 },
+    });
+    expect([...f.checks.errorCells.value]).toEqual(["1:0", "1:1"]);
+
+    f.checks.ignoreRange({
+      start: { row: 0, column: 0 },
+      end: { row: MAX_SHEET_ROWS - 1, column: 0 },
+    });
+    expect([...f.checks.errorCells.value]).toEqual(["1:1"]);
   });
 
   test("discards an ignored exception after the value changes, so a later return is warned", () => {

@@ -421,8 +421,8 @@ function confirmDuplicateErrorOptions(payload: {
   duplicateErrorChecks.applySettings(payload.settings, payload.resetIgnored);
   closeDuplicateErrorOptions();
 }
-function ignoreCellDuplicateError(address: CellAddress): void {
-  duplicateErrorChecks.ignoreCell(address);
+function ignoreSelectedDuplicateErrors(): void {
+  duplicateErrorChecks.ignoreRange(activeSelectionRange.value);
   void nextTick(focusCellEditor);
 }
 function ignoreAllDuplicateErrors(): void {
@@ -995,7 +995,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :validation-info="activeValidationInfo"
         :error-cells="duplicateErrorCells"
         :error-indicator-color="duplicateCheckSettings.indicatorColor"
-        @ignore-cell-error="ignoreCellDuplicateError"
+        @ignore-selected-cell-errors="ignoreSelectedDuplicateErrors"
         @ignore-all-cell-errors="ignoreAllDuplicateErrors"
         @edit-error-in-formula-bar="editErrorInFormulaBar"
         @error-check-options="openDuplicateErrorOptions"

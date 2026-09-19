@@ -1,8 +1,10 @@
 import { computed, ref, type ComputedRef } from "vue";
 import { getDuplicateEntryIssues } from "@idea10/core/duplicate-values";
+import { isCellInRange, normalizeCellRange } from "@idea10/sheet-engine/selection";
 import {
   createCellKey,
   type CellAddress,
+  type CellRange,
   type Sheet,
   type SheetEvaluator,
   type Workbook,
@@ -71,6 +73,7 @@ export function useDuplicateErrorChecks(options: Options): {
   enabled: ComputedRef<boolean>;
   ignoredCount: ComputedRef<number>;
   ignoreCell: (address: CellAddress) => void;
+  ignoreRange: (range: CellRange) => void;
   ignoreAll: () => void;
   resetIgnored: () => void;
   setEnabled: (enabled: boolean) => void;
@@ -159,28 +162,23 @@ export function useDuplicateErrorChecks(options: Options): {
   });
 
   function ignoreCell(address: CellAddress): void {
-    const snapshot = currentIssues();
-    const cellKey = createCellKey(address);
-    const signature = snapshot.signatures.get(cellKey);
-    if (!signature || ignoredKeys(snapshot).has(cellKey)) return;
-    updatePreferences({
-      ...preferences,
-      ignored: [
-        ...preferences.ignored,
-        {
-          workbookId: snapshot.workbook.id,
-          sheetId: snapshot.sheet.id,
-          cellKey,
-          signature,
-        },
-      ],
-    });
+    ignoreRange({ start: address, end: address });
+  }
+
+  function ignoreRange(range: CellRange): void {
+    const normalized = normalizeCellRange(range.start, range.end);
+    ignoreMatchingIssues((issue) => isCellInRange(issue.address, normalized));
   }
 
   function ignoreAll(): void {
+    ignoreMatchingIssues(() => true);
+  }
+
+  function ignoreMatchingIssues(matches: (issue: DuplicateIssue) => boolean): void {
     const snapshot = currentIssues();
     const ignored = ignoredKeys(snapshot);
     const additions = snapshot.issues
+      .filter(matches)
       .map((issue) => createCellKey(issue.address))
       .filter((cellKey) => !ignored.has(cellKey))
       .map((cellKey) => ({
@@ -231,6 +229,7 @@ export function useDuplicateErrorChecks(options: Options): {
     enabled,
     ignoredCount,
     ignoreCell,
+    ignoreRange,
     ignoreAll,
     resetIgnored,
     setEnabled,

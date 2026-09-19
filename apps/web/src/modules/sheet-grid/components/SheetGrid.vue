@@ -252,7 +252,7 @@ const emit = defineEmits<{
   ];
   outlineToggle: [payload: { id: string; collapsed: boolean }];
   outlineLevel: [payload: { axis: SheetDimensionAxis; level: number }];
-  ignoreCellError: [address: CellAddress];
+  ignoreSelectedCellErrors: [];
   ignoreAllCellErrors: [];
   editErrorInFormulaBar: [];
   errorCheckOptions: [];
@@ -2349,7 +2349,7 @@ defineExpose({
         !!errorCells?.has(`${activeCell.row}:${activeCell.column}`)
       "
       :read-only="readOnly"
-      @ignore="emit('ignoreCellError', { ...activeCell })"
+      @ignore="emit('ignoreSelectedCellErrors')"
       @ignore-all="emit('ignoreAllCellErrors')"
       @edit-formula-bar="emit('editErrorInFormulaBar')"
       @options="emit('errorCheckOptions')"
