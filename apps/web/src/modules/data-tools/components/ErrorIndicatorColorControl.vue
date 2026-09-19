@@ -98,7 +98,9 @@ watch(
     display: inline-flex;
     align-items: center;
     gap: var(--idea-space-2);
+    min-width: 136px;
     min-height: 28px;
+    justify-content: space-between;
     padding: 0 var(--idea-space-3);
     color: var(--idea-text-primary);
     font: inherit;

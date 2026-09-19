@@ -48,139 +48,160 @@ watch(
   <Dialog
     role="dialog"
     aria-modal="true"
-    width="min(580px, calc(100vw - 32px))"
+    placement="center"
+    width="min(860px, calc(100vw - 32px))"
     :visible="visible"
-    :header="t('dataTools.duplicates.errorChecks.title')"
+    :header="t('dataTools.duplicates.errorChecks.optionsTitle')"
     :aria-label="t('dataTools.duplicates.errorChecks.title')"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
     @close="close"
   >
     <div v-if="visible" class="duplicate-error-check-options-dialog">
-      <section class="duplicate-error-check-options-dialog__section">
-        <h3>{{ t("dataTools.duplicates.errorChecks.settings") }}</h3>
-        <TCheckbox v-model="draft.enabled" data-duplicate-error-checks-enabled>
-          {{ t("dataTools.duplicates.errorChecks.enabled") }}
-        </TCheckbox>
-        <span class="duplicate-error-check-options-dialog__field-label">
-          {{ t("dataTools.duplicates.errorChecks.indicatorColor") }}
+      <nav
+        class="duplicate-error-check-options-dialog__navigation"
+        :aria-label="t('dataTools.duplicates.errorChecks.optionsTitle')"
+      >
+        <span class="duplicate-error-check-options-dialog__navigation-item" aria-current="page">
+          {{ t("dataTools.duplicates.errorChecks.category") }}
         </span>
-        <ErrorIndicatorColorControl
-          :model-value="draft.indicatorColor"
-          :label="t('dataTools.duplicates.errorChecks.indicatorColor')"
-          :automatic-label="t('dataTools.duplicates.errorChecks.automaticColor')"
-          :disabled="!draft.enabled"
-          @select="draft.indicatorColor = $event"
-        />
-      </section>
-      <section class="duplicate-error-check-options-dialog__section">
-        <h3>{{ t("dataTools.duplicates.errorChecks.rules") }}</h3>
-        <div class="duplicate-error-check-options-dialog__rules">
-          <TCheckbox v-model="draft.duplicateEntries" :disabled="!draft.enabled">
-            <span class="duplicate-error-check-options-dialog__rule-label">{{
-              t("dataTools.duplicates.errorChecks.duplicateEntries")
-            }}</span>
+      </nav>
+      <div class="duplicate-error-check-options-dialog__content">
+        <section class="duplicate-error-check-options-dialog__section">
+          <h3>{{ t("dataTools.duplicates.errorChecks.settings") }}</h3>
+          <TCheckbox
+            v-model="draft.enabled"
+            class="duplicate-error-check-options-dialog__enabled"
+            data-duplicate-error-checks-enabled
+          >
+            {{ t("dataTools.duplicates.errorChecks.enabled") }}
           </TCheckbox>
-          <TCheckbox disabled
-            ><span class="duplicate-error-check-options-dialog__rule-label"
-              >{{ t("dataTools.duplicates.errorChecks.formulaError") }}
-              <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-            ></TCheckbox
+          <div class="duplicate-error-check-options-dialog__color-row">
+            <span class="duplicate-error-check-options-dialog__field-label">
+              {{ t("dataTools.duplicates.errorChecks.indicatorColor") }}
+            </span>
+            <ErrorIndicatorColorControl
+              :model-value="draft.indicatorColor"
+              :label="t('dataTools.duplicates.errorChecks.indicatorColor')"
+              :automatic-label="t('dataTools.duplicates.errorChecks.automaticColor')"
+              :disabled="!draft.enabled"
+              @select="draft.indicatorColor = $event"
+            />
+          </div>
+        </section>
+        <section class="duplicate-error-check-options-dialog__section">
+          <h3>{{ t("dataTools.duplicates.errorChecks.rules") }}</h3>
+          <div class="duplicate-error-check-options-dialog__rules">
+            <TCheckbox v-model="draft.duplicateEntries" :disabled="!draft.enabled">
+              <span class="duplicate-error-check-options-dialog__rule-label">{{
+                t("dataTools.duplicates.errorChecks.duplicateEntries")
+              }}</span>
+            </TCheckbox>
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.formulaError") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.numberStoredAsText") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.twoDigitYear") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.inconsistentFormula") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.formulaOmittingCells") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.unlockedFormula") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.formulaRefersToEmpty") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.dataValidation") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.leadingTrailingSpaces") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.calculatedColumn") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.calculationIncomplete") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+            <TCheckbox disabled
+              ><span class="duplicate-error-check-options-dialog__rule-label"
+                >{{ t("dataTools.duplicates.errorChecks.irregularDate") }}
+                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
+              ></TCheckbox
+            >
+          </div>
+        </section>
+        <section class="duplicate-error-check-options-dialog__reset">
+          <TButton
+            variant="outline"
+            :disabled="ignoredCount === 0"
+            :title="
+              ignoredCount === 0
+                ? t('dataTools.duplicates.errorChecks.resetIgnoredHint')
+                : undefined
+            "
+            :class="{ 'is-selected': resetIgnored }"
+            data-duplicate-error-reset-ignored
+            @click="toggleResetIgnored"
+            >{{
+              t("dataTools.duplicates.errorChecks.resetIgnored", { count: ignoredCount })
+            }}</TButton
           >
-          <TCheckbox disabled
-            ><span class="duplicate-error-check-options-dialog__rule-label"
-              >{{ t("dataTools.duplicates.errorChecks.numberStoredAsText") }}
-              <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-            ></TCheckbox
-          >
-          <TCheckbox disabled
-            ><span class="duplicate-error-check-options-dialog__rule-label"
-              >{{ t("dataTools.duplicates.errorChecks.twoDigitYear") }}
-              <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-            ></TCheckbox
-          >
-          <TCheckbox disabled
-            ><span class="duplicate-error-check-options-dialog__rule-label"
-              >{{ t("dataTools.duplicates.errorChecks.inconsistentFormula") }}
-              <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-            ></TCheckbox
-          >
-          <TCheckbox disabled
-            ><span class="duplicate-error-check-options-dialog__rule-label"
-              >{{ t("dataTools.duplicates.errorChecks.formulaOmittingCells") }}
-              <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-            ></TCheckbox
-          >
-          <TCheckbox disabled
-            ><span class="duplicate-error-check-options-dialog__rule-label"
-              >{{ t("dataTools.duplicates.errorChecks.unlockedFormula") }}
-              <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-            ></TCheckbox
-          >
-          <TCheckbox disabled
-            ><span class="duplicate-error-check-options-dialog__rule-label"
-              >{{ t("dataTools.duplicates.errorChecks.formulaRefersToEmpty") }}
-              <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-            ></TCheckbox
-          >
-          <TCheckbox disabled
-            ><span class="duplicate-error-check-options-dialog__rule-label"
-              >{{ t("dataTools.duplicates.errorChecks.dataValidation") }}
-              <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-            ></TCheckbox
-          >
-          <TCheckbox disabled
-            ><span class="duplicate-error-check-options-dialog__rule-label"
-              >{{ t("dataTools.duplicates.errorChecks.leadingTrailingSpaces") }}
-              <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-            ></TCheckbox
-          >
-          <TCheckbox disabled
-            ><span class="duplicate-error-check-options-dialog__rule-label"
-              >{{ t("dataTools.duplicates.errorChecks.calculatedColumn") }}
-              <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-            ></TCheckbox
-          >
-          <TCheckbox disabled
-            ><span class="duplicate-error-check-options-dialog__rule-label"
-              >{{ t("dataTools.duplicates.errorChecks.calculationIncomplete") }}
-              <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-            ></TCheckbox
-          >
-          <TCheckbox disabled
-            ><span class="duplicate-error-check-options-dialog__rule-label"
-              >{{ t("dataTools.duplicates.errorChecks.irregularDate") }}
-              <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-            ></TCheckbox
-          >
-        </div>
-      </section>
-      <section class="duplicate-error-check-options-dialog__section">
-        <TButton
-          variant="outline"
-          :disabled="ignoredCount === 0"
-          :title="
-            ignoredCount === 0 ? t('dataTools.duplicates.errorChecks.resetIgnoredHint') : undefined
-          "
-          :class="{ 'is-selected': resetIgnored }"
-          data-duplicate-error-reset-ignored
-          @click="toggleResetIgnored"
-          >{{
-            t("dataTools.duplicates.errorChecks.resetIgnored", { count: ignoredCount })
-          }}</TButton
-        >
-        <p v-if="resetIgnored">
-          {{ t("dataTools.duplicates.errorChecks.resetPending", { count: ignoredCount }) }}
-        </p>
-      </section>
+          <p v-if="resetIgnored">
+            {{ t("dataTools.duplicates.errorChecks.resetPending", { count: ignoredCount }) }}
+          </p>
+        </section>
+      </div>
     </div>
     <template #footer>
-      <TButton variant="outline" data-duplicate-error-cancel @click="close">{{
-        t("dataTools.duplicates.errorChecks.cancel")
-      }}</TButton>
-      <TButton theme="primary" data-duplicate-error-confirm @click="confirm">{{
-        t("dataTools.duplicates.errorChecks.confirm")
-      }}</TButton>
+      <div class="duplicate-error-check-options-dialog__actions">
+        <TButton theme="primary" data-duplicate-error-confirm @click="confirm">{{
+          t("dataTools.duplicates.errorChecks.confirm")
+        }}</TButton>
+        <TButton variant="outline" data-duplicate-error-cancel @click="close">{{
+          t("dataTools.duplicates.errorChecks.cancel")
+        }}</TButton>
+      </div>
     </template>
   </Dialog>
 </template>
@@ -188,48 +209,134 @@ watch(
 <style scoped lang="scss">
 .duplicate-error-check-options-dialog {
   display: grid;
-  gap: var(--idea-space-4);
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: var(--idea-space-3);
+  height: min(460px, calc(100vh - 180px));
+
+  &__navigation {
+    padding: var(--idea-space-1);
+    background: var(--idea-surface-secondary);
+    border: 1px solid var(--idea-border-control);
+  }
+
+  &__navigation-item {
+    display: block;
+    padding: var(--idea-space-3) var(--idea-space-4);
+    color: var(--idea-text-primary);
+    background: var(--idea-surface-active);
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--idea-space-4);
+    min-width: 0;
+    min-height: 0;
+    padding: var(--idea-space-4);
+    overflow: auto;
+    background: var(--idea-surface-panel);
+    border: 1px solid var(--idea-border-control);
+  }
+
   &__section {
     display: grid;
     gap: var(--idea-space-2);
   }
+
   h3,
   p {
     margin: 0;
   }
+
   h3 {
+    display: flex;
+    align-items: center;
+    gap: var(--idea-space-3);
+    color: var(--idea-text-primary);
+    font-size: var(--idea-font-size-body-medium);
+    line-height: var(--idea-line-height-body-medium);
+    font-weight: 400;
+
+    &::after {
+      flex: 1;
+      height: 1px;
+      background: var(--idea-border-control);
+      content: "";
+    }
+  }
+
+  p {
+    color: var(--idea-text-secondary);
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
+  }
+
+  &__enabled {
+    margin-left: var(--idea-space-4);
+  }
+
+  &__color-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--idea-space-3);
+    padding-left: 20px;
+  }
+
+  &__field-label {
     color: var(--idea-text-primary);
     font-size: var(--idea-font-size-body-medium);
     line-height: var(--idea-line-height-body-medium);
   }
-  p {
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-medium);
-  }
-  &__field-label {
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-  }
+
   &__rules {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--idea-space-2) var(--idea-space-4);
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+    gap: var(--idea-space-1);
+    padding-left: var(--idea-space-4);
   }
+
   &__rule-label {
     min-width: 0;
     white-space: normal;
+
+    em {
+      margin-left: var(--idea-space-2);
+      color: var(--idea-text-disabled);
+      font-size: var(--idea-font-size-body-small);
+      font-style: normal;
+    }
   }
-  &__rule-label em {
-    margin-left: var(--idea-space-1);
-    color: var(--idea-text-disabled);
-    font-size: var(--idea-font-size-body-small);
-    font-style: normal;
+
+  &__reset {
+    display: grid;
+    justify-items: start;
+    gap: var(--idea-space-2);
+    margin-top: auto;
+    padding-left: var(--idea-space-4);
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--idea-space-4);
+
+    > * {
+      min-width: 76px;
+    }
   }
 }
-@media (max-width: 520px) {
-  .duplicate-error-check-options-dialog__rules {
-    grid-template-columns: minmax(0, 1fr);
+
+@media (max-width: 560px) {
+  .duplicate-error-check-options-dialog {
+    grid-template-columns: 92px minmax(0, 1fr);
+
+    &__color-row {
+      padding-left: 0;
+    }
   }
 }
 </style>
