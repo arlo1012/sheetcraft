@@ -148,7 +148,9 @@ function apply(): void {
     gap: var(--idea-space-1);
     max-height: 180px;
     padding: var(--idea-space-2);
-    border-color: var(--idea-border-control);
+    border-color: var(--td-border-level-2-color);
+    border-radius: var(--td-radius-default);
+    background: var(--td-bg-color-specialcomponent);
   }
   &__column {
     min-width: max-content;
