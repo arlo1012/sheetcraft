@@ -63,8 +63,8 @@ describe("header painter", () => {
 
       expect(context.fillText).toHaveBeenCalledWith("1", gutter + 48 + 17.5, 34 + gutter);
       expect(context.fillRect).toHaveBeenCalledWith(gutter + 48, 24 + gutter, 35, 20);
-      expect(context.moveTo).toHaveBeenCalledWith(gutter + 47.5, 0);
-      expect(context.lineTo).toHaveBeenCalledWith(gutter + 47.5, frame.size.height);
+      expect(context.moveTo).not.toHaveBeenCalledWith(gutter + 47.5, 0);
+      expect(context.lineTo).not.toHaveBeenCalledWith(gutter + 47.5, frame.size.height);
     },
   );
 

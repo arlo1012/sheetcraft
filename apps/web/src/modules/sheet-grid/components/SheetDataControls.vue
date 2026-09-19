@@ -156,7 +156,7 @@ const outlineControls = computed(() => {
         group.axis === "row"
           ? {
               left: `${2 + (props.outlineControlOffset ?? 0) + (level - 1) * 12}px`,
-              top: `${item.offset + Math.max(1, item.size - 14)}px`,
+              top: `${item.offset + (item.size - 16) / 2}px`,
             }
           : {
               left: `${item.offset + Math.max(1, item.size - 14)}px`,

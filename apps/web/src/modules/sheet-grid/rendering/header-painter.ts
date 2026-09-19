@@ -325,10 +325,6 @@ export function paintSheetHeaders(
   context.strokeStyle = palette.border;
   context.lineWidth = 1;
   context.beginPath();
-  if (quickTools.rowOutlineGutter) {
-    context.moveTo(rowLabelStart - 0.5, 0);
-    context.lineTo(rowLabelStart - 0.5, height);
-  }
   context.moveTo(frame.headerSize.width - 0.5, corner.y);
   context.lineTo(frame.headerSize.width - 0.5, height);
   context.moveTo(corner.x, frame.headerSize.height - 0.5);

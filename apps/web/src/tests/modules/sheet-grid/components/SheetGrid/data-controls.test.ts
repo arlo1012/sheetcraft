@@ -166,8 +166,8 @@ describe("SheetGrid data controls", () => {
         .flatMap((pane) => pane.items)
         .find((item) => item.index === summaryRow)!;
       const control = wrapper.get(".sheet-data-controls__outline");
-      expect((control.element as HTMLElement).style.top).toBe(
-        `${summaryItem.offset + Math.max(1, summaryItem.size - 14)}px`,
+      expect(Number.parseFloat((control.element as HTMLElement).style.top) + 8).toBe(
+        summaryItem.offset + summaryItem.size / 2,
       );
     },
   );
