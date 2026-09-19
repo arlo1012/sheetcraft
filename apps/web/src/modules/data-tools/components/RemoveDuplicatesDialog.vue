@@ -76,7 +76,7 @@ function toggleAll(checked: boolean): void {
           >{{ column.header ? `${column.label} (${column.header})` : column.label }}</TCheckbox
         >
       </div>
-      <p v-if="removalCount !== undefined">
+      <p v-if="removalCount !== undefined" class="remove-duplicates-dialog__summary">
         {{ t("dataTools.removeDuplicates.removed", { count: removalCount }) }}
       </p>
     </div></Dialog
@@ -87,6 +87,12 @@ function toggleAll(checked: boolean): void {
   display: grid;
   gap: var(--idea-space-2);
   min-width: min(360px, calc(100vw - 64px));
+  &__summary {
+    margin: var(--idea-space-2) 0 0;
+    color: var(--idea-text-secondary);
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
+  }
   &__columns {
     display: grid;
     align-content: start;
