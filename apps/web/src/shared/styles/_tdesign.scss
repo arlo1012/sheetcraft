@@ -320,13 +320,15 @@
   font-size: 24px;
 }
 
-.cell-format-dialog {
-  // Dialog always renders a body node; let Tabs own the content layout.
+.cell-format-dialog,
+.error-check-options-dialog {
+  // Tabbed settings dialogs let Tabs own their content layout.
   .t-dialog__body {
     display: contents;
   }
 
-  .cell-format-dialog__tabs {
+  .cell-format-dialog__tabs,
+  .error-check-options-dialog__tabs {
     > .t-tabs__header {
       flex: none;
     }
