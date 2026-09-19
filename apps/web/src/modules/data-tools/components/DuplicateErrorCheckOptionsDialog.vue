@@ -216,7 +216,7 @@ watch(
   display: grid;
   grid-template-columns: 144px minmax(0, 1fr);
   gap: 16px;
-  height: min(508px, calc(100dvh - 192px));
+  max-height: calc(100dvh - 192px);
   min-height: 0;
   color: var(--idea-text-primary);
   font-size: var(--idea-font-size-body-medium);
