@@ -43,6 +43,7 @@ import {
   type CellFormatChange,
   type CellMergeMode,
   type CellValueConversionMode,
+  type CellValueConversionOptions,
   type WorkbookCommand,
   type WorkbookOperation,
 } from "@idea10/core/commands";
@@ -909,6 +910,7 @@ export function useSpreadsheetWorkspaceController(
   function convertNumberType(
     mode: CellValueConversionMode,
     scope: "cell" | "selection" | "sheet" = "selection",
+    conversionOptions?: CellValueConversionOptions,
   ): void {
     if (activeSheet.value.properties.protected || !flushPendingGridEdit()) return;
     try {
@@ -921,7 +923,12 @@ export function useSpreadsheetWorkspaceController(
                 end: { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 },
               }
             : activeSelectionRange.value;
-      const command = createConvertCellValueTypeCommand(activeSheet.value, range, mode);
+      const command = createConvertCellValueTypeCommand(
+        activeSheet.value,
+        range,
+        mode,
+        conversionOptions,
+      );
       if (command.changes.length === 0) {
         showWorkspaceStatus({ key: "workspace.conversionNoMatch" });
         return;

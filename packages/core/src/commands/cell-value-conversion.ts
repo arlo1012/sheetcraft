@@ -6,6 +6,14 @@ import type { CellRange, Sheet } from "../workbook.js";
 
 export type CellValueConversionMode = "text-to-number" | "number-to-text";
 
+/**
+ * Controls the deliberate precision-loss path used by error-correction UI.
+ * Ordinary conversions retain the spreadsheet's safety protection by default.
+ */
+export type CellValueConversionOptions = {
+  allowPrecisionLoss?: boolean;
+};
+
 const NUMBER_PATTERN = /^[+-]?(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
 
 function exceedsSpreadsheetPrecision(value: string): boolean {
@@ -21,17 +29,73 @@ function hasNonZeroMantissa(value: string): boolean {
   return /[1-9]/.test(value.replace(/e.*$/i, ""));
 }
 
-/**
- * Parses only a complete, finite numeric literal. This deliberately excludes
- * dates and text with numeric prefixes, while accepting common displayed
- * thousands separators, percentages, and scientific notation.
- */
-function parseTextNumber(value: string): number | undefined {
+type ParsedTextNumber = {
+  value: number;
+  losesPrecision: boolean;
+};
+
+function incrementDigits(digits: string): string {
+  const characters = digits.split("");
+  for (let index = characters.length - 1; index >= 0; index -= 1) {
+    if (characters[index] === "9") {
+      characters[index] = "0";
+      continue;
+    }
+    characters[index] = String(Number(characters[index]) + 1);
+    return characters.join("");
+  }
+  return `1${characters.join("")}`;
+}
+
+/** Builds a 15-significant-digit numeric literal without relying on binary rounding first. */
+function roundToSpreadsheetPrecision(source: string, percent: boolean): number | undefined {
+  const unsigned = source.replace(/^[+-]/, "");
+  const [mantissa = "", exponentSource = "0"] = unsigned.toLowerCase().split("e");
+  const exponent = Number(exponentSource);
+  const decimalIndex = mantissa.indexOf(".");
+  const digits = mantissa.replace(".", "");
+  const firstSignificant = digits.search(/[1-9]/);
+  if (firstSignificant === -1) return 0;
+
+  let roundedDigits = digits.slice(firstSignificant, firstSignificant + 15);
+  const roundingDigit = digits[firstSignificant + 15];
+  let scientificExponent =
+    exponent + (decimalIndex === -1 ? digits.length : decimalIndex) - firstSignificant - 1;
+  if (roundingDigit && roundingDigit >= "5") {
+    roundedDigits = incrementDigits(roundedDigits);
+    if (roundedDigits.length > 15) {
+      roundedDigits = `1${"0".repeat(14)}`;
+      scientificExponent += 1;
+    }
+  }
+
+  const sign = source.startsWith("-") ? "-" : "";
+  const numeric = Number(
+    `${sign}${roundedDigits[0]}.${roundedDigits.slice(1)}e${scientificExponent - (percent ? 2 : 0)}`,
+  );
+  if (!Number.isFinite(numeric) || (numeric === 0 && hasNonZeroMantissa(source))) return undefined;
+  return numeric;
+}
+
+/** Parses complete, finite numeric literals, including separators, percentages, and exponents. */
+function parseTextNumber(
+  value: string,
+  options: CellValueConversionOptions,
+): ParsedTextNumber | undefined {
   const trimmed = value.trim();
   const isPercent = trimmed.endsWith("%");
   const source = isPercent ? trimmed.slice(0, -1) : trimmed;
-  if (source === "" || !NUMBER_PATTERN.test(source) || exceedsSpreadsheetPrecision(source)) {
+  const losesPrecision = exceedsSpreadsheetPrecision(source);
+  if (
+    source === "" ||
+    !NUMBER_PATTERN.test(source) ||
+    (losesPrecision && !options.allowPrecisionLoss)
+  ) {
     return undefined;
+  }
+  if (losesPrecision) {
+    const numeric = roundToSpreadsheetPrecision(source.replaceAll(",", ""), isPercent);
+    return numeric === undefined ? undefined : { value: numeric, losesPrecision: true };
   }
   const numeric = Number(source.replaceAll(",", ""));
   if (!Number.isFinite(numeric)) return undefined;
@@ -39,7 +103,7 @@ function parseTextNumber(value: string): number | undefined {
   // Number("1e-999") is finite but silently underflows to zero. Preserve a
   // nonzero source as text rather than changing its value during conversion.
   if (!Number.isFinite(result) || (result === 0 && hasNonZeroMantissa(source))) return undefined;
-  return result;
+  return { value: result, losesPrecision: false };
 }
 
 function formatNumberForText(value: number): string {
@@ -70,6 +134,7 @@ export function createConvertCellValueTypeCommand(
   sheet: Sheet,
   range: CellRange,
   mode: CellValueConversionMode,
+  options: CellValueConversionOptions = {},
 ): SetCellContentsCommand {
   if (mode !== "text-to-number" && mode !== "number-to-text") {
     throw new TypeError("Cell value conversion mode must be text-to-number or number-to-text.");
@@ -88,14 +153,22 @@ export function createConvertCellValueTypeCommand(
     if (anchor && (anchor.row !== address.row || anchor.column !== address.column)) continue;
 
     if (mode === "text-to-number" && typeof cell.content.value === "string") {
-      const value = parseTextNumber(cell.content.value);
-      if (value === undefined) continue;
+      const parsed = parseTextNumber(cell.content.value, options);
+      if (parsed === undefined) continue;
       const change: CellContentChange = {
         sheetId: sheet.id,
         address,
-        content: { kind: "literal", value },
+        content: { kind: "literal", value: parsed.value },
       };
-      if (cell.style?.numberFormat) change.style = withoutNumberFormat(cell.style);
+      if (parsed.losesPrecision) {
+        const style = cloneCellStyle(cell.style) ?? {};
+        if (style.numberFormat?.kind !== "scientific") {
+          style.numberFormat = { kind: "scientific", fractionDigits: 2 };
+        }
+        change.style = style;
+      } else if (cell.style?.numberFormat) {
+        change.style = withoutNumberFormat(cell.style);
+      }
       changes.push(change);
       continue;
     }

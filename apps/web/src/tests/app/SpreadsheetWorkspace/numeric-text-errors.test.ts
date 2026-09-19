@@ -3,10 +3,16 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { serializeWorkbook } from "@idea10/core/serialization";
-import { createWorkbook, getCellContent, setCellContent } from "@idea10/core/workbook";
+import {
+  createWorkbook,
+  getCellContent,
+  getCellStyle,
+  setCellContent,
+} from "@idea10/core/workbook";
 import SpreadsheetWorkspace from "../../../app/SpreadsheetWorkspace.vue";
 import { DUPLICATE_ERROR_CHECKS_STORAGE_KEY } from "../../../modules/data-tools/duplicate-error-preferences";
 import { createMemoryImageAssetStore } from "../../../modules/image-assets/imageAssetStore";
+import CellEditor from "../../../modules/sheet-grid/components/CellEditor.vue";
 import SheetGrid from "../../../modules/sheet-grid/components/SheetGrid.vue";
 import { createAppI18n } from "../../../shared/i18n";
 import type { CellEditSession } from "../../../shared/cell-editing/useCellEditSession";
@@ -88,7 +94,7 @@ describe("numeric text cell errors", () => {
     ["convert-number-batch", [0, 1]],
     ["correct-sheet", [0, 1, 3]],
   ] as const)(
-    "routes %s to its intended scope and preserves over-precision text",
+    "routes %s to its intended scope and converts long text only within that scope",
     async (action, convertedRows) => {
       const { grid, sheet, enter } = await setup();
       for (const row of [1, 3]) {
@@ -136,8 +142,37 @@ describe("numeric text cell errors", () => {
       }
       expect(getCellContent(sheet, { row: 4, column: 0 })).toEqual({
         kind: "literal",
-        value: longValue,
+        value: action === "correct-sheet" ? 1.11111111111111e19 : longValue,
       });
+      if (action === "correct-sheet") {
+        expect(getCellStyle(sheet, { row: 4, column: 0 })?.numberFormat).toEqual({
+          kind: "scientific",
+          fractionDigits: 2,
+        });
+      }
     },
   );
+  test("explicit conversion displays long numeric text scientifically and undo restores every original digit", async () => {
+    const { grid, sheet, enter } = await setup();
+    const address = { row: 0, column: 0 };
+    const value = "11111111111111111111";
+    await enter(value);
+    await grid.get("[data-sheet-cell-error-trigger]").trigger("click");
+    await new DOMWrapper(document.body)
+      .get('[data-sheet-cell-error-action="convert-number"]')
+      .trigger("click");
+    await flushPromises();
+    expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value: 1.11111111111111e19 });
+    expect(getCellStyle(sheet, address)?.numberFormat).toEqual({
+      kind: "scientific",
+      fractionDigits: 2,
+    });
+    expect(grid.getComponent(CellEditor).props("displayValue")).toBe("1.11E+19");
+    expect(grid.props("errorCells")).toEqual(new Set());
+    grid.vm.$emit("undo");
+    await flushPromises();
+    expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value });
+    expect(getCellStyle(sheet, address)?.numberFormat).toBeUndefined();
+    expect(grid.props("errorCells")).toEqual(new Set(["0:0"]));
+  });
 });

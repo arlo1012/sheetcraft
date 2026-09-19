@@ -96,8 +96,10 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   detection does not convert or modify their content. The numeric-text menu offers
   Convert to Number for the active cell, batch conversion for the current selection,
   and whole-sheet correction for convertible numeric text on the current worksheet.
-  These reuse the existing conversion command and its precision protection: text
-  with more than 15 significant digits stays unchanged. Each conversion is undoable.
+  These explicitly convert finite text with more than 15 significant digits to
+  numbers rounded to 15 significant digits, using scientific number formatting.
+  Ordinary text-to-number tools retain their precision protection by default.
+  Each conversion is undoable, restoring the original text and formatting.
   The menu describes the active issue, with duplicate violations taking priority
   when both apply. The menu can ignore
   all issues in the current selection,

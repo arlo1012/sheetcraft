@@ -467,7 +467,7 @@ function confirmDuplicateErrorOptions(payload: {
 function convertCellErrorValues(scope: "cell" | "selection" | "sheet"): void {
   if (loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value) return;
   if (!cellEditSession.finish()) return;
-  convertNumberType("text-to-number", scope);
+  convertNumberType("text-to-number", scope, { allowPrecisionLoss: true });
   void nextTick(focusCellEditor);
 }
 function ignoreSelectedDuplicateErrors(): void {
