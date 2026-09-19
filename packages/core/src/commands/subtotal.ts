@@ -1,4 +1,5 @@
 import {
+  MAX_SHEET_COLUMNS,
   createSheetSparseState,
   createCellKey,
   createWorkbookEvaluator,
@@ -69,6 +70,29 @@ function keyForRow(workbook: Workbook, command: ApplySubtotalsCommand, row: numb
   return JSON.stringify(
     command.groupByColumns.map((column) => evaluator.getComputedValue({ row, column })),
   );
+}
+
+function subtotalLabelPlacement(
+  command: ApplySubtotalsCommand,
+): { source: number; target: number } | null {
+  if (!command.labels) return null;
+  const summaryColumns = new Set(command.summaryColumns);
+  const source =
+    command.groupByColumns.find((column) => !summaryColumns.has(column)) ??
+    command.groupByColumns[0]!;
+  let target = source;
+  while (target >= 0 && summaryColumns.has(target)) target -= 1;
+  if (target < 0) {
+    target = source + 1;
+    while (target < MAX_SHEET_COLUMNS && summaryColumns.has(target)) target += 1;
+  }
+  if (target >= MAX_SHEET_COLUMNS)
+    throw invalidCommandPayload(
+      "summaryColumns",
+      command.summaryColumns,
+      "A column is required for subtotal labels.",
+    );
+  return { source, target };
 }
 
 function rollbackWorkbookChanges(
@@ -148,6 +172,7 @@ export function applyApplySubtotalsCommand(
     )
   )
     throw invalidCommandPayload("columns", columns);
+  const labelPlacement = subtotalLabelPlacement(command);
   const before = createSheetSparseState(sheet);
   const workbookFormulaSources = [...workbook.sheets.values()].flatMap((sourceSheet) =>
     [...sourceSheet.cells.entries()].flatMap(([key, cell]) =>
@@ -296,17 +321,14 @@ export function applyApplySubtotalsCommand(
           },
         );
       }
-      const labelColumn = command.groupByColumns.find(
-        (column) => !command.summaryColumns.includes(column),
-      );
-      if (command.labels && labelColumn !== undefined) {
+      if (command.labels && labelPlacement) {
         const value = createWorkbookEvaluator(workbook, command.sheetId).getComputedValue({
           row: startWithShifts,
-          column: labelColumn,
+          column: labelPlacement.source,
         });
         setCellContent(
           sheet,
-          { row: insertAt, column: labelColumn },
+          { row: insertAt, column: labelPlacement.target },
           {
             kind: "literal",
             value: `${value === null ? "" : String(value)} ${command.labels.subtotal}`.trim(),
@@ -335,13 +357,10 @@ export function applyApplySubtotalsCommand(
         },
       );
     }
-    const grandLabelColumn = command.groupByColumns.find(
-      (column) => !command.summaryColumns.includes(column),
-    );
-    if (command.labels && grandLabelColumn !== undefined)
+    if (command.labels && labelPlacement)
       setCellContent(
         sheet,
-        { row: grandTotalRow, column: grandLabelColumn },
+        { row: grandTotalRow, column: labelPlacement.target },
         { kind: "literal", value: command.labels.grandTotal },
       );
     insertedBelow += 1;
@@ -400,6 +419,7 @@ function applyAboveSubtotals(
   }>,
   definedNames: DefinedName[],
 ): RestoreFullSheetStateCommand {
+  const labelPlacement = subtotalLabelPlacement(command);
   for (let index = groupStarts.length - 1; index >= 0; index -= 1) {
     const row = groupStarts[index]!;
     applySheetAxisCommand(workbook, {
@@ -420,17 +440,14 @@ function applyAboveSubtotals(
           },
         },
       );
-    const labelColumn = command.groupByColumns.find(
-      (column) => !command.summaryColumns.includes(column),
-    );
-    if (command.labels && labelColumn !== undefined) {
+    if (command.labels && labelPlacement) {
       const value = createWorkbookEvaluator(workbook, command.sheetId).getComputedValue({
         row: row + 1,
-        column: labelColumn,
+        column: labelPlacement.source,
       });
       setCellContent(
         sheet,
-        { row, column: labelColumn },
+        { row, column: labelPlacement.target },
         {
           kind: "literal",
           value: `${value === null ? "" : String(value)} ${command.labels.subtotal}`.trim(),
@@ -458,13 +475,10 @@ function applyAboveSubtotals(
         },
       },
     );
-  const labelColumn = command.groupByColumns.find(
-    (column) => !command.summaryColumns.includes(column),
-  );
-  if (command.labels && labelColumn !== undefined)
+  if (command.labels && labelPlacement)
     setCellContent(
       sheet,
-      { row: grandRow, column: labelColumn },
+      { row: grandRow, column: labelPlacement.target },
       { kind: "literal", value: command.labels.grandTotal },
     );
   const generatedRows = [grandRow, ...groupStarts.map((start, index) => start + index + 1)];
