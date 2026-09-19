@@ -54,15 +54,15 @@ describe("ConsolidateDialog", () => {
     await dialog().get('[aria-label="Select range"]').trigger("click");
     await flushPromises();
     expect(wrapper.props("selectSourceReference")).toHaveBeenCalledWith("Sheet1!A1:B2");
-    expect(dialog().findAll('[role="option"]')).toHaveLength(1);
+    expect(dialog().findAll('.consolidate-dialog__list [role="option"]')).toHaveLength(1);
     await dialog().get(".consolidate-dialog__actions button").trigger("click");
     expect(wrapper.emitted("draftChange")?.at(-1)?.[0]).toMatchObject({
       sources: ["Sheet1!A1:B2", "Other!$C$1:$C$4"],
     });
     await dialog().get(".consolidate-dialog__actions button").trigger("click");
-    expect(dialog().findAll('[role="option"]')).toHaveLength(2);
-    await dialog().get('[role="listbox"]').trigger("keydown", { key: "Home" });
-    await dialog().get('[role="listbox"]').trigger("keydown", { key: "Delete" });
+    expect(dialog().findAll('.consolidate-dialog__list [role="option"]')).toHaveLength(2);
+    await dialog().get(".consolidate-dialog__list").trigger("keydown", { key: "Home" });
+    await dialog().get(".consolidate-dialog__list").trigger("keydown", { key: "Delete" });
     expect(wrapper.emitted("draftChange")?.at(-1)?.[0]).toMatchObject({
       sources: ["Other!$C$1:$C$4"],
     });
@@ -71,9 +71,8 @@ describe("ConsolidateDialog", () => {
     const wrapper = mountDialog();
     expect(
       wrapper
-        .getComponent({ name: "TSelect" })
-        .props("options")
-        .map((option: { value: string }) => option.value),
+        .findAll("[data-consolidate-function]")
+        .map((option) => option.attributes("data-consolidate-function")),
     ).toEqual([
       "sum",
       "counta",
@@ -88,7 +87,7 @@ describe("ConsolidateDialog", () => {
       "varp",
     ]);
     await dialog().findAll(".consolidate-dialog__actions button")[1]!.trigger("click");
-    expect(dialog().findAll('[role="option"]')).toHaveLength(0);
+    expect(dialog().findAll('.consolidate-dialog__list [role="option"]')).toHaveLength(0);
     const apply = dialog()
       .findAll("button")
       .find((button) => button.text() === "Apply")!;
