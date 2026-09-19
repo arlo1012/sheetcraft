@@ -172,16 +172,21 @@ export type DuplicateEntryChange = {
 export function validateDuplicateEntries(
   workbook: Workbook,
   changes: readonly DuplicateEntryChange[],
+  options: { includeUnchanged?: boolean } = {},
 ): { valid: true } | { valid: false; sheetId: string; address: CellAddress; ruleId: string } {
   const contentChanged = (change: DuplicateEntryChange) =>
     JSON.stringify(
       workbook.sheets.get(change.sheetId)?.cells.get(createCellKey(change.address))?.content ??
         null,
     ) !== JSON.stringify(change.content);
+  // Direct input may explicitly re-enter an existing value. General mutations,
+  // including format-only changes, still validate only changed content by default.
+  const shouldValidate = (change: DuplicateEntryChange) =>
+    options.includeUnchanged || contentChanged(change);
   if (
     !changes.some(
       (change) =>
-        contentChanged(change) &&
+        shouldValidate(change) &&
         (workbook.sheets.get(change.sheetId)?.duplicateRules ?? []).some(
           (rule) => rule.kind === "reject" && inRange(change.address, rule.range),
         ),
@@ -214,7 +219,7 @@ export function validateDuplicateEntries(
   for (const [sheetId, entries] of bySheet) {
     const sheet = shadowWorkbook.sheets.get(sheetId);
     if (!sheet) continue;
-    const relevant = [...entries.values()].filter(contentChanged);
+    const relevant = [...entries.values()].filter(shouldValidate);
     const rules = (sheet.duplicateRules ?? []).filter(
       (rule) =>
         rule.kind === "reject" && relevant.some((change) => inRange(change.address, rule.range)),

@@ -25,7 +25,11 @@ afterEach(() => {
 });
 
 async function mountWorkspace(
-  options: { duplicate?: boolean; validation?: SheetDataValidation } = {},
+  options: {
+    duplicate?: boolean;
+    validation?: SheetDataValidation;
+    independentDuplicate?: boolean;
+  } = {},
 ) {
   const workbook = createWorkbook({
     idFactory: createSequentialIdFactory(),
@@ -41,6 +45,24 @@ async function mountWorkspace(
       },
     ];
     setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "Taken" });
+  }
+  if (options.independentDuplicate) {
+    sheet.duplicateRules = [
+      {
+        id: "reject-left",
+        kind: "reject",
+        range: { start: { row: 0, column: 0 }, end: { row: 2, column: 0 } },
+      },
+      {
+        id: "reject-right",
+        kind: "reject",
+        range: { start: { row: 0, column: 1 }, end: { row: 2, column: 1 } },
+      },
+    ];
+    for (const column of [0, 1]) {
+      setCellContent(sheet, { row: 0, column }, { kind: "literal", value: "Taken" });
+      setCellContent(sheet, { row: 1, column }, { kind: "literal", value: "Taken" });
+    }
   }
   if (options.validation) sheet.dataValidations = [options.validation];
 
@@ -90,7 +112,7 @@ describe("duplicate input rejection notice", () => {
     expect(grid(workspace).props("inputError")).toMatchObject({
       address: { row: 1, column: 0 },
       title: "Reject Duplicate Entries",
-      message: "This value duplicates another cell in this range. Press [Enter] again to confirm.",
+      message: "This value duplicates another cell in this range.\nPress [Enter] again to confirm.",
     });
     expect(workspace.find("[data-sheet-input-error-notice]").exists()).toBe(true);
     expect(workspace.findComponent(DataValidationFeedbackDialog).exists()).toBe(false);
@@ -132,6 +154,86 @@ describe("duplicate input rejection notice", () => {
       kind: "literal",
       value: "Taken",
     });
+  });
+
+  test("retains independent duplicate indicators after confirming one input", async () => {
+    const workspace = await mountWorkspace({ independentDuplicate: true });
+    const session = editSession(workspace);
+    const sheet = grid(workspace).props("sheet");
+    const errorCells = () => grid(workspace).props("errorCells") as ReadonlySet<string>;
+    expect(errorCells()).toEqual(new Set(["0:0", "1:0", "0:1", "1:1"]));
+
+    session.begin(
+      { sheetId: sheet.id, address: { row: 2, column: 0 }, input: "" },
+      { surface: "grid", mode: "replace", initialValue: "Taken" },
+    );
+    expect(session.finish()).toBe(false);
+    expect(session.finish({ confirmPendingWarning: true })).toBe(true);
+    await nextTick();
+
+    expect(errorCells()).toEqual(new Set(["0:0", "1:0", "2:0", "0:1", "1:1"]));
+  });
+
+  test("retains all rectangular-rule indicators after confirming a duplicate in that range", async () => {
+    const workbook = createWorkbook({
+      idFactory: createSequentialIdFactory(),
+      sheetName: "Overview",
+    });
+    const sheet = getActiveSheet(workbook);
+    sheet.duplicateRules = [
+      {
+        id: "reject-rectangle",
+        kind: "reject",
+        range: { start: { row: 0, column: 0 }, end: { row: 6, column: 4 } },
+      },
+    ];
+    for (let row = 0; row < 7; row += 1) {
+      for (let column = 0; column < 5; column += 1) {
+        setCellContent(sheet, { row, column }, { kind: "literal", value: row + 1 });
+      }
+    }
+    wrapper = mount(SpreadsheetWorkspace, {
+      attachTo: document.body,
+      props: {
+        workbookStore: {
+          load: async () => ({ revision: 1, savedAt: 1, snapshot: serializeWorkbook(workbook) }),
+          save: async () => ({ revision: 2, savedAt: 2 }),
+          replace: async () => ({ revision: 2, savedAt: 2 }),
+        },
+        imageAssetStore: createMemoryImageAssetStore(),
+      },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
+    await flushPromises();
+
+    const workspace = wrapper;
+    const session = editSession(workspace);
+    const errorCells = () => grid(workspace).props("errorCells") as ReadonlySet<string>;
+    expect(errorCells()).toHaveLength(35);
+    const activeSheet = grid(workspace).props("sheet");
+    session.begin(
+      { sheetId: activeSheet.id, address: { row: 0, column: 0 }, input: "" },
+      { surface: "grid", mode: "replace", initialValue: "2" },
+    );
+    expect(session.finish()).toBe(false);
+    expect(session.finish({ confirmPendingWarning: true })).toBe(true);
+    await nextTick();
+
+    expect(errorCells()).toHaveLength(35);
+    expect(errorCells()).toContain("6:4");
+
+    // D6 already contains 1. A real replace edit sends that unchanged input as
+    // both the source and draft, but it still needs a per-cell confirmation.
+    session.begin(
+      { sheetId: activeSheet.id, address: { row: 0, column: 1 }, input: "1" },
+      { surface: "grid", mode: "replace", initialValue: "1" },
+    );
+    expect(session.finish({ confirmPendingWarning: true })).toBe(false);
+    await nextTick();
+    expect(grid(workspace).props("inputError")).toMatchObject({
+      address: { row: 0, column: 1 },
+    });
+    expect(session.finish({ confirmPendingWarning: true })).toBe(true);
   });
 
   test("clears a duplicate notice when the draft changes or editing is cancelled", async () => {

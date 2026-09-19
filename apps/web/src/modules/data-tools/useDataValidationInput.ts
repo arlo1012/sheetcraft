@@ -145,7 +145,9 @@ export function useDataValidationInput(options: {
       isCurrentDuplicateConfirmation(pending, workbook, candidate)
         ? createDuplicateConfirmation(workbook, candidate)
         : undefined;
-    const duplicateBlocked = !validateDuplicateEntries(workbook, [candidate]).valid;
+    const duplicateBlocked = !validateDuplicateEntries(workbook, [candidate], {
+      includeUnchanged: true,
+    }).valid;
     if (duplicateBlocked && !confirmedDuplicate) return rejectDuplicate(workbook, candidate);
     const rule = getCellDataValidation(sheet, candidate.address);
     if (
@@ -203,7 +205,9 @@ export function useDataValidationInput(options: {
       dismiss();
       return false;
     }
-    const duplicateBlocked = !validateDuplicateEntries(workbook, [request.candidate]).valid;
+    const duplicateBlocked = !validateDuplicateEntries(workbook, [request.candidate], {
+      includeUnchanged: true,
+    }).valid;
     if (
       duplicateBlocked &&
       !isCurrentDuplicateConfirmation(request.confirmedDuplicate, workbook, request.candidate)

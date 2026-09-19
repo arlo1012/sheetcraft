@@ -102,6 +102,39 @@ describe("workspace data validation", () => {
     expect(getCellContent(sheet, { row: 1, column: 0 })).toBeNull();
   });
 
+  test("requires confirmation for re-entering an unchanged duplicate without adding history", () => {
+    const controller = setup();
+    const sheet = controller.activeSheet.value;
+    sheet.dataValidations = [];
+    sheet.duplicateRules = [
+      {
+        id: "reject-duplicates",
+        kind: "reject",
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      },
+    ];
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: 1 });
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: 1 });
+
+    const candidate = {
+      address: { row: 1, column: 0 },
+      input: "1",
+      confirmPendingWarning: true,
+    };
+    expect(controller.session.history.undoStack).toHaveLength(0);
+    expect(controller.commitCell(candidate)).toBe(false);
+    expect(controller.validationFeedback.value).toMatchObject({
+      source: "duplicate",
+      target: { sheetId: sheet.id, address: { row: 1, column: 0 } },
+    });
+    expect(controller.commitCell(candidate)).toBe(true);
+    expect(controller.session.history.undoStack).toHaveLength(0);
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toEqual({
+      kind: "literal",
+      value: 1,
+    });
+  });
+
   test("rejects a duplicate paste atomically", () => {
     const controller = setup();
     const sheet = controller.activeSheet.value;

@@ -62,7 +62,8 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   Reject Duplicate Entries creates a
   duplicate-owned selection rule that rejects a direct edit, paste, or fill when
   its prospective batch would contain an already-present nonblank value. Direct
-  editing shows a warning beside the cell and retains the draft. Pressing an
+  editing shows a warning beside the cell and retains the draft. Re-entering an
+  unchanged duplicate value with Enter also requires its own confirmation. Pressing an
   unmodified Enter again confirms only that exact pending input as one undoable
   edit; changing the draft, closing the notice, or changing the applicable rule
   requires a fresh warning. Tab, blur, save, paste and fill never confirm the

@@ -28,7 +28,7 @@ import { createTestWorkbookSession } from "../helpers.js";
 const range = { start: { row: 0, column: 0 }, end: { row: 9, column: 0 } };
 const rule = { id: "dup", kind: "reject" as const, range };
 describe("duplicate values", () => {
-  test("does not reject unchanged content during a format-only update", () => {
+  test("skips unchanged content by default but validates explicit re-entry", () => {
     const session = createTestWorkbookSession();
     const sheet = getActiveSheet(session.workbook);
     sheet.duplicateRules = [rule];
@@ -43,6 +43,19 @@ describe("duplicate values", () => {
         },
       ]).valid,
     ).toBe(true);
+    expect(
+      validateDuplicateEntries(
+        session.workbook,
+        [
+          {
+            sheetId: sheet.id,
+            address: { row: 1, column: 0 },
+            content: { kind: "literal", value: "A" },
+          },
+        ],
+        { includeUnchanged: true },
+      ),
+    ).toEqual({ valid: false, sheetId: sheet.id, address: { row: 1, column: 0 }, ruleId: rule.id });
   });
 
   test("creates a row-major rectangular count summary on a new sheet and supports undo", () => {

@@ -173,7 +173,7 @@ export function useCellEditSession(options: {
         mutableState.selection.direction,
       );
     }
-    if (mutableState.draft !== mutableState.source) {
+    if (mutableState.draft !== mutableState.source || flushOptions.confirmPendingWarning) {
       const accepted = options.onCommit({
         ...copyTarget(mutableState.owner),
         input: mutableState.draft,

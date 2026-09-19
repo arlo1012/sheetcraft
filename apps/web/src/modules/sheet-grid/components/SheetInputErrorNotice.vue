@@ -125,6 +125,7 @@ const overlay = computed(() => {
       font-size: var(--idea-font-size-body-small);
       line-height: var(--idea-line-height-body-small);
       overflow-wrap: anywhere;
+      white-space: pre-line;
     }
   }
 
