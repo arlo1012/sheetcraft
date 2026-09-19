@@ -169,6 +169,7 @@ export const enUS = {
       countHint:
         "Count each nonblank value across the selected range and create a summary in a new worksheet.",
       countSheetName: "Duplicate counts",
+      insertChartTodo: "Insert a chart of the summary (TODO)",
       valueHeader: "Value",
       countHeader: "Count",
       apply: "Apply",

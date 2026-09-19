@@ -164,6 +164,7 @@ export const zhCN = {
       pickRange: "选择区域",
       countHint: "汇总所选区域中每个非空值的出现次数，结果生成到新工作表。",
       countSheetName: "重复次数统计",
+      insertChartTodo: "将统计内容生成图表插入（TODO）",
       valueHeader: "值",
       countHeader: "次数",
       apply: "应用",

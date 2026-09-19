@@ -160,6 +160,7 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       pickRange: string;
       countHint: string;
       countSheetName: string;
+      insertChartTodo: string;
       valueHeader: string;
       countHeader: string;
       apply: string;

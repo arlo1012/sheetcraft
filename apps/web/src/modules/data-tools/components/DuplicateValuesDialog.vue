@@ -2,6 +2,7 @@
 import { SquareMousePointer } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
+import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
@@ -75,6 +76,9 @@ watch(
     @confirm="!busy && canApply && emit('apply', { ...draft })"
   >
     <div class="duplicate-values-dialog">
+      <TCheckbox v-if="mode === 'count'" :checked="false" disabled>
+        {{ t("dataTools.duplicates.insertChartTodo") }}
+      </TCheckbox>
       <label class="duplicate-values-dialog__field">
         <span>{{ t("dataTools.duplicates.range") }}</span>
         <TInput

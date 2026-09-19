@@ -91,6 +91,11 @@ manually hidden rows (such as SUBTOTAL/AGGREGATE) can recalculate differently.
 
 ## TODO
 
+- [ ] Add the WPS-style “将统计内容生成图表插入” option to duplicate-count
+      summaries. The count dialog currently shows a disabled, unchecked TODO
+      checkbox. Once workbook chart support is available, create the chart from
+      the generated Value/Count table on the result worksheet, and include it in
+      the same undo/redo operation and document persistence.
 - [ ] Support sorting by conditional formatting icons (条件格式图标).
       The Sort On selector shows this as a disabled TODO option until icon-set
       rules and their evaluated cell icons are available. Then offer icons from
