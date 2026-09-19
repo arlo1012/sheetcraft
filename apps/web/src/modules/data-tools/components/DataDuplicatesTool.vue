@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { CopyMinus, FileWarning, Highlighter, ListChecks, Trash2, XCircle } from "lucide-vue-next";
+import {
+  CopyMinus,
+  FileWarning,
+  Highlighter,
+  ListChecks,
+  Settings,
+  Trash2,
+  XCircle,
+} from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -15,6 +23,7 @@ const emit = defineEmits<{
   clearHighlights: [];
   clearRejections: [];
   remove: [];
+  errorCheckOptions: [];
 }>();
 const { t } = useAppI18n();
 const trigger = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
@@ -41,6 +50,10 @@ function clearRejections(): void {
 function remove(): void {
   emit("remove");
   dismiss("programmatic", true);
+}
+function openErrorCheckOptions(): void {
+  dismiss("programmatic", false);
+  emit("errorCheckOptions");
 }
 </script>
 <template>
@@ -98,6 +111,11 @@ function remove(): void {
           ><template #icon><Trash2 :size="15" /></template
           >{{ t("dataTools.duplicates.remove") }}</MenuItem
         >
+        <MenuSeparator />
+        <MenuItem data-data-duplicates="error-options" @select="openErrorCheckOptions">
+          <template #icon><Settings :size="15" /></template>
+          {{ t("dataTools.duplicates.errorChecks.optionsLabel") }}
+        </MenuItem>
       </MenuSurface>
     </Teleport>
   </div>

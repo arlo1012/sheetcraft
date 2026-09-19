@@ -180,6 +180,23 @@ export const enUS = {
       rangeChanged: "The data range changed. Select it again.",
       duplicateRejected: "Duplicate values are not allowed.",
       rejectionTitle: "Reject Duplicate Entries",
+      errorChecks: {
+        title: "Error Checking Options",
+        message: "The cell content does not meet the configured duplicate-entry restriction.",
+        markerLabel: "Duplicate entry error",
+        optionsLabel: "Error Checking Options...",
+        ignore: "Ignore Error",
+        ignoreAll: "Ignore All Similar Errors",
+        ignoreAllHint: "Ignore existing duplicate-entry errors in the current worksheet",
+        editFormulaBar: "Edit in Formula Bar",
+        enabled: "Enable duplicate-entry error checking",
+        enabledHint:
+          "Only checks existing values that violate duplicate-entry restrictions. When disabled, cell indicators and warning buttons are hidden.",
+        resetIgnored: "Clear ignored records in this worksheet ({count})",
+        resetIgnoredHint: "There are no ignored duplicate-entry errors in this worksheet.",
+        cancel: "Cancel",
+        confirm: "OK",
+      },
       colors: { lightRed: "Light red", yellow: "Yellow", green: "Green" },
     },
     validation: {

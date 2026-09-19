@@ -11,6 +11,7 @@ export type SheetCanvasPalette = {
   text: string;
   gridLine: string;
   mutedText: string;
+  errorIndicator?: string;
 };
 
 function clipRect(context: CanvasRenderingContext2D, rect: Rect): void {
@@ -27,6 +28,7 @@ export function paintSheetScene(
     palette: SheetCanvasPalette;
     showGridLines: boolean;
     editingCell?: CellAddress;
+    errorCells?: ReadonlySet<string>;
     imageUrls?: ReadonlyMap<string, string>;
     images: CanvasImageCache;
     imagePlaceholder: (assetId: string) => string;
@@ -104,6 +106,28 @@ export function paintSheetScene(
         paintCellText(context, content.textLayout, content.style, palette.text);
       }
       context.restore();
+    }
+    if (options.errorCells?.size) {
+      context.fillStyle = palette.errorIndicator ?? "#008a00";
+      for (const cell of paneScene.cells) {
+        if (
+          !options.errorCells.has(`${cell.address.row}:${cell.address.column}`) ||
+          layout.getPaneForAddress(cell.address) !== paneScene.id ||
+          (cell.address.row === options.editingCell?.row &&
+            cell.address.column === options.editingCell.column)
+        )
+          continue;
+        const size = Math.min(6, cell.rect.width - 2, cell.rect.height - 2);
+        if (size <= 0) continue;
+        const x = cell.rect.x + 1;
+        const y = cell.rect.y + 1;
+        context.beginPath();
+        context.moveTo(x, y);
+        context.lineTo(x + size, y);
+        context.lineTo(x, y + size);
+        context.closePath();
+        context.fill();
+      }
     }
     context.restore();
   }

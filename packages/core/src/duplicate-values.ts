@@ -125,6 +125,44 @@ export function createDuplicateHighlightResolver(
   };
 }
 
+/**
+ * Finds the existing cells that violate one or more duplicate-entry rejection rules.
+ *
+ * This is deliberately a sparse, read-only diagnosis: it does not add an exception
+ * to a rule or mutate the workbook. Consumers may keep their own ignored-issue UI
+ * state while continuing to render the remaining issues.
+ */
+export function getDuplicateEntryIssues(
+  sheet: Sheet,
+  evaluator: SheetEvaluator,
+): Array<{ address: CellAddress; ruleIds: string[]; valueKey: string }> {
+  const rules = (sheet.duplicateRules ?? []).filter((rule) => rule.kind === "reject");
+  if (!rules.length) return [];
+
+  const values = collectDuplicateValues(sheet, evaluator);
+  const issues = new Map<string, { address: CellAddress; ruleIds: string[]; valueKey: string }>();
+  for (const rule of rules) {
+    const counts = countValues(values, rule.range);
+    for (const value of values) {
+      if (!inRange(value.address, rule.range) || (counts.get(value.key) ?? 0) <= 1) continue;
+      const addressKey = createCellKey(value.address);
+      const issue = issues.get(addressKey);
+      if (issue) issue.ruleIds.push(rule.id);
+      else {
+        issues.set(addressKey, {
+          address: { ...value.address },
+          ruleIds: [rule.id],
+          valueKey: value.key,
+        });
+      }
+    }
+  }
+  return [...issues.values()].sort(
+    (left, right) =>
+      left.address.row - right.address.row || left.address.column - right.address.column,
+  );
+}
+
 export type DuplicateEntryChange = {
   sheetId: string;
   address: CellAddress;

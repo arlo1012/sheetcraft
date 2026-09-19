@@ -50,7 +50,7 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   destination column, and explicitly allow overwriting populated destinations.
 - Remove duplicate rows using chosen key columns and a header setting. The dialog
   previews the number of rows to remove.
-- Duplicate items is a selection-scoped menu with six operations. Set Highlight
+- Duplicate items groups six selection-scoped operations and error-check options. Set Highlight
   Duplicates creates a dynamic duplicate-owned overlay, using evaluated nonblank
   values in the selection and preserving the cells' base fill and text styles.
   Clear Highlight Duplicates removes only those duplicate-owned highlight rules.
@@ -65,6 +65,14 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   Reject Limit removes only those duplicate-owned rejection rules. Remove
   Duplicates retains the first matching row according to the selected key
   columns and removes later matches.
+  Existing violations of Reject Duplicate Entries show green cell-corner markers
+  and an orange warning menu for the active cell. The menu can ignore one issue,
+  ignore all current issues on the worksheet, focus the formula bar, or open
+  error-check options. Ignoring only hides the warning; rejection remains active.
+  The display switch and ignored issues persist in this browser, with ignored
+  issues scoped to workbook, worksheet, cell, value and rule. Changed or resolved
+  issues discard their ignored state. Error-check options can restore ignored
+  warnings and remain available from the Duplicate items menu when checks are off.
 - Set or edit cell validation: whole/decimal numbers, dates, times, text length,
   literal or range/named-range lists, and custom formulas. Input messages,
   in-cell dropdowns, Stop/Warning/Information feedback, and partial rule removal
@@ -76,8 +84,8 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   when equal keys are not adjacent.
 
 JSON snapshots use version 11 and retain filters, validation, outlines,
-subtotal metadata, and duplicate-owned rules. Every duplicate operation is
-undoable. XLSX import/export handles the supported filter conditions, standard
+subtotal metadata, and duplicate-owned rules. Duplicate document operations are
+undoable; browser-only error-check preferences do not enter workbook history. XLSX import/export handles the supported filter conditions, standard
 validation settings, and row/column outlines. XLSX export reports that
 duplicate-owned highlight/rejection rules were omitted because it does not map
 them to a superficially similar conditional-formatting or validation rule.

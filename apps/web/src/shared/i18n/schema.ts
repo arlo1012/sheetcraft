@@ -171,6 +171,22 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       rangeChanged: string;
       duplicateRejected: string;
       rejectionTitle: string;
+      errorChecks: {
+        title: string;
+        message: string;
+        markerLabel: string;
+        optionsLabel: string;
+        ignore: string;
+        ignoreAll: string;
+        ignoreAllHint: string;
+        editFormulaBar: string;
+        enabled: string;
+        enabledHint: string;
+        resetIgnored: string;
+        resetIgnoredHint: string;
+        cancel: string;
+        confirm: string;
+      };
       colors: { lightRed: string; yellow: string; green: string };
     };
     validation: {

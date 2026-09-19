@@ -29,6 +29,7 @@ const emit = defineEmits<{
   openDuplicateValues: [mode: DuplicateToolMode];
   clearDuplicateHighlights: [];
   clearDuplicateRejections: [];
+  errorCheckOptions: [];
   openValidation: [];
   group: [axis: "rows" | "columns"];
   ungroup: [axis: "rows" | "columns"];
@@ -95,6 +96,7 @@ const { t } = useAppI18n();
         @clear-highlights="emit('clearDuplicateHighlights')"
         @clear-rejections="emit('clearDuplicateRejections')"
         @remove="emit('openRemoveDuplicates')"
+        @error-check-options="emit('errorCheckOptions')"
       />
       <RibbonButton
         variant="tall"

@@ -95,6 +95,7 @@ import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
 import SheetCellContextMenu from "./SheetCellContextMenu.vue";
+import SheetCellErrorMenu from "./SheetCellErrorMenu.vue";
 import SheetSurface from "./SheetSurface.vue";
 import SheetAutoFillOptions from "./SheetAutoFillOptions.vue";
 import SheetDataControls, { type ActiveCellValidationInfo } from "./SheetDataControls.vue";
@@ -195,6 +196,7 @@ const props = withDefaults(
     dateSystem?: ExcelDateSystem;
     /** Resolved for the active cell by the Web data-tools adapter. */
     validationInfo?: ActiveCellValidationInfo;
+    errorCells?: ReadonlySet<string>;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -249,6 +251,10 @@ const emit = defineEmits<{
   ];
   outlineToggle: [payload: { id: string; collapsed: boolean }];
   outlineLevel: [payload: { axis: SheetDimensionAxis; level: number }];
+  ignoreCellError: [address: CellAddress];
+  ignoreAllCellErrors: [];
+  editErrorInFormulaBar: [];
+  errorCheckOptions: [];
   "update:zoom": [zoom: number];
 }>();
 
@@ -2291,6 +2297,7 @@ defineExpose({
       :paint-images="paintSurfaceImages"
       :active-cell="activeCell"
       :editing="isEditing"
+      :error-cells="errorCells"
       :label="headerLabel"
       :cursor="surfaceCursor"
       :show-grid-lines="showGridLines"
@@ -2331,6 +2338,20 @@ defineExpose({
         />
       </template>
     </SheetSurface>
+    <SheetCellErrorMenu
+      :frame="renderFrame"
+      :active-cell="activeCell"
+      :visible="
+        !isEditing &&
+        !referenceEditor &&
+        !!errorCells?.has(`${activeCell.row}:${activeCell.column}`)
+      "
+      :read-only="readOnly"
+      @ignore="emit('ignoreCellError', { ...activeCell })"
+      @ignore-all="emit('ignoreAllCellErrors')"
+      @edit-formula-bar="emit('editErrorInFormulaBar')"
+      @options="emit('errorCheckOptions')"
+    />
     <SheetDataControls
       :frame="renderFrame"
       :filter-range="sheet.filter?.advanced ? undefined : sheet.filter?.range"

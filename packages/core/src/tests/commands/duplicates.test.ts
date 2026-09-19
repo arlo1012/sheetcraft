@@ -7,6 +7,7 @@ import {
 } from "../../commands/index.js";
 import {
   createDuplicateHighlightResolver,
+  getDuplicateEntryIssues,
   getDuplicateValueCounts,
   getDuplicateValueSummaries,
   validateDuplicateEntries,
@@ -225,6 +226,93 @@ describe("duplicate values", () => {
       createDuplicateHighlightResolver(sheet, evaluator)({ row: 0, column: 0 })?.fillColor,
     ).toBe("#ffc7ce");
     expect(spy.mock.calls.length).toBeLessThan(10);
+  });
+
+  test("diagnoses every repeated value in a rectangular rejection rule while skipping distinct titles", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const rectangle = { start: { row: 0, column: 0 }, end: { row: 6, column: 4 } };
+    sheet.duplicateRules = [{ id: "reject-grid", kind: "reject", range: rectangle }];
+    for (let column = 0; column < 5; column += 1) {
+      setCellContent(sheet, { row: 0, column }, { kind: "literal", value: `title${column + 1}` });
+      for (let row = 1; row <= 6; row += 1)
+        setCellContent(sheet, { row, column }, { kind: "literal", value: row });
+    }
+
+    const issues = getDuplicateEntryIssues(
+      sheet,
+      createWorkbookEvaluator(session.workbook, sheet.id),
+    );
+    expect(issues).toHaveLength(30);
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        { address: { row: 1, column: 0 }, ruleIds: ["reject-grid"], valueKey: "n:1" },
+        { address: { row: 6, column: 4 }, ruleIds: ["reject-grid"], valueKey: "n:6" },
+      ]),
+    );
+    expect(issues.some((issue) => issue.address.row === 0)).toBe(false);
+  });
+
+  test("combines rejection rules, excludes blanks, and includes formula spill projections", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    sheet.duplicateRules = [
+      {
+        id: "all",
+        kind: "reject",
+        range: { start: { row: 0, column: 0 }, end: { row: 3, column: 0 } },
+      },
+      {
+        id: "overlap",
+        kind: "reject",
+        range: { start: { row: 1, column: 0 }, end: { row: 3, column: 0 } },
+      },
+    ];
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=SEQUENCE(3,1,7,0)" } },
+    );
+    setCellStyle(sheet, { row: 2, column: 0 }, { bold: true });
+
+    expect(
+      getDuplicateEntryIssues(sheet, createWorkbookEvaluator(session.workbook, sheet.id)),
+    ).toEqual([
+      { address: { row: 0, column: 0 }, ruleIds: ["all"], valueKey: "n:7" },
+      { address: { row: 1, column: 0 }, ruleIds: ["all", "overlap"], valueKey: "n:7" },
+      { address: { row: 2, column: 0 }, ruleIds: ["all", "overlap"], valueKey: "n:7" },
+    ]);
+  });
+
+  test("diagnoses a whole-sheet rejection rule from sparse cells only", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const whole = {
+      start: { row: 0, column: 0 },
+      end: { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 },
+    };
+    sheet.duplicateRules = [{ id: "whole", kind: "reject", range: whole }];
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "x" });
+    setCellContent(sheet, whole.end, { kind: "literal", value: "X" });
+    const evaluator = createWorkbookEvaluator(session.workbook, sheet.id);
+    const spy = vi.spyOn(evaluator, "getComputedValue");
+
+    expect(getDuplicateEntryIssues(sheet, evaluator)).toEqual([
+      { address: { row: 0, column: 0 }, ruleIds: ["whole"], valueKey: "s:x" },
+      { address: whole.end, ruleIds: ["whole"], valueKey: "s:x" },
+    ]);
+    expect(spy.mock.calls.length).toBeLessThan(10);
+  });
+
+  test("does not evaluate a sheet without rejection rules", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "x" });
+    const evaluator = createWorkbookEvaluator(session.workbook, sheet.id);
+    const spy = vi.spyOn(evaluator, "getComputedValue");
+
+    expect(getDuplicateEntryIssues(sheet, evaluator)).toEqual([]);
+    expect(spy).not.toHaveBeenCalled();
   });
 
   test("persists rules, clears only matching kind, and undoes", () => {

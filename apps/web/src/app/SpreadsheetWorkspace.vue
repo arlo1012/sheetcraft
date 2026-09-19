@@ -12,6 +12,8 @@ import { normalizeSheetZoom, SHEET_ZOOM_STEP } from "../shared/sheet-view/zoom";
 import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import { useFormulaToolsController } from "../modules/formula-tools/useFormulaToolsController";
 import { useDataToolsController } from "../modules/data-tools/useDataToolsController";
+import { useDuplicateErrorChecks } from "../modules/data-tools/useDuplicateErrorChecks";
+import DuplicateErrorCheckOptionsDialog from "../modules/data-tools/components/DuplicateErrorCheckOptionsDialog.vue";
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
 import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
@@ -384,6 +386,49 @@ const formulaTools = useFormulaToolsController({
   focusFormulaBar: () => formulaBarRef.value?.focus({ preserveSelection: true }),
   recalculate,
 });
+const duplicateErrorChecks = useDuplicateErrorChecks({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getEvaluator: () => activeSheetEvaluator.value,
+  getRevision: () => workbookRevision.value,
+});
+const {
+  errorCells: duplicateErrorCells,
+  enabled: duplicateChecksEnabled,
+  ignoredCount: ignoredDuplicateCount,
+} = duplicateErrorChecks;
+const duplicateErrorOptionsVisible = ref(false);
+function openDuplicateErrorOptions(): void {
+  if (
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    imageBusy.value ||
+    !cellEditSession.finish()
+  )
+    return;
+  duplicateErrorOptionsVisible.value = true;
+}
+function closeDuplicateErrorOptions(): void {
+  duplicateErrorOptionsVisible.value = false;
+  void nextTick(focusCellEditor);
+}
+function ignoreCellDuplicateError(address: CellAddress): void {
+  duplicateErrorChecks.ignoreCell(address);
+  void nextTick(focusCellEditor);
+}
+function ignoreAllDuplicateErrors(): void {
+  duplicateErrorChecks.ignoreAll();
+  void nextTick(focusCellEditor);
+}
+function editErrorInFormulaBar(): void {
+  if (!activeSheet.value.properties.protected) {
+    void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
+  }
+}
+watch(workbookGeneration, () => {
+  duplicateErrorOptionsVisible.value = false;
+});
 const dataTools = useDataToolsController({
   getWorkbook: () => session.workbook,
   getSelection: () => ({ address: activeAddress.value, range: activeSelectionRange.value }),
@@ -452,6 +497,7 @@ watch(duplicateValuesVisible, (visible) => {
 });
 const dataToolsModalOpen = computed(
   () =>
+    duplicateErrorOptionsVisible.value ||
     dataTools.sortVisible.value ||
     dataTools.textToColumnsVisible.value ||
     dataTools.removeDuplicatesVisible.value ||
@@ -680,6 +726,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @open-text-to-columns="dataTools.openTextToColumns"
           @open-remove-duplicates="dataTools.openRemoveDuplicates"
           @open-duplicate-values="dataTools.openDuplicateValues"
+          @error-check-options="openDuplicateErrorOptions"
           @clear-duplicate-highlights="dataTools.clearDuplicateHighlights"
           @clear-duplicate-rejections="dataTools.clearDuplicateRejections"
           @open-validation="dataTools.openValidation"
@@ -772,6 +819,14 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @close-subtotal="dataTools.closeSubtotal"
       @subtotal="dataTools.applySubtotal"
       @remove-subtotals="dataTools.removeSubtotals"
+    />
+    <DuplicateErrorCheckOptionsDialog
+      :visible="duplicateErrorOptionsVisible"
+      :enabled="duplicateChecksEnabled"
+      :ignored-count="ignoredDuplicateCount"
+      @update:enabled="duplicateErrorChecks.setEnabled"
+      @reset-ignored="duplicateErrorChecks.resetIgnored"
+      @close="closeDuplicateErrorOptions"
     />
     <DuplicateValuesDialog
       :visible="duplicateValuesVisible"
@@ -931,6 +986,11 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :evaluator="activeSheetEvaluator"
         :context-menu-state="contextMenuState"
         :validation-info="activeValidationInfo"
+        :error-cells="duplicateErrorCells"
+        @ignore-cell-error="ignoreCellDuplicateError"
+        @ignore-all-cell-errors="ignoreAllDuplicateErrors"
+        @edit-error-in-formula-bar="editErrorInFormulaBar"
+        @error-check-options="openDuplicateErrorOptions"
         @filter-column-request="dataTools.openColumnFilter($event.column, $event.anchor)"
         @validation-choose="chooseValidationValue"
         @outline-toggle="toggleOutline"
