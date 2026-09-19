@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Info, TriangleAlert, X } from "lucide-vue-next";
+import { TriangleAlert, X } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import type { CellAddress } from "@idea10/core/workbook";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
@@ -84,7 +84,6 @@ const overlay = computed(() => {
       :size="28"
       aria-hidden="true"
     />
-    <Info v-else class="sheet-cell-notice__icon" :size="28" aria-hidden="true" />
     <div class="sheet-cell-notice__content">
       <strong v-if="title">{{ title }}</strong>
       <p v-if="message">{{ message }}</p>
@@ -107,11 +106,11 @@ const overlay = computed(() => {
   position: absolute;
   z-index: 20;
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   column-gap: var(--idea-space-4);
   align-items: start;
   box-sizing: border-box;
-  width: 280px;
+  width: max-content;
   padding: var(--idea-tool-panel-padding);
   color: var(--idea-text-primary);
   background: var(--idea-surface-panel);
@@ -121,7 +120,13 @@ const overlay = computed(() => {
   box-shadow: var(--idea-shadow-menu);
 
   &--warning {
+    width: 280px;
+    grid-template-columns: 28px minmax(0, 1fr);
     background: var(--idea-palette-warning-1);
+
+    &.sheet-cell-notice--dismissible {
+      grid-template-columns: 28px minmax(0, 1fr) 18px;
+    }
 
     .sheet-cell-notice__icon {
       color: var(--idea-status-warning);
@@ -129,7 +134,7 @@ const overlay = computed(() => {
   }
 
   &--dismissible {
-    grid-template-columns: 28px minmax(0, 1fr) 18px;
+    grid-template-columns: minmax(0, 1fr) 18px;
     pointer-events: auto;
   }
 
@@ -140,6 +145,7 @@ const overlay = computed(() => {
 
   &__content {
     min-width: 0;
+    overflow-wrap: anywhere;
 
     strong {
       display: block;
