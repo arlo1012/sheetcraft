@@ -125,7 +125,9 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   cross-sheet picking returns to the original validation target and preserves the
   dialog draft. Cancel leaves the prior bound unchanged. References are evaluated
   from current workbook values; typed relative references shift with the validated
-  cell within the rule range. Input messages,
+  cell within the rule range. List sources support range picking; custom formulas
+  insert picked references at the caret or replace selected formula text without
+  discarding the rest of the expression. Input messages,
   in-cell dropdowns, Stop/Warning/Information feedback, and partial rule removal
   are supported. Rejected direct edits retain their draft until retry/cancel;
   warning/information values require explicit acceptance.

@@ -24,7 +24,10 @@ import type { AdvancedFilterDraft } from "../modules/data-tools/data-tools-types
 import FilterColumnPanel from "../modules/data-tools/components/FilterColumnPanel.vue";
 import DataValidationFeedbackDialog from "../modules/data-tools/components/DataValidationFeedbackDialog.vue";
 import RangeReferencePicker from "../shared/range-reference/RangeReferencePicker.vue";
-import { useRangeReferencePicker } from "../shared/range-reference/useRangeReferencePicker";
+import {
+  useRangeReferencePicker,
+  type RangeReferenceSelectionOptions,
+} from "../shared/range-reference/useRangeReferencePicker";
 import NamedRangesDialog from "../modules/formula-tools/components/NamedRangesDialog.vue";
 import {
   createIndexedDbImageAssetStore,
@@ -536,10 +539,15 @@ const validationRangePicker = useRangeReferencePicker(() => activeSheet.value.na
 });
 const { active: pickingValidationRange, reference: pickedValidationReference } =
   validationRangePicker;
-async function selectValidationReference(current: string): Promise<string | undefined> {
+const validationPickingCell = ref(true);
+async function selectValidationReference(
+  current: string,
+  options: RangeReferenceSelectionOptions = { singleCell: true },
+): Promise<string | undefined> {
   const workbook = session.workbook;
   const sheetId = activeSheet.value.id;
-  const selected = await validationRangePicker.selectReference(current);
+  validationPickingCell.value = options.singleCell === true;
+  const selected = await validationRangePicker.selectReference(current, options);
   if (session.workbook !== workbook || !dataValidationVisible.value) return undefined;
   if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
   return selected;
@@ -928,8 +936,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       v-if="pickingValidationRange"
       :reference="pickedValidationReference"
       :edit-session-id="cellEditSession.id"
-      :title="t('dataTools.validation.selectCell')"
-      :hint="t('dataTools.validation.selectCellHint')"
+      :title="validationPickingCell ? t('dataTools.validation.selectCell') : undefined"
+      :hint="validationPickingCell ? t('dataTools.validation.selectCellHint') : undefined"
       @confirm="validationRangePicker.confirm"
       @cancel="validationRangePicker.cancel"
     />

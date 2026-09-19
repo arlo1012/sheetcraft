@@ -5,6 +5,7 @@ import SortDialog from "./SortDialog.vue";
 import SubtotalDialog from "./SubtotalDialog.vue";
 import TextToColumnsDialog from "./TextToColumnsDialog.vue";
 import type { ExcelDateSystem } from "@idea10/core/formula";
+import type { RangeReferenceSelectionOptions } from "../../../shared/range-reference/useRangeReferencePicker";
 import type {
   DataToolColumn,
   DataValidationDraft,
@@ -33,7 +34,10 @@ withDefaults(
     duplicateCount?: number;
     validationInitial?: DataValidationInitial;
     validationSuspended?: boolean;
-    selectValidationReference?: (current: string) => Promise<string | undefined>;
+    selectValidationReference?: (
+      current: string,
+      options?: RangeReferenceSelectionOptions,
+    ) => Promise<string | undefined>;
     hasSubtotals?: boolean;
   }>(),
   {

@@ -9,6 +9,7 @@ import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { useAppI18n } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
+import type { RangeReferenceSelectionOptions } from "../../../shared/range-reference/useRangeReferencePicker";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import type { DataValidationDraft, DataValidationInitial } from "../data-tools-types";
 import {
@@ -22,7 +23,10 @@ const props = withDefaults(
     initial?: DataValidationInitial;
     dateSystem?: ExcelDateSystem;
     suspended?: boolean;
-    selectReference?: (current: string) => Promise<string | undefined>;
+    selectReference?: (
+      current: string,
+      options?: RangeReferenceSelectionOptions,
+    ) => Promise<string | undefined>;
   }>(),
   { initial: undefined, dateSystem: "1900", suspended: false, selectReference: undefined },
 );
@@ -93,8 +97,17 @@ const boundPlaceholder = computed(() =>
   ),
 );
 async function selectBoundReference(current: string): Promise<string | undefined> {
+  return selectDraftReference(current, true);
+}
+async function selectSourceReference(current: string): Promise<string | undefined> {
+  return selectDraftReference(current, false);
+}
+async function selectDraftReference(
+  current: string,
+  singleCell: boolean,
+): Promise<string | undefined> {
   const original = draft.value;
-  const selected = await props.selectReference?.(current);
+  const selected = await props.selectReference?.(current, { singleCell });
   return props.visible && draft.value === original ? selected : undefined;
 }
 </script>
@@ -158,7 +171,26 @@ async function selectBoundReference(current: string): Promise<string | undefined
             class="validation-dialog__field"
           >
             <span>{{ t("dataTools.validation.source") }}</span>
-            <TInput v-model="draft.source" :aria-label="t('dataTools.validation.source')" />
+            <RangeReferenceInput
+              v-model="draft.source"
+              :label="t('dataTools.validation.source')"
+              :pick-label="
+                t(
+                  draft.type === 'custom'
+                    ? 'dataTools.validation.pickFormulaReference'
+                    : 'dataTools.validation.pickSource',
+                )
+              "
+              :placeholder="
+                t(
+                  draft.type === 'custom'
+                    ? 'dataTools.validation.formulaPlaceholder'
+                    : 'dataTools.validation.listPlaceholder',
+                )
+              "
+              :insert-reference="draft.type === 'custom'"
+              :select-reference="selectReference ? selectSourceReference : undefined"
+            />
           </div>
           <div class="validation-dialog__options">
             <TCheckbox v-model="draft.ignoreBlank">{{

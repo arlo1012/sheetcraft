@@ -4,15 +4,18 @@ import type { FormulaReferenceEditor } from "../formula-editing/formula-editor-c
 import { getFormulaReferenceTokens } from "../formula-editing/formula-reference-tokens";
 import { formatRangeReference } from "./formatRangeReference";
 
+export type RangeReferenceSelectionOptions = { singleCell?: boolean };
+
 /** An independent reference draft: grid picking never changes the cell edit session. */
 export function useRangeReferencePicker(
   getSheetName: () => string,
-  options: { singleCell?: boolean } = {},
+  options: RangeReferenceSelectionOptions = {},
 ) {
   const active = ref(false);
   const reference = ref("");
   const tokens = computed(() => getFormulaReferenceTokens(reference.value));
   let resolveSelection: ((value: string | undefined) => void) | undefined;
+  let singleCell = options.singleCell === true;
 
   function finish(value?: string): void {
     active.value = false;
@@ -20,8 +23,12 @@ export function useRangeReferencePicker(
     resolveSelection = undefined;
   }
 
-  function selectReference(current: string): Promise<string | undefined> {
+  function selectReference(
+    current: string,
+    selectionOptions: RangeReferenceSelectionOptions = options,
+  ): Promise<string | undefined> {
     finish();
+    singleCell = selectionOptions.singleCell === true;
     reference.value = current;
     active.value = true;
     return new Promise((resolve) => {
@@ -33,7 +40,7 @@ export function useRangeReferencePicker(
     canPickReference: () => active.value,
     pickReference(range: CellRange) {
       if (!active.value) return false;
-      if (options.singleCell) range = { start: range.start, end: range.start };
+      if (singleCell) range = { start: range.start, end: range.start };
       reference.value = formatRangeReference(getSheetName(), {
         start: {
           row: Math.min(range.start.row, range.end.row),

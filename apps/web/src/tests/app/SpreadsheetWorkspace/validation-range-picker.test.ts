@@ -66,7 +66,10 @@ async function mountWorkspace() {
   return wrapper;
 }
 
-async function openWholeValidation(wrapper: Awaited<ReturnType<typeof mountWorkspace>>) {
+async function openWholeValidation(
+  wrapper: Awaited<ReturnType<typeof mountWorkspace>>,
+  validationType = "whole",
+) {
   await wrapper
     .getComponent(SpreadsheetRibbon)
     .get('[data-ribbon-category="data"]')
@@ -76,7 +79,7 @@ async function openWholeValidation(wrapper: Awaited<ReturnType<typeof mountWorks
   await flushPromises();
   const dialog = wrapper.getComponent(DataValidationDialog);
   const type = dialog.findAllComponents({ name: "TSelect" })[0]!;
-  type.vm.$emit("update:modelValue", "whole");
+  type.vm.$emit("update:modelValue", validationType);
   await flushPromises();
   return dialog;
 }
@@ -153,3 +156,45 @@ test("cancels a validation bound pick and returns from another sheet before conf
   await flushPromises();
   expect(boundInput(0).value).toBe("=Details!$B$1");
 });
+
+test.each([
+  ["list", "Select source range", "Red, Green", "=Summary!$B$1:$B$3"],
+  ["custom", "Select formula reference", "=SUM()>0", "=SUM(Summary!$B$1:$B$3)>0"],
+] as const)(
+  "picks a full range for %s validation and preserves formula text",
+  async (type, label, initial, expected) => {
+    const wrapper = await mountWorkspace();
+    const dialog = await openWholeValidation(wrapper, type);
+    const input = [
+      ...document.body.querySelectorAll<HTMLInputElement>(".validation-dialog .t-input__inner"),
+    ].at(-1)!;
+    await new DOMWrapper(input).setValue(initial);
+    if (type === "custom") {
+      input.focus();
+      input.setSelectionRange(5, 5);
+      await new DOMWrapper(input).trigger("select");
+    }
+    await dialog.get(`[aria-label="${label}"]`).trigger("click");
+    await flushPromises();
+    await triggerCanvasCell(wrapper, { row: 0, column: 1 }, "mousedown", { button: 0, buttons: 1 });
+    await triggerCanvasCell(wrapper, { row: 2, column: 1 }, "mousemove", { buttons: 1 });
+    await triggerCanvasCell(wrapper, { row: 2, column: 1 }, "mouseup", { button: 0 });
+    const picker = wrapper.getComponent(RangeReferencePicker);
+    expect(picker.props("reference")).toBe("=Summary!$B$1:$B$3");
+    picker.vm.$emit("confirm");
+    await flushPromises();
+    expect(input.value).toBe(expected);
+    const confirm = [
+      ...document.body.querySelectorAll<HTMLButtonElement>(".data-validation-dialog button"),
+    ].find((button) => button.textContent?.trim() === "OK")!;
+    await new DOMWrapper(confirm).trigger("click");
+    await flushPromises();
+    expect(wrapper.getComponent(SheetGrid).props("sheet").dataValidations).toEqual([
+      expect.objectContaining({
+        type,
+        formula1: expected,
+        range: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+      }),
+    ]);
+  },
+);

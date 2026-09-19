@@ -287,6 +287,10 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       boundPlaceholder: string;
       dateBoundPlaceholder: string;
       timeBoundPlaceholder: string;
+      pickSource: string;
+      pickFormulaReference: string;
+      listPlaceholder: string;
+      formulaPlaceholder: string;
       source: string;
       ignoreBlank: string;
       dropdown: string;
