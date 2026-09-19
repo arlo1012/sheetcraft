@@ -22,3 +22,4 @@ export * from "./data-transforms.js";
 export * from "./subtotal.js";
 export * from "./workbook-settings.js";
 export * from "./duplicates.js";
+export * from "./data-comparison.js";

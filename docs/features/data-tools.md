@@ -50,6 +50,24 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   destination column, and explicitly allow overwriting populated destinations.
 - Remove duplicate rows using chosen key columns and a header setting. The dialog
   previews the number of rows to remove.
+- Data Comparison offers Mark/Extract Duplicate Data and Mark/Extract Unique Data.
+  Compare one rectangle or two rectangles in the current workbook, including
+  different worksheets. Both references support grid picking and defined names.
+  Compare individual cell values or rows using selected column positions; row
+  comparison requires equal-width rectangles. Text comparison ignores case,
+  numbers remain distinct from text, and formulas use their calculated values.
+  Blank cells and rows with entirely blank comparison keys are skipped; partially
+  blank row keys still participate. The header setting excludes the first row
+  of each range. In one range, duplicate means appearing more than once and
+  unique means appearing once. In two ranges, duplicate means present in the
+  other range and unique means absent there; choose results from either or both.
+  Mark writes the chosen fill once and preserves other formatting and contents.
+  Extract copies all matching values or complete source rows, in source order,
+  into a new sheet; it does not collapse repeated records or copy formulas.
+  Both operations are one undo/redo step, including marking both worksheets.
+  Each source rectangle is limited to 100,000 cells. Marking protected sheets,
+  merged cells or dynamic-array spill cells is rejected before any change.
+  Cross-file comparison is not supported.
 - Duplicate items groups six selection-scoped operations and error-check options. Set Highlight
   Duplicates creates a dynamic duplicate-owned overlay, using evaluated nonblank
   values in the selection and preserving the cells' base fill and text styles.

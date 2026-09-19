@@ -18,6 +18,7 @@ import DuplicateErrorCheckOptionsDialog from "../modules/data-tools/components/D
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
 import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
+import DataComparisonDialog from "../modules/data-tools/components/DataComparisonDialog.vue";
 import AdvancedFilterDialog from "../modules/data-tools/components/AdvancedFilterDialog.vue";
 import type { AdvancedFilterDraft } from "../modules/data-tools/data-tools-types";
 import FilterColumnPanel from "../modules/data-tools/components/FilterColumnPanel.vue";
@@ -503,6 +504,11 @@ const {
   duplicateValuesMode,
   duplicateValuesDraft,
   duplicateValuesError,
+  comparisonVisible,
+  comparisonAction,
+  comparisonDraft,
+  comparisonError,
+  comparisonColumns,
 } = dataTools;
 const advancedRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingAdvancedRange, reference: pickedAdvancedReference } = advancedRangePicker;
@@ -530,6 +536,18 @@ async function pickDuplicateRange() {
 watch(duplicateValuesVisible, (visible) => {
   if (!visible) duplicateRangePicker.cancel();
 });
+const comparisonRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingComparisonRange, reference: pickedComparisonReference } =
+  comparisonRangePicker;
+async function pickComparisonRange(field: "firstRange" | "secondRange") {
+  const selected = await comparisonRangePicker.selectReference(comparisonDraft.value[field]);
+  if (selected !== undefined && comparisonVisible.value) {
+    dataTools.updateComparisonDraft({ ...comparisonDraft.value, [field]: selected });
+  }
+}
+watch(comparisonVisible, (visible) => {
+  if (!visible) comparisonRangePicker.cancel();
+});
 const dataToolsModalOpen = computed(
   () =>
     duplicateErrorOptionsVisible.value ||
@@ -539,7 +557,8 @@ const dataToolsModalOpen = computed(
     dataTools.validationVisible.value ||
     dataTools.subtotalVisible.value ||
     (dataAdvancedFilterVisible.value && !pickingAdvancedRange.value) ||
-    (duplicateValuesVisible.value && !pickingDuplicateRange.value),
+    (duplicateValuesVisible.value && !pickingDuplicateRange.value) ||
+    (comparisonVisible.value && !pickingComparisonRange.value),
 );
 
 function chooseValidationValue(payload: {
@@ -602,7 +621,11 @@ watch(workbookGeneration, () => {
 const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const pickingReferenceRange = computed(
-  () => pickingNameRange.value || pickingAdvancedRange.value || pickingDuplicateRange.value,
+  () =>
+    pickingNameRange.value ||
+    pickingAdvancedRange.value ||
+    pickingDuplicateRange.value ||
+    pickingComparisonRange.value,
 );
 watch(namesVisible, (visible) => {
   if (!visible) nameRangePicker.cancel();
@@ -627,11 +650,13 @@ function onWorkspaceWheel(event: WheelEvent): void {
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (pickingReferenceRange.value) {
-    const picker = pickingDuplicateRange.value
-      ? duplicateRangePicker
-      : pickingAdvancedRange.value
-        ? advancedRangePicker
-        : nameRangePicker;
+    const picker = pickingComparisonRange.value
+      ? comparisonRangePicker
+      : pickingDuplicateRange.value
+        ? duplicateRangePicker
+        : pickingAdvancedRange.value
+          ? advancedRangePicker
+          : nameRangePicker;
     if (event.key === "Escape") picker.cancel();
     else if (event.key === "Enter") picker.confirm();
     else if (event.key === "Tab") return;
@@ -749,6 +774,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       <template #data-tools>
         <DataToolbar
           :disabled="dataToolsDisabled"
+          :comparison-disabled="loading || fileBusy || xlsxBusy || imageBusy"
           :capabilities="dataToolCapabilities"
           :filter-active="dataFilterActive"
           :edit-session-id="cellEditSession.id"
@@ -761,6 +787,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @open-text-to-columns="dataTools.openTextToColumns"
           @open-remove-duplicates="dataTools.openRemoveDuplicates"
           @open-duplicate-values="dataTools.openDuplicateValues"
+          @open-comparison="dataTools.openComparison"
           @error-check-options="openDuplicateErrorOptions"
           @clear-duplicate-highlights="dataTools.clearDuplicateHighlights"
           @clear-duplicate-rejections="dataTools.clearDuplicateRejections"
@@ -861,6 +888,26 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :ignored-count="ignoredDuplicateCount"
       @confirm="confirmDuplicateErrorOptions"
       @close="closeDuplicateErrorOptions"
+    />
+    <DataComparisonDialog
+      :visible="comparisonVisible"
+      :action="comparisonAction"
+      :initial="comparisonDraft"
+      :columns="comparisonColumns"
+      :error="comparisonError"
+      :busy="loading || fileBusy || xlsxBusy || imageBusy"
+      :picking="pickingComparisonRange"
+      @close="dataTools.closeComparison"
+      @apply="dataTools.applyComparison"
+      @draft-change="dataTools.updateComparisonDraft"
+      @pick-range="pickComparisonRange"
+    />
+    <RangeReferencePicker
+      v-if="pickingComparisonRange"
+      :reference="pickedComparisonReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="comparisonRangePicker.confirm"
+      @cancel="comparisonRangePicker.cancel"
     />
     <DuplicateValuesDialog
       :visible="duplicateValuesVisible"
@@ -1035,13 +1082,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @context-action="contextActions.request"
         :date-system="session.workbook.dateSystem"
         :reference-editor="
-          pickingDuplicateRange
-            ? duplicateRangePicker.editor
-            : pickingAdvancedRange
-              ? advancedRangePicker.editor
-              : pickingNameRange
-                ? nameRangePicker.editor
-                : formulaBarRef
+          pickingComparisonRange
+            ? comparisonRangePicker.editor
+            : pickingDuplicateRange
+              ? duplicateRangePicker.editor
+              : pickingAdvancedRange
+                ? advancedRangePicker.editor
+                : pickingNameRange
+                  ? nameRangePicker.editor
+                  : formulaBarRef
         "
         :edit-session="cellEditSession"
         :image-asset-urls="imageAssetUrls"

@@ -6,16 +6,19 @@ import type { DataToolCapabilities } from "../data-tools-types";
 import DataOutlineTools from "./DataOutlineTools.vue";
 import DataFilterTool from "./DataFilterTool.vue";
 import DataDuplicatesTool from "./DataDuplicatesTool.vue";
+import DataComparisonTool from "./DataComparisonTool.vue";
+import type { DataComparisonAction } from "../data-comparison-types";
 import DataSortTool from "./DataSortTool.vue";
 import type { DuplicateToolMode } from "../duplicate-tools-types";
 const props = withDefaults(
   defineProps<{
     disabled?: boolean;
+    comparisonDisabled?: boolean;
     filterActive?: boolean;
     editSessionId?: string;
     capabilities: DataToolCapabilities;
   }>(),
-  { disabled: false, filterActive: false, editSessionId: undefined },
+  { disabled: false, comparisonDisabled: undefined, filterActive: false, editSessionId: undefined },
 );
 const emit = defineEmits<{
   sort: [direction: "ascending" | "descending"];
@@ -27,6 +30,7 @@ const emit = defineEmits<{
   openTextToColumns: [];
   openRemoveDuplicates: [];
   openDuplicateValues: [mode: DuplicateToolMode];
+  openComparison: [action: DataComparisonAction];
   clearDuplicateHighlights: [];
   clearDuplicateRejections: [];
   errorCheckOptions: [];
@@ -97,6 +101,10 @@ const { t } = useAppI18n();
         @clear-rejections="emit('clearDuplicateRejections')"
         @remove="emit('openRemoveDuplicates')"
         @error-check-options="emit('errorCheckOptions')"
+      />
+      <DataComparisonTool
+        :disabled="comparisonDisabled ?? disabled"
+        @open="emit('openComparison', $event)"
       />
       <RibbonButton
         variant="tall"

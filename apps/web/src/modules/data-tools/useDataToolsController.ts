@@ -40,6 +40,7 @@ import { readSortSettings, writeSortSettings } from "./sort-settings";
 import { getSortColorColumns } from "./sort-color-options";
 import { isValidationDraftComplete } from "./validation-draft";
 import { useDuplicateToolsController } from "./useDuplicateToolsController";
+import { useDataComparisonController } from "./useDataComparisonController";
 import { useAdvancedFilterController } from "./useAdvancedFilterController";
 import type {
   DataToolAxis,
@@ -117,6 +118,7 @@ export function useDataToolsController(options: Options) {
   const { t, locale } = useAppI18n();
   const advancedFilter = useAdvancedFilterController(options);
   const duplicates = useDuplicateToolsController(options);
+  const comparison = useDataComparisonController(options);
   const createId = createBrowserIdFactory();
   const sortVisible = ref(false);
   const textToColumnsVisible = ref(false);
@@ -793,6 +795,7 @@ export function useDataToolsController(options: Options) {
   return {
     ...advancedFilter,
     ...duplicates,
+    ...comparison,
     disabled,
     capabilities,
     columns: dialogColumns,
