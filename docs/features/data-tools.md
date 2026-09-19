@@ -77,13 +77,19 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   cells are skipped unless overwriting is enabled. Preview includes counts and a
   sample of the values to write. Values are copied after formula evaluation;
   formatting is preserved. Ranges together are limited to 100,000 cells.
-- Consolidate combines multiple ranges using Sum, Count Numbers, Average, Minimum
-  or Maximum. With neither label option selected, cells are combined by position.
+- Consolidate combines multiple ranges using Sum, Count, Average, Maximum, Minimum,
+  Product, Count Numbers, sample/population Standard Deviation and sample/population
+  Variance. The compact dialog separates a pending reference from the selected
+  reference list: pick or type a reference, Add it, or Delete a selected entry.
+  Arrow/Home/End keys navigate the list. Result preview is expandable. With neither label option selected, cells are combined by position.
   Top Row and Left Column align the corresponding axis by labels in first-seen
   order. Sources can be on different sheets; every reference and the destination
   supports grid picking and defined names. The destination is its top-left cell.
   Preview shows result dimensions, counts and a sample. Only numeric data takes
-  part in these aggregates. Existing destination content requires explicit
+  part in arithmetic aggregates and Count Numbers; Count includes all nonblank
+  values, including text and errors. Arithmetic functions propagate source errors.
+  Sample statistics require two numbers; population statistics require one.
+  Existing destination content requires explicit
   overwrite; blank positions in the resulting rectangle clear stale content.
   Source totals and the output rectangle are each limited to 100,000 cells.
   Results are a static value snapshot; they do not refresh when sources change.

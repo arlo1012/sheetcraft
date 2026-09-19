@@ -5,6 +5,17 @@ export const enUS = {
   ...formulaToolsEnUS,
   dataTools: {
     consolidate: {
+      counta: "Count",
+      product: "Product",
+      stdev: "Standard deviation",
+      stdevp: "Population standard deviation",
+      var: "Variance",
+      varp: "Population variance",
+      reference: "Reference",
+      labelPosition: "Use labels in",
+      close: "Close",
+      pickDestination: "Select destination cell",
+
       title: "Consolidate",
       sources: "References",
       sourceRange: "Source range",

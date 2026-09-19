@@ -151,3 +151,28 @@ test("picks a consolidation destination as one cell and applies the previewed re
     getCellContent(wrapper.getComponent(SheetGrid).props("sheet"), { row: 0, column: 2 }),
   ).toEqual({ kind: "literal", value: 16 });
 });
+
+test("stages a cross-sheet consolidation reference without changing the source list", async () => {
+  const wrapper = await mountWorkspace();
+  await wrapper
+    .getComponent(SpreadsheetRibbon)
+    .get('[data-ribbon-category="data"]')
+    .trigger("click");
+  await wrapper.getComponent(DataToolbar).get('[data-data-action="consolidate"]').trigger("click");
+  await flushPromises();
+  const dialog = wrapper.getComponent(ConsolidateDialog);
+  const initialSources = [...dialog.props("initial").sources];
+  const pending = dialog.props("selectSourceReference")!("Summary!A1");
+  await flushPromises();
+  expect(dialog.props("picking")).toBe(true);
+  wrapper.getComponent(WorkbookStatusBar).vm.$emit("select", "details");
+  await flushPromises();
+  await triggerCanvasCell(wrapper, { row: 0, column: 0 }, "mousedown", { button: 0, buttons: 1 });
+  await triggerCanvasCell(wrapper, { row: 0, column: 1 }, "mousemove", { buttons: 1 });
+  await triggerCanvasCell(wrapper, { row: 0, column: 1 }, "mouseup", { button: 0 });
+  wrapper.getComponent(RangeReferencePicker).vm.$emit("confirm");
+  expect(await pending).toBe("=Details!$A$1:$B$1");
+  await flushPromises();
+  expect(dialog.props("picking")).toBe(false);
+  expect(dialog.props("initial").sources).toEqual(initialSources);
+});

@@ -1,4 +1,6 @@
 import { isFormulaError, type CellContent, type FormulaValue } from "../formula/types.js";
+import { formulaError } from "../formula/functions/helpers.js";
+import { formatComputedValueForDisplay } from "../input.js";
 import {
   createCellKey,
   createWorkbookEvaluator,
@@ -20,7 +22,18 @@ import {
 import { createBatchSetCellContentsCommand } from "./values.js";
 
 export type ConsolidateSource = { sheetId: string; range: CellRange };
-export type ConsolidateFunction = "sum" | "count" | "average" | "min" | "max";
+export type ConsolidateFunction =
+  | "sum"
+  | "counta"
+  | "average"
+  | "max"
+  | "min"
+  | "product"
+  | "count"
+  | "stdev"
+  | "stdevp"
+  | "var"
+  | "varp";
 export type ConsolidateOptions = {
   sources: readonly ConsolidateSource[];
   destination: { sheetId: string; address: CellAddress };
@@ -43,7 +56,18 @@ type Normalized = Omit<ConsolidateOptions, "sources" | "destination"> & {
   sources: Source[];
   destination: { sheetId: string; address: CellAddress };
 };
-type Aggregate = { count: number; sum: number; min: number; max: number; seen: boolean };
+type Aggregate = {
+  count: number;
+  counta: number;
+  sum: number;
+  product: number;
+  mean: number;
+  m2: number;
+  min: number;
+  max: number;
+  seen: boolean;
+  error?: ReturnType<typeof formulaError>;
+};
 type Plan = {
   options: Normalized;
   changes: SetCellContentsCommand["changes"];
@@ -65,7 +89,7 @@ function intersects(left: CellRange, right: CellRange): boolean {
 }
 function text(value: FormulaValue): string {
   if (value === null) return "";
-  if (isFormulaError(value)) return `#${value.code}!`;
+  if (isFormulaError(value)) return formatComputedValueForDisplay(value);
   return String(value);
 }
 function literal(value: FormulaValue): CellContent {
@@ -78,6 +102,50 @@ function labelKey(value: FormulaValue): string {
   if (value === null) return "null";
   if (isFormulaError(value)) return `error:${value.code}`;
   return `${typeof value}:${String(value)}`;
+}
+function aggregateValue(
+  functionName: ConsolidateFunction,
+  aggregate: Aggregate,
+): FormulaValue | null {
+  if (functionName !== "count" && functionName !== "counta" && aggregate.error)
+    return aggregate.error;
+  switch (functionName) {
+    case "count":
+      return aggregate.count;
+    case "counta":
+      return aggregate.counta;
+    case "sum":
+      if (!aggregate.count) return null;
+      return Number.isFinite(aggregate.sum) ? aggregate.sum : formulaError("NUM");
+    case "product":
+      // Match the workbook PRODUCT evaluator's multiplicative identity for reference values.
+      if (!aggregate.count) return 1;
+      return Number.isFinite(aggregate.product) ? aggregate.product : formulaError("NUM");
+    default:
+      break;
+  }
+  switch (functionName) {
+    case "min":
+      return aggregate.count ? aggregate.min : 0;
+    case "max":
+      return aggregate.count ? aggregate.max : 0;
+    case "average":
+      return aggregate.count ? aggregate.mean : formulaError("DIV0");
+    case "stdev":
+    case "var":
+      if (aggregate.count < 2) return formulaError("DIV0");
+      return functionName === "stdev"
+        ? Math.sqrt(aggregate.m2 / (aggregate.count - 1))
+        : aggregate.m2 / (aggregate.count - 1);
+    case "stdevp":
+    case "varp":
+      if (!aggregate.count) return formulaError("DIV0");
+      return functionName === "stdevp"
+        ? Math.sqrt(aggregate.m2 / aggregate.count)
+        : aggregate.m2 / aggregate.count;
+    default:
+      return formulaError("VALUE");
+  }
 }
 function normalize(workbook: Workbook, input: ConsolidateOptions): Normalized {
   if (!input || typeof input !== "object") throw invalidCommandPayload("options", input);
@@ -107,7 +175,21 @@ function normalize(workbook: Workbook, input: ConsolidateOptions): Normalized {
     throw invalidCommandPayload("destination", input.destination);
   assertCellAddress(input.destination.address);
   getSheetOrThrow(workbook, input.destination.sheetId);
-  if (!["sum", "count", "average", "min", "max"].includes(input.function))
+  if (
+    ![
+      "sum",
+      "counta",
+      "average",
+      "max",
+      "min",
+      "product",
+      "count",
+      "stdev",
+      "stdevp",
+      "var",
+      "varp",
+    ].includes(input.function)
+  )
     throw invalidCommandPayload("function", input.function);
   if (
     typeof input.topRow !== "boolean" ||
@@ -232,15 +314,26 @@ function plan(workbook: Workbook, input: ConsolidateOptions): Plan {
         const key = `${outRow}:${outColumn}`;
         const aggregate = aggregates.get(key) ?? {
           count: 0,
+          counta: 0,
           sum: 0,
+          product: 1,
+          mean: 0,
+          m2: 0,
           min: Infinity,
           max: -Infinity,
           seen: false,
         };
         if (value !== null) aggregate.seen = true;
+        if (value !== null) aggregate.counta += 1;
+        if (isFormulaError(value) && options.function !== "count" && options.function !== "counta")
+          aggregate.error ??= value;
         if (typeof value === "number" && Number.isFinite(value)) {
           aggregate.count += 1;
           aggregate.sum += value;
+          aggregate.product *= value;
+          const delta = value - aggregate.mean;
+          aggregate.mean += delta / aggregate.count;
+          aggregate.m2 += delta * (value - aggregate.mean);
           aggregate.min = Math.min(aggregate.min, value);
           aggregate.max = Math.max(aggregate.max, value);
           numericValues += 1;
@@ -283,18 +376,7 @@ function plan(workbook: Workbook, input: ConsolidateOptions): Plan {
   for (const [key, aggregate] of aggregates) {
     if (!aggregate.seen) continue;
     const [row, column] = key.split(":").map(Number) as [number, number];
-    const value =
-      options.function === "count"
-        ? aggregate.count
-        : aggregate.count === 0
-          ? null
-          : options.function === "sum"
-            ? aggregate.sum
-            : options.function === "average"
-              ? aggregate.sum / aggregate.count
-              : options.function === "min"
-                ? aggregate.min
-                : aggregate.max;
+    const value = aggregateValue(options.function, aggregate);
     if (value !== null)
       add(row + Number(options.topRow), column + Number(options.leftColumn), value);
   }

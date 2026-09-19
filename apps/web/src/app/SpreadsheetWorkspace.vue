@@ -620,26 +620,18 @@ watch(lookupFillVisible, (visible) => {
 const consolidateRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingConsolidateRange, reference: pickedConsolidateReference } =
   consolidateRangePicker;
-async function pickConsolidateRange(field: "sources" | "destination", sourceIndex?: number) {
-  if (
-    field === "sources" &&
-    (sourceIndex === undefined ||
-      !Number.isInteger(sourceIndex) ||
-      sourceIndex < 0 ||
-      sourceIndex >= consolidateDraft.value.sources.length)
-  )
-    return;
+async function selectConsolidateSourceReference(current: string): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const selected = await consolidateRangePicker.selectReference(current);
+  return session.workbook === workbook && consolidateVisible.value ? selected : undefined;
+}
+async function pickConsolidateRange() {
   const selected = await consolidateRangePicker.selectReference(
-    field === "sources"
-      ? consolidateDraft.value.sources[sourceIndex!]!
-      : consolidateDraft.value.destination,
-    { singleCell: field === "destination" },
+    consolidateDraft.value.destination,
+    { singleCell: true },
   );
   if (selected === undefined || !consolidateVisible.value) return;
-  const draft = { ...consolidateDraft.value, sources: [...consolidateDraft.value.sources] };
-  if (field === "sources") draft.sources[sourceIndex!] = selected;
-  else draft.destination = selected;
-  dataTools.updateConsolidateDraft(draft);
+  dataTools.updateConsolidateDraft({ ...consolidateDraft.value, destination: selected });
 }
 watch(consolidateVisible, (visible) => {
   if (!visible) consolidateRangePicker.cancel();
@@ -1005,6 +997,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :preview="consolidatePreview"
       :busy="loading || fileBusy || xlsxBusy || imageBusy"
       :picking="pickingConsolidateRange"
+      :select-source-reference="selectConsolidateSourceReference"
       @close="dataTools.closeConsolidate"
       @apply="dataTools.applyConsolidate"
       @draft-change="dataTools.updateConsolidateDraft"

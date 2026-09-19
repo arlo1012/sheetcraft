@@ -102,10 +102,16 @@ describe("consolidate", () => {
 
   test.each([
     ["sum", 5],
+    ["counta", 2],
     ["count", 2],
     ["average", 2.5],
+    ["product", 6],
     ["min", 2],
     ["max", 3],
+    ["stdev", Math.SQRT1_2],
+    ["stdevp", 0.5],
+    ["var", 0.5],
+    ["varp", 0.25],
   ] as const)("calculates %s across source ranges", (functionName, expected) => {
     const session = createTestWorkbookSession();
     const first = getActiveSheet(session.workbook);
@@ -129,6 +135,138 @@ describe("consolidate", () => {
       kind: "literal",
       value: expected,
     });
+  });
+
+  test("returns DIV0 for under-sized sample or population dispersion", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    set(sheet, 0, 0, 2);
+    set(sheet, 0, 1, "text");
+    const base = {
+      destination: { sheetId: sheet.id, address: { row: 2, column: 0 } },
+      topRow: false,
+      leftColumn: false,
+      overwrite: false,
+    };
+    for (const [functionName, sources] of [
+      ["stdev", [{ sheetId: sheet.id, range: range(0, 0, 0, 0) }]],
+      ["var", [{ sheetId: sheet.id, range: range(0, 0, 0, 0) }]],
+      ["stdevp", [{ sheetId: sheet.id, range: range(0, 1, 0, 1) }]],
+      ["varp", [{ sheetId: sheet.id, range: range(0, 1, 0, 1) }]],
+    ] as const) {
+      const command = createConsolidateCommand(session.workbook, {
+        ...base,
+        sources,
+        function: functionName,
+      });
+      expect(executeWorkbookCommand(session, command)).toBe(true);
+      expect(getCellContent(sheet, { row: 2, column: 0 })).toEqual({
+        kind: "error",
+        error: { kind: "formula-error", code: "DIV0" },
+      });
+      expect(undoWorkbookCommand(session)).toBe(true);
+    }
+  });
+
+  test("keeps count semantics while counta includes text, logical values, and errors", () => {
+    const session = createTestWorkbookSession();
+    const first = getActiveSheet(session.workbook);
+    const textSheet = createSheet("Text", "text");
+    const logicalSheet = createSheet("Logical", "logical");
+    const errorSheet = createSheet("Error", "error");
+    insertSheet(session.workbook, textSheet);
+    insertSheet(session.workbook, logicalSheet);
+    insertSheet(session.workbook, errorSheet);
+    set(first, 0, 0, 2);
+    set(textSheet, 0, 0, "text");
+    setCellContent(logicalSheet, { row: 0, column: 0 }, { kind: "literal", value: true });
+    setCellContent(
+      errorSheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=1/0" } },
+    );
+    const sources = [first, textSheet, logicalSheet, errorSheet].map((sheet) => ({
+      sheetId: sheet.id,
+      range: range(0, 0, 0, 0),
+    }));
+    const base = {
+      sources,
+      destination: { sheetId: first.id, address: { row: 0, column: 2 } },
+      topRow: false,
+      leftColumn: false,
+      overwrite: false,
+    };
+    for (const [functionName, expected] of [
+      ["count", 1],
+      ["counta", 4],
+    ] as const) {
+      const command = createConsolidateCommand(session.workbook, {
+        ...base,
+        function: functionName,
+      });
+      expect(executeWorkbookCommand(session, command)).toBe(true);
+      expect(getCellContent(first, { row: 0, column: 2 })).toEqual({
+        kind: "literal",
+        value: expected,
+      });
+      expect(undoWorkbookCommand(session)).toBe(true);
+    }
+    expect(analyzeConsolidate(session.workbook, { ...base, function: "sum" }).sample).toEqual([
+      ["#DIV/0!"],
+    ]);
+    const command = createConsolidateCommand(session.workbook, { ...base, function: "sum" });
+    expect(executeWorkbookCommand(session, command)).toBe(true);
+    expect(getCellContent(first, { row: 0, column: 2 })).toEqual({
+      kind: "error",
+      error: { kind: "formula-error", code: "DIV0" },
+    });
+  });
+
+  test("uses PRODUCT's multiplicative identity when a source position has no numeric values", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    set(sheet, 0, 0, "text");
+    setCellContent(sheet, { row: 0, column: 1 }, { kind: "literal", value: true });
+    const command = createConsolidateCommand(session.workbook, {
+      sources: [{ sheetId: sheet.id, range: range(0, 0, 0, 1) }],
+      destination: { sheetId: sheet.id, address: { row: 2, column: 0 } },
+      function: "product",
+      topRow: false,
+      leftColumn: false,
+      overwrite: false,
+    });
+    expect(executeWorkbookCommand(session, command)).toBe(true);
+    expect(getCellContent(sheet, { row: 2, column: 0 })).toEqual({ kind: "literal", value: 1 });
+    expect(getCellContent(sheet, { row: 2, column: 1 })).toEqual({ kind: "literal", value: 1 });
+  });
+
+  test.each([
+    ["stdev", 1],
+    ["stdevp", Math.sqrt(2 / 3)],
+    ["var", 1],
+    ["varp", 2 / 3],
+  ] as const)("uses stable %s dispersion for large offsets", (functionName, expected) => {
+    const session = createTestWorkbookSession();
+    const first = getActiveSheet(session.workbook);
+    const sources = [1, 2, 3].map((offset, index) => {
+      const sheet = index === 0 ? first : createSheet(`S${index}`, `s${index}`);
+      if (index) insertSheet(session.workbook, sheet);
+      set(sheet, 0, 0, 1_000_000_000_000 + offset);
+      return { sheetId: sheet.id, range: range(0, 0, 0, 0) };
+    });
+    const command = createConsolidateCommand(session.workbook, {
+      sources,
+      destination: { sheetId: first.id, address: { row: 0, column: 2 } },
+      function: functionName,
+      topRow: false,
+      leftColumn: false,
+      overwrite: false,
+    });
+    expect(executeWorkbookCommand(session, command)).toBe(true);
+    expect((getCellContent(first, { row: 0, column: 2 }) as { value: number }).value).toBeCloseTo(
+      expected,
+      12,
+    );
   });
 
   test("supports top-row-only and left-column-only label aggregation", () => {

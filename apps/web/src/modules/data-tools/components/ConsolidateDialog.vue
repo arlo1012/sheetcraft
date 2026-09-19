@@ -4,6 +4,7 @@ import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
+import OptionList from "../../../shared/option-list/OptionList.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { ConsolidateDraft, ConsolidatePreview } from "../consolidate-types";
@@ -16,6 +17,7 @@ const props = withDefaults(
     preview?: ConsolidatePreview;
     busy?: boolean;
     picking?: boolean;
+    selectSourceReference?: (current: string) => Promise<string | undefined>;
   }>(),
   { error: "", preview: undefined, busy: false, picking: false },
 );
@@ -23,37 +25,71 @@ const emit = defineEmits<{
   apply: [draft: ConsolidateDraft];
   close: [];
   draftChange: [draft: ConsolidateDraft];
-  pickRange: [field: "sources" | "destination", sourceIndex?: number];
+  pickRange: [field: "destination"];
 }>();
 const { t } = useAppI18n();
-const copyDraft = (draft: ConsolidateDraft): ConsolidateDraft => ({
-  ...draft,
-  sources: [...draft.sources],
+const copyDraft = (value: ConsolidateDraft): ConsolidateDraft => ({
+  ...value,
+  sources: [...value.sources],
 });
 const draft = ref(copyDraft(props.initial));
-const canApply = computed(() =>
-  Boolean(draft.value.destination.trim() && draft.value.sources.every((source) => source.trim())),
+const reference = ref(props.initial.sources[0] ?? "");
+const selectedIndex = ref(props.initial.sources.length ? 0 : -1);
+const sourceOptions = computed(() =>
+  draft.value.sources.map((label, index) => ({ value: String(index), label })),
 );
+const canApply = computed(() =>
+  Boolean(
+    draft.value.destination.trim() &&
+    draft.value.sources.length &&
+    draft.value.sources.every((source) => source.trim()),
+  ),
+);
+const canAdd = computed(() => Boolean(reference.value.trim()));
 const functions = computed(() => [
   { value: "sum", label: t("dataTools.consolidate.sum") },
-  { value: "count", label: t("dataTools.consolidate.count") },
+  { value: "counta", label: t("dataTools.consolidate.counta") },
   { value: "average", label: t("dataTools.consolidate.average") },
-  { value: "min", label: t("dataTools.consolidate.min") },
   { value: "max", label: t("dataTools.consolidate.max") },
+  { value: "min", label: t("dataTools.consolidate.min") },
+  { value: "product", label: t("dataTools.consolidate.product") },
+  { value: "count", label: t("dataTools.consolidate.count") },
+  { value: "stdev", label: t("dataTools.consolidate.stdev") },
+  { value: "stdevp", label: t("dataTools.consolidate.stdevp") },
+  { value: "var", label: t("dataTools.consolidate.var") },
+  { value: "varp", label: t("dataTools.consolidate.varp") },
 ]);
+function selectSource(index: number): void {
+  selectedIndex.value = index;
+  reference.value = draft.value.sources[index] ?? "";
+}
 function addSource(): void {
-  draft.value.sources.push("");
+  if (props.busy || !canAdd.value) return;
+  const value = reference.value.trim();
+  const existing = draft.value.sources.findIndex(
+    (source) => source.replace(/^=/, "") === value.replace(/^=/, ""),
+  );
+  if (existing >= 0) {
+    selectSource(existing);
+    return;
+  }
+  draft.value.sources.push(value);
+  selectSource(draft.value.sources.length - 1);
 }
-function setSource(index: number, value: string): void {
-  draft.value.sources[index] = value;
-}
-function removeSource(index: number): void {
-  if (draft.value.sources.length > 1) draft.value.sources.splice(index, 1);
+function removeSource(): void {
+  if (props.busy || selectedIndex.value < 0) return;
+  draft.value.sources.splice(selectedIndex.value, 1);
+  selectSource(
+    draft.value.sources.length ? Math.min(selectedIndex.value, draft.value.sources.length - 1) : -1,
+  );
 }
 watch(
   () => props.visible,
   (visible) => {
-    if (visible && !props.picking) draft.value = copyDraft(props.initial);
+    if (visible && !props.picking) {
+      draft.value = copyDraft(props.initial);
+      selectSource(draft.value.sources.length ? 0 : -1);
+    }
   },
 );
 watch(
@@ -78,11 +114,11 @@ watch(
     role="dialog"
     aria-modal="true"
     :aria-label="t('dataTools.consolidate.title')"
-    width="min(520px, calc(100vw - 32px))"
+    width="min(400px, calc(100vw - 32px))"
     :visible="visible && !picking"
     :header="t('dataTools.consolidate.title')"
     :confirm-btn="{ content: t('dataTools.consolidate.apply'), disabled: busy || !canApply }"
-    :cancel-btn="t('dataTools.common.cancel')"
+    :cancel-btn="t('dataTools.consolidate.close')"
     :close-btn="!busy"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
@@ -90,49 +126,72 @@ watch(
     @confirm="!busy && canApply && emit('apply', copyDraft(draft))"
   >
     <div class="consolidate-dialog">
-      <section class="consolidate-dialog__sources">
-        <div class="consolidate-dialog__section-heading">
-          <span>{{ t("dataTools.consolidate.sources") }}</span>
-          <TButton variant="text" size="small" :disabled="busy" @click="addSource">
-            {{ t("dataTools.consolidate.addSource") }}
-          </TButton>
-        </div>
-        <div
-          v-for="(_source, index) in draft.sources"
-          :key="index"
-          class="consolidate-dialog__source"
-        >
-          <RangeReferenceInput
-            :model-value="draft.sources[index] ?? ''"
-            @update:model-value="setSource(index, $event)"
-            :disabled="busy"
-            :label="`${t('dataTools.consolidate.sourceRange')} ${index + 1}`"
-            :pick-label="t('dataTools.consolidate.pickRange')"
-            placeholder="A1:C10"
-            :select-reference="
-              async () => {
-                emit('pickRange', 'sources', index);
-                return undefined;
-              }
-            "
-          />
+      <div class="consolidate-dialog__field">
+        <span>{{ t("dataTools.consolidate.function") }}</span>
+        <TSelect
+          v-model="draft.function"
+          :aria-label="t('dataTools.consolidate.function')"
+          :disabled="busy"
+          :options="functions"
+        />
+      </div>
+      <div class="consolidate-dialog__field">
+        <span>{{ t("dataTools.consolidate.reference") }}</span>
+        <RangeReferenceInput
+          v-model="reference"
+          :disabled="busy"
+          :label="t('dataTools.consolidate.reference')"
+          :pick-label="t('dataTools.consolidate.pickRange')"
+          :select-reference="selectSourceReference"
+          placeholder="Sheet1!$A$1:$C$10"
+          @enter="addSource"
+        />
+      </div>
+      <section class="consolidate-dialog__field">
+        <span>{{ t("dataTools.consolidate.sources") }}</span>
+        <OptionList
+          class="consolidate-dialog__list"
+          :model-value="selectedIndex >= 0 ? String(selectedIndex) : undefined"
+          :options="sourceOptions"
+          :label="t('dataTools.consolidate.sources')"
+          :inert="busy || undefined"
+          overflow="ellipsis"
+          @select="!busy && selectSource(Number($event))"
+          @keydown.delete.stop.prevent="removeSource"
+        />
+        <div class="consolidate-dialog__actions">
+          <TButton size="small" variant="outline" :disabled="busy || !canAdd" @click="addSource">{{
+            t("dataTools.consolidate.addSource")
+          }}</TButton>
           <TButton
-            variant="text"
             size="small"
-            :disabled="busy || draft.sources.length === 1"
-            @click="removeSource(index)"
+            variant="outline"
+            :disabled="busy || selectedIndex < 0"
+            @click="removeSource"
+            >{{ t("dataTools.consolidate.removeSource") }}</TButton
           >
-            {{ t("dataTools.consolidate.removeSource") }}
-          </TButton>
         </div>
       </section>
-      <label class="consolidate-dialog__field">
+      <section class="consolidate-dialog__labels">
+        <span class="consolidate-dialog__heading">{{
+          t("dataTools.consolidate.labelPosition")
+        }}</span>
+        <div class="consolidate-dialog__checks">
+          <TCheckbox v-model="draft.topRow" :disabled="busy">{{
+            t("dataTools.consolidate.topRow")
+          }}</TCheckbox>
+          <TCheckbox v-model="draft.leftColumn" :disabled="busy">{{
+            t("dataTools.consolidate.leftColumn")
+          }}</TCheckbox>
+        </div>
+      </section>
+      <div class="consolidate-dialog__field">
         <span>{{ t("dataTools.consolidate.destination") }}</span>
         <RangeReferenceInput
           v-model="draft.destination"
           :disabled="busy"
           :label="t('dataTools.consolidate.destination')"
-          :pick-label="t('dataTools.consolidate.pickRange')"
+          :pick-label="t('dataTools.consolidate.pickDestination')"
           placeholder="E1"
           :select-reference="
             async () => {
@@ -141,26 +200,14 @@ watch(
             }
           "
         />
-      </label>
-      <label class="consolidate-dialog__field">
-        <span>{{ t("dataTools.consolidate.function") }}</span>
-        <TSelect v-model="draft.function" :disabled="busy" :options="functions" />
-      </label>
-      <div class="consolidate-dialog__checks">
-        <TCheckbox v-model="draft.topRow" :disabled="busy">{{
-          t("dataTools.consolidate.topRow")
-        }}</TCheckbox>
-        <TCheckbox v-model="draft.leftColumn" :disabled="busy">{{
-          t("dataTools.consolidate.leftColumn")
-        }}</TCheckbox>
-        <TCheckbox v-model="draft.overwrite" :disabled="busy">{{
-          t("dataTools.consolidate.overwrite")
-        }}</TCheckbox>
       </div>
-      <div v-if="preview" class="consolidate-dialog__preview">
-        <p>
+      <TCheckbox v-model="draft.overwrite" :disabled="busy">{{
+        t("dataTools.consolidate.overwrite")
+      }}</TCheckbox>
+      <details v-if="preview" class="consolidate-dialog__preview">
+        <summary>
           {{ t("dataTools.consolidate.preview", { rows: preview.rows, columns: preview.columns }) }}
-        </p>
+        </summary>
         <p>
           {{
             t("dataTools.consolidate.previewCounts", {
@@ -170,7 +217,7 @@ watch(
             })
           }}
         </p>
-        <div v-if="preview.sample.length" class="consolidate-dialog__sample">
+        <div class="consolidate-dialog__sample">
           <div
             v-for="(row, rowIndex) in preview.sample"
             :key="rowIndex"
@@ -180,7 +227,7 @@ watch(
             <span v-for="(value, columnIndex) in row" :key="columnIndex">{{ value }}</span>
           </div>
         </div>
-      </div>
+      </details>
       <p v-if="error" class="consolidate-dialog__error" role="alert">{{ error }}</p>
     </div>
   </Dialog>
@@ -189,56 +236,51 @@ watch(
 <style scoped lang="scss">
 .consolidate-dialog {
   display: grid;
-  gap: var(--idea-space-3);
-  &__sources,
-  &__checks {
+  gap: var(--idea-space-2);
+  &__field,
+  &__labels {
     display: grid;
-    gap: var(--idea-space-2);
+    gap: var(--idea-space-1);
   }
-  &__section-heading,
-  &__source {
+  &__labels {
+    margin-top: var(--idea-space-1);
+  }
+  &__heading {
+    font-weight: 600;
+  }
+  &__actions,
+  &__checks {
     display: flex;
     align-items: center;
     gap: var(--idea-space-2);
   }
-  &__section-heading {
-    justify-content: space-between;
-    font-weight: 500;
-  }
-  &__source > :first-child {
-    flex: 1;
-    min-width: 0;
-  }
-  &__field {
-    display: grid;
-    grid-template-columns: 84px minmax(0, 1fr);
-    align-items: center;
-    gap: var(--idea-space-2);
+  &__list {
+    height: 160px;
   }
   &__preview {
-    display: grid;
-    gap: var(--idea-space-1);
     color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-  }
-  &__preview p,
-  &__error {
-    margin: 0;
+    summary {
+      cursor: pointer;
+    }
+    p {
+      margin: var(--idea-space-1) 0;
+    }
   }
   &__sample {
     border: 1px solid var(--idea-border-subtle);
   }
   &__sample-row {
     display: grid;
-  }
-  &__sample span {
-    overflow: hidden;
-    padding: var(--idea-space-1);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    border-right: 1px solid var(--idea-border-subtle);
+    span {
+      padding: var(--idea-space-1);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      border-right: 1px solid var(--idea-border-subtle);
+    }
   }
   &__error {
+    margin: 0;
     color: var(--idea-status-error);
   }
 }

@@ -5,6 +5,17 @@ export type AppLocale = "zh-CN" | "en-US";
 export type MessageSchema = FormulaToolsMessageSchema & {
   dataTools: {
     consolidate: {
+      counta: string;
+      product: string;
+      stdev: string;
+      stdevp: string;
+      var: string;
+      varp: string;
+      reference: string;
+      labelPosition: string;
+      close: string;
+      pickDestination: string;
+
       title: string;
       sources: string;
       sourceRange: string;

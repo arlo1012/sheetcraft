@@ -1,7 +1,9 @@
+import type { ConsolidateFunction } from "@idea10/core/commands";
+
 export type ConsolidateDraft = {
   sources: string[];
   destination: string;
-  function: "sum" | "count" | "average" | "min" | "max";
+  function: ConsolidateFunction;
   topRow: boolean;
   leftColumn: boolean;
   overwrite: boolean;
