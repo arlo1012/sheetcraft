@@ -90,20 +90,23 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   Reject Limit removes only those duplicate-owned rejection rules. Remove
   Duplicates retains the first matching row according to the selected key
   columns and removes later matches.
-  Existing violations of Reject Duplicate Entries show cell-corner markers
-  (green by default) and a warning menu for the active cell. The menu can ignore
+  Existing violations of Reject Duplicate Entries and numeric text literals show
+  cell-corner markers (green by default) and a warning menu for the active cell.
+  Numeric text includes long numbers retained as text to preserve all digits;
+  detection does not convert or modify their content. The menu describes the
+  active issue, with duplicate violations taking priority when both apply. The menu can ignore
   all issues in the current selection,
-  ignore all current issues on the worksheet, focus the formula bar, or open
+  ignore current issues of the displayed kind on the worksheet, focus the formula bar, or open
   error-check options. Ignoring only hides the warning; rejection remains active.
   Error-check options have a background-check master switch, an indicator-color
-  picker (Automatic follows the theme), and an independent duplicate-entry rule
-  switch. Other WPS-style error-check rules are disabled TODO placeholders; their
+  picker (Automatic follows the theme), and independent duplicate-entry and
+  numbers-stored-as-text switches. Other WPS-style error-check rules are disabled TODO placeholders; their
   detectors are not implemented. These switches only control warnings, never
   command-time duplicate-entry rejection. Settings and clearing the current
   worksheet's ignored warnings stay in a local draft until Confirm; Cancel,
   Escape and closing the dialog discard that draft.
   Settings and ignored issues persist in this browser, with ignored issues scoped
-  to workbook, worksheet, cell, value and rule. Version 1 preferences migrate with
+  to workbook, worksheet, cell, value and rule. Version 1 and 2 preferences migrate with
   the old enabled state and ignored issues preserved. Changed or resolved issues
   discard their ignored state. Error-check options remain available from the
   Duplicate items menu when checks are off.

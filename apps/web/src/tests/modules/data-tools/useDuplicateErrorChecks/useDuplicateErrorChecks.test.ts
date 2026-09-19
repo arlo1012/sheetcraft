@@ -196,7 +196,117 @@ describe("duplicate error checks", () => {
     expect(f.checks.errorCells.value).toEqual(new Set());
   });
 
-  test("persists a normalized indicator color and migrates version-one preferences", () => {
+  test("finds literal numeric text without flagging numbers, formulas, booleans, or ordinary text", () => {
+    const f = fixture();
+    f.sheet.duplicateRules = [];
+    setCellValue(f.sheet, { row: 0, column: 0 }, "11111111111111111111");
+    setCellValue(f.sheet, { row: 0, column: 1 }, "0012");
+    setCellValue(f.sheet, { row: 0, column: 2 }, "12.5");
+    setCellValue(f.sheet, { row: 1, column: 0 }, 12);
+    setCellValue(f.sheet, { row: 1, column: 1 }, true);
+    setCellValue(f.sheet, { row: 1, column: 2 }, "not a number");
+    f.sheet.cells.set("1:3", {
+      content: { kind: "formula", formula: { source: "=12" } },
+    });
+
+    expect(f.checks.errorKinds.value).toEqual(
+      new Map([
+        ["0:0", "number-stored-as-text"],
+        ["0:1", "number-stored-as-text"],
+        ["0:2", "number-stored-as-text"],
+      ]),
+    );
+  });
+
+  test("prioritizes duplicate issues and clears a numeric-text ignore when a new enabled issue appears", () => {
+    const f = fixture();
+    setCellValue(f.sheet, { row: 0, column: 0 }, "0012");
+    setCellValue(f.sheet, { row: 1, column: 0 }, "0012");
+    f.checks.applySettings({
+      ...f.checks.settings.value,
+      duplicateEntries: false,
+    });
+    expect(f.checks.errorKinds.value).toEqual(
+      new Map([
+        ["0:0", "number-stored-as-text"],
+        ["1:0", "number-stored-as-text"],
+      ]),
+    );
+    f.checks.ignoreAll("number-stored-as-text");
+    expect(f.checks.errorCells.value).toEqual(new Set());
+
+    f.checks.applySettings({
+      ...f.checks.settings.value,
+      duplicateEntries: true,
+    });
+    expect(f.checks.errorKinds.value).toEqual(
+      new Map([
+        ["0:0", "duplicate"],
+        ["1:0", "duplicate"],
+      ]),
+    );
+    expect(readDuplicateErrorChecks(f.storage).ignored).toEqual([]);
+  });
+
+  test("ignores numeric-text warnings independently and can disable only that check", () => {
+    const f = fixture();
+    setCellValue(f.sheet, { row: 0, column: 1 }, "0012");
+    expect(f.checks.errorKinds.value).toEqual(
+      new Map([
+        ["0:0", "duplicate"],
+        ["1:0", "duplicate"],
+        ["0:1", "number-stored-as-text"],
+      ]),
+    );
+
+    f.checks.ignoreAll("number-stored-as-text");
+    expect(f.checks.errorKinds.value).toEqual(
+      new Map([
+        ["0:0", "duplicate"],
+        ["1:0", "duplicate"],
+      ]),
+    );
+
+    f.checks.resetIgnored();
+    f.checks.applySettings({
+      ...f.checks.settings.value,
+      numberStoredAsText: false,
+    });
+    expect(f.checks.errorKinds.value).toEqual(
+      new Map([
+        ["0:0", "duplicate"],
+        ["1:0", "duplicate"],
+      ]),
+    );
+  });
+
+  test("keeps an existing duplicate-only ignore when version-two preferences are reloaded", () => {
+    const f = fixture();
+    f.checks.ignoreCell({ row: 0, column: 0 });
+    const ignored = readDuplicateErrorChecks(f.storage).ignored;
+    const persisted = JSON.parse(f.storage.getItem(DUPLICATE_ERROR_CHECKS_STORAGE_KEY)!) as {
+      preferences: Record<string, unknown>;
+    };
+    const legacyPreferences = Object.fromEntries(
+      Object.entries(persisted.preferences).filter(([key]) => key !== "numberStoredAsText"),
+    );
+    f.storage.setItem(
+      DUPLICATE_ERROR_CHECKS_STORAGE_KEY,
+      JSON.stringify({ version: 2, preferences: legacyPreferences }),
+    );
+
+    const restored = useDuplicateErrorChecks({
+      getWorkbook: () => f.session.workbook,
+      getSheet: () => f.sheet,
+      getEvaluator: () => createSheetEvaluator(f.sheet),
+      getRevision: () => f.revision.value,
+      storage: f.storage,
+    });
+    expect(restored.errorCells.value).toEqual(new Set(["1:0"]));
+    expect(readDuplicateErrorChecks(f.storage).ignored).toEqual(ignored);
+  });
+
+  test("persists a normalized indicator color and migrates version-one and version-two preferences", () => {
     const storage = memoryStorage();
     storage.setItem(
       DUPLICATE_ERROR_CHECKS_STORAGE_KEY,
@@ -219,6 +329,7 @@ describe("duplicate error checks", () => {
       enabled: false,
       indicatorColor: null,
       duplicateEntries: true,
+      numberStoredAsText: true,
       ignored: [
         {
           workbookId: "workbook-a",
@@ -227,6 +338,26 @@ describe("duplicate error checks", () => {
           signature: "old-issue",
         },
       ],
+    });
+
+    storage.setItem(
+      DUPLICATE_ERROR_CHECKS_STORAGE_KEY,
+      JSON.stringify({
+        version: 2,
+        preferences: {
+          enabled: true,
+          indicatorColor: "#abcdef",
+          duplicateEntries: false,
+          ignored: [],
+        },
+      }),
+    );
+    expect(readDuplicateErrorChecks(storage)).toEqual({
+      enabled: true,
+      indicatorColor: "#abcdef",
+      duplicateEntries: false,
+      numberStoredAsText: true,
+      ignored: [],
     });
 
     const f = fixture(storage, "workbook-b");
@@ -253,6 +384,7 @@ describe("duplicate error checks", () => {
         enabled: true,
         indicatorColor: null,
         duplicateEntries: true,
+        numberStoredAsText: true,
         ignored: [
           {
             workbookId: "workbook-b",
@@ -268,7 +400,12 @@ describe("duplicate error checks", () => {
     left.checks.ignoreAll();
     expect(
       left.checks.applySettings(
-        { enabled: false, indicatorColor: "#ff0000", duplicateEntries: false },
+        {
+          enabled: false,
+          indicatorColor: "#ff0000",
+          duplicateEntries: false,
+          numberStoredAsText: false,
+        },
         true,
       ),
     ).toBe(true);
@@ -276,6 +413,7 @@ describe("duplicate error checks", () => {
       enabled: false,
       indicatorColor: "#ff0000",
       duplicateEntries: false,
+      numberStoredAsText: false,
     });
     const stored = readDuplicateErrorChecks(storage);
     expect(stored.ignored).toHaveLength(1);
@@ -304,6 +442,7 @@ describe("duplicate error checks", () => {
       enabled: true,
       indicatorColor: null,
       duplicateEntries: true,
+      numberStoredAsText: true,
       ignored: [],
     });
     const unavailable: Storage = {
@@ -324,6 +463,7 @@ describe("duplicate error checks", () => {
       enabled: true,
       indicatorColor: null,
       duplicateEntries: true,
+      numberStoredAsText: true,
       ignored: [],
     });
     expect(
@@ -332,6 +472,7 @@ describe("duplicate error checks", () => {
           enabled: false,
           indicatorColor: null,
           duplicateEntries: true,
+          numberStoredAsText: true,
           ignored: [],
         },
         unavailable,

@@ -243,6 +243,8 @@ export const zhCN = {
         unavailable: "TODO",
         formulaError: "计算出错值",
         numberStoredAsText: "数字以文本形式存储",
+        numberStoredAsTextMessage: "该数字是文本类型，可能导致计算结果出错！",
+        ignoreAllNumberTextHint: "忽略当前工作表中数字以文本形式存储的错误",
         twoDigitYear: "包含以两位数表示年份的单元格",
         inconsistentFormula: "与区域中其他公式不一致的公式",
         formulaOmittingCells: "遗漏区域内单元格的公式",

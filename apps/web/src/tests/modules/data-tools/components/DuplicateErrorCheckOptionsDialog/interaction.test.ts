@@ -3,7 +3,12 @@ import { afterEach, describe, expect, test } from "vitest";
 import DuplicateErrorCheckOptionsDialog from "../../../../../modules/data-tools/components/DuplicateErrorCheckOptionsDialog.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 
-const settings = { enabled: true, indicatorColor: null, duplicateEntries: true };
+const settings = {
+  enabled: true,
+  indicatorColor: null,
+  duplicateEntries: true,
+  numberStoredAsText: true,
+};
 const wrappers: ReturnType<typeof mount>[] = [];
 function mountDialog(ignoredCount = 2) {
   const wrapper = mount(DuplicateErrorCheckOptionsDialog, {
@@ -52,7 +57,12 @@ describe("DuplicateErrorCheckOptionsDialog", () => {
     expect(wrapper.emitted("confirm")).toEqual([
       [
         {
-          settings: { enabled: false, indicatorColor: "#c00000", duplicateEntries: true },
+          settings: {
+            enabled: false,
+            indicatorColor: "#c00000",
+            duplicateEntries: true,
+            numberStoredAsText: true,
+          },
           resetIgnored: true,
         },
       ],
@@ -62,10 +72,23 @@ describe("DuplicateErrorCheckOptionsDialog", () => {
   test("renders every unavailable WPS rule disabled and unchecked", () => {
     mountDialog();
     const unavailable = dialog().findAll(".t-checkbox.t-is-disabled");
-    expect(unavailable).toHaveLength(12);
+    expect(unavailable).toHaveLength(11);
     for (const item of unavailable) {
       expect((item.get("input").element as HTMLInputElement).checked).toBe(false);
       expect(item.get("input").attributes("disabled")).toBeDefined();
     }
+  });
+
+  test("allows the numeric-text rule to be disabled independently", async () => {
+    const wrapper = mountDialog();
+    const rule = dialog()
+      .findAll(".t-checkbox")
+      .find((item) => item.text() === "Numbers stored as text")!;
+    expect(rule.get("input").attributes("disabled")).toBeUndefined();
+    await rule.trigger("click");
+    await dialog().get("[data-duplicate-error-confirm]").trigger("click");
+    expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({
+      settings: { numberStoredAsText: false, duplicateEntries: true },
+    });
   });
 });

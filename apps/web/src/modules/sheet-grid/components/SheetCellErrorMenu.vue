@@ -9,6 +9,12 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
 
+export type CellErrorDescription = {
+  label: string;
+  message: string;
+  ignoreAllHint: string;
+};
+
 const props = withDefaults(
   defineProps<{
     frame: SheetRenderFrame;
@@ -16,6 +22,7 @@ const props = withDefaults(
     visible: boolean;
     disabled?: boolean;
     readOnly?: boolean;
+    description?: CellErrorDescription;
   }>(),
   { disabled: false, readOnly: false },
 );
@@ -26,6 +33,14 @@ const emit = defineEmits<{
   options: [];
 }>();
 const { t } = useAppI18n();
+const description = computed(
+  () =>
+    props.description ?? {
+      label: t("dataTools.duplicates.errorChecks.markerLabel"),
+      message: t("dataTools.duplicates.errorChecks.message"),
+      ignoreAllHint: t("dataTools.duplicates.errorChecks.ignoreAllHint"),
+    },
+);
 const triggerRef = ref<HTMLButtonElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `sheet-cell-error-menu-${useId().replaceAll(":", "")}`;
@@ -94,11 +109,11 @@ watch(
     class="sheet-cell-error-menu__trigger"
     :style="overlay.style"
     :disabled="disabled"
-    :aria-label="t('dataTools.duplicates.errorChecks.markerLabel')"
+    :aria-label="description.label"
     :aria-controls="open ? menuId : undefined"
     :aria-expanded="open"
     aria-haspopup="menu"
-    :title="t('dataTools.duplicates.errorChecks.message')"
+    :title="description.message"
     data-sheet-cell-error-trigger
     @pointerdown.prevent.stop
     @click.stop="toggleMenu"
@@ -119,20 +134,20 @@ watch(
       ref="menuSurfaceRef"
       class="sheet-cell-error-menu__surface"
       :style="floatingStyles"
-      :label="t('dataTools.duplicates.errorChecks.markerLabel')"
+      :label="description.label"
       :aria-describedby="`${menuId}-message`"
       tabindex="-1"
       @pointerdown.stop
       @click.stop
     >
       <li class="sheet-cell-error-menu__message" role="presentation">
-        <p :id="`${menuId}-message`">{{ t("dataTools.duplicates.errorChecks.message") }}</p>
+        <p :id="`${menuId}-message`">{{ description.message }}</p>
       </li>
       <MenuItem data-sheet-cell-error-action="ignore" @select="select('ignore')">
         {{ t("dataTools.duplicates.errorChecks.ignore") }}
       </MenuItem>
       <MenuItem
-        :title="t('dataTools.duplicates.errorChecks.ignoreAllHint')"
+        :title="description.ignoreAllHint"
         data-sheet-cell-error-action="ignore-all"
         @select="select('ignoreAll')"
       >

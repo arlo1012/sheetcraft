@@ -108,12 +108,11 @@ watch(
                 <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
               ></TCheckbox
             >
-            <TCheckbox disabled
-              ><span class="duplicate-error-check-options-dialog__rule-label"
-                >{{ t("dataTools.duplicates.errorChecks.numberStoredAsText") }}
-                <em>{{ t("dataTools.duplicates.errorChecks.unavailable") }}</em></span
-              ></TCheckbox
-            >
+            <TCheckbox v-model="draft.numberStoredAsText" :disabled="!draft.enabled">
+              <span class="duplicate-error-check-options-dialog__rule-label">{{
+                t("dataTools.duplicates.errorChecks.numberStoredAsText")
+              }}</span>
+            </TCheckbox>
             <TCheckbox disabled
               ><span class="duplicate-error-check-options-dialog__rule-label"
                 >{{ t("dataTools.duplicates.errorChecks.twoDigitYear") }}

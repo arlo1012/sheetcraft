@@ -426,6 +426,20 @@ const {
   settings: duplicateCheckSettings,
   ignoredCount: ignoredDuplicateCount,
 } = duplicateErrorChecks;
+const activeCellErrorKind = computed(() =>
+  duplicateErrorChecks.errorKinds.value.get(
+    `${activeAddress.value.row}:${activeAddress.value.column}`,
+  ),
+);
+const activeCellErrorDescription = computed(() =>
+  activeCellErrorKind.value === "number-stored-as-text"
+    ? {
+        label: t("dataTools.duplicates.errorChecks.numberStoredAsText"),
+        message: t("dataTools.duplicates.errorChecks.numberStoredAsTextMessage"),
+        ignoreAllHint: t("dataTools.duplicates.errorChecks.ignoreAllNumberTextHint"),
+      }
+    : undefined,
+);
 const duplicateErrorOptionsVisible = ref(false);
 function openDuplicateErrorOptions(): void {
   if (
@@ -454,7 +468,7 @@ function ignoreSelectedDuplicateErrors(): void {
   void nextTick(focusCellEditor);
 }
 function ignoreAllDuplicateErrors(): void {
-  duplicateErrorChecks.ignoreAll();
+  duplicateErrorChecks.ignoreAll(activeCellErrorKind.value);
   void nextTick(focusCellEditor);
 }
 function editErrorInFormulaBar(): void {
@@ -1070,6 +1084,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :input-error="duplicateInputError"
         @dismiss-input-error="retryValidationInput"
         :error-cells="duplicateErrorCells"
+        :active-cell-error="activeCellErrorDescription"
         :error-indicator-color="duplicateCheckSettings.indicatorColor"
         @ignore-selected-cell-errors="ignoreSelectedDuplicateErrors"
         @ignore-all-cell-errors="ignoreAllDuplicateErrors"

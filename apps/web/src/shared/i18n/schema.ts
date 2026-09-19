@@ -239,6 +239,8 @@ export type MessageSchema = FormulaToolsMessageSchema & {
         unavailable: string;
         formulaError: string;
         numberStoredAsText: string;
+        numberStoredAsTextMessage: string;
+        ignoreAllNumberTextHint: string;
         twoDigitYear: string;
         inconsistentFormula: string;
         formulaOmittingCells: string;

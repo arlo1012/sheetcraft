@@ -10,6 +10,12 @@ import type { CellValue } from "./workbook.js";
 
 const NUMBER_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
 
+/** Recognizes numeric text independently of the precision limit used for cell input. */
+export function isNumericText(value: string): boolean {
+  const trimmed = value.trim();
+  return NUMBER_PATTERN.test(trimmed) && Number.isFinite(Number(trimmed));
+}
+
 function exceedsSpreadsheetPrecision(value: string): boolean {
   const significantDigits = value
     .replace(/^[+-]/, "")

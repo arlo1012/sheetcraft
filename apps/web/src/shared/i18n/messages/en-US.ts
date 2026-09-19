@@ -251,6 +251,9 @@ export const enUS = {
         unavailable: "TODO",
         formulaError: "Formula error",
         numberStoredAsText: "Numbers stored as text",
+        numberStoredAsTextMessage:
+          "This number is stored as text and may cause calculation errors.",
+        ignoreAllNumberTextHint: "Ignore numbers stored as text on the current worksheet",
         twoDigitYear: "Cells containing years represented as 2 digits",
         inconsistentFormula: "Formulas inconsistent with other formulas in the region",
         formulaOmittingCells: "Formulas omitting cells in a region",

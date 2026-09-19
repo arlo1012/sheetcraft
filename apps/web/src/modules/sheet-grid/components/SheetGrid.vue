@@ -99,7 +99,7 @@ import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
 import SheetCellContextMenu from "./SheetCellContextMenu.vue";
-import SheetCellErrorMenu from "./SheetCellErrorMenu.vue";
+import SheetCellErrorMenu, { type CellErrorDescription } from "./SheetCellErrorMenu.vue";
 import SheetCellNotice from "./SheetCellNotice.vue";
 import SheetSurface from "./SheetSurface.vue";
 import SheetAutoFillOptions from "./SheetAutoFillOptions.vue";
@@ -202,6 +202,7 @@ const props = withDefaults(
     /** Resolved for the active cell by the Web data-tools adapter. */
     validationInfo?: ActiveCellValidationInfo;
     errorCells?: ReadonlySet<string>;
+    activeCellError?: CellErrorDescription;
     inputError?: { address: CellAddress; title: string; message: string };
     errorIndicatorColor?: string | null;
   }>(),
@@ -2374,6 +2375,7 @@ defineExpose({
     />
     <SheetCellErrorMenu
       :frame="renderFrame"
+      :description="activeCellError"
       :active-cell="activeCell"
       :visible="
         !isEditing &&

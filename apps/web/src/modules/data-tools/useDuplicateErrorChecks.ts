@@ -1,5 +1,6 @@
 import { computed, ref, type ComputedRef } from "vue";
 import { getDuplicateEntryIssues } from "@idea10/core/duplicate-values";
+import { isNumericText } from "@idea10/core/input";
 import { isCellInRange, normalizeCellRange } from "@idea10/sheet-engine/selection";
 import {
   createCellKey,
@@ -18,6 +19,13 @@ import {
 } from "./duplicate-error-preferences";
 
 type DuplicateIssue = ReturnType<typeof getDuplicateEntryIssues>[number];
+export type ErrorCheckKind = "duplicate" | "number-stored-as-text";
+
+type ErrorIssue = {
+  address: CellAddress;
+  kind: ErrorCheckKind;
+  signature: string;
+};
 
 type Options = {
   getWorkbook: () => Workbook;
@@ -33,7 +41,11 @@ type CachedIssues = {
   workbook: Workbook;
   sheet: Sheet;
   revision: number;
-  issues: DuplicateIssue[];
+  issues: ErrorIssue[];
+};
+
+type CurrentIssues = CachedIssues & {
+  errorKinds: Map<string, ErrorCheckKind>;
   signatures: Map<string, string>;
 };
 
@@ -55,6 +67,26 @@ function issueSignature(sheet: Sheet, evaluator: SheetEvaluator, issue: Duplicat
   });
 }
 
+function numberStoredAsTextIssues(sheet: Sheet): ErrorIssue[] {
+  const issues: ErrorIssue[] = [];
+  for (const [cellKey, cell] of sheet.cells) {
+    const content = cell.content;
+    if (
+      content?.kind !== "literal" ||
+      typeof content.value !== "string" ||
+      !isNumericText(content.value)
+    )
+      continue;
+    const [row, column] = cellKey.split(":").map(Number) as [number, number];
+    issues.push({
+      address: { row, column },
+      kind: "number-stored-as-text",
+      signature: stableValue({ content }),
+    });
+  }
+  return issues;
+}
+
 function sameScope(
   issue: { workbookId: string; sheetId: string },
   workbook: Workbook,
@@ -64,17 +96,18 @@ function sameScope(
 }
 
 /**
- * Browser-only presentation state for existing duplicate-entry violations.
+ * Browser-only presentation state for duplicate-entry and numeric-text issues.
  * It never changes duplicate rules or the command-time rejection validation.
  */
 export function useDuplicateErrorChecks(options: Options): {
   errorCells: ComputedRef<ReadonlySet<string>>;
+  errorKinds: ComputedRef<ReadonlyMap<string, ErrorCheckKind>>;
   settings: ComputedRef<ErrorCheckSettings>;
   enabled: ComputedRef<boolean>;
   ignoredCount: ComputedRef<number>;
   ignoreCell: (address: CellAddress) => void;
   ignoreRange: (range: CellRange) => void;
-  ignoreAll: () => void;
+  ignoreAll: (kind?: ErrorCheckKind) => void;
   resetIgnored: () => void;
   setEnabled: (enabled: boolean) => void;
   applySettings: (settings: ErrorCheckSettings, resetIgnored?: boolean) => boolean;
@@ -100,28 +133,62 @@ export function useDuplicateErrorChecks(options: Options): {
     if (cache?.workbook === workbook && cache.sheet === sheet && cache.revision === revision)
       return cache;
     const evaluator = options.getEvaluator();
-    const issues = getDuplicateEntryIssues(sheet, evaluator);
-    const signatures = new Map(
-      issues.map((issue) => [
-        createCellKey(issue.address),
-        issueSignature(sheet, evaluator, issue),
-      ]),
-    );
-    cache = { workbook, sheet, revision, issues, signatures };
+    const issues: ErrorIssue[] = [
+      ...getDuplicateEntryIssues(sheet, evaluator).map((issue) => ({
+        address: issue.address,
+        kind: "duplicate" as const,
+        signature: issueSignature(sheet, evaluator, issue),
+      })),
+      ...numberStoredAsTextIssues(sheet),
+    ];
+    cache = { workbook, sheet, revision, issues };
+
+    return cache;
+  }
+
+  function visibleIssues(snapshot: CachedIssues): CurrentIssues {
+    const byCell = new Map<string, ErrorIssue[]>();
+    for (const issue of snapshot.issues) {
+      if (
+        (issue.kind === "duplicate" && !preferences.duplicateEntries) ||
+        (issue.kind === "number-stored-as-text" && !preferences.numberStoredAsText)
+      )
+        continue;
+      const cellKey = createCellKey(issue.address);
+      const issues = byCell.get(cellKey);
+      if (issues) issues.push(issue);
+      else byCell.set(cellKey, [issue]);
+    }
+    const errorKinds = new Map<string, ErrorCheckKind>();
+    const signatures = new Map<string, string>();
+    for (const [cellKey, issues] of byCell) {
+      issues.sort((left, right) => left.kind.localeCompare(right.kind));
+      errorKinds.set(
+        cellKey,
+        issues.some((issue) => issue.kind === "duplicate") ? "duplicate" : "number-stored-as-text",
+      );
+      signatures.set(
+        cellKey,
+        issues.length === 1 && issues[0]!.kind === "duplicate"
+          ? issues[0]!.signature
+          : stableValue(issues.map(({ kind, signature }) => ({ kind, signature }))),
+      );
+    }
 
     // An exception only represents the exact current issue. Removing or changing the
     // issue discards it so a later return to the same value is warned again.
     const valid = new Map(signatures);
     const retained = preferences.ignored.filter(
       (ignored) =>
-        !sameScope(ignored, workbook, sheet) || valid.get(ignored.cellKey) === ignored.signature,
+        !sameScope(ignored, snapshot.workbook, snapshot.sheet) ||
+        valid.get(ignored.cellKey) === ignored.signature,
     );
     if (retained.length !== preferences.ignored.length)
       updatePreferences({ ...preferences, ignored: retained });
-    return cache;
+    return { ...snapshot, errorKinds, signatures };
   }
 
-  function ignoredKeys(snapshot: CachedIssues): Set<string> {
+  function ignoredKeys(snapshot: CurrentIssues): Set<string> {
     const ignored = new Set<string>();
     for (const item of preferences.ignored) {
       if (!sameScope(item, snapshot.workbook, snapshot.sheet)) continue;
@@ -137,27 +204,27 @@ export function useDuplicateErrorChecks(options: Options): {
 
   const settings = computed<ErrorCheckSettings>(() => {
     void stateVersion.value;
-    const { enabled, indicatorColor, duplicateEntries } = preferences;
-    return { enabled, indicatorColor, duplicateEntries };
+    const { enabled, indicatorColor, duplicateEntries, numberStoredAsText } = preferences;
+    return { enabled, indicatorColor, duplicateEntries, numberStoredAsText };
   });
 
-  const errorCells = computed<ReadonlySet<string>>(() => {
+  const errorKinds = computed<ReadonlyMap<string, ErrorCheckKind>>(() => {
     void stateVersion.value;
     // Continue diagnosing while the display is disabled. This invalidates stale
     // exceptions before the user enables warnings again.
-    const snapshot = currentIssues();
-    if (!settings.value.enabled || !settings.value.duplicateEntries) return new Set();
+    const snapshot = visibleIssues(currentIssues());
+    if (!settings.value.enabled) return new Map();
     const ignored = ignoredKeys(snapshot);
-    return new Set(
-      snapshot.issues
-        .map((issue) => createCellKey(issue.address))
-        .filter((key) => !ignored.has(key)),
-    );
+    return new Map([...snapshot.errorKinds].filter(([cellKey]) => !ignored.has(cellKey)));
+  });
+
+  const errorCells = computed<ReadonlySet<string>>(() => {
+    return new Set(errorKinds.value.keys());
   });
 
   const ignoredCount = computed(() => {
     void stateVersion.value;
-    const snapshot = currentIssues();
+    const snapshot = visibleIssues(currentIssues());
     return ignoredKeys(snapshot).size;
   });
 
@@ -167,19 +234,24 @@ export function useDuplicateErrorChecks(options: Options): {
 
   function ignoreRange(range: CellRange): void {
     const normalized = normalizeCellRange(range.start, range.end);
-    ignoreMatchingIssues((issue) => isCellInRange(issue.address, normalized));
+    ignoreMatchingIssues((cellKey) => isCellInRange(addressFromCellKey(cellKey), normalized));
   }
 
-  function ignoreAll(): void {
-    ignoreMatchingIssues(() => true);
+  function ignoreAll(kind?: ErrorCheckKind): void {
+    ignoreMatchingIssues((_cellKey, issueKind) => kind === undefined || issueKind === kind);
   }
 
-  function ignoreMatchingIssues(matches: (issue: DuplicateIssue) => boolean): void {
-    const snapshot = currentIssues();
+  function addressFromCellKey(cellKey: string): CellAddress {
+    const [row, column] = cellKey.split(":").map(Number) as [number, number];
+    return { row, column };
+  }
+
+  function ignoreMatchingIssues(matches: (cellKey: string, kind: ErrorCheckKind) => boolean): void {
+    if (!preferences.enabled) return;
+    const snapshot = visibleIssues(currentIssues());
     const ignored = ignoredKeys(snapshot);
-    const additions = snapshot.issues
-      .filter(matches)
-      .map((issue) => createCellKey(issue.address))
+    const additions = [...snapshot.errorKinds.keys()]
+      .filter((cellKey) => matches(cellKey, snapshot.errorKinds.get(cellKey)!))
       .filter((cellKey) => !ignored.has(cellKey))
       .map((cellKey) => ({
         workbookId: snapshot.workbook.id,
@@ -195,7 +267,7 @@ export function useDuplicateErrorChecks(options: Options): {
   }
 
   function resetIgnored(): void {
-    const snapshot = currentIssues();
+    const snapshot = visibleIssues(currentIssues());
     const ignored = preferences.ignored.filter(
       (item) => !sameScope(item, snapshot.workbook, snapshot.sheet),
     );
@@ -218,6 +290,7 @@ export function useDuplicateErrorChecks(options: Options): {
       preferences.enabled !== normalized.enabled ||
       preferences.indicatorColor !== normalized.indicatorColor ||
       preferences.duplicateEntries !== normalized.duplicateEntries ||
+      preferences.numberStoredAsText !== normalized.numberStoredAsText ||
       ignored !== preferences.ignored;
     if (changed) updatePreferences({ ...normalized, ignored });
     return true;
@@ -225,6 +298,7 @@ export function useDuplicateErrorChecks(options: Options): {
 
   return {
     errorCells,
+    errorKinds,
     settings,
     enabled,
     ignoredCount,

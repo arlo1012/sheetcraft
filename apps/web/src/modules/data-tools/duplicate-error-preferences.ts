@@ -1,16 +1,18 @@
 import { normalizeColor } from "../../shared/color/palette";
 
-/** User-configurable presentation and rule switches for duplicate-entry error checks. */
+/** User-configurable presentation and rule switches for cell error checks. */
 export type ErrorCheckSettings = {
   enabled: boolean;
   indicatorColor: string | null;
   duplicateEntries: boolean;
+  numberStoredAsText: boolean;
 };
 
 export const DEFAULT_ERROR_CHECK_SETTINGS: Readonly<ErrorCheckSettings> = {
   enabled: true,
   indicatorColor: null,
   duplicateEntries: true,
+  numberStoredAsText: true,
 };
 
 export type DuplicateErrorIgnoredIssue = {
@@ -25,7 +27,7 @@ export type DuplicateErrorChecksPreferences = ErrorCheckSettings & {
 };
 
 export const DUPLICATE_ERROR_CHECKS_STORAGE_KEY = "idea10.duplicateErrorChecks";
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
 
 function getStorage(): Storage | undefined {
   try {
@@ -67,7 +69,11 @@ function isLegacyPreferences(value: unknown): value is {
 export function normalizeErrorCheckSettings(value: unknown): ErrorCheckSettings | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const record = value as Record<string, unknown>;
-  if (typeof record.enabled !== "boolean" || typeof record.duplicateEntries !== "boolean")
+  if (
+    typeof record.enabled !== "boolean" ||
+    typeof record.duplicateEntries !== "boolean" ||
+    typeof record.numberStoredAsText !== "boolean"
+  )
     return undefined;
   const indicatorColor =
     record.indicatorColor === null
@@ -80,13 +86,36 @@ export function normalizeErrorCheckSettings(value: unknown): ErrorCheckSettings 
     enabled: record.enabled,
     indicatorColor,
     duplicateEntries: record.duplicateEntries,
+    numberStoredAsText: record.numberStoredAsText,
   };
+}
+
+function normalizeLegacyErrorCheckSettings(value: unknown): ErrorCheckSettings | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  return normalizeErrorCheckSettings({
+    ...record,
+    numberStoredAsText:
+      record.numberStoredAsText ?? DEFAULT_ERROR_CHECK_SETTINGS.numberStoredAsText,
+  });
 }
 
 function parsePreferences(value: unknown): DuplicateErrorChecksPreferences | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const record = value as Record<string, unknown>;
   const settings = normalizeErrorCheckSettings(record);
+  if (!settings || !Array.isArray(record.ignored) || !record.ignored.every(isIgnoredIssue))
+    return undefined;
+  return {
+    ...settings,
+    ignored: record.ignored.map((issue) => ({ ...issue })),
+  };
+}
+
+function parseLegacyPreferences(value: unknown): DuplicateErrorChecksPreferences | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const settings = normalizeLegacyErrorCheckSettings(record);
   if (!settings || !Array.isArray(record.ignored) || !record.ignored.every(isIgnoredIssue))
     return undefined;
   return {
@@ -106,6 +135,7 @@ function clonePreferences(
     enabled: preferences.enabled,
     indicatorColor: preferences.indicatorColor,
     duplicateEntries: preferences.duplicateEntries,
+    numberStoredAsText: preferences.numberStoredAsText,
     ignored: preferences.ignored.map((issue) => ({ ...issue })),
   };
 }
@@ -128,9 +158,11 @@ export function readDuplicateErrorChecks(
             enabled: record.preferences.enabled,
             ignored: record.preferences.ignored.map((issue) => ({ ...issue })),
           }
-        : record.version === STORAGE_VERSION
-          ? parsePreferences(record.preferences)
-          : undefined;
+        : record.version === 2
+          ? parseLegacyPreferences(record.preferences)
+          : record.version === STORAGE_VERSION
+            ? parsePreferences(record.preferences)
+            : undefined;
     if (!preferences) return defaultPreferences();
     const keys = preferences.ignored.map(
       (issue) => `${issue.workbookId}|${issue.sheetId}|${issue.cellKey}|${issue.signature}`,
