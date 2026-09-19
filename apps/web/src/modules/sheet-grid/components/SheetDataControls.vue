@@ -28,6 +28,8 @@ const props = defineProps<{
   validationInfo?: ActiveCellValidationInfo;
   suppressValidationPrompt?: boolean;
   outlineGroups?: readonly OutlineGroup[];
+  subtotalSummaryBelow?: Readonly<Record<string, boolean>>;
+  outlineControlOffset?: number;
   showOutline: boolean;
   readOnly: boolean;
 }>();
@@ -93,6 +95,13 @@ function getHeaderItem(axis: SheetDimensionAxis, index: number) {
 function getOutlineAnchor(axis: SheetDimensionAxis, group: OutlineGroup) {
   const panes = axis === "row" ? props.frame.rowHeaders : props.frame.columnHeaders;
   const items = panes.flatMap((pane) => pane.items).sort((left, right) => left.index - right.index);
+  const subtotalGroupSeparator = group.id.lastIndexOf("-group-");
+  const summaryBelow =
+    group.axis === "row" && subtotalGroupSeparator > 0
+      ? props.subtotalSummaryBelow?.[group.id.slice(0, subtotalGroupSeparator)]
+      : undefined;
+  if (summaryBelow === true) return getHeaderItem(axis, group.end + 1);
+  if (summaryBelow === false) return getHeaderItem(axis, group.start - 1);
   if (!group.collapsed) return getHeaderItem(axis, group.end);
   return (
     [...items].reverse().find((item) => item.index < group.start) ??
@@ -119,6 +128,17 @@ const outlineControls = computed(() => {
     level: number;
   }> = [];
   for (const group of groups) {
+    if (
+      groups.some(
+        (candidate) =>
+          candidate.axis === group.axis &&
+          candidate.id !== group.id &&
+          candidate.collapsed &&
+          candidate.start <= group.start &&
+          candidate.end >= group.end,
+      )
+    )
+      continue;
     const level =
       groups.filter(
         (candidate) =>
@@ -135,12 +155,12 @@ const outlineControls = computed(() => {
       style:
         group.axis === "row"
           ? {
-              left: `${2 + (level - 1) * 12}px`,
+              left: `${2 + (props.outlineControlOffset ?? 0) + (level - 1) * 12}px`,
               top: `${item.offset + Math.max(1, item.size - 14)}px`,
             }
           : {
               left: `${item.offset + Math.max(1, item.size - 14)}px`,
-              top: `${2 + (level - 1) * 12}px`,
+              top: `${2 + (props.outlineControlOffset ?? 0) + (level - 1) * 12}px`,
             },
     });
   }
@@ -281,6 +301,7 @@ watch(
     <div
       v-if="outlineLevels.rows"
       class="sheet-data-controls__outline-levels sheet-data-controls__outline-levels--rows"
+      :style="{ left: `${2 + (outlineControlOffset ?? 0)}px` }"
     >
       <button
         v-for="level in outlineLevels.rows + 1"
@@ -295,6 +316,7 @@ watch(
     <div
       v-if="outlineLevels.columns"
       class="sheet-data-controls__outline-levels sheet-data-controls__outline-levels--columns"
+      :style="{ top: `${2 + (outlineControlOffset ?? 0)}px` }"
     >
       <button
         v-for="level in outlineLevels.columns + 1"

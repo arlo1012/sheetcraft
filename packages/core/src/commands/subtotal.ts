@@ -27,6 +27,7 @@ type SubtotalMetadata = {
   id: string;
   range: CellRange;
   generatedRows: number[];
+  generatedColumns?: number[];
   summaryBelow?: boolean;
   pageBreakRows?: number[];
 };
@@ -72,27 +73,80 @@ function keyForRow(workbook: Workbook, command: ApplySubtotalsCommand, row: numb
   );
 }
 
-function subtotalLabelPlacement(
+type SubtotalLabelPlacement = { source: number; target: number };
+
+function prepareSubtotalLabelColumn(
+  workbook: Workbook,
+  sheet: SheetWithSubtotals,
   command: ApplySubtotalsCommand,
-): { source: number; target: number } | null {
-  if (!command.labels) return null;
-  const summaryColumns = new Set(command.summaryColumns);
-  const source =
-    command.groupByColumns.find((column) => !summaryColumns.has(column)) ??
-    command.groupByColumns[0]!;
-  let target = source;
-  while (target >= 0 && summaryColumns.has(target)) target -= 1;
-  if (target < 0) {
-    target = source + 1;
-    while (target < MAX_SHEET_COLUMNS && summaryColumns.has(target)) target += 1;
-  }
-  if (target >= MAX_SHEET_COLUMNS)
+  range: CellRange,
+): {
+  command: ApplySubtotalsCommand;
+  range: CellRange;
+  placement: SubtotalLabelPlacement | null;
+  generatedColumns: number[];
+} {
+  if (!command.labels) return { command, range, placement: null, generatedColumns: [] };
+  const source = command.groupByColumns.find((column) => !command.summaryColumns.includes(column));
+  if (source !== undefined)
+    return { command, range, placement: { source, target: source }, generatedColumns: [] };
+  const column = command.groupByColumns[0]!;
+  if (
+    range.end.column >= MAX_SHEET_COLUMNS - 1 ||
+    [...sheet.cells.keys()].some((key) => parseCellKey(key).column === MAX_SHEET_COLUMNS - 1)
+  )
     throw invalidCommandPayload(
       "summaryColumns",
       command.summaryColumns,
-      "A column is required for subtotal labels.",
+      "There is no room to insert a subtotal label column.",
     );
-  return { source, target };
+  applySheetAxisCommand(workbook, {
+    type: "insertSheetAxis",
+    sheetId: sheet.id,
+    axis: "column",
+    index: column,
+    count: 1,
+  });
+  const shift = (value: number) => (value >= column ? value + 1 : value);
+  return {
+    command: {
+      ...command,
+      groupByColumns: command.groupByColumns.map(shift),
+      summaryColumns: command.summaryColumns.map(shift),
+    },
+    range: { start: { ...range.start }, end: { ...range.end, column: range.end.column + 1 } },
+    placement: { source: column + 1, target: column },
+    generatedColumns: [column],
+  };
+}
+
+function removeEmptyGeneratedColumns(
+  workbook: Workbook,
+  sheet: SheetWithSubtotals,
+  entries: readonly SubtotalMetadata[],
+  protectedColumns: readonly number[] = [],
+): number[] {
+  const removed: number[] = [];
+  const columns = [...new Set(entries.flatMap((entry) => entry.generatedColumns ?? []))].sort(
+    (a, b) => b - a,
+  );
+  for (const column of columns) {
+    // Generated rows have already been removed. Retain a column if it now contains user edits.
+    if (
+      protectedColumns.includes(column) ||
+      [...sheet.cells.keys()].some((key) => parseCellKey(key).column === column)
+    )
+      continue;
+    applySheetAxisCommand(workbook, {
+      type: "deleteSheetAxis",
+      sheetId: sheet.id,
+      axis: "column",
+      index: column,
+      count: 1,
+    });
+    removed.push(column);
+  }
+  return removed;
 }
 
 function rollbackWorkbookChanges(
@@ -172,7 +226,6 @@ export function applyApplySubtotalsCommand(
     )
   )
     throw invalidCommandPayload("columns", columns);
-  const labelPlacement = subtotalLabelPlacement(command);
   const before = createSheetSparseState(sheet);
   const workbookFormulaSources = [...workbook.sheets.values()].flatMap((sourceSheet) =>
     [...sourceSheet.cells.entries()].flatMap(([key, cell]) =>
@@ -251,6 +304,25 @@ export function applyApplySubtotalsCommand(
       sheet.outlineGroups = (sheet.outlineGroups ?? []).filter(
         (group) => !existing.some((entry) => group.id.startsWith(`${entry.id}-group-`)),
       );
+      const removedColumns = removeEmptyGeneratedColumns(workbook, sheet, existing, [
+        ...command.groupByColumns,
+        ...command.summaryColumns,
+      ]);
+      for (const column of removedColumns) {
+        const shift = (value: number) => (value > column ? value - 1 : value);
+        command = {
+          ...command,
+          groupByColumns: command.groupByColumns.map(shift),
+          summaryColumns: command.summaryColumns.map(shift),
+        };
+        range = {
+          start: { ...range.start, column: shift(range.start.column) },
+          end: {
+            ...range.end,
+            column: column <= range.end.column ? range.end.column - 1 : range.end.column,
+          },
+        };
+      }
     }
     const ignoredGeneratedRows = new Set(
       (sheet.subtotalMetadata ?? []).flatMap((entry) => entry.generatedRows),
@@ -268,6 +340,11 @@ export function applyApplySubtotalsCommand(
       rollbackWorkbookChanges(workbook, sheet, before, workbookFormulaSources, definedNames);
       return null;
     }
+    const prepared = prepareSubtotalLabelColumn(workbook, sheet, command, range);
+    command = prepared.command;
+    range = prepared.range;
+    const labelPlacement = prepared.placement;
+    const generatedColumns = prepared.generatedColumns;
     const breaks: number[] = [];
     const groupStarts: number[] = [firstDataRow];
     let previousKey = keyForRow(workbook, command, firstDataRow);
@@ -292,6 +369,8 @@ export function applyApplySubtotalsCommand(
         groupStarts,
         firstDataRow,
         subtotalId,
+        labelPlacement,
+        generatedColumns,
         before,
         workbookFormulaSources,
         definedNames,
@@ -374,6 +453,7 @@ export function applyApplySubtotalsCommand(
       // Earlier inserts shift all lower summary rows; persist their final rows.
       generatedRows: [...breaks.map((end, index) => end + index + 1), grandTotalRow],
       summaryBelow: true,
+      ...(generatedColumns.length ? { generatedColumns } : {}),
       ...(command.pageBreaks
         ? { pageBreakRows: groupStarts.slice(1).map((start, index) => start + index + 1) }
         : {}),
@@ -381,6 +461,13 @@ export function applyApplySubtotalsCommand(
     sheet.subtotalMetadata = [...(sheet.subtotalMetadata ?? []), metadata];
     sheet.outlineGroups = [
       ...(sheet.outlineGroups ?? []),
+      {
+        id: `${metadata.id}-group-total`,
+        axis: "row",
+        start: firstDataRow,
+        end: grandTotalRow - 1,
+        collapsed: false,
+      },
       ...breaks.map((end, index) => ({
         id: `${metadata.id}-group-${index}`,
         axis: "row" as const,
@@ -411,6 +498,8 @@ function applyAboveSubtotals(
   groupStarts: number[],
   firstDataRow: number,
   subtotalId: string,
+  labelPlacement: SubtotalLabelPlacement | null,
+  generatedColumns: number[],
   before: ReturnType<typeof createSheetSparseState>,
   workbookFormulaSources: Array<{
     sheetId: string;
@@ -419,7 +508,6 @@ function applyAboveSubtotals(
   }>,
   definedNames: DefinedName[],
 ): RestoreFullSheetStateCommand {
-  const labelPlacement = subtotalLabelPlacement(command);
   for (let index = groupStarts.length - 1; index >= 0; index -= 1) {
     const row = groupStarts[index]!;
     applySheetAxisCommand(workbook, {
@@ -490,6 +578,7 @@ function applyAboveSubtotals(
     },
     generatedRows,
     summaryBelow: false,
+    ...(generatedColumns.length ? { generatedColumns } : {}),
     ...(command.pageBreaks
       ? { pageBreakRows: groupStarts.slice(1).map((start, index) => start + index + 2) }
       : {}),
@@ -497,6 +586,13 @@ function applyAboveSubtotals(
   sheet.subtotalMetadata = [...(sheet.subtotalMetadata ?? []), metadata];
   sheet.outlineGroups = [
     ...(sheet.outlineGroups ?? []),
+    {
+      id: `${metadata.id}-group-total`,
+      axis: "row",
+      start: grandRow + 1,
+      end: totalEnd,
+      collapsed: false,
+    },
     ...breaks.map((end, index) => ({
       id: `${metadata.id}-group-${index}`,
       axis: "row" as const,
@@ -570,6 +666,7 @@ export function applyRemoveSubtotalsCommand(
     sheet.outlineGroups = (sheet.outlineGroups ?? []).filter(
       (group) => !entries.some((entry) => group.id.startsWith(`${entry.id}-group-`)),
     );
+    removeEmptyGeneratedColumns(workbook, sheet, entries);
     return {
       type: "restoreSheetState",
       sheetId: command.sheetId,

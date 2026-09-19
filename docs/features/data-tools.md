@@ -162,11 +162,16 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   Subtotals insert SUBTOTAL formulas for contiguous groups and a grand total.
   The dialog supports Sum, Count, Average, Maximum, Minimum and Product, with
   labels beside the field selectors and checkbox captions beside their controls.
-  If the grouping field is also summarized, its formulas remain in that column
-  and subtotal/grand-total labels use the nearest non-summary column to its left.
-  If no such column exists on the left, labels use a non-summary column to the
-  right. Label text still comes from the grouping field. This does not insert
-  columns or expand the source range.
+  If the grouping field is also summarized, a new label column is inserted
+  immediately before it. Original data and formulas shift right, while subtotal
+  and grand-total labels occupy the new column. Generated label columns are
+  excluded from the dialog's source field choices. Replacing or removing
+  subtotals removes their generated columns when empty after the subtotal rows
+  are deleted; columns containing subsequent user edits are retained.
+  Each subtotal layer includes an outer total group: outline level 1 shows only
+  the grand total, level 2 also shows group subtotals, and level 3 shows details.
+  The row-header area widens with outline depth and reserves separate space when
+  row/column quick tools are enabled.
   Replace Current Subtotals is enabled by default; turn it off to retain existing
   subtotals and add a further summary layer. Generated subtotal rows do not become
   grouping keys. Summary Below Data is enabled by default; turn it off to put

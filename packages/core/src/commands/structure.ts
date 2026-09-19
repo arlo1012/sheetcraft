@@ -500,6 +500,13 @@ function transformSheetMetadataForAxis(
               return next === null ? [] : [next];
             })
           : [...entry.generatedRows];
+      const columns =
+        axis === "column"
+          ? (entry.generatedColumns ?? []).flatMap((column) => {
+              const next = transformAxisIndex(column, index, count, maximum, operation);
+              return next === null ? [] : [next];
+            })
+          : [...(entry.generatedColumns ?? [])];
       const pageBreakRows =
         axis === "row"
           ? (entry.pageBreakRows ?? []).flatMap((row) => {
@@ -512,6 +519,7 @@ function transformSheetMetadataForAxis(
           ...entry,
           range,
           generatedRows: rows,
+          ...(entry.generatedColumns ? { generatedColumns: columns } : {}),
           ...(entry.pageBreakRows ? { pageBreakRows } : {}),
         },
       ];
@@ -1255,6 +1263,12 @@ function transformSheetMetadataForAxisMove(
         ...entry,
         range,
         generatedRows: axis === "row" ? entry.generatedRows.map(map) : [...entry.generatedRows],
+        ...(entry.generatedColumns
+          ? {
+              generatedColumns:
+                axis === "column" ? entry.generatedColumns.map(map) : [...entry.generatedColumns],
+            }
+          : {}),
         ...(entry.pageBreakRows
           ? {
               pageBreakRows:

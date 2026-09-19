@@ -273,14 +273,57 @@ const emit = defineEmits<{
 const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 28;
 const AXIS_TOOL_GUTTER = 20;
+const OUTLINE_HEADER_LEVEL_WIDTH = 16;
+const OUTLINE_CONTROL_INSET = 2;
+const OUTLINE_CONTROL_STEP = 12;
+const OUTLINE_CONTROL_SIZE = 16;
 const quickToolsGutter = computed(() =>
   props.showHeaders && props.showAxisQuickTools ? AXIS_TOOL_GUTTER : 0,
 );
+function getOutlineDepth(axis: SheetDimensionAxis): number {
+  const groups = props.sheet.outlineGroups ?? [];
+  return groups.reduce((max, group) => {
+    if (group.axis !== axis) return max;
+    const depth = groups.filter(
+      (candidate) =>
+        candidate.axis === axis && candidate.start <= group.start && candidate.end >= group.end,
+    ).length;
+    return Math.max(max, depth);
+  }, 0);
+}
+const rowOutlineDepth = computed(() => getOutlineDepth("row"));
+const columnOutlineDepth = computed(() => getOutlineDepth("column"));
+const rowOutlineHeaderWidth = computed(() =>
+  rowOutlineDepth.value ? (rowOutlineDepth.value + 1) * OUTLINE_HEADER_LEVEL_WIDTH : 0,
+);
+const columnOutlineHeaderHeight = computed(() => {
+  const depth = columnOutlineDepth.value;
+  if (!depth) return 0;
+  return Math.max(
+    0,
+    OUTLINE_CONTROL_INSET +
+      (depth - 1) * OUTLINE_CONTROL_STEP +
+      OUTLINE_CONTROL_SIZE -
+      COLUMN_HEADER_HEIGHT,
+  );
+});
 
 const headerSize = computed(() => ({
-  width: props.showHeaders ? ROW_HEADER_WIDTH + quickToolsGutter.value : 0,
-  height: props.showHeaders ? COLUMN_HEADER_HEIGHT + quickToolsGutter.value : 0,
+  width: props.showHeaders
+    ? ROW_HEADER_WIDTH + quickToolsGutter.value + rowOutlineHeaderWidth.value
+    : 0,
+  height: props.showHeaders
+    ? COLUMN_HEADER_HEIGHT + quickToolsGutter.value + columnOutlineHeaderHeight.value
+    : 0,
 }));
+const subtotalSummaryBelow = computed(() =>
+  Object.fromEntries(
+    (props.sheet.subtotalMetadata ?? []).map((metadata) => [
+      metadata.id,
+      metadata.summaryBelow !== false,
+    ]),
+  ),
+);
 
 const outlineHiddenRows = computed(() =>
   createSheetHiddenRowIntervals(props.sheet, sheetEvaluator.value),
@@ -2402,6 +2445,8 @@ defineExpose({
       :validation-info="validationInfo"
       :suppress-validation-prompt="!!inputError"
       :outline-groups="sheet.outlineGroups ?? []"
+      :subtotal-summary-below="subtotalSummaryBelow"
+      :outline-control-offset="quickToolsGutter"
       :show-outline="showHeaders"
       :read-only="readOnly"
       @filter-column-request="emit('filterColumnRequest', $event)"

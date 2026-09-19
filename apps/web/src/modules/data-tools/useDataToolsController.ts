@@ -329,9 +329,16 @@ export function useDataToolsController(options: Options) {
               ? subtotalTarget.value
               : undefined,
   );
-  const dialogColumns = computed(() =>
-    visibleDialogTarget.value ? columnsFor(visibleDialogTarget.value) : [],
-  );
+  const dialogColumns = computed(() => {
+    const target = visibleDialogTarget.value;
+    if (!target) return [];
+    const columns = columnsFor(target);
+    if (!subtotalVisible.value) return columns;
+    const generatedColumns = new Set(
+      (activeSheet.value.subtotalMetadata ?? []).flatMap((entry) => entry.generatedColumns ?? []),
+    );
+    return columns.filter((column) => !generatedColumns.has(column.column));
+  });
   const sortColorColumns = computed(() => {
     const target = sortTarget.value;
     return sortVisible.value && target && valid(target)
@@ -692,6 +699,21 @@ export function useDataToolsController(options: Options) {
   function openSubtotal(): void {
     const target = capture();
     if (target) {
+      const existing = (activeSheet.value.subtotalMetadata ?? []).filter((entry) =>
+        intersects(entry.range, target.range),
+      );
+      for (const entry of existing) {
+        target.range = {
+          start: {
+            row: Math.min(target.range.start.row, entry.range.start.row),
+            column: Math.min(target.range.start.column, entry.range.start.column),
+          },
+          end: {
+            row: Math.max(target.range.end.row, entry.range.end.row),
+            column: Math.max(target.range.end.column, entry.range.end.column),
+          },
+        };
+      }
       subtotalTarget.value = target;
       subtotalVisible.value = true;
     }

@@ -181,6 +181,8 @@ export type SheetSubtotalMetadata = {
   id: string;
   range: CellRange;
   generatedRows: number[];
+  /** Zero-based columns inserted to hold subtotal labels or values. */
+  generatedColumns?: number[];
   /** Omitted is the legacy below-details layout. */
   summaryBelow?: boolean;
   /** Zero-based rows which begin a printed page after a group boundary. */
@@ -1858,6 +1860,11 @@ function normalizeSheetMetadata(
       entry.generatedRows.some(
         (row) => !Number.isInteger(row) || row < 0 || row >= MAX_SHEET_ROWS,
       ) ||
+      (entry.generatedColumns !== undefined &&
+        (!Array.isArray(entry.generatedColumns) ||
+          entry.generatedColumns.some(
+            (column) => !Number.isInteger(column) || column < 0 || column >= MAX_SHEET_COLUMNS,
+          ))) ||
       (entry.summaryBelow !== undefined && typeof entry.summaryBelow !== "boolean") ||
       (entry.pageBreakRows !== undefined &&
         (!Array.isArray(entry.pageBreakRows) ||
@@ -1870,6 +1877,7 @@ function normalizeSheetMetadata(
       ...entry,
       range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
       generatedRows: [...entry.generatedRows],
+      ...(entry.generatedColumns ? { generatedColumns: [...entry.generatedColumns] } : {}),
       ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
       ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
     };
@@ -1909,6 +1917,7 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
     ...entry,
     range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
     generatedRows: [...entry.generatedRows],
+    ...(entry.generatedColumns ? { generatedColumns: [...entry.generatedColumns] } : {}),
     ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
     ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
   }));
@@ -2111,6 +2120,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
       ...entry,
       range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
       generatedRows: [...entry.generatedRows],
+      ...(entry.generatedColumns ? { generatedColumns: [...entry.generatedColumns] } : {}),
       ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
       ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
     })),
@@ -2165,6 +2175,7 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
     ...entry,
     range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
     generatedRows: [...entry.generatedRows],
+    ...(entry.generatedColumns ? { generatedColumns: [...entry.generatedColumns] } : {}),
     ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
     ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
   }));
