@@ -48,7 +48,7 @@ const overlay = computed(() => {
     rect.y + rect.height,
   );
   if (right <= left || bottom <= top) return { visible: false, style: {} };
-  const buttonWidth = 36;
+  const buttonWidth = 32;
   const buttonHeight = 22;
   const maxLeft = props.frame.body.x + Math.max(0, props.frame.body.width - buttonWidth);
   const maxTop = props.frame.body.y + Math.max(0, props.frame.body.height - buttonHeight);
@@ -69,7 +69,7 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   placement: "bottom-start",
   offset: 4,
   defaultFocus: "first",
-  pointerFocus: "menu",
+  pointerFocus: "first",
 });
 
 function select(action: "ignore" | "ignoreAll" | "editFormulaBar" | "options"): void {
@@ -104,8 +104,13 @@ watch(
     @click.stop="toggleMenu"
     @keydown.stop="onTriggerKeydown"
   >
-    <CircleAlert :size="17" aria-hidden="true" />
-    <ChevronDown :size="12" aria-hidden="true" />
+    <CircleAlert class="sheet-cell-error-menu__icon" :size="16" aria-hidden="true" />
+    <ChevronDown
+      class="sheet-cell-error-menu__arrow"
+      :class="{ 'sheet-cell-error-menu__arrow--open': open }"
+      :size="10"
+      aria-hidden="true"
+    />
   </button>
   <Teleport to="body">
     <MenuSurface
@@ -115,14 +120,14 @@ watch(
       class="sheet-cell-error-menu__surface"
       :style="floatingStyles"
       :label="t('dataTools.duplicates.errorChecks.markerLabel')"
+      :aria-describedby="`${menuId}-message`"
       tabindex="-1"
       @pointerdown.stop
       @click.stop
     >
       <li class="sheet-cell-error-menu__message" role="presentation">
-        {{ t("dataTools.duplicates.errorChecks.message") }}
+        <p :id="`${menuId}-message`">{{ t("dataTools.duplicates.errorChecks.message") }}</p>
       </li>
-      <MenuSeparator />
       <MenuItem data-sheet-cell-error-action="ignore" @select="select('ignore')">
         {{ t("dataTools.duplicates.errorChecks.ignore") }}
       </MenuItem>
@@ -156,14 +161,24 @@ watch(
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
+    width: 32px;
     height: 22px;
     padding: 0;
-    color: #fff;
-    background: #f0a020;
-    border: 0;
-    border-radius: 11px;
-    box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+    color: var(--idea-text-secondary);
+    background: var(--idea-surface-panel);
+    border: 1px solid var(--idea-border-control);
+    border-radius: var(--idea-radius-small);
+    cursor: pointer;
+
+    &:hover:not(:disabled),
+    &[aria-expanded="true"] {
+      background: var(--idea-icon-button-hover-bg);
+    }
+
+    &:focus-visible {
+      outline: 1px solid var(--idea-action-primary);
+      outline-offset: 1px;
+    }
 
     &:disabled {
       cursor: default;
@@ -171,17 +186,33 @@ watch(
     }
   }
 
+  &__icon {
+    color: var(--idea-status-warning);
+  }
+
+  &__arrow--open {
+    transform: rotate(180deg);
+  }
+
   &__surface {
     z-index: 120;
-    width: min(276px, calc(100vw - 32px));
+    width: min(184px, calc(100vw - 32px));
   }
 
   &__message {
-    padding: 7px 14px;
-    color: var(--idea-text-primary);
-    font-size: var(--idea-font-size-body-small);
-    line-height: var(--idea-line-height-body-medium);
+    padding: 0 var(--idea-space-4) var(--idea-space-2);
     list-style: none;
+
+    p {
+      margin: 0;
+      padding: var(--idea-space-3);
+      color: var(--idea-text-secondary);
+      background: var(--idea-surface-secondary);
+      border-radius: var(--idea-radius-small);
+      font-size: var(--idea-font-size-body-small);
+      line-height: var(--idea-line-height-body-small);
+      overflow-wrap: anywhere;
+    }
   }
 }
 </style>
