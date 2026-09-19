@@ -4,6 +4,66 @@ export type AppLocale = "zh-CN" | "en-US";
 
 export type MessageSchema = FormulaToolsMessageSchema & {
   dataTools: {
+    consolidate: {
+      title: string;
+      sources: string;
+      sourceRange: string;
+      addSource: string;
+      removeSource: string;
+      destination: string;
+      pickRange: string;
+      function: string;
+      sum: string;
+      count: string;
+      average: string;
+      min: string;
+      max: string;
+      topRow: string;
+      leftColumn: string;
+      overwrite: string;
+      preview: string;
+      previewCounts: string;
+      apply: string;
+      invalidRange: string;
+      rangeChanged: string;
+      overwriteRequired: string;
+      protectedDestination: string;
+      mergedRange: string;
+      spillRange: string;
+      outOfBounds: string;
+      rangeTooLarge: string;
+      empty: string;
+      invalidOperation: string;
+    };
+    lookupFill: {
+      previewRow: string;
+      title: string;
+      apply: string;
+      sourceRange: string;
+      targetRange: string;
+      hasHeader: string;
+      matchFields: string;
+      fillFields: string;
+      addField: string;
+      removeField: string;
+      matchMode: string;
+      first: string;
+      last: string;
+      overwrite: string;
+      preview: string;
+      rangeChanged: string;
+      invalidRange: string;
+      protectedRange: string;
+      mergedRange: string;
+      spillRange: string;
+      rangeTooLarge: string;
+      invalidFields: string;
+      invalidOperation: string;
+      sourceField: string;
+      targetField: string;
+      noChanges: string;
+      executeFailed: string;
+    };
     toolbar: string;
     groups: { sortFilter: string; cleanup: string; outline: string };
     sort: {

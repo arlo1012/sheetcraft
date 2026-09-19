@@ -40,6 +40,8 @@ import { readSortSettings, writeSortSettings } from "./sort-settings";
 import { getSortColorColumns } from "./sort-color-options";
 import { isValidationDraftComplete } from "./validation-draft";
 import { useDuplicateToolsController } from "./useDuplicateToolsController";
+import { useConsolidateController } from "./useConsolidateController";
+import { useLookupFillController } from "./useLookupFillController";
 import { useDataComparisonController } from "./useDataComparisonController";
 import { useAdvancedFilterController } from "./useAdvancedFilterController";
 import type {
@@ -118,6 +120,8 @@ export function useDataToolsController(options: Options) {
   const { t, locale } = useAppI18n();
   const advancedFilter = useAdvancedFilterController(options);
   const duplicates = useDuplicateToolsController(options);
+  const consolidate = useConsolidateController(options);
+  const lookupFill = useLookupFillController(options);
   const comparison = useDataComparisonController(options);
   const createId = createBrowserIdFactory();
   const sortVisible = ref(false);
@@ -796,6 +800,8 @@ export function useDataToolsController(options: Options) {
     ...advancedFilter,
     ...duplicates,
     ...comparison,
+    ...lookupFill,
+    ...consolidate,
     disabled,
     capabilities,
     columns: dialogColumns,

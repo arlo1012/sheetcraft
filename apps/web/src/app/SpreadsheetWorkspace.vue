@@ -18,6 +18,8 @@ import DuplicateErrorCheckOptionsDialog from "../modules/data-tools/components/D
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
 import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
+import ConsolidateDialog from "../modules/data-tools/components/ConsolidateDialog.vue";
+import LookupFillDialog from "../modules/data-tools/components/LookupFillDialog.vue";
 import DataComparisonDialog from "../modules/data-tools/components/DataComparisonDialog.vue";
 import AdvancedFilterDialog from "../modules/data-tools/components/AdvancedFilterDialog.vue";
 import type { AdvancedFilterDraft } from "../modules/data-tools/data-tools-types";
@@ -528,6 +530,16 @@ const {
   duplicateValuesMode,
   duplicateValuesDraft,
   duplicateValuesError,
+  consolidateVisible,
+  consolidateDraft,
+  consolidateError,
+  consolidatePreview,
+  lookupFillVisible,
+  lookupFillDraft,
+  lookupFillError,
+  lookupFillPreview,
+  sourceColumns: lookupFillSourceColumns,
+  targetColumns: lookupFillTargetColumns,
   comparisonVisible,
   comparisonAction,
   comparisonDraft,
@@ -593,6 +605,45 @@ async function pickComparisonRange(field: "firstRange" | "secondRange") {
 watch(comparisonVisible, (visible) => {
   if (!visible) comparisonRangePicker.cancel();
 });
+const lookupFillRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingLookupFillRange, reference: pickedLookupFillReference } =
+  lookupFillRangePicker;
+async function pickLookupFillRange(field: "sourceRange" | "targetRange") {
+  const selected = await lookupFillRangePicker.selectReference(lookupFillDraft.value[field]);
+  if (selected !== undefined && lookupFillVisible.value) {
+    dataTools.updateLookupFillDraft({ ...lookupFillDraft.value, [field]: selected });
+  }
+}
+watch(lookupFillVisible, (visible) => {
+  if (!visible) lookupFillRangePicker.cancel();
+});
+const consolidateRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingConsolidateRange, reference: pickedConsolidateReference } =
+  consolidateRangePicker;
+async function pickConsolidateRange(field: "sources" | "destination", sourceIndex?: number) {
+  if (
+    field === "sources" &&
+    (sourceIndex === undefined ||
+      !Number.isInteger(sourceIndex) ||
+      sourceIndex < 0 ||
+      sourceIndex >= consolidateDraft.value.sources.length)
+  )
+    return;
+  const selected = await consolidateRangePicker.selectReference(
+    field === "sources"
+      ? consolidateDraft.value.sources[sourceIndex!]!
+      : consolidateDraft.value.destination,
+    { singleCell: field === "destination" },
+  );
+  if (selected === undefined || !consolidateVisible.value) return;
+  const draft = { ...consolidateDraft.value, sources: [...consolidateDraft.value.sources] };
+  if (field === "sources") draft.sources[sourceIndex!] = selected;
+  else draft.destination = selected;
+  dataTools.updateConsolidateDraft(draft);
+}
+watch(consolidateVisible, (visible) => {
+  if (!visible) consolidateRangePicker.cancel();
+});
 const dataToolsModalOpen = computed(
   () =>
     duplicateErrorOptionsVisible.value ||
@@ -603,7 +654,9 @@ const dataToolsModalOpen = computed(
     dataTools.subtotalVisible.value ||
     (dataAdvancedFilterVisible.value && !pickingAdvancedRange.value) ||
     (duplicateValuesVisible.value && !pickingDuplicateRange.value) ||
-    (comparisonVisible.value && !pickingComparisonRange.value),
+    (comparisonVisible.value && !pickingComparisonRange.value) ||
+    (lookupFillVisible.value && !pickingLookupFillRange.value) ||
+    (consolidateVisible.value && !pickingConsolidateRange.value),
 );
 
 function chooseValidationValue(payload: {
@@ -665,14 +718,17 @@ watch(workbookGeneration, () => {
 
 const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
-const pickingReferenceRange = computed(
-  () =>
-    pickingValidationRange.value ||
-    pickingNameRange.value ||
-    pickingAdvancedRange.value ||
-    pickingDuplicateRange.value ||
-    pickingComparisonRange.value,
-);
+const activeRangePicker = computed(() => {
+  if (pickingValidationRange.value) return validationRangePicker;
+  if (pickingConsolidateRange.value) return consolidateRangePicker;
+  if (pickingLookupFillRange.value) return lookupFillRangePicker;
+  if (pickingComparisonRange.value) return comparisonRangePicker;
+  if (pickingDuplicateRange.value) return duplicateRangePicker;
+  if (pickingAdvancedRange.value) return advancedRangePicker;
+  if (pickingNameRange.value) return nameRangePicker;
+  return undefined;
+});
+const pickingReferenceRange = computed(() => activeRangePicker.value !== undefined);
 watch(namesVisible, (visible) => {
   if (!visible) nameRangePicker.cancel();
 });
@@ -695,16 +751,8 @@ function onWorkspaceWheel(event: WheelEvent): void {
 }
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
-  if (pickingReferenceRange.value) {
-    const picker = pickingValidationRange.value
-      ? validationRangePicker
-      : pickingComparisonRange.value
-        ? comparisonRangePicker
-        : pickingDuplicateRange.value
-          ? duplicateRangePicker
-          : pickingAdvancedRange.value
-            ? advancedRangePicker
-            : nameRangePicker;
+  const picker = activeRangePicker.value;
+  if (picker) {
     if (event.key === "Escape") picker.cancel();
     else if (event.key === "Enter") picker.confirm();
     else if (event.key === "Tab") return;
@@ -835,6 +883,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @open-text-to-columns="dataTools.openTextToColumns"
           @open-remove-duplicates="dataTools.openRemoveDuplicates"
           @open-duplicate-values="dataTools.openDuplicateValues"
+          @open-consolidate="dataTools.openConsolidate"
+          @open-lookup-fill="dataTools.openLookupFill"
           @open-comparison="dataTools.openComparison"
           @error-check-options="openDuplicateErrorOptions"
           @clear-duplicate-highlights="dataTools.clearDuplicateHighlights"
@@ -947,6 +997,46 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :ignored-count="ignoredDuplicateCount"
       @confirm="confirmDuplicateErrorOptions"
       @close="closeDuplicateErrorOptions"
+    />
+    <ConsolidateDialog
+      :visible="consolidateVisible"
+      :initial="consolidateDraft"
+      :error="consolidateError"
+      :preview="consolidatePreview"
+      :busy="loading || fileBusy || xlsxBusy || imageBusy"
+      :picking="pickingConsolidateRange"
+      @close="dataTools.closeConsolidate"
+      @apply="dataTools.applyConsolidate"
+      @draft-change="dataTools.updateConsolidateDraft"
+      @pick-range="pickConsolidateRange"
+    />
+    <RangeReferencePicker
+      v-if="pickingConsolidateRange"
+      :reference="pickedConsolidateReference"
+      :title="t('dataTools.consolidate.title')"
+      @confirm="consolidateRangePicker.confirm"
+      @cancel="consolidateRangePicker.cancel"
+    />
+    <LookupFillDialog
+      :visible="lookupFillVisible"
+      :initial="lookupFillDraft"
+      :error="lookupFillError"
+      :preview="lookupFillPreview"
+      :source-columns="lookupFillSourceColumns"
+      :target-columns="lookupFillTargetColumns"
+      :busy="loading || fileBusy || xlsxBusy || imageBusy"
+      :picking="pickingLookupFillRange"
+      @close="dataTools.closeLookupFill"
+      @apply="dataTools.applyLookupFill"
+      @draft-change="dataTools.updateLookupFillDraft"
+      @pick-range="pickLookupFillRange"
+    />
+    <RangeReferencePicker
+      v-if="pickingLookupFillRange"
+      :reference="pickedLookupFillReference"
+      :title="t('dataTools.lookupFill.title')"
+      @confirm="lookupFillRangePicker.confirm"
+      @cancel="lookupFillRangePicker.cancel"
     />
     <DataComparisonDialog
       :visible="comparisonVisible"
@@ -1144,19 +1234,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @outline-level="showOutlineLevel"
         @context-action="contextActions.request"
         :date-system="session.workbook.dateSystem"
-        :reference-editor="
-          pickingValidationRange
-            ? validationRangePicker.editor
-            : pickingComparisonRange
-              ? comparisonRangePicker.editor
-              : pickingDuplicateRange
-                ? duplicateRangePicker.editor
-                : pickingAdvancedRange
-                  ? advancedRangePicker.editor
-                  : pickingNameRange
-                    ? nameRangePicker.editor
-                    : formulaBarRef
-        "
+        :reference-editor="activeRangePicker?.editor ?? formulaBarRef"
         :edit-session="cellEditSession"
         :image-asset-urls="imageAssetUrls"
         :loading-image-asset-ids="loadingImageAssetIds"

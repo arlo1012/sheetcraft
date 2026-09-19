@@ -68,6 +68,27 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   Each source rectangle is limited to 100,000 cells. Marking protected sheets,
   merged cells or dynamic-array spill cells is rejected before any change.
   Cross-file comparison is not supported.
+- Lookup Fill matches rows between two ranges in the current workbook, including
+  different worksheets. Choose one or more source-to-target match fields and one
+  or more fields to fill; field positions are relative to each range. Text keys
+  ignore case, numeric keys remain distinct from text, and blank keys are skipped.
+  Choose the first or last matching source record. The header option excludes
+  each range's first row. Unmatched target rows remain unchanged; populated target
+  cells are skipped unless overwriting is enabled. Preview includes counts and a
+  sample of the values to write. Values are copied after formula evaluation;
+  formatting is preserved. Ranges together are limited to 100,000 cells.
+- Consolidate combines multiple ranges using Sum, Count Numbers, Average, Minimum
+  or Maximum. With neither label option selected, cells are combined by position.
+  Top Row and Left Column align the corresponding axis by labels in first-seen
+  order. Sources can be on different sheets; every reference and the destination
+  supports grid picking and defined names. The destination is its top-left cell.
+  Preview shows result dimensions, counts and a sample. Only numeric data takes
+  part in these aggregates. Existing destination content requires explicit
+  overwrite; blank positions in the resulting rectangle clear stale content.
+  Source totals and the output rectangle are each limited to 100,000 cells.
+  Results are a static value snapshot; they do not refresh when sources change.
+  Both Lookup Fill and Consolidate preflight protected, merged and spilled target
+  cells, read sources before writing, and apply through one undo/redo command.
 - Duplicate items groups six selection-scoped operations and error-check options. Set Highlight
   Duplicates creates a dynamic duplicate-owned overlay, using evaluated nonblank
   values in the selection and preserving the cells' base fill and text styles.

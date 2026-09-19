@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronUp, Columns3, Database, Filter, ShieldCheck } from "lucide-vue-next";
+import {
+  ChevronDown,
+  ChevronUp,
+  Columns3,
+  TableProperties,
+  Combine,
+  Database,
+  Filter,
+  ShieldCheck,
+} from "lucide-vue-next";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { DataToolCapabilities } from "../data-tools-types";
@@ -30,6 +39,8 @@ const emit = defineEmits<{
   openTextToColumns: [];
   openRemoveDuplicates: [];
   openDuplicateValues: [mode: DuplicateToolMode];
+  openConsolidate: [];
+  openLookupFill: [];
   openComparison: [action: DataComparisonAction];
   clearDuplicateHighlights: [];
   clearDuplicateRejections: [];
@@ -102,6 +113,15 @@ const { t } = useAppI18n();
         @remove="emit('openRemoveDuplicates')"
         @error-check-options="emit('errorCheckOptions')"
       />
+      <RibbonButton
+        variant="tall"
+        :disabled="disabled"
+        :label="t('dataTools.lookupFill.title')"
+        :text="t('dataTools.lookupFill.title')"
+        data-data-action="lookup-fill"
+        @activate="emit('openLookupFill')"
+        ><TableProperties :size="18"
+      /></RibbonButton>
       <DataComparisonTool
         :disabled="comparisonDisabled ?? disabled"
         @open="emit('openComparison', $event)"
@@ -117,6 +137,15 @@ const { t } = useAppI18n();
       /></RibbonButton>
     </section>
     <section class="data-toolbar__group" role="group" :aria-label="t('dataTools.groups.outline')">
+      <RibbonButton
+        variant="tall"
+        :disabled="disabled"
+        :label="t('dataTools.consolidate.title')"
+        :text="t('dataTools.consolidate.title')"
+        data-data-action="consolidate"
+        @activate="emit('openConsolidate')"
+        ><Combine :size="18"
+      /></RibbonButton>
       <RibbonButton
         variant="tall"
         :disabled="disabled || !capabilities.subtotal"
