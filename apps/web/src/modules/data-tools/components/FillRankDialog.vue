@@ -52,6 +52,7 @@ function apply(): void {
 
 <template>
   <Dialog
+    dialog-class-name="data-fill-rank-dialog"
     :visible="visible && !picking"
     :header="t('dataTools.fill.rank')"
     width="min(440px, calc(100vw - 32px))"
@@ -63,19 +64,21 @@ function apply(): void {
     @confirm="apply"
   >
     <div class="fill-rank-dialog">
-      <p class="fill-rank-dialog__hint">{{ t("dataTools.fill.rankHint") }}</p>
-      <div
-        class="fill-rank-dialog__field"
-        role="group"
-        :aria-label="t('dataTools.fill.rankSource')"
-      >
-        <span>{{ t("dataTools.fill.rankSource") }}</span>
-        <RangeReferenceInput
-          v-model="draft.sourceRange"
-          :label="t('dataTools.fill.rankSource')"
-          :pick-label="t('dataTools.fill.pickRankSource')"
-          :select-reference="selectSourceReference"
-        />
+      <div class="fill-rank-dialog__source">
+        <p class="fill-rank-dialog__hint">{{ t("dataTools.fill.rankHint") }}</p>
+        <div
+          class="fill-rank-dialog__field"
+          role="group"
+          :aria-label="t('dataTools.fill.rankSource')"
+        >
+          <span>{{ t("dataTools.fill.rankSource") }}</span>
+          <RangeReferenceInput
+            v-model="draft.sourceRange"
+            :label="t('dataTools.fill.rankSource')"
+            :pick-label="t('dataTools.fill.pickRankSource')"
+            :select-reference="selectSourceReference"
+          />
+        </div>
       </div>
       <div
         class="fill-rank-dialog__field"
@@ -105,10 +108,12 @@ function apply(): void {
           :aria-label="t('dataTools.fill.rankTies')"
         />
       </div>
-      <TCheckbox v-model="draft.overwrite">{{ t("dataTools.fill.rankOverwrite") }}</TCheckbox>
-      <p v-if="error" class="fill-rank-dialog__error" role="alert">
-        {{ error }}
-      </p>
+      <div class="fill-rank-dialog__feedback">
+        <TCheckbox v-model="draft.overwrite">{{ t("dataTools.fill.rankOverwrite") }}</TCheckbox>
+        <p v-if="error" class="fill-rank-dialog__error" role="alert">
+          {{ error }}
+        </p>
+      </div>
     </div>
   </Dialog>
 </template>
@@ -118,6 +123,11 @@ function apply(): void {
 
 .fill-rank-dialog {
   @include fill-dialog.surface;
+
+  &__source,
+  &__feedback {
+    @include fill-dialog.group;
+  }
 
   &__hint,
   &__error {

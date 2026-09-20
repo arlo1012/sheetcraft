@@ -269,6 +269,10 @@
   padding: 0;
 }
 
+.data-fill-rank-dialog > .t-dialog__body {
+  padding-top: var(--idea-space-4);
+}
+
 .data-validation-dialog > .t-dialog__body {
   padding-top: 0;
 }
