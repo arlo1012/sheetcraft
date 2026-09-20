@@ -9,7 +9,6 @@ import {
   type SetCellContentsCommand,
   type WorkbookCommand,
 } from "@idea10/core/commands";
-import { datePartsToExcelSerial } from "@idea10/core/formula";
 import { parseCellInput } from "@idea10/core/input";
 import { getActiveSheet, type CellRange, type Workbook } from "@idea10/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
@@ -20,6 +19,7 @@ import type {
   FillSeriesDraft,
   FillTextDraft,
 } from "./fill-tool-types";
+import { parseFillSeriesDateStop } from "./fill-series-date";
 
 type Options = {
   getWorkbook: () => Workbook;
@@ -149,12 +149,8 @@ export function useFillToolsController(options: Options) {
       const input = draft.stop.trim();
       let stop: number | undefined;
       if (input && draft.type !== "auto") {
-        if (draft.type === "date" && /^\d{4}-\d{1,2}-\d{1,2}$/.test(input)) {
-          const [year, month, day] = input.split("-").map(Number) as [number, number, number];
-          stop = datePartsToExcelSerial(
-            { year, month, day, hour: 0, minute: 0, second: 0, millisecond: 0 },
-            workbook.dateSystem,
-          );
+        if (draft.type === "date") {
+          stop = parseFillSeriesDateStop(input, draft.dateUnit, draft.step, workbook.dateSystem);
         } else {
           stop = Number(input);
           if (!Number.isFinite(stop))

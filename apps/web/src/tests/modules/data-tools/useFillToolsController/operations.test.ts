@@ -93,6 +93,164 @@ describe("fill tools controller", () => {
     expect(getCellValue(f.sheet, { row: 2, column: 0 })).toBe(serial + 2);
     expect(getCellValue(f.sheet, { row: 3, column: 0 })).toBe(null);
   });
+  test("uses the end of a selected month as an ascending date-series stop", () => {
+    const f = fixture();
+    f.selection.range.end.row = 0;
+    setCellValue(
+      f.sheet,
+      { row: 0, column: 0 },
+      datePartsToExcelSerial(
+        { year: 2026, month: 1, day: 31, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1900",
+      ),
+    );
+    f.controller.openFillSeries();
+    f.controller.applyFillSeries({
+      ...f.controller.fillSeriesInitial.value,
+      type: "date",
+      dateUnit: "month",
+      step: 1,
+      stop: "2026-03",
+    });
+    expect([0, 1, 2].map((row) => getCellValue(f.sheet, { row, column: 0 }))).toEqual([
+      datePartsToExcelSerial(
+        { year: 2026, month: 1, day: 31, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1900",
+      ),
+      datePartsToExcelSerial(
+        { year: 2026, month: 2, day: 28, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1900",
+      ),
+      datePartsToExcelSerial(
+        { year: 2026, month: 3, day: 31, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1900",
+      ),
+    ]);
+  });
+  test("uses the start of a selected period for descending month and year series", () => {
+    const f = fixture();
+    f.selection.range.end.row = 0;
+    setCellValue(
+      f.sheet,
+      { row: 0, column: 0 },
+      datePartsToExcelSerial(
+        { year: 2026, month: 5, day: 31, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1900",
+      ),
+    );
+    f.controller.openFillSeries();
+    f.controller.applyFillSeries({
+      ...f.controller.fillSeriesInitial.value,
+      type: "date",
+      dateUnit: "month",
+      step: -1,
+      stop: "2026-03",
+    });
+    expect(getCellValue(f.sheet, { row: 2, column: 0 })).toBe(
+      datePartsToExcelSerial(
+        { year: 2026, month: 3, day: 31, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1900",
+      ),
+    );
+    f.selection.range.end.row = 0;
+    setCellValue(
+      f.sheet,
+      { row: 0, column: 1 },
+      datePartsToExcelSerial(
+        { year: 2028, month: 2, day: 29, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1900",
+      ),
+    );
+    f.selection.range.start.column = 1;
+    f.selection.range.end.column = 1;
+    f.controller.openFillSeries();
+    f.controller.applyFillSeries({
+      ...f.controller.fillSeriesInitial.value,
+      type: "date",
+      dateUnit: "year",
+      step: -1,
+      stop: "2026",
+    });
+    expect(getCellValue(f.sheet, { row: 2, column: 1 })).toBe(
+      datePartsToExcelSerial(
+        { year: 2026, month: 2, day: 28, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1900",
+      ),
+    );
+  });
+  test("uses calendar month boundaries with the 1904 date system", () => {
+    const f = fixture();
+    f.session.workbook.dateSystem = "1904";
+    f.selection.range.end.row = 0;
+    setCellValue(
+      f.sheet,
+      { row: 0, column: 0 },
+      datePartsToExcelSerial(
+        { year: 2026, month: 1, day: 31, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1904",
+      ),
+    );
+    f.controller.openFillSeries();
+    f.controller.applyFillSeries({
+      ...f.controller.fillSeriesInitial.value,
+      type: "date",
+      dateUnit: "month",
+      step: 1,
+      stop: "2026-02",
+    });
+    expect(getCellValue(f.sheet, { row: 1, column: 0 })).toBe(
+      datePartsToExcelSerial(
+        { year: 2026, month: 2, day: 28, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1904",
+      ),
+    );
+  });
+  test("uses the end of a selected year as an ascending date-series stop", () => {
+    const f = fixture();
+    f.selection.range.end.row = 0;
+    setCellValue(
+      f.sheet,
+      { row: 0, column: 0 },
+      datePartsToExcelSerial(
+        { year: 2024, month: 12, day: 31, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1900",
+      ),
+    );
+    f.controller.openFillSeries();
+    f.controller.applyFillSeries({
+      ...f.controller.fillSeriesInitial.value,
+      type: "date",
+      dateUnit: "year",
+      step: 1,
+      stop: "2026",
+    });
+    expect(getCellValue(f.sheet, { row: 2, column: 0 })).toBe(
+      datePartsToExcelSerial(
+        { year: 2026, month: 12, day: 31, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1900",
+      ),
+    );
+  });
+  test("rejects invalid calendar stops without partially filling the range", () => {
+    const f = fixture();
+    f.selection.range.end.row = 0;
+    const seed = datePartsToExcelSerial(
+      { year: 2026, month: 1, day: 31, hour: 0, minute: 0, second: 0, millisecond: 0 },
+      "1900",
+    );
+    setCellValue(f.sheet, { row: 0, column: 0 }, seed);
+    f.controller.openFillSeries();
+    f.controller.applyFillSeries({
+      ...f.controller.fillSeriesInitial.value,
+      type: "date",
+      dateUnit: "day",
+      stop: "2026-02-29",
+    });
+    expect(f.controller.fillSeriesVisible.value).toBe(true);
+    expect(f.controller.fillError.value).not.toBe("");
+    expect(getCellValue(f.sheet, { row: 0, column: 0 })).toBe(seed);
+    expect(getCellValue(f.sheet, { row: 1, column: 0 })).toBe(null);
+  });
   test("rejects stale workbook generations before writing", () => {
     const f = fixture();
     f.controller.openFillText();

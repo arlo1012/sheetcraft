@@ -164,7 +164,10 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   The same menu also opens Series, Current Date, Fill Blank Cells and Insert Text.
   Series supports row/column lanes, linear and growth steps, date intervals,
   automatic patterns and trend fitting. A stop value can extend a single seed;
-  a multi-cell selection bounds the output. Current Date writes a static numeric
+  a multi-cell selection bounds the output. Date limits use a date, month or year
+  picker matching the selected unit. Month/year limits include the entire selected
+  period: its final day for positive steps, or its first day for negative steps.
+  Current Date writes a static numeric
   date in the workbook's date system with a selected display format. Blank fill
   takes values from the chosen neighboring direction or a typed custom value,
   leaving existing content and formulas that return empty text intact. Text

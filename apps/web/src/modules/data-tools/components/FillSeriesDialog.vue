@@ -22,10 +22,38 @@ const copy = (value: FillSeriesDraft): FillSeriesDraft => ({ ...value });
 const draft = ref(copy(props.initial));
 const isAuto = computed(() => draft.value.type === "auto");
 const isDate = computed(() => draft.value.type === "date");
+const datePickerMode = computed(() =>
+  draft.value.dateUnit === "year" ? "year" : draft.value.dateUnit === "month" ? "month" : "date",
+);
+const datePickerFormat = computed(() =>
+  datePickerMode.value === "year"
+    ? "YYYY"
+    : datePickerMode.value === "month"
+      ? "YYYY-MM"
+      : "YYYY-MM-DD",
+);
+const stepLabel = computed(() => {
+  if (!isDate.value) return t("dataTools.fill.step");
+  switch (draft.value.dateUnit) {
+    case "day":
+      return t("dataTools.fill.stepDays");
+    case "weekday":
+      return t("dataTools.fill.stepWeekdays");
+    case "month":
+      return t("dataTools.fill.stepMonths");
+    case "year":
+      return t("dataTools.fill.stepYears");
+  }
+});
 const stopIsValid = computed(() => {
   const stop = draft.value.stop.trim();
   if (!stop || isAuto.value) return true;
-  return isDate.value ? /^\d{4}-\d{2}-\d{2}$/u.test(stop) : Number.isFinite(Number(stop));
+  if (!isDate.value) return Number.isFinite(Number(stop));
+  return datePickerMode.value === "year"
+    ? /^\d{4}$/u.test(stop)
+    : datePickerMode.value === "month"
+      ? /^\d{4}-\d{2}$/u.test(stop)
+      : /^\d{4}-\d{2}-\d{2}$/u.test(stop);
 });
 const canApply = computed(
   () =>
@@ -35,32 +63,50 @@ const canApply = computed(
         (!isDate.value || Number.isInteger(draft.value.step)))) &&
       stopIsValid.value),
 );
+let resettingDraft = false;
+function resetDraft() {
+  resettingDraft = true;
+  draft.value = copy(props.initial);
+  resettingDraft = false;
+}
 watch(
   () => props.visible,
   (visible) => {
-    if (visible) draft.value = copy(props.initial);
-  },
-);
-watch(
-  () => draft.value.type,
-  (type) => {
-    if (type !== "linear" && type !== "growth") draft.value.trend = false;
-    // Do not reinterpret a numeric limit as a date, or a date as a numeric limit.
-    if (
-      draft.value.stop &&
-      (type === "date"
-        ? !/^\d{4}-\d{2}-\d{2}$/u.test(draft.value.stop)
-        : type !== "auto" && !Number.isFinite(Number(draft.value.stop)))
-    )
-      draft.value.stop = "";
+    if (visible) resetDraft();
   },
 );
 watch(
   () => props.initial,
-  (value) => {
-    if (props.visible) draft.value = copy(value);
+  () => {
+    if (props.visible) resetDraft();
   },
   { deep: true },
+);
+watch(
+  () => draft.value.type,
+  (type, previous) => {
+    if (resettingDraft) return;
+    if (type !== "linear" && type !== "growth") draft.value.trend = false;
+    if ((type === "date") !== (previous === "date")) draft.value.stop = "";
+  },
+  { flush: "sync" },
+);
+watch(
+  () => draft.value.dateUnit,
+  () => {
+    if (resettingDraft || !isDate.value || !draft.value.stop) return;
+    const match = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$/u.exec(draft.value.stop);
+    if (!match) {
+      draft.value.stop = "";
+      return;
+    }
+    const date = `${match[1]}-${match[2] ?? "01"}-${match[3] ?? "01"}`;
+    draft.value.stop = date.slice(
+      0,
+      datePickerMode.value === "year" ? 4 : datePickerMode.value === "month" ? 7 : 10,
+    );
+  },
+  { flush: "sync" },
 );
 const updateDateStop: NonNullable<DatePickerProps["onChange"]> = (value) => {
   draft.value.stop = typeof value === "string" ? value : "";
@@ -130,13 +176,13 @@ function apply(): void {
         </div>
       </div>
       <div class="fill-dialog__fields">
-        <div role="group" :aria-label="t('dataTools.fill.step')" class="fill-dialog__field">
-          <span>{{ t("dataTools.fill.step") }}</span>
+        <div role="group" :aria-label="stepLabel" class="fill-dialog__field">
+          <span>{{ stepLabel }}</span>
           <TInputNumber
             v-model="draft.step"
             :disabled="isAuto || draft.trend"
             :decimal-places="isDate ? 0 : undefined"
-            :aria-label="t('dataTools.fill.step')"
+            :aria-label="stepLabel"
             theme="column"
             class="idea-input-number--persistent-controls"
             style="width: 100%; min-width: 0"
@@ -146,9 +192,11 @@ function apply(): void {
           <span>{{ t("dataTools.fill.stop") }}</span>
           <TDatePicker
             v-if="isDate"
+            :key="datePickerMode"
             :value="draft.stop"
-            format="YYYY-MM-DD"
-            value-type="YYYY-MM-DD"
+            :mode="datePickerMode"
+            :format="datePickerFormat"
+            :value-type="datePickerFormat"
             allow-input
             clearable
             :aria-label="t('dataTools.fill.stop')"

@@ -1,6 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, expect, test } from "vitest";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
+import { DatePicker as TDatePicker } from "tdesign-vue-next/es/date-picker";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
@@ -84,4 +85,49 @@ test("text fill publishes index position parameters", async () => {
     text: "ID-",
   });
   expect(initial).toEqual({ position: "start", from: "left", index: 0, text: "" });
+});
+
+test("date limits switch between date, month and year panels without mixing numeric limits", async () => {
+  wrapper = mount(FillSeriesDialog, {
+    attachTo: document.body,
+    props: { visible: true, initial: { ...series(), type: "date", stop: "2026-09-17" } },
+    global: { plugins: [createAppI18n("en-US")] },
+  });
+  expect(wrapper.findComponent(TDatePicker).props("mode")).toBe("date");
+  const units = wrapper.findAllComponents(TRadioGroup)[2]!;
+  units.vm.$emit("update:modelValue", "year");
+  await wrapper.vm.$nextTick();
+  expect(wrapper.findComponent(TDatePicker).props()).toMatchObject({
+    mode: "year",
+    format: "YYYY",
+    valueType: "YYYY",
+    value: "2026",
+  });
+  wrapper.findComponent(TDatePicker).vm.$emit("change", "2028");
+  wrapper.findComponent(Dialog).vm.$emit("confirm");
+  expect(wrapper.emitted("apply")?.at(-1)?.[0]).toMatchObject({ dateUnit: "year", stop: "2028" });
+  units.vm.$emit("update:modelValue", "month");
+  await wrapper.vm.$nextTick();
+  expect(wrapper.findComponent(TDatePicker).props()).toMatchObject({
+    mode: "month",
+    format: "YYYY-MM",
+    value: "2028-01",
+  });
+  wrapper.findComponent(TDatePicker).vm.$emit("change", "2028-02");
+  wrapper.findComponent(Dialog).vm.$emit("confirm");
+  expect(wrapper.emitted("apply")?.at(-1)?.[0]).toMatchObject({
+    dateUnit: "month",
+    stop: "2028-02",
+  });
+  units.vm.$emit("update:modelValue", "weekday");
+  await wrapper.vm.$nextTick();
+  expect(wrapper.findComponent(TDatePicker).props()).toMatchObject({
+    mode: "date",
+    format: "YYYY-MM-DD",
+    value: "2028-02-01",
+  });
+  wrapper.findAllComponents(TRadioGroup)[1]!.vm.$emit("update:modelValue", "linear");
+  await wrapper.vm.$nextTick();
+  expect(wrapper.findComponent(TDatePicker).exists()).toBe(false);
+  expect(wrapper.findAllComponents(TInputNumber)[1]!.props("modelValue")).toBe("");
 });

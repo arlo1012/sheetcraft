@@ -57,6 +57,10 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       month: string;
       year: string;
       step: string;
+      stepDays: string;
+      stepWeekdays: string;
+      stepMonths: string;
+      stepYears: string;
       stop: string;
       trend: string;
       blanksTitle: string;
