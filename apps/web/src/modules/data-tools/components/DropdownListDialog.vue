@@ -378,6 +378,7 @@ async function selectRange(current: string): Promise<string | undefined> {
 
   &.is-editing,
   &.is-editing:hover {
+    padding: 0;
     background: transparent;
   }
 }
