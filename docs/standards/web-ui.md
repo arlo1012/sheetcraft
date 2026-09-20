@@ -50,7 +50,7 @@ CSS pixels at 100% scale; size and line height are a pair.
 | Content panels | 8px all sides, inside border | `--idea-tool-panel-padding`                                                                 |
 | List menus     | 8px vertical, 0 horizontal   | `--idea-menu-padding`; rows own text/icon insets                                            |
 | Dialog frame   | 16px all sides               | Shared TDesign adapter                                                                      |
-| Dialog content | 8px vertical                 | `--idea-dialog-content-padding-block`; shared adapter, or tab content when it owns the body |
+| Dialog content | 12px vertical                | `--idea-dialog-content-padding-block`; shared adapter, or tab content when it owns the body |
 
 - Exactly one layer owns each inset; avoid nested padding across surface, header,
   content, and footer. Keep row/control padding and gaps separate. Menu hover and
