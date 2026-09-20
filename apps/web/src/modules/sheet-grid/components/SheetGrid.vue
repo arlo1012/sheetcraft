@@ -2297,6 +2297,7 @@ onBeforeUnmount(() => {
 });
 
 defineExpose({
+  fillSelection,
   clearClipboard,
   flushPendingEdit,
   focusGrid: focusEditor,

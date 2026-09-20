@@ -4,6 +4,14 @@ export type AppLocale = "zh-CN" | "en-US";
 
 export type MessageSchema = FormulaToolsMessageSchema & {
   dataTools: {
+    dropdownList: string;
+    fill: {
+      title: string;
+      down: string;
+      right: string;
+      up: string;
+      left: string;
+    };
     consolidate: {
       counta: string;
       product: string;

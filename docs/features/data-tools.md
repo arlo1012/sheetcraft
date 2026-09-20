@@ -145,6 +145,17 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   the old enabled state and ignored issues preserved. Changed or resolved issues
   discard their ignored state. Error-check options remain available from the
   Duplicate items menu when checks are off.
+- Dropdown List opens the existing validation dialog directly in List mode for
+  the selected cells. Existing list rules retain their source and settings;
+  other validation types start a blank list draft and preserve common messages.
+  Cancel does not edit the document. Apply uses the normal validation command.
+- Fill offers Down, Right, Up and Left for cell selections with a destination on
+  that axis. It copies the first/last selected row or column across the remaining
+  selection, including formatting and translated formula references. It shares
+  the grid's fill command, protection checks, feedback and undo/redo. The existing
+  post-fill options can switch to a series, supported date intervals or formatting
+  modes while retaining one undo step. Whole-axis and single-cell selections
+  disable incompatible fill directions.
 - Set or edit cell validation: whole/decimal numbers, dates, times, text length,
   literal or range/named-range lists, and custom formulas. Minimum/maximum bounds
   accept typed formulas and cell references, or single-cell picking through the

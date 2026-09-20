@@ -4,6 +4,14 @@ import { formulaToolsZhCN } from "../../../modules/formula-tools/formula-tools-m
 export const zhCN = {
   ...formulaToolsZhCN,
   dataTools: {
+    dropdownList: "下拉列表",
+    fill: {
+      title: "填充",
+      down: "向下填充",
+      right: "向右填充",
+      up: "向上填充",
+      left: "向左填充",
+    },
     consolidate: {
       counta: "计数",
       product: "乘积",

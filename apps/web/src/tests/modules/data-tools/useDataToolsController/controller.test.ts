@@ -434,4 +434,70 @@ describe("useDataToolsController", () => {
     );
     expect(rules.find((rule) => rule.range.start.row === 2)?.formula1).toBe("=A1<10");
   });
+
+  test("opens the dropdown shortcut with an existing list rule translated to the selected cell", () => {
+    const f = fixture({
+      address: { row: 2, column: 1 },
+      range: { start: { row: 2, column: 1 }, end: { row: 2, column: 1 } },
+    });
+    executeWorkbookCommand(
+      f.session,
+      createSetSheetDataValidationsCommand(f.sheet.id, [
+        {
+          id: "statuses",
+          range: { start: { row: 0, column: 1 }, end: { row: 4, column: 1 } },
+          type: "list",
+          formula1: "=D1:D2",
+          allowBlank: false,
+          showDropdown: false,
+          promptTitle: "Status",
+        },
+      ]),
+    );
+
+    f.controller.openDropdownList();
+
+    expect(f.controller.validationVisible.value).toBe(true);
+    expect(f.controller.validationInitial.value).toMatchObject({
+      type: "list",
+      formula1: "=D3:D4",
+      allowBlank: false,
+      showDropdown: false,
+      promptTitle: "Status",
+    });
+  });
+
+  test("opens a blank list draft over non-list validation and cancelling leaves the workbook unchanged", () => {
+    const f = fixture();
+    executeWorkbookCommand(
+      f.session,
+      createSetSheetDataValidationsCommand(f.sheet.id, [
+        {
+          id: "quantity",
+          range: { start: { row: 1, column: 1 }, end: { row: 1, column: 1 } },
+          type: "whole",
+          operator: "between",
+          formula1: "1",
+          formula2: "10",
+          allowBlank: false,
+          promptTitle: "Quantity",
+          showDropdown: false,
+        },
+      ]),
+    );
+    const before = serializeWorkbook(f.session.workbook);
+
+    f.controller.openDropdownList();
+
+    expect(f.controller.validationInitial.value).toMatchObject({
+      type: "list",
+      allowBlank: false,
+      showDropdown: true,
+      promptTitle: "Quantity",
+    });
+    expect(f.controller.validationInitial.value?.formula1).toBeUndefined();
+    expect(f.controller.validationInitial.value?.formula2).toBeUndefined();
+    f.controller.closeValidation();
+    expect(serializeWorkbook(f.session.workbook)).toEqual(before);
+  });
 });

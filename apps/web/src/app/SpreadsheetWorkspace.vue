@@ -22,6 +22,7 @@ import ConsolidateDialog from "../modules/data-tools/components/ConsolidateDialo
 import LookupFillDialog from "../modules/data-tools/components/LookupFillDialog.vue";
 import DataComparisonDialog from "../modules/data-tools/components/DataComparisonDialog.vue";
 import AdvancedFilterDialog from "../modules/data-tools/components/AdvancedFilterDialog.vue";
+import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
 import type { AdvancedFilterDraft } from "../modules/data-tools/data-tools-types";
 import FilterColumnPanel from "../modules/data-tools/components/FilterColumnPanel.vue";
 import DataValidationFeedbackDialog from "../modules/data-tools/components/DataValidationFeedbackDialog.vue";
@@ -119,6 +120,8 @@ const {
   activeAddressLabel,
   activeCellInput,
   activeSelectionRange,
+  activeSelectionMode,
+  fillSelection,
   activeSheetEvaluator,
   isFormattingSupported,
   activeSelectionStyle,
@@ -218,6 +221,33 @@ const fillActions = createCellFillActions({
   getRevision: () => workbookRevision.value,
   execute: executeReplaceableCommand,
 });
+const canFillRows = computed(
+  () =>
+    activeSelectionMode.value === "cells" &&
+    activeSelectionRange.value.start.row < activeSelectionRange.value.end.row,
+);
+const canFillColumns = computed(
+  () =>
+    activeSelectionMode.value === "cells" &&
+    activeSelectionRange.value.start.column < activeSelectionRange.value.end.column,
+);
+async function fillFromDataToolbar(direction: FillDirection): Promise<void> {
+  if (
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    imageBusy.value ||
+    formatPainterActive.value
+  )
+    return;
+  if (!cellEditSession.finish()) return;
+  const generation = workbookGeneration.value;
+  const sheetId = activeSheet.value.id;
+  await nextTick();
+  if (generation !== workbookGeneration.value || sheetId !== activeSheet.value.id) return;
+  fillSelection(direction);
+  focusCellEditor();
+}
 const axisTools = createAxisToolActions({
   getSheet: () => activeSheet.value,
   getEvaluator: () => activeSheetEvaluator.value,
@@ -864,6 +894,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           :disabled="dataToolsDisabled"
           :comparison-disabled="loading || fileBusy || xlsxBusy || imageBusy"
           :capabilities="dataToolCapabilities"
+          :fill-disabled="formatPainterActive"
+          :can-fill-rows="canFillRows"
+          :can-fill-columns="canFillColumns"
           :filter-active="dataFilterActive"
           :edit-session-id="cellEditSession.id"
           @sort="dataTools.sort"
@@ -882,6 +915,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @clear-duplicate-highlights="dataTools.clearDuplicateHighlights"
           @clear-duplicate-rejections="dataTools.clearDuplicateRejections"
           @open-validation="dataTools.openValidation"
+          @open-dropdown-list="dataTools.openDropdownList"
+          @fill="fillFromDataToolbar"
           @group="dataTools.group"
           @ungroup="dataTools.ungroup"
           @expand="dataTools.setGroupsCollapsed(false)"

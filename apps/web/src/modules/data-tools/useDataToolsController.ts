@@ -577,6 +577,12 @@ export function useDataToolsController(options: Options) {
       removeDuplicatesVisible.value = false;
   }
   function openValidation(): void {
+    openValidationDialog();
+  }
+  function openDropdownList(): void {
+    openValidationDialog("list");
+  }
+  function openValidationDialog(preset?: "list"): void {
     const target = capture(false);
     if (!target) return;
     validationTarget.value = target;
@@ -591,7 +597,7 @@ export function useDataToolsController(options: Options) {
       row: target.range.start.row - existing.range.start.row,
       column: target.range.start.column - existing.range.start.column,
     };
-    validationInitial.value =
+    const initial =
       existing && delta
         ? {
             ...existing,
@@ -603,6 +609,22 @@ export function useDataToolsController(options: Options) {
               : { formula2: translateFormulaForCopy(existing.formula2, delta) }),
           }
         : undefined;
+    validationInitial.value =
+      preset === "list"
+        ? initial?.type === "list"
+          ? initial
+          : initial
+            ? {
+                ...initial,
+                type: "list",
+                operator: undefined,
+                formula1: undefined,
+                formula2: undefined,
+                list: undefined,
+                showDropdown: true,
+              }
+            : { type: "list", allowBlank: true, showDropdown: true }
+        : initial;
     validationVisible.value = true;
   }
   function applyValidation(draft: DataValidationDraft): void {
@@ -861,6 +883,7 @@ export function useDataToolsController(options: Options) {
     openRemoveDuplicates,
     applyRemoveDuplicates,
     openValidation,
+    openDropdownList,
     applyValidation,
     clearValidation,
     group,

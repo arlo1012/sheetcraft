@@ -8,6 +8,7 @@ import {
   Database,
   Filter,
   ShieldCheck,
+  ListFilter,
 } from "lucide-vue-next";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -17,17 +18,30 @@ import DataFilterTool from "./DataFilterTool.vue";
 import DataDuplicatesTool from "./DataDuplicatesTool.vue";
 import DataComparisonTool from "./DataComparisonTool.vue";
 import type { DataComparisonAction } from "../data-comparison-types";
+import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
+import DataFillTool from "./DataFillTool.vue";
 import DataSortTool from "./DataSortTool.vue";
 import type { DuplicateToolMode } from "../duplicate-tools-types";
 const props = withDefaults(
   defineProps<{
     disabled?: boolean;
     comparisonDisabled?: boolean;
+    fillDisabled?: boolean;
+    canFillRows?: boolean;
+    canFillColumns?: boolean;
     filterActive?: boolean;
     editSessionId?: string;
     capabilities: DataToolCapabilities;
   }>(),
-  { disabled: false, comparisonDisabled: undefined, filterActive: false, editSessionId: undefined },
+  {
+    disabled: false,
+    comparisonDisabled: undefined,
+    fillDisabled: false,
+    canFillRows: false,
+    canFillColumns: false,
+    filterActive: false,
+    editSessionId: undefined,
+  },
 );
 const emit = defineEmits<{
   sort: [direction: "ascending" | "descending"];
@@ -46,6 +60,8 @@ const emit = defineEmits<{
   clearDuplicateRejections: [];
   errorCheckOptions: [];
   openValidation: [];
+  openDropdownList: [];
+  fill: [direction: FillDirection];
   group: [axis: "rows" | "columns"];
   ungroup: [axis: "rows" | "columns"];
   expand: [];
@@ -126,6 +142,21 @@ const { t } = useAppI18n();
         :disabled="comparisonDisabled ?? disabled"
         @open="emit('openComparison', $event)"
       />
+      <DataFillTool
+        :disabled="disabled || fillDisabled"
+        :can-fill-rows="canFillRows"
+        :can-fill-columns="canFillColumns"
+        @fill="emit('fill', $event)"
+      />
+      <RibbonButton
+        variant="tall"
+        :disabled="disabled"
+        :label="t('dataTools.dropdownList')"
+        :text="t('dataTools.dropdownList')"
+        data-data-action="dropdown-list"
+        @activate="emit('openDropdownList')"
+        ><ListFilter :size="18"
+      /></RibbonButton>
       <RibbonButton
         variant="tall"
         :disabled="disabled"

@@ -15,6 +15,51 @@ const capabilities = {
   clearFilter: true,
 };
 describe("DataToolbar", () => {
+  test("opens the list shortcut independently of general validation", async () => {
+    const wrapper = mount(DataToolbar, {
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { capabilities },
+    });
+    await wrapper.get('[data-data-action="dropdown-list"]').trigger("click");
+    expect(wrapper.emitted("openDropdownList")).toEqual([[]]);
+    expect(wrapper.emitted("openValidation")).toBeUndefined();
+    await wrapper.setProps({ disabled: true });
+    expect(wrapper.get('[data-data-action="dropdown-list"]').attributes("disabled")).toBe("");
+    wrapper.unmount();
+  });
+
+  test.each(["down", "right", "up", "left"])(
+    "dispatches %s fill and dismisses the menu",
+    async (direction) => {
+      const wrapper = mount(DataToolbar, {
+        attachTo: document.body,
+        global: { plugins: [createAppI18n("en-US")] },
+        props: { capabilities, canFillRows: true, canFillColumns: true },
+      });
+      await wrapper.get('[data-data-action="fill"]').trigger("click");
+      await new DOMWrapper(document.body).get(`[data-data-fill="${direction}"]`).trigger("click");
+      expect(wrapper.emitted("fill")).toEqual([[direction]]);
+      expect(new DOMWrapper(document.body).find('[data-data-fill="down"]').exists()).toBe(false);
+      wrapper.unmount();
+    },
+  );
+
+  test("disables unavailable fill axes and single-cell fills", async () => {
+    const wrapper = mount(DataToolbar, {
+      attachTo: document.body,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { capabilities, canFillRows: true },
+    });
+    await wrapper.get('[data-data-action="fill"]').trigger("click");
+    const right = new DOMWrapper(document.body).get('[data-data-fill="right"]');
+    expect(right.attributes("aria-disabled")).toBe("true");
+    await right.trigger("click");
+    expect(wrapper.emitted("fill")).toBeUndefined();
+    await wrapper.setProps({ canFillRows: false });
+    expect(wrapper.get('[data-data-action="fill"]').attributes("disabled")).toBe("");
+    wrapper.unmount();
+  });
+
   test("opens and closes the Group menu after selecting columns", async () => {
     const wrapper = mount(DataToolbar, {
       attachTo: document.body,

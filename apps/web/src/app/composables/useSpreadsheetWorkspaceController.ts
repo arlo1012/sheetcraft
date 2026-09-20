@@ -1,3 +1,4 @@
+import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
 import {
   computed,
   onScopeDispose,
@@ -157,6 +158,7 @@ type FormatPainterSource = {
 };
 
 export type SheetGridNavigator = {
+  fillSelection?(direction: FillDirection): boolean;
   clearClipboard?(): void;
   flushPendingEdit?(): boolean;
   hasPendingEdit?(): boolean;
@@ -1466,6 +1468,7 @@ export function useSpreadsheetWorkspaceController(
     activeCellInput,
     activeSheetEvaluator,
     activeSelectionRange,
+    activeSelectionMode,
     setSelectionDragging,
     isFormattingSupported,
     activeSelectionStyle,
@@ -1528,6 +1531,7 @@ export function useSpreadsheetWorkspaceController(
     undo,
     redo,
     setGridNavigator,
+    fillSelection: (direction: FillDirection) => gridRef.value?.fillSelection?.(direction) ?? false,
     clearGridClipboard: () => gridRef.value?.clearClipboard?.(),
     fitSelectionToViewport,
     scrollGridHorizontally,

@@ -13,6 +13,7 @@ import {
   getDoubleClickFillRange,
   getFillHandlePoint,
   type FillRange,
+  type FillDirection,
 } from "@idea10/sheet-engine/fill-selection";
 import type { Point, Size } from "@idea10/sheet-engine/geometry";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
@@ -177,31 +178,33 @@ export function useSheetAutoFill(options: {
     complete(fill, event.ctrlKey, options.getRevision());
   }
 
-  /** Implements Ctrl/Cmd+D and Ctrl/Cmd+R using the first row or column as the source. */
-  function fillSelection(direction: "down" | "right"): boolean {
+  /** Fills from the selection edge, shared by the ribbon and Ctrl/Cmd+D/R. */
+  function fillSelection(direction: FillDirection): boolean {
     if (!options.getCanFill()) return false;
     const range = options.getRange();
-    const source: CellRange =
-      direction === "down"
-        ? {
-            start: { ...range.start },
-            end: { row: range.start.row, column: range.end.column },
-          }
-        : {
-            start: { ...range.start },
-            end: { row: range.end.row, column: range.start.column },
-          };
-    const target: CellRange =
-      direction === "down"
-        ? {
-            start: { row: range.start.row + 1, column: range.start.column },
-            end: { ...range.end },
-          }
-        : {
-            start: { row: range.start.row, column: range.start.column + 1 },
-            end: { ...range.end },
-          };
-    if (target.start.row > target.end.row || target.start.column > target.end.column) return false;
+    const vertical = direction === "down" || direction === "up";
+    if (vertical ? range.start.row === range.end.row : range.start.column === range.end.column)
+      return false;
+    const source: CellRange = { start: { ...range.start }, end: { ...range.end } };
+    const target: CellRange = { start: { ...range.start }, end: { ...range.end } };
+    switch (direction) {
+      case "down":
+        source.end.row = range.start.row;
+        target.start.row++;
+        break;
+      case "up":
+        source.start.row = range.end.row;
+        target.end.row--;
+        break;
+      case "right":
+        source.end.column = range.start.column;
+        target.start.column++;
+        break;
+      case "left":
+        source.start.column = range.end.column;
+        target.end.column--;
+        break;
+    }
     options.onBeforeStart();
     clear();
     complete({ direction, source, target, range }, true, options.getRevision());

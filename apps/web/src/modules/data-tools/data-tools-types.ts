@@ -91,7 +91,6 @@ export type SubtotalDraft = {
 };
 export type DataValidationInitial = Pick<
   SheetDataValidation,
-  | "id"
   | "type"
   | "operator"
   | "formula1"
@@ -106,7 +105,9 @@ export type DataValidationInitial = Pick<
   | "errorTitle"
   | "error"
   | "errorStyle"
->;
+> & {
+  id?: SheetDataValidation["id"];
+};
 export type FilterColumnPanelState = {
   visible: boolean;
   anchor?: DataToolFilterAnchor;

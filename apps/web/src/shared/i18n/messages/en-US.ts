@@ -4,6 +4,14 @@ import { formulaToolsEnUS } from "../../../modules/formula-tools/formula-tools-m
 export const enUS = {
   ...formulaToolsEnUS,
   dataTools: {
+    dropdownList: "Dropdown list",
+    fill: {
+      title: "Fill",
+      down: "Fill Down",
+      right: "Fill Right",
+      up: "Fill Up",
+      left: "Fill Left",
+    },
     consolidate: {
       counta: "Count",
       product: "Product",
