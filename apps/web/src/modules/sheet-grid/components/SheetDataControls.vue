@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ChevronDown, Minus, Plus } from "lucide-vue-next";
+import { ChevronDown, Minus, Plus, Search } from "lucide-vue-next";
+import { Input as TInput } from "tdesign-vue-next/es/input";
 import { computed, ref, useId, watch } from "vue";
 import { columnIndexToLabel } from "@idea10/core/coordinates";
 import type { CellAddress, SheetDimensionAxis } from "@idea10/core/workbook";
@@ -48,6 +49,13 @@ const { t } = useAppI18n();
 const validationTriggerRef = ref<HTMLButtonElement | null>(null);
 const validationMenuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const validationMenuId = `sheet-validation-menu-${useId().replaceAll(":", "")}`;
+const validationSearch = ref("");
+const validationOptions = computed(() => {
+  const query = validationSearch.value.trim().toLocaleLowerCase();
+  return (props.validationInfo?.values ?? []).filter((value) =>
+    String(value).toLocaleLowerCase().includes(query),
+  );
+});
 
 function surfaceRect(address: CellAddress) {
   const rect = props.frame.layout.getCellViewportRect(address);
@@ -137,7 +145,22 @@ const {
   placement: "bottom-end",
   offset: 4,
   pointerFocus: "menu",
+  onOpen() {
+    validationSearch.value = "";
+  },
 });
+
+function onValidationSearchKeydown(event: KeyboardEvent): void {
+  if (event.isComposing) return;
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    if (event.key === "ArrowDown") validationMenuRef.value?.focusFirstItem();
+    else validationMenuRef.value?.focusLastItem();
+  } else if (event.key === "Enter" && validationOptions.value.length) {
+    event.preventDefault();
+    chooseValidation(validationOptions.value[0]!);
+  }
+}
 
 const outlineControls = computed(() => {
   if (!props.showOutline) return [];
@@ -271,14 +294,28 @@ watch(
           class="sheet-data-controls__validation-menu"
           :style="[
             validationMenuStyle,
-            { width: `${Math.max(140, activeValidationRect!.width)}px` },
+            { width: `${Math.max(200, activeValidationRect!.width)}px` },
           ]"
           :label="t('dataTools.validation.openList')"
           @pointerdown.stop
           @click.stop
         >
+          <li
+            class="sheet-data-controls__validation-search"
+            role="none"
+            @keydown="onValidationSearchKeydown"
+          >
+            <TInput
+              v-model="validationSearch"
+              clearable
+              :placeholder="t('dataTools.validation.searchValues')"
+              :aria-label="t('dataTools.validation.searchValues')"
+            >
+              <template #prefix-icon><Search :size="14" aria-hidden="true" /></template>
+            </TInput>
+          </li>
           <MenuItem
-            v-for="(value, index) in validationInfo.values"
+            v-for="(value, index) in validationOptions"
             :key="`${typeof value}:${String(value)}:${index}`"
             :disabled="readOnly"
             :title="String(value)"
@@ -286,6 +323,13 @@ watch(
           >
             {{ value }}
           </MenuItem>
+          <li
+            v-if="!validationOptions.length"
+            class="sheet-data-controls__validation-empty"
+            role="none"
+          >
+            <span role="status">{{ t("dataTools.filter.noMatches") }}</span>
+          </li>
         </MenuSurface>
       </Teleport>
     </template>
@@ -358,6 +402,8 @@ watch(
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/option-list/option-list";
+
 .sheet-data-controls {
   position: absolute;
   z-index: 12;
@@ -415,9 +461,27 @@ watch(
   }
 
   &__validation-menu {
+    @include option-list.scrollbar;
     z-index: 120;
-    max-height: min(220px, calc(100vh - 16px));
+    max-height: min(260px, calc(100vh - 16px));
+    scroll-padding-top: 44px;
     pointer-events: auto;
+  }
+
+  &__validation-search {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin-top: -8px;
+    padding: 8px;
+    background: var(--idea-surface-panel);
+    list-style: none;
+  }
+
+  &__validation-empty {
+    padding: 8px 14px;
+    color: var(--idea-text-secondary);
+    list-style: none;
   }
 
   &__outline-levels {

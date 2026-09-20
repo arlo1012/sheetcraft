@@ -364,6 +364,7 @@ export type MessageSchema = FormulaToolsMessageSchema & {
     validation: {
       title: string;
       openList: string;
+      searchValues: string;
       settings: string;
       inputMessage: string;
       errorAlert: string;

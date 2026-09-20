@@ -379,6 +379,7 @@ export const enUS = {
     validation: {
       title: "Data Validation",
       openList: "Open validation dropdown",
+      searchValues: "Search options",
       settings: "Settings",
       inputMessage: "Input Message",
       errorAlert: "Error Alert",

@@ -369,6 +369,7 @@ export const zhCN = {
     validation: {
       title: "数据验证",
       openList: "打开验证下拉列表",
+      searchValues: "搜索选项",
       settings: "设置",
       inputMessage: "输入信息",
       errorAlert: "出错警告",
