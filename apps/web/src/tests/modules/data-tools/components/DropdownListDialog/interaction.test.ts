@@ -31,7 +31,7 @@ afterEach(() => {
 test("adds an option and applies its active editor without requiring Enter", async () => {
   const dialog = mountDialog();
   await dialog.get("[data-dropdown-add]").trigger("click");
-  await dialog.get('input[aria-label="Edit option"]').setValue("Pending");
+  await dialog.get('[aria-label="Edit option"] input').setValue("Pending");
   await dialog.get("[data-dropdown-confirm]").trigger("click");
 
   expect(dialog.emitted("apply")?.[0]?.[0]).toEqual({

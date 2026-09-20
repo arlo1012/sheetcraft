@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, Pencil, PlusCircle, Trash2 } from "lucide-vue-n
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Input as TInput, type InputValue } from "tdesign-vue-next/es/input";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -43,7 +44,7 @@ const draft = ref<DropdownListDraft>(createDraft(props.initial));
 const selectedIndex = ref(-1);
 const editingIndex = ref<number>();
 const editingValue = ref("");
-const itemInput = ref<HTMLInputElement>();
+const itemInput = ref<{ focus(): void }>();
 const canConfirm = computed(() => {
   if (draft.value.clear) return true;
   if (draft.value.mode === "range") return Boolean(draft.value.source.trim());
@@ -81,10 +82,19 @@ function setMode(mode: DropdownListDraft["mode"]): void {
 async function focusEditor(): Promise<void> {
   await nextTick();
   itemInput.value?.focus();
-  itemInput.value?.select();
 }
 function setItemInput(element: unknown): void {
-  itemInput.value = element instanceof HTMLInputElement ? element : undefined;
+  itemInput.value = element ? (element as { focus(): void }) : undefined;
+}
+function onEditorFocus(_value: InputValue, { e }: { e: FocusEvent }): void {
+  if (e.target instanceof HTMLInputElement) e.target.select();
+}
+function onEditorKeydown(_value: InputValue, { e }: { e: KeyboardEvent }): void {
+  if (e.isComposing || (e.key !== "Enter" && e.key !== "Escape")) return;
+  e.stopPropagation();
+  e.preventDefault();
+  if (e.key === "Enter") commitEdit();
+  else cancelEdit();
 }
 function addItem(): void {
   if (editingIndex.value !== undefined) commitEdit();
@@ -273,13 +283,13 @@ async function selectRange(current: string): Promise<string | undefined> {
           @click="selectedIndex = index"
           @dblclick="beginEdit(index)"
         >
-          <input
+          <TInput
             v-if="editingIndex === index"
             :ref="setItemInput"
             v-model="editingValue"
             :aria-label="t('dataTools.dropdown.edit')"
-            @keydown.enter.stop.prevent="commitEdit"
-            @keydown.esc.stop.prevent="cancelEdit"
+            @focus="onEditorFocus"
+            @keydown="onEditorKeydown"
             @blur="commitEdit"
           />
           <span v-else>{{ item }}</span>
@@ -373,13 +383,6 @@ async function selectRange(current: string): Promise<string | undefined> {
 }
 .dropdown-list-dialog__item--selected {
   background: var(--td-bg-color-container-hover);
-}
-.dropdown-list-dialog__item input {
-  box-sizing: border-box;
-  width: 100%;
-  border: 0;
-  outline: 1px solid var(--td-brand-color);
-  font: inherit;
 }
 .dropdown-list-dialog__error {
   margin: 0;
