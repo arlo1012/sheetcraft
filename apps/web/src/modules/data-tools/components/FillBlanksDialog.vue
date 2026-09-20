@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Info } from "lucide-vue-next";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
@@ -44,45 +45,80 @@ watch(
     @close="emit('close')"
     @confirm="canApply && emit('apply', { ...draft })"
   >
-    <div class="fill-dialog">
-      <p v-if="rangeLabel" class="fill-dialog__range">
-        {{ t("dataTools.fill.range", { range: rangeLabel }) }}
-      </p>
-      <p class="fill-dialog__hint">{{ t("dataTools.fill.blanksHint") }}</p>
-      <TRadioGroup v-model="draft.mode" :aria-label="t('dataTools.fill.blanksTitle')"
-        ><TRadio value="up">{{ t("dataTools.fill.fillFromUp") }}</TRadio
-        ><TRadio value="down">{{ t("dataTools.fill.fillFromDown") }}</TRadio
-        ><TRadio value="left">{{ t("dataTools.fill.fillFromLeft") }}</TRadio
-        ><TRadio value="right">{{ t("dataTools.fill.fillFromRight") }}</TRadio
-        ><TRadio value="value">{{ t("dataTools.fill.fillWithValue") }}</TRadio></TRadioGroup
-      >
-      <label v-if="draft.mode === 'value'"
-        ><span>{{ t("dataTools.fill.value") }}</span
-        ><TInput v-model="draft.value" :aria-label="t('dataTools.fill.value')" autofocus
-      /></label>
-      <p v-if="error" class="fill-dialog__error" role="alert">{{ error }}</p>
+    <div class="fill-blanks-dialog">
+      <div class="fill-blanks-dialog__description">
+        <p v-if="rangeLabel" class="fill-blanks-dialog__range">
+          {{ t("dataTools.fill.range", { range: rangeLabel }) }}
+        </p>
+        <p class="fill-blanks-dialog__hint">
+          <Info :size="14" aria-hidden="true" />
+          <span>{{ t("dataTools.fill.blanksHint") }}</span>
+        </p>
+      </div>
+      <div class="fill-blanks-dialog__options">
+        <TRadioGroup
+          v-model="draft.mode"
+          direction="vertical"
+          :aria-label="t('dataTools.fill.blanksTitle')"
+        >
+          <TRadio value="up">{{ t("dataTools.fill.fillFromUp") }}</TRadio>
+          <TRadio value="down">{{ t("dataTools.fill.fillFromDown") }}</TRadio>
+          <TRadio value="left">{{ t("dataTools.fill.fillFromLeft") }}</TRadio>
+          <TRadio value="right">{{ t("dataTools.fill.fillFromRight") }}</TRadio>
+          <TRadio value="value">{{ t("dataTools.fill.fillWithValue") }}</TRadio>
+        </TRadioGroup>
+        <div v-if="draft.mode === 'value'" class="fill-blanks-dialog__value">
+          <TInput v-model="draft.value" :aria-label="t('dataTools.fill.value')" autofocus />
+        </div>
+      </div>
+      <p v-if="error" class="fill-blanks-dialog__error" role="alert">{{ error }}</p>
     </div>
   </Dialog>
 </template>
 <style scoped lang="scss">
 @use "./fill-dialog";
 
-.fill-dialog {
-  @include fill-dialog.surface;
-}
-.fill-dialog__range,
-.fill-dialog__hint,
-.fill-dialog__error {
-  @include fill-dialog.auxiliary-text;
-}
-.fill-dialog__range,
-.fill-dialog__hint {
-  @include fill-dialog.subdued-text;
-}
-.fill-dialog__error {
-  color: var(--idea-status-error);
-}
-label {
-  @include fill-dialog.field-label;
+.fill-blanks-dialog {
+  display: grid;
+  gap: var(--idea-space-5);
+
+  &__description,
+  &__options {
+    @include fill-dialog.group;
+  }
+
+  &__range,
+  &__hint,
+  &__error {
+    @include fill-dialog.auxiliary-text;
+  }
+
+  &__range,
+  &__hint {
+    @include fill-dialog.subdued-text;
+  }
+
+  &__range {
+    overflow-wrap: anywhere;
+  }
+
+  &__hint {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--idea-space-2);
+
+    > svg {
+      flex: none;
+      margin-top: var(--idea-space-1);
+    }
+  }
+
+  &__value {
+    padding-inline-start: calc(16px + var(--idea-space-4));
+  }
+
+  &__error {
+    color: var(--idea-status-error);
+  }
 }
 </style>
