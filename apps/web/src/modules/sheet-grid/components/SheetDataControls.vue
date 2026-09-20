@@ -119,7 +119,7 @@ const validationButtonStyle = computed(() => {
   const rect = activeValidationRect.value;
   if (!rect || !props.validationInfo?.values.length || rect.width < 24 || rect.height < 18) return;
   return {
-    left: `${rect.left + rect.width - 18}px`,
+    left: `${rect.left + rect.width + 1}px`,
     top: `${rect.top + Math.max(1, (rect.height - 16) / 2)}px`,
   };
 });
