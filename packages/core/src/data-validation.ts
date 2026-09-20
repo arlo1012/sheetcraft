@@ -47,7 +47,7 @@ export function getCellDataValidations(sheet: Sheet, address: CellAddress): Shee
 export function resolveDataValidationListValues(
   rule: SheetDataValidation,
   context: DataValidationEvaluationContext,
-): string[] {
+): (string | number | boolean)[] {
   if (rule.list) return [...rule.list];
   if (!rule.formula1) return [];
   if (context.workbook && context.sheet) {
@@ -75,21 +75,18 @@ export function resolveDataValidationListValues(
       const targetSheet = context.workbook.sheets.get(target.sheetId);
       if (!targetSheet) return [];
       const evaluator = createWorkbookEvaluator(context.workbook, targetSheet.id);
-      const values: string[] = [];
+      const values: (string | number | boolean)[] = [];
       for (let row = target.range.start.row; row <= target.range.end.row; row++)
         for (let column = target.range.start.column; column <= target.range.end.column; column++) {
           const value = evaluator.getComputedValue({ row, column });
-          if (value !== null && typeof value !== "object") values.push(String(value));
+          if (value !== null && typeof value !== "object") values.push(value);
         }
       return values;
     }
   }
   const value = context.resolveReference?.(rule.formula1, context.address);
-  return value == null
-    ? []
-    : String(value)
-        .split(",")
-        .map((entry) => entry.trim());
+  if (value == null) return [];
+  return typeof value === "string" ? value.split(",").map((entry) => entry.trim()) : [value];
 }
 function compare(
   operator: NonNullable<SheetDataValidation["operator"]>,
@@ -167,7 +164,9 @@ export function validateCellDataValidation(
   if ((value === null || value === "") && rule.allowBlank) return { valid: true };
   if (value === null || value === "") return { valid: false, reason: "blank" };
   if (rule.type === "list")
-    return resolveDataValidationListValues(rule, context).includes(String(value))
+    return resolveDataValidationListValues(rule, context).some(
+      (candidate) => String(candidate) === String(value),
+    )
       ? { valid: true }
       : { valid: false, reason: "list" };
   if (rule.type === "custom")

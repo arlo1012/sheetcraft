@@ -186,4 +186,38 @@ describe("SheetGrid data controls", () => {
       value: "=literal",
     });
   });
+
+  test.each([7, true, "=literal"])(
+    "preserves the selected validation value type (%j)",
+    async (value) => {
+      const { wrapper } = mountSheetGrid({
+        validationInfo: { values: [value] },
+      });
+      await nextTick();
+
+      await wrapper.get(".sheet-data-controls__validation").trigger("click");
+      await wrapper.getComponent(MenuItem).trigger("click");
+      expect(wrapper.emitted("validationChoose")?.[0]?.[0]).toEqual({
+        address: { row: 0, column: 0 },
+        value,
+      });
+    },
+  );
+
+  test("keeps the first value and its type when display-equivalent choices are deduplicated", async () => {
+    const { wrapper } = mountSheetGrid({
+      validationInfo: { values: [7, "7", true, "true", false, ""] },
+    });
+    await nextTick();
+
+    await wrapper.get(".sheet-data-controls__validation").trigger("click");
+    const items = wrapper.findAllComponents(MenuItem);
+    expect(items).toHaveLength(3);
+    expect(items.map((item) => item.text())).toEqual(["7", "true", "false"]);
+    await items[0]!.trigger("click");
+    expect(wrapper.emitted("validationChoose")?.[0]?.[0]).toEqual({
+      address: { row: 0, column: 0 },
+      value: 7,
+    });
+  });
 });
