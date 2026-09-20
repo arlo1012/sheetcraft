@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { useAppI18n } from "../../../shared/i18n";
@@ -18,7 +19,7 @@ const emit = defineEmits<{
   close: [];
   apply: [draft: FillNumberSequenceDraft];
 }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const copy = (value: FillNumberSequenceDraft): FillNumberSequenceDraft => ({
   ...value,
 });
@@ -58,39 +59,35 @@ function apply(): void {
     @confirm="apply"
   >
     <div class="fill-number-dialog">
-      <div
-        class="fill-number-dialog__field"
-        role="group"
-        :aria-label="t('dataTools.fill.sequenceDirection')"
+      <TForm
+        :data="draft"
+        layout="horizontal"
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 72 : 112"
       >
-        <span>{{ t("dataTools.fill.sequenceDirection") }}</span>
-        <TRadioGroup v-model="draft.axis">
-          <TRadio value="rows">{{ t("dataTools.fill.rows") }}</TRadio>
-          <TRadio value="columns">{{ t("dataTools.fill.columns") }}</TRadio>
-        </TRadioGroup>
-      </div>
-      <div
-        class="fill-number-dialog__field"
-        role="group"
-        :aria-label="t('dataTools.fill.startValue')"
-      >
-        <span>{{ t("dataTools.fill.startValue") }}</span>
-        <TInputNumber
-          v-model="draft.start"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :aria-label="t('dataTools.fill.startValue')"
-        />
-      </div>
-      <div class="fill-number-dialog__field" role="group" :aria-label="t('dataTools.fill.step')">
-        <span>{{ t("dataTools.fill.step") }}</span>
-        <TInputNumber
-          v-model="draft.step"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :aria-label="t('dataTools.fill.step')"
-        />
-      </div>
+        <TFormItem name="axis" :label="t('dataTools.fill.sequenceDirection')">
+          <TRadioGroup v-model="draft.axis" :aria-label="t('dataTools.fill.sequenceDirection')">
+            <TRadio value="rows">{{ t("dataTools.fill.rows") }}</TRadio>
+            <TRadio value="columns">{{ t("dataTools.fill.columns") }}</TRadio>
+          </TRadioGroup>
+        </TFormItem>
+        <TFormItem name="start" :label="t('dataTools.fill.startValue')">
+          <TInputNumber
+            v-model="draft.start"
+            theme="column"
+            class="idea-input-number--persistent-controls"
+            :aria-label="t('dataTools.fill.startValue')"
+          />
+        </TFormItem>
+        <TFormItem name="step" :label="t('dataTools.fill.step')">
+          <TInputNumber
+            v-model="draft.step"
+            theme="column"
+            class="idea-input-number--persistent-controls"
+            :aria-label="t('dataTools.fill.step')"
+          />
+        </TFormItem>
+      </TForm>
       <p v-if="error" class="fill-number-dialog__error" role="alert">
         {{ error }}
       </p>
@@ -103,10 +100,6 @@ function apply(): void {
 
 .fill-number-dialog {
   @include fill-dialog.surface;
-
-  &__field {
-    @include fill-dialog.field-label;
-  }
 
   &__error {
     @include fill-dialog.auxiliary-text;
