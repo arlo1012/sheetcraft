@@ -90,6 +90,8 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       value: string;
       insertTextTitle: string;
       text: string;
+      insertPosition: string;
+      countDirection: string;
       insertAtStart: string;
       insertAtEnd: string;
       insertAtIndex: string;

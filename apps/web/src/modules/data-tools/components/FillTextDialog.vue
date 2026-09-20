@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Info } from "lucide-vue-next";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { useAppI18n } from "../../../shared/i18n";
 import type { FillTextDraft } from "../fill-tool-types";
 const props = withDefaults(
-  defineProps<{ visible: boolean; initial: FillTextDraft; error?: string; rangeLabel?: string }>(),
-  { error: "", rangeLabel: "" },
+  defineProps<{ visible: boolean; initial: FillTextDraft; error?: string }>(),
+  { error: "" },
 );
 const emit = defineEmits<{ close: []; apply: [draft: FillTextDraft] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const draft = ref<FillTextDraft>({ ...props.initial });
 const canApply = computed(() => Boolean(draft.value.text));
 watch(
@@ -32,7 +34,7 @@ watch(
   <Dialog
     :visible="visible"
     :header="t('dataTools.fill.insertTextTitle')"
-    width="min(440px, calc(100vw - 32px))"
+    width="min(480px, calc(100vw - 32px))"
     :confirm-btn="{ content: t('dataTools.fill.apply'), disabled: !canApply }"
     :cancel-btn="t('dataTools.fill.cancel')"
     :close-on-overlay-click="false"
@@ -40,76 +42,80 @@ watch(
     @close="emit('close')"
     @confirm="canApply && emit('apply', { ...draft })"
   >
-    <div class="fill-dialog">
-      <p v-if="rangeLabel" class="fill-dialog__range">
-        {{ t("dataTools.fill.range", { range: rangeLabel }) }}
+    <div class="fill-text-dialog">
+      <p class="fill-text-dialog__hint">
+        <Info :size="14" aria-hidden="true" />
+        <span>{{ t("dataTools.fill.textHint") }}</span>
       </p>
-      <p class="fill-dialog__hint">{{ t("dataTools.fill.textHint") }}</p>
-      <label
-        ><span>{{ t("dataTools.fill.text") }}</span
-        ><TInput v-model="draft.text" :aria-label="t('dataTools.fill.text')" autofocus
-      /></label>
-      <div
-        class="fill-dialog__group"
-        role="group"
-        :aria-label="t('dataTools.fill.insertTextTitle')"
+      <TForm
+        :data="draft"
+        layout="horizontal"
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 96 : 136"
       >
-        <TRadioGroup v-model="draft.position"
-          ><TRadio value="start">{{ t("dataTools.fill.insertAtStart") }}</TRadio
-          ><TRadio value="end">{{ t("dataTools.fill.insertAtEnd") }}</TRadio
-          ><TRadio value="index">{{ t("dataTools.fill.insertAtIndex") }}</TRadio></TRadioGroup
-        >
-      </div>
-      <div v-if="draft.position === 'index'" class="fill-dialog__index">
-        <div class="fill-dialog__group" role="group" :aria-label="t('dataTools.fill.index')">
-          <TRadioGroup v-model="draft.from"
-            ><TRadio value="left">{{ t("dataTools.fill.fromLeft") }}</TRadio
-            ><TRadio value="right">{{ t("dataTools.fill.fromRight") }}</TRadio></TRadioGroup
+        <TFormItem name="text" :label="t('dataTools.fill.text')">
+          <TInput v-model="draft.text" :aria-label="t('dataTools.fill.text')" autofocus />
+        </TFormItem>
+        <TFormItem name="position" :label="t('dataTools.fill.insertPosition')">
+          <TRadioGroup
+            v-model="draft.position"
+            direction="vertical"
+            :aria-label="t('dataTools.fill.insertPosition')"
           >
-        </div>
-        <div role="group" :aria-label="t('dataTools.fill.index')" class="fill-dialog__field">
-          <span>{{ t("dataTools.fill.index") }}</span
-          ><TInputNumber
-            v-model="draft.index"
-            :min="0"
-            :decimal-places="0"
-            theme="column"
-            class="idea-input-number--persistent-controls"
-          />
-        </div>
-      </div>
-      <p v-if="error" class="fill-dialog__error" role="alert">{{ error }}</p>
+            <TRadio value="start">{{ t("dataTools.fill.insertAtStart") }}</TRadio>
+            <TRadio value="end">{{ t("dataTools.fill.insertAtEnd") }}</TRadio>
+            <TRadio value="index">{{ t("dataTools.fill.insertAtIndex") }}</TRadio>
+          </TRadioGroup>
+        </TFormItem>
+        <template v-if="draft.position === 'index'">
+          <TFormItem name="from" :label="t('dataTools.fill.countDirection')">
+            <TRadioGroup v-model="draft.from" :aria-label="t('dataTools.fill.countDirection')">
+              <TRadio value="left">{{ t("dataTools.fill.fromLeft") }}</TRadio>
+              <TRadio value="right">{{ t("dataTools.fill.fromRight") }}</TRadio>
+            </TRadioGroup>
+          </TFormItem>
+          <TFormItem name="index" :label="t('dataTools.fill.index')">
+            <TInputNumber
+              v-model="draft.index"
+              :min="0"
+              :decimal-places="0"
+              theme="column"
+              class="idea-input-number--persistent-controls"
+              :aria-label="t('dataTools.fill.index')"
+            />
+          </TFormItem>
+        </template>
+      </TForm>
+      <p v-if="error" class="fill-text-dialog__error" role="alert">{{ error }}</p>
     </div>
   </Dialog>
 </template>
 <style scoped lang="scss">
 @use "./fill-dialog";
 
-.fill-dialog {
-  @include fill-dialog.surface;
-}
-.fill-dialog__range,
-.fill-dialog__hint,
-.fill-dialog__error {
-  @include fill-dialog.auxiliary-text;
-}
-.fill-dialog__range,
-.fill-dialog__hint {
-  @include fill-dialog.subdued-text;
-}
-.fill-dialog__error {
-  color: var(--idea-status-error);
-}
-label,
-.fill-dialog__field {
-  @include fill-dialog.field-label;
-}
-.fill-dialog__index {
+.fill-text-dialog {
   display: grid;
-  grid-template-columns: 1fr 120px;
-  gap: var(--idea-space-6);
-}
-.fill-dialog__group {
-  @include fill-dialog.group;
+  gap: var(--idea-space-5);
+
+  &__hint,
+  &__error {
+    @include fill-dialog.auxiliary-text;
+  }
+
+  &__hint {
+    @include fill-dialog.subdued-text;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--idea-space-2);
+
+    > svg {
+      flex: none;
+      margin-top: var(--idea-space-1);
+    }
+  }
+
+  &__error {
+    color: var(--idea-status-error);
+  }
 }
 </style>

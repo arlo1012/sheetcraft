@@ -92,6 +92,8 @@ export const enUS = {
       value: "Value",
       insertTextTitle: "Insert Text",
       text: "Text",
+      insertPosition: "Insert position",
+      countDirection: "Count from",
       insertAtStart: "Insert at start",
       insertAtEnd: "Insert at end",
       insertAtIndex: "Insert at position",

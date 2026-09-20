@@ -90,6 +90,8 @@ export const zhCN = {
       value: "值",
       insertTextTitle: "批量插入文本",
       text: "文本",
+      insertPosition: "插入位置",
+      countDirection: "计数方向",
       insertAtStart: "在开头插入",
       insertAtEnd: "在结尾插入",
       insertAtIndex: "在指定位置插入",
