@@ -274,10 +274,7 @@ async function selectRange(current: string): Promise<string | undefined> {
         <div
           v-for="(item, index) in draft.items"
           :key="`${index}:${item}`"
-          :class="[
-            'dropdown-list-dialog__item',
-            { 'dropdown-list-dialog__item--selected': selectedIndex === index },
-          ]"
+          class="dropdown-list-dialog__item"
           role="option"
           :aria-selected="selectedIndex === index"
           @click="selectedIndex = index"
@@ -320,21 +317,17 @@ async function selectRange(current: string): Promise<string | undefined> {
     </div>
     <template #footer>
       <div class="dropdown-list-dialog__footer">
-        <TButton variant="outline" size="small" data-dropdown-clear @click="clearAll">{{
+        <TButton theme="default" data-dropdown-clear @click="clearAll">{{
           t("dataTools.dropdown.clearAll")
         }}</TButton>
-        <span />
-        <TButton
-          theme="primary"
-          size="small"
-          :disabled="!canConfirm"
-          data-dropdown-confirm
-          @click="apply"
-          >{{ t("dataTools.dropdown.confirm") }}</TButton
-        >
-        <TButton variant="outline" size="small" data-dropdown-cancel @click="emit('close')">{{
-          t("dataTools.dropdown.cancel")
-        }}</TButton>
+        <div>
+          <TButton theme="default" data-dropdown-cancel @click="emit('close')">{{
+            t("dataTools.dropdown.cancel")
+          }}</TButton>
+          <TButton theme="primary" :disabled="!canConfirm" data-dropdown-confirm @click="apply">{{
+            t("dataTools.dropdown.confirm")
+          }}</TButton>
+        </div>
       </div>
     </template>
   </Dialog>
@@ -366,32 +359,29 @@ async function selectRange(current: string): Promise<string | undefined> {
 .dropdown-list-dialog__list {
   @include option-list.surface;
   height: 190px;
-  padding: 0;
   outline: none;
-}
-.dropdown-list-dialog__list:focus {
-  border-color: var(--td-brand-color);
 }
 .dropdown-list-dialog__list--disabled {
   color: var(--idea-text-disabled);
   background: var(--td-bg-color-container-disabled);
 }
 .dropdown-list-dialog__item {
+  @include option-list.item;
   min-height: 28px;
   padding: 4px 8px;
-  cursor: default;
-}
-.dropdown-list-dialog__item--selected {
-  background: var(--td-bg-color-container-hover);
+  white-space: normal;
+
+  &[aria-selected="true"] {
+    font-weight: var(--idea-font-weight-medium);
+  }
 }
 .dropdown-list-dialog__error {
   margin: 0;
   color: var(--td-error-color);
 }
 .dropdown-list-dialog__footer {
-  display: grid;
-  grid-template-columns: auto 1fr auto auto;
-  gap: var(--idea-space-2);
+  display: flex;
+  justify-content: space-between;
   align-items: center;
 }
 </style>
