@@ -20,6 +20,7 @@ export type DataFillErrorReason =
   | "hiddenCells"
   | "invalidOptions"
   | "invalidSeed"
+  | "targetOccupied"
   | "emptyResult";
 
 export class DataFillError extends Error {

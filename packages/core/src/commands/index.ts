@@ -31,3 +31,10 @@ export { DataFillError, type DataFillErrorReason } from "./fill-common.js";
 export * from "./fill-batch.js";
 export * from "./fill-series.js";
 export { assertFillDataValidation } from "./fill-validation.js";
+
+export {
+  createFillNumberSequenceCommand,
+  createFillRankCommand,
+  type FillNumberSequenceOptions,
+  type FillRankOptions,
+} from "./fill-numbers.js";

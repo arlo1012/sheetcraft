@@ -26,6 +26,23 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       failed: string;
     };
     fill: {
+      numberSequence: string;
+      rank: string;
+      startValue: string;
+      sequenceDirection: string;
+      rankSource: string;
+      rankDestination: string;
+      rankOrder: string;
+      rankAscending: string;
+      rankDescending: string;
+      rankTies: string;
+      rankCompetition: string;
+      rankDense: string;
+      rankOrdinal: string;
+      rankOverwrite: string;
+      rankHint: string;
+      pickRankSource: string;
+      pickRankDestination: string;
       title: string;
       down: string;
       right: string;
@@ -93,6 +110,7 @@ export type MessageSchema = FormulaToolsMessageSchema & {
         hiddenCells: string;
         invalidOptions: string;
         invalidSeed: string;
+        targetOccupied: string;
         emptyResult: string;
         validation: string;
       };

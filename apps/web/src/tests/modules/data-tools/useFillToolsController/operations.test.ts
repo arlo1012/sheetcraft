@@ -8,7 +8,7 @@ import {
 } from "@idea10/core/history";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { datePartsToExcelSerial } from "@idea10/core/formula";
-import { getActiveSheet, getCellValue, setCellValue } from "@idea10/core/workbook";
+import { createSheet, getActiveSheet, getCellValue, setCellValue } from "@idea10/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useFillToolsController } from "../../../../modules/data-tools/useFillToolsController";
 const wrappers: Array<{ unmount(): void }> = [];
@@ -303,5 +303,92 @@ describe("fill tools controller", () => {
     f.controller.applyFillSeries(f.controller.fillSeriesInitial.value);
     expect(f.controller.fillSeriesVisible.value).toBe(true);
     expect(getCellValue(f.sheet, { row: 1, column: 0 })).toBe(null);
+  });
+});
+
+describe("number and quick fill integration", () => {
+  test("fills a captured rectangle with 123 sequence in one undo step", () => {
+    const f = fixture();
+    f.selection.range.end = { row: 1, column: 1 };
+    f.controller.openFillNumberSequence();
+    f.selection.range.end = { row: 9, column: 9 };
+    f.controller.applyFillNumberSequence({ axis: "rows", start: 10, step: -2 });
+    expect(
+      [0, 1].flatMap((row) => [0, 1].map((column) => getCellValue(f.sheet, { row, column }))),
+    ).toEqual([10, 8, 6, 4]);
+    expect(getCellValue(f.sheet, { row: 2, column: 1 })).toBeNull();
+    expect(f.controller.fillNumberSequenceVisible.value).toBe(false);
+    undoWorkbookCommand(f.session);
+    expect(getCellValue(getActiveSheet(f.session.workbook), { row: 0, column: 0 })).toBeNull();
+  });
+  test("presets the requested text insertion mode", () => {
+    const f = fixture();
+    setCellValue(f.sheet, { row: 0, column: 0 }, "hello");
+    f.controller.openFillText("index");
+    expect(f.controller.fillTextInitial.value.position).toBe("index");
+    f.controller.applyFillText({ ...f.controller.fillTextInitial.value, index: 2, text: "!" });
+    expect(getCellValue(f.sheet, { row: 0, column: 0 })).toBe("he!llo");
+  });
+  test("quick date uses the chosen format and retains an error dialog when rejected", () => {
+    const f = fixture();
+    f.controller.fillCurrentDate("yyyymmdd");
+    expect(typeof getCellValue(f.sheet, { row: 0, column: 0 })).toBe("number");
+    expect(f.sheet.cells.get("0:0")?.style?.numberFormat).toEqual({
+      kind: "custom",
+      code: "yyyymmdd",
+    });
+    expect(f.controller.fillCurrentDateVisible.value).toBe(false);
+    const blocked = fixture(true);
+    blocked.controller.fillCurrentDate("yyyy.m.d");
+    expect(blocked.controller.fillCurrentDateVisible.value).toBe(true);
+    expect(blocked.controller.fillError.value).not.toBe("");
+  });
+  test("ranks into another sheet, protects existing contents and supports undo", () => {
+    const f = fixture();
+    [20, 50, 50].forEach((value, row) => setCellValue(f.sheet, { row, column: 0 }, value));
+    const output = createSheet("Results", "results");
+    f.session.workbook.sheets.set(output.id, output);
+    setCellValue(output, { row: 1, column: 1 }, "keep");
+    f.controller.openFillRank();
+    const draft = { ...f.controller.fillRankInitial.value, destination: "=Results!$B$1" };
+    f.controller.applyFillRank(draft);
+    expect(f.controller.fillRankVisible.value).toBe(true);
+    expect(f.controller.fillError.value).toContain("contains data");
+    expect(getCellValue(output, { row: 0, column: 1 })).toBeNull();
+    f.controller.applyFillRank({ ...draft, overwrite: true });
+    expect(
+      [0, 1, 2].map((row) =>
+        getCellValue(f.session.workbook.sheets.get(output.id)!, { row, column: 1 }),
+      ),
+    ).toEqual([3, 1, 1]);
+    expect(f.controller.fillRankVisible.value).toBe(false);
+    undoWorkbookCommand(f.session);
+    expect(getCellValue(f.session.workbook.sheets.get(output.id)!, { row: 1, column: 1 })).toBe(
+      "keep",
+    );
+  });
+  test("rank validates the complete output atomically", () => {
+    const f = fixture();
+    [20, 50, 50].forEach((value, row) => setCellValue(f.sheet, { row, column: 0 }, value));
+    f.sheet.dataValidations = [
+      {
+        id: "rank-limit",
+        range: { start: { row: 0, column: 1 }, end: { row: 2, column: 1 } },
+        type: "whole",
+        operator: "between",
+        formula1: "1",
+        formula2: "2",
+        allowBlank: true,
+        showError: true,
+      },
+    ];
+    f.controller.openFillRank();
+    f.controller.applyFillRank(f.controller.fillRankInitial.value);
+    expect(f.controller.fillError.value).toContain("validation");
+    expect([0, 1, 2].map((row) => getCellValue(f.sheet, { row, column: 1 }))).toEqual([
+      null,
+      null,
+      null,
+    ]);
   });
 });

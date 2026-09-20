@@ -161,14 +161,21 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   post-fill options can switch to a series, supported date intervals or formatting
   modes while retaining one undo step. Whole-axis and single-cell selections
   disable incompatible fill directions.
-  The same menu also opens Series, Current Date, Fill Blank Cells and Insert Text.
+  The same menu also offers 123 Sequence, Rank, Series, Current Date, Fill Blank
+  Cells and Insert Text. 123 Sequence writes consecutive numbers in row or column
+  traversal order with a chosen start and step. Rank reads one row or column,
+  ranks numeric values (including formula results), and leaves other positions
+  blank. It supports ascending/descending order and competition, dense or stable
+  ordinal ties. Source and output references can be picked across sheets; the
+  output requires explicit overwrite consent when it contains data.
   Series supports row/column lanes, linear and growth steps, date intervals,
   automatic patterns and trend fitting. A stop value can extend a single seed;
   a multi-cell selection bounds the output. Date limits use a date, month or year
   picker matching the selected unit. Month/year limits include the entire selected
   period: its final day for positive steps, or its first day for negative steps.
-  Current Date writes a static numeric
-  date in the workbook's date system with a selected display format. Blank fill
+  Current Date offers nine display formats in a submenu and directly writes a
+  static numeric date in the workbook's date system. Insert Text offers start,
+  character-position and end shortcuts that open the corresponding settings. Blank fill
   takes values from the chosen neighboring direction or a typed custom value,
   leaving existing content and formulas that return empty text intact. Text
   insertion adds a prefix, suffix or text at a character position and converts

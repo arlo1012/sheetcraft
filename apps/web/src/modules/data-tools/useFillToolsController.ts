@@ -3,6 +3,8 @@ import {
   assertFillDataValidation,
   createFillBlanksCommand,
   createFillCurrentDateCommand,
+  createFillNumberSequenceCommand,
+  createFillRankCommand,
   createFillSeriesCommand,
   createInsertCellTextCommand,
   DataFillError,
@@ -10,15 +12,24 @@ import {
   type WorkbookCommand,
 } from "@idea10/core/commands";
 import { parseCellInput } from "@idea10/core/input";
-import { getActiveSheet, type CellRange, type Workbook } from "@idea10/core/workbook";
+import {
+  getActiveSheet,
+  isCellAddressInBounds,
+  type CellRange,
+  type Workbook,
+} from "@idea10/core/workbook";
 import { useAppI18n } from "../../shared/i18n";
-import { formatRangeReference } from "../../shared/range-reference/formatRangeReference";
+import {
+  formatRangeReference,
+  resolveRangeReference,
+} from "../../shared/range-reference/formatRangeReference";
 import type {
   FillBlanksDraft,
   FillCurrentDateDraft,
   FillSeriesDraft,
   FillTextDraft,
 } from "./fill-tool-types";
+import type { FillNumberSequenceDraft, FillRankDraft } from "./fill-number-types";
 import { parseFillSeriesDateStop } from "./fill-series-date";
 
 type Options = {
@@ -30,7 +41,7 @@ type Options = {
   flush: () => boolean;
   focusSheet: () => void;
 };
-type FillTool = "series" | "blanks" | "text" | "date";
+type FillTool = "series" | "blanks" | "text" | "date" | "numberSequence" | "rank";
 
 export function useFillToolsController(options: Options) {
   const { t, locale } = useAppI18n();
@@ -44,6 +55,18 @@ export function useFillToolsController(options: Options) {
     stop: "",
     dateUnit: "day",
     trend: false,
+  });
+  const fillNumberSequenceInitial = ref<FillNumberSequenceDraft>({
+    axis: "columns",
+    start: 1,
+    step: 1,
+  });
+  const fillRankInitial = ref<FillRankDraft>({
+    sourceRange: "",
+    destination: "",
+    order: "descending",
+    ties: "competition",
+    overwrite: false,
   });
   const fillBlanksInitial = ref<FillBlanksDraft>({ mode: "up", value: "" });
   const fillTextInitial = ref<FillTextDraft>({
@@ -63,10 +86,10 @@ export function useFillToolsController(options: Options) {
     | undefined;
 
   function open(tool: FillTool) {
-    if (options.isBusy() || !options.flush()) return;
+    if (options.isBusy() || !options.flush()) return false;
     const workbook = options.getWorkbook();
     const sheet = getActiveSheet(workbook);
-    if (sheet.properties.protected) return;
+    if (sheet.properties.protected) return false;
     const selection = options.getSelection().range;
     const range = {
       start: {
@@ -92,6 +115,20 @@ export function useFillToolsController(options: Options) {
       dateUnit: "day",
       trend: false,
     };
+    fillNumberSequenceInitial.value = { axis: fillSeriesInitial.value.axis, start: 1, step: 1 };
+    const rankDestination =
+      range.start.column === range.end.column
+        ? { row: range.start.row, column: range.end.column + 1 }
+        : { row: range.end.row + 1, column: range.start.column };
+    fillRankInitial.value = {
+      sourceRange: formatRangeReference(sheet.name, range),
+      destination: isCellAddressInBounds(rankDestination)
+        ? formatRangeReference(sheet.name, { start: rankDestination, end: rankDestination })
+        : "",
+      order: "descending",
+      ties: "competition",
+      overwrite: false,
+    };
     fillBlanksInitial.value = { mode: "up", value: "" };
     fillTextInitial.value = { position: "start", from: "left", index: 0, text: "" };
     const today = new Date();
@@ -102,6 +139,7 @@ export function useFillToolsController(options: Options) {
       format: "yyyy-mm-dd",
     };
     active.value = tool;
+    return true;
   }
   function closeFillTool() {
     active.value = undefined;
@@ -178,8 +216,48 @@ export function useFillToolsController(options: Options) {
       createFillCurrentDateCommand(workbook, sheetId, range, draft),
     );
   }
+  function openFillText(position: FillTextDraft["position"] = "start") {
+    if (open("text")) fillTextInitial.value.position = position;
+  }
+  function fillCurrentDate(format: string) {
+    if (!open("date")) return;
+    fillCurrentDateInitial.value.format = format;
+    applyFillCurrentDate(fillCurrentDateInitial.value);
+  }
+  function applyFillNumberSequence(draft: FillNumberSequenceDraft) {
+    apply("numberSequence", (workbook, sheetId, range) =>
+      createFillNumberSequenceCommand(workbook, sheetId, range, draft),
+    );
+  }
+  function applyFillRank(draft: FillRankDraft) {
+    apply("rank", (workbook, sheetId) => {
+      const source = resolveRangeReference(workbook, draft.sourceRange, sheetId);
+      const destination = resolveRangeReference(workbook, draft.destination, sheetId);
+      if (
+        !source ||
+        !destination ||
+        destination.range.start.row !== destination.range.end.row ||
+        destination.range.start.column !== destination.range.end.column
+      )
+        throw new DataFillError(
+          "invalidRange",
+          "Choose a source range and a single destination cell.",
+        );
+      return createFillRankCommand(workbook, {
+        source,
+        target: { sheetId: destination.sheetId, start: destination.range.start },
+        order: draft.order,
+        ties: draft.ties,
+        overwrite: draft.overwrite,
+      });
+    });
+  }
   watch(options.getGeneration, closeFillTool);
   return {
+    fillNumberSequenceVisible: computed(() => active.value === "numberSequence"),
+    fillRankVisible: computed(() => active.value === "rank"),
+    fillNumberSequenceInitial,
+    fillRankInitial,
     fillSeriesVisible: computed(() => active.value === "series"),
     fillBlanksVisible: computed(() => active.value === "blanks"),
     fillTextVisible: computed(() => active.value === "text"),
@@ -192,7 +270,12 @@ export function useFillToolsController(options: Options) {
     fillRangeLabel,
     openFillSeries: () => open("series"),
     openFillBlanks: () => open("blanks"),
-    openFillText: () => open("text"),
+    openFillText,
+    fillCurrentDate,
+    openFillNumberSequence: () => open("numberSequence"),
+    openFillRank: () => open("rank"),
+    applyFillNumberSequence,
+    applyFillRank,
     openFillCurrentDate: () => open("date"),
     closeFillTool,
     applyFillSeries,

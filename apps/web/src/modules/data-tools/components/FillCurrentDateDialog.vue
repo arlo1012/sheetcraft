@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import OptionList from "../../../shared/option-list/OptionList.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { fillDateFormats, formatFillDateSample } from "../fill-date-formats";
 import type { FillCurrentDateDraft } from "../fill-tool-types";
 const props = withDefaults(
   defineProps<{
@@ -29,22 +30,10 @@ watch(
   },
   { deep: true },
 );
-function formatDate(format: string): string {
-  const { year, month, day } = draft.value;
-  return format
-    .replace("yyyy", String(year))
-    .replace("mm", String(month).padStart(2, "0"))
-    .replace("m", String(month))
-    .replace("dd", String(day).padStart(2, "0"))
-    .replace("d", String(day));
-}
-const formatOptions = computed(() =>
-  ["yyyy-mm-dd", "yyyy/m/d", "yyyy年m月d日", "m/d/yyyy"].map((value) => ({
-    value,
-    label: formatDate(value),
-  })),
+const formatOptions = computed<Array<{ value: string; label: string }>>(() =>
+  fillDateFormats.map((value) => ({ value, label: formatFillDateSample(value, draft.value) })),
 );
-const sample = computed(() => formatDate(draft.value.format));
+const sample = computed(() => formatFillDateSample(draft.value.format, draft.value));
 </script>
 <template>
   <Dialog

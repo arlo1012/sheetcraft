@@ -63,9 +63,11 @@ const emit = defineEmits<{
   openDropdownList: [];
   fill: [direction: FillDirection];
   openFillSeries: [];
-  openFillCurrentDate: [];
+  openFillCurrentDate: [format: string];
   openFillBlanks: [];
-  openFillText: [];
+  openFillText: [position: "start" | "end" | "index"];
+  openFillNumberSequence: [];
+  openFillRank: [];
   group: [axis: "rows" | "columns"];
   ungroup: [axis: "rows" | "columns"];
   expand: [];
@@ -152,9 +154,11 @@ const { t } = useAppI18n();
         :can-fill-columns="canFillColumns"
         @fill="emit('fill', $event)"
         @series="emit('openFillSeries')"
-        @current-date="emit('openFillCurrentDate')"
+        @current-date="emit('openFillCurrentDate', $event)"
         @blanks="emit('openFillBlanks')"
-        @insert-text="emit('openFillText')"
+        @insert-text="emit('openFillText', $event)"
+        @number-sequence="emit('openFillNumberSequence')"
+        @rank="emit('openFillRank')"
       />
       <RibbonButton
         variant="tall"

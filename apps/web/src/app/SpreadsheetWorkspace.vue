@@ -19,6 +19,8 @@ import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
 import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
 import ConsolidateDialog from "../modules/data-tools/components/ConsolidateDialog.vue";
+import FillNumberSequenceDialog from "../modules/data-tools/components/FillNumberSequenceDialog.vue";
+import FillRankDialog from "../modules/data-tools/components/FillRankDialog.vue";
 import FillSeriesDialog from "../modules/data-tools/components/FillSeriesDialog.vue";
 import FillBlanksDialog from "../modules/data-tools/components/FillBlanksDialog.vue";
 import FillTextDialog from "../modules/data-tools/components/FillTextDialog.vue";
@@ -569,6 +571,10 @@ const {
   consolidateDraft,
   consolidateError,
   consolidatePreview,
+  fillNumberSequenceVisible,
+  fillRankVisible,
+  fillNumberSequenceInitial,
+  fillRankInitial,
   fillSeriesVisible,
   fillBlanksVisible,
   fillTextVisible,
@@ -627,6 +633,32 @@ async function selectDropdownReference(current: string): Promise<string | undefi
 }
 watch(dropdownListVisible, (visible) => {
   if (!visible) dropdownRangePicker.cancel();
+});
+const fillRankRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingFillRankRange, reference: pickedFillRankReference } = fillRankRangePicker;
+const fillRankPickingDestination = ref(false);
+async function selectFillRankReference(
+  current: string,
+  singleCell: boolean,
+): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const generation = workbookGeneration.value;
+  const sheetId = activeSheet.value.id;
+  fillRankPickingDestination.value = singleCell;
+  const selected = await fillRankRangePicker.selectReference(current, { singleCell });
+  if (
+    session.workbook !== workbook ||
+    workbookGeneration.value !== generation ||
+    !fillRankVisible.value
+  )
+    return undefined;
+  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+  return selected;
+}
+const selectFillRankSource = (current: string) => selectFillRankReference(current, false);
+const selectFillRankDestination = (current: string) => selectFillRankReference(current, true);
+watch(fillRankVisible, (visible) => {
+  if (!visible) fillRankRangePicker.cancel();
 });
 const advancedRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingAdvancedRange, reference: pickedAdvancedReference } = advancedRangePicker;
@@ -699,6 +731,8 @@ watch(consolidateVisible, (visible) => {
 });
 const dataToolsModalOpen = computed(
   () =>
+    fillNumberSequenceVisible.value ||
+    (fillRankVisible.value && !pickingFillRankRange.value) ||
     fillSeriesVisible.value ||
     fillBlanksVisible.value ||
     fillTextVisible.value ||
@@ -777,6 +811,7 @@ watch(workbookGeneration, () => {
 const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const activeRangePicker = computed(() => {
+  if (pickingFillRankRange.value) return fillRankRangePicker;
   if (pickingValidationRange.value) return validationRangePicker;
   if (pickingDropdownRange.value) return dropdownRangePicker;
   if (pickingConsolidateRange.value) return consolidateRangePicker;
@@ -955,7 +990,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @open-dropdown-list="dataTools.openDropdownList"
           @fill="fillFromDataToolbar"
           @open-fill-series="dataTools.openFillSeries"
-          @open-fill-current-date="dataTools.openFillCurrentDate"
+          @open-fill-number-sequence="dataTools.openFillNumberSequence"
+          @open-fill-rank="dataTools.openFillRank"
+          @open-fill-current-date="dataTools.fillCurrentDate"
           @open-fill-blanks="dataTools.openFillBlanks"
           @open-fill-text="dataTools.openFillText"
           @group="dataTools.group"
@@ -1085,6 +1122,37 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :title="t('dataTools.consolidate.title')"
       @confirm="consolidateRangePicker.confirm"
       @cancel="consolidateRangePicker.cancel"
+    />
+    <FillNumberSequenceDialog
+      :visible="fillNumberSequenceVisible"
+      :initial="fillNumberSequenceInitial"
+      :error="fillError"
+      @close="dataTools.closeFillTool"
+      @apply="dataTools.applyFillNumberSequence"
+    />
+    <FillRankDialog
+      :visible="fillRankVisible"
+      :initial="fillRankInitial"
+      :error="fillError"
+      :picking="pickingFillRankRange"
+      :select-source-reference="selectFillRankSource"
+      :select-destination-reference="selectFillRankDestination"
+      @close="dataTools.closeFillTool"
+      @apply="dataTools.applyFillRank"
+    />
+    <RangeReferencePicker
+      v-if="pickingFillRankRange"
+      :reference="pickedFillRankReference"
+      :edit-session-id="cellEditSession.id"
+      :title="
+        t(
+          fillRankPickingDestination
+            ? 'dataTools.fill.pickRankDestination'
+            : 'dataTools.fill.pickRankSource',
+        )
+      "
+      @confirm="fillRankRangePicker.confirm"
+      @cancel="fillRankRangePicker.cancel"
     />
     <FillSeriesDialog
       :visible="fillSeriesVisible"

@@ -26,6 +26,24 @@ export const enUS = {
       failed: "Unable to insert the dropdown list. Check the settings and try again.",
     },
     fill: {
+      numberSequence: "Number sequence",
+      rank: "Calculate and fill ranks",
+      startValue: "Start value",
+      sequenceDirection: "Fill direction",
+      rankSource: "Source range",
+      rankDestination: "Destination",
+      rankOrder: "Ranking order",
+      rankAscending: "Ascending (smallest first)",
+      rankDescending: "Descending (largest first)",
+      rankTies: "Ties",
+      rankCompetition: "Competition (1, 1, 3)",
+      rankDense: "Dense (1, 1, 2)",
+      rankOrdinal: "By original order (1, 2, 3)",
+      rankOverwrite: "Allow replacing existing destination contents",
+      rankHint:
+        "Choose a single row or column. Rank numeric values; leave the corresponding positions blank for text and empty cells.",
+      pickRankSource: "Select ranking source",
+      pickRankDestination: "Select ranking destination",
       title: "Fill",
       down: "Fill Down",
       right: "Fill Right",
@@ -94,6 +112,8 @@ export const enUS = {
         hiddenCells: "The selected range includes hidden cells.",
         invalidOptions: "Check the fill options.",
         invalidSeed: "A series cannot be inferred from the selection.",
+        targetOccupied:
+          "The output range contains data. Choose another location or allow overwriting.",
         emptyResult: "The fill result is empty.",
         validation:
           "The fill result does not meet the cell validation rules. Adjust the fill options or validation rules.",
