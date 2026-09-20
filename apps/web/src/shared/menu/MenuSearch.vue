@@ -34,6 +34,18 @@ defineExpose({ focus: () => inputRef.value?.focus() });
   background: var(--idea-surface-panel);
   list-style: none;
 
+  // Cover the menu's top inset while options scroll behind the sticky search.
+  &::before {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    left: 0;
+    height: var(--idea-space-4);
+    background: var(--idea-surface-panel);
+    content: "";
+    pointer-events: none;
+  }
+
   &__field {
     padding: 0 8px 6px;
 
