@@ -73,59 +73,72 @@ function apply(): void {
       <p v-if="rangeLabel" class="fill-dialog__range">
         {{ t("dataTools.fill.range", { range: rangeLabel }) }}
       </p>
-      <div class="fill-dialog__group" role="group" :aria-label="t('dataTools.fill.seriesAxis')">
-        <span>{{ t("dataTools.fill.seriesAxis") }}</span>
-        <TRadioGroup v-model="draft.axis"
-          ><TRadio value="rows">{{ t("dataTools.fill.rows") }}</TRadio
-          ><TRadio value="columns">{{ t("dataTools.fill.columns") }}</TRadio></TRadioGroup
+      <div class="fill-dialog__options">
+        <div
+          class="fill-dialog__group fill-dialog__axis"
+          role="group"
+          :aria-label="t('dataTools.fill.seriesAxis')"
         >
-      </div>
-      <div class="fill-dialog__group" role="group" :aria-label="t('dataTools.fill.seriesType')">
-        <span>{{ t("dataTools.fill.seriesType") }}</span>
-        <TRadioGroup v-model="draft.type"
-          ><TRadio value="linear">{{ t("dataTools.fill.linear") }}</TRadio
-          ><TRadio value="growth">{{ t("dataTools.fill.growth") }}</TRadio
-          ><TRadio value="date">{{ t("dataTools.fill.date") }}</TRadio
-          ><TRadio value="auto">{{ t("dataTools.fill.auto") }}</TRadio></TRadioGroup
+          <span>{{ t("dataTools.fill.seriesAxis") }}</span>
+          <TRadioGroup v-model="draft.axis" direction="vertical">
+            <TRadio value="rows">{{ t("dataTools.fill.rows") }}</TRadio>
+            <TRadio value="columns">{{ t("dataTools.fill.columns") }}</TRadio>
+          </TRadioGroup>
+          <div class="fill-dialog__trend">
+            <TCheckbox
+              v-model="draft.trend"
+              :disabled="isAuto || (draft.type !== 'linear' && draft.type !== 'growth')"
+              >{{ t("dataTools.fill.trend") }}</TCheckbox
+            >
+          </div>
+        </div>
+        <div class="fill-dialog__group" role="group" :aria-label="t('dataTools.fill.seriesType')">
+          <span>{{ t("dataTools.fill.seriesType") }}</span>
+          <TRadioGroup v-model="draft.type" direction="vertical">
+            <TRadio value="linear">{{ t("dataTools.fill.linear") }}</TRadio>
+            <TRadio value="growth">{{ t("dataTools.fill.growth") }}</TRadio>
+            <TRadio value="date">{{ t("dataTools.fill.date") }}</TRadio>
+            <TRadio value="auto">{{ t("dataTools.fill.auto") }}</TRadio>
+          </TRadioGroup>
+        </div>
+        <div
+          class="fill-dialog__group"
+          :class="{ 'is-disabled': !isDate }"
+          role="group"
+          :aria-label="t('dataTools.fill.dateUnit')"
+          :aria-disabled="!isDate"
         >
-      </div>
-      <div
-        v-if="isDate"
-        class="fill-dialog__group"
-        role="group"
-        :aria-label="t('dataTools.fill.dateUnit')"
-      >
-        <span>{{ t("dataTools.fill.dateUnit") }}</span>
-        <TRadioGroup v-model="draft.dateUnit"
-          ><TRadio value="day">{{ t("dataTools.fill.day") }}</TRadio
-          ><TRadio value="weekday">{{ t("dataTools.fill.weekday") }}</TRadio
-          ><TRadio value="month">{{ t("dataTools.fill.month") }}</TRadio
-          ><TRadio value="year">{{ t("dataTools.fill.year") }}</TRadio></TRadioGroup
-        >
+          <span>{{ t("dataTools.fill.dateUnit") }}</span>
+          <TRadioGroup v-model="draft.dateUnit" direction="vertical" :disabled="!isDate">
+            <TRadio value="day">{{ t("dataTools.fill.day") }}</TRadio>
+            <TRadio value="weekday">{{ t("dataTools.fill.weekday") }}</TRadio>
+            <TRadio value="month">{{ t("dataTools.fill.month") }}</TRadio>
+            <TRadio value="year">{{ t("dataTools.fill.year") }}</TRadio>
+          </TRadioGroup>
+        </div>
       </div>
       <div class="fill-dialog__fields">
         <div role="group" :aria-label="t('dataTools.fill.step')" class="fill-dialog__field">
-          <span>{{ t("dataTools.fill.step") }}</span
-          ><TInputNumber
+          <span>{{ t("dataTools.fill.step") }}</span>
+          <TInputNumber
             v-model="draft.step"
             :disabled="isAuto || draft.trend"
+            :aria-label="t('dataTools.fill.step')"
             theme="column"
             class="idea-input-number--persistent-controls"
+            style="width: 100%; min-width: 0"
           />
         </div>
-        <label
-          ><span>{{ t("dataTools.fill.stop") }}</span
-          ><TInput
+        <label class="fill-dialog__field">
+          <span>{{ t("dataTools.fill.stop") }}</span>
+          <TInput
             v-model="draft.stop"
             :disabled="isAuto"
             :placeholder="isDate ? 'YYYY-MM-DD' : undefined"
-        /></label>
+            :aria-label="t('dataTools.fill.stop')"
+          />
+        </label>
       </div>
-      <TCheckbox
-        v-model="draft.trend"
-        :disabled="isAuto || (draft.type !== 'linear' && draft.type !== 'growth')"
-        >{{ t("dataTools.fill.trend") }}</TCheckbox
-      >
       <p v-if="error" class="fill-dialog__error" role="alert">{{ error }}</p>
     </div>
   </Dialog>
@@ -135,27 +148,71 @@ function apply(): void {
 
 .fill-dialog {
   @include fill-dialog.surface;
-}
-.fill-dialog__range,
-.fill-dialog__error {
-  @include fill-dialog.auxiliary-text;
-}
-.fill-dialog__range {
-  @include fill-dialog.subdued-text;
-}
-.fill-dialog__error {
-  color: var(--idea-status-error);
-}
-.fill-dialog__group {
-  @include fill-dialog.group;
-}
-.fill-dialog__field,
-label {
-  @include fill-dialog.field-label;
-}
-.fill-dialog__fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--idea-space-6);
+
+  &__range,
+  &__error {
+    @include fill-dialog.auxiliary-text;
+  }
+
+  &__range {
+    @include fill-dialog.subdued-text;
+    overflow-wrap: anywhere;
+  }
+
+  &__error {
+    color: var(--idea-status-error);
+  }
+
+  &__options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--idea-space-6);
+  }
+
+  &__group {
+    @include fill-dialog.group;
+    align-content: start;
+
+    > span {
+      font-weight: var(--idea-font-weight-medium);
+    }
+
+    &.is-disabled > span {
+      color: var(--idea-text-disabled);
+    }
+  }
+
+  &__axis {
+    grid-template-rows: auto auto 1fr;
+  }
+
+  &__trend {
+    align-self: end;
+  }
+
+  &__fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--idea-space-6);
+  }
+
+  &__field {
+    @include fill-dialog.field-label;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: var(--idea-space-4);
+    min-width: 0;
+  }
+
+  @media (max-width: 440px) {
+    &__options {
+      gap: var(--idea-space-4);
+    }
+
+    &__fields {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--idea-space-4);
+    }
+  }
 }
 </style>
