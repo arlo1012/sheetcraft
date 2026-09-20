@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ChevronDown, Minus, Plus, Search } from "lucide-vue-next";
-import { Input as TInput } from "tdesign-vue-next/es/input";
-import { computed, ref, useId, watch } from "vue";
+import { ChevronDown, Minus, Plus } from "lucide-vue-next";
+import { computed, nextTick, ref, useId, watch } from "vue";
 import { columnIndexToLabel } from "@idea10/core/coordinates";
 import type { CellAddress, SheetDimensionAxis } from "@idea10/core/workbook";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
@@ -9,6 +8,7 @@ import SheetCellNotice from "./SheetCellNotice.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import MenuSearch from "../../../shared/menu/MenuSearch.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 
 type OutlineGroup = Readonly<{
@@ -50,6 +50,7 @@ const validationTriggerRef = ref<HTMLButtonElement | null>(null);
 const validationMenuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const validationMenuId = `sheet-validation-menu-${useId().replaceAll(":", "")}`;
 const validationSearch = ref("");
+const validationSearchRef = ref<InstanceType<typeof MenuSearch> | null>(null);
 const validationOptions = computed(() => {
   const query = validationSearch.value.trim().toLocaleLowerCase();
   return (props.validationInfo?.values ?? []).filter((value) =>
@@ -136,7 +137,7 @@ const {
   open: validationOpen,
   floatingStyles: validationMenuStyle,
   dismiss: dismissValidation,
-  toggleMenu: toggleValidation,
+  toggleMenu: toggleValidationMenu,
   onTriggerKeydown: onValidationTriggerKeydown,
 } = useMenu({
   triggerRef: validationTriggerRef,
@@ -149,6 +150,12 @@ const {
     validationSearch.value = "";
   },
 });
+
+async function toggleValidation(event: MouseEvent): Promise<void> {
+  toggleValidationMenu(event);
+  await nextTick();
+  if (validationOpen.value) validationSearchRef.value?.focus();
+}
 
 function onValidationSearchKeydown(event: KeyboardEvent): void {
   if (event.isComposing) return;
@@ -294,29 +301,22 @@ watch(
           class="sheet-data-controls__validation-menu"
           :style="[
             validationMenuStyle,
-            { width: `${Math.max(200, activeValidationRect!.width)}px` },
+            { width: `${Math.max(180, activeValidationRect!.width)}px` },
           ]"
           :label="t('dataTools.validation.openList')"
           @pointerdown.stop
           @click.stop
         >
-          <li
-            class="sheet-data-controls__validation-search"
-            role="none"
+          <MenuSearch
+            ref="validationSearchRef"
+            v-model="validationSearch"
+            :label="t('dataTools.validation.searchValues')"
             @keydown="onValidationSearchKeydown"
-          >
-            <TInput
-              v-model="validationSearch"
-              clearable
-              :placeholder="t('dataTools.validation.searchValues')"
-              :aria-label="t('dataTools.validation.searchValues')"
-            >
-              <template #prefix-icon><Search :size="14" aria-hidden="true" /></template>
-            </TInput>
-          </li>
+          />
           <MenuItem
             v-for="(value, index) in validationOptions"
             :key="`${typeof value}:${String(value)}:${index}`"
+            class="sheet-data-controls__validation-item"
             :disabled="readOnly"
             :title="String(value)"
             @select="chooseValidation(value)"
@@ -463,24 +463,23 @@ watch(
   &__validation-menu {
     @include option-list.scrollbar;
     z-index: 120;
-    max-height: min(260px, calc(100vh - 16px));
-    scroll-padding-top: 44px;
+    display: flex;
+    flex-direction: column;
+    max-height: min(320px, calc(100vh - var(--idea-space-4) - var(--idea-space-4)));
+    scroll-padding-top: 32px;
     pointer-events: auto;
   }
 
-  &__validation-search {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    margin-top: -8px;
-    padding: 8px;
-    background: var(--idea-surface-panel);
-    list-style: none;
+  &__validation-item {
+    flex: 0 0 auto;
+    min-width: 0;
   }
 
   &__validation-empty {
-    padding: 8px 14px;
+    padding: 6px 14px;
     color: var(--idea-text-secondary);
+    font-size: var(--idea-font-size-body-small);
+    line-height: var(--idea-line-height-body-small);
     list-style: none;
   }
 

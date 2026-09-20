@@ -6,6 +6,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import MenuSearch from "../../../shared/menu/MenuSearch.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import type { Sheet } from "@idea10/core/workbook";
 import { getVisibleSheets } from "../sheet-navigation";
@@ -18,7 +19,7 @@ const emit = defineEmits<{ select: [sheetId: string]; restore: [sheetId: string]
 const { t } = useAppI18n();
 const triggerRef = ref<HTMLButtonElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
-const searchInputRef = ref<HTMLInputElement | null>(null);
+const searchInputRef = ref<InstanceType<typeof MenuSearch> | null>(null);
 const menuRef = computed<HTMLElement | null>(() => menuSurfaceRef.value?.rootElement ?? null);
 const open = ref(false);
 const query = ref("");
@@ -109,19 +110,13 @@ watch(open, (isOpen) => {
       :style="floatingStyles"
       :label="t('sheetTabs.allSheets')"
     >
-      <li class="workbook-sheet-navigator__controls" role="presentation">
-        <div class="workbook-sheet-navigator__search">
-          <input
-            ref="searchInputRef"
-            v-model="query"
-            type="search"
-            :aria-label="t('sheetTabs.search')"
-            :placeholder="t('sheetTabs.search')"
-            data-workbook-sheet-navigator="search"
-            @keydown="onSearchKeydown"
-          />
-        </div>
-      </li>
+      <MenuSearch
+        ref="searchInputRef"
+        v-model="query"
+        :label="t('sheetTabs.search')"
+        data-workbook-sheet-navigator="search"
+        @keydown="onSearchKeydown"
+      />
       <MenuRadioItem
         v-for="sheet in visibleSheets"
         :key="sheet.id"
@@ -213,39 +208,6 @@ watch(open, (isOpen) => {
     flex-direction: column;
     width: min(180px, calc(100vw - var(--idea-space-4) - var(--idea-space-4)));
     max-height: min(320px, calc(100vh - var(--idea-space-4) - var(--idea-space-4)));
-  }
-
-  &__controls {
-    position: sticky;
-    z-index: 1;
-    top: 0;
-    flex: 0 0 auto;
-    background: var(--idea-surface-panel);
-    list-style: none;
-  }
-
-  &__search {
-    flex: 0 0 auto;
-    padding: 0 8px 6px;
-    input {
-      box-sizing: border-box;
-      width: 100%;
-      height: 26px;
-      padding: 0 8px;
-      background: var(--idea-surface-canvas);
-      border: 1px solid var(--idea-border-control);
-      border-radius: 3px;
-      color: var(--idea-text-primary);
-      font: inherit;
-      font-size: var(--idea-font-size-body-medium);
-      line-height: var(--idea-line-height-body-medium);
-
-      &:focus-visible {
-        border-color: var(--idea-action-primary);
-        box-shadow: 0 0 0 2px var(--idea-action-focus);
-        outline: none;
-      }
-    }
   }
 
   &__item {
