@@ -281,7 +281,7 @@ function checkboxPressed(
 
 <style scoped lang="scss">
 .cell-format-alignment {
-  padding: 12px 2px 4px;
+  padding-inline: 2px;
   color: var(--idea-text-primary);
   font-size: var(--idea-font-size-body-medium);
   &__layout {

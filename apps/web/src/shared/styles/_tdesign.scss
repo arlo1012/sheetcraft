@@ -265,16 +265,12 @@
   font-weight: var(--idea-font-weight-semibold);
 }
 
+.t-dialog__body {
+  padding-block: var(--idea-dialog-content-padding-block);
+}
+
 .t-dialog__footer {
   padding: 0;
-}
-
-.data-fill-rank-dialog > .t-dialog__body {
-  padding-top: var(--idea-space-4);
-}
-
-.data-validation-dialog > .t-dialog__body {
-  padding-top: 0;
 }
 
 .t-form__label {
@@ -340,11 +336,15 @@
   }
 
   .cell-format-dialog__tabs {
+    box-sizing: border-box;
+    padding-top: var(--idea-dialog-content-padding-block);
+
     > .t-tabs__header {
       flex: none;
     }
 
     > .t-tabs__content {
+      padding-block: var(--idea-dialog-content-padding-block);
       flex: 1;
       min-height: 0;
       overflow: auto;

@@ -52,7 +52,6 @@ function apply(): void {
 
 <template>
   <Dialog
-    dialog-class-name="data-fill-rank-dialog"
     :visible="visible && !picking"
     :header="t('dataTools.fill.rank')"
     width="min(440px, calc(100vw - 32px))"

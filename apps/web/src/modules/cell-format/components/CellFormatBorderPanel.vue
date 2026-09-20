@@ -294,7 +294,6 @@ const previewState = computed<SelectionBorderState>(() => ({
 .cell-format-border-panel {
   display: grid;
   gap: 20px;
-  padding: 16px 0 4px;
   color: var(--idea-text-primary);
   font-size: var(--idea-font-size-body-medium);
   line-height: var(--idea-line-height-body-medium);

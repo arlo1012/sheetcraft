@@ -116,7 +116,6 @@ async function selectDraftReference(
     role="dialog"
     aria-modal="true"
     placement="center"
-    dialog-class-name="data-validation-dialog"
     width="min(640px, calc(100vw - 32px))"
     :aria-label="t('dataTools.validation.title')"
     :visible="visible && !suspended"
@@ -275,7 +274,7 @@ async function selectDraftReference(
 
   &__form {
     display: grid;
-    padding-top: var(--idea-space-6);
+    padding-top: var(--idea-dialog-content-padding-block);
     max-height: calc(100dvh - 240px);
     overflow: auto;
     align-content: start;

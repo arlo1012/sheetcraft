@@ -1,6 +1,7 @@
 @layer theme {
   :root {
     --idea-tool-panel-padding: var(--idea-space-4);
+    --idea-dialog-content-padding-block: var(--idea-space-4);
     --idea-menu-padding: var(--idea-space-4) 0;
     --idea-control-icon-size: 14px;
     font-family: var(--idea-font-sans);
