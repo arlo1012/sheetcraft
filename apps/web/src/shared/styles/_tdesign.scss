@@ -273,6 +273,12 @@
   padding: 0;
 }
 
+// TDesign's outline variant removes spacing for connected radio buttons.
+// Ordinary vertical radios retain the standard gap even with that default variant.
+.t-radio-group.t-radio-group--vertical:has(> .t-radio) {
+  row-gap: var(--td-comp-margin-xs);
+}
+
 .t-form__label {
   padding-right: var(--td-comp-paddingLR-s);
 }

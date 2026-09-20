@@ -52,7 +52,6 @@ watch(
       <div class="fill-blanks-dialog__options">
         <TRadioGroup
           v-model="draft.mode"
-          class="fill-blanks-dialog__choices"
           direction="vertical"
           :aria-label="t('dataTools.fill.blanksTitle')"
         >
@@ -88,10 +87,6 @@ watch(
 
   &__hint {
     @include fill-dialog.subdued-text;
-  }
-
-  &__choices {
-    --td-comp-margin-xs: var(--idea-space-5);
   }
 
   &__hint {
