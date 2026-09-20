@@ -47,12 +47,7 @@ watch(
         <Info :size="14" aria-hidden="true" />
         <span>{{ t("dataTools.fill.textHint") }}</span>
       </p>
-      <TForm
-        :data="draft"
-        layout="horizontal"
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 96 : 136"
-      >
+      <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 96 : 136">
         <TFormItem name="text" :label="t('dataTools.fill.text')">
           <TInput v-model="draft.text" :aria-label="t('dataTools.fill.text')" autofocus />
         </TFormItem>

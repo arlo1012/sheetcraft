@@ -69,12 +69,7 @@ function apply(): void {
         <Info :size="14" aria-hidden="true" />
         <span>{{ t("dataTools.fill.rankHint") }}</span>
       </p>
-      <TForm
-        :data="draft"
-        layout="horizontal"
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 72 : 112"
-      >
+      <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 72 : 112">
         <TFormItem name="sourceRange" :label="t('dataTools.fill.rankSource')">
           <div class="fill-rank-dialog__reference">
             <RangeReferenceInput

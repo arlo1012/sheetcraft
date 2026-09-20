@@ -59,12 +59,7 @@ function apply(): void {
     @confirm="apply"
   >
     <div class="fill-number-dialog">
-      <TForm
-        :data="draft"
-        layout="horizontal"
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 72 : 112"
-      >
+      <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 72 : 112">
         <TFormItem name="axis" :label="t('dataTools.fill.sequenceDirection')">
           <TRadioGroup v-model="draft.axis" :aria-label="t('dataTools.fill.sequenceDirection')">
             <TRadio value="rows">{{ t("dataTools.fill.rows") }}</TRadio>
