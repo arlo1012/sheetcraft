@@ -11,9 +11,8 @@ const props = withDefaults(
     visible: boolean;
     initial: FillBlanksDraft;
     error?: string;
-    rangeLabel?: string;
   }>(),
-  { error: "", rangeLabel: "" },
+  { error: "" },
 );
 const emit = defineEmits<{ close: []; apply: [draft: FillBlanksDraft] }>();
 const { t } = useAppI18n();
@@ -46,18 +45,14 @@ watch(
     @confirm="canApply && emit('apply', { ...draft })"
   >
     <div class="fill-blanks-dialog">
-      <div class="fill-blanks-dialog__description">
-        <p v-if="rangeLabel" class="fill-blanks-dialog__range">
-          {{ t("dataTools.fill.range", { range: rangeLabel }) }}
-        </p>
-        <p class="fill-blanks-dialog__hint">
-          <Info :size="14" aria-hidden="true" />
-          <span>{{ t("dataTools.fill.blanksHint") }}</span>
-        </p>
-      </div>
+      <p class="fill-blanks-dialog__hint">
+        <Info :size="14" aria-hidden="true" />
+        <span>{{ t("dataTools.fill.blanksHint") }}</span>
+      </p>
       <div class="fill-blanks-dialog__options">
         <TRadioGroup
           v-model="draft.mode"
+          class="fill-blanks-dialog__choices"
           direction="vertical"
           :aria-label="t('dataTools.fill.blanksTitle')"
         >
@@ -82,24 +77,21 @@ watch(
   display: grid;
   gap: var(--idea-space-5);
 
-  &__description,
   &__options {
     @include fill-dialog.group;
   }
 
-  &__range,
   &__hint,
   &__error {
     @include fill-dialog.auxiliary-text;
   }
 
-  &__range,
   &__hint {
     @include fill-dialog.subdued-text;
   }
 
-  &__range {
-    overflow-wrap: anywhere;
+  &__choices {
+    --td-comp-margin-xs: var(--idea-space-5);
   }
 
   &__hint {

@@ -1165,7 +1165,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :visible="fillBlanksVisible"
       :initial="fillBlanksInitial"
       :error="fillError"
-      :range-label="fillRangeLabel"
       @close="dataTools.closeFillTool"
       @apply="dataTools.applyFillBlanks"
     />
