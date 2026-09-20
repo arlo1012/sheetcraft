@@ -51,9 +51,18 @@ const validationMenuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const validationMenuId = `sheet-validation-menu-${useId().replaceAll(":", "")}`;
 const validationSearch = ref("");
 const validationSearchRef = ref<InstanceType<typeof MenuSearch> | null>(null);
+const validationChoices = computed(() => {
+  const seen = new Set<string>();
+  return (props.validationInfo?.values ?? []).filter((value) => {
+    const text = String(value);
+    if (text === "" || seen.has(text)) return false;
+    seen.add(text);
+    return true;
+  });
+});
 const validationOptions = computed(() => {
   const query = validationSearch.value.trim().toLocaleLowerCase();
-  return (props.validationInfo?.values ?? []).filter((value) =>
+  return validationChoices.value.filter((value) =>
     String(value).toLocaleLowerCase().includes(query),
   );
 });
@@ -126,7 +135,7 @@ function getOutlineAnchor(axis: SheetDimensionAxis, group: OutlineGroup) {
 const activeValidationRect = computed(() => surfaceRect(props.activeCell));
 const validationButtonStyle = computed(() => {
   const rect = activeValidationRect.value;
-  if (!rect || !props.validationInfo?.values.length || rect.width < 24 || rect.height < 18) return;
+  if (!rect || !validationChoices.value.length || rect.width < 24 || rect.height < 18) return;
   return {
     left: `${rect.left + rect.width + 1}px`,
     top: `${rect.top + Math.max(1, (rect.height - 16) / 2)}px`,
