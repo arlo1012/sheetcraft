@@ -68,6 +68,7 @@ const emit = defineEmits<{
   openFillText: [position: "start" | "end" | "index"];
   openFillNumberSequence: [];
   openFillRank: [];
+  flashFill: [];
   group: [axis: "rows" | "columns"];
   ungroup: [axis: "rows" | "columns"];
   expand: [];
@@ -159,6 +160,7 @@ const { t } = useAppI18n();
         @insert-text="emit('openFillText', $event)"
         @number-sequence="emit('openFillNumberSequence')"
         @rank="emit('openFillRank')"
+        @flash-fill="emit('flashFill')"
       />
       <RibbonButton
         variant="tall"

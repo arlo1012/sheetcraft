@@ -26,6 +26,8 @@ export const enUS = {
       failed: "Unable to insert the dropdown list. Check the settings and try again.",
     },
     fill: {
+      flashFill: "Flash Fill",
+      flashFillSuccess: "Filled {count} cells using your examples.",
       numberSequence: "Number sequence",
       rank: "Calculate and fill ranks",
       startValue: "Start value",
@@ -106,6 +108,16 @@ export const enUS = {
       dateFormat: "Date format",
       dateSample: "Example: {date}",
       errors: {
+        flashFillRange: "Select a cell or a range in a single destination column.",
+        flashFillExamples:
+          "Enter an example in the destination column, then select it or the blank cell below. To use multiple examples, select from the first example.",
+        flashFillSource: "Place source data in adjacent columns, on the same row as your example.",
+        flashFillPattern:
+          "No consistent pattern matches these examples. Add examples and select a range containing them.",
+        flashFillAmbiguous:
+          "More than one pattern fits. Add examples and select from the first example before retrying.",
+        flashFillTooComplex:
+          "The text or pattern is too complex. Select a smaller range or simplify the examples.",
         invalidRange: "Select a valid range.",
         tooLarge: "The selected range is too large.",
         protected: "The selected range includes protected cells.",

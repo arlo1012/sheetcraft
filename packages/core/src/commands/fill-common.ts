@@ -11,6 +11,12 @@ import { getSheetOrThrow, normalizeRange } from "./helpers.js";
 export const MAX_FILL_CELLS = 100_000;
 
 export type DataFillErrorReason =
+  | "flashFillRange"
+  | "flashFillExamples"
+  | "flashFillSource"
+  | "flashFillPattern"
+  | "flashFillAmbiguous"
+  | "flashFillTooComplex"
   | "validation"
   | "invalidRange"
   | "tooLarge"

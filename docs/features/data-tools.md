@@ -183,6 +183,18 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   selected range and writes through one undoable Core command. New fill operations
   reject protected, merged, spilled, hidden or filtered targets and ranges above
   100,000 cells; the normal validation gate still applies.
+  Flash Fill (Ctrl+E, or Cmd+E on macOS) infers text from literal examples in a
+  destination column and displayed values in adjacent columns. It supports
+  delimiter extraction, digit runs, case changes, concatenation and fixed text;
+  fixed-length prefix/suffix extraction requires at least two examples. Select
+  an example or a blank cell beneath it to fill downward through the contiguous
+  source region. To combine several examples or limit the output, select a
+  single-column range starting with the first example. Existing values, formulas
+  and formatting are preserved; only blank destinations receive literal text.
+  Ambiguous, inconsistent or unsupported patterns request clearer examples and
+  leave the sheet unchanged. All results pass the same validation gate and form
+  one undo step. Inference is bounded to eight source columns, 256 characters per
+  cell and four extracted parts per result.
 - Set or edit cell validation: whole/decimal numbers, dates, times, text length,
   literal or range/named-range lists, and custom formulas. Minimum/maximum bounds
   accept typed formulas and cell references, or single-cell picking through the

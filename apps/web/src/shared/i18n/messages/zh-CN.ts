@@ -26,6 +26,8 @@ export const zhCN = {
       failed: "无法插入下拉列表，请检查设置后重试。",
     },
     fill: {
+      flashFill: "智能填充",
+      flashFillSuccess: "已智能填充 {count} 个单元格。",
       numberSequence: "录入123序列",
       rank: "计算并录入排名",
       startValue: "起始值",
@@ -104,6 +106,13 @@ export const zhCN = {
       dateFormat: "日期格式",
       dateSample: "示例：{date}",
       errors: {
+        flashFillRange: "请选择目标列中的单元格或单列区域。",
+        flashFillExamples:
+          "请先在目标列填写示例，再选中该示例或其下方空白单元格。使用多个示例时，请从首个示例选起。",
+        flashFillSource: "请将待处理数据放在目标列相邻的列中，示例与来源数据位于同一行。",
+        flashFillPattern: "无法根据示例识别一致的规律，请补充示例并选中包含这些示例的区域。",
+        flashFillAmbiguous: "示例可能对应多种规律，请补充示例并从首个示例选起后重试。",
+        flashFillTooComplex: "当前文本或规律过于复杂，请缩小数据区域或简化示例。",
         invalidRange: "请选择有效区域。",
         tooLarge: "所选区域过大。",
         protected: "所选区域包含受保护单元格。",

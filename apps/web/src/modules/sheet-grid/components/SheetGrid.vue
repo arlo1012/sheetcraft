@@ -243,6 +243,7 @@ const emit = defineEmits<{
   freezeChange: [freezePanes: { rows: number; columns: number }];
   formatPainterTarget: [range: CellRange];
   cancelFormatPainter: [];
+  flashFill: [];
   undo: [];
   redo: [];
   viewStateChange: [viewState: SheetGridViewState];
@@ -2125,6 +2126,26 @@ function onEditorKeydown(event: KeyboardEvent): void {
       editingValue.value = completeFormulaForCommit(editingValue.value);
       traverseSelection("Tab", event.shiftKey, true);
     }
+    return;
+  }
+
+  if (
+    !props.readOnly &&
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    event.key.toLowerCase() === "e" &&
+    !props.formatPainterActive &&
+    !getReferenceEditor() &&
+    !selectedImageId.value &&
+    !dimensionResize.value &&
+    !freezeDragging.value &&
+    !axisMoveDrag.value &&
+    getSelectionMode(selection.value) === "cells"
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    emit("flashFill");
     return;
   }
 

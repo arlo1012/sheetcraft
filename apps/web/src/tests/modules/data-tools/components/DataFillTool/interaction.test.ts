@@ -52,6 +52,7 @@ describe("DataFillTool", () => {
       "left",
       "number-sequence",
       "rank",
+      "flash-fill",
       "blanks",
       "insert-text",
       "current-date",
@@ -64,6 +65,10 @@ describe("DataFillTool", () => {
     await wrapper.get('[data-data-action="fill"]').trigger("click");
     await rootMenu().get('[data-data-fill="rank"]').trigger("click");
     expect(wrapper.emitted("rank")).toEqual([[]]);
+
+    await wrapper.get('[data-data-action="fill"]').trigger("click");
+    await rootMenu().get('[data-data-fill="flash-fill"]').trigger("click");
+    expect(wrapper.emitted("flashFill")).toEqual([[]]);
   });
 
   test("opens the text submenu and publishes its selected insertion position", async () => {

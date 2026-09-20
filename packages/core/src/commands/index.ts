@@ -38,3 +38,5 @@ export {
   type FillNumberSequenceOptions,
   type FillRankOptions,
 } from "./fill-numbers.js";
+
+export { createFlashFillCommand, type FlashFillOptions } from "./flash-fill.js";

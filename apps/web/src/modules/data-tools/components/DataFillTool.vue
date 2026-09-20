@@ -10,6 +10,7 @@ import {
   ListOrdered,
   TextCursorInput,
   Trophy,
+  WandSparkles,
 } from "lucide-vue-next";
 import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
 import { computed, nextTick, ref, useId } from "vue";
@@ -28,6 +29,7 @@ const emit = defineEmits<{
   series: [];
   numberSequence: [];
   rank: [];
+  flashFill: [];
   currentDate: [format: FillDateFormat];
   blanks: [];
   insertText: [position: "start" | "index" | "end"];
@@ -82,7 +84,7 @@ function closeAll(restoreFocus = true): void {
   dismiss("programmatic", restoreFocus);
 }
 
-function chooseTool(tool: "series" | "numberSequence" | "rank" | "blanks"): void {
+function chooseTool(tool: "series" | "numberSequence" | "rank" | "blanks" | "flashFill"): void {
   if (unavailable.value) return;
   closeAll(false);
   switch (tool) {
@@ -97,6 +99,9 @@ function chooseTool(tool: "series" | "numberSequence" | "rank" | "blanks"): void
       break;
     case "blanks":
       emit("blanks");
+      break;
+    case "flashFill":
+      emit("flashFill");
       break;
   }
 }
@@ -247,6 +252,11 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
         <MenuItem data-data-fill="rank" @select="chooseTool('rank')">
           <template #icon><Trophy :size="15" /></template>
           {{ t("dataTools.fill.rank") }}
+        </MenuItem>
+        <MenuItem data-data-fill="flash-fill" @select="chooseTool('flashFill')">
+          <template #icon><WandSparkles :size="15" /></template>
+          {{ t("dataTools.fill.flashFill") }}
+          <template #shortcut>Ctrl+E</template>
         </MenuItem>
         <MenuSeparator />
         <MenuItem data-data-fill="blanks" @select="chooseTool('blanks')">

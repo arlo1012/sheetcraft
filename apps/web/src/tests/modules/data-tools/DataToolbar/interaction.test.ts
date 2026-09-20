@@ -61,11 +61,12 @@ describe("DataToolbar", () => {
   });
 
   test.each([
-    ["series", "openFillSeries"],
-    ["current-date", "openFillCurrentDate"],
-    ["blanks", "openFillBlanks"],
-    ["insert-text", "openFillText"],
-  ])("opens %s for a single cell", async (action, event) => {
+    ["series", "openFillSeries", undefined],
+    ["current-date", "openFillCurrentDate", "yyyy年m月d日"],
+    ["blanks", "openFillBlanks", undefined],
+    ["insert-text", "openFillText", "start"],
+    ["flash-fill", "flashFill", undefined],
+  ] as const)("opens %s for a single cell", async (action, event, payload) => {
     const wrapper = mount(DataToolbar, {
       attachTo: document.body,
       global: { plugins: [createAppI18n("en-US")] },
@@ -73,7 +74,17 @@ describe("DataToolbar", () => {
     });
     await wrapper.get('[data-data-action="fill"]').trigger("click");
     await new DOMWrapper(document.body).get(`[data-data-fill="${action}"]`).trigger("click");
-    expect(wrapper.emitted(event)).toEqual([[]]);
+    if (action === "current-date") {
+      await new DOMWrapper(document.body)
+        .get('[data-data-fill="date-format-chinese"]')
+        .trigger("click");
+    }
+    if (action === "insert-text") {
+      await new DOMWrapper(document.body)
+        .get('[data-data-fill="insert-at-start"]')
+        .trigger("click");
+    }
+    expect(wrapper.emitted(event)).toEqual(payload === undefined ? [[]] : [[payload]]);
     expect(new DOMWrapper(document.body).find('[data-data-fill="series"]').exists()).toBe(false);
     wrapper.unmount();
   });

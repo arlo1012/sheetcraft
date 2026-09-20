@@ -1,11 +1,12 @@
 import { defineComponent, reactive, ref } from "vue";
 import { mount } from "@vue/test-utils";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   createWorkbookSession,
   executeWorkbookCommand,
   undoWorkbookCommand,
 } from "@idea10/core/history";
+import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { datePartsToExcelSerial } from "@idea10/core/formula";
 import { createSheet, getActiveSheet, getCellValue, setCellValue } from "@idea10/core/workbook";
@@ -411,5 +412,53 @@ describe("number and quick fill integration", () => {
       null,
       null,
     ]);
+  });
+});
+
+describe("Flash Fill controller", () => {
+  afterEach(() => vi.restoreAllMocks());
+  function flashFixture() {
+    const f = fixture();
+    ["alice@example.com", "bob@example.com", "carol@example.com"].forEach((value, row) =>
+      setCellValue(f.sheet, { row, column: 0 }, value),
+    );
+    setCellValue(f.sheet, { row: 0, column: 1 }, "alice");
+    f.selection.range = { start: { row: 0, column: 1 }, end: { row: 2, column: 1 } };
+    return f;
+  }
+  test("fills from examples and keeps the complete result in a single undo step", () => {
+    const success = vi.spyOn(MessagePlugin, "success").mockResolvedValue({ close: vi.fn() });
+    const f = flashFixture();
+    f.controller.flashFill();
+    expect([0, 1, 2].map((row) => getCellValue(f.sheet, { row, column: 1 }))).toEqual([
+      "alice",
+      "bob",
+      "carol",
+    ]);
+    expect(success).toHaveBeenCalled();
+    expect(f.session.history.undoStack).toHaveLength(1);
+    undoWorkbookCommand(f.session);
+    expect(getCellValue(getActiveSheet(f.session.workbook), { row: 1, column: 1 })).toBeNull();
+  });
+  test("reports missing examples and validation failures without partial writes", () => {
+    const warning = vi.spyOn(MessagePlugin, "warning").mockResolvedValue({ close: vi.fn() });
+    const f = flashFixture();
+    f.sheet.dataValidations = [
+      {
+        id: "limited",
+        range: { start: { row: 2, column: 1 }, end: { row: 2, column: 1 } },
+        type: "list",
+        list: ["alice", "bob"],
+        allowBlank: true,
+        showError: true,
+      },
+    ];
+    f.controller.flashFill();
+    expect(warning).toHaveBeenLastCalledWith(expect.stringContaining("validation"));
+    expect(getCellValue(f.sheet, { row: 1, column: 1 })).toBeNull();
+    setCellValue(f.sheet, { row: 0, column: 1 }, null);
+    f.controller.flashFill();
+    expect(warning).toHaveBeenLastCalledWith(expect.stringContaining("example"));
+    expect(f.session.history.undoStack).toHaveLength(0);
   });
 });

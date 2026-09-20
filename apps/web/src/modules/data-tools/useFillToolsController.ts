@@ -1,6 +1,8 @@
 import { computed, ref, watch } from "vue";
+import { MessagePlugin } from "tdesign-vue-next/es/message";
 import {
   assertFillDataValidation,
+  createFlashFillCommand,
   createFillBlanksCommand,
   createFillCurrentDateCommand,
   createFillNumberSequenceCommand,
@@ -15,6 +17,7 @@ import { parseCellInput } from "@idea10/core/input";
 import {
   getActiveSheet,
   isCellAddressInBounds,
+  type CellAddress,
   type CellRange,
   type Workbook,
 } from "@idea10/core/workbook";
@@ -34,7 +37,7 @@ import { parseFillSeriesDateStop } from "./fill-series-date";
 
 type Options = {
   getWorkbook: () => Workbook;
-  getSelection: () => { range: CellRange };
+  getSelection: () => { range: CellRange; address?: CellAddress };
   getGeneration: () => number;
   isBusy: () => boolean;
   execute: (command: WorkbookCommand) => boolean;
@@ -258,8 +261,41 @@ export function useFillToolsController(options: Options) {
       });
     });
   }
+  function flashFill() {
+    if (active.value || options.isBusy() || !options.flush()) return;
+    const workbook = options.getWorkbook();
+    const sheet = getActiveSheet(workbook);
+    const selection = options.getSelection();
+    try {
+      const command = createFlashFillCommand(workbook, sheet.id, selection.range, {
+        locale: locale.value,
+        ...(selection.address ? { anchor: selection.address } : {}),
+      });
+      if (!command.changes.length) {
+        void MessagePlugin.info(t("dataTools.fill.noChanges"));
+        return;
+      }
+      assertFillDataValidation(workbook, command);
+      if (!options.execute(command)) {
+        void MessagePlugin.warning(t("dataTools.fill.applyBlocked"));
+        return;
+      }
+      void MessagePlugin.success(
+        t("dataTools.fill.flashFillSuccess", { count: command.changes.length }),
+      );
+    } catch (cause) {
+      void MessagePlugin.warning(
+        cause instanceof DataFillError
+          ? t(`dataTools.fill.errors.${cause.reason}`)
+          : t("dataTools.fill.applyBlocked"),
+      );
+    } finally {
+      options.focusSheet();
+    }
+  }
   watch(options.getGeneration, closeFillTool);
   return {
+    flashFill,
     fillNumberSequenceVisible: computed(() => active.value === "numberSequence"),
     fillRankVisible: computed(() => active.value === "rank"),
     fillNumberSequenceInitial,

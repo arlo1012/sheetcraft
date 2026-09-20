@@ -26,6 +26,8 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       failed: string;
     };
     fill: {
+      flashFill: string;
+      flashFillSuccess: string;
       numberSequence: string;
       rank: string;
       startValue: string;
@@ -104,6 +106,12 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       dateFormat: string;
       dateSample: string;
       errors: {
+        flashFillRange: string;
+        flashFillExamples: string;
+        flashFillSource: string;
+        flashFillPattern: string;
+        flashFillAmbiguous: string;
+        flashFillTooComplex: string;
         invalidRange: string;
         tooLarge: string;
         protected: string;
