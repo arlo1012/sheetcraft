@@ -367,6 +367,27 @@ describe("number and quick fill integration", () => {
       "keep",
     );
   });
+  test.each([false, true])(
+    "accepts unchanged ranks with overwrite (retry after warning: %s)",
+    (retry) => {
+      const f = fixture();
+      [20, 50, 50].forEach((value, row) => setCellValue(f.sheet, { row, column: 0 }, value));
+      [3, 1, 1].forEach((value, row) => setCellValue(f.sheet, { row, column: 1 }, value));
+      f.controller.openFillRank();
+      const draft = f.controller.fillRankInitial.value;
+      if (retry) {
+        f.controller.applyFillRank(draft);
+        expect(f.controller.fillError.value).toContain("contains data");
+        expect(f.controller.fillRankVisible.value).toBe(true);
+      }
+      f.controller.applyFillRank({ ...draft, overwrite: true });
+      expect(f.controller.fillError.value).toBe("");
+      expect(f.controller.fillRankVisible.value).toBe(false);
+      expect([0, 1, 2].map((row) => getCellValue(f.sheet, { row, column: 1 }))).toEqual([3, 1, 1]);
+      expect(f.session.history.undoStack).toHaveLength(0);
+      expect(f.session.history.revision).toBe(0);
+    },
+  );
   test("rank validates the complete output atomically", () => {
     const f = fixture();
     [20, 50, 50].forEach((value, row) => setCellValue(f.sheet, { row, column: 0 }, value));

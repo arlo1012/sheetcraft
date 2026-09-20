@@ -192,12 +192,28 @@ export function createFillRankCommand(
         throw new DataFillError("targetOccupied", "Ranking target cells already contain data.");
     }
   return createBatchSetCellContentsCommand(
-    ranks.map((rank, index) => ({
-      sheetId: options.target.sheetId,
-      address: horizontal
+    ranks.flatMap((rank, index) => {
+      const address = horizontal
         ? { row: target.range.start.row, column: target.range.start.column + index }
-        : { row: target.range.start.row + index, column: target.range.start.column },
-      content: rank === null ? null : { kind: "literal" as const, value: rank },
-    })),
+        : { row: target.range.start.row + index, column: target.range.start.column };
+      const existing = getCellContent(target.sheet, address);
+      // Preserve a no-op only when the stored content already is the exact rank result.
+      // Formulas are deliberately rewritten, even when their current calculated value matches.
+      if (
+        (rank === null && existing === null) ||
+        (rank !== null &&
+          existing?.kind === "literal" &&
+          typeof existing.value === "number" &&
+          Object.is(existing.value, rank))
+      )
+        return [];
+      return [
+        {
+          sheetId: options.target.sheetId,
+          address,
+          content: rank === null ? null : { kind: "literal" as const, value: rank },
+        },
+      ];
+    }),
   );
 }

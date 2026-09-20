@@ -148,4 +148,56 @@ describe("fill number commands", () => {
       }),
     ).toThrow(expect.objectContaining({ reason: "invalidSeed" }));
   });
+
+  test("returns no changes when retrying an occupied output that already has the ranks", () => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    [1, 2].forEach((value, row) => {
+      setCellContent(sheet, { row: row + 1, column: 1 }, { kind: "literal", value });
+      setCellContent(sheet, { row: row + 1, column: 2 }, { kind: "literal", value });
+    });
+    const options = {
+      source: { sheetId: sheet.id, range: range(1, 1, 2, 1) },
+      target: { sheetId: sheet.id, start: { row: 1, column: 2 } },
+      order: "ascending" as const,
+      ties: "competition" as const,
+      overwrite: false,
+    };
+
+    expect(() => createFillRankCommand(workbook, options)).toThrow(
+      expect.objectContaining({ reason: "targetOccupied" }),
+    );
+    expect(createFillRankCommand(workbook, { ...options, overwrite: true }).changes).toEqual([]);
+  });
+
+  test("rewrites changed and formula rank outputs after an occupied-target retry", () => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    [1, 2, 3].forEach((value, row) =>
+      setCellContent(sheet, { row: row + 1, column: 1 }, { kind: "literal", value }),
+    );
+    setCellContent(sheet, { row: 1, column: 2 }, { kind: "literal", value: 1 });
+    setCellContent(sheet, { row: 2, column: 2 }, { kind: "literal", value: 99 });
+    setCellContent(sheet, { row: 3, column: 2 }, { kind: "formula", formula: { source: "=3" } });
+    const options = {
+      source: { sheetId: sheet.id, range: range(1, 1, 3, 1) },
+      target: { sheetId: sheet.id, start: { row: 1, column: 2 } },
+      order: "ascending" as const,
+      ties: "competition" as const,
+      overwrite: false,
+    };
+
+    expect(() => createFillRankCommand(workbook, options)).toThrow(
+      expect.objectContaining({ reason: "targetOccupied" }),
+    );
+
+    const command = createFillRankCommand(workbook, { ...options, overwrite: true });
+    expect(command.changes.map((change) => change.address)).toEqual([
+      { row: 2, column: 2 },
+      { row: 3, column: 2 },
+    ]);
+    applyWorkbookCommand(workbook, command);
+    expect([1, 2, 3].map((row) => getCellValue(sheet, { row, column: 2 }))).toEqual([1, 2, 3]);
+    expect(getCellContent(sheet, { row: 3, column: 2 })).toEqual({ kind: "literal", value: 3 });
+  });
 });

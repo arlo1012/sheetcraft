@@ -165,7 +165,13 @@ export function useFillToolsController(options: Options) {
     try {
       const command = build(workbook, target.sheetId, target.range);
       if (!command.changes.length) {
-        fillError.value = t("dataTools.fill.noChanges");
+        if (tool === "rank") {
+          // The requested ranks already match; no write or history entry is needed.
+          closeFillTool();
+          options.focusSheet();
+        } else {
+          fillError.value = t("dataTools.fill.noChanges");
+        }
         return;
       }
       assertFillDataValidation(workbook, command);
