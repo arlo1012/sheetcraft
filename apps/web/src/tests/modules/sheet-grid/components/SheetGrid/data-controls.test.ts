@@ -2,6 +2,7 @@ import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { getCanvasLayout, mountSheetGrid } from "./fixture";
 import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurface.vue";
+import MenuItem from "../../../../../shared/menu/MenuItem.vue";
 import type { SheetRenderFrame } from "../../../../../modules/sheet-grid/rendering/sheet-render-frame";
 
 describe("SheetGrid data controls", () => {
@@ -179,7 +180,7 @@ describe("SheetGrid data controls", () => {
     await nextTick();
 
     await wrapper.get(".sheet-data-controls__validation").trigger("click");
-    await wrapper.findAll('[role="option"]')[0]!.trigger("click");
+    await wrapper.findAllComponents(MenuItem)[0]!.trigger("click");
     expect(wrapper.emitted("validationChoose")?.[0]?.[0]).toEqual({
       address: { row: 0, column: 0 },
       value: "=literal",

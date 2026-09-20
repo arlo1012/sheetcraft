@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ChevronDown, Minus, Plus } from "lucide-vue-next";
-import { computed, ref, watch } from "vue";
+import { computed, ref, useId, watch } from "vue";
 import { columnIndexToLabel } from "@idea10/core/coordinates";
 import type { CellAddress, SheetDimensionAxis } from "@idea10/core/workbook";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
 import SheetCellNotice from "./SheetCellNotice.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import { useMenu } from "../../../shared/menu/useMenu";
 
 type OutlineGroup = Readonly<{
   id: string;
@@ -42,7 +45,9 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const validationOpen = ref(false);
+const validationTriggerRef = ref<HTMLButtonElement | null>(null);
+const validationMenuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
+const validationMenuId = `sheet-validation-menu-${useId().replaceAll(":", "")}`;
 
 function surfaceRect(address: CellAddress) {
   const rect = props.frame.layout.getCellViewportRect(address);
@@ -117,6 +122,21 @@ const validationButtonStyle = computed(() => {
     left: `${rect.left + rect.width - 18}px`,
     top: `${rect.top + Math.max(1, (rect.height - 16) / 2)}px`,
   };
+});
+
+const {
+  open: validationOpen,
+  floatingStyles: validationMenuStyle,
+  dismiss: dismissValidation,
+  toggleMenu: toggleValidation,
+  onTriggerKeydown: onValidationTriggerKeydown,
+} = useMenu({
+  triggerRef: validationTriggerRef,
+  menuSurfaceRef: validationMenuRef,
+  disabled: computed(() => props.readOnly || !validationButtonStyle.value),
+  placement: "bottom-end",
+  offset: 4,
+  pointerFocus: "menu",
 });
 
 const outlineControls = computed(() => {
@@ -195,14 +215,14 @@ function requestColumnFilter(column: number, event: MouseEvent): void {
 
 function chooseValidation(value: string | number | boolean): void {
   if (props.readOnly) return;
-  validationOpen.value = false;
+  dismissValidation("programmatic", true);
   emit("validationChoose", { address: { ...props.activeCell }, value });
 }
 
 watch(
   () => `${props.activeCell.row}:${props.activeCell.column}`,
   () => {
-    validationOpen.value = false;
+    dismissValidation("programmatic", false);
   },
 );
 </script>
@@ -227,41 +247,47 @@ watch(
 
     <template v-if="validationButtonStyle && validationInfo">
       <button
+        ref="validationTriggerRef"
         type="button"
         class="sheet-data-controls__validation"
         :style="validationButtonStyle"
         :aria-label="t('dataTools.validation.openList')"
         :title="validationInfo.prompt?.message || t('dataTools.validation.openList')"
         :aria-expanded="validationOpen"
+        :aria-controls="validationOpen ? validationMenuId : undefined"
+        aria-haspopup="menu"
         :disabled="readOnly"
         @pointerdown.stop
-        @click.stop="validationOpen = !validationOpen"
+        @click.stop="toggleValidation"
+        @keydown.stop="onValidationTriggerKeydown"
       >
         <ChevronDown :size="13" aria-hidden="true" />
       </button>
-      <div
-        v-if="validationOpen"
-        class="sheet-data-controls__validation-menu"
-        :style="{
-          left: `${activeValidationRect!.left}px`,
-          top: `${activeValidationRect!.top + activeValidationRect!.height}px`,
-          minWidth: `${Math.max(140, activeValidationRect!.width)}px`,
-        }"
-        role="listbox"
-        :aria-label="t('dataTools.validation.openList')"
-        @keydown.escape.stop="validationOpen = false"
-      >
-        <button
-          v-for="(value, index) in validationInfo.values"
-          :key="`${typeof value}:${String(value)}:${index}`"
-          type="button"
-          role="option"
+      <Teleport to="body">
+        <MenuSurface
+          v-if="validationOpen"
+          :id="validationMenuId"
+          ref="validationMenuRef"
+          class="sheet-data-controls__validation-menu"
+          :style="[
+            validationMenuStyle,
+            { width: `${Math.max(140, activeValidationRect!.width)}px` },
+          ]"
+          :label="t('dataTools.validation.openList')"
           @pointerdown.stop
-          @click.stop="chooseValidation(value)"
+          @click.stop
         >
-          {{ value }}
-        </button>
-      </div>
+          <MenuItem
+            v-for="(value, index) in validationInfo.values"
+            :key="`${typeof value}:${String(value)}:${index}`"
+            :disabled="readOnly"
+            :title="String(value)"
+            @select="chooseValidation(value)"
+          >
+            {{ value }}
+          </MenuItem>
+        </MenuSurface>
+      </Teleport>
     </template>
     <SheetCellNotice
       v-if="validationInfo?.prompt?.message && !validationOpen && !suppressValidationPrompt"
@@ -379,34 +405,19 @@ watch(
     background: var(--idea-surface-panel);
   }
 
-  &__validation-menu {
-    position: absolute;
-    z-index: 2;
-    display: grid;
-    max-height: 220px;
-    overflow: auto;
-    padding: 4px;
-    border: 1px solid var(--idea-border-control);
-    border-radius: 4px;
-    background: var(--idea-surface-panel);
-    box-shadow: var(--idea-shadow-2, 0 6px 16px rgb(0 0 0 / 15%));
-    pointer-events: auto;
-
-    button {
-      min-height: 26px;
-      padding: 3px 8px;
-      border: 0;
-      border-radius: 3px;
-      color: var(--idea-text-primary);
-      background: transparent;
-      text-align: left;
-      cursor: pointer;
-      &:hover,
-      &:focus-visible {
-        background: var(--idea-action-hover);
-        outline: none;
-      }
+  &__validation {
+    &:hover:not(:disabled),
+    &:focus-visible,
+    &[aria-expanded="true"] {
+      color: var(--idea-text-secondary);
+      background: var(--idea-icon-button-hover-bg);
     }
+  }
+
+  &__validation-menu {
+    z-index: 120;
+    max-height: min(220px, calc(100vh - 16px));
+    pointer-events: auto;
   }
 
   &__outline-levels {
