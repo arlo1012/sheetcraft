@@ -435,7 +435,7 @@ describe("useDataToolsController", () => {
     expect(rules.find((rule) => rule.range.start.row === 2)?.formula1).toBe("=A1<10");
   });
 
-  test("opens the dropdown shortcut with an existing list rule translated to the selected cell", () => {
+  test("opens the dedicated dropdown dialog with the existing list source", () => {
     const f = fixture({
       address: { row: 2, column: 1 },
       range: { start: { row: 2, column: 1 }, end: { row: 2, column: 1 } },
@@ -457,13 +457,12 @@ describe("useDataToolsController", () => {
 
     f.controller.openDropdownList();
 
-    expect(f.controller.validationVisible.value).toBe(true);
-    expect(f.controller.validationInitial.value).toMatchObject({
-      type: "list",
-      formula1: "=D3:D4",
-      allowBlank: false,
-      showDropdown: false,
-      promptTitle: "Status",
+    expect(f.controller.dropdownListVisible.value).toBe(true);
+    expect(f.controller.validationVisible.value).toBe(false);
+    expect(f.controller.dropdownListInitial.value).toMatchObject({
+      mode: "range",
+      source: "=D1:D2",
+      canApplyToMatching: true,
     });
   });
 
@@ -489,15 +488,13 @@ describe("useDataToolsController", () => {
 
     f.controller.openDropdownList();
 
-    expect(f.controller.validationInitial.value).toMatchObject({
-      type: "list",
-      allowBlank: false,
-      showDropdown: true,
-      promptTitle: "Quantity",
+    expect(f.controller.dropdownListInitial.value).toMatchObject({
+      mode: "manual",
+      items: [],
+      source: "",
+      canApplyToMatching: false,
     });
-    expect(f.controller.validationInitial.value?.formula1).toBeUndefined();
-    expect(f.controller.validationInitial.value?.formula2).toBeUndefined();
-    f.controller.closeValidation();
+    f.controller.closeDropdownList();
     expect(serializeWorkbook(f.session.workbook)).toEqual(before);
   });
 });

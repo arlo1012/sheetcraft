@@ -5,6 +5,26 @@ export type AppLocale = "zh-CN" | "en-US";
 export type MessageSchema = FormulaToolsMessageSchema & {
   dataTools: {
     dropdownList: string;
+    dropdown: {
+      title: string;
+      manual: string;
+      fromCells: string;
+      sourcePlaceholder: string;
+      pickSource: string;
+      applyToMatching: string;
+      add: string;
+      remove: string;
+      moveDown: string;
+      moveUp: string;
+      edit: string;
+      clearAll: string;
+      confirm: string;
+      cancel: string;
+      invalidRange: string;
+      invalidItems: string;
+      rangeChanged: string;
+      failed: string;
+    };
     fill: {
       title: string;
       down: string;

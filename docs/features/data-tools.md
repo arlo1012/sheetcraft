@@ -145,10 +145,15 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   the old enabled state and ignored issues preserved. Changed or resolved issues
   discard their ignored state. Error-check options remain available from the
   Duplicate items menu when checks are off.
-- Dropdown List opens the existing validation dialog directly in List mode for
-  the selected cells. Existing list rules retain their source and settings;
-  other validation types start a blank list draft and preserve common messages.
-  Cancel does not edit the document. Apply uses the normal validation command.
+- Dropdown List opens a dedicated compact dialog. Add, edit, delete and move
+  manual options up/down, or choose a single-row/column source range (including
+  another sheet or a defined name). Manual options are stored individually, so
+  commas inside an option remain part of its text. Existing list settings are
+  restored when reopening. Apply to Other Cells with the Same Settings updates
+  matching list rules on the current worksheet; it is available when editing an
+  existing list. Clear All resets the draft and removes the targeted list rules
+  only after confirmation. Cancel leaves the document untouched. Each confirmed
+  change is a single undo/redo step, preserving cell contents and formatting.
 - Fill offers Down, Right, Up and Left for cell selections with a destination on
   that axis. It copies the first/last selected row or column across the remaining
   selection, including formatting and translated formula references. It shares

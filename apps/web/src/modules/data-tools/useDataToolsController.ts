@@ -41,6 +41,7 @@ import { getSortColorColumns } from "./sort-color-options";
 import { isValidationDraftComplete } from "./validation-draft";
 import { useDuplicateToolsController } from "./useDuplicateToolsController";
 import { useConsolidateController } from "./useConsolidateController";
+import { useDropdownListController } from "./useDropdownListController";
 import { useLookupFillController } from "./useLookupFillController";
 import { useDataComparisonController } from "./useDataComparisonController";
 import { useAdvancedFilterController } from "./useAdvancedFilterController";
@@ -122,6 +123,7 @@ export function useDataToolsController(options: Options) {
   const duplicates = useDuplicateToolsController(options);
   const consolidate = useConsolidateController(options);
   const lookupFill = useLookupFillController(options);
+  const dropdownList = useDropdownListController(options);
   const comparison = useDataComparisonController(options);
   const createId = createBrowserIdFactory();
   const sortVisible = ref(false);
@@ -577,12 +579,6 @@ export function useDataToolsController(options: Options) {
       removeDuplicatesVisible.value = false;
   }
   function openValidation(): void {
-    openValidationDialog();
-  }
-  function openDropdownList(): void {
-    openValidationDialog("list");
-  }
-  function openValidationDialog(preset?: "list"): void {
     const target = capture(false);
     if (!target) return;
     validationTarget.value = target;
@@ -609,22 +605,7 @@ export function useDataToolsController(options: Options) {
               : { formula2: translateFormulaForCopy(existing.formula2, delta) }),
           }
         : undefined;
-    validationInitial.value =
-      preset === "list"
-        ? initial?.type === "list"
-          ? initial
-          : initial
-            ? {
-                ...initial,
-                type: "list",
-                operator: undefined,
-                formula1: undefined,
-                formula2: undefined,
-                list: undefined,
-                showDropdown: true,
-              }
-            : { type: "list", allowBlank: true, showDropdown: true }
-        : initial;
+    validationInitial.value = initial;
     validationVisible.value = true;
   }
   function applyValidation(draft: DataValidationDraft): void {
@@ -848,6 +829,7 @@ export function useDataToolsController(options: Options) {
     ...duplicates,
     ...comparison,
     ...lookupFill,
+    ...dropdownList,
     ...consolidate,
     disabled,
     capabilities,
@@ -883,7 +865,6 @@ export function useDataToolsController(options: Options) {
     openRemoveDuplicates,
     applyRemoveDuplicates,
     openValidation,
-    openDropdownList,
     applyValidation,
     clearValidation,
     group,

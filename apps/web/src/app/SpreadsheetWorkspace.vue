@@ -19,6 +19,7 @@ import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
 import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
 import ConsolidateDialog from "../modules/data-tools/components/ConsolidateDialog.vue";
+import DropdownListDialog from "../modules/data-tools/components/DropdownListDialog.vue";
 import LookupFillDialog from "../modules/data-tools/components/LookupFillDialog.vue";
 import DataComparisonDialog from "../modules/data-tools/components/DataComparisonDialog.vue";
 import AdvancedFilterDialog from "../modules/data-tools/components/AdvancedFilterDialog.vue";
@@ -564,6 +565,9 @@ const {
   consolidateDraft,
   consolidateError,
   consolidatePreview,
+  dropdownListVisible,
+  dropdownListInitial,
+  dropdownListError,
   lookupFillVisible,
   lookupFillDraft,
   lookupFillError,
@@ -596,6 +600,19 @@ async function selectValidationReference(
 }
 watch(dataValidationVisible, (visible) => {
   if (!visible) validationRangePicker.cancel();
+});
+const dropdownRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingDropdownRange, reference: pickedDropdownReference } = dropdownRangePicker;
+async function selectDropdownReference(current: string): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const sheetId = activeSheet.value.id;
+  const selected = await dropdownRangePicker.selectReference(current);
+  if (session.workbook !== workbook || !dropdownListVisible.value) return undefined;
+  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+  return selected;
+}
+watch(dropdownListVisible, (visible) => {
+  if (!visible) dropdownRangePicker.cancel();
 });
 const advancedRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingAdvancedRange, reference: pickedAdvancedReference } = advancedRangePicker;
@@ -678,6 +695,7 @@ const dataToolsModalOpen = computed(
     (duplicateValuesVisible.value && !pickingDuplicateRange.value) ||
     (comparisonVisible.value && !pickingComparisonRange.value) ||
     (lookupFillVisible.value && !pickingLookupFillRange.value) ||
+    (dropdownListVisible.value && !pickingDropdownRange.value) ||
     (consolidateVisible.value && !pickingConsolidateRange.value),
 );
 
@@ -742,6 +760,7 @@ const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const activeRangePicker = computed(() => {
   if (pickingValidationRange.value) return validationRangePicker;
+  if (pickingDropdownRange.value) return dropdownRangePicker;
   if (pickingConsolidateRange.value) return consolidateRangePicker;
   if (pickingLookupFillRange.value) return lookupFillRangePicker;
   if (pickingComparisonRange.value) return comparisonRangePicker;
@@ -1044,6 +1063,23 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :title="t('dataTools.consolidate.title')"
       @confirm="consolidateRangePicker.confirm"
       @cancel="consolidateRangePicker.cancel"
+    />
+    <DropdownListDialog
+      :visible="dropdownListVisible"
+      :initial="dropdownListInitial"
+      :error="dropdownListError"
+      :suspended="pickingDropdownRange"
+      :select-reference="selectDropdownReference"
+      @close="dataTools.closeDropdownList"
+      @apply="dataTools.applyDropdownList"
+    />
+    <RangeReferencePicker
+      v-if="pickingDropdownRange"
+      :reference="pickedDropdownReference"
+      :edit-session-id="cellEditSession.id"
+      :title="t('dataTools.dropdown.title')"
+      @confirm="dropdownRangePicker.confirm"
+      @cancel="dropdownRangePicker.cancel"
     />
     <LookupFillDialog
       :visible="lookupFillVisible"
