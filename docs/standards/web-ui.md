@@ -1,5 +1,38 @@
 # Web UI Standards
 
+## Component reuse and visual consistency
+
+- Before implementing or changing UI, find the closest existing product UI and
+  inspect its components and styles. State which existing implementations will
+  be reused in the implementation update; routine reuse does not require approval.
+  A user-provided reference takes priority over independently chosen styling.
+- Choose in this order: an existing project component that fits the interaction,
+  a TDesign component through its public API, then a new component only for a
+  confirmed gap. Do not create native replacements or one-to-one wrappers for
+  controls already covered by those implementations.
+- Reuse the implementation, not just its appearance. Share components or SCSS
+  primitives when the same contract occurs in multiple features; keep business
+  state and actions in their owning modules. Do not copy feature CSS or import
+  another feature's private components to reproduce its look.
+- Use these existing references for recurring patterns:
+  - Option lists: the number categories and date types in `CellFormatDialog`,
+    backed by `shared/option-list/OptionList.vue` and its shared SCSS primitives.
+  - Searchable menus: `WorkbookSheetNavigator`, `shared/menu/MenuSearch.vue`,
+    and the shared menu surface and items.
+  - Form controls and dialog actions: TDesign inputs and the default Dialog
+    buttons used by `CellFormatDialog`. Preserve their size, spacing, themes,
+    and cancel-before-confirm order, including when an extra action requires
+    a custom footer.
+- Feature styles own layout, placement, and necessary size limits. Shared
+  components own control padding, typography, borders, radii, shadows, scrollbars,
+  and hover, focus, selected, and disabled states. Extend the shared contract for
+  a real repeated need instead of overriding its internals in a feature.
+- Before committing, review new markup and style declarations against the chosen
+  reference. Remove duplicated controls, undefined tokens, and unexplained visual
+  differences. Functionality and passing static checks alone do not establish
+  visual consistency. Follow the repository's scoped verification policy; this
+  review does not require broad tests or browser checks for every small change.
+
 ## Typography
 
 Use four typography levels for Web interface text. Sizes are CSS pixels at
