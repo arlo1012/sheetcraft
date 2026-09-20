@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { Info } from "lucide-vue-next";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
@@ -21,7 +22,7 @@ const props = withDefaults(
   { error: "", picking: false },
 );
 const emit = defineEmits<{ close: []; apply: [draft: FillRankDraft] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const copy = (value: FillRankDraft): FillRankDraft => ({ ...value });
 const draft = ref(copy(props.initial));
 const canApply = computed(() =>
@@ -55,7 +56,7 @@ function apply(): void {
   <Dialog
     :visible="visible && !picking"
     :header="t('dataTools.fill.rank')"
-    width="min(440px, calc(100vw - 32px))"
+    width="min(480px, calc(100vw - 32px))"
     :confirm-btn="{ content: t('dataTools.fill.apply'), disabled: !canApply }"
     :cancel-btn="t('dataTools.fill.cancel')"
     :close-on-overlay-click="false"
@@ -64,59 +65,56 @@ function apply(): void {
     @confirm="apply"
   >
     <div class="fill-rank-dialog">
-      <div class="fill-rank-dialog__source">
-        <p class="fill-rank-dialog__hint">
-          <Info :size="14" aria-hidden="true" />
-          <span>{{ t("dataTools.fill.rankHint") }}</span>
-        </p>
-        <div
-          class="fill-rank-dialog__field"
-          role="group"
-          :aria-label="t('dataTools.fill.rankSource')"
-        >
-          <span>{{ t("dataTools.fill.rankSource") }}</span>
-          <RangeReferenceInput
-            v-model="draft.sourceRange"
-            :label="t('dataTools.fill.rankSource')"
-            :pick-label="t('dataTools.fill.pickRankSource')"
-            :select-reference="selectSourceReference"
-          />
-        </div>
-      </div>
-      <div
-        class="fill-rank-dialog__field"
-        role="group"
-        :aria-label="t('dataTools.fill.rankDestination')"
+      <p class="fill-rank-dialog__hint">
+        <Info :size="14" aria-hidden="true" />
+        <span>{{ t("dataTools.fill.rankHint") }}</span>
+      </p>
+      <TForm
+        :data="draft"
+        layout="horizontal"
+        label-align="right"
+        :label-width="locale === 'zh-CN' ? 72 : 112"
       >
-        <span>{{ t("dataTools.fill.rankDestination") }}</span>
-        <RangeReferenceInput
-          v-model="draft.destination"
-          :label="t('dataTools.fill.rankDestination')"
-          :pick-label="t('dataTools.fill.pickRankDestination')"
-          :select-reference="selectDestinationReference"
-        />
-      </div>
-      <div class="fill-rank-dialog__field" role="group" :aria-label="t('dataTools.fill.rankOrder')">
-        <span>{{ t("dataTools.fill.rankOrder") }}</span>
-        <TRadioGroup v-model="draft.order">
-          <TRadio value="descending">{{ t("dataTools.fill.rankDescending") }}</TRadio>
-          <TRadio value="ascending">{{ t("dataTools.fill.rankAscending") }}</TRadio>
-        </TRadioGroup>
-      </div>
-      <div class="fill-rank-dialog__field" role="group" :aria-label="t('dataTools.fill.rankTies')">
-        <span>{{ t("dataTools.fill.rankTies") }}</span>
-        <TSelect
-          v-model="draft.ties"
-          :options="tieOptions"
-          :aria-label="t('dataTools.fill.rankTies')"
-        />
-      </div>
-      <div class="fill-rank-dialog__feedback">
-        <TCheckbox v-model="draft.overwrite">{{ t("dataTools.fill.rankOverwrite") }}</TCheckbox>
-        <p v-if="error" class="fill-rank-dialog__error" role="alert">
-          {{ error }}
-        </p>
-      </div>
+        <TFormItem name="sourceRange" :label="t('dataTools.fill.rankSource')">
+          <div class="fill-rank-dialog__reference">
+            <RangeReferenceInput
+              v-model="draft.sourceRange"
+              :label="t('dataTools.fill.rankSource')"
+              :pick-label="t('dataTools.fill.pickRankSource')"
+              :select-reference="selectSourceReference"
+            />
+          </div>
+        </TFormItem>
+        <TFormItem name="destination" :label="t('dataTools.fill.rankDestination')">
+          <div class="fill-rank-dialog__reference">
+            <RangeReferenceInput
+              v-model="draft.destination"
+              :label="t('dataTools.fill.rankDestination')"
+              :pick-label="t('dataTools.fill.pickRankDestination')"
+              :select-reference="selectDestinationReference"
+            />
+          </div>
+        </TFormItem>
+        <TFormItem name="order" :label="t('dataTools.fill.rankOrder')">
+          <TRadioGroup v-model="draft.order" :aria-label="t('dataTools.fill.rankOrder')">
+            <TRadio value="descending">{{ t("dataTools.fill.rankDescending") }}</TRadio>
+            <TRadio value="ascending">{{ t("dataTools.fill.rankAscending") }}</TRadio>
+          </TRadioGroup>
+        </TFormItem>
+        <TFormItem name="ties" :label="t('dataTools.fill.rankTies')">
+          <TSelect
+            v-model="draft.ties"
+            :options="tieOptions"
+            :aria-label="t('dataTools.fill.rankTies')"
+          />
+        </TFormItem>
+        <TFormItem name="overwrite">
+          <div class="fill-rank-dialog__feedback">
+            <TCheckbox v-model="draft.overwrite">{{ t("dataTools.fill.rankOverwrite") }}</TCheckbox>
+            <p v-if="error" class="fill-rank-dialog__error" role="alert">{{ error }}</p>
+          </div>
+        </TFormItem>
+      </TForm>
     </div>
   </Dialog>
 </template>
@@ -127,7 +125,6 @@ function apply(): void {
 .fill-rank-dialog {
   @include fill-dialog.surface;
 
-  &__source,
   &__feedback {
     @include fill-dialog.group;
   }
@@ -153,8 +150,9 @@ function apply(): void {
     color: var(--idea-status-error);
   }
 
-  &__field {
-    @include fill-dialog.field-label;
+  &__reference {
+    width: 100%;
+    min-width: 0;
   }
 }
 </style>
