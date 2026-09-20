@@ -13,9 +13,8 @@ const props = withDefaults(
     visible: boolean;
     initial: FillSeriesDraft;
     error?: string;
-    rangeLabel?: string;
   }>(),
-  { error: "", rangeLabel: "" },
+  { error: "" },
 );
 const emit = defineEmits<{ close: []; apply: [draft: FillSeriesDraft] }>();
 const { t } = useAppI18n();
@@ -70,9 +69,6 @@ function apply(): void {
     @confirm="apply"
   >
     <div class="fill-dialog">
-      <p v-if="rangeLabel" class="fill-dialog__range">
-        {{ t("dataTools.fill.range", { range: rangeLabel }) }}
-      </p>
       <div class="fill-dialog__options">
         <div
           class="fill-dialog__group fill-dialog__axis"
@@ -149,14 +145,8 @@ function apply(): void {
 .fill-dialog {
   @include fill-dialog.surface;
 
-  &__range,
   &__error {
     @include fill-dialog.auxiliary-text;
-  }
-
-  &__range {
-    @include fill-dialog.subdued-text;
-    overflow-wrap: anywhere;
   }
 
   &__error {

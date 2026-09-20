@@ -1090,7 +1090,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :visible="fillSeriesVisible"
       :initial="fillSeriesInitial"
       :error="fillError"
-      :range-label="fillRangeLabel"
       @close="dataTools.closeFillTool"
       @apply="dataTools.applyFillSeries"
     />
