@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Info } from "lucide-vue-next";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
@@ -64,7 +65,10 @@ function apply(): void {
   >
     <div class="fill-rank-dialog">
       <div class="fill-rank-dialog__source">
-        <p class="fill-rank-dialog__hint">{{ t("dataTools.fill.rankHint") }}</p>
+        <p class="fill-rank-dialog__hint">
+          <Info :size="14" aria-hidden="true" />
+          <span>{{ t("dataTools.fill.rankHint") }}</span>
+        </p>
         <div
           class="fill-rank-dialog__field"
           role="group"
@@ -135,6 +139,14 @@ function apply(): void {
 
   &__hint {
     @include fill-dialog.subdued-text;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--idea-space-2);
+
+    > svg {
+      flex: none;
+      margin-top: var(--idea-space-1);
+    }
   }
 
   &__error {
