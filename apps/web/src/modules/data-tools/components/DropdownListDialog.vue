@@ -275,6 +275,7 @@ async function selectRange(current: string): Promise<string | undefined> {
           v-for="(item, index) in draft.items"
           :key="`${index}:${item}`"
           class="dropdown-list-dialog__item"
+          :class="{ 'is-editing': editingIndex === index }"
           role="option"
           :aria-selected="selectedIndex === index"
           @click="selectedIndex = index"
@@ -373,6 +374,11 @@ async function selectRange(current: string): Promise<string | undefined> {
 
   &[aria-selected="true"] {
     font-weight: var(--idea-font-weight-medium);
+  }
+
+  &.is-editing,
+  &.is-editing:hover {
+    background: transparent;
   }
 }
 .dropdown-list-dialog__error {
