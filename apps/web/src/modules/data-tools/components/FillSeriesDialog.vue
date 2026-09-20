@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Input as TInput } from "tdesign-vue-next/es/input";
+import { DatePicker as TDatePicker, type DatePickerProps } from "tdesign-vue-next/es/date-picker";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { useAppI18n } from "../../../shared/i18n";
@@ -25,13 +25,15 @@ const isDate = computed(() => draft.value.type === "date");
 const stopIsValid = computed(() => {
   const stop = draft.value.stop.trim();
   if (!stop || isAuto.value) return true;
-  return isDate.value
-    ? Number.isFinite(Number(stop)) || /^\d{4}-\d{1,2}-\d{1,2}$/u.test(stop)
-    : Number.isFinite(Number(stop));
+  return isDate.value ? /^\d{4}-\d{2}-\d{2}$/u.test(stop) : Number.isFinite(Number(stop));
 });
 const canApply = computed(
   () =>
-    isAuto.value || ((draft.value.trend || Number.isFinite(draft.value.step)) && stopIsValid.value),
+    isAuto.value ||
+    ((draft.value.trend ||
+      (Number.isFinite(draft.value.step) &&
+        (!isDate.value || Number.isInteger(draft.value.step)))) &&
+      stopIsValid.value),
 );
 watch(
   () => props.visible,
@@ -43,6 +45,14 @@ watch(
   () => draft.value.type,
   (type) => {
     if (type !== "linear" && type !== "growth") draft.value.trend = false;
+    // Do not reinterpret a numeric limit as a date, or a date as a numeric limit.
+    if (
+      draft.value.stop &&
+      (type === "date"
+        ? !/^\d{4}-\d{2}-\d{2}$/u.test(draft.value.stop)
+        : type !== "auto" && !Number.isFinite(Number(draft.value.stop)))
+    )
+      draft.value.stop = "";
   },
 );
 watch(
@@ -52,6 +62,12 @@ watch(
   },
   { deep: true },
 );
+const updateDateStop: NonNullable<DatePickerProps["onChange"]> = (value) => {
+  draft.value.stop = typeof value === "string" ? value : "";
+};
+function updateNumericStop(value: number | string): void {
+  draft.value.stop = String(value);
+}
 function apply(): void {
   if (canApply.value) emit("apply", copy(draft.value));
 }
@@ -119,21 +135,37 @@ function apply(): void {
           <TInputNumber
             v-model="draft.step"
             :disabled="isAuto || draft.trend"
+            :decimal-places="isDate ? 0 : undefined"
             :aria-label="t('dataTools.fill.step')"
             theme="column"
             class="idea-input-number--persistent-controls"
             style="width: 100%; min-width: 0"
           />
         </div>
-        <label class="fill-dialog__field">
+        <div class="fill-dialog__field" role="group" :aria-label="t('dataTools.fill.stop')">
           <span>{{ t("dataTools.fill.stop") }}</span>
-          <TInput
-            v-model="draft.stop"
-            :disabled="isAuto"
-            :placeholder="isDate ? 'YYYY-MM-DD' : undefined"
+          <TDatePicker
+            v-if="isDate"
+            :value="draft.stop"
+            format="YYYY-MM-DD"
+            value-type="YYYY-MM-DD"
+            allow-input
+            clearable
             :aria-label="t('dataTools.fill.stop')"
+            style="width: 100%; min-width: 0"
+            @change="updateDateStop"
           />
-        </label>
+          <TInputNumber
+            v-else
+            :model-value="isAuto || draft.stop === '' ? '' : Number(draft.stop)"
+            :disabled="isAuto"
+            :aria-label="t('dataTools.fill.stop')"
+            theme="column"
+            class="idea-input-number--persistent-controls"
+            style="width: 100%; min-width: 0"
+            @update:model-value="updateNumericStop"
+          />
+        </div>
       </div>
       <p v-if="error" class="fill-dialog__error" role="alert">{{ error }}</p>
     </div>
@@ -147,9 +179,6 @@ function apply(): void {
 
   &__error {
     @include fill-dialog.auxiliary-text;
-  }
-
-  &__error {
     color: var(--idea-status-error);
   }
 
