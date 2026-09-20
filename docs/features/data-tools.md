@@ -161,6 +161,18 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   post-fill options can switch to a series, supported date intervals or formatting
   modes while retaining one undo step. Whole-axis and single-cell selections
   disable incompatible fill directions.
+  The same menu also opens Series, Current Date, Fill Blank Cells and Insert Text.
+  Series supports row/column lanes, linear and growth steps, date intervals,
+  automatic patterns and trend fitting. A stop value can extend a single seed;
+  a multi-cell selection bounds the output. Current Date writes a static numeric
+  date in the workbook's date system with a selected display format. Blank fill
+  takes values from the chosen neighboring direction or a typed custom value,
+  leaving existing content and formulas that return empty text intact. Text
+  insertion adds a prefix, suffix or text at a character position and converts
+  calculated/formatted values to literal text. Each operation captures the exact
+  selected range and writes through one undoable Core command. New fill operations
+  reject protected, merged, spilled, hidden or filtered targets and ranges above
+  100,000 cells; the normal validation gate still applies.
 - Set or edit cell validation: whole/decimal numbers, dates, times, text length,
   literal or range/named-range lists, and custom formulas. Minimum/maximum bounds
   accept typed formulas and cell references, or single-cell picking through the

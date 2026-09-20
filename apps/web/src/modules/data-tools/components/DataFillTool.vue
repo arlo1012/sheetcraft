@@ -4,18 +4,25 @@ import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
 import { computed, ref, useId } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 
 const props = defineProps<{ disabled: boolean; canFillRows: boolean; canFillColumns: boolean }>();
-const emit = defineEmits<{ fill: [direction: FillDirection] }>();
+const emit = defineEmits<{
+  fill: [direction: FillDirection];
+  series: [];
+  currentDate: [];
+  blanks: [];
+  insertText: [];
+}>();
 const { t } = useAppI18n();
 const trigger = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const triggerRef = computed(() => trigger.value?.rootElement ?? null);
 const surface = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `data-fill-${useId().replaceAll(":", "")}`;
-const unavailable = computed(() => props.disabled || (!props.canFillRows && !props.canFillColumns));
+const unavailable = computed(() => props.disabled);
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef,
   menuSurfaceRef: surface,
@@ -28,6 +35,24 @@ function choose(direction: FillDirection): void {
     return;
   dismiss("programmatic", false);
   emit("fill", direction);
+}
+function chooseTool(tool: "series" | "currentDate" | "blanks" | "insertText"): void {
+  if (unavailable.value) return;
+  dismiss("programmatic", false);
+  switch (tool) {
+    case "series":
+      emit("series");
+      break;
+    case "currentDate":
+      emit("currentDate");
+      break;
+    case "blanks":
+      emit("blanks");
+      break;
+    case "insertText":
+      emit("insertText");
+      break;
+  }
 }
 </script>
 
@@ -72,6 +97,19 @@ function choose(direction: FillDirection): void {
           <template #icon><ArrowLeft :size="15" /></template>
           {{ t("dataTools.fill.left") }}
         </MenuItem>
+        <MenuSeparator />
+        <MenuItem data-data-fill="series" @select="chooseTool('series')">{{
+          t("dataTools.fill.series")
+        }}</MenuItem>
+        <MenuItem data-data-fill="current-date" @select="chooseTool('currentDate')">{{
+          t("dataTools.fill.currentDate")
+        }}</MenuItem>
+        <MenuItem data-data-fill="blanks" @select="chooseTool('blanks')">{{
+          t("dataTools.fill.blanks")
+        }}</MenuItem>
+        <MenuItem data-data-fill="insert-text" @select="chooseTool('insertText')">{{
+          t("dataTools.fill.insertText")
+        }}</MenuItem>
       </MenuSurface>
     </Teleport>
   </div>
@@ -84,7 +122,7 @@ function choose(direction: FillDirection): void {
   &__menu {
     position: fixed;
     z-index: 80;
-    min-width: 150px;
+    min-width: 190px;
   }
 }
 </style>

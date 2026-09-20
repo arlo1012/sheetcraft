@@ -44,7 +44,7 @@ describe("DataToolbar", () => {
     },
   );
 
-  test("disables unavailable fill axes and single-cell fills", async () => {
+  test("disables unavailable fill axes while keeping additional tools available", async () => {
     const wrapper = mount(DataToolbar, {
       attachTo: document.body,
       global: { plugins: [createAppI18n("en-US")] },
@@ -56,7 +56,25 @@ describe("DataToolbar", () => {
     await right.trigger("click");
     expect(wrapper.emitted("fill")).toBeUndefined();
     await wrapper.setProps({ canFillRows: false });
-    expect(wrapper.get('[data-data-action="fill"]').attributes("disabled")).toBe("");
+    expect(wrapper.get('[data-data-action="fill"]').attributes("disabled")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  test.each([
+    ["series", "openFillSeries"],
+    ["current-date", "openFillCurrentDate"],
+    ["blanks", "openFillBlanks"],
+    ["insert-text", "openFillText"],
+  ])("opens %s for a single cell", async (action, event) => {
+    const wrapper = mount(DataToolbar, {
+      attachTo: document.body,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { capabilities },
+    });
+    await wrapper.get('[data-data-action="fill"]').trigger("click");
+    await new DOMWrapper(document.body).get(`[data-data-fill="${action}"]`).trigger("click");
+    expect(wrapper.emitted(event)).toEqual([[]]);
+    expect(new DOMWrapper(document.body).find('[data-data-fill="series"]').exists()).toBe(false);
     wrapper.unmount();
   });
 

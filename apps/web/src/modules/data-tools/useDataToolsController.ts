@@ -41,6 +41,7 @@ import { getSortColorColumns } from "./sort-color-options";
 import { isValidationDraftComplete } from "./validation-draft";
 import { useDuplicateToolsController } from "./useDuplicateToolsController";
 import { useConsolidateController } from "./useConsolidateController";
+import { useFillToolsController } from "./useFillToolsController";
 import { useDropdownListController } from "./useDropdownListController";
 import { useLookupFillController } from "./useLookupFillController";
 import { useDataComparisonController } from "./useDataComparisonController";
@@ -123,6 +124,7 @@ export function useDataToolsController(options: Options) {
   const duplicates = useDuplicateToolsController(options);
   const consolidate = useConsolidateController(options);
   const lookupFill = useLookupFillController(options);
+  const fillTools = useFillToolsController(options);
   const dropdownList = useDropdownListController(options);
   const comparison = useDataComparisonController(options);
   const createId = createBrowserIdFactory();
@@ -830,6 +832,7 @@ export function useDataToolsController(options: Options) {
     ...comparison,
     ...lookupFill,
     ...dropdownList,
+    ...fillTools,
     ...consolidate,
     disabled,
     capabilities,

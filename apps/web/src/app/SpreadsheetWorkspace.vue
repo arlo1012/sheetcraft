@@ -19,6 +19,10 @@ import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
 import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
 import ConsolidateDialog from "../modules/data-tools/components/ConsolidateDialog.vue";
+import FillSeriesDialog from "../modules/data-tools/components/FillSeriesDialog.vue";
+import FillBlanksDialog from "../modules/data-tools/components/FillBlanksDialog.vue";
+import FillTextDialog from "../modules/data-tools/components/FillTextDialog.vue";
+import FillCurrentDateDialog from "../modules/data-tools/components/FillCurrentDateDialog.vue";
 import DropdownListDialog from "../modules/data-tools/components/DropdownListDialog.vue";
 import LookupFillDialog from "../modules/data-tools/components/LookupFillDialog.vue";
 import DataComparisonDialog from "../modules/data-tools/components/DataComparisonDialog.vue";
@@ -565,6 +569,16 @@ const {
   consolidateDraft,
   consolidateError,
   consolidatePreview,
+  fillSeriesVisible,
+  fillBlanksVisible,
+  fillTextVisible,
+  fillCurrentDateVisible,
+  fillSeriesInitial,
+  fillBlanksInitial,
+  fillTextInitial,
+  fillCurrentDateInitial,
+  fillError,
+  fillRangeLabel,
   dropdownListVisible,
   dropdownListInitial,
   dropdownListError,
@@ -685,6 +699,10 @@ watch(consolidateVisible, (visible) => {
 });
 const dataToolsModalOpen = computed(
   () =>
+    fillSeriesVisible.value ||
+    fillBlanksVisible.value ||
+    fillTextVisible.value ||
+    fillCurrentDateVisible.value ||
     duplicateErrorOptionsVisible.value ||
     dataTools.sortVisible.value ||
     dataTools.textToColumnsVisible.value ||
@@ -936,6 +954,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @open-validation="dataTools.openValidation"
           @open-dropdown-list="dataTools.openDropdownList"
           @fill="fillFromDataToolbar"
+          @open-fill-series="dataTools.openFillSeries"
+          @open-fill-current-date="dataTools.openFillCurrentDate"
+          @open-fill-blanks="dataTools.openFillBlanks"
+          @open-fill-text="dataTools.openFillText"
           @group="dataTools.group"
           @ungroup="dataTools.ungroup"
           @expand="dataTools.setGroupsCollapsed(false)"
@@ -1063,6 +1085,38 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :title="t('dataTools.consolidate.title')"
       @confirm="consolidateRangePicker.confirm"
       @cancel="consolidateRangePicker.cancel"
+    />
+    <FillSeriesDialog
+      :visible="fillSeriesVisible"
+      :initial="fillSeriesInitial"
+      :error="fillError"
+      :range-label="fillRangeLabel"
+      @close="dataTools.closeFillTool"
+      @apply="dataTools.applyFillSeries"
+    />
+    <FillBlanksDialog
+      :visible="fillBlanksVisible"
+      :initial="fillBlanksInitial"
+      :error="fillError"
+      :range-label="fillRangeLabel"
+      @close="dataTools.closeFillTool"
+      @apply="dataTools.applyFillBlanks"
+    />
+    <FillTextDialog
+      :visible="fillTextVisible"
+      :initial="fillTextInitial"
+      :error="fillError"
+      :range-label="fillRangeLabel"
+      @close="dataTools.closeFillTool"
+      @apply="dataTools.applyFillText"
+    />
+    <FillCurrentDateDialog
+      :visible="fillCurrentDateVisible"
+      :initial="fillCurrentDateInitial"
+      :error="fillError"
+      :range-label="fillRangeLabel"
+      @close="dataTools.closeFillTool"
+      @apply="dataTools.applyFillCurrentDate"
     />
     <DropdownListDialog
       :visible="dropdownListVisible"
