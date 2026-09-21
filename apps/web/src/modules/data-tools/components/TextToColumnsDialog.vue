@@ -70,7 +70,7 @@ const defaultDraft = (): TextToColumnsDraft => ({
   otherDelimiter: "",
   otherDelimiterMode: "characters",
   textTypes: ["chinese", "english", "number"],
-  keywords: [""],
+  keywords: Array.from({ length: 5 }, () => ""),
   keywordPosition: "after",
   keepKeywords: true,
   fixedWidths: [],
@@ -315,7 +315,10 @@ function setSetupMode(value: "auto" | "custom"): void {
       draft.value.textTypes = [...(options.textTypes ?? [])];
     } else if (options?.mode === "keyword") {
       draft.value.mode = "keyword";
-      draft.value.keywords = [...(options.keywords ?? [])];
+      draft.value.keywords = Array.from(
+        { length: 5 },
+        (_, index) => options.keywords?.[index] ?? "",
+      );
       draft.value.keywordPosition = options.keywordPosition ?? "after";
       draft.value.keepKeywords = options.keepKeywords ?? true;
     } else draft.value.mode = "delimiter";
@@ -340,12 +343,6 @@ function toggleTextType(type: "chinese" | "english" | "number", checked: boolean
   draft.value.textTypes = checked
     ? [...new Set([...types, type])]
     : types.filter((item) => item !== type);
-}
-function addKeyword(): void {
-  draft.value.keywords = [...(draft.value.keywords ?? []), ""];
-}
-function removeKeyword(index: number): void {
-  draft.value.keywords = (draft.value.keywords ?? []).filter((_, item) => item !== index);
 }
 function setKeyword(index: number, value: string | number): void {
   const keywords = [...(draft.value.keywords ?? [])];
@@ -523,27 +520,15 @@ function confirm(): void {
             role="group"
             :aria-label="t('dataTools.textToColumns.keyword')"
           >
-            <div
-              v-for="(_, index) in draft.keywords"
-              :key="index"
-              class="text-to-columns-dialog__keyword"
-            >
+            <div class="text-to-columns-dialog__keyword-inputs">
               <TInput
+                v-for="(_, index) in draft.keywords"
+                :key="index"
                 :value="draft.keywords?.[index]"
-                :aria-label="t('dataTools.textToColumns.keyword')"
+                :aria-label="`${t('dataTools.textToColumns.keyword')} ${index + 1}`"
                 @change="setKeyword(index, $event)"
               />
-              <TButton
-                variant="text"
-                theme="danger"
-                :disabled="draft.keywords?.length === 1"
-                @click="removeKeyword(index)"
-                >{{ t("dataTools.textToColumns.removeKeyword") }}</TButton
-              >
             </div>
-            <TButton variant="dashed" @click="addKeyword">{{
-              t("dataTools.textToColumns.addKeyword")
-            }}</TButton>
             <TRadioGroup v-model="draft.keywordPosition" class="text-to-columns-dialog__inline"
               ><TRadio value="before">{{ t("dataTools.textToColumns.beforeKeyword") }}</TRadio
               ><TRadio value="after">{{
@@ -713,9 +698,9 @@ function confirm(): void {
     gap: 12px;
     margin-block: 8px;
   }
-  &__keyword {
+  &__keyword-inputs {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) max-content;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 8px;
   }
   &__break-position {

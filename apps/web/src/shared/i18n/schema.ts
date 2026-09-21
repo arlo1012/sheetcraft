@@ -388,8 +388,6 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       number: string;
       anyCharacter: string;
       fullToken: string;
-      addKeyword: string;
-      removeKeyword: string;
       beforeKeyword: string;
       afterKeyword: string;
       keepKeywords: string;

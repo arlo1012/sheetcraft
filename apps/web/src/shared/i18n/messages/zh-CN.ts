@@ -395,8 +395,6 @@ export const zhCN = {
       number: "数字",
       anyCharacter: "任一字符",
       fullToken: "完整字符串",
-      addKeyword: "添加关键字",
-      removeKeyword: "删除",
       beforeKeyword: "关键字前",
       afterKeyword: "关键字后",
       keepKeywords: "保留分列关键字",

@@ -407,8 +407,6 @@ export const enUS = {
       number: "Numbers",
       anyCharacter: "Any character",
       fullToken: "Entire text",
-      addKeyword: "Add keyword",
-      removeKeyword: "Remove",
       beforeKeyword: "Before keyword",
       afterKeyword: "After keyword",
       keepKeywords: "Keep keywords",
