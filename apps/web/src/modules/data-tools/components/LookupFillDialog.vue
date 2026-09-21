@@ -36,6 +36,7 @@ const emit = defineEmits<{
 }>();
 const { t, locale } = useAppI18n();
 const step = ref<Step>("ranges");
+const fieldDefaultsApplied = ref(false);
 const copy = (value: LookupFillDraft): LookupFillDraft => ({
   ...value,
   matchFields: value.matchFields.map((field) => ({ ...field })),
@@ -87,6 +88,9 @@ function add(kind: MappingKind): void {
 function changeField(kind: MappingKind, index: number, field: LookupFillFieldDraft): void {
   if (!props.busy && draft.value[kind][index]) draft.value[kind][index] = { ...field };
 }
+function clearFields(kind: MappingKind): void {
+  if (!props.busy) draft.value[kind] = [];
+}
 function remove(kind: MappingKind, index: number): void {
   if (props.busy) return;
   draft.value[kind].splice(index, 1);
@@ -126,7 +130,16 @@ function matchRemainingFields(): void {
 }
 function next(): void {
   if (step.value === "ranges") {
-    if (rangesReady.value) step.value = "fields";
+    if (!rangesReady.value) return;
+    if (!fieldDefaultsApplied.value) {
+      if (!draft.value.matchFields.length) {
+        const field = defaultField();
+        if (field) draft.value.matchFields.push(field);
+      }
+      if (draft.value.hasHeader && !draft.value.fillFields.length) matchRemainingFields();
+      fieldDefaultsApplied.value = true;
+    }
+    step.value = "fields";
   } else if (step.value === "fields" && fieldsReady.value) step.value = "preview";
 }
 function back(): void {
@@ -139,6 +152,7 @@ function apply(): void {
 function reset(value: LookupFillDraft): void {
   draft.value = copy(value);
   step.value = "ranges";
+  fieldDefaultsApplied.value = false;
 }
 watch(
   () => props.initial,
@@ -152,17 +166,6 @@ watch(
   (visible) => {
     if (visible && !props.picking) reset(props.initial);
   },
-);
-watch(
-  [() => props.sourceColumns, () => props.targetColumns],
-  () => {
-    if (!rangesReady.value || draft.value.matchFields.length) return;
-    const field = defaultField();
-    if (field) {
-      draft.value.matchFields.push(field);
-    }
-  },
-  { deep: true, immediate: true },
 );
 watch(
   draft,
@@ -246,6 +249,7 @@ watch(
             :target-columns="targetColumns"
             :busy="busy"
             @add="add('matchFields')"
+            @clear="clearFields('matchFields')"
             @remove="remove('matchFields', $event)"
             @change="(index, field) => changeField('matchFields', index, field)"
           />
@@ -257,6 +261,7 @@ watch(
             :target-columns="targetColumns"
             :busy="busy"
             @add="add('fillFields')"
+            @clear="clearFields('fillFields')"
             @remove="remove('fillFields', $event)"
             @change="(index, field) => changeField('fillFields', index, field)"
           >

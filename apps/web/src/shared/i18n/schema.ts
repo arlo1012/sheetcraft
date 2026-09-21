@@ -168,6 +168,7 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       invalidOperation: string;
     };
     lookupFill: {
+      clearFields: string;
       steps: string;
       stepRanges: string;
       stepFields: string;

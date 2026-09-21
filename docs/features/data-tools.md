@@ -84,8 +84,11 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   each range's first row. Unmatched target rows remain unchanged; populated target
   cells are skipped unless overwriting is enabled. Preview includes counts and a
   sample of the values to write. The dialog separates range selection, field
-  mapping, and result preview into three steps. Unique matching column headers
-  can populate the fill mappings, excluding match keys and existing mappings.
+  mapping, and result preview into three steps. On first entering field mapping,
+  empty fill mappings are populated from unique matching column headers, excluding
+  match keys. Existing mappings remain intact. Both tables offer Add and Clear in
+  their title bars; clearing or navigating Back does not reapply defaults.
+  Match Same Headers can explicitly add any remaining unmapped fields.
   Values are copied after formula evaluation;
   formatting is preserved. Ranges together are limited to 100,000 cells.
 - Consolidate combines multiple ranges using Sum, Count, Average, Maximum, Minimum,

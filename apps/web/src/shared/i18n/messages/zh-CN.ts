@@ -170,6 +170,7 @@ export const zhCN = {
       invalidOperation: "无法完成合并计算。",
     },
     lookupFill: {
+      clearFields: "清空",
       steps: "查找录入步骤",
       stepRanges: "选择数据区域",
       stepFields: "字段对应",

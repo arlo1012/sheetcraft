@@ -177,6 +177,7 @@ export const enUS = {
       invalidOperation: "Unable to consolidate data.",
     },
     lookupFill: {
+      clearFields: "Clear",
       steps: "Lookup fill steps",
       stepRanges: "Select data ranges",
       stepFields: "Map fields",

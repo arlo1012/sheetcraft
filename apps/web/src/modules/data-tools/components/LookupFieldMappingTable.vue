@@ -20,6 +20,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   add: [];
+  clear: [];
   remove: [index: number];
   change: [index: number, field: LookupFillFieldDraft];
 }>();
@@ -46,12 +47,17 @@ function change(index: number, key: keyof LookupFillFieldDraft, value: unknown):
 </script>
 <template>
   <section class="lookup-field-mapping-table" :aria-label="title">
-    <strong class="lookup-field-mapping-table__title">{{ title }}</strong>
-    <div class="lookup-field-mapping-table__toolbar">
-      <TButton variant="outline" :disabled="busy" @click="emit('add')">{{
-        t("dataTools.lookupFill.addField")
-      }}</TButton>
-      <slot name="actions" />
+    <div class="lookup-field-mapping-table__header">
+      <strong class="lookup-field-mapping-table__title">{{ title }}</strong>
+      <div class="lookup-field-mapping-table__toolbar">
+        <slot name="actions" />
+        <TButton variant="outline" :disabled="busy || !fields.length" @click="emit('clear')">{{
+          t("dataTools.lookupFill.clearFields")
+        }}</TButton>
+        <TButton variant="outline" :disabled="busy" @click="emit('add')">{{
+          t("dataTools.lookupFill.addField")
+        }}</TButton>
+      </div>
     </div>
     <div class="lookup-field-mapping-table__table">
       <TableHeightWrapper v-slot="{ height }">
@@ -105,14 +111,22 @@ function change(index: number, key: keyof LookupFillFieldDraft, value: unknown):
 <style scoped lang="scss">
 .lookup-field-mapping-table {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
   min-width: 0;
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
   &__title {
+    flex-shrink: 0;
     font-weight: 500;
   }
   &__toolbar {
     display: flex;
+    justify-content: flex-end;
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
