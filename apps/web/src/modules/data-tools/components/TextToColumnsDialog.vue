@@ -615,56 +615,59 @@ function confirm(): void {
           <p class="text-to-columns-dialog__hint">{{ t("dataTools.textToColumns.formatHint") }}</p>
         </template>
       </TForm>
-      <div class="text-to-columns-dialog__preview-heading">
-        <strong>{{ t("dataTools.textToColumns.preview") }}</strong
-        ><span>{{ t("dataTools.textToColumns.previewHint") }}</span>
-      </div>
-      <p v-if="previewError" class="text-to-columns-dialog__error">{{ previewError }}</p>
-      <FixedWidthSplitEditor
-        v-if="step === 0 && setupMode === 'custom' && draft.mode === 'fixed-width'"
-        :rows="sourceRows"
-        :widths="draft.fixedWidths"
-        @change="changeWidths"
-      />
-      <div
-        v-else
-        class="text-to-columns-dialog__preview"
-        :aria-label="t('dataTools.textToColumns.preview')"
-      >
-        <TableHeightWrapper v-slot="{ height }">
-          <TTable
-            class="idea-table--mini"
-            row-key="row"
-            :data="previewData"
-            :columns="previewColumns"
-            :height="height"
-            :table-content-width="previewTableWidth"
-            :bordered="false"
-            cell-empty-content=""
-            size="small"
-            table-layout="fixed"
-            hover
-            :aria-label="t('dataTools.textToColumns.preview')"
-          >
-            <template #row="{ row }">{{ row.row + 1 }}</template>
-            <template #previewColumnTitle="{ colIndex }">
-              <TButton
-                v-if="step === 1"
-                variant="text"
-                :theme="selectedColumn === colIndex - 1 ? 'primary' : 'default'"
-                :aria-pressed="selectedColumn === colIndex - 1"
-                :data-split-column="colIndex - 1"
-                @click="selectedColumn = colIndex - 1"
-              >
-                {{ t("dataTools.textToColumns.column", { column: colIndex }) }} ·
-                {{
-                  typeOptions.find((type) => type.value === draft.columnTypes[colIndex - 1])?.label
-                }}
-              </TButton>
-              <span v-else>{{ t("dataTools.textToColumns.column", { column: colIndex }) }}</span>
-            </template>
-          </TTable>
-        </TableHeightWrapper>
+      <div class="text-to-columns-dialog__preview-section">
+        <div class="text-to-columns-dialog__preview-heading">
+          <strong>{{ t("dataTools.textToColumns.preview") }}</strong
+          ><span>{{ t("dataTools.textToColumns.previewHint") }}</span>
+        </div>
+        <p v-if="previewError" class="text-to-columns-dialog__error">{{ previewError }}</p>
+        <FixedWidthSplitEditor
+          v-if="step === 0 && setupMode === 'custom' && draft.mode === 'fixed-width'"
+          :rows="sourceRows"
+          :widths="draft.fixedWidths"
+          @change="changeWidths"
+        />
+        <div
+          v-else
+          class="text-to-columns-dialog__preview"
+          :aria-label="t('dataTools.textToColumns.preview')"
+        >
+          <TableHeightWrapper v-slot="{ height }">
+            <TTable
+              class="idea-table--mini"
+              row-key="row"
+              :data="previewData"
+              :columns="previewColumns"
+              :height="height"
+              :table-content-width="previewTableWidth"
+              :bordered="false"
+              cell-empty-content=""
+              size="small"
+              table-layout="fixed"
+              hover
+              :aria-label="t('dataTools.textToColumns.preview')"
+            >
+              <template #row="{ row }">{{ row.row + 1 }}</template>
+              <template #previewColumnTitle="{ colIndex }">
+                <TButton
+                  v-if="step === 1"
+                  variant="text"
+                  :theme="selectedColumn === colIndex - 1 ? 'primary' : 'default'"
+                  :aria-pressed="selectedColumn === colIndex - 1"
+                  :data-split-column="colIndex - 1"
+                  @click="selectedColumn = colIndex - 1"
+                >
+                  {{ t("dataTools.textToColumns.column", { column: colIndex }) }} ·
+                  {{
+                    typeOptions.find((type) => type.value === draft.columnTypes[colIndex - 1])
+                      ?.label
+                  }}
+                </TButton>
+                <span v-else>{{ t("dataTools.textToColumns.column", { column: colIndex }) }}</span>
+              </template>
+            </TTable>
+          </TableHeightWrapper>
+        </div>
       </div>
     </div>
     <template #footer
@@ -765,6 +768,11 @@ function confirm(): void {
     align-items: center;
     gap: 12px;
     width: 100%;
+  }
+  &__preview-section {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
   }
   &__preview-heading {
     display: flex;
