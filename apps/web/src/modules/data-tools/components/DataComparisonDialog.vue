@@ -187,48 +187,47 @@ watch(
         </TFormItem>
 
         <TFormItem name="comparisonMode" :label="t('dataTools.comparison.comparisonMode')">
-          <TRadioGroup v-model="draft.comparisonMode" :disabled="busy">
-            <TRadio value="cells">{{ t("dataTools.comparison.cells") }}</TRadio>
-            <TRadio value="rows">{{ t("dataTools.comparison.rows") }}</TRadio>
-          </TRadioGroup>
-        </TFormItem>
-        <TFormItem name="hasHeader">
-          <TCheckbox v-model="draft.hasHeader" :disabled="busy">
-            {{ t("dataTools.comparison.header") }}
-          </TCheckbox>
-        </TFormItem>
-
-        <TFormItem v-if="draft.comparisonMode === 'rows'" name="columns">
-          <div class="data-comparison-dialog__columns">
-            <div class="data-comparison-dialog__selection-actions">
-              <TCheckbox
-                :checked="allSelected"
-                :indeterminate="partlySelected"
-                :disabled="busy || columns.length === 0"
-                @change="toggleAll(Boolean($event))"
-                >{{ t("dataTools.comparison.selectAll") }}</TCheckbox
-              >
-              <TButton
-                variant="text"
-                size="small"
-                :disabled="busy || columns.length === 0"
-                @click="invertSelection"
-                >{{ t("dataTools.comparison.invert") }}</TButton
-              >
+          <div class="data-comparison-dialog__comparison">
+            <div class="data-comparison-dialog__mode">
+              <TRadioGroup v-model="draft.comparisonMode" :disabled="busy">
+                <TRadio value="cells">{{ t("dataTools.comparison.cells") }}</TRadio>
+                <TRadio value="rows">{{ t("dataTools.comparison.rows") }}</TRadio>
+              </TRadioGroup>
             </div>
-            <TCheckbox
-              v-for="column in columns"
-              :key="column.column"
-              class="data-comparison-dialog__column"
-              :checked="draft.columns.includes(column.column)"
-              :disabled="busy"
-              @change="toggle(column.column, Boolean($event))"
-              >{{ t("dataTools.comparison.column", { column: column.label })
-              }}{{ column.header ? ` (${column.header})` : "" }}</TCheckbox
-            >
-            <p v-if="draft.scope === 'double'" class="data-comparison-dialog__hint">
-              {{ t("dataTools.comparison.doubleRowsHint") }}
-            </p>
+            <TCheckbox v-model="draft.hasHeader" :disabled="busy">
+              {{ t("dataTools.comparison.header") }}
+            </TCheckbox>
+            <div v-if="draft.comparisonMode === 'rows'" class="data-comparison-dialog__columns">
+              <div class="data-comparison-dialog__selection-actions">
+                <TCheckbox
+                  :checked="allSelected"
+                  :indeterminate="partlySelected"
+                  :disabled="busy || columns.length === 0"
+                  @change="toggleAll(Boolean($event))"
+                  >{{ t("dataTools.comparison.selectAll") }}</TCheckbox
+                >
+                <TButton
+                  variant="text"
+                  size="small"
+                  :disabled="busy || columns.length === 0"
+                  @click="invertSelection"
+                  >{{ t("dataTools.comparison.invert") }}</TButton
+                >
+              </div>
+              <TCheckbox
+                v-for="column in columns"
+                :key="column.column"
+                class="data-comparison-dialog__column"
+                :checked="draft.columns.includes(column.column)"
+                :disabled="busy"
+                @change="toggle(column.column, Boolean($event))"
+                >{{ t("dataTools.comparison.column", { column: column.label })
+                }}{{ column.header ? ` (${column.header})` : "" }}</TCheckbox
+              >
+              <p v-if="draft.scope === 'double'" class="data-comparison-dialog__hint">
+                {{ t("dataTools.comparison.doubleRowsHint") }}
+              </p>
+            </div>
           </div>
         </TFormItem>
 
@@ -276,6 +275,19 @@ watch(
 .data-comparison-dialog {
   display: grid;
   gap: var(--idea-space-2);
+
+  &__comparison {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    gap: var(--idea-space-2);
+  }
+
+  &__mode {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+  }
 
   &__columns {
     @include option-list.surface;
