@@ -486,7 +486,7 @@ function confirm(): void {
                 t("dataTools.textToColumns.mergeDelimiters")
               }}</TCheckbox>
             </div>
-            <TFormItem :label="t('dataTools.textToColumns.qualifier')"
+            <TFormItem :label="t('dataTools.textToColumns.qualifier')" label-align="right"
               ><TSelect
                 v-model="draft.textQualifier"
                 :options="qualifierOptions"
