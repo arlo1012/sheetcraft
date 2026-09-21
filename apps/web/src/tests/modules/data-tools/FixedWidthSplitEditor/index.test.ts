@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
-import { afterEach, describe, expect, test } from "vitest";
-import { nextTick } from "vue";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import { defineComponent, nextTick, ref } from "vue";
 import FixedWidthSplitEditor from "../../../../modules/data-tools/components/FixedWidthSplitEditor.vue";
 import { createAppI18n } from "../../../../shared/i18n";
 
@@ -20,6 +20,31 @@ function mountEditor(widths: readonly number[] = [2, 3]) {
     },
     global: { plugins: [createAppI18n("en-US")] },
   });
+  mounted.push(wrapper);
+  return wrapper;
+}
+
+function mountControlledEditor(widths: readonly number[] = [2, 3]) {
+  const wrapper = mount(
+    defineComponent({
+      components: { FixedWidthSplitEditor },
+      setup() {
+        const currentWidths = ref([...widths]);
+        const updateWidths = (next: number[]) => {
+          currentWidths.value = next;
+        };
+        return { currentWidths, updateWidths };
+      },
+      template: `
+        <FixedWidthSplitEditor
+          :rows="[{ row: 0, text: '123456789' }]"
+          :widths="currentWidths"
+          @change="updateWidths"
+        />
+      `,
+    }),
+    { attachTo: document.body, global: { plugins: [createAppI18n("en-US")] } },
+  );
   mounted.push(wrapper);
   return wrapper;
 }
@@ -77,18 +102,51 @@ describe("FixedWidthSplitEditor", () => {
     expect(editor.emitted("change")?.length).toBe(changesAfterStop);
   });
 
-  test("moves and removes a break with the keyboard or double click", async () => {
-    const editor = mountEditor([2, 3]);
+  test("focuses added and moved breaks so keyboard movement and deletion work", async () => {
+    const editor = mountControlledEditor([2]);
+    const ruler = editor.get(".fixed-width-split-editor__ruler");
+    setLeft(ruler.element, 200);
+    await ruler.trigger("click", { clientX: 270 });
+    await nextTick();
+
+    const addedLine = editor.get('[aria-label="Column break after character 5"]');
+    expect(document.activeElement).toBe(addedLine.element);
+
+    const bodyKeydown = vi.fn();
+    document.body.addEventListener("keydown", bodyKeydown);
+    addedLine.element.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "ArrowRight" }),
+    );
+    await nextTick();
+
+    const movedLine = editor.get('[aria-label="Column break after character 6"]');
+    expect(document.activeElement).toBe(movedLine.element);
+    expect(bodyKeydown).not.toHaveBeenCalled();
+
+    movedLine.element.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Delete" }));
+    await nextTick();
+    expect(document.activeElement).toBe(
+      editor.get('[aria-label="Column break after character 2"]').element,
+    );
+    document.body.removeEventListener("keydown", bodyKeydown);
+  });
+
+  test("focuses an existing break after pointerdown and keeps double click deletion", async () => {
+    const editor = mountControlledEditor([2, 3]);
+    const ruler = editor.get(".fixed-width-split-editor__ruler");
+    setLeft(ruler.element, 100);
     const firstLine = editor.get('[aria-label="Column break after character 2"]');
 
-    await firstLine.trigger("keydown", { key: "ArrowRight" });
-    expect(editor.emitted("change")?.at(-1)).toEqual([[3, 2]]);
-
-    await firstLine.trigger("keydown", { key: "Delete" });
-    expect(editor.emitted("change")?.at(-1)).toEqual([[5]]);
+    await firstLine.trigger("pointerdown", { button: 0 });
+    expect(document.activeElement).toBe(firstLine.element);
+    window.dispatchEvent(pointerEvent("pointerup", 100));
 
     const secondLine = editor.get('[aria-label="Column break after character 5"]');
     await secondLine.trigger("dblclick");
-    expect(editor.emitted("change")?.at(-1)).toEqual([[2]]);
+    await nextTick();
+    expect(editor.find('[aria-label="Column break after character 5"]').exists()).toBe(false);
+    expect(document.activeElement).toBe(
+      editor.get('[aria-label="Column break after character 2"]').element,
+    );
   });
 });
