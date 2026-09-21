@@ -219,6 +219,7 @@ watch(
             <TCheckbox
               v-for="column in columns"
               :key="column.column"
+              class="data-comparison-dialog__column"
               :checked="draft.columns.includes(column.column)"
               :disabled="busy"
               @change="toggle(column.column, Boolean($event))"
@@ -270,17 +271,28 @@ watch(
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/option-list/option-list";
+
 .data-comparison-dialog {
   display: grid;
   gap: var(--idea-space-2);
 
   &__columns {
+    @include option-list.surface;
+    width: 100%;
     display: grid;
     align-content: start;
-    gap: var(--idea-space-2);
+    gap: var(--idea-space-1);
     max-height: 180px;
-    overflow: auto;
-    padding: var(--idea-space-1) 0;
+    padding: var(--idea-space-2);
+    border-color: var(--td-border-level-2-color);
+    border-radius: var(--td-radius-default);
+    background: var(--td-bg-color-specialcomponent);
+  }
+
+  &__column {
+    min-width: max-content;
+    white-space: nowrap;
   }
 
   &__selection-actions {
