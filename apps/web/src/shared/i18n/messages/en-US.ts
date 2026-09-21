@@ -210,7 +210,7 @@ export const enUS = {
       fillFields: "Fields to fill",
       addField: "Add field",
       removeField: "Remove",
-      matchMode: "When multiple source rows match",
+      matchMode: "Multiple matches",
       first: "Use first match",
       last: "Use last match",
       overwrite: "Overwrite existing target values",

@@ -286,7 +286,12 @@ watch(
                 ><template #icon><Trash2 :size="16" /></template
               ></TButton>
             </div>
-            <TButton variant="text" size="small" :disabled="busy" @click="add('matchFields')"
+            <TButton
+              class="lookup-fill-dialog__add-field"
+              variant="text"
+              size="small"
+              :disabled="busy"
+              @click="add('matchFields')"
               ><template #icon><Plus :size="15" /></template
               >{{ t("dataTools.lookupFill.addField") }}</TButton
             >
@@ -339,7 +344,12 @@ watch(
                 ><template #icon><Trash2 :size="16" /></template
               ></TButton>
             </div>
-            <TButton variant="text" size="small" :disabled="busy" @click="add('fillFields')"
+            <TButton
+              class="lookup-fill-dialog__add-field"
+              variant="text"
+              size="small"
+              :disabled="busy"
+              @click="add('fillFields')"
               ><template #icon><Plus :size="15" /></template
               >{{ t("dataTools.lookupFill.addField") }}</TButton
             >
@@ -351,18 +361,20 @@ watch(
             ><TRadio value="last">{{ t("dataTools.lookupFill.last") }}</TRadio></TRadioGroup
           ></TFormItem
         >
-        <TFormItem name="overwrite" :label="t('dataTools.lookupFill.overwrite')"
+        <TFormItem name="overwrite"
           ><TCheckbox v-model="draft.overwrite" :disabled="busy">{{
             t("dataTools.lookupFill.overwriteExisting")
           }}</TCheckbox></TFormItem
         >
-        <p v-if="invalidMappings || !fieldsReady" class="lookup-fill-dialog__notice" role="alert">
-          {{
-            invalidMappings
-              ? t("dataTools.lookupFill.invalidMappings")
-              : t("dataTools.lookupFill.completeMappings")
-          }}
-        </p>
+        <TFormItem v-if="invalidMappings || !fieldsReady">
+          <p class="lookup-fill-dialog__notice" role="alert">
+            {{
+              invalidMappings
+                ? t("dataTools.lookupFill.invalidMappings")
+                : t("dataTools.lookupFill.completeMappings")
+            }}
+          </p>
+        </TFormItem>
       </TForm>
       <section
         v-else
@@ -468,6 +480,9 @@ watch(
 .lookup-fill-dialog__mapping-head {
   color: var(--idea-text-secondary);
   font-size: var(--idea-font-size-body-small);
+}
+.lookup-fill-dialog__add-field {
+  justify-self: start;
 }
 .lookup-fill-dialog__mapping-actions {
   display: flex;

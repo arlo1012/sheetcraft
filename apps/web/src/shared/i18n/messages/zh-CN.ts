@@ -203,7 +203,7 @@ export const zhCN = {
       fillFields: "填写字段",
       addField: "添加字段",
       removeField: "移除",
-      matchMode: "来源中有多条匹配记录时",
+      matchMode: "多条匹配",
       first: "使用第一条",
       last: "使用最后一条",
       overwrite: "覆盖目标中已有的内容",
