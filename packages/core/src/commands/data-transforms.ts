@@ -14,14 +14,15 @@ import {
 } from "../workbook.js";
 import type { CellContent } from "../formula/types.js";
 import { cloneCellStyle } from "../style.js";
-import { datePartsToExcelSerial } from "../formula/date-system.js";
 import { translateFormulaForCopy } from "../formula/references.js";
 import { resolveDataRange } from "../data-range.js";
 import type {
   RemoveDuplicatesCommand,
   RestoreFullSheetStateCommand,
   SplitColumnCommand,
+  SplitTextOptions,
 } from "./contracts.js";
+import { convertSplitColumnField, splitText } from "./split-text.js";
 import {
   assertCellRange,
   getSheetOrThrow,
@@ -53,104 +54,9 @@ function valueAsText(workbook: Workbook, sheetId: string, address: CellAddress):
   return value === null ? "" : typeof value === "object" ? `#${value.code}!` : String(value);
 }
 
-type DelimiterOptions = {
-  textQualifier?: '"' | "'" | "none";
-  mergeDelimiters?: boolean;
-};
-
-function delimiterOptions(options: boolean | DelimiterOptions | undefined): {
-  qualifier?: '"' | "'";
-  mergeDelimiters: boolean;
-} {
-  if (typeof options === "boolean")
-    return { qualifier: options ? '"' : undefined, mergeDelimiters: false };
-  return {
-    qualifier:
-      options?.textQualifier === "none" ? undefined : options?.textQualifier === "'" ? "'" : '"',
-    mergeDelimiters: options?.mergeDelimiters ?? false,
-  };
-}
-
-/** Parses qualified fields as well as ordinary one-character delimiters. */
-export function splitDelimitedText(
-  text: string,
-  delimiter: string,
-  options: boolean | DelimiterOptions = true,
-): string[] {
-  if (!delimiter) throw new RangeError("A delimiter is required.");
-  const { qualifier, mergeDelimiters } = delimiterOptions(options);
-  const fields: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index]!;
-    if (qualifier && char === qualifier && (inQuotes || field.length === 0)) {
-      if (inQuotes && text[index + 1] === qualifier) {
-        field += qualifier;
-        index += 1;
-      } else inQuotes = !inQuotes;
-    } else if (
-      !inQuotes &&
-      (delimiter.length === 1 ? char === delimiter : delimiter.includes(char))
-    ) {
-      fields.push(field);
-      field = "";
-      if (mergeDelimiters)
-        while (index + 1 < text.length && delimiter.includes(text[index + 1]!)) index += 1;
-    } else field += char;
-  }
-  fields.push(field);
-  return fields;
-}
-
 /** Pure preview used by UI before issuing a split command. */
-export function previewSplitColumn(
-  text: string,
-  options: Pick<
-    SplitColumnCommand,
-    "mode" | "delimiter" | "fixedWidths" | "parseQuoted" | "textQualifier" | "mergeDelimiters"
-  >,
-): string[] {
-  return options.mode === "delimiter"
-    ? splitDelimitedText(text, options.delimiter ?? ",", {
-        textQualifier: options.textQualifier ?? (options.parseQuoted === false ? "none" : '"'),
-        mergeDelimiters: options.mergeDelimiters,
-      })
-    : splitFixedWidthText(text, options.fixedWidths ?? []);
-}
-
-function parseDateField(raw: string, workbook: Workbook): number | undefined {
-  const match = raw.trim().match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/u);
-  if (!match) return undefined;
-  try {
-    return datePartsToExcelSerial(
-      {
-        year: Number(match[1]),
-        month: Number(match[2]),
-        day: Number(match[3]),
-        hour: 0,
-        minute: 0,
-        second: 0,
-        millisecond: 0,
-      },
-      workbook.dateSystem,
-    );
-  } catch {
-    return undefined;
-  }
-}
-
-export function splitFixedWidthText(text: string, widths: readonly number[]): string[] {
-  if (!widths.length || widths.some((width) => !Number.isInteger(width) || width <= 0))
-    throw new RangeError("Fixed widths must be positive integers.");
-  const fields: string[] = [];
-  let offset = 0;
-  for (const width of widths) {
-    fields.push(text.slice(offset, offset + width));
-    offset += width;
-  }
-  fields.push(text.slice(offset));
-  return fields;
+export function previewSplitColumn(text: string, options: SplitTextOptions): string[] {
+  return splitText(text, options);
 }
 
 export function createSplitColumnCommand(
@@ -198,12 +104,7 @@ export function applySplitColumnCommand(
       row,
       column: command.sourceColumn,
     });
-    return command.mode === "delimiter"
-      ? splitDelimitedText(text, command.delimiter ?? ",", {
-          textQualifier: command.textQualifier ?? (command.parseQuoted === false ? "none" : '"'),
-          mergeDelimiters: command.mergeDelimiters,
-        })
-      : splitFixedWidthText(text, command.fixedWidths ?? []);
+    return splitText(text, command);
   });
   // A downward destination may overlap a later source row. Capture styles before
   // the first write so each output row keeps its original source formatting.
@@ -290,18 +191,19 @@ export function applySplitColumnCommand(
         column: command.destinationColumn + outputOffset,
       };
       const raw = fields[offset] ?? "";
-      const date = type === "date" ? parseDateField(raw, workbook) : undefined;
-      const value =
-        date ??
-        (type === "general" && raw.trim() !== "" && Number.isFinite(Number(raw))
-          ? Number(raw)
-          : raw);
-      setCellContent(sheet, address, { kind: "literal", value });
-      if (sourceStyle || date !== undefined) {
-        const style = cloneCellStyle(sourceStyle) ?? {};
-        if (date !== undefined) style.numberFormat = { kind: "date", code: "yyyy-mm-dd" };
-        setCellStyle(sheet, address, style);
-      }
+      const converted = convertSplitColumnField(
+        raw,
+        type,
+        command.dateOrders?.[offset],
+        workbook.dateSystem,
+      );
+      setCellContent(sheet, address, { kind: "literal", value: converted.value });
+      // Always set a style (or clear it), otherwise an overwritten target can
+      // retain a date/currency format unrelated to the parsed result.
+      const style = cloneCellStyle(sourceStyle) ?? {};
+      if (converted.numberFormat) style.numberFormat = converted.numberFormat;
+      else if (command.columnTypes?.[offset] === "general") delete style.numberFormat;
+      setCellStyle(sheet, address, Object.keys(style).length ? style : null);
       changed = true;
     }
   }

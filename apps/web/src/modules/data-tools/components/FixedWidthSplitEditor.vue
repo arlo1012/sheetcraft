@@ -8,8 +8,11 @@ const props = defineProps<{
 const emit = defineEmits<{ change: [widths: number[]] }>();
 const { t } = useAppI18n();
 const characterWidth = 14;
+function characters(text: string): string[] {
+  return Array.from(text);
+}
 const length = computed(() =>
-  Math.min(512, Math.max(20, ...props.rows.map((row) => row.text.length))),
+  Math.min(512, Math.max(20, ...props.rows.map((row) => characters(row.text).length))),
 );
 const positions = computed(() => {
   let offset = 0;
@@ -91,7 +94,7 @@ onBeforeUnmount(() => endDrag?.());
         </div>
         <div v-for="row in rows" :key="row.row" class="fixed-width-split-editor__row">
           <span
-            v-for="(char, index) in row.text.slice(0, 512).split('')"
+            v-for="(char, index) in characters(row.text).slice(0, 512)"
             :key="index"
             :style="{ width: `${characterWidth}px` }"
             >{{ char }}</span

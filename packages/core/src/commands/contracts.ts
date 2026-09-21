@@ -253,22 +253,37 @@ export type AdvancedFilterCommand = {
   uniqueOnly: boolean;
   overwrite: boolean;
 };
-export type SplitColumnCommand = {
+export type SplitTextMode = "delimiter" | "fixedWidth" | "textType" | "keyword";
+export type SplitTextType = "chinese" | "english" | "number";
+export type SplitDateOrder = "YMD" | "MDY" | "DMY" | "YDM" | "MYD" | "DYM";
+
+/** Runtime-neutral rules for turning one text value into fields. */
+export type SplitTextOptions = {
+  mode: SplitTextMode;
+  /** Legacy delimiter syntax: every character is an independent delimiter. */
+  delimiter?: string;
+  /** Atomic delimiter tokens. Longer tokens take precedence over shorter ones. */
+  delimiters?: string[];
+  fixedWidths?: number[];
+  textQualifier?: '"' | "'" | "none";
+  mergeDelimiters?: boolean;
+  parseQuoted?: boolean;
+  textTypes?: SplitTextType[];
+  keywords?: string[];
+  keywordPosition?: "before" | "after";
+  keepKeywords?: boolean;
+};
+
+export type SplitColumnCommand = SplitTextOptions & {
   type: "splitColumn";
   sheetId: string;
   sourceColumn: number;
   range?: CellRange;
   destinationColumn: number;
-  mode: "delimiter" | "fixedWidth";
-  delimiter?: string;
-  fixedWidths?: number[];
-  /** The character that can wrap a delimited field. `parseQuoted` remains for older callers. */
-  textQualifier?: '"' | "'" | "none";
-  /** Treat adjacent delimiter characters as a single delimiter. */
-  mergeDelimiters?: boolean;
-  parseQuoted?: boolean;
   /** Output conversions. Skipped source fields do not consume a destination column. */
   columnTypes?: Array<"general" | "text" | "date" | "skip">;
+  /** Date component order for each output field when its type is `date`. */
+  dateOrders?: SplitDateOrder[];
   /** Zero-based output start row; defaults to the first source row. */
   destinationRow?: number;
   overwrite?: boolean;

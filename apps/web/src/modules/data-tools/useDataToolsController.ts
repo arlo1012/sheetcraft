@@ -18,6 +18,7 @@ import {
   getSheetFilterColumnValueCounts,
   getSheetFilterValueKey,
   previewSplitColumn,
+  suggestSplitColumnOptions,
   subtractSheetDataValidation,
   type WorkbookCommand,
 } from "@idea10/core/commands";
@@ -39,6 +40,7 @@ import { resolveRangeReference } from "../../shared/range-reference/formatRangeR
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { readSortSettings, writeSortSettings } from "./sort-settings";
 import { getSortColorColumns } from "./sort-color-options";
+import { resolveTextToColumnsOptions } from "./text-to-columns-options";
 import { isValidationDraftComplete } from "./validation-draft";
 import { useDuplicateToolsController } from "./useDuplicateToolsController";
 import { useConsolidateController } from "./useConsolidateController";
@@ -354,19 +356,38 @@ export function useDataToolsController(options: Options) {
     const target = visibleDialogTarget.value;
     return target ? rangeLabel(target.range) : "";
   });
-  function previewSplitText(text: string, draft: TextToColumnsDraft): string[] {
-    return previewSplitColumn(text, {
-      mode: draft.mode === "fixed-width" ? "fixedWidth" : "delimiter",
-      textQualifier: draft.textQualifier,
-      mergeDelimiters: draft.mergeDelimiters,
-      ...(draft.mode === "delimiter"
-        ? { delimiter: [...draft.delimiters, draft.otherDelimiter].filter(Boolean).join("") }
-        : { fixedWidths: draft.fixedWidths }),
-    });
-  }
   function splitText(value: ReturnType<SheetEvaluator["getComputedValue"]>): string {
     return value === null ? "" : typeof value === "object" ? `#${value.code}!` : String(value);
   }
+  const splitSourceEntries = computed(() => {
+    const target = textTarget.value;
+    if (!target || !valid(target)) return [];
+    const evaluator = options.getSheetEvaluator();
+    const entries: Array<{ row: number; text: string }> = [];
+    for (const [key, cell] of activeSheet.value.cells) {
+      if (!cell.content) continue;
+      const separator = key.indexOf(":");
+      const row = Number(key.slice(0, separator));
+      const column = Number(key.slice(separator + 1));
+      if (
+        column === target.range.start.column &&
+        row >= target.range.start.row &&
+        row <= target.range.end.row
+      )
+        entries.push({ row, text: splitText(evaluator.getComputedValue({ row, column })) });
+    }
+    return entries.sort((left, right) => left.row - right.row);
+  });
+  const splitSuggestions = computed(() => {
+    const entries = splitSourceEntries.value.filter(({ text }) => text.trim().length > 0);
+    const count = Math.min(entries.length, 200);
+    const sample = Array.from(
+      { length: count },
+      (_, index) =>
+        entries[count === 1 ? 0 : Math.floor((index * (entries.length - 1)) / (count - 1))]!.text,
+    );
+    return suggestSplitColumnOptions(sample);
+  });
   const splitSourceRows = computed(() => {
     const target = textTarget.value;
     if (!target || !valid(target)) return [];
@@ -384,47 +405,31 @@ export function useDataToolsController(options: Options) {
     const target = textTarget.value;
     return target ? `${columnName(target.range.start.column)}${target.range.start.row + 1}` : "";
   });
-  const splitPreviewRows = computed(() => {
+  const splitAnalysis = computed(() => {
     const draft = splitDraft.value;
-    if (!draft) return [];
+    const empty = { rows: [], columnCount: 0, error: "" };
+    if (!draft) return empty;
+    const resolved = resolveTextToColumnsOptions(draft, splitSuggestions.value);
+    if (!resolved) return empty;
     try {
-      return splitSourceRows.value.map(({ row, text }) => ({
-        row,
-        values: previewSplitText(text, draft),
-      }));
+      let columnCount = previewSplitColumn("", resolved).length;
+      for (const { text } of splitSourceEntries.value)
+        columnCount = Math.max(columnCount, previewSplitColumn(text, resolved).length);
+      return {
+        rows: splitSourceRows.value.map(({ row, text }) => ({
+          row,
+          values: previewSplitColumn(text, resolved),
+        })),
+        columnCount,
+        error: "",
+      };
     } catch {
-      return [];
+      return { ...empty, error: t("dataTools.textToColumns.invalidSettings") };
     }
   });
-  const splitColumnCount = computed(() => {
-    const target = textTarget.value;
-    const draft = splitDraft.value;
-    if (!target || !draft || !valid(target)) return 0;
-    try {
-      const sheet = activeSheet.value;
-      const evaluator = options.getSheetEvaluator();
-      let max = previewSplitText("", draft).length;
-      for (const [key, cell] of sheet.cells) {
-        if (!cell.content) continue;
-        const separator = key.indexOf(":");
-        const row = Number(key.slice(0, separator));
-        const column = Number(key.slice(separator + 1));
-        if (
-          column !== target.range.start.column ||
-          row < target.range.start.row ||
-          row > target.range.end.row
-        )
-          continue;
-        max = Math.max(
-          max,
-          previewSplitText(splitText(evaluator.getComputedValue({ row, column })), draft).length,
-        );
-      }
-      return max;
-    } catch {
-      return 0;
-    }
-  });
+  const splitPreviewRows = computed(() => splitAnalysis.value.rows);
+  const splitColumnCount = computed(() => splitAnalysis.value.columnCount);
+  const splitPreviewError = computed(() => splitAnalysis.value.error);
   const splitPreview = computed(() => splitPreviewRows.value[0]?.values ?? []);
   const duplicateCount = computed(() => {
     const target = duplicateTarget.value;
@@ -577,13 +582,21 @@ export function useDataToolsController(options: Options) {
   }
   function applyTextToColumns(draft: TextToColumnsDraft): void {
     const target = textTarget.value;
-    const delimiter = [...draft.delimiters, draft.otherDelimiter].filter(Boolean).join("");
-    if (
-      !target ||
-      (draft.mode === "delimiter" && !delimiter) ||
-      (draft.mode === "fixed-width" && !draft.fixedWidths.length)
-    ) {
-      error();
+    const resolved = resolveTextToColumnsOptions(draft, splitSuggestions.value);
+    if (!target || !resolved) {
+      error(
+        t(
+          draft.mode === "auto"
+            ? "dataTools.textToColumns.autoNoSuggestion"
+            : "dataTools.textToColumns.invalidSettings",
+        ),
+      );
+      return;
+    }
+    try {
+      previewSplitColumn("", resolved);
+    } catch {
+      error(t("dataTools.textToColumns.invalidSettings"));
       return;
     }
     const sourceColumn = target.range.start.column;
@@ -610,10 +623,8 @@ export function useDataToolsController(options: Options) {
         createSplitColumnCommand(target.sheetId, sourceColumn, target.range, {
           destinationColumn: destination.range.start.column,
           destinationRow: destination.range.start.row,
-          textQualifier: draft.textQualifier,
-          mergeDelimiters: draft.mergeDelimiters,
-          mode: draft.mode === "fixed-width" ? "fixedWidth" : "delimiter",
-          ...(draft.mode === "fixed-width" ? { fixedWidths: draft.fixedWidths } : { delimiter }),
+          ...resolved,
+          dateOrders: draft.dateOrders,
           overwrite: draft.overwrite,
           columnTypes: draft.columnTypes,
         }),
@@ -907,6 +918,8 @@ export function useDataToolsController(options: Options) {
     splitPreview,
     splitPreviewRows,
     splitSourceRows,
+    splitSuggestions,
+    splitPreviewError,
     splitColumnCount,
     splitDestinationLabel,
     duplicateCount,

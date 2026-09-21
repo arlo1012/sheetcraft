@@ -6,7 +6,9 @@ import {
   createSetSheetFilterCommand,
   createSplitColumnCommand,
   createSheetFilterHiddenRowIntervals,
+  convertSplitColumnField,
   previewSplitColumn,
+  suggestSplitColumnOptions,
 } from "../../commands/index.js";
 import { executeWorkbookCommand, undoWorkbookCommand, redoWorkbookCommand } from "../../history.js";
 import {
@@ -45,6 +47,177 @@ describe("data transforms", () => {
         textQualifier: "'",
       }),
     ).toEqual(["O'Brien", "007"]);
+  });
+
+  test("supports atomic delimiters, character types, keywords, and code-point widths", () => {
+    expect(
+      previewSplitColumn("a\r\nb\n c", {
+        mode: "delimiter",
+        delimiters: ["\n", " "],
+        mergeDelimiters: true,
+      }),
+    ).toEqual(["a", "b", "c"]);
+    expect(
+      previewSplitColumn("张三ABC123", {
+        mode: "textType",
+        textTypes: ["chinese", "english", "number"],
+      }),
+    ).toEqual(["张三", "ABC", "123"]);
+    expect(
+      previewSplitColumn("foo::bar:baz", {
+        mode: "keyword",
+        keywords: [":", "::"],
+        keywordPosition: "after",
+        keepKeywords: true,
+      }),
+    ).toEqual(["foo::", "bar:", "baz"]);
+    expect(previewSplitColumn("😀ab", { mode: "fixedWidth", fixedWidths: [1, 1] })).toEqual([
+      "😀",
+      "a",
+      "b",
+    ]);
+  });
+
+  test("uses the longest delimiter token and treats newline as a CRLF unit", () => {
+    expect(
+      previewSplitColumn("a::b:c\r\nd", {
+        mode: "delimiter",
+        delimiters: [":", "::", "\n"],
+      }),
+    ).toEqual(["a", "b", "c", "d"]);
+    expect(() => previewSplitColumn("a,b", { mode: "delimiter", delimiters: [] })).toThrow(
+      "delimiter",
+    );
+  });
+
+  test("keeps or removes keywords at the requested split boundary", () => {
+    expect(
+      previewSplitColumn("north/central/south", {
+        mode: "keyword",
+        keywords: ["/"],
+        keywordPosition: "before",
+        keepKeywords: true,
+      }),
+    ).toEqual(["north", "/central", "/south"]);
+    expect(
+      previewSplitColumn("north/central/south", {
+        mode: "keyword",
+        keywords: ["/"],
+        keywordPosition: "after",
+        keepKeywords: true,
+      }),
+    ).toEqual(["north/", "central/", "south"]);
+    expect(
+      previewSplitColumn("/", {
+        mode: "keyword",
+        keywords: ["/"],
+        keepKeywords: false,
+      }),
+    ).toEqual([""]);
+    expect(() => previewSplitColumn("a", { mode: "keyword", keywords: [""] })).toThrow("keyword");
+  });
+
+  test("requires a selected type and only ends selected type runs", () => {
+    expect(() => previewSplitColumn("Ada7", { mode: "textType", textTypes: [] })).toThrow(
+      "text type",
+    );
+    expect(
+      previewSplitColumn("张三ABC123", { mode: "textType", textTypes: ["chinese", "number"] }),
+    ).toEqual(["张三", "ABC123"]);
+  });
+
+  test("shares safe result conversion and data-wide split suggestions", () => {
+    expect(convertSplitColumnField("001", "general", undefined, "1900").value).toBe(1);
+    expect(convertSplitColumnField("001", "text", undefined, "1900").value).toBe("001");
+    expect(convertSplitColumnField("2026-21-09", "date", "YDM", "1900")).toMatchObject({
+      numberFormat: { code: "yyyy-mm-dd" },
+    });
+    expect(convertSplitColumnField("1234567890123456", "general", undefined, "1900").value).toBe(
+      "1234567890123456",
+    );
+    expect(suggestSplitColumnOptions(["Ada,7", "Bob,8", "Cy,9"])[0]).toMatchObject({
+      options: { mode: "delimiter", delimiters: [","] },
+      columnCount: 2,
+    });
+    expect(suggestSplitColumnOptions(["2026-09-22", "12.5", "-7", "1e6"])).toEqual([]);
+    expect(suggestSplitColumnOptions(["2026/09/22", "2026/09/23"])).toEqual([]);
+    expect(suggestSplitColumnOptions(["1,234", "12,345"])).toEqual([]);
+    expect(suggestSplitColumnOptions(["Ada,7", "plain"])).toEqual([]);
+    expect(suggestSplitColumnOptions(["Ada, 7", "Bob, 8"])[0]).toMatchObject({
+      options: { delimiters: [","] },
+    });
+  });
+
+  test("replaces stale destination formats and honours explicit result formats", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "2,001" });
+    setCellContent(sheet, { row: 0, column: 1 }, { kind: "literal", value: 1 });
+    setCellStyle(
+      sheet,
+      { row: 0, column: 1 },
+      { numberFormat: { kind: "date", code: "yyyy-mm-dd" } },
+    );
+    executeWorkbookCommand(
+      session,
+      createSplitColumnCommand(
+        sheet.id,
+        0,
+        { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+        { destinationColumn: 0, mode: "delimiter", delimiter: ",", overwrite: true },
+      ),
+    );
+    expect(getCellContent(sheet, { row: 0, column: 1 })).toEqual({ kind: "literal", value: 1 });
+    expect(getCellStyle(sheet, { row: 0, column: 1 })).toBeUndefined();
+
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: "0042" });
+    setCellStyle(
+      sheet,
+      { row: 1, column: 0 },
+      { bold: true, numberFormat: { kind: "date", code: "yyyy-mm-dd" } },
+    );
+    executeWorkbookCommand(
+      session,
+      createSplitColumnCommand(
+        sheet.id,
+        0,
+        { start: { row: 1, column: 0 }, end: { row: 1, column: 0 } },
+        { destinationColumn: 2, mode: "delimiter", delimiter: ",", columnTypes: ["text"] },
+      ),
+    );
+    expect(getCellStyle(sheet, { row: 1, column: 2 })).toMatchObject({
+      bold: true,
+      numberFormat: { kind: "text" },
+    });
+  });
+
+  test("converts every supported date order, compact dates, and invalid values safely", () => {
+    for (const [order, source] of [
+      ["YMD", "2026-09-21"],
+      ["MDY", "09-21-2026"],
+      ["DMY", "21-09-2026"],
+      ["YDM", "2026-21-09"],
+      ["MYD", "09-2026-21"],
+      ["DYM", "21-2026-09"],
+    ] as const)
+      expect(convertSplitColumnField(source, "date", order, "1900")).toMatchObject({
+        numberFormat: { code: "yyyy-mm-dd" },
+      });
+    for (const [order, compact] of [
+      ["YMD", "20260921"],
+      ["MDY", "09212026"],
+      ["DMY", "21092026"],
+      ["YDM", "20262109"],
+      ["MYD", "09202621"],
+      ["DYM", "21202609"],
+    ] as const)
+      expect(convertSplitColumnField(compact, "date", order, "1900")).toMatchObject({
+        numberFormat: { code: "yyyy-mm-dd" },
+      });
+    expect(convertSplitColumnField("2026年9月21日", "date", "DMY", "1900")).toMatchObject({
+      numberFormat: { code: "yyyy-mm-dd" },
+    });
+    expect(convertSplitColumnField("2026-02-29", "date", "YMD", "1900").value).toBe("2026-02-29");
   });
 
   test("splits quoted delimiters atomically and preserves undo", () => {

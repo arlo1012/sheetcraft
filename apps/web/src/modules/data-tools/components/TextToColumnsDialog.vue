@@ -8,6 +8,7 @@ import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Steps as TSteps, StepItem as TStepItem } from "tdesign-vue-next/es/steps";
+import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { BaseTable as TTable } from "tdesign-vue-next/es/table";
 import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
@@ -15,6 +16,9 @@ import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceI
 import { useAppI18n } from "../../../shared/i18n";
 import FixedWidthSplitEditor from "./FixedWidthSplitEditor.vue";
 import type { TextToColumnsDraft } from "../data-tools-types";
+import { convertSplitColumnField, type SplitColumnSuggestion } from "@idea10/core/commands";
+import { formatCellNumberValue } from "@idea10/core/number-format";
+import type { ExcelDateSystem } from "@idea10/core/formula";
 
 const props = withDefaults(
   defineProps<{
@@ -27,6 +31,9 @@ const props = withDefaults(
     destinationLabel?: string;
     picking?: boolean;
     selectReference?: (current: string) => Promise<string | undefined>;
+    suggestions?: readonly SplitColumnSuggestion[];
+    previewError?: string;
+    dateSystem?: ExcelDateSystem;
   }>(),
   {
     preview: () => [],
@@ -36,6 +43,9 @@ const props = withDefaults(
     rangeLabel: "",
     destinationLabel: "",
     picking: false,
+    suggestions: () => [],
+    previewError: "",
+    dateSystem: "1900",
   },
 );
 const emit = defineEmits<{
@@ -45,13 +55,20 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 const step = ref(0);
+const setupMode = ref<"auto" | "custom">("auto");
 const selectedColumn = ref(0);
-const widthsInput = ref("");
+const breakPositionInput = ref("");
 const otherEnabled = ref(false);
 const defaultDraft = (): TextToColumnsDraft => ({
-  mode: "delimiter",
+  mode: "auto",
+  autoSuggestionId: undefined,
   delimiters: [","],
   otherDelimiter: "",
+  otherDelimiterMode: "characters",
+  textTypes: ["chinese", "english", "number"],
+  keywords: [""],
+  keywordPosition: "after",
+  keepKeywords: true,
   fixedWidths: [],
   columnTypes: Array.from(
     {
@@ -63,12 +80,17 @@ const defaultDraft = (): TextToColumnsDraft => ({
     },
     () => "general" as const,
   ),
+  dateOrders: [],
   textQualifier: '"',
   mergeDelimiters: false,
   destination: props.destinationLabel,
   overwrite: false,
 });
 const draft = ref(defaultDraft());
+const widthsInput = computed(() => {
+  let offset = 0;
+  return draft.value.fixedWidths.map((width) => (offset += width)).join(", ");
+});
 const rows = computed(() =>
   props.previewRows.length
     ? props.previewRows
@@ -79,10 +101,24 @@ const rows = computed(() =>
 const columnCount = computed(() =>
   Math.max(props.totalColumnCount, ...rows.value.map((row) => row.values.length)),
 );
-const previewData = computed(() => (step.value === 0 ? [...props.sourceRows] : [...rows.value]));
-const previewColumnWidth = computed(() => (step.value === 2 ? 160 : 120));
-const previewTableWidth = computed(() =>
-  step.value === 0 ? "100%" : `max(100%, ${56 + columnCount.value * previewColumnWidth.value}px)`,
+const showSourcePreview = computed(
+  () => step.value === 0 && draft.value.mode === "auto" && !props.suggestions.length,
+);
+const previewData = computed(() => {
+  if (
+    showSourcePreview.value ||
+    (step.value === 0 && setupMode.value === "custom" && draft.value.mode === "fixed-width")
+  )
+    return [...props.sourceRows];
+  if (step.value === 0) return [...rows.value];
+  return rows.value.map((row) => ({
+    ...row,
+    values: row.values.map((raw, index) => previewField(raw, index)),
+  }));
+});
+const previewColumnWidth = computed(() => 136);
+const previewTableWidth = computed(
+  () => `max(100%, ${56 + columnCount.value * previewColumnWidth.value}px)`,
 );
 const previewColumns = computed<BaseTableCol[]>(() => [
   {
@@ -92,7 +128,7 @@ const previewColumns = computed<BaseTableCol[]>(() => [
     align: "center",
     fixed: "left",
   },
-  ...(step.value === 0
+  ...(showSourcePreview.value
     ? [{ colKey: "text", title: t("dataTools.textToColumns.source"), ellipsis: true }]
     : Array.from({ length: columnCount.value }, (_, index) => ({
         colKey: `values.${index}`,
@@ -100,15 +136,15 @@ const previewColumns = computed<BaseTableCol[]>(() => [
         width: previewColumnWidth.value,
         ellipsis: true,
         className: [
-          step.value === 2 && selectedColumn.value === index
+          step.value === 1 && selectedColumn.value === index
             ? "text-to-columns-dialog__column--selected"
             : "",
-          step.value === 2 && draft.value.columnTypes[index] === "skip"
+          step.value === 1 && draft.value.columnTypes[index] === "skip"
             ? "text-to-columns-dialog__column--skipped"
             : "",
         ],
         thClassName:
-          step.value === 2 && selectedColumn.value === index
+          step.value === 1 && selectedColumn.value === index
             ? "text-to-columns-dialog__column--selected"
             : "",
       }))),
@@ -118,6 +154,7 @@ const delimiterOptions = computed(() => [
   { value: ";", label: t("dataTools.textToColumns.semicolon") },
   { value: ",", label: t("dataTools.textToColumns.comma") },
   { value: " ", label: t("dataTools.textToColumns.space") },
+  { value: "\n", label: t("dataTools.textToColumns.lineBreak") },
 ]);
 const typeOptions = computed(() => [
   { value: "general", label: t("cellFormat.general") },
@@ -130,15 +167,36 @@ const qualifierOptions = computed(() => [
   { value: "'", label: t("dataTools.textToColumns.singleQuote") },
   { value: "none", label: t("dataTools.textToColumns.none") },
 ]);
+const dateOrderOptions = computed(() =>
+  ["YMD", "MDY", "DMY", "YDM", "MYD", "DYM"].map((value) => ({ value, label: value })),
+);
+const splitModeOptions = computed(() => [
+  { value: "delimiter", label: t("dataTools.textToColumns.delimiter") },
+  { value: "text-type", label: t("dataTools.textToColumns.textType") },
+  { value: "keyword", label: t("dataTools.textToColumns.keyword") },
+  { value: "fixed-width", label: t("dataTools.textToColumns.fixedWidth") },
+]);
+const selectedSuggestion = computed(() =>
+  props.suggestions.find((item) => item.id === draft.value.autoSuggestionId),
+);
 const widthsValid = computed(
-  () => !widthsInput.value.trim() || /^\s*[1-9]\d*(\s*,\s*[1-9]\d*)*\s*$/.test(widthsInput.value),
+  () =>
+    !breakPositionInput.value.trim() ||
+    (/^\s*[1-9]\d*\s*$/.test(breakPositionInput.value) &&
+      Number.isSafeInteger(Number(breakPositionInput.value))),
 );
 const canNext = computed(
   () =>
-    step.value === 0 ||
-    (draft.value.mode === "delimiter"
-      ? Boolean(draft.value.delimiters.length || draft.value.otherDelimiter)
-      : widthsValid.value && draft.value.fixedWidths.length > 0),
+    !props.previewError &&
+    (draft.value.mode === "auto"
+      ? Boolean(selectedSuggestion.value)
+      : draft.value.mode === "delimiter"
+        ? Boolean(draft.value.delimiters.length || draft.value.otherDelimiter)
+        : draft.value.mode === "fixed-width"
+          ? widthsValid.value && draft.value.fixedWidths.length > 0
+          : draft.value.mode === "text-type"
+            ? Boolean(draft.value.textTypes?.length)
+            : Boolean(draft.value.keywords?.some((keyword) => keyword.trim()))),
 );
 const canApply = computed(() =>
   Boolean(
@@ -154,6 +212,9 @@ function copyDraft(): TextToColumnsDraft {
     delimiters: [...draft.value.delimiters],
     fixedWidths: [...draft.value.fixedWidths],
     columnTypes: [...draft.value.columnTypes],
+    dateOrders: [...(draft.value.dateOrders ?? [])],
+    textTypes: [...(draft.value.textTypes ?? [])],
+    keywords: [...(draft.value.keywords ?? [])],
   };
 }
 watch(
@@ -161,10 +222,20 @@ watch(
   (visible) => {
     if (!visible) return;
     step.value = 0;
+    setupMode.value = "auto";
     selectedColumn.value = 0;
-    widthsInput.value = "";
+    breakPositionInput.value = "";
     otherEnabled.value = false;
     draft.value = defaultDraft();
+  },
+  { immediate: true },
+);
+watch(
+  () => [props.visible, props.suggestions, draft.value.mode] as const,
+  ([, suggestions]) => {
+    if (!props.visible || draft.value.mode !== "auto" || !suggestions.length) return;
+    if (!suggestions.some((suggestion) => suggestion.id === draft.value.autoSuggestionId))
+      chooseSuggestion(suggestions[0]!.id);
   },
   { immediate: true },
 );
@@ -193,23 +264,114 @@ function toggleDelimiter(delimiter: string, checked: boolean): void {
     ? [...new Set([...draft.value.delimiters, delimiter])]
     : draft.value.delimiters.filter((item) => item !== delimiter);
 }
-function setWidths(value: string | number): void {
-  widthsInput.value = String(value);
-  if (widthsValid.value)
-    draft.value.fixedWidths = widthsInput.value.trim()
-      ? widthsInput.value.split(",").map(Number)
-      : [];
-}
 function changeWidths(widths: number[]): void {
   draft.value.fixedWidths = widths;
-  widthsInput.value = widths.join(",");
+}
+function addBreakPosition(): void {
+  if (!widthsValid.value || !breakPositionInput.value.trim()) return;
+  const position = Number(breakPositionInput.value);
+  const positions = draft.value.fixedWidths.reduce<number[]>(
+    (values, width) => [...values, (values.at(-1) ?? 0) + width],
+    [],
+  );
+  if (!positions.includes(position)) {
+    const all = [...positions, position].sort((a, b) => a - b);
+    draft.value.fixedWidths = all.map((value, index) => value - (all[index - 1] ?? 0));
+  }
+  breakPositionInput.value = "";
 }
 function setColumnType(value: unknown): void {
   if (value === "general" || value === "text" || value === "date" || value === "skip")
     draft.value.columnTypes[selectedColumn.value] = value;
 }
+function setSetupMode(value: "auto" | "custom"): void {
+  setupMode.value = value;
+  if (value === "custom" && draft.value.mode === "auto") {
+    const options = selectedSuggestion.value?.options;
+    if (options?.mode === "delimiter") {
+      draft.value.mode = "delimiter";
+      draft.value.delimiters = [...(options.delimiters ?? [])];
+      draft.value.textQualifier = options.textQualifier ?? '"';
+      draft.value.mergeDelimiters = options.mergeDelimiters ?? false;
+    } else if (options?.mode === "fixedWidth") {
+      draft.value.mode = "fixed-width";
+      draft.value.fixedWidths = [...(options.fixedWidths ?? [])];
+    } else if (options?.mode === "textType") {
+      draft.value.mode = "text-type";
+      draft.value.textTypes = [...(options.textTypes ?? [])];
+    } else if (options?.mode === "keyword") {
+      draft.value.mode = "keyword";
+      draft.value.keywords = [...(options.keywords ?? [])];
+      draft.value.keywordPosition = options.keywordPosition ?? "after";
+      draft.value.keepKeywords = options.keepKeywords ?? true;
+    } else draft.value.mode = "delimiter";
+  } else if (value === "auto") draft.value.mode = "auto";
+}
+function setCustomMode(value: unknown): void {
+  if (
+    value === "delimiter" ||
+    value === "fixed-width" ||
+    value === "text-type" ||
+    value === "keyword"
+  )
+    draft.value.mode = value;
+}
+function chooseSuggestion(id: string): void {
+  const suggestion = props.suggestions.find((item) => item.id === id);
+  if (!suggestion) return;
+  draft.value.autoSuggestionId = id;
+}
+function toggleTextType(type: "chinese" | "english" | "number", checked: boolean): void {
+  const types = draft.value.textTypes ?? [];
+  draft.value.textTypes = checked
+    ? [...new Set([...types, type])]
+    : types.filter((item) => item !== type);
+}
+function addKeyword(): void {
+  draft.value.keywords = [...(draft.value.keywords ?? []), ""];
+}
+function removeKeyword(index: number): void {
+  draft.value.keywords = (draft.value.keywords ?? []).filter((_, item) => item !== index);
+}
+function setKeyword(index: number, value: string | number): void {
+  const keywords = [...(draft.value.keywords ?? [])];
+  keywords[index] = String(value);
+  draft.value.keywords = keywords;
+}
+function setDateOrder(value: unknown): void {
+  const orders = [...(draft.value.dateOrders ?? [])];
+  const order = String(value) as NonNullable<TextToColumnsDraft["dateOrders"]>[number];
+  orders[selectedColumn.value] = order;
+  draft.value.dateOrders = orders;
+}
+function previewField(raw: string, index: number): string {
+  const type = draft.value.columnTypes[index] ?? "general";
+  const result = convertSplitColumnField(
+    raw,
+    type,
+    draft.value.dateOrders?.[index],
+    props.dateSystem,
+  );
+  if (result.numberFormat && typeof result.value === "number")
+    return formatCellNumberValue(result.value, result.numberFormat, {
+      dateSystem: props.dateSystem,
+    }).text;
+  return String(result.value);
+}
+function suggestionLabel(suggestion: SplitColumnSuggestion): string {
+  const mode = suggestion.options.mode;
+  const rule =
+    mode === "delimiter"
+      ? `${t("dataTools.textToColumns.delimiter")} (${suggestion.options.delimiters?.map((delimiter) => delimiterOptions.value.find((option) => option.value === delimiter)?.label ?? delimiter).join(", ")})`
+      : mode === "fixedWidth"
+        ? t("dataTools.textToColumns.fixedWidth")
+        : mode === "textType"
+          ? t("dataTools.textToColumns.textType")
+          : t("dataTools.textToColumns.keyword");
+  return t("dataTools.textToColumns.suggestion", { rule, count: suggestion.columnCount });
+}
 function confirm(): void {
-  if (step.value < 2) {
+  if (step.value < 1) {
     if (canNext.value) step.value += 1;
   } else if (canApply.value) emit("apply", copyDraft());
 }
@@ -226,7 +388,6 @@ function confirm(): void {
   >
     <div class="text-to-columns-dialog">
       <TSteps :current="step" readonly theme="dot">
-        <TStepItem :title="t('dataTools.textToColumns.stepType')" />
         <TStepItem :title="t('dataTools.textToColumns.stepSplit')" />
         <TStepItem :title="t('dataTools.textToColumns.stepOutput')" />
       </TSteps>
@@ -235,20 +396,41 @@ function confirm(): void {
       </p>
       <TForm label-align="left" :label-width="104" @submit.prevent>
         <template v-if="step === 0">
-          <TFormItem :label="t('dataTools.textToColumns.stepType')">
-            <TRadioGroup v-model="draft.mode" class="text-to-columns-dialog__modes">
-              <div>
-                <TRadio value="delimiter">{{ t("dataTools.textToColumns.delimiter") }}</TRadio>
-                <p>{{ t("dataTools.textToColumns.delimiterHint") }}</p>
+          <TTabs :value="setupMode" @change="setSetupMode($event as 'auto' | 'custom')">
+            <TTabPanel value="auto" :label="t('dataTools.textToColumns.autoSplit')">
+              <div class="text-to-columns-dialog__auto-settings">
+                <p class="text-to-columns-dialog__hint">
+                  {{ t("dataTools.textToColumns.autoHint") }}
+                </p>
+                <TRadioGroup
+                  :value="draft.autoSuggestionId"
+                  class="text-to-columns-dialog__suggestions"
+                  @change="chooseSuggestion(String($event))"
+                >
+                  <TRadio
+                    v-for="suggestion in suggestions"
+                    :key="suggestion.id"
+                    :value="suggestion.id"
+                    >{{ suggestionLabel(suggestion) }}</TRadio
+                  >
+                </TRadioGroup>
+                <p v-if="!suggestions.length" class="text-to-columns-dialog__error">
+                  {{ t("dataTools.textToColumns.autoNoSuggestion") }}
+                </p>
               </div>
-              <div>
-                <TRadio value="fixed-width">{{ t("dataTools.textToColumns.fixedWidth") }}</TRadio>
-                <p>{{ t("dataTools.textToColumns.widthHint") }}</p>
-              </div>
-            </TRadioGroup>
-          </TFormItem>
-        </template>
-        <template v-else-if="step === 1">
+            </TTabPanel>
+            <TTabPanel value="custom" :label="t('dataTools.textToColumns.customSplit')">
+              <TRadioGroup
+                :value="draft.mode"
+                class="text-to-columns-dialog__mode-tabs"
+                @change="setCustomMode"
+              >
+                <TRadio v-for="item in splitModeOptions" :key="item.value" :value="item.value">{{
+                  item.label
+                }}</TRadio>
+              </TRadioGroup>
+            </TTabPanel>
+          </TTabs>
           <template v-if="draft.mode === 'delimiter'">
             <TFormItem :label="t('dataTools.textToColumns.delimiter')">
               <div class="text-to-columns-dialog__delimiter-group">
@@ -261,6 +443,16 @@ function confirm(): void {
                     >{{ item.label }}</TCheckbox
                   >
                 </div>
+                <TRadioGroup
+                  v-if="otherEnabled"
+                  v-model="draft.otherDelimiterMode"
+                  class="text-to-columns-dialog__inline"
+                >
+                  <TRadio value="characters">{{
+                    t("dataTools.textToColumns.anyCharacter")
+                  }}</TRadio>
+                  <TRadio value="token">{{ t("dataTools.textToColumns.fullToken") }}</TRadio>
+                </TRadioGroup>
                 <div class="text-to-columns-dialog__other">
                   <TCheckbox
                     v-model="otherEnabled"
@@ -285,17 +477,89 @@ function confirm(): void {
             /></TFormItem>
           </template>
           <TFormItem
-            v-else
-            :label="t('dataTools.textToColumns.widths')"
-            :help="t('dataTools.textToColumns.widthsHint')"
+            v-else-if="draft.mode === 'text-type'"
+            :label="t('dataTools.textToColumns.textType')"
+          >
+            <div class="text-to-columns-dialog__setting">
+              <p class="text-to-columns-dialog__hint">
+                {{ t("dataTools.textToColumns.textTypeHint") }}
+              </p>
+              <div class="text-to-columns-dialog__inline">
+                <TCheckbox
+                  :checked="draft.textTypes?.includes('chinese')"
+                  @change="toggleTextType('chinese', Boolean($event))"
+                  >{{ t("dataTools.textToColumns.chinese") }}</TCheckbox
+                >
+                <TCheckbox
+                  :checked="draft.textTypes?.includes('english')"
+                  @change="toggleTextType('english', Boolean($event))"
+                  >{{ t("dataTools.textToColumns.english") }}</TCheckbox
+                >
+                <TCheckbox
+                  :checked="draft.textTypes?.includes('number')"
+                  @change="toggleTextType('number', Boolean($event))"
+                  >{{ t("dataTools.textToColumns.number") }}</TCheckbox
+                >
+              </div>
+            </div>
+          </TFormItem>
+          <TFormItem
+            v-else-if="draft.mode === 'keyword'"
+            :label="t('dataTools.textToColumns.keyword')"
+          >
+            <div class="text-to-columns-dialog__keywords">
+              <div
+                v-for="(_, index) in draft.keywords"
+                :key="index"
+                class="text-to-columns-dialog__keyword"
+              >
+                <TInput
+                  :value="draft.keywords?.[index]"
+                  :aria-label="t('dataTools.textToColumns.keyword')"
+                  @change="setKeyword(index, $event)"
+                />
+                <TButton
+                  variant="text"
+                  theme="danger"
+                  :disabled="draft.keywords?.length === 1"
+                  @click="removeKeyword(index)"
+                  >{{ t("dataTools.textToColumns.removeKeyword") }}</TButton
+                >
+              </div>
+              <TButton variant="dashed" @click="addKeyword">{{
+                t("dataTools.textToColumns.addKeyword")
+              }}</TButton>
+              <TRadioGroup v-model="draft.keywordPosition" class="text-to-columns-dialog__inline"
+                ><TRadio value="before">{{ t("dataTools.textToColumns.beforeKeyword") }}</TRadio
+                ><TRadio value="after">{{
+                  t("dataTools.textToColumns.afterKeyword")
+                }}</TRadio></TRadioGroup
+              >
+              <TCheckbox v-model="draft.keepKeywords">{{
+                t("dataTools.textToColumns.keepKeywords")
+              }}</TCheckbox>
+            </div>
+          </TFormItem>
+          <TFormItem
+            v-else-if="draft.mode === 'fixed-width'"
+            :label="t('dataTools.textToColumns.breakPosition')"
+            :help="t('dataTools.textToColumns.breakPositionHint')"
             :status="widthsValid ? undefined : 'error'"
           >
-            <TInput
-              :value="widthsInput"
-              :aria-label="t('dataTools.textToColumns.widths')"
-              placeholder="5,8,4"
-              @change="setWidths"
-            />
+            <div class="text-to-columns-dialog__break-position">
+              <TInput
+                v-model="breakPositionInput"
+                :aria-label="t('dataTools.textToColumns.breakPosition')"
+                placeholder="5"
+                @enter="addBreakPosition"
+              />
+              <TButton theme="primary" variant="outline" @click="addBreakPosition">{{
+                t("dataTools.textToColumns.createBreak")
+              }}</TButton>
+              <span v-if="widthsInput">{{
+                t("dataTools.textToColumns.currentBreaks", { positions: widthsInput })
+              }}</span>
+            </div>
           </TFormItem>
         </template>
         <template v-else>
@@ -310,6 +574,13 @@ function confirm(): void {
               /><span>{{
                 t("dataTools.textToColumns.columnSelected", { column: selectedColumn + 1 })
               }}</span>
+              <TSelect
+                v-if="draft.columnTypes[selectedColumn] === 'date'"
+                :value="draft.dateOrders?.[selectedColumn] ?? 'YMD'"
+                :options="dateOrderOptions"
+                :aria-label="t('dataTools.textToColumns.dateOrder')"
+                @change="setDateOrder"
+              />
             </div>
           </TFormItem>
           <TFormItem :label="t('dataTools.textToColumns.destination')"
@@ -330,8 +601,9 @@ function confirm(): void {
         <strong>{{ t("dataTools.textToColumns.preview") }}</strong
         ><span>{{ t("dataTools.textToColumns.previewHint") }}</span>
       </div>
+      <p v-if="previewError" class="text-to-columns-dialog__error">{{ previewError }}</p>
       <FixedWidthSplitEditor
-        v-if="step === 1 && draft.mode === 'fixed-width'"
+        v-if="step === 0 && setupMode === 'custom' && draft.mode === 'fixed-width'"
         :rows="sourceRows"
         :widths="draft.fixedWidths"
         @change="changeWidths"
@@ -359,7 +631,7 @@ function confirm(): void {
             <template #row="{ row }">{{ row.row + 1 }}</template>
             <template #previewColumnTitle="{ colIndex }">
               <TButton
-                v-if="step === 2"
+                v-if="step === 1"
                 variant="text"
                 :theme="selectedColumn === colIndex - 1 ? 'primary' : 'default'"
                 :aria-pressed="selectedColumn === colIndex - 1"
@@ -384,11 +656,11 @@ function confirm(): void {
       }}</TButton
       ><TButton
         theme="primary"
-        :disabled="step < 2 ? !canNext : !canApply"
+        :disabled="step < 1 ? !canNext : !canApply"
         data-split-next
         @click="confirm"
         >{{
-          step < 2 ? t("dataTools.textToColumns.next") : t("dataTools.textToColumns.confirm")
+          step < 1 ? t("dataTools.textToColumns.next") : t("dataTools.textToColumns.confirm")
         }}</TButton
       ></template
     >
@@ -404,13 +676,49 @@ function confirm(): void {
     margin: 0;
     color: var(--idea-text-secondary);
   }
-  &__modes {
+  &__suggestions,
+  &__keywords {
     display: grid;
-    gap: 12px;
+    gap: 8px;
+    width: 100%;
+  }
+  &__auto-settings {
+    display: grid;
+    gap: 8px;
+    padding-top: 12px;
+  }
+  &__setting {
+    display: grid;
+    gap: 8px;
     p {
-      margin: 2px 0 0 24px;
+      margin: 0;
+    }
+  }
+  &__mode-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-block: 12px;
+  }
+  &__keyword {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 8px;
+  }
+  &__break-position {
+    display: grid;
+    grid-template-columns: minmax(0, 120px) max-content;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    span {
+      grid-column: 1 / -1;
       color: var(--idea-text-secondary);
     }
+  }
+  &__error {
+    margin: 0;
+    color: var(--td-error-color);
   }
   &__delimiter-group,
   &__destination {
@@ -432,7 +740,7 @@ function confirm(): void {
   }
   &__format {
     display: grid;
-    grid-template-columns: 180px auto;
+    grid-template-columns: 180px auto auto;
     align-items: center;
     gap: 12px;
     width: 100%;

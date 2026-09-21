@@ -1,135 +1,119 @@
 import { mount } from "@vue/test-utils";
-import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
+import { Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { afterEach, describe, expect, test } from "vitest";
-import { defineComponent, h, nextTick, ref } from "vue";
+import { nextTick } from "vue";
 import TextToColumnsDialog from "../../../../modules/data-tools/components/TextToColumnsDialog.vue";
-import FixedWidthSplitEditor from "../../../../modules/data-tools/components/FixedWidthSplitEditor.vue";
 import { createAppI18n } from "../../../../shared/i18n";
+
 let wrapper: ReturnType<typeof mount> | undefined;
 afterEach(() => {
   wrapper?.unmount();
   wrapper = undefined;
   document.body.innerHTML = "";
 });
-function mountDialog(preview = ["001", "North"]) {
+
+const suggestion = {
+  id: "comma",
+  options: {
+    mode: "delimiter" as const,
+    delimiters: [","],
+    textQualifier: '"' as const,
+    mergeDelimiters: false,
+  },
+  confidence: 1,
+  columnCount: 2,
+};
+function mountDialog(
+  options: { suggestions?: readonly (typeof suggestion)[]; preview?: string[] } = {},
+) {
   wrapper = mount(TextToColumnsDialog, {
     attachTo: document.body,
     props: {
       visible: true,
-      preview,
       destinationLabel: "A1",
-      sourceRows: [
-        { row: 0, text: "001,North" },
-        { row: 1, text: "002,South" },
-      ],
+      preview: options.preview ?? ["2026-09-21", "001"],
+      suggestions: options.suggestions ?? [suggestion],
+      sourceRows: [{ row: 0, text: "2026-09-21,001" }],
     },
     global: { plugins: [createAppI18n("en-US")] },
   });
   return wrapper;
 }
-async function next(dialog: Pick<ReturnType<typeof mount>, "get">) {
+async function next(dialog: ReturnType<typeof mount>) {
   await dialog.get("[data-split-next]").trigger("click");
+  await nextTick();
 }
-describe("TextToColumnsDialog wizard", () => {
-  test("previews multiple source rows, advances without writing, and applies selected column types only on Finish", async () => {
-    const dialog = mountDialog();
-    expect(dialog.text()).toContain("002,South");
-    await next(dialog);
-    await next(dialog);
-    expect(dialog.emitted("apply")).toBeUndefined();
-    dialog.getComponent(TSelect).vm.$emit("change", "text");
+
+describe("TextToColumnsDialog", () => {
+  test("starts in automatic split, selects the first recommendation, and blocks an empty recommendation set", async () => {
+    const automatic = mountDialog();
     await nextTick();
-    await dialog.get('[data-split-column="1"]').trigger("click");
-    dialog.getComponent(TSelect).vm.$emit("change", "skip");
-    await nextTick();
-    await next(dialog);
-    expect(dialog.emitted("apply")?.at(-1)?.[0]).toMatchObject({
-      columnTypes: ["text", "skip"],
-      destination: "A1",
-      textQualifier: '"',
-      mergeDelimiters: false,
-    });
+    expect(automatic.text()).toContain("Delimited (Comma): about 2 columns");
+    expect(automatic.get("[data-split-next]").attributes("disabled")).toBeUndefined();
+    automatic.unmount();
+    const empty = mountDialog({ suggestions: [] });
+    expect(empty.text()).toContain("No reliable split rule was detected");
+    expect(empty.get("[data-split-next]").attributes("disabled")).toBeDefined();
   });
-  test("retains formats through preview changes, previous steps and a suspended range picker", async () => {
-    const dialog = mountDialog(["001"]);
-    await next(dialog);
-    await next(dialog);
-    dialog.getComponent(TSelect).vm.$emit("change", "text");
+
+  test("switches to custom split and exposes all four basic rules", async () => {
+    const dialog = mountDialog();
+    dialog.getComponent(TTabs).vm.$emit("change", "custom");
     await nextTick();
-    await dialog.setProps({ picking: true, preview: [] });
-    await dialog.setProps({ picking: false, preview: ["001", "North", "2026"] });
-    expect(dialog.getComponent(TSelect).props("value")).toBe("text");
+    expect(dialog.text()).toContain("Delimited");
+    expect(dialog.text()).toContain("Text type");
+    expect(dialog.text()).toContain("Keyword");
+    expect(dialog.text()).toContain("Fixed width");
+  });
+
+  test("configures keyword, text-type, and fixed-width custom rules", async () => {
+    const dialog = mountDialog();
+    dialog.getComponent(TTabs).vm.$emit("change", "custom");
+    await nextTick();
+    const modes = dialog.findAllComponents(TRadioGroup).at(-1)!;
+    modes.vm.$emit("change", "keyword");
+    await nextTick();
+    expect(dialog.text()).toContain("Keep keywords");
+    modes.vm.$emit("change", "text-type");
+    await nextTick();
+    expect(dialog.text()).toContain("all characters are retained");
+    modes.vm.$emit("change", "fixed-width");
+    await nextTick();
+    expect(dialog.text()).toContain("Create");
+  });
+
+  test("formats an output column as a date, preserves it after back, and applies only on Finish", async () => {
+    const dialog = mountDialog();
+    await next(dialog);
+    const select = dialog.getComponent(TSelect);
+    select.vm.$emit("change", "date");
+    await nextTick();
+    expect(dialog.findAllComponents(TSelect).at(1)?.props("value")).toBe("YMD");
     await dialog.get("[data-split-previous]").trigger("click");
     await next(dialog);
-    await next(dialog);
-    expect(dialog.emitted("apply")?.at(-1)?.[0]).toMatchObject({
-      columnTypes: ["text", "general", "general"],
-    });
-    await dialog.setProps({ visible: false });
-    await dialog.setProps({ visible: true });
-    await next(dialog);
-    await next(dialog);
-    expect(dialog.getComponent(TSelect).props("value")).toBe("general");
-  });
-  test("requires fixed-width breaks before advancing and blocks all skipped output", async () => {
-    const dialog = mountDialog();
-    dialog.getComponent(TRadioGroup).vm.$emit("update:modelValue", "fixed-width");
-    await nextTick();
-    await next(dialog);
-    expect(dialog.get("[data-split-next]").attributes("disabled")).toBeDefined();
-    dialog.getComponent(FixedWidthSplitEditor).vm.$emit("change", [3]);
-    await nextTick();
-    await next(dialog);
-    dialog.getComponent(TSelect).vm.$emit("change", "skip");
-    await nextTick();
-    await dialog.get('[data-split-column="1"]').trigger("click");
-    dialog.getComponent(TSelect).vm.$emit("change", "skip");
-    await nextTick();
-    expect(dialog.get("[data-split-next]").attributes("disabled")).toBeDefined();
-    dialog.getComponent(Dialog).vm.$emit("confirm");
+    expect(dialog.getComponent(TSelect).props("value")).toBe("date");
     expect(dialog.emitted("apply")).toBeUndefined();
-  });
-  test("offers formats for columns that occur beyond the preview sample", async () => {
-    const dialog = mountDialog(["001", "North"]);
-    await dialog.setProps({ totalColumnCount: 3 });
-    await next(dialog);
-    await next(dialog);
-    await dialog.get('[data-split-column="2"]').trigger("click");
-    dialog.getComponent(TSelect).vm.$emit("change", "text");
-    await nextTick();
     await next(dialog);
     expect(dialog.emitted("apply")?.at(-1)?.[0]).toMatchObject({
-      columnTypes: ["general", "general", "text"],
+      mode: "auto",
+      autoSuggestionId: "comma",
+      columnTypes: ["date", "general"],
     });
   });
-  test("does not loop when a parent computes a fresh preview for each draft", async () => {
-    const preview = ref(["001", "North"]);
-    const count = ref(0);
-    wrapper = mount(
-      defineComponent({
-        setup: () => () =>
-          h(TextToColumnsDialog, {
-            visible: true,
-            destinationLabel: "A1",
-            preview: [...preview.value],
-            onDraftChange: () => {
-              count.value += 1;
-              preview.value = [...preview.value];
-            },
-          }),
-      }),
-      { attachTo: document.body, global: { plugins: [createAppI18n("en-US")] } },
-    );
-    await nextTick();
-    const dialog = wrapper.getComponent(TextToColumnsDialog);
+
+  test("keeps result-column state when the preview changes", async () => {
+    const dialog = mountDialog();
     await next(dialog);
-    await next(dialog);
-    const before = count.value;
     dialog.getComponent(TSelect).vm.$emit("change", "text");
     await nextTick();
+    await dialog.setProps({ preview: ["001", "North", "West"] });
     await nextTick();
-    expect(count.value).toBe(before + 1);
+    expect(dialog.getComponent(TSelect).props("value")).toBe("text");
+    await dialog.get('[data-split-column="2"]').trigger("click");
+    dialog.getComponent(TSelect).vm.$emit("change", "skip");
+    await nextTick();
+    expect(dialog.text()).toContain("Do not import");
   });
 });

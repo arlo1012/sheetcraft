@@ -4,6 +4,7 @@ import RemoveDuplicatesDialog from "./RemoveDuplicatesDialog.vue";
 import SortDialog from "./SortDialog.vue";
 import SubtotalDialog from "./SubtotalDialog.vue";
 import TextToColumnsDialog from "./TextToColumnsDialog.vue";
+import type { SplitColumnSuggestion } from "@idea10/core/commands";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import type { RangeReferenceSelectionOptions } from "../../../shared/range-reference/useRangeReferencePicker";
 import type {
@@ -34,6 +35,8 @@ withDefaults(
     splitColumnCount?: number;
     splitPreviewRows?: readonly { row: number; values: readonly string[] }[];
     splitSourceRows?: readonly { row: number; text: string }[];
+    splitSuggestions?: readonly SplitColumnSuggestion[];
+    splitPreviewError?: string;
     splitDestinationLabel?: string;
     splitPicking?: boolean;
     selectSplitReference?: (current: string) => Promise<string | undefined>;
@@ -92,6 +95,9 @@ const emit = defineEmits<{
     :total-column-count="splitColumnCount"
     :preview-rows="splitPreviewRows"
     :source-rows="splitSourceRows"
+    :suggestions="splitSuggestions"
+    :preview-error="splitPreviewError"
+    :date-system="dateSystem"
     :range-label="rangeLabel"
     :destination-label="splitDestinationLabel"
     :picking="splitPicking"

@@ -48,11 +48,18 @@ export type SortDraft = {
   levels: SortLevel[];
 };
 export type TextToColumnsDraft = {
-  mode: "delimiter" | "fixed-width";
+  mode: "auto" | "delimiter" | "fixed-width" | "text-type" | "keyword";
+  autoSuggestionId?: string;
   delimiters: string[];
   otherDelimiter: string;
+  otherDelimiterMode?: "characters" | "token";
+  textTypes?: Array<"chinese" | "english" | "number">;
+  keywords?: string[];
+  keywordPosition?: "before" | "after";
+  keepKeywords?: boolean;
   fixedWidths: number[];
   columnTypes: Array<"general" | "text" | "date" | "skip">;
+  dateOrders?: Array<"YMD" | "MDY" | "DMY" | "YDM" | "MYD" | "DYM">;
   textQualifier?: '"' | "'" | "none";
   mergeDelimiters?: boolean;
   destination: string;

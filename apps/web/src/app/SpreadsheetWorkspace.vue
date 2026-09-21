@@ -1087,6 +1087,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :split-column-count="dataTools.splitColumnCount.value"
       :split-preview-rows="dataTools.splitPreviewRows.value"
       :split-source-rows="dataTools.splitSourceRows.value"
+      :split-suggestions="dataTools.splitSuggestions.value"
+      :split-preview-error="dataTools.splitPreviewError.value"
       :split-destination-label="dataTools.splitDestinationLabel.value"
       :split-picking="pickingSplitRange"
       :select-split-reference="selectSplitReference"
