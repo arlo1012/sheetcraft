@@ -125,3 +125,11 @@
     line-height: var(--idea-line-height-body-medium);
   }
 }
+
+// Split rulers and character cells share an exact horizontal origin for dragging.
+.t-table.idea-table--split-preview {
+  .t-table__header > tr > th.idea-table__split-text,
+  .t-table__body > tr > td.idea-table__split-text {
+    padding: 0;
+  }
+}

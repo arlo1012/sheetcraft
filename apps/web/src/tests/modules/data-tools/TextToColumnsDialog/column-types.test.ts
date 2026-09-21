@@ -72,13 +72,17 @@ describe("TextToColumnsDialog", () => {
     const dialog = mountDialog();
     dialog.getComponent(TTabs).vm.$emit("change", "custom");
     await nextTick();
-    const modes = dialog.findAllComponents(TRadioGroup).at(-1)!;
+    const modes = dialog
+      .findAllComponents(TRadioGroup)
+      .find((group) => group.classes().includes("text-to-columns-dialog__mode-tabs"))!;
     modes.vm.$emit("change", "keyword");
     await nextTick();
     expect(dialog.text()).toContain("Keep keywords");
     modes.vm.$emit("change", "text-type");
     await nextTick();
-    expect(dialog.text()).toContain("all characters are retained");
+    expect(dialog.text()).toContain("Chinese");
+    expect(dialog.text()).toContain("English");
+    expect(dialog.text()).toContain("Numbers");
     modes.vm.$emit("change", "fixed-width");
     await nextTick();
     expect(dialog.text()).toContain("Create");

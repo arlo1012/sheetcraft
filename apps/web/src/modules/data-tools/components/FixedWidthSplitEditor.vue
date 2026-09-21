@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount } from "vue";
+import { BaseTable as TTable } from "tdesign-vue-next/es/table";
+import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n } from "../../../shared/i18n";
 const props = defineProps<{
   rows: readonly { row: number; text: string }[];
@@ -14,6 +17,25 @@ function characters(text: string): string[] {
 const length = computed(() =>
   Math.min(512, Math.max(20, ...props.rows.map((row) => characters(row.text).length))),
 );
+const columns = computed<BaseTableCol[]>(() => [
+  {
+    colKey: "row",
+    title: t("dataTools.textToColumns.row"),
+    width: 56,
+    align: "center",
+    fixed: "left",
+  },
+  {
+    colKey: "text",
+    width: length.value * characterWidth,
+    title: "ruler",
+    cell: "characters",
+    className: "idea-table__split-text",
+    thClassName: "idea-table__split-text",
+  },
+]);
+const tableData = computed(() => [...props.rows]);
+const tableWidth = computed(() => `max(100%, ${56 + length.value * characterWidth}px)`);
 const positions = computed(() => {
   let offset = 0;
   return props.widths.map((width) => (offset += width));
@@ -79,41 +101,68 @@ onBeforeUnmount(() => endDrag?.());
 </script>
 <template>
   <div class="fixed-width-split-editor">
-    <div class="fixed-width-split-editor__scroll">
-      <div
-        class="fixed-width-split-editor__surface"
-        :style="{ width: `${length * characterWidth}px` }"
-      >
-        <div class="fixed-width-split-editor__ruler" @click="add">
-          <span
-            v-for="position in length"
-            :key="position"
-            :style="{ width: `${characterWidth}px` }"
-            >{{ position % 5 === 0 ? position : "·" }}</span
-          >
-        </div>
-        <div v-for="row in rows" :key="row.row" class="fixed-width-split-editor__row">
-          <span
-            v-for="(char, index) in characters(row.text).slice(0, 512)"
-            :key="index"
-            :style="{ width: `${characterWidth}px` }"
-            >{{ char }}</span
-          >
-        </div>
-        <button
-          v-for="(position, index) in positions"
-          :key="index"
-          type="button"
-          class="fixed-width-split-editor__line"
-          :style="{ left: `${position * characterWidth}px` }"
-          :aria-label="t('dataTools.textToColumns.breakAt', { position })"
-          @pointerdown.prevent="startDrag($event, position)"
-          @dblclick.prevent="remove(position)"
-          @keydown="key($event, position)"
+    <div class="fixed-width-split-editor__preview">
+      <TableHeightWrapper v-slot="{ height }">
+        <TTable
+          class="idea-table--mini idea-table--split-preview"
+          row-key="row"
+          :data="tableData"
+          :columns="columns"
+          :height="height"
+          :table-content-width="tableWidth"
+          :bordered="false"
+          cell-empty-content=""
+          size="small"
+          table-layout="fixed"
+          hover
+          :aria-label="t('dataTools.textToColumns.preview')"
         >
-          <span aria-hidden="true">▼</span>
-        </button>
-      </div>
+          <template #row="{ row }">{{ row.row + 1 }}</template>
+          <template #ruler>
+            <div class="fixed-width-split-editor__ruler" @click="add">
+              <span
+                v-for="position in length"
+                :key="position"
+                class="fixed-width-split-editor__character"
+                :style="{ width: `${characterWidth}px` }"
+                >{{ position % 5 === 0 ? position : "·" }}</span
+              >
+              <button
+                v-for="(position, index) in positions"
+                :key="index"
+                type="button"
+                class="fixed-width-split-editor__line"
+                :style="{ left: `${position * characterWidth}px` }"
+                :aria-label="t('dataTools.textToColumns.breakAt', { position })"
+                @click.stop
+                @pointerdown.prevent="startDrag($event, position)"
+                @dblclick.stop.prevent="remove(position)"
+                @keydown="key($event, position)"
+              >
+                <span aria-hidden="true">▼</span>
+              </button>
+            </div>
+          </template>
+          <template #characters="{ row }">
+            <div class="fixed-width-split-editor__row">
+              <span
+                v-for="(char, index) in characters(row.text).slice(0, 512)"
+                :key="index"
+                class="fixed-width-split-editor__character"
+                :style="{ width: `${characterWidth}px` }"
+                >{{ char }}</span
+              >
+              <span
+                v-for="position in positions"
+                :key="`line-${position}`"
+                class="fixed-width-split-editor__guide"
+                :style="{ left: `${position * characterWidth}px` }"
+                aria-hidden="true"
+              />
+            </div>
+          </template>
+        </TTable>
+      </TableHeightWrapper>
     </div>
     <p>{{ t("dataTools.textToColumns.fixedHint") }}</p>
   </div>
@@ -121,34 +170,31 @@ onBeforeUnmount(() => endDrag?.());
 <style scoped lang="scss">
 .fixed-width-split-editor {
   min-width: 0;
-  &__scroll {
-    overflow: auto;
-    max-height: 204px;
-    border: 1px solid var(--idea-border-subtle);
-  }
-  &__surface {
-    position: relative;
-    min-height: 100px;
+  &__preview {
+    height: 220px;
+    min-width: 0;
   }
   &__ruler,
   &__row {
+    position: relative;
     display: flex;
     white-space: pre;
-    min-height: 24px;
-    line-height: 24px;
-    font-family: monospace;
-    span {
-      flex-shrink: 0;
-      text-align: center;
-    }
+    height: 28px;
+    line-height: 28px;
+  }
+  &__character {
+    flex-shrink: 0;
+    text-align: center;
   }
   &__ruler {
-    background: var(--idea-surface-secondary);
-    border-bottom: 1px solid var(--idea-border-subtle);
     cursor: crosshair;
   }
-  &__row {
-    border-bottom: 1px solid var(--idea-border-subtle);
+  &__guide {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 1px solid var(--td-brand-color);
+    pointer-events: none;
   }
   &__line {
     position: absolute;
@@ -178,6 +224,7 @@ onBeforeUnmount(() => endDrag?.());
     }
     &:focus-visible {
       outline: 2px solid var(--td-brand-color);
+      outline-offset: -2px;
     }
   }
   p {
