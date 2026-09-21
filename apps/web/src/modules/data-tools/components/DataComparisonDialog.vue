@@ -224,10 +224,13 @@ watch(
                 >{{ t("dataTools.comparison.column", { column: column.label })
                 }}{{ column.header ? ` (${column.header})` : "" }}</TCheckbox
               >
-              <p v-if="draft.scope === 'double'" class="data-comparison-dialog__hint">
-                {{ t("dataTools.comparison.doubleRowsHint") }}
-              </p>
             </div>
+            <p
+              v-if="draft.comparisonMode === 'rows' && draft.scope === 'double'"
+              class="data-comparison-dialog__hint"
+            >
+              {{ t("dataTools.comparison.doubleRowsHint") }}
+            </p>
           </div>
         </TFormItem>
 
