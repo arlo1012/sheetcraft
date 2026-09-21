@@ -411,8 +411,8 @@ function confirm(): void {
     @confirm="confirm"
   >
     <div class="text-to-columns-dialog">
-      <TForm label-align="left" :label-width="104" @submit.prevent>
-        <TFormItem :label="t('dataTools.textToColumns.source')" label-align="right">
+      <TForm label-align="right" :label-width="104" @submit.prevent>
+        <TFormItem :label="t('dataTools.textToColumns.source')">
           <div class="text-to-columns-dialog__source">
             <RangeReferenceInput
               :model-value="draft.source ?? ''"
@@ -496,7 +496,7 @@ function confirm(): void {
                 t("dataTools.textToColumns.mergeDelimiters")
               }}</TCheckbox>
             </div>
-            <TFormItem :label="t('dataTools.textToColumns.qualifier')" label-align="right"
+            <TFormItem :label="t('dataTools.textToColumns.qualifier')"
               ><TSelect
                 v-model="draft.textQualifier"
                 :options="qualifierOptions"
