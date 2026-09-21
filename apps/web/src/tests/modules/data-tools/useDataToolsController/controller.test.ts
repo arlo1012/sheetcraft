@@ -369,6 +369,80 @@ describe("useDataToolsController", () => {
     expect(createSheetEvaluator(f.sheet).getComputedValue({ row: 3, column: 5 })).toBe("003");
   });
 
+  test("previews all sampled rows with the same quoted delimiter rules and writes to a picked cell", () => {
+    const f = fixture({
+      address: { row: 1, column: 2 },
+      range: { start: { row: 1, column: 2 }, end: { row: 2, column: 2 } },
+    });
+    f.set(1, 2, "'North|East'||001|discard");
+    f.set(2, 2, "South||002|discard");
+    f.controller.openTextToColumns();
+    const draft = {
+      mode: "delimiter" as const,
+      delimiters: ["|"],
+      otherDelimiter: "",
+      fixedWidths: [],
+      destination: `='${f.sheet.name}'!$E$5`,
+      overwrite: false,
+      columnTypes: ["general", "text", "skip"] as Array<"general" | "text" | "skip">,
+      textQualifier: "'" as const,
+      mergeDelimiters: true,
+    };
+    f.controller.updateTextToColumnsDraft(draft);
+    expect(f.controller.splitDestinationLabel.value).toBe("C2");
+    expect(f.controller.splitPreviewRows.value).toEqual([
+      { row: 1, values: ["North|East", "001", "discard"] },
+      { row: 2, values: ["South", "002", "discard"] },
+    ]);
+    f.controller.applyTextToColumns(draft);
+    const evaluator = createSheetEvaluator(f.sheet);
+    expect(evaluator.getComputedValue({ row: 4, column: 4 })).toBe("North|East");
+    expect(evaluator.getComputedValue({ row: 5, column: 5 })).toBe("002");
+    expect(evaluator.getComputedValue({ row: 4, column: 6 })).toBeNull();
+    expect(evaluator.getComputedValue({ row: 1, column: 2 })).toBe("'North|East'||001|discard");
+  });
+  test("counts fields beyond the 20-row preview so every output column can be configured", () => {
+    const f = fixture({
+      address: { row: 0, column: 2 },
+      range: { start: { row: 0, column: 2 }, end: { row: 20, column: 2 } },
+    });
+    f.set(0, 2, "first|row");
+    f.set(20, 2, "late|field|needs|format");
+    f.controller.openTextToColumns();
+    f.controller.updateTextToColumnsDraft({
+      mode: "delimiter",
+      delimiters: ["|"],
+      otherDelimiter: "",
+      fixedWidths: [],
+      destination: "E1",
+      overwrite: false,
+      columnTypes: [],
+    });
+
+    expect(f.controller.splitPreviewRows.value).toHaveLength(20);
+    expect(f.controller.splitPreviewRows.value.at(-1)?.values).toEqual([""]);
+    expect(f.controller.splitColumnCount.value).toBe(4);
+  });
+  test("does not silently choose a comma when all separators are cleared", () => {
+    const f = fixture();
+    f.set(1, 1, "A,B");
+    f.controller.openTextToColumns();
+    const draft = {
+      mode: "delimiter" as const,
+      delimiters: [],
+      otherDelimiter: "",
+      fixedWidths: [],
+      destination: "D1",
+      overwrite: false,
+      columnTypes: [],
+    };
+    f.controller.updateTextToColumnsDraft(draft);
+    expect(f.controller.splitPreviewRows.value).toEqual([]);
+    f.controller.applyTextToColumns(draft);
+    expect(f.controller.textToColumnsVisible.value).toBe(true);
+    expect(createSheetEvaluator(f.sheet).getComputedValue({ row: 0, column: 3 })).toBeNull();
+  });
+
   test("updates duplicate count from the draft key columns and header choice", () => {
     const f = fixture({
       address: { row: 1, column: 0 },

@@ -120,16 +120,32 @@ export function useLookupFillController(options: Options) {
         }
       : undefined;
   }
+  function formatLookupFillError(cause: unknown): string {
+    const field = cause instanceof WorkbookDomainError ? cause.data.details?.field : undefined;
+    return field === "protected"
+      ? t("dataTools.lookupFill.protectedRange")
+      : field === "merged"
+        ? t("dataTools.lookupFill.mergedRange")
+        : field === "spill"
+          ? t("dataTools.lookupFill.spillRange")
+          : field === "size"
+            ? t("dataTools.lookupFill.rangeTooLarge")
+            : field === "matchFields" || field === "fillFields"
+              ? t("dataTools.lookupFill.invalidFields")
+              : t("dataTools.lookupFill.invalidOperation");
+  }
   function updatePreview() {
     const payload = toOptions(lookupFillDraft.value);
-    if (!payload) {
+    if (!payload || !payload.matchFields.length || !payload.fillFields.length) {
       lookupFillPreview.value = undefined;
       return;
     }
     try {
       lookupFillPreview.value = analyzeLookupFill(options.getWorkbook(), payload);
-    } catch {
+      lookupFillError.value = "";
+    } catch (cause) {
       lookupFillPreview.value = undefined;
+      lookupFillError.value = formatLookupFillError(cause);
     }
   }
   function closeLookupFill() {
@@ -167,19 +183,7 @@ export function useLookupFillController(options: Options) {
       closeLookupFill();
       options.focusSheet();
     } catch (cause) {
-      const field = cause instanceof WorkbookDomainError ? cause.data.details?.field : undefined;
-      lookupFillError.value =
-        field === "protected"
-          ? t("dataTools.lookupFill.protectedRange")
-          : field === "merged"
-            ? t("dataTools.lookupFill.mergedRange")
-            : field === "spill"
-              ? t("dataTools.lookupFill.spillRange")
-              : field === "size"
-                ? t("dataTools.lookupFill.rangeTooLarge")
-                : field === "matchFields" || field === "fillFields"
-                  ? t("dataTools.lookupFill.invalidFields")
-                  : t("dataTools.lookupFill.invalidOperation");
+      lookupFillError.value = formatLookupFillError(cause);
     }
   }
   watch(options.getGeneration, closeLookupFill);

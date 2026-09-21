@@ -600,6 +600,21 @@ const {
   comparisonError,
   comparisonColumns,
 } = dataTools;
+const splitRangePicker = useRangeReferencePicker(() => activeSheet.value.name, {
+  singleCell: true,
+});
+const { active: pickingSplitRange, reference: pickedSplitReference } = splitRangePicker;
+async function selectSplitReference(current: string): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const sheetId = activeSheet.value.id;
+  const selected = await splitRangePicker.selectReference(current);
+  if (session.workbook !== workbook || !dataTextToColumnsVisible.value) return undefined;
+  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+  return selected;
+}
+watch(dataTextToColumnsVisible, (visible) => {
+  if (!visible) splitRangePicker.cancel();
+});
 const validationRangePicker = useRangeReferencePicker(() => activeSheet.value.name, {
   singleCell: true,
 });
@@ -739,7 +754,7 @@ const dataToolsModalOpen = computed(
     fillCurrentDateVisible.value ||
     duplicateErrorOptionsVisible.value ||
     dataTools.sortVisible.value ||
-    dataTools.textToColumnsVisible.value ||
+    (dataTools.textToColumnsVisible.value && !pickingSplitRange.value) ||
     dataTools.removeDuplicatesVisible.value ||
     (dataValidationVisible.value && !pickingValidationRange.value) ||
     dataTools.subtotalVisible.value ||
@@ -811,6 +826,7 @@ watch(workbookGeneration, () => {
 const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const activeRangePicker = computed(() => {
+  if (pickingSplitRange.value) return splitRangePicker;
   if (pickingFillRankRange.value) return fillRankRangePicker;
   if (pickingValidationRange.value) return validationRangePicker;
   if (pickingDropdownRange.value) return dropdownRangePicker;
@@ -1068,6 +1084,12 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :date-system="session.workbook.dateSystem"
       :range-label="dataToolRangeLabel"
       :split-preview="dataSplitPreview"
+      :split-column-count="dataTools.splitColumnCount.value"
+      :split-preview-rows="dataTools.splitPreviewRows.value"
+      :split-source-rows="dataTools.splitSourceRows.value"
+      :split-destination-label="dataTools.splitDestinationLabel.value"
+      :split-picking="pickingSplitRange"
+      :select-split-reference="selectSplitReference"
       :duplicate-count="dataDuplicateCount"
       :validation-initial="dataValidationInitial"
       :validation-suspended="pickingValidationRange"
@@ -1087,6 +1109,13 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @close-subtotal="dataTools.closeSubtotal"
       @subtotal="dataTools.applySubtotal"
       @remove-subtotals="dataTools.removeSubtotals"
+    />
+    <RangeReferencePicker
+      v-if="pickingSplitRange"
+      :reference="pickedSplitReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="splitRangePicker.confirm"
+      @cancel="splitRangePicker.cancel"
     />
     <RangeReferencePicker
       v-if="pickingValidationRange"

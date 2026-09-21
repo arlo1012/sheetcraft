@@ -5,6 +5,7 @@ import {
   getCellContent,
   getCellStyle,
   MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
   setCellContent,
   setCellStyle,
   type CellAddress,
@@ -13,6 +14,7 @@ import {
 } from "../workbook.js";
 import type { CellContent } from "../formula/types.js";
 import { cloneCellStyle } from "../style.js";
+import { datePartsToExcelSerial } from "../formula/date-system.js";
 import { translateFormulaForCopy } from "../formula/references.js";
 import { resolveDataRange } from "../data-range.js";
 import type {
@@ -51,17 +53,40 @@ function valueAsText(workbook: Workbook, sheetId: string, address: CellAddress):
   return value === null ? "" : typeof value === "object" ? `#${value.code}!` : String(value);
 }
 
-/** Parses CSV-style quoted fields as well as ordinary one-character delimiters. */
-export function splitDelimitedText(text: string, delimiter: string, quoted = true): string[] {
+type DelimiterOptions = {
+  textQualifier?: '"' | "'" | "none";
+  mergeDelimiters?: boolean;
+};
+
+function delimiterOptions(options: boolean | DelimiterOptions | undefined): {
+  qualifier?: '"' | "'";
+  mergeDelimiters: boolean;
+} {
+  if (typeof options === "boolean")
+    return { qualifier: options ? '"' : undefined, mergeDelimiters: false };
+  return {
+    qualifier:
+      options?.textQualifier === "none" ? undefined : options?.textQualifier === "'" ? "'" : '"',
+    mergeDelimiters: options?.mergeDelimiters ?? false,
+  };
+}
+
+/** Parses qualified fields as well as ordinary one-character delimiters. */
+export function splitDelimitedText(
+  text: string,
+  delimiter: string,
+  options: boolean | DelimiterOptions = true,
+): string[] {
   if (!delimiter) throw new RangeError("A delimiter is required.");
+  const { qualifier, mergeDelimiters } = delimiterOptions(options);
   const fields: string[] = [];
   let field = "";
   let inQuotes = false;
   for (let index = 0; index < text.length; index += 1) {
     const char = text[index]!;
-    if (quoted && char === '"') {
-      if (inQuotes && text[index + 1] === '"') {
-        field += '"';
+    if (qualifier && char === qualifier && (inQuotes || field.length === 0)) {
+      if (inQuotes && text[index + 1] === qualifier) {
+        field += qualifier;
         index += 1;
       } else inQuotes = !inQuotes;
     } else if (
@@ -70,6 +95,8 @@ export function splitDelimitedText(text: string, delimiter: string, quoted = tru
     ) {
       fields.push(field);
       field = "";
+      if (mergeDelimiters)
+        while (index + 1 < text.length && delimiter.includes(text[index + 1]!)) index += 1;
     } else field += char;
   }
   fields.push(field);
@@ -79,11 +106,38 @@ export function splitDelimitedText(text: string, delimiter: string, quoted = tru
 /** Pure preview used by UI before issuing a split command. */
 export function previewSplitColumn(
   text: string,
-  options: Pick<SplitColumnCommand, "mode" | "delimiter" | "fixedWidths" | "parseQuoted">,
+  options: Pick<
+    SplitColumnCommand,
+    "mode" | "delimiter" | "fixedWidths" | "parseQuoted" | "textQualifier" | "mergeDelimiters"
+  >,
 ): string[] {
   return options.mode === "delimiter"
-    ? splitDelimitedText(text, options.delimiter ?? ",", options.parseQuoted !== false)
+    ? splitDelimitedText(text, options.delimiter ?? ",", {
+        textQualifier: options.textQualifier ?? (options.parseQuoted === false ? "none" : '"'),
+        mergeDelimiters: options.mergeDelimiters,
+      })
     : splitFixedWidthText(text, options.fixedWidths ?? []);
+}
+
+function parseDateField(raw: string, workbook: Workbook): number | undefined {
+  const match = raw.trim().match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/u);
+  if (!match) return undefined;
+  try {
+    return datePartsToExcelSerial(
+      {
+        year: Number(match[1]),
+        month: Number(match[2]),
+        day: Number(match[3]),
+        hour: 0,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+      },
+      workbook.dateSystem,
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 export function splitFixedWidthText(text: string, widths: readonly number[]): string[] {
@@ -140,27 +194,58 @@ export function applySplitColumnCommand(
     (_, offset) => range.start.row + offset,
   );
   const parsed = rows.map((row) => {
-    const text = valueAsText(workbook, command.sheetId, { row, column: command.sourceColumn });
+    const text = valueAsText(workbook, command.sheetId, {
+      row,
+      column: command.sourceColumn,
+    });
     return command.mode === "delimiter"
-      ? splitDelimitedText(text, command.delimiter ?? ",", command.parseQuoted !== false)
+      ? splitDelimitedText(text, command.delimiter ?? ",", {
+          textQualifier: command.textQualifier ?? (command.parseQuoted === false ? "none" : '"'),
+          mergeDelimiters: command.mergeDelimiters,
+        })
       : splitFixedWidthText(text, command.fixedWidths ?? []);
   });
-  const width = Math.max(1, ...parsed.map((fields) => fields.length));
+  // A downward destination may overlap a later source row. Capture styles before
+  // the first write so each output row keeps its original source formatting.
+  const sourceStyles = rows.map((row) =>
+    cloneCellStyle(getCellStyle(sheet, { row, column: command.sourceColumn })),
+  );
+  const fieldCount = Math.max(1, ...parsed.map((fields) => fields.length));
+  const outputFieldOffsets = Array.from({ length: fieldCount }, (_, offset) => offset).filter(
+    (offset) => command.columnTypes?.[offset] !== "skip",
+  );
+  const width = outputFieldOffsets.length;
   if (command.destinationColumn + width > MAX_SHEET_COLUMNS)
     throw invalidCommandPayload(
       "destinationColumn",
       command.destinationColumn,
       "Split result exceeds sheet columns.",
     );
+  const destinationRow = command.destinationRow ?? range.start.row;
+  if (
+    !Number.isInteger(destinationRow) ||
+    destinationRow < 0 ||
+    destinationRow + rows.length > MAX_SHEET_ROWS
+  )
+    throw invalidCommandPayload("destinationRow", command.destinationRow);
+  const destinationRange = {
+    start: { row: destinationRow, column: command.destinationColumn },
+    end: {
+      row: destinationRow + rows.length - 1,
+      column: command.destinationColumn + Math.max(0, width - 1),
+    },
+  };
+  const intersectsRange = (merged: CellRange, candidate: CellRange) =>
+    !(
+      merged.end.row < candidate.start.row ||
+      merged.start.row > candidate.end.row ||
+      merged.end.column < candidate.start.column ||
+      merged.start.column > candidate.end.column
+    );
   if (
     sheet.mergedCells.some(
       (merged) =>
-        !(
-          merged.end.row < range.start.row ||
-          merged.start.row > range.end.row ||
-          merged.end.column < range.start.column ||
-          merged.start.column > range.end.column
-        ),
+        intersectsRange(merged, range) || (width > 0 && intersectsRange(merged, destinationRange)),
     )
   )
     throw invalidCommandPayload("range", command.range, "Splitting merged cells is not supported.");
@@ -179,10 +264,11 @@ export function applySplitColumnCommand(
       "Splitting an active filtered range is not supported.",
     );
   if (!command.overwrite) {
-    const wouldOverwrite = rows.some((row) =>
+    const wouldOverwrite = rows.some((sourceRow, rowOffset) =>
       Array.from({ length: width }, (_, offset) => command.destinationColumn + offset).some(
         (column) =>
-          column !== command.sourceColumn && getCellContent(sheet, { row, column }) !== null,
+          !(column === command.sourceColumn && destinationRow + rowOffset === sourceRow) &&
+          getCellContent(sheet, { row: destinationRow + rowOffset, column }) !== null,
       ),
     );
     if (wouldOverwrite)
@@ -194,18 +280,28 @@ export function applySplitColumnCommand(
   }
   let changed = false;
   for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index]!;
-    const source = { row, column: command.sourceColumn };
-    const sourceStyle = cloneCellStyle(getCellStyle(sheet, source));
+    const sourceStyle = sourceStyles[index];
     const fields = parsed[index] ?? [];
-    for (let offset = 0; offset < width; offset += 1) {
-      const address = { row, column: command.destinationColumn + offset };
-      const raw = fields[offset] ?? "";
+    for (let outputOffset = 0; outputOffset < outputFieldOffsets.length; outputOffset += 1) {
+      const offset = outputFieldOffsets[outputOffset]!;
       const type = command.columnTypes?.[offset] ?? "general";
+      const address = {
+        row: destinationRow + index,
+        column: command.destinationColumn + outputOffset,
+      };
+      const raw = fields[offset] ?? "";
+      const date = type === "date" ? parseDateField(raw, workbook) : undefined;
       const value =
-        type === "general" && raw.trim() !== "" && Number.isFinite(Number(raw)) ? Number(raw) : raw;
+        date ??
+        (type === "general" && raw.trim() !== "" && Number.isFinite(Number(raw))
+          ? Number(raw)
+          : raw);
       setCellContent(sheet, address, { kind: "literal", value });
-      if (sourceStyle) setCellStyle(sheet, address, cloneCellStyle(sourceStyle));
+      if (sourceStyle || date !== undefined) {
+        const style = cloneCellStyle(sourceStyle) ?? {};
+        if (date !== undefined) style.numberFormat = { kind: "date", code: "yyyy-mm-dd" };
+        setCellStyle(sheet, address, style);
+      }
       changed = true;
     }
   }

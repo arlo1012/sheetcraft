@@ -70,4 +70,14 @@ describe("lookup fill controller", () => {
     expect(f.controller.lookupFillVisible.value).toBe(true);
     expect(f.controller.lookupFillError.value).toContain("changed");
   });
+  test("reports a preview analysis failure instead of treating it as no changes", () => {
+    const f = fixture();
+    f.controller.openLookupFill();
+    f.controller.updateLookupFillDraft({
+      ...draft(f.controller),
+      matchFields: [{ sourceColumn: 2, targetColumn: 0 }],
+    });
+    expect(f.controller.lookupFillPreview.value).toBeUndefined();
+    expect(f.controller.lookupFillError.value).toContain("valid match");
+  });
 });

@@ -45,9 +45,17 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   formulas in the source list are evaluated. List and criteria rectangles are
   limited to 1,000,000 cells. Clear advanced filtering before structural edits
   to the filtered sheet or a sheet containing its criteria.
-- Split a selected single column using multiple delimiters or fixed widths.
-  Preview the result, select General/Text for each output column, choose a
-  destination column, and explicitly allow overwriting populated destinations.
+- Text to Columns uses a three-step wizard: choose delimited or fixed-width data,
+  configure the split, then set formats and destination. Preview up to 20 source
+  rows. Delimited data supports Tab, semicolon, comma, space and custom characters,
+  double/single/no text qualifier, and treating consecutive delimiters as one.
+  Fixed-width breaks can be added on a ruler, dragged, moved with arrow keys or
+  removed with double-click/Delete; widths can also be entered directly.
+  Click a preview header to set General, Text, Date (YMD), or Do Not Import.
+  Date accepts YYYY-MM-DD, YYYY/MM/DD and YYYY.MM.DD; invalid dates remain text.
+  Skipped fields do not occupy output columns. Choose a single destination cell
+  on the current sheet by typing or grid picking. Overwriting other populated
+  cells requires opt-in; completion is one undoable Core command.
 - Remove duplicate rows using chosen key columns and a header setting. The dialog
   previews the number of rows to remove.
 - Data Comparison offers Mark/Extract Duplicate Data and Mark/Extract Unique Data.
@@ -75,7 +83,10 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   Choose the first or last matching source record. The header option excludes
   each range's first row. Unmatched target rows remain unchanged; populated target
   cells are skipped unless overwriting is enabled. Preview includes counts and a
-  sample of the values to write. Values are copied after formula evaluation;
+  sample of the values to write. The dialog separates range selection, field
+  mapping, and result preview into three steps. Unique matching column headers
+  can populate the fill mappings, excluding match keys and existing mappings.
+  Values are copied after formula evaluation;
   formatting is preserved. Ranges together are limited to 100,000 cells.
 - Consolidate combines multiple ranges using Sum, Count, Average, Maximum, Minimum,
   Product, Count Numbers, sample/population Standard Deviation and sample/population
@@ -309,6 +320,14 @@ Use the File menu to import a workbook containing:
    Reapply. Show All restores the rows. Repeat in copy mode to H1, verify the
    header plus matching records, then undo. Use each field's picker and cancel
    a pick to confirm its prior draft remains unchanged.
+
+## Workflow references
+
+The Text to Columns and Lookup Fill workflows follow the operations described in
+[WPS Text to Columns](https://www.wps.cn/learning/room/d/329772) and
+[WPS Lookup Fill](https://www.wps.cn/learning/course/detail/id/330082.html).
+The Web dialogs use the project's TDesign forms, steps and range-reference picker;
+only the implemented options listed above are exposed.
 
 ## Verification notes (2026-09-16)
 

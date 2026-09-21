@@ -262,8 +262,15 @@ export type SplitColumnCommand = {
   mode: "delimiter" | "fixedWidth";
   delimiter?: string;
   fixedWidths?: number[];
+  /** The character that can wrap a delimited field. `parseQuoted` remains for older callers. */
+  textQualifier?: '"' | "'" | "none";
+  /** Treat adjacent delimiter characters as a single delimiter. */
+  mergeDelimiters?: boolean;
   parseQuoted?: boolean;
-  columnTypes?: Array<"general" | "text">;
+  /** Output conversions. Skipped source fields do not consume a destination column. */
+  columnTypes?: Array<"general" | "text" | "date" | "skip">;
+  /** Zero-based output start row; defaults to the first source row. */
+  destinationRow?: number;
   overwrite?: boolean;
 };
 export type RemoveDuplicatesCommand = {

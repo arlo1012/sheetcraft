@@ -52,7 +52,9 @@ export type TextToColumnsDraft = {
   delimiters: string[];
   otherDelimiter: string;
   fixedWidths: number[];
-  columnTypes: Array<"general" | "text">;
+  columnTypes: Array<"general" | "text" | "date" | "skip">;
+  textQualifier?: '"' | "'" | "none";
+  mergeDelimiters?: boolean;
   destination: string;
   overwrite: boolean;
 };

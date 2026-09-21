@@ -31,6 +31,12 @@ withDefaults(
     dateSystem?: ExcelDateSystem;
     rangeLabel?: string;
     splitPreview?: readonly string[];
+    splitColumnCount?: number;
+    splitPreviewRows?: readonly { row: number; values: readonly string[] }[];
+    splitSourceRows?: readonly { row: number; text: string }[];
+    splitDestinationLabel?: string;
+    splitPicking?: boolean;
+    selectSplitReference?: (current: string) => Promise<string | undefined>;
     duplicateCount?: number;
     validationInitial?: DataValidationInitial;
     validationSuspended?: boolean;
@@ -83,7 +89,13 @@ const emit = defineEmits<{
   <TextToColumnsDialog
     :visible="textToColumnsVisible"
     :preview="splitPreview"
-    :destination-label="columns[0]?.label"
+    :total-column-count="splitColumnCount"
+    :preview-rows="splitPreviewRows"
+    :source-rows="splitSourceRows"
+    :range-label="rangeLabel"
+    :destination-label="splitDestinationLabel"
+    :picking="splitPicking"
+    :select-reference="selectSplitReference"
     @close="emit('closeTextToColumns')"
     @apply="emit('textToColumns', $event)"
     @draft-change="emit('textToColumnsDraftChange', $event)"
