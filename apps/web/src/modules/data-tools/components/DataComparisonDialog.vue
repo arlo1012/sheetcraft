@@ -4,6 +4,7 @@ import { computed, ref, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { useAppI18n } from "../../../shared/i18n";
@@ -28,7 +29,7 @@ const emit = defineEmits<{
   draftChange: [draft: DataComparisonDraft];
   pickRange: [field: "firstRange" | "secondRange"];
 }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const draft = ref<DataComparisonDraft>(copyDraft(props.initial));
 const colors = [
   { value: "#ffc7ce", label: "lightRed" },
@@ -36,15 +37,7 @@ const colors = [
   { value: "#c6efce", label: "green" },
 ] as const;
 const isMarking = computed(() => props.action === "markDuplicate" || props.action === "markUnique");
-const isExtracting = computed(
-  () => props.action === "extractDuplicate" || props.action === "extractUnique",
-);
-const title = computed(() => t(`dataTools.comparison.${props.action}`));
-const semanticsHint = computed(() => {
-  const match = props.action.endsWith("Duplicate") ? "Duplicate" : "Unique";
-  const scope = draft.value.scope === "single" ? "single" : "double";
-  return t(`dataTools.comparison.${scope}${match}Hint`);
-});
+const title = computed(() => t(`dataTools.comparison.${props.action}Title`));
 const selectedCount = computed(
   () => props.columns.filter((column) => draft.value.columns.includes(column.column)).length,
 );
@@ -138,131 +131,135 @@ watch(
     @confirm="!busy && canApply && emit('apply', copyDraft(draft))"
   >
     <div class="data-comparison-dialog">
-      <TRadioGroup v-model="draft.scope" class="data-comparison-dialog__scope" :disabled="busy">
-        <TRadio value="single">{{ t("dataTools.comparison.singleRange") }}</TRadio>
-        <TRadio value="double">{{ t("dataTools.comparison.doubleRange") }}</TRadio>
-      </TRadioGroup>
+      <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 88 : 104">
+        <TFormItem name="scope">
+          <TRadioGroup v-model="draft.scope" :disabled="busy">
+            <TRadio value="single">{{ t("dataTools.comparison.singleRange") }}</TRadio>
+            <TRadio value="double">{{ t("dataTools.comparison.doubleRange") }}</TRadio>
+          </TRadioGroup>
+        </TFormItem>
 
-      <label class="data-comparison-dialog__field">
-        <span>{{ t("dataTools.comparison.firstRange") }}</span>
-        <TInput
-          v-model="draft.firstRange"
-          :disabled="busy"
-          autocomplete="off"
-          placeholder="A1:C10"
-          :aria-label="t('dataTools.comparison.firstRange')"
+        <TFormItem name="firstRange" :label="t('dataTools.comparison.firstRange')">
+          <TInput
+            v-model="draft.firstRange"
+            :disabled="busy"
+            autocomplete="off"
+            placeholder="A1:C10"
+            :aria-label="t('dataTools.comparison.firstRange')"
+          >
+            <template #suffix>
+              <TButton
+                variant="text"
+                shape="square"
+                :disabled="busy"
+                :aria-label="`${t('dataTools.comparison.pickRange')}：${t('dataTools.comparison.firstRange')}`"
+                :title="t('formulaTools.selectRange')"
+                @click="emit('pickRange', 'firstRange')"
+                ><SquareMousePointer :size="16" aria-hidden="true" />
+              </TButton>
+            </template>
+          </TInput>
+        </TFormItem>
+        <TFormItem
+          v-if="draft.scope === 'double'"
+          name="secondRange"
+          :label="t('dataTools.comparison.secondRange')"
         >
-          <template #suffix>
-            <TButton
-              variant="text"
-              shape="square"
+          <TInput
+            v-model="draft.secondRange"
+            :disabled="busy"
+            autocomplete="off"
+            placeholder="E1:G10"
+            :aria-label="t('dataTools.comparison.secondRange')"
+          >
+            <template #suffix>
+              <TButton
+                variant="text"
+                shape="square"
+                :disabled="busy"
+                :aria-label="`${t('dataTools.comparison.pickRange')}：${t('dataTools.comparison.secondRange')}`"
+                :title="t('formulaTools.selectRange')"
+                @click="emit('pickRange', 'secondRange')"
+                ><SquareMousePointer :size="16" aria-hidden="true" />
+              </TButton>
+            </template>
+          </TInput>
+        </TFormItem>
+
+        <TFormItem name="comparisonMode" :label="t('dataTools.comparison.comparisonMode')">
+          <TRadioGroup v-model="draft.comparisonMode" :disabled="busy">
+            <TRadio value="cells">{{ t("dataTools.comparison.cells") }}</TRadio>
+            <TRadio value="rows">{{ t("dataTools.comparison.rows") }}</TRadio>
+          </TRadioGroup>
+        </TFormItem>
+        <TFormItem name="hasHeader">
+          <TCheckbox v-model="draft.hasHeader" :disabled="busy">
+            {{ t("dataTools.comparison.header") }}
+          </TCheckbox>
+        </TFormItem>
+
+        <TFormItem v-if="draft.comparisonMode === 'rows'" name="columns">
+          <div class="data-comparison-dialog__columns">
+            <div class="data-comparison-dialog__selection-actions">
+              <TCheckbox
+                :checked="allSelected"
+                :indeterminate="partlySelected"
+                :disabled="busy || columns.length === 0"
+                @change="toggleAll(Boolean($event))"
+                >{{ t("dataTools.comparison.selectAll") }}</TCheckbox
+              >
+              <TButton
+                variant="text"
+                size="small"
+                :disabled="busy || columns.length === 0"
+                @click="invertSelection"
+                >{{ t("dataTools.comparison.invert") }}</TButton
+              >
+            </div>
+            <TCheckbox
+              v-for="column in columns"
+              :key="column.column"
+              :checked="draft.columns.includes(column.column)"
               :disabled="busy"
-              :aria-label="`${t('dataTools.comparison.pickRange')}：${t('dataTools.comparison.firstRange')}`"
-              :title="t('formulaTools.selectRange')"
-              @click="emit('pickRange', 'firstRange')"
-              ><SquareMousePointer :size="16" aria-hidden="true" />
-            </TButton>
-          </template>
-        </TInput>
-      </label>
-      <label v-if="draft.scope === 'double'" class="data-comparison-dialog__field">
-        <span>{{ t("dataTools.comparison.secondRange") }}</span>
-        <TInput
-          v-model="draft.secondRange"
-          :disabled="busy"
-          autocomplete="off"
-          placeholder="E1:G10"
-          :aria-label="t('dataTools.comparison.secondRange')"
+              @change="toggle(column.column, Boolean($event))"
+              >{{ t("dataTools.comparison.column", { column: column.label })
+              }}{{ column.header ? ` (${column.header})` : "" }}</TCheckbox
+            >
+            <p v-if="draft.scope === 'double'" class="data-comparison-dialog__hint">
+              {{ t("dataTools.comparison.doubleRowsHint") }}
+            </p>
+          </div>
+        </TFormItem>
+
+        <TFormItem
+          v-if="draft.scope === 'double'"
+          name="side"
+          :label="t('dataTools.comparison.resultSource')"
         >
-          <template #suffix>
-            <TButton
-              variant="text"
-              shape="square"
-              :disabled="busy"
-              :aria-label="`${t('dataTools.comparison.pickRange')}：${t('dataTools.comparison.secondRange')}`"
-              :title="t('formulaTools.selectRange')"
-              @click="emit('pickRange', 'secondRange')"
-              ><SquareMousePointer :size="16" aria-hidden="true" />
-            </TButton>
-          </template>
-        </TInput>
-      </label>
+          <TRadioGroup v-model="draft.side" :disabled="busy">
+            <TRadio value="first">{{ t("dataTools.comparison.firstSource") }}</TRadio>
+            <TRadio value="second">{{ t("dataTools.comparison.secondSource") }}</TRadio>
+            <TRadio value="both">{{ t("dataTools.comparison.bothSource") }}</TRadio>
+          </TRadioGroup>
+        </TFormItem>
 
-      <div class="data-comparison-dialog__field">
-        <span>{{ t("dataTools.comparison.comparisonMode") }}</span>
-        <TRadioGroup v-model="draft.comparisonMode" :disabled="busy">
-          <TRadio value="cells">{{ t("dataTools.comparison.cells") }}</TRadio>
-          <TRadio value="rows">{{ t("dataTools.comparison.rows") }}</TRadio>
-        </TRadioGroup>
-      </div>
-      <TCheckbox v-model="draft.hasHeader" :disabled="busy">
-        {{ t("dataTools.comparison.header") }}
-      </TCheckbox>
-
-      <div v-if="draft.comparisonMode === 'rows'" class="data-comparison-dialog__columns">
-        <div class="data-comparison-dialog__selection-actions">
-          <TCheckbox
-            :checked="allSelected"
-            :indeterminate="partlySelected"
-            :disabled="busy || columns.length === 0"
-            @change="toggleAll(Boolean($event))"
-            >{{ t("dataTools.comparison.selectAll") }}</TCheckbox
+        <TFormItem v-if="isMarking" name="fillColor" :label="t('dataTools.comparison.fillColor')">
+          <TRadioGroup
+            v-model="draft.fillColor"
+            direction="horizontal"
+            :disabled="busy"
+            :aria-label="t('dataTools.comparison.fillColor')"
           >
-          <TButton
-            variant="text"
-            size="small"
-            :disabled="busy || columns.length === 0"
-            @click="invertSelection"
-            >{{ t("dataTools.comparison.invert") }}</TButton
-          >
-        </div>
-        <TCheckbox
-          v-for="column in columns"
-          :key="column.column"
-          :checked="draft.columns.includes(column.column)"
-          :disabled="busy"
-          @change="toggle(column.column, Boolean($event))"
-          >{{ t("dataTools.comparison.column", { column: column.label })
-          }}{{ column.header ? ` (${column.header})` : "" }}</TCheckbox
-        >
-        <p v-if="draft.scope === 'double'" class="data-comparison-dialog__hint">
-          {{ t("dataTools.comparison.doubleRowsHint") }}
-        </p>
-      </div>
-
-      <div v-if="draft.scope === 'double'" class="data-comparison-dialog__field">
-        <span>{{ t("dataTools.comparison.resultSource") }}</span>
-        <TRadioGroup v-model="draft.side" :disabled="busy">
-          <TRadio value="first">{{ t("dataTools.comparison.firstSource") }}</TRadio>
-          <TRadio value="second">{{ t("dataTools.comparison.secondSource") }}</TRadio>
-          <TRadio value="both">{{ t("dataTools.comparison.bothSource") }}</TRadio>
-        </TRadioGroup>
-      </div>
-
-      <div v-if="isMarking" class="data-comparison-dialog__field">
-        <span>{{ t("dataTools.comparison.fillColor") }}</span>
-        <TRadioGroup
-          v-model="draft.fillColor"
-          class="data-comparison-dialog__colors"
-          :disabled="busy"
-          :aria-label="t('dataTools.comparison.fillColor')"
-        >
-          <TRadio v-for="color in colors" :key="color.value" :value="color.value"
-            ><span
-              class="data-comparison-dialog__swatch"
-              :style="{ backgroundColor: color.value }"
-              aria-hidden="true"
-            />{{ t(`dataTools.comparison.colors.${color.label}`) }}</TRadio
-          >
-        </TRadioGroup>
-      </div>
-      <p v-if="isMarking" class="data-comparison-dialog__hint">
-        {{ t("dataTools.comparison.markHint") }}
-      </p>
-      <p v-if="isExtracting" class="data-comparison-dialog__hint">
-        {{ t("dataTools.comparison.extractHint") }}
-      </p>
-      <p class="data-comparison-dialog__hint">{{ semanticsHint }}</p>
+            <TRadio v-for="color in colors" :key="color.value" :value="color.value"
+              ><span
+                class="data-comparison-dialog__swatch"
+                :style="{ backgroundColor: color.value }"
+                aria-hidden="true"
+              />{{ t(`dataTools.comparison.colors.${color.label}`) }}</TRadio
+            >
+          </TRadioGroup>
+        </TFormItem>
+      </TForm>
       <p v-if="error" class="data-comparison-dialog__error" role="alert">
         {{ error }}
       </p>
@@ -273,19 +270,7 @@ watch(
 <style scoped lang="scss">
 .data-comparison-dialog {
   display: grid;
-  gap: var(--idea-space-3);
-
-  &__scope {
-    display: flex;
-    gap: var(--idea-space-4);
-  }
-
-  &__field {
-    display: grid;
-    grid-template-columns: 84px minmax(0, 1fr);
-    align-items: center;
-    gap: var(--idea-space-2);
-  }
+  gap: var(--idea-space-2);
 
   &__columns {
     display: grid;
@@ -300,11 +285,6 @@ watch(
     display: flex;
     align-items: center;
     gap: var(--idea-space-4);
-  }
-
-  &__colors {
-    display: grid;
-    gap: var(--idea-space-1);
   }
 
   &__swatch {

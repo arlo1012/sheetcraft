@@ -81,10 +81,11 @@ describe("DataComparisonDialog", () => {
     ["extractDuplicate", "Extract Duplicate Data", "Creates a new worksheet"],
     ["markUnique", "Mark Unique Data", "Marks the current data"],
     ["extractUnique", "Extract Unique Data", "Creates a new worksheet"],
-  ] as const)("shows the %s action title and hint", (action, title, hint) => {
+  ] as const)("shows the %s title without redundant explanatory text", (action, title, hint) => {
     mountDialog({ action });
     expect(dialog().text()).toContain(title);
-    expect(dialog().text()).toContain(hint);
+    expect(dialog().attributes("aria-label")).toBe(title);
+    expect(dialog().text()).not.toContain(hint);
   });
 });
 

@@ -343,6 +343,10 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       extractDuplicate: string;
       markUnique: string;
       extractUnique: string;
+      markDuplicateTitle: string;
+      extractDuplicateTitle: string;
+      markUniqueTitle: string;
+      extractUniqueTitle: string;
       singleRange: string;
       doubleRange: string;
       firstRange: string;
