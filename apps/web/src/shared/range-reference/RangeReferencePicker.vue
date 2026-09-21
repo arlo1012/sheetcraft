@@ -33,7 +33,7 @@ const { t } = useAppI18n();
       @keydown.esc.stop.prevent="emit('cancel')"
     >
       <TInput :value="reference" readonly :aria-label="t('formulaTools.reference')" />
-      <p class="range-reference-picker__hint">{{ hint ?? t("formulaTools.selectRangeHint") }}</p>
+      <p v-if="hint" class="range-reference-picker__hint">{{ hint }}</p>
     </div>
   </Dialog>
 </template>
