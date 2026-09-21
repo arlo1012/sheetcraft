@@ -4,6 +4,7 @@ import { computed, ref, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { useAppI18n } from "../../../shared/i18n";
@@ -26,7 +27,7 @@ const emit = defineEmits<{
   pickRange: [];
   draftChange: [draft: DuplicateToolDraft];
 }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const draft = ref<DuplicateToolDraft>({ ...props.initial });
 const colors = [
   { value: "#ffc7ce", label: "lightRed" },
@@ -79,45 +80,49 @@ watch(
       <TCheckbox v-if="mode === 'count'" :checked="false" disabled>
         {{ t("dataTools.duplicates.insertChartTodo") }}
       </TCheckbox>
-      <label class="duplicate-values-dialog__field">
-        <span>{{ t("dataTools.duplicates.range") }}</span>
-        <TInput
-          v-model="draft.range"
-          :disabled="busy"
-          autocomplete="off"
-          placeholder="A1:A10"
-          :aria-label="t('dataTools.duplicates.range')"
-        >
-          <template #suffix
-            ><TButton
-              variant="text"
-              shape="square"
-              :disabled="busy"
-              :aria-label="`${t('dataTools.duplicates.pickRange')}：${t('dataTools.duplicates.range')}`"
-              :title="t('formulaTools.selectRange')"
-              @click="emit('pickRange')"
-              ><template #icon
-                ><SquareMousePointer :size="16" aria-hidden="true" /></template></TButton
-          ></template>
-        </TInput>
-      </label>
-      <div v-if="mode === 'highlight'" class="duplicate-values-dialog__field">
-        <span>{{ t("dataTools.duplicates.fillColor") }}</span>
-        <TRadioGroup
-          v-model="draft.fillColor"
-          direction="horizontal"
-          :disabled="busy"
-          :aria-label="t('dataTools.duplicates.fillColor')"
-        >
-          <TRadio v-for="color in colors" :key="color.value" :value="color.value"
-            ><span
-              class="duplicate-values-dialog__swatch"
-              :style="{ backgroundColor: color.value }"
-              aria-hidden="true"
-            />{{ t(`dataTools.duplicates.colors.${color.label}`) }}</TRadio
+      <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 88 : 104">
+        <TFormItem name="range" :label="t('dataTools.duplicates.range')">
+          <TInput
+            v-model="draft.range"
+            :disabled="busy"
+            autocomplete="off"
+            placeholder="A1:A10"
+            :aria-label="t('dataTools.duplicates.range')"
           >
-        </TRadioGroup>
-      </div>
+            <template #suffix
+              ><TButton
+                variant="text"
+                shape="square"
+                :disabled="busy"
+                :aria-label="`${t('dataTools.duplicates.pickRange')}：${t('dataTools.duplicates.range')}`"
+                :title="t('formulaTools.selectRange')"
+                @click="emit('pickRange')"
+                ><template #icon
+                  ><SquareMousePointer :size="16" aria-hidden="true" /></template></TButton
+            ></template>
+          </TInput>
+        </TFormItem>
+        <TFormItem
+          v-if="mode === 'highlight'"
+          name="fillColor"
+          :label="t('dataTools.duplicates.fillColor')"
+        >
+          <TRadioGroup
+            v-model="draft.fillColor"
+            direction="horizontal"
+            :disabled="busy"
+            :aria-label="t('dataTools.duplicates.fillColor')"
+          >
+            <TRadio v-for="color in colors" :key="color.value" :value="color.value"
+              ><span
+                class="duplicate-values-dialog__swatch"
+                :style="{ backgroundColor: color.value }"
+                aria-hidden="true"
+              />{{ t(`dataTools.duplicates.colors.${color.label}`) }}</TRadio
+            >
+          </TRadioGroup>
+        </TFormItem>
+      </TForm>
       <p v-if="mode === 'count'" class="duplicate-values-dialog__hint">
         {{ t("dataTools.duplicates.countHint") }}
       </p>
@@ -131,15 +136,6 @@ watch(
 .duplicate-values-dialog {
   display: grid;
   gap: var(--idea-space-2);
-  &__field {
-    display: grid;
-    grid-template-columns: 84px minmax(0, 1fr);
-    align-items: center;
-    gap: var(--idea-space-2);
-    > span {
-      text-align: right;
-    }
-  }
   &__swatch {
     display: inline-block;
     width: 14px;
