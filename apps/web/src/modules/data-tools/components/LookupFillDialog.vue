@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, ArrowRight, Plus, Trash2 } from "lucide-vue-next";
+import { ArrowLeft, Plus, Trash2 } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
@@ -435,8 +435,7 @@ watch(
           theme="primary"
           :disabled="busy || (step === 'ranges' ? !rangesReady : !fieldsReady)"
           @click="next"
-          >{{ t("dataTools.lookupFill.next")
-          }}<template #suffix><ArrowRight :size="16" /></template></TButton
+          >{{ t("dataTools.lookupFill.next") }}</TButton
         ><TButton v-else theme="primary" :disabled="busy || !canApply" @click="apply">{{
           t("dataTools.lookupFill.apply")
         }}</TButton>
