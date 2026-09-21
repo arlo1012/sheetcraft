@@ -82,9 +82,24 @@ const previewRows = computed(() =>
   })),
 );
 const previewColumns = computed<BaseTableCol[]>(() => [
-  { colKey: "sourceRow", title: t("dataTools.lookupFill.previewSourceRow"), width: 100 },
-  { colKey: "targetRow", title: t("dataTools.lookupFill.previewTargetRow"), width: 100 },
-  { colKey: "column", title: t("dataTools.lookupFill.previewColumn"), width: 80 },
+  {
+    colKey: "sourceRow",
+    title: t("dataTools.lookupFill.previewSourceRow"),
+    width: 88,
+    align: "center",
+  },
+  {
+    colKey: "targetRow",
+    title: t("dataTools.lookupFill.previewTargetRow"),
+    width: 88,
+    align: "center",
+  },
+  {
+    colKey: "column",
+    title: t("dataTools.lookupFill.previewColumn"),
+    width: 64,
+    align: "center",
+  },
   { colKey: "value", title: t("dataTools.lookupFill.previewValue"), ellipsis: true },
 ]);
 const unmatchedRows = computed(() =>
