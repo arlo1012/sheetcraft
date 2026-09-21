@@ -257,7 +257,7 @@ watch(
   &__functions {
     display: flex;
     flex-direction: column;
-    gap: var(--idea-space-2);
+    gap: var(--idea-space-1);
     min-width: 0;
   }
   &__function-list {
