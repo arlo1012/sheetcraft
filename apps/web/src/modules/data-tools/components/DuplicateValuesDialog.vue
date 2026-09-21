@@ -114,11 +114,13 @@ watch(
             :aria-label="t('dataTools.duplicates.fillColor')"
           >
             <TRadio v-for="color in colors" :key="color.value" :value="color.value"
-              ><span
-                class="duplicate-values-dialog__swatch"
-                :style="{ backgroundColor: color.value }"
-                aria-hidden="true"
-              />{{ t(`dataTools.duplicates.colors.${color.label}`) }}</TRadio
+              ><span class="duplicate-values-dialog__color-label"
+                ><span
+                  class="duplicate-values-dialog__swatch"
+                  :style="{ backgroundColor: color.value }"
+                  aria-hidden="true"
+                />{{ t(`dataTools.duplicates.colors.${color.label}`) }}</span
+              ></TRadio
             >
           </TRadioGroup>
         </TFormItem>
@@ -136,14 +138,18 @@ watch(
 .duplicate-values-dialog {
   display: grid;
   gap: var(--idea-space-2);
+  &__color-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--idea-space-1);
+    vertical-align: top;
+  }
   &__swatch {
-    display: inline-block;
+    flex: none;
     width: 14px;
     height: 14px;
-    margin-right: var(--idea-space-1);
     border: 1px solid var(--idea-border-subtle);
     border-radius: 2px;
-    vertical-align: -2px;
   }
   &__hint,
   &__error {
