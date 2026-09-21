@@ -50,7 +50,7 @@ watch(
     role="dialog"
     aria-modal="true"
     placement="center"
-    width="min(640px, calc(100vw - 32px))"
+    width="min(560px, calc(100vw - 32px))"
     :visible="visible"
     :header="t('dataTools.duplicates.errorChecks.optionsTitle')"
     :aria-label="t('dataTools.duplicates.errorChecks.title')"
