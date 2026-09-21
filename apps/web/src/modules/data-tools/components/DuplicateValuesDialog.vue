@@ -105,7 +105,7 @@ watch(
         <span>{{ t("dataTools.duplicates.fillColor") }}</span>
         <TRadioGroup
           v-model="draft.fillColor"
-          class="duplicate-values-dialog__colors"
+          direction="horizontal"
           :disabled="busy"
           :aria-label="t('dataTools.duplicates.fillColor')"
         >
@@ -136,10 +136,9 @@ watch(
     grid-template-columns: 84px minmax(0, 1fr);
     align-items: center;
     gap: var(--idea-space-2);
-  }
-  &__colors {
-    display: grid;
-    gap: var(--idea-space-1);
+    > span {
+      text-align: right;
+    }
   }
   &__swatch {
     display: inline-block;
