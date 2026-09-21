@@ -96,6 +96,31 @@ describe("DataFillTool", () => {
     }
   });
 
+  test.each(["insert-text", "current-date"])(
+    "opens %s from row padding and stays open across SVG icons and empty space",
+    async (action) => {
+      const wrapper = mountTool();
+      await wrapper.get('[data-data-action="fill"]').trigger("click");
+      const item = rootMenu().get(`[data-data-fill="${action}"]`);
+      const focused = document.activeElement;
+      // Hovering padding targets the row itself; icon shapes are SVGElements.
+      await item.trigger("mouseover");
+      expect(item.attributes("aria-expanded")).toBe("true");
+      for (const icon of [item.get("svg"), item.get("svg path")]) {
+        await icon.trigger("mouseover");
+        expect(item.attributes("aria-expanded")).toBe("true");
+      }
+      await item.trigger("mouseover");
+      expect(item.attributes("aria-expanded")).toBe("true");
+      expect(document.activeElement).toBe(focused);
+
+      await rootMenu().get('[data-data-fill="blanks"]').trigger("mouseover");
+      expect(document.body.querySelector('[id^="data-fill-submenu-"]')).toBeNull();
+      await item.trigger("mouseover");
+      expect(item.attributes("aria-expanded")).toBe("true");
+    },
+  );
+
   test("publishes each current-date shortcut with a current date sample", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 8, 21, 9));

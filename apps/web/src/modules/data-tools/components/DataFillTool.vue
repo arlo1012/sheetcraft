@@ -175,12 +175,16 @@ function onMenuFocusin(event: FocusEvent): void {
 
 function onMenuMouseover(event: MouseEvent): void {
   const submenu =
-    event.target instanceof HTMLElement
+    event.target instanceof Element
       ? (event.target.closest<HTMLElement>("[data-data-fill]")?.dataset.dataFill as
           | FillSubmenu
           | undefined)
       : undefined;
-  if (activeSubmenu.value && submenu !== activeSubmenu.value) activeSubmenu.value = null;
+  if (submenu === "insert-text" || submenu === "current-date") {
+    if (activeSubmenu.value !== submenu) openSubmenu(submenu, false);
+  } else {
+    activeSubmenu.value = null;
+  }
 }
 
 function onSubmenuKeydown(event: KeyboardEvent): void {
@@ -269,7 +273,6 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
           :aria-expanded="activeSubmenu === 'insert-text'"
           :aria-controls="activeSubmenu === 'insert-text' ? submenuId : undefined"
           @select="openSubmenu('insert-text')"
-          @mouseenter="openSubmenu('insert-text', false)"
         >
           <template #icon><TextCursorInput :size="15" /></template>
           {{ t("dataTools.fill.insertText") }}
@@ -281,7 +284,6 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
           :aria-expanded="activeSubmenu === 'current-date'"
           :aria-controls="activeSubmenu === 'current-date' ? submenuId : undefined"
           @select="openSubmenu('current-date')"
-          @mouseenter="openSubmenu('current-date', false)"
         >
           <template #icon><CalendarDays :size="15" /></template>
           {{ t("dataTools.fill.currentDate") }}
