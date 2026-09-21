@@ -684,8 +684,8 @@ function confirm(): void {
   }
   &__auto-settings {
     display: grid;
-    gap: 8px;
-    padding-top: 12px;
+    gap: 12px;
+    padding-block: 16px 8px;
   }
   &__setting {
     display: grid;
