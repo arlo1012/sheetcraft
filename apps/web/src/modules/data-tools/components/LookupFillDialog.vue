@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { ArrowLeft, Plus, Trash2 } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
-import { Select as TSelect, Option as TOption } from "tdesign-vue-next/es/select";
 import { Steps as TSteps, StepItem as TStepItem } from "tdesign-vue-next/es/steps";
+import LookupFieldMappingTable from "./LookupFieldMappingTable.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { LookupFillPreview } from "@idea10/core/commands";
@@ -45,10 +44,6 @@ const copy = (value: LookupFillDraft): LookupFillDraft => ({
 const draft = ref(copy(props.initial));
 const same = (left: LookupFillDraft, right: LookupFillDraft) =>
   JSON.stringify(left) === JSON.stringify(right);
-const label = (columns: readonly DataToolColumn[], index: number) => {
-  const item = columns.find((column) => column.column === index);
-  return item ? `${item.label}${item.header ? ` (${item.header})` : ""}` : "";
-};
 const validField = (field: LookupFillFieldDraft) =>
   props.sourceColumns.some((item) => item.column === field.sourceColumn) &&
   props.targetColumns.some((item) => item.column === field.targetColumn);
@@ -88,6 +83,9 @@ function add(kind: MappingKind): void {
   const field = defaultField();
   if (!field || props.busy) return;
   draft.value[kind].push(field);
+}
+function changeField(kind: MappingKind, index: number, field: LookupFillFieldDraft): void {
+  if (!props.busy && draft.value[kind][index]) draft.value[kind][index] = { ...field };
 }
 function remove(kind: MappingKind, index: number): void {
   if (props.busy) return;
@@ -179,7 +177,7 @@ watch(
   <Dialog
     :visible="visible && !picking"
     :header="t('dataTools.lookupFill.title')"
-    width="min(640px, calc(100vw - 32px))"
+    :width="step === 'fields' ? 'min(860px, calc(100vw - 32px))' : 'min(640px, calc(100vw - 32px))'"
     :close-btn="!busy"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
@@ -238,144 +236,61 @@ watch(
           {{ t("dataTools.lookupFill.invalidRange") }}
         </p>
       </TForm>
-      <TForm
-        v-else-if="step === 'fields'"
-        :data="draft"
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 88 : 116"
-      >
-        <TFormItem name="matchFields" :label="t('dataTools.lookupFill.matchFields')">
-          <section class="lookup-fill-dialog__mapping-panel">
-            <div class="lookup-fill-dialog__mapping-head">
-              <span>{{ t("dataTools.lookupFill.sourceColumn") }}</span
-              ><span>{{ t("dataTools.lookupFill.targetColumn") }}</span
-              ><span aria-hidden="true" />
-            </div>
-            <p v-if="!draft.matchFields.length" class="lookup-fill-dialog__empty">
-              {{ t("dataTools.lookupFill.noMatchFields") }}
-            </p>
-            <div
-              v-for="(field, index) in draft.matchFields"
-              :key="`match-${index}`"
-              class="lookup-fill-dialog__mapping-row"
-            >
-              <TSelect
-                v-model="field.sourceColumn"
-                :aria-label="t('dataTools.lookupFill.sourceField')"
-                :disabled="busy"
-                ><TOption
-                  v-for="item in sourceColumns"
-                  :key="item.column"
-                  :value="item.column"
-                  :label="label(sourceColumns, item.column)" /></TSelect
-              ><TSelect
-                v-model="field.targetColumn"
-                :aria-label="t('dataTools.lookupFill.targetField')"
-                :disabled="busy"
-                ><TOption
-                  v-for="item in targetColumns"
-                  :key="item.column"
-                  :value="item.column"
-                  :label="label(targetColumns, item.column)" /></TSelect
-              ><TButton
-                variant="text"
-                shape="square"
-                :disabled="busy"
-                :aria-label="t('dataTools.lookupFill.removeField')"
-                @click="remove('matchFields', index)"
-                ><template #icon><Trash2 :size="16" /></template
-              ></TButton>
-            </div>
-            <TButton
-              class="lookup-fill-dialog__add-field"
-              variant="text"
-              size="small"
-              :disabled="busy"
-              @click="add('matchFields')"
-              ><template #icon><Plus :size="15" /></template
-              >{{ t("dataTools.lookupFill.addField") }}</TButton
-            >
-          </section>
-        </TFormItem>
-        <TFormItem name="fillFields" :label="t('dataTools.lookupFill.fillFields')">
-          <section class="lookup-fill-dialog__mapping-panel">
-            <div class="lookup-fill-dialog__mapping-actions">
-              <TButton variant="text" size="small" :disabled="busy" @click="matchRemainingFields">{{
+      <div v-else-if="step === 'fields'" class="lookup-fill-dialog__fields">
+        <div class="lookup-fill-dialog__tables">
+          <LookupFieldMappingTable
+            :title="t('dataTools.lookupFill.matchFields')"
+            :empty="t('dataTools.lookupFill.noMatchFields')"
+            :fields="draft.matchFields"
+            :source-columns="sourceColumns"
+            :target-columns="targetColumns"
+            :busy="busy"
+            @add="add('matchFields')"
+            @remove="remove('matchFields', $event)"
+            @change="(index, field) => changeField('matchFields', index, field)"
+          />
+          <LookupFieldMappingTable
+            :title="t('dataTools.lookupFill.fillFields')"
+            :empty="t('dataTools.lookupFill.noFillFields')"
+            :fields="draft.fillFields"
+            :source-columns="sourceColumns"
+            :target-columns="targetColumns"
+            :busy="busy"
+            @add="add('fillFields')"
+            @remove="remove('fillFields', $event)"
+            @change="(index, field) => changeField('fillFields', index, field)"
+          >
+            <template #actions>
+              <TButton variant="outline" :disabled="busy" @click="matchRemainingFields">{{
                 t("dataTools.lookupFill.matchSameHeaders")
               }}</TButton>
-            </div>
-            <div class="lookup-fill-dialog__mapping-head">
-              <span>{{ t("dataTools.lookupFill.sourceColumn") }}</span
-              ><span>{{ t("dataTools.lookupFill.targetColumn") }}</span
-              ><span aria-hidden="true" />
-            </div>
-            <p v-if="!draft.fillFields.length" class="lookup-fill-dialog__empty">
-              {{ t("dataTools.lookupFill.noFillFields") }}
-            </p>
-            <div
-              v-for="(field, index) in draft.fillFields"
-              :key="`fill-${index}`"
-              class="lookup-fill-dialog__mapping-row"
-            >
-              <TSelect
-                v-model="field.sourceColumn"
-                :aria-label="t('dataTools.lookupFill.sourceField')"
-                :disabled="busy"
-                ><TOption
-                  v-for="item in sourceColumns"
-                  :key="item.column"
-                  :value="item.column"
-                  :label="label(sourceColumns, item.column)" /></TSelect
-              ><TSelect
-                v-model="field.targetColumn"
-                :aria-label="t('dataTools.lookupFill.targetField')"
-                :disabled="busy"
-                ><TOption
-                  v-for="item in targetColumns"
-                  :key="item.column"
-                  :value="item.column"
-                  :label="label(targetColumns, item.column)" /></TSelect
-              ><TButton
-                variant="text"
-                shape="square"
-                :disabled="busy"
-                :aria-label="t('dataTools.lookupFill.removeField')"
-                @click="remove('fillFields', index)"
-                ><template #icon><Trash2 :size="16" /></template
-              ></TButton>
-            </div>
-            <TButton
-              class="lookup-fill-dialog__add-field"
-              variant="text"
-              size="small"
+            </template>
+          </LookupFieldMappingTable>
+        </div>
+        <div class="lookup-fill-dialog__options">
+          <div class="lookup-fill-dialog__match-mode">
+            <span>{{ t("dataTools.lookupFill.matchMode") }}</span>
+            <TRadioGroup
+              v-model="draft.matchMode"
               :disabled="busy"
-              @click="add('fillFields')"
-              ><template #icon><Plus :size="15" /></template
-              >{{ t("dataTools.lookupFill.addField") }}</TButton
+              :aria-label="t('dataTools.lookupFill.matchMode')"
             >
-          </section>
-        </TFormItem>
-        <TFormItem name="matchMode" :label="t('dataTools.lookupFill.matchMode')"
-          ><TRadioGroup v-model="draft.matchMode" :disabled="busy"
-            ><TRadio value="first">{{ t("dataTools.lookupFill.first") }}</TRadio
-            ><TRadio value="last">{{ t("dataTools.lookupFill.last") }}</TRadio></TRadioGroup
-          ></TFormItem
-        >
-        <TFormItem name="overwrite"
-          ><TCheckbox v-model="draft.overwrite" :disabled="busy">{{
+              <TRadio value="first">{{ t("dataTools.lookupFill.first") }}</TRadio>
+              <TRadio value="last">{{ t("dataTools.lookupFill.last") }}</TRadio>
+            </TRadioGroup>
+          </div>
+          <TCheckbox v-model="draft.overwrite" :disabled="busy">{{
             t("dataTools.lookupFill.overwriteExisting")
-          }}</TCheckbox></TFormItem
-        >
-        <TFormItem v-if="invalidMappings || !fieldsReady">
-          <p class="lookup-fill-dialog__notice" role="alert">
-            {{
-              invalidMappings
-                ? t("dataTools.lookupFill.invalidMappings")
-                : t("dataTools.lookupFill.completeMappings")
-            }}
-          </p>
-        </TFormItem>
-      </TForm>
+          }}</TCheckbox>
+        </div>
+        <p v-if="invalidMappings || !fieldsReady" class="lookup-fill-dialog__notice" role="alert">
+          {{
+            invalidMappings
+              ? t("dataTools.lookupFill.invalidMappings")
+              : t("dataTools.lookupFill.completeMappings")
+          }}
+        </p>
+      </div>
       <section
         v-else
         class="lookup-fill-dialog__preview"
@@ -439,9 +354,9 @@ watch(
         <TButton theme="default" :disabled="busy" @click="emit('close')">{{
           t("dataTools.common.cancel")
         }}</TButton
-        ><TButton v-if="step !== 'ranges'" theme="default" :disabled="busy" @click="back"
-          ><template #icon><ArrowLeft :size="16" /></template
-          >{{ t("dataTools.lookupFill.back") }}</TButton
+        ><TButton v-if="step !== 'ranges'" theme="default" :disabled="busy" @click="back">{{
+          t("dataTools.lookupFill.back")
+        }}</TButton
         ><TButton
           v-if="step !== 'preview'"
           theme="primary"
@@ -461,33 +376,32 @@ watch(
   display: grid;
   gap: var(--idea-space-5);
 }
-.lookup-fill-dialog__mapping-panel {
+.lookup-fill-dialog__fields {
   display: grid;
-  gap: var(--idea-space-2);
-  width: 100%;
-  padding: var(--idea-space-3);
-  border: 1px solid var(--idea-border-control);
-  border-radius: var(--idea-radius-medium);
-  background: var(--idea-surface-secondary);
+  gap: 12px;
 }
-.lookup-fill-dialog__mapping-head,
-.lookup-fill-dialog__mapping-row {
+.lookup-fill-dialog__tables {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 28px;
-  gap: var(--idea-space-2);
-  align-items: center;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
-.lookup-fill-dialog__mapping-head {
-  color: var(--idea-text-secondary);
-  font-size: var(--idea-font-size-body-small);
-}
-.lookup-fill-dialog__add-field {
-  justify-self: start;
-}
-.lookup-fill-dialog__mapping-actions {
+.lookup-fill-dialog__options {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.lookup-fill-dialog__match-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+@media (max-width: 680px) {
+  .lookup-fill-dialog__tables {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .lookup-fill-dialog__notice,
 .lookup-fill-dialog__empty,
