@@ -50,15 +50,9 @@ function byText(selector: string, label: string): DOMWrapper<Element> {
 
 async function selectColumnType(wrapper: ReturnType<typeof mount>, label: string) {
   const field = wrapper.get("[data-text-to-columns-column-type]");
-  await field.get(".t-input__inner").trigger("keydown", { code: "ArrowDown" });
-  await expect
-    .poll(() =>
-      [...document.querySelectorAll<HTMLElement>(".t-select-option")].map((option) =>
-        option.textContent?.trim(),
-      ),
-    )
-    .toContain(label);
-  await byText(".t-select-option", label).trigger("click");
+  const option = field.findAll(".t-radio").find((radio) => radio.text().trim() === label);
+  if (!option) throw new Error(`Could not find column format ${label}.`);
+  await option.trigger("click");
   await nextTick();
 }
 

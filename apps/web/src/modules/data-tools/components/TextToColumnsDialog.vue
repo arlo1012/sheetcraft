@@ -577,26 +577,6 @@ function confirm(): void {
           </TFormItem>
         </template>
         <template v-else>
-          <TFormItem :label="t('dataTools.textToColumns.columnFormat')">
-            <div class="text-to-columns-dialog__format">
-              <TSelect
-                :value="draft.columnTypes[selectedColumn] ?? 'general'"
-                :options="typeOptions"
-                :aria-label="t('dataTools.textToColumns.columnFormat')"
-                data-text-to-columns-column-type
-                @change="setColumnType"
-              /><span>{{
-                t("dataTools.textToColumns.columnSelected", { column: selectedColumn + 1 })
-              }}</span>
-              <TSelect
-                v-if="draft.columnTypes[selectedColumn] === 'date'"
-                :value="draft.dateOrders?.[selectedColumn] ?? 'YMD'"
-                :options="dateOrderOptions"
-                :aria-label="t('dataTools.textToColumns.dateOrder')"
-                @change="setDateOrder"
-              />
-            </div>
-          </TFormItem>
           <TFormItem :label="t('dataTools.textToColumns.destination')"
             ><div class="text-to-columns-dialog__destination">
               <RangeReferenceInput
@@ -608,6 +588,34 @@ function confirm(): void {
               }}</TCheckbox>
             </div></TFormItem
           >
+          <TFormItem :label="t('dataTools.textToColumns.columnFormat')">
+            <div class="text-to-columns-dialog__format">
+              <TRadioGroup
+                :value="draft.columnTypes[selectedColumn] ?? 'general'"
+                class="text-to-columns-dialog__inline"
+                :aria-label="t('dataTools.textToColumns.columnFormat')"
+                data-text-to-columns-column-type
+                @change="setColumnType"
+              >
+                <TRadio v-for="option in typeOptions" :key="option.value" :value="option.value">{{
+                  option.label
+                }}</TRadio> </TRadioGroup
+              ><span>{{
+                t("dataTools.textToColumns.columnSelected", { column: selectedColumn + 1 })
+              }}</span>
+              <div
+                v-if="draft.columnTypes[selectedColumn] === 'date'"
+                class="text-to-columns-dialog__date-order"
+              >
+                <TSelect
+                  :value="draft.dateOrders?.[selectedColumn] ?? 'YMD'"
+                  :options="dateOrderOptions"
+                  :aria-label="t('dataTools.textToColumns.dateOrder')"
+                  @change="setDateOrder"
+                />
+              </div>
+            </div>
+          </TFormItem>
           <p class="text-to-columns-dialog__hint">{{ t("dataTools.textToColumns.formatHint") }}</p>
         </template>
       </TForm>
@@ -761,11 +769,14 @@ function confirm(): void {
     gap: 8px;
   }
   &__format {
-    display: grid;
-    grid-template-columns: 180px auto auto;
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
+    gap: 8px 12px;
     width: 100%;
+  }
+  &__date-order {
+    width: 120px;
   }
   &__preview-section {
     display: grid;

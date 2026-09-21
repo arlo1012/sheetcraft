@@ -91,13 +91,13 @@ describe("TextToColumnsDialog", () => {
   test("formats an output column as a date, preserves it after back, and applies only on Finish", async () => {
     const dialog = mountDialog();
     await next(dialog);
-    const select = dialog.getComponent(TSelect);
+    const select = dialog.getComponent(TRadioGroup);
     select.vm.$emit("change", "date");
     await nextTick();
-    expect(dialog.findAllComponents(TSelect).at(1)?.props("value")).toBe("YMD");
+    expect(dialog.getComponent(TSelect).props("value")).toBe("YMD");
     await dialog.get("[data-split-previous]").trigger("click");
     await next(dialog);
-    expect(dialog.getComponent(TSelect).props("value")).toBe("date");
+    expect(dialog.getComponent(TRadioGroup).props("value")).toBe("date");
     expect(dialog.emitted("apply")).toBeUndefined();
     await next(dialog);
     expect(dialog.emitted("apply")?.at(-1)?.[0]).toMatchObject({
@@ -110,13 +110,13 @@ describe("TextToColumnsDialog", () => {
   test("keeps result-column state when the preview changes", async () => {
     const dialog = mountDialog();
     await next(dialog);
-    dialog.getComponent(TSelect).vm.$emit("change", "text");
+    dialog.getComponent(TRadioGroup).vm.$emit("change", "text");
     await nextTick();
     await dialog.setProps({ preview: ["001", "North", "West"] });
     await nextTick();
-    expect(dialog.getComponent(TSelect).props("value")).toBe("text");
+    expect(dialog.getComponent(TRadioGroup).props("value")).toBe("text");
     await dialog.get('[data-split-column="2"]').trigger("click");
-    dialog.getComponent(TSelect).vm.$emit("change", "skip");
+    dialog.getComponent(TRadioGroup).vm.$emit("change", "skip");
     await nextTick();
     expect(dialog.text()).toContain("Do not import");
   });
