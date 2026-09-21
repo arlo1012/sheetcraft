@@ -559,15 +559,17 @@ function confirm(): void {
             :status="widthsValid ? undefined : 'error'"
           >
             <div class="text-to-columns-dialog__break-position">
-              <TInput
-                v-model="breakPositionInput"
-                :aria-label="t('dataTools.textToColumns.breakPosition')"
-                placeholder="5"
-                @enter="addBreakPosition"
-              />
-              <TButton theme="primary" variant="outline" @click="addBreakPosition">{{
-                t("dataTools.textToColumns.createBreak")
-              }}</TButton>
+              <div class="text-to-columns-dialog__break-controls">
+                <TInput
+                  v-model="breakPositionInput"
+                  :aria-label="t('dataTools.textToColumns.breakPosition')"
+                  placeholder="5"
+                  @enter="addBreakPosition"
+                />
+                <TButton theme="primary" variant="outline" @click="addBreakPosition">{{
+                  t("dataTools.textToColumns.createBreak")
+                }}</TButton>
+              </div>
               <span v-if="widthsInput">{{
                 t("dataTools.textToColumns.currentBreaks", { positions: widthsInput })
               }}</span>
@@ -718,14 +720,20 @@ function confirm(): void {
   }
   &__break-position {
     display: grid;
-    grid-template-columns: minmax(0, 120px) max-content;
-    align-items: center;
     gap: 8px;
     width: 100%;
-    span {
-      grid-column: 1 / -1;
+    min-width: 0;
+    > span {
+      overflow-wrap: anywhere;
       color: var(--idea-text-secondary);
     }
+  }
+  &__break-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 120px) max-content;
+    justify-content: start;
+    align-items: center;
+    gap: 8px;
   }
   &__error {
     margin: 0;
