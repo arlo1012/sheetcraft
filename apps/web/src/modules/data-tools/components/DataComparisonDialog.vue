@@ -251,11 +251,13 @@ watch(
             :aria-label="t('dataTools.comparison.fillColor')"
           >
             <TRadio v-for="color in colors" :key="color.value" :value="color.value"
-              ><span
-                class="data-comparison-dialog__swatch"
-                :style="{ backgroundColor: color.value }"
-                aria-hidden="true"
-              />{{ t(`dataTools.comparison.colors.${color.label}`) }}</TRadio
+              ><span class="data-comparison-dialog__color-label"
+                ><span
+                  class="data-comparison-dialog__swatch"
+                  :style="{ backgroundColor: color.value }"
+                  aria-hidden="true"
+                />{{ t(`dataTools.comparison.colors.${color.label}`) }}</span
+              ></TRadio
             >
           </TRadioGroup>
         </TFormItem>
@@ -287,14 +289,19 @@ watch(
     gap: var(--idea-space-4);
   }
 
+  &__color-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--idea-space-1);
+    vertical-align: top;
+  }
+
   &__swatch {
-    display: inline-block;
+    flex: none;
     width: 14px;
     height: 14px;
-    margin-right: var(--idea-space-1);
     border: 1px solid var(--idea-border-subtle);
     border-radius: 2px;
-    vertical-align: -2px;
   }
 
   &__hint {
