@@ -398,7 +398,6 @@ export const enUS = {
       next: "Next",
       autoSplit: "Auto split",
       customSplit: "Custom split",
-      autoHint: "Choose a detected rule, or switch to Custom split to adjust it.",
       autoNoSuggestion: "No reliable split rule was detected. Choose Custom split.",
       suggestion: "{rule}: about {count} columns",
       textType: "Text type",

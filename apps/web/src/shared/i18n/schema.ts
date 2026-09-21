@@ -379,7 +379,6 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       next: string;
       autoSplit: string;
       customSplit: string;
-      autoHint: string;
       autoNoSuggestion: string;
       suggestion: string;
       textType: string;

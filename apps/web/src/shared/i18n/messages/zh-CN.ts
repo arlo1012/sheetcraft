@@ -386,7 +386,6 @@ export const zhCN = {
       next: "下一步",
       autoSplit: "自动分列",
       customSplit: "自定义分列",
-      autoHint: "选择识别出的规则，或切换到自定义分列调整规则。",
       autoNoSuggestion: "未识别出可靠的分列规则，请选择自定义分列。",
       suggestion: "{rule}：预计分为 {count} 列",
       textType: "文本类型",

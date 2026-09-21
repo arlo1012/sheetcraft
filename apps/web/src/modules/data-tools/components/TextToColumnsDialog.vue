@@ -416,9 +416,6 @@ function confirm(): void {
           <TTabs :value="setupMode" @change="setSetupMode($event as 'auto' | 'custom')">
             <TTabPanel value="auto" :label="t('dataTools.textToColumns.autoSplit')">
               <div class="text-to-columns-dialog__auto-settings">
-                <p class="text-to-columns-dialog__hint">
-                  {{ t("dataTools.textToColumns.autoHint") }}
-                </p>
                 <TRadioGroup
                   v-if="suggestions.length"
                   :value="draft.autoSuggestionId"
