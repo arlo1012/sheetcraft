@@ -78,11 +78,6 @@ watch(
   >
     <div class="duplicate-values-dialog">
       <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 88 : 104">
-        <TFormItem v-if="mode === 'count'">
-          <TCheckbox :checked="false" disabled>
-            {{ t("dataTools.duplicates.insertChartTodo") }}
-          </TCheckbox>
-        </TFormItem>
         <TFormItem name="range" :label="t('dataTools.duplicates.range')">
           <TInput
             v-model="draft.range"
@@ -103,6 +98,11 @@ watch(
                   ><SquareMousePointer :size="16" aria-hidden="true" /></template></TButton
             ></template>
           </TInput>
+        </TFormItem>
+        <TFormItem v-if="mode === 'count'">
+          <TCheckbox :checked="false" disabled>
+            {{ t("dataTools.duplicates.insertChartTodo") }}
+          </TCheckbox>
         </TFormItem>
         <TFormItem
           v-if="mode === 'highlight'"
