@@ -354,6 +354,7 @@ export const zhCN = {
       destination: "目标位置",
       overwrite: "覆盖已有数据",
       overwriteRequired: "目标列已有数据，请改选其他列或勾选允许覆盖。",
+      invalidSource: "请选择当前工作表内有效的单列源数据范围。",
       selectSingleColumn: "请在同一列中选择要分列的单元格。",
       invalidDestination: "请选择当前工作表中的单个目标单元格，例如 D1。",
       confirm: "完成",

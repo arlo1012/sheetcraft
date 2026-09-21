@@ -365,6 +365,7 @@ export const enUS = {
       overwrite: "Overwrite existing data",
       overwriteRequired:
         "The destination contains data. Choose another column or allow overwriting.",
+      invalidSource: "Select a valid single-column source range on the current sheet.",
       selectSingleColumn: "Select the cells to split within one column.",
       invalidDestination: "Select one destination cell on the current worksheet, such as D1.",
       confirm: "Finish",

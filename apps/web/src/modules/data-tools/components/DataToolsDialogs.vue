@@ -39,7 +39,10 @@ withDefaults(
     splitPreviewError?: string;
     splitDestinationLabel?: string;
     splitPicking?: boolean;
-    selectSplitReference?: (current: string) => Promise<string | undefined>;
+    selectSplitReference?: (
+      current: string,
+      options?: RangeReferenceSelectionOptions,
+    ) => Promise<string | undefined>;
     duplicateCount?: number;
     validationInitial?: DataValidationInitial;
     validationSuspended?: boolean;

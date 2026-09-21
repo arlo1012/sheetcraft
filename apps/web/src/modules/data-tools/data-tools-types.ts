@@ -48,6 +48,7 @@ export type SortDraft = {
   levels: SortLevel[];
 };
 export type TextToColumnsDraft = {
+  source?: string;
   mode: "auto" | "delimiter" | "fixed-width" | "text-type" | "keyword";
   autoSuggestionId?: string;
   delimiters: string[];

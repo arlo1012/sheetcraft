@@ -1,6 +1,6 @@
 import { mount, DOMWrapper } from "@vue/test-utils";
 import { defineComponent, nextTick, ref } from "vue";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import TextToColumnsDialog from "../../../../modules/data-tools/components/TextToColumnsDialog.vue";
 import { createAppI18n } from "../../../../shared/i18n";
@@ -70,6 +70,32 @@ async function switchToFixedWidth() {
 }
 
 describe("TextToColumnsDialog flow regressions", () => {
+  test("reselects a source range without truncating it to one cell and keeps it after cancelling", async () => {
+    const selectReference = vi.fn().mockResolvedValueOnce("B3:B8").mockResolvedValueOnce(undefined);
+    const dialog = mountDialog({ rangeLabel: "A1:A2", destinationLabel: "A1", selectReference });
+    expect(dialog.find(".t-steps").exists()).toBe(false);
+    const source = dialog.get(".text-to-columns-dialog__source");
+    await source.get("input").setValue("B3:B4");
+    expect(dialog.emitted("draftChange")?.at(-1)?.[0]).toMatchObject({ source: "B3:B4" });
+    await source.get("button").trigger("click");
+    await nextTick();
+    expect(selectReference).toHaveBeenLastCalledWith("B3:B4", { singleCell: false });
+    expect(dialog.emitted("draftChange")?.at(-1)?.[0]).toMatchObject({ source: "B3:B8" });
+    await source.get("button").trigger("click");
+    await nextTick();
+    expect(dialog.emitted("draftChange")?.at(-1)?.[0]).toMatchObject({ source: "B3:B8" });
+  });
+
+  test("moves the default destination with the source but preserves a manually chosen destination", async () => {
+    const dialog = mountDialog({ rangeLabel: "A1:A2", destinationLabel: "A1" });
+    await dialog.setProps({ destinationLabel: "B3" });
+    expect(dialog.emitted("draftChange")?.at(-1)?.[0]).toMatchObject({ destination: "B3" });
+    await next(dialog);
+    await dialog.get(".text-to-columns-dialog__destination input").setValue("F5");
+    await dialog.setProps({ destinationLabel: "C7" });
+    expect(dialog.emitted("draftChange")?.at(-1)?.[0]).toMatchObject({ destination: "F5" });
+  });
+
   test("does not recurse when the parent recreates preview and suggestions for every draft update", async () => {
     let draftChanges = 0;
     const host = mount(

@@ -359,8 +359,22 @@ export function useDataToolsController(options: Options) {
   function splitText(value: ReturnType<SheetEvaluator["getComputedValue"]>): string {
     return value === null ? "" : typeof value === "object" ? `#${value.code}!` : String(value);
   }
-  const splitSourceEntries = computed(() => {
+  function resolveSplitSource(draft?: TextToColumnsDraft): Target | undefined {
     const target = textTarget.value;
+    if (!target || !valid(target)) return undefined;
+    if (draft?.source === undefined) return target;
+    const source = resolveRangeReference(options.getWorkbook(), draft.source, target.sheetId);
+    if (
+      !source ||
+      source.sheetId !== target.sheetId ||
+      source.range.start.column !== source.range.end.column
+    )
+      return undefined;
+    return { ...target, range: source.range };
+  }
+  const splitSourceTarget = computed(() => resolveSplitSource(splitDraft.value));
+  const splitSourceEntries = computed(() => {
+    const target = splitSourceTarget.value;
     if (!target || !valid(target)) return [];
     const evaluator = options.getSheetEvaluator();
     const entries: Array<{ row: number; text: string }> = [];
@@ -389,7 +403,7 @@ export function useDataToolsController(options: Options) {
     return suggestSplitColumnOptions(sample);
   });
   const splitSourceRows = computed(() => {
-    const target = textTarget.value;
+    const target = splitSourceTarget.value;
     if (!target || !valid(target)) return [];
     const evaluator = options.getSheetEvaluator();
     return Array.from(
@@ -402,13 +416,15 @@ export function useDataToolsController(options: Options) {
     );
   });
   const splitDestinationLabel = computed(() => {
-    const target = textTarget.value;
+    const target = splitSourceTarget.value ?? textTarget.value;
     return target ? `${columnName(target.range.start.column)}${target.range.start.row + 1}` : "";
   });
   const splitAnalysis = computed(() => {
     const draft = splitDraft.value;
     const empty = { rows: [], columnCount: 0, error: "" };
     if (!draft) return empty;
+    if (!splitSourceTarget.value)
+      return { ...empty, error: t("dataTools.textToColumns.invalidSource") };
     const resolved = resolveTextToColumnsOptions(draft, splitSuggestions.value);
     if (!resolved) return empty;
     try {
@@ -581,9 +597,14 @@ export function useDataToolsController(options: Options) {
     }
   }
   function applyTextToColumns(draft: TextToColumnsDraft): void {
-    const target = textTarget.value;
+    splitDraft.value = draft;
+    const target = resolveSplitSource(draft);
+    if (!target) {
+      error(t("dataTools.textToColumns.invalidSource"));
+      return;
+    }
     const resolved = resolveTextToColumnsOptions(draft, splitSuggestions.value);
-    if (!target || !resolved) {
+    if (!resolved) {
       error(
         t(
           draft.mode === "auto"

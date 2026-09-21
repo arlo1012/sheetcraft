@@ -10,7 +10,9 @@ import {
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { datePartsToExcelSerial } from "@idea10/core/formula";
 import {
+  createSheet,
   createSheetEvaluator,
+  createWorkbook,
   getActiveSheet,
   getCellStyle,
   type Workbook,
@@ -116,6 +118,61 @@ describe("text to columns controller", () => {
     expect(undoWorkbookCommand(f.session)).toBe(true);
     expect(values(f, 1, [4, 5, 6])).toEqual([null, null, null]);
     expect(values(f, 1, [1])).toEqual(["north,001"]);
+  });
+
+  test("uses a replacement single-column source for automatic analysis, writing, and undo", () => {
+    const f = fixture({
+      address: { row: 0, column: 0 },
+      range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+    });
+    f.set(0, 0, "stale,selection");
+    f.set(1, 0, "must,not,write");
+    f.set(2, 1, "north,001");
+    f.set(3, 1, "south,002");
+    f.controller.openTextToColumns();
+
+    const replacement = draft({ mode: "auto", source: "B3:B4", destination: "E" });
+    f.controller.updateTextToColumnsDraft(replacement);
+    expect(f.controller.splitSuggestions.value).toContainEqual(
+      expect.objectContaining({ id: 'delimiter:","' }),
+    );
+    expect(f.controller.splitPreviewRows.value).toEqual([
+      { row: 2, values: ["north", "001"] },
+      { row: 3, values: ["south", "002"] },
+    ]);
+
+    f.controller.applyTextToColumns(replacement);
+    expect(values(f, 2, [4, 5])).toEqual(["north", 1]);
+    expect(values(f, 3, [4, 5])).toEqual(["south", 2]);
+    expect(values(f, 0, [4, 5])).toEqual([null, null]);
+    expect(undoWorkbookCommand(f.session)).toBe(true);
+    expect(values(f, 2, [4, 5])).toEqual([null, null]);
+  });
+
+  test("rejects empty, multi-column, and cross-sheet replacement sources without writing selection data", () => {
+    const workbook = createWorkbook({ id: "workbook", sheetId: "sheet" });
+    workbook.sheets.get("sheet")!.name = "Sheet1";
+    workbook.sheets.set("other", createSheet("Other", "other"));
+    const f = fixture(
+      {
+        address: { row: 0, column: 0 },
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      },
+      workbook,
+    );
+    f.set(0, 0, "old,source");
+    f.set(1, 0, "old,source");
+    f.controller.openTextToColumns();
+
+    for (const source of ["", "B1:C2", "='Other'!B1:B2"]) {
+      const invalid = draft({ delimiters: [","], source, destination: "E" });
+      f.controller.updateTextToColumnsDraft(invalid);
+      expect(f.controller.splitPreviewError.value).not.toBe("");
+      expect(f.controller.splitPreviewRows.value).toEqual([]);
+      f.controller.applyTextToColumns(invalid);
+      expect(values(f, 0, [4, 5])).toEqual([null, null]);
+      expect(values(f, 1, [4, 5])).toEqual([null, null]);
+    }
   });
 
   test("keeps keyword tokens at the chosen before or after boundary without treating them as characters", () => {

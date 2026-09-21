@@ -7,11 +7,11 @@ import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import { Steps as TSteps, StepItem as TStepItem } from "tdesign-vue-next/es/steps";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { BaseTable as TTable } from "tdesign-vue-next/es/table";
 import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
+import type { RangeReferenceSelectionOptions } from "../../../shared/range-reference/useRangeReferencePicker";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import FixedWidthSplitEditor from "./FixedWidthSplitEditor.vue";
@@ -30,7 +30,10 @@ const props = withDefaults(
     rangeLabel?: string;
     destinationLabel?: string;
     picking?: boolean;
-    selectReference?: (current: string) => Promise<string | undefined>;
+    selectReference?: (
+      current: string,
+      options?: RangeReferenceSelectionOptions,
+    ) => Promise<string | undefined>;
     suggestions?: readonly SplitColumnSuggestion[];
     previewError?: string;
     dateSystem?: ExcelDateSystem;
@@ -60,6 +63,7 @@ const selectedColumn = ref(0);
 const breakPositionInput = ref("");
 const otherEnabled = ref(false);
 const defaultDraft = (): TextToColumnsDraft => ({
+  source: props.rangeLabel,
   mode: "auto",
   autoSuggestionId: undefined,
   delimiters: [","],
@@ -259,6 +263,16 @@ watch(
   },
   { deep: true, immediate: true },
 );
+watch(
+  () => props.destinationLabel,
+  (destination, previous) => {
+    if (props.visible && draft.value.destination === previous)
+      draft.value.destination = destination;
+  },
+);
+function selectSourceReference(current: string): Promise<string | undefined> {
+  return props.selectReference?.(current, { singleCell: false }) ?? Promise.resolve(undefined);
+}
 function toggleDelimiter(delimiter: string, checked: boolean): void {
   draft.value.delimiters = checked
     ? [...new Set([...draft.value.delimiters, delimiter])]
@@ -387,14 +401,17 @@ function confirm(): void {
     @confirm="confirm"
   >
     <div class="text-to-columns-dialog">
-      <TSteps :current="step" readonly theme="dot">
-        <TStepItem :title="t('dataTools.textToColumns.stepSplit')" />
-        <TStepItem :title="t('dataTools.textToColumns.stepOutput')" />
-      </TSteps>
-      <p class="text-to-columns-dialog__summary">
-        {{ t("dataTools.textToColumns.source") }}：{{ rangeLabel || destinationLabel }}
-      </p>
       <TForm label-align="left" :label-width="104" @submit.prevent>
+        <TFormItem :label="t('dataTools.textToColumns.source')">
+          <div class="text-to-columns-dialog__source">
+            <RangeReferenceInput
+              :model-value="draft.source ?? ''"
+              :label="t('dataTools.textToColumns.source')"
+              :select-reference="selectReference ? selectSourceReference : undefined"
+              @update:model-value="draft.source = $event"
+            />
+          </div>
+        </TFormItem>
         <template v-if="step === 0">
           <TTabs :value="setupMode" @change="setSetupMode($event as 'auto' | 'custom')">
             <TTabPanel value="auto" :label="t('dataTools.textToColumns.autoSplit')">
@@ -671,7 +688,6 @@ function confirm(): void {
   display: grid;
   gap: 12px;
   min-width: 0;
-  &__summary,
   &__hint {
     margin: 0;
     color: var(--idea-text-secondary);
@@ -720,6 +736,7 @@ function confirm(): void {
     margin: 0;
     color: var(--td-error-color);
   }
+  &__source,
   &__delimiter-group,
   &__destination {
     display: grid;

@@ -348,6 +348,7 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       destination: string;
       overwrite: string;
       overwriteRequired: string;
+      invalidSource: string;
       selectSingleColumn: string;
       invalidDestination: string;
       confirm: string;

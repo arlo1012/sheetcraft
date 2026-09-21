@@ -604,10 +604,13 @@ const splitRangePicker = useRangeReferencePicker(() => activeSheet.value.name, {
   singleCell: true,
 });
 const { active: pickingSplitRange, reference: pickedSplitReference } = splitRangePicker;
-async function selectSplitReference(current: string): Promise<string | undefined> {
+async function selectSplitReference(
+  current: string,
+  options: RangeReferenceSelectionOptions = { singleCell: true },
+): Promise<string | undefined> {
   const workbook = session.workbook;
   const sheetId = activeSheet.value.id;
-  const selected = await splitRangePicker.selectReference(current);
+  const selected = await splitRangePicker.selectReference(current, options);
   if (session.workbook !== workbook || !dataTextToColumnsVisible.value) return undefined;
   if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
   return selected;
