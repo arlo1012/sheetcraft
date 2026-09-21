@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { useAppI18n } from "../../../shared/i18n";
 import type { DataToolColumn, SubtotalDraft } from "../data-tools-types";
@@ -12,7 +13,7 @@ const props = defineProps<{
   hasSubtotals?: boolean;
 }>();
 const emit = defineEmits<{ close: []; apply: [draft: SubtotalDraft]; removeAll: [] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 function createDraft(): SubtotalDraft {
   return {
     groupColumn: props.columns[0]?.column ?? 0,
@@ -76,25 +77,27 @@ function apply(): void {
         t("dataTools.outline.confirm")
       }}</TButton>
     </template>
-    <div class="subtotal-dialog">
-      <div class="subtotal-dialog__field">
-        <span>{{ t("dataTools.outline.groupBy") }}</span>
+    <TForm
+      class="subtotal-dialog"
+      :data="draft"
+      label-align="right"
+      :label-width="locale === 'zh-CN' ? 88 : 128"
+    >
+      <TFormItem name="groupColumn" :label="t('dataTools.outline.groupBy')">
         <TSelect
           v-model="draft.groupColumn"
           :aria-label="t('dataTools.outline.groupBy')"
           :options="columns"
         />
-      </div>
-      <div class="subtotal-dialog__field">
-        <span>{{ t("dataTools.outline.useFunction") }}</span>
+      </TFormItem>
+      <TFormItem name="function" :label="t('dataTools.outline.useFunction')">
         <TSelect
           v-model="draft.function"
           :aria-label="t('dataTools.outline.useFunction')"
           :options="functions"
         />
-      </div>
-      <div class="subtotal-dialog__field subtotal-dialog__summaries">
-        <span>{{ t("dataTools.outline.addSubtotalTo") }}</span>
+      </TFormItem>
+      <TFormItem name="valueColumns" :label="t('dataTools.outline.addSubtotalTo')">
         <div
           class="subtotal-dialog__columns"
           role="group"
@@ -109,8 +112,8 @@ function apply(): void {
             >{{ column.label }}</TCheckbox
           >
         </div>
-      </div>
-      <div class="subtotal-dialog__field">
+      </TFormItem>
+      <TFormItem>
         <div class="subtotal-dialog__options">
           <TCheckbox v-model="draft.replaceExisting">{{
             t("dataTools.outline.replace")
@@ -120,30 +123,18 @@ function apply(): void {
             t("dataTools.outline.summaryBelow")
           }}</TCheckbox>
         </div>
-      </div>
-    </div>
+      </TFormItem>
+    </TForm>
   </Dialog>
 </template>
 <style scoped lang="scss">
 @use "../../../shared/option-list/option-list";
 
 .subtotal-dialog {
-  display: grid;
-  gap: var(--idea-space-2);
-  &__field {
-    display: grid;
-    grid-template-columns: 84px minmax(0, 1fr);
-    gap: var(--idea-space-2);
-    align-items: center;
-    > span {
-      text-align: right;
-    }
-  }
-  &__summaries {
-    align-items: start;
-  }
   &__columns {
     @include option-list.surface;
+    width: 100%;
+    min-width: 0;
     display: grid;
     gap: var(--idea-space-1);
     max-height: 180px;
@@ -157,10 +148,8 @@ function apply(): void {
     white-space: nowrap;
   }
   &__options {
-    grid-column: 2;
     display: grid;
     gap: var(--idea-space-1);
-    margin-top: var(--idea-space-1);
   }
   &__space {
     flex: 1;
