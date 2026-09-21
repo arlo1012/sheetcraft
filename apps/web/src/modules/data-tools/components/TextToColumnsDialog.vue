@@ -461,15 +461,10 @@ function confirm(): void {
                   >{{ item.label }}</TCheckbox
                 >
               </div>
-              <TRadioGroup
-                v-if="otherEnabled"
-                v-model="draft.otherDelimiterMode"
-                class="text-to-columns-dialog__inline"
+              <div
+                class="text-to-columns-dialog__other"
+                :class="{ 'text-to-columns-dialog__other--enabled': otherEnabled }"
               >
-                <TRadio value="characters">{{ t("dataTools.textToColumns.anyCharacter") }}</TRadio>
-                <TRadio value="token">{{ t("dataTools.textToColumns.fullToken") }}</TRadio>
-              </TRadioGroup>
-              <div class="text-to-columns-dialog__other">
                 <TCheckbox
                   v-model="otherEnabled"
                   @change="!$event && (draft.otherDelimiter = '')"
@@ -479,6 +474,16 @@ function confirm(): void {
                   :disabled="!otherEnabled"
                   :aria-label="t('dataTools.textToColumns.other')"
                 />
+                <TRadioGroup
+                  v-if="otherEnabled"
+                  v-model="draft.otherDelimiterMode"
+                  class="text-to-columns-dialog__inline"
+                >
+                  <TRadio value="characters">{{
+                    t("dataTools.textToColumns.anyCharacter")
+                  }}</TRadio>
+                  <TRadio value="token">{{ t("dataTools.textToColumns.fullToken") }}</TRadio>
+                </TRadioGroup>
               </div>
               <TCheckbox v-model="draft.mergeDelimiters">{{
                 t("dataTools.textToColumns.mergeDelimiters")
@@ -754,10 +759,12 @@ function confirm(): void {
   }
   &__other {
     display: grid;
-    grid-template-columns: max-content 100px;
-    justify-content: start;
+    grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
     gap: 8px;
+  }
+  &__other--enabled {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
   }
   &__format {
     display: grid;
