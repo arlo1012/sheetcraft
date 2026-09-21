@@ -77,10 +77,12 @@ watch(
     @confirm="!busy && canApply && emit('apply', { ...draft })"
   >
     <div class="duplicate-values-dialog">
-      <TCheckbox v-if="mode === 'count'" :checked="false" disabled>
-        {{ t("dataTools.duplicates.insertChartTodo") }}
-      </TCheckbox>
       <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 88 : 104">
+        <TFormItem v-if="mode === 'count'">
+          <TCheckbox :checked="false" disabled>
+            {{ t("dataTools.duplicates.insertChartTodo") }}
+          </TCheckbox>
+        </TFormItem>
         <TFormItem name="range" :label="t('dataTools.duplicates.range')">
           <TInput
             v-model="draft.range"
@@ -125,9 +127,6 @@ watch(
           </TRadioGroup>
         </TFormItem>
       </TForm>
-      <p v-if="mode === 'count'" class="duplicate-values-dialog__hint">
-        {{ t("dataTools.duplicates.countHint") }}
-      </p>
       <p v-if="error" class="duplicate-values-dialog__error" role="alert">
         {{ error }}
       </p>
@@ -151,15 +150,8 @@ watch(
     border: 1px solid var(--idea-border-subtle);
     border-radius: 2px;
   }
-  &__hint,
   &__error {
     margin: 0;
-  }
-  &__hint {
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-  }
-  &__error {
     color: var(--idea-status-error);
   }
 }
