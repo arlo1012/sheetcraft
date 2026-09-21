@@ -8,6 +8,9 @@ import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Steps as TSteps, StepItem as TStepItem } from "tdesign-vue-next/es/steps";
+import { BaseTable as TTable } from "tdesign-vue-next/es/table";
+import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import FixedWidthSplitEditor from "./FixedWidthSplitEditor.vue";
@@ -76,6 +79,40 @@ const rows = computed(() =>
 const columnCount = computed(() =>
   Math.max(props.totalColumnCount, ...rows.value.map((row) => row.values.length)),
 );
+const previewData = computed(() => (step.value === 0 ? [...props.sourceRows] : [...rows.value]));
+const previewColumnWidth = computed(() => (step.value === 2 ? 160 : 120));
+const previewTableWidth = computed(() =>
+  step.value === 0 ? "100%" : `max(100%, ${56 + columnCount.value * previewColumnWidth.value}px)`,
+);
+const previewColumns = computed<BaseTableCol[]>(() => [
+  {
+    colKey: "row",
+    title: t("dataTools.textToColumns.row"),
+    width: 56,
+    align: "center",
+    fixed: "left",
+  },
+  ...(step.value === 0
+    ? [{ colKey: "text", title: t("dataTools.textToColumns.source"), ellipsis: true }]
+    : Array.from({ length: columnCount.value }, (_, index) => ({
+        colKey: `values.${index}`,
+        title: "previewColumnTitle",
+        width: previewColumnWidth.value,
+        ellipsis: true,
+        className: [
+          step.value === 2 && selectedColumn.value === index
+            ? "text-to-columns-dialog__column--selected"
+            : "",
+          step.value === 2 && draft.value.columnTypes[index] === "skip"
+            ? "text-to-columns-dialog__column--skipped"
+            : "",
+        ],
+        thClassName:
+          step.value === 2 && selectedColumn.value === index
+            ? "text-to-columns-dialog__column--selected"
+            : "",
+      }))),
+]);
 const delimiterOptions = computed(() => [
   { value: "\t", label: t("dataTools.textToColumns.tab") },
   { value: ";", label: t("dataTools.textToColumns.semicolon") },
@@ -304,62 +341,40 @@ function confirm(): void {
         class="text-to-columns-dialog__preview"
         :aria-label="t('dataTools.textToColumns.preview')"
       >
-        <table v-if="step === 0">
-          <thead>
-            <tr>
-              <th>{{ t("dataTools.textToColumns.row") }}</th>
-              <th>{{ t("dataTools.textToColumns.source") }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in sourceRows" :key="row.row">
-              <th>{{ row.row + 1 }}</th>
-              <td>{{ row.text }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <table v-else>
-          <thead>
-            <tr>
-              <th>{{ t("dataTools.textToColumns.row") }}</th>
-              <th
-                v-for="(_, index) in columnCount"
-                :key="index"
-                :class="{ 'is-selected': step === 2 && selectedColumn === index }"
+        <TableHeightWrapper v-slot="{ height }">
+          <TTable
+            class="idea-table--mini"
+            row-key="row"
+            :data="previewData"
+            :columns="previewColumns"
+            :height="height"
+            :table-content-width="previewTableWidth"
+            :bordered="false"
+            cell-empty-content=""
+            size="small"
+            table-layout="fixed"
+            hover
+            :aria-label="t('dataTools.textToColumns.preview')"
+          >
+            <template #row="{ row }">{{ row.row + 1 }}</template>
+            <template #previewColumnTitle="{ colIndex }">
+              <TButton
+                v-if="step === 2"
+                variant="text"
+                :theme="selectedColumn === colIndex - 1 ? 'primary' : 'default'"
+                :aria-pressed="selectedColumn === colIndex - 1"
+                :data-split-column="colIndex - 1"
+                @click="selectedColumn = colIndex - 1"
               >
-                <button
-                  v-if="step === 2"
-                  type="button"
-                  :aria-pressed="selectedColumn === index"
-                  :data-split-column="index"
-                  @click="selectedColumn = index"
-                >
-                  {{ t("dataTools.textToColumns.column", { column: index + 1 }) }} ·
-                  {{
-                    typeOptions.find((type) => type.value === draft.columnTypes[index])?.label
-                  }}</button
-                ><span v-else>{{
-                  t("dataTools.textToColumns.column", { column: index + 1 })
-                }}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in rows" :key="row.row">
-              <th>{{ row.row + 1 }}</th>
-              <td
-                v-for="(_, index) in columnCount"
-                :key="index"
-                :class="{
-                  'is-selected': step === 2 && selectedColumn === index,
-                  'is-skipped': step === 2 && draft.columnTypes[index] === 'skip',
-                }"
-              >
-                {{ row.values[index] ?? "" }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                {{ t("dataTools.textToColumns.column", { column: colIndex }) }} ·
+                {{
+                  typeOptions.find((type) => type.value === draft.columnTypes[colIndex - 1])?.label
+                }}
+              </TButton>
+              <span v-else>{{ t("dataTools.textToColumns.column", { column: colIndex }) }}</span>
+            </template>
+          </TTable>
+        </TableHeightWrapper>
       </div>
     </div>
     <template #footer
@@ -410,7 +425,8 @@ function confirm(): void {
   }
   &__other {
     display: grid;
-    grid-template-columns: auto 100px;
+    grid-template-columns: max-content 100px;
+    justify-content: start;
     align-items: center;
     gap: 8px;
   }
@@ -430,53 +446,13 @@ function confirm(): void {
     }
   }
   &__preview {
-    overflow: auto;
     height: 220px;
-    border: 1px solid var(--idea-border-subtle);
-    table {
-      border-collapse: separate;
-      border-spacing: 0;
-      min-width: 100%;
-    }
-    th,
-    td {
-      padding: 4px 8px;
-      min-width: 110px;
-      max-width: 280px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      border-right: 1px solid var(--idea-border-subtle);
-      border-bottom: 1px solid var(--idea-border-subtle);
-      text-align: left;
-    }
-    th {
-      font-weight: 400;
-      background: var(--idea-surface-secondary);
-    }
-    thead th {
-      position: sticky;
-      top: 0;
-      z-index: 1;
-    }
-    th:first-child {
-      min-width: 40px;
-      width: 40px;
-    }
-    button {
-      font: inherit;
-      background: transparent;
-      border: 0;
-      padding: 0;
-      color: inherit;
-      cursor: pointer;
-      width: 100%;
-      text-align: left;
-    }
-    .is-selected {
+    min-width: 0;
+    min-height: 0;
+    :deep(.text-to-columns-dialog__column--selected) {
       background: var(--idea-surface-active);
     }
-    .is-skipped {
+    :deep(.text-to-columns-dialog__column--skipped) {
       color: var(--idea-text-secondary);
       text-decoration: line-through;
     }
