@@ -621,10 +621,10 @@ function confirm(): void {
       </TForm>
       <div class="text-to-columns-dialog__preview-section">
         <div class="text-to-columns-dialog__preview-heading">
-          <strong>{{ t("dataTools.textToColumns.preview") }}</strong
-          ><span>{{ t("dataTools.textToColumns.previewHint") }}</span>
+          <strong>{{ t("dataTools.textToColumns.preview") }}</strong>
+          <p v-if="previewError" class="text-to-columns-dialog__error">{{ previewError }}</p>
+          <span>{{ t("dataTools.textToColumns.previewHint") }}</span>
         </div>
-        <p v-if="previewError" class="text-to-columns-dialog__error">{{ previewError }}</p>
         <FixedWidthSplitEditor
           v-if="step === 0 && setupMode === 'custom' && draft.mode === 'fixed-width'"
           :rows="sourceRows"
@@ -785,9 +785,14 @@ function confirm(): void {
   }
   &__preview-heading {
     display: flex;
-    justify-content: space-between;
-    gap: 12px;
+    align-items: baseline;
+    gap: 8px;
+    strong,
     span {
+      flex-shrink: 0;
+    }
+    span {
+      margin-left: auto;
       color: var(--idea-text-secondary);
     }
   }
