@@ -402,7 +402,7 @@ function confirm(): void {
   >
     <div class="text-to-columns-dialog">
       <TForm label-align="left" :label-width="104" @submit.prevent>
-        <TFormItem :label="t('dataTools.textToColumns.source')">
+        <TFormItem :label="t('dataTools.textToColumns.source')" label-align="right">
           <div class="text-to-columns-dialog__source">
             <RangeReferenceInput
               :model-value="draft.source ?? ''"
