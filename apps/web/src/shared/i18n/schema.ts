@@ -382,7 +382,6 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       autoNoSuggestion: string;
       suggestion: string;
       textType: string;
-      textTypeHint: string;
       keyword: string;
       chinese: string;
       english: string;

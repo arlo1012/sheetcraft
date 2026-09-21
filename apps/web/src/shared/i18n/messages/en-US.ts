@@ -401,8 +401,6 @@ export const enUS = {
       autoNoSuggestion: "No reliable split rule was detected. Choose Custom split.",
       suggestion: "{rule}: about {count} columns",
       textType: "Text type",
-      textTypeHint:
-        "Split at the end of each selected type of consecutive text; all characters are retained.",
       keyword: "Keyword",
       chinese: "Chinese",
       english: "English",

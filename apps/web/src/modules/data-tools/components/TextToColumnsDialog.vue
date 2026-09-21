@@ -499,9 +499,6 @@ function confirm(): void {
             role="group"
             :aria-label="t('dataTools.textToColumns.textType')"
           >
-            <p class="text-to-columns-dialog__hint">
-              {{ t("dataTools.textToColumns.textTypeHint") }}
-            </p>
             <div class="text-to-columns-dialog__inline">
               <TCheckbox
                 :checked="draft.textTypes?.includes('chinese')"
@@ -709,9 +706,6 @@ function confirm(): void {
   &__setting {
     display: grid;
     gap: 8px;
-    p {
-      margin: 0;
-    }
   }
   &__mode-tabs {
     display: flex;

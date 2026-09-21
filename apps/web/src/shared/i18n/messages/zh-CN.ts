@@ -389,7 +389,6 @@ export const zhCN = {
       autoNoSuggestion: "未识别出可靠的分列规则，请选择自定义分列。",
       suggestion: "{rule}：预计分为 {count} 列",
       textType: "文本类型",
-      textTypeHint: "在所选类型的连续文本末尾分列，保留所有字符。",
       keyword: "按关键字",
       chinese: "中文",
       english: "英文",
