@@ -349,6 +349,19 @@ function setKeyword(index: number, value: string | number): void {
   keywords[index] = String(value);
   draft.value.keywords = keywords;
 }
+function handleKeywordKeydown(event: KeyboardEvent): void {
+  if (event.key !== "Backspace" || event.isComposing) return;
+  const input = event.target;
+  const group = event.currentTarget;
+  if (!(input instanceof HTMLInputElement) || input.value || !(group instanceof HTMLElement))
+    return;
+  const inputs = Array.from(group.querySelectorAll("input"));
+  const previous = inputs[inputs.indexOf(input) - 1];
+  if (!previous) return;
+  event.preventDefault();
+  previous.focus();
+  previous.setSelectionRange(previous.value.length, previous.value.length);
+}
 function setDateOrder(value: unknown): void {
   const orders = [...(draft.value.dateOrders ?? [])];
   const order = String(value) as NonNullable<TextToColumnsDraft["dateOrders"]>[number];
@@ -520,7 +533,7 @@ function confirm(): void {
             role="group"
             :aria-label="t('dataTools.textToColumns.keyword')"
           >
-            <div class="text-to-columns-dialog__keyword-inputs">
+            <div class="text-to-columns-dialog__keyword-inputs" @keydown="handleKeywordKeydown">
               <TInput
                 v-for="(_, index) in draft.keywords"
                 :key="index"
