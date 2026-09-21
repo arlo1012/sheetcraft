@@ -461,10 +461,7 @@ function confirm(): void {
                   >{{ item.label }}</TCheckbox
                 >
               </div>
-              <div
-                class="text-to-columns-dialog__other"
-                :class="{ 'text-to-columns-dialog__other--enabled': otherEnabled }"
-              >
+              <div class="text-to-columns-dialog__other">
                 <TCheckbox
                   v-model="otherEnabled"
                   @change="!$event && (draft.otherDelimiter = '')"
@@ -475,8 +472,8 @@ function confirm(): void {
                   :aria-label="t('dataTools.textToColumns.other')"
                 />
                 <TRadioGroup
-                  v-if="otherEnabled"
                   v-model="draft.otherDelimiterMode"
+                  :disabled="!otherEnabled"
                   class="text-to-columns-dialog__inline"
                 >
                   <TRadio value="characters">{{
@@ -759,12 +756,9 @@ function confirm(): void {
   }
   &__other {
     display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
     align-items: center;
     gap: 8px;
-  }
-  &__other--enabled {
-    grid-template-columns: max-content minmax(0, 1fr) max-content;
   }
   &__format {
     display: grid;
