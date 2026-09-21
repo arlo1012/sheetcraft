@@ -6,6 +6,9 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { Steps as TSteps, StepItem as TStepItem } from "tdesign-vue-next/es/steps";
+import { BaseTable as TTable } from "tdesign-vue-next/es/table";
+import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
+import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import LookupFieldMappingTable from "./LookupFieldMappingTable.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -69,6 +72,21 @@ const fieldsReady = computed(
 );
 const canApply = computed(() => fieldsReady.value && (props.preview?.writeCount ?? 0) > 0);
 const previewChanges = computed(() => props.preview?.changes ?? []);
+const previewRows = computed(() =>
+  previewChanges.value.map((change) => ({
+    id: `${change.row}:${change.column}`,
+    sourceRow: change.sourceRow + 1,
+    targetRow: change.row + 1,
+    column: change.column + 1,
+    value: change.value,
+  })),
+);
+const previewColumns = computed<BaseTableCol[]>(() => [
+  { colKey: "sourceRow", title: t("dataTools.lookupFill.previewSourceRow"), width: 100 },
+  { colKey: "targetRow", title: t("dataTools.lookupFill.previewTargetRow"), width: 100 },
+  { colKey: "column", title: t("dataTools.lookupFill.previewColumn"), width: 80 },
+  { colKey: "value", title: t("dataTools.lookupFill.previewValue"), ellipsis: true },
+]);
 const unmatchedRows = computed(() =>
   Math.max(0, (props.preview?.targetRows ?? 0) - (props.preview?.matchedRows ?? 0)),
 );
@@ -323,24 +341,20 @@ watch(
           {{ t("dataTools.lookupFill.noPreviewChanges") }}
         </p>
         <div v-else class="lookup-fill-dialog__sample">
-          <table>
-            <thead>
-              <tr>
-                <th>{{ t("dataTools.lookupFill.previewSourceRow") }}</th>
-                <th>{{ t("dataTools.lookupFill.previewTargetRow") }}</th>
-                <th>{{ t("dataTools.lookupFill.previewColumn") }}</th>
-                <th>{{ t("dataTools.lookupFill.previewValue") }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="change in previewChanges" :key="`${change.row}:${change.column}`">
-                <td>{{ change.sourceRow + 1 }}</td>
-                <td>{{ change.row + 1 }}</td>
-                <td>{{ change.column + 1 }}</td>
-                <td>{{ change.value }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <TableHeightWrapper v-slot="{ height }">
+            <TTable
+              class="idea-table--mini"
+              row-key="id"
+              :data="previewRows"
+              :columns="previewColumns"
+              :height="height"
+              :bordered="false"
+              size="small"
+              table-layout="fixed"
+              hover
+              :aria-label="t('dataTools.lookupFill.preview')"
+            />
+          </TableHeightWrapper>
         </div>
         <p
           v-if="preview && preview.writeCount === 0 && !error"
@@ -449,36 +463,15 @@ watch(
   color: var(--idea-text-secondary);
   font-size: var(--idea-font-size-body-small);
 }
+.lookup-fill-dialog__preview {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
 .lookup-fill-dialog__sample {
-  max-height: 192px;
-  overflow: auto;
-  border: 1px solid var(--idea-border-control);
-  border-radius: var(--idea-radius-medium);
-}
-.lookup-fill-dialog__sample table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-  font-size: var(--idea-font-size-body-small);
-}
-.lookup-fill-dialog__sample th,
-.lookup-fill-dialog__sample td {
-  padding: var(--idea-space-2) var(--idea-space-3);
-  border-bottom: 1px solid var(--idea-border-control);
-  text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.lookup-fill-dialog__sample th {
-  position: sticky;
-  top: 0;
-  background: var(--idea-surface-secondary);
-  color: var(--idea-text-secondary);
-  font-weight: var(--idea-font-weight-medium);
-}
-.lookup-fill-dialog__sample tbody tr:last-child td {
-  border-bottom: 0;
+  height: 192px;
+  min-width: 0;
+  min-height: 0;
 }
 .lookup-fill-dialog__footer {
   display: flex;
