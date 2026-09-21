@@ -72,7 +72,7 @@ function apply(): void {
         t("dataTools.outline.removeAll")
       }}</TButton>
       <span class="subtotal-dialog__space" />
-      <TButton variant="outline" @click="emit('close')">{{ t("dataTools.common.cancel") }}</TButton>
+      <TButton theme="default" @click="emit('close')">{{ t("dataTools.common.cancel") }}</TButton>
       <TButton theme="primary" :disabled="draft.valueColumns.length === 0" @click="apply">{{
         t("dataTools.outline.confirm")
       }}</TButton>
