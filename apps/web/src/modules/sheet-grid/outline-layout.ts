@@ -69,7 +69,7 @@ export function createOutlinePanes(
             ? (previous ?? items.find((item) => item.index > group.end))
             : items.find((item) => item.index === group.end);
       const buttonOffset = anchor
-        ? summaryIndex !== undefined
+        ? axis === "row"
           ? anchor.offset + (anchor.size - OUTLINE_CONTROL_SIZE) / 2
           : group.collapsed && !previous
             ? anchor.offset + OUTLINE_CONTROL_INSET
@@ -118,13 +118,13 @@ export function createOutlinePanes(
         if (!fragment.length) return [];
         const first = fragment[0]!;
         const last = fragment[fragment.length - 1]!;
-        const start =
-          button && summaryBelow === false ? buttonOffset! : first.offset + OUTLINE_CONTROL_INSET;
+        const rangeInset = axis === "row" ? 0 : OUTLINE_CONTROL_INSET;
+        const start = button && summaryBelow === false ? buttonOffset! : first.offset + rangeInset;
         const end = button
           ? summaryBelow === false
-            ? last.offset + last.size - OUTLINE_CONTROL_INSET
+            ? last.offset + last.size - rangeInset
             : buttonOffset! + OUTLINE_CONTROL_SIZE
-          : last.offset + last.size - OUTLINE_CONTROL_INSET;
+          : last.offset + last.size - rangeInset;
         return [
           {
             group,

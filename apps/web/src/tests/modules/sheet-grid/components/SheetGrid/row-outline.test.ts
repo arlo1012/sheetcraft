@@ -35,6 +35,41 @@ describe("SheetGrid row outlines", () => {
     expect(wrapper.emitted("outlineToggle")?.[0]?.[0]).toEqual({ id: "inner", collapsed: true });
   });
 
+  test.each([false, true])(
+    "centers a row toggle at different row heights (collapsed: %s)",
+    async (collapsed) => {
+      const { wrapper } = mountSheetGrid({
+        beforeMount(sheet) {
+          sheet.rowHeights.set(0, 36);
+          sheet.rowHeights.set(1, 32);
+          sheet.rowHeights.set(2, 48);
+          sheet.outlineGroups = [{ id: "rows", axis: "row", start: 1, end: 2, collapsed }];
+        },
+      });
+      await nextTick();
+      const headers = getSheetRenderFrame(wrapper).rowHeaders.flatMap((pane) => pane.items);
+      const anchor = headers.find((item) => item.index === (collapsed ? 0 : 2))!;
+      const control = wrapper.get<HTMLElement>('[data-outline-id="rows"]');
+      const track = control.element.parentElement!;
+      const pane = track.parentElement!;
+      const paneTop = Number.parseFloat(pane.style.top);
+      const trackTop = Number.parseFloat(track.style.top);
+      expect(paneTop + trackTop + Number.parseFloat(control.element.style.top) + 8).toBe(
+        anchor.offset + anchor.size / 2,
+      );
+      if (!collapsed) {
+        const detail = headers.find((item) => item.index === 1)!;
+        expect(paneTop + trackTop).toBe(detail.offset);
+        const dot = wrapper.get<HTMLElement>(
+          ".sheet-data-controls__row-outline-pane .sheet-data-controls__outline-dot",
+        );
+        expect(paneTop + Number.parseFloat(dot.element.style.top)).toBe(
+          detail.offset + detail.size / 2,
+        );
+      }
+    },
+  );
+
   test("keeps a group starting at row 1 reopenable and hides nested controls", async () => {
     const { wrapper } = mountSheetGrid({
       beforeMount(sheet) {
