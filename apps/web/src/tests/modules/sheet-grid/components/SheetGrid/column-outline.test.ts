@@ -34,10 +34,10 @@ describe("SheetGrid column outlines", () => {
   });
 
   test.each([
-    { collapsed: false, start: 1, anchorIndex: 2 },
-    { collapsed: true, start: 1, anchorIndex: 0 },
+    { collapsed: false, start: 1, anchorIndex: 3 },
+    { collapsed: true, start: 1, anchorIndex: 3 },
     { collapsed: true, start: 0, anchorIndex: 3 },
-  ])("centers the toggle in its visible column (%j)", async ({ collapsed, start, anchorIndex }) => {
+  ])("centers the toggle in the next column (%j)", async ({ collapsed, start, anchorIndex }) => {
     const { sheet, wrapper } = mountSheetGrid({
       beforeMount(sheet) {
         sheet.columnWidths.set(anchorIndex, 140);
@@ -60,6 +60,7 @@ describe("SheetGrid column outlines", () => {
       expect(center).toBe(anchor.offset + anchor.size / 2);
     };
     assertCentered();
+    if (!collapsed) expect(wrapper.findAll(".sheet-data-controls__outline-dot")).toHaveLength(2);
     sheet.columnWidths.set(anchorIndex, 72);
     await nextTick();
     assertCentered();
@@ -88,26 +89,31 @@ describe("SheetGrid column outlines", () => {
     expect(wrapper.emitted("outlineToggle")?.[0]?.[0]).toEqual({ id: "outer", collapsed: false });
   });
 
-  test("splits a group crossing frozen columns into clipped brackets with one toggle", async () => {
-    const { wrapper } = mountSheetGrid({
-      beforeMount(sheet) {
-        sheet.freezePanes = { rows: 0, columns: 2 };
-        sheet.outlineGroups = [
-          { id: "crossing", axis: "column", start: 0, end: 4, collapsed: false },
-        ];
-      },
-    });
-    await nextTick();
-    expect(wrapper.findAll(".sheet-data-controls__column-outline-track")).toHaveLength(2);
-    expect(wrapper.findAll(".sheet-data-controls__column-outline-line.has-start")).toHaveLength(1);
-    expect(wrapper.findAll('[data-outline-id="crossing"]')).toHaveLength(1);
-    const frame = getSheetRenderFrame(wrapper);
-    const panes = wrapper.findAll<HTMLElement>(".sheet-data-controls__column-outline-pane");
-    expect(panes.map((pane) => Number.parseFloat(pane.element.style.left))).toEqual(
-      frame.columnHeaders.map((pane) => pane.clip.x),
-    );
-    expect(panes.map((pane) => Number.parseFloat(pane.element.style.width))).toEqual(
-      frame.columnHeaders.map((pane) => pane.clip.width),
-    );
-  });
+  test.each([1, 4])(
+    "clips column brackets across the frozen boundary (group end: %s)",
+    async (end) => {
+      const { wrapper } = mountSheetGrid({
+        beforeMount(sheet) {
+          sheet.freezePanes = { rows: 0, columns: 2 };
+          sheet.outlineGroups = [
+            { id: "crossing", axis: "column", start: 0, end, collapsed: false },
+          ];
+        },
+      });
+      await nextTick();
+      expect(wrapper.findAll(".sheet-data-controls__column-outline-track")).toHaveLength(2);
+      expect(wrapper.findAll(".sheet-data-controls__column-outline-line.has-start")).toHaveLength(
+        1,
+      );
+      expect(wrapper.findAll('[data-outline-id="crossing"]')).toHaveLength(1);
+      const frame = getSheetRenderFrame(wrapper);
+      const panes = wrapper.findAll<HTMLElement>(".sheet-data-controls__column-outline-pane");
+      expect(panes.map((pane) => Number.parseFloat(pane.element.style.left))).toEqual(
+        frame.columnHeaders.map((pane) => pane.clip.x),
+      );
+      expect(panes.map((pane) => Number.parseFloat(pane.element.style.width))).toEqual(
+        frame.columnHeaders.map((pane) => pane.clip.width),
+      );
+    },
+  );
 });

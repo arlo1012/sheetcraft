@@ -36,19 +36,19 @@ describe("SheetGrid row outlines", () => {
   });
 
   test.each([false, true])(
-    "centers a row toggle at different row heights (collapsed: %s)",
+    "centers a row toggle on the next row at different row heights (collapsed: %s)",
     async (collapsed) => {
       const { wrapper } = mountSheetGrid({
         beforeMount(sheet) {
           sheet.rowHeights.set(0, 36);
           sheet.rowHeights.set(1, 32);
-          sheet.rowHeights.set(2, 48);
+          sheet.rowHeights.set(3, 48);
           sheet.outlineGroups = [{ id: "rows", axis: "row", start: 1, end: 2, collapsed }];
         },
       });
       await nextTick();
       const headers = getSheetRenderFrame(wrapper).rowHeaders.flatMap((pane) => pane.items);
-      const anchor = headers.find((item) => item.index === (collapsed ? 0 : 2))!;
+      const anchor = headers.find((item) => item.index === 3)!;
       const control = wrapper.get<HTMLElement>('[data-outline-id="rows"]');
       const track = control.element.parentElement!;
       const pane = track.parentElement!;
@@ -58,6 +58,7 @@ describe("SheetGrid row outlines", () => {
         anchor.offset + anchor.size / 2,
       );
       if (!collapsed) {
+        expect(wrapper.findAll(".sheet-data-controls__outline-dot")).toHaveLength(2);
         const detail = headers.find((item) => item.index === 1)!;
         expect(paneTop + trackTop).toBe(detail.offset);
         const dot = wrapper.get<HTMLElement>(
@@ -93,26 +94,29 @@ describe("SheetGrid row outlines", () => {
     expect(wrapper.emitted("outlineToggle")?.[0]?.[0]).toEqual({ id: "outer", collapsed: false });
   });
 
-  test("clips brackets across frozen rows and renders the toggle only at the group end", async () => {
-    const { wrapper } = mountSheetGrid({
-      beforeMount(sheet) {
-        sheet.freezePanes = { rows: 2, columns: 0 };
-        sheet.outlineGroups = [{ id: "crossing", axis: "row", start: 0, end: 4, collapsed: false }];
-      },
-    });
-    await nextTick();
-    expect(wrapper.findAll(".sheet-data-controls__row-outline-track")).toHaveLength(2);
-    expect(wrapper.findAll(".sheet-data-controls__row-outline-line.has-start")).toHaveLength(1);
-    expect(wrapper.findAll('[data-outline-id="crossing"]')).toHaveLength(1);
-    const frame = getSheetRenderFrame(wrapper);
-    const panes = wrapper.findAll<HTMLElement>(".sheet-data-controls__row-outline-pane");
-    expect(panes.map((pane) => Number.parseFloat(pane.element.style.top))).toEqual(
-      frame.rowHeaders.map((pane) => pane.clip.y),
-    );
-    expect(panes.map((pane) => Number.parseFloat(pane.element.style.height))).toEqual(
-      frame.rowHeaders.map((pane) => pane.clip.height),
-    );
-  });
+  test.each([1, 4])(
+    "clips row brackets across the frozen boundary (group end: %s)",
+    async (end) => {
+      const { wrapper } = mountSheetGrid({
+        beforeMount(sheet) {
+          sheet.freezePanes = { rows: 2, columns: 0 };
+          sheet.outlineGroups = [{ id: "crossing", axis: "row", start: 0, end, collapsed: false }];
+        },
+      });
+      await nextTick();
+      expect(wrapper.findAll(".sheet-data-controls__row-outline-track")).toHaveLength(2);
+      expect(wrapper.findAll(".sheet-data-controls__row-outline-line.has-start")).toHaveLength(1);
+      expect(wrapper.findAll('[data-outline-id="crossing"]')).toHaveLength(1);
+      const frame = getSheetRenderFrame(wrapper);
+      const panes = wrapper.findAll<HTMLElement>(".sheet-data-controls__row-outline-pane");
+      expect(panes.map((pane) => Number.parseFloat(pane.element.style.top))).toEqual(
+        frame.rowHeaders.map((pane) => pane.clip.y),
+      );
+      expect(panes.map((pane) => Number.parseFloat(pane.element.style.height))).toEqual(
+        frame.rowHeaders.map((pane) => pane.clip.height),
+      );
+    },
+  );
 
   test.each([true, false])(
     "connects the bracket to a subtotal summary (below: %s)",

@@ -57,17 +57,9 @@ export function createOutlinePanes(
         axis === "row" && separator > 0
           ? subtotalSummaryBelow[group.id.slice(0, separator)]
           : undefined;
-      const summaryIndex =
-        summaryBelow === undefined ? undefined : summaryBelow ? group.end + 1 : group.start - 1;
-      const previous = group.collapsed
-        ? [...items].reverse().find((item) => item.index < group.start)
-        : undefined;
-      const anchor =
-        summaryIndex !== undefined
-          ? items.find((item) => item.index === summaryIndex)
-          : group.collapsed
-            ? (previous ?? items.find((item) => item.index > group.end))
-            : items.find((item) => item.index === group.end);
+      // Controls live outside the detail range, including after it is collapsed.
+      const summaryIndex = summaryBelow === false ? group.start - 1 : group.end + 1;
+      const anchor = items.find((item) => item.index === summaryIndex);
       const buttonOffset = anchor
         ? anchor.offset + (anchor.size - OUTLINE_CONTROL_SIZE) / 2
         : undefined;
@@ -106,8 +98,8 @@ export function createOutlinePanes(
               ]
             : [];
         }
-        const firstIndex = Math.min(group.start, summaryIndex ?? group.start);
-        const lastIndex = Math.max(group.end, summaryIndex ?? group.end);
+        const firstIndex = Math.min(group.start, summaryIndex);
+        const lastIndex = Math.max(group.end, summaryIndex);
         const fragment = pane.items.filter(
           (item) => item.index >= firstIndex && item.index <= lastIndex,
         );
