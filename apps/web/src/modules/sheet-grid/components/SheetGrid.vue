@@ -122,6 +122,7 @@ import {
 } from "../../../shared/sheet-input/surface-coordinates";
 import { useHeaderInteraction } from "../input/useHeaderInteraction";
 import type { HeaderInteractionState } from "../input/useHeaderInteraction";
+import { getColumnOutlineHeight } from "../outline-layout";
 import type {
   FormulaReferenceOverlay as FormulaReferenceOverlayGroup,
   SheetOverlayState,
@@ -303,17 +304,7 @@ const rowOutlineGutter = computed(() => {
     (depth + 1) * OUTLINE_HEADER_LEVEL_WIDTH - ROW_HEADER_WIDTH + 20,
   );
 });
-const columnOutlineHeaderHeight = computed(() => {
-  const depth = columnOutlineDepth.value;
-  if (!depth) return 0;
-  return Math.max(
-    0,
-    OUTLINE_CONTROL_INSET +
-      (depth - 1) * OUTLINE_CONTROL_STEP +
-      OUTLINE_CONTROL_SIZE -
-      COLUMN_HEADER_HEIGHT,
-  );
-});
+const columnOutlineHeaderHeight = computed(() => getColumnOutlineHeight(columnOutlineDepth.value));
 
 const headerSize = computed(() => ({
   width: props.showHeaders ? ROW_HEADER_WIDTH + quickToolsGutter.value + rowOutlineGutter.value : 0,
@@ -776,6 +767,7 @@ const headerQuickTools = computed(() => ({
   enabled: headerQuickToolsEnabled.value,
   gutter: quickToolsGutter.value,
   rowOutlineGutter: props.showHeaders ? rowOutlineGutter.value : 0,
+  columnOutlineGutter: props.showHeaders ? columnOutlineHeaderHeight.value : 0,
 }));
 const headerInput = useHeaderInteraction({
   canFocus: () => !getReferenceEditor() && !isComposing.value,

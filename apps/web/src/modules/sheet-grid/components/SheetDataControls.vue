@@ -4,6 +4,12 @@ import { computed, nextTick, ref, useId, watch } from "vue";
 import { columnIndexToLabel } from "@idea10/core/coordinates";
 import type { CellAddress, SheetDimensionAxis } from "@idea10/core/workbook";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
+import {
+  COLUMN_OUTLINE_LEVEL_STEP,
+  OUTLINE_CONTROL_SIZE,
+  OUTLINE_CONTROL_INSET,
+  getColumnOutlineHeight,
+} from "../outline-layout";
 import SheetCellNotice from "./SheetCellNotice.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -187,6 +193,7 @@ const outlineControls = computed(() => {
     level: number;
   }> = [];
   for (const group of groups) {
+    if (group.axis !== "row") continue;
     if (
       groups.some(
         (candidate) =>
@@ -211,16 +218,10 @@ const outlineControls = computed(() => {
     output.push({
       group,
       level,
-      style:
-        group.axis === "row"
-          ? {
-              left: `${2 + (props.outlineControlOffset ?? 0) + (level - 1) * 12}px`,
-              top: `${item.offset + (item.size - 16) / 2}px`,
-            }
-          : {
-              left: `${item.offset + Math.max(1, item.size - 14)}px`,
-              top: `${2 + (props.outlineControlOffset ?? 0) + (level - 1) * 12}px`,
-            },
+      style: {
+        left: `${2 + (props.outlineControlOffset ?? 0) + (level - 1) * 12}px`,
+        top: `${item.offset + (item.size - 16) / 2}px`,
+      },
     });
   }
   return output;
@@ -243,6 +244,83 @@ const outlineLevels = computed(() => {
       return Math.max(max, level);
     }, 0);
   return { rows: maxLevel("row"), columns: maxLevel("column") };
+});
+
+const columnOutlineHeight = computed(() => getColumnOutlineHeight(outlineLevels.value.columns));
+const columnOutlinePanes = computed(() => {
+  if (!props.showOutline || !columnOutlineHeight.value) return [];
+  const groups = props.outlineGroups ?? [];
+  return props.frame.columnHeaders
+    .filter((pane) => pane.clip.width > 0)
+    .map((pane) => {
+      const tracks = groups
+        .filter((group) => group.axis === "column")
+        .flatMap((group) => {
+          const parents = groups.filter(
+            (candidate) =>
+              candidate.axis === "column" &&
+              candidate.id !== group.id &&
+              candidate.start <= group.start &&
+              candidate.end >= group.end,
+          );
+          if (parents.some((parent) => parent.collapsed)) return [];
+          const top = OUTLINE_CONTROL_INSET + parents.length * COLUMN_OUTLINE_LEVEL_STEP;
+          if (group.collapsed) {
+            const allItems = props.frame.columnHeaders.flatMap((part) => part.items);
+            const previous = allItems
+              .filter((item) => item.index < group.start)
+              .sort((a, b) => b.index - a.index)[0];
+            const next = allItems
+              .filter((item) => item.index > group.end)
+              .sort((a, b) => a.index - b.index)[0];
+            const anchor = previous ?? next;
+            if (!anchor || !pane.items.includes(anchor)) return [];
+            const left = previous
+              ? anchor.offset + anchor.size - OUTLINE_CONTROL_SIZE - OUTLINE_CONTROL_INSET
+              : anchor.offset + OUTLINE_CONTROL_INSET;
+            return [
+              {
+                group,
+                top,
+                left: left - pane.clip.x,
+                width: OUTLINE_CONTROL_SIZE,
+                start: false,
+                button: true,
+              },
+            ];
+          }
+          const items = pane.items.filter(
+            (item) => item.index >= group.start && item.index <= group.end,
+          );
+          if (!items.length) return [];
+          const first = items[0]!;
+          const last = items[items.length - 1]!;
+          const left = first.offset + OUTLINE_CONTROL_INSET - pane.clip.x;
+          return [
+            {
+              group,
+              top,
+              left,
+              width: Math.max(
+                OUTLINE_CONTROL_SIZE,
+                last.offset + last.size - OUTLINE_CONTROL_INSET - pane.clip.x - left,
+              ),
+              start: first.index === group.start,
+              button: last.index === group.end,
+            },
+          ];
+        });
+      return {
+        id: pane.id,
+        style: {
+          left: `${pane.clip.x}px`,
+          top: `${props.outlineControlOffset ?? 0}px`,
+          width: `${pane.clip.width}px`,
+          height: `${columnOutlineHeight.value}px`,
+        },
+        tracks,
+      };
+    });
 });
 
 function requestColumnFilter(column: number, event: MouseEvent): void {
@@ -378,9 +456,54 @@ watch(
     </button>
 
     <div
+      v-for="pane in columnOutlinePanes"
+      :key="pane.id"
+      class="sheet-data-controls__column-outline-pane"
+      :style="pane.style"
+    >
+      <div
+        v-for="track in pane.tracks"
+        :key="track.group.id"
+        class="sheet-data-controls__column-outline-track"
+        :style="{ left: `${track.left}px`, top: `${track.top}px`, width: `${track.width}px` }"
+      >
+        <span
+          v-if="!track.group.collapsed"
+          class="sheet-data-controls__column-outline-line"
+          :class="{ 'has-start': track.start, 'has-button': track.button }"
+          aria-hidden="true"
+        />
+        <button
+          v-if="track.button"
+          type="button"
+          class="sheet-data-controls__outline sheet-data-controls__outline--column"
+          :data-outline-id="track.group.id"
+          :aria-label="
+            t(track.group.collapsed ? 'dataTools.outline.expand' : 'dataTools.outline.collapse')
+          "
+          :title="
+            t(track.group.collapsed ? 'dataTools.outline.expand' : 'dataTools.outline.collapse')
+          "
+          :aria-expanded="!track.group.collapsed"
+          :disabled="readOnly"
+          @pointerdown.stop
+          @click.stop="
+            emit('outlineToggle', { id: track.group.id, collapsed: !track.group.collapsed })
+          "
+        >
+          <Plus v-if="track.group.collapsed" :size="11" aria-hidden="true" />
+          <Minus v-else :size="11" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+
+    <div
       v-if="outlineLevels.rows"
       class="sheet-data-controls__outline-levels sheet-data-controls__outline-levels--rows"
-      :style="{ left: `${2 + (outlineControlOffset ?? 0)}px` }"
+      :style="{
+        left: `${2 + (outlineControlOffset ?? 0)}px`,
+        top: `${2 + columnOutlineHeight + (columnOutlineHeight ? (outlineControlOffset ?? 0) : 0)}px`,
+      }"
     >
       <button
         v-for="level in outlineLevels.rows + 1"
@@ -395,7 +518,10 @@ watch(
     <div
       v-if="outlineLevels.columns"
       class="sheet-data-controls__outline-levels sheet-data-controls__outline-levels--columns"
-      :style="{ top: `${2 + (outlineControlOffset ?? 0)}px` }"
+      :style="{
+        top: `${2 + (outlineControlOffset ?? 0)}px`,
+        left: `${frame.headerSize.width - 18}px`,
+      }"
     >
       <button
         v-for="level in outlineLevels.columns + 1"
@@ -492,6 +618,33 @@ watch(
     list-style: none;
   }
 
+  &__column-outline-pane {
+    position: absolute;
+    overflow: hidden;
+  }
+  &__column-outline-track {
+    position: absolute;
+    height: 16px;
+  }
+  &__column-outline-line {
+    position: absolute;
+    top: 8px;
+    left: 0;
+    right: 0;
+    height: 6px;
+    border-top: 1px solid var(--idea-border-control);
+    &.has-start {
+      border-left: 1px solid var(--idea-border-control);
+    }
+    &.has-button {
+      right: 16px;
+    }
+  }
+  &__outline--column {
+    right: 0;
+    top: 0;
+  }
+
   &__outline-levels {
     position: absolute;
     display: flex;
@@ -519,8 +672,13 @@ watch(
       top: 2px;
     }
     &--columns {
-      right: 2px;
-      top: 2px;
+      flex-direction: column;
+      gap: 4px;
+      button {
+        width: 16px;
+        height: 16px;
+        font-size: 12px;
+      }
     }
   }
 }

@@ -28,7 +28,7 @@ function createContext() {
   } as unknown as CanvasRenderingContext2D;
 }
 
-function createFrame(gutter = 0, rowOutlineGutter = 0) {
+function createFrame(gutter = 0, rowOutlineGutter = 0, columnOutlineGutter = 0) {
   const geometry = createSheetGeometry({
     rowCount: 8,
     columnCount: 8,
@@ -43,7 +43,7 @@ function createFrame(gutter = 0, rowOutlineGutter = 0) {
   });
   return createSheetRenderFrame(
     layout,
-    { width: 36 + gutter + rowOutlineGutter, height: 24 + gutter },
+    { width: 36 + gutter + rowOutlineGutter, height: 24 + gutter + columnOutlineGutter },
     1,
   );
 }
@@ -96,6 +96,19 @@ describe("header painter", () => {
     expect(context.fillText).toHaveBeenCalledWith("A", 56, 11.5);
     expect(context.fillText).toHaveBeenCalledWith("1", 17.5, 34);
     expect(context.clearRect).not.toHaveBeenCalled();
+  });
+
+  test("keeps column labels below their reserved outline tracks", () => {
+    const context = createContext();
+    paintSheetHeaders(context, {
+      frame: createFrame(0, 0, 44),
+      selection: { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0, mode: "cells" },
+      quickTools: { enabled: false, gutter: 0, columnOutlineGutter: 44 },
+      palette: DEFAULT_SHEET_HEADER_PALETTE,
+    });
+
+    expect(context.fillText).toHaveBeenCalledWith("A", 56, 55.5);
+    expect(context.fillRect).toHaveBeenCalledWith(36, 44, 40, 23);
   });
 
   test("draws quick controls only for the current header target", () => {

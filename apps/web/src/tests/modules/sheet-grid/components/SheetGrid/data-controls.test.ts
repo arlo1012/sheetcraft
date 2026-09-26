@@ -90,7 +90,7 @@ describe("SheetGrid data controls", () => {
       "--sheet-row-header-width: 100px",
     );
     expect(wrapper.get(".sheet-grid").attributes("style")).toContain(
-      "--sheet-column-header-height: 50px",
+      "--sheet-column-header-height: 112px",
     );
     expect(
       wrapper.get(".sheet-data-controls__outline-levels--rows").element.getAttribute("style"),
@@ -99,20 +99,14 @@ describe("SheetGrid data controls", () => {
       wrapper.get(".sheet-data-controls__outline-levels--columns").element.getAttribute("style"),
     ).toContain("top: 22px");
     const frame = wrapper.getComponent(SheetSurface).props("frame") as SheetRenderFrame;
-    expect(frame.headerSize).toEqual({ width: 100, height: 50 });
-    expect(frame.body).toMatchObject({ x: 100, y: 50 });
+    expect(frame.headerSize).toEqual({ width: 100, height: 112 });
+    expect(frame.body).toMatchObject({ x: 100, y: 112 });
     expect(frame.layout.freeze).toEqual({ rows: 1, columns: 1 });
-    const columnControls = wrapper
-      .findAll(".sheet-data-controls__outline")
-      .map((control) => control.element as HTMLElement)
-      .filter((control) => Number.parseFloat(control.style.top) < frame.headerSize.height);
+    const columnControls = wrapper.findAll(".sheet-data-controls__outline--column");
     expect(columnControls).toHaveLength(2);
-    expect(columnControls.every((control) => Number.parseFloat(control.style.top) >= 22)).toBe(
-      true,
-    );
     expect(
-      columnControls.every(
-        (control) => Number.parseFloat(control.style.top) + 16 <= frame.headerSize.height,
+      columnControls.every((control) =>
+        control.element.parentElement?.classList.contains("sheet-data-controls__column-outline-track"),
       ),
     ).toBe(true);
   });

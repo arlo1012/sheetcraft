@@ -112,10 +112,11 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
     const quickTools = options.getQuickTools();
     const gutter = quickTools.gutter;
     const rowLabelStart = gutter + (quickTools.rowOutlineGutter ?? 0);
+    const columnLabelStart = gutter + (quickTools.columnOutlineGutter ?? 0);
     if (point.x >= gutter && point.x < rowLabelStart) return undefined;
     if (
       point.x >= rowLabelStart &&
-      point.y >= gutter &&
+      point.y >= columnLabelStart &&
       point.x < frame.headerSize.width &&
       point.y < frame.headerSize.height
     ) {
@@ -159,7 +160,8 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
               return { axis, index: item.index + 1, ownerIndex: item.index, action: "quickInsert" };
             }
           }
-          const inMainArea = axis === "row" ? point.x >= rowLabelStart : point.y >= gutter;
+          const inMainArea =
+            axis === "row" ? point.x >= rowLabelStart : point.y >= columnLabelStart;
           if (!inMainArea) {
             if (!quickTools.enabled) continue;
             const gripX = axis === "row" ? gutter / 2 : item.offset + item.size / 2;
@@ -260,10 +262,13 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
     const quickTools = options.getQuickTools();
     const gutter = quickTools.gutter;
     const rowLabelStart = gutter + (quickTools.rowOutlineGutter ?? 0);
+    const columnLabelStart = gutter + (quickTools.columnOutlineGutter ?? 0);
     if (focused.axis === "corner") {
       return {
         x: bounds.left + ((rowLabelStart + frame.headerSize.width) / 2) * frame.scale,
-        y: bounds.top + (frame.headerSize.height / 2) * frame.scale,
+        y:
+          bounds.top +
+          (columnLabelStart + (frame.headerSize.height - columnLabelStart) / 2) * frame.scale,
       };
     }
     const panes = focused.axis === "row" ? frame.rowHeaders : frame.columnHeaders;
@@ -274,7 +279,10 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
     const point =
       focused.axis === "row"
         ? { x: (rowLabelStart + frame.headerSize.width) / 2, y: item.offset + item.size / 2 }
-        : { x: item.offset + item.size / 2, y: gutter + (frame.headerSize.height - gutter) / 2 };
+        : {
+            x: item.offset + item.size / 2,
+            y: columnLabelStart + (frame.headerSize.height - columnLabelStart) / 2,
+          };
     return { x: bounds.left + point.x * frame.scale, y: bounds.top + point.y * frame.scale };
   }
 

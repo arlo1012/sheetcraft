@@ -34,6 +34,8 @@ export type HeaderQuickToolsState = Readonly<{
   gutter: number;
   /** Outline controls occupy a separate lane before the fixed-width row labels. */
   rowOutlineGutter?: number;
+  /** Column outline tracks sit above the fixed-height column labels. */
+  columnOutlineGutter?: number;
 }>;
 
 /** Colors and text metrics read once by the surface from its computed style. */
@@ -194,6 +196,7 @@ function paintAxisItem(
   const { palette, quickTools, selection, hovered, focused } = state;
   const gutter = quickTools.gutter;
   const rowLabelStart = gutter + (quickTools.rowOutlineGutter ?? 0);
+  const columnLabelStart = gutter + (quickTools.columnOutlineGutter ?? 0);
   const rect =
     axis === "row"
       ? {
@@ -204,9 +207,9 @@ function paintAxisItem(
         }
       : {
           x: item.offset,
-          y: gutter,
+          y: columnLabelStart,
           width: item.size,
-          height: Math.max(0, frame.headerSize.height - gutter - 1),
+          height: Math.max(0, frame.headerSize.height - columnLabelStart - 1),
         };
   if (rect.width <= 0 || rect.height <= 0) return;
   const axisSelected = isAxisSelected(axis, item.index, selection);
@@ -309,11 +312,12 @@ export function paintSheetHeaders(
   paintAxisHeaders(context, "row", frame.rowHeaders, state);
 
   const rowLabelStart = quickTools.gutter + (quickTools.rowOutlineGutter ?? 0);
+  const columnLabelStart = quickTools.gutter + (quickTools.columnOutlineGutter ?? 0);
   const corner = {
     x: rowLabelStart,
-    y: quickTools.gutter,
+    y: columnLabelStart,
     width: Math.max(0, frame.headerSize.width - rowLabelStart),
-    height: Math.max(0, frame.headerSize.height - quickTools.gutter),
+    height: Math.max(0, frame.headerSize.height - columnLabelStart),
   };
   context.fillStyle =
     selection.mode === "all"
