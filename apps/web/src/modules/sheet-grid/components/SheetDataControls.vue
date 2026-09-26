@@ -613,6 +613,10 @@ watch(
     gap: 4px;
     pointer-events: auto;
     button {
+      display: grid;
+      place-items: center;
+      box-sizing: border-box;
+      flex-shrink: 0;
       width: 16px;
       height: 16px;
       padding: 0;
@@ -622,6 +626,7 @@ watch(
       background: var(--idea-surface-panel);
       cursor: pointer;
       font-size: 12px;
+      line-height: 1;
     }
     button:hover,
     button:focus-visible {
