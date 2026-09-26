@@ -122,7 +122,7 @@ import {
 } from "../../../shared/sheet-input/surface-coordinates";
 import { useHeaderInteraction } from "../input/useHeaderInteraction";
 import type { HeaderInteractionState } from "../input/useHeaderInteraction";
-import { getColumnOutlineHeight } from "../outline-layout";
+import { getOutlineGutterSize } from "../outline-layout";
 import type {
   FormulaReferenceOverlay as FormulaReferenceOverlayGroup,
   SheetOverlayState,
@@ -275,10 +275,6 @@ const emit = defineEmits<{
 const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 28;
 const AXIS_TOOL_GUTTER = 20;
-const OUTLINE_HEADER_LEVEL_WIDTH = 16;
-const OUTLINE_CONTROL_INSET = 2;
-const OUTLINE_CONTROL_STEP = 12;
-const OUTLINE_CONTROL_SIZE = 16;
 const quickToolsGutter = computed(() =>
   props.showHeaders && props.showAxisQuickTools ? AXIS_TOOL_GUTTER : 0,
 );
@@ -295,16 +291,8 @@ function getOutlineDepth(axis: SheetDimensionAxis): number {
 }
 const rowOutlineDepth = computed(() => getOutlineDepth("row"));
 const columnOutlineDepth = computed(() => getOutlineDepth("column"));
-const rowOutlineGutter = computed(() => {
-  const depth = rowOutlineDepth.value;
-  if (!depth) return 0;
-  // Level buttons can share the empty corner above row labels; keep its select-all icon clear.
-  return Math.max(
-    OUTLINE_CONTROL_INSET * 2 + (depth - 1) * OUTLINE_CONTROL_STEP + OUTLINE_CONTROL_SIZE,
-    (depth + 1) * OUTLINE_HEADER_LEVEL_WIDTH - ROW_HEADER_WIDTH + 20,
-  );
-});
-const columnOutlineHeaderHeight = computed(() => getColumnOutlineHeight(columnOutlineDepth.value));
+const rowOutlineGutter = computed(() => getOutlineGutterSize(rowOutlineDepth.value));
+const columnOutlineHeaderHeight = computed(() => getOutlineGutterSize(columnOutlineDepth.value));
 
 const headerSize = computed(() => ({
   width: props.showHeaders ? ROW_HEADER_WIDTH + quickToolsGutter.value + rowOutlineGutter.value : 0,

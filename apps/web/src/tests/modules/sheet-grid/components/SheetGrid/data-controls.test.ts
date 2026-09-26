@@ -5,6 +5,16 @@ import SheetSurface from "../../../../../modules/sheet-grid/components/SheetSurf
 import MenuItem from "../../../../../shared/menu/MenuItem.vue";
 import type { SheetRenderFrame } from "../../../../../modules/sheet-grid/rendering/sheet-render-frame";
 
+function inlineOffset(element: HTMLElement): number {
+  let offset = 0;
+  let current: HTMLElement | null = element;
+  while (current && !current.classList.contains("sheet-data-controls")) {
+    offset += Number.parseFloat(current.style.top || "0");
+    current = current.parentElement;
+  }
+  return offset;
+}
+
 describe("SheetGrid data controls", () => {
   test("anchors a request to the visible filter header cell and reflects an applied column", async () => {
     const { sheet, wrapper } = mountSheetGrid({
@@ -59,7 +69,7 @@ describe("SheetGrid data controls", () => {
     const levels = wrapper.findAll(".sheet-data-controls__outline-levels--rows button");
     expect(levels.map((level) => level.text())).toEqual(["1", "2", "3"]);
     expect(wrapper.get(".sheet-grid").attributes("style")).toContain(
-      "--sheet-row-header-width: 80px",
+      "--sheet-row-header-width: 112px",
     );
     await levels[0]!.trigger("click");
     await levels[1]!.trigger("click");
@@ -87,7 +97,7 @@ describe("SheetGrid data controls", () => {
     await nextTick();
 
     expect(wrapper.get(".sheet-grid").attributes("style")).toContain(
-      "--sheet-row-header-width: 100px",
+      "--sheet-row-header-width: 132px",
     );
     expect(wrapper.get(".sheet-grid").attributes("style")).toContain(
       "--sheet-column-header-height: 112px",
@@ -96,11 +106,14 @@ describe("SheetGrid data controls", () => {
       wrapper.get(".sheet-data-controls__outline-levels--rows").element.getAttribute("style"),
     ).toContain("left: 22px");
     expect(
+      wrapper.get(".sheet-data-controls__outline-levels--rows").element.getAttribute("style"),
+    ).toContain("top: 94px");
+    expect(
       wrapper.get(".sheet-data-controls__outline-levels--columns").element.getAttribute("style"),
     ).toContain("top: 22px");
     const frame = wrapper.getComponent(SheetSurface).props("frame") as SheetRenderFrame;
-    expect(frame.headerSize).toEqual({ width: 100, height: 112 });
-    expect(frame.body).toMatchObject({ x: 100, y: 112 });
+    expect(frame.headerSize).toEqual({ width: 132, height: 112 });
+    expect(frame.body).toMatchObject({ x: 132, y: 112 });
     expect(frame.layout.freeze).toEqual({ rows: 1, columns: 1 });
     const columnControls = wrapper.findAll(".sheet-data-controls__outline--column");
     expect(columnControls).toHaveLength(2);
@@ -160,8 +173,8 @@ describe("SheetGrid data controls", () => {
       const summaryItem = frame.rowHeaders
         .flatMap((pane) => pane.items)
         .find((item) => item.index === summaryRow)!;
-      const control = wrapper.get(".sheet-data-controls__outline");
-      expect(Number.parseFloat((control.element as HTMLElement).style.top) + 8).toBe(
+      const control = wrapper.get(".sheet-data-controls__outline--row");
+      expect(inlineOffset(control.element as HTMLElement) + 8).toBe(
         summaryItem.offset + summaryItem.size / 2,
       );
     },
