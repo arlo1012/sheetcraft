@@ -139,6 +139,25 @@ export function createOutlinePanes(
         ];
       },
     );
-    return [{ id: pane.id, offset, size, tracks }];
+    // Mark detail items in the lane immediately after their deepest expanded group.
+    // Summary/toggle items already have a control, so they do not also get a dot.
+    const dots = pane.items.flatMap((item) => {
+      if (visibleGroups.some(({ anchor }) => anchor?.index === item.index)) return [];
+      const containing = visibleGroups.filter(
+        ({ group }) => !group.collapsed && item.index >= group.start && item.index <= group.end,
+      );
+      if (!containing.length) return [];
+      return [
+        {
+          index: item.index,
+          lane:
+            Math.max(...containing.map(({ lane }) => lane)) +
+            OUTLINE_LEVEL_STEP +
+            OUTLINE_CONTROL_SIZE / 2,
+          offset: item.offset + item.size / 2 - offset,
+        },
+      ];
+    });
+    return [{ id: pane.id, offset, size, tracks, dots }];
   });
 }

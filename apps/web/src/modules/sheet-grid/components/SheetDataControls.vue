@@ -169,7 +169,7 @@ const outlineLevels = computed(() => {
 const rowOutlineWidth = computed(() => getOutlineGutterSize(outlineLevels.value.rows));
 const columnOutlineHeight = computed(() => getOutlineGutterSize(outlineLevels.value.columns));
 const rowOutlinePanes = computed(() =>
-  props.showOutline
+  props.showOutline && rowOutlineWidth.value
     ? createOutlinePanes(
         "row",
         props.frame.rowHeaders,
@@ -302,6 +302,13 @@ watch(
         height: `${pane.size}px`,
       }"
     >
+      <span
+        v-for="dot in pane.dots"
+        :key="`dot-${dot.index}`"
+        class="sheet-data-controls__outline-dot"
+        :style="{ left: `${dot.lane}px`, top: `${dot.offset}px` }"
+        aria-hidden="true"
+      />
       <div
         v-for="track in pane.tracks"
         :key="track.group.id"
@@ -338,8 +345,8 @@ watch(
             emit('outlineToggle', { id: track.group.id, collapsed: !track.group.collapsed })
           "
         >
-          <Plus v-if="track.group.collapsed" :size="11" aria-hidden="true" />
-          <Minus v-else :size="11" aria-hidden="true" />
+          <Plus v-if="track.group.collapsed" :size="10" :stroke-width="2.5" aria-hidden="true" />
+          <Minus v-else :size="10" :stroke-width="2.5" aria-hidden="true" />
         </button>
       </div>
     </div>
@@ -355,6 +362,13 @@ watch(
         height: `${columnOutlineHeight}px`,
       }"
     >
+      <span
+        v-for="dot in pane.dots"
+        :key="`dot-${dot.index}`"
+        class="sheet-data-controls__outline-dot"
+        :style="{ left: `${dot.offset}px`, top: `${dot.lane}px` }"
+        aria-hidden="true"
+      />
       <div
         v-for="track in pane.tracks"
         :key="track.group.id"
@@ -385,8 +399,8 @@ watch(
             emit('outlineToggle', { id: track.group.id, collapsed: !track.group.collapsed })
           "
         >
-          <Plus v-if="track.group.collapsed" :size="11" aria-hidden="true" />
-          <Minus v-else :size="11" aria-hidden="true" />
+          <Plus v-if="track.group.collapsed" :size="10" :stroke-width="2.5" aria-hidden="true" />
+          <Minus v-else :size="10" :stroke-width="2.5" aria-hidden="true" />
         </button>
       </div>
     </div>
@@ -476,8 +490,33 @@ watch(
   }
 
   &__outline {
-    border: 1px solid var(--idea-border-control);
-    background: var(--idea-surface-panel);
+    border-radius: 0;
+    color: var(--idea-text-primary);
+    background: transparent;
+
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      border: 1px solid var(--idea-border-control);
+      background: var(--idea-surface-panel);
+    }
+    svg {
+      position: relative;
+    }
+    &:hover::before,
+    &:focus-visible::before {
+      border-color: var(--idea-action-primary);
+      background: var(--idea-action-hover);
+    }
+  }
+
+  &__outline-dot {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: var(--idea-text-primary);
+    transform: translate(-50%, -50%);
   }
 
   &__validation {
@@ -526,13 +565,13 @@ watch(
     left: 8px;
     top: 0;
     bottom: 0;
-    width: 6px;
-    border-left: 1px solid var(--idea-border-control);
+    width: 4px;
+    border-left: 1px solid var(--idea-text-primary);
     &.has-start {
-      border-top: 1px solid var(--idea-border-control);
+      border-top: 1px solid var(--idea-text-primary);
     }
     &.has-end {
-      border-bottom: 1px solid var(--idea-border-control);
+      border-bottom: 1px solid var(--idea-text-primary);
     }
     &.has-button {
       bottom: 16px;
@@ -554,10 +593,10 @@ watch(
     top: 8px;
     left: 0;
     right: 0;
-    height: 6px;
-    border-top: 1px solid var(--idea-border-control);
+    height: 4px;
+    border-top: 1px solid var(--idea-text-primary);
     &.has-start {
-      border-left: 1px solid var(--idea-border-control);
+      border-left: 1px solid var(--idea-text-primary);
     }
     &.has-button {
       right: 16px;
@@ -577,9 +616,9 @@ watch(
       width: 16px;
       height: 16px;
       padding: 0;
-      border: 0;
-      border-radius: 2px;
-      color: var(--idea-text-secondary);
+      border: 1px solid var(--idea-border-control);
+      border-radius: 0;
+      color: var(--idea-text-primary);
       background: var(--idea-surface-panel);
       cursor: pointer;
       font-size: 12px;
