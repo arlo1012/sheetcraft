@@ -69,11 +69,7 @@ export function createOutlinePanes(
             ? (previous ?? items.find((item) => item.index > group.end))
             : items.find((item) => item.index === group.end);
       const buttonOffset = anchor
-        ? axis === "row"
-          ? anchor.offset + (anchor.size - OUTLINE_CONTROL_SIZE) / 2
-          : group.collapsed && !previous
-            ? anchor.offset + OUTLINE_CONTROL_INSET
-            : anchor.offset + anchor.size - OUTLINE_CONTROL_SIZE - OUTLINE_CONTROL_INSET
+        ? anchor.offset + (anchor.size - OUTLINE_CONTROL_SIZE) / 2
         : undefined;
       return [
         {

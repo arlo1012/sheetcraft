@@ -33,6 +33,38 @@ describe("SheetGrid column outlines", () => {
     expect(wrapper.emitted("outlineToggle")?.[0]?.[0]).toEqual({ id: "inner", collapsed: true });
   });
 
+  test.each([
+    { collapsed: false, start: 1, anchorIndex: 2 },
+    { collapsed: true, start: 1, anchorIndex: 0 },
+    { collapsed: true, start: 0, anchorIndex: 3 },
+  ])("centers the toggle in its visible column (%j)", async ({ collapsed, start, anchorIndex }) => {
+    const { sheet, wrapper } = mountSheetGrid({
+      beforeMount(sheet) {
+        sheet.columnWidths.set(anchorIndex, 140);
+        sheet.outlineGroups = [{ id: "columns", axis: "column", start, end: 2, collapsed }];
+      },
+    });
+    await nextTick();
+    const assertCentered = () => {
+      const anchor = getSheetRenderFrame(wrapper)
+        .columnHeaders.flatMap((pane) => pane.items)
+        .find((item) => item.index === anchorIndex)!;
+      const control = wrapper.get<HTMLElement>('[data-outline-id="columns"]');
+      const track = control.element.parentElement!;
+      const pane = track.parentElement!;
+      const center =
+        Number.parseFloat(pane.style.left) +
+        Number.parseFloat(track.style.left) +
+        Number.parseFloat(track.style.width) -
+        8;
+      expect(center).toBe(anchor.offset + anchor.size / 2);
+    };
+    assertCentered();
+    sheet.columnWidths.set(anchorIndex, 72);
+    await nextTick();
+    assertCentered();
+  });
+
   test("keeps a group starting at A reopenable and hides its collapsed descendants", async () => {
     const { wrapper } = mountSheetGrid({
       beforeMount(sheet) {
