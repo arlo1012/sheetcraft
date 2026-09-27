@@ -292,7 +292,6 @@ function close(): void {
         v-if="hasSearchedAll"
         :results="results"
         :result-count="resultCount"
-        :status="status"
         @select-result="emit('selectResult', $event)"
       />
       <p v-else-if="status || pickingFormat" class="workbook-find-dialog__status" role="status">

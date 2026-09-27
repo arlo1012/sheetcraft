@@ -10,14 +10,10 @@ import type {
 import { useAppI18n } from "../../../shared/i18n";
 import type { WorkbookFindResult } from "../workbook-find-types";
 
-const props = withDefaults(
-  defineProps<{
-    results: readonly WorkbookFindResult[];
-    resultCount: number;
-    status?: string;
-  }>(),
-  { status: "" },
-);
+const props = defineProps<{
+  results: readonly WorkbookFindResult[];
+  resultCount: number;
+}>();
 const emit = defineEmits<{ selectResult: [result: WorkbookFindResult] }>();
 const { t } = useAppI18n();
 
@@ -66,7 +62,6 @@ function onTableKeydown(event: KeyboardEvent): void {
 <template>
   <section class="workbook-find-results" :aria-label="t('navigation.findResults')">
     <h3 class="workbook-find-results__heading">{{ t("navigation.findResults") }}</h3>
-    <p v-if="status" class="workbook-find-results__status" role="status">{{ status }}</p>
     <div class="workbook-find-results__table narrow-scrollbar">
       <TTable
         class="idea-table--mini workbook-find-results__data"
@@ -110,7 +105,6 @@ function onTableKeydown(event: KeyboardEvent): void {
   gap: var(--idea-space-3);
   min-width: 0;
 
-  &__status,
   &__count {
     margin: 0;
     color: var(--idea-text-secondary);
