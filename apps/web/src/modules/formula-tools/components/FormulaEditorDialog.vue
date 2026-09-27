@@ -234,7 +234,7 @@ watch(
     class="formula-editor-dialog"
     :visible="visible"
     :header="t('formulaTools.formulaEditor')"
-    width="min(780px, calc(100vw - 32px))"
+    width="min(720px, calc(100vw - 32px))"
     placement="center"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
@@ -248,109 +248,126 @@ watch(
     @close="onClose"
   >
     <div class="formula-editor-dialog__content" :data-cell-edit-session="editSessionId">
-      <div class="formula-editor-dialog__context">
-        <span>{{ t("formulaTools.formulaEditorTarget") }}</span>
-        <strong>{{ targetLabel }}</strong>
+      <div class="formula-editor-dialog__heading">
+        <div class="formula-editor-dialog__context">
+          <label for="formula-editor-input">{{ t("formulaTools.formulaEditorInput") }}</label>
+          <span class="formula-editor-dialog__target">
+            {{ t("formulaTools.formulaEditorTarget") }}
+            <strong>{{ targetLabel }}</strong>
+          </span>
+        </div>
+        <Button
+          variant="text"
+          size="small"
+          :aria-label="t('formulaTools.formulaEditorEditFunction')"
+          @click="functionBrowserVisible = true"
+        >
+          <template #icon><FunctionSquare :size="15" aria-hidden="true" /></template>
+          {{ t("formulaTools.formulaEditorEditFunction") }}
+        </Button>
       </div>
 
-      <section class="formula-editor-dialog__editor" :data-cell-edit-session="editSessionId">
-        <div class="formula-editor-dialog__editor-heading">
-          <label for="formula-editor-input">{{ t("formulaTools.formulaEditorInput") }}</label>
-          <Button
-            variant="text"
-            size="small"
-            :aria-label="t('formulaTools.formulaEditorEditFunction')"
-            @click="functionBrowserVisible = true"
-          >
-            <template #icon><FunctionSquare :size="16" aria-hidden="true" /></template>
-            {{ t("formulaTools.formulaEditorEditFunction") }}
-          </Button>
-        </div>
-        <div class="formula-editor-dialog__textarea-wrap">
-          <Textarea
-            v-native-control="{
-              onElement: setInput,
-              attributes: {
-                ...inputAssist?.inputAria,
-                id: 'formula-editor-input',
-                'aria-describedby': 'formula-editor-shortcut',
-                'data-cell-edit-session': editSessionId,
-                'data-formula-editor-input': '',
-                autocomplete: 'off',
-                spellcheck: false,
-              },
-            }"
-            class="idea-formula-editor-textarea"
-            :class="{ 'has-formula-colors': references.length > 0 }"
-            :value="value"
-            :autosize="{ minRows: 7, maxRows: 14 }"
-            @input="onInput"
-            @focus="focused = true"
-            @blur="focused = false"
-            @keydown="(_value, { e }) => onKeydown(e)"
-            @select="captureSelection"
-            @keyup="captureSelection"
-            @click="captureSelection"
-            @compositionstart="onCompositionStart"
-            @compositionend="onCompositionEnd"
-          />
-          <FormulaTextOverlay
-            :input="input"
-            :value="value"
-            :references="references"
-            :active="references.length > 0"
-          />
-          <FormulaInputAssist
-            ref="inputAssist"
-            :value="value"
-            :input="input"
-            :active="focused"
-            :composing="composing"
-            :z-index="2600"
-            @text-edit="applyTextEdit"
-          />
-        </div>
-        <p id="formula-editor-shortcut" class="formula-editor-dialog__hint">
-          {{ t("formulaTools.formulaEditorConfirmHint") }}
-        </p>
-      </section>
+      <div class="formula-editor-dialog__body narrow-scrollbar">
+        <section class="formula-editor-dialog__editor" :data-cell-edit-session="editSessionId">
+          <div class="formula-editor-dialog__textarea-wrap">
+            <Textarea
+              v-native-control="{
+                onElement: setInput,
+                attributes: {
+                  ...inputAssist?.inputAria,
+                  id: 'formula-editor-input',
+                  'aria-describedby': 'formula-editor-shortcut',
+                  'data-cell-edit-session': editSessionId,
+                  'data-formula-editor-input': '',
+                  autocomplete: 'off',
+                  spellcheck: false,
+                },
+              }"
+              class="idea-formula-editor-textarea"
+              :class="{ 'has-formula-colors': references.length > 0 }"
+              :value="value"
+              :autosize="{ minRows: 4, maxRows: 8 }"
+              @input="onInput"
+              @focus="focused = true"
+              @blur="focused = false"
+              @keydown="(_value, { e }) => onKeydown(e)"
+              @select="captureSelection"
+              @keyup="captureSelection"
+              @click="captureSelection"
+              @compositionstart="onCompositionStart"
+              @compositionend="onCompositionEnd"
+            />
+            <FormulaTextOverlay
+              :input="input"
+              :value="value"
+              :references="references"
+              :active="references.length > 0"
+            />
+            <FormulaInputAssist
+              ref="inputAssist"
+              :value="value"
+              :input="input"
+              :active="focused"
+              :composing="composing"
+              :z-index="2600"
+              @text-edit="applyTextEdit"
+            />
+          </div>
+          <p id="formula-editor-shortcut" class="formula-editor-dialog__hint">
+            {{ t("formulaTools.formulaEditorConfirmHint") }}
+          </p>
+        </section>
 
-      <section class="formula-editor-dialog__details">
-        <div>
-          <span>{{ t("formulaTools.formulaEditorPreview") }}</span>
-          <output :aria-label="t('formulaTools.formulaEditorPreview')">{{ previewValue }}</output>
-        </div>
-        <div>
-          <span>{{ t("formulaTools.formulaEditorCurrentFunction") }}</span>
+        <section v-if="rootArguments.length" class="formula-editor-dialog__arguments">
+          <div class="formula-editor-dialog__section-heading">
+            <span>{{ t("formulaTools.formulaEditorArguments") }}</span>
+            <strong>{{ rootFunction?.name }}</strong>
+          </div>
+          <div class="formula-editor-dialog__argument-fields">
+            <label v-for="argument in rootArguments" :key="argument.index">
+              <span>{{ argument.label }}{{ argument.optional ? "" : " *" }}</span>
+              <TInput
+                v-native-control="{
+                  attributes: { 'aria-label': argument.label },
+                }"
+                :value="argument.value"
+                :placeholder="argument.optional ? t('formulaTools.value') : undefined"
+                :data-formula-editor-argument="argument.index"
+                @change="onArgumentInput(argument.index, $event)"
+              />
+            </label>
+          </div>
+        </section>
+
+        <section class="formula-editor-dialog__details">
           <template v-if="displayedFunction">
-            <strong>{{ t(`formulaFunctions.${displayedFunction.name}.signature`) }}</strong>
-            <p>
-              {{ t(`formulaFunctions.${displayedFunction.name}.description`) }}
+            <div class="formula-editor-dialog__section-heading">
+              <span>{{ t("formulaTools.formulaEditorFunctionHelp") }}</span>
+              <strong>{{ displayedFunction.name }}</strong>
+            </div>
+            <code class="formula-editor-dialog__signature">{{
+              t(`formulaFunctions.${displayedFunction.name}.signature`)
+            }}</code>
+            <p>{{ t(`formulaFunctions.${displayedFunction.name}.description`) }}</p>
+            <p class="formula-editor-dialog__example">
+              {{ t("formulaTools.example") }}：<code>{{
+                t(`formulaFunctions.${displayedFunction.name}.example`)
+              }}</code>
             </p>
             <p v-if="currentArgumentLabel" class="formula-editor-dialog__argument">
               {{ currentArgumentLabel }}
             </p>
           </template>
           <p v-else>{{ t("formulaTools.formulaEditorNoFunction") }}</p>
-        </div>
-      </section>
-      <section v-if="rootArguments.length" class="formula-editor-dialog__arguments">
-        <span>{{ t("formulaTools.formulaEditorCurrentFunction") }}</span>
-        <div class="formula-editor-dialog__argument-fields">
-          <label v-for="argument in rootArguments" :key="argument.index">
-            <span>{{ argument.label }}{{ argument.optional ? "" : " *" }}</span>
-            <TInput
-              v-native-control="{
-                attributes: { 'aria-label': argument.label },
-              }"
-              :value="argument.value"
-              :placeholder="argument.optional ? t('formulaTools.value') : undefined"
-              :data-formula-editor-argument="argument.index"
-              @change="onArgumentInput(argument.index, $event)"
-            />
-          </label>
-        </div>
-      </section>
+        </section>
+      </div>
+
+      <div class="formula-editor-dialog__result">
+        <span>{{ t("formulaTools.formulaEditorPreview") }}</span>
+        <output class="narrow-scrollbar" :aria-label="t('formulaTools.formulaEditorPreview')">{{
+          previewValue || "—"
+        }}</output>
+      </div>
       <p v-if="error || localMessage" class="formula-editor-dialog__error" role="alert">
         {{ error || localMessage }}
       </p>
@@ -369,43 +386,67 @@ watch(
 <style scoped lang="scss">
 .formula-editor-dialog {
   &__content {
-    display: grid;
+    display: flex;
+    flex-direction: column;
+    gap: var(--idea-space-5);
+    min-width: 0;
+    max-height: calc(100dvh - 180px);
+  }
+
+  &__heading,
+  &__context,
+  &__section-heading {
+    display: flex;
+    align-items: center;
     gap: var(--idea-space-4);
     min-width: 0;
   }
 
-  &__context,
-  &__editor-heading {
-    display: flex;
-    align-items: center;
-    gap: var(--idea-space-2);
+  &__heading {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    flex: none;
   }
 
   &__context {
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-
-    strong {
-      color: var(--idea-text-primary);
-      font-weight: var(--idea-font-weight-medium);
-    }
-  }
-
-  &__editor {
-    display: grid;
-    gap: var(--idea-space-2);
-  }
-
-  &__editor-heading {
-    justify-content: space-between;
+    flex-wrap: wrap;
 
     label {
       font-weight: var(--idea-font-weight-medium);
     }
   }
 
+  &__target {
+    min-width: 0;
+    color: var(--idea-text-secondary);
+    font-size: var(--idea-font-size-body-small);
+    overflow-wrap: anywhere;
+
+    strong {
+      margin-inline-start: var(--idea-space-2);
+      color: var(--idea-text-primary);
+      font-weight: var(--idea-font-weight-medium);
+    }
+  }
+
+  &__body {
+    display: grid;
+    align-content: start;
+    gap: var(--idea-space-6);
+    min-height: 0;
+    overflow: auto;
+  }
+
+  &__editor,
+  &__arguments {
+    display: grid;
+    gap: var(--idea-space-4);
+    min-width: 0;
+  }
+
   &__textarea-wrap {
     position: relative;
+    min-width: 0;
   }
 
   &__hint,
@@ -416,66 +457,82 @@ watch(
     line-height: var(--idea-line-height-body-small);
   }
 
-  &__details {
-    display: grid;
-    grid-template-columns: minmax(160px, 0.4fr) minmax(0, 1fr);
-    border: 1px solid var(--idea-border-control);
+  &__section-heading {
+    font-size: var(--idea-font-size-body-small);
+    color: var(--idea-text-secondary);
 
-    > div {
-      display: grid;
-      align-content: start;
-      gap: var(--idea-space-1);
-      min-height: 76px;
-      padding: var(--idea-space-3);
-    }
-
-    > div + div {
-      border-inline-start: 1px solid var(--idea-border-control);
-    }
-
-    span {
-      color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-body-small);
-    }
-
-    output,
     strong {
-      overflow-wrap: anywhere;
-    }
-  }
-
-  &__argument {
-    color: var(--idea-text-primary) !important;
-  }
-
-  &__arguments {
-    display: grid;
-    gap: var(--idea-space-2);
-    padding: var(--idea-space-3);
-    background: var(--idea-surface-secondary);
-    border: 1px solid var(--idea-border-control);
-
-    > span {
-      font-size: var(--idea-font-size-body-small);
       font-weight: var(--idea-font-weight-medium);
+      color: var(--idea-text-primary);
     }
   }
 
   &__argument-fields {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--idea-space-3);
+    gap: var(--idea-space-4);
 
     label {
       display: grid;
-      gap: var(--idea-space-1);
+      grid-template-columns: minmax(80px, 128px) minmax(0, 1fr);
+      align-items: center;
+      gap: var(--idea-space-5);
       min-width: 0;
+
+      > span {
+        color: var(--idea-text-secondary);
+        text-align: right;
+        overflow-wrap: anywhere;
+      }
+    }
+  }
+
+  &__details {
+    display: grid;
+    gap: var(--idea-space-2);
+    min-width: 0;
+    overflow-wrap: anywhere;
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: inherit;
+    }
+
+    .formula-editor-dialog__argument {
+      color: var(--idea-text-primary);
+    }
+  }
+
+  &__signature {
+    color: var(--idea-text-primary);
+  }
+
+  &__result {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--idea-space-5);
+    flex: none;
+    padding-top: var(--idea-space-5);
+    border-top: 1px solid var(--idea-border-control);
+
+    > span {
       color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-body-small);
+    }
+
+    output {
+      max-height: 84px;
+      overflow: auto;
+      font-size: var(--idea-font-size-body-large);
+      line-height: var(--idea-line-height-body-large);
+      font-weight: var(--idea-font-weight-medium);
+      color: var(--idea-text-primary);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
   }
 
   &__error {
+    flex: none;
     margin: 0;
     color: var(--idea-text-danger);
     font-size: var(--idea-font-size-body-small);
@@ -483,17 +540,13 @@ watch(
 }
 
 @media (max-width: 560px) {
-  .formula-editor-dialog__details {
-    grid-template-columns: 1fr;
+  .formula-editor-dialog__argument-fields label {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--idea-space-2);
 
-    > div + div {
-      border-top: 1px solid var(--idea-border-control);
-      border-inline-start: 0;
+    > span {
+      text-align: start;
     }
-  }
-
-  .formula-editor-dialog__argument-fields {
-    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -33,8 +33,11 @@ export const formulaToolsEnUS = {
     formulaEditorTarget: "Target cell",
     formulaEditorInput: "Formula",
     formulaEditorPreview: "Result",
+    formulaEditorArguments: "Function arguments",
+    formulaEditorFunctionHelp: "Function help",
     formulaEditorCurrentFunction: "Current function",
-    formulaEditorNoFunction: "Select a function in the formula to view its details",
+    formulaEditorNoFunction:
+      "Edit the formula directly, or choose a function to view its syntax and arguments.",
     formulaEditorEditFunction: "Choose function",
     formulaEditorConfirmHint: "Press Ctrl+Enter to apply; Enter inserts a line break",
     formulaEditorInsertUnavailable: "Place the cursor where a function can be inserted.",

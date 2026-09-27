@@ -27,6 +27,8 @@ export type FormulaToolsMessageSchema = {
     formulaEditorTarget: string;
     formulaEditorInput: string;
     formulaEditorPreview: string;
+    formulaEditorArguments: string;
+    formulaEditorFunctionHelp: string;
     formulaEditorCurrentFunction: string;
     formulaEditorNoFunction: string;
     formulaEditorEditFunction: string;
