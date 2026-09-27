@@ -93,6 +93,7 @@ function onTableKeydown(event: KeyboardEvent): void {
         table-layout="fixed"
         height="180"
         hover
+        resizable
         :empty="t('navigation.findNoMatches')"
         @row-click="selectRow"
         @keydown="onTableKeydown"
