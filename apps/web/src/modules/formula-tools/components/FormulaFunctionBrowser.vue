@@ -232,7 +232,6 @@ function onKeydown(event: KeyboardEvent): void {
     text-align: center;
   }
   &__details {
-    min-height: 76px;
     max-height: 120px;
     overflow: auto;
     p {
