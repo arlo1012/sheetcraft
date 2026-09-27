@@ -29,7 +29,8 @@ describe("WorkbookFormulaBar", () => {
     expect(wrapper.get("[data-formula-input]").element).toBeInstanceOf(HTMLTextAreaElement);
     expect(wrapper.find("[data-search-input]").exists()).toBe(false);
     expect(wrapper.get("[data-search-trigger]").attributes("aria-label")).toBe("在工作表中查找");
-    expect(wrapper.get(".workbook-formula-bar__fx").attributes("aria-hidden")).toBe("true");
+    expect(wrapper.get(".workbook-formula-bar__fx").attributes("role")).toBe("button");
+    expect(wrapper.get(".workbook-formula-bar__fx").attributes("aria-haspopup")).toBe("dialog");
   });
 
   test("normalizes address navigation and restores the selected address", async () => {

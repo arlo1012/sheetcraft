@@ -1,6 +1,7 @@
 import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
 import {
   computed,
+  nextTick,
   onScopeDispose,
   reactive,
   readonly,
@@ -80,7 +81,7 @@ import {
 import { validateDuplicateEntries } from "@idea10/core/duplicate-values";
 import { WorkbookDomainError } from "@idea10/core/errors";
 import type { IdFactory } from "@idea10/core/runtime";
-import { findCellByText, type SheetSearchDirection } from "@idea10/core/search";
+import { useWorkbookFindController } from "../../modules/workbook/composables/useWorkbookFindController";
 import { getSelectionSummary } from "@idea10/core/selection-summary";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import {
@@ -203,7 +204,6 @@ export function useSpreadsheetWorkspaceController(
   const calculationVersion = ref(0);
   const workbookGeneration = ref(0);
   const selectionDragging = ref(false);
-  const searchQuery = ref("");
   const formatPainterSource = ref<FormatPainterSource>();
   const workspaceStatus = ref<FeedbackState>();
   let workspaceStatusTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1317,7 +1317,7 @@ export function useSpreadsheetWorkspaceController(
     calculation = createWorkbookCalculationSession(session.workbook);
     session.history = createWorkbookHistory(session.history.maxEntries);
     viewStates.clear();
-    searchQuery.value = "";
+    workbookFind.reset();
     formatPainterSource.value = undefined;
     clearWorkspaceStatus();
     workbookGeneration.value += 1;
@@ -1364,33 +1364,28 @@ export function useSpreadsheetWorkspaceController(
     });
   }
 
-  function updateSearchQuery(query: string): void {
-    searchQuery.value = query;
-    clearWorkspaceStatus();
-  }
-
-  function findCell(direction: SheetSearchDirection): void {
-    if (!searchQuery.value.trim()) {
-      showWorkspaceStatus({ key: "workspace.enterSearchTerm" });
-      return;
-    }
-    const match = findCellByText(
-      activeSheet.value,
-      searchQuery.value,
-      activeAddress.value,
-      direction,
-      activeSheetEvaluator.value,
-    );
-    if (!match) {
-      showWorkspaceStatus({ key: "workspace.noMatches" });
-      return;
-    }
-    gridRef.value?.navigateToCell(match);
-    showWorkspaceStatus({
-      key: "workspace.found",
-      params: { address: formatCellAddress(match) },
-    });
-  }
+  const workbookFind = useWorkbookFindController({
+    getWorkbook: () => session.workbook,
+    getRevision: () => [workbookVersion.value, calculationVersion.value],
+    getAddress: () => activeAddress.value,
+    getEvaluator: (sheetId) => calculation.getEvaluator(sheetId),
+    navigate: (result) => {
+      if (result.sheetId === activeSheet.value.id) {
+        gridRef.value?.navigateToCell(result.address);
+        return;
+      }
+      selectSheet(result.sheetId);
+      const generation = workbookGeneration.value;
+      void nextTick(() => {
+        if (generation === workbookGeneration.value && activeSheet.value.id === result.sheetId)
+          gridRef.value?.navigateToCell(result.address);
+      });
+    },
+    feedback: (feedback) => (feedback ? showWorkspaceStatus(feedback) : clearWorkspaceStatus()),
+  });
+  const searchQuery = workbookFind.query;
+  const updateSearchQuery = workbookFind.updateQuery;
+  const findCell = workbookFind.find;
 
   function undo(): boolean {
     const command = session.history.undoStack.at(-1)?.command;
@@ -1459,6 +1454,7 @@ export function useSpreadsheetWorkspaceController(
     handleFormulaReferenceKeydown,
     viewStates,
     searchQuery,
+    workbookFind,
     t,
     activeSheet,
     sheets,

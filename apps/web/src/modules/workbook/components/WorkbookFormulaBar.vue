@@ -53,7 +53,7 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 const formulaInput = ref<HTMLTextAreaElement>();
-const searchTrigger = ref<InstanceType<typeof Search>>();
+const formulaBarRoot = ref<HTMLDivElement>();
 const expanded = ref(false);
 
 function openInsertFunction(): void {
@@ -345,7 +345,8 @@ function focusInput(options: { preserveSelection?: boolean }): void {
 }
 
 defineExpose({
-  focusSearch: () => searchTrigger.value?.$el.focus(),
+  focusSearch: () =>
+    formulaBarRoot.value?.querySelector<SVGSVGElement>("[data-search-trigger]")?.focus(),
   flushPendingEdit,
   hasPendingEdit,
   focus,
@@ -376,6 +377,7 @@ defineExpose({
 
 <template>
   <div
+    ref="formulaBarRoot"
     class="workbook-formula-bar"
     role="group"
     :aria-label="t('formulaBar.label')"
@@ -516,7 +518,6 @@ defineExpose({
     </div>
     <span class="workbook-formula-bar__search-divider" aria-hidden="true" />
     <Search
-      ref="searchTrigger"
       class="workbook-formula-bar__action workbook-formula-bar__search-trigger"
       :size="15"
       role="button"

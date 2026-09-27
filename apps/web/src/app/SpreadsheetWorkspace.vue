@@ -70,6 +70,19 @@ import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
 import SheetHorizontalScrollbar from "../modules/sheet-grid/components/SheetHorizontalScrollbar.vue";
 import type { SheetHorizontalScrollState } from "../modules/sheet-grid/horizontal-scroll";
 import WorkbookFormulaBar from "../modules/workbook/components/WorkbookFormulaBar.vue";
+import {
+  applyFindFormatChange,
+  buildFindFormatFromCell,
+  createFindFormatDraft,
+} from "../modules/workbook/workbook-find-format";
+import type {
+  WorkbookFindFormatMode,
+  WorkbookFindResult,
+} from "../modules/workbook/workbook-find-types";
+import {
+  formatRangeReference,
+  resolveRangeReference,
+} from "../shared/range-reference/formatRangeReference";
 import WorkbookFindDialog from "../modules/workbook/components/WorkbookFindDialog.vue";
 import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.vue";
 import {
@@ -135,6 +148,7 @@ const {
   fitSelectionToViewport,
   handleFormulaReferenceKeydown,
   searchQuery,
+  workbookFind,
   t,
   activeSheet,
   sheets,
@@ -201,7 +215,6 @@ const {
   navigateToAddress,
   traverseFromFormulaBar,
   updateSearchQuery,
-  findCell,
   undo,
   redo,
   setGridNavigator,
@@ -640,6 +653,74 @@ const {
   comparisonError,
   comparisonColumns,
 } = dataTools;
+const {
+  options: findOptions,
+  results: findResults,
+  resultCount: findResultCount,
+  hasSearchedAll: findHasSearchedAll,
+  status: findStatus,
+  formatSummary: findFormatSummary,
+} = workbookFind;
+const findFormatDraft = shallowRef<ReturnType<typeof createFindFormatDraft>>();
+const findFormatPicker = useRangeReferencePicker(() => activeSheet.value.name, {
+  singleCell: true,
+});
+const { active: pickingFindFormat, reference: pickedFindFormatReference } = findFormatPicker;
+function runFind(direction: "forward" | "backward"): void {
+  if (cellEditSession.finish()) workbookFind.find(direction);
+}
+function runFindAll(): void {
+  if (cellEditSession.finish()) workbookFind.findAll();
+}
+function selectFindResult(result: WorkbookFindResult): void {
+  if (cellEditSession.finish()) workbookFind.selectResult(result);
+}
+function configureFindFormat(): void {
+  if (!cellEditSession.finish()) return;
+  findFormatDraft.value = createFindFormatDraft(workbookFind.format.value);
+}
+function confirmFindFormat(change: CellFormatChange): void {
+  workbookFind.setFormat(applyFindFormatChange(workbookFind.format.value, change));
+  findFormatDraft.value = undefined;
+}
+async function pickFindFormat(mode: WorkbookFindFormatMode): Promise<void> {
+  if (!cellEditSession.finish()) return;
+  const workbook = session.workbook;
+  const generation = workbookGeneration.value;
+  const sheetId = activeSheet.value.id;
+  const selected = await findFormatPicker.selectReference(
+    formatRangeReference(activeSheet.value.name, {
+      start: activeAddress.value,
+      end: activeAddress.value,
+    }),
+  );
+  if (
+    !selected ||
+    workbook !== session.workbook ||
+    generation !== workbookGeneration.value ||
+    !findDialogVisible.value
+  )
+    return;
+  const target = resolveRangeReference(workbook, selected, sheetId);
+  if (!target) return;
+  const sheet = workbook.sheets.get(target.sheetId);
+  if (!sheet) return;
+  const address = target.range.start;
+  workbookFind.setFormat(
+    buildFindFormatFromCell(sheet.cells.get(`${address.row}:${address.column}`)?.style, mode),
+    `${sheet.name}!${formatCellAddress(address)}`,
+  );
+}
+watch(findDialogVisible, (visible) => {
+  if (!visible) {
+    findFormatPicker.cancel();
+    findFormatDraft.value = undefined;
+  }
+});
+watch(workbookGeneration, () => {
+  findFormatPicker.cancel();
+  findFormatDraft.value = undefined;
+});
 const simulationRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingSimulationRange, reference: pickedSimulationReference } =
   simulationRangePicker;
@@ -945,6 +1026,7 @@ watch(workbookGeneration, () => {
 const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const activeRangePicker = computed(() => {
+  if (pickingFindFormat.value) return findFormatPicker;
   if (pickingSimulationRange.value) return simulationRangePicker;
   if (pickingProofreadingRange.value) return proofreadingRangePicker;
   if (pickingSplitRange.value) return splitRangePicker;
@@ -1067,6 +1149,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         fileBusy ||
         xlsxBusy ||
         !!cellFormatSelection ||
+        !!findFormatDraft ||
         namesVisible ||
         pickingReferenceRange ||
         dataToolsModalOpen ||
@@ -1588,6 +1671,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         fileBusy ||
         xlsxBusy ||
         !!cellFormatSelection ||
+        !!findFormatDraft ||
         pickingReferenceRange ||
         dataToolsModalOpen ||
         formulaEditorVisible ||
@@ -1636,12 +1720,43 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @close="formulaEditor.close"
     />
     <WorkbookFindDialog
-      :visible="findDialogVisible"
+      :visible="findDialogVisible && !pickingFindFormat && !findFormatDraft"
       :query="searchQuery"
+      :options="findOptions"
+      :results="findResults"
+      :has-searched-all="findHasSearchedAll"
+      :result-count="findResultCount"
+      :status="findStatus"
+      :format-summary="findFormatSummary"
       @update-query="updateSearchQuery"
-      @find="findCell"
+      @update-options="workbookFind.updateOptions"
+      @find="runFind"
+      @find-all="runFindAll"
+      @select-result="selectFindResult"
+      @pick-format="pickFindFormat"
+      @configure-format="configureFindFormat"
+      @clear-format="workbookFind.setFormat()"
       @close="findDialogVisible = false"
       @closed="restoreSearchFocus"
+    />
+    <RangeReferencePicker
+      v-if="pickingFindFormat"
+      :reference="pickedFindFormatReference"
+      :title="t('navigation.findPickFormat')"
+      :hint="t('navigation.findPickFormatHint')"
+      :edit-session-id="cellEditSession.id"
+      @confirm="findFormatPicker.confirm"
+      @cancel="findFormatPicker.cancel"
+    />
+    <CellFormatDialog
+      v-if="findFormatDraft"
+      :state="findFormatDraft.state"
+      :border-state="findFormatDraft.borderState"
+      :border-capabilities="{ innerHorizontal: false, innerVertical: false }"
+      :sample-value="searchQuery || 'Aa'"
+      initial-tab="font"
+      @confirm="confirmFindFormat"
+      @cancel="findFormatDraft = undefined"
     />
     <div
       class="spreadsheet-workspace__grid"
@@ -1651,6 +1766,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         fileBusy ||
         xlsxBusy ||
         !!cellFormatSelection ||
+        !!findFormatDraft ||
         dataToolsModalOpen ||
         formulaEditorVisible ||
         formulaInsertVisible ||
