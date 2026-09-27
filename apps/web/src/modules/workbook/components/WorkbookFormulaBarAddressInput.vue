@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { Input as TInput } from "tdesign-vue-next/es/input";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 
 const props = defineProps<{
   addressLabel: string;
@@ -11,7 +13,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const input = ref<HTMLInputElement>();
+const input = ref<{ blur(): void }>();
 const draft = ref(props.addressLabel);
 const isFocused = ref(false);
 
@@ -28,13 +30,13 @@ function reset(): void {
   draft.value = props.addressLabel;
 }
 
-function onInput(event: Event): void {
-  draft.value = (event.target as HTMLInputElement).value.toUpperCase();
+function onUpdate(value: string | number): void {
+  draft.value = String(value).toUpperCase();
 }
 
-function onFocus(event: FocusEvent): void {
+function onFocus(_value: string | number, context: { e: FocusEvent }): void {
   isFocused.value = true;
-  (event.target as HTMLInputElement).select();
+  (context.e.target as HTMLInputElement).select();
 }
 
 function onBlur(): void {
@@ -48,11 +50,15 @@ function submit(): void {
   input.value?.blur();
 }
 
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    submit();
-  } else if (event.key === "Escape") {
+function onEnter(_value: string | number, context: { e: KeyboardEvent }): void {
+  const { e: event } = context;
+  event.preventDefault();
+  submit();
+}
+
+function onKeydown(_value: string | number, context: { e: KeyboardEvent }): void {
+  const { e: event } = context;
+  if (event.key === "Escape") {
     event.preventDefault();
     reset();
     input.value?.blur();
@@ -68,18 +74,24 @@ function onKeydown(event: KeyboardEvent): void {
   >
     <label class="workbook-formula-bar__field">
       <span class="ui-visually-hidden">{{ t("formulaBar.cellAddress") }}</span>
-      <input
+      <TInput
         ref="input"
         class="workbook-formula-bar__address-input"
         :value="draft"
+        align="center"
         type="text"
         autocomplete="off"
-        :spellcheck="false"
-        :aria-label="t('formulaBar.cellAddress')"
-        data-address-input
-        @input="onInput"
+        :spell-check="false"
+        v-native-control="{
+          attributes: {
+            'aria-label': t('formulaBar.cellAddress'),
+            'data-address-input': '',
+          },
+        }"
+        @update:value="onUpdate"
         @focus="onFocus"
         @blur="onBlur"
+        @enter="onEnter"
         @keydown="onKeydown"
       />
     </label>
@@ -87,8 +99,7 @@ function onKeydown(event: KeyboardEvent): void {
 </template>
 
 <style scoped lang="scss">
-.workbook-formula-bar__address,
-.workbook-formula-bar__field {
+.workbook-formula-bar__address {
   min-width: 0;
   height: 100%;
   margin: 0;
@@ -96,26 +107,12 @@ function onKeydown(event: KeyboardEvent): void {
 
 .workbook-formula-bar__field {
   display: block;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
 }
 
 .workbook-formula-bar__address-input {
   width: 100%;
-  min-width: 0;
-  height: 100%;
-  padding: 0 8px;
-  background: var(--idea-surface-panel);
-  border: 1px solid var(--idea-border-control);
-  border-radius: var(--idea-radius-default);
-  outline: none;
-  color: var(--idea-text-primary);
-  font-size: var(--idea-font-size-body-medium);
-  line-height: var(--idea-line-height-body-medium);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-  text-align: center;
-
-  &:focus {
-    border-color: var(--idea-action-primary);
-  }
 }
 </style>

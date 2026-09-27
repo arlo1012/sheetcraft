@@ -4,6 +4,7 @@ import { Button } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input } from "tdesign-vue-next/es/input";
 import { useAppI18n } from "../../../shared/i18n";
+import { vNativeControl } from "../../../shared/tdesign/native-control";
 
 defineProps<{
   visible: boolean;
@@ -45,7 +46,7 @@ function onKeydown(event: KeyboardEvent): void {
       <Input
         ref="input"
         :value="query"
-        :aria-label="t('navigation.findInSheet')"
+        v-native-control="{ attributes: { 'aria-label': t('navigation.findInSheet') } }"
         :placeholder="t('navigation.findPlaceholder')"
         autocomplete="off"
         :spell-check="false"

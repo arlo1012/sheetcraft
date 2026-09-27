@@ -1735,7 +1735,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
 <style scoped lang="scss">
 .spreadsheet-workspace {
   display: grid;
-  grid-template-rows: auto auto 34px minmax(0, 1fr) 49px;
+  grid-template-rows: auto auto auto minmax(0, 1fr) 49px;
   grid-template-columns: minmax(0, 1fr);
   width: 100%;
   height: 100dvh;
