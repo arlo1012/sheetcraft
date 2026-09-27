@@ -64,7 +64,6 @@ function toggleIssue(id: string, checked: boolean): void {
     :visible="visible && !picking"
     :header="t('proofreading.title')"
     :aria-label="t('proofreading.title')"
-    :footer="false"
     :close-btn="!busy"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
@@ -170,23 +169,24 @@ function toggleIssue(id: string, checked: boolean): void {
           </span>
         </div>
       </div>
-
+    </div>
+    <template #footer>
       <div class="data-proofreading-dialog__footer">
         <span>{{ t("proofreading.selected", { count: safeSelectedCount }) }}</span>
         <div class="data-proofreading-dialog__footer-actions">
+          <TButton theme="default" :disabled="busy" @click="emit('close')">{{
+            t("proofreading.close")
+          }}</TButton>
           <TButton
-            variant="outline"
+            theme="primary"
             :disabled="busy || safeSelectedCount === 0"
             @click="emit('applySelected')"
           >
             {{ t("proofreading.applySelected") }}
           </TButton>
-          <TButton variant="outline" :disabled="busy" @click="emit('close')">{{
-            t("proofreading.close")
-          }}</TButton>
         </div>
       </div>
-    </div>
+    </template>
   </Dialog>
 </template>
 
