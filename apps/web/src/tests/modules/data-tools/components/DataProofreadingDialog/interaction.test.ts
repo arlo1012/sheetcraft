@@ -74,11 +74,28 @@ describe("DataProofreadingDialog", () => {
   test("keeps advisory items out of batch selection and exposes explicit actions", async () => {
     const wrapper = mountDialog({ hasScanned: true, issues });
     const checkboxes = dialog().findAll('input[type="checkbox"]');
-    expect(checkboxes).toHaveLength(2);
-    expect((checkboxes[1]!.element as HTMLInputElement).disabled).toBe(true);
-    await new DOMWrapper(checkboxes[0]!.element).setValue(true);
+    expect(checkboxes).toHaveLength(3);
+    expect((checkboxes[2]!.element as HTMLInputElement).disabled).toBe(true);
+    await new DOMWrapper(checkboxes[1]!.element).setValue(true);
     expect(wrapper.emitted("selectionChange")).toEqual([[[issues[0]!.id]]]);
     expect(dialog().text()).toContain("Apply type");
     expect(dialog().text()).toContain("Ignore type");
+  });
+  test("selects all safe rows, supports partial selection, and clears the selection", async () => {
+    const extra = { ...issues[0]!, id: "sheet:2:0:textNumber", address: "A3" };
+    const wrapper = mountDialog({ hasScanned: true, issues: [...issues, extra] });
+    const checkboxes = () => dialog().findAll('input[type="checkbox"]');
+    const header = () => checkboxes()[0]!;
+    await checkboxes()[1]!.setValue(true);
+    expect(wrapper.emitted("selectionChange")?.at(-1)).toEqual([[issues[0]!.id]]);
+    await wrapper.setProps({ selectedIds: [issues[0]!.id] });
+    expect(dialog().find("thead .t-checkbox").classes()).toContain("t-is-indeterminate");
+    await header().setValue(true);
+    expect(wrapper.emitted("selectionChange")?.at(-1)).toEqual([[issues[0]!.id, extra.id]]);
+    await wrapper.setProps({ selectedIds: [issues[0]!.id, extra.id] });
+    expect((header().element as HTMLInputElement).checked).toBe(true);
+    expect((checkboxes()[2]!.element as HTMLInputElement).disabled).toBe(true);
+    await header().setValue(false);
+    expect(wrapper.emitted("selectionChange")?.at(-1)).toEqual([[]]);
   });
 });

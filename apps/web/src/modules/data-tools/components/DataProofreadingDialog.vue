@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
-import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { BaseTable as TTable } from "tdesign-vue-next/es/table";
-import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
+import { PrimaryTable as TTable } from "tdesign-vue-next/es/table";
+import type { PrimaryTableCol } from "tdesign-vue-next/es/table/type";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type {
@@ -41,8 +40,14 @@ const emit = defineEmits<{
 }>();
 const { t, locale } = useAppI18n();
 const rows = computed(() => [...props.issues]);
-const columns = computed<BaseTableCol<DataProofreadingIssue>[]>(() => [
-  { colKey: "selection", title: "", width: 36, align: "center" },
+const columns = computed<PrimaryTableCol<DataProofreadingIssue>[]>(() => [
+  {
+    colKey: "row-select",
+    type: "multiple",
+    width: 36,
+    align: "center",
+    disabled: ({ row }) => props.busy || !row.safe,
+  },
   { colKey: "type", title: t("proofreading.type"), width: 72 },
   { colKey: "reason", title: t("proofreading.reason"), width: 160, ellipsis: true },
   { colKey: "address", title: t("proofreading.address"), width: 84 },
@@ -53,6 +58,7 @@ const columns = computed<BaseTableCol<DataProofreadingIssue>[]>(() => [
     title: t("proofreading.action"),
     width: locale.value === "zh-CN" ? 240 : 336,
     fixed: "right",
+    align: "center",
   },
 ]);
 
@@ -64,11 +70,13 @@ const safeSelectedCount = computed(
 function updateRange(range: string): void {
   emit("draftChange", { range });
 }
-function toggleIssue(id: string, checked: boolean): void {
-  const next = new Set(props.selectedIds);
-  if (checked) next.add(id);
-  else next.delete(id);
-  emit("selectionChange", [...next]);
+function selectIssues(keys: Array<string | number>): void {
+  if (props.busy) return;
+  const safeIds = new Set(props.issues.filter((issue) => issue.safe).map((issue) => issue.id));
+  emit(
+    "selectionChange",
+    keys.filter((key): key is string => typeof key === "string" && safeIds.has(key)),
+  );
 }
 </script>
 
@@ -116,22 +124,16 @@ function toggleIssue(id: string, checked: boolean): void {
         row-key="id"
         :data="rows"
         :columns="columns"
-        :active-row-keys="[...selectedIds]"
+        :selected-row-keys="[...selectedIds]"
         :bordered="false"
         :aria-label="t('proofreading.title')"
         size="small"
         table-layout="fixed"
+        vertical-align="middle"
         max-height="min(48vh, 440px)"
         hover
+        @select-change="selectIssues"
       >
-        <template #selection="{ row }">
-          <TCheckbox
-            :checked="selected.has(row.id)"
-            :disabled="busy || !row.safe"
-            :aria-label="`${t('proofreading.applySelected')} ${row.address}`"
-            @change="toggleIssue(row.id, Boolean($event))"
-          />
-        </template>
         <template #type="{ row }">
           {{ t(`proofreading.types.${row.type}`) }}
         </template>
@@ -236,6 +238,7 @@ function toggleIssue(id: string, checked: boolean): void {
     color: var(--idea-text-secondary);
   }
   &__actions {
+    justify-content: center;
     flex-wrap: wrap;
     gap: 4px;
   }
