@@ -28,7 +28,29 @@ export const simulationEnUS = {
     relation: "Relation",
     rightSide: "Constraint / cell",
     nonnegative: "Make unspecified variables non-negative",
-    linearOnly: "Method: Linear",
+    method: "Solving method",
+    methodSimplex: "Simplex LP",
+    methodGrg: "GRG Nonlinear",
+    methodEvolutionary: "Evolutionary",
+    methodSimplexHint: "Use for linear formulas and constraints.",
+    methodGrgHint:
+      "Use for smooth nonlinear models with finite bounds. Results can be local and depend on initial values.",
+    methodEvolutionaryHint:
+      "Use for non-smooth models. Set finite lower and upper bounds for every variable; global optimality is not guaranteed.",
+    integerConstraint: "Integer",
+    binaryConstraint: "Binary (0 or 1)",
+    constraintVariableRequired:
+      "Cells in integer or binary constraints must be included as variable cells.",
+    finiteBoundsRequired:
+      "Set finite lower and upper bounds for every variable. Binary variables default to 0 through 1.",
+    localSolution:
+      "A local feasible solution was found. It depends on the initial values and is not guaranteed globally optimal.",
+    heuristicSolution:
+      "Evolutionary search found a feasible solution; global optimality is not guaranteed.",
+    unsupportedModel:
+      "The selected method does not support some formulas or references in this model.",
+    invalidMethod: "Select a valid solving method.",
+    volatileModel: "The model cannot contain random, volatile functions or dynamic references.",
     unsupportedNonlinear: "Only linear formulas and constraints are supported.",
     selectCell: "Select cell",
     solve: "Solve",

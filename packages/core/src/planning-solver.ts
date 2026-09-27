@@ -2,6 +2,7 @@ import solver, { type ModelDefinition, type SolveResult } from "javascript-lp-so
 import { assertFillDataValidation } from "./commands/fill-validation.js";
 import { createBatchSetCellContentsCommand } from "./commands/values.js";
 import { validateDuplicateEntries } from "./duplicate-values.js";
+import { hasVolatileDependency } from "./goal-seek.js";
 import {
   evaluateFormulaAst,
   getFormulaAst,
@@ -20,6 +21,9 @@ import {
   type Workbook,
 } from "./workbook.js";
 import type { WorkbookCommand } from "./commands/contracts.js";
+import { solveGrg } from "./planning-grg.js";
+import { solveMixedGrg } from "./planning-grg-discrete.js";
+import { solveEvolutionary } from "./planning-evolutionary.js";
 
 const MAX_VARIABLES = 50;
 const MAX_CONSTRAINTS = 200;
@@ -30,6 +34,8 @@ const EPSILON = 1e-8;
 export type PlanningCellRef = Readonly<{ sheetId: string; address: CellAddress }>;
 export type PlanningVariableKind = "continuous" | "integer" | "binary";
 export type PlanningDirection = "maximize" | "minimize" | "target";
+/** Solver engines corresponding to the familiar Excel/WPS Solver choices. */
+export type PlanningMethod = "simplex" | "grg" | "evolutionary";
 export type PlanningRelation = "lte" | "gte" | "eq";
 export type PlanningVariable = Readonly<{
   cell: PlanningCellRef;
@@ -49,6 +55,8 @@ export type PlanningRequest = Readonly<{
   variables: readonly PlanningVariable[];
   constraints: readonly PlanningConstraint[];
   timeLimitMs?: number;
+  /** Defaults to Simplex LP to preserve existing workbooks. */
+  method?: PlanningMethod;
 }>;
 export type PlanningChange = Readonly<{ sheetId: string; address: CellAddress; value: number }>;
 export type PlanningDiagnostic = Readonly<{
@@ -545,6 +553,8 @@ function buildModel(workbook: Workbook, request: PlanningRequest): BuiltModel {
     variables,
     direction: request.direction,
     targetValue: request.targetValue,
+    method: request.method ?? "simplex",
+    workbook: workbookPlanningSignature(workbook),
   });
   return { variables, objective, constraints, signature };
 }
@@ -554,6 +564,182 @@ function affineSerializable(value: Affine) {
     constant: value.constant,
     coefficients: [...value.coefficients].sort(([a], [b]) => a - b),
   };
+}
+
+type NonlinearModel = Readonly<{
+  variables: readonly PlanningVariable[];
+  signature: string;
+}>;
+
+/** A conservative whole-workbook fingerprint. It makes stale nonlinear plans fail closed. */
+function workbookPlanningSignature(workbook: Workbook): unknown {
+  return [...workbook.sheets.values()]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map((sheet) => ({
+      id: sheet.id,
+      protected: sheet.properties.protected,
+      merges: sheet.mergedCells,
+      cells: [...sheet.cells.entries()].sort(([left], [right]) => left.localeCompare(right)),
+    }));
+}
+
+function buildNonlinearModel(workbook: Workbook, request: PlanningRequest): NonlinearModel {
+  if (!Array.isArray(request.variables) || !request.variables.length)
+    throw new PlanningFailure("invalid", "Planning requires at least one changing cell.");
+  if (request.variables.length > MAX_VARIABLES)
+    throw new PlanningFailure(
+      "limit",
+      `Planning supports at most ${MAX_VARIABLES} changing cells.`,
+    );
+  if (!Array.isArray(request.constraints) || request.constraints.length > MAX_CONSTRAINTS)
+    throw new PlanningFailure("limit", `Planning supports at most ${MAX_CONSTRAINTS} constraints.`);
+  if (!["maximize", "minimize", "target"].includes(request.direction))
+    throw new PlanningFailure("invalid", "Planning direction is invalid.");
+  if (request.direction === "target" && !Number.isFinite(request.targetValue))
+    throw new PlanningFailure("invalid", "A target value is required for target planning.");
+  if (
+    request.timeLimitMs !== undefined &&
+    (!Number.isFinite(request.timeLimitMs) || request.timeLimitMs <= 0)
+  )
+    throw new PlanningFailure("invalid", "Planning time limit must be finite.");
+  const variables = request.variables.map((variable) => ({
+    ...variable,
+    cell: cloneReference(variable.cell),
+  }));
+  const spillKeys = spillProjectionKeys(workbook);
+  const seen = new Set<string>();
+  for (const variable of variables) {
+    const sheet = assertReference(workbook, variable.cell);
+    if (!["continuous", "integer", "binary"].includes(variable.kind))
+      throw new PlanningFailure("invalid", "A planning variable kind is invalid.", variable.cell);
+    if (
+      (variable.lower !== undefined && !Number.isFinite(variable.lower)) ||
+      (variable.upper !== undefined && !Number.isFinite(variable.upper)) ||
+      (variable.lower !== undefined &&
+        variable.upper !== undefined &&
+        variable.lower > variable.upper)
+    )
+      throw new PlanningFailure("invalid", "A planning variable bound is invalid.", variable.cell);
+    if (
+      variable.kind === "binary" &&
+      ((variable.lower !== undefined && variable.lower < 0) ||
+        (variable.upper !== undefined && variable.upper > 1))
+    )
+      throw new PlanningFailure(
+        "invalid",
+        "Binary variables must remain between zero and one.",
+        variable.cell,
+      );
+    if (sheet.properties.protected)
+      throw new PlanningFailure(
+        "invalid",
+        "A changing cell is on a protected sheet.",
+        variable.cell,
+      );
+    if (sheet.mergedCells.some((range) => contains(range, variable.cell.address)))
+      throw new PlanningFailure("invalid", "A changing cell cannot be merged.", variable.cell);
+    if (spillKeys.has(keyOf(variable.cell)))
+      throw new PlanningFailure(
+        "invalid",
+        "A changing cell cannot be a spill result.",
+        variable.cell,
+      );
+    const content = sheet.cells.get(createCellKey(variable.cell.address))?.content;
+    if (content?.kind === "formula")
+      throw new PlanningFailure(
+        "invalid",
+        "A changing cell cannot contain a formula.",
+        variable.cell,
+      );
+    if (
+      content &&
+      (content.kind !== "literal" ||
+        typeof content.value !== "number" ||
+        !Number.isFinite(content.value))
+    )
+      throw new PlanningFailure(
+        "invalid",
+        "A changing cell must contain a finite number or be blank.",
+        variable.cell,
+      );
+    if (seen.has(keyOf(variable.cell)))
+      throw new PlanningFailure("invalid", "Changing cells must be unique.", variable.cell);
+    seen.add(keyOf(variable.cell));
+  }
+  const checked = [
+    request.objective,
+    ...request.constraints.flatMap((constraint) => [
+      constraint.left,
+      ...(typeof constraint.right === "number" ? [] : [constraint.right]),
+    ]),
+  ];
+  for (const reference of checked) {
+    assertReference(workbook, reference);
+    if (hasVolatileDependency(workbook, reference))
+      throw new PlanningFailure(
+        "unsupported",
+        "Planning cannot optimize volatile or dynamic formulas.",
+        reference,
+      );
+  }
+  for (const constraint of request.constraints)
+    if (!["lte", "gte", "eq"].includes(constraint.relation))
+      throw new PlanningFailure("invalid", "A planning relation is invalid.", constraint.left);
+  return {
+    variables,
+    signature: stable({
+      request: { ...request, method: request.method ?? "simplex" },
+      workbook: workbookPlanningSignature(workbook),
+    }),
+  };
+}
+
+type NonlinearEvaluation = Readonly<{ objective: number; residuals: readonly number[] }>;
+
+/** Evaluates a candidate in a detached workbook, leaving the user workbook untouched. */
+function evaluateNonlinearWorkbook(
+  workbook: Workbook,
+  request: PlanningRequest,
+  changes: readonly PlanningChange[],
+): NonlinearEvaluation | undefined {
+  const sheets = new Map(workbook.sheets);
+  const copies = new Map<string, Sheet>();
+  for (const change of changes) {
+    const source = workbook.sheets.get(change.sheetId);
+    if (!source || !Number.isFinite(change.value)) return undefined;
+    let copy = copies.get(change.sheetId);
+    if (!copy) {
+      copy = { ...source, cells: new Map(source.cells) };
+      copies.set(change.sheetId, copy);
+      sheets.set(copy.id, copy);
+    }
+    setCellContent(copy, change.address, { kind: "literal", value: change.value });
+  }
+  const shadow: Workbook = { ...workbook, sheets };
+  const values = new Map<string, number>();
+  const numeric = (reference: PlanningCellRef): number | undefined => {
+    const cached = values.get(keyOf(reference));
+    if (cached !== undefined) return cached;
+    const value = createWorkbookEvaluator(shadow, reference.sheetId).getComputedValue(
+      reference.address,
+    );
+    if (typeof value !== "number" || !Number.isFinite(value) || isFormulaError(value))
+      return undefined;
+    values.set(keyOf(reference), value);
+    return value;
+  };
+  const objective = numeric(request.objective);
+  if (objective === undefined) return undefined;
+  const residuals: number[] = [];
+  for (const constraint of request.constraints) {
+    const left = numeric(constraint.left);
+    const right =
+      typeof constraint.right === "number" ? constraint.right : numeric(constraint.right);
+    if (left === undefined || right === undefined || !Number.isFinite(right)) return undefined;
+    residuals.push(constraint.relation === "gte" ? right - left : left - right);
+  }
+  if (request.direction === "target") residuals.push(objective - request.targetValue!);
+  return { objective, residuals };
 }
 
 function failure(error: unknown): PlanningResult {
@@ -670,7 +856,7 @@ function actualWorkbookViolation(
 }
 
 /** Solves only formulas that can be proven affine in the declared changing cells. */
-export function solvePlanning(workbook: Workbook, request: PlanningRequest): PlanningResult {
+function solveSimplexPlanning(workbook: Workbook, request: PlanningRequest): PlanningResult {
   let built: BuiltModel;
   try {
     built = buildModel(workbook, request);
@@ -811,6 +997,221 @@ export function solvePlanning(workbook: Workbook, request: PlanningRequest): Pla
   };
 }
 
+function nonlinearViolation(
+  workbook: Workbook,
+  request: PlanningRequest,
+  built: NonlinearModel,
+  changes: readonly PlanningChange[],
+): string | undefined {
+  if (changes.length !== built.variables.length) return "Planning returned an incomplete solution.";
+  for (const [index, variable] of built.variables.entries()) {
+    const change = changes[index]!;
+    if (keyOf(change) !== keyOf(variable.cell) || !Number.isFinite(change.value))
+      return "Planning returned an invalid changing-cell value.";
+    if (variable.lower !== undefined && change.value < variable.lower - EPSILON)
+      return "The solver returned a value below its lower bound.";
+    if (variable.upper !== undefined && change.value > variable.upper + EPSILON)
+      return "The solver returned a value above its upper bound.";
+    if (
+      variable.kind !== "continuous" &&
+      Math.abs(change.value - Math.round(change.value)) > EPSILON
+    )
+      return "The solver returned a fractional discrete value.";
+    if (variable.kind === "binary" && (change.value < -EPSILON || change.value > 1 + EPSILON))
+      return "The solver returned a non-binary value.";
+  }
+  const evaluated = evaluateNonlinearWorkbook(workbook, request, changes);
+  if (!evaluated) return "The workbook does not recalculate to finite numeric planning values.";
+  for (const [index, constraint] of request.constraints.entries()) {
+    const residual = evaluated.residuals[index]!;
+    if (
+      (constraint.relation === "eq" && Math.abs(residual) > 1e-6) ||
+      (constraint.relation !== "eq" && residual > 1e-6)
+    )
+      return "The recalculated workbook does not satisfy every planning constraint.";
+  }
+  if (request.direction === "target" && Math.abs(evaluated.objective - request.targetValue!) > 1e-6)
+    return "The recalculated workbook does not reach the requested target.";
+  return undefined;
+}
+
+function solveNonlinearPlanning(
+  workbook: Workbook,
+  request: PlanningRequest,
+  method: "grg" | "evolutionary",
+): PlanningResult {
+  let built: NonlinearModel;
+  try {
+    built = buildNonlinearModel(workbook, request);
+  } catch (error) {
+    return failure(error);
+  }
+  const limit = Math.min(MAX_SOLVE_TIME_MS, Math.max(1, request.timeLimitMs ?? MAX_SOLVE_TIME_MS));
+  const deadlineMs = Date.now() + limit;
+  const initial = built.variables.map((variable) => {
+    const content = workbook.sheets
+      .get(variable.cell.sheetId)!
+      .cells.get(createCellKey(variable.cell.address))?.content;
+    return content?.kind === "literal" ? (content.value as number) : 0;
+  });
+  const bounds = built.variables.map((variable, index) => ({
+    lower:
+      variable.kind === "binary"
+        ? Math.max(0, variable.lower ?? 0)
+        : (variable.lower ?? -1_000_000),
+    upper:
+      variable.kind === "binary" ? Math.min(1, variable.upper ?? 1) : (variable.upper ?? 1_000_000),
+    kind: variable.kind,
+    initial: initial[index]!,
+  }));
+  if (
+    (method === "evolutionary" || method === "grg") &&
+    built.variables.some(
+      (variable) =>
+        variable.kind !== "binary" &&
+        (variable.lower === undefined || variable.upper === undefined),
+    )
+  )
+    return {
+      status: "invalid",
+      changes: [],
+      modelSignature: built.signature,
+      diagnostics: [
+        {
+          code: "finite-bounds-required",
+          message: `${method === "grg" ? "GRG Nonlinear" : "Evolutionary"} solving requires a finite lower and upper bound for every changing cell.`,
+        },
+      ],
+    };
+  const changesAt = (point: readonly number[]): PlanningChange[] =>
+    built.variables.map((variable, index) => ({
+      sheetId: variable.cell.sheetId,
+      address: cloneAddress(variable.cell.address),
+      value: point[index]!,
+    }));
+  const evaluate = (point: readonly number[]) => {
+    const actual = evaluateNonlinearWorkbook(workbook, request, changesAt(point));
+    if (!actual)
+      return { objective: Number.MAX_VALUE, equalities: [Number.MAX_VALUE], inequalities: [] };
+    const equalities: number[] = [];
+    const inequalities: number[] = [];
+    for (const [index, constraint] of request.constraints.entries())
+      (constraint.relation === "eq" ? equalities : inequalities).push(actual.residuals[index]!);
+    if (request.direction === "target") equalities.push(actual.objective - request.targetValue!);
+    return {
+      objective:
+        request.direction === "maximize"
+          ? -actual.objective
+          : request.direction === "target"
+            ? (actual.objective - request.targetValue!) ** 2
+            : actual.objective,
+      equalities,
+      inequalities,
+    };
+  };
+  const started = Date.now();
+  const grgModel = {
+    bounds: bounds.map(({ lower, upper }) => ({ lower, upper })),
+    initial,
+    evaluate,
+  };
+  const raw =
+    method === "grg"
+      ? built.variables.some((variable) => variable.kind !== "continuous")
+        ? solveMixedGrg(
+            grgModel,
+            built.variables.map((variable) => variable.kind),
+            { deadlineMs },
+          )
+        : solveGrg(grgModel, { deadlineMs })
+      : undefined;
+  const evolutionary =
+    method === "evolutionary"
+      ? solveEvolutionary(
+          {
+            bounds: bounds.map(({ lower, upper, kind }) => ({ lower, upper, kind })),
+            initial,
+            evaluate,
+          },
+          { deadlineMs },
+        )
+      : undefined;
+  const elapsedMs = Date.now() - started;
+  const status = raw?.status ?? evolutionary!.status;
+  const point = raw?.point ?? evolutionary?.vector;
+  if (!point || status === "error")
+    return {
+      status: status === "error" ? "error" : status === "infeasible" ? "infeasible" : "limit",
+      changes: [],
+      elapsedMs,
+      modelSignature: built.signature,
+      diagnostics:
+        status === "limit"
+          ? [
+              {
+                code: "time-limit",
+                message: "The solver stopped before finding a verified feasible solution.",
+              },
+            ]
+          : [],
+    };
+  const changes = changesAt(
+    point.map((value, index) =>
+      built.variables[index]!.kind === "continuous" ? value : Math.round(value),
+    ),
+  );
+  const violation = nonlinearViolation(workbook, request, built, changes);
+  if (violation)
+    return {
+      status: "error",
+      changes: [],
+      elapsedMs,
+      modelSignature: built.signature,
+      diagnostics: [{ code: "invalid-solution", message: violation }],
+    };
+  const actual = evaluateNonlinearWorkbook(workbook, request, changes)!;
+  return {
+    status: "feasible",
+    changes,
+    objectiveValue: actual.objective,
+    ...(request.direction === "target"
+      ? { targetResidual: actual.objective - request.targetValue! }
+      : {}),
+    elapsedMs,
+    modelSignature: built.signature,
+    diagnostics:
+      status === "limit"
+        ? [
+            {
+              code: "time-limit",
+              message: "The solver reached its time limit after finding a feasible solution.",
+            },
+          ]
+        : [
+            {
+              code: method === "grg" ? "local-solution" : "heuristic-solution",
+              message:
+                method === "grg"
+                  ? "GRG found a locally feasible solution; global optimality is not proven."
+                  : "Evolutionary solving found a feasible solution; global optimality is not proven.",
+            },
+          ],
+  };
+}
+
+/** Dispatches to Simplex LP, GRG Nonlinear, or Evolutionary Solver. */
+export function solvePlanning(workbook: Workbook, request: PlanningRequest): PlanningResult {
+  const method = request.method ?? "simplex";
+  if (method === "simplex") return solveSimplexPlanning(workbook, request);
+  if (method === "grg" || method === "evolutionary")
+    return solveNonlinearPlanning(workbook, request, method);
+  return {
+    status: "invalid",
+    changes: [],
+    diagnostics: [{ code: "invalid-method", message: "Planning method is invalid." }],
+  };
+}
+
 /** Revalidates a detached solution and creates one undoable, checked final write. */
 export function createApplyPlanningCommand(
   workbook: Workbook,
@@ -823,9 +1224,12 @@ export function createApplyPlanningCommand(
       reason: "not-solved",
       message: "Planning did not produce an applicable solution.",
     };
-  let built: BuiltModel;
+  let built: BuiltModel | NonlinearModel;
   try {
-    built = buildModel(workbook, request);
+    built =
+      (request.method ?? "simplex") === "simplex"
+        ? buildModel(workbook, request)
+        : buildNonlinearModel(workbook, request);
   } catch {
     return {
       ok: false,
@@ -883,9 +1287,15 @@ export function createApplyPlanningCommand(
         message: "Planning returned an invalid binary value.",
       };
   }
-  const violation = solutionViolation(built, result.changes);
+  const violation =
+    (request.method ?? "simplex") === "simplex"
+      ? solutionViolation(built as BuiltModel, result.changes)
+      : nonlinearViolation(workbook, request, built as NonlinearModel, result.changes);
   if (violation) return { ok: false, reason: "invalid-result", message: violation };
-  const actualViolation = actualWorkbookViolation(workbook, built, request, result.changes);
+  const actualViolation =
+    (request.method ?? "simplex") === "simplex"
+      ? actualWorkbookViolation(workbook, built as BuiltModel, request, result.changes)
+      : undefined;
   if (actualViolation) return { ok: false, reason: "invalid-result", message: actualViolation };
   const changes = result.changes.map((change) => ({
     sheetId: change.sheetId,

@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { Plus, SquareMousePointer, Trash2 } from "lucide-vue-next";
+import { Plus, Trash2 } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
+import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { RangeReferenceSelectionOptions } from "../../../shared/range-reference/useRangeReferencePicker";
 import type { SimulationMessageKey } from "../simulation-messages";
@@ -38,8 +38,8 @@ const emit = defineEmits<{
   apply: [];
   draftChange: [draft: PlanningDraft];
 }>();
-const { t, locale } = useAppI18n();
-const tr = (key: SimulationMessageKey) => t(key as never);
+const { t } = useAppI18n();
+const tr = (key: SimulationMessageKey) => t(key);
 let serial = 0;
 const id = () => `simulation-${++serial}`;
 const blankVariable = (): PlanningVariableDraft => ({
@@ -91,31 +91,18 @@ function removeVariable(index: number) {
 function removeConstraint(index: number) {
   draft.value.constraints.splice(index, 1);
 }
-async function pick(
-  target:
-    | { kind: "objective" }
-    | { kind: "variable"; index: number }
-    | { kind: "constraint"; index: number; side: "left" | "right" },
-) {
-  if (target.kind === "objective") {
-    const result = await props.selectReference?.(draft.value.objective, { singleCell: true });
-    if (result !== undefined) draft.value.objective = result;
-    return;
-  }
-  if (target.kind === "variable") {
-    const item = draft.value.variables[target.index];
-    if (!item) return;
-    const result = await props.selectReference?.(item.cell, { singleCell: false });
-    if (result !== undefined) item.cell = result;
-    return;
-  }
-  const item = draft.value.constraints[target.index];
-  if (!item) return;
-  const current = item[target.side];
-  const result = await props.selectReference?.(current, { singleCell: false });
-  if (result === undefined) return;
-  item[target.side] = result;
-}
+const selectCellReference = computed(() =>
+  props.selectReference
+    ? (current: string) => props.selectReference!(current, { singleCell: true })
+    : undefined,
+);
+const selectRangeReference = computed(() =>
+  props.selectReference
+    ? (current: string) => props.selectReference!(current, { singleCell: false })
+    : undefined,
+);
+const discrete = (relation: PlanningConstraintDraft["relation"]) =>
+  relation === "integer" || relation === "binary";
 const statusLabel = computed(() =>
   props.result
     ? tr(
@@ -127,11 +114,30 @@ function confirm() {
   if (canApply.value) emit("apply");
   else emit("solve", copy(draft.value));
 }
-const numericOptions = [
+const numericOptions = computed(() => [
   { label: tr("simulation.continuous"), value: "continuous" },
   { label: tr("simulation.integer"), value: "integer" },
   { label: tr("simulation.binary"), value: "binary" },
-];
+]);
+const relationOptions = computed(() => [
+  { label: "≤", value: "lte" },
+  { label: "=", value: "eq" },
+  { label: "≥", value: "gte" },
+  { label: `int · ${tr("simulation.integer")}`, value: "integer" },
+  { label: `bin · ${tr("simulation.binary")}`, value: "binary" },
+]);
+const methodOptions = computed(() => [
+  { label: tr("simulation.methodSimplex"), value: "simplex" },
+  { label: tr("simulation.methodGrg"), value: "grg" },
+  { label: tr("simulation.methodEvolutionary"), value: "evolutionary" },
+]);
+const methodHint = computed(() =>
+  draft.value.method === "grg"
+    ? tr("simulation.methodGrgHint")
+    : draft.value.method === "evolutionary"
+      ? tr("simulation.methodEvolutionaryHint")
+      : tr("simulation.methodSimplexHint"),
+);
 </script>
 <template>
   <Dialog
@@ -148,155 +154,174 @@ const numericOptions = [
     :close-btn="!busy"
     @close="emit('close')"
     @confirm="confirm"
-    ><div class="simulation-dialog simulation-dialog--solver">
-      <TForm
-        class="simulation-dialog__form"
-        :data="draft"
-        label-align="right"
-        :label-width="locale === 'zh-CN' ? 84 : 108"
-        ><TFormItem :label="tr('simulation.objective')"
-          ><TInput
+  >
+    <div class="simulation-dialog">
+      <div class="simulation-dialog__fields">
+        <div class="simulation-dialog__field">
+          <span>{{ tr("simulation.objective") }}</span>
+          <RangeReferenceInput
             v-model="draft.objective"
             :disabled="busy"
-            :aria-label="tr('simulation.objective')"
+            :label="tr('simulation.objective')"
             :placeholder="tr('simulation.objective')"
-            ><template #suffix
-              ><TButton
-                variant="text"
-                shape="square"
-                :disabled="busy"
-                :aria-label="tr('simulation.selectCell')"
-                @click="pick({ kind: 'objective' })"
-                ><SquareMousePointer /></TButton></template></TInput></TFormItem
-        ><TFormItem :label="tr('simulation.direction')"
-          ><TRadioGroup v-model="draft.direction" :disabled="busy"
-            ><TRadio value="maximize">{{ tr("simulation.maximize") }}</TRadio
-            ><TRadio value="minimize">{{ tr("simulation.minimize") }}</TRadio
-            ><TRadio value="target">{{ tr("simulation.target") }}</TRadio></TRadioGroup
-          ><TInput
-            v-if="draft.direction === 'target'"
-            v-model="draft.targetValue"
-            class="simulation-dialog__target"
-            :disabled="busy"
-            :aria-label="tr('simulation.targetValue')"
-            :placeholder="tr('simulation.targetValue')"
-            inputmode="decimal" /></TFormItem
-      ></TForm>
-      <section>
+            :pick-label="tr('simulation.selectCell')"
+            :select-reference="selectCellReference"
+          />
+        </div>
+        <div class="simulation-dialog__field">
+          <span>{{ tr("simulation.direction") }}</span>
+          <div class="simulation-dialog__direction">
+            <TRadioGroup
+              v-model="draft.direction"
+              :disabled="busy"
+              :aria-label="tr('simulation.direction')"
+            >
+              <TRadio value="maximize">{{ tr("simulation.maximize") }}</TRadio>
+              <TRadio value="minimize">{{ tr("simulation.minimize") }}</TRadio>
+              <TRadio value="target">{{ tr("simulation.target") }}</TRadio>
+            </TRadioGroup>
+            <TInput
+              v-if="draft.direction === 'target'"
+              v-model="draft.targetValue"
+              class="simulation-dialog__target"
+              :disabled="busy"
+              :aria-label="tr('simulation.targetValue')"
+              :placeholder="tr('simulation.targetValue')"
+              inputmode="decimal"
+            />
+          </div>
+        </div>
+      </div>
+      <section class="simulation-dialog__section" :aria-label="tr('simulation.variables')">
         <div class="simulation-dialog__section-title">
-          <strong>{{ tr("simulation.variables") }}</strong
-          ><TButton
+          <strong>{{ tr("simulation.variables") }}</strong>
+          <TButton
             theme="primary"
             variant="text"
             size="small"
             :disabled="busy"
             @click="draft.variables.push(blankVariable())"
-            ><Plus :size="15" />{{ tr("simulation.addVariable") }}</TButton
           >
+            <Plus class="simulation-dialog__action-icon" />{{ tr("simulation.addVariable") }}
+          </TButton>
         </div>
         <div v-for="(item, index) in draft.variables" :key="item.id" class="simulation-dialog__row">
-          <TInput
+          <RangeReferenceInput
             v-model="item.cell"
             :disabled="busy"
+            :label="tr('simulation.variables')"
             :placeholder="tr('simulation.cell')"
-            :aria-label="tr('simulation.cell')"
-            ><template #suffix
-              ><TButton
-                variant="text"
-                shape="square"
-                :disabled="busy"
-                :aria-label="tr('simulation.selectCell')"
-                @click="pick({ kind: 'variable', index })"
-                ><SquareMousePointer /></TButton></template></TInput
-          ><TSelect
+            :select-reference="selectRangeReference"
+          />
+          <TSelect
             v-model="item.kind"
             :placeholder="tr('simulation.type')"
             :aria-label="tr('simulation.type')"
             :options="numericOptions"
             :disabled="busy"
-          /><TInput
+          />
+          <TInput
             v-model="item.lower"
             :disabled="busy"
             :placeholder="tr('simulation.lowerBound')"
             :aria-label="tr('simulation.lowerBound')"
             inputmode="decimal"
-          /><TInput
+          />
+          <TInput
             v-model="item.upper"
             :disabled="busy"
             :placeholder="tr('simulation.upperBound')"
             :aria-label="tr('simulation.upperBound')"
             inputmode="decimal"
-          /><TButton
+          />
+          <TButton
             variant="text"
             shape="square"
             :disabled="busy"
             :aria-label="tr('simulation.removeVariable')"
             @click="removeVariable(index)"
-            ><Trash2 :size="16"
-          /></TButton>
+          >
+            <Trash2 class="simulation-dialog__action-icon" />
+          </TButton>
         </div>
       </section>
-      <section>
+      <section class="simulation-dialog__section" :aria-label="tr('simulation.constraints')">
         <div class="simulation-dialog__section-title">
-          <strong>{{ tr("simulation.constraints") }}</strong
-          ><TButton
+          <strong>{{ tr("simulation.constraints") }}</strong>
+          <TButton
             theme="primary"
             variant="text"
             size="small"
             :disabled="busy"
             @click="draft.constraints.push(blankConstraint())"
-            ><Plus :size="15" />{{ tr("simulation.addConstraint") }}</TButton
           >
+            <Plus class="simulation-dialog__action-icon" />{{ tr("simulation.addConstraint") }}
+          </TButton>
         </div>
         <div
           v-for="(item, index) in draft.constraints"
           :key="item.id"
           class="simulation-dialog__constraint"
         >
-          <TInput
+          <RangeReferenceInput
             v-model="item.left"
             :disabled="busy"
+            :label="tr('simulation.cell')"
             :placeholder="tr('simulation.cell')"
-            :aria-label="tr('simulation.cell')"
-            ><template #suffix
-              ><TButton
-                variant="text"
-                shape="square"
-                :disabled="busy"
-                :aria-label="tr('simulation.selectCell')"
-                @click="pick({ kind: 'constraint', index, side: 'left' })"
-                ><SquareMousePointer /></TButton></template></TInput
-          ><TSelect
+            :select-reference="selectRangeReference"
+          />
+          <TSelect
             v-model="item.relation"
             :placeholder="tr('simulation.relation')"
             :aria-label="tr('simulation.relation')"
             :disabled="busy"
-            :options="[
-              { label: '≤', value: 'lte' },
-              { label: '≥', value: 'gte' },
-              { label: '=', value: 'eq' },
-            ]"
-          /><TInput
+            :options="relationOptions"
+          />
+          <TInput
+            v-if="discrete(item.relation)"
+            :value="
+              item.relation === 'integer'
+                ? tr('simulation.integerConstraint')
+                : tr('simulation.binaryConstraint')
+            "
+            :aria-label="tr('simulation.rightSide')"
+            disabled
+          />
+          <RangeReferenceInput
+            v-else
             v-model="item.right"
             :disabled="busy"
+            :label="tr('simulation.rightSide')"
             :placeholder="tr('simulation.rightSide')"
-            :aria-label="tr('simulation.rightSide')"
-          /><TButton
+            :select-reference="selectRangeReference"
+          />
+          <TButton
             variant="text"
             shape="square"
             :disabled="busy"
             :aria-label="tr('simulation.removeConstraint')"
             @click="removeConstraint(index)"
-            ><Trash2 :size="16"
-          /></TButton>
+          >
+            <Trash2 class="simulation-dialog__action-icon" />
+          </TButton>
         </div>
       </section>
       <TCheckbox v-model="draft.nonnegative" :disabled="busy">{{
         tr("simulation.nonnegative")
       }}</TCheckbox>
-      <p class="simulation-dialog__hint">
-        {{ tr("simulation.linearOnly") }} · {{ tr("simulation.unsupportedNonlinear") }}
-      </p>
+      <div class="simulation-dialog__method">
+        <div class="simulation-dialog__field">
+          <span>{{ tr("simulation.method") }}</span>
+          <TSelect
+            v-model="draft.method"
+            :disabled="busy"
+            :aria-label="tr('simulation.method')"
+            :placeholder="tr('simulation.method')"
+            :options="methodOptions"
+          />
+        </div>
+        <p class="simulation-dialog__hint">{{ methodHint }}</p>
+      </div>
       <p v-if="error" class="simulation-dialog__error" role="alert">{{ error }}</p>
       <section v-if="result" class="simulation-dialog__result">
         <strong>{{ tr("simulation.result") }} · {{ statusLabel }}</strong>
@@ -323,39 +348,62 @@ const numericOptions = [
 .simulation-dialog {
   display: grid;
   gap: 12px;
-  &--solver {
-    max-height: min(640px, 70vh);
-    overflow: auto;
-    padding-right: 3px;
+  max-height: min(640px, 70vh);
+  overflow: auto;
+
+  &__fields,
+  &__section,
+  &__method {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
   }
-  &__form {
-    margin-bottom: 4px;
+  &__field {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    > span {
+      min-width: 76px;
+    }
+  }
+  &__direction {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
   }
   &__target {
     width: 110px;
-    margin-left: 12px;
   }
   &__section-title {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin: 2px 0 7px;
+    strong {
+      font-weight: 500;
+    }
   }
   &__row,
   &__constraint {
     display: grid;
-    grid-template-columns: minmax(120px, 1fr) 120px minmax(95px, 0.7fr) minmax(95px, 0.7fr) 32px;
+    grid-template-columns: minmax(140px, 1fr) 100px minmax(80px, 0.65fr) minmax(80px, 0.65fr) 28px;
     gap: 8px;
-    margin: 6px 0;
     align-items: center;
+    > * {
+      min-width: 0;
+    }
   }
   &__constraint {
-    grid-template-columns: minmax(140px, 1fr) 82px minmax(140px, 1fr) 32px;
+    grid-template-columns: minmax(140px, 1fr) 110px minmax(140px, 1fr) 28px;
+  }
+  &__action-icon {
+    width: var(--idea-action-icon-size);
+    height: var(--idea-action-icon-size);
   }
   &__hint {
     margin: 0;
     color: var(--idea-text-secondary);
-    font-size: 12px;
   }
   &__error {
     margin: 0;
@@ -381,13 +429,15 @@ const numericOptions = [
   }
 }
 @media (max-width: 600px) {
-  .simulation-dialog__row,
-  .simulation-dialog__constraint {
-    grid-template-columns: 1fr 1fr 32px;
-  }
-  .simulation-dialog__row :nth-child(1),
-  .simulation-dialog__constraint :nth-child(1) {
-    grid-column: span 2;
+  .simulation-dialog {
+    &__row,
+    &__constraint {
+      grid-template-columns: 1fr 1fr 28px;
+    }
+    &__row > :first-child,
+    &__constraint > :first-child {
+      grid-column: span 2;
+    }
   }
 }
 </style>

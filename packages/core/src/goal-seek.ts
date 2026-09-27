@@ -106,7 +106,11 @@ function formulaTokens(expression: FormulaExpression): {
   return { functions, identifiers, axes };
 }
 
-function hasVolatileDependency(workbook: Workbook, target: GoalSeekRequest["target"]): boolean {
+/** Shared deterministic-evaluation guard for workbook optimization tools. */
+export function hasVolatileDependency(
+  workbook: Workbook,
+  target: GoalSeekRequest["target"],
+): boolean {
   const pending = [target];
   const seen = new Set<string>();
   while (pending.length) {

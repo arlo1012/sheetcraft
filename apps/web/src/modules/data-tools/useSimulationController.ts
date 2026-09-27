@@ -46,11 +46,16 @@ type Snapshot = { workbook: Workbook; generation: number; revision: number; shee
 type SolveState =
   | { snapshot: Snapshot; request: GoalSeekRequest; result: GoalSeekResult }
   | { snapshot: Snapshot; request: PlanningRequest; result: PlanningResult };
+type PlanningRequestBuild =
+  | { request: PlanningRequest }
+  | { error: "simulation.invalidReference" | "simulation.constraintVariableRequired" };
+type PlanningVariable = PlanningRequest["variables"][number];
 const EMPTY_GOAL = (): GoalSeekDraft => ({ formulaCell: "", targetValue: "", changingCell: "" });
 let sequence = 0;
 const EMPTY_PLANNING = (): PlanningDraft => ({
   objective: "",
   direction: "maximize",
+  method: "simplex",
   targetValue: "",
   variables: [{ id: `variable-${++sequence}`, cell: "", kind: "continuous", lower: "", upper: "" }],
   constraints: [],
@@ -147,18 +152,23 @@ export function useSimulationController(options: Options) {
     referenceSheetId = undefined;
     void nextTick(options.focusSheet);
   }
-  function planningRequest(draft: PlanningDraft, target: Snapshot): PlanningRequest | undefined {
+  function planningRequest(draft: PlanningDraft, target: Snapshot): PlanningRequestBuild {
     const objective = resolveCell(draft.objective, target);
     const targetValue = draft.direction === "target" ? asNumber(draft.targetValue) : undefined;
-    if (!objective || (draft.direction === "target" && targetValue === undefined)) return undefined;
-    const variables: Array<PlanningRequest["variables"][number]> = [];
+    if (!objective || (draft.direction === "target" && targetValue === undefined))
+      return { error: "simulation.invalidReference" };
+    const variables: PlanningVariable[] = [];
+    const variableIndexes = new Map<string, number>();
     for (const item of draft.variables) {
       const cells = expand(item.cell, target, 50);
       const lower = asOptionalNumber(item.lower);
       const upper = asOptionalNumber(item.upper);
       if (!cells || lower === false || upper === false || variables.length + cells.length > 50)
-        return undefined;
-      for (const cell of cells)
+        return { error: "simulation.invalidReference" };
+      for (const cell of cells) {
+        const key = cellKey(cell);
+        if (variableIndexes.has(key)) return { error: "simulation.invalidReference" };
+        variableIndexes.set(key, variables.length);
         variables.push({
           cell,
           kind: item.kind,
@@ -169,19 +179,24 @@ export function useSimulationController(options: Options) {
               : { lower }),
           ...(upper === undefined ? {} : { upper }),
         });
+      }
     }
-    if (!variables.length) return undefined;
+    if (!variables.length) return { error: "simulation.invalidReference" };
     const constraints: Array<PlanningRequest["constraints"][number]> = [];
     for (const item of draft.constraints) {
-      if (!appendConstraints(constraints, item, target)) return undefined;
+      const error = appendConstraints(constraints, variables, variableIndexes, item, target);
+      if (error) return { error };
     }
     return {
-      objective,
-      direction: draft.direction,
-      ...(targetValue === undefined ? {} : { targetValue }),
-      variables,
-      constraints,
-      timeLimitMs: 3000,
+      request: {
+        objective,
+        direction: draft.direction,
+        method: draft.method,
+        ...(targetValue === undefined ? {} : { targetValue }),
+        variables,
+        constraints,
+        timeLimitMs: 3000,
+      },
     };
   }
   function expand(
@@ -210,25 +225,40 @@ export function useSimulationController(options: Options) {
   }
   function appendConstraints(
     destination: Array<PlanningRequest["constraints"][number]>,
+    variables: PlanningVariable[],
+    variableIndexes: ReadonlyMap<string, number>,
     item: PlanningConstraintDraft,
     target: Snapshot,
   ) {
-    if (!item.left.trim() && !item.right.trim()) return true;
+    if (!item.left.trim() && !item.right.trim()) return undefined;
     const left = expand(item.left, target, 200);
-    if (!left || destination.length + left.length > 200) return false;
+    if (!left || destination.length + left.length > 200) return "simulation.invalidReference";
+    if (item.relation === "integer" || item.relation === "binary") {
+      for (const cell of left) {
+        const index = variableIndexes.get(cellKey(cell));
+        if (index === undefined) return "simulation.constraintVariableRequired";
+        const variable = variables[index]!;
+        variables[index] = {
+          ...variable,
+          kind: variable.kind === "binary" || item.relation === "binary" ? "binary" : "integer",
+        };
+      }
+      return undefined;
+    }
+    const relation = item.relation;
     const scalar = asNumber(item.right);
     if (scalar !== undefined) {
-      for (const cell of left)
-        destination.push({ left: cell, relation: item.relation, right: scalar });
-      return true;
+      for (const cell of left) destination.push({ left: cell, relation, right: scalar });
+      return undefined;
     }
     const right = expand(item.right, target, 200);
     if (!right || right.length !== left.length || !sameShape(item.left, item.right, target))
-      return false;
-    left.forEach((cell, index) =>
-      destination.push({ left: cell, relation: item.relation, right: right[index]! }),
-    );
-    return true;
+      return "simulation.invalidReference";
+    left.forEach((cell, index) => destination.push({ left: cell, relation, right: right[index]! }));
+    return undefined;
+  }
+  function cellKey(cell: { sheetId: string; address: CellAddress }) {
+    return `${cell.sheetId}:${cell.address.row}:${cell.address.column}`;
   }
   function sameShape(left: string, right: string, target: Snapshot) {
     const first = resolveRangeReference(target.workbook, left, target.sheetId)?.range;
@@ -300,11 +330,12 @@ export function useSimulationController(options: Options) {
     if (busy.value) return;
     const target = snapshot();
     if (!target) return;
-    const request = planningRequest(draft, target);
-    if (!request) {
-      error.value = tr("simulation.invalidReference");
+    const built = planningRequest(draft, target);
+    if ("error" in built) {
+      error.value = tr(built.error);
       return;
     }
+    const { request } = built;
     busy.value = true;
     error.value = "";
     result.value = undefined;
@@ -376,15 +407,29 @@ export function useSimulationController(options: Options) {
         : tr("simulation.invalidReference");
   }
   function diagnostic(code: string): string {
-    if (code === "feasible-not-proven-optimal") return tr("simulation.feasibleNotOptimal");
-    if (code === "time-limit") return tr("simulation.statusLimit");
-    return code === "unsupported"
-      ? tr("simulation.unsupportedNonlinear")
-      : code === "limit"
-        ? tr("simulation.statusLimit")
-        : code === "invalid"
-          ? tr("simulation.invalidReference")
-          : tr("simulation.solveFailed");
+    switch (code) {
+      case "feasible-not-proven-optimal":
+        return tr("simulation.feasibleNotOptimal");
+      case "finite-bounds-required":
+        return tr("simulation.finiteBoundsRequired");
+      case "local-solution":
+        return tr("simulation.localSolution");
+      case "heuristic-solution":
+        return tr("simulation.heuristicSolution");
+      case "invalid-method":
+        return tr("simulation.invalidMethod");
+      case "volatile-model":
+        return tr("simulation.volatileModel");
+      case "time-limit":
+      case "limit":
+        return tr("simulation.statusLimit");
+      case "unsupported":
+        return tr("simulation.unsupportedModel");
+      case "invalid":
+        return tr("simulation.invalidReference");
+      default:
+        return tr("simulation.solveFailed");
+    }
   }
   watch(options.getGeneration, () => {
     if (!dialog.value) return;

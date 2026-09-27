@@ -7,8 +7,9 @@ export type GoalSeekDraft = {
 };
 
 export type PlanningDirection = "maximize" | "minimize" | "target";
+export type PlanningMethod = "simplex" | "grg" | "evolutionary";
 export type PlanningVariableKind = "continuous" | "integer" | "binary";
-export type PlanningRelation = "lte" | "gte" | "eq";
+export type PlanningRelation = "lte" | "gte" | "eq" | "integer" | "binary";
 
 export type PlanningVariableDraft = {
   id: string;
@@ -28,6 +29,7 @@ export type PlanningConstraintDraft = {
 export type PlanningDraft = {
   objective: SimulationCellReference;
   direction: PlanningDirection;
+  method: PlanningMethod;
   targetValue: string;
   variables: PlanningVariableDraft[];
   constraints: PlanningConstraintDraft[];

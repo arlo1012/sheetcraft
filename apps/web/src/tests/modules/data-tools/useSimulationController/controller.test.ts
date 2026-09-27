@@ -58,6 +58,7 @@ describe("useSimulationController", () => {
     await f.controller.solvePlanning({
       objective: f.cell("D"),
       direction: "maximize",
+      method: "simplex",
       targetValue: "",
       nonnegative: false,
       variables: [{ id: "v", cell: f.range("A", "B"), kind: "continuous", lower: "0", upper: "0" }],
@@ -78,6 +79,7 @@ describe("useSimulationController", () => {
     await f.controller.solvePlanning({
       objective: f.cell("D"),
       direction: "maximize",
+      method: "simplex",
       targetValue: "",
       nonnegative: false,
       variables: [{ id: "v", cell: f.cell("A"), kind: "continuous", lower: "", upper: "" }],
@@ -86,6 +88,59 @@ describe("useSimulationController", () => {
       ],
     });
     expect(f.controller.simulationError.value).toContain("valid");
+  });
+
+  test("normalizes integer and binary constraints into the declared changing variables", async () => {
+    const f = fixture();
+    f.controller.openPlanning();
+    runSimulation.mockResolvedValue({ status: "optimal", changes: [], diagnostics: [] });
+    await f.controller.solvePlanning({
+      objective: f.cell("D"),
+      direction: "maximize",
+      method: "simplex",
+      targetValue: "",
+      nonnegative: true,
+      variables: [{ id: "v", cell: f.range("A", "B"), kind: "continuous", lower: "", upper: "" }],
+      constraints: [
+        { id: "integer", left: f.range("A", "B"), relation: "integer", right: "" },
+        { id: "binary", left: f.cell("B"), relation: "binary", right: "ignored" },
+        { id: "scalar", left: f.range("A", "B"), relation: "lte", right: "2" },
+      ],
+    });
+
+    const request = runSimulation.mock.calls[0]?.[0].request;
+    expect(request.method).toBe("simplex");
+    expect(request.variables.map((item: { kind: string }) => item.kind)).toEqual([
+      "integer",
+      "binary",
+    ]);
+    expect(request.constraints).toHaveLength(2);
+    expect(
+      request.constraints.map((item: { relation: string; right: number }) => [
+        item.relation,
+        item.right,
+      ]),
+    ).toEqual([
+      ["lte", 2],
+      ["lte", 2],
+    ]);
+  });
+
+  test("requires integer and binary constraint cells to be changing variables", async () => {
+    const f = fixture();
+    f.controller.openPlanning();
+    await f.controller.solvePlanning({
+      objective: f.cell("D"),
+      direction: "maximize",
+      method: "simplex",
+      targetValue: "",
+      nonnegative: true,
+      variables: [{ id: "v", cell: f.cell("A"), kind: "continuous", lower: "", upper: "" }],
+      constraints: [{ id: "binary", left: f.cell("B"), relation: "binary", right: "" }],
+    });
+
+    expect(runSimulation).not.toHaveBeenCalled();
+    expect(f.controller.simulationError.value).toContain("must be included as variable cells");
   });
 
   test("retains an unsolved draft across a revision, invalidates solved preview, and closes on generation", async () => {

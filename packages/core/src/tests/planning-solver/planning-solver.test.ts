@@ -116,6 +116,113 @@ describe("planning solver", () => {
     expect(result.diagnostics[0]?.message).toContain("products of changing values");
   });
 
+  test("dispatches bounded binary nonlinear planning to the evolutionary solver", () => {
+    const { session, sheet } = fixture();
+    setCellContent(sheet, { row: 0, column: 0 }, literal(0));
+    setCellContent(sheet, { row: 0, column: 2 }, formula("=A1*A1"));
+    const planning = request({
+      method: "evolutionary",
+      variables: [{ cell: cell(0, 0), kind: "binary" }],
+      constraints: [],
+    });
+    const result = solvePlanning(session.workbook, planning);
+    expect(result).toMatchObject({ status: "feasible", objectiveValue: 1 });
+    expect(result.changes).toEqual([
+      { sheetId: sheet.id, address: { row: 0, column: 0 }, value: 1 },
+    ]);
+    expect(createApplyPlanningCommand(session.workbook, planning, result).ok).toBe(true);
+  });
+
+  test("requires explicit finite bounds for non-binary nonlinear variables", () => {
+    const { session, sheet } = fixture();
+    setCellContent(sheet, { row: 0, column: 0 }, literal(0));
+    setCellContent(sheet, { row: 0, column: 2 }, formula("=A1*A1"));
+    const result = solvePlanning(
+      session.workbook,
+      request({
+        method: "evolutionary",
+        variables: [{ cell: cell(0, 0), kind: "continuous" }],
+        constraints: [],
+      }),
+    );
+    expect(result).toMatchObject({ status: "invalid" });
+    expect(result.diagnostics[0]?.code).toBe("finite-bounds-required");
+  });
+
+  test("rejects volatile nonlinear models before any trial evaluation", () => {
+    const { session, sheet } = fixture();
+    setCellContent(sheet, { row: 0, column: 0 }, literal(0));
+    setCellContent(sheet, { row: 0, column: 2 }, formula("=A1+RAND()"));
+    const result = solvePlanning(
+      session.workbook,
+      request({
+        method: "grg",
+        variables: [{ cell: cell(0, 0), kind: "continuous", lower: 0, upper: 1 }],
+        constraints: [],
+      }),
+    );
+    expect(result).toMatchObject({ status: "unsupported" });
+  });
+
+  test("dispatches a nonlinear equality model to GRG and applies only the verified result", () => {
+    const { session, sheet } = fixture();
+    setCellContent(sheet, { row: 0, column: 0 }, literal(0));
+    setCellContent(sheet, { row: 0, column: 1 }, literal(0));
+    setCellContent(sheet, { row: 0, column: 2 }, formula("=(A1-0.5)*(A1-0.5)+(B1-0.5)*(B1-0.5)"));
+    setCellContent(sheet, { row: 1, column: 2 }, formula("=A1+B1"));
+    const planning = request({
+      method: "grg",
+      direction: "minimize",
+      variables: [
+        { cell: cell(0, 0), kind: "continuous", lower: 0, upper: 1 },
+        { cell: cell(0, 1), kind: "continuous", lower: 0, upper: 1 },
+      ],
+      constraints: [{ left: cell(1, 2), relation: "eq", right: 1 }],
+    });
+    const result = solvePlanning(session.workbook, planning);
+    expect(result.status).toBe("feasible");
+    expect(result.changes[0]?.value).toBeCloseTo(0.5, 3);
+    expect(result.changes[1]?.value).toBeCloseTo(0.5, 3);
+    expect(createApplyPlanningCommand(session.workbook, planning, result).ok).toBe(true);
+    setCellContent(sheet, { row: 0, column: 2 }, formula("=A1*A1+B1*B1"));
+    expect(createApplyPlanningCommand(session.workbook, planning, result)).toMatchObject({
+      ok: false,
+      reason: "stale-solution",
+    });
+  });
+
+  test("does not apply an unreachable nonlinear target", () => {
+    const { session, sheet } = fixture();
+    setCellContent(sheet, { row: 0, column: 0 }, literal(0));
+    setCellContent(sheet, { row: 0, column: 2 }, formula("=A1*A1"));
+    const result = solvePlanning(
+      session.workbook,
+      request({
+        method: "evolutionary",
+        direction: "target",
+        targetValue: 0.5,
+        variables: [{ cell: cell(0, 0), kind: "binary" }],
+        constraints: [],
+        timeLimitMs: 100,
+      }),
+    );
+    expect(result.status).toBe("limit");
+    expect(
+      createApplyPlanningCommand(
+        session.workbook,
+        request({
+          method: "evolutionary",
+          direction: "target",
+          targetValue: 0.5,
+          variables: [{ cell: cell(0, 0), kind: "binary" }],
+          constraints: [],
+          timeLimitMs: 100,
+        }),
+        result,
+      ),
+    ).toMatchObject({ ok: false, reason: "not-solved" });
+  });
+
   test("evaluates constant functions through constant cell references", () => {
     const { session, sheet } = fixture();
     setCellContent(sheet, { row: 0, column: 0 }, literal(0));
