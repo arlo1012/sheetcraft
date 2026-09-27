@@ -654,6 +654,7 @@ const {
   comparisonColumns,
 } = dataTools;
 const {
+  history: findHistory,
   format: findFormat,
   options: findOptions,
   results: findResults,
@@ -1723,6 +1724,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     <WorkbookFindDialog
       :visible="findDialogVisible && !pickingFindFormat && !findFormatDraft"
       :query="searchQuery"
+      :history="findHistory"
       :options="findOptions"
       :results="findResults"
       :has-searched-all="findHasSearchedAll"

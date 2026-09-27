@@ -18,7 +18,7 @@ describe("WorkbookFindDialog", () => {
       props: { visible: true, query: "needle" },
     });
     const dialog = new DOMWrapper(document.body);
-    const searchInput = dialog.get<HTMLTextAreaElement>("[data-search-input] textarea");
+    const searchInput = dialog.get<HTMLInputElement>("[data-search-input] input");
     await searchInput.setValue("updated");
     await searchInput.trigger("keydown", { key: "Enter" });
     await searchInput.trigger("keydown", { key: "Enter", shiftKey: true });
@@ -60,21 +60,51 @@ describe("WorkbookFindDialog", () => {
     wrapper.unmount();
   });
 
-  test("inserts special content at the textarea caret and retains newline queries", async () => {
+  test("inserts visible newline tokens at the combobox caret", async () => {
     const wrapper = mount(WorkbookFindDialog, {
       attachTo: document.body,
       global: { plugins: [createAppI18n("en-US")] },
       props: { visible: true, query: "ac" },
     });
     const body = new DOMWrapper(document.body);
-    const input = body.get<HTMLTextAreaElement>("[data-search-input] textarea");
+    const input = body.get<HTMLInputElement>("[data-search-input] input");
     input.element.setSelectionRange(1, 1);
     await body.get("button[aria-label='Special content']").trigger("click");
-    await body.get("[data-find-special='single']").trigger("click");
-    expect(wrapper.emitted("updateQuery")).toEqual([["a?c"]]);
-    await wrapper.setProps({ query: "\n" });
+    await body.get("[data-find-special='line-break']").trigger("click");
+    expect(wrapper.emitted("updateQuery")).toEqual([["a^lc"]]);
+    await wrapper.setProps({ query: "^l" });
     await input.trigger("keydown", { key: "Enter" });
     expect(wrapper.emitted("find")?.at(-1)).toEqual(["forward"]);
+    wrapper.unmount();
+  });
+  test("recalls history with the keyboard without immediately searching", async () => {
+    const wrapper = mount(WorkbookFindDialog, {
+      attachTo: document.body,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { visible: true, query: "other", history: ["^l", "1"] },
+    });
+    const input = new DOMWrapper(document.body).get<HTMLInputElement>("[data-search-input] input");
+    await input.trigger("keydown", { key: "ArrowDown" });
+    await input.trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("updateQuery")?.at(-1)).toEqual(["^l"]);
+    expect(wrapper.emitted("find")).toBeUndefined();
+    await wrapper.setProps({ query: "^l" });
+    await input.trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("find")).toEqual([["forward"]]);
+    wrapper.unmount();
+  });
+  test("preserves pasted line breaks as visible search tokens", async () => {
+    const wrapper = mount(WorkbookFindDialog, {
+      attachTo: document.body,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { visible: true, query: "ab" },
+    });
+    const input = new DOMWrapper(document.body).get<HTMLInputElement>("[data-search-input] input");
+    input.element.setSelectionRange(1, 1);
+    const clipboardData = new DataTransfer();
+    clipboardData.setData("text/plain", "x\ny");
+    await input.trigger("paste", { clipboardData });
+    expect(wrapper.emitted("updateQuery")?.at(-1)).toEqual(["ax^lyb"]);
     wrapper.unmount();
   });
 });

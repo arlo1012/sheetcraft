@@ -69,6 +69,7 @@ function mountController(
 
 afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
+  localStorage.removeItem("idea10.findHistory");
 });
 
 describe("useWorkbookFindController", () => {
@@ -181,5 +182,62 @@ describe("useWorkbookFindController", () => {
     expect(controller.format.value).toBeUndefined();
     expect(controller.hasSearchedAll.value).toBe(false);
     expect(controller.results.value).toEqual([]);
+  });
+
+  test("normalizes newline shortcuts for display and decodes them before searching", () => {
+    const { controller, workbook } = mountController();
+    const summary = getActiveSheet(workbook);
+    setCellValue(summary, { row: 0, column: 0 }, "first\nsecond");
+    setCellValue(summary, { row: 1, column: 0 }, "^l");
+
+    controller.updateQuery("first\nsecond");
+    expect(controller.query.value).toBe("first^lsecond");
+    controller.findAll();
+    expect(controller.results.value.map((result) => result.address)).toEqual([
+      { row: 0, column: 0 },
+    ]);
+
+    controller.updateQuery("^^l");
+    controller.findAll();
+    expect(controller.results.value.map((result) => result.address)).toEqual([
+      { row: 1, column: 0 },
+    ]);
+  });
+
+  test("records a deduplicated MRU text history without recording format-only finds", () => {
+    const { controller } = mountController();
+
+    controller.updateQuery("first");
+    controller.find("forward");
+    controller.updateQuery("second");
+    controller.findAll();
+    controller.updateQuery("first");
+    controller.findAll();
+    expect(controller.history.value).toEqual(["first", "second"]);
+
+    controller.updateQuery("");
+    controller.setFormat({ style: { fillColor: "#ff0000" }, keys: ["fillColor"] });
+    controller.findAll();
+    expect(controller.history.value).toEqual(["first", "second"]);
+
+    controller.reset();
+    expect(controller.history.value).toEqual(["first", "second"]);
+    expect(mountController().controller.history.value).toEqual(["first", "second"]);
+    expect(JSON.parse(localStorage.getItem("idea10.findHistory") ?? "{}")).toMatchObject({
+      version: 1,
+      queries: ["first", "second"],
+    });
+  });
+
+  test("limits persisted history to 20 most recent queries", () => {
+    const { controller } = mountController();
+    for (let index = 0; index < 21; index += 1) {
+      controller.updateQuery(`query ${index}`);
+      controller.findAll();
+    }
+
+    expect(controller.history.value).toHaveLength(20);
+    expect(controller.history.value[0]).toBe("query 20");
+    expect(controller.history.value.at(-1)).toBe("query 1");
   });
 });

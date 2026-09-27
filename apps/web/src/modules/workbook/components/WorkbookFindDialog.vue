@@ -1,20 +1,19 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useId } from "vue";
+import { computed, ref, useId } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Textarea } from "tdesign-vue-next/es/textarea";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { ChevronDown, ChevronUp } from "lucide-vue-next";
 import type { SheetSearchFormat } from "@idea10/core/search";
 import WorkbookFindFormatPreview from "./WorkbookFindFormatPreview.vue";
 import WorkbookFindResults from "./WorkbookFindResults.vue";
 import { useAppI18n } from "../../../shared/i18n";
-import { insertTextAtSelection } from "../../../shared/forms/text-selection";
+import WorkbookFindQueryInput from "./WorkbookFindQueryInput.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
-import { vNativeControl } from "../../../shared/tdesign/native-control";
 import {
   DEFAULT_WORKBOOK_FIND_OPTIONS,
   type WorkbookFindFormatMode,
@@ -26,6 +25,7 @@ const props = withDefaults(
   defineProps<{
     visible: boolean;
     query: string;
+    history?: readonly string[];
     options?: WorkbookFindOptions;
     results?: readonly WorkbookFindResult[];
     hasSearchedAll?: boolean;
@@ -38,6 +38,7 @@ const props = withDefaults(
   {
     options: () => ({ ...DEFAULT_WORKBOOK_FIND_OPTIONS }),
     results: () => [],
+    history: () => [],
     hasSearchedAll: false,
     resultCount: 0,
     status: "",
@@ -59,7 +60,7 @@ const emit = defineEmits<{
   cancelFormatPick: [];
 }>();
 const { t } = useAppI18n();
-const input = ref<HTMLTextAreaElement | null>(null);
+const queryInput = ref<InstanceType<typeof WorkbookFindQueryInput>>();
 const expanded = ref(false);
 const formatTrigger = ref<InstanceType<typeof Button> | null>(null);
 const specialTrigger = ref<InstanceType<typeof Button> | null>(null);
@@ -88,7 +89,7 @@ const {
 } = useMenu({
   triggerRef: computed(() => specialTrigger.value?.$el as HTMLElement | null),
   menuSurfaceRef: specialSurface,
-  placement: "bottom-end",
+  placement: "bottom-start",
   pointerFocus: "menu",
 });
 const canFind = computed(() => Boolean(props.query || props.formatSummary));
@@ -105,38 +106,19 @@ const lookInOptions = computed(() => [
   { value: "formulas", label: t("navigation.findLookInFormulas") },
   { value: "values", label: t("navigation.findLookInValues") },
 ]);
-function setInput(element: HTMLInputElement | HTMLTextAreaElement | null): void {
-  input.value = element instanceof HTMLTextAreaElement ? element : null;
-}
 function updateOptions(options: Partial<WorkbookFindOptions>): void {
   emit("updateOptions", options);
 }
 function find(direction: "forward" | "backward"): void {
   if (canFind.value) emit("find", direction);
 }
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === "Enter" && !event.isComposing && canFind.value) {
-    event.preventDefault();
-    find(event.shiftKey ? "backward" : "forward");
-  }
-}
 function chooseFormat(mode: WorkbookFindFormatMode): void {
   emit("pickFormat", mode);
   dismissFormat("programmatic", true);
 }
 function insertSpecial(text: string): void {
-  const edit = insertTextAtSelection(
-    props.query,
-    input.value?.selectionStart ?? props.query.length,
-    input.value?.selectionEnd ?? props.query.length,
-    text,
-  );
-  emit("updateQuery", edit.value);
   dismissSpecial("programmatic", false);
-  void nextTick(() => {
-    input.value?.focus({ preventScroll: true });
-    input.value?.setSelectionRange(edit.caret, edit.caret);
-  });
+  queryInput.value?.insertText(text);
 }
 function close(): void {
   if (props.pickingFormat) emit("cancelFormatPick");
@@ -158,7 +140,7 @@ function close(): void {
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
     :footer="false"
-    @opened="input?.focus()"
+    @opened="queryInput?.focus()"
     @close="close"
     @closed="emit('closed')"
   >
@@ -168,19 +150,13 @@ function close(): void {
           <span class="workbook-find-dialog__query-label">{{
             t("navigation.findQueryLabel")
           }}</span>
-          <Textarea
+          <WorkbookFindQueryInput
+            ref="queryInput"
             class="workbook-find-dialog__query"
             :value="query"
-            v-native-control="{
-              onElement: setInput,
-              attributes: { 'aria-label': t('navigation.findQueryLabel') },
-            }"
-            autocomplete="off"
-            :spell-check="false"
-            :autosize="{ minRows: 1, maxRows: 3 }"
-            data-search-input
-            @update:value="emit('updateQuery', String($event))"
-            @keydown="(_value, { e }) => onKeydown(e)"
+            :history="history"
+            @update:value="emit('updateQuery', $event)"
+            @find="find"
           />
           <WorkbookFindFormatPreview
             :format="format"
@@ -343,22 +319,20 @@ function close(): void {
       v-if="specialOpen"
       :id="specialId"
       ref="specialSurface"
-      class="workbook-find-dialog__menu"
+      class="workbook-find-dialog__menu workbook-find-dialog__special-menu"
       :style="specialStyles"
       :label="t('navigation.findSpecialContent')"
-      ><MenuItem data-find-special="line-break" @select="insertSpecial('\n')">{{
-        t("navigation.findSpecialLineBreak")
-      }}</MenuItem
-      ><MenuItem data-find-special="single" @select="insertSpecial('?')">{{
-        t("navigation.findSpecialSingleCharacter")
-      }}</MenuItem
-      ><MenuItem data-find-special="multiple" @select="insertSpecial('*')">{{
-        t("navigation.findSpecialAnyText")
-      }}</MenuItem>
-      <li class="workbook-find-dialog__hint">
-        {{ t("navigation.findWildcardHint") }}
-      </li></MenuSurface
-    ></Teleport
+      ><MenuItem data-find-special="line-break" @select="insertSpecial('^l')"
+        >{{ t("navigation.findSpecialLineBreak") }}<template #shortcut>^l</template></MenuItem
+      >
+      <MenuSeparator />
+      <MenuItem data-find-special="single" @select="insertSpecial('?')"
+        >{{ t("navigation.findSpecialSingleCharacter") }}<template #shortcut>?</template></MenuItem
+      >
+      <MenuItem data-find-special="multiple" @select="insertSpecial('*')"
+        >{{ t("navigation.findSpecialAnyText") }}<template #shortcut>*</template></MenuItem
+      >
+    </MenuSurface></Teleport
   >
 </template>
 
@@ -373,9 +347,6 @@ function close(): void {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--idea-space-4);
     min-width: 0;
-    padding: var(--idea-space-3);
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-medium);
   }
   &__query-row {
     display: grid;
@@ -430,12 +401,8 @@ function close(): void {
     z-index: 2600;
     min-width: 180px;
   }
-  &__hint {
-    padding: var(--idea-space-2) var(--idea-space-3);
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-    list-style: none;
-    border-top: 1px solid var(--idea-border-subtle);
+  &__special-menu {
+    width: 184px;
   }
 }
 @media (max-width: 520px) {

@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef } from "vue";
+import { computed, readonly, ref, shallowRef } from "vue";
 import { formatFormulaAddress } from "@idea10/core/formula";
 import { formatComputedValueForDisplay } from "@idea10/core/input";
 import {
@@ -18,6 +18,7 @@ import {
   type WorkbookFindOptions,
   type WorkbookFindResult,
 } from "../workbook-find-types";
+import { readWorkbookFindHistory, recordWorkbookFindHistory } from "../workbook-find-history";
 
 type Feedback = { key: MessageKey; params?: MessageParams };
 
@@ -25,6 +26,30 @@ function formatAbsoluteAddress(address: CellAddress): string {
   const label = formatFormulaAddress(address);
   const rowStart = label.search(/\d/);
   return `$${label.slice(0, rowStart)}$${label.slice(rowStart)}`;
+}
+
+function normalizeFindQuery(value: string): string {
+  return value.replace(/\r\n?|\n/g, "^l");
+}
+
+function decodeFindQuery(value: string): string {
+  let decoded = "";
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index]!;
+    const next = value[index + 1];
+    if (character !== "^") {
+      decoded += character;
+    } else if (next === "^") {
+      decoded += "^";
+      index += 1;
+    } else if (next === "l" || next === "L") {
+      decoded += "\n";
+      index += 1;
+    } else {
+      decoded += character;
+    }
+  }
+  return decoded;
 }
 
 function findDefinedNames(workbook: Workbook, sheetId: string, address: CellAddress): string {
@@ -52,6 +77,7 @@ export function useWorkbookFindController(deps: {
 }) {
   const { t } = useAppI18n();
   const query = ref("");
+  const history = ref(readWorkbookFindHistory());
   const options = ref<WorkbookFindOptions>({ ...DEFAULT_WORKBOOK_FIND_OPTIONS });
   const format = shallowRef<SheetSearchFormat>();
   const formatSource = ref("");
@@ -71,6 +97,7 @@ export function useWorkbookFindController(deps: {
     void deps.getRevision();
     const workbook = deps.getWorkbook();
     if (query.value === "" && !format.value) return [];
+    const searchQuery = decodeFindQuery(query.value);
     const sheets = getWorkbookSheets(workbook).filter(
       (sheet) =>
         !sheet.properties.hidden &&
@@ -78,7 +105,7 @@ export function useWorkbookFindController(deps: {
     );
     return sheets.flatMap((sheet) => {
       const evaluator = deps.getEvaluator(sheet.id);
-      return findCellsByText(sheet, query.value, evaluator, {
+      return findCellsByText(sheet, searchQuery, evaluator, {
         ...options.value,
         format: format.value,
       }).map((address) => {
@@ -107,8 +134,11 @@ export function useWorkbookFindController(deps: {
     report();
   }
   function updateQuery(value: string): void {
-    query.value = value;
+    query.value = normalizeFindQuery(value);
     invalidate();
+  }
+  function recordQuery(): void {
+    if (query.value) history.value = recordWorkbookFindHistory(history.value, query.value);
   }
   function updateOptions(value: Partial<WorkbookFindOptions>): void {
     options.value = { ...options.value, ...value };
@@ -140,11 +170,13 @@ export function useWorkbookFindController(deps: {
   }
   function findAll(): void {
     if (!canSearch()) return;
+    recordQuery();
     hasSearchedAll.value = true;
     report(matches.value.length ? undefined : { key: "workspace.noMatches" });
   }
   function find(direction: SheetSearchDirection): void {
     if (!canSearch()) return;
+    recordQuery();
     const found = matches.value;
     if (!found.length) {
       report({ key: "workspace.noMatches" });
@@ -172,6 +204,7 @@ export function useWorkbookFindController(deps: {
   }
   return {
     query,
+    history: readonly(history),
     options,
     format,
     formatSummary,

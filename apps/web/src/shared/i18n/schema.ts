@@ -853,6 +853,8 @@ export type MessageSchema = ToolMessageSchema & {
     findInSheet: string;
     findPlaceholder: string;
     findQueryLabel: string;
+    findHistory: string;
+    findHistoryEmpty: string;
     findFormatUnset: string;
     findFormatPreview: string;
     findPrevious: string;

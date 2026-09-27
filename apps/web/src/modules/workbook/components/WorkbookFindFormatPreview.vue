@@ -165,8 +165,10 @@ const borderLines = computed<PreviewBorderLine[]>(() => {
   width: 100%;
   min-width: 0;
   height: 28px;
-  border: 1px solid var(--idea-border-control);
-  background: var(--idea-surface-panel);
+  overflow: hidden;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: var(--td-radius-default);
+  background: var(--td-bg-color-container);
   color: var(--idea-text-primary);
   font-size: var(--idea-font-size-body-small);
 
@@ -187,6 +189,7 @@ const borderLines = computed<PreviewBorderLine[]>(() => {
     min-width: 0;
     height: 100%;
     overflow: hidden;
+    border-radius: inherit;
     padding: 3px var(--idea-space-2);
     white-space: nowrap;
   }
