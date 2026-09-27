@@ -515,6 +515,37 @@ describe("XLSX IO", () => {
     );
   });
 
+  test("flattens product-owned SIMTABLE results because Excel cannot recalculate them", async () => {
+    const workbook = createWorkbook({ id: "simulation-table", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: 1 });
+    setCellContent(sheet, { row: 0, column: 1 }, { kind: "formula", formula: { source: "=A1*2" } });
+    setCellContent(sheet, { row: 0, column: 2 }, { kind: "literal", value: 3 });
+    setCellContent(
+      sheet,
+      { row: 0, column: 3 },
+      { kind: "formula", formula: { source: "=SIMTABLE(B1,A1,C1)" } },
+    );
+
+    const encoded = await encodeXlsx(workbook);
+    expect(encoded.report.issues).toEqual([
+      expect.objectContaining({ code: "feature-omitted", locations: ["Sheet1!D1"] }),
+    ]);
+    const worksheetXml = xlsxEntryText(encoded.bytes, "xl/worksheets/sheet1.xml").replace(
+      / s="\d+"/g,
+      "",
+    );
+    expect(worksheetXml).toContain('<c r="D1"><v>6</v></c>');
+    expect(worksheetXml).not.toContain("SIMTABLE");
+
+    expect(
+      getCellContent(getActiveSheet((await decodeXlsx(encoded.bytes)).workbook), {
+        row: 0,
+        column: 3,
+      }),
+    ).toEqual({ kind: "literal", value: 6 });
+  });
+
   test("blocks unsupported parts and oversized archives before ExcelJS loads them", async () => {
     await expect(decodeXlsx(storedZip("xl/vbaProject.bin"))).rejects.toBeInstanceOf(
       XlsxCompatibilityError,

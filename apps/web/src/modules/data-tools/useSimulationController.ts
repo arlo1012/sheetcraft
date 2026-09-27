@@ -9,6 +9,12 @@ import {
   type PlanningRequest,
   type PlanningResult,
 } from "@idea10/core/planning-solver";
+import {
+  createDataTableCommand,
+  type DataTableRequest,
+  type DataTablePreviewResult,
+} from "@idea10/core";
+import type { DataTableDraft, DataTablePreview } from "./data-table-types";
 import type { WorkbookCommand } from "@idea10/core/commands";
 import {
   getActiveSheet,
@@ -46,6 +52,7 @@ type Snapshot = { workbook: Workbook; generation: number; revision: number; shee
 type SolveState =
   | { snapshot: Snapshot; request: GoalSeekRequest; result: GoalSeekResult }
   | { snapshot: Snapshot; request: PlanningRequest; result: PlanningResult };
+type DataTableState = { snapshot: Snapshot; request: DataTableRequest };
 type PlanningRequestBuild =
   | { request: PlanningRequest }
   | { error: "simulation.invalidReference" | "simulation.constraintVariableRequired" };
@@ -76,6 +83,9 @@ export function useSimulationController(options: Options) {
   const result = ref<SimulationResult>();
   const goalSeekDraft = ref(EMPTY_GOAL());
   const planningDraft = ref(EMPTY_PLANNING());
+  const dataTableDraft = ref<DataTableDraft>({ range: "", rowInput: "", columnInput: "" });
+  const dataTablePreview = ref<DataTablePreview>();
+  let tableSolved: DataTableState | undefined;
   let solved: SolveState | undefined;
   let referenceSheetId: string | undefined;
   const activeSheet = computed(() => getActiveSheet(options.getWorkbook()));
@@ -125,6 +135,8 @@ export function useSimulationController(options: Options) {
     error.value = "";
     result.value = undefined;
     solved = undefined;
+    tableSolved = undefined;
+    dataTablePreview.value = undefined;
     dialog.value = "goalSeek";
   }
   function openPlanning() {
@@ -141,13 +153,114 @@ export function useSimulationController(options: Options) {
     error.value = "";
     result.value = undefined;
     solved = undefined;
+    tableSolved = undefined;
+    dataTablePreview.value = undefined;
     dialog.value = "planning";
+  }
+  function openDataTable() {
+    referenceSheetId = getActiveSheet(options.getWorkbook()).id;
+    const target = snapshot();
+    if (!target) return;
+    const sheet = target.workbook.sheets.get(target.sheetId)!;
+    dataTableDraft.value = {
+      range: formatRangeReference(sheet.name, options.getSelection().range),
+      rowInput: "",
+      columnInput: "",
+    };
+    error.value = "";
+    result.value = undefined;
+    solved = undefined;
+    tableSolved = undefined;
+    dataTablePreview.value = undefined;
+    dialog.value = "dataTable";
+  }
+  function updateDataTableDraft(draft: DataTableDraft) {
+    if (JSON.stringify(dataTableDraft.value) === JSON.stringify(draft)) return;
+    dataTableDraft.value = { ...draft };
+    tableSolved = undefined;
+    dataTablePreview.value = undefined;
+    error.value = "";
+  }
+  async function solveDataTable(draft: DataTableDraft) {
+    if (busy.value) return;
+    const target = snapshot();
+    if (!target) return;
+    const range = resolveRangeReference(target.workbook, draft.range, target.sheetId);
+    const rowInput = draft.rowInput.trim() ? resolveCell(draft.rowInput, target) : undefined;
+    const columnInput = draft.columnInput.trim()
+      ? resolveCell(draft.columnInput, target)
+      : undefined;
+    if (
+      !range ||
+      (draft.rowInput.trim() && !rowInput) ||
+      (draft.columnInput.trim() && !columnInput)
+    ) {
+      error.value = tr("simulation.invalidReference");
+      return;
+    }
+    const request: DataTableRequest = {
+      sheetId: range.sheetId,
+      range: range.range,
+      rowInput,
+      columnInput,
+    };
+    busy.value = true;
+    error.value = "";
+    tableSolved = undefined;
+    dataTablePreview.value = undefined;
+    try {
+      const raw = (await runSimulation({
+        kind: "dataTable",
+        workbook: target.workbook,
+        request,
+      })) as DataTablePreviewResult;
+      if (!isCurrent(target)) {
+        error.value = tr("simulation.stale");
+        return;
+      }
+      if (!raw.ok) {
+        const keys = {
+          "invalid-range": "dataTable.invalidRange",
+          "invalid-input": "dataTable.invalidInput",
+          "invalid-formula": "dataTable.invalidFormula",
+          overlap: "dataTable.overlap",
+          protected: "dataTable.protected",
+          limit: "dataTable.limit",
+          "formula-error": "dataTable.formulaError",
+        } as const;
+        error.value = t(keys[raw.reason]);
+        return;
+      }
+      dataTablePreview.value = { rows: raw.rows, columns: raw.columns, values: raw.values };
+      tableSolved = { snapshot: target, request };
+    } catch {
+      error.value = tr("simulation.solveFailed");
+    } finally {
+      busy.value = false;
+    }
+  }
+  function applyDataTable() {
+    if (!tableSolved || busy.value || options.isBusy() || !options.flush()) return;
+    if (!isCurrent(tableSolved.snapshot)) {
+      error.value = tr("simulation.stale");
+      return;
+    }
+    try {
+      const command = createDataTableCommand(options.getWorkbook(), tableSolved.request);
+      if (!options.execute(command)) return;
+      options.recalculate?.();
+      close();
+    } catch {
+      error.value = tr("simulation.stale");
+    }
   }
   function close() {
     if (busy.value) return;
     dialog.value = undefined;
     result.value = undefined;
     solved = undefined;
+    tableSolved = undefined;
+    dataTablePreview.value = undefined;
     error.value = "";
     referenceSheetId = undefined;
     void nextTick(options.focusSheet);
@@ -435,6 +548,8 @@ export function useSimulationController(options: Options) {
     if (!dialog.value) return;
     result.value = undefined;
     solved = undefined;
+    tableSolved = undefined;
+    dataTablePreview.value = undefined;
     error.value = tr("simulation.stale");
     dialog.value = undefined;
     referenceSheetId = undefined;
@@ -442,9 +557,11 @@ export function useSimulationController(options: Options) {
   watch(
     () => options.getRevision?.() ?? options.getGeneration(),
     () => {
-      if (!dialog.value || !solved) return;
+      if (!dialog.value || (!solved && !tableSolved)) return;
       result.value = undefined;
       solved = undefined;
+      tableSolved = undefined;
+      dataTablePreview.value = undefined;
       error.value = tr("simulation.stale");
     },
   );
@@ -453,6 +570,8 @@ export function useSimulationController(options: Options) {
     goalSeekDraft.value = { ...draft };
     result.value = undefined;
     solved = undefined;
+    tableSolved = undefined;
+    dataTablePreview.value = undefined;
     error.value = "";
   }
   function updatePlanningDraft(draft: PlanningDraft) {
@@ -464,6 +583,8 @@ export function useSimulationController(options: Options) {
     };
     result.value = undefined;
     solved = undefined;
+    tableSolved = undefined;
+    dataTablePreview.value = undefined;
     error.value = "";
   }
   return {
@@ -474,6 +595,12 @@ export function useSimulationController(options: Options) {
     simulationDisabled: disabled,
     goalSeekDraft,
     planningDraft,
+    dataTableDraft,
+    dataTablePreview,
+    openDataTable,
+    solveDataTable,
+    applyDataTable,
+    updateDataTableDraft,
     openGoalSeek,
     openPlanning,
     closeSimulation: close,

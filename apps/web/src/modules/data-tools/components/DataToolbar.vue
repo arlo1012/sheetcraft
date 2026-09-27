@@ -52,6 +52,7 @@ const emit = defineEmits<{
   openSort: [];
   openGoalSeek: [];
   openPlanning: [];
+  openDataTable: [];
   openProofreading: [];
   toggleFilter: [];
   advancedFilter: [];
@@ -212,6 +213,7 @@ const { t } = useAppI18n();
         :disabled="disabled"
         @goal-seek="emit('openGoalSeek')"
         @planning="emit('openPlanning')"
+        @data-table="emit('openDataTable')"
       />
       <RibbonButton
         variant="tall"

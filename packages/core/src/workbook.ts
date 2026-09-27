@@ -22,6 +22,7 @@ import {
   type FormulaFunctionArgument,
 } from "./formula/functions.js";
 import { getFormulaAst } from "./formula/parser.js";
+import { isSimulationTableRoot, parseSimulationTableFormula } from "./data-table-formula.js";
 import {
   createFormulaError,
   isFormulaError,
@@ -570,6 +571,8 @@ export type WorkbookEvaluatorOptions = Readonly<{
   ) => FormulaRuntimeValue | undefined;
   /** Supplies one deterministic clock for volatile date functions in this calculation cycle. */
   now?: () => ExcelDateParts;
+  /** Internal shared guard for shadow-evaluated What-If Data Table formulas. */
+  simulationTableComputing?: Set<string>;
 }>;
 type SparseRangeIndex = { rows: number[]; byRow: Map<number, CellAddress[]> };
 
@@ -618,6 +621,7 @@ export function createWorkbookEvaluator(
   const formulaDependencies = new Map<string, Set<string>>();
   const formulaAddresses = new Map<string, Dependency>();
   const possibleSpillRoots = new Map<string, CellAddress[]>();
+  const simulationTableComputing = options?.simulationTableComputing ?? new Set<string>();
   const keyFor = (targetSheetId: string, address: CellAddress) =>
     `${targetSheetId}|${createCellKey(address)}`;
   const sheetForName = (name: string | undefined, fallback: string): string | null => {
@@ -1065,6 +1069,9 @@ export function createWorkbookEvaluator(
         unique.set(keyFor(dependency.sheetId, dependency.address), dependency);
       return [...unique.values()];
     };
+    // The output formula depends on its target and on the input/header cells.
+    // Its target's graph is evaluated in a shadow below; scheduling these roots
+    // here keeps cycle diagnostics and manual calculation caching conservative.
     const dependencies = collect(ast.expression, stage);
     const key = keyFor(fromSheetId, address);
     formulaAddresses.set(key, { sheetId: fromSheetId, address });
@@ -1073,6 +1080,76 @@ export function createWorkbookEvaluator(
     for (const dependency of dependencies) keys.add(keyFor(dependency.sheetId, dependency.address));
     formulaDependencies.set(key, keys);
     return dependencies;
+  };
+  const evaluateSimulationTable = (
+    currentSheetId: string,
+    address: CellAddress,
+    expression: FormulaExpression,
+  ): FormulaValue | undefined => {
+    const table = parseSimulationTableFormula(expression);
+    if (!table) {
+      if (!isSimulationTableRoot(expression)) return undefined;
+      return expression.args.some(
+        (argument) => argument.kind === "error" && argument.code === "REF",
+      )
+        ? createFormulaError("REF")
+        : createFormulaError("VALUE");
+    }
+    const tableKey = keyFor(currentSheetId, address);
+    if (simulationTableComputing.has(tableKey)) return createFormulaError("CYCLE");
+    simulationTableComputing.add(tableKey);
+    try {
+      const resolveReferenceSheet = (sheetName: string | undefined): string | null =>
+        sheetForName(sheetName, currentSheetId);
+      const scalarReference = (reference: typeof table.formula): FormulaValue => {
+        const referenceSheetId = resolveReferenceSheet(reference.sheetName);
+        return referenceSheetId ? resolve(referenceSheetId, reference) : createFormulaError("REF");
+      };
+      const formulaSheetId = resolveReferenceSheet(table.formula.sheetName);
+      const firstInputSheetId = resolveReferenceSheet(table.rowInput?.sheetName);
+      const firstValue = table.rowValue
+        ? scalarReference(table.rowValue)
+        : createFormulaError("VALUE");
+      const secondInputSheetId = table.columnInput
+        ? resolveReferenceSheet(table.columnInput.sheetName)
+        : undefined;
+      const secondValue = table.columnValue ? scalarReference(table.columnValue) : undefined;
+      if (
+        !formulaSheetId ||
+        !firstInputSheetId ||
+        (table.columnInput && !secondInputSheetId) ||
+        (isFormulaError(firstValue) && firstValue.code === "REF") ||
+        (isFormulaError(secondValue) && secondValue.code === "REF")
+      )
+        return createFormulaError("REF");
+      if (typeof firstValue !== "number" || (table.columnInput && typeof secondValue !== "number"))
+        return createFormulaError("VALUE");
+      const formulaContent = contentFor(formulaSheetId, table.formula);
+      if (formulaContent?.kind !== "formula") return createFormulaError("VALUE");
+      const sheets = new Map(workbook.sheets);
+      const cloneInputSheet = (inputSheetId: string) => {
+        const source = sheets.get(inputSheetId)!;
+        if (source === workbook.sheets.get(inputSheetId))
+          sheets.set(inputSheetId, { ...source, cells: new Map(source.cells) });
+        return sheets.get(inputSheetId)!;
+      };
+      setCellContent(cloneInputSheet(firstInputSheetId), table.rowInput!, {
+        kind: "literal",
+        value: firstValue,
+      });
+      if (table.columnInput && secondInputSheetId && typeof secondValue === "number")
+        setCellContent(cloneInputSheet(secondInputSheetId), table.columnInput, {
+          kind: "literal",
+          value: secondValue,
+        });
+      const shadow = { ...workbook, sheets };
+      return createWorkbookEvaluator(shadow, formulaSheetId, {
+        now: () => cycleNow,
+        simulationTableComputing,
+      }).getComputedValue(table.formula);
+    } finally {
+      simulationTableComputing.delete(tableKey);
+    }
   };
   const resolve = (targetSheetId: string, target: CellAddress): FormulaValue => {
     if (!isCellAddressInBounds(target)) return createFormulaError("REF");
@@ -1099,6 +1176,16 @@ export function createWorkbookEvaluator(
     };
     if (hydrateCachedFormula(targetSheetId, target, source)) {
       return valueFor(targetSheetId, target);
+    }
+    const simulation = getFormulaAst(source.formula.source);
+    if (simulation) {
+      const tableValue = evaluateSimulationTable(targetSheetId, target, simulation.expression);
+      if (tableValue !== undefined) {
+        memo.set(targetKey, tableValue);
+        runtimeMemo.set(targetKey, tableValue);
+        state.set(targetKey, "done");
+        return tableValue;
+      }
     }
     const stack: Frame[] = [{ sheetId: targetSheetId, address: target, stage: "prepare" }];
     while (stack.length) {
@@ -1153,6 +1240,20 @@ export function createWorkbookEvaluator(
           else stack.push({ ...dependency, stage: "prepare" });
         }
         continue;
+      }
+      const simulation = getFormulaAst(content.formula.source);
+      if (simulation) {
+        const tableValue = evaluateSimulationTable(
+          frame.sheetId,
+          frame.address,
+          simulation.expression,
+        );
+        if (tableValue !== undefined) {
+          runtimeMemo.set(frameKey, tableValue);
+          memo.set(frameKey, tableValue);
+          state.set(frameKey, "done");
+          continue;
+        }
       }
       const runtime = evaluateFormulaRuntime(content.formula.source, resolverFor(frame.sheetId), {
         dateSystem: workbook.dateSystem,

@@ -1,4 +1,5 @@
 import { simulationEnUS } from "../../../modules/data-tools/simulation-messages.en-US";
+import { dataTableEnUS } from "../../../modules/data-tools/data-table-messages.en-US";
 import { proofreadingEnUS } from "../../../modules/data-tools/proofreading-messages.en-US";
 import type { MessageSchema } from "../schema";
 import { formulaToolsEnUS } from "../../../modules/formula-tools/formula-tools-messages.en-US";
@@ -6,6 +7,7 @@ import { formulaToolsEnUS } from "../../../modules/formula-tools/formula-tools-m
 export const enUS = {
   ...formulaToolsEnUS,
   ...simulationEnUS,
+  ...dataTableEnUS,
   ...proofreadingEnUS,
   dataTools: {
     dropdownList: "Dropdown list",

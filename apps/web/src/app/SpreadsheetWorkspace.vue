@@ -16,6 +16,7 @@ import { useDataToolsController } from "../modules/data-tools/useDataToolsContro
 import { useDuplicateErrorChecks } from "../modules/data-tools/useDuplicateErrorChecks";
 import type { ErrorCheckSettings } from "../modules/data-tools/duplicate-error-preferences";
 import DuplicateErrorCheckOptionsDialog from "../modules/data-tools/components/DuplicateErrorCheckOptionsDialog.vue";
+import DataTableDialog from "../modules/data-tools/components/DataTableDialog.vue";
 import GoalSeekDialog from "../modules/data-tools/components/GoalSeekDialog.vue";
 import PlanningSolverDialog from "../modules/data-tools/components/PlanningSolverDialog.vue";
 import DataProofreadingDialog from "../modules/data-tools/components/DataProofreadingDialog.vue";
@@ -563,6 +564,8 @@ const {
   simulationResult,
   goalSeekDraft,
   planningDraft,
+  dataTableDraft,
+  dataTablePreview,
   proofreadingVisible,
   proofreadingHasScanned,
   proofreadingDraft,
@@ -1067,6 +1070,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @open-sort="dataTools.openSort"
           @open-goal-seek="dataTools.openGoalSeek"
           @open-planning="dataTools.openPlanning"
+          @open-data-table="dataTools.openDataTable"
           @open-proofreading="dataTools.openDataProofreading"
           @toggle-filter="dataTools.toggleFilter"
           @advanced-filter="dataTools.openAdvancedFilter"
@@ -1352,6 +1356,19 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :edit-session-id="cellEditSession.id"
       @confirm="comparisonRangePicker.confirm"
       @cancel="comparisonRangePicker.cancel"
+    />
+    <DataTableDialog
+      :visible="simulationDialog === 'dataTable'"
+      :initial="dataTableDraft"
+      :busy="simulationBusy"
+      :error="simulationError"
+      :result="dataTablePreview"
+      :suspended="pickingSimulationRange"
+      :select-reference="selectSimulationReference"
+      @close="dataTools.closeSimulation"
+      @solve="dataTools.solveDataTable"
+      @apply="dataTools.applyDataTable"
+      @draft-change="dataTools.updateDataTableDraft"
     />
     <GoalSeekDialog
       :visible="simulationDialog === 'goalSeek'"

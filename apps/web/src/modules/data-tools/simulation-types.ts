@@ -55,4 +55,4 @@ export type SimulationResult = {
   exploredNodes?: number;
 };
 
-export type SimulationDialog = "goalSeek" | "planning" | undefined;
+export type SimulationDialog = "goalSeek" | "planning" | "dataTable" | undefined;

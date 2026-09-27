@@ -83,6 +83,10 @@
       "types": "./dist/data-validation.d.ts",
       "import": "./dist/data-validation.js"
     },
+    "./data-table": {
+      "types": "./dist/data-table.d.ts",
+      "import": "./dist/data-table.js"
+    },
     "./data-outline": {
       "types": "./dist/data-outline.d.ts",
       "import": "./dist/data-outline.js"

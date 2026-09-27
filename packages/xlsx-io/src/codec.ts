@@ -6,9 +6,13 @@ import { excelColumnWidthToPixels, pixelsToExcelColumnWidth } from "./column-wid
 import { getAutoFitRowNumbers } from "./auto-fit-rows.js";
 import {
   createFormulaError,
+  FORMULA_ERROR_TOKENS,
   datePartsToExcelSerial,
   formulaErrorCodeFromToken,
+  isFormulaError,
+  parseFormula,
   type CellContent,
+  type FormulaValue,
 } from "@idea10/core/formula";
 import {
   createSheetEvaluator,
@@ -139,6 +143,25 @@ function columnLabel(column: number): string {
 }
 function address(row: number, column: number): string {
   return `${columnLabel(column)}${row + 1}`;
+}
+
+/**
+ * SIMTABLE is an internal, dynamic What-If Data Table formula. Excel and WPS
+ * do not implement it, so its results must be exported as values rather than
+ * a formula which recalculates to #NAME?.
+ */
+function isSimulationTableFormula(source: string): boolean {
+  const parsed = parseFormula(source);
+  return (
+    parsed.ok &&
+    parsed.ast.expression.kind === "function" &&
+    parsed.ast.expression.name.toUpperCase() === "SIMTABLE"
+  );
+}
+
+function formulaSnapshotValue(value: FormulaValue): unknown {
+  if (!isFormulaError(value)) return value;
+  return { error: FORMULA_ERROR_TOKENS[value.code] };
 }
 
 function workbookId(): string {
@@ -857,14 +880,19 @@ export async function encodeWithExcelJs(
       const outputCell = output.getCell(address(row, column));
       if (cell.content?.kind === "literal") outputCell.value = cell.content.value;
       else if (cell.content?.kind === "formula") {
-        const result = isFormulaCacheEligible(row, column)
-          ? formulaCacheValue(evaluator.getComputedValue({ row, column }))
-          : undefined;
-        outputCell.value = {
-          formula: cell.content.formula.source.slice(1),
-          ...(result !== undefined ? { result } : {}),
-        };
-        if (result === undefined) add(report, "formula-not-calculated", issueLocation);
+        if (isSimulationTableFormula(cell.content.formula.source)) {
+          outputCell.value = formulaSnapshotValue(evaluator.getComputedValue({ row, column }));
+          add(report, "feature-omitted", issueLocation);
+        } else {
+          const result = isFormulaCacheEligible(row, column)
+            ? formulaCacheValue(evaluator.getComputedValue({ row, column }))
+            : undefined;
+          outputCell.value = {
+            formula: cell.content.formula.source.slice(1),
+            ...(result !== undefined ? { result } : {}),
+          };
+          if (result === undefined) add(report, "formula-not-calculated", issueLocation);
+        }
       } else if (cell.content?.kind === "error")
         outputCell.value = {
           error: {

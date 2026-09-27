@@ -1,9 +1,11 @@
+import type { DataTableRequest } from "@idea10/core";
 import type { GoalSeekRequest } from "@idea10/core/goal-seek";
 import type { PlanningRequest } from "@idea10/core/planning-solver";
 import { serializeWorkbook, type WorkbookSnapshot } from "@idea10/core/serialization";
 import type { Workbook } from "@idea10/core/workbook";
 
 type Work =
+  | { kind: "dataTable"; workbook: Workbook; request: DataTableRequest }
   | { kind: "goalSeek"; workbook: Workbook; request: GoalSeekRequest }
   | { kind: "planning"; workbook: Workbook; request: PlanningRequest };
 

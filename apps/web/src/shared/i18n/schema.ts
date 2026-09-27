@@ -1,4 +1,5 @@
 import type { SimulationMessageSchema } from "../../modules/data-tools/simulation-messages";
+import type { DataTableMessageSchema } from "../../modules/data-tools/data-table-messages";
 import type { ProofreadingMessageSchema } from "../../modules/data-tools/proofreading-messages";
 import type { FormulaToolsMessageSchema } from "../../modules/formula-tools/formula-tools-messages";
 
@@ -6,6 +7,7 @@ export type AppLocale = "zh-CN" | "en-US";
 
 type ToolMessageSchema = FormulaToolsMessageSchema &
   SimulationMessageSchema &
+  DataTableMessageSchema &
   ProofreadingMessageSchema;
 
 export type MessageSchema = ToolMessageSchema & {

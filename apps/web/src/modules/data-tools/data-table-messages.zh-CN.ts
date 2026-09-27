@@ -1,0 +1,35 @@
+import type { DataTableMessageSchema } from "./data-table-messages";
+
+export const dataTableZhCN = {
+  dataTable: {
+    title: "模拟运算表",
+    range: "运算表区域",
+    rowInput: "行输入单元格",
+    columnInput: "列输入单元格",
+    selectRange: "选择区域",
+    selectCell: "选择单元格",
+    rangePlaceholder: "Sheet1!A1:F8",
+    inputPlaceholder: "A1",
+    instructions:
+      "顶行的试算值对应行输入单元格，首列的试算值对应列输入单元格。可填写其中一个，或同时填写两个。",
+    instructionsRow: "顶行的试算值对应行输入单元格；公式位于顶行下方的首列。",
+    instructionsColumn: "首列的试算值对应列输入单元格；公式位于首列右侧的顶行。",
+    instructionsBoth: "顶行和首列的试算值对应各自输入单元格；公式位于左上角单元格。",
+    recalculation: "试算值或源公式变化时自动更新结果（遵循工作簿计算模式）。",
+    preview: "预览",
+    previewSize: "{rows} 行 × {columns} 列",
+    previewLimited: "仅显示前 8 行和前 8 列。",
+    previewHelp: "仅填充所选区域内部，保留顶行和首列；已有结果将被替换。",
+    solve: "预览",
+    create: "创建运算表",
+    cancel: "取消",
+    close: "关闭",
+    invalidRange: "请选择有效的运算表区域。",
+    invalidInput: "请输入有效的输入单元格。",
+    invalidFormula: "运算表的公式单元格必须包含公式。",
+    overlap: "请避开合并或溢出区域，并将输入单元格放在运算表区域外。",
+    protected: "运算表区域包含受保护的单元格。",
+    limit: "每个运算表最多支持 1,000 个结果单元格。",
+    formulaError: "无法计算运算表公式。",
+  },
+} satisfies DataTableMessageSchema;

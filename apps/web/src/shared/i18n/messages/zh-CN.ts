@@ -1,4 +1,5 @@
 import { simulationZhCN } from "../../../modules/data-tools/simulation-messages.zh-CN";
+import { dataTableZhCN } from "../../../modules/data-tools/data-table-messages.zh-CN";
 import { proofreadingZhCN } from "../../../modules/data-tools/proofreading-messages.zh-CN";
 import type { MessageSchema } from "../schema";
 import { formulaToolsZhCN } from "../../../modules/formula-tools/formula-tools-messages.zh-CN";
@@ -6,6 +7,7 @@ import { formulaToolsZhCN } from "../../../modules/formula-tools/formula-tools-m
 export const zhCN = {
   ...formulaToolsZhCN,
   ...simulationZhCN,
+  ...dataTableZhCN,
   ...proofreadingZhCN,
   dataTools: {
     dropdownList: "下拉列表",
