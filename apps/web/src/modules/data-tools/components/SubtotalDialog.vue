@@ -71,7 +71,6 @@ function apply(): void {
       <TButton v-if="hasSubtotals" variant="text" @click="emit('removeAll')">{{
         t("dataTools.outline.removeAll")
       }}</TButton>
-      <span class="subtotal-dialog__space" />
       <TButton theme="default" @click="emit('close')">{{ t("dataTools.common.cancel") }}</TButton>
       <TButton theme="primary" :disabled="draft.valueColumns.length === 0" @click="apply">{{
         t("dataTools.outline.confirm")
@@ -150,9 +149,6 @@ function apply(): void {
   &__options {
     display: grid;
     gap: var(--idea-space-1);
-  }
-  &__space {
-    flex: 1;
   }
 }
 </style>
