@@ -4,13 +4,15 @@ export const proofreadingEnUS = {
   proofreading: {
     title: "Data Proofreading",
     range: "Range",
+    rangePlaceholder: "Current worksheet by default; range optional",
     pickRange: "Pick range",
     scan: "Proofread",
     rescan: "Scan again",
     close: "Close",
     issues: "{count} items need review",
     noIssues: "No items need proofreading.",
-    scanHint: "Choose a range and start proofreading. No data is changed automatically.",
+    scanHint:
+      "Proofread the current worksheet, or specify a range. No data is changed automatically.",
     type: "Type",
     address: "Cell",
     currentValue: "Current value",

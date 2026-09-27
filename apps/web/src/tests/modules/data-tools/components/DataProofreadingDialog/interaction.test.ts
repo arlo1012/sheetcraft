@@ -39,7 +39,7 @@ function mountDialog(
     attachTo: host,
     props: {
       visible: true,
-      draft: { range: "Sheet1!A1:A2" },
+      draft: { range: "" },
       issues: [],
       selectedIds: [],
       ...overrides,
@@ -54,11 +54,21 @@ const dialog = () => new DOMWrapper(document.body).get('[role="dialog"]');
 describe("DataProofreadingDialog", () => {
   test("does not present an empty scan as success before proofreading begins", async () => {
     const wrapper = mountDialog();
-    expect(dialog().text()).toContain("Choose a range and start proofreading");
+    expect(dialog().text()).toContain("Proofread the current worksheet");
     expect(dialog().text()).not.toContain("No items need proofreading");
 
     await wrapper.setProps({ hasScanned: true });
     expect(dialog().text()).toContain("No items need proofreading");
+  });
+
+  test("allows proofreading with an empty optional range", async () => {
+    const wrapper = mountDialog();
+    const scan = dialog()
+      .findAll("button")
+      .find((button) => button.text() === "Proofread")!;
+    expect((scan.element as HTMLButtonElement).disabled).toBe(false);
+    await scan.trigger("click");
+    expect(wrapper.emitted("scan")).toEqual([[{ range: "" }]]);
   });
 
   test("keeps advisory items out of batch selection and exposes explicit actions", async () => {

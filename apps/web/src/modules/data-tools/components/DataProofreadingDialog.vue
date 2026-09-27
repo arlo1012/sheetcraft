@@ -43,7 +43,6 @@ const selected = computed(() => new Set(props.selectedIds));
 const safeSelectedCount = computed(
   () => props.issues.filter((issue) => issue.safe && selected.value.has(issue.id)).length,
 );
-const canScan = computed(() => Boolean(props.draft.range.trim()));
 
 function updateRange(range: string): void {
   emit("draftChange", { range });
@@ -77,11 +76,11 @@ function toggleIssue(id: string, checked: boolean): void {
           :label="t('proofreading.range')"
           :pick-label="t('proofreading.pickRange')"
           :select-reference="selectReference"
-          placeholder="Sheet1!A1:C10"
+          :placeholder="t('proofreading.rangePlaceholder')"
           @update:model-value="updateRange"
-          @enter="canScan && !busy && emit('scan', draft)"
+          @enter="!busy && emit('scan', draft)"
         />
-        <TButton :loading="busy" :disabled="busy || !canScan" @click="emit('scan', draft)">
+        <TButton :loading="busy" :disabled="busy" @click="emit('scan', draft)">
           {{ issues.length ? t("proofreading.rescan") : t("proofreading.scan") }}
         </TButton>
       </div>

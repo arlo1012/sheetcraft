@@ -4,6 +4,7 @@ export type ProofreadingMessageSchema = {
   proofreading: {
     title: string;
     range: string;
+    rangePlaceholder: string;
     pickRange: string;
     scan: string;
     rescan: string;

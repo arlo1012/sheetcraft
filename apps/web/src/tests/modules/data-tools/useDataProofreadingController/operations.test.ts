@@ -11,10 +11,6 @@ import { useDataProofreadingController } from "../../../../modules/data-tools/us
 function fixture() {
   const session = reactive(createWorkbookSession({ idFactory: createSequentialIdFactory() }));
   const sheet = getActiveSheet(session.workbook);
-  const selection = {
-    address: { row: 0, column: 0 },
-    range: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
-  };
   const navigateCalls: Array<{ sheetId: string; address: { row: number; column: number } }> = [];
   let controller!: ReturnType<typeof useDataProofreadingController>;
   mount(
@@ -22,7 +18,6 @@ function fixture() {
       setup: () => {
         controller = useDataProofreadingController({
           getWorkbook: () => session.workbook,
-          getSelection: () => selection,
           getGeneration: () => 0,
           getRevision: () => session.history.revision,
           isBusy: () => false,
@@ -45,7 +40,7 @@ function fixture() {
 }
 
 describe("useDataProofreadingController", () => {
-  test("scans the current data region, navigates advisory results, and applies only explicit safe proposals", () => {
+  test("scans the current worksheet, navigates advisory results, and applies only explicit safe proposals", () => {
     const f = fixture();
     f.set(0, 0, "42");
     f.set(1, 0, "0012");
@@ -69,6 +64,55 @@ describe("useDataProofreadingController", () => {
       kind: "literal",
       value: 42,
     });
+  });
+
+  test("defaults to the entire sparse worksheet and retains that scope on rescans", () => {
+    const f = fixture();
+    f.set(4, 5, "42");
+    f.set(9999, 20, "12%");
+    f.controller.openDataProofreading();
+    expect(f.controller.proofreadingDraft.value.range).toBe("");
+    f.controller.scanDataProofreadingResults();
+    expect(f.controller.proofreadingIssues.value.map((issue) => issue.address)).toEqual([
+      "F5",
+      "U10000",
+    ]);
+    expect(f.controller.proofreadingDraft.value.range).toBe("");
+    f.set(19999, 30, "64");
+    f.controller.scanDataProofreadingResults();
+    expect(f.controller.proofreadingIssues.value.map((issue) => issue.address)).toEqual([
+      "F5",
+      "U10000",
+      "AE20000",
+    ]);
+  });
+
+  test("honors an optional explicit range and clears its results when the scope changes", () => {
+    const f = fixture();
+    f.set(0, 0, "42");
+    f.set(10, 10, "64");
+    f.controller.openDataProofreading();
+    f.controller.scanDataProofreadingResults({ range: "A1:A2" });
+    expect(f.controller.proofreadingIssues.value.map((issue) => issue.address)).toEqual(["A1"]);
+    f.controller.setSelectedProofreadingIssueIds([f.controller.proofreadingIssues.value[0]!.id]);
+    f.controller.updateDataProofreadingDraft({ range: "" });
+    expect(f.controller.proofreadingIssues.value).toEqual([]);
+    expect(f.controller.selectedProofreadingIssueIds.value).toEqual([]);
+    expect(f.controller.proofreadingHasScanned.value).toBe(false);
+    f.controller.scanDataProofreadingResults();
+    expect(f.controller.proofreadingIssues.value.map((issue) => issue.address)).toEqual([
+      "A1",
+      "K11",
+    ]);
+  });
+
+  test("accepts an empty worksheet without requiring a range", () => {
+    const f = fixture();
+    f.controller.openDataProofreading();
+    f.controller.scanDataProofreadingResults();
+    expect(f.controller.proofreadingError.value).toBe("");
+    expect(f.controller.proofreadingHasScanned.value).toBe(true);
+    expect(f.controller.proofreadingIssues.value).toEqual([]);
   });
 
   test("keeps scan results visible when the source cell changes before an apply", () => {

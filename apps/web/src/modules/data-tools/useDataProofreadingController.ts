@@ -4,12 +4,13 @@ import {
   scanDataProofreading,
   type DataProofreadingIssue as CoreDataProofreadingIssue,
 } from "@idea10/core/data-proofreading";
-import { resolveDataRange } from "@idea10/core/data-range";
 import { formatCellAddress } from "@idea10/core/coordinates";
 import type { WorkbookCommand } from "@idea10/core/commands";
 import { WorkbookDomainError } from "@idea10/core/errors";
 import {
   getActiveSheet,
+  MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
   type CellAddress,
   type CellRange,
   type Workbook,
@@ -27,7 +28,6 @@ import type {
 
 type Options = {
   getWorkbook: () => Workbook;
-  getSelection: () => { range: CellRange };
   getGeneration: () => number;
   /** Revision is optional so isolated controller tests can use the existing workspace fixture. */
   getRevision?: () => number;
@@ -97,14 +97,13 @@ export function useDataProofreadingController(options: Options) {
     if (options.isBusy() || !options.flush()) return;
     const workbook = options.getWorkbook();
     const sheet = getActiveSheet(workbook);
-    const range = resolveDataRange(sheet, options.getSelection().range);
     target = {
       workbook,
       generation: options.getGeneration(),
       ...(options.getRevision ? { revision: options.getRevision() } : {}),
       sheetId: sheet.id,
     };
-    proofreadingDraft.value = { range: formatRangeReference(sheet.name, normalizeRange(range)) };
+    proofreadingDraft.value = emptyDraft();
     rawIssues.value = [];
     proofreadingHasScanned.value = false;
     selectedProofreadingIssueIds.value = [];
@@ -113,6 +112,11 @@ export function useDataProofreadingController(options: Options) {
   }
 
   function updateDataProofreadingDraft(draft: DataProofreadingDraft): void {
+    if (draft.range !== proofreadingDraft.value.range) {
+      rawIssues.value = [];
+      proofreadingHasScanned.value = false;
+      selectedProofreadingIssueIds.value = [];
+    }
     proofreadingDraft.value = { range: draft.range };
     proofreadingError.value = "";
   }
@@ -137,7 +141,16 @@ export function useDataProofreadingController(options: Options) {
       return;
     }
     if (options.isBusy() || !options.flush()) return;
-    const source = resolveRangeReference(options.getWorkbook(), draft.range, target.sheetId);
+    const wholeSheet = !draft.range.trim();
+    const source = wholeSheet
+      ? {
+          sheetId: getActiveSheet(options.getWorkbook()).id,
+          range: {
+            start: { row: 0, column: 0 },
+            end: { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 },
+          },
+        }
+      : resolveRangeReference(options.getWorkbook(), draft.range, target.sheetId);
     if (!source) {
       proofreadingError.value = t("proofreading.invalidRange");
       return;
@@ -159,10 +172,12 @@ export function useDataProofreadingController(options: Options) {
         sheetId: source.sheetId,
       };
       proofreadingDraft.value = {
-        range: formatRangeReference(
-          options.getWorkbook().sheets.get(source.sheetId)!.name,
-          source.range,
-        ),
+        range: wholeSheet
+          ? ""
+          : formatRangeReference(
+              options.getWorkbook().sheets.get(source.sheetId)!.name,
+              source.range,
+            ),
       };
     } catch (cause) {
       const isTooLarge =
