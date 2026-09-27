@@ -535,10 +535,13 @@ defineExpose({
 
 <style scoped lang="scss">
 .workbook-formula-bar {
+  --formula-bar-action-size: var(--td-comp-size-m);
+  --formula-bar-action-gap: var(--idea-space-2);
+
   display: grid;
-  grid-template-columns: 132px minmax(0, 1fr) 1px 28px;
-  gap: var(--idea-space-4);
-  align-items: start;
+  grid-template-columns: 80px minmax(0, 1fr) 1px var(--formula-bar-action-size);
+  gap: var(--formula-bar-action-gap);
+  align-items: center;
   min-width: 0;
   padding: var(--idea-space-2) var(--idea-space-4);
   background: var(--idea-surface-secondary);
@@ -546,8 +549,11 @@ defineExpose({
 
   &__editor {
     display: grid;
-    grid-template-columns: 56px minmax(0, 1fr) 24px 24px;
-    align-items: start;
+    grid-template-columns:
+      calc(2 * var(--formula-bar-action-size) + var(--formula-bar-action-gap))
+      minmax(0, 1fr) repeat(2, var(--formula-bar-action-size));
+    gap: var(--formula-bar-action-gap);
+    align-items: center;
     min-width: 0;
 
     &.is-expanded {
@@ -564,15 +570,19 @@ defineExpose({
   }
 
   &__leading-actions {
-    display: inline-flex;
+    display: grid;
+    grid-template-columns: repeat(2, var(--formula-bar-action-size));
+    gap: var(--formula-bar-action-gap);
     align-items: center;
-    justify-content: space-around;
-    width: 56px;
-    height: 28px;
+    height: var(--formula-bar-action-size);
     color: var(--idea-text-secondary);
   }
 
   &__action {
+    box-sizing: border-box;
+    width: var(--formula-bar-action-size);
+    height: var(--formula-bar-action-size);
+    padding: calc((var(--formula-bar-action-size) - 15px) / 2);
     flex: none;
     cursor: pointer;
     color: var(--idea-text-secondary);
@@ -595,26 +605,19 @@ defineExpose({
   }
 
   &__fx {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
     font-family: Georgia, serif;
     font-size: 14px;
     font-style: italic;
-  }
-
-  &__editor-trigger,
-  &__expand-trigger {
-    justify-self: center;
-    margin-top: 6.5px;
   }
 
   &__expand-trigger {
     &.is-expanded {
       transform: rotate(180deg);
     }
-  }
-
-  &__search-trigger {
-    justify-self: center;
-    margin-top: 6.5px;
   }
 
   &__search-divider {
@@ -624,8 +627,7 @@ defineExpose({
   }
 
   @media (max-width: 520px) {
-    grid-template-columns: 88px minmax(0, 1fr) 1px 28px;
-    gap: var(--idea-space-2);
+    grid-template-columns: 72px minmax(0, 1fr) 1px var(--formula-bar-action-size);
     padding-inline: var(--idea-space-2);
   }
 }
