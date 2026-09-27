@@ -514,6 +514,7 @@ defineExpose({
         @keydown.space.prevent="openFormulaEditor"
       />
     </div>
+    <span class="workbook-formula-bar__search-divider" aria-hidden="true" />
     <Search
       ref="searchTrigger"
       class="workbook-formula-bar__action workbook-formula-bar__search-trigger"
@@ -535,7 +536,7 @@ defineExpose({
 <style scoped lang="scss">
 .workbook-formula-bar {
   display: grid;
-  grid-template-columns: 132px minmax(0, 1fr) 28px;
+  grid-template-columns: 132px minmax(0, 1fr) 1px 28px;
   gap: var(--idea-space-4);
   align-items: start;
   min-width: 0;
@@ -616,8 +617,14 @@ defineExpose({
     margin-top: 6.5px;
   }
 
+  &__search-divider {
+    align-self: center;
+    height: 16px;
+    background: var(--idea-border-control);
+  }
+
   @media (max-width: 520px) {
-    grid-template-columns: 88px minmax(0, 1fr) 28px;
+    grid-template-columns: 88px minmax(0, 1fr) 1px 28px;
     gap: var(--idea-space-2);
     padding-inline: var(--idea-space-2);
   }
