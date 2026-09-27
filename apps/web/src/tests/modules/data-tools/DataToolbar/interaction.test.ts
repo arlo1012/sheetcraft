@@ -10,6 +10,7 @@ const capabilities = {
   subtotal: true,
   ungroupRows: true,
   ungroupColumns: true,
+  clearOutline: true,
   expand: true,
   collapse: true,
   clearFilter: true,
@@ -103,12 +104,34 @@ describe("DataToolbar", () => {
     expect(new DOMWrapper(document.body).find('[data-data-group="columns"]').exists()).toBe(false);
     wrapper.unmount();
   });
-  test("disables the Ungroup menu when neither axis has a group", () => {
+  test("keeps Clear Outline available when the selection cannot be ungrouped", async () => {
     const wrapper = mount(DataToolbar, {
+      attachTo: document.body,
       global: { plugins: [createAppI18n("en-US")] },
       props: { capabilities: { ...capabilities, ungroupRows: false, ungroupColumns: false } },
     });
-    expect(wrapper.get('[data-data-action="ungroup"]').attributes("disabled")).toBe("");
+    await wrapper.get('[data-data-action="ungroup"]').trigger("click");
+    const menu = new DOMWrapper(document.body);
+    expect(menu.get("[data-data-ungroup]").attributes("aria-disabled")).toBe("true");
+    await menu.get("[data-data-clear-outline]").trigger("click");
+    expect(wrapper.emitted("clearOutline")).toEqual([[]]);
+    wrapper.unmount();
+  });
+
+  test("opens Ungroup selection and forwards the chosen axis", async () => {
+    const wrapper = mount(DataToolbar, {
+      attachTo: document.body,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { capabilities },
+    });
+    await wrapper.get('[data-data-action="ungroup"]').trigger("click");
+    await new DOMWrapper(document.body).get("[data-data-ungroup]").trigger("click");
+    expect(new DOMWrapper(document.body).get(".outline-ungroup-dialog").text()).toContain(
+      "Select what to ungroup",
+    );
+    await wrapper.findComponent({ name: "OutlineUngroupDialog" }).vm.$emit("confirm", "columns");
+    expect(wrapper.emitted("ungroup")).toEqual([["columns"]]);
+    wrapper.unmount();
   });
   test("opens the Filter split menu and forwards Advanced Filter", async () => {
     const wrapper = mount(DataToolbar, {

@@ -530,7 +530,11 @@ watch([workbookGeneration, () => activeSheet.value.id], () => {
 });
 const dataTools = useDataToolsController({
   getWorkbook: () => session.workbook,
-  getSelection: () => ({ address: activeAddress.value, range: activeSelectionRange.value }),
+  getSelection: () => ({
+    address: activeAddress.value,
+    range: activeSelectionRange.value,
+    mode: activeSelectionMode.value,
+  }),
   getSheetEvaluator: () => activeSheetEvaluator.value,
   getGeneration: () => workbookGeneration.value,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
@@ -1017,6 +1021,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @open-fill-text="dataTools.openFillText"
           @group="dataTools.group"
           @ungroup="dataTools.ungroup"
+          @clear-outline="dataTools.clearOutline"
           @expand="dataTools.setGroupsCollapsed(false)"
           @collapse="dataTools.setGroupsCollapsed(true)"
           @open-subtotal="dataTools.openSubtotal"

@@ -9,10 +9,11 @@ import {
   createMultiKeySortSheetRangeCommand,
   createRemoveDuplicatesCommand,
   createRemoveSubtotalsCommand,
-  createRemoveSheetOutlineGroupCommand,
+  createUngroupSheetRangeCommand,
+  createClearSheetOutlineCommand,
   createSetSheetDataValidationsCommand,
   createSetSheetFilterCriteriaCommand,
-  createSetSheetOutlineGroupCollapsedCommand,
+  createSetSheetOutlineGroupsCollapsedCommand,
   createSplitColumnCommand,
   getRemoveDuplicatesCount,
   getSheetFilterColumnValueCounts,
@@ -67,10 +68,17 @@ import type {
   TextToColumnsDraft,
 } from "./data-tools-types";
 
+import {
+  canUngroupOutlineRange,
+  getOutlineSelectionRoots,
+  getOutlineDetailTargets,
+  type OutlineSelection,
+} from "./outline-selection";
+
 type Target = DataToolRangeSnapshot;
 type Options = {
   getWorkbook: () => Workbook;
-  getSelection: () => { address: CellAddress; range: CellRange };
+  getSelection: () => OutlineSelection & { address: CellAddress };
   getSheetEvaluator: () => SheetEvaluator;
   getGeneration: () => number;
   isBusy: () => boolean;
@@ -154,15 +162,9 @@ export function useDataToolsController(options: Options) {
   const filterPanel = ref<{ column: number; anchor?: DataToolFilterAnchor; target: Target }>();
   const activeSheet = computed(() => getActiveSheet(options.getWorkbook()));
   const disabled = computed(() => options.isBusy() || activeSheet.value.properties.protected);
-  const selectedGroups = computed(() => {
-    const { address } = options.getSelection();
-    return (activeSheet.value.outlineGroups ?? [])
-      .filter((group) => {
-        const index = group.axis === "row" ? address.row : address.column;
-        return group.start <= index && group.end >= index;
-      })
-      .sort((left, right) => left.end - left.start - (right.end - right.start));
-  });
+  const selectedOutlineRoots = computed(() =>
+    getOutlineSelectionRoots(activeSheet.value, options.getSelection()),
+  );
   const capabilities = computed<DataToolCapabilities>(() => {
     const sheet = activeSheet.value;
     const selection = options.getSelection();
@@ -183,10 +185,11 @@ export function useDataToolsController(options: Options) {
       subtotal:
         (rows > 1 && range.end.column > range.start.column && !filtered && !merged) ||
         Boolean(sheet.subtotalMetadata?.length),
-      ungroupRows: selectedGroups.value.some((group) => group.axis === "row"),
-      ungroupColumns: selectedGroups.value.some((group) => group.axis === "column"),
-      expand: selectedGroups.value.some((group) => group.collapsed),
-      collapse: selectedGroups.value.some((group) => !group.collapsed),
+      ungroupRows: canUngroupOutlineRange(sheet, selection, "row"),
+      ungroupColumns: canUngroupOutlineRange(sheet, selection, "column"),
+      clearOutline: Boolean(sheet.outlineGroups?.length),
+      expand: getOutlineDetailTargets(sheet, selectedOutlineRoots.value, false).length > 0,
+      collapse: getOutlineDetailTargets(sheet, selectedOutlineRoots.value, true).length > 0,
       clearFilter: Boolean(sheet.filter?.columns.length || sheet.filter?.advanced),
     };
   });
@@ -782,19 +785,35 @@ export function useDataToolsController(options: Options) {
   function ungroup(axis: DataToolAxis): void {
     const target = capture(false);
     if (!target) return;
-    const group = selectedGroups.value.find(
-      (item) => item.axis === (axis === "rows" ? "row" : "column"),
+    const dimension = axis === "rows" ? "row" : "column";
+    if (!canUngroupOutlineRange(activeSheet.value, options.getSelection(), dimension)) return;
+    execute(target, () =>
+      createUngroupSheetRangeCommand(
+        target.sheetId,
+        dimension,
+        Math.min(target.range.start[dimension], target.range.end[dimension]),
+        Math.max(target.range.start[dimension], target.range.end[dimension]),
+      ),
     );
-    if (group)
-      execute(target, () => createRemoveSheetOutlineGroupCommand(target.sheetId, group.id));
+  }
+  function clearOutline(): void {
+    const target = capture(false);
+    if (target && activeSheet.value.outlineGroups?.length)
+      execute(target, () => createClearSheetOutlineCommand(target.sheetId));
   }
   function setGroupsCollapsed(collapsed: boolean): void {
     const target = capture(false);
     if (!target) return;
-    const group = selectedGroups.value.find((item) => Boolean(item.collapsed) !== collapsed);
-    if (group)
+    const sheet = activeSheet.value;
+    const roots = getOutlineSelectionRoots(sheet, options.getSelection());
+    const groups = getOutlineDetailTargets(sheet, roots, collapsed);
+    if (groups.length)
       execute(target, () =>
-        createSetSheetOutlineGroupCollapsedCommand(target.sheetId, group.id, collapsed),
+        createSetSheetOutlineGroupsCollapsedCommand(
+          target.sheetId,
+          groups.map((group) => group.id),
+          collapsed,
+        ),
       );
   }
   function openSubtotal(): void {
@@ -974,6 +993,7 @@ export function useDataToolsController(options: Options) {
     clearValidation,
     group,
     ungroup,
+    clearOutline,
     setGroupsCollapsed,
     openSubtotal,
     applySubtotal,

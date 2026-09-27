@@ -37,9 +37,12 @@ import {
 } from "./duplicates.js";
 import {
   applyAddSheetOutlineGroupCommand,
+  applyClearSheetOutlineCommand,
   applyRemoveSheetOutlineGroupCommand,
   applySetSheetOutlineGroupCollapsedCommand,
+  applySetSheetOutlineGroupsCollapsedCommand,
   applySetSheetOutlineLevelCommand,
+  applyUngroupSheetRangeCommand,
 } from "./outline.js";
 import {
   applyMergeCellsCommand,
@@ -136,7 +139,10 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "addSheetOutlineGroup":
     case "removeSheetOutlineGroup":
     case "setSheetOutlineGroupCollapsed":
+    case "setSheetOutlineGroupsCollapsed":
     case "setSheetOutlineLevel":
+    case "clearSheetOutline":
+    case "ungroupSheetRange":
     case "setFloatingImage":
     case "deleteFloatingImage":
     case "convertFloatingImageToCell":
@@ -247,8 +253,14 @@ export function applyWorkbookCommand(
         return applyRemoveSheetOutlineGroupCommand(workbook, command);
       case "setSheetOutlineGroupCollapsed":
         return applySetSheetOutlineGroupCollapsedCommand(workbook, command);
+      case "setSheetOutlineGroupsCollapsed":
+        return applySetSheetOutlineGroupsCollapsedCommand(workbook, command);
       case "setSheetOutlineLevel":
         return applySetSheetOutlineLevelCommand(workbook, command);
+      case "clearSheetOutline":
+        return applyClearSheetOutlineCommand(workbook, command);
+      case "ungroupSheetRange":
+        return applyUngroupSheetRangeCommand(workbook, command);
       case "setFloatingImage":
         return applySetFloatingImageCommand(workbook, command);
       case "deleteFloatingImage":

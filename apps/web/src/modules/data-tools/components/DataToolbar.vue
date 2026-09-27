@@ -72,6 +72,7 @@ const emit = defineEmits<{
   flashFill: [];
   group: [axis: "rows" | "columns"];
   ungroup: [axis: "rows" | "columns"];
+  clearOutline: [];
   expand: [];
   collapse: [];
   openSubtotal: [];
@@ -204,8 +205,10 @@ const { t } = useAppI18n();
         :disabled="disabled"
         :ungroup-rows="capabilities.ungroupRows"
         :ungroup-columns="capabilities.ungroupColumns"
+        :clear-outline="capabilities.clearOutline"
         @group="emit('group', $event)"
         @ungroup="emit('ungroup', $event)"
+        @clear-outline="emit('clearOutline')"
       />
       <div class="data-toolbar__stack data-toolbar__stack--outline">
         <RibbonButton

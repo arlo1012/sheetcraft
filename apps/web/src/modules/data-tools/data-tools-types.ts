@@ -17,6 +17,7 @@ export type DataToolCapabilities = {
   subtotal: boolean;
   ungroupRows: boolean;
   ungroupColumns: boolean;
+  clearOutline: boolean;
   expand: boolean;
   collapse: boolean;
   clearFilter: boolean;

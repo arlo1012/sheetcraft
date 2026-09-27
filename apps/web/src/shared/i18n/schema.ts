@@ -585,6 +585,10 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       pageBreaks: string;
       group: string;
       ungroup: string;
+      ungroupMenuItem: string;
+      ungroupDialogTitle: string;
+      ungroupAxis: string;
+      clearOutline: string;
       rows: string;
       columns: string;
       expand: string;

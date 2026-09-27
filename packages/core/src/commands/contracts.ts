@@ -341,11 +341,31 @@ export type SetSheetOutlineGroupCollapsedCommand = {
   id: string;
   collapsed: boolean;
 };
+/** Sets multiple outline controls in one history operation. */
+export type SetSheetOutlineGroupsCollapsedCommand = {
+  type: "setSheetOutlineGroupsCollapsed";
+  sheetId: string;
+  ids: string[];
+  collapsed: boolean;
+};
 export type SetSheetOutlineLevelCommand = {
   type: "setSheetOutlineLevel";
   sheetId: string;
   axis: SheetDimensionAxis;
   level: number;
+};
+/** Removes all row and column outline groups while preserving sheet contents and dimensions. */
+export type ClearSheetOutlineCommand = {
+  type: "clearSheetOutline";
+  sheetId: string;
+};
+/** Lowers the outline level for the selected row or column band by one. */
+export type UngroupSheetRangeCommand = {
+  type: "ungroupSheetRange";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  start: number;
+  end: number;
 };
 
 export type AddSheetCommand = {
@@ -586,7 +606,10 @@ export type WorkbookCommand =
   | AddSheetOutlineGroupCommand
   | RemoveSheetOutlineGroupCommand
   | SetSheetOutlineGroupCollapsedCommand
+  | SetSheetOutlineGroupsCollapsedCommand
   | SetSheetOutlineLevelCommand
+  | ClearSheetOutlineCommand
+  | UngroupSheetRangeCommand
   | SetFloatingImageCommand
   | DeleteFloatingImageCommand
   | ConvertFloatingImageToCellCommand
@@ -713,7 +736,10 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "addSheetOutlineGroup":
     case "removeSheetOutlineGroup":
     case "setSheetOutlineGroupCollapsed":
+    case "setSheetOutlineGroupsCollapsed":
     case "setSheetOutlineLevel":
+    case "clearSheetOutline":
+    case "ungroupSheetRange":
       return "data.outline";
     case "setFloatingImage":
       return "images.floating.set";
