@@ -35,9 +35,7 @@ describe("SpreadsheetRibbon", () => {
     );
     expect(wrapper.get(".home-format-toolbar").attributes("aria-label")).toBe("Cell formatting");
     expect(
-      wrapper.get(
-        "[data-ribbon-tools] > [data-ribbon-scroll-viewport] > .home-format-toolbar__rail",
-      ),
+      wrapper.get("[data-ribbon-tools] > [data-ribbon-scroll-viewport] > [data-ribbon-rail]"),
     ).toBeTruthy();
     expect(
       new Set(

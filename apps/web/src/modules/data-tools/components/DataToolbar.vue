@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   ListFilter,
 } from "lucide-vue-next";
+import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { DataToolCapabilities } from "../data-tools-types";
@@ -80,16 +81,15 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 </script>
 <template>
-  <div
+  <RibbonToolbar
     class="data-toolbar"
-    data-ribbon-tools
-    role="group"
-    :aria-label="t('dataTools.toolbar')"
+    :label="t('dataTools.toolbar')"
     :data-cell-edit-session="editSessionId"
   >
     <section
       class="data-toolbar__group"
       role="group"
+      data-ribbon-group="data-sort-filter"
       :aria-label="t('dataTools.groups.sortFilter')"
     >
       <DataSortTool
@@ -120,7 +120,12 @@ const { t } = useAppI18n();
         /></RibbonButton>
       </div>
     </section>
-    <section class="data-toolbar__group" role="group" :aria-label="t('dataTools.groups.cleanup')">
+    <section
+      class="data-toolbar__group"
+      role="group"
+      data-ribbon-group="data-cleanup"
+      :aria-label="t('dataTools.groups.cleanup')"
+    >
       <RibbonButton
         variant="tall"
         :disabled="disabled || !capabilities.split"
@@ -192,7 +197,12 @@ const { t } = useAppI18n();
         ><Combine
       /></RibbonButton>
     </section>
-    <section class="data-toolbar__group" role="group" :aria-label="t('dataTools.groups.outline')">
+    <section
+      class="data-toolbar__group"
+      role="group"
+      data-ribbon-group="data-outline"
+      :aria-label="t('dataTools.groups.outline')"
+    >
       <RibbonButton
         variant="tall"
         :disabled="disabled || !capabilities.subtotal"
@@ -228,21 +238,13 @@ const { t } = useAppI18n();
         /></RibbonButton>
       </div>
     </section>
-  </div>
+  </RibbonToolbar>
 </template>
 <style scoped lang="scss">
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
 .data-toolbar {
-  @include ribbon.columns;
-  padding-block: 5px;
   &__group {
     @include ribbon.columns;
-    gap: var(--idea-space-1);
-    padding-right: var(--idea-space-2);
-    border-right: 1px solid var(--idea-border-subtle);
-    &:last-child {
-      border-right: 0;
-    }
   }
   &__stack {
     @include ribbon.stack;

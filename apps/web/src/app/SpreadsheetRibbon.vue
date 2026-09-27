@@ -279,7 +279,7 @@ defineSlots<{
   }
 
   &__panel {
-    flex: 0 0 68px;
+    flex: 0 0 var(--idea-ribbon-toolbar-height);
     min-width: 0;
     margin: 0 8px;
     overflow: hidden;

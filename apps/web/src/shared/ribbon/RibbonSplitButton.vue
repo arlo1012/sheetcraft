@@ -150,7 +150,7 @@ function toggleMenu(): void {
     align-self: stretch;
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 58px);
-    height: calc(var(--ribbon-control-height, 26px) * 2 + var(--ribbon-row-gap, 2px));
+    height: var(--idea-ribbon-content-height, 54px);
     padding: 0;
 
     &.is-full-width {

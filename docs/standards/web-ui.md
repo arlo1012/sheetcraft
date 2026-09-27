@@ -75,10 +75,16 @@ CSS pixels at 100% scale; size and line height are a pair.
   semantic line weights. Dropdown indicators and dialog launchers keep their
   separate shared auxiliary sizes.
 
+- All toolbar tabs compose their concrete feature groups inside `RibbonToolbar`.
+  It owns the viewport, rail, overflow scrolling, and focus visibility; do not
+  recreate those containers in feature toolbars. Use `ribbon.columns` or
+  `ribbon.compact` for group shells, `ribbon.stack`/`ribbon.two-rows` for action
+  columns, and `ribbon.row` for compact rows. Keep only feature-specific column
+  widths and horizontal arrangements local.
 - Tall actions and stacked compact actions share a 54px height (two 26px rows
   with a 2px gap). Tall action icons and labels occupy those same two rows;
-  derive the height from the shared row height and gap instead of centering a
-  separate icon/text cluster.
+  derive dimensions from the shared `--idea-ribbon-*` tokens rather than adding
+  local height or row-gap values.
 
 - In `shared/ribbon`, use `RibbonButton` for actions/pressed states,
   `RibbonMenuButton` for popup triggers, and `RibbonSplitButton` for action + popup.

@@ -105,11 +105,10 @@ function toggleWrapText(state: ToggleStyleState): void {
   @include ribbon.dialog-launcher-anchor;
 
   &__row {
+    @include ribbon.row;
     display: grid;
     grid-template-columns: calc(5 * var(--ribbon-button-width, 27px)) minmax(72px, 1fr);
-    align-items: center;
     gap: 4px;
-    min-height: var(--ribbon-control-height, 26px);
   }
 
   &__leading {

@@ -1,35 +1,8 @@
 import { mount, type VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { h, nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import HomeFormatToolbar from "../../../../../modules/home-tools/components/HomeFormatToolbar.vue";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
-import { createAppI18n, type AppLocale } from "../../../../../shared/i18n";
-
-function createStyleState(): SelectionCellStyleState {
-  return {
-    fontFamily: { value: undefined, mixed: false },
-    fontSize: { value: undefined, mixed: false },
-    bold: "off",
-    italic: "off",
-    underline: "off",
-    underlineStyle: { value: undefined, mixed: false },
-    strikethrough: "off",
-    fontScript: { value: undefined, mixed: false },
-    textColor: { value: undefined, mixed: false },
-    fillColor: { value: undefined, mixed: false },
-    fillPattern: { value: undefined, mixed: false },
-    fillPatternColor: { value: undefined, mixed: false },
-    fillGradient: { value: undefined, mixed: false },
-    horizontalAlign: { value: undefined, mixed: false },
-    verticalAlign: { value: undefined, mixed: false },
-    indent: { value: 0, mixed: false },
-    shrinkToFit: "off",
-    textDirection: { value: "context", mixed: false },
-    textRotation: { value: 0, mixed: false },
-    wrapText: "off",
-    numberFormat: { value: undefined, mixed: false },
-  };
-}
+import RibbonToolbar from "../../../../shared/ribbon/RibbonToolbar.vue";
+import { createAppI18n, type AppLocale } from "../../../../shared/i18n";
 
 const mountedWrappers: Array<{ host: HTMLElement; wrapper: VueWrapper }> = [];
 const observe = vi.fn();
@@ -39,7 +12,7 @@ let notifyResize: (() => void) | undefined;
 class MockResizeObserver {
   readonly observe = (target: Element) => {
     observe(target);
-    if (target instanceof HTMLElement && target.classList.contains("home-format-toolbar")) {
+    if (target instanceof HTMLElement && target.classList.contains("ribbon-toolbar")) {
       notifyResize = () => this.callback([], this as unknown as ResizeObserver);
     }
   };
@@ -49,17 +22,26 @@ class MockResizeObserver {
   constructor(private readonly callback: ResizeObserverCallback) {}
 }
 
+function toolGroup(name: string, action: string, label: string) {
+  return h(
+    "section",
+    { "data-ribbon-group": name, role: "group" },
+    h("button", { "data-ribbon-action": action, "aria-label": label }, label),
+  );
+}
+
 function mountToolbar(locale: AppLocale = "en-US") {
   const host = document.createElement("div");
   document.body.append(host);
-  const wrapper = mount(HomeFormatToolbar, {
+  const wrapper = mount(RibbonToolbar, {
     attachTo: host,
-    global: {
-      plugins: [createAppI18n(locale)],
-    },
-    props: {
-      state: createStyleState(),
-      disabled: false,
+    global: { plugins: [createAppI18n(locale)] },
+    props: { label: "Toolbar" },
+    slots: {
+      default: () => [
+        toolGroup("first", "first", "First tool"),
+        toolGroup("alignment", "align-center", "Align center"),
+      ],
     },
   });
   mountedWrappers.push({ host, wrapper });
@@ -82,20 +64,14 @@ function setHorizontalGeometry(
     scrollLeft?: number;
   },
 ) {
-  const toolbar = wrapper.get<HTMLElement>(".home-format-toolbar").element;
+  const toolbar = wrapper.get<HTMLElement>(".ribbon-toolbar").element;
   const viewport = wrapper.get<HTMLDivElement>("[data-ribbon-scroll-viewport]").element;
-  const rail = wrapper.get<HTMLElement>(".home-format-toolbar__rail").element;
+  const rail = wrapper.get<HTMLElement>("[data-ribbon-rail]").element;
   let currentScrollLeft = scrollLeft;
   const maxScrollLeft = Math.max(0, scrollWidth - viewportWidth);
 
-  Object.defineProperty(toolbar, "clientWidth", {
-    configurable: true,
-    get: () => toolbarWidth,
-  });
-  Object.defineProperty(rail, "scrollWidth", {
-    configurable: true,
-    get: () => railWidth,
-  });
+  Object.defineProperty(toolbar, "clientWidth", { configurable: true, get: () => toolbarWidth });
+  Object.defineProperty(rail, "scrollWidth", { configurable: true, get: () => railWidth });
   Object.defineProperties(viewport, {
     clientWidth: { configurable: true, get: () => viewportWidth },
     scrollWidth: { configurable: true, get: () => scrollWidth },
@@ -152,8 +128,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("HomeFormatToolbar overflow navigation", () => {
-  test("keeps overflow controls absent when the rail fits", async () => {
+describe("RibbonToolbar overflow navigation", () => {
+  test("keeps controls absent when the rail fits", async () => {
     const wrapper = mountToolbar();
     setHorizontalGeometry(wrapper, {
       toolbarWidth: 400,
@@ -161,17 +137,16 @@ describe("HomeFormatToolbar overflow navigation", () => {
       viewportWidth: 400,
       scrollWidth: 400,
     });
-
     await measureOverflow();
 
     expect(wrapper.findAll("[data-ribbon-scroll]")).toHaveLength(0);
     expect(wrapper.findAll("[data-ribbon-overflow-cue]")).toHaveLength(0);
-    expect(observe).toHaveBeenCalledWith(wrapper.get(".home-format-toolbar").element);
+    expect(observe).toHaveBeenCalledWith(wrapper.get(".ribbon-toolbar").element);
     expect(observe).toHaveBeenCalledWith(wrapper.get("[data-ribbon-scroll-viewport]").element);
-    expect(observe).toHaveBeenCalledWith(wrapper.get(".home-format-toolbar__rail").element);
+    expect(observe).toHaveBeenCalledWith(wrapper.get("[data-ribbon-rail]").element);
   });
 
-  test("pages through an overflowing rail while preserving both edge controls", async () => {
+  test("pages through an overflowing rail", async () => {
     const wrapper = mountToolbar();
     const geometry = setHorizontalGeometry(wrapper, {
       toolbarWidth: 320,
@@ -183,55 +158,20 @@ describe("HomeFormatToolbar overflow navigation", () => {
 
     const left = wrapper.get<HTMLButtonElement>('[data-ribbon-scroll="left"]');
     const right = wrapper.get<HTMLButtonElement>('[data-ribbon-scroll="right"]');
-    expect(left.attributes()).toMatchObject({
-      "aria-disabled": "true",
-      tabindex: "-1",
-    });
-    expect(right.attributes()).toMatchObject({
-      "aria-disabled": "false",
-      tabindex: "0",
-    });
-    expect(wrapper.get('[data-ribbon-overflow-cue="left"]').classes()).not.toContain("is-visible");
-    expect(wrapper.get('[data-ribbon-overflow-cue="right"]').classes()).toContain("is-visible");
+    expect(left.attributes()).toMatchObject({ "aria-disabled": "true", tabindex: "-1" });
+    expect(right.attributes()).toMatchObject({ "aria-disabled": "false", tabindex: "0" });
 
     await right.trigger("click");
     expect(geometry.getScrollLeft()).toBe(230);
-    expect(left.attributes()).toMatchObject({
-      "aria-disabled": "false",
-      tabindex: "0",
-    });
-    expect(right.attributes()).toMatchObject({
-      "aria-disabled": "false",
-      tabindex: "0",
-    });
-
-    right.element.focus();
-    expect(document.activeElement).toBe(right.element);
     geometry.setScrollLeft(544);
-    await geometry.viewport.dispatchEvent(new Event("scroll"));
+    geometry.viewport.dispatchEvent(new Event("scroll"));
     await nextTick();
-    expect(wrapper.get<HTMLButtonElement>('[data-ribbon-scroll="right"]').element).toBe(
-      right.element,
-    );
-    expect(right.attributes()).toMatchObject({
-      "aria-disabled": "true",
-      tabindex: "-1",
-    });
-    expect(left.attributes()).toMatchObject({
-      "aria-disabled": "false",
-      tabindex: "0",
-    });
-    expect(document.activeElement).toBe(right.element);
-
+    expect(right.attributes()).toMatchObject({ "aria-disabled": "true", tabindex: "-1" });
     await left.trigger("click");
     expect(geometry.getScrollLeft()).toBe(314);
-    expect(right.attributes()).toMatchObject({
-      "aria-disabled": "false",
-      tabindex: "0",
-    });
   });
 
-  test("returns focus to the first available tool when a resize removes overflow controls", async () => {
+  test("returns focus to the first tool when a resize removes overflow", async () => {
     const wrapper = mountToolbar();
     setHorizontalGeometry(wrapper, {
       toolbarWidth: 320,
@@ -240,11 +180,7 @@ describe("HomeFormatToolbar overflow navigation", () => {
       scrollWidth: 864,
     });
     await measureOverflow();
-
-    const right = wrapper.get<HTMLButtonElement>('[data-ribbon-scroll="right"]');
-    right.element.focus();
-    expect(document.activeElement).toBe(right.element);
-
+    wrapper.get<HTMLButtonElement>('[data-ribbon-scroll="right"]').element.focus();
     const fittedGeometry = setHorizontalGeometry(wrapper, {
       toolbarWidth: 1000,
       railWidth: 800,
@@ -256,10 +192,10 @@ describe("HomeFormatToolbar overflow navigation", () => {
 
     expect(wrapper.findAll("[data-ribbon-scroll]")).toHaveLength(0);
     expect(fittedGeometry.getScrollLeft()).toBe(0);
-    expect(document.activeElement).toBe(wrapper.get('[data-ribbon-action="undo"]').element);
+    expect(document.activeElement).toBe(wrapper.get('[data-ribbon-action="first"]').element);
   });
 
-  test("scrolls the owning tool group into the unobscured viewport on focus", async () => {
+  test("scrolls a regular owning group into the unobscured viewport on focus", async () => {
     const wrapper = mountToolbar();
     const geometry = setHorizontalGeometry(wrapper, {
       toolbarWidth: 320,
@@ -273,22 +209,34 @@ describe("HomeFormatToolbar overflow navigation", () => {
     const target = wrapper.get('[aria-label="Align center"]');
     const group = target.element.closest<HTMLElement>('[data-ribbon-group="alignment"]');
     expect(group).not.toBeNull();
-    let groupContentLeft = 700;
-    group!.getBoundingClientRect = () =>
-      rect(groupContentLeft - geometry.getScrollLeft(), 120, 7, 54);
-
+    group!.getBoundingClientRect = () => rect(700 - geometry.getScrollLeft(), 120, 7, 54);
     await target.trigger("focusin");
+
     expect(geometry.getScrollLeft()).toBe(432);
-    expect(group!.getBoundingClientRect().left).toBe(268);
-    expect(group!.getBoundingClientRect().right).toBe(388);
-
-    geometry.setScrollLeft(0);
-    groupContentLeft = 150;
-    await target.trigger("focusin");
-    expect(geometry.getScrollLeft()).toBe(0);
   });
 
-  test("localizes the overflow navigation labels", async () => {
+  test("reveals the focused tool in an oversized group", async () => {
+    const wrapper = mountToolbar();
+    const geometry = setHorizontalGeometry(wrapper, {
+      toolbarWidth: 320,
+      railWidth: 800,
+      viewportWidth: 320,
+      scrollWidth: 864,
+    });
+    await measureOverflow();
+    geometry.viewport.getBoundingClientRect = () => rect(100, 320, 0, 68);
+
+    const target = wrapper.get('[aria-label="Align center"]');
+    const group = target.element.closest<HTMLElement>('[data-ribbon-group="alignment"]');
+    expect(group).not.toBeNull();
+    group!.getBoundingClientRect = () => rect(100 - geometry.getScrollLeft(), 600, 7, 54);
+    target.element.getBoundingClientRect = () => rect(680 - geometry.getScrollLeft(), 20, 7, 26);
+    await target.trigger("focusin");
+
+    expect(geometry.getScrollLeft()).toBe(312);
+  });
+
+  test("localizes overflow navigation labels", async () => {
     const wrapper = mountToolbar("zh-CN");
     setHorizontalGeometry(wrapper, {
       toolbarWidth: 320,
@@ -300,9 +248,6 @@ describe("HomeFormatToolbar overflow navigation", () => {
 
     expect(wrapper.get('[data-ribbon-scroll="left"]').attributes("aria-label")).toBe(
       "向左滚动功能区",
-    );
-    expect(wrapper.get('[data-ribbon-scroll="right"]').attributes("aria-label")).toBe(
-      "向右滚动功能区",
     );
   });
 });

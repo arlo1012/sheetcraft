@@ -30,6 +30,7 @@ import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismiss
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
+import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import RibbonSplitButton from "../../../shared/ribbon/RibbonSplitButton.vue";
@@ -189,380 +190,342 @@ function insertFunction(name: string): void {
 </script>
 
 <template>
-  <div
+  <RibbonToolbar
     class="formula-toolbar"
-    role="group"
-    data-ribbon-tools
-    :aria-label="t('formulaTools.toolbar')"
+    :label="t('formulaTools.toolbar')"
     :data-cell-edit-session="editSessionId"
   >
-    <div class="formula-toolbar__rail">
-      <section
-        class="formula-toolbar__group formula-toolbar__group--sum"
-        data-ribbon-group="formula-sum"
-        role="group"
-        :aria-label="t('formulaTools.autoSum')"
-      >
-        <RibbonSplitButton
-          ref="sumSplitRef"
-          variant="tall"
-          :label="t('formulaTools.autoSum')"
-          :menu-label="t('formulaTools.autoSumMenu')"
-          :text="t('formulaTools.autoSum')"
-          :disabled="disabled"
-          :menu-disabled="disabled"
-          :expanded="sumMenuOpen"
-          :menu-id="sumMenuId"
-          @activate="chooseAggregate('SUM')"
-          @toggle-menu="toggleSumMenu"
-          @menu-keydown="openSumMenuFromKeyboard"
-          ><Sigma
-        /></RibbonSplitButton>
-        <Teleport to="body"
-          ><div
-            v-if="sumMenuOpen"
-            :id="sumMenuId"
-            ref="sumPanelRef"
-            class="formula-toolbar__sum-menu"
-            role="presentation"
-            tabindex="-1"
-            :style="floatingStyles"
-            :data-cell-edit-session="editSessionId"
-          >
-            <MenuSurface ref="sumMenuRef" :label="t('formulaTools.autoSumMenu')"
-              ><MenuItem
-                v-for="aggregate in aggregates"
-                :key="aggregate.name"
-                :data-formula-aggregate="aggregate.name"
-                @select="chooseAggregate(aggregate.name)"
-                >{{ aggregate.label }}</MenuItem
-              ></MenuSurface
-            >
-          </div></Teleport
+    <section
+      class="formula-toolbar__group"
+      data-ribbon-group="formula-sum"
+      role="group"
+      :aria-label="t('formulaTools.autoSum')"
+    >
+      <RibbonSplitButton
+        ref="sumSplitRef"
+        variant="tall"
+        :label="t('formulaTools.autoSum')"
+        :menu-label="t('formulaTools.autoSumMenu')"
+        :text="t('formulaTools.autoSum')"
+        :disabled="disabled"
+        :menu-disabled="disabled"
+        :expanded="sumMenuOpen"
+        :menu-id="sumMenuId"
+        @activate="chooseAggregate('SUM')"
+        @toggle-menu="toggleSumMenu"
+        @menu-keydown="openSumMenuFromKeyboard"
+        ><Sigma
+      /></RibbonSplitButton>
+      <Teleport to="body"
+        ><div
+          v-if="sumMenuOpen"
+          :id="sumMenuId"
+          ref="sumPanelRef"
+          class="formula-toolbar__sum-menu"
+          role="presentation"
+          tabindex="-1"
+          :style="floatingStyles"
+          :data-cell-edit-session="editSessionId"
         >
-      </section>
-      <section
-        class="formula-toolbar__group formula-toolbar__group--categories"
-        data-ribbon-group="formula-categories"
-        role="group"
-        :aria-label="t('formulaTools.categories')"
+          <MenuSurface ref="sumMenuRef" :label="t('formulaTools.autoSumMenu')"
+            ><MenuItem
+              v-for="aggregate in aggregates"
+              :key="aggregate.name"
+              :data-formula-aggregate="aggregate.name"
+              @select="chooseAggregate(aggregate.name)"
+              >{{ aggregate.label }}</MenuItem
+            ></MenuSurface
+          >
+        </div></Teleport
       >
-        <div class="formula-toolbar__category-column">
-          <FormulaCategoryMenu
-            category="Financial"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          >
-            <template #icon><Banknote /></template>
-          </FormulaCategoryMenu>
-          <FormulaCategoryMenu
-            category="Logical"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          >
-            <template #icon><GitBranch /></template>
-          </FormulaCategoryMenu>
-        </div>
-        <div class="formula-toolbar__category-column">
-          <FormulaCategoryMenu
-            category="Text"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          >
-            <template #icon><CaseSensitive /></template>
-          </FormulaCategoryMenu>
-          <FormulaCategoryMenu
-            category="Date"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          >
-            <template #icon><CalendarDays /></template>
-          </FormulaCategoryMenu>
-        </div>
-        <div class="formula-toolbar__category-column">
-          <FormulaCategoryMenu
-            category="Statistical"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          >
-            <template #icon><ChartColumn /></template>
-          </FormulaCategoryMenu>
-          <FormulaCategoryMenu
-            category="Engineering"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          >
-            <template #icon><Wrench /></template>
-          </FormulaCategoryMenu>
-        </div>
-        <div class="formula-toolbar__category-column">
-          <FormulaCategoryMenu
-            category="Information"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          >
-            <template #icon><Info /></template>
-          </FormulaCategoryMenu>
-          <FormulaCategoryMenu
-            category="Database"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          >
-            <template #icon><Database /></template>
-          </FormulaCategoryMenu>
-        </div>
-        <div class="formula-toolbar__category-column">
-          <FormulaCategoryMenu
-            category="Lookup"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          >
-            <template #icon><Search /></template>
-          </FormulaCategoryMenu>
-          <FormulaCategoryMenu
-            category="Math"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          >
-            <template #icon><Radical /></template>
-          </FormulaCategoryMenu>
-        </div>
-        <div class="formula-toolbar__category-column">
-          <FormulaCategoryMenu
-            category="Compatibility"
-            :disabled="disabled"
-            :edit-session-id="editSessionId"
-            @insert-function="emit('insertFunction', $event)"
-          >
-            <template #icon><RotateCcw /></template>
-          </FormulaCategoryMenu>
-        </div>
-      </section>
-      <section
-        class="formula-toolbar__group formula-toolbar__group--actions"
-        data-ribbon-group="formula-actions"
-        role="group"
-        :aria-label="t('formulaTools.toolbar')"
-      >
-        <RibbonButton
-          variant="tall"
-          :label="t('formulaTools.nameManager')"
-          :text="t('formulaTools.nameManager')"
+    </section>
+    <section
+      class="formula-toolbar__group"
+      data-ribbon-group="formula-categories"
+      role="group"
+      :aria-label="t('formulaTools.categories')"
+    >
+      <div class="formula-toolbar__category-column">
+        <FormulaCategoryMenu
+          category="Financial"
           :disabled="disabled"
-          @activate="emit('openNames')"
-          ><Tags
-        /></RibbonButton>
-        <RibbonMenuButton
-          ref="nameQuickCreateRef"
-          variant="tall"
-          :label="t('formulaTools.quickCreateNames')"
-          :text="t('formulaTools.quickCreateNames')"
-          :disabled="disabled || !nameCreationEnabled"
-          :expanded="nameMenuOpen"
-          :menu-id="nameMenuId"
-          popup-role="dialog"
-          @activate="openNameMenu"
-          ><Plus
-        /></RibbonMenuButton>
-        <Teleport to="body"
-          ><section
-            v-if="nameMenuOpen"
-            :id="nameMenuId"
-            ref="namePanelRef"
-            class="formula-toolbar__name-menu"
-            role="dialog"
-            :aria-label="t('formulaTools.createNamesFromSelection')"
-            tabindex="-1"
-            :style="nameMenuStyles"
-            :data-cell-edit-session="editSessionId"
-          >
-            <p>{{ t("formulaTools.createNamesFromSelection") }}</p>
-            <TCheckbox v-model="namePositions.top" data-formula-name-position="top">{{
-              t("formulaTools.nameFromTopRow")
-            }}</TCheckbox>
-            <TCheckbox v-model="namePositions.left" data-formula-name-position="left">{{
-              t("formulaTools.nameFromLeftColumn")
-            }}</TCheckbox>
-            <TCheckbox v-model="namePositions.bottom" data-formula-name-position="bottom">{{
-              t("formulaTools.nameFromBottomRow")
-            }}</TCheckbox>
-            <TCheckbox v-model="namePositions.right" data-formula-name-position="right">{{
-              t("formulaTools.nameFromRightColumn")
-            }}</TCheckbox>
-            <div class="formula-toolbar__name-menu-actions">
-              <TButton variant="outline" theme="default" @click="nameMenuOpen = false">{{
-                t("formulaTools.cancel")
-              }}</TButton>
-              <TButton
-                theme="primary"
-                data-formula-name-confirm
-                :disabled="!Object.values(namePositions).some(Boolean)"
-                @click="createNamesFromSelection"
-                >{{ t("formulaTools.createNamesFromSelection") }}</TButton
-              >
-            </div>
-          </section></Teleport
+          :edit-session-id="editSessionId"
+          @insert-function="emit('insertFunction', $event)"
         >
-        <RibbonSplitButton
-          ref="calculationSplitRef"
-          variant="tall"
-          :label="t('formulaTools.recalculate')"
-          :menu-label="t('formulaTools.calculationOptions')"
-          :text="t('formulaTools.recalculate')"
+          <template #icon><Banknote /></template>
+        </FormulaCategoryMenu>
+        <FormulaCategoryMenu
+          category="Logical"
           :disabled="disabled"
-          :menu-disabled="disabled || !calculationSettings"
-          :expanded="calculationMenuOpen"
-          :menu-id="calculationMenuId"
-          popup-role="dialog"
-          @activate="emit('recalculate')"
-          @toggle-menu="toggleCalculationMenu"
-          ><Calculator
-        /></RibbonSplitButton>
-        <Teleport to="body"
-          ><section
-            v-if="calculationMenuOpen && calculationSettings"
-            :id="calculationMenuId"
-            ref="calculationPanelRef"
-            class="formula-toolbar__calculation-menu"
-            role="dialog"
-            :aria-label="t('formulaTools.calculationOptions')"
-            tabindex="-1"
-            :style="calculationMenuStyles"
-            :data-cell-edit-session="editSessionId"
+          :edit-session-id="editSessionId"
+          @insert-function="emit('insertFunction', $event)"
+        >
+          <template #icon><GitBranch /></template>
+        </FormulaCategoryMenu>
+      </div>
+      <div class="formula-toolbar__category-column">
+        <FormulaCategoryMenu
+          category="Text"
+          :disabled="disabled"
+          :edit-session-id="editSessionId"
+          @insert-function="emit('insertFunction', $event)"
+        >
+          <template #icon><CaseSensitive /></template>
+        </FormulaCategoryMenu>
+        <FormulaCategoryMenu
+          category="Date"
+          :disabled="disabled"
+          :edit-session-id="editSessionId"
+          @insert-function="emit('insertFunction', $event)"
+        >
+          <template #icon><CalendarDays /></template>
+        </FormulaCategoryMenu>
+      </div>
+      <div class="formula-toolbar__category-column">
+        <FormulaCategoryMenu
+          category="Statistical"
+          :disabled="disabled"
+          :edit-session-id="editSessionId"
+          @insert-function="emit('insertFunction', $event)"
+        >
+          <template #icon><ChartColumn /></template>
+        </FormulaCategoryMenu>
+        <FormulaCategoryMenu
+          category="Engineering"
+          :disabled="disabled"
+          :edit-session-id="editSessionId"
+          @insert-function="emit('insertFunction', $event)"
+        >
+          <template #icon><Wrench /></template>
+        </FormulaCategoryMenu>
+      </div>
+      <div class="formula-toolbar__category-column">
+        <FormulaCategoryMenu
+          category="Information"
+          :disabled="disabled"
+          :edit-session-id="editSessionId"
+          @insert-function="emit('insertFunction', $event)"
+        >
+          <template #icon><Info /></template>
+        </FormulaCategoryMenu>
+        <FormulaCategoryMenu
+          category="Database"
+          :disabled="disabled"
+          :edit-session-id="editSessionId"
+          @insert-function="emit('insertFunction', $event)"
+        >
+          <template #icon><Database /></template>
+        </FormulaCategoryMenu>
+      </div>
+      <div class="formula-toolbar__category-column">
+        <FormulaCategoryMenu
+          category="Lookup"
+          :disabled="disabled"
+          :edit-session-id="editSessionId"
+          @insert-function="emit('insertFunction', $event)"
+        >
+          <template #icon><Search /></template>
+        </FormulaCategoryMenu>
+        <FormulaCategoryMenu
+          category="Math"
+          :disabled="disabled"
+          :edit-session-id="editSessionId"
+          @insert-function="emit('insertFunction', $event)"
+        >
+          <template #icon><Radical /></template>
+        </FormulaCategoryMenu>
+      </div>
+      <div class="formula-toolbar__category-column">
+        <FormulaCategoryMenu
+          category="Compatibility"
+          :disabled="disabled"
+          :edit-session-id="editSessionId"
+          @insert-function="emit('insertFunction', $event)"
+        >
+          <template #icon><RotateCcw /></template>
+        </FormulaCategoryMenu>
+      </div>
+    </section>
+    <section
+      class="formula-toolbar__group"
+      data-ribbon-group="formula-actions"
+      role="group"
+      :aria-label="t('formulaTools.toolbar')"
+    >
+      <RibbonButton
+        variant="tall"
+        :label="t('formulaTools.nameManager')"
+        :text="t('formulaTools.nameManager')"
+        :disabled="disabled"
+        @activate="emit('openNames')"
+        ><Tags
+      /></RibbonButton>
+      <RibbonMenuButton
+        ref="nameQuickCreateRef"
+        variant="tall"
+        :label="t('formulaTools.quickCreateNames')"
+        :text="t('formulaTools.quickCreateNames')"
+        :disabled="disabled || !nameCreationEnabled"
+        :expanded="nameMenuOpen"
+        :menu-id="nameMenuId"
+        popup-role="dialog"
+        @activate="openNameMenu"
+        ><Plus
+      /></RibbonMenuButton>
+      <Teleport to="body"
+        ><section
+          v-if="nameMenuOpen"
+          :id="nameMenuId"
+          ref="namePanelRef"
+          class="formula-toolbar__name-menu"
+          role="dialog"
+          :aria-label="t('formulaTools.createNamesFromSelection')"
+          tabindex="-1"
+          :style="nameMenuStyles"
+          :data-cell-edit-session="editSessionId"
+        >
+          <p>{{ t("formulaTools.createNamesFromSelection") }}</p>
+          <TCheckbox v-model="namePositions.top" data-formula-name-position="top">{{
+            t("formulaTools.nameFromTopRow")
+          }}</TCheckbox>
+          <TCheckbox v-model="namePositions.left" data-formula-name-position="left">{{
+            t("formulaTools.nameFromLeftColumn")
+          }}</TCheckbox>
+          <TCheckbox v-model="namePositions.bottom" data-formula-name-position="bottom">{{
+            t("formulaTools.nameFromBottomRow")
+          }}</TCheckbox>
+          <TCheckbox v-model="namePositions.right" data-formula-name-position="right">{{
+            t("formulaTools.nameFromRightColumn")
+          }}</TCheckbox>
+          <div class="formula-toolbar__name-menu-actions">
+            <TButton variant="outline" theme="default" @click="nameMenuOpen = false">{{
+              t("formulaTools.cancel")
+            }}</TButton>
+            <TButton
+              theme="primary"
+              data-formula-name-confirm
+              :disabled="!Object.values(namePositions).some(Boolean)"
+              @click="createNamesFromSelection"
+              >{{ t("formulaTools.createNamesFromSelection") }}</TButton
+            >
+          </div>
+        </section></Teleport
+      >
+      <RibbonSplitButton
+        ref="calculationSplitRef"
+        variant="tall"
+        :label="t('formulaTools.recalculate')"
+        :menu-label="t('formulaTools.calculationOptions')"
+        :text="t('formulaTools.recalculate')"
+        :disabled="disabled"
+        :menu-disabled="disabled || !calculationSettings"
+        :expanded="calculationMenuOpen"
+        :menu-id="calculationMenuId"
+        popup-role="dialog"
+        @activate="emit('recalculate')"
+        @toggle-menu="toggleCalculationMenu"
+        ><Calculator
+      /></RibbonSplitButton>
+      <Teleport to="body"
+        ><section
+          v-if="calculationMenuOpen && calculationSettings"
+          :id="calculationMenuId"
+          ref="calculationPanelRef"
+          class="formula-toolbar__calculation-menu"
+          role="dialog"
+          :aria-label="t('formulaTools.calculationOptions')"
+          tabindex="-1"
+          :style="calculationMenuStyles"
+          :data-cell-edit-session="editSessionId"
+        >
+          <div
+            class="formula-toolbar__calculation-mode"
+            role="group"
+            :aria-label="t('formulaTools.calculation')"
           >
-            <div
-              class="formula-toolbar__calculation-mode"
-              role="group"
-              :aria-label="t('formulaTools.calculation')"
+            <span>{{ t("formulaTools.calculation") }}</span>
+            <TRadioGroup
+              :value="calculationSettings.mode"
+              direction="vertical"
+              @change="updateCalculationMode"
             >
-              <span>{{ t("formulaTools.calculation") }}</span>
-              <TRadioGroup
-                :value="calculationSettings.mode"
-                direction="vertical"
-                @change="updateCalculationMode"
-              >
-                <TRadio value="automatic">{{ t("formulaTools.automaticCalculation") }}</TRadio>
-                <TRadio value="manual">{{ t("formulaTools.manualCalculation") }}</TRadio>
-              </TRadioGroup>
-            </div>
-            <TCheckbox
-              :checked="calculationSettings.iterative"
-              @change="updateCalculationSettings({ iterative: $event })"
-              >{{ t("formulaTools.iterativeCalculation") }}</TCheckbox
-            >
-            <div
-              class="formula-toolbar__number-field"
-              role="group"
-              :aria-label="t('formulaTools.maximumIterations')"
-            >
-              <span>{{ t("formulaTools.maximumIterations") }}</span>
-              <TInputNumber
-                class="idea-input-number--persistent-controls"
-                theme="column"
-                :value="calculationSettings.maxIterations"
-                :min="1"
-                :max="10000"
-                :decimal-places="0"
-                :allow-input-over-limit="false"
-                :disabled="!calculationSettings.iterative"
-                :input-props="{ name: 'maxIterations' }"
-                @change="updateNumericCalculationSetting('maxIterations', $event)"
-              />
-            </div>
-            <div
-              class="formula-toolbar__number-field"
-              role="group"
-              :aria-label="t('formulaTools.maximumChange')"
-            >
-              <span>{{ t("formulaTools.maximumChange") }}</span>
-              <TInputNumber
-                class="idea-input-number--persistent-controls"
-                theme="column"
-                :value="calculationSettings.maxChange"
-                :min="0.000000001"
-                :step="0.001"
-                :allow-input-over-limit="false"
-                :disabled="!calculationSettings.iterative"
-                :input-props="{ name: 'maxChange' }"
-                @change="updateNumericCalculationSetting('maxChange', $event)"
-              />
-            </div></section
-        ></Teleport>
-        <RibbonButton
-          variant="tall"
-          :label="t('formulaTools.insertFunction')"
-          :text="t('formulaTools.insertFunction')"
-          :disabled="disabled"
-          @activate="browserOpen = true"
-          ><FunctionSquare
-        /></RibbonButton>
-      </section>
-    </div>
-    <FormulaFunctionBrowser
-      :visible="browserOpen"
-      :recent-functions="recentFunctions"
-      :edit-session-id="editSessionId"
-      @close="closeBrowser"
-      @insert-function="insertFunction"
-    />
-  </div>
+              <TRadio value="automatic">{{ t("formulaTools.automaticCalculation") }}</TRadio>
+              <TRadio value="manual">{{ t("formulaTools.manualCalculation") }}</TRadio>
+            </TRadioGroup>
+          </div>
+          <TCheckbox
+            :checked="calculationSettings.iterative"
+            @change="updateCalculationSettings({ iterative: $event })"
+            >{{ t("formulaTools.iterativeCalculation") }}</TCheckbox
+          >
+          <div
+            class="formula-toolbar__number-field"
+            role="group"
+            :aria-label="t('formulaTools.maximumIterations')"
+          >
+            <span>{{ t("formulaTools.maximumIterations") }}</span>
+            <TInputNumber
+              class="idea-input-number--persistent-controls"
+              theme="column"
+              :value="calculationSettings.maxIterations"
+              :min="1"
+              :max="10000"
+              :decimal-places="0"
+              :allow-input-over-limit="false"
+              :disabled="!calculationSettings.iterative"
+              :input-props="{ name: 'maxIterations' }"
+              @change="updateNumericCalculationSetting('maxIterations', $event)"
+            />
+          </div>
+          <div
+            class="formula-toolbar__number-field"
+            role="group"
+            :aria-label="t('formulaTools.maximumChange')"
+          >
+            <span>{{ t("formulaTools.maximumChange") }}</span>
+            <TInputNumber
+              class="idea-input-number--persistent-controls"
+              theme="column"
+              :value="calculationSettings.maxChange"
+              :min="0.000000001"
+              :step="0.001"
+              :allow-input-over-limit="false"
+              :disabled="!calculationSettings.iterative"
+              :input-props="{ name: 'maxChange' }"
+              @change="updateNumericCalculationSetting('maxChange', $event)"
+            />
+          </div></section
+      ></Teleport>
+      <RibbonButton
+        variant="tall"
+        :label="t('formulaTools.insertFunction')"
+        :text="t('formulaTools.insertFunction')"
+        :disabled="disabled"
+        @activate="browserOpen = true"
+        ><FunctionSquare
+      /></RibbonButton>
+    </section>
+    <template #overlays>
+      <FormulaFunctionBrowser
+        :visible="browserOpen"
+        :recent-functions="recentFunctions"
+        :edit-session-id="editSessionId"
+        @close="closeBrowser"
+        @insert-function="insertFunction"
+      />
+    </template>
+  </RibbonToolbar>
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/ribbon/ribbon-layout" as ribbon;
 .formula-toolbar {
-  height: 68px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  background: var(--idea-surface-panel);
-  scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
-  &__rail {
-    display: flex;
-    align-items: stretch;
-    width: max-content;
-    min-width: 100%;
-    height: calc(var(--ribbon-control-height, 26px) * 2 + var(--ribbon-row-gap, 2px) + 12px);
-    padding: 5px 8px;
-  }
   &__group {
-    flex: 0 0 auto;
-    min-width: max-content;
-    padding: 1px 3px;
-    border-right: 1px solid var(--idea-border-subtle);
-  }
-  &__group--sum {
-    display: flex;
-    align-items: center;
-  }
-  &__group--categories {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding-inline: 8px;
+    @include ribbon.columns;
   }
   &__category-column {
-    display: grid;
-    grid-template-rows: repeat(2, var(--ribbon-control-height, 26px));
+    @include ribbon.two-rows;
     min-width: 86px;
-    gap: var(--ribbon-row-gap, 2px);
-  }
-  &__group--actions {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    padding-inline: 7px;
   }
   &__sum-menu {
     z-index: 40;

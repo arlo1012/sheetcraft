@@ -3,6 +3,10 @@
   min-width: max-content;
   padding: 1px 3px;
   border-right: 1px solid var(--idea-border-subtle);
+
+  &:last-child {
+    border-right: 0;
+  }
 }
 
 @mixin dialog-launcher-anchor {
@@ -21,7 +25,7 @@
   flex-direction: column;
   justify-content: center;
   gap: var(--ribbon-row-gap, 2px);
-  min-height: calc(var(--ribbon-control-height, 26px) * 2 + var(--ribbon-row-gap, 2px));
+  min-height: var(--idea-ribbon-content-height, 54px);
 }
 
 @mixin compact {
@@ -50,4 +54,11 @@
   display: inline-flex;
   align-items: stretch;
   min-width: 0;
+}
+
+// Reserve both rows even when a column contains only one action.
+@mixin two-rows {
+  display: grid;
+  grid-template-rows: repeat(2, var(--ribbon-control-height, 26px));
+  gap: var(--ribbon-row-gap, 2px);
 }
