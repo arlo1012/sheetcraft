@@ -547,6 +547,7 @@ defineExpose({
     flex: none;
     cursor: pointer;
     color: var(--idea-text-secondary);
+    outline: none;
 
     &:hover,
     &[aria-pressed="true"] {
