@@ -13,6 +13,7 @@ export const proofreadingZhCN = {
     noIssues: "未发现需要校对的数据。",
     scanHint: "默认校对当前工作表中的数据，也可指定区域；校对不会自动修改数据。",
     type: "类型",
+    reason: "校对原因",
     address: "单元格",
     currentValue: "当前值",
     proposedValue: "建议值",

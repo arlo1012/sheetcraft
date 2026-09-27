@@ -13,6 +13,7 @@ export type ProofreadingMessageSchema = {
     noIssues: string;
     scanHint: string;
     type: string;
+    reason: string;
     address: string;
     currentValue: string;
     proposedValue: string;

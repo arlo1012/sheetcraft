@@ -14,6 +14,7 @@ export const proofreadingEnUS = {
     scanHint:
       "Proofread the current worksheet, or specify a range. No data is changed automatically.",
     type: "Type",
+    reason: "Review reason",
     address: "Cell",
     currentValue: "Current value",
     proposedValue: "Suggested value",

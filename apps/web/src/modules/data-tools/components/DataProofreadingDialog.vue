@@ -43,7 +43,8 @@ const { t, locale } = useAppI18n();
 const rows = computed(() => [...props.issues]);
 const columns = computed<BaseTableCol<DataProofreadingIssue>[]>(() => [
   { colKey: "selection", title: "", width: 36, align: "center" },
-  { colKey: "type", title: t("proofreading.type"), width: 160 },
+  { colKey: "type", title: t("proofreading.type"), width: 72 },
+  { colKey: "reason", title: t("proofreading.reason"), width: 160, ellipsis: true },
   { colKey: "address", title: t("proofreading.address"), width: 84 },
   { colKey: "currentValue", title: t("proofreading.currentValue"), ellipsis: true },
   { colKey: "proposedValue", title: t("proofreading.proposedValue"), ellipsis: true },
@@ -132,12 +133,10 @@ function toggleIssue(id: string, checked: boolean): void {
           />
         </template>
         <template #type="{ row }">
-          <div :title="t(`proofreading.reasons.${row.reason}`)">
-            {{ t(`proofreading.types.${row.type}`) }}
-            <span class="data-proofreading-dialog__reason">{{
-              t(`proofreading.reasons.${row.reason}`)
-            }}</span>
-          </div>
+          {{ t(`proofreading.types.${row.type}`) }}
+        </template>
+        <template #reason="{ row }">
+          {{ t(`proofreading.reasons.${row.reason}`) }}
         </template>
         <template #address="{ row }">
           <TButton
@@ -239,11 +238,6 @@ function toggleIssue(id: string, checked: boolean): void {
   &__actions {
     flex-wrap: wrap;
     gap: 4px;
-  }
-  &__reason {
-    display: block;
-    color: var(--idea-text-secondary);
-    font-weight: 400;
   }
   &__footer {
     justify-content: space-between;
