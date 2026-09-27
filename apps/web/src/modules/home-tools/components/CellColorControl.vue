@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Baseline, PaintBucket } from "lucide-vue-next";
 import { computed, ref, type CSSProperties } from "vue";
 import {
   DEFAULT_CELL_FILL_COLOR,
@@ -48,15 +47,32 @@ function applyColor(color: string | null): void {
       :disabled="disabled"
       @change="applyColor"
     >
-      <span
-        class="cell-color-control__icon"
-        :class="`cell-color-control__icon--${kind}`"
-        :style="indicatorStyle"
-        :data-cell-color-icon="kind"
-      >
-        <Baseline v-if="kind === 'text'" aria-hidden="true" />
-        <PaintBucket v-else aria-hidden="true" />
-        <span class="cell-color-control__indicator" data-color-indicator />
+      <span class="cell-color-control__icon" :style="indicatorStyle" :data-cell-color-icon="kind">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path v-if="kind === 'text'" d="m4 17 8-14 8 14M7.5 11h9" />
+          <template v-else>
+            <path
+              d="m8 4 2-2a1 1 0 0 1 1.4 0l8.6 8.6a1 1 0 0 1 0 1.4l-6 6a3 3 0 0 1-4.2 0l-6-6a3 3 0 0 1 0-4.2L6 5.6M5 2l6 6M3 12h16"
+            />
+          </template>
+          <rect
+            class="cell-color-control__indicator"
+            x="2"
+            y="21"
+            width="20"
+            height="3"
+            rx="0.6"
+            stroke="none"
+            data-color-indicator
+          />
+        </svg>
       </span>
     </CellColorPicker>
   </div>
@@ -76,40 +92,13 @@ function applyColor(color: string | null): void {
     width: var(--idea-icon-size, var(--idea-action-icon-size));
     height: var(--idea-icon-size, var(--idea-action-icon-size));
 
-    &--text {
-      position: relative;
-
-      :deep(svg) {
-        transform: translateY(1px);
-      }
-
-      :deep(path:first-of-type) {
-        display: none;
-      }
-    }
-
-    &--fill {
-      position: relative;
-
-      :deep(svg) {
-        transform: translateY(-1px);
-      }
-
-      :deep(path:nth-of-type(3)) {
-        display: none;
-      }
+    svg {
+      stroke-width: var(--idea-icon-stroke-width);
     }
   }
 
   &__indicator {
-    position: absolute;
-    right: 2px;
-    bottom: 0;
-    left: 2px;
-    height: 3px;
-    background: var(--cell-color-indicator);
-    border-radius: 1px;
-    box-shadow: inset 0 0 0 1px rgb(32 36 44 / 22%);
+    fill: var(--cell-color-indicator);
   }
 }
 </style>

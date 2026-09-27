@@ -12,150 +12,71 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
 </script>
 
 <template>
-  <span class="cell-border-preset-icon" :data-border-preset-icon="preset" aria-hidden="true">
-    <span class="cell-border-preset-icon__guide is-top" />
-    <span class="cell-border-preset-icon__guide is-right" />
-    <span class="cell-border-preset-icon__guide is-bottom" />
-    <span class="cell-border-preset-icon__guide is-left" />
-    <span class="cell-border-preset-icon__guide is-horizontal" />
-    <span class="cell-border-preset-icon__guide is-vertical" />
-
-    <span v-if="hasOuter || preset === 'top'" class="cell-border-preset-icon__line is-top" />
-    <span v-if="hasOuter || preset === 'right'" class="cell-border-preset-icon__line is-right" />
-    <span v-if="hasOuter || preset === 'bottom'" class="cell-border-preset-icon__line is-bottom" />
-    <span v-if="hasOuter || preset === 'left'" class="cell-border-preset-icon__line is-left" />
-
-    <template v-if="hasInnerHorizontal">
-      <span class="cell-border-preset-icon__line is-horizontal" />
-    </template>
-    <template v-if="hasInnerVertical">
-      <span class="cell-border-preset-icon__line is-vertical" />
-    </template>
-    <span v-if="preset === 'diagonalUp'" class="cell-border-preset-icon__diagonal is-up" />
-    <span v-if="preset === 'diagonalDown'" class="cell-border-preset-icon__diagonal is-down" />
-  </span>
+  <svg
+    class="cell-border-preset-icon"
+    :data-border-preset-icon="preset"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    aria-hidden="true"
+  >
+    <path class="cell-border-preset-icon__guide is-top" d="M3 3h18" />
+    <path class="cell-border-preset-icon__guide is-right" d="M21 3v18" />
+    <path class="cell-border-preset-icon__guide is-bottom" d="M3 21h18" />
+    <path class="cell-border-preset-icon__guide is-left" d="M3 3v18" />
+    <path class="cell-border-preset-icon__guide is-horizontal" d="M3 12h18" />
+    <path class="cell-border-preset-icon__guide is-vertical" d="M12 3v18" />
+    <path
+      v-if="hasOuter || preset === 'top'"
+      class="cell-border-preset-icon__line is-top"
+      d="M3 3h18"
+    />
+    <path
+      v-if="hasOuter || preset === 'right'"
+      class="cell-border-preset-icon__line is-right"
+      d="M21 3v18"
+    />
+    <path
+      v-if="hasOuter || preset === 'bottom'"
+      class="cell-border-preset-icon__line is-bottom"
+      d="M3 21h18"
+    />
+    <path
+      v-if="hasOuter || preset === 'left'"
+      class="cell-border-preset-icon__line is-left"
+      d="M3 3v18"
+    />
+    <path
+      v-if="hasInnerHorizontal"
+      class="cell-border-preset-icon__line is-horizontal"
+      d="M3 12h18"
+    />
+    <path v-if="hasInnerVertical" class="cell-border-preset-icon__line is-vertical" d="M12 3v18" />
+    <path
+      v-if="preset === 'diagonalUp'"
+      class="cell-border-preset-icon__diagonal is-up"
+      d="m3 21 18-18"
+    />
+    <path
+      v-if="preset === 'diagonalDown'"
+      class="cell-border-preset-icon__diagonal is-down"
+      d="m3 3 18 18"
+    />
+  </svg>
 </template>
 
 <style scoped lang="scss">
 .cell-border-preset-icon {
-  position: relative;
   display: block;
   width: var(--idea-icon-size, 18px);
   height: var(--idea-icon-size, 18px);
-
-  &__guide,
-  &__line,
-  &__diagonal {
-    position: absolute;
-    display: block;
-    pointer-events: none;
-  }
+  stroke-width: var(--idea-icon-stroke-width);
+  stroke-linecap: square;
 
   &__guide {
-    background: var(--idea-border-subtle);
-
-    &.is-top,
-    &.is-bottom,
-    &.is-horizontal {
-      right: 0;
-      left: 0;
-      height: 1px;
-    }
-
-    &.is-left,
-    &.is-right,
-    &.is-vertical {
-      top: 0;
-      bottom: 0;
-      width: 1px;
-    }
-
-    &.is-top {
-      top: 0;
-    }
-
-    &.is-right {
-      right: 0;
-    }
-
-    &.is-bottom {
-      bottom: 0;
-    }
-
-    &.is-left {
-      left: 0;
-    }
-
-    &.is-horizontal {
-      top: 50%;
-    }
-
-    &.is-vertical {
-      left: 50%;
-    }
-  }
-
-  &__line {
-    z-index: 1;
-    background: currentcolor;
-
-    &.is-top,
-    &.is-bottom,
-    &.is-horizontal {
-      right: 0;
-      left: 0;
-      height: 1px;
-    }
-
-    &.is-left,
-    &.is-right,
-    &.is-vertical {
-      top: 0;
-      bottom: 0;
-      width: 1px;
-    }
-
-    &.is-top {
-      top: 0;
-    }
-
-    &.is-right {
-      right: 0;
-    }
-
-    &.is-bottom {
-      bottom: 0;
-    }
-
-    &.is-left {
-      left: 0;
-    }
-
-    &.is-horizontal {
-      top: 50%;
-    }
-
-    &.is-vertical {
-      left: 50%;
-    }
-  }
-
-  &__diagonal {
-    z-index: 2;
-    top: 50%;
-    left: 50%;
-    width: calc((var(--idea-icon-size, 18px) - 2px) * 1.41421356);
-    height: 1px;
-    background: currentcolor;
-    transform-origin: center;
-
-    &.is-up {
-      transform: translate(-50%, -50%) rotate(-45deg);
-    }
-
-    &.is-down {
-      transform: translate(-50%, -50%) rotate(45deg);
-    }
+    stroke-width: 1;
+    stroke-dasharray: 2 2;
+    opacity: 0.45;
   }
 }
 </style>
