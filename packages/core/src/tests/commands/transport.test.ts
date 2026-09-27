@@ -64,6 +64,7 @@ describe("workbook command transport", () => {
       outlineGroups: [],
       subtotalMetadata: [],
       duplicateRules: [],
+      conditionalFormats: [],
       floatingImages: [],
     });
     expectTransportSafe(command);

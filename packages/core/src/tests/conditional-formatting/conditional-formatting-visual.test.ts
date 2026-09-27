@@ -1,0 +1,274 @@
+import { describe, expect, test } from "vitest";
+import {
+  createConditionalFormatResolver,
+  createConditionalFormatVisualResolver,
+  normalizeConditionalFormatRules,
+  type ConditionalFormatCondition,
+  type SheetConditionalFormatRule,
+} from "../../conditional-formatting.js";
+import { datePartsToExcelSerial } from "../../formula/date-system.js";
+import {
+  createWorkbookEvaluator,
+  getActiveSheet,
+  setCellContent,
+  setCellValue,
+} from "../../workbook.js";
+import { createTestWorkbook } from "../helpers.js";
+
+const scope = { start: { row: 0, column: 0 }, end: { row: 9, column: 0 } };
+function rule(
+  id: string,
+  condition: ConditionalFormatCondition,
+  style: SheetConditionalFormatRule["style"] = {},
+): SheetConditionalFormatRule {
+  return { id, ranges: [scope], anchor: { ...scope.start }, condition, style };
+}
+function resolver(rules: SheetConditionalFormatRule[], values: number[]) {
+  const workbook = createTestWorkbook();
+  const sheet = getActiveSheet(workbook);
+  values.forEach((value, row) => setCellValue(sheet, { row, column: 0 }, value));
+  sheet.conditionalFormats = rules;
+  const evaluator = createWorkbookEvaluator(workbook, sheet.id);
+  return { sheet, evaluator };
+}
+
+describe("conditional-formatting extended predicates", () => {
+  test("handles large sparse numeric scopes without spread-argument limits", () => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    const rowCount = 130_000;
+    for (let row = 0; row < rowCount; row += 1) setCellValue(sheet, { row, column: 0 }, row);
+    sheet.conditionalFormats = [
+      {
+        ...rule("top", { kind: "rank", count: 1 }, { fillColor: "#ff0000" }),
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: rowCount - 1, column: 0 } }],
+      },
+    ];
+    const resolve = createConditionalFormatResolver(
+      sheet,
+      createWorkbookEvaluator(workbook, sheet.id),
+    );
+    expect(resolve({ row: rowCount - 1, column: 0 })).toEqual({ fillColor: "#ff0000" });
+    expect(resolve({ row: rowCount - 2, column: 0 })).toBeUndefined();
+  });
+
+  test("materializes formula spills before collecting sparse numeric rule values", () => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=SEQUENCE(3)" } },
+    );
+    sheet.conditionalFormats = [
+      {
+        ...rule("top", { kind: "rank", count: 1 }, { fillColor: "#ff0000" }),
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 2, column: 0 } }],
+      },
+    ];
+    expect(
+      createConditionalFormatResolver(
+        sheet,
+        createWorkbookEvaluator(workbook, sheet.id),
+      )({ row: 2, column: 0 }),
+    ).toEqual({ fillColor: "#ff0000" });
+  });
+
+  test("rejects statically descending thresholds", () => {
+    expect(() =>
+      normalizeConditionalFormatRules([
+        rule("bad", {
+          kind: "colorScale",
+          stops: [
+            { threshold: { kind: "num", value: 10 }, color: "#000000" },
+            { threshold: { kind: "num", value: 1 }, color: "#ffffff" },
+          ],
+        }),
+      ]),
+    ).toThrow("conditional-formatting");
+  });
+
+  test("uses rank semantics that include boundary ties and rounds top percentages up", () => {
+    const { sheet, evaluator } = resolver(
+      [
+        rule("top", { kind: "rank", count: 2 }, { fillColor: "#ff0000" }),
+        rule(
+          "bottom-percent",
+          { kind: "rank", count: 50, percent: true, bottom: true },
+          { textColor: "#0000ff" },
+        ),
+      ],
+      [100, 90, 90, 10],
+    );
+    const resolve = createConditionalFormatResolver(sheet, evaluator);
+    expect(resolve({ row: 0, column: 0 })).toEqual({ fillColor: "#ff0000" });
+    expect(resolve({ row: 1, column: 0 })).toEqual({ fillColor: "#ff0000", textColor: "#0000ff" });
+    expect(resolve({ row: 2, column: 0 })).toEqual({ fillColor: "#ff0000", textColor: "#0000ff" });
+    expect(resolve({ row: 3, column: 0 })).toEqual({ textColor: "#0000ff" });
+  });
+
+  test("calculates averages from finite numeric values only and uses injected date system/time", () => {
+    const workbook = createTestWorkbook();
+    workbook.dateSystem = "1904";
+    const sheet = getActiveSheet(workbook);
+    setCellValue(sheet, { row: 0, column: 0 }, 1);
+    setCellValue(sheet, { row: 1, column: 0 }, 3);
+    setCellValue(sheet, { row: 2, column: 0 }, "ignored");
+    setCellValue(
+      sheet,
+      { row: 3, column: 0 },
+      datePartsToExcelSerial(
+        { year: 2026, month: 9, day: 28, hour: 0, minute: 0, second: 0, millisecond: 0 },
+        "1904",
+      ),
+    );
+    sheet.conditionalFormats = [
+      {
+        ...rule("above", { kind: "average", above: true }, { fillColor: "#ff0000" }),
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 2, column: 0 } }],
+      },
+      rule("today", { kind: "date", period: "today" }, { textColor: "#0000ff" }),
+    ];
+    const resolve = createConditionalFormatResolver(
+      sheet,
+      createWorkbookEvaluator(workbook, sheet.id),
+      {
+        dateSystem: "1904",
+        now: () => new Date(2026, 8, 28, 12),
+      },
+    );
+    expect(resolve({ row: 1, column: 0 })).toEqual({ fillColor: "#ff0000" });
+    expect(resolve({ row: 3, column: 0 })).toEqual({ textColor: "#0000ff" });
+  });
+});
+
+describe("conditional-formatting visuals", () => {
+  test("provides interpolated color-scale fills and combines first data-bar and icon-set visuals", () => {
+    const { sheet, evaluator } = resolver(
+      [
+        rule("scale", {
+          kind: "colorScale",
+          stops: [
+            { threshold: { kind: "min" }, color: "#000000" },
+            { threshold: { kind: "max" }, color: "#ffffff" },
+          ],
+        }),
+        rule("bar", {
+          kind: "dataBar",
+          minimum: { kind: "num", value: -10 },
+          maximum: { kind: "num", value: 10 },
+          color: "#00ff00",
+          negativeColor: "#ff0000",
+          showValue: false,
+        }),
+        rule("icons", {
+          kind: "iconSet",
+          iconSet: "threeArrows",
+          thresholds: [{ kind: "min" }, { kind: "num", value: 0 }, { kind: "max" }],
+        }),
+      ],
+      [-10, 0, 10],
+    );
+    expect(createConditionalFormatResolver(sheet, evaluator)({ row: 1, column: 0 })).toEqual({
+      fillColor: "#808080",
+    });
+    const visual = createConditionalFormatVisualResolver(sheet, evaluator)({ row: 0, column: 0 });
+    expect(visual).toEqual({
+      dataBar: {
+        start: 0,
+        end: 0.5,
+        axis: 0.5,
+        color: "#ff0000",
+        negativeColor: "#ff0000",
+        gradient: true,
+        showValue: false,
+      },
+      iconSet: { iconSet: "threeArrows", iconIndex: 0, showValue: true },
+    });
+  });
+
+  test("uses a stable full bar for an equal domain and honors stop-if-true for lower styles and visuals", () => {
+    const { sheet, evaluator } = resolver(
+      [
+        {
+          ...rule("stop", {
+            kind: "dataBar",
+            minimum: { kind: "num", value: 1 },
+            maximum: { kind: "num", value: 1 },
+            color: "#00ff00",
+          }),
+          stopIfTrue: true,
+        },
+        rule("icon", {
+          kind: "iconSet",
+          iconSet: "threeArrows",
+          thresholds: [{ kind: "min" }, { kind: "percent", value: 50 }, { kind: "max" }],
+        }),
+        rule("style", { kind: "cellValue", operator: "equal", value: 1 }, { fillColor: "#ff0000" }),
+      ],
+      [1],
+    );
+    expect(createConditionalFormatVisualResolver(sheet, evaluator)({ row: 0, column: 0 })).toEqual({
+      dataBar: { start: 0, end: 1, axis: 0, color: "#00ff00", gradient: true, showValue: true },
+    });
+    expect(
+      createConditionalFormatResolver(sheet, evaluator)({ row: 0, column: 0 }),
+    ).toBeUndefined();
+  });
+
+  test("anchors bars at the correct edge for fully positive and fully negative domains", () => {
+    const positive = resolver(
+      [
+        rule("bar", {
+          kind: "dataBar",
+          minimum: { kind: "min" },
+          maximum: { kind: "max" },
+          color: "#00ff00",
+        }),
+      ],
+      [2, 10],
+    );
+    expect(
+      createConditionalFormatVisualResolver(
+        positive.sheet,
+        positive.evaluator,
+      )({ row: 1, column: 0 })?.dataBar,
+    ).toMatchObject({ start: 0, end: 1, axis: 0, color: "#00ff00" });
+    const negative = resolver(
+      [
+        rule("bar", {
+          kind: "dataBar",
+          minimum: { kind: "min" },
+          maximum: { kind: "max" },
+          color: "#00ff00",
+          negativeColor: "#ff0000",
+        }),
+      ],
+      [-10, -2],
+    );
+    expect(
+      createConditionalFormatVisualResolver(
+        negative.sheet,
+        negative.evaluator,
+      )({ row: 0, column: 0 })?.dataBar,
+    ).toMatchObject({ start: 0, end: 1, axis: 1, color: "#ff0000" });
+    const equalNegative = resolver(
+      [
+        rule("bar", {
+          kind: "dataBar",
+          minimum: { kind: "min" },
+          maximum: { kind: "max" },
+          color: "#00ff00",
+          negativeColor: "#ff0000",
+        }),
+      ],
+      [-1],
+    );
+    expect(
+      createConditionalFormatVisualResolver(
+        equalNegative.sheet,
+        equalNegative.evaluator,
+      )({ row: 0, column: 0 })?.dataBar,
+    ).toMatchObject({ start: 0, end: 1, axis: 1, color: "#ff0000" });
+  });
+});

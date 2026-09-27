@@ -37,6 +37,8 @@ import {
   createSetSheetFilterCriteriaCommand,
   createSetSheetFreezePanesCommand,
   createSetSheetPropertiesCommand,
+  createSetSheetConditionalFormatsCommand,
+  createClearSheetConditionalFormatsCommand,
   createSortSheetRangeCommand,
   createUnmergeCellsCommand,
   getCellMergeModeAvailability,
@@ -50,6 +52,10 @@ import {
   type WorkbookCommand,
   type WorkbookOperation,
 } from "@idea10/core/commands";
+import {
+  cloneConditionalFormatRule,
+  type SheetConditionalFormatRule,
+} from "@idea10/core/conditional-formatting";
 import { getCellMatrixSize, tileCellMatrix, type CellValueMatrix } from "@idea10/core/clipboard";
 import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
 import {
@@ -199,6 +205,13 @@ export type CellFormatSelection = {
   };
   sampleValue: string | number | boolean | null;
   dateSystem: ExcelDateSystem;
+};
+
+export type ConditionalFormattingSelection = {
+  sheetId: string;
+  generation: number;
+  range: CellRange;
+  rules: SheetConditionalFormatRule[];
 };
 
 export function useSpreadsheetWorkspaceController(
@@ -987,6 +1000,41 @@ export function useSpreadsheetWorkspaceController(
     };
   }
 
+  function captureConditionalFormattingSelection(): ConditionalFormattingSelection | undefined {
+    if (activeSheet.value.properties.protected) return;
+    const range = activeSelectionRange.value;
+    return {
+      sheetId: activeSheet.value.id,
+      generation: workbookGeneration.value,
+      range: { start: { ...range.start }, end: { ...range.end } },
+      rules: (activeSheet.value.conditionalFormats ?? []).map(cloneConditionalFormatRule),
+    };
+  }
+
+  function setConditionalFormats(
+    rules: readonly SheetConditionalFormatRule[],
+    target: ConditionalFormattingSelection,
+  ): boolean {
+    const sheet = session.workbook.sheets.get(target.sheetId);
+    if (target.generation !== workbookGeneration.value || !sheet || sheet.properties.protected) {
+      return false;
+    }
+    execute(createSetSheetConditionalFormatsCommand(target.sheetId, rules), "format.cells");
+    return true;
+  }
+
+  function clearConditionalFormats(scope: "selection" | "sheet"): boolean {
+    const sheet = activeSheet.value;
+    if (sheet.properties.protected) return false;
+    return execute(
+      createClearSheetConditionalFormatsCommand(
+        sheet.id,
+        scope === "selection" ? activeSelectionRange.value : undefined,
+      ),
+      "format.cells",
+    );
+  }
+
   function applyCellFormat(change: CellFormatChange, target: CellFormatSelection): boolean {
     const sheet = session.workbook.sheets.get(target.sheetId);
     if (target.generation !== workbookGeneration.value || !sheet || sheet.properties.protected) {
@@ -1570,6 +1618,9 @@ export function useSpreadsheetWorkspaceController(
     convertNumberType,
     applyCellBorders,
     captureCellFormatSelection,
+    captureConditionalFormattingSelection,
+    setConditionalFormats,
+    clearConditionalFormats,
     applyCellFormat,
     updateBorderFormat,
     adjustNumberFormatDecimals,

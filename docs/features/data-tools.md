@@ -245,7 +245,7 @@ concrete Vue tools and dialogs; persistent edits run through Core commands.
   when equal keys are not adjacent. Applying, replacing and removing subtotals are
   undoable document edits.
 
-JSON snapshots use version 11 and retain filters, validation, outlines,
+JSON snapshots use version 12 and retain filters, validation, outlines,
 subtotal metadata, and duplicate-owned rules. Duplicate document operations are
 undoable; browser-only error-check preferences do not enter workbook history. XLSX import/export handles the supported filter conditions, standard
 validation settings, and row/column outlines. XLSX export reports that

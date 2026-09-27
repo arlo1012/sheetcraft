@@ -156,6 +156,61 @@ describe("Canvas cell presentation cache", () => {
     expect(sheet.cells.has("2:0")).toBe(false);
   });
 
+  test("resolves conditional formats at each spill projection while inheriting the root style", () => {
+    const { sheet, render, refreshDisplay } = fixture();
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=SEQUENCE(3)" } },
+    );
+    setCellStyle(sheet, { row: 0, column: 0 }, { fillColor: "#d9eaf7" });
+    sheet.conditionalFormats = [
+      {
+        id: "bar",
+        anchor: { row: 0, column: 0 },
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 2, column: 0 } }],
+        condition: {
+          kind: "dataBar",
+          minimum: { kind: "min" },
+          maximum: { kind: "max" },
+          color: "#4f81bd",
+        },
+        style: {},
+      },
+      {
+        id: "icons",
+        anchor: { row: 0, column: 0 },
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 2, column: 0 } }],
+        condition: {
+          kind: "iconSet",
+          iconSet: "threeTrafficLights",
+          thresholds: [{ kind: "min" }, { kind: "percent", value: 50 }, { kind: "max" }],
+        },
+        style: {},
+      },
+      {
+        id: "projection-style",
+        anchor: { row: 0, column: 0 },
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 2, column: 0 } }],
+        condition: { kind: "cellValue", operator: "greaterThan", value: 1 },
+        style: { fillColor: "#c6efce" },
+      },
+    ];
+    refreshDisplay();
+    const first = cell(render(), 0, 0);
+    const second = cell(render(), 1, 0);
+    const third = cell(render(), 2, 0);
+    expect(first.style?.fillColor).toBe("#d9eaf7");
+    expect(second.style?.fillColor).toBe("#c6efce");
+    expect(third.style?.fillColor).toBe("#c6efce");
+    expect(first.content.conditionalFormatVisual?.dataBar?.end).toBe(0);
+    expect(second.content.conditionalFormatVisual?.dataBar?.end).toBeCloseTo(0.5);
+    expect(third.content.conditionalFormatVisual?.dataBar?.end).toBe(1);
+    expect(first.content.conditionalFormatVisual?.iconSet?.iconIndex).toBe(0);
+    expect(second.content.conditionalFormatVisual?.iconSet?.iconIndex).toBe(1);
+    expect(third.content.conditionalFormatVisual?.iconSet?.iconIndex).toBe(2);
+  });
+
   test("updates changed styles, locale and loaded font metrics", () => {
     const { sheet, measure, render, refreshDisplay } = fixture();
     setCellValue(sheet, { row: 0, column: 0 }, 12.5);
@@ -196,5 +251,79 @@ describe("Canvas cell presentation cache", () => {
       expect(fragment.contentRect).toEqual({ x: 0, y: 0, width: 192, height: 48 });
       expect(fragment.content).toBe(fragments[0]!.content);
     }
+  });
+
+  test("projects data bars and icon sets into the scene while reserving icon space and hiding values", () => {
+    const { sheet, render, refreshDisplay } = fixture();
+    setCellValue(sheet, { row: 0, column: 0 }, -10);
+    setCellValue(sheet, { row: 1, column: 0 }, 20);
+    expect(cell(render(), 0, 0).content.conditionalFormatVisual).toBeUndefined();
+    sheet.conditionalFormats = [
+      {
+        id: "bar",
+        anchor: { row: 0, column: 0 },
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 1, column: 0 } }],
+        condition: {
+          kind: "dataBar",
+          minimum: { kind: "min" },
+          maximum: { kind: "max" },
+          color: "#4f81bd",
+          negativeColor: "#c0504d",
+          showValue: false,
+        },
+        style: {},
+      },
+      {
+        id: "icons",
+        anchor: { row: 0, column: 0 },
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 1, column: 0 } }],
+        condition: {
+          kind: "iconSet",
+          iconSet: "threeTrafficLights",
+          thresholds: [{ kind: "min" }, { kind: "percent", value: 50 }, { kind: "max" }],
+        },
+        style: {},
+      },
+    ];
+    refreshDisplay();
+    const negative = cell(render(), 0, 0).content;
+    const positive = cell(render(), 1, 0).content;
+    expect(negative.text).toBe("");
+    expect(negative.textLayout).toBeUndefined();
+    expect(negative.conditionalFormatVisual).toMatchObject({
+      dataBar: { axis: expect.any(Number), showValue: false },
+      iconSet: { iconSet: "threeTrafficLights", iconIndex: 0 },
+    });
+    expect(positive.conditionalFormatVisual?.dataBar).toMatchObject({
+      start: expect.any(Number),
+      end: expect.any(Number),
+      axis: expect.any(Number),
+    });
+    expect(positive.conditionalFormatVisual?.iconSet?.iconIndex).toBe(2);
+  });
+
+  test("keeps a visible value clear of its icon set slot", () => {
+    const { sheet, render, refreshDisplay } = fixture();
+    setCellValue(sheet, { row: 0, column: 0 }, 40);
+    setCellStyle(sheet, { row: 0, column: 0 }, { horizontalAlign: "left" });
+    const before = cell(render(), 0, 0).content.textLayout!;
+    sheet.conditionalFormats = [
+      {
+        id: "icons",
+        anchor: { row: 0, column: 0 },
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
+        condition: {
+          kind: "iconSet",
+          iconSet: "threeArrows",
+          thresholds: [{ kind: "min" }, { kind: "percent", value: 50 }, { kind: "max" }],
+          showValue: true,
+        },
+        style: {},
+      },
+    ];
+    refreshDisplay();
+    const after = cell(render(), 0, 0).content;
+    expect(after.text).toBe("40");
+    expect(after.textLayout?.x).toBeGreaterThan(before.x);
   });
 });

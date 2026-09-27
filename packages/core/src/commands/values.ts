@@ -1,5 +1,18 @@
 import { getCellMatrixSize } from "../clipboard.js";
 import {
+  cloneConditionalFormatRule,
+  normalizeConditionalFormatRules,
+} from "../conditional-formatting.js";
+import {
+  assertConditionalFormatCrossSheetMoveSupported,
+  createConditionalFormatMoveReferenceTransform,
+  moveConditionalFormatRules,
+} from "../conditional-formatting-move.js";
+import {
+  getConditionalFormatFormulaSources,
+  rewriteConditionalFormatQualifiedReferencesForSheet,
+} from "../formula/workbook-references.js";
+import {
   cloneCellStyle,
   mergeCellStyle,
   normalizeCellStyle,
@@ -214,6 +227,16 @@ export function applySetCellContentsCommand(
   if (!Array.isArray(command.changes)) {
     throw invalidCommandPayload("changes", command.changes);
   }
+  if (command.conditionalFormats !== undefined && !Array.isArray(command.conditionalFormats))
+    throw invalidCommandPayload("conditionalFormats", command.conditionalFormats);
+  const ruleSheetIds = new Set<string>();
+  const conditionalFormats = (command.conditionalFormats ?? []).map((entry) => {
+    if (!entry || ruleSheetIds.has(entry.sheetId))
+      throw invalidCommandPayload("conditionalFormats", entry);
+    const sheet = getSheetOrThrow(workbook, entry.sheetId);
+    ruleSheetIds.add(entry.sheetId);
+    return { sheet, rules: normalizeConditionalFormatRules(entry.rules) };
+  });
   const resolvers = new Map<string, MergedCellRangeResolver>();
   const getResolver = (sheetId: string) => {
     const cached = resolvers.get(sheetId);
@@ -372,7 +395,20 @@ export function applySetCellContentsCommand(
       }
     }
   }
-  return reverseChanges.length > 0 ? createBatchSetCellContentsCommand(reverseChanges) : null;
+  const previousRules: NonNullable<SetCellContentsCommand["conditionalFormats"]> = [];
+  for (const { sheet, rules } of conditionalFormats) {
+    if (JSON.stringify(sheet.conditionalFormats ?? []) === JSON.stringify(rules)) continue;
+    previousRules.push({
+      sheetId: sheet.id,
+      rules: (sheet.conditionalFormats ?? []).map(cloneConditionalFormatRule),
+    });
+    sheet.conditionalFormats = rules;
+  }
+  if (!reverseChanges.length && !previousRules.length) return null;
+  return {
+    ...createBatchSetCellContentsCommand(reverseChanges),
+    ...(previousRules.length ? { conditionalFormats: previousRules } : {}),
+  };
 }
 
 export function applyClearCellRangeCommand(
@@ -437,6 +473,13 @@ export function applyMoveCellRangeCommand(
   )
     return null;
   const previous = createSheetSparseState(sheet);
+  assertConditionalFormatCrossSheetMoveSupported(workbook, sheet.id);
+  const conditionalFormatFormulaSources = getConditionalFormatFormulaSources(workbook, sheet.id);
+  const conditionalFormats = moveConditionalFormatRules(
+    sheet.conditionalFormats ?? [],
+    source,
+    command.destination,
+  );
   const captured = [...sheet.cells].flatMap(([key, cell]) => {
     const address = parseCellKey(key);
     return address.row >= source.start.row &&
@@ -498,11 +541,23 @@ export function applyMoveCellRangeCommand(
   reconcileCellBorderTargets(targets, (address, patch) =>
     setCellStyle(sheet, address, mergeCellStyle(getCellStyle(sheet, address), patch)),
   );
+  sheet.conditionalFormats = conditionalFormats;
+  rewriteConditionalFormatQualifiedReferencesForSheet(
+    workbook,
+    sheet.id,
+    createConditionalFormatMoveReferenceTransform(source, command.destination),
+  );
   const current = createSheetSparseState(sheet);
-  if (JSON.stringify(current) === JSON.stringify(previous)) return null;
+  if (
+    JSON.stringify(current) === JSON.stringify(previous) &&
+    JSON.stringify(getConditionalFormatFormulaSources(workbook, sheet.id)) ===
+      JSON.stringify(conditionalFormatFormulaSources)
+  )
+    return null;
   return {
     type: "restoreSheetState",
     sheetId: command.sheetId,
     state: previous,
+    ...(conditionalFormatFormulaSources.length ? { conditionalFormatFormulaSources } : {}),
   };
 }

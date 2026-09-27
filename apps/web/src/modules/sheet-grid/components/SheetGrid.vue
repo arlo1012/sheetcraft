@@ -381,6 +381,7 @@ const display = useSheetDisplaySnapshot({
   getSheet: () => props.sheet,
   getEvaluator: () => sheetEvaluator.value,
   getRevision: () => props.workbookRevision,
+  getDateSystem: () => props.dateSystem,
 });
 const contentExtent = computed(() => display.value.contentExtent);
 const {

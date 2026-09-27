@@ -6,6 +6,7 @@ import type { CellMergeMode, CellValueConversionMode } from "@idea10/core/comman
 import type { DefinedNameLabelPosition } from "@idea10/core/commands";
 import type { WorkbookCalculationSettings } from "@idea10/core/workbook";
 import type { CellFormatTab } from "../modules/cell-format/components/CellFormatDialog.vue";
+import type { ConditionalFormatQuickRule } from "../modules/conditional-formatting/components/ConditionalFormattingMenu.vue";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import { useAppI18n } from "../shared/i18n";
@@ -16,19 +17,23 @@ import type {
   MergeCellsState,
 } from "../modules/home-tools/components/data-tool-state";
 
-defineProps<{
-  state: SelectionCellStyleState;
-  disabled: boolean;
-  readOnly?: boolean;
-  formatPainterActive?: boolean;
-  dataState?: HomeDataToolState;
-  mergeState?: MergeCellsState;
-  formulaDisabled?: boolean;
-  editSessionId?: string;
-  recentFunctions?: readonly string[];
-  nameCreationEnabled?: boolean;
-  calculationSettings?: WorkbookCalculationSettings;
-}>();
+withDefaults(
+  defineProps<{
+    state: SelectionCellStyleState;
+    disabled: boolean;
+    conditionalFormattingDisabled?: boolean;
+    readOnly?: boolean;
+    formatPainterActive?: boolean;
+    dataState?: HomeDataToolState;
+    mergeState?: MergeCellsState;
+    formulaDisabled?: boolean;
+    editSessionId?: string;
+    recentFunctions?: readonly string[];
+    nameCreationEnabled?: boolean;
+    calculationSettings?: WorkbookCalculationSettings;
+  }>(),
+  { conditionalFormattingDisabled: undefined },
+);
 
 const emit = defineEmits<{
   applyBorders: [action: CellBorderAction];
@@ -58,6 +63,9 @@ const emit = defineEmits<{
   undo: [];
   redo: [];
   toggleProtection: [];
+  createConditionalFormat: [kind: ConditionalFormatQuickRule];
+  manageConditionalFormats: [];
+  clearConditionalFormats: [scope: "selection" | "sheet"];
 }>();
 
 const { t } = useAppI18n();
@@ -162,6 +170,7 @@ defineSlots<{
         :edit-session-id="editSessionId"
         :state="state"
         :disabled="disabled"
+        :conditional-formatting-disabled="conditionalFormattingDisabled"
         :read-only="readOnly"
         :format-painter-active="formatPainterActive"
         :data-state="dataState"
@@ -187,6 +196,9 @@ defineSlots<{
         @redo="emit('redo')"
         @toggle-protection="emit('toggleProtection')"
         @open-data-tools="activeCategory = 'data'"
+        @create-conditional-format="emit('createConditionalFormat', $event)"
+        @manage-conditional-formats="emit('manageConditionalFormats')"
+        @clear-conditional-formats="emit('clearConditionalFormats', $event)"
       >
         <template v-if="$slots['row-column-tools']" #row-column-tools>
           <slot name="row-column-tools" />

@@ -24,6 +24,10 @@ import { isFormulaError } from "@idea10/core/formula";
 import { formatComputedValueForDisplay } from "@idea10/core/input";
 import { cloneCellStyle, type CellStyle } from "@idea10/core/style";
 import {
+  cloneConditionalFormatRule,
+  type SheetConditionalFormatRule,
+} from "@idea10/core/conditional-formatting";
+import {
   getSelectionMode,
   getSelectionRange,
   type CellSelection,
@@ -70,11 +74,19 @@ export type GridPastePayload =
       /** Physical source rows before filtered copies compact their value matrix. */
       sourceRows?: number[];
       styles?: CellStyleMatrix;
+      conditionalFormats?: SheetConditionalFormatRule[];
       /** Original external TSV fields for Text-number-format targets. */
       rawTextValues?: string[][];
     }
   | { kind: "values"; plan: GridPastePlan; rawTextValues?: string[][] }
-  | { kind: "formats"; plan: GridPastePlan; styles: CellStyleMatrix };
+  | {
+      kind: "formats";
+      plan: GridPastePlan;
+      styles: CellStyleMatrix;
+      conditionalFormats?: SheetConditionalFormatRule[];
+      sourceRange?: CellRange;
+      sourceRows?: number[];
+    };
 
 type GridPasteKind = GridPastePayload["kind"];
 
@@ -107,6 +119,7 @@ type PendingClipboard = {
   contents: CellContentMatrix;
   values: CellValueMatrix;
   styles: CellStyleMatrix;
+  conditionalFormats: SheetConditionalFormatRule[];
   sourceRows?: number[];
   revision: number;
   localTokenWritten: boolean;
@@ -259,6 +272,7 @@ export function useGridClipboard(options: {
       contents,
       values,
       styles,
+      conditionalFormats: (sheet.conditionalFormats ?? []).map(cloneConditionalFormatRule),
       sourceRows: compressed ? rows : undefined,
       revision: getRevision(),
       localTokenWritten: false,
@@ -606,6 +620,9 @@ export function useGridClipboard(options: {
           plannedStyles ?? matchingFormatSource.styles,
           getCellMatrixSize(plan.values),
         ),
+        conditionalFormats: matchingFormatSource.conditionalFormats,
+        sourceRange: plannedSourceRange ?? matchingFormatSource.range,
+        sourceRows: matchingFormatSource.sourceRows,
       };
     } else if (kind === "values") {
       payload = {
@@ -633,6 +650,9 @@ export function useGridClipboard(options: {
             isMatchingLocalClipboard && pending
               ? tileCellMatrix(plannedStyles ?? pending.styles, getCellMatrixSize(plan.values))
               : undefined,
+          ...(isMatchingLocalClipboard && pending
+            ? { conditionalFormats: pending.conditionalFormats }
+            : {}),
           ...(targetRawTextValues ? { rawTextValues: targetRawTextValues } : {}),
         };
       }

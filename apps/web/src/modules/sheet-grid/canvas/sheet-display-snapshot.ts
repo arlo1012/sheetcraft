@@ -1,5 +1,12 @@
 import { createDuplicateHighlightResolver } from "@idea10/core/duplicate-values";
+import {
+  applyConditionalFormatStyle,
+  createConditionalFormatResolver,
+  createConditionalFormatVisualResolver,
+} from "@idea10/core/conditional-formatting";
+import type { ConditionalFormatVisual } from "@idea10/core/conditional-formatting";
 import type { CellStyle } from "@idea10/core/style";
+import type { ExcelDateSystem } from "@idea10/core/formula";
 import { computed, type ComputedRef } from "vue";
 import type { CellAddress, Sheet, SheetEvaluator } from "@idea10/core/workbook";
 import type { FormulaValue } from "@idea10/core/formula";
@@ -25,6 +32,7 @@ export type SheetDisplaySnapshot = Readonly<{
   getComputedValue: (address: CellAddress) => FormulaValue;
   getSpill: (address: CellAddress) => SpillProjection | undefined;
   getCellStyle: (address: CellAddress) => Readonly<CellStyle> | undefined;
+  getConditionalFormatVisual: (address: CellAddress) => ConditionalFormatVisual | undefined;
 }>;
 
 function addressKey(address: CellAddress): string {
@@ -43,6 +51,7 @@ export function createSheetDisplaySnapshot(options: {
   sheet: Sheet;
   evaluator: SheetEvaluator;
   revision?: number;
+  dateSystem?: ExcelDateSystem;
 }): SheetDisplaySnapshot {
   const contentExtent = getSheetContentExtent(options.sheet);
 
@@ -66,11 +75,25 @@ export function createSheetDisplaySnapshot(options: {
   }
 
   const resolveHighlight = createDuplicateHighlightResolver(options.sheet, options.evaluator);
+  const resolveConditionalFormat = createConditionalFormatResolver(
+    options.sheet,
+    options.evaluator,
+    { dateSystem: options.dateSystem },
+  );
+  const resolveConditionalFormatVisual = createConditionalFormatVisualResolver(
+    options.sheet,
+    options.evaluator,
+    { dateSystem: options.dateSystem },
+  );
   const styles = new Map<string, Readonly<CellStyle> | undefined>();
   function getCellStyle(address: CellAddress): Readonly<CellStyle> | undefined {
     const key = addressKey(address);
     if (styles.has(key)) return styles.get(key);
-    const base = options.sheet.cells.get(key)?.style;
+    const base =
+      options.sheet.cells.get(key)?.style ??
+      (spills.get(key)
+        ? options.sheet.cells.get(addressKey(spills.get(key)!.root))?.style
+        : undefined);
     const highlight = resolveHighlight(address);
     let style = base;
     if (highlight) {
@@ -81,8 +104,11 @@ export function createSheetDisplaySnapshot(options: {
         delete style.fillPatternColor;
       }
     }
-    styles.set(key, style);
-    return style;
+    // Conditional rules override product duplicate highlights, while the stored
+    // manual style stays untouched and is revealed again when no rule matches.
+    const effectiveStyle = applyConditionalFormatStyle(style, resolveConditionalFormat(address));
+    styles.set(key, effectiveStyle);
+    return effectiveStyle;
   }
 
   return {
@@ -94,6 +120,7 @@ export function createSheetDisplaySnapshot(options: {
       computedValues.get(addressKey(address)) ?? options.evaluator.getComputedValue(address),
     getSpill: (address) => spills.get(addressKey(address)),
     getCellStyle,
+    getConditionalFormatVisual: resolveConditionalFormatVisual,
   };
 }
 
@@ -125,18 +152,25 @@ function trackSheetDisplayDocument(sheet: Sheet): void {
   void sheet.filter;
   void sheet.floatingImages;
   void sheet.duplicateRules;
+  void sheet.conditionalFormats;
 }
 
 export function useSheetDisplaySnapshot(options: {
   getSheet: () => Sheet;
   getEvaluator: () => SheetEvaluator;
   getRevision?: () => number | undefined;
+  getDateSystem?: () => ExcelDateSystem;
 }): ComputedRef<SheetDisplaySnapshot> {
   return computed(() => {
     const sheet = options.getSheet();
     const evaluator = options.getEvaluator();
     const revision = options.getRevision?.();
     trackSheetDisplayDocument(sheet);
-    return createSheetDisplaySnapshot({ sheet, evaluator, revision });
+    return createSheetDisplaySnapshot({
+      sheet,
+      evaluator,
+      revision,
+      dateSystem: options.getDateSystem?.(),
+    });
   });
 }

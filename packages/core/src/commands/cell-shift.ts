@@ -268,6 +268,23 @@ function assertFormulaRangesAreSafe(
           );
       }
     }
+    for (const rule of sourceSheet.conditionalFormats ?? []) {
+      if (rule.condition.kind !== "formula") continue;
+      for (const formulaRange of collectFormulaRanges(rule.condition.formula)) {
+        const qualified = formulaRange.start.sheetName;
+        const targetsSheet = qualified
+          ? qualified.toLowerCase() === targetName
+          : sourceSheet.id === sheetId;
+        if (!targetsSheet) continue;
+        const reference = { start: formulaRange.start, end: formulaRange.end };
+        if (!intersects(reference, movement)) continue;
+        throw invalidCommandPayload(
+          "range",
+          range,
+          "Cell shifts intersecting a conditional-format formula reference are not supported.",
+        );
+      }
+    }
   }
 }
 
@@ -312,12 +329,15 @@ export function applyCellShiftCommand(
   if (
     (sheet.dataValidations ?? []).some((rule) => intersects(rule.range, movement)) ||
     (sheet.subtotalMetadata ?? []).some((entry) => intersects(entry.range, movement)) ||
-    (sheet.duplicateRules ?? []).some((rule) => intersects(rule.range, movement))
+    (sheet.duplicateRules ?? []).some((rule) => intersects(rule.range, movement)) ||
+    (sheet.conditionalFormats ?? []).some((rule) =>
+      rule.ranges.some((appliesTo) => intersects(appliesTo, movement)),
+    )
   )
     throw invalidCommandPayload(
       "range",
       range,
-      "Cell shifts intersecting data validation, duplicate, or subtotal ranges are not supported.",
+      "Cell shifts intersecting data validation, conditional-format, duplicate, or subtotal ranges are not supported.",
     );
   const outlineAxis =
     command.direction === "left" || command.direction === "right" ? "column" : "row";

@@ -517,6 +517,8 @@ describe("useGridClipboard menu commands", () => {
     await fixture.clipboard.pasteFormatsSelection();
     expect(fixture.pastes[0]).toEqual({
       kind: "formats",
+      conditionalFormats: [],
+      sourceRange: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
       plan: {
         anchor: { row: 2, column: 2 },
         range: { start: { row: 2, column: 2 }, end: { row: 3, column: 3 } },

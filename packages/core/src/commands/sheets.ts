@@ -2,7 +2,11 @@ import { WorkbookDomainError, toWorkbookErrorData, toWorkbookErrorDetail } from 
 import type { IdFactory } from "../runtime.js";
 import { deserializeSheet, serializeSheet } from "../serialization.js";
 import {
+  getConditionalFormatFormulaSources,
+  renameConditionalFormatQualifiedReferencesForSheet,
   renameQualifiedReferencesForSheet,
+  restoreConditionalFormatFormulaSources,
+  rewriteConditionalFormatQualifiedReferencesForSheet,
   restoreFormulaSources,
   rewriteQualifiedReferencesForSheet,
 } from "../formula/workbook-references.js";
@@ -292,6 +296,7 @@ export function applyAddSheetCommand(
       });
     }
   }
+  restoreConditionalFormatFormulaSources(workbook, command.conditionalFormatFormulaSources ?? []);
   return {
     type: "deleteSheet",
     sheetId: sheet.id,
@@ -357,7 +362,12 @@ export function applyDeleteSheetCommand(
         : [];
     }),
   );
+  const conditionalFormatFormulaSources = getConditionalFormatFormulaSources(
+    workbook,
+    command.sheetId,
+  );
   rewriteQualifiedReferencesForSheet(workbook, command.sheetId, null);
+  rewriteConditionalFormatQualifiedReferencesForSheet(workbook, command.sheetId, null);
   for (const definition of definedNames) workbook.definedNames.delete(definition.id);
   const { sheet, index } = removeSheet(workbook, command.sheetId);
   setActiveSheet(workbook, command.activeSheetId);
@@ -367,6 +377,7 @@ export function applyDeleteSheetCommand(
     index,
     activeSheetId: previousActiveSheetId,
     formulaSources,
+    conditionalFormatFormulaSources,
     definedNames,
   };
 }
@@ -437,12 +448,19 @@ export function applyRenameSheetCommand(
   if (!changed) return null;
   if (command.formulaSources) {
     restoreFormulaSources(workbook, command.formulaSources);
+    restoreConditionalFormatFormulaSources(workbook, command.conditionalFormatFormulaSources ?? []);
     return createRenameSheetCommand(command.sheetId, previousName);
   }
   const formulaSources = renameQualifiedReferencesForSheet(workbook, previousName, name);
+  const conditionalFormatFormulaSources = renameConditionalFormatQualifiedReferencesForSheet(
+    workbook,
+    previousName,
+    name,
+  );
   return {
     ...createRenameSheetCommand(command.sheetId, previousName),
     formulaSources,
+    conditionalFormatFormulaSources,
   };
 }
 

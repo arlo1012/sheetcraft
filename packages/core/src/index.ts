@@ -22,3 +22,4 @@ export * from "./data-table.js";
 export * from "./data-outline.js";
 export * from "./data-range.js";
 export * from "./duplicate-values.js";
+export * from "./conditional-formatting.js";

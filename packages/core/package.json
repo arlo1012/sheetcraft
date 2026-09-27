@@ -99,6 +99,10 @@
       "types": "./dist/duplicate-values.d.ts",
       "import": "./dist/duplicate-values.js"
     },
+    "./conditional-formatting": {
+      "types": "./dist/conditional-formatting.d.ts",
+      "import": "./dist/conditional-formatting.js"
+    },
     "./goal-seek": {
       "types": "./dist/goal-seek.d.ts",
       "import": "./dist/goal-seek.js"

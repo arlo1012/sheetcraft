@@ -374,4 +374,30 @@ describe("rectangular cell shift commands", () => {
     ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
     expect(createSheetSparseState(sheet)).toEqual(before);
   });
+
+  test("rejects a shift that intersects conditional-format ranges or formula references", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    sheet.conditionalFormats = [
+      {
+        id: "rule",
+        ranges: [{ start: { row: 2, column: 1 }, end: { row: 2, column: 3 } }],
+        anchor: { row: 2, column: 1 },
+        condition: { kind: "formula", formula: "=B3>0" },
+        style: { fillColor: "#FF0000" },
+      },
+    ];
+    const before = createSheetSparseState(sheet);
+    expect(
+      tryApplyWorkbookCommand(
+        session.workbook,
+        createInsertCellsCommand(
+          sheet.id,
+          { start: { row: 2, column: 0 }, end: { row: 2, column: 0 } },
+          "right",
+        ),
+      ),
+    ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
+    expect(createSheetSparseState(sheet)).toEqual(before);
+  });
 });

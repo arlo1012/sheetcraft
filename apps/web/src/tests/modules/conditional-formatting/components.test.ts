@@ -1,0 +1,187 @@
+import { DOMWrapper, mount } from "@vue/test-utils";
+import { afterEach, describe, expect, test } from "vitest";
+import ConditionalFormatEditorDialog from "../../../modules/conditional-formatting/components/ConditionalFormatEditorDialog.vue";
+import ConditionalFormatManagerDialog from "../../../modules/conditional-formatting/components/ConditionalFormatManagerDialog.vue";
+import { createAppI18n } from "../../../shared/i18n";
+import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
+
+const mounted: Array<{ unmount(): void }> = [];
+
+afterEach(() => {
+  for (const wrapper of mounted.splice(0)) wrapper.unmount();
+  document.body.replaceChildren();
+});
+
+function mountEditor(rule?: SheetConditionalFormatRule, initialKind?: "between" | "formula") {
+  const wrapper = mount(ConditionalFormatEditorDialog, {
+    attachTo: document.body,
+    props: { visible: true, rule, ranges: "A1:A3", initialKind },
+    global: { plugins: [createAppI18n("en-US")] },
+  });
+  mounted.push(wrapper);
+  return wrapper;
+}
+
+function confirmButton(): DOMWrapper<HTMLButtonElement> {
+  const button = [...document.body.querySelectorAll("button")].find((candidate) =>
+    candidate.textContent?.trim().startsWith("OK"),
+  );
+  if (!(button instanceof HTMLButtonElement))
+    throw new Error("Missing dialog confirmation button.");
+  return new DOMWrapper(button);
+}
+
+const textRule: SheetConditionalFormatRule = {
+  id: "text-rule",
+  ranges: [{ start: { row: 0, column: 0 }, end: { row: 2, column: 0 } }],
+  anchor: { row: 0, column: 0 },
+  condition: { kind: "text", operator: "contains", text: "late" },
+  style: { textColor: "#0000FF", bold: false, italic: false },
+};
+
+const shiftedFormulaRule: SheetConditionalFormatRule = {
+  id: "formula-rule",
+  ranges: [{ start: { row: 4, column: 0 }, end: { row: 7, column: 0 } }],
+  anchor: { row: 0, column: 0 },
+  condition: { kind: "formula", formula: "=B1>0" },
+  style: { fillColor: "#FDE2E1" },
+};
+
+const stringValueRule: SheetConditionalFormatRule = {
+  id: "string-value-rule",
+  ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
+  anchor: { row: 0, column: 0 },
+  condition: { kind: "cellValue", operator: "equal", value: "001" },
+  style: { fillColor: "#FDE2E1" },
+};
+
+describe("conditional formatting dialogs", () => {
+  test("manager immediately shows mounted rules and opens a quick-create editor", () => {
+    const wrapper = mount(ConditionalFormatManagerDialog, {
+      attachTo: document.body,
+      props: {
+        visible: true,
+        rules: [textRule],
+        selectionRanges: "A1",
+        createKind: "formula",
+      },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
+    mounted.push(wrapper);
+
+    expect(document.body.textContent).toContain("New conditional formatting rule");
+    expect(
+      [...document.body.querySelectorAll("input")].some(
+        (input) => input.getAttribute("placeholder") === '=$D2="Overdue"',
+      ),
+    ).toBe(true);
+  });
+
+  test("limits priority changes to the current-sheet rule scope", () => {
+    const secondRule = { ...textRule, id: "second-rule" };
+    const wrapper = mount(ConditionalFormatManagerDialog, {
+      attachTo: document.body,
+      props: { visible: true, rules: [textRule, secondRule], selectionRanges: "A1" },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
+    mounted.push(wrapper);
+
+    expect(
+      document.body.querySelector<HTMLButtonElement>('[aria-label="Move down"]')?.disabled,
+    ).toBe(true);
+  });
+
+  test("preserves text and explicit false format attributes when editing", async () => {
+    const wrapper = mountEditor(textRule);
+    expect((document.body.querySelectorAll("input")[0] as HTMLInputElement).value).toBe("A1:A3");
+    await confirmButton().trigger("click");
+    expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({
+      anchor: { row: 0, column: 0 },
+      condition: { kind: "text", operator: "contains", text: "late" },
+      style: { textColor: "#0000FF", bold: false, italic: false },
+    });
+  });
+
+  test("rebases a stored formula to the first visible application range", async () => {
+    const wrapper = mountEditor(shiftedFormulaRule);
+    expect(
+      [...document.body.querySelectorAll<HTMLInputElement>("input")].map((input) => input.value),
+    ).toContain("=B5>0");
+    await confirmButton().trigger("click");
+    expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({
+      anchor: { row: 4, column: 0 },
+      condition: { kind: "formula", formula: "=B5>0" },
+    });
+  });
+
+  test("keeps a string cell-value operand while editing only the style", async () => {
+    const wrapper = mountEditor(stringValueRule);
+    await confirmButton().trigger("click");
+    expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({
+      condition: { kind: "cellValue", operator: "equal", value: "001" },
+    });
+  });
+
+  test("does not emit an invalid formula or incomplete between rule", async () => {
+    const formula = mountEditor(undefined, "formula");
+    const selects = document.body.querySelectorAll("input");
+    await new DOMWrapper(selects[1]!).setValue("=NOT A FORMULA(");
+    await confirmButton().trigger("click");
+    expect(formula.emitted("save")).toBeUndefined();
+    formula.unmount();
+    mounted.splice(mounted.indexOf(formula), 1);
+    document.body.replaceChildren();
+
+    const between = mountEditor(undefined, "between");
+    const inputs = document.body.querySelectorAll("input");
+    await new DOMWrapper(inputs[1]!).setValue("1");
+    await confirmButton().trigger("click");
+    expect(between.emitted("save")).toBeUndefined();
+  });
+});
+
+test("initializes rank and date quick rules with their selected preset", async () => {
+  const topPercent = mountEditor(undefined, "top10Percent" as never);
+  await confirmButton().trigger("click");
+  expect(topPercent.emitted("save")?.[0]?.[0]).toMatchObject({
+    condition: { kind: "rank", count: 10, percent: true },
+  });
+  topPercent.unmount();
+  mounted.splice(mounted.indexOf(topPercent), 1);
+  document.body.replaceChildren();
+
+  const yesterday = mountEditor(undefined, "yesterday" as never);
+  await confirmButton().trigger("click");
+  expect(yesterday.emitted("save")?.[0]?.[0]).toMatchObject({
+    condition: { kind: "date", period: "yesterday" },
+  });
+});
+
+test("initializes visual gallery presets with their exact visual conditions", async () => {
+  const bar = mountEditor(undefined, "barGreenSolid" as never);
+  await confirmButton().trigger("click");
+  expect(bar.emitted("save")?.[0]?.[0]).toMatchObject({
+    condition: { kind: "dataBar", color: "#63BE7B", gradient: false },
+  });
+  bar.unmount();
+  mounted.splice(mounted.indexOf(bar), 1);
+  document.body.replaceChildren();
+
+  const scale = mountEditor(undefined, "scaleWhiteRed" as never);
+  await confirmButton().trigger("click");
+  expect(
+    (scale.emitted("save")?.[0]?.[0] as SheetConditionalFormatRule | undefined)?.condition,
+  ).toMatchObject({
+    kind: "colorScale",
+    stops: [{ color: "#FFFFFF" }, { color: "#F8696B" }],
+  });
+  scale.unmount();
+  mounted.splice(mounted.indexOf(scale), 1);
+  document.body.replaceChildren();
+
+  const icons = mountEditor(undefined, "iconsTrafficLights" as never);
+  await confirmButton().trigger("click");
+  expect(icons.emitted("save")?.[0]?.[0]).toMatchObject({
+    condition: { kind: "iconSet", iconSet: "threeTrafficLights" },
+  });
+});

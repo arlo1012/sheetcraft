@@ -36,6 +36,10 @@ import {
   applySetSheetDuplicateRulesCommand,
 } from "./duplicates.js";
 import {
+  applyClearSheetConditionalFormatsCommand,
+  applySetSheetConditionalFormatsCommand,
+} from "./conditional-formatting.js";
+import {
   applyAddSheetOutlineGroupCommand,
   applyClearSheetOutlineCommand,
   applyRemoveSheetOutlineGroupCommand,
@@ -94,7 +98,10 @@ function assertCommandDoesNotModifyProtectedSheet(
 ): void {
   const sheetIds =
     command.type === "setCellContents"
-      ? command.changes.map((change) => change.sheetId)
+      ? [
+          ...command.changes.map((change) => change.sheetId),
+          ...(command.conditionalFormats ?? []).map((entry) => entry.sheetId),
+        ]
       : command.type === "advancedFilter" && command.mode === "copy" && command.destination
         ? [command.destination.sheetId]
         : "sheetId" in command
@@ -136,6 +143,8 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "clearSheetDataValidations":
     case "setSheetDuplicateRules":
     case "clearSheetDuplicateRules":
+    case "setSheetConditionalFormats":
+    case "clearSheetConditionalFormats":
     case "addSheetOutlineGroup":
     case "removeSheetOutlineGroup":
     case "setSheetOutlineGroupCollapsed":
@@ -247,6 +256,10 @@ export function applyWorkbookCommand(
         return applySetSheetDuplicateRulesCommand(workbook, command);
       case "clearSheetDuplicateRules":
         return applyClearSheetDuplicateRulesCommand(workbook, command);
+      case "setSheetConditionalFormats":
+        return applySetSheetConditionalFormatsCommand(workbook, command);
+      case "clearSheetConditionalFormats":
+        return applyClearSheetConditionalFormatsCommand(workbook, command);
       case "addSheetOutlineGroup":
         return applyAddSheetOutlineGroupCommand(workbook, command);
       case "removeSheetOutlineGroup":

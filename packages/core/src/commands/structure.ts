@@ -19,11 +19,22 @@ import {
   type Workbook,
 } from "../workbook.js";
 import {
+  collectFormulaReferences,
   collectFormulaRanges,
+  translateFormulaForCopy,
   transformFormulaForAxis,
   transformFormulaForAxisMove,
 } from "../formula/references.js";
-import { rewriteQualifiedReferencesForSheet } from "../formula/workbook-references.js";
+import {
+  getConditionalFormatFormulaSources,
+  rewriteConditionalFormatQualifiedReferencesForSheet,
+  restoreConditionalFormatFormulaSources,
+  rewriteQualifiedReferencesForSheet,
+} from "../formula/workbook-references.js";
+import {
+  cloneConditionalFormatRule,
+  type SheetConditionalFormatRule,
+} from "../conditional-formatting.js";
 import {
   transformMergedCellRangesForAxisDelete,
   transformMergedCellRangesForAxisInsert,
@@ -95,6 +106,46 @@ function assertNoAdvancedCriteriaReferencesSheet(workbook: Workbook, sheetId: st
     );
 }
 
+/**
+ * A conditional-format formula is evaluated after translating it from the rule
+ * anchor to each applied cell. When another sheet's structural axis changes,
+ * a single stored formula can only be rewritten safely if every applied cell
+ * has the same offset on that axis. Otherwise rows/cells on opposite sides of
+ * the edit would need different formula text, so reject rather than corrupt it.
+ */
+function assertConditionalFormatReferencesCanTransform(
+  workbook: Workbook,
+  targetSheetId: string,
+  axis: SheetDimensionAxis,
+): void {
+  const targetName = workbook.sheets.get(targetSheetId)?.name.toLowerCase();
+  if (!targetName) return;
+  for (const sourceSheet of workbook.sheets.values()) {
+    if (sourceSheet.id === targetSheetId) continue;
+    for (const rule of sourceSheet.conditionalFormats ?? []) {
+      if (rule.condition.kind !== "formula") continue;
+      const hasRelativeQualifiedReference = collectFormulaReferences(rule.condition.formula).some(
+        (reference) =>
+          reference.sheetName?.toLowerCase() === targetName &&
+          (axis === "row" ? !reference.rowAbsolute : !reference.columnAbsolute),
+      );
+      if (!hasRelativeQualifiedReference) continue;
+      const anchorIndex = axis === "row" ? rule.anchor.row : rule.anchor.column;
+      const hasOneAxisOffset = rule.ranges.every((range) => {
+        const start = axis === "row" ? range.start.row : range.start.column;
+        const end = axis === "row" ? range.end.row : range.end.column;
+        return start === anchorIndex && end === anchorIndex;
+      });
+      if (!hasOneAxisOffset)
+        throw invalidCommandPayload(
+          "sheetId",
+          targetSheetId,
+          "Structural axis changes cannot safely rewrite a relative conditional-format reference across multiple applied rows or columns.",
+        );
+    }
+  }
+}
+
 function getAxisIndex(address: SheetSparseCell["address"], axis: SheetDimensionAxis): number {
   return axis === "row" ? address.row : address.column;
 }
@@ -135,6 +186,15 @@ function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
           workbookFormulaSources: slice.workbookFormulaSources.map((formula) => ({
             sheetId: formula.sheetId,
             address: { ...formula.address },
+            source: formula.source,
+          })),
+        }
+      : {}),
+    ...(slice.conditionalFormatFormulaSources
+      ? {
+          conditionalFormatFormulaSources: slice.conditionalFormatFormulaSources.map((formula) => ({
+            sheetId: formula.sheetId,
+            ruleId: formula.ruleId,
             source: formula.source,
           })),
         }
@@ -185,6 +245,7 @@ function cloneSheetMetadata(metadata: SheetMetadata): SheetMetadata {
       ...rule,
       range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
     })),
+    conditionalFormats: (metadata.conditionalFormats ?? []).map(cloneConditionalFormatRule),
   };
 }
 
@@ -350,6 +411,58 @@ function transformRangeForAxis(
         start: { row: range.start.row, column: nextStart },
         end: { row: range.end.row, column: nextEnd },
       };
+}
+
+function transformConditionalFormatsForAxis(
+  rules: readonly SheetConditionalFormatRule[],
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  maximum: number,
+  operation: "insert" | "delete",
+): SheetConditionalFormatRule[] {
+  return rules.flatMap((rule) => {
+    const ranges = rule.ranges.flatMap((range) => {
+      const next = transformRangeForAxis(range, axis, index, count, maximum, operation);
+      return next ? [next] : [];
+    });
+    if (!ranges.length) return [];
+    const anchorIndex = axis === "row" ? rule.anchor.row : rule.anchor.column;
+    const transformedAnchor = transformAxisIndex(anchorIndex, index, count, maximum, operation);
+    const anchor =
+      transformedAnchor === null
+        ? { ...ranges[0]!.start }
+        : axis === "row"
+          ? { row: transformedAnchor, column: rule.anchor.column }
+          : { row: rule.anchor.row, column: transformedAnchor };
+    let condition = rule.condition;
+    if (condition.kind === "formula") {
+      // A deleted anchor is replaced by the first surviving applied cell. Move
+      // relative references to that former cell before the deletion transform,
+      // so `=A1` remains meaningful instead of becoming `#REF!`.
+      const sourceAnchor =
+        transformedAnchor === null
+          ? axis === "row"
+            ? { row: anchor.row >= index ? anchor.row + count : anchor.row, column: anchor.column }
+            : {
+                row: anchor.row,
+                column: anchor.column >= index ? anchor.column + count : anchor.column,
+              }
+          : rule.anchor;
+      const rebased =
+        transformedAnchor === null
+          ? translateFormulaForCopy(condition.formula, {
+              row: sourceAnchor.row - rule.anchor.row,
+              column: sourceAnchor.column - rule.anchor.column,
+            })
+          : condition.formula;
+      condition = {
+        kind: "formula",
+        formula: transformFormulaForAxis(rebased, { axis, operation, index, count }),
+      };
+    }
+    return [cloneConditionalFormatRule({ ...rule, ranges, anchor, condition })];
+  });
 }
 
 function transformFilterForAxis(
@@ -528,6 +641,14 @@ function transformSheetMetadataForAxis(
       const range = transformRangeForAxis(rule.range, axis, index, count, maximum, operation);
       return range ? [{ ...rule, range }] : [];
     }),
+    conditionalFormats: transformConditionalFormatsForAxis(
+      metadata.conditionalFormats ?? [],
+      axis,
+      index,
+      count,
+      maximum,
+      operation,
+    ),
   };
 }
 
@@ -975,6 +1096,10 @@ export function applyRestoreSheetStateCommand(
           content: { kind: "formula", formula: { source: formula.source } },
         });
     }
+    restoreConditionalFormatFormulaSources(
+      workbook,
+      command.slice.conditionalFormatFormulaSources ?? [],
+    );
     if (command.slice.definedNames) {
       workbook.definedNames.clear();
       for (const definition of command.slice.definedNames)
@@ -1009,6 +1134,9 @@ export function applyRestoreSheetStateCommand(
         ),
       )
     : undefined;
+  const conditionalFormatFormulaSources = command.conditionalFormatFormulaSources
+    ? getConditionalFormatFormulaSources(workbook, command.sheetId)
+    : undefined;
   const definedNames = command.definedNames
     ? [...workbook.definedNames.values()].map((definition) => ({
         ...definition,
@@ -1022,7 +1150,13 @@ export function applyRestoreSheetStateCommand(
   const changed = validateCommandPayload("state", command.state, () =>
     replaceSheetSparseState(sheet, command.state),
   );
-  if (!changed && !command.workbookFormulaSources && !command.definedNames) return null;
+  if (
+    !changed &&
+    !command.workbookFormulaSources &&
+    !command.conditionalFormatFormulaSources &&
+    !command.definedNames
+  )
+    return null;
   for (const formula of command.workbookFormulaSources ?? []) {
     const targetSheet = workbook.sheets.get(formula.sheetId);
     const cell = targetSheet?.cells.get(createCellKey(formula.address));
@@ -1032,6 +1166,7 @@ export function applyRestoreSheetStateCommand(
         content: { kind: "formula", formula: { source: formula.source } },
       });
   }
+  restoreConditionalFormatFormulaSources(workbook, command.conditionalFormatFormulaSources ?? []);
   if (command.definedNames) {
     workbook.definedNames.clear();
     for (const definition of command.definedNames)
@@ -1049,6 +1184,7 @@ export function applyRestoreSheetStateCommand(
     sheetId: command.sheetId,
     state: previousState,
     ...(workbookFormulaSources ? { workbookFormulaSources } : {}),
+    ...(conditionalFormatFormulaSources ? { conditionalFormatFormulaSources } : {}),
     ...(definedNames ? { definedNames } : {}),
   };
 }
@@ -1060,6 +1196,7 @@ export function applySheetAxisCommand(
   assertNoAdvancedCriteriaReferencesSheet(workbook, command.sheetId);
   const maximum = assertSheetAxisRange(command.axis, command.index, command.count);
   const sheet = getSheetOrThrow(workbook, command.sheetId);
+  assertConditionalFormatReferencesCanTransform(workbook, command.sheetId, command.axis);
   const operation = command.type === "insertSheetAxis" ? "insert" : "delete";
   const slice = captureSheetAxisSlice(
     sheet,
@@ -1079,6 +1216,10 @@ export function applySheetAxisCommand(
             },
           ],
     ),
+  );
+  slice.conditionalFormatFormulaSources = getConditionalFormatFormulaSources(
+    workbook,
+    command.sheetId,
   );
   slice.definedNames = [...workbook.definedNames.values()].map((definition) => ({
     ...definition,
@@ -1115,6 +1256,16 @@ export function applySheetAxisCommand(
       ? { row: next, column: address.column }
       : { row: address.row, column: next };
   });
+  rewriteConditionalFormatQualifiedReferencesForSheet(workbook, command.sheetId, (address) => {
+    const value = command.axis === "row" ? address.row : address.column;
+    let next = value;
+    if (operation === "insert") next = value >= command.index ? value + command.count : value;
+    else if (value >= command.index && value < command.index + command.count) return null;
+    else if (value >= command.index + command.count) next = value - command.count;
+    return command.axis === "row"
+      ? { row: next, column: address.column }
+      : { row: address.row, column: next };
+  });
   for (const [id, definition] of workbook.definedNames) {
     if (definition.reference.sheetId !== command.sheetId) continue;
     const reference = transformRangeForAxis(
@@ -1140,6 +1291,12 @@ export function applySheetAxisCommand(
         .get(formula.sheetId)
         ?.cells.get(createCellKey(formula.address))?.content;
       return current?.kind === "formula" && current.formula.source !== formula.source;
+    }) ||
+    (slice.conditionalFormatFormulaSources ?? []).some((formula) => {
+      const current = workbook.sheets
+        .get(formula.sheetId)
+        ?.conditionalFormats?.find((rule) => rule.id === formula.ruleId);
+      return current?.condition.kind === "formula" && current.condition.formula !== formula.source;
     }) ||
     JSON.stringify(slice.definedNames) !== JSON.stringify([...workbook.definedNames.values()]);
   return changed || metadataChanged || externalChanged
@@ -1287,6 +1444,35 @@ function transformSheetMetadataForAxisMove(
         );
       return { ...rule, range };
     }),
+    conditionalFormats: (metadata.conditionalFormats ?? []).map((rule) => {
+      const ranges = rule.ranges.map((range) => {
+        const next = moveRange(range);
+        if (!next)
+          throw invalidCommandPayload(
+            "axis",
+            axis,
+            "Moving this row or column band would split a conditional-format range.",
+          );
+        return next;
+      });
+      const anchor =
+        axis === "row"
+          ? { row: map(rule.anchor.row), column: rule.anchor.column }
+          : { row: rule.anchor.row, column: map(rule.anchor.column) };
+      const condition =
+        rule.condition.kind === "formula"
+          ? {
+              kind: "formula" as const,
+              formula: transformFormulaForAxisMove(rule.condition.formula, {
+                axis,
+                index,
+                count,
+                toIndex,
+              }),
+            }
+          : rule.condition;
+      return cloneConditionalFormatRule({ ...rule, ranges, anchor, condition });
+    }),
   };
 }
 
@@ -1327,6 +1513,7 @@ export function applyMoveSheetAxisCommand(
   assertSheetAxisMove(command);
   assertNoAdvancedCriteriaReferencesSheet(workbook, command.sheetId);
   const sheet = getSheetOrThrow(workbook, command.sheetId);
+  assertConditionalFormatReferencesCanTransform(workbook, command.sheetId, command.axis);
   if (command.index === command.toIndex) return null;
 
   // Validate every non-cell resource before changing the sheet, so an unsupported
@@ -1340,6 +1527,10 @@ export function applyMoveSheetAxisCommand(
   );
   assertFormulaRangesCanMove(sheet, command.axis, command.index, command.count, command.toIndex);
   const previousState = createSheetSparseState(sheet);
+  const conditionalFormatFormulaSources = getConditionalFormatFormulaSources(
+    workbook,
+    command.sheetId,
+  );
   const mapIndex = (value: number) =>
     transformAxisIndexForMove(value, command.index, command.count, command.toIndex);
   const mapAddress = (address: SheetSparseCell["address"]): SheetSparseCell["address"] =>
@@ -1391,6 +1582,7 @@ export function applyMoveSheetAxisCommand(
     outlineGroups: metadata.outlineGroups,
     subtotalMetadata: metadata.subtotalMetadata,
     duplicateRules: metadata.duplicateRules,
+    conditionalFormats: metadata.conditionalFormats,
     floatingImages: previousState.floatingImages.map((image) => ({
       ...image,
       anchor:
@@ -1399,7 +1591,14 @@ export function applyMoveSheetAxisCommand(
           : { row: image.anchor.row, column: mapIndex(image.anchor.column) },
     })),
   };
-  return replaceSheetSparseState(sheet, state)
-    ? createRestoreSheetStateCommand(command.sheetId, previousState)
-    : null;
+  if (!replaceSheetSparseState(sheet, state)) return null;
+  rewriteConditionalFormatQualifiedReferencesForSheet(workbook, command.sheetId, (address) =>
+    command.axis === "row"
+      ? { row: mapIndex(address.row), column: address.column }
+      : { row: address.row, column: mapIndex(address.column) },
+  );
+  return {
+    ...createRestoreSheetStateCommand(command.sheetId, previousState),
+    ...(conditionalFormatFormulaSources.length ? { conditionalFormatFormulaSources } : {}),
+  };
 }

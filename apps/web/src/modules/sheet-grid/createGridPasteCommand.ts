@@ -4,7 +4,12 @@ import {
   createPasteCellContentsCommand,
   type WorkbookCommand,
 } from "@idea10/core/commands";
-import { getCellMatrixSize, translateCellContentForCopy } from "@idea10/core/clipboard";
+import {
+  clearConditionalFormatRanges,
+  copyConditionalFormatRules,
+  getCellMatrixSize,
+  translateCellContentForCopy,
+} from "@idea10/core/clipboard";
 import type { CellContent } from "@idea10/core/formula";
 import { parseCellContent } from "@idea10/core/input";
 import { isTextCellNumberFormat } from "@idea10/core/number-format";
@@ -242,7 +247,7 @@ function isPhysicalRectangle(plan: GridPastePlan, rows: readonly number[]): bool
   return rows.every((row, index) => row === plan.anchor.row + index);
 }
 
-export function createGridPasteCommand(
+function createCellPasteCommand(
   sheet: Sheet,
   payload: GridPastePayload,
   evaluator?: SheetEvaluator,
@@ -363,4 +368,42 @@ export function createGridPasteCommand(
       }),
     ),
   );
+}
+
+/** Keeps copied document rules and cell contents in one undoable transaction. */
+export function createGridPasteCommand(
+  sheet: Sheet,
+  payload: GridPastePayload,
+  evaluator?: SheetEvaluator,
+): WorkbookCommand {
+  const command = createCellPasteCommand(sheet, payload, evaluator);
+  if (
+    payload.kind === "values" ||
+    command.type !== "setCellContents" ||
+    payload.conditionalFormats === undefined ||
+    !payload.sourceRange
+  )
+    return command;
+  const plan = validatePlan(payload.plan);
+  const cuts = payload.plan.rows
+    ? plan.rows.map((row) => ({
+        start: { row, column: payload.plan.range.start.column },
+        end: { row, column: payload.plan.range.end.column },
+      }))
+    : [payload.plan.range];
+  const remaining = clearConditionalFormatRanges(sheet.conditionalFormats ?? [], cuts);
+  const copied = copyConditionalFormatRules(
+    payload.conditionalFormats,
+    payload.sourceRange,
+    payload.plan.range,
+    {
+      sourceRows: payload.sourceRows,
+      destinationRows: plan.rows,
+      existingIds: (sheet.conditionalFormats ?? []).map((rule) => rule.id),
+    },
+  );
+  return {
+    ...command,
+    conditionalFormats: [{ sheetId: sheet.id, rules: [...copied, ...remaining] }],
+  };
 }

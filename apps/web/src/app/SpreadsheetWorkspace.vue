@@ -91,10 +91,18 @@ import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.
 import {
   useSpreadsheetWorkspaceController,
   type CellFormatSelection,
+  type ConditionalFormattingSelection,
 } from "./composables/useSpreadsheetWorkspaceController";
 import CellFormatDialog, {
   type CellFormatTab,
 } from "../modules/cell-format/components/CellFormatDialog.vue";
+import ConditionalFormatManagerDialog from "../modules/conditional-formatting/components/ConditionalFormatManagerDialog.vue";
+import type { ConditionalFormatQuickRule } from "../modules/conditional-formatting/components/ConditionalFormattingMenu.vue";
+import { getConditionalFormatPreset } from "../modules/conditional-formatting/conditional-format-presets";
+import {
+  createConditionalFormatRuleId,
+  formatConditionalFormatRanges,
+} from "../modules/conditional-formatting/conditional-formatting-ui";
 import WorkbookFileActions from "../modules/workbook-persistence/components/WorkbookFileActions.vue";
 import WorkbookFileFeedback from "../modules/workbook-persistence/components/WorkbookFileFeedback.vue";
 import { createIndexedDbWorkbookStore } from "../modules/workbook-persistence/indexedDbWorkbookStore";
@@ -198,6 +206,9 @@ const {
   convertNumberType,
   applyCellBorders,
   captureCellFormatSelection,
+  captureConditionalFormattingSelection,
+  setConditionalFormats,
+  clearConditionalFormats,
   applyCellFormat,
   updateBorderFormat,
   adjustNumberFormatDecimals,
@@ -384,8 +395,11 @@ const { statisticsRange, choiceAddress, filterState: contextFilterState } = cont
 watch(workbookGeneration, () => cellEditSession.cancel(), { flush: "sync" });
 const cellFormatSelection = shallowRef<CellFormatSelection>();
 const cellFormatInitialTab = ref<CellFormatTab>("border");
+const conditionalFormattingSelection = shallowRef<ConditionalFormattingSelection>();
+const conditionalFormatQuickRule = ref<ConditionalFormatQuickRule>();
 watch(workbookGeneration, () => {
   cellFormatSelection.value = undefined;
+  conditionalFormattingSelection.value = undefined;
 });
 
 function openCellFormat(tab: CellFormatTab = "border"): void {
@@ -404,6 +418,49 @@ function confirmCellFormat(change: CellFormatChange): void {
   if (!target) return;
   applyCellFormat(change, target);
   closeCellFormat();
+}
+
+function openConditionalFormatting(kind?: ConditionalFormatQuickRule): void {
+  if (loading.value || fileBusy.value || xlsxBusy.value || !cellEditSession.finish()) return;
+  const target = captureConditionalFormattingSelection();
+  if (!target) return;
+  const preset = kind ? getConditionalFormatPreset(kind) : undefined;
+  if (preset) {
+    setConditionalFormats(
+      [
+        {
+          id: createConditionalFormatRuleId(),
+          ranges: [target.range],
+          anchor: { ...target.range.start },
+          condition: preset,
+          style: {},
+        },
+        ...target.rules,
+      ],
+      target,
+    );
+    void nextTick(focusCellEditor);
+    return;
+  }
+  conditionalFormatQuickRule.value = kind;
+  conditionalFormattingSelection.value = target;
+}
+
+function closeConditionalFormatting(): void {
+  conditionalFormattingSelection.value = undefined;
+  conditionalFormatQuickRule.value = undefined;
+  void nextTick(focusCellEditor);
+}
+
+function saveConditionalFormats(rules: Parameters<typeof setConditionalFormats>[0]): void {
+  const target = conditionalFormattingSelection.value;
+  if (!target) return;
+  if (setConditionalFormats(rules, target)) closeConditionalFormatting();
+}
+
+function clearConditionalFormatRules(scope: "selection" | "sheet"): void {
+  if (loading.value || fileBusy.value || xlsxBusy.value || !cellEditSession.finish()) return;
+  clearConditionalFormats(scope);
 }
 
 function onSelectSheet(sheetId: string): void {
@@ -1189,6 +1246,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     <SpreadsheetRibbon
       :state="activeSelectionStyle"
       :disabled="!isFormattingSupported || activeSheet.properties.protected"
+      :conditional-formatting-disabled="activeSheet.properties.protected"
       :read-only="activeSheet.properties.protected"
       @toggle-protection="
         changeSheetProperties({
@@ -1209,6 +1267,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         fileBusy ||
         xlsxBusy ||
         !!cellFormatSelection ||
+        !!conditionalFormattingSelection ||
         !!findFormatDraft ||
         namesVisible ||
         pickingReferenceRange ||
@@ -1221,6 +1280,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @apply-borders="applyCellBorders"
       @update-border-format="updateBorderFormat"
       @open-cell-format="openCellFormat"
+      @create-conditional-format="openConditionalFormatting"
+      @manage-conditional-formats="openConditionalFormatting()"
+      @clear-conditional-formats="clearConditionalFormatRules"
       @apply-style="applyCellStyle"
       @convert-number-type="convertNumberType"
       @adjust-decimals="adjustNumberFormatDecimals"
@@ -1705,6 +1767,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :initial-tab="cellFormatInitialTab"
       @confirm="confirmCellFormat"
       @cancel="closeCellFormat"
+    />
+    <ConditionalFormatManagerDialog
+      v-if="conditionalFormattingSelection"
+      :visible="true"
+      :rules="conditionalFormattingSelection.rules"
+      :selection-ranges="formatConditionalFormatRanges([conditionalFormattingSelection.range])"
+      :create-kind="conditionalFormatQuickRule"
+      @save="saveConditionalFormats"
+      @close="closeConditionalFormatting"
     />
     <div class="spreadsheet-workspace__file-feedback">
       <WorkbookFileFeedback

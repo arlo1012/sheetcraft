@@ -3,9 +3,11 @@ import { dataTableEnUS } from "../../../modules/data-tools/data-table-messages.e
 import { proofreadingEnUS } from "../../../modules/data-tools/proofreading-messages.en-US";
 import type { MessageSchema } from "../schema";
 import { formulaToolsEnUS } from "../../../modules/formula-tools/formula-tools-messages.en-US";
+import { conditionalFormattingEnUS } from "../../../modules/conditional-formatting/conditional-formatting-messages.en-US";
 
 export const enUS = {
   ...formulaToolsEnUS,
+  ...conditionalFormattingEnUS,
   ...simulationEnUS,
   ...dataTableEnUS,
   ...proofreadingEnUS,

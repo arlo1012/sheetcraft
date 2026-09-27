@@ -3,9 +3,11 @@ import { dataTableZhCN } from "../../../modules/data-tools/data-table-messages.z
 import { proofreadingZhCN } from "../../../modules/data-tools/proofreading-messages.zh-CN";
 import type { MessageSchema } from "../schema";
 import { formulaToolsZhCN } from "../../../modules/formula-tools/formula-tools-messages.zh-CN";
+import { conditionalFormattingZhCN } from "../../../modules/conditional-formatting/conditional-formatting-messages.zh-CN";
 
 export const zhCN = {
   ...formulaToolsZhCN,
+  ...conditionalFormattingZhCN,
   ...simulationZhCN,
   ...dataTableZhCN,
   ...proofreadingZhCN,

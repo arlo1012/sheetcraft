@@ -1,6 +1,7 @@
 import type { Cell, CellAddress, CellRange } from "@idea10/core/workbook";
 import type { ExcelDateSystem, FormulaValue } from "@idea10/core/formula";
 import type { CellStyle } from "@idea10/core/style";
+import type { ConditionalFormatVisual } from "@idea10/core/conditional-formatting";
 import type { FrozenPaneId } from "@idea10/sheet-engine/frozen-layout";
 import type { Rect } from "@idea10/sheet-engine/geometry";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
@@ -9,6 +10,7 @@ import { layoutCellText, type CellTextLayout } from "../../../shared/cell-text/t
 import { getCellValuePresentationForGrid } from "../cell-value-presentation";
 import { createCellTextSpanResolver, type CellTextSpan } from "../cell-text-spans";
 import type { SheetDisplaySnapshot } from "./sheet-display-snapshot";
+import { getConditionalFormatIconSlot } from "../../../shared/conditional-formatting/conditional-format-painter";
 
 export const SHEET_PANE_IDS = ["topLeft", "top", "left", "body"] as const;
 
@@ -17,6 +19,7 @@ export type CanvasCellContent = {
   style: Readonly<CellStyle> | undefined;
   textLayout?: CellTextLayout;
   image?: Extract<NonNullable<Cell["content"]>, { kind: "image" }>["image"];
+  conditionalFormatVisual?: ConditionalFormatVisual;
 };
 
 export type CanvasCell = {
@@ -97,7 +100,10 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
     const sourceAddress = span?.kind === "fill" ? span.source : (spill?.root ?? address);
     const source = options.display.sheet.cells.get(`${sourceAddress.row}:${sourceAddress.column}`);
     const formulaEvaluator =
-      source?.content?.kind === "formula" || spill || options.display.sheet.duplicateRules?.length
+      source?.content?.kind === "formula" ||
+      spill ||
+      options.display.sheet.duplicateRules?.length ||
+      options.display.sheet.conditionalFormats?.length
         ? options.display
         : undefined;
     const cached = contents.get(key);
@@ -117,7 +123,10 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
     const displayCell = cell ?? source;
     const image = displayCell?.content?.kind === "image" ? displayCell.content.image : undefined;
     const value = image ? null : (spill?.value ?? options.display.getComputedValue(sourceAddress));
-    const displayStyle = options.display.getCellStyle(cell ? address : sourceAddress);
+    // A spill projection inherits the root's persisted style, but its display-only
+    // rules resolve against the projected address and value.
+    const styleAddress = spill ? address : cell ? address : sourceAddress;
+    const displayStyle = options.display.getCellStyle(styleAddress);
     const presentation = getCellValuePresentationForGrid(
       value,
       displayStyle,
@@ -127,21 +136,33 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
     const style = presentation.color
       ? { ...displayStyle, textColor: presentation.color }
       : displayStyle;
+    const conditionalFormatVisual = options.display.getConditionalFormatVisual(
+      spill ? address : sourceAddress,
+    );
+    const hideValue =
+      conditionalFormatVisual?.dataBar?.showValue === false ||
+      conditionalFormatVisual?.iconSet?.showValue === false;
+    const iconSlot = getConditionalFormatIconSlot(rect, conditionalFormatVisual);
+    const textWidth = Math.max(0, rect.width - 1 - iconSlot);
     const content: CanvasCellContent = {
-      text: presentation.text,
+      text: hideValue ? "" : presentation.text,
       style,
+      ...(conditionalFormatVisual ? { conditionalFormatVisual } : {}),
       ...(image ? { image } : {}),
-      ...(presentation.text
+      ...(presentation.text && !hideValue
         ? {
-            textLayout: layoutCellText({
-              text: presentation.text,
-              value,
-              style,
-              fill: presentation.fill,
-              width: Math.max(0, rect.width - 1),
-              height: Math.max(0, rect.height - 1),
-              measurer,
-            }),
+            textLayout: (() => {
+              const textLayout = layoutCellText({
+                text: presentation.text,
+                value,
+                style,
+                fill: presentation.fill,
+                width: textWidth,
+                height: Math.max(0, rect.height - 1),
+                measurer,
+              });
+              return iconSlot ? { ...textLayout, x: textLayout.x + iconSlot } : textLayout;
+            })(),
           }
         : {}),
     };

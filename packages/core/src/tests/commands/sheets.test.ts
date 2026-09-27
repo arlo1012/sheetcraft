@@ -351,4 +351,62 @@ describe("sheet commands", () => {
     ).toThrow("protected");
     expect(getCellValue(session.workbook.sheets.get(first)!, { row: 0, column: 0 })).toBeNull();
   });
+
+  test("rewrites conditional-format qualified references on rename and restores them through history", () => {
+    const session = createTestWorkbookSession();
+    const sourceId = session.workbook.activeSheetId;
+    executeWorkbookCommand(session, createAddSheetCommand(session.workbook, { id: "sheet-2" }));
+    const target = session.workbook.sheets.get("sheet-2")!;
+    target.conditionalFormats = [
+      {
+        id: "source-check",
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 2, column: 0 } }],
+        anchor: { row: 0, column: 0 },
+        condition: { kind: "formula", formula: "=Sheet1!A1>0" },
+        style: { textColor: "#FF0000" },
+      },
+    ];
+
+    expect(executeWorkbookCommand(session, createRenameSheetCommand(sourceId, "Source Data"))).toBe(
+      true,
+    );
+    expect(target.conditionalFormats?.[0]?.condition).toEqual({
+      kind: "formula",
+      formula: "='Source Data'!A1>0",
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(target.conditionalFormats?.[0]?.condition).toEqual({
+      kind: "formula",
+      formula: "=Sheet1!A1>0",
+    });
+  });
+
+  test("marks conditional-format references to a deleted sheet and restores them on undo", () => {
+    const session = createTestWorkbookSession();
+    const sourceId = session.workbook.activeSheetId;
+    executeWorkbookCommand(session, createAddSheetCommand(session.workbook, { id: "sheet-2" }));
+    const target = session.workbook.sheets.get("sheet-2")!;
+    target.conditionalFormats = [
+      {
+        id: "source-check",
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
+        anchor: { row: 0, column: 0 },
+        condition: { kind: "formula", formula: "=Sheet1!A1>0" },
+        style: { textColor: "#FF0000" },
+      },
+    ];
+
+    expect(
+      executeWorkbookCommand(session, createDeleteSheetCommand(session.workbook, sourceId)),
+    ).toBe(true);
+    expect(target.conditionalFormats?.[0]?.condition).toEqual({
+      kind: "formula",
+      formula: "=#REF!>0",
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(target.conditionalFormats?.[0]?.condition).toEqual({
+      kind: "formula",
+      formula: "=Sheet1!A1>0",
+    });
+  });
 });

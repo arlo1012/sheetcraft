@@ -1,5 +1,6 @@
 import { WorkbookDomainError, toWorkbookErrorDetail } from "../errors.js";
 import { cloneCellStyle, type CellStyle } from "../style.js";
+import { cloneConditionalFormatRule } from "../conditional-formatting.js";
 import {
   cloneCellContent,
   cloneFloatingImage,
@@ -185,6 +186,9 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
             range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
           })),
         }
+      : {}),
+    ...(state.conditionalFormats
+      ? { conditionalFormats: state.conditionalFormats.map(cloneConditionalFormatRule) }
       : {}),
     floatingImages: state.floatingImages.map(cloneFloatingImage),
   };

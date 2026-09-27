@@ -22,6 +22,7 @@ import type {
   FloatingImage,
   SheetDataValidation,
   SheetOutlineGroup,
+  SheetConditionalFormatRule,
   DefinedName,
 } from "../workbook.js";
 
@@ -35,6 +36,8 @@ export type CellContentChange = {
 export type SetCellContentsCommand = {
   type: "setCellContents";
   changes: CellContentChange[];
+  /** Optional rule updates applied atomically with clipboard cell changes. */
+  conditionalFormats?: Array<{ sheetId: string; rules: SheetConditionalFormatRule[] }>;
   reconcileBorders?: true;
 };
 
@@ -375,6 +378,8 @@ export type AddSheetCommand = {
   activeSheetId: string;
   /** Formula text on surviving sheets restored by a delete-sheet inverse. */
   formulaSources?: FormulaSourceRestore[];
+  /** Conditional-format formula text on surviving sheets restored by a delete-sheet inverse. */
+  conditionalFormatFormulaSources?: ConditionalFormatFormulaSourceRestore[];
   definedNames?: DefinedName[];
 };
 
@@ -441,12 +446,20 @@ export type RenameSheetCommand = {
   name: string;
   /** Exact raw formula sources restored by a rename inverse. */
   formulaSources?: FormulaSourceRestore[];
+  /** Exact conditional-format formula sources restored by a rename inverse. */
+  conditionalFormatFormulaSources?: ConditionalFormatFormulaSourceRestore[];
 };
 
 /** Exact formula source associated with a command inverse. */
 export type FormulaSourceRestore = {
   sheetId: string;
   address: CellAddress;
+  source: string;
+};
+
+export type ConditionalFormatFormulaSourceRestore = {
+  sheetId: string;
+  ruleId: string;
   source: string;
 };
 
@@ -509,6 +522,7 @@ export type RestoreFullSheetStateCommand = {
   sheetId: string;
   state: SheetSparseState;
   workbookFormulaSources?: FormulaSourceRestore[];
+  conditionalFormatFormulaSources?: ConditionalFormatFormulaSourceRestore[];
   definedNames?: DefinedName[];
 };
 export type SetSheetDuplicateRulesCommand = {
@@ -522,6 +536,16 @@ export type ClearSheetDuplicateRulesCommand = {
   kind: "highlight" | "reject";
   range?: CellRange;
 };
+export type SetSheetConditionalFormatsCommand = {
+  type: "setSheetConditionalFormats";
+  sheetId: string;
+  rules: SheetConditionalFormatRule[];
+};
+export type ClearSheetConditionalFormatsCommand = {
+  type: "clearSheetConditionalFormats";
+  sheetId: string;
+  range?: CellRange;
+};
 
 export type SheetAxisSparseSlice = {
   cells: SheetSparseCell[];
@@ -533,6 +557,7 @@ export type SheetAxisSparseSlice = {
   /** Exact raw formula sources before the structural change, for lossless undo. */
   formulaSources?: Array<{ address: CellAddress; source: string }>;
   workbookFormulaSources?: FormulaSourceRestore[];
+  conditionalFormatFormulaSources?: ConditionalFormatFormulaSourceRestore[];
   definedNames?: DefinedName[];
   /** Exact sheet metadata before the structural change. */
   metadata: SheetMetadata;
@@ -602,6 +627,8 @@ export type WorkbookCommand =
   | SetSheetDataValidationsCommand
   | SetSheetDuplicateRulesCommand
   | ClearSheetDuplicateRulesCommand
+  | SetSheetConditionalFormatsCommand
+  | ClearSheetConditionalFormatsCommand
   | ClearSheetDataValidationsCommand
   | AddSheetOutlineGroupCommand
   | RemoveSheetOutlineGroupCommand
@@ -648,6 +675,7 @@ export type WorkbookOperation =
   | "data.filter"
   | "data.sort"
   | "data.validation"
+  | "format.conditional"
   | "data.outline"
   | "data.transform"
   | "data.subtotal"
@@ -733,6 +761,9 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "setSheetDuplicateRules":
     case "clearSheetDuplicateRules":
       return "data.validation";
+    case "setSheetConditionalFormats":
+    case "clearSheetConditionalFormats":
+      return "format.conditional";
     case "addSheetOutlineGroup":
     case "removeSheetOutlineGroup":
     case "setSheetOutlineGroupCollapsed":

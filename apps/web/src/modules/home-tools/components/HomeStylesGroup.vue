@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
-import { Sparkles, TableProperties } from "lucide-vue-next";
+import { TableProperties } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
+import ConditionalFormattingMenu, {
+  type ConditionalFormatQuickRule,
+} from "../../conditional-formatting/components/ConditionalFormattingMenu.vue";
+
+defineProps<{ disabled?: boolean; editSessionId?: string }>();
+const emit = defineEmits<{
+  createConditionalFormat: [kind: ConditionalFormatQuickRule];
+  manageConditionalFormats: [];
+  clearConditionalFormats: [scope: "selection" | "sheet"];
+}>();
 
 const { t } = useAppI18n();
 </script>
@@ -25,15 +35,13 @@ const { t } = useAppI18n();
       </RibbonMenuButton>
     </div>
     <div class="home-styles-group__row" data-ribbon-row="2">
-      <RibbonMenuButton
-        full-width
-        :label="t('app.unavailableFeature', { feature: t('ribbon.conditionalFormatting') })"
-        :text="t('ribbon.conditionalFormatting')"
-        disabled
-        data-ribbon-placeholder="conditional-formatting"
-      >
-        <Sparkles aria-hidden="true" />
-      </RibbonMenuButton>
+      <ConditionalFormattingMenu
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        @create="emit('createConditionalFormat', $event)"
+        @manage="emit('manageConditionalFormats')"
+        @clear="emit('clearConditionalFormats', $event)"
+      />
     </div>
   </section>
 </template>

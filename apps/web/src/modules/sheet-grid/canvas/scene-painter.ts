@@ -2,6 +2,7 @@ import type { CellAddress } from "@idea10/core/workbook";
 import type { Rect } from "@idea10/sheet-engine/geometry";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import { paintCellFill } from "./cell-fill-painter";
+import { paintConditionalFormatVisual } from "../../../shared/conditional-formatting/conditional-format-painter";
 import { paintCellText } from "./cell-text-painter";
 import type { SheetCanvasScene } from "./cell-scene";
 import { paintCellImage, type CanvasImageCache } from "./image-painter";
@@ -53,6 +54,8 @@ export function paintSheetScene(
     clipRect(context, pane.clip);
     context.translate(-scrollX, -scrollY);
     for (const cell of paneScene.cells) paintCellFill(context, cell.rect, cell.style);
+    for (const cell of paneScene.cells)
+      paintConditionalFormatVisual(context, cell.rect, cell.content.conditionalFormatVisual);
     if (options.showGridLines) {
       context.beginPath();
       context.strokeStyle = palette.gridLine;

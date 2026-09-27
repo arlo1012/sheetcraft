@@ -3,6 +3,10 @@ import {
   formatCellValueForDisplay,
   parseCellInput,
 } from "./input.js";
+export {
+  clearConditionalFormatRanges,
+  copyConditionalFormatRules,
+} from "./conditional-formatting-transfer.js";
 import { translateFormulaForCopy } from "./formula/references.js";
 import { isFormulaError, type CellContent, type FormulaValue } from "./formula/types.js";
 import {

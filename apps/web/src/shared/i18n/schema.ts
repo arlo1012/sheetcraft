@@ -2,10 +2,12 @@ import type { SimulationMessageSchema } from "../../modules/data-tools/simulatio
 import type { DataTableMessageSchema } from "../../modules/data-tools/data-table-messages";
 import type { ProofreadingMessageSchema } from "../../modules/data-tools/proofreading-messages";
 import type { FormulaToolsMessageSchema } from "../../modules/formula-tools/formula-tools-messages";
+import type { ConditionalFormattingMessageSchema } from "../../modules/conditional-formatting/conditional-formatting-messages";
 
 export type AppLocale = "zh-CN" | "en-US";
 
 type ToolMessageSchema = FormulaToolsMessageSchema &
+  ConditionalFormattingMessageSchema &
   SimulationMessageSchema &
   DataTableMessageSchema &
   ProofreadingMessageSchema;

@@ -3,6 +3,7 @@ import { createTestWorkbookSession } from "../helpers.js";
 import {
   applyWorkbookCommand,
   createDeleteSheetAxisCommand,
+  createAddSheetCommand,
   createInsertSheetAxisCommand,
   createMoveSheetAxisCommand,
   createSetFloatingImageCommand,
@@ -676,5 +677,105 @@ describe("sheet axis structure commands", () => {
 
     expect(() => applyWorkbookCommand(session.workbook, command)).toThrow("duplicate cell");
     expect(createSheetSparseState(sheet)).toEqual(before);
+  });
+
+  test("rebases a deleted conditional-format anchor before rewriting its relative formula", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    sheet.conditionalFormats = [
+      {
+        id: "formula-rule",
+        ranges: [{ start: { row: 1, column: 0 }, end: { row: 4, column: 0 } }],
+        anchor: { row: 1, column: 0 },
+        condition: { kind: "formula", formula: "=A2>0" },
+        style: { fillColor: "#FF0000" },
+      },
+    ];
+
+    expect(executeWorkbookCommand(session, createDeleteSheetAxisCommand(sheet.id, "row", 1))).toBe(
+      true,
+    );
+    expect(sheet.conditionalFormats).toEqual([
+      {
+        id: "formula-rule",
+        ranges: [{ start: { row: 1, column: 0 }, end: { row: 3, column: 0 } }],
+        anchor: { row: 1, column: 0 },
+        condition: { kind: "formula", formula: "=A2>0" },
+        style: { fillColor: "#FF0000" },
+      },
+    ]);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(sheet.conditionalFormats?.[0]?.condition).toEqual({ kind: "formula", formula: "=A2>0" });
+  });
+
+  test("moves conditional-format ranges, anchors, and local or qualified formulas reversibly", () => {
+    const session = createTestWorkbookSession();
+    const source = getActiveSheet(session.workbook);
+    source.conditionalFormats = [
+      {
+        id: "local",
+        ranges: [{ start: { row: 1, column: 0 }, end: { row: 1, column: 0 } }],
+        anchor: { row: 1, column: 0 },
+        condition: { kind: "formula", formula: "=A2>0" },
+        style: { fillColor: "#FF0000" },
+      },
+    ];
+    executeWorkbookCommand(session, createAddSheetCommand(session.workbook, { id: "other" }));
+    const other = session.workbook.sheets.get("other")!;
+    other.conditionalFormats = [
+      {
+        id: "qualified",
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
+        anchor: { row: 0, column: 0 },
+        condition: { kind: "formula", formula: "=Sheet1!A2>0" },
+        style: { textColor: "#FF0000" },
+      },
+    ];
+
+    expect(
+      executeWorkbookCommand(session, createMoveSheetAxisCommand(source.id, "row", 1, 1, 3)),
+    ).toBe(true);
+    expect(source.conditionalFormats?.[0]).toMatchObject({
+      ranges: [{ start: { row: 3, column: 0 }, end: { row: 3, column: 0 } }],
+      anchor: { row: 3, column: 0 },
+      condition: { kind: "formula", formula: "=A4>0" },
+    });
+    expect(other.conditionalFormats?.[0]?.condition).toEqual({
+      kind: "formula",
+      formula: "=Sheet1!A4>0",
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(source.conditionalFormats?.[0]?.condition).toEqual({
+      kind: "formula",
+      formula: "=A2>0",
+    });
+    expect(other.conditionalFormats?.[0]?.condition).toEqual({
+      kind: "formula",
+      formula: "=Sheet1!A2>0",
+    });
+  });
+
+  test("rejects external relative conditional formulas applied over multiple changed-axis cells", () => {
+    const session = createTestWorkbookSession();
+    const source = getActiveSheet(session.workbook);
+    executeWorkbookCommand(session, createAddSheetCommand(session.workbook, { id: "other" }));
+    const other = session.workbook.sheets.get("other")!;
+    other.conditionalFormats = [
+      {
+        id: "ambiguous",
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 1, column: 0 } }],
+        anchor: { row: 0, column: 0 },
+        condition: { kind: "formula", formula: "=Sheet1!A1>0" },
+        style: { fillColor: "#FF0000" },
+      },
+    ];
+    const sourceBefore = createSheetSparseState(source);
+    const otherBefore = createSheetSparseState(other);
+
+    expect(
+      tryApplyWorkbookCommand(session.workbook, createDeleteSheetAxisCommand(source.id, "row", 1)),
+    ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
+    expect(createSheetSparseState(source)).toEqual(sourceBefore);
+    expect(createSheetSparseState(other)).toEqual(otherBefore);
   });
 });

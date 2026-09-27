@@ -158,7 +158,6 @@ function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBu
   if (
     (worksheetPart &&
       [
-        "conditionalFormatting",
         "sheetProtection",
         "protectedRanges",
         "hyperlinks",

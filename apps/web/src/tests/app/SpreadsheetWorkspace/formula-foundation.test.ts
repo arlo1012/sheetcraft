@@ -125,7 +125,7 @@ describe("SpreadsheetWorkspace formula foundation", () => {
     await flushPromises();
 
     const savedSnapshot = store.save.mock.calls[0]?.[0];
-    expect(savedSnapshot).toMatchObject({ version: 11, dateSystem: "1904" });
+    expect(savedSnapshot).toMatchObject({ version: 12, dateSystem: "1904" });
     const restored = deserializeWorkbook(savedSnapshot);
     const sheet = getActiveSheet(restored);
     expect(restored.dateSystem).toBe("1904");

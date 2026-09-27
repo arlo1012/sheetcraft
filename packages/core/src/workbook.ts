@@ -44,6 +44,12 @@ import {
   type ImageTransform,
 } from "./image-transform.js";
 import { normalizeOutlineGroups } from "./data-outline.js";
+import {
+  cloneConditionalFormatRule,
+  normalizeConditionalFormatRules,
+  type SheetConditionalFormatRule,
+} from "./conditional-formatting.js";
+export type { SheetConditionalFormatRule } from "./conditional-formatting.js";
 
 export {
   areImageTransformsEqual,
@@ -134,6 +140,7 @@ export type SheetMetadata = {
   outlineGroups?: SheetOutlineGroup[];
   subtotalMetadata?: SheetSubtotalMetadata[];
   duplicateRules?: SheetDuplicateRule[];
+  conditionalFormats?: SheetConditionalFormatRule[];
 };
 
 export type DataValidationType =
@@ -241,6 +248,7 @@ export type Sheet = {
   outlineGroups?: SheetOutlineGroup[];
   subtotalMetadata?: SheetSubtotalMetadata[];
   duplicateRules?: SheetDuplicateRule[];
+  conditionalFormats?: SheetConditionalFormatRule[];
   floatingImages: FloatingImage[];
 };
 
@@ -269,6 +277,7 @@ export type SheetSparseState = {
   outlineGroups?: SheetOutlineGroup[];
   subtotalMetadata?: SheetSubtotalMetadata[];
   duplicateRules?: SheetDuplicateRule[];
+  conditionalFormats?: SheetConditionalFormatRule[];
   floatingImages: FloatingImage[];
 };
 
@@ -319,6 +328,7 @@ export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory)
     outlineGroups: [],
     subtotalMetadata: [],
     duplicateRules: [],
+    conditionalFormats: [],
     floatingImages: [],
   };
 }
@@ -554,6 +564,8 @@ export function getCellContent(sheet: Sheet, address: CellAddress): CellContent 
 /** Evaluates a cell against the current sparse sheet state. */
 export type SheetEvaluator = {
   getComputedValue: (address: CellAddress) => FormulaValue;
+  /** Evaluates a formula in the context of an address without persisting a cell. */
+  evaluateFormula?: (source: string, address: CellAddress) => FormulaValue;
   getSpillProjections?: () => Iterable<{
     address: CellAddress;
     root: CellAddress;
@@ -1313,6 +1325,14 @@ export function createWorkbookEvaluator(
       throw new Error(`Sheet ${targetSheetId} does not exist.`);
     return {
       getComputedValue: (address) => compute(targetSheetId, address),
+      evaluateFormula: (source, address) =>
+        scalarize(
+          evaluateFormulaRuntime(source, resolverFor(targetSheetId), {
+            dateSystem: workbook.dateSystem,
+            address,
+            now: () => cycleNow,
+          }),
+        ),
       getRuntimeValue: (address) => {
         const value = compute(targetSheetId, address);
         if (isFormulaError(value) && (value.code === "SPILL" || value.code === "CYCLE"))
@@ -1857,6 +1877,7 @@ function normalizeSheetMetadata(
     | "outlineGroups"
     | "subtotalMetadata"
     | "duplicateRules"
+    | "conditionalFormats"
   >,
 ): SheetMetadata {
   const freezePanes = normalizeFreezePanes(state.freezePanes);
@@ -1947,6 +1968,7 @@ function normalizeSheetMetadata(
       },
     };
   });
+  const conditionalFormats = normalizeConditionalFormatRules(state.conditionalFormats ?? []);
   if (new Set(dataValidations.map((rule) => rule.id)).size !== dataValidations.length)
     throw new Error("Duplicate data validation ID.");
   const outlineGroups = normalizeOutlineGroups(state.outlineGroups ?? []);
@@ -1991,6 +2013,7 @@ function normalizeSheetMetadata(
     outlineGroups,
     subtotalMetadata,
     duplicateRules,
+    conditionalFormats,
   };
 }
 
@@ -2026,6 +2049,7 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
     ...rule,
     range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
   }));
+  sheet.conditionalFormats = (normalized.conditionalFormats ?? []).map(cloneConditionalFormatRule);
   return true;
 }
 
@@ -2139,6 +2163,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     outlineGroups: metadata.outlineGroups ?? [],
     subtotalMetadata: metadata.subtotalMetadata ?? [],
     duplicateRules: metadata.duplicateRules ?? [],
+    conditionalFormats: metadata.conditionalFormats ?? [],
     floatingImages,
   };
 }
@@ -2154,6 +2179,8 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
     !areSheetMetadataEqual(left, right) ||
     JSON.stringify(left.subtotalMetadata ?? []) !== JSON.stringify(right.subtotalMetadata ?? []) ||
     JSON.stringify(left.duplicateRules ?? []) !== JSON.stringify(right.duplicateRules ?? []) ||
+    JSON.stringify(left.conditionalFormats ?? []) !==
+      JSON.stringify(right.conditionalFormats ?? []) ||
     left.floatingImages.length !== right.floatingImages.length
   ) {
     return false;
@@ -2229,6 +2256,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
       ...rule,
       range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
     })),
+    conditionalFormats: (sheet.conditionalFormats ?? []).map(cloneConditionalFormatRule),
     floatingImages: sheet.floatingImages.map(cloneFloatingImage),
   });
 }
@@ -2284,6 +2312,7 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
     ...rule,
     range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
   }));
+  sheet.conditionalFormats = (nextState.conditionalFormats ?? []).map(cloneConditionalFormatRule);
   sheet.floatingImages = nextState.floatingImages.map(cloneFloatingImage);
   return true;
 }

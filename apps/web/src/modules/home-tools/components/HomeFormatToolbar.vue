@@ -15,6 +15,7 @@ import HomeHistoryGroup from "./HomeHistoryGroup.vue";
 import HomeInsertGroup from "./HomeInsertGroup.vue";
 import HomeNumberGroup from "./HomeNumberGroup.vue";
 import HomeStylesGroup from "./HomeStylesGroup.vue";
+import type { ConditionalFormatQuickRule } from "../../conditional-formatting/components/ConditionalFormattingMenu.vue";
 import HomeUtilityGroup from "./HomeUtilityGroup.vue";
 import {
   createDefaultHomeDataToolState,
@@ -24,15 +25,19 @@ import {
   type MergeCellsState,
 } from "./data-tool-state";
 
-const props = defineProps<{
-  state: SelectionCellStyleState;
-  disabled: boolean;
-  readOnly?: boolean;
-  editSessionId?: string;
-  formatPainterActive?: boolean;
-  dataState?: HomeDataToolState;
-  mergeState?: MergeCellsState;
-}>();
+const props = withDefaults(
+  defineProps<{
+    state: SelectionCellStyleState;
+    disabled: boolean;
+    conditionalFormattingDisabled?: boolean;
+    readOnly?: boolean;
+    editSessionId?: string;
+    formatPainterActive?: boolean;
+    dataState?: HomeDataToolState;
+    mergeState?: MergeCellsState;
+  }>(),
+  { conditionalFormattingDisabled: undefined },
+);
 
 defineSlots<{ "row-column-tools"?: () => unknown; "worksheet-tools"?: () => unknown }>();
 
@@ -58,6 +63,9 @@ const emit = defineEmits<{
   redo: [];
   toggleProtection: [];
   openDataTools: [];
+  createConditionalFormat: [kind: ConditionalFormatQuickRule];
+  manageConditionalFormats: [];
+  clearConditionalFormats: [scope: "selection" | "sheet"];
 }>();
 
 const { t } = useAppI18n();
@@ -133,7 +141,13 @@ function onKeydown(event: KeyboardEvent): void {
         <slot name="worksheet-tools" />
       </div>
     </section>
-    <HomeStylesGroup />
+    <HomeStylesGroup
+      :disabled="conditionalFormattingDisabled ?? disabled"
+      :edit-session-id="editSessionId"
+      @create-conditional-format="emit('createConditionalFormat', $event)"
+      @manage-conditional-formats="emit('manageConditionalFormats')"
+      @clear-conditional-formats="emit('clearConditionalFormats', $event)"
+    />
     <HomeDataGroup
       :edit-session-id="editSessionId"
       :state="dataState"

@@ -22,6 +22,7 @@ import {
   type SheetFilter,
   type Workbook,
 } from "@idea10/core/workbook";
+import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
 import {
   CELL_FILL_PATTERNS,
   DEFAULT_CELL_FONT_SIZE,
@@ -48,6 +49,7 @@ import {
   readRawWorksheetTextDirections,
 } from "./raw-cell-values.js";
 import { readXlsxDataMetadata, type XlsxDataMetadata } from "./data-tools-metadata.js";
+import { readXlsxConditionalFormatMetadata } from "./conditional-formatting.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
@@ -496,6 +498,7 @@ export async function decodeWithExcelJs(
   const rawNumericValues = readRawWorksheetNumericValues(bytes);
   const rawTextDirections = readRawWorksheetTextDirections(bytes);
   const rawDataMetadata = readXlsxDataMetadata(bytes);
+  const rawConditionalFormats = readXlsxConditionalFormatMetadata(bytes, report);
   const source = new ExcelJS.Workbook();
   await source.xlsx.load(bytes);
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
@@ -517,6 +520,7 @@ export async function decodeWithExcelJs(
     const hiddenRows: number[] = [];
     const hiddenColumns: number[] = [];
     const metadata = rawDataMetadata[sheetIndex];
+    const conditionalFormats = rawConditionalFormats[sheetIndex]?.rules ?? [];
     const sourceDefaultColumnWidth = sourceSheet.properties.defaultColWidth;
     const defaultColumnWidth =
       typeof sourceDefaultColumnWidth === "number" && Number.isFinite(sourceDefaultColumnWidth)
@@ -653,6 +657,7 @@ export async function decodeWithExcelJs(
         id: `xlsx-outline-${sheetIndex + 1}-${index + 1}`,
         ...group,
       })),
+      conditionalFormats,
       floatingImages: [],
     });
     return sheet;
@@ -806,6 +811,7 @@ export async function encodeWithExcelJs(
   const dataMetadata: Array<
     Omit<XlsxDataMetadata, "unsupportedFilters" | "unsupportedValidations">
   > = [];
+  const conditionalFormats: SheetConditionalFormatRule[][] = [];
   target.properties.date1904 = workbook.dateSystem === "1904";
   target.calcProperties.fullCalcOnLoad = true;
   let encodedCells = 0;
@@ -863,6 +869,7 @@ export async function encodeWithExcelJs(
       ...(pageBreakRows === undefined ? {} : { pageBreakRows }),
       ...(summaryBelow === undefined ? {} : { summaryBelow }),
     });
+    conditionalFormats.push(sheet.conditionalFormats ?? []);
     if (sheet.filter?.advanced)
       add(report, "advanced-filter-criteria-omitted", `${sheet.name}.advancedFilter`);
     // Duplicate highlighting and duplicate-entry rejection are product-owned
@@ -948,6 +955,8 @@ export async function encodeWithExcelJs(
       collectDefinedNames(workbook, report),
       workbook.calculation,
       dataMetadata,
+      conditionalFormats,
+      report,
     ),
     report: report.build(),
   };

@@ -11,6 +11,7 @@ const props = defineProps<{
   label?: string;
   placeholder?: string;
   pickLabel?: string;
+  showPicker?: boolean;
   insertReference?: boolean;
   selectReference?: (current: string) => Promise<string | undefined>;
 }>();
@@ -89,6 +90,7 @@ async function pickReference(): Promise<void> {
     >
       <template #suffix>
         <TButton
+          v-if="showPicker !== false"
           class="range-reference-input__picker"
           variant="text"
           shape="square"
