@@ -91,10 +91,9 @@ function activate(): void {
     justify-content: center;
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 58px);
-    height: 54px;
-    flex-direction: column;
-    gap: 3px;
-    padding: 2px;
+    height: calc(var(--ribbon-control-height, 26px) * 2 + var(--ribbon-row-gap, 2px));
+    @include ribbon.tall-content;
+    padding: 0 2px;
 
     &.has-text {
       width: max-content;

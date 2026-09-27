@@ -75,6 +75,11 @@ CSS pixels at 100% scale; size and line height are a pair.
   semantic line weights. Dropdown indicators and dialog launchers keep their
   separate shared auxiliary sizes.
 
+- Tall actions and stacked compact actions share a 54px height (two 26px rows
+  with a 2px gap). Tall action icons and labels occupy those same two rows;
+  derive the height from the shared row height and gap instead of centering a
+  separate icon/text cluster.
+
 - In `shared/ribbon`, use `RibbonButton` for actions/pressed states,
   `RibbonMenuButton` for popup triggers, and `RibbonSplitButton` for action + popup.
   Compact/tall are variants. Font selectors use TDesign Select and the adapter.

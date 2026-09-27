@@ -150,17 +150,17 @@ function toggleMenu(): void {
     align-self: stretch;
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 58px);
-    height: 54px;
+    height: calc(var(--ribbon-control-height, 26px) * 2 + var(--ribbon-row-gap, 2px));
+    padding: 0;
 
     &.is-full-width {
       width: 100%;
     }
 
     .ribbon-split-button__main {
-      flex-direction: column;
+      @include ribbon.tall-content;
       justify-content: center;
-      gap: 3px;
-      padding: 1px 2px;
+      padding: 0 2px;
     }
 
     .ribbon-split-button__menu {
