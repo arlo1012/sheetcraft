@@ -533,7 +533,7 @@ function insertFunction(name: string): void {
     align-items: stretch;
     width: max-content;
     min-width: 100%;
-    height: 56px;
+    height: calc(var(--ribbon-control-height, 26px) * 2 + var(--ribbon-row-gap, 2px) + 12px);
     padding: 5px 8px;
   }
   &__group {
@@ -554,9 +554,9 @@ function insertFunction(name: string): void {
   }
   &__category-column {
     display: grid;
-    grid-template-rows: repeat(2, 26px);
+    grid-template-rows: repeat(2, var(--ribbon-control-height, 26px));
     min-width: 86px;
-    gap: 1px;
+    gap: var(--ribbon-row-gap, 2px);
   }
   &__group--actions {
     display: flex;

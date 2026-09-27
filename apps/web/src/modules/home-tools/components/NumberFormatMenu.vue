@@ -126,7 +126,11 @@ function openCellFormat(): void {
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/ribbon/ribbon-layout" as ribbon;
+
 .number-format-menu {
+  @include ribbon.tool;
+
   min-width: 62px;
 
   &__surface {

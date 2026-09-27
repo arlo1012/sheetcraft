@@ -234,6 +234,7 @@ const { t } = useAppI18n();
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
 .data-toolbar {
   @include ribbon.columns;
+  padding-block: 5px;
   &__group {
     @include ribbon.columns;
     gap: var(--idea-space-1);
