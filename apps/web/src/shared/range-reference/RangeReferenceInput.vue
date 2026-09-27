@@ -7,6 +7,7 @@ import { useAppI18n } from "../i18n";
 
 const props = defineProps<{
   disabled?: boolean;
+  clearable?: boolean;
   label?: string;
   placeholder?: string;
   pickLabel?: string;
@@ -80,6 +81,7 @@ async function pickReference(): Promise<void> {
     <TInput
       v-model="reference"
       :disabled="disabled"
+      :clearable="clearable"
       :aria-label="label ?? t('formulaTools.reference')"
       :placeholder="placeholder"
       autocomplete="off"

@@ -96,6 +96,7 @@ function selectIssues(keys: Array<string | number>): void {
     <div class="data-proofreading-dialog">
       <div class="data-proofreading-dialog__toolbar">
         <RangeReferenceInput
+          clearable
           :model-value="draft.range"
           :disabled="busy"
           :label="t('proofreading.range')"
@@ -106,14 +107,14 @@ function selectIssues(keys: Array<string | number>): void {
           @enter="!busy && emit('scan', draft)"
         />
         <TButton :loading="busy" :disabled="busy" @click="emit('scan', draft)">
-          {{ issues.length ? t("proofreading.rescan") : t("proofreading.scan") }}
+          {{ hasScanned ? t("proofreading.rescan") : t("proofreading.scan") }}
         </TButton>
       </div>
 
-      <p v-if="error" class="data-proofreading-dialog__error" role="alert">{{ error }}</p>
-      <p v-else-if="!issues.length" class="data-proofreading-dialog__empty">
+      <div v-if="error" class="data-proofreading-dialog__error" role="alert">{{ error }}</div>
+      <div v-else-if="!issues.length" class="data-proofreading-dialog__empty">
         {{ hasScanned ? t("proofreading.noIssues") : t("proofreading.scanHint") }}
-      </p>
+      </div>
 
       <TTable
         v-if="hasScanned && issues.length"
@@ -219,7 +220,6 @@ function selectIssues(keys: Array<string | number>): void {
   &__toolbar,
   &__footer,
   &__summary,
-  &__footer-actions,
   &__actions {
     display: flex;
     align-items: center;
@@ -230,12 +230,10 @@ function selectIssues(keys: Array<string | number>): void {
     flex: 1;
   }
   &__error {
-    margin: 0;
     color: var(--idea-status-error);
   }
   &__summary,
   &__empty {
-    margin: 0;
     color: var(--idea-text-secondary);
   }
   &__summary {
@@ -252,7 +250,8 @@ function selectIssues(keys: Array<string | number>): void {
     color: var(--idea-text-secondary);
   }
   &__footer-actions {
-    flex-wrap: wrap;
+    display: flex;
+    align-items: center;
     justify-content: flex-end;
   }
 }

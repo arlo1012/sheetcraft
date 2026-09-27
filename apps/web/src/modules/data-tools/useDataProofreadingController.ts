@@ -109,6 +109,9 @@ export function useDataProofreadingController(options: Options) {
     selectedProofreadingIssueIds.value = [];
     proofreadingError.value = "";
     proofreadingVisible.value = true;
+    // Opening is a read-only inspection of the current worksheet. Keep the
+    // explicit scan action for refreshing after the sheet or range changes.
+    scanDataProofreadingResults();
   }
 
   function updateDataProofreadingDraft(draft: DataProofreadingDraft): void {

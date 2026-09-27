@@ -71,6 +71,20 @@ describe("DataProofreadingDialog", () => {
     expect(wrapper.emitted("scan")).toEqual([[{ range: "" }]]);
   });
 
+  test("clears a picked range so proofreading can return to the whole worksheet", async () => {
+    const wrapper = mountDialog({ draft: { range: "Sheet1!$A$1:$B$4" } });
+    await dialog().get(".t-input").trigger("mouseenter");
+    await dialog().get(".t-input__suffix-clear").trigger("click");
+    expect(wrapper.emitted("draftChange")?.at(-1)).toEqual([{ range: "" }]);
+    await wrapper.setProps({ draft: { range: "" } });
+    expect(dialog().get<HTMLInputElement>("input").element.value).toBe("");
+    const scan = dialog()
+      .findAll("button")
+      .find((button) => button.text() === "Proofread")!;
+    await scan.trigger("click");
+    expect(wrapper.emitted("scan")?.at(-1)).toEqual([{ range: "" }]);
+  });
+
   test("keeps advisory items out of batch selection and exposes explicit actions", async () => {
     const wrapper = mountDialog({ hasScanned: true, issues });
     const checkboxes = dialog().findAll('input[type="checkbox"]');

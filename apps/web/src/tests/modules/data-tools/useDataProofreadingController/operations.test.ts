@@ -46,7 +46,6 @@ describe("useDataProofreadingController", () => {
     f.set(1, 0, "0012");
 
     f.controller.openDataProofreading();
-    f.controller.scanDataProofreadingResults();
     expect(f.controller.proofreadingError.value).toBe("");
     expect(f.controller.proofreadingIssues.value).toEqual([
       expect.objectContaining({ address: "A1", type: "number", safe: true }),
@@ -66,13 +65,12 @@ describe("useDataProofreadingController", () => {
     });
   });
 
-  test("defaults to the entire sparse worksheet and retains that scope on rescans", () => {
+  test("automatically scans the entire sparse worksheet when it opens and retains that scope on rescans", () => {
     const f = fixture();
     f.set(4, 5, "42");
     f.set(9999, 20, "12%");
     f.controller.openDataProofreading();
     expect(f.controller.proofreadingDraft.value.range).toBe("");
-    f.controller.scanDataProofreadingResults();
     expect(f.controller.proofreadingIssues.value.map((issue) => issue.address)).toEqual([
       "F5",
       "U10000",
@@ -92,6 +90,10 @@ describe("useDataProofreadingController", () => {
     f.set(0, 0, "42");
     f.set(10, 10, "64");
     f.controller.openDataProofreading();
+    expect(f.controller.proofreadingIssues.value.map((issue) => issue.address)).toEqual([
+      "A1",
+      "K11",
+    ]);
     f.controller.scanDataProofreadingResults({ range: "A1:A2" });
     expect(f.controller.proofreadingIssues.value.map((issue) => issue.address)).toEqual(["A1"]);
     f.controller.setSelectedProofreadingIssueIds([f.controller.proofreadingIssues.value[0]!.id]);
@@ -106,10 +108,9 @@ describe("useDataProofreadingController", () => {
     ]);
   });
 
-  test("accepts an empty worksheet without requiring a range", () => {
+  test("automatically accepts an empty worksheet without requiring a range", () => {
     const f = fixture();
     f.controller.openDataProofreading();
-    f.controller.scanDataProofreadingResults();
     expect(f.controller.proofreadingError.value).toBe("");
     expect(f.controller.proofreadingHasScanned.value).toBe(true);
     expect(f.controller.proofreadingIssues.value).toEqual([]);
@@ -119,7 +120,6 @@ describe("useDataProofreadingController", () => {
     const f = fixture();
     f.set(0, 0, "42");
     f.controller.openDataProofreading();
-    f.controller.scanDataProofreadingResults();
     const issue = f.controller.proofreadingIssues.value[0]!;
     f.set(0, 0, "43");
 
