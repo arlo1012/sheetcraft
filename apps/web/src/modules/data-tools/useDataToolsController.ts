@@ -49,6 +49,8 @@ import { useFillToolsController } from "./useFillToolsController";
 import { useDropdownListController } from "./useDropdownListController";
 import { useLookupFillController } from "./useLookupFillController";
 import { useDataComparisonController } from "./useDataComparisonController";
+import { useSimulationController } from "./useSimulationController";
+import { useDataProofreadingController } from "./useDataProofreadingController";
 import { useAdvancedFilterController } from "./useAdvancedFilterController";
 import type {
   DataToolAxis,
@@ -81,6 +83,8 @@ type Options = {
   getSelection: () => OutlineSelection & { address: CellAddress };
   getSheetEvaluator: () => SheetEvaluator;
   getGeneration: () => number;
+  getRevision?: () => number;
+  navigateToCell?: (sheetId: string, address: CellAddress) => void;
   isBusy: () => boolean;
   execute: (command: WorkbookCommand) => boolean;
   flush: () => boolean;
@@ -131,6 +135,13 @@ function cloneSortInitial(initial: SortInitial): SortInitial {
 
 export function useDataToolsController(options: Options) {
   const { t, locale } = useAppI18n();
+  const analysisOptions = {
+    ...options,
+    getRevision: options.getRevision ?? options.getGeneration,
+    navigateToCell: options.navigateToCell ?? (() => {}),
+  };
+  const simulation = useSimulationController(analysisOptions);
+  const proofreading = useDataProofreadingController(analysisOptions);
   const advancedFilter = useAdvancedFilterController(options);
   const duplicates = useDuplicateToolsController(options);
   const consolidate = useConsolidateController(options);
@@ -942,6 +953,8 @@ export function useDataToolsController(options: Options) {
       filterPanel.value = undefined;
   }
   return {
+    ...simulation,
+    ...proofreading,
     ...advancedFilter,
     ...duplicates,
     ...comparison,

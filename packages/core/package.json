@@ -94,6 +94,18 @@
     "./duplicate-values": {
       "types": "./dist/duplicate-values.d.ts",
       "import": "./dist/duplicate-values.js"
+    },
+    "./goal-seek": {
+      "types": "./dist/goal-seek.d.ts",
+      "import": "./dist/goal-seek.js"
+    },
+    "./planning-solver": {
+      "types": "./dist/planning-solver.d.ts",
+      "import": "./dist/planning-solver.js"
+    },
+    "./data-proofreading": {
+      "types": "./dist/data-proofreading.d.ts",
+      "import": "./dist/data-proofreading.js"
     }
   },
   "scripts": {
@@ -102,6 +114,7 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "javascript-lp-solver": "1.0.3",
     "numfmt": "3.2.6"
   },
   "engines": {

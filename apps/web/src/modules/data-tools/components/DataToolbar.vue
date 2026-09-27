@@ -10,11 +10,13 @@ import {
   Filter,
   ShieldCheck,
   ListFilter,
+  ClipboardCheck,
 } from "lucide-vue-next";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { DataToolCapabilities } from "../data-tools-types";
+import DataSimulationTool from "./DataSimulationTool.vue";
 import DataOutlineTools from "./DataOutlineTools.vue";
 import DataFilterTool from "./DataFilterTool.vue";
 import DataDuplicatesTool from "./DataDuplicatesTool.vue";
@@ -48,6 +50,9 @@ const props = withDefaults(
 const emit = defineEmits<{
   sort: [direction: "ascending" | "descending"];
   openSort: [];
+  openGoalSeek: [];
+  openPlanning: [];
+  openProofreading: [];
   toggleFilter: [];
   advancedFilter: [];
   clearFilter: [];
@@ -195,6 +200,27 @@ const { t } = useAppI18n();
         data-data-action="consolidate"
         @activate="emit('openConsolidate')"
         ><Combine
+      /></RibbonButton>
+    </section>
+    <section
+      class="data-toolbar__group"
+      role="group"
+      data-ribbon-group="data-analysis"
+      :aria-label="t('simulation.groupLabel')"
+    >
+      <DataSimulationTool
+        :disabled="disabled"
+        @goal-seek="emit('openGoalSeek')"
+        @planning="emit('openPlanning')"
+      />
+      <RibbonButton
+        variant="tall"
+        :disabled="comparisonDisabled ?? disabled"
+        :label="t('proofreading.title')"
+        :text="t('proofreading.title')"
+        data-data-action="proofreading"
+        @activate="emit('openProofreading')"
+        ><ClipboardCheck
       /></RibbonButton>
     </section>
     <section

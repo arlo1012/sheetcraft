@@ -1,8 +1,12 @@
+import { simulationEnUS } from "../../../modules/data-tools/simulation-messages.en-US";
+import { proofreadingEnUS } from "../../../modules/data-tools/proofreading-messages.en-US";
 import type { MessageSchema } from "../schema";
 import { formulaToolsEnUS } from "../../../modules/formula-tools/formula-tools-messages.en-US";
 
 export const enUS = {
   ...formulaToolsEnUS,
+  ...simulationEnUS,
+  ...proofreadingEnUS,
   dataTools: {
     dropdownList: "Dropdown list",
     dropdown: {

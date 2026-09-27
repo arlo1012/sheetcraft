@@ -16,6 +16,33 @@ const capabilities = {
   clearFilter: true,
 };
 describe("DataToolbar", () => {
+  test("opens both simulation tools and proofreading through their concrete controls", async () => {
+    const wrapper = mount(DataToolbar, {
+      attachTo: document.body,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { capabilities },
+    });
+    try {
+      await wrapper.get('[data-data-action="simulation"]').trigger("click");
+      await new DOMWrapper(document.body)
+        .get('[data-data-simulation="goal-seek"]')
+        .trigger("click");
+      expect(wrapper.emitted("openGoalSeek")).toEqual([[]]);
+      await wrapper.get('[data-data-action="simulation"]').trigger("click");
+      await new DOMWrapper(document.body).get('[data-data-simulation="planning"]').trigger("click");
+      expect(wrapper.emitted("openPlanning")).toEqual([[]]);
+      await wrapper.get('[data-data-action="proofreading"]').trigger("click");
+      expect(wrapper.emitted("openProofreading")).toEqual([[]]);
+      await wrapper.setProps({ disabled: true, comparisonDisabled: false });
+      expect(wrapper.get('[data-data-action="simulation"]').attributes("disabled")).toBeDefined();
+      expect(
+        wrapper.get('[data-data-action="proofreading"]').attributes("disabled"),
+      ).toBeUndefined();
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   test("opens the list shortcut independently of general validation", async () => {
     const wrapper = mount(DataToolbar, {
       global: { plugins: [createAppI18n("en-US")] },

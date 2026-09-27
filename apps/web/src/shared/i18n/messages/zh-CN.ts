@@ -1,8 +1,12 @@
+import { simulationZhCN } from "../../../modules/data-tools/simulation-messages.zh-CN";
+import { proofreadingZhCN } from "../../../modules/data-tools/proofreading-messages.zh-CN";
 import type { MessageSchema } from "../schema";
 import { formulaToolsZhCN } from "../../../modules/formula-tools/formula-tools-messages.zh-CN";
 
 export const zhCN = {
   ...formulaToolsZhCN,
+  ...simulationZhCN,
+  ...proofreadingZhCN,
   dataTools: {
     dropdownList: "下拉列表",
     dropdown: {

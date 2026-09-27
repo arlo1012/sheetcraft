@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatCellAddress } from "@idea10/core/coordinates";
 import { computed, nextTick, ref, shallowRef, shallowReactive, useId, watch } from "vue";
 import {
   createSetSheetOutlineGroupCollapsedCommand,
@@ -15,6 +16,9 @@ import { useDataToolsController } from "../modules/data-tools/useDataToolsContro
 import { useDuplicateErrorChecks } from "../modules/data-tools/useDuplicateErrorChecks";
 import type { ErrorCheckSettings } from "../modules/data-tools/duplicate-error-preferences";
 import DuplicateErrorCheckOptionsDialog from "../modules/data-tools/components/DuplicateErrorCheckOptionsDialog.vue";
+import GoalSeekDialog from "../modules/data-tools/components/GoalSeekDialog.vue";
+import PlanningSolverDialog from "../modules/data-tools/components/PlanningSolverDialog.vue";
+import DataProofreadingDialog from "../modules/data-tools/components/DataProofreadingDialog.vue";
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
 import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
@@ -537,6 +541,11 @@ const dataTools = useDataToolsController({
   }),
   getSheetEvaluator: () => activeSheetEvaluator.value,
   getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  navigateToCell: (sheetId, address) => {
+    if (activeSheet.value.id !== sheetId) selectSheet(sheetId);
+    void nextTick(() => navigateToAddress(formatCellAddress(address)));
+  },
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
   execute: (command) => {
     const changed = executeCommand(command);
@@ -548,6 +557,19 @@ const dataTools = useDataToolsController({
   recalculate,
 });
 const {
+  simulationDialog,
+  simulationBusy,
+  simulationError,
+  simulationResult,
+  goalSeekDraft,
+  planningDraft,
+  proofreadingVisible,
+  proofreadingHasScanned,
+  proofreadingDraft,
+  proofreadingIssues,
+  proofreadingError,
+  proofreadingBusy,
+  selectedProofreadingIssueIds,
   disabled: dataToolsDisabled,
   capabilities: dataToolCapabilities,
   filterActive: dataFilterActive,
@@ -604,6 +626,49 @@ const {
   comparisonError,
   comparisonColumns,
 } = dataTools;
+const simulationRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingSimulationRange, reference: pickedSimulationReference } =
+  simulationRangePicker;
+async function selectSimulationReference(
+  current: string,
+  options: RangeReferenceSelectionOptions = { singleCell: true },
+): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const generation = workbookGeneration.value;
+  const sheetId = activeSheet.value.id;
+  const dialog = simulationDialog.value;
+  const selected = await simulationRangePicker.selectReference(current, options);
+  if (
+    session.workbook !== workbook ||
+    workbookGeneration.value !== generation ||
+    !dialog ||
+    simulationDialog.value !== dialog
+  )
+    return undefined;
+  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+  return selected;
+}
+watch(simulationDialog, () => simulationRangePicker.cancel());
+const proofreadingRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingProofreadingRange, reference: pickedProofreadingReference } =
+  proofreadingRangePicker;
+async function selectProofreadingReference(current: string): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const generation = workbookGeneration.value;
+  const sheetId = activeSheet.value.id;
+  const selected = await proofreadingRangePicker.selectReference(current);
+  if (
+    session.workbook !== workbook ||
+    workbookGeneration.value !== generation ||
+    !proofreadingVisible.value
+  )
+    return undefined;
+  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+  return selected;
+}
+watch(proofreadingVisible, (visible) => {
+  if (!visible) proofreadingRangePicker.cancel();
+});
 const splitRangePicker = useRangeReferencePicker(() => activeSheet.value.name, {
   singleCell: true,
 });
@@ -753,6 +818,8 @@ watch(consolidateVisible, (visible) => {
 });
 const dataToolsModalOpen = computed(
   () =>
+    (Boolean(simulationDialog.value) && !pickingSimulationRange.value) ||
+    (proofreadingVisible.value && !pickingProofreadingRange.value) ||
     fillNumberSequenceVisible.value ||
     (fillRankVisible.value && !pickingFillRankRange.value) ||
     fillSeriesVisible.value ||
@@ -833,6 +900,8 @@ watch(workbookGeneration, () => {
 const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const activeRangePicker = computed(() => {
+  if (pickingSimulationRange.value) return simulationRangePicker;
+  if (pickingProofreadingRange.value) return proofreadingRangePicker;
   if (pickingSplitRange.value) return splitRangePicker;
   if (pickingFillRankRange.value) return fillRankRangePicker;
   if (pickingValidationRange.value) return validationRangePicker;
@@ -996,6 +1065,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           :edit-session-id="cellEditSession.id"
           @sort="dataTools.sort"
           @open-sort="dataTools.openSort"
+          @open-goal-seek="dataTools.openGoalSeek"
+          @open-planning="dataTools.openPlanning"
+          @open-proofreading="dataTools.openDataProofreading"
           @toggle-filter="dataTools.toggleFilter"
           @advanced-filter="dataTools.openAdvancedFilter"
           @clear-filter="dataTools.clearFilter"
@@ -1280,6 +1352,67 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :edit-session-id="cellEditSession.id"
       @confirm="comparisonRangePicker.confirm"
       @cancel="comparisonRangePicker.cancel"
+    />
+    <GoalSeekDialog
+      :visible="simulationDialog === 'goalSeek'"
+      :initial="goalSeekDraft"
+      :busy="simulationBusy"
+      :error="simulationError"
+      :result="simulationResult"
+      :suspended="pickingSimulationRange"
+      :select-reference="selectSimulationReference"
+      @close="dataTools.closeSimulation"
+      @solve="dataTools.solveGoalSeek"
+      @apply="dataTools.applySimulation"
+      @draft-change="dataTools.updateGoalSeekDraft"
+    />
+    <PlanningSolverDialog
+      :visible="simulationDialog === 'planning'"
+      :initial="planningDraft"
+      :busy="simulationBusy"
+      :error="simulationError"
+      :result="simulationResult"
+      :suspended="pickingSimulationRange"
+      :select-reference="selectSimulationReference"
+      @close="dataTools.closeSimulation"
+      @solve="dataTools.solvePlanning"
+      @apply="dataTools.applySimulation"
+      @draft-change="dataTools.updatePlanningDraft"
+    />
+    <RangeReferencePicker
+      v-if="pickingSimulationRange"
+      :reference="pickedSimulationReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="simulationRangePicker.confirm"
+      @cancel="simulationRangePicker.cancel"
+    />
+    <DataProofreadingDialog
+      :visible="proofreadingVisible"
+      :has-scanned="proofreadingHasScanned"
+      :draft="proofreadingDraft"
+      :issues="proofreadingIssues"
+      :selected-ids="selectedProofreadingIssueIds"
+      :busy="proofreadingBusy"
+      :error="proofreadingError"
+      :picking="pickingProofreadingRange"
+      :select-reference="selectProofreadingReference"
+      @close="dataTools.closeDataProofreading"
+      @draft-change="dataTools.updateDataProofreadingDraft"
+      @scan="dataTools.scanDataProofreadingResults"
+      @selection-change="dataTools.setSelectedProofreadingIssueIds"
+      @select-issue="dataTools.selectDataProofreadingIssue"
+      @apply-issue="dataTools.applyDataProofreadingIssue"
+      @apply-type="dataTools.applyDataProofreadingType"
+      @apply-selected="dataTools.applySelectedDataProofreadingIssues"
+      @ignore-issue="dataTools.ignoreDataProofreadingIssue"
+      @ignore-type="dataTools.ignoreDataProofreadingType"
+    />
+    <RangeReferencePicker
+      v-if="pickingProofreadingRange"
+      :reference="pickedProofreadingReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="proofreadingRangePicker.confirm"
+      @cancel="proofreadingRangePicker.cancel"
     />
     <DuplicateValuesDialog
       :visible="duplicateValuesVisible"

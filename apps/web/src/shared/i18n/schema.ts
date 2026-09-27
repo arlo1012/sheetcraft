@@ -1,8 +1,14 @@
+import type { SimulationMessageSchema } from "../../modules/data-tools/simulation-messages";
+import type { ProofreadingMessageSchema } from "../../modules/data-tools/proofreading-messages";
 import type { FormulaToolsMessageSchema } from "../../modules/formula-tools/formula-tools-messages";
 
 export type AppLocale = "zh-CN" | "en-US";
 
-export type MessageSchema = FormulaToolsMessageSchema & {
+type ToolMessageSchema = FormulaToolsMessageSchema &
+  SimulationMessageSchema &
+  ProofreadingMessageSchema;
+
+export type MessageSchema = ToolMessageSchema & {
   dataTools: {
     dropdownList: string;
     dropdown: {
