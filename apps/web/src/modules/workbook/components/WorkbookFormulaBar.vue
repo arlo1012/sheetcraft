@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import { Search } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import { isCellEditSessionTarget } from "../../../shared/cell-editing/cell-edit-focus";
@@ -14,13 +15,12 @@ import {
   type CellEditSession,
 } from "../../../shared/cell-editing/useCellEditSession";
 import WorkbookFormulaBarAddressInput from "./WorkbookFormulaBarAddressInput.vue";
-import WorkbookFormulaBarSearchControls from "./WorkbookFormulaBarSearchControls.vue";
 
 const props = defineProps<{
   address: CellAddress;
   addressLabel: string;
   inputValue: string;
-  searchQuery: string;
+  searchOpen?: boolean;
   sheetId?: string;
   sheetName?: string;
   editTargetSheetName?: string;
@@ -39,13 +39,13 @@ const emit = defineEmits<{
       sheetId?: string;
     },
   ];
-  updateSearchQuery: [query: string];
-  find: [direction: "forward" | "backward"];
+  openSearch: [];
   cancelEdit: [sheetId: string | undefined];
 }>();
 
 const { t } = useAppI18n();
 const formulaInput = ref<HTMLTextAreaElement>();
+const searchTrigger = ref<HTMLButtonElement>();
 const formulaAssistRef = ref<InstanceType<typeof FormulaInputAssist> | null>(null);
 const formulaFocused = ref(false);
 const editSession =
@@ -306,6 +306,7 @@ function focus(options: { preserveSelection?: boolean } = {}): void {
 }
 
 defineExpose({
+  focusSearch: () => searchTrigger.value?.focus(),
   flushPendingEdit,
   hasPendingEdit,
   focus,
@@ -346,89 +347,138 @@ defineExpose({
       @navigate="emit('navigate', $event)"
     />
 
-    <span class="workbook-formula-bar__fx" aria-hidden="true">fx</span>
-
-    <label class="workbook-formula-bar__field workbook-formula-bar__formula">
-      <span class="ui-visually-hidden">
-        {{
-          t("formulaBar.editor", {
-            address: formulaFocused ? formulaTargetLabel : addressLabel,
-          })
-        }}
-      </span>
-      <textarea
-        ref="formulaInput"
-        v-bind="formulaAssistRef?.inputAria"
-        class="workbook-formula-bar__formula-input"
-        :class="{ 'has-formula-colors': showFormulaColors }"
-        :value="formulaDraft"
-        :readonly="readOnly"
-        :aria-readonly="readOnly ? true : undefined"
-        rows="1"
-        wrap="off"
-        autocomplete="off"
-        :spellcheck="false"
-        :aria-label="
-          t('formulaBar.editor', {
-            address: formulaFocused ? formulaTargetLabel : addressLabel,
-          })
-        "
-        aria-keyshortcuts="Alt+Enter Control+F2 F2 F4"
-        :placeholder="t('formulaBar.placeholder')"
-        data-formula-input
-        :data-cell-edit-session="editSession.id"
-        data-cell-edit-surface="formula-bar"
-        @input="onFormulaInput"
-        @focus="onFormulaFocus"
-        @blur="onFormulaBlur"
-        @keydown="onFormulaKeydown"
-        @select="captureSelection"
-        @keyup="captureSelection"
-        @click="captureSelection"
-        @compositionstart="onFormulaCompositionStart"
-        @compositionend="onFormulaCompositionEnd"
-      />
-      <FormulaTextOverlay
-        :input="formulaInput"
-        :value="formulaDraft"
-        :references="coloredReferences"
-        :active="showFormulaColors"
-      />
-      <FormulaInputAssist
-        ref="formulaAssistRef"
-        :value="formulaDraft"
-        :input="formulaInput"
-        :active="
-          !readOnly &&
-          formulaFocused &&
-          formulaOwnsSession &&
-          editSession.state.surface === 'formula-bar'
-        "
-        :composing="isComposing"
-        :reference-sheet-name="formulaTargetSheetId !== sheetId ? sheetName : undefined"
-        @text-edit="applyFormulaTextEdit"
-      />
-    </label>
-
-    <WorkbookFormulaBarSearchControls
-      :search-query="searchQuery"
-      @update-search-query="emit('updateSearchQuery', $event)"
-      @find="emit('find', $event)"
-    />
+    <div class="workbook-formula-bar__editor">
+      <button
+        ref="searchTrigger"
+        class="workbook-formula-bar__search-trigger"
+        type="button"
+        :aria-label="t('navigation.findInSheet')"
+        :title="t('navigation.findInSheet')"
+        aria-haspopup="dialog"
+        :aria-expanded="searchOpen ?? false"
+        data-search-trigger
+        @click="emit('openSearch')"
+      >
+        <Search :size="15" aria-hidden="true" />
+      </button>
+      <span class="workbook-formula-bar__fx" aria-hidden="true">fx</span>
+      <label class="workbook-formula-bar__field workbook-formula-bar__formula">
+        <span class="ui-visually-hidden">
+          {{
+            t("formulaBar.editor", {
+              address: formulaFocused ? formulaTargetLabel : addressLabel,
+            })
+          }}
+        </span>
+        <textarea
+          ref="formulaInput"
+          v-bind="formulaAssistRef?.inputAria"
+          class="workbook-formula-bar__formula-input"
+          :class="{ 'has-formula-colors': showFormulaColors }"
+          :value="formulaDraft"
+          :readonly="readOnly"
+          :aria-readonly="readOnly ? true : undefined"
+          rows="1"
+          wrap="off"
+          autocomplete="off"
+          :spellcheck="false"
+          :aria-label="
+            t('formulaBar.editor', {
+              address: formulaFocused ? formulaTargetLabel : addressLabel,
+            })
+          "
+          aria-keyshortcuts="Alt+Enter Control+F2 F2 F4"
+          :placeholder="t('formulaBar.placeholder')"
+          data-formula-input
+          :data-cell-edit-session="editSession.id"
+          data-cell-edit-surface="formula-bar"
+          @input="onFormulaInput"
+          @focus="onFormulaFocus"
+          @blur="onFormulaBlur"
+          @keydown="onFormulaKeydown"
+          @select="captureSelection"
+          @keyup="captureSelection"
+          @click="captureSelection"
+          @compositionstart="onFormulaCompositionStart"
+          @compositionend="onFormulaCompositionEnd"
+        />
+        <FormulaTextOverlay
+          :input="formulaInput"
+          :value="formulaDraft"
+          :references="coloredReferences"
+          :active="showFormulaColors"
+        />
+        <FormulaInputAssist
+          ref="formulaAssistRef"
+          :value="formulaDraft"
+          :input="formulaInput"
+          :active="
+            !readOnly &&
+            formulaFocused &&
+            formulaOwnsSession &&
+            editSession.state.surface === 'formula-bar'
+          "
+          :composing="isComposing"
+          :reference-sheet-name="formulaTargetSheetId !== sheetId ? sheetName : undefined"
+          @text-edit="applyFormulaTextEdit"
+        />
+      </label>
+    </div>
   </div>
 </template>
 
 <style scoped lang="scss">
 .workbook-formula-bar {
   display: grid;
-  grid-template-columns: 104px 30px minmax(120px, 1fr) minmax(210px, 300px);
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: var(--idea-space-4);
   align-items: center;
   min-width: 0;
   height: 34px;
+  padding: var(--idea-space-2) var(--idea-space-4);
   font-size: var(--idea-font-size-body-medium);
   line-height: var(--idea-line-height-body-medium);
   background: var(--idea-surface-secondary);
   border-bottom: 1px solid var(--idea-border-control);
+
+  &__editor {
+    display: grid;
+    grid-template-columns: 28px 28px minmax(0, 1fr);
+    align-items: center;
+    min-width: 0;
+    height: 100%;
+    background: var(--idea-surface-panel);
+    border: 1px solid var(--idea-border-control);
+    border-radius: var(--idea-radius-default);
+
+    &:focus-within {
+      border-color: var(--idea-action-primary);
+    }
+  }
+
+  &__search-trigger {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 22px;
+    justify-self: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--idea-radius-small);
+    background: transparent;
+    color: var(--idea-text-secondary);
+    cursor: pointer;
+
+    &:hover,
+    &[aria-expanded="true"] {
+      background: var(--idea-icon-button-hover-bg);
+    }
+
+    &:focus-visible {
+      outline: 1px solid var(--idea-action-primary);
+      outline-offset: -1px;
+    }
+  }
 
   &__field,
   &__formula {
@@ -446,18 +496,13 @@ defineExpose({
     min-width: 0;
     height: 100%;
     padding: 0 8px;
-    background: var(--idea-surface-panel);
-    border: 1px solid transparent;
-    border-radius: 2px;
+    background: transparent;
+    border: 0;
     outline: none;
     color: var(--idea-text-primary);
     font-size: var(--idea-font-size-body-medium);
     line-height: var(--idea-line-height-body-medium);
     letter-spacing: 0;
-
-    &:focus {
-      border-color: var(--idea-action-primary);
-    }
 
     &.has-formula-colors {
       -webkit-text-fill-color: transparent;
@@ -469,7 +514,7 @@ defineExpose({
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 22px;
+    height: 16px;
     border-right: 1px solid var(--idea-border-control);
     color: var(--idea-text-muted);
     font-family: Georgia, serif;
@@ -479,7 +524,7 @@ defineExpose({
 
   &__formula {
     position: relative;
-    padding: 4px 6px;
+    padding: 1px 0;
   }
 
   &__formula-input {
@@ -497,12 +542,9 @@ defineExpose({
   }
 
   @media (max-width: 520px) {
-    grid-template-columns: 72px 24px minmax(64px, 1fr) 128px;
-
-    &__formula {
-      padding-right: 4px;
-      padding-left: 4px;
-    }
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: var(--idea-space-2);
+    padding-inline: var(--idea-space-2);
   }
 }
 </style>

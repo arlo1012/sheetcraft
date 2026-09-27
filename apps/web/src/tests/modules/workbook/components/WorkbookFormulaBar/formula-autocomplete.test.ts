@@ -13,7 +13,6 @@ function mountFormulaBar(inputValue = "", sheetId?: string) {
       address: { row: 0, column: 0 },
       addressLabel: "A1",
       inputValue,
-      searchQuery: "",
       sheetId,
     },
   });

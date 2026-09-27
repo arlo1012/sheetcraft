@@ -12,7 +12,6 @@ function mountFormulaBar() {
       address: { row: 0, column: 0 },
       addressLabel: "A1",
       inputValue: "",
-      searchQuery: "",
     },
   });
   mounted.push(wrapper);

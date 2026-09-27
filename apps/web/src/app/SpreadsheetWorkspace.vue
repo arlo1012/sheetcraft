@@ -67,6 +67,7 @@ import SheetGrid from "../modules/sheet-grid/components/SheetGrid.vue";
 import SheetHorizontalScrollbar from "../modules/sheet-grid/components/SheetHorizontalScrollbar.vue";
 import type { SheetHorizontalScrollState } from "../modules/sheet-grid/horizontal-scroll";
 import WorkbookFormulaBar from "../modules/workbook/components/WorkbookFormulaBar.vue";
+import WorkbookFindDialog from "../modules/workbook/components/WorkbookFindDialog.vue";
 import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.vue";
 import {
   useSpreadsheetWorkspaceController,
@@ -91,6 +92,13 @@ const props = defineProps<{
   imageAssetStore?: ImageAssetStore;
 }>();
 const formulaBarRef = ref<InstanceType<typeof WorkbookFormulaBar> | null>(null);
+const findDialogVisible = ref(false);
+
+function restoreSearchFocus(): void {
+  if (!findDialogVisible.value) {
+    formulaBarRef.value?.focusSearch();
+  }
+}
 const gridId = `workbook-grid-${useId()}`;
 const zoom = ref(100);
 const showHeaders = ref(true);
@@ -1555,13 +1563,20 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :input-value="activeCellInput"
       :edit-session="cellEditSession"
       :handle-reference-keydown="handleFormulaReferenceKeydown"
-      :search-query="searchQuery"
+      :search-open="findDialogVisible"
       @navigate="navigateToAddress"
       @commit-cell="commitCell"
       @traverse="onTraverseFromFormulaBar"
       @cancel-edit="onCancelFormulaEdit"
-      @update-search-query="updateSearchQuery"
+      @open-search="findDialogVisible = true"
+    />
+    <WorkbookFindDialog
+      :visible="findDialogVisible"
+      :query="searchQuery"
+      @update-query="updateSearchQuery"
       @find="findCell"
+      @close="findDialogVisible = false"
+      @closed="restoreSearchFocus"
     />
     <div
       class="spreadsheet-workspace__grid"

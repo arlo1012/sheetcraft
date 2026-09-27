@@ -94,10 +94,6 @@ function onKeydown(event: KeyboardEvent): void {
   margin: 0;
 }
 
-.workbook-formula-bar__address {
-  padding: 4px 6px;
-}
-
 .workbook-formula-bar__field {
   display: block;
 }
@@ -108,8 +104,8 @@ function onKeydown(event: KeyboardEvent): void {
   height: 100%;
   padding: 0 8px;
   background: var(--idea-surface-panel);
-  border: 1px solid transparent;
-  border-radius: 2px;
+  border: 1px solid var(--idea-border-control);
+  border-radius: var(--idea-radius-default);
   outline: none;
   color: var(--idea-text-primary);
   font-size: var(--idea-font-size-body-medium);
@@ -120,13 +116,6 @@ function onKeydown(event: KeyboardEvent): void {
 
   &:focus {
     border-color: var(--idea-action-primary);
-  }
-}
-
-@media (max-width: 520px) {
-  .workbook-formula-bar__address {
-    padding-right: 4px;
-    padding-left: 4px;
   }
 }
 </style>

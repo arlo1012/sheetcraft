@@ -10,7 +10,6 @@ test("protection cancels formula drafts while leaving address navigation availab
       address: { row: 0, column: 0 },
       addressLabel: "A1",
       inputValue: "12",
-      searchQuery: "",
     },
   });
   const input = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");

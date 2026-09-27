@@ -10,7 +10,6 @@ function mountFormulaBar(locale: "en-US" | "zh-CN" = "en-US") {
       address: { row: 0, column: 0 },
       addressLabel: "A1",
       inputValue: "",
-      searchQuery: "",
     },
   });
 }
@@ -28,7 +27,8 @@ describe("WorkbookFormulaBar", () => {
       "Alt+Enter Control+F2 F2 F4",
     );
     expect(wrapper.get("[data-formula-input]").element).toBeInstanceOf(HTMLTextAreaElement);
-    expect(wrapper.get("[data-search-input]").attributes("aria-label")).toBe("在工作表中查找");
+    expect(wrapper.find("[data-search-input]").exists()).toBe(false);
+    expect(wrapper.get("[data-search-trigger]").attributes("aria-label")).toBe("在工作表中查找");
     expect(wrapper.get(".workbook-formula-bar__fx").attributes("aria-hidden")).toBe("true");
   });
 
@@ -70,10 +70,9 @@ describe("WorkbookFormulaBar", () => {
     expect(input.element.value).toBe("1");
   });
 
-  test("traverses from an unchanged draft and searches in both directions", async () => {
+  test("traverses from an unchanged draft and opens the independent search dialog", async () => {
     const wrapper = mountFormulaBar();
     const formulaInput = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
-    const searchInput = wrapper.get<HTMLInputElement>("[data-search-input]");
 
     await formulaInput.trigger("focus");
     await formulaInput.trigger("keydown", { key: "Enter", shiftKey: true });
@@ -82,14 +81,8 @@ describe("WorkbookFormulaBar", () => {
       [{ address: { row: 0, column: 0 }, direction: "up" }],
     ]);
 
-    await searchInput.setValue("needle");
-    await searchInput.trigger("keydown", { key: "Enter" });
-    await searchInput.trigger("keydown", { key: "Enter", shiftKey: true });
-    await wrapper.get('[aria-label="Find next"]').trigger("click");
-    await wrapper.get('[aria-label="Find previous"]').trigger("click");
-
-    expect(wrapper.emitted("updateSearchQuery")).toEqual([["needle"]]);
-    expect(wrapper.emitted("find")).toEqual([["forward"], ["backward"], ["forward"], ["backward"]]);
+    await wrapper.get("[data-search-trigger]").trigger("click");
+    expect(wrapper.emitted("openSearch")).toEqual([[]]);
   });
 
   test("cancels with Escape and defers commit during IME composition", async () => {
