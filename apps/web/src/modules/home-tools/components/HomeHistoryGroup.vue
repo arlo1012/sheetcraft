@@ -28,10 +28,10 @@ const { t } = useAppI18n();
   >
     <div class="home-history-group__row" data-ribbon-row="1">
       <RibbonButton :label="t('ribbon.undo')" data-ribbon-action="undo" @activate="emit('undo')">
-        <Undo2 :size="16" aria-hidden="true" />
+        <Undo2 aria-hidden="true" />
       </RibbonButton>
       <RibbonButton :label="t('ribbon.redo')" data-ribbon-action="redo" @activate="emit('redo')">
-        <Redo2 :size="16" aria-hidden="true" />
+        <Redo2 aria-hidden="true" />
       </RibbonButton>
     </div>
     <div class="home-history-group__row" data-ribbon-row="2">
@@ -42,7 +42,7 @@ const { t } = useAppI18n();
         data-ribbon-action="format-painter"
         @activate="emit('activateFormatPainter')"
       >
-        <Paintbrush :size="15" aria-hidden="true" />
+        <Paintbrush aria-hidden="true" />
       </RibbonButton>
       <RibbonButton
         :label="t('ribbon.clearFormatting')"
@@ -50,7 +50,7 @@ const { t } = useAppI18n();
         data-ribbon-action="clear-formatting"
         @activate="emit('applyStyle', createClearCellStylePatch())"
       >
-        <Eraser :size="15" aria-hidden="true" />
+        <Eraser aria-hidden="true" />
       </RibbonButton>
     </div>
   </section>

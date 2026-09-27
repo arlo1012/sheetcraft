@@ -93,7 +93,7 @@ function clearFilter(): void {
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
     >
-      <ListFilter :size="17" aria-hidden="true" />
+      <ListFilter aria-hidden="true" />
     </RibbonMenuButton>
 
     <Teleport to="body">

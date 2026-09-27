@@ -55,6 +55,7 @@ function activate(): void {
 @use "./ribbon-actions" as ribbon;
 
 .ribbon-button {
+  --ribbon-icon-size: var(--idea-control-icon-size);
   @include ribbon.action-button(var(--ribbon-button-width, 27px));
 
   padding: 0;
@@ -72,6 +73,7 @@ function activate(): void {
   }
 
   &.is-tall {
+    --ribbon-icon-size: var(--idea-ribbon-large-icon-size);
     position: relative;
     align-self: stretch;
     justify-content: center;

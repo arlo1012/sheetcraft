@@ -345,7 +345,7 @@ watch(
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
     >
-      <Rows3 :size="15" aria-hidden="true" />
+      <Rows3 aria-hidden="true" />
     </RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface

@@ -41,6 +41,17 @@
 }
 
 @mixin icon-slot {
+  --idea-icon-size: var(--ribbon-icon-size, var(--idea-control-icon-size));
+
+  :deep(svg) {
+    width: var(--idea-icon-size);
+    height: var(--idea-icon-size);
+  }
+
+  :deep(svg.lucide) {
+    stroke-width: var(--idea-icon-stroke-width);
+  }
+
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;

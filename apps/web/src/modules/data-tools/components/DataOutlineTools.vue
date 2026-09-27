@@ -88,7 +88,7 @@ function onClearOutline(): void {
       :menu-id="groupId"
       @activate="toggleGroupMenu"
       @keydown="onGroupKeydown"
-      ><ListPlus :size="18" /></RibbonMenuButton
+      ><ListPlus /></RibbonMenuButton
     ><RibbonMenuButton
       ref="ungroupTrigger"
       variant="tall"
@@ -101,7 +101,7 @@ function onClearOutline(): void {
       :menu-id="ungroupId"
       @activate="toggleUngroupMenu"
       @keydown="onUngroupKeydown"
-      ><ListX :size="18" /></RibbonMenuButton
+      ><ListX /></RibbonMenuButton
     ><Teleport to="body"
       ><MenuSurface
         v-if="groupOpen"

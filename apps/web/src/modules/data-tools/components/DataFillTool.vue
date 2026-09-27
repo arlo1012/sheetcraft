@@ -216,7 +216,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
       :menu-id="menuId"
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
-      ><Copy :size="18"
+      ><Copy
     /></RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface

@@ -70,7 +70,7 @@ function openErrorCheckOptions(): void {
       :menu-id="menuId"
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
-      ><CopyMinus :size="18"
+      ><CopyMinus
     /></RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface

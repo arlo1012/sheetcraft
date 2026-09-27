@@ -41,7 +41,7 @@ function choose(action: DataComparisonAction): void {
       :menu-id="menuId"
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
-      ><GitCompareArrows :size="18"
+      ><GitCompareArrows
     /></RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface

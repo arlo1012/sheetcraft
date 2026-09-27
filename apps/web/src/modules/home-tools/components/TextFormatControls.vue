@@ -37,7 +37,7 @@ function toggle(
       :pressed="ariaPressed(state.bold)"
       @activate="toggle('bold', state.bold)"
     >
-      <Bold :size="17" :stroke-width="2.2" aria-hidden="true" />
+      <Bold aria-hidden="true" />
     </RibbonButton>
     <RibbonButton
       class="text-format-controls__button"
@@ -46,7 +46,7 @@ function toggle(
       :pressed="ariaPressed(state.italic)"
       @activate="toggle('italic', state.italic)"
     >
-      <Italic :size="17" :stroke-width="2.2" aria-hidden="true" />
+      <Italic aria-hidden="true" />
     </RibbonButton>
     <RibbonButton
       class="text-format-controls__button"
@@ -55,7 +55,7 @@ function toggle(
       :pressed="ariaPressed(state.underline)"
       @activate="toggle('underline', state.underline)"
     >
-      <Underline :size="17" :stroke-width="2.2" aria-hidden="true" />
+      <Underline aria-hidden="true" />
     </RibbonButton>
     <RibbonButton
       class="text-format-controls__button"
@@ -64,7 +64,7 @@ function toggle(
       :pressed="ariaPressed(state.strikethrough)"
       @activate="toggle('strikethrough', state.strikethrough)"
     >
-      <Strikethrough :size="15" aria-hidden="true" />
+      <Strikethrough aria-hidden="true" />
     </RibbonButton>
   </div>
 </template>

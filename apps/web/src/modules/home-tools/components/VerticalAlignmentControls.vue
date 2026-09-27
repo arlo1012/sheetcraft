@@ -37,7 +37,7 @@ function align(alignment: "top" | "middle" | "bottom"): void {
       data-vertical-alignment-action="top"
       @activate="align('top')"
     >
-      <ArrowUpToLine :size="17" :stroke-width="1.5" aria-hidden="true" />
+      <ArrowUpToLine aria-hidden="true" />
     </RibbonButton>
     <RibbonButton
       class="vertical-alignment-controls__button"
@@ -47,7 +47,7 @@ function align(alignment: "top" | "middle" | "bottom"): void {
       data-vertical-alignment-action="middle"
       @activate="align('middle')"
     >
-      <FoldVertical :size="17" :stroke-width="1.5" aria-hidden="true" />
+      <FoldVertical aria-hidden="true" />
     </RibbonButton>
     <RibbonButton
       class="vertical-alignment-controls__button"
@@ -57,7 +57,7 @@ function align(alignment: "top" | "middle" | "bottom"): void {
       data-vertical-alignment-action="bottom"
       @activate="align('bottom')"
     >
-      <ArrowDownToLine :size="17" :stroke-width="1.5" aria-hidden="true" />
+      <ArrowDownToLine aria-hidden="true" />
     </RibbonButton>
   </div>
 </template>

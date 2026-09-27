@@ -105,6 +105,7 @@ function toggleMenu(): void {
 @use "./ribbon-actions" as ribbon;
 
 .ribbon-split-button {
+  --ribbon-icon-size: var(--idea-control-icon-size);
   display: inline-flex;
   flex: 0 0 auto;
   align-items: stretch;
@@ -145,6 +146,7 @@ function toggleMenu(): void {
   }
 
   &.is-tall {
+    --ribbon-icon-size: var(--idea-ribbon-large-icon-size);
     align-self: stretch;
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 58px);

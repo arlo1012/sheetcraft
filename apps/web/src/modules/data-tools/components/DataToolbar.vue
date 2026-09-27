@@ -109,14 +109,14 @@ const { t } = useAppI18n();
           :text="t('dataTools.filter.showAll')"
           data-data-action="clear-filter"
           @activate="emit('clearFilter')"
-          ><Filter :size="14" /></RibbonButton
+          ><Filter /></RibbonButton
         ><RibbonButton
           :disabled="disabled || !filterActive"
           :label="t('dataTools.filter.reapply')"
           :text="t('dataTools.filter.reapply')"
           data-data-action="reapply-filter"
           @activate="emit('reapplyFilter')"
-          ><Database :size="14"
+          ><Database
         /></RibbonButton>
       </div>
     </section>
@@ -128,7 +128,7 @@ const { t } = useAppI18n();
         :text="t('dataTools.textToColumns.title')"
         data-data-action="split"
         @activate="emit('openTextToColumns')"
-        ><Columns3 :size="18" /></RibbonButton
+        ><Columns3 /></RibbonButton
       ><DataDuplicatesTool
         :disabled="disabled"
         :remove-duplicates="capabilities.removeDuplicates"
@@ -145,7 +145,7 @@ const { t } = useAppI18n();
         :text="t('dataTools.lookupFill.title')"
         data-data-action="lookup-fill"
         @activate="emit('openLookupFill')"
-        ><TableProperties :size="18"
+        ><TableProperties
       /></RibbonButton>
       <DataComparisonTool
         :disabled="comparisonDisabled ?? disabled"
@@ -171,7 +171,7 @@ const { t } = useAppI18n();
         :text="t('dataTools.dropdownList')"
         data-data-action="dropdown-list"
         @activate="emit('openDropdownList')"
-        ><ListFilter :size="18"
+        ><ListFilter
       /></RibbonButton>
       <RibbonButton
         variant="tall"
@@ -180,7 +180,7 @@ const { t } = useAppI18n();
         :text="t('dataTools.validation.title')"
         data-data-action="validation"
         @activate="emit('openValidation')"
-        ><ShieldCheck :size="18"
+        ><ShieldCheck
       /></RibbonButton>
       <RibbonButton
         variant="tall"
@@ -189,7 +189,7 @@ const { t } = useAppI18n();
         :text="t('dataTools.consolidate.title')"
         data-data-action="consolidate"
         @activate="emit('openConsolidate')"
-        ><Combine :size="18"
+        ><Combine
       /></RibbonButton>
     </section>
     <section class="data-toolbar__group" role="group" :aria-label="t('dataTools.groups.outline')">
@@ -200,7 +200,7 @@ const { t } = useAppI18n();
         :text="t('dataTools.outline.subtotal')"
         data-data-action="subtotal"
         @activate="emit('openSubtotal')"
-        ><Rows3 :size="18" /></RibbonButton
+        ><Rows3 /></RibbonButton
       ><DataOutlineTools
         :disabled="disabled"
         :ungroup-rows="capabilities.ungroupRows"
@@ -217,14 +217,14 @@ const { t } = useAppI18n();
           :text="t('dataTools.outline.expandShort')"
           data-data-action="expand"
           @activate="emit('expand')"
-          ><SquarePlus :size="14" /></RibbonButton
+          ><SquarePlus /></RibbonButton
         ><RibbonButton
           :disabled="disabled || !capabilities.collapse"
           :label="t('dataTools.outline.collapse')"
           :text="t('dataTools.outline.collapseShort')"
           data-data-action="collapse"
           @activate="emit('collapse')"
-          ><SquareMinus :size="14"
+          ><SquareMinus
         /></RibbonButton>
       </div>
     </section>

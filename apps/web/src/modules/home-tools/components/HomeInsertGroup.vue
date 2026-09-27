@@ -25,7 +25,7 @@ const { t } = useAppI18n();
       data-ribbon-placeholder="insert"
       data-ribbon-span="2"
     >
-      <CirclePlus :size="17" aria-hidden="true" />
+      <CirclePlus aria-hidden="true" />
     </RibbonMenuButton>
     <ImageInsertMenu :disabled="disabled" @insert-image="emit('insertImage', $event)" />
     <div class="home-insert-group__stack" data-ribbon-stack="chart-pivot">
@@ -36,7 +36,7 @@ const { t } = useAppI18n();
         data-ribbon-placeholder="chart"
         data-ribbon-row="1"
       >
-        <ChartNoAxesColumn :size="15" aria-hidden="true" />
+        <ChartNoAxesColumn aria-hidden="true" />
       </RibbonMenuButton>
       <RibbonMenuButton
         :label="t('app.unavailableFeature', { feature: t('ribbon.pivotTable') })"
@@ -45,7 +45,7 @@ const { t } = useAppI18n();
         data-ribbon-placeholder="pivot-table"
         data-ribbon-row="2"
       >
-        <Table2 :size="15" aria-hidden="true" />
+        <Table2 aria-hidden="true" />
       </RibbonMenuButton>
     </div>
   </section>

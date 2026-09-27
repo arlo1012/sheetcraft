@@ -41,7 +41,7 @@ function custom(): void {
       :menu-id="id"
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
-      ><ArrowDownAZ :size="18" /></RibbonMenuButton
+      ><ArrowDownAZ /></RibbonMenuButton
     ><Teleport to="body"
       ><MenuSurface
         v-if="open"

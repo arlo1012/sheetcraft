@@ -67,7 +67,7 @@ const emit = defineEmits<{
         data-ribbon-row="1"
         @activate="emit('autoSum')"
       >
-        <Sigma :size="15" aria-hidden="true" />
+        <Sigma aria-hidden="true" />
       </RibbonButton>
       <RibbonButton
         :label="t('ribbon.data')"
@@ -76,7 +76,7 @@ const emit = defineEmits<{
         data-ribbon-row="2"
         @activate="emit('openDataTools')"
       >
-        <Database :size="15" aria-hidden="true" />
+        <Database aria-hidden="true" />
       </RibbonButton>
     </div>
 
@@ -90,7 +90,7 @@ const emit = defineEmits<{
       data-ribbon-span="2"
       @activate="emit('toggleProtection')"
     >
-      <LockKeyhole :size="17" aria-hidden="true" />
+      <LockKeyhole aria-hidden="true" />
     </RibbonButton>
   </section>
 </template>

@@ -54,8 +54,8 @@ function applyColor(color: string | null): void {
         :style="indicatorStyle"
         :data-cell-color-icon="kind"
       >
-        <Baseline v-if="kind === 'text'" :size="18" :stroke-width="1.8" aria-hidden="true" />
-        <PaintBucket v-else :size="18" :stroke-width="1.8" aria-hidden="true" />
+        <Baseline v-if="kind === 'text'" aria-hidden="true" />
+        <PaintBucket v-else aria-hidden="true" />
         <span class="cell-color-control__indicator" data-color-indicator />
       </span>
     </CellColorPicker>
@@ -73,8 +73,8 @@ function applyColor(color: string | null): void {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
+    width: var(--idea-icon-size, 14px);
+    height: var(--idea-icon-size, 14px);
 
     &--text {
       position: relative;

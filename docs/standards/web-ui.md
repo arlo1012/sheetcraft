@@ -65,6 +65,14 @@ CSS pixels at 100% scale; size and line height are a pair.
 
 ## Ribbon and menus
 
+- Action icon sizes belong to the shared controls: compact ribbon actions use
+  `--idea-control-icon-size` (14px), tall actions use `--idea-ribbon-large-icon-size`
+  (18px), and menu icons use `--idea-menu-icon-size` (15px). Lucide action icons use
+  `--idea-icon-stroke-width` (2). Do not set size/stroke props in feature action slots.
+  Composite icon containers inherit the slot size; border previews retain their
+  semantic line weights. Dropdown indicators and dialog launchers keep their
+  separate shared auxiliary sizes.
+
 - In `shared/ribbon`, use `RibbonButton` for actions/pressed states,
   `RibbonMenuButton` for popup triggers, and `RibbonSplitButton` for action + popup.
   Compact/tall are variants. Font selectors use TDesign Select and the adapter.

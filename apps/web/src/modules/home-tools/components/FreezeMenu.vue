@@ -57,7 +57,7 @@ function unfreeze(): void {
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
     >
-      <Snowflake :size="15" aria-hidden="true" />
+      <Snowflake aria-hidden="true" />
     </RibbonMenuButton>
 
     <Teleport to="body">

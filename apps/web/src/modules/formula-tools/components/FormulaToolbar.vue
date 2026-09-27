@@ -216,7 +216,7 @@ function insertFunction(name: string): void {
           @activate="chooseAggregate('SUM')"
           @toggle-menu="toggleSumMenu"
           @menu-keydown="openSumMenuFromKeyboard"
-          ><Sigma :size="19"
+          ><Sigma
         /></RibbonSplitButton>
         <Teleport to="body"
           ><div
@@ -254,7 +254,7 @@ function insertFunction(name: string): void {
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
           >
-            <template #icon><Banknote :size="16" /></template>
+            <template #icon><Banknote /></template>
           </FormulaCategoryMenu>
           <FormulaCategoryMenu
             category="Logical"
@@ -262,7 +262,7 @@ function insertFunction(name: string): void {
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
           >
-            <template #icon><GitBranch :size="16" /></template>
+            <template #icon><GitBranch /></template>
           </FormulaCategoryMenu>
         </div>
         <div class="formula-toolbar__category-column">
@@ -272,7 +272,7 @@ function insertFunction(name: string): void {
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
           >
-            <template #icon><CaseSensitive :size="16" /></template>
+            <template #icon><CaseSensitive /></template>
           </FormulaCategoryMenu>
           <FormulaCategoryMenu
             category="Date"
@@ -280,7 +280,7 @@ function insertFunction(name: string): void {
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
           >
-            <template #icon><CalendarDays :size="16" /></template>
+            <template #icon><CalendarDays /></template>
           </FormulaCategoryMenu>
         </div>
         <div class="formula-toolbar__category-column">
@@ -290,7 +290,7 @@ function insertFunction(name: string): void {
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
           >
-            <template #icon><ChartColumn :size="16" /></template>
+            <template #icon><ChartColumn /></template>
           </FormulaCategoryMenu>
           <FormulaCategoryMenu
             category="Engineering"
@@ -298,7 +298,7 @@ function insertFunction(name: string): void {
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
           >
-            <template #icon><Wrench :size="16" /></template>
+            <template #icon><Wrench /></template>
           </FormulaCategoryMenu>
         </div>
         <div class="formula-toolbar__category-column">
@@ -308,7 +308,7 @@ function insertFunction(name: string): void {
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
           >
-            <template #icon><Info :size="16" /></template>
+            <template #icon><Info /></template>
           </FormulaCategoryMenu>
           <FormulaCategoryMenu
             category="Database"
@@ -316,7 +316,7 @@ function insertFunction(name: string): void {
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
           >
-            <template #icon><Database :size="16" /></template>
+            <template #icon><Database /></template>
           </FormulaCategoryMenu>
         </div>
         <div class="formula-toolbar__category-column">
@@ -326,7 +326,7 @@ function insertFunction(name: string): void {
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
           >
-            <template #icon><Search :size="16" /></template>
+            <template #icon><Search /></template>
           </FormulaCategoryMenu>
           <FormulaCategoryMenu
             category="Math"
@@ -334,7 +334,7 @@ function insertFunction(name: string): void {
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
           >
-            <template #icon><Radical :size="16" /></template>
+            <template #icon><Radical /></template>
           </FormulaCategoryMenu>
         </div>
         <div class="formula-toolbar__category-column">
@@ -344,7 +344,7 @@ function insertFunction(name: string): void {
             :edit-session-id="editSessionId"
             @insert-function="emit('insertFunction', $event)"
           >
-            <template #icon><RotateCcw :size="16" /></template>
+            <template #icon><RotateCcw /></template>
           </FormulaCategoryMenu>
         </div>
       </section>
@@ -360,7 +360,7 @@ function insertFunction(name: string): void {
           :text="t('formulaTools.nameManager')"
           :disabled="disabled"
           @activate="emit('openNames')"
-          ><Tags :size="18"
+          ><Tags
         /></RibbonButton>
         <RibbonMenuButton
           ref="nameQuickCreateRef"
@@ -372,7 +372,7 @@ function insertFunction(name: string): void {
           :menu-id="nameMenuId"
           popup-role="dialog"
           @activate="openNameMenu"
-          ><Plus :size="18"
+          ><Plus
         /></RibbonMenuButton>
         <Teleport to="body"
           ><section
@@ -426,7 +426,7 @@ function insertFunction(name: string): void {
           popup-role="dialog"
           @activate="emit('recalculate')"
           @toggle-menu="toggleCalculationMenu"
-          ><Calculator :size="18"
+          ><Calculator
         /></RibbonSplitButton>
         <Teleport to="body"
           ><section
@@ -504,7 +504,7 @@ function insertFunction(name: string): void {
           :text="t('formulaTools.insertFunction')"
           :disabled="disabled"
           @activate="browserOpen = true"
-          ><FunctionSquare :size="18"
+          ><FunctionSquare
         /></RibbonButton>
       </section>
     </div>

@@ -40,8 +40,8 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
 .cell-border-preset-icon {
   position: relative;
   display: block;
-  width: 18px;
-  height: 18px;
+  width: var(--idea-icon-size, 18px);
+  height: var(--idea-icon-size, 18px);
 
   &__guide,
   &__line,
@@ -87,11 +87,11 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
     }
 
     &.is-horizontal {
-      top: 9px;
+      top: 50%;
     }
 
     &.is-vertical {
-      left: 9px;
+      left: 50%;
     }
   }
 
@@ -132,11 +132,11 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
     }
 
     &.is-horizontal {
-      top: 9px;
+      top: 50%;
     }
 
     &.is-vertical {
-      left: 9px;
+      left: 50%;
     }
   }
 
@@ -144,7 +144,7 @@ const hasInnerVertical = computed(() => ["all", "inner", "innerVertical"].includ
     z-index: 2;
     top: 50%;
     left: 50%;
-    width: 22.6274px;
+    width: calc((var(--idea-icon-size, 18px) - 2px) * 1.41421356);
     height: 1px;
     background: currentcolor;
     transform-origin: center;

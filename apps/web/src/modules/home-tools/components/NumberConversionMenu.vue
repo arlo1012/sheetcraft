@@ -41,7 +41,7 @@ function convert(mode: CellValueConversionMode): void {
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
     >
-      <ArrowRightLeft :size="15" aria-hidden="true" />
+      <ArrowRightLeft aria-hidden="true" />
     </RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface

@@ -41,7 +41,7 @@ function choose(action: "toggle" | "advanced"): void {
       @activate="emit('toggle')"
       @toggle-menu="toggleMenu"
       @menu-keydown="onTriggerKeydown"
-      ><Filter :size="18" /></RibbonSplitButton
+      ><Filter /></RibbonSplitButton
     ><Teleport to="body"
       ><MenuSurface
         v-if="open"

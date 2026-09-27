@@ -69,7 +69,7 @@ function toggleWrapText(state: ToggleStyleState): void {
           data-ribbon-action="wrap-text"
           @activate="toggleWrapText(state.wrapText)"
         >
-          <TextWrap :size="17" aria-hidden="true" />
+          <TextWrap aria-hidden="true" />
         </RibbonButton>
       </div>
     </div>
