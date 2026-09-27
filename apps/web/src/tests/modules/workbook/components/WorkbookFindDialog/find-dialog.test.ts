@@ -1,11 +1,20 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { AutoComplete } from "tdesign-vue-next/es/auto-complete";
+import { Popup } from "tdesign-vue-next/es/popup";
 import WorkbookFindDialog from "../../../../../modules/workbook/components/WorkbookFindDialog.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 
 describe("WorkbookFindDialog", () => {
+  beforeEach(() => {
+    // Happy DOM has no layout; Popper otherwise treats the input as hidden.
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+      new DOMRect(0, 0, 240, 32),
+    );
+  });
   afterEach(() => {
+    vi.restoreAllMocks();
     document.body.replaceChildren();
   });
 
@@ -86,6 +95,9 @@ describe("WorkbookFindDialog", () => {
     const input = new DOMWrapper(document.body).get<HTMLInputElement>("[data-search-input] input");
     await input.trigger("focus");
     await input.trigger("keydown", { key: "ArrowDown" });
+    // The first arrow opens the history; subsequent arrows navigate native options.
+    await flushPromises();
+    await input.trigger("keydown", { key: "ArrowDown" });
     await input.trigger("keydown", { key: "Enter" });
     expect(wrapper.emitted("updateQuery")?.at(-1)).toEqual(["^l"]);
     expect(wrapper.emitted("find")).toBeUndefined();
@@ -93,6 +105,33 @@ describe("WorkbookFindDialog", () => {
     await flushPromises();
     await input.trigger("keydown", { key: "Enter" });
     expect(wrapper.emitted("find")).toEqual([["forward"]]);
+    wrapper.unmount();
+  });
+  test("opens history only on request, keeping focus and typing quiet", async () => {
+    const wrapper = mount(WorkbookFindDialog, {
+      attachTo: document.body,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { visible: true, query: "other", history: ["^l", "1"] },
+    });
+    const body = new DOMWrapper(document.body);
+    const input = body.get<HTMLInputElement>("[data-search-input] input");
+    const popup = wrapper.getComponent(AutoComplete).getComponent(Popup);
+    await input.trigger("focus");
+    expect(popup.props("visible")).toBe(false);
+    await input.setValue("needle");
+    expect(popup.props("visible")).toBe(false);
+    const arrow = body.get("[role='button'][aria-label='Find history']");
+    await arrow.trigger("click");
+    expect(popup.props("visible")).toBe(true);
+    await flushPromises();
+    await input.trigger("keydown", { key: "ArrowDown" });
+    await input.trigger("keydown", { key: "Escape" });
+    await input.trigger("focus");
+    expect(popup.props("visible")).toBe(false);
+    await input.trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("find")).toEqual([["forward"]]);
+    expect(wrapper.emitted("updateQuery")).toEqual([["needle"]]);
+    await flushPromises();
     wrapper.unmount();
   });
   test("preserves pasted line breaks as visible search tokens", async () => {

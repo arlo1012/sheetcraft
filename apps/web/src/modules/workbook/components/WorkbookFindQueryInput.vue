@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
 import { AutoComplete } from "tdesign-vue-next/es/auto-complete";
-import { Button } from "tdesign-vue-next/es/button";
-import { ChevronDown, ChevronUp } from "lucide-vue-next";
+import { ChevronDown } from "lucide-vue-next";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import { useAppI18n } from "../../../shared/i18n";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
@@ -27,9 +26,9 @@ function focus(): void {
 }
 function toggleHistory(): void {
   const wasOpen = open.value;
-  // AutoComplete owns its popup; use its native focus/blur trigger.
   input.value?.blur();
   if (!wasOpen) focus();
+  open.value = !wasOpen;
 }
 function onSelect(_value: string, { e }: { e: MouseEvent | KeyboardEvent }): void {
   selectedEvents.add(e);
@@ -45,6 +44,7 @@ function onEnter({ e }: { e: KeyboardEvent }): void {
   });
 }
 function onKeydown(event: KeyboardEvent): void {
+  if (event.target !== input.value) return;
   if (event.isComposing || composing.value) {
     event.stopPropagation();
   } else if (event.key === "Escape" && open.value) {
@@ -55,6 +55,7 @@ function onKeydown(event: KeyboardEvent): void {
   } else if (!open.value && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
     input.value?.blur();
     focus();
+    open.value = true;
   }
 }
 function onPaste(event: ClipboardEvent): void {
@@ -89,15 +90,12 @@ defineExpose({ focus, insertText });
     }"
     :value="value"
     :options="options"
+    :popup-props="{ visible: open, destroyOnClose: true }"
     :filterable="false"
     :highlight-keyword="false"
     :placeholder="t('navigation.findQueryLabel')"
     :empty="t('navigation.findHistoryEmpty')"
-    @change="
-      open = true;
-      emit('update:value', $event);
-    "
-    @focus="open = true"
+    @change="emit('update:value', $event)"
     @blur="open = false"
     @select="onSelect"
     @enter="onEnter"
@@ -107,16 +105,20 @@ defineExpose({ focus, insertText });
     @paste.capture="onPaste"
   >
     <template #suffixIcon>
-      <Button
-        variant="text"
-        shape="square"
-        size="small"
+      <ChevronDown
+        class="workbook-find-query-input__arrow"
+        :class="{ 'is-open': open }"
+        :size="14"
+        role="button"
+        tabindex="0"
+        :aria-hidden="false"
         :aria-label="t('navigation.findHistory')"
         :aria-expanded="open"
         @mousedown.prevent
         @click.stop="toggleHistory"
-        ><ChevronUp v-if="open" :size="14" /><ChevronDown v-else :size="14"
-      /></Button>
+        @keydown.enter.stop.prevent="toggleHistory"
+        @keydown.space.stop.prevent="toggleHistory"
+      />
     </template>
     <template #option="{ option }"
       ><span @mousedown.prevent>{{ option.text }}</span></template
@@ -128,5 +130,13 @@ defineExpose({ focus, insertText });
 .workbook-find-query-input {
   width: 100%;
   min-width: 0;
+
+  &__arrow {
+    cursor: pointer;
+
+    &.is-open {
+      transform: rotate(180deg);
+    }
+  }
 }
 </style>
