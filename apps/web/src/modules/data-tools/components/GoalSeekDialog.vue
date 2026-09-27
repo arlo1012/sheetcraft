@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
+import SimulationResultPanel from "./SimulationResultPanel.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { RangeReferenceSelectionOptions } from "../../../shared/range-reference/useRangeReferencePicker";
@@ -64,13 +65,6 @@ const selectCellReference = computed(() =>
     ? (current: string) => props.selectReference!(current, { singleCell: true })
     : undefined,
 );
-const statusLabel = computed(() =>
-  props.result
-    ? tr(
-        `simulation.status${props.result.status[0]!.toUpperCase()}${props.result.status.slice(1)}` as SimulationMessageKey,
-      )
-    : "",
-);
 function confirm() {
   if (canApply.value) emit("apply");
   else emit("solve", { ...draft.value });
@@ -121,23 +115,7 @@ function confirm() {
             :select-reference="selectCellReference" /></TFormItem
       ></TForm>
       <p v-if="error" class="simulation-dialog__error" role="alert">{{ error }}</p>
-      <section v-if="result" class="simulation-dialog__result">
-        <strong>{{ tr("simulation.result") }} · {{ statusLabel }}</strong>
-        <p>{{ tr("simulation.previewOnly") }}</p>
-        <dl>
-          <template v-if="result.objectiveValue !== undefined"
-            ><dt>{{ tr("simulation.objectiveValue") }}</dt>
-            <dd>{{ result.objectiveValue }}</dd></template
-          ><template v-if="result.targetResidual !== undefined"
-            ><dt>{{ tr("simulation.residual") }}</dt>
-            <dd>{{ result.targetResidual }}</dd></template
-          ><template v-for="change in result.changes" :key="change.cell"
-            ><dt>{{ change.cell }}</dt>
-            <dd>{{ change.value }}</dd></template
-          >
-        </dl>
-        <p v-if="!result.changes.length">{{ tr("simulation.noChanges") }}</p>
-      </section>
+      <SimulationResultPanel v-if="result" :result="result" />
     </div>
   </Dialog>
 </template>
@@ -151,24 +129,6 @@ function confirm() {
   &__error {
     color: var(--idea-status-error);
     margin: 0;
-  }
-  &__result {
-    border-top: 1px solid var(--idea-border-subtle);
-    padding-top: 12px;
-    p {
-      color: var(--idea-text-secondary);
-      margin: 6px 0;
-    }
-    dl {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 4px 16px;
-      margin: 8px 0 0;
-    }
-    dd {
-      margin: 0;
-      font-variant-numeric: tabular-nums;
-    }
   }
 }
 </style>
