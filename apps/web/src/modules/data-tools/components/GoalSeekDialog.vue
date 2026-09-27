@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { SquareMousePointer } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
+import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { RangeReferenceSelectionOptions } from "../../../shared/range-reference/useRangeReferencePicker";
 import type { SimulationMessageKey } from "../simulation-messages";
@@ -60,10 +59,11 @@ watch(
   { deep: true },
 );
 watch(draft, (value) => emit("draftChange", { ...value }), { deep: true });
-async function pick(field: "formulaCell" | "changingCell") {
-  const value = await props.selectReference?.(draft.value[field], { singleCell: true });
-  if (value !== undefined) draft.value[field] = value;
-}
+const selectCellReference = computed(() =>
+  props.selectReference
+    ? (current: string) => props.selectReference!(current, { singleCell: true })
+    : undefined,
+);
 const statusLabel = computed(() =>
   props.result
     ? tr(
@@ -95,19 +95,14 @@ function confirm() {
     <div class="simulation-dialog">
       <TForm :data="draft" label-align="right" :label-width="locale === 'zh-CN' ? 108 : 130"
         ><TFormItem :label="tr('simulation.formulaCell')"
-          ><TInput
+          ><RangeReferenceInput
             v-model="draft.formulaCell"
+            class="simulation-dialog__reference"
             :disabled="busy"
-            :aria-label="tr('simulation.formulaCell')"
+            :label="tr('simulation.formulaCell')"
             :placeholder="tr('simulation.formulaCell')"
-            ><template #suffix
-              ><TButton
-                variant="text"
-                shape="square"
-                :disabled="busy"
-                :aria-label="tr('simulation.selectCell')"
-                @click="pick('formulaCell')"
-                ><SquareMousePointer /></TButton></template></TInput></TFormItem
+            :pick-label="tr('simulation.selectCell')"
+            :select-reference="selectCellReference" /></TFormItem
         ><TFormItem :label="tr('simulation.targetValue')"
           ><TInput
             v-model="draft.targetValue"
@@ -116,19 +111,14 @@ function confirm() {
             :placeholder="tr('simulation.targetValue')"
             inputmode="decimal" /></TFormItem
         ><TFormItem :label="tr('simulation.changingCell')"
-          ><TInput
+          ><RangeReferenceInput
             v-model="draft.changingCell"
+            class="simulation-dialog__reference"
             :disabled="busy"
-            :aria-label="tr('simulation.changingCell')"
+            :label="tr('simulation.changingCell')"
             :placeholder="tr('simulation.changingCell')"
-            ><template #suffix
-              ><TButton
-                variant="text"
-                shape="square"
-                :disabled="busy"
-                :aria-label="tr('simulation.selectCell')"
-                @click="pick('changingCell')"
-                ><SquareMousePointer /></TButton></template></TInput></TFormItem
+            :pick-label="tr('simulation.selectCell')"
+            :select-reference="selectCellReference" /></TFormItem
       ></TForm>
       <p v-if="error" class="simulation-dialog__error" role="alert">{{ error }}</p>
       <section v-if="result" class="simulation-dialog__result">
@@ -155,6 +145,9 @@ function confirm() {
 .simulation-dialog {
   display: grid;
   gap: 12px;
+  &__reference {
+    width: 100%;
+  }
   &__error {
     color: var(--idea-status-error);
     margin: 0;
