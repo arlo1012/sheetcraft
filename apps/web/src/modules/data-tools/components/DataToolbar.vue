@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
-  SquareChevronDown,
-  SquareChevronUp,
+  SquarePlus,
+  SquareMinus,
   Rows3,
   Columns3,
   TableProperties,
@@ -217,14 +217,14 @@ const { t } = useAppI18n();
           :text="t('dataTools.outline.expandShort')"
           data-data-action="expand"
           @activate="emit('expand')"
-          ><SquareChevronDown :size="14" /></RibbonButton
+          ><SquarePlus :size="16" /></RibbonButton
         ><RibbonButton
           :disabled="disabled || !capabilities.collapse"
           :label="t('dataTools.outline.collapse')"
           :text="t('dataTools.outline.collapseShort')"
           data-data-action="collapse"
           @activate="emit('collapse')"
-          ><SquareChevronUp :size="14"
+          ><SquareMinus :size="16"
         /></RibbonButton>
       </div>
     </section>
