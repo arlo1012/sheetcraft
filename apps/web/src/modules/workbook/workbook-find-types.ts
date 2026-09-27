@@ -15,8 +15,10 @@ export const DEFAULT_WORKBOOK_FIND_OPTIONS: WorkbookFindOptions = {
 };
 
 export type WorkbookFindResult = {
+  workbookName: string;
   sheetId: string;
   sheetName: string;
+  definedName: string;
   address: CellAddress;
   addressLabel: string;
   value: string;

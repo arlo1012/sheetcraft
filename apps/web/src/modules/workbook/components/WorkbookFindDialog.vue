@@ -5,7 +5,10 @@ import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import { ChevronDown, ChevronUp, ListFilter, Palette, Sparkles } from "lucide-vue-next";
+import { ChevronDown, ChevronUp } from "lucide-vue-next";
+import type { SheetSearchFormat } from "@idea10/core/search";
+import WorkbookFindFormatPreview from "./WorkbookFindFormatPreview.vue";
+import WorkbookFindResults from "./WorkbookFindResults.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { insertTextAtSelection } from "../../../shared/forms/text-selection";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -29,6 +32,7 @@ const props = withDefaults(
     resultCount?: number;
     status?: string;
     formatSummary?: string;
+    format?: SheetSearchFormat;
     pickingFormat?: boolean;
   }>(),
   {
@@ -88,7 +92,6 @@ const {
   pointerFocus: "menu",
 });
 const canFind = computed(() => Boolean(props.query || props.formatSummary));
-const limited = computed(() => props.resultCount > props.results.length);
 const scopeOptions = computed(() => [
   { value: "sheet", label: t("navigation.findScopeSheet") },
   { value: "workbook", label: t("navigation.findScopeWorkbook") },
@@ -144,190 +147,158 @@ function close(): void {
 <template>
   <Dialog
     :visible="visible"
-    :header="t('navigation.findInSheet')"
+    :header="t('navigation.findPlaceholder')"
     mode="modeless"
+    dialog-class-name="workbook-find-dialog-frame"
     draggable
     top="160px"
-    width="min(560px, calc(100vw - 32px))"
+    width="min(600px, calc(100vw - 32px))"
     :show-overlay="false"
     :prevent-scroll-through="false"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
+    :footer="false"
     @opened="input?.focus()"
     @close="close"
     @closed="emit('closed')"
   >
     <div class="workbook-find-dialog">
-      <div class="workbook-find-dialog__query-row">
-        <Textarea
-          :value="query"
-          v-native-control="{
-            onElement: setInput,
-            attributes: { 'aria-label': t('navigation.findInSheet') },
-          }"
-          :placeholder="t('navigation.findPlaceholder')"
-          autocomplete="off"
-          :spell-check="false"
-          :autosize="{ minRows: 1, maxRows: 3 }"
-          data-search-input
-          @update:value="emit('updateQuery', String($event))"
-          @keydown="(_value, { e }) => onKeydown(e)"
-        />
-        <Button
-          ref="specialTrigger"
-          variant="outline"
-          shape="square"
-          :aria-label="t('navigation.findSpecialContent')"
-          :aria-expanded="specialOpen"
-          :aria-controls="specialOpen ? specialId : undefined"
-          @click="toggleSpecial"
-          @keydown="specialKeydown"
-          ><Sparkles :size="16"
-        /></Button>
-        <Button
-          variant="text"
-          :aria-expanded="expanded"
-          aria-controls="find-options"
-          @click="expanded = !expanded"
-          ><template #icon
-            ><ChevronUp v-if="expanded" :size="16" /><ChevronDown v-else :size="16" /></template
-          >{{ t(expanded ? "navigation.findHideOptions" : "navigation.findOptions") }}</Button
-        >
-      </div>
-      <p v-if="formatSummary || pickingFormat" class="workbook-find-dialog__status" role="status">
-        {{ pickingFormat ? t("navigation.findPickFormatHint") : formatSummary }}
-      </p>
-      <section
-        v-if="expanded"
-        id="find-options"
-        class="workbook-find-dialog__options"
-        :aria-label="t('navigation.findOptions')"
-      >
-        <label
-          ><span>{{ t("navigation.findScope") }}</span
-          ><TSelect
-            :value="options.scope"
-            :options="scopeOptions"
-            :aria-label="t('navigation.findScope')"
-            @change="
-              updateOptions({
-                scope: $event === 'workbook' ? 'workbook' : 'sheet',
-              })
-            "
-        /></label>
-        <label
-          ><span>{{ t("navigation.findOrder") }}</span
-          ><TSelect
-            :value="options.order"
-            :options="orderOptions"
-            :aria-label="t('navigation.findOrder')"
-            @change="
-              updateOptions({
-                order: $event === 'columns' ? 'columns' : 'rows',
-              })
-            "
-        /></label>
-        <label
-          ><span>{{ t("navigation.findLookIn") }}</span
-          ><TSelect
-            :value="options.lookIn"
-            :options="lookInOptions"
-            :aria-label="t('navigation.findLookIn')"
-            @change="
-              updateOptions({
-                lookIn: $event === 'formulas' || $event === 'values' ? $event : 'smart',
-              })
-            "
-        /></label>
-        <div class="workbook-find-dialog__checks">
-          <TCheckbox
-            :checked="options.matchCase"
-            @change="updateOptions({ matchCase: Boolean($event) })"
-            >{{ t("navigation.findMatchCase") }}</TCheckbox
-          ><TCheckbox
-            :checked="options.matchEntireCell"
-            @change="updateOptions({ matchEntireCell: Boolean($event) })"
-            >{{ t("navigation.findMatchEntireCell") }}</TCheckbox
-          ><TCheckbox
-            :checked="options.matchWidth"
-            @change="updateOptions({ matchWidth: Boolean($event) })"
-            >{{ t("navigation.findMatchWidth") }}</TCheckbox
-          >
-        </div>
-        <p v-if="options.scope === 'workbook'" class="workbook-find-dialog__visible-sheets">
-          {{ t("navigation.findVisibleSheetsOnly") }}
-        </p>
-        <div class="workbook-find-dialog__format">
-          <span>{{ t("navigation.findFormat") }}</span
-          ><Button
+      <section class="workbook-find-dialog__form">
+        <div class="workbook-find-dialog__query-row">
+          <span class="workbook-find-dialog__query-label">{{
+            t("navigation.findQueryLabel")
+          }}</span>
+          <Textarea
+            class="workbook-find-dialog__query"
+            :value="query"
+            v-native-control="{
+              onElement: setInput,
+              attributes: { 'aria-label': t('navigation.findQueryLabel') },
+            }"
+            autocomplete="off"
+            :spell-check="false"
+            :autosize="{ minRows: 1, maxRows: 3 }"
+            data-search-input
+            @update:value="emit('updateQuery', String($event))"
+            @keydown="(_value, { e }) => onKeydown(e)"
+          />
+          <WorkbookFindFormatPreview
+            :format="format"
+            :title="formatSummary"
+            :empty-label="t('navigation.findFormatUnset')"
+          />
+          <Button
             ref="formatTrigger"
             variant="outline"
             :aria-expanded="formatOpen"
             :aria-controls="formatOpen ? formatId : undefined"
             @click="toggleFormat"
             @keydown="formatKeydown"
-            ><template #icon><Palette :size="16" /></template
-            >{{ formatSummary || t("navigation.findChooseFormat") }}</Button
-          >
+            >{{ t("navigation.findFormat") }}<template #suffix><ChevronDown :size="14" /></template
+          ></Button>
         </div>
-      </section>
-      <section
-        v-if="hasSearchedAll"
-        class="workbook-find-dialog__results"
-        :aria-label="t('navigation.findResults')"
-      >
-        <div>
-          <strong>{{
-            limited
-              ? t("navigation.findResultsLimited", {
-                  shown: results.length,
-                  count: resultCount,
+        <section
+          v-if="expanded"
+          id="find-options"
+          class="workbook-find-dialog__options"
+          :aria-label="t('navigation.findOptions')"
+        >
+          <div class="workbook-find-dialog__option">
+            <span>{{ t("navigation.findScope") }}</span>
+            <TSelect
+              class="workbook-find-dialog__select"
+              :value="options.scope"
+              :options="scopeOptions"
+              :aria-label="t('navigation.findScope')"
+              @change="updateOptions({ scope: $event === 'workbook' ? 'workbook' : 'sheet' })"
+            />
+            <TCheckbox
+              :checked="options.matchCase"
+              @change="updateOptions({ matchCase: Boolean($event) })"
+              >{{ t("navigation.findMatchCase") }}</TCheckbox
+            >
+          </div>
+          <div class="workbook-find-dialog__option">
+            <span>{{ t("navigation.findOrder") }}</span>
+            <TSelect
+              class="workbook-find-dialog__select"
+              :value="options.order"
+              :options="orderOptions"
+              :aria-label="t('navigation.findOrder')"
+              @change="updateOptions({ order: $event === 'columns' ? 'columns' : 'rows' })"
+            />
+            <TCheckbox
+              :checked="options.matchEntireCell"
+              @change="updateOptions({ matchEntireCell: Boolean($event) })"
+              >{{ t("navigation.findMatchEntireCell") }}</TCheckbox
+            >
+          </div>
+          <div class="workbook-find-dialog__option">
+            <span>{{ t("navigation.findLookIn") }}</span>
+            <TSelect
+              class="workbook-find-dialog__select"
+              :value="options.lookIn"
+              :options="lookInOptions"
+              :aria-label="t('navigation.findLookIn')"
+              @change="
+                updateOptions({
+                  lookIn: $event === 'formulas' || $event === 'values' ? $event : 'smart',
                 })
-              : t("navigation.findResultsCount", { count: resultCount })
-          }}</strong
-          ><span v-if="status">{{ status }}</span>
+              "
+            />
+            <TCheckbox
+              :checked="options.matchWidth"
+              @change="updateOptions({ matchWidth: Boolean($event) })"
+              >{{ t("navigation.findMatchWidth") }}</TCheckbox
+            >
+          </div>
+        </section>
+        <div class="workbook-find-dialog__tools">
+          <Button
+            ref="specialTrigger"
+            variant="outline"
+            :aria-label="t('navigation.findSpecialContent')"
+            :aria-expanded="specialOpen"
+            :aria-controls="specialOpen ? specialId : undefined"
+            @click="toggleSpecial"
+            @keydown="specialKeydown"
+            >{{ t("navigation.findSpecialContent")
+            }}<template #suffix><ChevronDown :size="14" /></template
+          ></Button>
+          <Button
+            variant="outline"
+            :aria-expanded="expanded"
+            aria-controls="find-options"
+            @click="expanded = !expanded"
+            >{{ t("navigation.findOptions")
+            }}<template #suffix
+              ><ChevronUp v-if="expanded" :size="14" /><ChevronDown v-else :size="14" /></template
+          ></Button>
         </div>
-        <div v-if="results.length" class="workbook-find-dialog__results-list">
-          <table>
-            <thead>
-              <tr>
-                <th>{{ t("navigation.findResultCell") }}</th>
-                <th>{{ t("navigation.findResultValue") }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="result in results" :key="`${result.sheetId}:${result.addressLabel}`">
-                <td>
-                  <Button variant="text" @click="emit('selectResult', result)"
-                    >{{ result.sheetName }}!{{ result.addressLabel }}</Button
-                  >
-                </td>
-                <td>{{ result.value || result.formula }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p v-else class="workbook-find-dialog__status">
-          {{ status || t("navigation.findNoMatches") }}
-        </p>
       </section>
-      <p v-else-if="status" class="workbook-find-dialog__status" role="status">
-        {{ status }}
-      </p>
-    </div>
-    <template #footer
-      ><div class="workbook-find-dialog__actions">
-        <Button variant="text" @click="close">{{ t("navigation.findClose") }}</Button
-        ><Button variant="outline" :disabled="!canFind" @click="emit('findAll')"
-          ><template #icon><ListFilter :size="16" /></template>{{ t("navigation.findAll") }}</Button
-        ><Button variant="outline" :disabled="!canFind" @click="find('backward')">{{
+      <div class="workbook-find-dialog__actions">
+        <Button variant="outline" :disabled="!canFind" @click="emit('findAll')">{{
+          t("navigation.findAll")
+        }}</Button>
+        <Button variant="outline" :disabled="!canFind" @click="find('backward')">{{
           t("navigation.findPrevious")
-        }}</Button
-        ><Button theme="primary" :disabled="!canFind" @click="find('forward')">{{
+        }}</Button>
+        <Button theme="primary" :disabled="!canFind" @click="find('forward')">{{
           t("navigation.findNext")
         }}</Button>
-      </div></template
-    >
+        <Button variant="outline" @click="close">{{ t("navigation.findClose") }}</Button>
+      </div>
+      <WorkbookFindResults
+        v-if="hasSearchedAll"
+        :results="results"
+        :result-count="resultCount"
+        :status="status"
+        @select-result="emit('selectResult', $event)"
+      />
+      <p v-else-if="status || pickingFormat" class="workbook-find-dialog__status" role="status">
+        {{ pickingFormat ? t("navigation.findPickFormatHint") : status }}
+      </p>
+    </div>
   </Dialog>
   <Teleport to="body"
     ><MenuSurface
@@ -394,90 +365,65 @@ function close(): void {
 <style scoped lang="scss">
 .workbook-find-dialog {
   display: grid;
-  gap: var(--idea-space-3);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--idea-space-4);
   min-width: 0;
-  &__query-row,
-  &__actions,
-  &__format,
-  &__results > div:first-child {
-    display: flex;
+  &__form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--idea-space-4);
+    min-width: 0;
+    padding: var(--idea-space-3);
+    border: 1px solid var(--idea-border-subtle);
+    border-radius: var(--idea-radius-medium);
+  }
+  &__query-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) 108px auto;
     align-items: center;
     gap: var(--idea-space-2);
-  }
-  &__query-row > :first-child {
-    flex: 1;
     min-width: 0;
   }
-  &__status,
-  &__visible-sheets {
-    margin: 0;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
+  &__query-label {
+    white-space: nowrap;
+  }
+  &__query,
+  &__select {
+    min-width: 0;
+    width: 100%;
   }
   &__options {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--idea-space-3);
-    padding-block: var(--idea-space-3);
-    border-block: 1px solid var(--idea-border-subtle);
-    > label {
-      display: grid;
-      gap: var(--idea-space-1);
-      min-width: 0;
-      color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-body-small);
-    }
+    min-width: 0;
   }
-  &__checks,
-  &__format,
-  &__visible-sheets {
-    grid-column: 1/-1;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--idea-space-3);
-  }
-  &__format {
-    justify-content: space-between;
-  }
-  &__results {
+  &__option {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--idea-space-2);
+    min-width: 0;
+    > * {
+      min-width: 0;
+      max-width: 100%;
+    }
   }
-  &__results > div:first-child {
-    justify-content: space-between;
-    color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small);
-  }
-  &__results-list {
-    max-height: 200px;
-    overflow: auto;
-    border: 1px solid var(--idea-border-subtle);
-    table {
-      width: 100%;
-      table-layout: fixed;
-      border-collapse: collapse;
-      font-size: var(--idea-font-size-body-small);
-    }
-    th,
-    td {
-      padding: var(--idea-space-2) var(--idea-space-3);
-      text-align: left;
-      border-bottom: 1px solid var(--idea-border-subtle);
-    }
-    td:last-child {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    th:first-child,
-    td:first-child {
-      width: 38%;
-    }
+  &__tools,
+  &__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--idea-space-2);
+    min-width: 0;
   }
   &__actions {
     justify-content: flex-end;
-    flex-wrap: wrap;
+  }
+  &__status {
+    margin: 0;
+    color: var(--idea-text-secondary);
+    font-size: var(--idea-font-size-body-small);
+    overflow-wrap: anywhere;
   }
   &__menu {
     position: fixed;
@@ -492,9 +438,20 @@ function close(): void {
     border-top: 1px solid var(--idea-border-subtle);
   }
 }
-@media (max-width: 560px) {
-  .workbook-find-dialog__options {
-    grid-template-columns: 1fr;
+@media (max-width: 520px) {
+  .workbook-find-dialog {
+    &__query-row {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    &__query-label {
+      grid-column: 1 / -1;
+    }
+    &__query {
+      grid-column: 1 / -1;
+    }
+    &__options {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 }
 </style>

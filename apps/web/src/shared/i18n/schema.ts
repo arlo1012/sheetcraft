@@ -852,6 +852,9 @@ export type MessageSchema = ToolMessageSchema & {
     cellAddress: string;
     findInSheet: string;
     findPlaceholder: string;
+    findQueryLabel: string;
+    findFormatUnset: string;
+    findFormatPreview: string;
     findPrevious: string;
     findNext: string;
     findClose: string;
@@ -861,7 +864,6 @@ export type MessageSchema = ToolMessageSchema & {
     findScope: string;
     findScopeSheet: string;
     findScopeWorkbook: string;
-    findVisibleSheetsOnly: string;
     findOrder: string;
     findOrderRows: string;
     findOrderColumns: string;
@@ -892,6 +894,10 @@ export type MessageSchema = ToolMessageSchema & {
     findResults: string;
     findResultsCount: string;
     findResultsLimited: string;
+    findResultWorkbook: string;
+    findResultSheet: string;
+    findResultName: string;
+    findResultFormula: string;
     findResultCell: string;
     findResultValue: string;
     findNoMatches: string;

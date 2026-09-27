@@ -317,6 +317,11 @@
   padding-block: var(--idea-dialog-content-padding-block);
 }
 
+// Find owns actions and results in its body; the frame owns the bottom inset.
+.workbook-find-dialog-frame .t-dialog__body {
+  padding-bottom: 0;
+}
+
 .t-dialog__footer {
   padding: 0;
 }

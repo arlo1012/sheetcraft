@@ -654,6 +654,7 @@ const {
   comparisonColumns,
 } = dataTools;
 const {
+  format: findFormat,
   options: findOptions,
   results: findResults,
   resultCount: findResultCount,
@@ -1728,6 +1729,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :result-count="findResultCount"
       :status="findStatus"
       :format-summary="findFormatSummary"
+      :format="findFormat"
       @update-query="updateSearchQuery"
       @update-options="workbookFind.updateOptions"
       @find="runFind"

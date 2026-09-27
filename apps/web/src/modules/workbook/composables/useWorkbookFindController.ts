@@ -1,6 +1,6 @@
 import { computed, ref, shallowRef } from "vue";
-import { formatCellAddress } from "@idea10/core/coordinates";
-import { formatCellContentForInput, formatComputedValueForDisplay } from "@idea10/core/input";
+import { formatFormulaAddress } from "@idea10/core/formula";
+import { formatComputedValueForDisplay } from "@idea10/core/input";
 import {
   findCellsByText,
   type SheetSearchDirection,
@@ -20,6 +20,28 @@ import {
 } from "../workbook-find-types";
 
 type Feedback = { key: MessageKey; params?: MessageParams };
+
+function formatAbsoluteAddress(address: CellAddress): string {
+  const label = formatFormulaAddress(address);
+  const rowStart = label.search(/\d/);
+  return `$${label.slice(0, rowStart)}$${label.slice(rowStart)}`;
+}
+
+function findDefinedNames(workbook: Workbook, sheetId: string, address: CellAddress): string {
+  return [...workbook.definedNames.values()]
+    .filter(
+      (definition) =>
+        definition.reference.sheetId === sheetId &&
+        (definition.scopeSheetId === undefined || definition.scopeSheetId === sheetId) &&
+        address.row >= definition.reference.start.row &&
+        address.row <= definition.reference.end.row &&
+        address.column >= definition.reference.start.column &&
+        address.column <= definition.reference.end.column,
+    )
+    .map((definition) => definition.name)
+    .join(", ");
+}
+
 export function useWorkbookFindController(deps: {
   getWorkbook: () => Workbook;
   getRevision: () => unknown;
@@ -59,16 +81,19 @@ export function useWorkbookFindController(deps: {
       return findCellsByText(sheet, query.value, evaluator, {
         ...options.value,
         format: format.value,
-      }).map((address) => ({
-        sheetId: sheet.id,
-        sheetName: sheet.name,
-        address,
-        addressLabel: formatCellAddress(address),
-        value: formatComputedValueForDisplay(evaluator.getComputedValue(address)),
-        formula: formatCellContentForInput(
-          sheet.cells.get(`${address.row}:${address.column}`)?.content ?? null,
-        ),
-      }));
+      }).map((address) => {
+        const content = sheet.cells.get(`${address.row}:${address.column}`)?.content;
+        return {
+          workbookName: t("navigation.findScopeWorkbook"),
+          sheetId: sheet.id,
+          sheetName: sheet.name,
+          definedName: findDefinedNames(workbook, sheet.id, address),
+          address,
+          addressLabel: formatAbsoluteAddress(address),
+          value: formatComputedValueForDisplay(evaluator.getComputedValue(address)),
+          formula: content?.kind === "formula" ? content.formula.source : "",
+        };
+      });
     });
   });
   const results = computed(() => (hasSearchedAll.value ? matches.value.slice(0, 200) : []));
