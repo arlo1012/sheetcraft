@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { ChevronDown, Eye, Search } from "lucide-vue-next";
+import { ChevronDown, Eye, Pencil, Search } from "lucide-vue-next";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
 import { useAppI18n } from "../../../shared/i18n";
@@ -46,6 +46,7 @@ const emit = defineEmits<{
   ];
   openSearch: [];
   openFormulaEditor: [];
+  openInsertFunction: [];
   updatePreviewing: [previewing: boolean];
   cancelEdit: [sheetId: string | undefined];
 }>();
@@ -54,6 +55,12 @@ const { t } = useAppI18n();
 const formulaInput = ref<HTMLTextAreaElement>();
 const searchTrigger = ref<InstanceType<typeof Search>>();
 const expanded = ref(false);
+
+function openInsertFunction(): void {
+  if (!props.readOnly && !props.formulaEditorDisabled && !isComposing.value) {
+    emit("openInsertFunction");
+  }
+}
 
 function openFormulaEditor(): void {
   if (!props.readOnly && !props.formulaEditorDisabled && !isComposing.value) {
@@ -400,14 +407,14 @@ defineExpose({
           class="workbook-formula-bar__action workbook-formula-bar__fx"
           role="button"
           :tabindex="readOnly || formulaEditorDisabled || isComposing ? -1 : 0"
-          :aria-label="t('formulaBar.openEditor')"
-          :title="t('formulaBar.openEditor')"
+          :aria-label="t('formulaTools.insertFunction')"
+          :title="t('formulaTools.insertFunction')"
           :aria-disabled="readOnly || formulaEditorDisabled || isComposing"
           aria-haspopup="dialog"
-          data-formula-editor-trigger
-          @click="openFormulaEditor"
-          @keydown.enter.prevent="openFormulaEditor"
-          @keydown.space.prevent="openFormulaEditor"
+          data-formula-insert-trigger
+          @click="openInsertFunction"
+          @keydown.enter.prevent="openInsertFunction"
+          @keydown.space.prevent="openInsertFunction"
           >fx</span
         >
       </div>
@@ -475,6 +482,21 @@ defineExpose({
           @text-edit="applyFormulaTextEdit"
         />
       </div>
+      <Pencil
+        class="workbook-formula-bar__action workbook-formula-bar__editor-trigger"
+        :size="15"
+        role="button"
+        :tabindex="readOnly || formulaEditorDisabled || isComposing ? -1 : 0"
+        :aria-label="t('formulaBar.openEditor')"
+        :title="t('formulaBar.openEditor')"
+        :aria-disabled="readOnly || formulaEditorDisabled || isComposing"
+        :data-cell-edit-session="editSession.id"
+        aria-haspopup="dialog"
+        data-formula-editor-trigger
+        @click="openFormulaEditor"
+        @keydown.enter.prevent="openFormulaEditor"
+        @keydown.space.prevent="openFormulaEditor"
+      />
       <ChevronDown
         class="workbook-formula-bar__action workbook-formula-bar__expand-trigger"
         :class="{ 'is-expanded': expanded }"
@@ -569,6 +591,13 @@ defineExpose({
     font-family: Georgia, serif;
     font-size: 14px;
     font-style: italic;
+  }
+
+  &__editor-trigger {
+    position: absolute;
+    z-index: 2;
+    inset-block-start: 6.5px;
+    inset-inline-end: 31px;
   }
 
   &__expand-trigger {

@@ -30,8 +30,12 @@ function mountFormulaBar(
 }
 
 describe("WorkbookFormulaBar actions", () => {
-  test("opens the independent formula editor from the fx button", async () => {
+  test("opens function insertion from fx and the editor from its separate icon", async () => {
     const { wrapper } = mountFormulaBar();
+
+    await wrapper.get("[data-formula-insert-trigger]").trigger("click");
+    expect(wrapper.emitted("openInsertFunction")).toEqual([[]]);
+    expect(wrapper.emitted("openFormulaEditor")).toBeUndefined();
 
     await wrapper.get("[data-formula-editor-trigger]").trigger("click");
 
@@ -89,9 +93,9 @@ describe("WorkbookFormulaBar actions", () => {
 
   test("does not open the formula editor for a protected formula bar", async () => {
     const { wrapper } = mountFormulaBar({ readOnly: true });
-    const trigger = wrapper.get<HTMLButtonElement>("[data-formula-editor-trigger]");
+    const trigger = wrapper.get<SVGElement>("[data-formula-editor-trigger]");
 
-    expect(trigger.attributes("disabled")).toBeDefined();
+    expect(trigger.attributes("aria-disabled")).toBe("true");
     await trigger.trigger("click");
     expect(wrapper.emitted("openFormulaEditor")).toBeUndefined();
   });

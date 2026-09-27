@@ -13,6 +13,7 @@ import { normalizeSheetZoom, SHEET_ZOOM_STEP } from "../shared/sheet-view/zoom";
 import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import { useFormulaToolsController } from "../modules/formula-tools/useFormulaToolsController";
 import { useFormulaEditorController } from "../modules/formula-tools/useFormulaEditorController";
+import FormulaFunctionBrowser from "../modules/formula-tools/components/FormulaFunctionBrowser.vue";
 import FormulaEditorDialog from "../modules/formula-tools/components/FormulaEditorDialog.vue";
 import { useDataToolsController } from "../modules/data-tools/useDataToolsController";
 import { useDuplicateErrorChecks } from "../modules/data-tools/useDuplicateErrorChecks";
@@ -905,6 +906,18 @@ const {
   calculationSettings,
 } = formulaTools;
 const formulaReadOnly = computed(() => editTargetSheet.value.properties.protected);
+const formulaInsertVisible = ref(false);
+
+function closeFormulaInsert(): void {
+  formulaInsertVisible.value = false;
+  void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
+}
+
+function insertFunctionFromBar(name: string): void {
+  formulaTools.insertFunction(name);
+  closeFormulaInsert();
+}
+
 const formulaEditor = useFormulaEditorController({
   getWorkbook: () => session.workbook,
   getRevision: () => workbookRevision.value,
@@ -924,6 +937,7 @@ const {
 } = formulaEditor;
 watch(workbookGeneration, () => {
   formulaEditor.reset();
+  formulaInsertVisible.value = false;
   namesVisible.value = false;
   recentFunctions.value = [];
 });
@@ -968,7 +982,7 @@ function onWorkspaceWheel(event: WheelEvent): void {
 }
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
-  if (formulaEditorVisible.value) return;
+  if (formulaEditorVisible.value || formulaInsertVisible.value) return;
   const picker = activeRangePicker.value;
   if (picker) {
     if (event.key === "Escape") picker.cancel();
@@ -1057,6 +1071,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         pickingReferenceRange ||
         dataToolsModalOpen ||
         formulaEditorVisible ||
+        formulaInsertVisible ||
         !!modalValidationFeedback
       "
       @insert-image="imageActions.requestInsert"
@@ -1576,6 +1591,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         pickingReferenceRange ||
         dataToolsModalOpen ||
         formulaEditorVisible ||
+        formulaInsertVisible ||
         !!modalValidationFeedback
       "
       :address="activeAddress"
@@ -1597,6 +1613,14 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @open-search="findDialogVisible = true"
       @update-previewing="formulaPreviewing = $event"
       @open-formula-editor="formulaEditor.open"
+      @open-insert-function="formulaInsertVisible = true"
+    />
+    <FormulaFunctionBrowser
+      :visible="formulaInsertVisible"
+      :recent-functions="recentFunctions"
+      :edit-session-id="cellEditSession.id"
+      @insert-function="insertFunctionFromBar"
+      @close="closeFormulaInsert"
     />
     <FormulaEditorDialog
       :visible="formulaEditorVisible"
@@ -1629,6 +1653,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!cellFormatSelection ||
         dataToolsModalOpen ||
         formulaEditorVisible ||
+        formulaInsertVisible ||
         !!modalValidationFeedback
       "
     >
