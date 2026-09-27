@@ -61,7 +61,22 @@ function onTableKeydown(event: KeyboardEvent): void {
 
 <template>
   <section class="workbook-find-results" :aria-label="t('navigation.findResults')">
-    <h3 class="workbook-find-results__heading">{{ t("navigation.findResults") }}</h3>
+    <div class="workbook-find-results__header">
+      <h3 class="workbook-find-results__heading">{{ t("navigation.findResults") }}</h3>
+      <p class="workbook-find-results__count">
+        {{
+          t(
+            resultCount > results.length
+              ? "navigation.findResultsLimited"
+              : "navigation.findResultsCount",
+            {
+              count: resultCount,
+              shown: results.length,
+            },
+          )
+        }}
+      </p>
+    </div>
     <div class="workbook-find-results__table narrow-scrollbar">
       <TTable
         class="idea-table--mini workbook-find-results__data"
@@ -83,19 +98,6 @@ function onTableKeydown(event: KeyboardEvent): void {
         @keydown="onTableKeydown"
       />
     </div>
-    <p class="workbook-find-results__count">
-      {{
-        t(
-          resultCount > results.length
-            ? "navigation.findResultsLimited"
-            : "navigation.findResultsCount",
-          {
-            count: resultCount,
-            shown: results.length,
-          },
-        )
-      }}
-    </p>
   </section>
 </template>
 
@@ -104,6 +106,13 @@ function onTableKeydown(event: KeyboardEvent): void {
   display: grid;
   gap: var(--idea-space-3);
   min-width: 0;
+
+  &__header {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--idea-space-2);
+  }
 
   &__count {
     margin: 0;
