@@ -3,6 +3,8 @@ import { computed } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { BaseTable as TTable } from "tdesign-vue-next/es/table";
+import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type {
@@ -37,7 +39,21 @@ const emit = defineEmits<{
   ignoreIssue: [id: string];
   ignoreType: [type: DataProofreadingIssueKind];
 }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
+const rows = computed(() => [...props.issues]);
+const columns = computed<BaseTableCol<DataProofreadingIssue>[]>(() => [
+  { colKey: "selection", title: "", width: 36, align: "center" },
+  { colKey: "type", title: t("proofreading.type"), width: 160 },
+  { colKey: "address", title: t("proofreading.address"), width: 84 },
+  { colKey: "currentValue", title: t("proofreading.currentValue"), ellipsis: true },
+  { colKey: "proposedValue", title: t("proofreading.proposedValue"), ellipsis: true },
+  {
+    colKey: "actions",
+    title: t("proofreading.action"),
+    width: locale.value === "zh-CN" ? 240 : 336,
+    fixed: "right",
+  },
+]);
 
 const selected = computed(() => new Set(props.selectedIds));
 const safeSelectedCount = computed(
@@ -93,51 +109,56 @@ function toggleIssue(id: string, checked: boolean): void {
         {{ hasScanned ? t("proofreading.noIssues") : t("proofreading.scanHint") }}
       </p>
 
-      <div v-if="hasScanned && issues.length" class="data-proofreading-dialog__list" role="table">
-        <div class="data-proofreading-dialog__row data-proofreading-dialog__row--head" role="row">
-          <span aria-hidden="true"></span>
-          <span role="columnheader">{{ t("proofreading.type") }}</span>
-          <span role="columnheader">{{ t("proofreading.address") }}</span>
-          <span role="columnheader">{{ t("proofreading.currentValue") }}</span>
-          <span role="columnheader">{{ t("proofreading.proposedValue") }}</span>
-          <span role="columnheader">{{ t("proofreading.action") }}</span>
-        </div>
-        <div
-          v-for="issue in issues"
-          :key="issue.id"
-          class="data-proofreading-dialog__row"
-          role="row"
-        >
+      <TTable
+        v-if="hasScanned && issues.length"
+        class="idea-table--mini"
+        row-key="id"
+        :data="rows"
+        :columns="columns"
+        :active-row-keys="[...selectedIds]"
+        :bordered="false"
+        :aria-label="t('proofreading.title')"
+        size="small"
+        table-layout="fixed"
+        max-height="min(48vh, 440px)"
+        hover
+      >
+        <template #selection="{ row }">
           <TCheckbox
-            :checked="selected.has(issue.id)"
-            :disabled="busy || !issue.safe"
-            :aria-label="`${t('proofreading.applySelected')} ${issue.address}`"
-            @change="toggleIssue(issue.id, Boolean($event))"
+            :checked="selected.has(row.id)"
+            :disabled="busy || !row.safe"
+            :aria-label="`${t('proofreading.applySelected')} ${row.address}`"
+            @change="toggleIssue(row.id, Boolean($event))"
           />
-          <span role="cell" :title="t(`proofreading.reasons.${issue.reason}`)">
-            {{ t(`proofreading.types.${issue.type}`) }}
-            <small class="data-proofreading-dialog__reason">{{
-              t(`proofreading.reasons.${issue.reason}`)
-            }}</small>
-          </span>
+        </template>
+        <template #type="{ row }">
+          <div :title="t(`proofreading.reasons.${row.reason}`)">
+            {{ t(`proofreading.types.${row.type}`) }}
+            <span class="data-proofreading-dialog__reason">{{
+              t(`proofreading.reasons.${row.reason}`)
+            }}</span>
+          </div>
+        </template>
+        <template #address="{ row }">
           <TButton
             variant="text"
             size="small"
             :disabled="busy"
-            @click="emit('selectIssue', issue.id)"
+            @click="emit('selectIssue', row.id)"
           >
-            {{ issue.address }}
+            {{ row.address }}
           </TButton>
-          <span role="cell" class="data-proofreading-dialog__value">{{ issue.currentValue }}</span>
-          <span role="cell" class="data-proofreading-dialog__value">
-            {{ issue.proposedValue ?? t("proofreading.unsafe") }}
-          </span>
-          <span class="data-proofreading-dialog__actions" role="cell">
+        </template>
+        <template #proposedValue="{ row }">
+          {{ row.proposedValue ?? t("proofreading.unsafe") }}
+        </template>
+        <template #actions="{ row }">
+          <div class="data-proofreading-dialog__actions">
             <TButton
               size="small"
               variant="text"
-              :disabled="busy || !issue.safe"
-              @click="emit('applyIssue', issue.id)"
+              :disabled="busy || !row.safe"
+              @click="emit('applyIssue', row.id)"
             >
               {{ t("proofreading.apply") }}
             </TButton>
@@ -145,15 +166,15 @@ function toggleIssue(id: string, checked: boolean): void {
               size="small"
               variant="text"
               :disabled="busy"
-              @click="emit('ignoreIssue', issue.id)"
+              @click="emit('ignoreIssue', row.id)"
             >
               {{ t("proofreading.ignore") }}
             </TButton>
             <TButton
               size="small"
               variant="text"
-              :disabled="busy || !issue.safe"
-              @click="emit('applyType', issue.type)"
+              :disabled="busy || !row.safe"
+              @click="emit('applyType', row.type)"
             >
               {{ t("proofreading.applyType") }}
             </TButton>
@@ -161,13 +182,13 @@ function toggleIssue(id: string, checked: boolean): void {
               size="small"
               variant="text"
               :disabled="busy"
-              @click="emit('ignoreType', issue.type)"
+              @click="emit('ignoreType', row.type)"
             >
               {{ t("proofreading.ignoreType") }}
             </TButton>
-          </span>
-        </div>
-      </div>
+          </div>
+        </template>
+      </TTable>
     </div>
     <template #footer>
       <div class="data-proofreading-dialog__footer">
@@ -215,33 +236,9 @@ function toggleIssue(id: string, checked: boolean): void {
     margin: 0;
     color: var(--idea-text-secondary);
   }
-  &__list {
-    max-height: min(48vh, 440px);
-    overflow: auto;
-    border: 1px solid var(--idea-border-control);
-  }
-  &__row {
-    display: grid;
-    grid-template-columns: 34px 100px 90px minmax(120px, 1fr) minmax(120px, 1fr) 134px;
-    align-items: center;
-    min-width: 720px;
-    min-height: 42px;
-    border-bottom: 1px solid var(--idea-border-control);
-    padding: 0 8px;
-    gap: 8px;
-  }
-  &__row:last-child {
-    border-bottom: 0;
-  }
-  &__row--head {
-    min-height: 36px;
-    font-weight: 600;
-    background: var(--idea-surface-secondary);
-  }
-  &__value {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  &__actions {
+    flex-wrap: wrap;
+    gap: 4px;
   }
   &__reason {
     display: block;
