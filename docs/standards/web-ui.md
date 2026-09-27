@@ -65,9 +65,11 @@ CSS pixels at 100% scale; size and line height are a pair.
 
 ## Ribbon and menus
 
-- Action icon sizes belong to the shared controls: compact ribbon actions use
-  `--idea-control-icon-size` (14px), tall actions use `--idea-ribbon-large-icon-size`
-  (18px), and menu icons use `--idea-menu-icon-size` (15px). Lucide action icons use
+- Action icons use two sizes, owned by the shared controls: compact ribbon actions
+  and menu icons use `--idea-action-icon-size` (15px); tall actions use
+  `--idea-ribbon-large-icon-size` (18px). `--idea-menu-icon-size` aliases the compact
+  size. Form-control indicators keep their separate `--idea-control-icon-size` token.
+  Lucide action icons use
   `--idea-icon-stroke-width` (2). Do not set size/stroke props in feature action slots.
   Composite icon containers inherit the slot size; border previews retain their
   semantic line weights. Dropdown indicators and dialog launchers keep their

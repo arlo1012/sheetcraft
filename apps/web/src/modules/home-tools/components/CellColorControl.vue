@@ -73,8 +73,8 @@ function applyColor(color: string | null): void {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: var(--idea-icon-size, 14px);
-    height: var(--idea-icon-size, 14px);
+    width: var(--idea-icon-size, var(--idea-action-icon-size));
+    height: var(--idea-icon-size, var(--idea-action-icon-size));
 
     &--text {
       position: relative;

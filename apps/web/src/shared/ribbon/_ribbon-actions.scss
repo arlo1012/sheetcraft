@@ -41,7 +41,7 @@
 }
 
 @mixin icon-slot {
-  --idea-icon-size: var(--ribbon-icon-size, var(--idea-control-icon-size));
+  --idea-icon-size: var(--ribbon-icon-size, var(--idea-action-icon-size));
 
   :deep(svg) {
     width: var(--idea-icon-size);

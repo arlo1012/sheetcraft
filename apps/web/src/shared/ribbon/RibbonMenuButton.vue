@@ -67,7 +67,7 @@ function activate(): void {
 @use "./ribbon-actions" as ribbon;
 
 .ribbon-menu-button {
-  --ribbon-icon-size: var(--idea-control-icon-size);
+  --ribbon-icon-size: var(--idea-action-icon-size);
   @include ribbon.action-button(var(--ribbon-menu-button-width, 40px));
 
   padding: 0 2px;

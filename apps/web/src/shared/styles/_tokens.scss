@@ -4,8 +4,9 @@
     --idea-dialog-content-padding-block: var(--idea-space-5);
     --idea-menu-padding: var(--idea-space-4) 0;
     --idea-control-icon-size: 14px;
+    --idea-action-icon-size: 15px;
     --idea-ribbon-large-icon-size: 18px;
-    --idea-menu-icon-size: 15px;
+    --idea-menu-icon-size: var(--idea-action-icon-size);
     --idea-icon-stroke-width: 2;
     font-family: var(--idea-font-sans);
     font-size: var(--idea-font-size-body-medium);
