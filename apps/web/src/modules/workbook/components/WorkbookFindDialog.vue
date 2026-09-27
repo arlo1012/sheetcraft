@@ -17,7 +17,7 @@ const emit = defineEmits<{
   closed: [];
 }>();
 const { t } = useAppI18n();
-const input = ref<InstanceType<typeof Input>>();
+const input = ref<{ focus(): void }>();
 
 function onKeydown(event: KeyboardEvent): void {
   if (event.key !== "Enter" || event.isComposing) return;

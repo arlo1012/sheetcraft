@@ -856,6 +856,12 @@ export type MessageSchema = ToolMessageSchema & {
     findNext: string;
   };
   formulaBar: {
+    previewResult: string;
+    showFormula: string;
+    previewValue: string;
+    expand: string;
+    collapse: string;
+    openEditor: string;
     label: string;
     goToCell: string;
     cellAddress: string;

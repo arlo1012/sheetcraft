@@ -12,6 +12,8 @@ import { useEyeComfortMode } from "../modules/workbook/composables/useEyeComfort
 import { normalizeSheetZoom, SHEET_ZOOM_STEP } from "../shared/sheet-view/zoom";
 import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import { useFormulaToolsController } from "../modules/formula-tools/useFormulaToolsController";
+import { useFormulaEditorController } from "../modules/formula-tools/useFormulaEditorController";
+import FormulaEditorDialog from "../modules/formula-tools/components/FormulaEditorDialog.vue";
 import { useDataToolsController } from "../modules/data-tools/useDataToolsController";
 import { useDuplicateErrorChecks } from "../modules/data-tools/useDuplicateErrorChecks";
 import type { ErrorCheckSettings } from "../modules/data-tools/duplicate-error-preferences";
@@ -903,7 +905,25 @@ const {
   calculationSettings,
 } = formulaTools;
 const formulaReadOnly = computed(() => editTargetSheet.value.properties.protected);
+const formulaEditor = useFormulaEditorController({
+  getWorkbook: () => session.workbook,
+  getRevision: () => workbookRevision.value,
+  getAddress: () => activeAddress.value,
+  editSession: cellEditSession,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
+  focusFormulaBar: () => formulaBarRef.value?.focus({ preserveSelection: true }),
+});
+const {
+  visible: formulaEditorVisible,
+  previewing: formulaPreviewing,
+  previewValue: formulaPreviewValue,
+  value: formulaEditorValue,
+  targetLabel: formulaEditorTarget,
+  error: formulaEditorError,
+  disabled: formulaEditorDisabled,
+} = formulaEditor;
 watch(workbookGeneration, () => {
+  formulaEditor.reset();
   namesVisible.value = false;
   recentFunctions.value = [];
 });
@@ -948,6 +968,7 @@ function onWorkspaceWheel(event: WheelEvent): void {
 }
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
+  if (formulaEditorVisible.value) return;
   const picker = activeRangePicker.value;
   if (picker) {
     if (event.key === "Escape") picker.cancel();
@@ -1035,6 +1056,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         namesVisible ||
         pickingReferenceRange ||
         dataToolsModalOpen ||
+        formulaEditorVisible ||
         !!modalValidationFeedback
       "
       @insert-image="imageActions.requestInsert"
@@ -1553,6 +1575,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!cellFormatSelection ||
         pickingReferenceRange ||
         dataToolsModalOpen ||
+        formulaEditorVisible ||
         !!modalValidationFeedback
       "
       :address="activeAddress"
@@ -1564,11 +1587,29 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :edit-session="cellEditSession"
       :handle-reference-keydown="handleFormulaReferenceKeydown"
       :search-open="findDialogVisible"
+      :previewing="formulaPreviewing"
+      :preview-value="formulaPreviewValue"
+      :formula-editor-disabled="formulaEditorDisabled"
       @navigate="navigateToAddress"
       @commit-cell="commitCell"
       @traverse="onTraverseFromFormulaBar"
       @cancel-edit="onCancelFormulaEdit"
       @open-search="findDialogVisible = true"
+      @update-previewing="formulaPreviewing = $event"
+      @open-formula-editor="formulaEditor.open"
+    />
+    <FormulaEditorDialog
+      :visible="formulaEditorVisible"
+      :value="formulaEditorValue"
+      :target-label="formulaEditorTarget"
+      :preview-value="formulaPreviewValue"
+      :edit-session-id="cellEditSession.id"
+      :recent-functions="recentFunctions"
+      :error="formulaEditorError"
+      @change="formulaEditor.change"
+      @composing="formulaEditor.composing"
+      @confirm="formulaEditor.confirm"
+      @close="formulaEditor.close"
     />
     <WorkbookFindDialog
       :visible="findDialogVisible"
@@ -1587,6 +1628,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         xlsxBusy ||
         !!cellFormatSelection ||
         dataToolsModalOpen ||
+        formulaEditorVisible ||
         !!modalValidationFeedback
       "
     >

@@ -224,7 +224,7 @@
     height: var(--td-comp-size-m);
     min-height: var(--td-comp-size-m);
     padding-block: calc((var(--td-comp-size-m) - var(--td-line-height-body-medium) - 2px) / 2);
-    padding-inline: 36px var(--idea-space-4);
+    padding-inline: 64px 36px;
     resize: none;
     white-space: pre;
     overflow: auto;
@@ -233,6 +233,22 @@
     &::-webkit-scrollbar {
       display: none;
     }
+  }
+
+  &.has-formula-colors .t-textarea__inner {
+    -webkit-text-fill-color: transparent;
+    caret-color: var(--idea-text-primary);
+  }
+
+  &.is-expanded .t-textarea__inner {
+    height: calc(var(--td-comp-size-m) + 4 * var(--td-line-height-body-medium));
+  }
+}
+
+.idea-formula-editor-textarea.t-textarea {
+  .t-textarea__inner {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    line-height: var(--idea-line-height-body-medium);
   }
 
   &.has-formula-colors .t-textarea__inner {

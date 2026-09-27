@@ -894,6 +894,12 @@ export const enUS = {
     findNext: "Find next",
   },
   formulaBar: {
+    previewResult: "Preview calculated value",
+    showFormula: "Show original formula",
+    previewValue: "Calculated value for {address}",
+    expand: "Expand formula bar",
+    collapse: "Collapse formula bar",
+    openEditor: "Open formula editor",
     label: "Address and formula bar",
     goToCell: "Go to cell",
     cellAddress: "Cell address",

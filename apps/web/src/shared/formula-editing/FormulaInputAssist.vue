@@ -27,6 +27,7 @@ const props = defineProps<{
   active: boolean;
   composing: boolean;
   referenceSheetName?: string;
+  zIndex?: number;
 }>();
 
 const emit = defineEmits<{
@@ -329,7 +330,7 @@ defineExpose<
       ref="listboxRef"
       class="formula-input-assist"
       :class="{ 'is-help-only': !isOpen }"
-      :style="floatingStyles"
+      :style="[floatingStyles, { zIndex: zIndex ?? 30 }]"
       :role="isOpen ? 'listbox' : undefined"
       :aria-label="isOpen ? t('formulaAssist.listLabel') : undefined"
       @pointerdown.prevent
@@ -364,7 +365,6 @@ defineExpose<
 
 .formula-input-assist {
   @include option-list.surface;
-  z-index: 30;
   min-width: 210px;
   max-width: min(480px, calc(100vw - 24px));
   max-height: min(360px, calc(100vh - 40px));

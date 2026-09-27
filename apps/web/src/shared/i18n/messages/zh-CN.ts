@@ -869,6 +869,12 @@ export const zhCN = {
     findNext: "查找下一个",
   },
   formulaBar: {
+    previewResult: "预览计算结果",
+    showFormula: "显示原始公式",
+    previewValue: "单元格 {address} 的计算结果",
+    expand: "展开公式栏",
+    collapse: "收起公式栏",
+    openEditor: "打开公式编辑器",
     label: "地址和公式栏",
     goToCell: "转到单元格",
     cellAddress: "单元格地址",

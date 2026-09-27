@@ -23,6 +23,17 @@ export type FormulaToolsMessageSchema = {
     maximumChange: string;
     recalculate: string;
     functionBrowser: string;
+    formulaEditor: string;
+    formulaEditorTarget: string;
+    formulaEditorInput: string;
+    formulaEditorPreview: string;
+    formulaEditorCurrentFunction: string;
+    formulaEditorNoFunction: string;
+    formulaEditorEditFunction: string;
+    formulaEditorConfirmHint: string;
+    formulaEditorInsertUnavailable: string;
+    editorConfirm: string;
+    editorApplyFailed: string;
     searchFunctions: string;
     selectFunction: string;
     recent: string;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { Search } from "lucide-vue-next";
+import { ChevronDown, ChevronUp, Eye, EyeOff, Search } from "lucide-vue-next";
 import { Button } from "tdesign-vue-next/es/button";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
@@ -24,6 +24,9 @@ const props = defineProps<{
   addressLabel: string;
   inputValue: string;
   searchOpen?: boolean;
+  previewing?: boolean;
+  previewValue?: string;
+  formulaEditorDisabled?: boolean;
   sheetId?: string;
   sheetName?: string;
   editTargetSheetName?: string;
@@ -43,12 +46,15 @@ const emit = defineEmits<{
     },
   ];
   openSearch: [];
+  openFormulaEditor: [];
+  updatePreviewing: [previewing: boolean];
   cancelEdit: [sheetId: string | undefined];
 }>();
 
 const { t } = useAppI18n();
 const formulaInput = ref<HTMLTextAreaElement>();
 const searchTrigger = ref<InstanceType<typeof Button>>();
+const expanded = ref(false);
 
 function setFormulaInput(element: HTMLInputElement | HTMLTextAreaElement | null): void {
   formulaInput.value = element instanceof HTMLTextAreaElement ? element : undefined;
@@ -86,7 +92,11 @@ const formulaTargetLabel = computed(() =>
 );
 const isComposing = computed(() => showsSessionDraft.value && editSession.state.composing);
 const showFormulaColors = computed(
-  () => showsSessionDraft.value && !isComposing.value && formulaDraft.value.startsWith("="),
+  () =>
+    !props.previewing &&
+    showsSessionDraft.value &&
+    !isComposing.value &&
+    formulaDraft.value.startsWith("="),
 );
 const coloredReferences = computed(() =>
   showFormulaColors.value ? getFormulaReferenceTokens(formulaDraft.value) : [],
@@ -118,7 +128,7 @@ function context() {
 }
 
 function onFormulaFocus(): void {
-  if (props.readOnly) return;
+  if (props.readOnly || props.previewing) return;
   formulaFocused.value = true;
   finishAfterComposition = false;
   if (!formulaOwnsSession.value && !editingThisCell.value && !editingFormulaSession.value) {
@@ -129,8 +139,9 @@ function onFormulaFocus(): void {
 }
 
 function onFormulaInput(event: Event): void {
-  if (props.readOnly) {
-    if (formulaInput.value) formulaInput.value.value = props.inputValue;
+  if (props.readOnly || props.previewing) {
+    if (formulaInput.value)
+      formulaInput.value.value = props.previewing ? (props.previewValue ?? "") : props.inputValue;
     return;
   }
   const value = readInputValue(event);
@@ -161,7 +172,7 @@ function hasPendingEdit(): boolean {
 
 function captureSelection(): void {
   const input = formulaInput.value;
-  if (!input || !formulaOwnsSession.value) return;
+  if (!input || !formulaOwnsSession.value || props.previewing) return;
   editSession.setSelection(
     input.selectionStart,
     input.selectionEnd,
@@ -198,7 +209,7 @@ function applyFormulaTextEdit(edit: { value: string; caret: number }): void {
 }
 
 function onFormulaKeydown(event: KeyboardEvent): void {
-  if (props.readOnly) return;
+  if (props.readOnly || props.previewing) return;
   if (formulaAssistRef.value?.handleKeydown(event)) {
     event.preventDefault();
     event.stopPropagation();
@@ -267,7 +278,7 @@ function onFormulaBlur(event: FocusEvent): void {
 }
 
 function onFormulaCompositionStart(): void {
-  if (props.readOnly) return;
+  if (props.readOnly || props.previewing) return;
   if (
     !formulaOwnsSession.value &&
     !editSession.begin(context(), {
@@ -298,6 +309,15 @@ function onFormulaCompositionEnd(event: CompositionEvent): void {
 }
 
 function focus(options: { preserveSelection?: boolean } = {}): void {
+  if (props.previewing) {
+    emit("updatePreviewing", false);
+    void nextTick(() => focusInput(options));
+    return;
+  }
+  focusInput(options);
+}
+
+function focusInput(options: { preserveSelection?: boolean }): void {
   const input = formulaInput.value;
   if (!input) return;
   input.focus({ preventScroll: true });
@@ -355,7 +375,34 @@ defineExpose({
     />
 
     <div class="workbook-formula-bar__editor">
-      <span class="workbook-formula-bar__fx" aria-hidden="true">fx</span>
+      <div class="workbook-formula-bar__leading-actions" :data-cell-edit-session="editSession.id">
+        <Button
+          variant="text"
+          shape="square"
+          :aria-label="t(previewing ? 'formulaBar.showFormula' : 'formulaBar.previewResult')"
+          :title="t(previewing ? 'formulaBar.showFormula' : 'formulaBar.previewResult')"
+          :aria-pressed="previewing ?? false"
+          :disabled="isComposing"
+          data-formula-preview-trigger
+          @mousedown.prevent
+          @click="emit('updatePreviewing', !previewing)"
+        >
+          <EyeOff v-if="previewing" :size="15" aria-hidden="true" />
+          <Eye v-else :size="15" aria-hidden="true" />
+        </Button>
+        <Button
+          variant="text"
+          shape="square"
+          :aria-label="t('formulaBar.openEditor')"
+          :title="t('formulaBar.openEditor')"
+          :disabled="readOnly || formulaEditorDisabled || isComposing"
+          aria-haspopup="dialog"
+          data-formula-editor-trigger
+          @click="emit('openFormulaEditor')"
+        >
+          <span class="workbook-formula-bar__fx" aria-hidden="true">fx</span>
+        </Button>
+      </div>
       <div class="workbook-formula-bar__formula">
         <span class="ui-visually-hidden">
           {{
@@ -369,24 +416,24 @@ defineExpose({
             onElement: setFormulaInput,
             attributes: {
               ...formulaAssistRef?.inputAria,
-              'aria-label': t('formulaBar.editor', {
+              'aria-label': t(previewing ? 'formulaBar.previewValue' : 'formulaBar.editor', {
                 address: formulaFocused ? formulaTargetLabel : addressLabel,
               }),
-              'aria-readonly': readOnly ? true : undefined,
+              'aria-readonly': readOnly || previewing ? true : undefined,
               'aria-keyshortcuts': 'Alt+Enter Control+F2 F2 F4',
               'data-formula-input': '',
               'data-cell-edit-session': editSession.id,
               'data-cell-edit-surface': 'formula-bar',
-              rows: 1,
+              rows: expanded ? 5 : 1,
               wrap: 'off',
               autocomplete: 'off',
               spellcheck: false,
             },
           }"
           class="idea-formula-textarea"
-          :class="{ 'has-formula-colors': showFormulaColors }"
-          :value="formulaDraft"
-          :readonly="readOnly"
+          :class="{ 'has-formula-colors': showFormulaColors, 'is-expanded': expanded }"
+          :value="previewing ? (previewValue ?? '') : formulaDraft"
+          :readonly="readOnly || previewing"
           :placeholder="t('formulaBar.placeholder')"
           @input="onFormulaInput"
           @focus="onFormulaFocus"
@@ -410,6 +457,7 @@ defineExpose({
           :input="formulaInput"
           :active="
             !readOnly &&
+            !previewing &&
             formulaFocused &&
             formulaOwnsSession &&
             editSession.state.surface === 'formula-bar'
@@ -419,6 +467,21 @@ defineExpose({
           @text-edit="applyFormulaTextEdit"
         />
       </div>
+      <Button
+        class="workbook-formula-bar__expand-trigger"
+        variant="text"
+        shape="square"
+        :aria-label="t(expanded ? 'formulaBar.collapse' : 'formulaBar.expand')"
+        :title="t(expanded ? 'formulaBar.collapse' : 'formulaBar.expand')"
+        :aria-expanded="expanded"
+        :data-cell-edit-session="editSession.id"
+        data-formula-expand-trigger
+        @mousedown.prevent
+        @click="expanded = !expanded"
+      >
+        <ChevronUp v-if="expanded" :size="15" aria-hidden="true" />
+        <ChevronDown v-else :size="15" aria-hidden="true" />
+      </Button>
     </div>
     <Button
       ref="searchTrigger"
@@ -442,7 +505,7 @@ defineExpose({
   display: grid;
   grid-template-columns: 132px minmax(0, 1fr) 28px;
   gap: var(--idea-space-4);
-  align-items: center;
+  align-items: start;
   min-width: 0;
   padding: var(--idea-space-2) var(--idea-space-4);
   background: var(--idea-surface-secondary);
@@ -457,23 +520,29 @@ defineExpose({
     min-width: 0;
   }
 
-  &__fx {
+  &__leading-actions {
     position: absolute;
     z-index: 2;
-    inset-block-start: 50%;
+    inset-block-start: 0;
     inset-inline-start: 1px;
-    transform: translateY(-50%);
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 16px;
-    border-right: 1px solid var(--idea-border-control);
-    color: var(--idea-text-muted);
+    height: 28px;
+    color: var(--idea-text-secondary);
+  }
+
+  &__fx {
     font-family: Georgia, serif;
     font-size: 14px;
     font-style: italic;
-    pointer-events: none;
+  }
+
+  &__expand-trigger {
+    position: absolute;
+    z-index: 2;
+    inset-block-start: 0;
+    inset-inline-end: 1px;
+    color: var(--idea-text-secondary);
   }
 
   &__search-trigger {
