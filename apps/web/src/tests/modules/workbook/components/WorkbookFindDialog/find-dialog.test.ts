@@ -60,12 +60,36 @@ describe("WorkbookFindDialog", () => {
     });
     const body = new DOMWrapper(document.body);
     await body.get("button[aria-controls='find-options']").trigger("click");
+    expect(wrapper.emitted("updateExpanded")).toEqual([[true]]);
+    await wrapper.setProps({ expanded: true });
     const scope = wrapper.findAllComponents(TSelect)[0];
     scope?.vm.$emit("change", "workbook");
     await body.get("button[aria-controls='find-options']").trigger("click");
+    await wrapper.setProps({ expanded: false });
     await body.get("button[aria-controls='find-options']").trigger("click");
+    await wrapper.setProps({ expanded: true });
     expect(wrapper.emitted("updateOptions")).toEqual([[{ scope: "workbook" }]]);
     expect(body.find("[data-find-format='clear']").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  test("hides format controls and disables format-only search while options are collapsed", async () => {
+    const wrapper = mount(WorkbookFindDialog, {
+      attachTo: document.body,
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { visible: true, query: "", formatSummary: "Fill: blue" },
+    });
+    const body = new DOMWrapper(document.body);
+    const findAll = () => body.findAll("button").find((button) => button.text() === "Find all")!;
+    const hasFormat = () => body.findAll("button").some((button) => button.text() === "Format");
+    expect(hasFormat()).toBe(false);
+    expect(findAll().element.disabled).toBe(true);
+    await wrapper.setProps({ expanded: true });
+    expect(hasFormat()).toBe(true);
+    expect(findAll().element.disabled).toBe(false);
+    await wrapper.setProps({ expanded: false, query: "needle" });
+    expect(hasFormat()).toBe(false);
+    expect(findAll().element.disabled).toBe(false);
     wrapper.unmount();
   });
 

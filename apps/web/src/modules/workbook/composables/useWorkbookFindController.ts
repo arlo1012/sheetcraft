@@ -79,7 +79,9 @@ export function useWorkbookFindController(deps: {
   const query = ref("");
   const history = ref(readWorkbookFindHistory());
   const options = ref<WorkbookFindOptions>({ ...DEFAULT_WORKBOOK_FIND_OPTIONS });
+  const optionsExpanded = ref(false);
   const format = shallowRef<SheetSearchFormat>();
+  const activeFormat = computed(() => (optionsExpanded.value ? format.value : undefined));
   const formatSource = ref("");
   const hasSearchedAll = ref(false);
   const feedback = shallowRef<Feedback>();
@@ -96,7 +98,7 @@ export function useWorkbookFindController(deps: {
   const matches = computed<WorkbookFindResult[]>(() => {
     void deps.getRevision();
     const workbook = deps.getWorkbook();
-    if (query.value === "" && !format.value) return [];
+    if (query.value === "" && !activeFormat.value) return [];
     const searchQuery = decodeFindQuery(query.value);
     const sheets = getWorkbookSheets(workbook).filter(
       (sheet) =>
@@ -107,7 +109,7 @@ export function useWorkbookFindController(deps: {
       const evaluator = deps.getEvaluator(sheet.id);
       return findCellsByText(sheet, searchQuery, evaluator, {
         ...options.value,
-        format: format.value,
+        format: activeFormat.value,
       }).map((address) => {
         const content = sheet.cells.get(`${address.row}:${address.column}`)?.content;
         return {
@@ -144,6 +146,11 @@ export function useWorkbookFindController(deps: {
     options.value = { ...options.value, ...value };
     invalidate();
   }
+  function setOptionsExpanded(value: boolean): void {
+    if (optionsExpanded.value === value) return;
+    optionsExpanded.value = value;
+    invalidate();
+  }
   function setFormat(value?: SheetSearchFormat, source = ""): void {
     format.value = value?.keys.length ? value : undefined;
     formatSource.value = source;
@@ -164,7 +171,7 @@ export function useWorkbookFindController(deps: {
     });
   }
   function canSearch(): boolean {
-    if (query.value !== "" || format.value) return true;
+    if (query.value !== "" || activeFormat.value) return true;
     report({ key: "workspace.enterSearchTerm" });
     return false;
   }
@@ -200,12 +207,14 @@ export function useWorkbookFindController(deps: {
   function reset(): void {
     query.value = "";
     options.value = { ...DEFAULT_WORKBOOK_FIND_OPTIONS };
+    optionsExpanded.value = false;
     setFormat();
   }
   return {
     query,
     history: readonly(history),
     options,
+    optionsExpanded: readonly(optionsExpanded),
     format,
     formatSummary,
     hasSearchedAll,
@@ -214,6 +223,7 @@ export function useWorkbookFindController(deps: {
     status,
     updateQuery,
     updateOptions,
+    setOptionsExpanded,
     setFormat,
     findAll,
     find,

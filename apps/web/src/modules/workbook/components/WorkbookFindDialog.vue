@@ -24,6 +24,7 @@ const props = withDefaults(
     query: string;
     history?: readonly string[];
     options?: WorkbookFindOptions;
+    expanded?: boolean;
     results?: readonly WorkbookFindResult[];
     hasSearchedAll?: boolean;
     resultCount?: number;
@@ -34,6 +35,7 @@ const props = withDefaults(
   }>(),
   {
     options: () => ({ ...DEFAULT_WORKBOOK_FIND_OPTIONS }),
+    expanded: false,
     results: () => [],
     history: () => [],
     hasSearchedAll: false,
@@ -49,6 +51,7 @@ const emit = defineEmits<{
   close: [];
   closed: [];
   updateOptions: [options: Partial<WorkbookFindOptions>];
+  updateExpanded: [expanded: boolean];
   findAll: [];
   selectResult: [result: WorkbookFindResult];
   pickFormat: [mode: WorkbookFindFormatMode];
@@ -58,10 +61,9 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 const queryInput = ref<InstanceType<typeof WorkbookFindQueryInput>>();
-const expanded = ref(false);
 const formatOpen = ref(false);
 const specialOpen = ref(false);
-const canFind = computed(() => Boolean(props.query || props.formatSummary));
+const canFind = computed(() => Boolean(props.query || (props.expanded && props.formatSummary)));
 const scopeOptions = computed(() => [
   { value: "sheet", label: t("navigation.findScopeSheet") },
   { value: "workbook", label: t("navigation.findScopeWorkbook") },
@@ -110,7 +112,7 @@ function close(): void {
   >
     <div class="workbook-find-dialog">
       <section class="workbook-find-dialog__form">
-        <div class="workbook-find-dialog__query-row">
+        <div class="workbook-find-dialog__query-row" :class="{ 'is-expanded': expanded }">
           <span class="workbook-find-dialog__query-label">{{
             t("navigation.findQueryLabel")
           }}</span>
@@ -123,11 +125,13 @@ function close(): void {
             @find="find"
           />
           <WorkbookFindFormatPreview
+            v-if="expanded"
             :format="format"
             :title="formatSummary"
             :empty-label="t('navigation.findFormatUnset')"
           />
           <Dropdown
+            v-if="expanded"
             trigger="click"
             placement="bottom-left"
             :min-column-width="180"
@@ -265,7 +269,7 @@ function close(): void {
             variant="outline"
             :aria-expanded="expanded"
             aria-controls="find-options"
-            @click="expanded = !expanded"
+            @click="emit('updateExpanded', !expanded)"
             >{{ t("navigation.findOptions")
             }}<template #suffix
               ><ChevronUp v-if="expanded" :size="14" /><ChevronDown v-else :size="14" /></template
@@ -312,10 +316,13 @@ function close(): void {
   }
   &__query-row {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) 108px auto;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: var(--idea-space-2);
     min-width: 0;
+    &.is-expanded {
+      grid-template-columns: auto minmax(0, 1fr) 108px auto;
+    }
   }
   &__query-label {
     white-space: nowrap;
@@ -371,7 +378,8 @@ function close(): void {
 }
 @media (max-width: 520px) {
   .workbook-find-dialog {
-    &__query-row {
+    &__query-row,
+    &__query-row.is-expanded {
       grid-template-columns: minmax(0, 1fr) auto;
     }
     &__query-label {

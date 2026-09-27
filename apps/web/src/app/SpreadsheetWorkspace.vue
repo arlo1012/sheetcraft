@@ -657,6 +657,7 @@ const {
   history: findHistory,
   format: findFormat,
   options: findOptions,
+  optionsExpanded: findOptionsExpanded,
   results: findResults,
   resultCount: findResultCount,
   hasSearchedAll: findHasSearchedAll,
@@ -1726,6 +1727,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :query="searchQuery"
       :history="findHistory"
       :options="findOptions"
+      :expanded="findOptionsExpanded"
       :results="findResults"
       :has-searched-all="findHasSearchedAll"
       :result-count="findResultCount"
@@ -1734,6 +1736,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :format="findFormat"
       @update-query="updateSearchQuery"
       @update-options="workbookFind.updateOptions"
+      @update-expanded="workbookFind.setOptionsExpanded"
       @find="runFind"
       @find-all="runFindAll"
       @select-result="selectFindResult"

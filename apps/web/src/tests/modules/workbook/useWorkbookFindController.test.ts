@@ -167,6 +167,7 @@ describe("useWorkbookFindController", () => {
     setCellStyle(summary, { row: 3, column: 2 }, { fillColor: "#ff0000" });
 
     controller.setFormat({ style: { fillColor: "#ff0000" }, keys: ["fillColor"] });
+    controller.setOptionsExpanded(true);
     controller.findAll();
     expect(controller.results.value.map((result) => result.address)).toEqual([
       { row: 3, column: 2 },
@@ -179,9 +180,50 @@ describe("useWorkbookFindController", () => {
 
     expect(controller.query.value).toBe("");
     expect(controller.options.value).toEqual(DEFAULT_WORKBOOK_FIND_OPTIONS);
+    expect(controller.optionsExpanded.value).toBe(false);
     expect(controller.format.value).toBeUndefined();
     expect(controller.hasSearchedAll.value).toBe(false);
     expect(controller.results.value).toEqual([]);
+  });
+
+  test("suspends stored format criteria while collapsed and restores them when expanded", () => {
+    const { controller, workbook, navigated } = mountController();
+    const sheet = getActiveSheet(workbook);
+    setCellValue(sheet, { row: 0, column: 0 }, "needle");
+    setCellValue(sheet, { row: 1, column: 0 }, "needle");
+    setCellStyle(sheet, { row: 0, column: 0 }, { fillColor: "#ff0000" });
+    controller.setFormat({ style: { fillColor: "#ff0000" }, keys: ["fillColor"] });
+    controller.updateQuery("needle");
+
+    controller.findAll();
+    expect(controller.resultCount.value).toBe(2);
+    controller.find("forward");
+    expect(navigated.at(-1)?.address).toEqual({ row: 1, column: 0 });
+
+    controller.setOptionsExpanded(true);
+    expect(controller.hasSearchedAll.value).toBe(false);
+    controller.findAll();
+    expect(controller.resultCount.value).toBe(1);
+    controller.find("forward");
+    expect(navigated.at(-1)?.address).toEqual({ row: 0, column: 0 });
+
+    controller.setOptionsExpanded(false);
+    expect(controller.results.value).toEqual([]);
+    expect(controller.status.value).toBe("");
+    controller.find("backward");
+    expect(navigated.at(-1)?.address).toEqual({ row: 1, column: 0 });
+    controller.updateQuery("");
+    controller.findAll();
+    controller.find("forward");
+    expect(navigated).toHaveLength(3);
+    expect(controller.hasSearchedAll.value).toBe(false);
+    expect(controller.format.value?.style.fillColor).toBe("#ff0000");
+
+    controller.setOptionsExpanded(true);
+    controller.findAll();
+    expect(controller.results.value.map((result) => result.address)).toEqual([
+      { row: 0, column: 0 },
+    ]);
   });
 
   test("normalizes newline shortcuts for display and decodes them before searching", () => {
@@ -217,6 +259,7 @@ describe("useWorkbookFindController", () => {
 
     controller.updateQuery("");
     controller.setFormat({ style: { fillColor: "#ff0000" }, keys: ["fillColor"] });
+    controller.setOptionsExpanded(true);
     controller.findAll();
     expect(controller.history.value).toEqual(["first", "second"]);
 
