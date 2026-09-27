@@ -482,21 +482,6 @@ defineExpose({
           @text-edit="applyFormulaTextEdit"
         />
       </div>
-      <Pencil
-        class="workbook-formula-bar__action workbook-formula-bar__editor-trigger"
-        :size="15"
-        role="button"
-        :tabindex="readOnly || formulaEditorDisabled || isComposing ? -1 : 0"
-        :aria-label="t('formulaBar.openEditor')"
-        :title="t('formulaBar.openEditor')"
-        :aria-disabled="readOnly || formulaEditorDisabled || isComposing"
-        :data-cell-edit-session="editSession.id"
-        aria-haspopup="dialog"
-        data-formula-editor-trigger
-        @click="openFormulaEditor"
-        @keydown.enter.prevent="openFormulaEditor"
-        @keydown.space.prevent="openFormulaEditor"
-      />
       <ChevronDown
         class="workbook-formula-bar__action workbook-formula-bar__expand-trigger"
         :class="{ 'is-expanded': expanded }"
@@ -512,6 +497,21 @@ defineExpose({
         @click="expanded = !expanded"
         @keydown.enter.prevent="expanded = !expanded"
         @keydown.space.prevent="expanded = !expanded"
+      />
+      <Pencil
+        class="workbook-formula-bar__action workbook-formula-bar__editor-trigger"
+        :size="15"
+        role="button"
+        :tabindex="readOnly || formulaEditorDisabled || isComposing ? -1 : 0"
+        :aria-label="t('formulaBar.openEditor')"
+        :title="t('formulaBar.openEditor')"
+        :aria-disabled="readOnly || formulaEditorDisabled || isComposing"
+        :data-cell-edit-session="editSession.id"
+        aria-haspopup="dialog"
+        data-formula-editor-trigger
+        @click="openFormulaEditor"
+        @keydown.enter.prevent="openFormulaEditor"
+        @keydown.space.prevent="openFormulaEditor"
       />
     </div>
     <Search
