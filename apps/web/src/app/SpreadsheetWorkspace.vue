@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatCellAddress } from "@idea10/core/coordinates";
+import type { SheetGoToOptions } from "@idea10/core/go-to";
 import { computed, nextTick, ref, shallowRef, shallowReactive, useId, watch } from "vue";
 import {
   createSetSheetOutlineGroupCollapsedCommand,
@@ -77,6 +78,7 @@ import {
 } from "../modules/workbook/workbook-find-format";
 import type {
   WorkbookFindFormatMode,
+  WorkbookFindMode,
   WorkbookFindResult,
 } from "../modules/workbook/workbook-find-types";
 import {
@@ -84,6 +86,7 @@ import {
   resolveRangeReference,
 } from "../shared/range-reference/formatRangeReference";
 import WorkbookFindDialog from "../modules/workbook/components/WorkbookFindDialog.vue";
+import { useWorkbookFindShortcuts } from "../modules/workbook/composables/useWorkbookFindShortcuts";
 import WorkbookStatusBar from "../modules/workbook/components/WorkbookStatusBar.vue";
 import {
   useSpreadsheetWorkspaceController,
@@ -109,6 +112,8 @@ const props = defineProps<{
 }>();
 const formulaBarRef = ref<InstanceType<typeof WorkbookFormulaBar> | null>(null);
 const findDialogVisible = ref(false);
+const findDialogRef = ref<InstanceType<typeof WorkbookFindDialog>>();
+const findMode = ref<WorkbookFindMode>("find");
 
 function restoreSearchFocus(): void {
   if (!findDialogVisible.value) {
@@ -149,6 +154,7 @@ const {
   handleFormulaReferenceKeydown,
   searchQuery,
   workbookFind,
+  workbookGoTo,
   t,
   activeSheet,
   sheets,
@@ -655,6 +661,9 @@ const {
 } = dataTools;
 const {
   history: findHistory,
+  replacement: findReplacement,
+  replacementFormat: findReplacementFormat,
+  replacementFormatSummary: findReplacementFormatSummary,
   format: findFormat,
   options: findOptions,
   optionsExpanded: findOptionsExpanded,
@@ -664,29 +673,75 @@ const {
   status: findStatus,
   formatSummary: findFormatSummary,
 } = workbookFind;
+const findFormatTarget = ref<"find" | "replace">("find");
 const findFormatDraft = shallowRef<ReturnType<typeof createFindFormatDraft>>();
 const findFormatPicker = useRangeReferencePicker(() => activeSheet.value.name, {
   singleCell: true,
 });
 const { active: pickingFindFormat, reference: pickedFindFormatReference } = findFormatPicker;
+function openFind(mode: WorkbookFindMode = "find"): void {
+  if (!cellEditSession.finish()) return;
+  findMode.value = mode;
+  findDialogVisible.value = true;
+  void nextTick(() => findDialogRef.value?.focusQuery());
+}
+useWorkbookFindShortcuts({
+  canOpen: (event) => {
+    if (
+      cellEditSession.state.composing ||
+      formulaEditorVisible.value ||
+      formulaInsertVisible.value ||
+      activeRangePicker.value ||
+      cellFormatSelection.value ||
+      findFormatDraft.value
+    )
+      return false;
+    const dialog = event.target instanceof Element ? event.target.closest(".t-dialog") : null;
+    return !dialog || dialog.classList.contains("workbook-find-dialog-frame");
+  },
+  open: openFind,
+});
 function runFind(direction: "forward" | "backward"): void {
   if (cellEditSession.finish()) workbookFind.find(direction);
 }
 function runFindAll(): void {
   if (cellEditSession.finish()) workbookFind.findAll();
 }
+function runReplace(all = false): void {
+  if (!cellEditSession.finish()) return;
+  if (all) workbookFind.replaceAll();
+  else workbookFind.replace();
+}
+function runGoTo(options: SheetGoToOptions): void {
+  if (cellEditSession.finish()) workbookGoTo.locate(options);
+}
+function selectGoToResult(result: WorkbookFindResult): void {
+  if (cellEditSession.finish()) workbookGoTo.selectResult(result);
+}
 function selectFindResult(result: WorkbookFindResult): void {
   if (cellEditSession.finish()) workbookFind.selectResult(result);
 }
-function configureFindFormat(): void {
+function configureFindFormat(target: "find" | "replace" = "find"): void {
   if (!cellEditSession.finish()) return;
-  findFormatDraft.value = createFindFormatDraft(workbookFind.format.value);
+  findFormatTarget.value = target;
+  findFormatDraft.value = createFindFormatDraft(
+    target === "replace" ? workbookFind.replacementFormat.value : workbookFind.format.value,
+  );
 }
 function confirmFindFormat(change: CellFormatChange): void {
-  workbookFind.setFormat(applyFindFormatChange(workbookFind.format.value, change));
+  if (findFormatTarget.value === "replace") {
+    workbookFind.setReplacementFormat(
+      applyFindFormatChange(workbookFind.replacementFormat.value, change),
+    );
+  } else {
+    workbookFind.setFormat(applyFindFormatChange(workbookFind.format.value, change));
+  }
   findFormatDraft.value = undefined;
 }
-async function pickFindFormat(mode: WorkbookFindFormatMode): Promise<void> {
+async function pickFindFormat(
+  mode: WorkbookFindFormatMode,
+  purpose: "find" | "replace" = "find",
+): Promise<void> {
   if (!cellEditSession.finish()) return;
   const workbook = session.workbook;
   const generation = workbookGeneration.value;
@@ -709,7 +764,9 @@ async function pickFindFormat(mode: WorkbookFindFormatMode): Promise<void> {
   const sheet = workbook.sheets.get(target.sheetId);
   if (!sheet) return;
   const address = target.range.start;
-  workbookFind.setFormat(
+  const setFormat =
+    purpose === "replace" ? workbookFind.setReplacementFormat : workbookFind.setFormat;
+  setFormat(
     buildFindFormatFromCell(sheet.cells.get(`${address.row}:${address.column}`)?.style, mode),
     `${sheet.name}!${formatCellAddress(address)}`,
   );
@@ -1697,7 +1754,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @commit-cell="commitCell"
       @traverse="onTraverseFromFormulaBar"
       @cancel-edit="onCancelFormulaEdit"
-      @open-search="findDialogVisible = true"
+      @open-search="openFind('find')"
       @update-previewing="formulaPreviewing = $event"
       @open-formula-editor="formulaEditor.open"
       @open-insert-function="formulaInsertVisible = true"
@@ -1723,6 +1780,14 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @close="formulaEditor.close"
     />
     <WorkbookFindDialog
+      ref="findDialogRef"
+      :mode="findMode"
+      :replacement="findReplacement"
+      :replacement-format="findReplacementFormat"
+      :replacement-format-summary="findReplacementFormatSummary"
+      :go-to-results="workbookGoTo.results.value"
+      :go-to-result-count="workbookGoTo.resultCount.value"
+      :go-to-status="workbookGoTo.status.value"
       :visible="findDialogVisible && !pickingFindFormat && !findFormatDraft"
       :query="searchQuery"
       :history="findHistory"
@@ -1735,13 +1800,22 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :format-summary="findFormatSummary"
       :format="findFormat"
       @update-query="updateSearchQuery"
+      @update-mode="findMode = $event"
+      @update-replacement="findReplacement = $event"
       @update-options="workbookFind.updateOptions"
       @update-expanded="workbookFind.setOptionsExpanded"
       @find="runFind"
       @find-all="runFindAll"
+      @replace="runReplace()"
+      @replace-all="runReplace(true)"
+      @go-to="runGoTo"
+      @select-go-to-result="selectGoToResult"
       @select-result="selectFindResult"
       @pick-format="pickFindFormat"
-      @configure-format="configureFindFormat"
+      @configure-format="configureFindFormat()"
+      @configure-replacement-format="configureFindFormat('replace')"
+      @pick-replacement-format="pickFindFormat($event, 'replace')"
+      @clear-replacement-format="workbookFind.setReplacementFormat()"
       @clear-format="workbookFind.setFormat()"
       @close="findDialogVisible = false"
       @closed="restoreSearchFocus"
@@ -1760,7 +1834,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :state="findFormatDraft.state"
       :border-state="findFormatDraft.borderState"
       :border-capabilities="{ innerHorizontal: false, innerVertical: false }"
-      :sample-value="searchQuery || 'Aa'"
+      :sample-value="(findFormatTarget === 'replace' ? findReplacement : searchQuery) || 'Aa'"
       initial-tab="font"
       @confirm="confirmFindFormat"
       @cancel="findFormatDraft = undefined"

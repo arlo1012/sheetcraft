@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createTestWorkbook } from "../helpers.js";
-import { findCellByText, findCellsByText } from "../../search.js";
+import { buildSheetTextReplacements, findCellByText, findCellsByText } from "../../search.js";
 import {
   createSheet,
   createWorkbookEvaluator,
@@ -203,5 +203,121 @@ describe("advanced sparse sheet search", () => {
     ).toEqual([{ row: 5, column: 2 }]);
     expect(sheet.cells.size).toBe(4);
     expect([...sheet.cells]).toEqual(before);
+  });
+});
+
+describe("sparse sheet replacement planning", () => {
+  test("replaces every non-overlapping raw-input match in the selected order", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellValue(sheet, { row: 1, column: 2 }, "Needle needle NEEDLE");
+    setCellValue(sheet, { row: 0, column: 3 }, "needle");
+
+    expect(
+      buildSheetTextReplacements(sheet, "needle", "$&$1", undefined, { order: "columns" }),
+    ).toEqual([
+      { address: { row: 1, column: 2 }, input: "$&$1 $&$1 $&$1" },
+      { address: { row: 0, column: 3 }, input: "$&$1" },
+    ]);
+    expect(
+      buildSheetTextReplacements(sheet, "needle", "x", undefined, { matchCase: true }),
+    ).toEqual([
+      { address: { row: 0, column: 3 }, input: "x" },
+      { address: { row: 1, column: 2 }, input: "Needle x NEEDLE" },
+    ]);
+    expect(
+      buildSheetTextReplacements(sheet, "needle", "needle", undefined, { matchCase: true }),
+    ).toEqual([]);
+  });
+
+  test("uses wildcard, escaping, newline, whole-cell, width, and format filters", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellValue(sheet, { row: 0, column: 0 }, "Part*?\nNeedle and Part*?\nNeedle");
+    setCellValue(sheet, { row: 1, column: 0 }, "ＡＢＣ");
+    setCellStyle(sheet, { row: 1, column: 0 }, { fillColor: "#ff0000" });
+
+    expect(buildSheetTextReplacements(sheet, "Part~*~?*Needle", "x")).toEqual([
+      { address: { row: 0, column: 0 }, input: "x" },
+    ]);
+    expect(
+      buildSheetTextReplacements(sheet, "ABC", "x", undefined, { matchEntireCell: true }),
+    ).toEqual([{ address: { row: 1, column: 0 }, input: "x" }]);
+    expect(buildSheetTextReplacements(sheet, "ABC", "x", undefined, { matchWidth: true })).toEqual(
+      [],
+    );
+    expect(
+      buildSheetTextReplacements(sheet, "ABC", "x", undefined, {
+        format: { style: { fillColor: "#ff0000" }, keys: ["fillColor"] },
+      }),
+    ).toEqual([{ address: { row: 1, column: 0 }, input: "x" }]);
+  });
+
+  test("edits formula source but never replaces formula computed values", () => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    const inputs = createSheet("Inputs", "inputs");
+    workbook.sheets.set(inputs.id, inputs);
+    setCellValue(inputs, { row: 0, column: 0 }, "computed needle");
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "formula", formula: { source: "=Inputs!A1" } },
+    );
+    const evaluator = createWorkbookEvaluator(workbook, sheet.id);
+
+    expect(buildSheetTextReplacements(sheet, "Inputs", "Data", evaluator)).toEqual([
+      { address: { row: 0, column: 0 }, input: "=Data!A1" },
+    ]);
+    expect(buildSheetTextReplacements(sheet, "computed", "changed", evaluator)).toEqual([]);
+    expect(
+      buildSheetTextReplacements(sheet, "computed", "changed", evaluator, { lookIn: "values" }),
+    ).toEqual([]);
+  });
+
+  test("preserves literal text without input escape markers", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellValue(sheet, { row: 0, column: 0 }, "=foo");
+    setCellValue(sheet, { row: 1, column: 0 }, "0123");
+    setCellValue(sheet, { row: 2, column: 0 }, "'quoted");
+
+    expect(findCellsByText(sheet, "=foo", undefined, { matchEntireCell: true })).toEqual([
+      { row: 0, column: 0 },
+    ]);
+    expect(buildSheetTextReplacements(sheet, "foo", "'bar")).toEqual([
+      { address: { row: 0, column: 0 }, input: "='bar" },
+    ]);
+    expect(buildSheetTextReplacements(sheet, "12", "x")).toEqual([
+      { address: { row: 1, column: 0 }, input: "0x3" },
+    ]);
+    expect(buildSheetTextReplacements(sheet, "quoted", "word")).toEqual([
+      { address: { row: 2, column: 0 }, input: "'word" },
+    ]);
+    expect(
+      buildSheetTextReplacements(sheet, "0123", "0123", undefined, { matchEntireCell: true }),
+    ).toEqual([]);
+  });
+
+  test("maps case-fold expansions back to complete original characters", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellValue(sheet, { row: 0, column: 0 }, "İneedle");
+
+    expect(buildSheetTextReplacements(sheet, "needle", "value")).toEqual([
+      { address: { row: 0, column: 0 }, input: "İvalue" },
+    ]);
+    setCellValue(sheet, { row: 0, column: 0 }, "İ");
+    expect(buildSheetTextReplacements(sheet, "?", "x")).toEqual([
+      { address: { row: 0, column: 0 }, input: "x" },
+    ]);
+  });
+
+  test("treats escaped wildcards as literal text in the fast path", () => {
+    const sheet = getActiveSheet(createTestWorkbook());
+    setCellValue(sheet, { row: 0, column: 0 }, "*?~");
+
+    expect(buildSheetTextReplacements(sheet, "~*", "x")).toEqual([
+      { address: { row: 0, column: 0 }, input: "x?~" },
+    ]);
+    expect(
+      buildSheetTextReplacements(sheet, "~*~?~~", "value", undefined, { matchEntireCell: true }),
+    ).toEqual([{ address: { row: 0, column: 0 }, input: "value" }]);
   });
 });

@@ -1,6 +1,7 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { AutoComplete } from "tdesign-vue-next/es/auto-complete";
 import { Popup } from "tdesign-vue-next/es/popup";
 import WorkbookFindDialog from "../../../../../modules/workbook/components/WorkbookFindDialog.vue";
@@ -176,4 +177,55 @@ describe("WorkbookFindDialog", () => {
     expect(wrapper.emitted("updateQuery")?.at(-1)).toEqual(["ax^lyb"]);
     wrapper.unmount();
   });
+});
+
+test("keeps an empty replacement legal and emits replace actions", async () => {
+  const wrapper = mount(WorkbookFindDialog, {
+    attachTo: document.body,
+    global: { plugins: [createAppI18n("en-US")] },
+    props: { visible: true, mode: "replace", query: "needle", replacement: "" },
+  });
+  const body = new DOMWrapper(document.body);
+  expect(body.get<HTMLButtonElement>("button").element.disabled).toBe(false);
+  await body
+    .findAll("button")
+    .find((button) => button.text() === "Replace")!
+    .trigger("click");
+  await body
+    .findAll("button")
+    .find((button) => button.text() === "Replace all")!
+    .trigger("click");
+  expect(wrapper.emitted("replace")).toEqual([[]]);
+  expect(wrapper.emitted("replaceAll")).toEqual([[]]);
+  wrapper.unmount();
+});
+
+test("disables replace actions only when the find query is empty", async () => {
+  const wrapper = mount(WorkbookFindDialog, {
+    attachTo: document.body,
+    global: { plugins: [createAppI18n("en-US")] },
+    props: { visible: true, mode: "replace", query: "", replacement: "" },
+  });
+  const body = new DOMWrapper(document.body);
+  const actions = body
+    .findAll("button")
+    .filter((button) => ["Replace", "Replace all"].includes(button.text()));
+  expect(actions.every((button) => button.attributes("disabled") !== undefined)).toBe(true);
+  wrapper.unmount();
+});
+
+test("emits the selected go-to category", async () => {
+  const wrapper = mount(WorkbookFindDialog, {
+    attachTo: document.body,
+    global: { plugins: [createAppI18n("en-US")] },
+    props: { visible: true, mode: "goto", query: "" },
+  });
+  const body = new DOMWrapper(document.body);
+  await wrapper.findComponent(TRadioGroup).vm.$emit("change", "blanks");
+  await body
+    .findAll("button")
+    .find((button) => button.text() === "Go to")!
+    .trigger("click");
+  expect(wrapper.emitted("goTo")?.at(-1)?.[0]).toMatchObject({ kind: "blanks" });
+  wrapper.unmount();
 });

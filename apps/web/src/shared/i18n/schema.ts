@@ -823,6 +823,9 @@ export type MessageSchema = ToolMessageSchema & {
     formatPainterRangeMismatch: string;
     sheetDuplicated: string;
     sheetMoved: string;
+    replacedCells: string;
+    noReplaceMatches: string;
+    replaceFailed: string;
   };
   autoFill: {
     options: string;
@@ -903,6 +906,33 @@ export type MessageSchema = ToolMessageSchema & {
     findResultCell: string;
     findResultValue: string;
     findNoMatches: string;
+    findTab: string;
+    replaceTab: string;
+    goToTab: string;
+    replaceWith: string;
+    replace: string;
+    replaceAll: string;
+    goToAction: string;
+    goToData: string;
+    goToConstants: string;
+    goToFormulas: string;
+    goToNumber: string;
+    goToText: string;
+    goToLogical: string;
+    goToError: string;
+    goToBlanks: string;
+    goToVisible: string;
+    goToLastCell: string;
+    goToCurrentRegion: string;
+    goToObjects: string;
+    goToRowDifferences: string;
+    goToColumnDifferences: string;
+    goToMerged: string;
+    goToComments: string;
+    goToResultHint: string;
+    goToNoMatches: string;
+    goToMatches: string;
+    goToFailed: string;
   };
   formulaBar: {
     previewResult: string;

@@ -22,7 +22,7 @@ const selectedId = ref<string>();
 const rows = computed<FindResultRow[]>(() =>
   props.results.map((result) => ({
     ...result,
-    id: `${result.sheetId}:${result.address.row}:${result.address.column}`,
+    id: result.id ?? `${result.sheetId}:${result.address.row}:${result.address.column}`,
   })),
 );
 const columns = computed<BaseTableCol[]>(() => [

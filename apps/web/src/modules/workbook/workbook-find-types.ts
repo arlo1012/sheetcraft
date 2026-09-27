@@ -15,6 +15,8 @@ export const DEFAULT_WORKBOOK_FIND_OPTIONS: WorkbookFindOptions = {
 };
 
 export type WorkbookFindResult = {
+  /** Stable result identity when an address alone is not unique. */
+  id?: string;
   workbookName: string;
   sheetId: string;
   sheetName: string;
@@ -26,3 +28,5 @@ export type WorkbookFindResult = {
 };
 
 export type WorkbookFindFormatMode = "fill" | "font" | "colors" | "all";
+
+export type WorkbookFindMode = "find" | "replace" | "goto";

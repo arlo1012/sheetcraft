@@ -1476,6 +1476,19 @@ function navigateToCell(address: CellAddress): void {
   }
 }
 
+function navigateToRange(range: CellRange): void {
+  const nextSelection: CellSelection = {
+    active: { ...range.start },
+    anchor: { ...range.start },
+    focus: { ...range.end },
+    mode: "cells",
+  };
+  if (deferSelectionWhileComposing(nextSelection)) return;
+  if (isEditing.value && !finishEdit(nextSelection)) return;
+  ensureGridExtentContains(range.end);
+  setSelection(nextSelection, range.start);
+}
+
 function moveSelection(
   delta: { rows?: number; columns?: number },
   commitEdit: boolean,
@@ -2305,6 +2318,8 @@ defineExpose({
   handleReferenceKeydown,
   hasPendingEdit,
   navigateToCell,
+  navigateToRange,
+  selectFloatingImage,
   scrollHorizontally,
   fitSelectionToViewport,
 });

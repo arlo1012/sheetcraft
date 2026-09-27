@@ -110,6 +110,10 @@
     "./data-proofreading": {
       "types": "./dist/data-proofreading.d.ts",
       "import": "./dist/data-proofreading.js"
+    },
+    "./go-to": {
+      "types": "./dist/go-to.d.ts",
+      "import": "./dist/go-to.js"
     }
   },
   "scripts": {

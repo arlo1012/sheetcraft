@@ -3,12 +3,22 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import {
+  createWorkbookSession,
+  executeWorkbookCommand,
+  undoWorkbookCommand,
+} from "@idea10/core/history";
+import { createBatchSetCellContentsCommand } from "@idea10/core/commands";
+import { mergeCellStyle } from "@idea10/core/style";
+import {
   createSheet,
   createWorkbook,
   createWorkbookEvaluator,
   getActiveSheet,
   setCellStyle,
   setCellValue,
+  setCellContent,
+  getCellContent,
+  getCellStyle,
   type CellAddress,
   type Workbook,
 } from "@idea10/core/workbook";
@@ -40,6 +50,7 @@ function mountController(
   const activeAddress = ref(address);
   const navigated: Array<{ sheetId: string; address: CellAddress }> = [];
   const feedback = vi.fn();
+  const session = createWorkbookSession({ workbook, idFactory: createSequentialIdFactory() });
   let controller: FindController | undefined;
   const wrapper = mount(
     defineComponent({
@@ -56,6 +67,32 @@ function mountController(
             navigated.push(result);
           },
           feedback,
+          applyReplacements: (changes, replacementFormat) => {
+            const changesWithFormat = changes.map((change) => {
+              if (!replacementFormat) return change;
+              const sheet = workbook.sheets.get(change.sheetId);
+              return {
+                ...change,
+                style: sheet
+                  ? mergeCellStyle(
+                      getCellStyle(sheet, change.address),
+                      Object.fromEntries(
+                        replacementFormat.keys.map((key) => [
+                          key,
+                          replacementFormat.style[key] ?? null,
+                        ]),
+                      ),
+                    )
+                  : null,
+              };
+            });
+            const changed = executeWorkbookCommand(
+              session,
+              createBatchSetCellContentsCommand(changesWithFormat),
+            );
+            if (changed) revision.value += 1;
+            return changed;
+          },
         });
         return () => h("div");
       },
@@ -64,7 +101,7 @@ function mountController(
   );
   mounted.push(wrapper);
   if (!controller) throw new Error("Missing workbook find controller");
-  return { controller, workbook, navigated, feedback, revision };
+  return { controller, workbook, navigated, feedback, revision, session };
 }
 
 afterEach(() => {
@@ -73,6 +110,168 @@ afterEach(() => {
 });
 
 describe("useWorkbookFindController", () => {
+  test("replaces across visible sheets as one undo step while preserving strings and formulas", () => {
+    const { controller, workbook, session } = mountController();
+    const sheet = getActiveSheet(workbook);
+    const beta = workbook.sheets.get("beta")!;
+    const hidden = workbook.sheets.get("hidden")!;
+    setCellValue(sheet, { row: 0, column: 0 }, "0012");
+    setCellValue(beta, { row: 0, column: 0 }, "12 cats");
+    setCellContent(beta, { row: 1, column: 0 }, { kind: "formula", formula: { source: "=12+1" } });
+    setCellContent(beta, { row: 2, column: 0 }, { kind: "formula", formula: { source: "=6+6" } });
+    setCellValue(hidden, { row: 0, column: 0 }, "12 hidden");
+    controller.updateQuery("12");
+    controller.replacement.value = "34";
+    controller.updateOptions({ scope: "workbook" });
+    controller.replaceAll();
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "0034",
+    });
+    expect(getCellContent(beta, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "34 cats",
+    });
+    expect(getCellContent(beta, { row: 1, column: 0 })).toEqual({
+      kind: "formula",
+      formula: { source: "=34+1" },
+    });
+    expect(getCellContent(beta, { row: 2, column: 0 })).toEqual({
+      kind: "formula",
+      formula: { source: "=6+6" },
+    });
+    expect(getCellContent(hidden, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "12 hidden",
+    });
+    expect(session.history.undoStack).toHaveLength(1);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "0012",
+    });
+    expect(getCellContent(beta, { row: 1, column: 0 })).toEqual({
+      kind: "formula",
+      formula: { source: "=12+1" },
+    });
+  });
+
+  test("first locates a replaceable match, then replaces it and allows an empty replacement", () => {
+    const { controller, workbook, navigated, session } = mountController();
+    const sheet = getActiveSheet(workbook);
+    setCellValue(sheet, { row: 1, column: 0 }, "needle");
+    setCellValue(sheet, { row: 2, column: 0 }, "needle");
+    controller.updateQuery("needle");
+    controller.replace();
+    expect(navigated.at(-1)?.address).toEqual({ row: 1, column: 0 });
+    expect(session.history.undoStack).toHaveLength(0);
+    controller.replace();
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toBeNull();
+    expect(navigated.at(-1)?.address).toEqual({ row: 2, column: 0 });
+    expect(session.history.undoStack).toHaveLength(1);
+  });
+
+  test("replaces line break tokens and suspends format filtering when collapsed", () => {
+    const { controller, workbook } = mountController();
+    const sheet = getActiveSheet(workbook);
+    setCellValue(sheet, { row: 0, column: 0 }, "a\nb");
+    setCellValue(sheet, { row: 1, column: 0 }, "c\nd");
+    setCellStyle(sheet, { row: 0, column: 0 }, { fillColor: "#ff0000" });
+    controller.updateQuery("^l");
+    controller.replacement.value = "'";
+    controller.setFormat({ style: { fillColor: "#ff0000" }, keys: ["fillColor"] });
+    controller.setOptionsExpanded(true);
+    controller.replaceAll();
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({ kind: "literal", value: "a'b" });
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toEqual({
+      kind: "literal",
+      value: "c\nd",
+    });
+    controller.setOptionsExpanded(false);
+    controller.replacement.value = "^l^l";
+    controller.replaceAll();
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toEqual({
+      kind: "literal",
+      value: "c\n\nd",
+    });
+  });
+
+  test("does not partially replace when a sheet is protected", () => {
+    const { controller, workbook, session } = mountController();
+    const sheet = getActiveSheet(workbook);
+    const beta = workbook.sheets.get("beta")!;
+    setCellValue(sheet, { row: 0, column: 0 }, "needle");
+    setCellValue(beta, { row: 0, column: 0 }, "needle");
+    beta.properties.protected = true;
+    controller.updateOptions({ scope: "workbook" });
+    controller.updateQuery("needle");
+    controller.replacement.value = "new";
+    controller.replaceAll();
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "needle",
+    });
+    expect(session.history.undoStack).toHaveLength(0);
+    expect(controller.status.value).toBeTruthy();
+  });
+
+  test("applies replacement text and selected format keys in one undo entry", () => {
+    const { controller, workbook, session } = mountController();
+    const sheet = getActiveSheet(workbook);
+    setCellValue(sheet, { row: 0, column: 0 }, "needle");
+    setCellStyle(sheet, { row: 0, column: 0 }, { bold: true, fillColor: "#ff0000" });
+    controller.updateQuery("needle");
+    controller.replacement.value = "changed";
+    controller.setOptionsExpanded(true);
+    controller.setReplacementFormat({ style: { fillColor: "#0000ff" }, keys: ["fillColor"] });
+    controller.replaceAll();
+
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "changed",
+    });
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toMatchObject({
+      bold: true,
+      fillColor: "#0000ff",
+    });
+    expect(session.history.undoStack).toHaveLength(1);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "needle",
+    });
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toMatchObject({
+      bold: true,
+      fillColor: "#ff0000",
+    });
+  });
+
+  test("supports format-only and same-text replacement when expanded", () => {
+    const { controller, workbook, session } = mountController();
+    const sheet = getActiveSheet(workbook);
+    setCellValue(sheet, { row: 0, column: 0 }, "needle");
+    setCellValue(sheet, { row: 1, column: 0 }, "other");
+    setCellStyle(sheet, { row: 0, column: 0 }, { fillColor: "#ff0000", italic: true });
+    setCellStyle(sheet, { row: 1, column: 0 }, { fillColor: "#00ff00" });
+    controller.setOptionsExpanded(true);
+    controller.setFormat({ style: { fillColor: "#ff0000" }, keys: ["fillColor"] });
+    controller.setReplacementFormat({ style: { bold: true }, keys: ["bold"] });
+    controller.replaceAll();
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "needle",
+    });
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toMatchObject({ italic: true, bold: true });
+    expect(getCellStyle(sheet, { row: 1, column: 0 })).not.toHaveProperty("bold");
+    expect(session.history.undoStack).toHaveLength(1);
+
+    controller.updateQuery("needle");
+    controller.replacement.value = "needle";
+    controller.setReplacementFormat({ style: { fillColor: "#0000ff" }, keys: ["fillColor"] });
+    controller.replaceAll();
+    expect(getCellStyle(sheet, { row: 0, column: 0 })).toMatchObject({ fillColor: "#0000ff" });
+    expect(session.history.undoStack).toHaveLength(2);
+  });
   test("moves through visible sheets and wraps next and previous in row order", () => {
     const { controller, workbook, navigated } = mountController();
     const summary = getActiveSheet(workbook);

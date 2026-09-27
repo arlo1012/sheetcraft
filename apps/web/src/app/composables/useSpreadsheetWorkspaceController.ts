@@ -11,6 +11,7 @@ import {
 } from "vue";
 import {
   createAddSheetCommand,
+  createBatchSetCellContentsCommand,
   createAdjustCellIndentCommand,
   createAdjustCellNumberFormatDecimalsCommand,
   createApplyCellBordersCommand,
@@ -77,13 +78,20 @@ import { doMergedCellRangesIntersect } from "@idea10/core";
 import {
   getCellDataValidation,
   resolveDataValidationListValues,
+  validateCellContentDataValidation,
 } from "@idea10/core/data-validation";
 import { validateDuplicateEntries } from "@idea10/core/duplicate-values";
 import { WorkbookDomainError } from "@idea10/core/errors";
 import type { IdFactory } from "@idea10/core/runtime";
 import { useWorkbookFindController } from "../../modules/workbook/composables/useWorkbookFindController";
+import { useWorkbookGoToController } from "../../modules/workbook/composables/useWorkbookGoToController";
 import { getSelectionSummary } from "@idea10/core/selection-summary";
-import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
+import {
+  mergeCellStyle,
+  type CellBorderAction,
+  type CellBorderFormatPatch,
+  type CellStylePatch,
+} from "@idea10/core/style";
 import {
   getSelectionCellStyleState,
   getSelectionBorderState,
@@ -166,6 +174,8 @@ export type SheetGridNavigator = {
   focusGrid(): void;
   handleReferenceKeydown?(event: KeyboardEvent): boolean;
   navigateToCell(address: CellAddress): void;
+  navigateToRange?(range: CellRange): void;
+  selectFloatingImage?(id: string | null): void;
   scrollHorizontally?(position: number, allowExpansion?: boolean): void;
   fitSelectionToViewport?(): void;
 };
@@ -1369,6 +1379,42 @@ export function useSpreadsheetWorkspaceController(
     getRevision: () => [workbookVersion.value, calculationVersion.value],
     getAddress: () => activeAddress.value,
     getEvaluator: (sheetId) => calculation.getEvaluator(sheetId),
+    applyReplacements: (changes, replacementFormat) => {
+      const changesWithFormat = changes.map((change) => {
+        if (!replacementFormat) return change;
+        const sheet = session.workbook.sheets.get(change.sheetId);
+        const patch = Object.fromEntries(
+          replacementFormat.keys.map((key) => [key, replacementFormat.style[key] ?? null]),
+        ) as CellStylePatch;
+        return {
+          ...change,
+          style: sheet ? mergeCellStyle(getCellStyle(sheet, change.address), patch) : null,
+        };
+      });
+      for (const change of changesWithFormat) {
+        const sheet = session.workbook.sheets.get(change.sheetId);
+        if (!sheet || sheet.properties.protected) return false;
+        const rule = getCellDataValidation(sheet, change.address);
+        if (
+          rule &&
+          rule.showError !== false &&
+          !validateCellContentDataValidation(rule, change.content, {
+            workbook: session.workbook,
+            sheet,
+            address: change.address,
+          }).valid
+        )
+          return false;
+      }
+      return execute(
+        createBatchSetCellContentsCommand(changesWithFormat, {
+          reconcileBorders: Boolean(
+            replacementFormat?.keys.some((key) => key.startsWith("border")),
+          ),
+        }),
+        "cells.edit",
+      );
+    },
     navigate: (result) => {
       if (result.sheetId === activeSheet.value.id) {
         gridRef.value?.navigateToCell(result.address);
@@ -1384,6 +1430,29 @@ export function useSpreadsheetWorkspaceController(
     feedback: (feedback) => (feedback ? showWorkspaceStatus(feedback) : clearWorkspaceStatus()),
   });
   const searchQuery = workbookFind.query;
+  const workbookGoTo = useWorkbookGoToController({
+    getWorkbook: () => session.workbook,
+    getRevision: () => [workbookVersion.value, calculationVersion.value],
+    getSelection: () => activeSelectionRange.value,
+    getAddress: () => activeAddress.value,
+    getEvaluator: (sheetId) => calculation.getEvaluator(sheetId),
+    navigate: (sheetId, target) => {
+      const navigate = () => {
+        if (gridRef.value?.navigateToRange) gridRef.value.navigateToRange(target.range);
+        else gridRef.value?.navigateToCell(target.range.start);
+        if (target.imageId) gridRef.value?.selectFloatingImage?.(target.imageId);
+      };
+      if (sheetId === activeSheet.value.id) navigate();
+      else {
+        selectSheet(sheetId);
+        const generation = workbookGeneration.value;
+        void nextTick(() => {
+          if (generation === workbookGeneration.value && sheetId === activeSheet.value.id)
+            navigate();
+        });
+      }
+    },
+  });
   const updateSearchQuery = workbookFind.updateQuery;
   const findCell = workbookFind.find;
 
@@ -1455,6 +1524,7 @@ export function useSpreadsheetWorkspaceController(
     viewStates,
     searchQuery,
     workbookFind,
+    workbookGoTo,
     t,
     activeSheet,
     sheets,
