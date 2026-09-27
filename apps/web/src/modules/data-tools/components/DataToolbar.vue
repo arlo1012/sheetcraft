@@ -217,14 +217,14 @@ const { t } = useAppI18n();
           :text="t('dataTools.outline.expandShort')"
           data-data-action="expand"
           @activate="emit('expand')"
-          ><SquarePlus :size="16" /></RibbonButton
+          ><SquarePlus :size="14" /></RibbonButton
         ><RibbonButton
           :disabled="disabled || !capabilities.collapse"
           :label="t('dataTools.outline.collapse')"
           :text="t('dataTools.outline.collapseShort')"
           data-data-action="collapse"
           @activate="emit('collapse')"
-          ><SquareMinus :size="16"
+          ><SquareMinus :size="14"
         /></RibbonButton>
       </div>
     </section>
