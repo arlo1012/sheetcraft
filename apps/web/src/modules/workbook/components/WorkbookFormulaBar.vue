@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { ChevronDown, ChevronUp, Eye, EyeOff, Search } from "lucide-vue-next";
-import { Button } from "tdesign-vue-next/es/button";
+import { ChevronDown, Eye, Search } from "lucide-vue-next";
 import { Textarea } from "tdesign-vue-next/es/textarea";
 import { vNativeControl } from "../../../shared/tdesign/native-control";
 import { useAppI18n } from "../../../shared/i18n";
@@ -53,8 +52,14 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 const formulaInput = ref<HTMLTextAreaElement>();
-const searchTrigger = ref<InstanceType<typeof Button>>();
+const searchTrigger = ref<InstanceType<typeof Search>>();
 const expanded = ref(false);
+
+function openFormulaEditor(): void {
+  if (!props.readOnly && !props.formulaEditorDisabled && !isComposing.value) {
+    emit("openFormulaEditor");
+  }
+}
 
 function setFormulaInput(element: HTMLInputElement | HTMLTextAreaElement | null): void {
   formulaInput.value = element instanceof HTMLTextAreaElement ? element : undefined;
@@ -376,32 +381,35 @@ defineExpose({
 
     <div class="workbook-formula-bar__editor">
       <div class="workbook-formula-bar__leading-actions" :data-cell-edit-session="editSession.id">
-        <Button
-          variant="text"
-          shape="square"
+        <Eye
+          class="workbook-formula-bar__action"
+          :size="15"
+          role="button"
+          :tabindex="isComposing ? -1 : 0"
           :aria-label="t(previewing ? 'formulaBar.showFormula' : 'formulaBar.previewResult')"
           :title="t(previewing ? 'formulaBar.showFormula' : 'formulaBar.previewResult')"
           :aria-pressed="previewing ?? false"
-          :disabled="isComposing"
+          :aria-disabled="isComposing"
           data-formula-preview-trigger
           @mousedown.prevent
-          @click="emit('updatePreviewing', !previewing)"
-        >
-          <EyeOff v-if="previewing" :size="15" aria-hidden="true" />
-          <Eye v-else :size="15" aria-hidden="true" />
-        </Button>
-        <Button
-          variant="text"
-          shape="square"
+          @click="!isComposing && emit('updatePreviewing', !previewing)"
+          @keydown.enter.prevent="!isComposing && emit('updatePreviewing', !previewing)"
+          @keydown.space.prevent="!isComposing && emit('updatePreviewing', !previewing)"
+        />
+        <span
+          class="workbook-formula-bar__action workbook-formula-bar__fx"
+          role="button"
+          :tabindex="readOnly || formulaEditorDisabled || isComposing ? -1 : 0"
           :aria-label="t('formulaBar.openEditor')"
           :title="t('formulaBar.openEditor')"
-          :disabled="readOnly || formulaEditorDisabled || isComposing"
+          :aria-disabled="readOnly || formulaEditorDisabled || isComposing"
           aria-haspopup="dialog"
           data-formula-editor-trigger
-          @click="emit('openFormulaEditor')"
+          @click="openFormulaEditor"
+          @keydown.enter.prevent="openFormulaEditor"
+          @keydown.space.prevent="openFormulaEditor"
+          >fx</span
         >
-          <span class="workbook-formula-bar__fx" aria-hidden="true">fx</span>
-        </Button>
       </div>
       <div class="workbook-formula-bar__formula">
         <span class="ui-visually-hidden">
@@ -467,10 +475,12 @@ defineExpose({
           @text-edit="applyFormulaTextEdit"
         />
       </div>
-      <Button
-        class="workbook-formula-bar__expand-trigger"
-        variant="text"
-        shape="square"
+      <ChevronDown
+        class="workbook-formula-bar__action workbook-formula-bar__expand-trigger"
+        :class="{ 'is-expanded': expanded }"
+        :size="15"
+        role="button"
+        tabindex="0"
         :aria-label="t(expanded ? 'formulaBar.collapse' : 'formulaBar.expand')"
         :title="t(expanded ? 'formulaBar.collapse' : 'formulaBar.expand')"
         :aria-expanded="expanded"
@@ -478,25 +488,25 @@ defineExpose({
         data-formula-expand-trigger
         @mousedown.prevent
         @click="expanded = !expanded"
-      >
-        <ChevronUp v-if="expanded" :size="15" aria-hidden="true" />
-        <ChevronDown v-else :size="15" aria-hidden="true" />
-      </Button>
+        @keydown.enter.prevent="expanded = !expanded"
+        @keydown.space.prevent="expanded = !expanded"
+      />
     </div>
-    <Button
+    <Search
       ref="searchTrigger"
-      class="workbook-formula-bar__search-trigger"
-      variant="text"
-      shape="square"
+      class="workbook-formula-bar__action workbook-formula-bar__search-trigger"
+      :size="15"
+      role="button"
+      tabindex="0"
       :aria-label="t('navigation.findInSheet')"
       :title="t('navigation.findInSheet')"
       aria-haspopup="dialog"
       :aria-expanded="searchOpen ?? false"
       data-search-trigger
       @click="emit('openSearch')"
-    >
-      <Search :size="15" aria-hidden="true" />
-    </Button>
+      @keydown.enter.prevent="emit('openSearch')"
+      @keydown.space.prevent="emit('openSearch')"
+    />
   </div>
 </template>
 
@@ -527,8 +537,31 @@ defineExpose({
     inset-inline-start: 1px;
     display: inline-flex;
     align-items: center;
+    justify-content: space-around;
+    width: 56px;
     height: 28px;
     color: var(--idea-text-secondary);
+  }
+
+  &__action {
+    flex: none;
+    cursor: pointer;
+    color: var(--idea-text-secondary);
+
+    &:hover,
+    &[aria-pressed="true"] {
+      color: var(--idea-text-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--idea-action-primary);
+      outline-offset: 3px;
+    }
+
+    &[aria-disabled="true"] {
+      cursor: default;
+      opacity: 0.4;
+    }
   }
 
   &__fx {
@@ -540,13 +573,17 @@ defineExpose({
   &__expand-trigger {
     position: absolute;
     z-index: 2;
-    inset-block-start: 0;
-    inset-inline-end: 1px;
-    color: var(--idea-text-secondary);
+    inset-block-start: 6.5px;
+    inset-inline-end: 7px;
+
+    &.is-expanded {
+      transform: rotate(180deg);
+    }
   }
 
   &__search-trigger {
-    color: var(--idea-text-secondary);
+    justify-self: center;
+    margin-top: 6.5px;
   }
 
   @media (max-width: 520px) {
