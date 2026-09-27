@@ -1,4 +1,4 @@
-import { DOMWrapper, mount } from "@vue/test-utils";
+import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import WorkbookFindDialog from "../../../../../modules/workbook/components/WorkbookFindDialog.vue";
@@ -84,11 +84,13 @@ describe("WorkbookFindDialog", () => {
       props: { visible: true, query: "other", history: ["^l", "1"] },
     });
     const input = new DOMWrapper(document.body).get<HTMLInputElement>("[data-search-input] input");
+    await input.trigger("focus");
     await input.trigger("keydown", { key: "ArrowDown" });
     await input.trigger("keydown", { key: "Enter" });
     expect(wrapper.emitted("updateQuery")?.at(-1)).toEqual(["^l"]);
     expect(wrapper.emitted("find")).toBeUndefined();
     await wrapper.setProps({ query: "^l" });
+    await flushPromises();
     await input.trigger("keydown", { key: "Enter" });
     expect(wrapper.emitted("find")).toEqual([["forward"]]);
     wrapper.unmount();
