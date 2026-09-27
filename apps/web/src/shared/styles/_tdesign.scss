@@ -241,7 +241,15 @@
   }
 
   &.is-expanded .t-textarea__inner {
-    height: calc(var(--td-comp-size-m) + 4 * var(--td-line-height-body-medium));
+    height: min(calc(var(--td-comp-size-m) + 4 * var(--td-line-height-body-medium)), 40dvh);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    scrollbar-width: thin;
+    box-shadow: var(--idea-shadow-menu);
+
+    &::-webkit-scrollbar {
+      display: block;
+    }
   }
 }
 

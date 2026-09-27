@@ -386,7 +386,7 @@ defineExpose({
       @navigate="emit('navigate', $event)"
     />
 
-    <div class="workbook-formula-bar__editor">
+    <div class="workbook-formula-bar__editor" :class="{ 'is-expanded': expanded }">
       <div class="workbook-formula-bar__leading-actions" :data-cell-edit-session="editSession.id">
         <Eye
           class="workbook-formula-bar__action"
@@ -440,7 +440,7 @@ defineExpose({
               'data-cell-edit-session': editSession.id,
               'data-cell-edit-surface': 'formula-bar',
               rows: expanded ? 5 : 1,
-              wrap: 'off',
+              wrap: expanded ? 'soft' : 'off',
               autocomplete: 'off',
               spellcheck: false,
             },
@@ -546,6 +546,17 @@ defineExpose({
   &__editor {
     position: relative;
     min-width: 0;
+
+    &.is-expanded {
+      z-index: 30;
+      height: var(--td-comp-size-m);
+
+      .workbook-formula-bar__formula {
+        position: absolute;
+        inset-block-start: 0;
+        inset-inline: 0;
+      }
+    }
   }
 
   &__formula {
