@@ -111,10 +111,7 @@ function selectIssues(keys: Array<string | number>): void {
       </div>
 
       <p v-if="error" class="data-proofreading-dialog__error" role="alert">{{ error }}</p>
-      <p v-else-if="issues.length" class="data-proofreading-dialog__summary">
-        {{ t("proofreading.issues", { count: issues.length }) }}
-      </p>
-      <p v-else class="data-proofreading-dialog__empty">
+      <p v-else-if="!issues.length" class="data-proofreading-dialog__empty">
         {{ hasScanned ? t("proofreading.noIssues") : t("proofreading.scanHint") }}
       </p>
 
@@ -193,7 +190,10 @@ function selectIssues(keys: Array<string | number>): void {
     </div>
     <template #footer>
       <div class="data-proofreading-dialog__footer">
-        <span>{{ t("proofreading.selected", { count: safeSelectedCount }) }}</span>
+        <div class="data-proofreading-dialog__summary" aria-live="polite">
+          <span v-if="issues.length">{{ t("proofreading.issues", { count: issues.length }) }}</span>
+          <span>{{ t("proofreading.selected", { count: safeSelectedCount }) }}</span>
+        </div>
         <div class="data-proofreading-dialog__footer-actions">
           <TButton theme="default" :disabled="busy" @click="emit('close')">{{
             t("proofreading.close")
@@ -218,6 +218,7 @@ function selectIssues(keys: Array<string | number>): void {
 
   &__toolbar,
   &__footer,
+  &__summary,
   &__footer-actions,
   &__actions {
     display: flex;
@@ -236,6 +237,10 @@ function selectIssues(keys: Array<string | number>): void {
   &__empty {
     margin: 0;
     color: var(--idea-text-secondary);
+  }
+  &__summary {
+    flex-wrap: wrap;
+    gap: 12px;
   }
   &__actions {
     justify-content: center;

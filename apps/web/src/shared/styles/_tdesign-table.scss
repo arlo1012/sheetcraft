@@ -63,8 +63,8 @@
   }
 }
 
-// 不存在边框 且 .t-table__content 内容高度溢出产生上下滚动条的表格
-.t-table:not(.t-table--bordered).t-table--header-fixed {
+// 外框已经绘制底边，最后一行不再叠加底线；有无纵向滚动均保持一致。
+.t-table:not(.t-table--bordered) {
   .t-table__body > tr:last-child > td {
     border-bottom: none;
   }
