@@ -66,14 +66,12 @@ function applyColor(color: string | null): void {
           </g>
           <rect
             class="cell-color-control__indicator"
-            x="0.5"
-            y="18.5"
-            width="23"
-            height="5"
-            rx="0.75"
-            stroke="currentColor"
-            stroke-width="0.8"
-            stroke-opacity="0.25"
+            x="1.5"
+            y="19"
+            width="21"
+            height="4"
+            rx="1.5"
+            stroke="none"
             data-color-indicator
           />
         </svg>
