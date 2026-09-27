@@ -293,7 +293,7 @@ describe("HomeFormatToolbar", () => {
       '[data-ribbon-group]:not([data-ribbon-group="history"]) button, input',
     )) {
       if (
-        ["auto-sum", "protect", "convert-number"].includes(
+        ["auto-sum", "protect", "convert-number", "open-data-tools"].includes(
           control.attributes("data-ribbon-action") ?? "",
         )
       )
@@ -321,7 +321,7 @@ describe("HomeFormatToolbar", () => {
     expect(wrapper.emitted("autoSum")).toHaveLength(1);
   });
 
-  test("renders ordered two-row tool groups", () => {
+  test("renders ordered two-row tool groups", async () => {
     const wrapper = mountToolbar();
 
     const groups = wrapper.findAll("[data-ribbon-group]");
@@ -418,12 +418,10 @@ describe("HomeFormatToolbar", () => {
     const autoSum = wrapper.get('[data-ribbon-action="auto-sum"]');
     expect(autoSum.attributes("data-ribbon-row")).toBe("1");
     expect(autoSum.attributes("data-ribbon-placeholder")).toBeUndefined();
-    expect(
-      wrapper
-        .get('[data-ribbon-stack="sum-data"]')
-        .findAll("[data-ribbon-placeholder]")
-        .map((action) => action.attributes("data-ribbon-placeholder")),
-    ).toEqual(["data"]);
+    const openDataTools = wrapper.get('[data-ribbon-action="open-data-tools"]');
+    expect(openDataTools.attributes("data-ribbon-placeholder")).toBeUndefined();
+    await openDataTools.trigger("click");
+    expect(wrapper.emitted("openDataTools")).toHaveLength(1);
 
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="undo"]')).toBeTruthy();
     expect(wrapper.get('[data-ribbon-group="history"] [data-ribbon-action="redo"]')).toBeTruthy();
@@ -442,7 +440,7 @@ describe("HomeFormatToolbar", () => {
     expect(
       wrapper.get('[data-ribbon-group="alignment"] [data-ribbon-action="wrap-text"]'),
     ).toBeTruthy();
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(13);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(12);
     for (const placeholder of wrapper.findAll("[data-ribbon-placeholder]")) {
       expect(placeholder.element).toBeInstanceOf(HTMLButtonElement);
       expect(placeholder.attributes()).toMatchObject({

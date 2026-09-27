@@ -20,6 +20,8 @@ import type {
   SheetSparseDimension,
   SheetSparseState,
   FloatingImage,
+  SheetDataValidation,
+  SheetOutlineGroup,
   DefinedName,
 } from "../workbook.js";
 
@@ -219,12 +221,151 @@ export type SetSheetFilterCommand = {
 
 export type SortDirection = "ascending" | "descending";
 
+export type SortKey = {
+  column: number;
+  direction: SortDirection;
+  /** Omitted retains value sorting for saved commands created before color sorting. */
+  sortOn?: "value" | "cellColor" | "fontColor";
+  /** Explicit value order for value sorts. Unlisted values use the ordinary value comparison. */
+  customOrder?: string[];
+  /** Required by color sorts. `null` selects cells without a fill for `cellColor`. */
+  color?: string | null;
+};
+
 export type SortSheetRangeCommand = {
   type: "sortSheetRange";
   sheetId: string;
   range: CellRange;
   keyColumn: number;
   direction: SortDirection;
+  sortKeys?: SortKey[];
+  hasHeader?: boolean;
+  /** Omitted preserves the legacy case-sensitive text ordering. */
+  caseSensitive?: boolean;
+};
+export type AdvancedFilterCommand = {
+  type: "advancedFilter";
+  sheetId: string;
+  listRange: CellRange;
+  criteria?: { sheetId: string; range: CellRange };
+  mode: "inPlace" | "copy";
+  destination?: { sheetId: string; address: CellAddress };
+  uniqueOnly: boolean;
+  overwrite: boolean;
+};
+export type SplitTextMode = "delimiter" | "fixedWidth" | "textType" | "keyword";
+export type SplitTextType = "chinese" | "english" | "number";
+export type SplitDateOrder = "YMD" | "MDY" | "DMY" | "YDM" | "MYD" | "DYM";
+
+/** Runtime-neutral rules for turning one text value into fields. */
+export type SplitTextOptions = {
+  mode: SplitTextMode;
+  /** Legacy delimiter syntax: every character is an independent delimiter. */
+  delimiter?: string;
+  /** Atomic delimiter tokens. Longer tokens take precedence over shorter ones. */
+  delimiters?: string[];
+  fixedWidths?: number[];
+  textQualifier?: '"' | "'" | "none";
+  mergeDelimiters?: boolean;
+  parseQuoted?: boolean;
+  textTypes?: SplitTextType[];
+  keywords?: string[];
+  keywordPosition?: "before" | "after";
+  keepKeywords?: boolean;
+};
+
+export type SplitColumnCommand = SplitTextOptions & {
+  type: "splitColumn";
+  sheetId: string;
+  sourceColumn: number;
+  range?: CellRange;
+  destinationColumn: number;
+  /** Output conversions. Skipped source fields do not consume a destination column. */
+  columnTypes?: Array<"general" | "text" | "date" | "skip">;
+  /** Date component order for each output field when its type is `date`. */
+  dateOrders?: SplitDateOrder[];
+  /** Zero-based output start row; defaults to the first source row. */
+  destinationRow?: number;
+  overwrite?: boolean;
+};
+export type RemoveDuplicatesCommand = {
+  type: "removeDuplicates";
+  sheetId: string;
+  range: CellRange;
+  keyColumns: number[];
+  hasHeader?: boolean;
+};
+export type ApplySubtotalsCommand = {
+  type: "applySubtotals";
+  sheetId: string;
+  range: CellRange;
+  groupByColumns: number[];
+  summaryColumns: number[];
+  operation: "sum" | "count" | "average" | "min" | "max" | "product";
+  hasHeader?: boolean;
+  subtotalId?: string;
+  labels?: { subtotal: string; grandTotal: string };
+  replaceExisting?: boolean;
+  pageBreaks?: boolean;
+  summaryBelow?: boolean;
+};
+export type RemoveSubtotalsCommand = {
+  type: "removeSubtotals";
+  sheetId: string;
+  subtotalId?: string;
+};
+
+export type SetSheetDataValidationsCommand = {
+  type: "setSheetDataValidations";
+  sheetId: string;
+  rules: SheetDataValidation[];
+};
+export type ClearSheetDataValidationsCommand = {
+  type: "clearSheetDataValidations";
+  sheetId: string;
+  range?: CellRange;
+};
+export type AddSheetOutlineGroupCommand = {
+  type: "addSheetOutlineGroup";
+  sheetId: string;
+  group: SheetOutlineGroup;
+};
+export type RemoveSheetOutlineGroupCommand = {
+  type: "removeSheetOutlineGroup";
+  sheetId: string;
+  id: string;
+};
+export type SetSheetOutlineGroupCollapsedCommand = {
+  type: "setSheetOutlineGroupCollapsed";
+  sheetId: string;
+  id: string;
+  collapsed: boolean;
+};
+/** Sets multiple outline controls in one history operation. */
+export type SetSheetOutlineGroupsCollapsedCommand = {
+  type: "setSheetOutlineGroupsCollapsed";
+  sheetId: string;
+  ids: string[];
+  collapsed: boolean;
+};
+export type SetSheetOutlineLevelCommand = {
+  type: "setSheetOutlineLevel";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  level: number;
+};
+/** Removes all row and column outline groups while preserving sheet contents and dimensions. */
+export type ClearSheetOutlineCommand = {
+  type: "clearSheetOutline";
+  sheetId: string;
+};
+/** Lowers the outline level for the selected row or column band by one. */
+export type UngroupSheetRangeCommand = {
+  type: "ungroupSheetRange";
+  sheetId: string;
+  axis: SheetDimensionAxis;
+  start: number;
+  end: number;
 };
 
 export type AddSheetCommand = {
@@ -367,6 +508,19 @@ export type RestoreFullSheetStateCommand = {
   type: "restoreSheetState";
   sheetId: string;
   state: SheetSparseState;
+  workbookFormulaSources?: FormulaSourceRestore[];
+  definedNames?: DefinedName[];
+};
+export type SetSheetDuplicateRulesCommand = {
+  type: "setSheetDuplicateRules";
+  sheetId: string;
+  rules: import("../workbook.js").SheetDuplicateRule[];
+};
+export type ClearSheetDuplicateRulesCommand = {
+  type: "clearSheetDuplicateRules";
+  sheetId: string;
+  kind: "highlight" | "reject";
+  range?: CellRange;
 };
 
 export type SheetAxisSparseSlice = {
@@ -440,6 +594,22 @@ export type WorkbookCommand =
   | UnmergeCellsCommand
   | SetSheetFilterCommand
   | SortSheetRangeCommand
+  | AdvancedFilterCommand
+  | SplitColumnCommand
+  | RemoveDuplicatesCommand
+  | ApplySubtotalsCommand
+  | RemoveSubtotalsCommand
+  | SetSheetDataValidationsCommand
+  | SetSheetDuplicateRulesCommand
+  | ClearSheetDuplicateRulesCommand
+  | ClearSheetDataValidationsCommand
+  | AddSheetOutlineGroupCommand
+  | RemoveSheetOutlineGroupCommand
+  | SetSheetOutlineGroupCollapsedCommand
+  | SetSheetOutlineGroupsCollapsedCommand
+  | SetSheetOutlineLevelCommand
+  | ClearSheetOutlineCommand
+  | UngroupSheetRangeCommand
   | SetFloatingImageCommand
   | DeleteFloatingImageCommand
   | ConvertFloatingImageToCellCommand
@@ -477,6 +647,10 @@ export type WorkbookOperation =
   | "cells.unmerge"
   | "data.filter"
   | "data.sort"
+  | "data.validation"
+  | "data.outline"
+  | "data.transform"
+  | "data.subtotal"
   | "images.floating.set"
   | "images.floating.delete"
   | "images.floating.convert"
@@ -545,6 +719,28 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "data.filter";
     case "sortSheetRange":
       return "data.sort";
+    case "advancedFilter":
+      return "data.filter";
+    case "splitColumn":
+    case "removeDuplicates":
+      return "data.transform";
+    case "applySubtotals":
+    case "removeSubtotals":
+      return "data.subtotal";
+    case "setSheetDataValidations":
+    case "clearSheetDataValidations":
+      return "data.validation";
+    case "setSheetDuplicateRules":
+    case "clearSheetDuplicateRules":
+      return "data.validation";
+    case "addSheetOutlineGroup":
+    case "removeSheetOutlineGroup":
+    case "setSheetOutlineGroupCollapsed":
+    case "setSheetOutlineGroupsCollapsed":
+    case "setSheetOutlineLevel":
+    case "clearSheetOutline":
+    case "ungroupSheetRange":
+      return "data.outline";
     case "setFloatingImage":
       return "images.floating.set";
     case "deleteFloatingImage":

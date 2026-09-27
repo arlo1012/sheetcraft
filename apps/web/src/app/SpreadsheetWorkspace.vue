@@ -1,14 +1,48 @@
 <script setup lang="ts">
+import { formatCellAddress } from "@idea10/core/coordinates";
 import { computed, nextTick, ref, shallowRef, shallowReactive, useId, watch } from "vue";
-import type { CellFormatChange } from "@idea10/core/commands";
+import {
+  createSetSheetOutlineGroupCollapsedCommand,
+  createSetSheetOutlineLevelCommand,
+  type CellFormatChange,
+} from "@idea10/core/commands";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { useWorkbookFullscreen } from "../modules/workbook/composables/useWorkbookFullscreen";
 import { useEyeComfortMode } from "../modules/workbook/composables/useEyeComfortMode";
 import { normalizeSheetZoom, SHEET_ZOOM_STEP } from "../shared/sheet-view/zoom";
 import { useCellEditSession } from "../shared/cell-editing/useCellEditSession";
 import { useFormulaToolsController } from "../modules/formula-tools/useFormulaToolsController";
-import NamedRangePicker from "../modules/formula-tools/components/NamedRangePicker.vue";
-import { useNamedRangePicker } from "../modules/formula-tools/useNamedRangePicker";
+import { useDataToolsController } from "../modules/data-tools/useDataToolsController";
+import { useDuplicateErrorChecks } from "../modules/data-tools/useDuplicateErrorChecks";
+import type { ErrorCheckSettings } from "../modules/data-tools/duplicate-error-preferences";
+import DuplicateErrorCheckOptionsDialog from "../modules/data-tools/components/DuplicateErrorCheckOptionsDialog.vue";
+import DataTableDialog from "../modules/data-tools/components/DataTableDialog.vue";
+import GoalSeekDialog from "../modules/data-tools/components/GoalSeekDialog.vue";
+import PlanningSolverDialog from "../modules/data-tools/components/PlanningSolverDialog.vue";
+import DataProofreadingDialog from "../modules/data-tools/components/DataProofreadingDialog.vue";
+import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
+import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
+import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
+import ConsolidateDialog from "../modules/data-tools/components/ConsolidateDialog.vue";
+import FillNumberSequenceDialog from "../modules/data-tools/components/FillNumberSequenceDialog.vue";
+import FillRankDialog from "../modules/data-tools/components/FillRankDialog.vue";
+import FillSeriesDialog from "../modules/data-tools/components/FillSeriesDialog.vue";
+import FillBlanksDialog from "../modules/data-tools/components/FillBlanksDialog.vue";
+import FillTextDialog from "../modules/data-tools/components/FillTextDialog.vue";
+import FillCurrentDateDialog from "../modules/data-tools/components/FillCurrentDateDialog.vue";
+import DropdownListDialog from "../modules/data-tools/components/DropdownListDialog.vue";
+import LookupFillDialog from "../modules/data-tools/components/LookupFillDialog.vue";
+import DataComparisonDialog from "../modules/data-tools/components/DataComparisonDialog.vue";
+import AdvancedFilterDialog from "../modules/data-tools/components/AdvancedFilterDialog.vue";
+import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
+import type { AdvancedFilterDraft } from "../modules/data-tools/data-tools-types";
+import FilterColumnPanel from "../modules/data-tools/components/FilterColumnPanel.vue";
+import DataValidationFeedbackDialog from "../modules/data-tools/components/DataValidationFeedbackDialog.vue";
+import RangeReferencePicker from "../shared/range-reference/RangeReferencePicker.vue";
+import {
+  useRangeReferencePicker,
+  type RangeReferenceSelectionOptions,
+} from "../shared/range-reference/useRangeReferencePicker";
 import NamedRangesDialog from "../modules/formula-tools/components/NamedRangesDialog.vue";
 import {
   createIndexedDbImageAssetStore,
@@ -50,7 +84,7 @@ import type { WorkbookStore } from "../modules/workbook-persistence/workbookStor
 import XlsxFileActions from "../modules/workbook-xlsx/components/XlsxFileActions.vue";
 import XlsxFileFeedback from "../modules/workbook-xlsx/components/XlsxFileFeedback.vue";
 import { useWorkbookXlsxActions } from "../modules/workbook-xlsx/useWorkbookXlsxActions";
-import type { SheetProperties } from "@idea10/core/workbook";
+import type { CellAddress, SheetDimensionAxis, SheetProperties } from "@idea10/core/workbook";
 
 const props = defineProps<{
   workbookStore?: WorkbookStore;
@@ -98,6 +132,8 @@ const {
   activeAddressLabel,
   activeCellInput,
   activeSelectionRange,
+  activeSelectionMode,
+  fillSelection,
   activeSheetEvaluator,
   isFormattingSupported,
   activeSelectionStyle,
@@ -105,8 +141,13 @@ const {
   activeSelectionSummary,
   setSelectionDragging,
   dataToolState,
+  activeValidationInfo,
+  validationFeedback,
+  acceptValidationInput,
+  dismissValidationInput,
   mergeState,
   commitCell,
+  commitCellValue,
   setCellImage,
   setFloatingImage,
   deleteFloatingImage,
@@ -153,10 +194,38 @@ const {
   undo,
   redo,
   setGridNavigator,
+  clearGridClipboard,
   scrollGridHorizontally,
 } = useSpreadsheetWorkspaceController();
 
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
+const duplicateInputError = computed(() => {
+  const feedback = validationFeedback.value;
+  if (feedback?.source !== "duplicate" || feedback.target.sheetId !== activeSheet.value.id)
+    return undefined;
+  return {
+    address: feedback.target.address,
+    title: t("dataTools.duplicates.rejectionTitle"),
+    message: t("dataTools.duplicates.rejectionMessage"),
+  };
+});
+const modalValidationFeedback = computed(() =>
+  duplicateInputError.value ? undefined : validationFeedback.value,
+);
+watch(
+  () => [
+    cellEditSession.state.active,
+    cellEditSession.state.draft,
+    cellEditSession.state.owner?.sheetId,
+    cellEditSession.state.owner?.address.row,
+    cellEditSession.state.owner?.address.column,
+    activeSheet.value.id,
+  ],
+  () => {
+    if (validationFeedback.value?.source === "duplicate") dismissValidationInput();
+  },
+  { flush: "sync" },
+);
 const { locale } = useAppI18n();
 const fillActions = createCellFillActions({
   getWorkbook: () => session.workbook,
@@ -164,6 +233,33 @@ const fillActions = createCellFillActions({
   getRevision: () => workbookRevision.value,
   execute: executeReplaceableCommand,
 });
+const canFillRows = computed(
+  () =>
+    activeSelectionMode.value === "cells" &&
+    activeSelectionRange.value.start.row < activeSelectionRange.value.end.row,
+);
+const canFillColumns = computed(
+  () =>
+    activeSelectionMode.value === "cells" &&
+    activeSelectionRange.value.start.column < activeSelectionRange.value.end.column,
+);
+async function fillFromDataToolbar(direction: FillDirection): Promise<void> {
+  if (
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    imageBusy.value ||
+    formatPainterActive.value
+  )
+    return;
+  if (!cellEditSession.finish()) return;
+  const generation = workbookGeneration.value;
+  const sheetId = activeSheet.value.id;
+  await nextTick();
+  if (generation !== workbookGeneration.value || sheetId !== activeSheet.value.id) return;
+  fillSelection(direction);
+  focusCellEditor();
+}
 const axisTools = createAxisToolActions({
   getSheet: () => activeSheet.value,
   getEvaluator: () => activeSheetEvaluator.value,
@@ -366,6 +462,429 @@ const formulaTools = useFormulaToolsController({
   focusFormulaBar: () => formulaBarRef.value?.focus({ preserveSelection: true }),
   recalculate,
 });
+const duplicateErrorChecks = useDuplicateErrorChecks({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getEvaluator: () => activeSheetEvaluator.value,
+  getRevision: () => workbookRevision.value,
+});
+const {
+  errorCells: duplicateErrorCells,
+  settings: duplicateCheckSettings,
+  ignoredCount: ignoredDuplicateCount,
+} = duplicateErrorChecks;
+const activeCellErrorKind = computed(() =>
+  duplicateErrorChecks.errorKinds.value.get(
+    `${activeAddress.value.row}:${activeAddress.value.column}`,
+  ),
+);
+const activeCellErrorDescription = computed(() =>
+  activeCellErrorKind.value === "number-stored-as-text"
+    ? {
+        numberConversion: true,
+        label: t("dataTools.duplicates.errorChecks.numberStoredAsText"),
+        message: t("dataTools.duplicates.errorChecks.numberStoredAsTextMessage"),
+        ignoreAllHint: t("dataTools.duplicates.errorChecks.ignoreAllNumberTextHint"),
+      }
+    : undefined,
+);
+const duplicateErrorOptionsVisible = ref(false);
+function openDuplicateErrorOptions(): void {
+  if (
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    imageBusy.value ||
+    !cellEditSession.finish()
+  )
+    return;
+  duplicateErrorOptionsVisible.value = true;
+}
+function closeDuplicateErrorOptions(): void {
+  duplicateErrorOptionsVisible.value = false;
+  void nextTick(focusCellEditor);
+}
+function confirmDuplicateErrorOptions(payload: {
+  settings: ErrorCheckSettings;
+  resetIgnored: boolean;
+}): void {
+  duplicateErrorChecks.applySettings(payload.settings, payload.resetIgnored);
+  closeDuplicateErrorOptions();
+}
+function convertCellErrorValues(scope: "cell" | "selection" | "sheet"): void {
+  if (loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value) return;
+  if (!cellEditSession.finish()) return;
+  convertNumberType("text-to-number", scope, { allowPrecisionLoss: true });
+  void nextTick(focusCellEditor);
+}
+function ignoreSelectedDuplicateErrors(): void {
+  duplicateErrorChecks.ignoreRange(activeSelectionRange.value);
+  void nextTick(focusCellEditor);
+}
+function ignoreAllDuplicateErrors(): void {
+  duplicateErrorChecks.ignoreAll(activeCellErrorKind.value);
+  void nextTick(focusCellEditor);
+}
+function editErrorInFormulaBar(): void {
+  if (!activeSheet.value.properties.protected) {
+    void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
+  }
+}
+watch([workbookGeneration, () => activeSheet.value.id], () => {
+  duplicateErrorOptionsVisible.value = false;
+});
+const dataTools = useDataToolsController({
+  getWorkbook: () => session.workbook,
+  getSelection: () => ({
+    address: activeAddress.value,
+    range: activeSelectionRange.value,
+    mode: activeSelectionMode.value,
+  }),
+  getSheetEvaluator: () => activeSheetEvaluator.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  navigateToCell: (sheetId, address) => {
+    if (activeSheet.value.id !== sheetId) selectSheet(sheetId);
+    void nextTick(() => navigateToAddress(formatCellAddress(address)));
+  },
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
+  execute: (command) => {
+    const changed = executeCommand(command);
+    if (changed) clearGridClipboard();
+    return changed;
+  },
+  flush: () => cellEditSession.finish(),
+  focusSheet: focusCellEditor,
+  recalculate,
+});
+const {
+  simulationDialog,
+  simulationBusy,
+  simulationError,
+  simulationResult,
+  goalSeekDraft,
+  planningDraft,
+  dataTableDraft,
+  dataTablePreview,
+  proofreadingVisible,
+  proofreadingHasScanned,
+  proofreadingDraft,
+  proofreadingIssues,
+  proofreadingError,
+  proofreadingBusy,
+  selectedProofreadingIssueIds,
+  disabled: dataToolsDisabled,
+  capabilities: dataToolCapabilities,
+  filterActive: dataFilterActive,
+  columns: dataToolColumns,
+  sortInitial: dataSortInitial,
+  rangeLabel: dataToolRangeLabel,
+  splitPreview: dataSplitPreview,
+  duplicateCount: dataDuplicateCount,
+  validationInitial: dataValidationInitial,
+  hasSubtotals: dataHasSubtotals,
+  filterState: dataFilterState,
+  sortVisible: dataSortVisible,
+  textToColumnsVisible: dataTextToColumnsVisible,
+  removeDuplicatesVisible: dataRemoveDuplicatesVisible,
+  validationVisible: dataValidationVisible,
+  subtotalVisible: dataSubtotalVisible,
+  advancedFilterVisible: dataAdvancedFilterVisible,
+  advancedFilterDraft: dataAdvancedFilterDraft,
+  advancedFilterError: dataAdvancedFilterError,
+  duplicateValuesVisible,
+  duplicateValuesMode,
+  duplicateValuesDraft,
+  duplicateValuesError,
+  consolidateVisible,
+  consolidateDraft,
+  consolidateError,
+  consolidatePreview,
+  fillNumberSequenceVisible,
+  fillRankVisible,
+  fillNumberSequenceInitial,
+  fillRankInitial,
+  fillSeriesVisible,
+  fillBlanksVisible,
+  fillTextVisible,
+  fillCurrentDateVisible,
+  fillSeriesInitial,
+  fillBlanksInitial,
+  fillTextInitial,
+  fillCurrentDateInitial,
+  fillError,
+  fillRangeLabel,
+  dropdownListVisible,
+  dropdownListInitial,
+  dropdownListError,
+  lookupFillVisible,
+  lookupFillDraft,
+  lookupFillError,
+  lookupFillPreview,
+  sourceColumns: lookupFillSourceColumns,
+  targetColumns: lookupFillTargetColumns,
+  comparisonVisible,
+  comparisonAction,
+  comparisonDraft,
+  comparisonError,
+  comparisonColumns,
+} = dataTools;
+const simulationRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingSimulationRange, reference: pickedSimulationReference } =
+  simulationRangePicker;
+async function selectSimulationReference(
+  current: string,
+  options: RangeReferenceSelectionOptions = { singleCell: true },
+): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const generation = workbookGeneration.value;
+  const sheetId = activeSheet.value.id;
+  const dialog = simulationDialog.value;
+  const selected = await simulationRangePicker.selectReference(current, options);
+  if (
+    session.workbook !== workbook ||
+    workbookGeneration.value !== generation ||
+    !dialog ||
+    simulationDialog.value !== dialog
+  )
+    return undefined;
+  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+  return selected;
+}
+watch(simulationDialog, () => simulationRangePicker.cancel());
+const proofreadingRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingProofreadingRange, reference: pickedProofreadingReference } =
+  proofreadingRangePicker;
+async function selectProofreadingReference(current: string): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const generation = workbookGeneration.value;
+  const sheetId = activeSheet.value.id;
+  const selected = await proofreadingRangePicker.selectReference(current);
+  if (
+    session.workbook !== workbook ||
+    workbookGeneration.value !== generation ||
+    !proofreadingVisible.value
+  )
+    return undefined;
+  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+  return selected;
+}
+watch(proofreadingVisible, (visible) => {
+  if (!visible) proofreadingRangePicker.cancel();
+});
+const splitRangePicker = useRangeReferencePicker(() => activeSheet.value.name, {
+  singleCell: true,
+});
+const { active: pickingSplitRange, reference: pickedSplitReference } = splitRangePicker;
+async function selectSplitReference(
+  current: string,
+  options: RangeReferenceSelectionOptions = { singleCell: true },
+): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const sheetId = activeSheet.value.id;
+  const selected = await splitRangePicker.selectReference(current, options);
+  if (session.workbook !== workbook || !dataTextToColumnsVisible.value) return undefined;
+  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+  return selected;
+}
+watch(dataTextToColumnsVisible, (visible) => {
+  if (!visible) splitRangePicker.cancel();
+});
+const validationRangePicker = useRangeReferencePicker(() => activeSheet.value.name, {
+  singleCell: true,
+});
+const { active: pickingValidationRange, reference: pickedValidationReference } =
+  validationRangePicker;
+const validationPickingCell = ref(true);
+async function selectValidationReference(
+  current: string,
+  options: RangeReferenceSelectionOptions = { singleCell: true },
+): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const sheetId = activeSheet.value.id;
+  validationPickingCell.value = options.singleCell === true;
+  const selected = await validationRangePicker.selectReference(current, options);
+  if (session.workbook !== workbook || !dataValidationVisible.value) return undefined;
+  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+  return selected;
+}
+watch(dataValidationVisible, (visible) => {
+  if (!visible) validationRangePicker.cancel();
+});
+const dropdownRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingDropdownRange, reference: pickedDropdownReference } = dropdownRangePicker;
+async function selectDropdownReference(current: string): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const sheetId = activeSheet.value.id;
+  const selected = await dropdownRangePicker.selectReference(current);
+  if (session.workbook !== workbook || !dropdownListVisible.value) return undefined;
+  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+  return selected;
+}
+watch(dropdownListVisible, (visible) => {
+  if (!visible) dropdownRangePicker.cancel();
+});
+const fillRankRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingFillRankRange, reference: pickedFillRankReference } = fillRankRangePicker;
+const fillRankPickingDestination = ref(false);
+async function selectFillRankReference(
+  current: string,
+  singleCell: boolean,
+): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const generation = workbookGeneration.value;
+  const sheetId = activeSheet.value.id;
+  fillRankPickingDestination.value = singleCell;
+  const selected = await fillRankRangePicker.selectReference(current, { singleCell });
+  if (
+    session.workbook !== workbook ||
+    workbookGeneration.value !== generation ||
+    !fillRankVisible.value
+  )
+    return undefined;
+  if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+  return selected;
+}
+const selectFillRankSource = (current: string) => selectFillRankReference(current, false);
+const selectFillRankDestination = (current: string) => selectFillRankReference(current, true);
+watch(fillRankVisible, (visible) => {
+  if (!visible) fillRankRangePicker.cancel();
+});
+const advancedRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingAdvancedRange, reference: pickedAdvancedReference } = advancedRangePicker;
+const advancedRangeField = ref<"listRange" | "criteriaRange" | "destination">();
+async function pickAdvancedFilterRange(field: "listRange" | "criteriaRange" | "destination") {
+  advancedRangeField.value = field;
+  const selected = await advancedRangePicker.selectReference(dataAdvancedFilterDraft.value[field]);
+  advancedRangeField.value = undefined;
+  if (selected !== undefined && dataAdvancedFilterVisible.value) {
+    const draft: AdvancedFilterDraft = { ...dataAdvancedFilterDraft.value, [field]: selected };
+    dataTools.updateAdvancedFilterDraft(draft);
+  }
+}
+watch(dataAdvancedFilterVisible, (visible) => {
+  if (!visible) advancedRangePicker.cancel();
+});
+const duplicateRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingDuplicateRange, reference: pickedDuplicateReference } = duplicateRangePicker;
+async function pickDuplicateRange() {
+  const selected = await duplicateRangePicker.selectReference(duplicateValuesDraft.value.range);
+  if (selected !== undefined && duplicateValuesVisible.value) {
+    dataTools.updateDuplicateValuesDraft({ ...duplicateValuesDraft.value, range: selected });
+  }
+}
+watch(duplicateValuesVisible, (visible) => {
+  if (!visible) duplicateRangePicker.cancel();
+});
+const comparisonRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingComparisonRange, reference: pickedComparisonReference } =
+  comparisonRangePicker;
+async function pickComparisonRange(field: "firstRange" | "secondRange") {
+  const selected = await comparisonRangePicker.selectReference(comparisonDraft.value[field]);
+  if (selected !== undefined && comparisonVisible.value) {
+    dataTools.updateComparisonDraft({ ...comparisonDraft.value, [field]: selected });
+  }
+}
+watch(comparisonVisible, (visible) => {
+  if (!visible) comparisonRangePicker.cancel();
+});
+const lookupFillRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingLookupFillRange, reference: pickedLookupFillReference } =
+  lookupFillRangePicker;
+async function pickLookupFillRange(field: "sourceRange" | "targetRange") {
+  const selected = await lookupFillRangePicker.selectReference(lookupFillDraft.value[field]);
+  if (selected !== undefined && lookupFillVisible.value) {
+    dataTools.updateLookupFillDraft({ ...lookupFillDraft.value, [field]: selected });
+  }
+}
+watch(lookupFillVisible, (visible) => {
+  if (!visible) lookupFillRangePicker.cancel();
+});
+const consolidateRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingConsolidateRange, reference: pickedConsolidateReference } =
+  consolidateRangePicker;
+async function selectConsolidateSourceReference(current: string): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const selected = await consolidateRangePicker.selectReference(current);
+  return session.workbook === workbook && consolidateVisible.value ? selected : undefined;
+}
+async function pickConsolidateRange() {
+  const selected = await consolidateRangePicker.selectReference(
+    consolidateDraft.value.destination,
+    { singleCell: true },
+  );
+  if (selected === undefined || !consolidateVisible.value) return;
+  dataTools.updateConsolidateDraft({ ...consolidateDraft.value, destination: selected });
+}
+watch(consolidateVisible, (visible) => {
+  if (!visible) consolidateRangePicker.cancel();
+});
+const dataToolsModalOpen = computed(
+  () =>
+    (Boolean(simulationDialog.value) && !pickingSimulationRange.value) ||
+    (proofreadingVisible.value && !pickingProofreadingRange.value) ||
+    fillNumberSequenceVisible.value ||
+    (fillRankVisible.value && !pickingFillRankRange.value) ||
+    fillSeriesVisible.value ||
+    fillBlanksVisible.value ||
+    fillTextVisible.value ||
+    fillCurrentDateVisible.value ||
+    duplicateErrorOptionsVisible.value ||
+    dataTools.sortVisible.value ||
+    (dataTools.textToColumnsVisible.value && !pickingSplitRange.value) ||
+    dataTools.removeDuplicatesVisible.value ||
+    (dataValidationVisible.value && !pickingValidationRange.value) ||
+    dataTools.subtotalVisible.value ||
+    (dataAdvancedFilterVisible.value && !pickingAdvancedRange.value) ||
+    (duplicateValuesVisible.value && !pickingDuplicateRange.value) ||
+    (comparisonVisible.value && !pickingComparisonRange.value) ||
+    (lookupFillVisible.value && !pickingLookupFillRange.value) ||
+    (dropdownListVisible.value && !pickingDropdownRange.value) ||
+    (consolidateVisible.value && !pickingConsolidateRange.value),
+);
+
+function chooseValidationValue(payload: {
+  address: CellAddress;
+  value: string | number | boolean;
+}): void {
+  if (!cellEditSession.finish()) return;
+  commitCellValue(payload);
+  void nextTick(focusCellEditor);
+}
+
+function retryValidationInput(): void {
+  dismissValidationInput();
+  void nextTick(() =>
+    cellEditSession.state.surface === "formula-bar"
+      ? formulaBarRef.value?.focus({ preserveSelection: true })
+      : focusCellEditor(),
+  );
+}
+
+function cancelValidationInput(): void {
+  dismissValidationInput();
+  cellEditSession.cancel();
+  void nextTick(focusCellEditor);
+}
+
+function confirmValidationInput(): void {
+  if (acceptValidationInput()) cellEditSession.cancel();
+  void nextTick(focusCellEditor);
+}
+
+function toggleOutline(payload: { id: string; collapsed: boolean }): void {
+  if (dataToolsDisabled.value || !cellEditSession.finish()) return;
+  executeCommand(
+    createSetSheetOutlineGroupCollapsedCommand(activeSheet.value.id, payload.id, payload.collapsed),
+  );
+}
+
+function showOutlineLevel(payload: { axis: SheetDimensionAxis; level: number }): void {
+  if (dataToolsDisabled.value || !cellEditSession.finish()) return;
+  executeCommand(
+    createSetSheetOutlineLevelCommand(activeSheet.value.id, payload.axis, payload.level),
+  );
+}
 const {
   disabled: formulaToolsDisabled,
   editTargetSheet,
@@ -381,8 +900,24 @@ watch(workbookGeneration, () => {
   recentFunctions.value = [];
 });
 
-const nameRangePicker = useNamedRangePicker(() => activeSheet.value.name);
+const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
+const activeRangePicker = computed(() => {
+  if (pickingSimulationRange.value) return simulationRangePicker;
+  if (pickingProofreadingRange.value) return proofreadingRangePicker;
+  if (pickingSplitRange.value) return splitRangePicker;
+  if (pickingFillRankRange.value) return fillRankRangePicker;
+  if (pickingValidationRange.value) return validationRangePicker;
+  if (pickingDropdownRange.value) return dropdownRangePicker;
+  if (pickingConsolidateRange.value) return consolidateRangePicker;
+  if (pickingLookupFillRange.value) return lookupFillRangePicker;
+  if (pickingComparisonRange.value) return comparisonRangePicker;
+  if (pickingDuplicateRange.value) return duplicateRangePicker;
+  if (pickingAdvancedRange.value) return advancedRangePicker;
+  if (pickingNameRange.value) return nameRangePicker;
+  return undefined;
+});
+const pickingReferenceRange = computed(() => activeRangePicker.value !== undefined);
 watch(namesVisible, (visible) => {
   if (!visible) nameRangePicker.cancel();
 });
@@ -405,9 +940,10 @@ function onWorkspaceWheel(event: WheelEvent): void {
 }
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
-  if (pickingNameRange.value) {
-    if (event.key === "Escape") nameRangePicker.cancel();
-    else if (event.key === "Enter") nameRangePicker.confirm();
+  const picker = activeRangePicker.value;
+  if (picker) {
+    if (event.key === "Escape") picker.cancel();
+    else if (event.key === "Enter") picker.confirm();
     else if (event.key === "Tab") return;
     event.preventDefault();
     event.stopPropagation();
@@ -483,7 +1019,16 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :recent-functions="recentFunctions"
       :name-creation-enabled="!formulaToolsDisabled"
       :calculation-settings="calculationSettings"
-      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection || namesVisible"
+      :inert="
+        loading ||
+        fileBusy ||
+        xlsxBusy ||
+        !!cellFormatSelection ||
+        namesVisible ||
+        pickingReferenceRange ||
+        dataToolsModalOpen ||
+        !!modalValidationFeedback
+      "
       @insert-image="imageActions.requestInsert"
       @apply-borders="applyCellBorders"
       @update-border-format="updateBorderFormat"
@@ -511,6 +1056,53 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @undo="undo"
       @redo="redo"
     >
+      <template #data-tools>
+        <DataToolbar
+          :disabled="dataToolsDisabled"
+          :comparison-disabled="loading || fileBusy || xlsxBusy || imageBusy"
+          :capabilities="dataToolCapabilities"
+          :fill-disabled="formatPainterActive"
+          :can-fill-rows="canFillRows"
+          :can-fill-columns="canFillColumns"
+          :filter-active="dataFilterActive"
+          :edit-session-id="cellEditSession.id"
+          @sort="dataTools.sort"
+          @open-sort="dataTools.openSort"
+          @open-goal-seek="dataTools.openGoalSeek"
+          @open-planning="dataTools.openPlanning"
+          @open-data-table="dataTools.openDataTable"
+          @open-proofreading="dataTools.openDataProofreading"
+          @toggle-filter="dataTools.toggleFilter"
+          @advanced-filter="dataTools.openAdvancedFilter"
+          @clear-filter="dataTools.clearFilter"
+          @reapply-filter="dataTools.reapplyFilter"
+          @open-text-to-columns="dataTools.openTextToColumns"
+          @open-remove-duplicates="dataTools.openRemoveDuplicates"
+          @open-duplicate-values="dataTools.openDuplicateValues"
+          @open-consolidate="dataTools.openConsolidate"
+          @open-lookup-fill="dataTools.openLookupFill"
+          @open-comparison="dataTools.openComparison"
+          @error-check-options="openDuplicateErrorOptions"
+          @clear-duplicate-highlights="dataTools.clearDuplicateHighlights"
+          @clear-duplicate-rejections="dataTools.clearDuplicateRejections"
+          @open-validation="dataTools.openValidation"
+          @open-dropdown-list="dataTools.openDropdownList"
+          @fill="fillFromDataToolbar"
+          @open-fill-series="dataTools.openFillSeries"
+          @open-fill-number-sequence="dataTools.openFillNumberSequence"
+          @open-fill-rank="dataTools.openFillRank"
+          @flash-fill="dataTools.flashFill"
+          @open-fill-current-date="dataTools.fillCurrentDate"
+          @open-fill-blanks="dataTools.openFillBlanks"
+          @open-fill-text="dataTools.openFillText"
+          @group="dataTools.group"
+          @ungroup="dataTools.ungroup"
+          @clear-outline="dataTools.clearOutline"
+          @expand="dataTools.setGroupsCollapsed(false)"
+          @collapse="dataTools.setGroupsCollapsed(true)"
+          @open-subtotal="dataTools.openSubtotal"
+        />
+      </template>
       <template #row-column-tools>
         <RowColumnOperationsMenu
           :sheet="activeSheet"
@@ -566,6 +1158,334 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         </WorkbookFileActions>
       </template>
     </SpreadsheetRibbon>
+    <DataToolsDialogs
+      :sort-visible="dataSortVisible"
+      :text-to-columns-visible="dataTextToColumnsVisible"
+      :remove-duplicates-visible="dataRemoveDuplicatesVisible"
+      :validation-visible="dataValidationVisible"
+      :subtotal-visible="dataSubtotalVisible"
+      :columns="dataToolColumns"
+      :sort-initial="dataSortInitial"
+      :sort-color-columns="dataTools.sortColorColumns.value"
+      :date-system="session.workbook.dateSystem"
+      :range-label="dataToolRangeLabel"
+      :split-preview="dataSplitPreview"
+      :split-column-count="dataTools.splitColumnCount.value"
+      :split-preview-rows="dataTools.splitPreviewRows.value"
+      :split-source-rows="dataTools.splitSourceRows.value"
+      :split-suggestions="dataTools.splitSuggestions.value"
+      :split-preview-error="dataTools.splitPreviewError.value"
+      :split-destination-label="dataTools.splitDestinationLabel.value"
+      :split-picking="pickingSplitRange"
+      :select-split-reference="selectSplitReference"
+      :duplicate-count="dataDuplicateCount"
+      :validation-initial="dataValidationInitial"
+      :validation-suspended="pickingValidationRange"
+      :select-validation-reference="selectValidationReference"
+      :has-subtotals="dataHasSubtotals"
+      @close-sort="dataTools.closeSort"
+      @sort="dataTools.applySort"
+      @close-text-to-columns="dataTools.closeTextToColumns"
+      @text-to-columns="dataTools.applyTextToColumns"
+      @text-to-columns-draft-change="dataTools.updateTextToColumnsDraft"
+      @close-remove-duplicates="dataTools.closeRemoveDuplicates"
+      @remove-duplicates="dataTools.applyRemoveDuplicates"
+      @remove-duplicates-draft-change="dataTools.updateRemoveDuplicatesDraft"
+      @close-validation="dataTools.closeValidation"
+      @validation="dataTools.applyValidation"
+      @clear-validation="dataTools.clearValidation"
+      @close-subtotal="dataTools.closeSubtotal"
+      @subtotal="dataTools.applySubtotal"
+      @remove-subtotals="dataTools.removeSubtotals"
+    />
+    <RangeReferencePicker
+      v-if="pickingSplitRange"
+      :reference="pickedSplitReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="splitRangePicker.confirm"
+      @cancel="splitRangePicker.cancel"
+    />
+    <RangeReferencePicker
+      v-if="pickingValidationRange"
+      :reference="pickedValidationReference"
+      :edit-session-id="cellEditSession.id"
+      :title="validationPickingCell ? t('dataTools.validation.selectCell') : undefined"
+      :hint="validationPickingCell ? t('dataTools.validation.selectCellHint') : undefined"
+      @confirm="validationRangePicker.confirm"
+      @cancel="validationRangePicker.cancel"
+    />
+    <DuplicateErrorCheckOptionsDialog
+      :visible="duplicateErrorOptionsVisible"
+      :settings="duplicateCheckSettings"
+      :ignored-count="ignoredDuplicateCount"
+      @confirm="confirmDuplicateErrorOptions"
+      @close="closeDuplicateErrorOptions"
+    />
+    <ConsolidateDialog
+      :visible="consolidateVisible"
+      :initial="consolidateDraft"
+      :error="consolidateError"
+      :preview="consolidatePreview"
+      :busy="loading || fileBusy || xlsxBusy || imageBusy"
+      :picking="pickingConsolidateRange"
+      :select-source-reference="selectConsolidateSourceReference"
+      @close="dataTools.closeConsolidate"
+      @apply="dataTools.applyConsolidate"
+      @draft-change="dataTools.updateConsolidateDraft"
+      @pick-range="pickConsolidateRange"
+    />
+    <RangeReferencePicker
+      v-if="pickingConsolidateRange"
+      :reference="pickedConsolidateReference"
+      :title="t('dataTools.consolidate.title')"
+      @confirm="consolidateRangePicker.confirm"
+      @cancel="consolidateRangePicker.cancel"
+    />
+    <FillNumberSequenceDialog
+      :visible="fillNumberSequenceVisible"
+      :initial="fillNumberSequenceInitial"
+      :error="fillError"
+      @close="dataTools.closeFillTool"
+      @apply="dataTools.applyFillNumberSequence"
+    />
+    <FillRankDialog
+      :visible="fillRankVisible"
+      :initial="fillRankInitial"
+      :error="fillError"
+      :picking="pickingFillRankRange"
+      :select-source-reference="selectFillRankSource"
+      :select-destination-reference="selectFillRankDestination"
+      @close="dataTools.closeFillTool"
+      @apply="dataTools.applyFillRank"
+    />
+    <RangeReferencePicker
+      v-if="pickingFillRankRange"
+      :reference="pickedFillRankReference"
+      :edit-session-id="cellEditSession.id"
+      :title="
+        t(
+          fillRankPickingDestination
+            ? 'dataTools.fill.pickRankDestination'
+            : 'dataTools.fill.pickRankSource',
+        )
+      "
+      @confirm="fillRankRangePicker.confirm"
+      @cancel="fillRankRangePicker.cancel"
+    />
+    <FillSeriesDialog
+      :visible="fillSeriesVisible"
+      :initial="fillSeriesInitial"
+      :error="fillError"
+      @close="dataTools.closeFillTool"
+      @apply="dataTools.applyFillSeries"
+    />
+    <FillBlanksDialog
+      :visible="fillBlanksVisible"
+      :initial="fillBlanksInitial"
+      :error="fillError"
+      @close="dataTools.closeFillTool"
+      @apply="dataTools.applyFillBlanks"
+    />
+    <FillTextDialog
+      :visible="fillTextVisible"
+      :initial="fillTextInitial"
+      :error="fillError"
+      @close="dataTools.closeFillTool"
+      @apply="dataTools.applyFillText"
+    />
+    <FillCurrentDateDialog
+      :visible="fillCurrentDateVisible"
+      :initial="fillCurrentDateInitial"
+      :error="fillError"
+      :range-label="fillRangeLabel"
+      @close="dataTools.closeFillTool"
+      @apply="dataTools.applyFillCurrentDate"
+    />
+    <DropdownListDialog
+      :visible="dropdownListVisible"
+      :initial="dropdownListInitial"
+      :error="dropdownListError"
+      :suspended="pickingDropdownRange"
+      :select-reference="selectDropdownReference"
+      @close="dataTools.closeDropdownList"
+      @apply="dataTools.applyDropdownList"
+    />
+    <RangeReferencePicker
+      v-if="pickingDropdownRange"
+      :reference="pickedDropdownReference"
+      :edit-session-id="cellEditSession.id"
+      :title="t('dataTools.dropdown.title')"
+      @confirm="dropdownRangePicker.confirm"
+      @cancel="dropdownRangePicker.cancel"
+    />
+    <LookupFillDialog
+      :visible="lookupFillVisible"
+      :initial="lookupFillDraft"
+      :error="lookupFillError"
+      :preview="lookupFillPreview"
+      :source-columns="lookupFillSourceColumns"
+      :target-columns="lookupFillTargetColumns"
+      :busy="loading || fileBusy || xlsxBusy || imageBusy"
+      :picking="pickingLookupFillRange"
+      @close="dataTools.closeLookupFill"
+      @apply="dataTools.applyLookupFill"
+      @draft-change="dataTools.updateLookupFillDraft"
+      @pick-range="pickLookupFillRange"
+    />
+    <RangeReferencePicker
+      v-if="pickingLookupFillRange"
+      :reference="pickedLookupFillReference"
+      :title="t('dataTools.lookupFill.title')"
+      @confirm="lookupFillRangePicker.confirm"
+      @cancel="lookupFillRangePicker.cancel"
+    />
+    <DataComparisonDialog
+      :visible="comparisonVisible"
+      :action="comparisonAction"
+      :initial="comparisonDraft"
+      :columns="comparisonColumns"
+      :error="comparisonError"
+      :busy="loading || fileBusy || xlsxBusy || imageBusy"
+      :picking="pickingComparisonRange"
+      @close="dataTools.closeComparison"
+      @apply="dataTools.applyComparison"
+      @draft-change="dataTools.updateComparisonDraft"
+      @pick-range="pickComparisonRange"
+    />
+    <RangeReferencePicker
+      v-if="pickingComparisonRange"
+      :reference="pickedComparisonReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="comparisonRangePicker.confirm"
+      @cancel="comparisonRangePicker.cancel"
+    />
+    <DataTableDialog
+      :visible="simulationDialog === 'dataTable'"
+      :initial="dataTableDraft"
+      :busy="simulationBusy"
+      :error="simulationError"
+      :result="dataTablePreview"
+      :suspended="pickingSimulationRange"
+      :select-reference="selectSimulationReference"
+      @close="dataTools.closeSimulation"
+      @solve="dataTools.solveDataTable"
+      @apply="dataTools.applyDataTable"
+      @draft-change="dataTools.updateDataTableDraft"
+    />
+    <GoalSeekDialog
+      :visible="simulationDialog === 'goalSeek'"
+      :initial="goalSeekDraft"
+      :busy="simulationBusy"
+      :error="simulationError"
+      :result="simulationResult"
+      :suspended="pickingSimulationRange"
+      :select-reference="selectSimulationReference"
+      @close="dataTools.closeSimulation"
+      @solve="dataTools.solveGoalSeek"
+      @apply="dataTools.applySimulation"
+      @draft-change="dataTools.updateGoalSeekDraft"
+    />
+    <PlanningSolverDialog
+      :visible="simulationDialog === 'planning'"
+      :initial="planningDraft"
+      :busy="simulationBusy"
+      :error="simulationError"
+      :result="simulationResult"
+      :suspended="pickingSimulationRange"
+      :select-reference="selectSimulationReference"
+      @close="dataTools.closeSimulation"
+      @solve="dataTools.solvePlanning"
+      @apply="dataTools.applySimulation"
+      @draft-change="dataTools.updatePlanningDraft"
+    />
+    <RangeReferencePicker
+      v-if="pickingSimulationRange"
+      :reference="pickedSimulationReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="simulationRangePicker.confirm"
+      @cancel="simulationRangePicker.cancel"
+    />
+    <DataProofreadingDialog
+      :visible="proofreadingVisible"
+      :has-scanned="proofreadingHasScanned"
+      :draft="proofreadingDraft"
+      :issues="proofreadingIssues"
+      :selected-ids="selectedProofreadingIssueIds"
+      :busy="proofreadingBusy"
+      :error="proofreadingError"
+      :picking="pickingProofreadingRange"
+      :select-reference="selectProofreadingReference"
+      @close="dataTools.closeDataProofreading"
+      @draft-change="dataTools.updateDataProofreadingDraft"
+      @scan="dataTools.scanDataProofreadingResults"
+      @selection-change="dataTools.setSelectedProofreadingIssueIds"
+      @select-issue="dataTools.selectDataProofreadingIssue"
+      @apply-issue="dataTools.applyDataProofreadingIssue"
+      @apply-type="dataTools.applyDataProofreadingType"
+      @apply-selected="dataTools.applySelectedDataProofreadingIssues"
+      @ignore-issue="dataTools.ignoreDataProofreadingIssue"
+      @ignore-type="dataTools.ignoreDataProofreadingType"
+    />
+    <RangeReferencePicker
+      v-if="pickingProofreadingRange"
+      :reference="pickedProofreadingReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="proofreadingRangePicker.confirm"
+      @cancel="proofreadingRangePicker.cancel"
+    />
+    <DuplicateValuesDialog
+      :visible="duplicateValuesVisible"
+      :mode="duplicateValuesMode"
+      :initial="duplicateValuesDraft"
+      :error="duplicateValuesError"
+      :busy="loading || fileBusy || xlsxBusy || imageBusy"
+      :picking="pickingDuplicateRange"
+      @close="dataTools.closeDuplicateValues"
+      @apply="dataTools.applyDuplicateValues"
+      @draft-change="dataTools.updateDuplicateValuesDraft"
+      @pick-range="pickDuplicateRange"
+    />
+    <RangeReferencePicker
+      v-if="pickingDuplicateRange"
+      :reference="pickedDuplicateReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="duplicateRangePicker.confirm"
+      @cancel="duplicateRangePicker.cancel"
+    />
+    <AdvancedFilterDialog
+      :visible="dataAdvancedFilterVisible"
+      :initial="dataAdvancedFilterDraft"
+      :error="dataAdvancedFilterError"
+      :busy="loading || fileBusy || xlsxBusy || imageBusy"
+      :picking="advancedRangeField"
+      @close="dataTools.closeAdvancedFilter"
+      @apply="dataTools.applyAdvancedFilter"
+      @draft-change="dataTools.updateAdvancedFilterDraft"
+      @pick-range="pickAdvancedFilterRange"
+    />
+    <RangeReferencePicker
+      v-if="pickingAdvancedRange"
+      :reference="pickedAdvancedReference"
+      :edit-session-id="cellEditSession.id"
+      @confirm="advancedRangePicker.confirm"
+      @cancel="advancedRangePicker.cancel"
+    />
+    <FilterColumnPanel
+      v-if="dataFilterState"
+      v-bind="dataFilterState"
+      :date-system="session.workbook.dateSystem"
+      @sort="dataTools.sortFilterColumn"
+      @apply="dataTools.applyColumnFilter"
+      @clear="dataTools.clearColumnFilter"
+      @close="dataTools.closeColumnFilter"
+    />
+    <DataValidationFeedbackDialog
+      v-if="modalValidationFeedback"
+      :feedback="modalValidationFeedback"
+      @retry="retryValidationInput"
+      @accept="confirmValidationInput"
+      @cancel="cancelValidationInput"
+    />
     <NamedRangesDialog
       :edit-session-id="cellEditSession.id"
       :visible="namesVisible"
@@ -579,7 +1499,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @save="formulaTools.saveName"
       @delete="formulaTools.deleteName"
     />
-    <NamedRangePicker
+    <RangeReferencePicker
       v-if="pickingNameRange"
       :reference="pickedNameReference"
       :edit-session-id="cellEditSession.id"
@@ -618,7 +1538,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :read-only="formulaReadOnly"
       :key="workbookGeneration"
       ref="formulaBarRef"
-      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection || pickingNameRange"
+      :inert="
+        loading ||
+        fileBusy ||
+        xlsxBusy ||
+        !!cellFormatSelection ||
+        pickingReferenceRange ||
+        dataToolsModalOpen ||
+        !!modalValidationFeedback
+      "
       :address="activeAddress"
       :sheet-id="activeSheet.id"
       :sheet-name="activeSheet.name"
@@ -638,7 +1566,14 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     <div
       class="spreadsheet-workspace__grid"
       :class="{ 'is-eye-comfort': eyeComfortEnabled }"
-      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection"
+      :inert="
+        loading ||
+        fileBusy ||
+        xlsxBusy ||
+        !!cellFormatSelection ||
+        dataToolsModalOpen ||
+        !!modalValidationFeedback
+      "
     >
       <SheetGrid
         v-model:zoom="zoom"
@@ -655,9 +1590,26 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :sheet="activeSheet"
         :evaluator="activeSheetEvaluator"
         :context-menu-state="contextMenuState"
+        :validation-info="activeValidationInfo"
+        :input-error="duplicateInputError"
+        @dismiss-input-error="retryValidationInput"
+        :error-cells="duplicateErrorCells"
+        :active-cell-error="activeCellErrorDescription"
+        :error-indicator-color="duplicateCheckSettings.indicatorColor"
+        @convert-cell-to-number="convertCellErrorValues('cell')"
+        @convert-selection-to-number="convertCellErrorValues('selection')"
+        @correct-sheet-errors="convertCellErrorValues('sheet')"
+        @ignore-selected-cell-errors="ignoreSelectedDuplicateErrors"
+        @ignore-all-cell-errors="ignoreAllDuplicateErrors"
+        @edit-error-in-formula-bar="editErrorInFormulaBar"
+        @error-check-options="openDuplicateErrorOptions"
+        @filter-column-request="dataTools.openColumnFilter($event.column, $event.anchor)"
+        @validation-choose="chooseValidationValue"
+        @outline-toggle="toggleOutline"
+        @outline-level="showOutlineLevel"
         @context-action="contextActions.request"
         :date-system="session.workbook.dateSystem"
-        :reference-editor="pickingNameRange ? nameRangePicker.editor : formulaBarRef"
+        :reference-editor="activeRangePicker?.editor ?? formulaBarRef"
         :edit-session="cellEditSession"
         :image-asset-urls="imageAssetUrls"
         :loading-image-asset-ids="loadingImageAssetIds"
@@ -673,7 +1625,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         :apply-axis-move="moveAxis"
         :apply-fill="fillActions.apply"
         @end-fill="fillActions.clear"
-        @fill-feedback="MessagePlugin.warning(t(`autoFill.${$event}`))"
+        @fill-feedback="
+          MessagePlugin.warning(
+            t(
+              $event === 'duplicate'
+                ? 'dataTools.duplicates.duplicateRejected'
+                : `autoFill.${$event}`,
+            ),
+          )
+        "
         :view-state="activeSheetViewState"
         :format-painter-active="formatPainterActive"
         @clear-cells="clearCells"
@@ -684,6 +1644,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @freeze-change="setFreezePanes"
         @resize-dimension="resizeDimension"
         @cancel-format-painter="cancelFormatPainter"
+        @flash-fill="dataTools.flashFill"
         @undo="undo"
         @redo="redo"
         @view-state-change="updateActiveSheetViewState"

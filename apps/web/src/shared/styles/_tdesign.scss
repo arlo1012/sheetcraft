@@ -265,8 +265,18 @@
   font-weight: var(--idea-font-weight-semibold);
 }
 
+.t-dialog__body {
+  padding-block: var(--idea-dialog-content-padding-block);
+}
+
 .t-dialog__footer {
   padding: 0;
+}
+
+// TDesign's outline variant removes spacing for connected radio buttons.
+// Ordinary vertical radios retain the standard gap even with that default variant.
+.t-radio-group.t-radio-group--vertical:has(> .t-radio) {
+  row-gap: var(--td-comp-margin-xs);
 }
 
 .t-form__label {
@@ -301,6 +311,11 @@
   margin-bottom: var(--td-comp-margin-xl);
 }
 
+.t-tabs__header {
+  --td-comp-size-xxl: 32px;
+  --td-comp-size-xxxxl: 40px;
+}
+
 .t-tabs__nav-item.t-is-active {
   font-weight: var(--idea-font-weight-medium);
 }
@@ -327,11 +342,15 @@
   }
 
   .cell-format-dialog__tabs {
+    box-sizing: border-box;
+    padding-top: var(--idea-dialog-content-padding-block);
+
     > .t-tabs__header {
       flex: none;
     }
 
     > .t-tabs__content {
+      padding-block: var(--idea-dialog-content-padding-block);
       flex: 1;
       min-height: 0;
       overflow: auto;

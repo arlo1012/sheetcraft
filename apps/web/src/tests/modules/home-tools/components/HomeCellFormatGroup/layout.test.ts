@@ -78,8 +78,8 @@ describe("HomeCellFormatGroup layout", () => {
     expect(colorIcons).toHaveLength(2);
     for (const colorIcon of colorIcons) {
       expect(colorIcon.attributes()).toMatchObject({
-        width: "18",
-        height: "18",
+        viewBox: "0 0 24 24",
+        "aria-hidden": "true",
       });
     }
     expect(wrapper.find(".cell-color-picker__swatch").exists()).toBe(false);

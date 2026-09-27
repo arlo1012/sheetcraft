@@ -9,6 +9,7 @@ import FormulaInputAssist from "../../../shared/formula-editing/FormulaInputAssi
 import FormulaTextOverlay from "../../../shared/formula-editing/FormulaTextOverlay.vue";
 import { getFormulaReferenceTokens } from "../../../shared/formula-editing/formula-reference-tokens";
 import {
+  isExplicitWarningConfirmationKey,
   useCellEditSession,
   type CellEditSession,
 } from "../../../shared/cell-editing/useCellEditSession";
@@ -212,7 +213,14 @@ function onFormulaKeydown(event: KeyboardEvent): void {
   ) {
     event.preventDefault();
     const owner = editSession.state.owner;
-    if (!owner || !editSession.finish({ complete: true })) return;
+    if (
+      !owner ||
+      !editSession.finish({
+        complete: true,
+        confirmPendingWarning: isExplicitWarningConfirmationKey(event),
+      })
+    )
+      return;
     emit("traverse", {
       address: { ...owner.address },
       ...(owner.sheetId === undefined ? {} : { sheetId: owner.sheetId }),

@@ -6,6 +6,7 @@ import { isCellEditSessionTarget } from "../../../shared/cell-editing/cell-edit-
 import {
   useCellEditSession,
   type CellEditSession,
+  type CellEditFinishOptions,
 } from "../../../shared/cell-editing/useCellEditSession";
 
 export type CellEditorHandle = {
@@ -88,19 +89,27 @@ export function useCellEditing(options: {
     pendingSelectionAfterComposition = undefined;
   }
 
-  function finishEdit(destination?: CellSelection, restoreFocus = true): void {
+  function finishEdit(
+    destination?: CellSelection,
+    restoreFocus = true,
+    finishOptions: CellEditFinishOptions = {},
+  ): boolean {
     if (isEditing.value) {
       if (isComposing.value) {
         shouldFinishAfterComposition = true;
         pendingSelectionAfterComposition = destination;
-        return;
+        return false;
       }
       options.onClearClipboard();
-      editSession.finish();
+      if (!editSession.finish(finishOptions)) {
+        if (restoreFocus) focusEditor();
+        return false;
+      }
     }
     clearDeferredComposition();
     if (destination) options.onSelectionChange(destination);
     else if (restoreFocus) focusEditor();
+    return true;
   }
 
   function cancelEdit(restoreFocus = true): void {

@@ -147,6 +147,14 @@ function onKeydown(event: KeyboardEvent): void {
   }
 
   &__icon {
+    --idea-icon-size: var(--idea-menu-icon-size);
+
+    :deep(svg.lucide) {
+      width: var(--idea-icon-size);
+      height: var(--idea-icon-size);
+      stroke-width: var(--idea-icon-stroke-width);
+    }
+
     display: grid;
     width: 16px;
     place-items: center;

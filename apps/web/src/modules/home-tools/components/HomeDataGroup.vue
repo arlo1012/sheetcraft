@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import { Database, LockKeyhole, Sigma } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import type { FilterValueKey, HomeDataToolState } from "./data-tool-state";
@@ -20,6 +19,7 @@ const emit = defineEmits<{
   freeze: [mode: "panes" | "top-row" | "first-column"];
   unfreeze: [];
   toggleProtection: [];
+  openDataTools: [];
 }>();
 </script>
 
@@ -67,17 +67,17 @@ const emit = defineEmits<{
         data-ribbon-row="1"
         @activate="emit('autoSum')"
       >
-        <Sigma :size="15" aria-hidden="true" />
+        <Sigma aria-hidden="true" />
       </RibbonButton>
-      <RibbonMenuButton
-        :label="t('app.unavailableFeature', { feature: t('ribbon.data') })"
+      <RibbonButton
+        :label="t('ribbon.data')"
         :text="t('ribbon.data')"
-        disabled
-        data-ribbon-placeholder="data"
+        data-ribbon-action="open-data-tools"
         data-ribbon-row="2"
+        @activate="emit('openDataTools')"
       >
-        <Database :size="15" aria-hidden="true" />
-      </RibbonMenuButton>
+        <Database aria-hidden="true" />
+      </RibbonButton>
     </div>
 
     <RibbonButton
@@ -90,7 +90,7 @@ const emit = defineEmits<{
       data-ribbon-span="2"
       @activate="emit('toggleProtection')"
     >
-      <LockKeyhole :size="17" aria-hidden="true" />
+      <LockKeyhole aria-hidden="true" />
     </RibbonButton>
   </section>
 </template>

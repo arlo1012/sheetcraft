@@ -32,6 +32,10 @@ export type HeaderQuickToolsState = Readonly<{
   enabled: boolean;
   /** Reserved layout space, independent of the current interaction state. */
   gutter: number;
+  /** Outline controls occupy a separate lane before the fixed-width row labels. */
+  rowOutlineGutter?: number;
+  /** Column outline tracks sit above the fixed-height column labels. */
+  columnOutlineGutter?: number;
 }>;
 
 /** Colors and text metrics read once by the surface from its computed style. */
@@ -191,19 +195,21 @@ function paintAxisItem(
 ): void {
   const { palette, quickTools, selection, hovered, focused } = state;
   const gutter = quickTools.gutter;
+  const rowLabelStart = gutter + (quickTools.rowOutlineGutter ?? 0);
+  const columnLabelStart = gutter + (quickTools.columnOutlineGutter ?? 0);
   const rect =
     axis === "row"
       ? {
-          x: gutter,
+          x: rowLabelStart,
           y: item.offset,
-          width: Math.max(0, frame.headerSize.width - gutter - 1),
+          width: Math.max(0, frame.headerSize.width - rowLabelStart - 1),
           height: item.size,
         }
       : {
           x: item.offset,
-          y: gutter,
+          y: columnLabelStart,
           width: item.size,
-          height: Math.max(0, frame.headerSize.height - gutter - 1),
+          height: Math.max(0, frame.headerSize.height - columnLabelStart - 1),
         };
   if (rect.width <= 0 || rect.height <= 0) return;
   const axisSelected = isAxisSelected(axis, item.index, selection);
@@ -305,11 +311,13 @@ export function paintSheetHeaders(
   paintAxisHeaders(context, "column", frame.columnHeaders, state);
   paintAxisHeaders(context, "row", frame.rowHeaders, state);
 
+  const rowLabelStart = quickTools.gutter + (quickTools.rowOutlineGutter ?? 0);
+  const columnLabelStart = quickTools.gutter + (quickTools.columnOutlineGutter ?? 0);
   const corner = {
-    x: quickTools.gutter,
-    y: quickTools.gutter,
-    width: Math.max(0, frame.headerSize.width - quickTools.gutter),
-    height: Math.max(0, frame.headerSize.height - quickTools.gutter),
+    x: rowLabelStart,
+    y: columnLabelStart,
+    width: Math.max(0, frame.headerSize.width - rowLabelStart),
+    height: Math.max(0, frame.headerSize.height - columnLabelStart),
   };
   context.fillStyle =
     selection.mode === "all"

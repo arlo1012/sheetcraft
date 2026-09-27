@@ -111,9 +111,12 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
     if (!frame) return undefined;
     const quickTools = options.getQuickTools();
     const gutter = quickTools.gutter;
+    const rowLabelStart = gutter + (quickTools.rowOutlineGutter ?? 0);
+    const columnLabelStart = gutter + (quickTools.columnOutlineGutter ?? 0);
+    if (point.x >= gutter && point.x < rowLabelStart) return undefined;
     if (
-      point.x >= gutter &&
-      point.y >= gutter &&
+      point.x >= rowLabelStart &&
+      point.y >= columnLabelStart &&
       point.x < frame.headerSize.width &&
       point.y < frame.headerSize.height
     ) {
@@ -157,7 +160,8 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
               return { axis, index: item.index + 1, ownerIndex: item.index, action: "quickInsert" };
             }
           }
-          const inMainArea = axis === "row" ? point.x >= gutter : point.y >= gutter;
+          const inMainArea =
+            axis === "row" ? point.x >= rowLabelStart : point.y >= columnLabelStart;
           if (!inMainArea) {
             if (!quickTools.enabled) continue;
             const gripX = axis === "row" ? gutter / 2 : item.offset + item.size / 2;
@@ -255,10 +259,16 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
     const frame = options.getFrame();
     const bounds = trigger.getBoundingClientRect();
     if (!frame) return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
+    const quickTools = options.getQuickTools();
+    const gutter = quickTools.gutter;
+    const rowLabelStart = gutter + (quickTools.rowOutlineGutter ?? 0);
+    const columnLabelStart = gutter + (quickTools.columnOutlineGutter ?? 0);
     if (focused.axis === "corner") {
       return {
-        x: bounds.left + (frame.headerSize.width / 2) * frame.scale,
-        y: bounds.top + (frame.headerSize.height / 2) * frame.scale,
+        x: bounds.left + ((rowLabelStart + frame.headerSize.width) / 2) * frame.scale,
+        y:
+          bounds.top +
+          (columnLabelStart + (frame.headerSize.height - columnLabelStart) / 2) * frame.scale,
       };
     }
     const panes = focused.axis === "row" ? frame.rowHeaders : frame.columnHeaders;
@@ -266,11 +276,13 @@ export function useHeaderInteraction(options: HeaderInteractionOptions) {
       .flatMap((pane) => pane.items)
       .find((candidate) => candidate.index === focused.index);
     if (!item) return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
-    const gutter = options.getQuickTools().gutter;
     const point =
       focused.axis === "row"
-        ? { x: gutter + (frame.headerSize.width - gutter) / 2, y: item.offset + item.size / 2 }
-        : { x: item.offset + item.size / 2, y: gutter + (frame.headerSize.height - gutter) / 2 };
+        ? { x: (rowLabelStart + frame.headerSize.width) / 2, y: item.offset + item.size / 2 }
+        : {
+            x: item.offset + item.size / 2,
+            y: columnLabelStart + (frame.headerSize.height - columnLabelStart) / 2,
+          };
     return { x: bounds.left + point.x * frame.scale, y: bounds.top + point.y * frame.scale };
   }
 

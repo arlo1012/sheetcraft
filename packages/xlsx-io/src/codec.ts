@@ -6,15 +6,20 @@ import { excelColumnWidthToPixels, pixelsToExcelColumnWidth } from "./column-wid
 import { getAutoFitRowNumbers } from "./auto-fit-rows.js";
 import {
   createFormulaError,
+  FORMULA_ERROR_TOKENS,
   datePartsToExcelSerial,
   formulaErrorCodeFromToken,
+  isFormulaError,
+  parseFormula,
   type CellContent,
+  type FormulaValue,
 } from "@idea10/core/formula";
 import {
   createSheetEvaluator,
   getDefaultColumnWidth,
   replaceSheetSparseState,
   type CellRange,
+  type SheetFilter,
   type Workbook,
 } from "@idea10/core/workbook";
 import {
@@ -42,6 +47,7 @@ import {
   readRawWorksheetNumericValues,
   readRawWorksheetTextDirections,
 } from "./raw-cell-values.js";
+import { readXlsxDataMetadata, type XlsxDataMetadata } from "./data-tools-metadata.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
@@ -95,6 +101,7 @@ type BrowserWorksheet = XlsxImageWorksheet & {
     address: string,
   ) => BrowserCell & { value: unknown; style: Record<string, unknown>; numFmt?: string };
 };
+
 type BrowserWorkbook = XlsxImageWorkbook & {
   properties: { date1904?: boolean };
   calcProperties: { fullCalcOnLoad: boolean };
@@ -106,6 +113,20 @@ type BrowserWorkbook = XlsxImageWorkbook & {
     writeBuffer: () => Promise<ArrayBuffer | Uint8Array>;
   };
 };
+
+function advancedHiddenRows(filter: SheetFilter | null): number[] {
+  const rows: number[] = [];
+  for (const interval of filter?.advanced?.hiddenRows ?? []) {
+    const start = Math.max(0, interval.start);
+    const end = Math.min(MAX_SHEET_ROWS - 1, interval.end);
+    for (let row = start; row <= end; row += 1) {
+      rows.push(row);
+      if (rows.length > MAX_SPARSE_CELLS)
+        throw new RangeError("The workbook exceeds the XLSX v1 hidden-row export limit.");
+    }
+  }
+  return rows;
+}
 type BrowserExcelJs = { Workbook: new () => BrowserWorkbook };
 const ExcelJS = ExcelJSImport as BrowserExcelJs;
 const EXCEL_FILL_PATTERNS = new Set<string>(CELL_FILL_PATTERNS);
@@ -122,6 +143,25 @@ function columnLabel(column: number): string {
 }
 function address(row: number, column: number): string {
   return `${columnLabel(column)}${row + 1}`;
+}
+
+/**
+ * SIMTABLE is an internal, dynamic What-If Data Table formula. Excel and WPS
+ * do not implement it, so its results must be exported as values rather than
+ * a formula which recalculates to #NAME?.
+ */
+function isSimulationTableFormula(source: string): boolean {
+  const parsed = parseFormula(source);
+  return (
+    parsed.ok &&
+    parsed.ast.expression.kind === "function" &&
+    parsed.ast.expression.name.toUpperCase() === "SIMTABLE"
+  );
+}
+
+function formulaSnapshotValue(value: FormulaValue): unknown {
+  if (!isFormulaError(value)) return value;
+  return { error: FORMULA_ERROR_TOKENS[value.code] };
 }
 
 function workbookId(): string {
@@ -455,6 +495,7 @@ export async function decodeWithExcelJs(
   const report = new CompatibilityReportBuilder();
   const rawNumericValues = readRawWorksheetNumericValues(bytes);
   const rawTextDirections = readRawWorksheetTextDirections(bytes);
+  const rawDataMetadata = readXlsxDataMetadata(bytes);
   const source = new ExcelJS.Workbook();
   await source.xlsx.load(bytes);
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
@@ -475,6 +516,7 @@ export async function decodeWithExcelJs(
     const columnWidths: Array<{ index: number; size: number }> = [];
     const hiddenRows: number[] = [];
     const hiddenColumns: number[] = [];
+    const metadata = rawDataMetadata[sheetIndex];
     const sourceDefaultColumnWidth = sourceSheet.properties.defaultColWidth;
     const defaultColumnWidth =
       typeof sourceDefaultColumnWidth === "number" && Number.isFinite(sourceDefaultColumnWidth)
@@ -487,7 +529,17 @@ export async function decodeWithExcelJs(
       const rowNumber = row.number;
       if (typeof rowNumber !== "number" || !Number.isInteger(rowNumber) || rowNumber < 1) continue;
       const rowIndex = rowNumber - 1;
-      if (row.hidden === true) hiddenRows.push(rowIndex);
+      if (
+        row.hidden === true &&
+        !metadata?.outlineGroups.some(
+          (group) =>
+            group.axis === "row" &&
+            group.collapsed &&
+            group.start <= rowIndex &&
+            group.end >= rowIndex,
+        )
+      )
+        hiddenRows.push(rowIndex);
       if (typeof row.height === "number") {
         const coreHeight = (row.height * 4) / 3;
         const roundedHeight = Math.round(coreHeight);
@@ -543,7 +595,17 @@ export async function decodeWithExcelJs(
       const width = column.width;
       if (typeof index !== "number" || !Number.isInteger(index) || index < 1) continue;
       const columnIndex = index;
-      if (column.hidden === true) hiddenColumns.push(columnIndex - 1);
+      if (
+        column.hidden === true &&
+        !metadata?.outlineGroups.some(
+          (group) =>
+            group.axis === "column" &&
+            group.collapsed &&
+            group.start <= columnIndex - 1 &&
+            group.end >= columnIndex - 1,
+        )
+      )
+        hiddenColumns.push(columnIndex - 1);
       if (width === undefined) continue;
       const pixels = excelColumnWidthToPixels(width);
       const size = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, pixels));
@@ -570,7 +632,9 @@ export async function decodeWithExcelJs(
       }
       return [range];
     });
-    if (sourceSheet.autoFilter) add(report, "filter-omitted", sourceSheet.name);
+    if (metadata?.unsupportedFilters) add(report, "filter-omitted", sourceSheet.name);
+    if (metadata?.unsupportedValidations)
+      add(report, "feature-omitted", `${sourceSheet.name}.dataValidations`);
     replaceSheetSparseState(sheet, {
       cells,
       rowHeights,
@@ -579,8 +643,16 @@ export async function decodeWithExcelJs(
       hiddenColumns,
       defaultColumnWidth,
       freezePanes,
-      filter: null,
+      filter: (metadata?.filter ?? null) as typeof sheet.filter,
       mergedCells,
+      dataValidations: (metadata?.dataValidations ?? []).map((validation, index) => ({
+        id: `xlsx-validation-${sheetIndex + 1}-${index + 1}`,
+        ...validation,
+      })),
+      outlineGroups: (metadata?.outlineGroups ?? []).map((group, index) => ({
+        id: `xlsx-outline-${sheetIndex + 1}-${index + 1}`,
+        ...group,
+      })),
       floatingImages: [],
     });
     return sheet;
@@ -731,6 +803,9 @@ export async function encodeWithExcelJs(
   const target = new ExcelJS.Workbook();
   const imageExporter = createXlsxImageExporter(target, options);
   const cellImages: NativeCellImage[] = [];
+  const dataMetadata: Array<
+    Omit<XlsxDataMetadata, "unsupportedFilters" | "unsupportedValidations">
+  > = [];
   target.properties.date1904 = workbook.dateSystem === "1904";
   target.calcProperties.fullCalcOnLoad = true;
   let encodedCells = 0;
@@ -753,7 +828,8 @@ export async function encodeWithExcelJs(
     for (const [index, size] of sheet.rowHeights) {
       output.getRow(index + 1).height = (size * 3) / 4;
     }
-    for (const index of sheet.hiddenRows ?? []) {
+    const advancedRows = advancedHiddenRows(sheet.filter);
+    for (const index of new Set([...(sheet.hiddenRows ?? []), ...advancedRows])) {
       output.getRow(index + 1).hidden = true;
     }
     for (const [index, size] of sheet.columnWidths) {
@@ -762,7 +838,38 @@ export async function encodeWithExcelJs(
     for (const index of sheet.hiddenColumns ?? []) {
       output.getColumn(index + 1).hidden = true;
     }
-    if (sheet.filter) add(report, "filter-omitted", sheet.name);
+    const subtotalMetadata = sheet.subtotalMetadata ?? [];
+    const pageBreakRows = subtotalMetadata.some((entry) => entry.pageBreakRows !== undefined)
+      ? subtotalMetadata.flatMap((entry) => entry.pageBreakRows ?? [])
+      : undefined;
+    let summaryBelow: boolean | undefined;
+    for (const entry of subtotalMetadata)
+      if (entry.summaryBelow !== undefined) summaryBelow = entry.summaryBelow;
+    dataMetadata.push({
+      // Advanced Filter has different criteria semantics. Do not serialize its
+      // list range as an ordinary AutoFilter and imply that it is equivalent.
+      filter: sheet.filter?.advanced
+        ? null
+        : (sheet.filter as unknown as XlsxDataMetadata["filter"]),
+      hiddenRows: [...new Set([...(sheet.hiddenRows ?? []), ...advancedRows])],
+      dataValidations: (sheet.dataValidations ?? []).map((validation) => {
+        const { id: _id, ...value } = validation as { id?: unknown } & Record<string, unknown>;
+        return value as XlsxDataMetadata["dataValidations"][number];
+      }),
+      outlineGroups: (sheet.outlineGroups ?? []).map((group) => {
+        const { id: _id, ...value } = group as { id?: unknown } & Record<string, unknown>;
+        return value as XlsxDataMetadata["outlineGroups"][number];
+      }),
+      ...(pageBreakRows === undefined ? {} : { pageBreakRows }),
+      ...(summaryBelow === undefined ? {} : { summaryBelow }),
+    });
+    if (sheet.filter?.advanced)
+      add(report, "advanced-filter-criteria-omitted", `${sheet.name}.advancedFilter`);
+    // Duplicate highlighting and duplicate-entry rejection are product-owned
+    // rules. Do not serialize them as ordinary XLSX conditional formatting or
+    // validation, because that would imply equivalent behavior after import.
+    if (sheet.duplicateRules?.length)
+      add(report, "feature-omitted", `${sheet.name}.duplicateRules`);
     for (const [key, cell] of sheet.cells) {
       encodedCells += 1;
       if (encodedCells > MAX_SPARSE_CELLS)
@@ -773,14 +880,19 @@ export async function encodeWithExcelJs(
       const outputCell = output.getCell(address(row, column));
       if (cell.content?.kind === "literal") outputCell.value = cell.content.value;
       else if (cell.content?.kind === "formula") {
-        const result = isFormulaCacheEligible(row, column)
-          ? formulaCacheValue(evaluator.getComputedValue({ row, column }))
-          : undefined;
-        outputCell.value = {
-          formula: cell.content.formula.source.slice(1),
-          ...(result !== undefined ? { result } : {}),
-        };
-        if (result === undefined) add(report, "formula-not-calculated", issueLocation);
+        if (isSimulationTableFormula(cell.content.formula.source)) {
+          outputCell.value = formulaSnapshotValue(evaluator.getComputedValue({ row, column }));
+          add(report, "feature-omitted", issueLocation);
+        } else {
+          const result = isFormulaCacheEligible(row, column)
+            ? formulaCacheValue(evaluator.getComputedValue({ row, column }))
+            : undefined;
+          outputCell.value = {
+            formula: cell.content.formula.source.slice(1),
+            ...(result !== undefined ? { result } : {}),
+          };
+          if (result === undefined) add(report, "formula-not-calculated", issueLocation);
+        }
       } else if (cell.content?.kind === "error")
         outputCell.value = {
           error: {
@@ -835,6 +947,7 @@ export async function encodeWithExcelJs(
       cellImages,
       collectDefinedNames(workbook, report),
       workbook.calculation,
+      dataMetadata,
     ),
     report: report.build(),
   };

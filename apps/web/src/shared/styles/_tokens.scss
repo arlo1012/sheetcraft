@@ -1,8 +1,20 @@
 @layer theme {
   :root {
     --idea-tool-panel-padding: var(--idea-space-4);
+    --idea-dialog-content-padding-block: var(--idea-space-5);
     --idea-menu-padding: var(--idea-space-4) 0;
     --idea-control-icon-size: 14px;
+    --idea-action-icon-size: 15px;
+    --idea-ribbon-large-icon-size: 18px;
+    --idea-ribbon-row-height: 26px;
+    --idea-ribbon-row-gap: 2px;
+    --idea-ribbon-content-height: calc(
+      var(--idea-ribbon-row-height) * 2 + var(--idea-ribbon-row-gap)
+    );
+    --idea-ribbon-group-height: calc(var(--idea-ribbon-content-height) + 2px);
+    --idea-ribbon-toolbar-height: calc(var(--idea-ribbon-group-height) + 12px);
+    --idea-menu-icon-size: var(--idea-action-icon-size);
+    --idea-icon-stroke-width: 2;
     font-family: var(--idea-font-sans);
     font-size: var(--idea-font-size-body-medium);
     font-weight: var(--idea-font-weight-regular);

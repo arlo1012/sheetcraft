@@ -158,7 +158,6 @@ function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBu
   if (
     (worksheetPart &&
       [
-        "dataValidations",
         "conditionalFormatting",
         "sheetProtection",
         "protectedRanges",
@@ -169,11 +168,6 @@ function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBu
         "printOptions",
       ].some((feature) => hasXmlElement(xml, feature))) ||
     hasCustomizedPageSetup(xml)
-  )
-    report.add("feature-omitted", "warning", name);
-  if (
-    worksheetPart &&
-    xmlAttributeValues(xml, "hidden").some((value) => /^(1|true)$/i.test(value.trim()))
   )
     report.add("feature-omitted", "warning", name);
 }

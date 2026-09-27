@@ -8,6 +8,7 @@ const props = withDefaults(
     menuLabel: string;
     text?: string;
     disabled?: boolean;
+    pressed?: boolean;
     menuDisabled?: boolean;
     expanded?: boolean;
     menuId?: string;
@@ -18,6 +19,7 @@ const props = withDefaults(
   {
     text: undefined,
     disabled: false,
+    pressed: undefined,
     menuDisabled: false,
     expanded: false,
     menuId: undefined,
@@ -54,6 +56,7 @@ function toggleMenu(): void {
       'has-text': text,
       'is-expanded': expanded,
       'is-disabled': disabled && menuDisabled,
+      'is-pressed': pressed,
       'is-tall': variant === 'tall',
       'is-full-width': fullWidth,
     }"
@@ -65,6 +68,7 @@ function toggleMenu(): void {
       data-ribbon-split-main
       :disabled="disabled"
       :aria-label="label"
+      :aria-pressed="pressed"
       :title="label"
       @click="activate"
     >
@@ -101,6 +105,7 @@ function toggleMenu(): void {
 @use "./ribbon-actions" as ribbon;
 
 .ribbon-split-button {
+  --ribbon-icon-size: var(--idea-action-icon-size);
   display: inline-flex;
   flex: 0 0 auto;
   align-items: stretch;
@@ -131,25 +136,31 @@ function toggleMenu(): void {
     min-width: 40px;
   }
 
+  &.is-pressed {
+    background: var(--idea-action-primary-subtle);
+    color: var(--idea-action-primary);
+  }
+
   &.is-full-width {
     width: 100%;
   }
 
   &.is-tall {
+    --ribbon-icon-size: var(--idea-ribbon-large-icon-size);
     align-self: stretch;
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 58px);
-    height: 54px;
+    height: var(--idea-ribbon-content-height, 54px);
+    padding: 0;
 
     &.is-full-width {
       width: 100%;
     }
 
     .ribbon-split-button__main {
-      flex-direction: column;
+      @include ribbon.tall-content;
       justify-content: center;
-      gap: 3px;
-      padding: 1px 2px;
+      padding: 0 2px;
     }
 
     .ribbon-split-button__menu {

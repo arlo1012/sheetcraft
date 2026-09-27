@@ -2,6 +2,7 @@ import { nextTick } from "vue";
 import { describe, expect, test } from "vitest";
 import { DEFAULT_ROW_HEIGHT, getCellValue, setCellValue } from "@idea10/core/workbook";
 import { activeCell, mountSheetGrid, triggerCell } from "./fixture";
+import { useCellEditSession } from "../../../../../shared/cell-editing/useCellEditSession";
 
 describe("cell editor", () => {
   test("replaces content with printable input and commits with Enter", async () => {
@@ -95,6 +96,56 @@ describe("cell editor", () => {
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "c" });
     await wrapper.get("textarea.cell-editor").trigger("keydown", { key: "Tab", shiftKey: true });
     expect(activeCell(wrapper)).toBe("D3");
+  });
+
+  test("does not move after Tab when the shared edit session rejects validation", async () => {
+    const editSession = useCellEditSession({ onCommit: () => false });
+    const { wrapper } = mountSheetGrid({ editSession });
+    const editor = wrapper.get("textarea.cell-editor");
+
+    await editor.trigger("keydown", { key: "i" });
+    await editor.setValue("invalid");
+    await editor.trigger("keydown", { key: "Tab" });
+
+    expect(activeCell(wrapper)).toBe("A1");
+    expect((editor.element as HTMLTextAreaElement).value).toBe("invalid");
+    expect(editor.classes()).toContain("is-editing");
+    expect((wrapper.vm as unknown as { flushPendingEdit: () => boolean }).flushPendingEdit()).toBe(
+      false,
+    );
+  });
+
+  test("only a plain Enter marks a commit as warning confirmation", async () => {
+    const commits: Array<{ input: string; confirmPendingWarning?: boolean }> = [];
+    const editSession = useCellEditSession({
+      onCommit: (payload) => {
+        commits.push(payload);
+      },
+    });
+    const { wrapper } = mountSheetGrid({ editSession });
+    const editor = wrapper.get("textarea.cell-editor");
+
+    await editor.trigger("keydown", { key: "a" });
+    await editor.setValue("plain");
+    await editor.trigger("keydown", { key: "Enter" });
+    expect(commits).toHaveLength(1);
+    expect(commits[0]).toMatchObject({
+      address: { row: 0, column: 0 },
+      input: "plain",
+      confirmPendingWarning: true,
+    });
+
+    await editor.trigger("keydown", { key: "b" });
+    await editor.setValue("tab");
+    await editor.trigger("keydown", { key: "Tab" });
+    await editor.trigger("keydown", { key: "c" });
+    await editor.setValue("repeat");
+    await editor.trigger("keydown", { key: "Enter", repeat: true });
+    expect(commits).toHaveLength(3);
+    expect(commits[1]).toMatchObject({ address: { row: 1, column: 0 }, input: "tab" });
+    expect(commits[1]?.confirmPendingWarning).toBeUndefined();
+    expect(commits[2]).toMatchObject({ address: { row: 1, column: 1 }, input: "repeat" });
+    expect(commits[2]?.confirmPendingWarning).toBeUndefined();
   });
 
   test("keeps editing when the editor itself receives a pointer event", async () => {

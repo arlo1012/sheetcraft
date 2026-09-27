@@ -22,6 +22,7 @@ import {
   type FormulaFunctionArgument,
 } from "./formula/functions.js";
 import { getFormulaAst } from "./formula/parser.js";
+import { isSimulationTableRoot, parseSimulationTableFormula } from "./data-table-formula.js";
 import {
   createFormulaError,
   isFormulaError,
@@ -42,6 +43,7 @@ import {
   normalizeImageTransform,
   type ImageTransform,
 } from "./image-transform.js";
+import { normalizeOutlineGroups } from "./data-outline.js";
 
 export {
   areImageTransformsEqual,
@@ -90,18 +92,109 @@ export type SheetFilterValue =
 export type SheetFilterColumn = {
   column: number;
   allowedValues: SheetFilterValue[];
+  condition?: SheetFilterCondition;
 };
+export type SheetFilterCondition =
+  | {
+      kind: "text";
+      operator: "contains" | "doesNotContain" | "beginsWith" | "endsWith" | "equals" | "notEquals";
+      value: string;
+    }
+  | {
+      kind: "number" | "date";
+      operator:
+        | "equals"
+        | "notEquals"
+        | "greaterThan"
+        | "greaterThanOrEqual"
+        | "lessThan"
+        | "lessThanOrEqual"
+        | "between"
+        | "notBetween";
+      value: number;
+      value2?: number;
+    };
 
 /** Persisted filter criteria. Visibility is derived by the sheet-engine layer. */
 export type SheetFilter = {
   range: CellRange;
   columns: SheetFilterColumn[];
+  advanced?: {
+    criteria?: { sheetId: string; range: CellRange };
+    uniqueOnly: boolean;
+    hiddenRows: Array<{ start: number; end: number }>;
+  };
 };
 
 export type SheetMetadata = {
   freezePanes: FreezePanes;
   filter: SheetFilter | null;
   mergedCells: CellRange[];
+  dataValidations?: SheetDataValidation[];
+  outlineGroups?: SheetOutlineGroup[];
+  subtotalMetadata?: SheetSubtotalMetadata[];
+  duplicateRules?: SheetDuplicateRule[];
+};
+
+export type DataValidationType =
+  | "whole"
+  | "decimal"
+  | "list"
+  | "date"
+  | "time"
+  | "textLength"
+  | "custom";
+export type DataValidationOperator =
+  | "between"
+  | "notBetween"
+  | "equal"
+  | "notEqual"
+  | "greaterThan"
+  | "lessThan"
+  | "greaterThanOrEqual"
+  | "lessThanOrEqual";
+export type SheetDataValidation = {
+  id: string;
+  range: CellRange;
+  type: DataValidationType;
+  operator?: DataValidationOperator;
+  formula1?: string;
+  formula2?: string;
+  list?: string[];
+  allowBlank: boolean;
+  showInput?: boolean;
+  showError?: boolean;
+  showDropdown?: boolean;
+  promptTitle?: string;
+  prompt?: string;
+  errorTitle?: string;
+  error?: string;
+  errorStyle?: "stop" | "warning" | "information";
+};
+export type SheetOutlineGroup = {
+  id: string;
+  axis: SheetDimensionAxis;
+  start: number;
+  end: number;
+  collapsed: boolean;
+};
+export type SheetSubtotalMetadata = {
+  id: string;
+  range: CellRange;
+  generatedRows: number[];
+  /** Zero-based columns inserted to hold subtotal labels or values. */
+  generatedColumns?: number[];
+  /** Omitted is the legacy below-details layout. */
+  summaryBelow?: boolean;
+  /** Zero-based rows which begin a printed page after a group boundary. */
+  pageBreakRows?: number[];
+};
+export type SheetDuplicateRule = {
+  id: string;
+  kind: "highlight" | "reject";
+  range: CellRange;
+  fillColor?: string;
+  textColor?: string;
 };
 
 /** A positioned image that is anchored to a sheet cell without owning its binary data. */
@@ -144,6 +237,10 @@ export type Sheet = {
   freezePanes: FreezePanes;
   filter: SheetFilter | null;
   mergedCells: CellRange[];
+  dataValidations?: SheetDataValidation[];
+  outlineGroups?: SheetOutlineGroup[];
+  subtotalMetadata?: SheetSubtotalMetadata[];
+  duplicateRules?: SheetDuplicateRule[];
   floatingImages: FloatingImage[];
 };
 
@@ -168,6 +265,10 @@ export type SheetSparseState = {
   freezePanes: FreezePanes;
   filter: SheetFilter | null;
   mergedCells: CellRange[];
+  dataValidations?: SheetDataValidation[];
+  outlineGroups?: SheetOutlineGroup[];
+  subtotalMetadata?: SheetSubtotalMetadata[];
+  duplicateRules?: SheetDuplicateRule[];
   floatingImages: FloatingImage[];
 };
 
@@ -214,6 +315,10 @@ export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory)
     freezePanes: { rows: 0, columns: 0 },
     filter: null,
     mergedCells: [],
+    dataValidations: [],
+    outlineGroups: [],
+    subtotalMetadata: [],
+    duplicateRules: [],
     floatingImages: [],
   };
 }
@@ -331,10 +436,10 @@ function assertSheetNameAvailable(
 }
 
 function replaceWorkbookSheets(workbook: Workbook, sheets: readonly Sheet[]): void {
-  workbook.sheets.clear();
-  for (const sheet of sheets) {
-    workbook.sheets.set(sheet.id, sheet);
-  }
+  // Replacing the map publishes the reordered collection in one assignment. In
+  // particular, reactive consumers never observe a transient empty map while an
+  // insertion or move is rebuilding its order.
+  workbook.sheets = new Map(sheets.map((sheet) => [sheet.id, sheet]));
 }
 
 export function insertSheet(workbook: Workbook, sheet: Sheet, index = workbook.sheets.size): void {
@@ -372,8 +477,10 @@ export function removeSheet(workbook: Workbook, sheetId: string): RemovedSheet {
   if (!sheet) {
     throw new Error(`Sheet ${sheetId} disappeared while removing it.`);
   }
-  replaceWorkbookSheets(workbook, sheets);
+  // Publish a surviving active sheet before the removed sheet disappears so a
+  // synchronous observer can resolve the active sheet at each publication.
   workbook.activeSheetId = nextActiveSheetId;
+  replaceWorkbookSheets(workbook, sheets);
   return { sheet, index };
 }
 
@@ -464,6 +571,8 @@ export type WorkbookEvaluatorOptions = Readonly<{
   ) => FormulaRuntimeValue | undefined;
   /** Supplies one deterministic clock for volatile date functions in this calculation cycle. */
   now?: () => ExcelDateParts;
+  /** Internal shared guard for shadow-evaluated What-If Data Table formulas. */
+  simulationTableComputing?: Set<string>;
 }>;
 type SparseRangeIndex = { rows: number[]; byRow: Map<number, CellAddress[]> };
 
@@ -512,6 +621,7 @@ export function createWorkbookEvaluator(
   const formulaDependencies = new Map<string, Set<string>>();
   const formulaAddresses = new Map<string, Dependency>();
   const possibleSpillRoots = new Map<string, CellAddress[]>();
+  const simulationTableComputing = options?.simulationTableComputing ?? new Set<string>();
   const keyFor = (targetSheetId: string, address: CellAddress) =>
     `${targetSheetId}|${createCellKey(address)}`;
   const sheetForName = (name: string | undefined, fallback: string): string | null => {
@@ -959,6 +1069,9 @@ export function createWorkbookEvaluator(
         unique.set(keyFor(dependency.sheetId, dependency.address), dependency);
       return [...unique.values()];
     };
+    // The output formula depends on its target and on the input/header cells.
+    // Its target's graph is evaluated in a shadow below; scheduling these roots
+    // here keeps cycle diagnostics and manual calculation caching conservative.
     const dependencies = collect(ast.expression, stage);
     const key = keyFor(fromSheetId, address);
     formulaAddresses.set(key, { sheetId: fromSheetId, address });
@@ -967,6 +1080,76 @@ export function createWorkbookEvaluator(
     for (const dependency of dependencies) keys.add(keyFor(dependency.sheetId, dependency.address));
     formulaDependencies.set(key, keys);
     return dependencies;
+  };
+  const evaluateSimulationTable = (
+    currentSheetId: string,
+    address: CellAddress,
+    expression: FormulaExpression,
+  ): FormulaValue | undefined => {
+    const table = parseSimulationTableFormula(expression);
+    if (!table) {
+      if (!isSimulationTableRoot(expression)) return undefined;
+      return expression.args.some(
+        (argument) => argument.kind === "error" && argument.code === "REF",
+      )
+        ? createFormulaError("REF")
+        : createFormulaError("VALUE");
+    }
+    const tableKey = keyFor(currentSheetId, address);
+    if (simulationTableComputing.has(tableKey)) return createFormulaError("CYCLE");
+    simulationTableComputing.add(tableKey);
+    try {
+      const resolveReferenceSheet = (sheetName: string | undefined): string | null =>
+        sheetForName(sheetName, currentSheetId);
+      const scalarReference = (reference: typeof table.formula): FormulaValue => {
+        const referenceSheetId = resolveReferenceSheet(reference.sheetName);
+        return referenceSheetId ? resolve(referenceSheetId, reference) : createFormulaError("REF");
+      };
+      const formulaSheetId = resolveReferenceSheet(table.formula.sheetName);
+      const firstInputSheetId = resolveReferenceSheet(table.rowInput?.sheetName);
+      const firstValue = table.rowValue
+        ? scalarReference(table.rowValue)
+        : createFormulaError("VALUE");
+      const secondInputSheetId = table.columnInput
+        ? resolveReferenceSheet(table.columnInput.sheetName)
+        : undefined;
+      const secondValue = table.columnValue ? scalarReference(table.columnValue) : undefined;
+      if (
+        !formulaSheetId ||
+        !firstInputSheetId ||
+        (table.columnInput && !secondInputSheetId) ||
+        (isFormulaError(firstValue) && firstValue.code === "REF") ||
+        (isFormulaError(secondValue) && secondValue.code === "REF")
+      )
+        return createFormulaError("REF");
+      if (typeof firstValue !== "number" || (table.columnInput && typeof secondValue !== "number"))
+        return createFormulaError("VALUE");
+      const formulaContent = contentFor(formulaSheetId, table.formula);
+      if (formulaContent?.kind !== "formula") return createFormulaError("VALUE");
+      const sheets = new Map(workbook.sheets);
+      const cloneInputSheet = (inputSheetId: string) => {
+        const source = sheets.get(inputSheetId)!;
+        if (source === workbook.sheets.get(inputSheetId))
+          sheets.set(inputSheetId, { ...source, cells: new Map(source.cells) });
+        return sheets.get(inputSheetId)!;
+      };
+      setCellContent(cloneInputSheet(firstInputSheetId), table.rowInput!, {
+        kind: "literal",
+        value: firstValue,
+      });
+      if (table.columnInput && secondInputSheetId && typeof secondValue === "number")
+        setCellContent(cloneInputSheet(secondInputSheetId), table.columnInput, {
+          kind: "literal",
+          value: secondValue,
+        });
+      const shadow = { ...workbook, sheets };
+      return createWorkbookEvaluator(shadow, formulaSheetId, {
+        now: () => cycleNow,
+        simulationTableComputing,
+      }).getComputedValue(table.formula);
+    } finally {
+      simulationTableComputing.delete(tableKey);
+    }
   };
   const resolve = (targetSheetId: string, target: CellAddress): FormulaValue => {
     if (!isCellAddressInBounds(target)) return createFormulaError("REF");
@@ -993,6 +1176,16 @@ export function createWorkbookEvaluator(
     };
     if (hydrateCachedFormula(targetSheetId, target, source)) {
       return valueFor(targetSheetId, target);
+    }
+    const simulation = getFormulaAst(source.formula.source);
+    if (simulation) {
+      const tableValue = evaluateSimulationTable(targetSheetId, target, simulation.expression);
+      if (tableValue !== undefined) {
+        memo.set(targetKey, tableValue);
+        runtimeMemo.set(targetKey, tableValue);
+        state.set(targetKey, "done");
+        return tableValue;
+      }
     }
     const stack: Frame[] = [{ sheetId: targetSheetId, address: target, stage: "prepare" }];
     while (stack.length) {
@@ -1047,6 +1240,20 @@ export function createWorkbookEvaluator(
           else stack.push({ ...dependency, stage: "prepare" });
         }
         continue;
+      }
+      const simulation = getFormulaAst(content.formula.source);
+      if (simulation) {
+        const tableValue = evaluateSimulationTable(
+          frame.sheetId,
+          frame.address,
+          simulation.expression,
+        );
+        if (tableValue !== undefined) {
+          runtimeMemo.set(frameKey, tableValue);
+          memo.set(frameKey, tableValue);
+          state.set(frameKey, "done");
+          continue;
+        }
       }
       const runtime = evaluateFormulaRuntime(content.formula.source, resolverFor(frame.sheetId), {
         dateSystem: workbook.dateSystem,
@@ -1439,7 +1646,27 @@ function cloneSheetFilter(filter: SheetFilter): SheetFilter {
     columns: filter.columns.map((column) => ({
       column: column.column,
       allowedValues: column.allowedValues.map(cloneFilterValue),
+      ...(column.condition ? { condition: { ...column.condition } } : {}),
     })),
+    ...(filter.advanced
+      ? {
+          advanced: {
+            ...(filter.advanced.criteria
+              ? {
+                  criteria: {
+                    sheetId: filter.advanced.criteria.sheetId,
+                    range: {
+                      start: { ...filter.advanced.criteria.range.start },
+                      end: { ...filter.advanced.criteria.range.end },
+                    },
+                  },
+                }
+              : {}),
+            uniqueOnly: filter.advanced.uniqueOnly,
+            hiddenRows: filter.advanced.hiddenRows.map((interval) => ({ ...interval })),
+          },
+        }
+      : {}),
   };
 }
 
@@ -1523,17 +1750,114 @@ function normalizeSheetFilter(filter: SheetFilter | null): SheetFilter | null {
       const rightKey = filterValueKey(right);
       return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
     });
-    return { column: column.column, allowedValues };
+    const condition = column.condition;
+    if (condition !== undefined) {
+      const text =
+        condition.kind === "text" &&
+        typeof condition.value === "string" &&
+        ["contains", "doesNotContain", "beginsWith", "endsWith", "equals", "notEquals"].includes(
+          condition.operator,
+        );
+      const numeric =
+        (condition.kind === "number" || condition.kind === "date") &&
+        typeof condition.value === "number" &&
+        Number.isFinite(condition.value) &&
+        [
+          "equals",
+          "notEquals",
+          "greaterThan",
+          "greaterThanOrEqual",
+          "lessThan",
+          "lessThanOrEqual",
+          "between",
+          "notBetween",
+        ].includes(condition.operator) &&
+        (condition.value2 === undefined ||
+          (typeof condition.value2 === "number" && Number.isFinite(condition.value2))) &&
+        (!["between", "notBetween"].includes(condition.operator) || condition.value2 !== undefined);
+      if (!text && !numeric) throw new TypeError("Invalid filter condition.");
+    }
+    return {
+      column: column.column,
+      allowedValues,
+      ...(condition ? { condition: { ...condition } } : {}),
+    };
   });
   columns.sort((left, right) => left.column - right.column);
   if (columns.some((column, index) => column.column === columns[index - 1]?.column)) {
     throw new Error("Filter columns must be unique.");
   }
-  return { range: normalizedRange, columns };
+  let advanced: SheetFilter["advanced"];
+  if (filter.advanced !== undefined) {
+    const source = filter.advanced;
+    if (
+      !source ||
+      typeof source !== "object" ||
+      typeof source.uniqueOnly !== "boolean" ||
+      !Array.isArray(source.hiddenRows)
+    )
+      throw new TypeError("Invalid advanced filter.");
+    const hiddenRows = source.hiddenRows.map((interval) => {
+      if (
+        !interval ||
+        !Number.isInteger(interval.start) ||
+        !Number.isInteger(interval.end) ||
+        interval.start < normalizedRange.start.row + 1 ||
+        interval.end < interval.start ||
+        interval.end > normalizedRange.end.row
+      )
+        throw new RangeError("Invalid advanced filter hidden rows.");
+      return { start: interval.start, end: interval.end };
+    });
+    if (
+      hiddenRows.some(
+        (interval, index) => index > 0 && interval.start <= hiddenRows[index - 1]!.end,
+      )
+    )
+      throw new RangeError("Advanced filter hidden rows must not overlap.");
+    if (source.criteria !== undefined) {
+      const criteria = source.criteria;
+      if (
+        !criteria ||
+        typeof criteria.sheetId !== "string" ||
+        !criteria.sheetId ||
+        !isCellAddressInBounds(criteria.range?.start) ||
+        !isCellAddressInBounds(criteria.range?.end)
+      )
+        throw new TypeError("Invalid advanced filter criteria.");
+      advanced = {
+        criteria: {
+          sheetId: criteria.sheetId,
+          range: {
+            start: {
+              row: Math.min(criteria.range.start.row, criteria.range.end.row),
+              column: Math.min(criteria.range.start.column, criteria.range.end.column),
+            },
+            end: {
+              row: Math.max(criteria.range.start.row, criteria.range.end.row),
+              column: Math.max(criteria.range.start.column, criteria.range.end.column),
+            },
+          },
+        },
+        uniqueOnly: source.uniqueOnly,
+        hiddenRows,
+      };
+    } else advanced = { uniqueOnly: source.uniqueOnly, hiddenRows };
+  }
+  return { range: normalizedRange, columns, ...(advanced ? { advanced } : {}) };
 }
 
 function normalizeSheetMetadata(
-  state: Pick<SheetSparseState, "freezePanes" | "filter" | "mergedCells">,
+  state: Pick<
+    SheetSparseState,
+    | "freezePanes"
+    | "filter"
+    | "mergedCells"
+    | "dataValidations"
+    | "outlineGroups"
+    | "subtotalMetadata"
+    | "duplicateRules"
+  >,
 ): SheetMetadata {
   const freezePanes = normalizeFreezePanes(state.freezePanes);
   const mergedCells = validateMergedCellRanges(state.mergedCells);
@@ -1550,7 +1874,124 @@ function normalizeSheetMetadata(
   if (filter && mergedCells.some((range) => doMergedCellRangesIntersect(range, filter.range))) {
     throw new RangeError("A filter range cannot intersect merged cells.");
   }
-  return { freezePanes, filter, mergedCells };
+  const dataValidations = (state.dataValidations ?? []).map((rule) => {
+    if (
+      !rule ||
+      typeof rule.id !== "string" ||
+      !rule.id.trim() ||
+      !isCellAddressInBounds(rule.range.start) ||
+      !isCellAddressInBounds(rule.range.end) ||
+      !["whole", "decimal", "list", "date", "time", "textLength", "custom"].includes(rule.type) ||
+      typeof rule.allowBlank !== "boolean" ||
+      (rule.list !== undefined &&
+        (!Array.isArray(rule.list) || rule.list.some((value) => typeof value !== "string"))) ||
+      (rule.formula1 !== undefined && typeof rule.formula1 !== "string") ||
+      (rule.formula2 !== undefined && typeof rule.formula2 !== "string") ||
+      (rule.operator !== undefined &&
+        ![
+          "between",
+          "notBetween",
+          "equal",
+          "notEqual",
+          "greaterThan",
+          "lessThan",
+          "greaterThanOrEqual",
+          "lessThanOrEqual",
+        ].includes(rule.operator)) ||
+      (rule.errorStyle !== undefined &&
+        !["stop", "warning", "information"].includes(rule.errorStyle)) ||
+      [rule.showInput, rule.showError, rule.showDropdown].some(
+        (value) => value !== undefined && typeof value !== "boolean",
+      )
+    )
+      throw new TypeError("Invalid data validation rule.");
+    return {
+      ...rule,
+      range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+      ...(rule.list ? { list: [...rule.list] } : {}),
+    };
+  });
+  const duplicateRuleIds = new Set<string>();
+  const duplicateRules = (state.duplicateRules ?? []).map((rule) => {
+    if (
+      !rule ||
+      typeof rule.id !== "string" ||
+      !rule.id.trim() ||
+      (rule.kind !== "highlight" && rule.kind !== "reject") ||
+      !isCellAddressInBounds(rule.range.start) ||
+      !isCellAddressInBounds(rule.range.end)
+    )
+      throw new TypeError("Invalid duplicate rule.");
+    if (duplicateRuleIds.has(rule.id)) throw new TypeError("Duplicate rule IDs must be unique.");
+    duplicateRuleIds.add(rule.id);
+    if (
+      (rule.fillColor !== undefined && typeof rule.fillColor !== "string") ||
+      (rule.textColor !== undefined && typeof rule.textColor !== "string")
+    )
+      throw new TypeError("Duplicate highlight colors must be strings.");
+    normalizeCellStyle({
+      ...(rule.fillColor === undefined ? {} : { fillColor: rule.fillColor }),
+      ...(rule.textColor === undefined ? {} : { textColor: rule.textColor }),
+    });
+    return {
+      ...rule,
+      range: {
+        start: {
+          row: Math.min(rule.range.start.row, rule.range.end.row),
+          column: Math.min(rule.range.start.column, rule.range.end.column),
+        },
+        end: {
+          row: Math.max(rule.range.start.row, rule.range.end.row),
+          column: Math.max(rule.range.start.column, rule.range.end.column),
+        },
+      },
+    };
+  });
+  if (new Set(dataValidations.map((rule) => rule.id)).size !== dataValidations.length)
+    throw new Error("Duplicate data validation ID.");
+  const outlineGroups = normalizeOutlineGroups(state.outlineGroups ?? []);
+  const subtotalMetadata = (state.subtotalMetadata ?? []).map((entry) => {
+    if (
+      !entry ||
+      typeof entry.id !== "string" ||
+      !entry.id ||
+      !isCellAddressInBounds(entry.range.start) ||
+      !isCellAddressInBounds(entry.range.end) ||
+      !Array.isArray(entry.generatedRows) ||
+      entry.generatedRows.some(
+        (row) => !Number.isInteger(row) || row < 0 || row >= MAX_SHEET_ROWS,
+      ) ||
+      (entry.generatedColumns !== undefined &&
+        (!Array.isArray(entry.generatedColumns) ||
+          entry.generatedColumns.some(
+            (column) => !Number.isInteger(column) || column < 0 || column >= MAX_SHEET_COLUMNS,
+          ))) ||
+      (entry.summaryBelow !== undefined && typeof entry.summaryBelow !== "boolean") ||
+      (entry.pageBreakRows !== undefined &&
+        (!Array.isArray(entry.pageBreakRows) ||
+          entry.pageBreakRows.some(
+            (row) => !Number.isInteger(row) || row < 0 || row >= MAX_SHEET_ROWS,
+          )))
+    )
+      throw new TypeError("Invalid subtotal metadata.");
+    return {
+      ...entry,
+      range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
+      generatedRows: [...entry.generatedRows],
+      ...(entry.generatedColumns ? { generatedColumns: [...entry.generatedColumns] } : {}),
+      ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
+      ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
+    };
+  });
+  return {
+    freezePanes,
+    filter,
+    mergedCells,
+    dataValidations,
+    outlineGroups,
+    subtotalMetadata,
+    duplicateRules,
+  };
 }
 
 export function getSheetMetadata(sheet: Sheet): SheetMetadata {
@@ -1566,6 +2007,24 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
   sheet.mergedCells = normalized.mergedCells.map((range) => ({
     start: { ...range.start },
     end: { ...range.end },
+  }));
+  sheet.dataValidations = (normalized.dataValidations ?? []).map((rule) => ({
+    ...rule,
+    range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+    ...(rule.list ? { list: [...rule.list] } : {}),
+  }));
+  sheet.outlineGroups = (normalized.outlineGroups ?? []).map((group) => ({ ...group }));
+  sheet.subtotalMetadata = (normalized.subtotalMetadata ?? []).map((entry) => ({
+    ...entry,
+    range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
+    generatedRows: [...entry.generatedRows],
+    ...(entry.generatedColumns ? { generatedColumns: [...entry.generatedColumns] } : {}),
+    ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
+    ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
+  }));
+  sheet.duplicateRules = (normalized.duplicateRules ?? []).map((rule) => ({
+    ...rule,
+    range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
   }));
   return true;
 }
@@ -1676,6 +2135,10 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
       start: { ...range.start },
       end: { ...range.end },
     })),
+    dataValidations: metadata.dataValidations ?? [],
+    outlineGroups: metadata.outlineGroups ?? [],
+    subtotalMetadata: metadata.subtotalMetadata ?? [],
+    duplicateRules: metadata.duplicateRules ?? [],
     floatingImages,
   };
 }
@@ -1689,6 +2152,8 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
     left.hiddenColumns?.length !== right.hiddenColumns?.length ||
     left.defaultColumnWidth !== right.defaultColumnWidth ||
     !areSheetMetadataEqual(left, right) ||
+    JSON.stringify(left.subtotalMetadata ?? []) !== JSON.stringify(right.subtotalMetadata ?? []) ||
+    JSON.stringify(left.duplicateRules ?? []) !== JSON.stringify(right.duplicateRules ?? []) ||
     left.floatingImages.length !== right.floatingImages.length
   ) {
     return false;
@@ -1746,6 +2211,24 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
       start: { ...range.start },
       end: { ...range.end },
     })),
+    dataValidations: (sheet.dataValidations ?? []).map((rule) => ({
+      ...rule,
+      range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+      ...(rule.list ? { list: [...rule.list] } : {}),
+    })),
+    outlineGroups: (sheet.outlineGroups ?? []).map((group) => ({ ...group })),
+    subtotalMetadata: (sheet.subtotalMetadata ?? []).map((entry) => ({
+      ...entry,
+      range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
+      generatedRows: [...entry.generatedRows],
+      ...(entry.generatedColumns ? { generatedColumns: [...entry.generatedColumns] } : {}),
+      ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
+      ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
+    })),
+    duplicateRules: (sheet.duplicateRules ?? []).map((rule) => ({
+      ...rule,
+      range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+    })),
     floatingImages: sheet.floatingImages.map(cloneFloatingImage),
   });
 }
@@ -1782,6 +2265,24 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   sheet.mergedCells = nextState.mergedCells.map((range) => ({
     start: { ...range.start },
     end: { ...range.end },
+  }));
+  sheet.dataValidations = (nextState.dataValidations ?? []).map((rule) => ({
+    ...rule,
+    range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+    ...(rule.list ? { list: [...rule.list] } : {}),
+  }));
+  sheet.outlineGroups = (nextState.outlineGroups ?? []).map((group) => ({ ...group }));
+  sheet.subtotalMetadata = (nextState.subtotalMetadata ?? []).map((entry) => ({
+    ...entry,
+    range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
+    generatedRows: [...entry.generatedRows],
+    ...(entry.generatedColumns ? { generatedColumns: [...entry.generatedColumns] } : {}),
+    ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
+    ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
+  }));
+  sheet.duplicateRules = (nextState.duplicateRules ?? []).map((rule) => ({
+    ...rule,
+    range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
   }));
   sheet.floatingImages = nextState.floatingImages.map(cloneFloatingImage);
   return true;

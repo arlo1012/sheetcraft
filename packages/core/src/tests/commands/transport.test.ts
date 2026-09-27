@@ -60,6 +60,10 @@ describe("workbook command transport", () => {
       freezePanes: { rows: 0, columns: 0 },
       filter: null,
       mergedCells: [],
+      dataValidations: [],
+      outlineGroups: [],
+      subtotalMetadata: [],
+      duplicateRules: [],
       floatingImages: [],
     });
     expectTransportSafe(command);

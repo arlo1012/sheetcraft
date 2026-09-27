@@ -276,6 +276,16 @@ export function applyCellShiftCommand(
   command: CellShiftCommand,
 ): RestoreCellShiftCommand | null {
   const range = validate(command);
+  if (
+    [...workbook.sheets.values()].some(
+      (entry) => entry.filter?.advanced?.criteria?.sheetId === command.sheetId,
+    )
+  )
+    throw invalidCommandPayload(
+      "sheetId",
+      command.sheetId,
+      "Cell shifts on a sheet used by active advanced filter criteria are not supported.",
+    );
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const movement: Range =
     command.direction === "right" || command.direction === "left"
@@ -298,6 +308,31 @@ export function applyCellShiftCommand(
       "range",
       range,
       "Cell shifts inside an active filter are not supported.",
+    );
+  if (
+    (sheet.dataValidations ?? []).some((rule) => intersects(rule.range, movement)) ||
+    (sheet.subtotalMetadata ?? []).some((entry) => intersects(entry.range, movement)) ||
+    (sheet.duplicateRules ?? []).some((rule) => intersects(rule.range, movement))
+  )
+    throw invalidCommandPayload(
+      "range",
+      range,
+      "Cell shifts intersecting data validation, duplicate, or subtotal ranges are not supported.",
+    );
+  const outlineAxis =
+    command.direction === "left" || command.direction === "right" ? "column" : "row";
+  const outlineStart = outlineAxis === "row" ? movement.start.row : movement.start.column;
+  const outlineEnd = outlineAxis === "row" ? movement.end.row : movement.end.column;
+  if (
+    (sheet.outlineGroups ?? []).some(
+      (group) =>
+        group.axis === outlineAxis && group.start <= outlineEnd && outlineStart <= group.end,
+    )
+  )
+    throw invalidCommandPayload(
+      "range",
+      range,
+      "Cell shifts intersecting outline groups are not supported.",
     );
   assertFormulaRangesAreSafe(workbook, sheet.id, range, movement, command.direction);
 

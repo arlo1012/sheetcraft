@@ -103,6 +103,8 @@ export function createCellFillActions(options: {
 }
 
 function fillFailure(error: unknown): GridFillFeedback {
+  if (error instanceof WorkbookDomainError && error.data.details?.field === "duplicate")
+    return "duplicate";
   if (error instanceof WorkbookDomainError && error.data.code === "sheet_protected")
     return "readOnly";
   if (error instanceof CellFillError) {

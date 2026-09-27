@@ -22,7 +22,7 @@ import {
   type NamedRangeFilter,
 } from "../named-range-filters";
 import NamedRangeEditorDialog from "./NamedRangeEditorDialog.vue";
-import NamedRangeReferenceInput from "./NamedRangeReferenceInput.vue";
+import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 
 type NameTableRow = NamedRangeRow & { scopeLabel: string };
 const props = withDefaults(
@@ -321,7 +321,7 @@ watch(
             @click="saveReference"
             ><Check :size="15"
           /></TButton>
-          <NamedRangeReferenceInput
+          <RangeReferenceInput
             v-model="referenceDraft"
             :disabled="!selectedRange"
             :select-reference="selectReference"

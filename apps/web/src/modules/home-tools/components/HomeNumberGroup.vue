@@ -67,7 +67,7 @@ function selectFormat(choice: NumberFormatPresetChoice): void {
         data-ribbon-action="percent-format"
         @activate="selectFormat('percent')"
       >
-        <Percent :size="15" aria-hidden="true" />
+        <Percent aria-hidden="true" />
       </RibbonButton>
       <RibbonButton
         :label="t('ribbon.currencyFormat')"
@@ -75,7 +75,7 @@ function selectFormat(choice: NumberFormatPresetChoice): void {
         data-ribbon-action="currency-format"
         @activate="selectFormat('currency')"
       >
-        <DollarSign :size="15" aria-hidden="true" />
+        <DollarSign aria-hidden="true" />
       </RibbonButton>
       <RibbonButton
         :label="t('ribbon.decreaseDecimal')"
@@ -83,7 +83,7 @@ function selectFormat(choice: NumberFormatPresetChoice): void {
         data-ribbon-action="decrease-decimal"
         @activate="emit('adjustDecimals', -1)"
       >
-        <MoveLeft :size="15" aria-hidden="true" />
+        <MoveLeft aria-hidden="true" />
       </RibbonButton>
       <RibbonButton
         :label="t('ribbon.increaseDecimal')"
@@ -91,7 +91,7 @@ function selectFormat(choice: NumberFormatPresetChoice): void {
         data-ribbon-action="increase-decimal"
         @activate="emit('adjustDecimals', 1)"
       >
-        <MoveRight :size="15" aria-hidden="true" />
+        <MoveRight aria-hidden="true" />
       </RibbonButton>
     </div>
     <RibbonDialogLauncher

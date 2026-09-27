@@ -10,6 +10,8 @@ function createFixture(options?: {
   hiddenRows?: number[];
   quickTools?: boolean;
   gutter?: number;
+  rowOutlineGutter?: number;
+  columnOutlineGutter?: number;
   canFocus?: boolean;
 }) {
   const geometry = createSheetGeometry({
@@ -40,7 +42,15 @@ function createFixture(options?: {
     openContextMenu: vi.fn(),
   };
   const interaction = useHeaderInteraction({
-    getFrame: () => createSheetRenderFrame(layout, { width: 36, height: 24 }, 1),
+    getFrame: () =>
+      createSheetRenderFrame(
+        layout,
+        {
+          width: 36 + (options?.rowOutlineGutter ?? 0),
+          height: 24 + (options?.columnOutlineGutter ?? 0),
+        },
+        1,
+      ),
     getSelection: () => ({
       startRow: 0,
       endRow: 0,
@@ -50,6 +60,8 @@ function createFixture(options?: {
     }),
     getQuickTools: () => ({
       enabled: options?.quickTools ?? false,
+      rowOutlineGutter: options?.rowOutlineGutter,
+      columnOutlineGutter: options?.columnOutlineGutter,
       gutter: options?.gutter ?? (options?.quickTools ? 16 : 0),
     }),
     getGeometry: () => geometry,
@@ -84,6 +96,33 @@ const trigger = {
 } as unknown as HTMLElement;
 
 describe("useHeaderInteraction", () => {
+  test.each([false, true])(
+    "excludes outline space from row actions with quick tools %s",
+    (quickTools) => {
+      const { interaction } = createFixture({ quickTools, rowOutlineGutter: 48 });
+      const gutter = quickTools ? 16 : 0;
+      expect(interaction.hitTest({ x: gutter + 20, y: 12 })).toBeUndefined();
+      expect(interaction.hitTest({ x: gutter + 20, y: 32 })).toBeUndefined();
+      expect(interaction.hitTest({ x: gutter + 20, y: 43 })).toBeUndefined();
+      expect(interaction.onPointerMove({ x: 76, y: 32 })).toMatchObject({
+        axis: "row",
+        action: "axis",
+      });
+      expect(interaction.hitTest({ x: 76, y: 43 })).toMatchObject({
+        axis: "row",
+        action: "resize",
+      });
+      if (quickTools) {
+        expect(interaction.hitTest({ x: 8, y: 24 })).toMatchObject({
+          axis: "row",
+          action: "quickInsert",
+        });
+        interaction.onPointerLeave();
+        expect(interaction.hitTest({ x: 8, y: 34 })).toMatchObject({ axis: "row", action: "grip" });
+      }
+    },
+  );
+
   test("does not expand header hit areas into the reserved gutter when controls are disabled", () => {
     const { interaction } = createFixture({ quickTools: false, gutter: 16 });
 
@@ -92,6 +131,17 @@ describe("useHeaderInteraction", () => {
     expect(interaction.hitTest({ x: 50, y: 8 })).toBeUndefined();
     expect(interaction.hitTest({ x: 24, y: 32 })).toMatchObject({ axis: "row", action: "axis" });
     expect(interaction.hitTest({ x: 50, y: 20 })).toMatchObject({ axis: "column", action: "axis" });
+  });
+
+  test("keeps the column outline tracks out of column-header actions", () => {
+    const { interaction } = createFixture({ columnOutlineGutter: 44 });
+
+    expect(interaction.hitTest({ x: 50, y: 12 })).toBeUndefined();
+    expect(interaction.hitTest({ x: 50, y: 43 })).toBeUndefined();
+    expect(interaction.hitTest({ x: 50, y: 44 })).toMatchObject({
+      axis: "column",
+      action: "axis",
+    });
   });
 
   test("uses the render frame for row and column hits", () => {

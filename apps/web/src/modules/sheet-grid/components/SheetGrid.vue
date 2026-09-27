@@ -22,7 +22,11 @@ import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
 import { getSelectionFitZoom } from "../selection-zoom";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import type { FormulaReferenceEditor } from "../../../shared/formula-editing/formula-editor-contract";
-import type { CellEditSession } from "../../../shared/cell-editing/useCellEditSession";
+import {
+  isExplicitWarningConfirmationKey,
+  type CellEditFinishOptions,
+  type CellEditSession,
+} from "../../../shared/cell-editing/useCellEditSession";
 import { completeFormulaForCommit } from "../../../shared/formula-editing/formula-commit";
 import type { FormulaReferenceToken } from "../../../shared/formula-editing/formula-reference-tokens";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
@@ -36,7 +40,6 @@ import {
   MIN_ROW_HEIGHT,
   createSheetEvaluator,
   getCellContent,
-  getCellStyle,
   getDefaultColumnWidth,
   type FloatingImage,
   type CellAddress,
@@ -47,7 +50,6 @@ import {
   type SheetDimensionAxis,
 } from "@idea10/core/workbook";
 import { expandSelectionToMergedCellRanges } from "@idea10/core";
-import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import {
   DEFAULT_GRID_EXTENT_POLICY,
   DEFAULT_INITIAL_GRID_EXTENT,
@@ -97,8 +99,15 @@ import CellEditor from "./CellEditor.vue";
 import SheetAxisContextMenu from "./SheetAxisContextMenu.vue";
 import SheetFreezeHandles from "./SheetFreezeHandles.vue";
 import SheetCellContextMenu from "./SheetCellContextMenu.vue";
+import SheetCellErrorMenu, { type CellErrorDescription } from "./SheetCellErrorMenu.vue";
+import SheetCellNotice from "./SheetCellNotice.vue";
 import SheetSurface from "./SheetSurface.vue";
 import SheetAutoFillOptions from "./SheetAutoFillOptions.vue";
+import SheetDataControls, { type ActiveCellValidationInfo } from "./SheetDataControls.vue";
+import {
+  createSheetHiddenColumnIntervals,
+  createSheetHiddenRowIntervals,
+} from "../data-visibility";
 import {
   createFloatingImageCanvasCache,
   paintFloatingImages,
@@ -113,6 +122,7 @@ import {
 } from "../../../shared/sheet-input/surface-coordinates";
 import { useHeaderInteraction } from "../input/useHeaderInteraction";
 import type { HeaderInteractionState } from "../input/useHeaderInteraction";
+import { getOutlineGutterSize } from "../outline-layout";
 import type {
   FormulaReferenceOverlay as FormulaReferenceOverlayGroup,
   SheetOverlayState,
@@ -190,6 +200,12 @@ const props = withDefaults(
     showGridLines?: boolean;
     showAxisQuickTools?: boolean;
     dateSystem?: ExcelDateSystem;
+    /** Resolved for the active cell by the Web data-tools adapter. */
+    validationInfo?: ActiveCellValidationInfo;
+    errorCells?: ReadonlySet<string>;
+    activeCellError?: CellErrorDescription;
+    inputError?: { address: CellAddress; title: string; message: string };
+    errorIndicatorColor?: string | null;
   }>(),
   {
     initialRowCount: DEFAULT_INITIAL_GRID_EXTENT.rowCount,
@@ -228,6 +244,7 @@ const emit = defineEmits<{
   freezeChange: [freezePanes: { rows: number; columns: number }];
   formatPainterTarget: [range: CellRange];
   cancelFormatPainter: [];
+  flashFill: [];
   undo: [];
   redo: [];
   viewStateChange: [viewState: SheetGridViewState];
@@ -235,6 +252,23 @@ const emit = defineEmits<{
   fillFeedback: [feedback: GridFillFeedback];
   endFill: [];
   horizontalScrollChange: [state: SheetHorizontalScrollState];
+  filterColumnRequest: [payload: { column: number; anchor: DOMRect }];
+  validationChoose: [
+    payload: {
+      address: CellAddress;
+      value: string | number | boolean;
+    },
+  ];
+  outlineToggle: [payload: { id: string; collapsed: boolean }];
+  outlineLevel: [payload: { axis: SheetDimensionAxis; level: number }];
+  convertCellToNumber: [];
+  convertSelectionToNumber: [];
+  correctSheetErrors: [];
+  ignoreSelectedCellErrors: [];
+  dismissInputError: [];
+  ignoreAllCellErrors: [];
+  editErrorInFormulaBar: [];
+  errorCheckOptions: [];
   "update:zoom": [zoom: number];
 }>();
 
@@ -244,11 +278,48 @@ const AXIS_TOOL_GUTTER = 20;
 const quickToolsGutter = computed(() =>
   props.showHeaders && props.showAxisQuickTools ? AXIS_TOOL_GUTTER : 0,
 );
+function getOutlineDepth(axis: SheetDimensionAxis): number {
+  const groups = props.sheet.outlineGroups ?? [];
+  return groups.reduce((max, group) => {
+    if (group.axis !== axis) return max;
+    const depth = groups.filter(
+      (candidate) =>
+        candidate.axis === axis && candidate.start <= group.start && candidate.end >= group.end,
+    ).length;
+    return Math.max(max, depth);
+  }, 0);
+}
+const rowOutlineDepth = computed(() => getOutlineDepth("row"));
+const columnOutlineDepth = computed(() => getOutlineDepth("column"));
+const rowOutlineGutter = computed(() => getOutlineGutterSize(rowOutlineDepth.value));
+const columnOutlineHeaderHeight = computed(() => getOutlineGutterSize(columnOutlineDepth.value));
 
 const headerSize = computed(() => ({
-  width: props.showHeaders ? ROW_HEADER_WIDTH + quickToolsGutter.value : 0,
-  height: props.showHeaders ? COLUMN_HEADER_HEIGHT + quickToolsGutter.value : 0,
+  width: props.showHeaders ? ROW_HEADER_WIDTH + quickToolsGutter.value + rowOutlineGutter.value : 0,
+  height: props.showHeaders
+    ? COLUMN_HEADER_HEIGHT + quickToolsGutter.value + columnOutlineHeaderHeight.value
+    : 0,
 }));
+const subtotalSummaryBelow = computed(() =>
+  Object.fromEntries(
+    (props.sheet.subtotalMetadata ?? []).map((metadata) => [
+      metadata.id,
+      metadata.summaryBelow !== false,
+    ]),
+  ),
+);
+
+const outlineHiddenRows = computed(() =>
+  createSheetHiddenRowIntervals(props.sheet, sheetEvaluator.value),
+);
+const outlineHiddenColumns = computed(() => createSheetHiddenColumnIntervals(props.sheet));
+const outlineHiddenColumnSet = computed(() => {
+  const hidden = new Set(props.sheet.hiddenColumns ?? []);
+  for (const interval of outlineHiddenColumns.value) {
+    for (let column = interval.start; column <= interval.end; column += 1) hidden.add(column);
+  }
+  return hidden;
+});
 
 const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
@@ -366,13 +437,12 @@ const {
   getColumnWidths: () => effectiveColumnWidths.value,
   getDefaultColumnWidth: () => getDefaultColumnWidth(props.sheet),
   getHiddenRows: () => props.sheet.hiddenRows,
-  getHiddenColumns: () => props.sheet.hiddenColumns,
+  getHiddenColumns: () => outlineHiddenColumnSet.value,
   getContentExtent: () => contentExtent.value,
   getRowHeights: () => effectiveRowHeights.value,
   getFreezePanes: () => props.sheet.freezePanes,
   getMergedCells: () => props.sheet.mergedCells,
-  getHiddenRowIntervals: () =>
-    createSheetFilterHiddenRowIntervals(props.sheet, sheetEvaluator.value),
+  getHiddenRowIntervals: () => outlineHiddenRows.value,
   getSelection: () => selection.value,
   onScrollStart: () => {
     axisContextMenu.value = undefined;
@@ -684,6 +754,8 @@ const headerSelection = computed(() => ({
 const headerQuickTools = computed(() => ({
   enabled: headerQuickToolsEnabled.value,
   gutter: quickToolsGutter.value,
+  rowOutlineGutter: props.showHeaders ? rowOutlineGutter.value : 0,
+  columnOutlineGutter: props.showHeaders ? columnOutlineHeaderHeight.value : 0,
 }));
 const headerInput = useHeaderInteraction({
   canFocus: () => !getReferenceEditor() && !isComposing.value,
@@ -922,23 +994,23 @@ const activeCellDisplayValue = computed(() =>
     ? t("image.cellAlt")
     : formatCellValueForGrid(
         sheetEvaluator.value.getComputedValue(activeCell.value),
-        getCellStyle(props.sheet, activeCell.value),
+        display.value.getCellStyle(activeCell.value),
         locale.value,
         props.dateSystem,
       ),
 );
 const activeCellEditorStyle = computed(() =>
   getCellEditorStyle(
-    getCellStyle(props.sheet, activeCell.value),
+    display.value.getCellStyle(activeCell.value),
     sheetEvaluator.value.getComputedValue(activeCell.value),
     isEditing.value ? editingValue.value : activeCellDisplayValue.value,
   ),
 );
 const activeCellEditorFrameStyle = computed(() =>
-  getCellEditorFrameStyle(getCellStyle(props.sheet, activeCell.value)),
+  getCellEditorFrameStyle(display.value.getCellStyle(activeCell.value)),
 );
 const activeCellWrapText = computed(() =>
-  isCellTextWrapped(getCellStyle(props.sheet, activeCell.value)),
+  isCellTextWrapped(display.value.getCellStyle(activeCell.value)),
 );
 const browserClipboard = createBrowserGridClipboardPort();
 const {
@@ -1021,6 +1093,7 @@ const {
   fillSelection,
 } = useSheetAutoFill({
   getSheet: () => props.sheet,
+  getEvaluator: () => sheetEvaluator.value,
   getRevision: () => props.workbookRevision ?? 0,
   getRange: () => selectedRange.value,
   getCanFill: () =>
@@ -1302,9 +1375,13 @@ function stopFormulaReferenceDrag(): void {
   formulaReferenceDragEditor = undefined;
 }
 
-function finishEdit(destination?: CellSelection, restoreFocus = true): void {
+function finishEdit(
+  destination?: CellSelection,
+  restoreFocus = true,
+  finishOptions: CellEditFinishOptions = {},
+): boolean {
   stopFormulaReferenceDrag();
-  finishCellEdit(destination, restoreFocus);
+  return finishCellEdit(destination, restoreFocus, finishOptions);
 }
 
 function cancelEdit(restoreFocus = true): void {
@@ -1350,21 +1427,21 @@ function startReferencePick(address: CellAddress, event: MouseEvent): boolean {
 function getNextVisibleColumn(column: number, direction: -1 | 1): number | null {
   let next = column + direction;
   while (next >= 0 && next < MAX_SHEET_COLUMNS) {
-    if (!props.sheet.hiddenColumns?.has(next)) return next;
+    if (!outlineHiddenColumnSet.value.has(next)) return next;
     next += direction;
   }
   return null;
 }
 
 watch(
-  [navigationRows, () => props.sheet.hiddenColumns],
+  [navigationRows, outlineHiddenColumnSet],
   () => {
     const current = selection.value.active;
     const rows = navigationRows.value;
     const row = rows.isRowVisible(current.row)
       ? current.row
       : (rows.getNextVisibleRow(current.row) ?? rows.getPreviousVisibleRow(current.row));
-    const column = !props.sheet.hiddenColumns?.has(current.column)
+    const column = !outlineHiddenColumnSet.value.has(current.column)
       ? current.column
       : (getNextVisibleColumn(current.column, 1) ?? getNextVisibleColumn(current.column, -1));
     if (row === null || column === null || (row === current.row && column === current.column))
@@ -1393,7 +1470,7 @@ function navigateToCell(address: CellAddress): void {
   }
 
   if (isEditing.value) {
-    finishEdit(nextSelection);
+    if (!finishEdit(nextSelection)) return;
   } else {
     setSelection(nextSelection, address);
   }
@@ -1403,6 +1480,7 @@ function moveSelection(
   delta: { rows?: number; columns?: number },
   commitEdit: boolean,
   extend = false,
+  finishOptions: CellEditFinishOptions = {},
 ): void {
   const destination = moveCellSelection(
     selection.value,
@@ -1440,7 +1518,7 @@ function moveSelection(
   ensureGridExtentContains(visibleAddress);
 
   if (commitEdit) {
-    finishEdit(destination);
+    if (!finishEdit(destination, true, finishOptions)) return;
   } else {
     setSelection(destination, visibleAddress);
   }
@@ -1507,7 +1585,7 @@ function onCellMouseDown(address: CellAddress, event: MouseEvent): void {
   }
 
   if (isEditing.value) {
-    finishEdit(nextSelection);
+    if (!finishEdit(nextSelection)) return;
   } else {
     setSelection(nextSelection, address);
   }
@@ -1529,7 +1607,7 @@ function selectAxis(
     return;
   }
   if (isEditing.value) {
-    finishEdit(nextSelection, restoreFocus);
+    if (!finishEdit(nextSelection, restoreFocus)) return;
   } else {
     setSelection(nextSelection, address, restoreFocus);
   }
@@ -1882,7 +1960,12 @@ function handleHistoryShortcut(event: KeyboardEvent): boolean {
   return true;
 }
 
-function traverseSelection(key: "Enter" | "Tab", reverse: boolean, commitEdit: boolean): void {
+function traverseSelection(
+  key: "Enter" | "Tab",
+  reverse: boolean,
+  commitEdit: boolean,
+  finishOptions: CellEditFinishOptions = {},
+): void {
   if (!isSingleCellSelection(selection.value)) {
     const direction =
       key === "Tab"
@@ -1896,12 +1979,12 @@ function traverseSelection(key: "Enter" | "Tab", reverse: boolean, commitEdit: b
       isRowVisible: (row) => navigationRows.value.isRowVisible(row),
       getNextVisibleRow: (row) => navigationRows.value.getNextVisibleRow(row),
       getPreviousVisibleRow: (row) => navigationRows.value.getPreviousVisibleRow(row),
-      isColumnVisible: (column) => !props.sheet.hiddenColumns?.has(column),
+      isColumnVisible: (column) => !outlineHiddenColumnSet.value.has(column),
       getNextVisibleColumn: (column) => getNextVisibleColumn(column, 1),
       getPreviousVisibleColumn: (column) => getNextVisibleColumn(column, -1),
     });
     if (commitEdit) {
-      finishEdit(destination);
+      finishEdit(destination, true, finishOptions);
     } else {
       setSelection(destination);
     }
@@ -1911,6 +1994,8 @@ function traverseSelection(key: "Enter" | "Tab", reverse: boolean, commitEdit: b
   moveSelection(
     key === "Tab" ? { columns: reverse ? -1 : 1 } : { rows: reverse ? -1 : 1 },
     commitEdit,
+    false,
+    finishOptions,
   );
 }
 
@@ -1962,7 +2047,7 @@ function onEditorKeydown(event: KeyboardEvent): void {
       const bounds = rootRef.value!.getBoundingClientRect();
       const x =
         axis === "row"
-          ? frame.headerSize.width / 2
+          ? frame.headerSize.width - ROW_HEADER_WIDTH / 2
           : (item?.offset ?? frame.body.x) + (item?.size ?? 0) / 2;
       const y =
         axis === "column"
@@ -2011,7 +2096,9 @@ function onEditorKeydown(event: KeyboardEvent): void {
         return;
       }
       editingValue.value = completeFormulaForCommit(editingValue.value);
-      traverseSelection("Enter", event.shiftKey, true);
+      traverseSelection("Enter", event.shiftKey, true, {
+        confirmPendingWarning: isExplicitWarningConfirmationKey(event),
+      });
       return;
     }
     if (event.key === "Tab") {
@@ -2019,6 +2106,26 @@ function onEditorKeydown(event: KeyboardEvent): void {
       editingValue.value = completeFormulaForCommit(editingValue.value);
       traverseSelection("Tab", event.shiftKey, true);
     }
+    return;
+  }
+
+  if (
+    !props.readOnly &&
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    event.key.toLowerCase() === "e" &&
+    !props.formatPainterActive &&
+    !getReferenceEditor() &&
+    !selectedImageId.value &&
+    !dimensionResize.value &&
+    !freezeDragging.value &&
+    !axisMoveDrag.value &&
+    getSelectionMode(selection.value) === "cells"
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    emit("flashFill");
     return;
   }
 
@@ -2123,7 +2230,7 @@ function flushPendingEdit(): boolean {
     return false;
   }
   if (isEditing.value) {
-    finishEdit(undefined, false);
+    return finishEdit(undefined, false);
   }
   return true;
 }
@@ -2191,6 +2298,7 @@ onBeforeUnmount(() => {
 });
 
 defineExpose({
+  fillSelection,
   clearClipboard,
   flushPendingEdit,
   focusGrid: focusEditor,
@@ -2265,6 +2373,8 @@ defineExpose({
       :paint-images="paintSurfaceImages"
       :active-cell="activeCell"
       :editing="isEditing"
+      :error-cells="errorCells"
+      :error-indicator-color="errorIndicatorColor"
       :label="headerLabel"
       :cursor="surfaceCursor"
       :show-grid-lines="showGridLines"
@@ -2305,6 +2415,52 @@ defineExpose({
         />
       </template>
     </SheetSurface>
+    <SheetCellNotice
+      v-if="inputError"
+      tone="warning"
+      data-sheet-input-error-notice
+      :frame="renderFrame"
+      :address="inputError.address"
+      :title="inputError.title"
+      :message="inputError.message"
+      :close-label="t('dataTools.duplicates.closeRejection')"
+      @close="emit('dismissInputError')"
+    />
+    <SheetCellErrorMenu
+      :frame="renderFrame"
+      :description="activeCellError"
+      :active-cell="activeCell"
+      :visible="
+        !isEditing &&
+        !referenceEditor?.editingFormula &&
+        !!errorCells?.has(`${activeCell.row}:${activeCell.column}`)
+      "
+      :read-only="readOnly"
+      @convert-number="emit('convertCellToNumber')"
+      @convert-number-batch="emit('convertSelectionToNumber')"
+      @correct-sheet="emit('correctSheetErrors')"
+      @ignore="emit('ignoreSelectedCellErrors')"
+      @ignore-all="emit('ignoreAllCellErrors')"
+      @edit-formula-bar="emit('editErrorInFormulaBar')"
+      @options="emit('errorCheckOptions')"
+    />
+    <SheetDataControls
+      :frame="renderFrame"
+      :filter-range="sheet.filter?.advanced ? undefined : sheet.filter?.range"
+      :filtered-columns="sheet.filter?.columns.map((entry) => entry.column)"
+      :active-cell="activeCell"
+      :validation-info="validationInfo"
+      :suppress-validation-prompt="!!inputError"
+      :outline-groups="sheet.outlineGroups ?? []"
+      :subtotal-summary-below="subtotalSummaryBelow"
+      :outline-control-offset="quickToolsGutter"
+      :show-outline="showHeaders"
+      :read-only="readOnly"
+      @filter-column-request="emit('filterColumnRequest', $event)"
+      @validation-choose="emit('validationChoose', $event)"
+      @outline-toggle="emit('outlineToggle', $event)"
+      @outline-level="emit('outlineLevel', $event)"
+    />
     <button
       v-if="fillHandlePoint"
       type="button"

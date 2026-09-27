@@ -126,6 +126,7 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
   list-style: none;
   background: var(--idea-surface-panel);
   border: 1px solid var(--idea-border-subtle);
+  outline: none;
   border-radius: var(--idea-radius-default);
   box-shadow: var(--idea-shadow-menu);
 }

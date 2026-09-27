@@ -1,5 +1,4 @@
 import type { CellFillMode } from "@idea10/core/cell-autofill";
-import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import { formatCellAddress } from "@idea10/core/coordinates";
 import {
   getCellContent,
@@ -8,11 +7,13 @@ import {
   type CellAddress,
   type CellRange,
   type Sheet,
+  type SheetEvaluator,
 } from "@idea10/core/workbook";
 import {
   getDoubleClickFillRange,
   getFillHandlePoint,
   type FillRange,
+  type FillDirection,
 } from "@idea10/sheet-engine/fill-selection";
 import type { Point, Size } from "@idea10/sheet-engine/geometry";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
@@ -25,6 +26,7 @@ import type {
   GridFillSession,
 } from "../auto-fill-contracts";
 import { useFillDrag } from "./useFillDrag";
+import { createSheetHiddenRowIntervals } from "../data-visibility";
 
 function sameRange(left: CellRange, right: CellRange): boolean {
   return (
@@ -38,6 +40,7 @@ function sameRange(left: CellRange, right: CellRange): boolean {
 /** Connects a temporary fill gesture and its options to the grid's existing geometry. */
 export function useSheetAutoFill(options: {
   getSheet: () => Sheet;
+  getEvaluator?: () => SheetEvaluator;
   getRevision: () => number;
   getRange: () => CellRange;
   getCanFill: () => boolean;
@@ -146,7 +149,7 @@ export function useSheetAutoFill(options: {
     options.onBeforeStart();
     const sheet = options.getSheet();
     const source = options.getRange();
-    const filterHiddenRows = createSheetFilterHiddenRowIntervals(sheet);
+    const hiddenRows = createSheetHiddenRowIntervals(sheet, options.getEvaluator?.());
     const fill = getDoubleClickFillRange(source, {
       rowCount: Math.min(MAX_SHEET_ROWS, options.getContentRowCount()),
       columnCount: MAX_SHEET_COLUMNS,
@@ -158,7 +161,7 @@ export function useSheetAutoFill(options: {
       // This avoids computing a distant end only for Core to reject it afterwards.
       isRowFillable: (row) =>
         !sheet.hiddenRows?.has(row) &&
-        !filterHiddenRows.some((interval) => row >= interval.start && row <= interval.end) &&
+        !hiddenRows.some((interval) => row >= interval.start && row <= interval.end) &&
         !sheet.mergedCells.some(
           (merge) =>
             row >= merge.start.row &&
@@ -175,31 +178,33 @@ export function useSheetAutoFill(options: {
     complete(fill, event.ctrlKey, options.getRevision());
   }
 
-  /** Implements Ctrl/Cmd+D and Ctrl/Cmd+R using the first row or column as the source. */
-  function fillSelection(direction: "down" | "right"): boolean {
+  /** Fills from the selection edge, shared by the ribbon and Ctrl/Cmd+D/R. */
+  function fillSelection(direction: FillDirection): boolean {
     if (!options.getCanFill()) return false;
     const range = options.getRange();
-    const source: CellRange =
-      direction === "down"
-        ? {
-            start: { ...range.start },
-            end: { row: range.start.row, column: range.end.column },
-          }
-        : {
-            start: { ...range.start },
-            end: { row: range.end.row, column: range.start.column },
-          };
-    const target: CellRange =
-      direction === "down"
-        ? {
-            start: { row: range.start.row + 1, column: range.start.column },
-            end: { ...range.end },
-          }
-        : {
-            start: { row: range.start.row, column: range.start.column + 1 },
-            end: { ...range.end },
-          };
-    if (target.start.row > target.end.row || target.start.column > target.end.column) return false;
+    const vertical = direction === "down" || direction === "up";
+    if (vertical ? range.start.row === range.end.row : range.start.column === range.end.column)
+      return false;
+    const source: CellRange = { start: { ...range.start }, end: { ...range.end } };
+    const target: CellRange = { start: { ...range.start }, end: { ...range.end } };
+    switch (direction) {
+      case "down":
+        source.end.row = range.start.row;
+        target.start.row++;
+        break;
+      case "up":
+        source.start.row = range.end.row;
+        target.end.row--;
+        break;
+      case "right":
+        source.end.column = range.start.column;
+        target.start.column++;
+        break;
+      case "left":
+        source.start.column = range.end.column;
+        target.end.column--;
+        break;
+    }
     options.onBeforeStart();
     clear();
     complete({ direction, source, target, range }, true, options.getRevision());

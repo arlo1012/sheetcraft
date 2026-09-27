@@ -45,7 +45,7 @@ function insertImage(mode: "cell" | "floating"): void {
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
     >
-      <ImageIcon :size="17" aria-hidden="true" />
+      <ImageIcon aria-hidden="true" />
     </RibbonMenuButton>
 
     <Teleport to="body">

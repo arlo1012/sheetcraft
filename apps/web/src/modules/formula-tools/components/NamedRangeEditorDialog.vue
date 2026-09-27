@@ -7,7 +7,7 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
 import { useAppI18n } from "../../../shared/i18n";
 import type { NamedRangeDraft, NamedRangeSheet } from "../named-range-types";
-import NamedRangeReferenceInput from "./NamedRangeReferenceInput.vue";
+import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -133,7 +133,7 @@ watch(() => props.initialDraft, resetDraft, { deep: true, immediate: true });
           />
         </TFormItem>
         <TFormItem :label="t('formulaTools.reference')">
-          <NamedRangeReferenceInput
+          <RangeReferenceInput
             v-model="draft.reference"
             :select-reference="selectReference"
             data-formula-reference

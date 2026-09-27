@@ -57,7 +57,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="left"
       @activate="align('left')"
     >
-      <TextAlignStart :size="17" aria-hidden="true" />
+      <TextAlignStart aria-hidden="true" />
     </RibbonButton>
     <RibbonButton
       class="horizontal-alignment-controls__button"
@@ -67,7 +67,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="center"
       @activate="align('center')"
     >
-      <TextAlignCenter :size="17" aria-hidden="true" />
+      <TextAlignCenter aria-hidden="true" />
     </RibbonButton>
     <RibbonButton
       class="horizontal-alignment-controls__button"
@@ -77,7 +77,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="right"
       @activate="align('right')"
     >
-      <TextAlignEnd :size="17" aria-hidden="true" />
+      <TextAlignEnd aria-hidden="true" />
     </RibbonButton>
     <RibbonButton
       class="horizontal-alignment-controls__button"
@@ -87,7 +87,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="justify"
       @activate="align('justify')"
     >
-      <TextAlignJustify :size="17" :stroke-width="1.5" aria-hidden="true" />
+      <TextAlignJustify aria-hidden="true" />
     </RibbonButton>
     <RibbonButton
       class="horizontal-alignment-controls__button"
@@ -97,7 +97,7 @@ function align(alignment: HorizontalCellAlignment): void {
       data-horizontal-alignment-action="distributed"
       @activate="align('distributed')"
     >
-      <AlignHorizontalSpaceBetween :size="17" :stroke-width="1.5" aria-hidden="true" />
+      <AlignHorizontalSpaceBetween aria-hidden="true" />
     </RibbonButton>
   </div>
 </template>

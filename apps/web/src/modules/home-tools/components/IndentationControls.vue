@@ -34,7 +34,7 @@ function canAdjust(delta: -1 | 1): boolean {
       data-ribbon-action="decrease-indent"
       @activate="emit('adjustIndent', -1)"
     >
-      <ListIndentDecrease :size="17" :stroke-width="1.5" aria-hidden="true" />
+      <ListIndentDecrease aria-hidden="true" />
     </RibbonButton>
     <RibbonButton
       class="indentation-controls__button"
@@ -43,7 +43,7 @@ function canAdjust(delta: -1 | 1): boolean {
       data-ribbon-action="increase-indent"
       @activate="emit('adjustIndent', 1)"
     >
-      <ListIndentIncrease :size="17" :stroke-width="1.5" aria-hidden="true" />
+      <ListIndentIncrease aria-hidden="true" />
     </RibbonButton>
   </div>
 </template>

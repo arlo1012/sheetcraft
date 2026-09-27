@@ -78,7 +78,6 @@ export const formulaToolsEnUS = {
     selection: "Current selection",
     selectRange: "Select reference range",
     confirmRange: "OK",
-    selectRangeHint: "Drag across cells in the sheet, then choose OK.",
     createFromSelection: "Create from selection",
     deleteName: "Delete",
     saveName: "Save",

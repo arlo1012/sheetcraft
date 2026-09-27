@@ -39,6 +39,8 @@ import { createBrowserIdFactory } from "../../../../../shared/runtime/browser-id
 import type { CellAddress } from "@idea10/core/workbook";
 import type { SheetRenderFrame } from "../../../../../modules/sheet-grid/rendering/sheet-render-frame";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
+import type { ActiveCellValidationInfo } from "../../../../../modules/sheet-grid/components/SheetDataControls.vue";
+import type { CellEditSession } from "../../../../../shared/cell-editing/useCellEditSession";
 
 export type SheetGridFixtureOptions = {
   attachTo?: HTMLElement;
@@ -51,6 +53,9 @@ export type SheetGridFixtureOptions = {
   showHeaders?: boolean;
   showGridLines?: boolean;
   showAxisQuickTools?: boolean;
+  validationInfo?: ActiveCellValidationInfo;
+  errorCells?: ReadonlySet<string>;
+  editSession?: CellEditSession;
   beforeMount?: (sheet: ReturnType<typeof getActiveSheet>) => void;
   evaluator?: (
     session: WorkbookSession,
@@ -81,6 +86,9 @@ export function mountSheetGrid(options?: SheetGridFixtureOptions) {
       showHeaders: options?.showHeaders,
       showGridLines: options?.showGridLines,
       showAxisQuickTools: options?.showAxisQuickTools,
+      validationInfo: options?.validationInfo,
+      errorCells: options?.errorCells,
+      editSession: options?.editSession,
       onClearCells(range: CellRange) {
         executeWorkbookCommand(session, createClearCellRangeCommand(sheet.id, range));
       },

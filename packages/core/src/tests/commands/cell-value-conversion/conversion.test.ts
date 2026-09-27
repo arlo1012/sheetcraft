@@ -174,6 +174,116 @@ describe("cell value type conversion", () => {
     expect(getCellContent(sheet, { row: 0, column: 3 })).toEqual({ kind: "literal", value: 0 });
   });
 
+  test("opt-in conversion rounds over-precision text and restores General formatting", () => {
+    const session = createTestWorkbookSession();
+    const sheet = session.workbook.sheets.get(session.workbook.activeSheetId)!;
+    const address = { row: 0, column: 0 };
+    setCellContent(sheet, address, { kind: "literal", value: "11111111111111111111" });
+    setCellStyle(sheet, address, {
+      bold: true,
+      fillColor: "#abcdef",
+      numberFormat: { kind: "text" },
+    });
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createConvertCellValueTypeCommand(
+          sheet,
+          { start: address, end: address },
+          "text-to-number",
+          { allowPrecisionLoss: true },
+        ),
+      ),
+    ).toBe(true);
+    expect(getCellContent(sheet, address)).toEqual({
+      kind: "literal",
+      value: Number("1.11111111111111e19"),
+    });
+    expect(getCellStyle(sheet, address)).toEqual({
+      bold: true,
+      fillColor: "#abcdef",
+    });
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellContent(sheet, address)).toEqual({
+      kind: "literal",
+      value: "11111111111111111111",
+    });
+    expect(getCellStyle(sheet, address)).toEqual({
+      bold: true,
+      fillColor: "#abcdef",
+      numberFormat: { kind: "text" },
+    });
+  });
+
+  test.each([
+    ["9999999999999999", 1e16],
+    ["-1234567890123456", -1.23456789012346e15],
+    ["0.0001234567890123456", 0.000123456789012346],
+    ["1.234567890123456e20", 1.23456789012346e20],
+    ["1234567890123456%", 1.23456789012346e13],
+    ["1,234,567,890,123,456", 1.23456789012346e15],
+  ])(
+    "rounds %s to 15 significant digits and clears the previous number format",
+    (source, value) => {
+      const session = createTestWorkbookSession();
+      const sheet = session.workbook.sheets.get(session.workbook.activeSheetId)!;
+      const address = { row: 0, column: 0 };
+      setCellContent(sheet, address, { kind: "literal", value: source });
+      setCellStyle(sheet, address, { numberFormat: { kind: "scientific", fractionDigits: 5 } });
+
+      expect(
+        executeWorkbookCommand(
+          session,
+          createConvertCellValueTypeCommand(
+            sheet,
+            { start: address, end: address },
+            "text-to-number",
+            { allowPrecisionLoss: true },
+          ),
+        ),
+      ).toBe(true);
+      expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value });
+      expect(getCellStyle(sheet, address)?.numberFormat).toBeUndefined();
+    },
+  );
+
+  test("opt-in precision conversion still rejects overflowing and underflowing values", () => {
+    const session = createTestWorkbookSession();
+    const sheet = session.workbook.sheets.get(session.workbook.activeSheetId)!;
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      { kind: "literal", value: "123456789012345678e999" },
+    );
+    setCellContent(
+      sheet,
+      { row: 0, column: 1 },
+      { kind: "literal", value: "123456789012345678e-999" },
+    );
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createConvertCellValueTypeCommand(
+          sheet,
+          { start: { row: 0, column: 0 }, end: { row: 0, column: 1 } },
+          "text-to-number",
+          { allowPrecisionLoss: true },
+        ),
+      ),
+    ).toBe(false);
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toEqual({
+      kind: "literal",
+      value: "123456789012345678e999",
+    });
+    expect(getCellContent(sheet, { row: 0, column: 1 })).toEqual({
+      kind: "literal",
+      value: "123456789012345678e-999",
+    });
+  });
+
   test("creates no history entry when nothing matches", () => {
     const session = createTestWorkbookSession();
     const sheet = session.workbook.sheets.get(session.workbook.activeSheetId)!;

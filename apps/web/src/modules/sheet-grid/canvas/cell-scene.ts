@@ -97,7 +97,9 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
     const sourceAddress = span?.kind === "fill" ? span.source : (spill?.root ?? address);
     const source = options.display.sheet.cells.get(`${sourceAddress.row}:${sourceAddress.column}`);
     const formulaEvaluator =
-      source?.content?.kind === "formula" || spill ? options.display : undefined;
+      source?.content?.kind === "formula" || spill || options.display.sheet.duplicateRules?.length
+        ? options.display
+        : undefined;
     const cached = contents.get(key);
     if (
       cached &&
@@ -115,15 +117,16 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
     const displayCell = cell ?? source;
     const image = displayCell?.content?.kind === "image" ? displayCell.content.image : undefined;
     const value = image ? null : (spill?.value ?? options.display.getComputedValue(sourceAddress));
+    const displayStyle = options.display.getCellStyle(cell ? address : sourceAddress);
     const presentation = getCellValuePresentationForGrid(
       value,
-      displayCell?.style,
+      displayStyle,
       options.locale,
       options.dateSystem,
     );
     const style = presentation.color
-      ? { ...displayCell?.style, textColor: presentation.color }
-      : displayCell?.style;
+      ? { ...displayStyle, textColor: presentation.color }
+      : displayStyle;
     const content: CanvasCellContent = {
       text: presentation.text,
       style,
@@ -236,7 +239,7 @@ export function createSheetCanvasScene(
           rect,
           contentRect,
           content: cache.getContent(source, contentRect, span),
-          style: options.display.sheet.cells.get(key)?.style,
+          style: options.display.getCellStyle(anchor),
           span,
         });
       }

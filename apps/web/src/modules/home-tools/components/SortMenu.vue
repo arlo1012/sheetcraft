@@ -41,7 +41,7 @@ function select(direction: "ascending" | "descending"): void {
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
     >
-      <ArrowDownAZ :size="15" aria-hidden="true" />
+      <ArrowDownAZ aria-hidden="true" />
     </RibbonMenuButton>
 
     <Teleport to="body">

@@ -9,6 +9,7 @@ import {
   replaceSheetSparseState,
   setSheetMetadata,
   type Sheet,
+  type CellRange,
   type FloatingImage,
   type SheetDimensionAxis,
   type SheetFilter,
@@ -79,6 +80,19 @@ export function createRestoreSheetStateCommand(
   state: SheetSparseState,
 ): RestoreFullSheetStateCommand {
   return { type: "restoreSheetState", sheetId, state: cloneSparseState(state) };
+}
+
+function assertNoAdvancedCriteriaReferencesSheet(workbook: Workbook, sheetId: string): void {
+  if (
+    [...workbook.sheets.values()].some(
+      (sheet) => sheet.filter?.advanced?.criteria?.sheetId === sheetId,
+    )
+  )
+    throw invalidCommandPayload(
+      "sheetId",
+      sheetId,
+      "Changing a sheet used by an active advanced filter criteria range is not supported.",
+    );
 }
 
 function getAxisIndex(address: SheetSparseCell["address"], axis: SheetDimensionAxis): number {
@@ -153,12 +167,23 @@ function cloneSheetMetadata(metadata: SheetMetadata): SheetMetadata {
           columns: metadata.filter.columns.map((column) => ({
             column: column.column,
             allowedValues: column.allowedValues.map((value) => ({ ...value })),
+            ...(column.condition ? { condition: { ...column.condition } } : {}),
           })),
         }
       : null,
     mergedCells: metadata.mergedCells.map((range) => ({
       start: { ...range.start },
       end: { ...range.end },
+    })),
+    dataValidations: (metadata.dataValidations ?? []).map((rule) => ({
+      ...rule,
+      range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+      ...(rule.list ? { list: [...rule.list] } : {}),
+    })),
+    outlineGroups: (metadata.outlineGroups ?? []).map((group) => ({ ...group })),
+    duplicateRules: (metadata.duplicateRules ?? []).map((rule) => ({
+      ...rule,
+      range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
     })),
   };
 }
@@ -351,6 +376,7 @@ function transformFilterForAxis(
       ? filter.columns.map((column) => ({
           column: column.column,
           allowedValues: column.allowedValues.map((value) => ({ ...value })),
+          ...(column.condition ? { condition: { ...column.condition } } : {}),
         }))
       : filter.columns.flatMap((column) => {
           const next = transformAxisIndex(column.column, index, count, maximum, operation);
@@ -362,11 +388,40 @@ function transformFilterForAxis(
                   allowedValues: column.allowedValues.map((value) => ({
                     ...value,
                   })),
+                  ...(column.condition ? { condition: { ...column.condition } } : {}),
                 },
               ];
         });
   if (range.end.row <= range.start.row) return null;
-  return { range, columns };
+  if (filter.advanced && axis === "row")
+    throw invalidCommandPayload(
+      "axis",
+      axis,
+      "Changing rows while an advanced filter is active is not supported.",
+    );
+  return {
+    range,
+    columns,
+    ...(filter.advanced
+      ? {
+          advanced: {
+            ...(filter.advanced.criteria
+              ? {
+                  criteria: {
+                    sheetId: filter.advanced.criteria.sheetId,
+                    range: {
+                      start: { ...filter.advanced.criteria.range.start },
+                      end: { ...filter.advanced.criteria.range.end },
+                    },
+                  },
+                }
+              : {}),
+            uniqueOnly: filter.advanced.uniqueOnly,
+            hiddenRows: filter.advanced.hiddenRows.map((interval) => ({ ...interval })),
+          },
+        }
+      : {}),
+  };
 }
 
 function transformSheetMetadataForAxis(
@@ -377,6 +432,19 @@ function transformSheetMetadataForAxis(
   maximum: number,
   operation: "insert" | "delete",
 ): SheetMetadata {
+  const transformValidationFormula = (source: string | undefined) =>
+    source === undefined
+      ? undefined
+      : (() => {
+          const explicit = source.startsWith("=");
+          const next = transformFormulaForAxis(explicit ? source : `=${source}`, {
+            axis,
+            operation,
+            index,
+            count,
+          });
+          return explicit ? next : next.slice(1);
+        })();
   const freezeValue = axis === "row" ? metadata.freezePanes.rows : metadata.freezePanes.columns;
   const nextFreezeValue =
     operation === "insert"
@@ -397,6 +465,69 @@ function transformSheetMetadataForAxis(
         : { rows: metadata.freezePanes.rows, columns: nextFreezeValue },
     filter: transformFilterForAxis(metadata.filter, axis, index, count, maximum, operation),
     mergedCells,
+    dataValidations: (metadata.dataValidations ?? []).flatMap((rule) => {
+      const range = transformRangeForAxis(rule.range, axis, index, count, maximum, operation);
+      return range
+        ? [
+            {
+              ...rule,
+              range,
+              ...(rule.formula1 === undefined
+                ? {}
+                : { formula1: transformValidationFormula(rule.formula1) }),
+              ...(rule.formula2 === undefined
+                ? {}
+                : { formula2: transformValidationFormula(rule.formula2) }),
+            },
+          ]
+        : [];
+    }),
+    outlineGroups: (metadata.outlineGroups ?? []).flatMap((group) => {
+      if (group.axis !== axis) return [{ ...group }];
+      const start = transformAxisIndex(group.start, index, count, maximum, operation);
+      const end = transformAxisIndex(group.end, index, count, maximum, operation);
+      return start === null || end === null
+        ? []
+        : [{ ...group, start: Math.min(start, end), end: Math.max(start, end) }];
+    }),
+    subtotalMetadata: (metadata.subtotalMetadata ?? []).flatMap((entry) => {
+      const range = transformRangeForAxis(entry.range, axis, index, count, maximum, operation);
+      if (!range) return [];
+      const rows =
+        axis === "row"
+          ? entry.generatedRows.flatMap((row) => {
+              const next = transformAxisIndex(row, index, count, maximum, operation);
+              return next === null ? [] : [next];
+            })
+          : [...entry.generatedRows];
+      const columns =
+        axis === "column"
+          ? (entry.generatedColumns ?? []).flatMap((column) => {
+              const next = transformAxisIndex(column, index, count, maximum, operation);
+              return next === null ? [] : [next];
+            })
+          : [...(entry.generatedColumns ?? [])];
+      const pageBreakRows =
+        axis === "row"
+          ? (entry.pageBreakRows ?? []).flatMap((row) => {
+              const next = transformAxisIndex(row, index, count, maximum, operation);
+              return next === null ? [] : [next];
+            })
+          : [...(entry.pageBreakRows ?? [])];
+      return [
+        {
+          ...entry,
+          range,
+          generatedRows: rows,
+          ...(entry.generatedColumns ? { generatedColumns: columns } : {}),
+          ...(entry.pageBreakRows ? { pageBreakRows } : {}),
+        },
+      ];
+    }),
+    duplicateRules: (metadata.duplicateRules ?? []).flatMap((rule) => {
+      const range = transformRangeForAxis(rule.range, axis, index, count, maximum, operation);
+      return range ? [{ ...rule, range }] : [];
+    }),
   };
 }
 
@@ -863,17 +994,70 @@ export function applyRestoreSheetStateCommand(
   }
 
   const previousState = createSheetSparseState(sheet);
-  return validateCommandPayload("state", command.state, () =>
+  const workbookFormulaSources = command.workbookFormulaSources
+    ? [...workbook.sheets.values()].flatMap((sourceSheet) =>
+        [...sourceSheet.cells.entries()].flatMap(([key, cell]) =>
+          sourceSheet.id === command.sheetId || cell.content?.kind !== "formula"
+            ? []
+            : [
+                {
+                  sheetId: sourceSheet.id,
+                  address: parseCellKey(key),
+                  source: cell.content.formula.source,
+                },
+              ],
+        ),
+      )
+    : undefined;
+  const definedNames = command.definedNames
+    ? [...workbook.definedNames.values()].map((definition) => ({
+        ...definition,
+        reference: {
+          sheetId: definition.reference.sheetId,
+          start: { ...definition.reference.start },
+          end: { ...definition.reference.end },
+        },
+      }))
+    : undefined;
+  const changed = validateCommandPayload("state", command.state, () =>
     replaceSheetSparseState(sheet, command.state),
-  )
-    ? createRestoreSheetStateCommand(command.sheetId, previousState)
-    : null;
+  );
+  if (!changed && !command.workbookFormulaSources && !command.definedNames) return null;
+  for (const formula of command.workbookFormulaSources ?? []) {
+    const targetSheet = workbook.sheets.get(formula.sheetId);
+    const cell = targetSheet?.cells.get(createCellKey(formula.address));
+    if (targetSheet && cell?.content?.kind === "formula")
+      targetSheet.cells.set(createCellKey(formula.address), {
+        ...cell,
+        content: { kind: "formula", formula: { source: formula.source } },
+      });
+  }
+  if (command.definedNames) {
+    workbook.definedNames.clear();
+    for (const definition of command.definedNames)
+      workbook.definedNames.set(definition.id, {
+        ...definition,
+        reference: {
+          sheetId: definition.reference.sheetId,
+          start: { ...definition.reference.start },
+          end: { ...definition.reference.end },
+        },
+      });
+  }
+  return {
+    type: "restoreSheetState",
+    sheetId: command.sheetId,
+    state: previousState,
+    ...(workbookFormulaSources ? { workbookFormulaSources } : {}),
+    ...(definedNames ? { definedNames } : {}),
+  };
 }
 
 export function applySheetAxisCommand(
   workbook: Workbook,
   command: InsertSheetAxisCommand | DeleteSheetAxisCommand,
 ): RestoreSheetAxisSliceCommand | null {
+  assertNoAdvancedCriteriaReferencesSheet(workbook, command.sheetId);
   const maximum = assertSheetAxisRange(command.axis, command.index, command.count);
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const operation = command.type === "insertSheetAxis" ? "insert" : "delete";
@@ -977,6 +1161,19 @@ function transformSheetMetadataForAxisMove(
   count: number,
   toIndex: number,
 ): SheetMetadata {
+  const transformValidationFormula = (source: string | undefined) =>
+    source === undefined
+      ? undefined
+      : (() => {
+          const explicit = source.startsWith("=");
+          const next = transformFormulaForAxisMove(explicit ? source : `=${source}`, {
+            axis,
+            index,
+            count,
+            toIndex,
+          });
+          return explicit ? next : next.slice(1);
+        })();
   const mergedCells = metadata.mergedCells.map((range) => {
     const transformed = transformRangeForAxisMove(range, axis, index, count, toIndex);
     if (!transformed) {
@@ -1010,7 +1207,87 @@ function transformSheetMetadataForAxisMove(
         };
       })()
     : null;
-  return { freezePanes: { ...metadata.freezePanes }, filter, mergedCells };
+  const map = (value: number) => transformAxisIndexForMove(value, index, count, toIndex);
+  const moveRange = (range: CellRange) =>
+    transformRangeForAxisMove(range, axis, index, count, toIndex);
+  return {
+    freezePanes: { ...metadata.freezePanes },
+    filter,
+    mergedCells,
+    dataValidations: (metadata.dataValidations ?? []).map((rule) => {
+      const range = moveRange(rule.range);
+      if (!range)
+        throw invalidCommandPayload(
+          "axis",
+          axis,
+          "Moving this row or column band would split a data validation range.",
+        );
+      return {
+        ...rule,
+        range,
+        ...(rule.formula1 === undefined
+          ? {}
+          : { formula1: transformValidationFormula(rule.formula1) }),
+        ...(rule.formula2 === undefined
+          ? {}
+          : { formula2: transformValidationFormula(rule.formula2) }),
+      };
+    }),
+    outlineGroups: (metadata.outlineGroups ?? []).map((group) => {
+      if (group.axis !== axis) return { ...group };
+      const range = moveRange({
+        start: axis === "row" ? { row: group.start, column: 0 } : { row: 0, column: group.start },
+        end: axis === "row" ? { row: group.end, column: 0 } : { row: 0, column: group.end },
+      });
+      if (!range)
+        throw invalidCommandPayload(
+          "axis",
+          axis,
+          "Moving this row or column band would split an outline group.",
+        );
+      return {
+        ...group,
+        start: axis === "row" ? range.start.row : range.start.column,
+        end: axis === "row" ? range.end.row : range.end.column,
+      };
+    }),
+    subtotalMetadata: (metadata.subtotalMetadata ?? []).map((entry) => {
+      const range = moveRange(entry.range);
+      if (!range)
+        throw invalidCommandPayload(
+          "axis",
+          axis,
+          "Moving this row or column band would split subtotal metadata.",
+        );
+      return {
+        ...entry,
+        range,
+        generatedRows: axis === "row" ? entry.generatedRows.map(map) : [...entry.generatedRows],
+        ...(entry.generatedColumns
+          ? {
+              generatedColumns:
+                axis === "column" ? entry.generatedColumns.map(map) : [...entry.generatedColumns],
+            }
+          : {}),
+        ...(entry.pageBreakRows
+          ? {
+              pageBreakRows:
+                axis === "row" ? entry.pageBreakRows.map(map) : [...entry.pageBreakRows],
+            }
+          : {}),
+      };
+    }),
+    duplicateRules: (metadata.duplicateRules ?? []).map((rule) => {
+      const range = moveRange(rule.range);
+      if (!range)
+        throw invalidCommandPayload(
+          "axis",
+          axis,
+          "Moving this row or column band would split a duplicate rule range.",
+        );
+      return { ...rule, range };
+    }),
+  };
 }
 
 function assertFormulaRangesCanMove(
@@ -1048,6 +1325,7 @@ export function applyMoveSheetAxisCommand(
   command: MoveSheetAxisCommand,
 ): RestoreFullSheetStateCommand | null {
   assertSheetAxisMove(command);
+  assertNoAdvancedCriteriaReferencesSheet(workbook, command.sheetId);
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   if (command.index === command.toIndex) return null;
 
@@ -1109,6 +1387,10 @@ export function applyMoveSheetAxisCommand(
     freezePanes: metadata.freezePanes,
     filter: metadata.filter,
     mergedCells: metadata.mergedCells,
+    dataValidations: metadata.dataValidations,
+    outlineGroups: metadata.outlineGroups,
+    subtotalMetadata: metadata.subtotalMetadata,
+    duplicateRules: metadata.duplicateRules,
     floatingImages: previousState.floatingImages.map((image) => ({
       ...image,
       anchor:

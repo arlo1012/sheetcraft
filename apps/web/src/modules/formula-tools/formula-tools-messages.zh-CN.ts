@@ -78,7 +78,6 @@ export const formulaToolsZhCN = {
     selection: "当前选区",
     selectRange: "选择引用区域",
     confirmRange: "确定",
-    selectRangeHint: "在表格中拖选区域，然后点击确定。",
     createFromSelection: "从选区创建",
     deleteName: "删除",
     saveName: "保存",

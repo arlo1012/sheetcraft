@@ -238,7 +238,6 @@ const previewText = computed(() =>
 .cell-format-font {
   display: grid;
   gap: 16px;
-  padding: 16px 0 4px;
   color: var(--idea-text-primary);
   font-size: var(--idea-font-size-body-medium);
   line-height: var(--idea-line-height-body-medium);

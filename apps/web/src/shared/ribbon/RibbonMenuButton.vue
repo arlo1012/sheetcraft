@@ -67,6 +67,7 @@ function activate(): void {
 @use "./ribbon-actions" as ribbon;
 
 .ribbon-menu-button {
+  --ribbon-icon-size: var(--idea-action-icon-size);
   @include ribbon.action-button(var(--ribbon-menu-button-width, 40px));
 
   padding: 0 2px;
@@ -84,15 +85,15 @@ function activate(): void {
   }
 
   &.is-tall {
+    --ribbon-icon-size: var(--idea-ribbon-large-icon-size);
     position: relative;
     align-self: stretch;
     justify-content: center;
     width: max-content;
     min-width: var(--ribbon-tall-action-min-width, 58px);
-    height: 54px;
-    flex-direction: column;
-    gap: 3px;
-    padding: 2px;
+    height: var(--idea-ribbon-content-height, 54px);
+    @include ribbon.tall-content;
+    padding: 0 2px;
 
     &.has-text {
       width: max-content;

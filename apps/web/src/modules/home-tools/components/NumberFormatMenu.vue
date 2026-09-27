@@ -96,7 +96,7 @@ function openCellFormat(): void {
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
     >
-      <Hash :size="15" aria-hidden="true" />
+      <Hash aria-hidden="true" />
     </RibbonMenuButton>
     <Teleport to="body">
       <MenuSurface
@@ -126,7 +126,11 @@ function openCellFormat(): void {
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/ribbon/ribbon-layout" as ribbon;
+
 .number-format-menu {
+  @include ribbon.tool;
+
   min-width: 62px;
 
   &__surface {

@@ -3,7 +3,10 @@ import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   createWorkbook,
+  createSheet as createWorkbookSheet,
+  createWorkbookEvaluator,
   getActiveSheet,
+  setCellContent,
   setCellValue,
 } from "@idea10/core/workbook";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
@@ -28,6 +31,43 @@ function createSheet() {
 }
 
 describe("grid clipboard rows", () => {
+  test("uses the supplied workbook evaluator for cross-sheet formula filters", () => {
+    const workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
+    const sheet = getActiveSheet(workbook);
+    const inputs = createWorkbookSheet("Inputs", "inputs");
+    workbook.sheets.set(inputs.id, inputs);
+    setCellValue(inputs, { row: 0, column: 0 }, "keep");
+    setCellValue(inputs, { row: 1, column: 0 }, "hide");
+    setCellContent(
+      sheet,
+      { row: 1, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=Inputs!A1" },
+      },
+    );
+    setCellContent(
+      sheet,
+      { row: 2, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=Inputs!A2" },
+      },
+    );
+    sheet.filter = {
+      range: { start: { row: 0, column: 0 }, end: { row: 2, column: 0 } },
+      columns: [{ column: 0, allowedValues: [{ kind: "string", value: "keep" }] }],
+    };
+
+    const evaluator = createWorkbookEvaluator(workbook, sheet.id);
+    expect(
+      getVisibleClipboardRows(createGridClipboardRowVisibility(sheet, evaluator), {
+        start: { row: 1, column: 0 },
+        end: { row: 2, column: 0 },
+      }),
+    ).toEqual([1]);
+  });
+
   test("normalizes a reverse selection and returns only its visible physical rows", () => {
     const sheet = createFilteredSheet({ start: 0, end: 4 });
     setCellValue(sheet, { row: 1, column: 0 }, "visible");

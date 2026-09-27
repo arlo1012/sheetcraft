@@ -24,6 +24,26 @@ import {
   applySetSheetDimensionSizesCommand,
 } from "./dimensions.js";
 import { applySetSheetFilterCommand } from "./filter.js";
+import { applyAdvancedFilterCommand } from "./advanced-filter.js";
+import { applySplitColumnCommand, applyRemoveDuplicatesCommand } from "./data-transforms.js";
+import { applyApplySubtotalsCommand, applyRemoveSubtotalsCommand } from "./subtotal.js";
+import {
+  applyClearSheetDataValidationsCommand,
+  applySetSheetDataValidationsCommand,
+} from "./validation.js";
+import {
+  applyClearSheetDuplicateRulesCommand,
+  applySetSheetDuplicateRulesCommand,
+} from "./duplicates.js";
+import {
+  applyAddSheetOutlineGroupCommand,
+  applyClearSheetOutlineCommand,
+  applyRemoveSheetOutlineGroupCommand,
+  applySetSheetOutlineGroupCollapsedCommand,
+  applySetSheetOutlineGroupsCollapsedCommand,
+  applySetSheetOutlineLevelCommand,
+  applyUngroupSheetRangeCommand,
+} from "./outline.js";
 import {
   applyMergeCellsCommand,
   applySetSheetFreezePanesCommand,
@@ -75,9 +95,11 @@ function assertCommandDoesNotModifyProtectedSheet(
   const sheetIds =
     command.type === "setCellContents"
       ? command.changes.map((change) => change.sheetId)
-      : "sheetId" in command
-        ? [command.sheetId]
-        : [];
+      : command.type === "advancedFilter" && command.mode === "copy" && command.destination
+        ? [command.destination.sheetId]
+        : "sheetId" in command
+          ? [command.sheetId]
+          : [];
   const blocked = sheetIds.find((sheetId) => workbook.sheets.get(sheetId)?.properties.protected);
   if (!blocked) return;
   switch (command.type) {
@@ -104,7 +126,23 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "mergeCells":
     case "unmergeCells":
     case "setSheetFilter":
+    case "advancedFilter":
     case "sortSheetRange":
+    case "splitColumn":
+    case "removeDuplicates":
+    case "applySubtotals":
+    case "removeSubtotals":
+    case "setSheetDataValidations":
+    case "clearSheetDataValidations":
+    case "setSheetDuplicateRules":
+    case "clearSheetDuplicateRules":
+    case "addSheetOutlineGroup":
+    case "removeSheetOutlineGroup":
+    case "setSheetOutlineGroupCollapsed":
+    case "setSheetOutlineGroupsCollapsed":
+    case "setSheetOutlineLevel":
+    case "clearSheetOutline":
+    case "ungroupSheetRange":
     case "setFloatingImage":
     case "deleteFloatingImage":
     case "convertFloatingImageToCell":
@@ -189,8 +227,40 @@ export function applyWorkbookCommand(
         return applyUnmergeCellsCommand(workbook, command);
       case "setSheetFilter":
         return applySetSheetFilterCommand(workbook, command);
+      case "advancedFilter":
+        return applyAdvancedFilterCommand(workbook, command);
       case "sortSheetRange":
         return applySortSheetRangeCommand(workbook, command);
+      case "splitColumn":
+        return applySplitColumnCommand(workbook, command);
+      case "removeDuplicates":
+        return applyRemoveDuplicatesCommand(workbook, command);
+      case "applySubtotals":
+        return applyApplySubtotalsCommand(workbook, command);
+      case "removeSubtotals":
+        return applyRemoveSubtotalsCommand(workbook, command);
+      case "setSheetDataValidations":
+        return applySetSheetDataValidationsCommand(workbook, command);
+      case "clearSheetDataValidations":
+        return applyClearSheetDataValidationsCommand(workbook, command);
+      case "setSheetDuplicateRules":
+        return applySetSheetDuplicateRulesCommand(workbook, command);
+      case "clearSheetDuplicateRules":
+        return applyClearSheetDuplicateRulesCommand(workbook, command);
+      case "addSheetOutlineGroup":
+        return applyAddSheetOutlineGroupCommand(workbook, command);
+      case "removeSheetOutlineGroup":
+        return applyRemoveSheetOutlineGroupCommand(workbook, command);
+      case "setSheetOutlineGroupCollapsed":
+        return applySetSheetOutlineGroupCollapsedCommand(workbook, command);
+      case "setSheetOutlineGroupsCollapsed":
+        return applySetSheetOutlineGroupsCollapsedCommand(workbook, command);
+      case "setSheetOutlineLevel":
+        return applySetSheetOutlineLevelCommand(workbook, command);
+      case "clearSheetOutline":
+        return applyClearSheetOutlineCommand(workbook, command);
+      case "ungroupSheetRange":
+        return applyUngroupSheetRangeCommand(workbook, command);
       case "setFloatingImage":
         return applySetFloatingImageCommand(workbook, command);
       case "deleteFloatingImage":

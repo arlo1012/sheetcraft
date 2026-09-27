@@ -94,7 +94,7 @@ describe("useSheetAutoFill", () => {
     wrapper.unmount();
   });
 
-  test("fills Ctrl/Cmd+D and Ctrl/Cmd+R from the selection edge and skips a single axis", () => {
+  test("fills all four directions from the selection edge and skips a single axis", () => {
     const { apply, control, selected, wrapper } = mountAutoFill({
       start: { row: 3, column: 4 },
       end: { row: 5, column: 6 },
@@ -114,8 +114,26 @@ describe("useSheetAutoFill", () => {
         copy: true,
       }),
     );
+    expect(control.fillSelection("up")).toBe(true);
+    expect(apply).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        source: { start: { row: 5, column: 4 }, end: { row: 5, column: 6 } },
+        copy: true,
+      }),
+    );
+    expect(control.fillSelection("left")).toBe(true);
+    expect(apply).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        source: { start: { row: 3, column: 6 }, end: { row: 5, column: 6 } },
+        copy: true,
+      }),
+    );
     selected.value = { start: { row: 3, column: 4 }, end: { row: 3, column: 6 } };
     expect(control.fillSelection("down")).toBe(false);
+    expect(control.fillSelection("up")).toBe(false);
+    selected.value = { start: { row: 3, column: 4 }, end: { row: 5, column: 4 } };
+    expect(control.fillSelection("left")).toBe(false);
+    expect(control.fillSelection("right")).toBe(false);
     expect(control.optionsPosition.value?.x).toBeGreaterThanOrEqual(0);
     expect(control.optionsPosition.value?.y).toBeGreaterThanOrEqual(0);
     wrapper.unmount();

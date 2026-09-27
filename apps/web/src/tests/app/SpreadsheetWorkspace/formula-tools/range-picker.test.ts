@@ -3,7 +3,7 @@ import { expect, test } from "vitest";
 import SpreadsheetRibbon from "../../../../app/SpreadsheetRibbon.vue";
 import NamedRangesDialog from "../../../../modules/formula-tools/components/NamedRangesDialog.vue";
 import NamedRangeEditorDialog from "../../../../modules/formula-tools/components/NamedRangeEditorDialog.vue";
-import NamedRangePicker from "../../../../modules/formula-tools/components/NamedRangePicker.vue";
+import NamedRangePicker from "../../../../shared/range-reference/RangeReferencePicker.vue";
 import WorkbookFormulaBar from "../../../../modules/workbook/components/WorkbookFormulaBar.vue";
 import { triggerCanvasCell } from "../../canvas-interaction";
 import {

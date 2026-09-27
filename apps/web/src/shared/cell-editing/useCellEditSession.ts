@@ -15,7 +15,27 @@ export type CellEditContext = CellEditTarget & {
 
 export type CellEditCommit = CellEditTarget & {
   input: string;
+  /** A second explicit Enter that may confirm an already displayed warning. */
+  confirmPendingWarning?: boolean;
 };
+
+export type CellEditFinishOptions = {
+  complete?: boolean;
+  confirmPendingWarning?: boolean;
+};
+
+/** Only an unmodified, non-repeating Enter may confirm a pending warning. */
+export function isExplicitWarningConfirmationKey(event: KeyboardEvent): boolean {
+  return (
+    event.key === "Enter" &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    !event.repeat &&
+    !event.isComposing
+  );
+}
 
 type CellEditSelection = {
   start: number;
@@ -56,7 +76,9 @@ function clampSelectionOffset(offset: number, length: number): number {
   return Math.max(0, Math.min(Math.trunc(offset), length));
 }
 
-export function useCellEditSession(options: { onCommit: (payload: CellEditCommit) => void }) {
+export function useCellEditSession(options: {
+  onCommit: (payload: CellEditCommit) => void | boolean;
+}) {
   const id = `cell-edit-${++sessionSequence}`;
   const mutableState = reactive<CellEditState>({
     active: false,
@@ -139,7 +161,7 @@ export function useCellEditSession(options: { onCommit: (payload: CellEditCommit
     if (mutableState.active) mutableState.mode = mode;
   }
 
-  function flush(flushOptions: { complete?: boolean; end?: boolean } = {}): boolean {
+  function flush(flushOptions: CellEditFinishOptions & { end?: boolean } = {}): boolean {
     if (!mutableState.active) return true;
     if (mutableState.composing || !mutableState.owner) return false;
 
@@ -151,16 +173,21 @@ export function useCellEditSession(options: { onCommit: (payload: CellEditCommit
         mutableState.selection.direction,
       );
     }
-    if (mutableState.draft !== mutableState.source) {
-      options.onCommit({ ...copyTarget(mutableState.owner), input: mutableState.draft });
+    if (mutableState.draft !== mutableState.source || flushOptions.confirmPendingWarning) {
+      const accepted = options.onCommit({
+        ...copyTarget(mutableState.owner),
+        input: mutableState.draft,
+        ...(flushOptions.confirmPendingWarning ? { confirmPendingWarning: true } : {}),
+      });
+      if (accepted === false) return false;
       mutableState.source = mutableState.draft;
     }
     if (flushOptions.end) reset();
     return true;
   }
 
-  function finish(finishOptions: { complete?: boolean } = {}): boolean {
-    return flush({ complete: finishOptions.complete, end: true });
+  function finish(finishOptions: CellEditFinishOptions = {}): boolean {
+    return flush({ ...finishOptions, end: true });
   }
 
   function cancel(): void {

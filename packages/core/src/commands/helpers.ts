@@ -127,13 +127,65 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
           columns: state.filter.columns.map((column) => ({
             column: column.column,
             allowedValues: column.allowedValues.map((value) => ({ ...value })),
+            ...(column.condition ? { condition: { ...column.condition } } : {}),
           })),
+          ...(state.filter.advanced
+            ? {
+                advanced: {
+                  ...(state.filter.advanced.criteria
+                    ? {
+                        criteria: {
+                          sheetId: state.filter.advanced.criteria.sheetId,
+                          range: {
+                            start: { ...state.filter.advanced.criteria.range.start },
+                            end: { ...state.filter.advanced.criteria.range.end },
+                          },
+                        },
+                      }
+                    : {}),
+                  uniqueOnly: state.filter.advanced.uniqueOnly,
+                  hiddenRows: state.filter.advanced.hiddenRows.map((interval) => ({ ...interval })),
+                },
+              }
+            : {}),
         }
       : null,
     mergedCells: state.mergedCells.map((range) => ({
       start: { ...range.start },
       end: { ...range.end },
     })),
+    ...(state.dataValidations
+      ? {
+          dataValidations: state.dataValidations.map((rule) => ({
+            ...rule,
+            range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+            ...(rule.list ? { list: [...rule.list] } : {}),
+          })),
+        }
+      : {}),
+    ...(state.outlineGroups
+      ? { outlineGroups: state.outlineGroups.map((group) => ({ ...group })) }
+      : {}),
+    ...(state.subtotalMetadata
+      ? {
+          subtotalMetadata: state.subtotalMetadata.map((entry) => ({
+            ...entry,
+            range: { start: { ...entry.range.start }, end: { ...entry.range.end } },
+            generatedRows: [...entry.generatedRows],
+            ...(entry.generatedColumns ? { generatedColumns: [...entry.generatedColumns] } : {}),
+            ...(entry.summaryBelow === undefined ? {} : { summaryBelow: entry.summaryBelow }),
+            ...(entry.pageBreakRows ? { pageBreakRows: [...entry.pageBreakRows] } : {}),
+          })),
+        }
+      : {}),
+    ...(state.duplicateRules
+      ? {
+          duplicateRules: state.duplicateRules.map((rule) => ({
+            ...rule,
+            range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
+          })),
+        }
+      : {}),
     floatingImages: state.floatingImages.map(cloneFloatingImage),
   };
 }

@@ -1,13 +1,4 @@
-// Shared appearance for option lists and input-driven suggestion lists.
-@mixin surface {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  padding: 4px;
-  border: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-default);
-  background: var(--idea-surface-panel);
-
+@mixin scrollbar {
   &::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -35,6 +26,18 @@
     scrollbar-width: thin;
     scrollbar-color: var(--idea-scrollbar-thumb) transparent;
   }
+}
+
+// Shared appearance for option lists and input-driven suggestion lists.
+@mixin surface {
+  @include scrollbar;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--idea-border-subtle);
+  border-radius: var(--idea-radius-default);
+  background: var(--idea-surface-panel);
 }
 
 @mixin item {

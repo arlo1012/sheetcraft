@@ -202,7 +202,7 @@ watch(
       data-ribbon-action="worksheet-operations"
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
-      ><Sheet :size="16"
+      ><Sheet
     /></RibbonMenuButton>
 
     <Teleport to="body">

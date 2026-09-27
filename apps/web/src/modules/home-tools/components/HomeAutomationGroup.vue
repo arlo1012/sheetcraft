@@ -30,7 +30,7 @@ const { t } = useAppI18n();
       data-ribbon-placeholder="quick-tools"
       data-ribbon-span="2"
     >
-      <WandSparkles :size="17" aria-hidden="true" />
+      <WandSparkles aria-hidden="true" />
     </RibbonMenuButton>
     <RibbonButton
       variant="tall"
@@ -41,7 +41,7 @@ const { t } = useAppI18n();
       data-ribbon-placeholder="generate-icon"
       data-ribbon-span="2"
     >
-      <Shapes :size="17" aria-hidden="true" />
+      <Shapes aria-hidden="true" />
     </RibbonButton>
     <div class="home-automation-group__stack" data-ribbon-stack="smart-table-pdf">
       <RibbonButton
@@ -51,7 +51,7 @@ const { t } = useAppI18n();
         data-ribbon-placeholder="smart-table"
         data-ribbon-row="1"
       >
-        <TableProperties :size="15" aria-hidden="true" />
+        <TableProperties aria-hidden="true" />
       </RibbonButton>
       <RibbonButton
         :label="t('app.unavailableFeature', { feature: t('ribbon.pdfToEditable') })"
@@ -60,7 +60,7 @@ const { t } = useAppI18n();
         data-ribbon-placeholder="pdf-to-editable"
         data-ribbon-row="2"
       >
-        <FilePenLine :size="15" aria-hidden="true" />
+        <FilePenLine aria-hidden="true" />
       </RibbonButton>
     </div>
     <div class="home-automation-group__stack" data-ribbon-stack="app-generator-pdf">
@@ -71,7 +71,7 @@ const { t } = useAppI18n();
         data-ribbon-placeholder="app-generator"
         data-ribbon-row="1"
       >
-        <AppWindow :size="15" aria-hidden="true" />
+        <AppWindow aria-hidden="true" />
       </RibbonButton>
       <RibbonButton
         :label="t('app.unavailableFeature', { feature: t('ribbon.pdfToImage') })"
@@ -80,7 +80,7 @@ const { t } = useAppI18n();
         data-ribbon-placeholder="pdf-to-image"
         data-ribbon-row="2"
       >
-        <FileImage :size="15" aria-hidden="true" />
+        <FileImage aria-hidden="true" />
       </RibbonButton>
     </div>
   </section>

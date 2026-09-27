@@ -147,7 +147,9 @@ export function useGridClipboard(options: {
 }) {
   const clipboardPort = options.clipboardPort ?? createBrowserGridClipboardPort();
   const pendingClipboard = shallowRef<PendingClipboard | null>(null);
-  const rowVisibility = computed(() => createGridClipboardRowVisibility(options.getSheet()));
+  const rowVisibility = computed(() =>
+    createGridClipboardRowVisibility(options.getSheet(), options.getEvaluator?.()),
+  );
   const getRevision = () => options.getRevision?.() ?? 0;
   let clipboardOperation = 0;
   let nativeWrite: Promise<void> | undefined;
@@ -381,7 +383,10 @@ export function useGridClipboard(options: {
       }
       const range: CellRange = {
         start: { row: selected.start.row, column: 0 },
-        end: { row: selected.start.row + rowCount - 1, column: size.columnCount - 1 },
+        end: {
+          row: selected.start.row + rowCount - 1,
+          column: size.columnCount - 1,
+        },
       };
       for (const key of options.getSheet().cells.keys()) {
         const separator = key.indexOf(":");
@@ -414,7 +419,10 @@ export function useGridClipboard(options: {
     }
     const range: CellRange = {
       start: { row: 0, column: selected.start.column },
-      end: { row: size.rowCount - 1, column: selected.start.column + columnCount - 1 },
+      end: {
+        row: size.rowCount - 1,
+        column: selected.start.column + columnCount - 1,
+      },
     };
     for (const key of options.getSheet().cells.keys()) {
       const separator = key.indexOf(":");
@@ -464,8 +472,14 @@ export function useGridClipboard(options: {
     target: CellRange,
   ): CellRange {
     return axis === "rows"
-      ? { start: { ...source.start }, end: { row: source.end.row, column: target.end.column } }
-      : { start: { ...source.start }, end: { row: target.end.row, column: source.end.column } };
+      ? {
+          start: { ...source.start },
+          end: { row: source.end.row, column: target.end.column },
+        }
+      : {
+          start: { ...source.start },
+          end: { row: target.end.row, column: source.end.column },
+        };
   }
 
   function pasteTransfer(
@@ -601,7 +615,11 @@ export function useGridClipboard(options: {
       };
     } else {
       if (isLocalCut && pending) {
-        payload = { kind: "all", plan, moveSource: plannedSourceRange ?? pending.range };
+        payload = {
+          kind: "all",
+          plan,
+          moveSource: plannedSourceRange ?? pending.range,
+        };
       } else {
         payload = {
           kind: "all",

@@ -90,6 +90,37 @@ describe("SheetSurface invalidation", () => {
     expect(wrapper.findAll("canvas")).toHaveLength(1);
   });
 
+  test("repaints error markers without rebuilding document content", async () => {
+    const host = installCanvasHost();
+    const createScene = vi.spyOn(cellScene, "createSheetCanvasScene");
+    const paint = vi.spyOn(scenePainter, "paintSheetScene");
+    const { wrapper } = mountCanvasGrid();
+    host.flush();
+    await wrapper.vm.$nextTick();
+    host.flush();
+    createScene.mockClear();
+    paint.mockClear();
+    const errorCells = new Set(["0:0", "1:1"]);
+    await wrapper.setProps({ errorCells });
+    host.flush();
+    expect(createScene).not.toHaveBeenCalled();
+    expect(paint).toHaveBeenCalledOnce();
+    expect(paint.mock.calls[0]?.[3].errorCells).toEqual(errorCells);
+    const automaticColor = paint.mock.calls[0]?.[3].palette.errorIndicator;
+    paint.mockClear();
+    await wrapper.setProps({ errorIndicatorColor: "#ff0000" });
+    host.flush();
+    expect(createScene).not.toHaveBeenCalled();
+    expect(paint).toHaveBeenCalledOnce();
+    expect(paint.mock.calls[0]?.[3].palette.errorIndicator).toBe("#ff0000");
+    await wrapper.setProps({ errorIndicatorColor: null });
+    host.flush();
+    expect(paint.mock.calls.at(-1)?.[3].palette.errorIndicator).toBe(automaticColor);
+    await wrapper.setProps({ errorCells: new Set() });
+    host.flush();
+    expect(paint.mock.calls.at(-1)?.[3].errorCells?.size).toBe(0);
+  });
+
   test("repaints a sub-cell scroll without rebuilding its scene or border plan", async () => {
     const host = installCanvasHost();
     const createScene = vi.spyOn(cellScene, "createSheetCanvasScene");

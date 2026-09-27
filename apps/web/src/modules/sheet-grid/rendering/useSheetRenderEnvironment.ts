@@ -56,7 +56,13 @@ export function useSheetRenderEnvironment(getRoot: () => HTMLElement | null) {
     environment.value = {
       density: window.devicePixelRatio || 1,
       fontFamily,
-      cells: { background, text, gridLine: color("border-subtle", "#e5e7eb"), mutedText },
+      cells: {
+        background,
+        text,
+        gridLine: color("border-subtle", "#e5e7eb"),
+        mutedText,
+        errorIndicator: color("status-success", "#008a00"),
+      },
       headers: {
         background: color("surface-secondary", "#f5f6f7"),
         hover: color("surface-hover", "#eceef0"),

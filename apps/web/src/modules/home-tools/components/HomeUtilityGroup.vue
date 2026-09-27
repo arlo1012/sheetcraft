@@ -22,7 +22,7 @@ const { t } = useAppI18n();
       data-ribbon-placeholder="print"
       data-ribbon-span="2"
     >
-      <Printer :size="17" aria-hidden="true" />
+      <Printer aria-hidden="true" />
     </RibbonButton>
   </section>
 </template>

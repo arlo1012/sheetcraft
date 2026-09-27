@@ -21,7 +21,7 @@ const { t } = useAppI18n();
         disabled
         data-ribbon-placeholder="table-styles"
       >
-        <TableProperties :size="15" aria-hidden="true" />
+        <TableProperties aria-hidden="true" />
       </RibbonMenuButton>
     </div>
     <div class="home-styles-group__row" data-ribbon-row="2">
@@ -32,7 +32,7 @@ const { t } = useAppI18n();
         disabled
         data-ribbon-placeholder="conditional-formatting"
       >
-        <Sparkles :size="15" aria-hidden="true" />
+        <Sparkles aria-hidden="true" />
       </RibbonMenuButton>
     </div>
   </section>

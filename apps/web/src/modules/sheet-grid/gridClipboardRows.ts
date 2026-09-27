@@ -1,5 +1,4 @@
 import { createPastePlan, getCellMatrixSize, type CellValueMatrix } from "@idea10/core/clipboard";
-import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import { doMergedCellRangesIntersect } from "@idea10/core";
 import {
   MAX_SHEET_COLUMNS,
@@ -7,9 +6,11 @@ import {
   type CellAddress,
   type CellRange,
   type Sheet,
+  type SheetEvaluator,
 } from "@idea10/core/workbook";
 import { createRowVisibilityIndex, type RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
 import type { GridPastePlan } from "./useGridClipboard";
+import { createSheetHiddenRowIntervals } from "./data-visibility";
 
 export const MAX_GRID_CLIPBOARD_CELLS = 100_000;
 
@@ -98,11 +99,15 @@ function createFilteredPlan(
 }
 
 /** Builds sheet-wide row visibility independently of the current viewport extent. */
-export function createGridClipboardRowVisibility(sheet: Sheet): RowVisibilityIndex {
+export function createGridClipboardRowVisibility(
+  sheet: Sheet,
+  evaluator?: SheetEvaluator,
+): RowVisibilityIndex {
   return createRowVisibilityIndex({
     rowCount: MAX_SHEET_ROWS,
     defaultRowHeight: 1,
-    hiddenIntervals: createSheetFilterHiddenRowIntervals(sheet),
+    hiddenRows: sheet.hiddenRows,
+    hiddenIntervals: createSheetHiddenRowIntervals(sheet, evaluator),
   });
 }
 

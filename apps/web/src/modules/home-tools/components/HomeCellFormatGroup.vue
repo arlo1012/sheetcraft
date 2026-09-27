@@ -86,7 +86,6 @@ const { t } = useAppI18n();
   --cell-format-font-width: 126px;
   --cell-format-font-size-width: 40px;
   --cell-format-gap: 4px;
-  --ribbon-control-height: 26px;
 
   &__row {
     @include ribbon.row;

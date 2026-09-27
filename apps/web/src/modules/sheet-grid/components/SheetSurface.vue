@@ -46,6 +46,8 @@ const props = withDefaults(
     overlays: SheetOverlayState;
     activeCell: CellAddress;
     editing: boolean;
+    errorCells?: ReadonlySet<string>;
+    errorIndicatorColor?: string | null;
     label: string;
     cursor?: string;
     showGridLines?: boolean;
@@ -144,9 +146,13 @@ function paint(): void {
   context.save();
   context.translate(frame.body.x, frame.body.y);
   paintSheetScene(context, scene, frame.layout, {
-    palette: props.environment.cells,
+    palette: {
+      ...props.environment.cells,
+      errorIndicator: props.errorIndicatorColor ?? props.environment.cells.errorIndicator,
+    },
     showGridLines: props.showGridLines,
     editingCell: props.editing ? props.activeCell : undefined,
+    errorCells: props.errorCells,
     imageUrls: props.imageAssetUrls,
     images,
     imagePlaceholder: (id) =>
@@ -186,6 +192,8 @@ watch([() => props.frame, () => props.environment], () => invalidate(), { flush:
 watch(
   [
     () => props.showGridLines,
+    () => props.errorCells,
+    () => props.errorIndicatorColor,
     () => props.imageAssetUrls,
     () => props.loadingImageAssetIds,
     () => props.editing,

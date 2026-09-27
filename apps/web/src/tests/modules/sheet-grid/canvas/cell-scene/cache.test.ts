@@ -67,6 +67,39 @@ function fixture() {
 }
 
 describe("Canvas cell presentation cache", () => {
+  test("updates duplicate highlights after offscreen edits and restores base styles on clear", () => {
+    const { sheet, render, refreshDisplay } = fixture();
+    setCellValue(sheet, { row: 0, column: 0 }, "Alpha");
+    setCellValue(sheet, { row: 90, column: 0 }, "alpha");
+    setCellStyle(sheet, { row: 0, column: 0 }, { fillColor: "#0000ff", textColor: "#000000" });
+    sheet.duplicateRules = [
+      {
+        id: "highlight",
+        kind: "highlight",
+        range: {
+          start: { row: 0, column: 0 },
+          end: { row: 99, column: 0 },
+        },
+        fillColor: "#ffc7ce",
+        textColor: "#9c0006",
+      },
+    ];
+    refreshDisplay();
+    expect(cell(render(), 0, 0).style?.fillColor).toBe("#ffc7ce");
+    expect(cell(render(), 0, 0).content.style?.textColor).toBe("#9c0006");
+    expect(sheet.cells.get("0:0")?.style?.fillColor).toBe("#0000ff");
+    setCellValue(sheet, { row: 90, column: 0 }, "Beta");
+    refreshDisplay();
+    expect(cell(render(), 0, 0).style?.fillColor).toBe("#0000ff");
+    expect(cell(render(), 0, 0).content.style?.textColor).toBe("#000000");
+    setCellValue(sheet, { row: 90, column: 0 }, "Alpha");
+    refreshDisplay();
+    expect(cell(render(), 0, 0).style?.fillColor).toBe("#ffc7ce");
+    sheet.duplicateRules = [];
+    refreshDisplay();
+    expect(cell(render(), 0, 0).style?.fillColor).toBe("#0000ff");
+  });
+
   test("reuses text layouts through scrolling and unrelated cell edits", () => {
     const { sheet, measure, render } = fixture();
     setCellValue(sheet, { row: 2, column: 1 }, "wrapped words that need several lines");

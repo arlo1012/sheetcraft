@@ -1,3 +1,4 @@
+import type { FillDirection } from "@idea10/sheet-engine/fill-selection";
 import {
   computed,
   onScopeDispose,
@@ -43,6 +44,7 @@ import {
   type CellFormatChange,
   type CellMergeMode,
   type CellValueConversionMode,
+  type CellValueConversionOptions,
   type WorkbookCommand,
   type WorkbookOperation,
 } from "@idea10/core/commands";
@@ -71,6 +73,11 @@ import {
   createWorkbookCalculationSession,
 } from "@idea10/core/formula";
 import { doMergedCellRangesIntersect } from "@idea10/core";
+import {
+  getCellDataValidation,
+  resolveDataValidationListValues,
+} from "@idea10/core/data-validation";
+import { validateDuplicateEntries } from "@idea10/core/duplicate-values";
 import { WorkbookDomainError } from "@idea10/core/errors";
 import type { IdFactory } from "@idea10/core/runtime";
 import { findCellByText, type SheetSearchDirection } from "@idea10/core/search";
@@ -129,6 +136,7 @@ import {
 import { useAppI18n, type MessageKey, type MessageParams } from "../../shared/i18n";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { useDeferredSelectionSnapshot } from "../../modules/workbook/composables/useDeferredSelectionSnapshot";
+import { useDataValidationInput } from "../../modules/data-tools/useDataValidationInput";
 import type {
   FilterValueKey,
   HomeDataToolState,
@@ -150,6 +158,7 @@ type FormatPainterSource = {
 };
 
 export type SheetGridNavigator = {
+  fillSelection?(direction: FillDirection): boolean;
   clearClipboard?(): void;
   flushPendingEdit?(): boolean;
   hasPendingEdit?(): boolean;
@@ -239,7 +248,10 @@ export function useSpreadsheetWorkspaceController(
   );
   const activeSelectionStyle = computed(() => {
     const address = toolbarSelection.value.activeAddress;
-    return getSelectionCellStyleState(activeSheet.value, { start: address, end: address });
+    return getSelectionCellStyleState(activeSheet.value, {
+      start: address,
+      end: address,
+    });
   });
   const activeSelectionSummary = computed(() =>
     getSelectionSummary(
@@ -373,6 +385,36 @@ export function useSpreadsheetWorkspaceController(
     workspaceStatus.value ? t(workspaceStatus.value.key, workspaceStatus.value.params) : "",
   );
   const formatPainterActive = computed(() => formatPainterSource.value !== undefined);
+  const validationInput = useDataValidationInput({
+    getWorkbook: () => session.workbook,
+    getGeneration: () => workbookGeneration.value,
+    execute: (command, options) => execute(command, "cells.edit", options),
+    getDuplicateRejectionFeedback: () => ({
+      title: t("dataTools.duplicates.rejectionTitle"),
+      message: t("dataTools.duplicates.duplicateRejected"),
+    }),
+  });
+  const activeValidationInfo = computed(() => {
+    void workbookVersion.value;
+    const sheet = activeSheet.value;
+    const address = activeAddress.value;
+    const rule = getCellDataValidation(sheet, address);
+    if (!rule) return undefined;
+    return {
+      values:
+        rule.type === "list" && rule.showDropdown !== false
+          ? resolveDataValidationListValues(rule, {
+              workbook: session.workbook,
+              sheet,
+              address,
+            })
+          : [],
+      prompt:
+        rule.prompt && rule.showInput !== false
+          ? { title: rule.promptTitle, message: rule.prompt }
+          : undefined,
+    };
+  });
 
   function collectCommandSheetIds(command: WorkbookCommand, sheetIds: Set<string>): void {
     if (command.type === "setCellContents") {
@@ -398,9 +440,21 @@ export function useSpreadsheetWorkspaceController(
     }
   }
 
-  function execute(command: WorkbookCommand, operation?: WorkbookOperation): boolean {
+  function execute(
+    command: WorkbookCommand,
+    operation?: WorkbookOperation,
+    options: { allowDuplicateEntry?: boolean } = {},
+  ): boolean {
     let changed: boolean;
     try {
+      if (
+        !(
+          options.allowDuplicateEntry &&
+          command.type === "setCellContents" &&
+          command.changes.length === 1
+        )
+      )
+        assertDuplicateEntriesAreAllowed(command);
       calculation.prepareMutation(
         command.type === "setWorkbookCalculation" ? command.calculation.mode : undefined,
       );
@@ -423,6 +477,7 @@ export function useSpreadsheetWorkspaceController(
     command: WorkbookCommand,
     token?: ReplaceableWorkbookCommandToken,
   ) {
+    assertDuplicateEntriesAreAllowed(command);
     calculation.prepareMutation();
     const result = executeReplaceableWorkbookCommand(session, token, command);
     if (result.changed) {
@@ -431,6 +486,21 @@ export function useSpreadsheetWorkspaceController(
       pruneViewStates();
     }
     return result;
+  }
+
+  /** Reject entire value mutations before history can record a partial duplicate entry. */
+  function assertDuplicateEntriesAreAllowed(command: WorkbookCommand): void {
+    if (command.type !== "setCellContents") return;
+    const result = validateDuplicateEntries(session.workbook, command.changes);
+    if (!result.valid) {
+      throw new WorkbookDomainError(
+        {
+          code: "invalid_command_payload",
+          details: { field: "duplicate", sheetId: result.sheetId, ruleId: result.ruleId },
+        },
+        "A duplicate value is not allowed in this range.",
+      );
+    }
   }
 
   function clearWorkspaceStatus(): void {
@@ -531,21 +601,40 @@ export function useSpreadsheetWorkspaceController(
     }
   }
 
-  function commitCell(payload: { address: CellAddress; input: string; sheetId?: string }): void {
+  function commitCell(payload: {
+    address: CellAddress;
+    input: string;
+    sheetId?: string;
+    confirmPendingWarning?: boolean;
+  }): boolean {
     const sheetId = payload.sheetId ?? activeSheet.value.id;
     const sheet = session.workbook.sheets.get(sheetId);
-    if (!sheet) return;
-    execute(
-      createSetCellContentCommand(
+    if (!sheet) return false;
+    const accepted = validationInput.commit(
+      {
         sheetId,
-        payload.address,
-        parseCellContent(payload.input, {
-          asText: isTextCellNumberFormat(getCellStyle(sheet, payload.address)?.numberFormat),
-        }),
-      ),
-      "cells.edit",
+        address: payload.address,
+        content:
+          parseCellContent(payload.input, {
+            asText: isTextCellNumberFormat(getCellStyle(sheet, payload.address)?.numberFormat),
+          }) ?? null,
+      },
+      { confirmPendingWarning: payload.confirmPendingWarning },
     );
-    clearWorkspaceStatus();
+    if (accepted) clearWorkspaceStatus();
+    return accepted;
+  }
+
+  function commitCellValue(payload: {
+    address: CellAddress;
+    value: string | number | boolean;
+    sheetId?: string;
+  }): boolean {
+    return validationInput.commit({
+      sheetId: payload.sheetId ?? activeSheet.value.id,
+      address: payload.address,
+      content: { kind: "literal", value: payload.value },
+    });
   }
 
   function setCellImage(payload: {
@@ -606,12 +695,15 @@ export function useSpreadsheetWorkspaceController(
     if (activeSheet.value.properties.protected) return { ok: false, reason: "pasteRejected" };
     try {
       execute(
-        createGridPasteCommand(activeSheet.value, payload),
+        createGridPasteCommand(activeSheet.value, payload, activeSheetEvaluator.value),
         payload.kind === "all" && payload.moveSource ? "cells.move" : "cells.paste",
       );
       clearWorkspaceStatus();
       return { ok: true };
     } catch (error) {
+      if (isDuplicateEntryError(error)) {
+        showWorkspaceStatus({ key: "dataTools.duplicates.duplicateRejected" });
+      }
       return {
         ok: false,
         reason: error instanceof GridPasteError ? error.reason : "pasteRejected",
@@ -620,7 +712,20 @@ export function useSpreadsheetWorkspaceController(
   }
 
   function showClipboardFeedback(feedback: GridClipboardFeedback): void {
+    if (
+      feedback === "pasteRejected" &&
+      workspaceStatus.value?.key === "dataTools.duplicates.duplicateRejected"
+    )
+      return;
     showWorkspaceStatus({ key: `clipboard.${feedback}` });
+  }
+
+  function isDuplicateEntryError(error: unknown): boolean {
+    return (
+      error instanceof WorkbookDomainError &&
+      error.data.code === "invalid_command_payload" &&
+      error.data.details?.field === "duplicate"
+    );
   }
 
   function clearCells(range: CellRange): void {
@@ -644,7 +749,10 @@ export function useSpreadsheetWorkspaceController(
         "cells.edit",
       )
     ) {
-      showWorkspaceStatus({ key: "workspace.autoSumApplied", params: { formula } });
+      showWorkspaceStatus({
+        key: "workspace.autoSumApplied",
+        params: { formula },
+      });
     }
   }
 
@@ -692,7 +800,10 @@ export function useSpreadsheetWorkspaceController(
             .filter((criterion) => criterion.column !== column)
             .map((criterion) => ({
               column: criterion.column,
-              allowedValues: criterion.allowedValues.map((value) => ({ ...value })),
+              allowedValues: criterion.allowedValues.map((value) => ({
+                ...value,
+              })),
+              ...(criterion.condition ? { condition: { ...criterion.condition } } : {}),
             }))
         : [];
     if (!allSelected) columns.push({ column, allowedValues });
@@ -717,7 +828,10 @@ export function useSpreadsheetWorkspaceController(
         ? { rows: 1, columns: 0 }
         : mode === "first-column"
           ? { rows: 0, columns: 1 }
-          : { rows: activeAddress.value.row, columns: activeAddress.value.column };
+          : {
+              rows: activeAddress.value.row,
+              columns: activeAddress.value.column,
+            };
     executeFeature(
       () => createSetSheetFreezePanesCommand(activeSheet.value.id, freezePanes),
       "view.freeze",
@@ -727,7 +841,11 @@ export function useSpreadsheetWorkspaceController(
 
   function unfreeze(): void {
     executeFeature(
-      () => createSetSheetFreezePanesCommand(activeSheet.value.id, { rows: 0, columns: 0 }),
+      () =>
+        createSetSheetFreezePanesCommand(activeSheet.value.id, {
+          rows: 0,
+          columns: 0,
+        }),
       "view.freeze",
       "workspace.freezeUnavailable",
     );
@@ -791,13 +909,27 @@ export function useSpreadsheetWorkspaceController(
     clearWorkspaceStatus();
   }
 
-  function convertNumberType(mode: CellValueConversionMode): void {
+  function convertNumberType(
+    mode: CellValueConversionMode,
+    scope: "cell" | "selection" | "sheet" = "selection",
+    conversionOptions?: CellValueConversionOptions,
+  ): void {
     if (activeSheet.value.properties.protected || !flushPendingGridEdit()) return;
     try {
+      const range =
+        scope === "cell"
+          ? { start: activeAddress.value, end: activeAddress.value }
+          : scope === "sheet"
+            ? {
+                start: { row: 0, column: 0 },
+                end: { row: MAX_SHEET_ROWS - 1, column: MAX_SHEET_COLUMNS - 1 },
+              }
+            : activeSelectionRange.value;
       const command = createConvertCellValueTypeCommand(
         activeSheet.value,
-        activeSelectionRange.value,
+        range,
         mode,
+        conversionOptions,
       );
       if (command.changes.length === 0) {
         showWorkspaceStatus({ key: "workspace.conversionNoMatch" });
@@ -932,7 +1064,10 @@ export function useSpreadsheetWorkspaceController(
     }
     const sheet = activeSheet.value;
     const range = activeSelectionRange.value;
-    const rows = getVisibleClipboardRows(createGridClipboardRowVisibility(sheet), range);
+    const rows = getVisibleClipboardRows(
+      createGridClipboardRowVisibility(sheet, activeSheetEvaluator.value),
+      range,
+    );
     if (!rows?.length || rangeIntersectsMergedCells(sheet, range)) {
       showWorkspaceStatus({
         key: rows?.length ? "clipboard.mergedRangeUnsupported" : "clipboard.noVisibleCells",
@@ -970,7 +1105,7 @@ export function useSpreadsheetWorkspaceController(
       source.values,
       range,
       range.start,
-      createGridClipboardRowVisibility(activeSheet.value),
+      createGridClipboardRowVisibility(activeSheet.value, activeSheetEvaluator.value),
     );
     if (!plan) {
       showWorkspaceStatus({ key: "workspace.formatPainterRangeMismatch" });
@@ -1251,7 +1386,10 @@ export function useSpreadsheetWorkspaceController(
       return;
     }
     gridRef.value?.navigateToCell(match);
-    showWorkspaceStatus({ key: "workspace.found", params: { address: formatCellAddress(match) } });
+    showWorkspaceStatus({
+      key: "workspace.found",
+      params: { address: formatCellAddress(match) },
+    });
   }
 
   function undo(): boolean {
@@ -1305,7 +1443,8 @@ export function useSpreadsheetWorkspaceController(
 
   return {
     session,
-    executeCommand: execute,
+    executeCommand: (command: WorkbookCommand, operation?: WorkbookOperation) =>
+      execute(command, operation),
     executeReplaceableCommand,
     recalculate: () => {
       calculation.recalculate();
@@ -1329,15 +1468,21 @@ export function useSpreadsheetWorkspaceController(
     activeCellInput,
     activeSheetEvaluator,
     activeSelectionRange,
+    activeSelectionMode,
     setSelectionDragging,
     isFormattingSupported,
     activeSelectionStyle,
     activeSelectionSummary,
     dataToolState,
+    activeValidationInfo,
+    validationFeedback: validationInput.feedback,
+    acceptValidationInput: validationInput.accept,
+    dismissValidationInput: validationInput.dismiss,
     mergeState,
     workspaceStatusText,
     formatPainterActive,
     commitCell,
+    commitCellValue,
     setCellImage,
     setFloatingImage,
     deleteFloatingImage,
@@ -1386,6 +1531,8 @@ export function useSpreadsheetWorkspaceController(
     undo,
     redo,
     setGridNavigator,
+    fillSelection: (direction: FillDirection) => gridRef.value?.fillSelection?.(direction) ?? false,
+    clearGridClipboard: () => gridRef.value?.clearClipboard?.(),
     fitSelectionToViewport,
     scrollGridHorizontally,
   };

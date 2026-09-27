@@ -1,6 +1,6 @@
 import { isFormulaError, type FormulaValue } from "@idea10/core/formula";
-import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import type { CellAddress, CellRange, Sheet, SheetEvaluator } from "@idea10/core/workbook";
+import { createSheetHiddenRowIntervals, isInHiddenAxisIntervals } from "./data-visibility";
 
 export type ColumnValueDistribution = Readonly<{
   value: string;
@@ -52,25 +52,14 @@ function parseCellKey(key: string): CellAddress | null {
   return Number.isInteger(row) && Number.isInteger(column) ? { row, column } : null;
 }
 
-function isFilteredOut(sheet: Sheet, address: CellAddress, evaluator: SheetEvaluator): boolean {
-  const filter = sheet.filter;
-  if (!filter || address.row <= filter.range.start.row || address.row > filter.range.end.row) {
-    return false;
-  }
-
-  return filter.columns.some((column) => {
-    const value = evaluator.getComputedValue({ row: address.row, column: column.column });
-    return !column.allowedValues.some((allowed) => {
-      if (isFormulaError(value)) return allowed.kind === "error" && allowed.code === value.code;
-      if (value === null) return allowed.kind === "blank";
-      return allowed.kind === typeof value && allowed.value === value;
-    });
-  });
-}
-
-function isVisibleRow(sheet: Sheet, address: CellAddress, evaluator: SheetEvaluator): boolean {
+function isVisibleRow(
+  sheet: Sheet,
+  address: CellAddress,
+  hiddenIntervals: readonly { start: number; end: number }[],
+): boolean {
   return (
-    !(sheet.hiddenRows?.has(address.row) ?? false) && !isFilteredOut(sheet, address, evaluator)
+    !(sheet.hiddenRows?.has(address.row) ?? false) &&
+    !isInHiddenAxisIntervals(address.row, hiddenIntervals)
   );
 }
 
@@ -96,7 +85,7 @@ function isInIntervals(row: number, intervals: readonly { start: number; end: nu
 }
 
 function getVisibleRowCount(sheet: Sheet, range: CellRange, evaluator: SheetEvaluator): number {
-  const intervals = createSheetFilterHiddenRowIntervals(sheet, evaluator);
+  const intervals = createSheetHiddenRowIntervals(sheet, evaluator);
   let hiddenCount = 0;
   for (const interval of intervals) {
     const start = Math.max(range.start.row, interval.start);
@@ -122,6 +111,7 @@ export function getColumnStatistics(
   evaluator: SheetEvaluator,
 ): ColumnStatistics[] {
   const normalized = normalizeRange(range);
+  const hiddenIntervals = createSheetHiddenRowIntervals(sheet, evaluator);
   const valuesByColumn = new Map<number, Map<string, number>>();
   const statistics = new Map<number, ReturnType<typeof createEmptyStatistic>>();
 
@@ -134,7 +124,7 @@ export function getColumnStatistics(
       address.row > normalized.end.row ||
       address.column < normalized.start.column ||
       address.column > normalized.end.column ||
-      !isVisibleRow(sheet, address, evaluator)
+      !isVisibleRow(sheet, address, hiddenIntervals)
     ) {
       continue;
     }
@@ -213,6 +203,7 @@ export function getColumnChoices(
   evaluator: SheetEvaluator,
 ): ColumnChoice[] {
   const choices = new Map<string, { count: number; nearestRow: number }>();
+  const hiddenIntervals = createSheetHiddenRowIntervals(sheet, evaluator);
   for (const [key, cell] of sheet.cells) {
     if (cell.content?.kind !== "literal" || typeof cell.content.value !== "string") continue;
     const candidate = parseCellKey(key);
@@ -221,7 +212,7 @@ export function getColumnChoices(
       !candidate ||
       candidate.column !== address.column ||
       value.trim() === "" ||
-      !isVisibleRow(sheet, candidate, evaluator)
+      !isVisibleRow(sheet, candidate, hiddenIntervals)
     ) {
       continue;
     }

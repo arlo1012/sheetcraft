@@ -38,7 +38,13 @@ describe("WorkbookFormulaBar formula commit completion", () => {
       await input.trigger("keydown", { key });
 
       expect(wrapper.emitted("commitCell")).toEqual([
-        [{ address: { row: 0, column: 0 }, input: "=SUM(B1:C2)" }],
+        [
+          {
+            address: { row: 0, column: 0 },
+            input: "=SUM(B1:C2)",
+            ...(key === "Enter" ? { confirmPendingWarning: true } : {}),
+          },
+        ],
       ]);
       expect(wrapper.emitted("traverse")).toEqual([
         [{ address: { row: 0, column: 0 }, direction }],
@@ -54,7 +60,7 @@ describe("WorkbookFormulaBar formula commit completion", () => {
     await closedInput.trigger("keydown", { key: "Enter" });
 
     expect(alreadyClosed.emitted("commitCell")).toEqual([
-      [{ address: { row: 0, column: 0 }, input: "=SUM(B1)" }],
+      [{ address: { row: 0, column: 0 }, input: "=SUM(B1)", confirmPendingWarning: true }],
     ]);
 
     const nested = mountFormulaBar();
@@ -64,7 +70,13 @@ describe("WorkbookFormulaBar formula commit completion", () => {
     await nestedInput.trigger("keydown", { key: "Enter" });
 
     expect(nested.emitted("commitCell")).toEqual([
-      [{ address: { row: 0, column: 0 }, input: "=SUM(SUM(B1),C2)" }],
+      [
+        {
+          address: { row: 0, column: 0 },
+          input: "=SUM(SUM(B1),C2)",
+          confirmPendingWarning: true,
+        },
+      ],
     ]);
   });
 

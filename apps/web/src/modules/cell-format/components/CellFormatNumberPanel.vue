@@ -220,7 +220,6 @@ function selectNegative(code: string): void {
   box-sizing: border-box;
   height: 100%;
   min-height: 0;
-  padding-top: 16px;
   color: var(--idea-text-primary);
   font-size: var(--idea-font-size-body-medium);
   line-height: var(--idea-line-height-body-medium);

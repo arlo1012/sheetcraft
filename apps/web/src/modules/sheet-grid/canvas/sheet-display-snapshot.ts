@@ -1,3 +1,5 @@
+import { createDuplicateHighlightResolver } from "@idea10/core/duplicate-values";
+import type { CellStyle } from "@idea10/core/style";
 import { computed, type ComputedRef } from "vue";
 import type { CellAddress, Sheet, SheetEvaluator } from "@idea10/core/workbook";
 import type { FormulaValue } from "@idea10/core/formula";
@@ -22,6 +24,7 @@ export type SheetDisplaySnapshot = Readonly<{
   contentExtent: GridExtent;
   getComputedValue: (address: CellAddress) => FormulaValue;
   getSpill: (address: CellAddress) => SpillProjection | undefined;
+  getCellStyle: (address: CellAddress) => Readonly<CellStyle> | undefined;
 }>;
 
 function addressKey(address: CellAddress): string {
@@ -62,6 +65,26 @@ export function createSheetDisplaySnapshot(options: {
     contentExtent.columnCount = Math.max(contentExtent.columnCount, projection.address.column + 1);
   }
 
+  const resolveHighlight = createDuplicateHighlightResolver(options.sheet, options.evaluator);
+  const styles = new Map<string, Readonly<CellStyle> | undefined>();
+  function getCellStyle(address: CellAddress): Readonly<CellStyle> | undefined {
+    const key = addressKey(address);
+    if (styles.has(key)) return styles.get(key);
+    const base = options.sheet.cells.get(key)?.style;
+    const highlight = resolveHighlight(address);
+    let style = base;
+    if (highlight) {
+      style = { ...base, ...highlight };
+      if (highlight.fillColor) {
+        delete style.fillGradient;
+        delete style.fillPattern;
+        delete style.fillPatternColor;
+      }
+    }
+    styles.set(key, style);
+    return style;
+  }
+
   return {
     sheet: options.sheet,
     evaluator: options.evaluator,
@@ -70,6 +93,7 @@ export function createSheetDisplaySnapshot(options: {
     getComputedValue: (address) =>
       computedValues.get(addressKey(address)) ?? options.evaluator.getComputedValue(address),
     getSpill: (address) => spills.get(addressKey(address)),
+    getCellStyle,
   };
 }
 
@@ -100,6 +124,7 @@ function trackSheetDisplayDocument(sheet: Sheet): void {
   void sheet.freezePanes;
   void sheet.filter;
   void sheet.floatingImages;
+  void sheet.duplicateRules;
 }
 
 export function useSheetDisplaySnapshot(options: {

@@ -143,7 +143,7 @@ function onSameMenuKeydown(event: KeyboardEvent): void {
       @toggle-menu="toggleMenu"
       @menu-keydown="onTriggerKeydown"
     >
-      <TableCellsMerge :size="17" aria-hidden="true" />
+      <TableCellsMerge aria-hidden="true" />
     </RibbonSplitButton>
 
     <Teleport to="body">
