@@ -544,30 +544,25 @@ defineExpose({
   border-bottom: 1px solid var(--idea-border-control);
 
   &__editor {
-    position: relative;
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) 24px 24px;
+    align-items: start;
     min-width: 0;
 
     &.is-expanded {
-      z-index: 30;
-      height: var(--td-comp-size-m);
-
       .workbook-formula-bar__formula {
-        position: absolute;
-        inset-block-start: 0;
-        inset-inline: 0;
+        z-index: 30;
       }
     }
   }
 
   &__formula {
+    position: relative;
     min-width: 0;
+    height: var(--td-comp-size-m);
   }
 
   &__leading-actions {
-    position: absolute;
-    z-index: 2;
-    inset-block-start: 0;
-    inset-inline-start: 1px;
     display: inline-flex;
     align-items: center;
     justify-content: space-around;
@@ -604,19 +599,13 @@ defineExpose({
     font-style: italic;
   }
 
-  &__editor-trigger {
-    position: absolute;
-    z-index: 2;
-    inset-block-start: 6.5px;
-    inset-inline-end: 31px;
+  &__editor-trigger,
+  &__expand-trigger {
+    justify-self: center;
+    margin-top: 6.5px;
   }
 
   &__expand-trigger {
-    position: absolute;
-    z-index: 2;
-    inset-block-start: 6.5px;
-    inset-inline-end: 7px;
-
     &.is-expanded {
       transform: rotate(180deg);
     }
