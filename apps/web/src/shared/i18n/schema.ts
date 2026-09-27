@@ -588,7 +588,9 @@ export type MessageSchema = FormulaToolsMessageSchema & {
       rows: string;
       columns: string;
       expand: string;
+      expandShort: string;
       collapse: string;
+      collapseShort: string;
       subtotal: string;
       subtotalTitle: string;
       subtotalLabel: string;

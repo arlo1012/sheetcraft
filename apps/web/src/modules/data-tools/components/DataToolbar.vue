@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import {
-  ChevronDown,
-  ChevronUp,
+  SquareChevronDown,
+  SquareChevronUp,
+  Rows3,
   Columns3,
   TableProperties,
   Combine,
@@ -180,8 +181,6 @@ const { t } = useAppI18n();
         @activate="emit('openValidation')"
         ><ShieldCheck :size="18"
       /></RibbonButton>
-    </section>
-    <section class="data-toolbar__group" role="group" :aria-label="t('dataTools.groups.outline')">
       <RibbonButton
         variant="tall"
         :disabled="disabled"
@@ -191,6 +190,8 @@ const { t } = useAppI18n();
         @activate="emit('openConsolidate')"
         ><Combine :size="18"
       /></RibbonButton>
+    </section>
+    <section class="data-toolbar__group" role="group" :aria-label="t('dataTools.groups.outline')">
       <RibbonButton
         variant="tall"
         :disabled="disabled || !capabilities.subtotal"
@@ -198,7 +199,7 @@ const { t } = useAppI18n();
         :text="t('dataTools.outline.subtotal')"
         data-data-action="subtotal"
         @activate="emit('openSubtotal')"
-        ><Database :size="18" /></RibbonButton
+        ><Rows3 :size="18" /></RibbonButton
       ><DataOutlineTools
         :disabled="disabled"
         :ungroup-rows="capabilities.ungroupRows"
@@ -206,21 +207,21 @@ const { t } = useAppI18n();
         @group="emit('group', $event)"
         @ungroup="emit('ungroup', $event)"
       />
-      <div class="data-toolbar__stack">
+      <div class="data-toolbar__stack data-toolbar__stack--outline">
         <RibbonButton
           :disabled="disabled || !capabilities.expand"
           :label="t('dataTools.outline.expand')"
-          :text="t('dataTools.outline.expand')"
+          :text="t('dataTools.outline.expandShort')"
           data-data-action="expand"
           @activate="emit('expand')"
-          ><ChevronDown :size="14" /></RibbonButton
+          ><SquareChevronDown :size="14" /></RibbonButton
         ><RibbonButton
           :disabled="disabled || !capabilities.collapse"
           :label="t('dataTools.outline.collapse')"
-          :text="t('dataTools.outline.collapse')"
+          :text="t('dataTools.outline.collapseShort')"
           data-data-action="collapse"
           @activate="emit('collapse')"
-          ><ChevronUp :size="14"
+          ><SquareChevronUp :size="14"
         /></RibbonButton>
       </div>
     </section>
@@ -242,6 +243,9 @@ const { t } = useAppI18n();
   &__stack {
     @include ribbon.stack;
     min-width: 64px;
+    &--outline {
+      min-width: 0;
+    }
   }
 }
 </style>

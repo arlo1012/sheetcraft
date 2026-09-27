@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Columns3, Rows3, Ungroup } from "lucide-vue-next";
+import { Columns3, Rows3, ListPlus, ListX } from "lucide-vue-next";
 import { computed, ref, useId } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
@@ -58,6 +58,7 @@ function chooseUngroup(axis: "rows" | "columns"): void {
   <div class="data-outline-tools">
     <RibbonMenuButton
       ref="groupTrigger"
+      variant="tall"
       :label="t('dataTools.outline.group')"
       :text="t('dataTools.outline.group')"
       :disabled="disabled"
@@ -67,9 +68,10 @@ function chooseUngroup(axis: "rows" | "columns"): void {
       :menu-id="groupId"
       @activate="toggleGroupMenu"
       @keydown="onGroupKeydown"
-      ><Rows3 :size="15" /></RibbonMenuButton
+      ><ListPlus :size="18" /></RibbonMenuButton
     ><RibbonMenuButton
       ref="ungroupTrigger"
+      variant="tall"
       :label="t('dataTools.outline.ungroup')"
       :text="t('dataTools.outline.ungroup')"
       :disabled="ungroupDisabled"
@@ -79,7 +81,7 @@ function chooseUngroup(axis: "rows" | "columns"): void {
       :menu-id="ungroupId"
       @activate="toggleUngroupMenu"
       @keydown="onUngroupKeydown"
-      ><Ungroup :size="15" /></RibbonMenuButton
+      ><ListX :size="18" /></RibbonMenuButton
     ><Teleport to="body"
       ><MenuSurface
         v-if="groupOpen"
