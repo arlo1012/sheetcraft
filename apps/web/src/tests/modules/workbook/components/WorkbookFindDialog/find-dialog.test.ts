@@ -78,7 +78,11 @@ describe("WorkbookFindDialog", () => {
     const body = new DOMWrapper(document.body);
     const input = body.get<HTMLInputElement>("[data-search-input] input");
     input.element.setSelectionRange(1, 1);
+    await flushPromises();
     await body.get("button[aria-label='Special content']").trigger("click");
+    await vi.waitFor(() =>
+      expect(body.find("[data-find-special='line-break']").exists()).toBe(true),
+    );
     await body.get("[data-find-special='line-break']").trigger("click");
     expect(wrapper.emitted("updateQuery")).toEqual([["a^lc"]]);
     await wrapper.setProps({ query: "^l" });

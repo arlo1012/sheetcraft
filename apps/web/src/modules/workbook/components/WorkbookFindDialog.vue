@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { computed, ref } from "vue";
 import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Dropdown, DropdownItem, DropdownMenu } from "tdesign-vue-next/es/dropdown";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { ChevronDown, ChevronUp } from "lucide-vue-next";
 import type { SheetSearchFormat } from "@idea10/core/search";
@@ -10,10 +11,6 @@ import WorkbookFindFormatPreview from "./WorkbookFindFormatPreview.vue";
 import WorkbookFindResults from "./WorkbookFindResults.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import WorkbookFindQueryInput from "./WorkbookFindQueryInput.vue";
-import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
-import MenuItem from "../../../shared/menu/MenuItem.vue";
-import MenuSurface from "../../../shared/menu/MenuSurface.vue";
-import { useMenu } from "../../../shared/menu/useMenu";
 import {
   DEFAULT_WORKBOOK_FIND_OPTIONS,
   type WorkbookFindFormatMode,
@@ -62,36 +59,8 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 const queryInput = ref<InstanceType<typeof WorkbookFindQueryInput>>();
 const expanded = ref(false);
-const formatTrigger = ref<InstanceType<typeof Button> | null>(null);
-const specialTrigger = ref<InstanceType<typeof Button> | null>(null);
-const formatSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
-const specialSurface = ref<InstanceType<typeof MenuSurface> | null>(null);
-const formatId = `find-format-${useId().replaceAll(":", "")}`;
-const specialId = `find-special-${useId().replaceAll(":", "")}`;
-const {
-  open: formatOpen,
-  floatingStyles: formatStyles,
-  dismiss: dismissFormat,
-  toggleMenu: toggleFormat,
-  onTriggerKeydown: formatKeydown,
-} = useMenu({
-  triggerRef: computed(() => formatTrigger.value?.$el as HTMLElement | null),
-  menuSurfaceRef: formatSurface,
-  placement: "bottom-start",
-  pointerFocus: "menu",
-});
-const {
-  open: specialOpen,
-  floatingStyles: specialStyles,
-  dismiss: dismissSpecial,
-  toggleMenu: toggleSpecial,
-  onTriggerKeydown: specialKeydown,
-} = useMenu({
-  triggerRef: computed(() => specialTrigger.value?.$el as HTMLElement | null),
-  menuSurfaceRef: specialSurface,
-  placement: "bottom-start",
-  pointerFocus: "menu",
-});
+const formatOpen = ref(false);
+const specialOpen = ref(false);
 const canFind = computed(() => Boolean(props.query || props.formatSummary));
 const scopeOptions = computed(() => [
   { value: "sheet", label: t("navigation.findScopeSheet") },
@@ -112,12 +81,7 @@ function updateOptions(options: Partial<WorkbookFindOptions>): void {
 function find(direction: "forward" | "backward"): void {
   if (canFind.value) emit("find", direction);
 }
-function chooseFormat(mode: WorkbookFindFormatMode): void {
-  emit("pickFormat", mode);
-  dismissFormat("programmatic", true);
-}
 function insertSpecial(text: string): void {
-  dismissSpecial("programmatic", false);
   queryInput.value?.insertText(text);
 }
 function close(): void {
@@ -163,15 +127,40 @@ function close(): void {
             :title="formatSummary"
             :empty-label="t('navigation.findFormatUnset')"
           />
-          <Button
-            ref="formatTrigger"
-            variant="outline"
-            :aria-expanded="formatOpen"
-            :aria-controls="formatOpen ? formatId : undefined"
-            @click="toggleFormat"
-            @keydown="formatKeydown"
-            >{{ t("navigation.findFormat") }}<template #suffix><ChevronDown :size="14" /></template
-          ></Button>
+          <Dropdown
+            trigger="click"
+            placement="bottom-left"
+            :min-column-width="180"
+            :max-column-width="300"
+            :popup-props="{ zIndex: 2600, onVisibleChange: (visible) => (formatOpen = visible) }"
+          >
+            <Button variant="outline" aria-haspopup="menu" :aria-expanded="formatOpen">
+              {{ t("navigation.findFormat") }}
+              <template #suffix><ChevronDown :size="14" /></template>
+            </Button>
+            <template #dropdown>
+              <DropdownMenu>
+                <DropdownItem @click="emit('configureFormat')">
+                  <span data-find-format="configure">{{ t("navigation.findCustomFormat") }}</span>
+                </DropdownItem>
+                <DropdownItem @click="emit('pickFormat', 'fill')">
+                  <span data-find-format="fill">{{ t("navigation.findFormatFill") }}</span>
+                </DropdownItem>
+                <DropdownItem @click="emit('pickFormat', 'font')">
+                  <span data-find-format="font">{{ t("navigation.findFormatFont") }}</span>
+                </DropdownItem>
+                <DropdownItem @click="emit('pickFormat', 'colors')">
+                  <span data-find-format="colors">{{ t("navigation.findFormatColors") }}</span>
+                </DropdownItem>
+                <DropdownItem @click="emit('pickFormat', 'all')">
+                  <span data-find-format="all">{{ t("navigation.findFormatAll") }}</span>
+                </DropdownItem>
+                <DropdownItem :disabled="!formatSummary" @click="emit('clearFormat')">
+                  <span data-find-format="clear">{{ t("navigation.findClearFormat") }}</span>
+                </DropdownItem>
+              </DropdownMenu>
+            </template>
+          </Dropdown>
         </div>
         <section
           v-if="expanded"
@@ -230,17 +219,48 @@ function close(): void {
           </div>
         </section>
         <div class="workbook-find-dialog__tools">
-          <Button
-            ref="specialTrigger"
-            variant="outline"
-            :aria-label="t('navigation.findSpecialContent')"
-            :aria-expanded="specialOpen"
-            :aria-controls="specialOpen ? specialId : undefined"
-            @click="toggleSpecial"
-            @keydown="specialKeydown"
-            >{{ t("navigation.findSpecialContent")
-            }}<template #suffix><ChevronDown :size="14" /></template
-          ></Button>
+          <Dropdown
+            trigger="click"
+            placement="bottom-left"
+            :min-column-width="184"
+            :max-column-width="300"
+            :popup-props="{ zIndex: 2600, onVisibleChange: (visible) => (specialOpen = visible) }"
+          >
+            <Button
+              variant="outline"
+              :aria-label="t('navigation.findSpecialContent')"
+              aria-haspopup="menu"
+              :aria-expanded="specialOpen"
+            >
+              {{ t("navigation.findSpecialContent") }}
+              <template #suffix><ChevronDown :size="14" /></template>
+            </Button>
+            <template #dropdown>
+              <DropdownMenu>
+                <DropdownItem divider @click="insertSpecial('^l')">
+                  <span
+                    class="workbook-find-dialog__special-content"
+                    data-find-special="line-break"
+                  >
+                    {{ t("navigation.findSpecialLineBreak") }}
+                    <span class="workbook-find-dialog__special-token">^l</span>
+                  </span>
+                </DropdownItem>
+                <DropdownItem @click="insertSpecial('?')">
+                  <span class="workbook-find-dialog__special-content" data-find-special="single">
+                    {{ t("navigation.findSpecialSingleCharacter") }}
+                    <span class="workbook-find-dialog__special-token">?</span>
+                  </span>
+                </DropdownItem>
+                <DropdownItem @click="insertSpecial('*')">
+                  <span class="workbook-find-dialog__special-content" data-find-special="multiple">
+                    {{ t("navigation.findSpecialAnyText") }}
+                    <span class="workbook-find-dialog__special-token">*</span>
+                  </span>
+                </DropdownItem>
+              </DropdownMenu>
+            </template>
+          </Dropdown>
           <Button
             variant="outline"
             :aria-expanded="expanded"
@@ -276,64 +296,6 @@ function close(): void {
       </p>
     </div>
   </Dialog>
-  <Teleport to="body"
-    ><MenuSurface
-      v-if="formatOpen"
-      :id="formatId"
-      ref="formatSurface"
-      class="workbook-find-dialog__menu"
-      :style="formatStyles"
-      :label="t('navigation.findFormat')"
-      ><MenuItem
-        data-find-format="configure"
-        @select="
-          emit('configureFormat');
-          dismissFormat('programmatic', true);
-        "
-        >{{ t("navigation.findCustomFormat") }}</MenuItem
-      ><MenuItem data-find-format="fill" @select="chooseFormat('fill')">{{
-        t("navigation.findFormatFill")
-      }}</MenuItem
-      ><MenuItem data-find-format="font" @select="chooseFormat('font')">{{
-        t("navigation.findFormatFont")
-      }}</MenuItem
-      ><MenuItem data-find-format="colors" @select="chooseFormat('colors')">{{
-        t("navigation.findFormatColors")
-      }}</MenuItem
-      ><MenuItem data-find-format="all" @select="chooseFormat('all')">{{
-        t("navigation.findFormatAll")
-      }}</MenuItem
-      ><MenuItem
-        data-find-format="clear"
-        :disabled="!formatSummary"
-        @select="
-          emit('clearFormat');
-          dismissFormat('programmatic', true);
-        "
-        >{{ t("navigation.findClearFormat") }}</MenuItem
-      ></MenuSurface
-    ></Teleport
-  >
-  <Teleport to="body"
-    ><MenuSurface
-      v-if="specialOpen"
-      :id="specialId"
-      ref="specialSurface"
-      class="workbook-find-dialog__menu workbook-find-dialog__special-menu"
-      :style="specialStyles"
-      :label="t('navigation.findSpecialContent')"
-      ><MenuItem data-find-special="line-break" @select="insertSpecial('^l')"
-        >{{ t("navigation.findSpecialLineBreak") }}<template #shortcut>^l</template></MenuItem
-      >
-      <MenuSeparator />
-      <MenuItem data-find-special="single" @select="insertSpecial('?')"
-        >{{ t("navigation.findSpecialSingleCharacter") }}<template #shortcut>?</template></MenuItem
-      >
-      <MenuItem data-find-special="multiple" @select="insertSpecial('*')"
-        >{{ t("navigation.findSpecialAnyText") }}<template #shortcut>*</template></MenuItem
-      >
-    </MenuSurface></Teleport
-  >
 </template>
 
 <style scoped lang="scss">
@@ -396,13 +358,15 @@ function close(): void {
     font-size: var(--idea-font-size-body-small);
     overflow-wrap: anywhere;
   }
-  &__menu {
-    position: fixed;
-    z-index: 2600;
-    min-width: 180px;
+  &__special-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--idea-space-4);
+    width: 100%;
   }
-  &__special-menu {
-    width: 184px;
+  &__special-token {
+    color: var(--idea-text-secondary);
   }
 }
 @media (max-width: 520px) {
