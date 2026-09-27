@@ -56,20 +56,24 @@ function applyColor(color: string | null): void {
           stroke-linejoin="round"
           aria-hidden="true"
         >
-          <path v-if="kind === 'text'" d="m4 17 8-14 8 14M7.5 11h9" />
-          <template v-else>
-            <path
-              d="m8 4 2-2a1 1 0 0 1 1.4 0l8.6 8.6a1 1 0 0 1 0 1.4l-6 6a3 3 0 0 1-4.2 0l-6-6a3 3 0 0 1 0-4.2L6 5.6M5 2l6 6M3 12h16"
-            />
-          </template>
+          <g transform="translate(0 -0.5) scale(1 0.9)">
+            <path v-if="kind === 'text'" d="m4 17 8-14 8 14M7.5 11h9" />
+            <template v-else>
+              <path
+                d="m8 4 2-2a1 1 0 0 1 1.4 0l8.6 8.6a1 1 0 0 1 0 1.4l-6 6a3 3 0 0 1-4.2 0l-6-6a3 3 0 0 1 0-4.2L6 5.6M5 2l6 6M3 12h16"
+              />
+            </template>
+          </g>
           <rect
             class="cell-color-control__indicator"
-            x="2"
-            y="21"
-            width="20"
-            height="3"
-            rx="0.6"
-            stroke="none"
+            x="0.5"
+            y="18.5"
+            width="23"
+            height="5"
+            rx="0.75"
+            stroke="currentColor"
+            stroke-width="0.8"
+            stroke-opacity="0.25"
             data-color-indicator
           />
         </svg>
