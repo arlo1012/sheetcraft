@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -159,7 +158,7 @@ watch(
     @confirm="save"
     @close="emit('close')"
   >
-    <TForm class="conditional-format-quick" layout="vertical" :label-width="0">
+    <div class="conditional-format-quick">
       <p class="conditional-format-quick__instruction">{{ instruction }}</p>
       <p v-if="isAverage" class="conditional-format-quick__scope">
         {{ t("conditionalFormatting.quickSelection") }}
@@ -172,7 +171,12 @@ watch(
           'conditional-format-quick__row--between': kind === 'between',
         }"
       >
-        <TFormItem v-if="isRank" role="group" :aria-label="t('conditionalFormatting.count')">
+        <div
+          class="conditional-format-quick__field"
+          v-if="isRank"
+          role="group"
+          :aria-label="t('conditionalFormatting.count')"
+        >
           <TInputNumber
             v-model="count"
             :aria-label="t('conditionalFormatting.count')"
@@ -183,8 +187,9 @@ watch(
             :decimal-places="0"
           />
           <span v-if="isPercent" class="conditional-format-quick__unit">%</span>
-        </TFormItem>
-        <TFormItem
+        </div>
+        <div
+          class="conditional-format-quick__field"
           v-else-if="kind === 'date'"
           role="group"
           :aria-label="t('conditionalFormatting.datePeriod')"
@@ -194,8 +199,9 @@ watch(
             :aria-label="t('conditionalFormatting.datePeriod')"
             :options="dateOptions"
           />
-        </TFormItem>
-        <TFormItem
+        </div>
+        <div
+          class="conditional-format-quick__field"
           v-else-if="kind === 'duplicate'"
           role="group"
           :aria-label="t('conditionalFormatting.condition')"
@@ -208,8 +214,9 @@ watch(
               { value: true, label: t('conditionalFormatting.unique') },
             ]"
           />
-        </TFormItem>
-        <TFormItem
+        </div>
+        <div
+          class="conditional-format-quick__field"
           v-else-if="!isAverage"
           role="group"
           :aria-label="t('conditionalFormatting.value')"
@@ -220,19 +227,24 @@ watch(
             autofocus
             @enter="save"
           />
-        </TFormItem>
+        </div>
         <template v-if="kind === 'between'">
           <span>{{ t("conditionalFormatting.and") }}</span>
-          <TFormItem role="group" :aria-label="t('conditionalFormatting.secondValue')"
-            ><TInput
+          <div
+            class="conditional-format-quick__field"
+            role="group"
+            :aria-label="t('conditionalFormatting.secondValue')"
+          >
+            <TInput
               v-model="secondValue"
               :aria-label="t('conditionalFormatting.secondValue')"
               @enter="save"
-          /></TFormItem>
+            />
+          </div>
         </template>
         <span v-if="!isAverage">{{ t("conditionalFormatting.setFormat") }}</span>
-        <TFormItem
-          class="conditional-format-quick__format"
+        <div
+          class="conditional-format-quick__field conditional-format-quick__format"
           role="group"
           :aria-label="t('conditionalFormatting.setFormat')"
         >
@@ -242,10 +254,10 @@ watch(
             :date-system="dateSystem"
             @custom-visible="customVisible = $event"
           />
-        </TFormItem>
+        </div>
       </div>
       <p v-if="error" role="alert" class="conditional-format-quick__error">{{ error }}</p>
-    </TForm>
+    </div>
   </Dialog>
 </template>
 
@@ -281,6 +293,15 @@ watch(
       &--between > .conditional-format-quick__format {
         grid-column: span 2;
       }
+    }
+  }
+  &__field {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    > :first-child {
+      flex: 1;
+      min-width: 0;
     }
   }
   &__unit {
