@@ -706,8 +706,8 @@ function cellFormulaValue(value: number | string): string {
   return typeof value === "number" ? String(value) : `"${quoteFormulaText(value)}"`;
 }
 
-function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId: number): string {
-  const dxf = Object.keys(rule.style).length ? ` dxfId="${dxfId}"` : "";
+function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId?: number): string {
+  const dxf = dxfId === undefined ? "" : ` dxfId="${dxfId}"`;
   const stop = rule.stopIfTrue ? ' stopIfTrue="1"' : "";
   // OOXML conditions are evaluated relative to the first sqref cell. The Core
   // anchor can survive a partial clear, so rebase before serializing it.
@@ -792,7 +792,34 @@ function appendX14ConditionalFormatting(xml: string, body: string): string {
   return xml.replace(/<\/worksheet>/i, `<extLst>${extension}</extLst></worksheet>`);
 }
 
-/** Add first-release conditional formats after ExcelJS has produced its base archive. */
+/** Keep the first exact duplicate, preserving relative rule priority. Formula rules are
+ * retained because separate evaluations can differ for volatile functions.
+ * Never union ranges: that changes rank, duplicate and visual statistics.
+ */
+function compactExportRules(
+  rules: readonly SheetConditionalFormatRule[],
+): SheetConditionalFormatRule[] {
+  const seen = new Set<string>();
+  return normalizeConditionalFormatRules(rules).filter((rule) => {
+    if (rule.condition.kind === "formula") return true;
+    const key = JSON.stringify({
+      ranges: rule.ranges,
+      anchor: rule.anchor,
+      condition: rule.condition,
+      style: {
+        ...rule.style,
+        ...(rule.style.fillColor ? { fillColor: rule.style.fillColor.toUpperCase() } : {}),
+        ...(rule.style.textColor ? { textColor: rule.style.textColor.toUpperCase() } : {}),
+      },
+      stopIfTrue: Boolean(rule.stopIfTrue),
+    });
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** Compact only the export copy, preserving the editable workbook and history. */
 export function writeXlsxConditionalFormats(
   entries: Record<string, Uint8Array>,
   sheets: readonly SheetConditionalFormatRule[][],
@@ -800,9 +827,29 @@ export function writeXlsxConditionalFormats(
 ): void {
   const styles = entries["xl/styles.xml"];
   if (!styles) throw new Error("Missing generated XLSX styles.");
-  const allRules = sheets.flat();
+  const exportSheets = sheets.map(compactExportRules);
+  const allRules = exportSheets.flat();
   if (!allRules.length) return;
-  const dxfs = allRules.map((rule) => dxfXml(rule.style));
+  const dxfs: string[] = [];
+  const styleIds = new Map<string, number>();
+  const ruleStyleIds = new Map<SheetConditionalFormatRule, number>();
+  for (const rule of allRules) {
+    if (
+      !Object.keys(rule.style).length ||
+      rule.condition.kind === "iconSet" ||
+      rule.condition.kind === "dataBar" ||
+      rule.condition.kind === "colorScale"
+    )
+      continue;
+    const xml = dxfXml(rule.style);
+    let id = styleIds.get(xml);
+    if (id === undefined) {
+      id = dxfs.length;
+      dxfs.push(xml);
+      styleIds.set(xml, id);
+    }
+    ruleStyleIds.set(rule, id);
+  }
   const stylesXml = strFromU8(styles);
   const previous = /<dxfs\b[^>]*>[\s\S]*?<\/dxfs>|<dxfs\b[^>]*\/?\s*>/i;
   const dxfContainer = `<dxfs count="${dxfs.length}">${dxfs.join("")}</dxfs>`;
@@ -812,8 +859,7 @@ export function writeXlsxConditionalFormats(
       : stylesXml.replace(/<tableStyles\b/i, `${dxfContainer}<tableStyles`),
   );
   let priority = 1;
-  let dxfId = 0;
-  for (const [sheetIndex, rules] of sheets.entries()) {
+  for (const [sheetIndex, rules] of exportSheets.entries()) {
     if (!rules.length) continue;
     const path = `xl/worksheets/sheet${sheetIndex + 1}.xml`;
     const entry = entries[path];
@@ -823,7 +869,7 @@ export function writeXlsxConditionalFormats(
     const body = rules
       .map((rule) => {
         const x14 = x14RuleXml(rule, priority);
-        const next = x14 ?? ruleXml(rule, priority, dxfId);
+        const next = x14 ?? ruleXml(rule, priority, ruleStyleIds.get(rule));
         if (
           rule.condition.kind === "dataBar" &&
           (rule.condition.negativeColor !== undefined || rule.condition.gradient === false)
@@ -841,7 +887,6 @@ export function writeXlsxConditionalFormats(
           );
         if (x14) x14Body += x14;
         priority += 1;
-        dxfId += 1;
         return x14
           ? ""
           : `<conditionalFormatting sqref="${rule.ranges.map(rangeReference).join(" ")}">${next}</conditionalFormatting>`;
