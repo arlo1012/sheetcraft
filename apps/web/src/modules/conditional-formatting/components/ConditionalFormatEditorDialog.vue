@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {
   normalizeConditionalFormatRules,
+  cloneConditionalFormatRule,
+  type ConditionalFormatStyle,
   type ConditionalFormatIconSet,
   type ConditionalFormatThreshold,
   type SheetConditionalFormatRule,
@@ -12,8 +14,10 @@ import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
-import { computed, reactive, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
+import ConditionalFormatStyleSelect from "./ConditionalFormatStyleSelect.vue";
+import { conditionalFormatPresetStyle } from "../conditional-format-quick-rules";
 import ConditionalFormatPreview from "./ConditionalFormatPreview.vue";
 import ConditionalFormatThresholdField from "./ConditionalFormatThresholdField.vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
@@ -25,7 +29,6 @@ import {
   type ConditionalFormatPresetKind,
 } from "../conditional-format-presets";
 import {
-  DEFAULT_CONDITIONAL_FORMAT_STYLE,
   createConditionalFormatRuleId,
   formatConditionalFormatRanges,
   parseConditionalFormatRanges,
@@ -76,10 +79,6 @@ type EditorDraft = {
   equalAverage?: boolean;
   stdDev?: number;
   datePeriod: string;
-  fillColor: string | null | undefined;
-  textColor: string | null | undefined;
-  bold: boolean | undefined;
-  italic: boolean | undefined;
   stopIfTrue: boolean;
   minimumKind: ThresholdKind;
   minimumValue: number;
@@ -104,6 +103,8 @@ const props = defineProps<{
   rule?: SheetConditionalFormatRule;
   ranges: string;
   initialKind?: ConditionalFormatEditorKind;
+  sampleValue?: string | number | boolean | null;
+  dateSystem?: "1900" | "1904";
 }>();
 const emit = defineEmits<{
   close: [];
@@ -112,6 +113,12 @@ const emit = defineEmits<{
 const { t } = useAppI18n();
 const iconSets = iconSetPresetTiles;
 const draft = reactive<EditorDraft>(createDraft());
+const format = ref<ConditionalFormatStyle>(
+  props.rule
+    ? cloneConditionalFormatRule(props.rule).style
+    : conditionalFormatPresetStyle("redFillText"),
+);
+const customVisible = ref(false);
 const error = reactive({ ranges: "", value: "", formula: "", format: "" });
 type RuleCategory = "visual" | "containing" | "rank" | "average" | "duplicate" | "formula";
 const categoryOptions = computed(
@@ -205,11 +212,6 @@ const needsSecondValue = computed(
   () => draft.kind === "cellValue" && ["between", "notBetween"].includes(draft.operator),
 );
 const formulaPlaceholder = '=$D2="Overdue"';
-const presets = [
-  { label: "presetRed", fillColor: "#FDE2E1", textColor: "#9C0006" },
-  { label: "presetYellow", fillColor: "#FFF2CC", textColor: "#7F6000" },
-  { label: "presetGreen", fillColor: "#E2F0D9", textColor: "#375623" },
-];
 function threshold(kind: ThresholdKind, value: number): ConditionalFormatThreshold {
   return kind === "min" || kind === "max" ? { kind } : { kind, value };
 }
@@ -302,10 +304,6 @@ function createDraft(rule = props.rule): EditorDraft {
           ].includes(props.initialKind ?? "")
             ? props.initialKind
             : "today") as string),
-    fillColor: rule ? rule.style.fillColor : DEFAULT_CONDITIONAL_FORMAT_STYLE.fillColor,
-    textColor: rule ? rule.style.textColor : DEFAULT_CONDITIONAL_FORMAT_STYLE.textColor,
-    bold: rule?.style.bold,
-    italic: rule?.style.italic,
     stopIfTrue: Boolean(rule?.stopIfTrue),
     minimumKind: min?.kind ?? "min",
     minimumValue: minValue,
@@ -339,6 +337,10 @@ function createDraft(rule = props.rule): EditorDraft {
   };
 }
 function resetDraft() {
+  format.value = props.rule
+    ? cloneConditionalFormatRule(props.rule).style
+    : conditionalFormatPresetStyle("redFillText");
+  customVisible.value = false;
   Object.assign(draft, createDraft());
   Object.assign(error, { ranges: "", value: "", formula: "", format: "" });
 }
@@ -492,12 +494,7 @@ function save() {
     style:
       draft.kind === "dataBar" || draft.kind === "colorScale" || draft.kind === "iconSet"
         ? {}
-        : {
-            ...(draft.fillColor ? { fillColor: draft.fillColor } : {}),
-            ...(draft.textColor ? { textColor: draft.textColor } : {}),
-            ...(draft.bold !== undefined ? { bold: draft.bold } : {}),
-            ...(draft.italic !== undefined ? { italic: draft.italic } : {}),
-          },
+        : format.value,
     ...(draft.stopIfTrue && category.value !== "visual" ? { stopIfTrue: true } : {}),
   };
   try {
@@ -516,7 +513,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
 </script>
 <template>
   <Dialog
-    :visible="visible"
+    :visible="visible && !customVisible"
     :header="rule ? t('conditionalFormatting.editRule') : t('conditionalFormatting.newRule')"
     :confirm-btn="{ content: t('conditionalFormatting.save') }"
     :cancel-btn="t('conditionalFormatting.cancel')"
@@ -782,62 +779,20 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           :tips="error.formula || t('conditionalFormatting.formulaHint')"
           ><TInput v-model="draft.formula" :placeholder="formulaPlaceholder"
         /></TFormItem>
-        <fieldset v-if="category !== 'visual'" class="conditional-format-editor__format">
-          <legend>{{ t("conditionalFormatting.format") }}</legend>
-          <div class="conditional-format-editor__presets">
-            <button
-              v-for="preset in presets"
-              :key="preset.fillColor"
-              type="button"
-              :aria-label="t(`conditionalFormatting.${preset.label}` as MessageKey)"
-              :title="t(`conditionalFormatting.${preset.label}` as MessageKey)"
-              :style="{ backgroundColor: preset.fillColor, color: preset.textColor }"
-              @click="
-                draft.fillColor = preset.fillColor;
-                draft.textColor = preset.textColor;
-              "
-            >
-              {{ t(`conditionalFormatting.${preset.label}` as MessageKey) }}
-            </button>
-          </div>
-          <div class="conditional-format-editor__criteria">
-            <TFormItem :label="t('conditionalFormatting.fillColor')"
-              ><ColorPaletteSelect
-                :model-value="draft.fillColor"
-                :label="t('conditionalFormatting.fillColor')"
-                :default-color="DEFAULT_CONDITIONAL_FORMAT_STYLE.fillColor"
-                :default-label="t('conditionalFormatting.noFill')"
-                @select="draft.fillColor = $event"
-            /></TFormItem>
-            <TFormItem :label="t('conditionalFormatting.textColor')"
-              ><ColorPaletteSelect
-                :model-value="draft.textColor"
-                :label="t('conditionalFormatting.textColor')"
-                default-color="#000000"
-                :default-label="t('conditionalFormatting.automatic')"
-                @select="draft.textColor = $event"
-            /></TFormItem>
-          </div>
-          <div class="conditional-format-editor__toggles">
-            <TCheckbox v-model="draft.bold">{{ t("conditionalFormatting.bold") }}</TCheckbox
-            ><TCheckbox v-model="draft.italic">{{ t("conditionalFormatting.italic") }}</TCheckbox>
-          </div>
-        </fieldset>
+        <TFormItem v-if="category !== 'visual'" :label="t('conditionalFormatting.format')">
+          <ConditionalFormatStyleSelect
+            v-model="format"
+            :sample-value="sampleValue"
+            :date-system="dateSystem"
+            @custom-visible="customVisible = $event"
+          />
+        </TFormItem>
         <div class="conditional-format-editor__preview">
           <span>{{ t("conditionalFormatting.preview") }}</span
           ><ConditionalFormatPreview
             wide
             :condition="previewCondition"
-            :format="
-              category === 'visual'
-                ? undefined
-                : {
-                    fillColor: draft.fillColor ?? undefined,
-                    textColor: draft.textColor ?? undefined,
-                    bold: draft.bold,
-                    italic: draft.italic,
-                  }
-            "
+            :format="category === 'visual' ? undefined : format"
           />
         </div>
       </section>
@@ -924,28 +879,6 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     grid-template-columns: 32px auto minmax(0, 1fr);
     align-items: center;
     gap: 12px;
-  }
-  &__format {
-    display: grid;
-    gap: 8px;
-    padding: 8px;
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-default);
-  }
-  &__presets {
-    display: flex;
-    gap: 6px;
-    button {
-      flex: 1;
-      min-height: 28px;
-      border: 1px solid var(--idea-border-subtle);
-      border-radius: var(--idea-radius-small);
-      cursor: pointer;
-      font: inherit;
-      &:focus-visible {
-        outline: 2px solid var(--idea-action-primary);
-      }
-    }
   }
   &__preview {
     display: grid;

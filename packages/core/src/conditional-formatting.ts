@@ -3,7 +3,7 @@ import { parseFormula } from "./formula/parser.js";
 import { translateFormulaForCopy } from "./formula/references.js";
 import { excelSerialToDateParts, type ExcelDateSystem } from "./formula/date-system.js";
 import { isFormulaError, type FormulaValue } from "./formula/types.js";
-import { normalizeCellStyle, type CellStyle } from "./style.js";
+import { mergeCellStyle, normalizeCellStyle, type CellStyle } from "./style.js";
 import {
   createCellKey,
   isCellAddressInBounds,
@@ -13,12 +13,66 @@ import {
   type SheetEvaluator,
 } from "./workbook.js";
 
+export type ConditionalFormatStyleKey =
+  | "numberFormat"
+  | "fontFamily"
+  | "fontSize"
+  | "fontScript"
+  | "bold"
+  | "italic"
+  | "underline"
+  | "strikethrough"
+  | "textColor"
+  | "fillColor"
+  | "fillPattern"
+  | "fillPatternColor"
+  | "fillGradient"
+  | "borderTop"
+  | "borderRight"
+  | "borderBottom"
+  | "borderLeft"
+  | "borderDiagonalUp"
+  | "borderDiagonalDown";
+
+/**
+ * A display-only cell-style patch. `null` and `false` explicitly clear the
+ * corresponding base style; normalized rules store clear operations as `false`.
+ */
 export type ConditionalFormatStyle = {
-  fillColor?: string;
-  textColor?: string;
-  bold?: boolean;
-  italic?: boolean;
+  [Key in ConditionalFormatStyleKey]?: CellStyle[Key] | null | false;
 };
+
+const CONDITIONAL_STYLE_KEYS = [
+  "numberFormat",
+  "fontFamily",
+  "fontSize",
+  "fontScript",
+  "bold",
+  "italic",
+  "underline",
+  "strikethrough",
+  "textColor",
+  "fillColor",
+  "fillPattern",
+  "fillPatternColor",
+  "fillGradient",
+  "borderTop",
+  "borderRight",
+  "borderBottom",
+  "borderLeft",
+  "borderDiagonalUp",
+  "borderDiagonalDown",
+] as const satisfies readonly ConditionalFormatStyleKey[];
+const CONDITIONAL_STYLE_KEY_SET = new Set<string>(CONDITIONAL_STYLE_KEYS);
+const CONDITIONAL_FILL_KEYS = [
+  "fillColor",
+  "fillPattern",
+  "fillPatternColor",
+  "fillGradient",
+] as const satisfies readonly ConditionalFormatStyleKey[];
+const CONDITIONAL_NON_FILL_STYLE_KEYS = CONDITIONAL_STYLE_KEYS.filter(
+  (key) => !CONDITIONAL_FILL_KEYS.includes(key as (typeof CONDITIONAL_FILL_KEYS)[number]),
+);
 
 export type ConditionalFormatDatePeriod =
   | "yesterday"
@@ -411,26 +465,37 @@ function normalizeStyle(
   style: ConditionalFormatStyle,
   allowEmpty: boolean,
 ): ConditionalFormatStyle {
-  if (!style || typeof style !== "object") invalid("style", style);
-  if (
-    style.fillColor !== undefined &&
-    (typeof style.fillColor !== "string" || !COLOR_PATTERN.test(style.fillColor))
-  )
-    invalid("style.fillColor", style.fillColor);
-  if (
-    style.textColor !== undefined &&
-    (typeof style.textColor !== "string" || !COLOR_PATTERN.test(style.textColor))
-  )
-    invalid("style.textColor", style.textColor);
-  if (style.bold !== undefined && typeof style.bold !== "boolean")
-    invalid("style.bold", style.bold);
-  if (style.italic !== undefined && typeof style.italic !== "boolean")
-    invalid("style.italic", style.italic);
-  const normalized: ConditionalFormatStyle = {};
-  if (style.fillColor !== undefined) normalized.fillColor = style.fillColor;
-  if (style.textColor !== undefined) normalized.textColor = style.textColor;
-  if (style.bold !== undefined) normalized.bold = style.bold;
-  if (style.italic !== undefined) normalized.italic = style.italic;
+  if (!style || typeof style !== "object" || Array.isArray(style)) invalid("style", style);
+  for (const key of Object.keys(style))
+    if (!CONDITIONAL_STYLE_KEY_SET.has(key))
+      invalid(`style.${key}`, style[key as keyof typeof style]);
+
+  const positive: CellStyle = {};
+  const explicitClears: ConditionalFormatStyle = {};
+  for (const key of CONDITIONAL_STYLE_KEYS) {
+    const value = style[key];
+    if (value === undefined) continue;
+    if (value === null || value === false) {
+      explicitClears[key] = false;
+      continue;
+    }
+    Object.assign(positive, { [key]: value });
+  }
+  let normalizedCell: CellStyle | undefined;
+  try {
+    normalizedCell = normalizeCellStyle(positive);
+  } catch {
+    invalid("style", style);
+  }
+  const normalized: ConditionalFormatStyle = { ...normalizedCell, ...explicitClears };
+  // Conditional formatting historically preserves the entered case for its flat
+  // colors. Keep that serialization contract while using CellStyle validation.
+  for (const key of ["fillColor", "textColor", "fillPatternColor"] as const) {
+    const value = style[key];
+    if (value === undefined || value === null || value === false) continue;
+    if (typeof value !== "string" || !COLOR_PATTERN.test(value)) invalid(`style.${key}`, value);
+    if (Object.hasOwn(normalized, key)) normalized[key] = value;
+  }
   if (!allowEmpty && !Object.keys(normalized).length) invalid("style", style);
   return normalized;
 }
@@ -826,12 +891,10 @@ export function createConditionalFormatResolver(
     return counts;
   };
   return (address) => {
-    const key = createCellKey(address);
-    if (overlays.has(key)) return overlays.get(key);
-    let fillColor: string | undefined,
-      textColor: string | undefined,
-      bold: boolean | undefined,
-      italic: boolean | undefined;
+    const cacheKey = createCellKey(address);
+    if (overlays.has(cacheKey)) return overlays.get(cacheKey);
+    const overlay: ConditionalFormatStyle = {};
+    let hasFillOverlay = false;
     for (const rule of rules) {
       if (!isInRule(address, rule)) continue;
       const value = evaluator.getComputedValue(address);
@@ -873,27 +936,31 @@ export function createConditionalFormatResolver(
         rule.condition.kind === "colorScale"
           ? colorScaleColor(value, rule.condition, getNumericSummary(rule))
           : undefined;
-      if (fillColor === undefined && (calculatedFill ?? rule.style.fillColor) !== undefined)
-        fillColor = calculatedFill ?? rule.style.fillColor;
-      if (textColor === undefined && rule.style.textColor !== undefined)
-        textColor = rule.style.textColor;
-      if (bold === undefined && rule.style.bold !== undefined) bold = rule.style.bold;
-      if (italic === undefined && rule.style.italic !== undefined) italic = rule.style.italic;
+      for (const key of CONDITIONAL_NON_FILL_STYLE_KEYS) {
+        if (Object.hasOwn(overlay, key)) continue;
+        const styleValue = rule.style[key];
+        if (styleValue !== undefined) (overlay as Record<string, unknown>)[key] = styleValue;
+      }
+      // A rule's fill fields form one visual family: its solid background,
+      // pattern, and gradient are meaningful together. The first matching rule
+      // with any fill entry therefore owns the entire family, so a lower-priority
+      // gradient cannot replace a higher-priority solid fill after normalization.
+      const hasRuleFill =
+        calculatedFill !== undefined ||
+        CONDITIONAL_FILL_KEYS.some((key) => Object.hasOwn(rule.style, key));
+      if (!hasFillOverlay && hasRuleFill) {
+        hasFillOverlay = true;
+        if (calculatedFill !== undefined) overlay.fillColor = calculatedFill;
+        else
+          for (const key of CONDITIONAL_FILL_KEYS) {
+            const styleValue = rule.style[key];
+            if (styleValue !== undefined) (overlay as Record<string, unknown>)[key] = styleValue;
+          }
+      }
       if (rule.stopIfTrue) break;
     }
-    const result =
-      fillColor === undefined &&
-      textColor === undefined &&
-      bold === undefined &&
-      italic === undefined
-        ? undefined
-        : {
-            ...(fillColor === undefined ? {} : { fillColor }),
-            ...(textColor === undefined ? {} : { textColor }),
-            ...(bold === undefined ? {} : { bold }),
-            ...(italic === undefined ? {} : { italic }),
-          };
-    overlays.set(key, result);
+    const result = Object.keys(overlay).length ? overlay : undefined;
+    overlays.set(cacheKey, result);
     return result;
   };
 }
@@ -1037,17 +1104,5 @@ export function applyConditionalFormatStyle(
   overlay: ConditionalFormatStyle | undefined,
 ): Readonly<CellStyle> | undefined {
   if (!overlay) return base;
-  const result: CellStyle = { ...base };
-  if (overlay.fillColor !== undefined) {
-    result.fillColor = overlay.fillColor;
-    delete result.fillPattern;
-    delete result.fillPatternColor;
-    delete result.fillGradient;
-  }
-  if (overlay.textColor !== undefined) result.textColor = overlay.textColor;
-  if (overlay.bold === true) result.bold = true;
-  if (overlay.bold === false) delete result.bold;
-  if (overlay.italic === true) result.italic = true;
-  if (overlay.italic === false) delete result.italic;
-  return normalizeCellStyle(result);
+  return mergeCellStyle(base ? { ...base } : undefined, overlay);
 }

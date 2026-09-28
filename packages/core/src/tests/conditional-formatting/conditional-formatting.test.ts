@@ -181,3 +181,156 @@ describe("conditional-formatting normalization", () => {
     ).toThrow("conditional-formatting");
   });
 });
+
+describe("conditional-formatting custom styles", () => {
+  test("normalizes, deep-clones, merges, and applies every supported style field", () => {
+    const gradient = {
+      type: "linear" as const,
+      angle: 45,
+      stops: [
+        { position: 0, color: "#112233" },
+        { position: 1, color: "#AABBCC" },
+      ],
+    };
+    const normalized = normalizeConditionalFormatRules([
+      rule(
+        "custom",
+        { kind: "cellValue", operator: "greaterThan", value: 0 },
+        {
+          fontFamily: "Arial",
+          fontSize: 14,
+          fontScript: "superscript",
+          bold: false,
+          italic: true,
+          underline: "double",
+          strikethrough: true,
+          textColor: "#123456",
+          fillGradient: gradient,
+          numberFormat: { kind: "currency", currency: "USD", fractionDigits: 2 },
+          borderTop: { style: "thin", color: "#654321" },
+          borderDiagonalDown: null,
+        },
+      ),
+    ])[0]!;
+    gradient.stops[0]!.color = "#FFFFFF";
+    expect(normalized.style).toMatchObject({
+      fontFamily: "Arial",
+      fontSize: 14,
+      fontScript: "superscript",
+      bold: false,
+      italic: true,
+      underline: "double",
+      strikethrough: true,
+      textColor: "#123456",
+      borderTop: { style: "thin", color: "#654321" },
+      borderDiagonalDown: false,
+    });
+    const normalizedGradient = normalized.style.fillGradient;
+    expect(normalizedGradient).not.toBe(false);
+    expect(normalizedGradient).not.toBeNull();
+    if (!normalizedGradient) throw new Error("Expected gradient");
+    expect(normalizedGradient.stops[0]).toEqual({ position: 0, color: "#112233" });
+
+    const applied = applyConditionalFormatStyle(
+      {
+        bold: true,
+        borderDiagonalDown: { style: "dashed", color: "#000000" },
+        fillColor: "#FFFFFF",
+      },
+      normalized.style,
+    );
+    expect(applied).toMatchObject({
+      fontFamily: "Arial",
+      fontSize: 14,
+      fontScript: "superscript",
+      italic: true,
+      underline: "double",
+      strikethrough: true,
+      textColor: "#123456",
+      fillGradient: { type: "linear", angle: 45 },
+      borderTop: { style: "thin", color: "#654321" },
+    });
+    expect(applied?.bold).toBeUndefined();
+    expect(applied?.borderDiagonalDown).toBeUndefined();
+    expect(applied?.fillColor).toBeUndefined();
+  });
+
+  test("keeps the first matching rule's explicit clear for each style property", () => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    setCellValue(sheet, { row: 0, column: 0 }, 1);
+    sheet.conditionalFormats = [
+      rule("high", { kind: "cellValue", operator: "greaterThan", value: 0 }, { underline: false }),
+      rule(
+        "low",
+        { kind: "cellValue", operator: "greaterThan", value: 0 },
+        { underline: true, borderLeft: { style: "double", color: "#123456" } },
+      ),
+    ];
+    expect(
+      createConditionalFormatResolver(
+        sheet,
+        createWorkbookEvaluator(workbook, sheet.id),
+      )({ row: 0, column: 0 }),
+    ).toEqual({ underline: false, borderLeft: { style: "double", color: "#123456" } });
+  });
+});
+
+test("treats fill representations as one priority family across matching rules", () => {
+  const workbook = createTestWorkbook();
+  const sheet = getActiveSheet(workbook);
+  setCellValue(sheet, { row: 0, column: 0 }, 1);
+  sheet.conditionalFormats = [
+    rule(
+      "solid",
+      { kind: "cellValue", operator: "greaterThan", value: 0 },
+      { fillColor: "#AABBCC" },
+    ),
+    rule(
+      "gradient",
+      { kind: "cellValue", operator: "greaterThan", value: 0 },
+      {
+        fillGradient: {
+          type: "linear",
+          angle: 90,
+          stops: [
+            { position: 0, color: "#112233" },
+            { position: 1, color: "#445566" },
+          ],
+        },
+      },
+    ),
+  ];
+  const overlay = createConditionalFormatResolver(
+    sheet,
+    createWorkbookEvaluator(workbook, sheet.id),
+  )({ row: 0, column: 0 });
+  expect(overlay).toEqual({ fillColor: "#AABBCC" });
+  expect(applyConditionalFormatStyle(undefined, overlay)).toEqual({ fillColor: "#aabbcc" });
+});
+
+test("keeps a matching rule's background and pattern together", () => {
+  const workbook = createTestWorkbook();
+  const sheet = getActiveSheet(workbook);
+  setCellValue(sheet, { row: 0, column: 0 }, 1);
+  sheet.conditionalFormats = [
+    rule(
+      "pattern",
+      { kind: "cellValue", operator: "greaterThan", value: 0 },
+      { fillColor: "#AABBCC", fillPattern: "lightGrid", fillPatternColor: "#112233" },
+    ),
+  ];
+  expect(
+    createConditionalFormatResolver(
+      sheet,
+      createWorkbookEvaluator(workbook, sheet.id),
+    )({
+      row: 0,
+      column: 0,
+    }),
+  ).toEqual({
+    fillColor: "#AABBCC",
+    fillPattern: "lightGrid",
+    fillPatternColor: "#112233",
+  });
+});

@@ -33,6 +33,7 @@ import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 
 export type ConditionalFormatQuickRule =
   | ConditionalFormatPresetKind
+  | "cellValue"
   | "greaterThan"
   | "lessThan"
   | "between"
@@ -289,6 +290,10 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
             ><template #icon><CopyPlus /></template
             >{{ t("conditionalFormatting.duplicate") }}</MenuItem
           >
+          <MenuSeparator />
+          <MenuItem @select="create('cellValue')">{{
+            t("conditionalFormatting.moreRules")
+          }}</MenuItem>
         </template>
         <template v-else-if="activeSubmenu === 'topBottom'">
           <MenuItem @select="create('top10Items')"
@@ -315,6 +320,8 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
             ><template #icon><ArrowDown /></template
             >{{ t("conditionalFormatting.belowAverage") }}</MenuItem
           >
+          <MenuSeparator />
+          <MenuItem @select="create('rank')">{{ t("conditionalFormatting.moreRules") }}</MenuItem>
         </template>
         <template
           v-else-if="

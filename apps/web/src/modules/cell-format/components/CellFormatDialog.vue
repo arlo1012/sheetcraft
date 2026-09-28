@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, toRaw } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { TabPanel, Tabs } from "tdesign-vue-next/es/tabs";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
@@ -24,19 +24,28 @@ const props = withDefaults(
     sampleValue: string | number | boolean | null;
     dateSystem?: "1900" | "1904";
     initialTab?: CellFormatTab;
+    /** Allows differential-style consumers to expose a subset of the workbook format tabs. */
+    availableTabs?: readonly CellFormatTab[];
+    initialStylePatch?: CellStylePatch;
     mergeState?: {
       canMerge: boolean;
       canUnmerge: boolean;
       merged: "on" | "off" | "mixed";
     };
   }>(),
-  { initialTab: "border" },
+  {
+    initialTab: "border",
+    availableTabs: () => ["number", "alignment", "font", "border", "fill"],
+    initialStylePatch: () => ({}),
+  },
 );
 const emit = defineEmits<{ confirm: [change: CellFormatChange]; cancel: [] }>();
 const { t } = useAppI18n();
-const activeTab = ref<CellFormatTab>(props.initialTab);
+const activeTab = ref<CellFormatTab>(
+  props.availableTabs.includes(props.initialTab) ? props.initialTab : props.availableTabs[0]!,
+);
 const tabsRef = ref<{ $el: HTMLElement }>();
-const tabOrder: CellFormatTab[] = ["number", "alignment", "font", "border", "fill"];
+const tabOrder = computed(() => props.availableTabs);
 onMounted(() => {
   void nextTick(() =>
     tabsRef.value?.$el
@@ -53,9 +62,10 @@ function onTabKeydown(event: KeyboardEvent): void {
     event.key === "Home"
       ? 0
       : event.key === "End"
-        ? tabOrder.length - 1
-        : (tabOrder.indexOf(activeTab.value) + direction + tabOrder.length) % tabOrder.length;
-  activeTab.value = tabOrder[index]!;
+        ? tabOrder.value.length - 1
+        : (tabOrder.value.indexOf(activeTab.value) + direction + tabOrder.value.length) %
+          tabOrder.value.length;
+  activeTab.value = tabOrder.value[index]!;
   tabsRef.value?.$el
     .querySelector<HTMLElement>(`[data-cell-format-tab="${activeTab.value}"]`)
     ?.focus();
@@ -79,7 +89,9 @@ function onDialogKeydown(event: KeyboardEvent): void {
   }
 }
 
-const stylePatch = ref<CellStylePatch>({});
+const stylePatch = ref<CellStylePatch>(
+  JSON.parse(JSON.stringify(toRaw(props.initialStylePatch))) as CellStylePatch,
+);
 const numberFormatValid = ref(true);
 const borderActions = ref<CellBorderAction[]>([]);
 const borderFormat = ref<CellBorderFormatPatch | undefined>();
@@ -149,7 +161,7 @@ function confirm(): void {
         'cell-format-dialog__tabs--fill': activeTab === 'fill',
       }"
     >
-      <TabPanel value="number" :destroy-on-hide="false">
+      <TabPanel v-if="availableTabs.includes('number')" value="number" :destroy-on-hide="false">
         <template #label
           ><button
             type="button"
@@ -169,7 +181,7 @@ function confirm(): void {
           @update:patch="updateStyle"
           @validity-change="numberFormatValid = $event"
       /></TabPanel>
-      <TabPanel value="alignment">
+      <TabPanel v-if="availableTabs.includes('alignment')" value="alignment">
         <template #label
           ><button
             type="button"
@@ -190,7 +202,7 @@ function confirm(): void {
           @update:patch="updateStyle"
           @update:merge="updateMerge"
       /></TabPanel>
-      <TabPanel value="font">
+      <TabPanel v-if="availableTabs.includes('font')" value="font">
         <template #label
           ><button
             type="button"
@@ -208,7 +220,7 @@ function confirm(): void {
           :sample-value="sampleValue"
           @update:patch="updateStyle"
       /></TabPanel>
-      <TabPanel value="border">
+      <TabPanel v-if="availableTabs.includes('border')" value="border">
         <template #label
           ><button
             type="button"
@@ -228,7 +240,7 @@ function confirm(): void {
           @update:actions="updateBorderActions"
           @update:format="updateBorderFormat"
       /></TabPanel>
-      <TabPanel value="fill">
+      <TabPanel v-if="availableTabs.includes('fill')" value="fill">
         <template #label
           ><button
             type="button"

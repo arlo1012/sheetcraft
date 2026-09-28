@@ -98,4 +98,30 @@ describe("border painter", () => {
 
     expect(context.translate).toHaveBeenCalledWith(-20, -10);
   });
+
+  test("uses the display style resolver for conditional borders without persisting them", () => {
+    const sheet = createSheet("Sheet1", "effective-border");
+    const geometry = createSheetGeometry({
+      rowCount: 2,
+      columnCount: 2,
+      rowHeight: 20,
+      columnWidth: 40,
+    });
+    const rows = createRowVisibilityIndex({ rowCount: 2, defaultRowHeight: 20 });
+    const layout = createSheetViewportLayout({
+      geometry,
+      rows,
+      viewportSize: { width: 80, height: 40 },
+    });
+    const plan = createBorderPaintPlan(sheet, geometry, layout, rows, (address) =>
+      address.row === 0 && address.column === 0
+        ? { borderBottom: { style: "medium", color: "#7f6000" } }
+        : undefined,
+    );
+
+    expect(sheet.cells.get("0:0")?.style?.borderBottom).toBeUndefined();
+    expect(plan.panes[0]?.lines).toEqual(
+      expect.arrayContaining([expect.objectContaining({ color: "#7f6000", thickness: 2 })]),
+    );
+  });
 });

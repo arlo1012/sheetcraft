@@ -1774,6 +1774,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :rules="conditionalFormattingSelection.rules"
       :selection-ranges="formatConditionalFormatRanges([conditionalFormattingSelection.range])"
       :create-kind="conditionalFormatQuickRule"
+      :sample-value="conditionalFormattingSelection.sampleValue"
+      :date-system="session.workbook.dateSystem"
       @save="saveConditionalFormats"
       @close="closeConditionalFormatting"
     />

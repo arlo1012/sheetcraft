@@ -173,3 +173,47 @@ describe("conditional-formatting command integration", () => {
     expect(serializeWorkbook(session.workbook)).toEqual(before);
   });
 });
+
+test("copies custom conditional-style objects without sharing nested state", () => {
+  const session = createTestWorkbookSession();
+  const sheet = getActiveSheet(session.workbook);
+  const customRule = {
+    ...rule("custom"),
+    style: {
+      fillGradient: {
+        type: "linear" as const,
+        angle: 20,
+        stops: [
+          { position: 0, color: "#112233" },
+          { position: 1, color: "#445566" },
+        ],
+      },
+      borderRight: { style: "double" as const, color: "#AABBCC" },
+      underline: "double" as const,
+    },
+  };
+  const command: SetCellContentsCommand = {
+    type: "setCellContents",
+    changes: [],
+    conditionalFormats: [{ sheetId: sheet.id, rules: [customRule] }],
+  };
+  expect(executeWorkbookCommand(session, command)).toBe(true);
+  customRule.style.fillGradient.stops[0]!.color = "#FFFFFF";
+  customRule.style.borderRight.color = "#000000";
+  const persistedStyle = sheet.conditionalFormats?.[0]?.style;
+  expect(persistedStyle).toMatchObject({
+    borderRight: { style: "double", color: "#aabbcc" },
+    underline: "double",
+  });
+  expect(persistedStyle?.fillGradient).not.toBe(false);
+  expect(persistedStyle?.fillGradient).not.toBeNull();
+  if (!persistedStyle?.fillGradient) throw new Error("Expected copied gradient");
+  expect(persistedStyle.fillGradient.stops[0]).toEqual({ position: 0, color: "#112233" });
+  expect(undoWorkbookCommand(session)).toBe(true);
+  expect(redoWorkbookCommand(session)).toBe(true);
+  const restoredGradient = sheet.conditionalFormats?.[0]?.style.fillGradient;
+  expect(restoredGradient).not.toBe(false);
+  expect(restoredGradient).not.toBeNull();
+  if (!restoredGradient) throw new Error("Expected restored gradient");
+  expect(restoredGradient.stops[0]).toEqual({ position: 0, color: "#112233" });
+});

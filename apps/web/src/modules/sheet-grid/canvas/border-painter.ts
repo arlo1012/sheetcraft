@@ -1,4 +1,6 @@
 import type { Sheet } from "@idea10/core/workbook";
+import type { CellStyle } from "@idea10/core/style";
+import type { CellAddress } from "@idea10/core/workbook";
 import type { SheetGeometry, VisibleCellRange } from "@idea10/sheet-engine/geometry";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import type { FrozenPaneId } from "@idea10/sheet-engine/frozen-layout";
@@ -114,6 +116,7 @@ export function createBorderPaintPlan(
   geometry: SheetGeometry,
   layout: SheetViewportLayout,
   rows: RowVisibilityIndex,
+  getCellStyle?: (address: CellAddress) => Readonly<CellStyle> | undefined,
 ): SheetBorderPaintPlan {
   const panes: BorderPaintPane[] = [];
 
@@ -145,6 +148,7 @@ export function createBorderPaintPlan(
       rowIndexes,
       columnIndexes,
       layout.getMergedRangeAt,
+      getCellStyle,
     );
     const diagonals = resolveVisibleDiagonalBorderSegments(
       sheet,
@@ -155,6 +159,7 @@ export function createBorderPaintPlan(
       rowIndexes,
       columnIndexes,
       layout.getMergedRangeAt,
+      getCellStyle,
     );
     panes.push({
       id,

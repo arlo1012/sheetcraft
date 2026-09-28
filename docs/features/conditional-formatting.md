@@ -6,15 +6,18 @@ include cell-value comparisons, text predicates, relative dates, blank/nonblank
 cells, duplicate/unique values, and formulas. Top/bottom rules support item counts,
 percentages, and above/below-average comparisons.
 The rule manager edits rules for the current selection or the whole sheet,
-including multiple A1 areas, priority, and Stop If True. Styles support fill color,
-text color, bold, and italic. Rules and manual cell styles remain separate.
+including multiple A1 areas, priority, and Stop If True. Styles support number
+formats, font family/size/color/emphasis/underline/script, solid/pattern/gradient
+fills, and individual cell borders. Rules and manual cell styles remain separate.
 
 ## Document and display contract
 
 Core owns `Sheet.conditionalFormats`. Array order is descending priority. A rule
 has a stable ID, one or more ranges, an explicit formula anchor, a typed condition,
 a differential style, and an optional stop flag. Matching rules combine properties;
-the first matching definition of each property wins. A stop flag prevents lower
+the first matching definition of each property wins. Fill properties are resolved
+as a group so a lower-priority gradient cannot replace a higher-priority solid fill.
+Explicit clears remain distinct from omitted attributes. A stop flag prevents lower
 priority rules from contributing even if the stopping rule has no visual style.
 Conditional formatting overrides the existing duplicate-tool highlight and manual
 formatting without modifying either persisted style.
@@ -63,7 +66,6 @@ a lower-priority icon set after export.
 Extended solid and negative-color data bars remain outside the supported subset.
 See [XLSX IO](../xlsx-io.md) for details.
 
-Conditional borders and conditional number formats remain outside this release.
 The existing sort-by-color feature still uses manual cell colors. Existing
 duplicate-tool document rules keep their separate product semantics and are not
 converted into conditional-format rules.
@@ -75,3 +77,12 @@ Interaction follows [Excel conditional-formatting guidance](https://support.micr
 The gallery contains 12 data-bar presets, 12 color-scale presets, and 20 icon sets grouped into directions, shapes, indicators, and ratings, following the [WPS tutorial](https://www.wps.cn/learning/course/detail/id/556?sid=137).
 
 Date-relative rules evaluate against the current local date when the sheet display snapshot is rebuilt (including edits/recalculation/opening); idle workbooks do not schedule a midnight refresh.
+
+Highlight-cell and top/bottom menu shortcuts open dedicated compact dialogs: the
+comparison, rank direction, percentage mode, and above/below-average direction
+remain fixed to the selected command. Rank defaults to 10. Six format presets
+match the reference dropdown, and Custom format reuses the Number, Font, Border,
+and Fill tabs of the cell-format dialog. Cancelling custom formatting preserves
+the shortcut draft. One confirmation saves the rule; More rules and the manager
+retain the complete editor. Inner range borders and alignment are excluded from
+the differential-style dialog.

@@ -1,4 +1,4 @@
-import type { CellBorderLineStyle } from "@idea10/core/style";
+import type { CellBorder, CellBorderLineStyle } from "@idea10/core/style";
 
 export type BorderLinePresentation = Readonly<{
   thickness: number;
@@ -50,4 +50,18 @@ const BORDER_LINE_PRESENTATIONS: Record<CellBorderLineStyle, BorderLinePresentat
 
 export function getBorderLinePresentation(style: CellBorderLineStyle): BorderLinePresentation {
   return BORDER_LINE_PRESENTATIONS[style];
+}
+
+/** CSS border shorthand matching the workbook line style. */
+export function getCellBorderCss(border: CellBorder): string {
+  const { thickness } = getBorderLinePresentation(border.style);
+  const lineStyle =
+    border.style === "double"
+      ? "double"
+      : border.style === "dotted"
+        ? "dotted"
+        : border.style === "dashed" || border.style === "mediumDashed"
+          ? "dashed"
+          : "solid";
+  return `${thickness}px ${lineStyle} ${border.color}`;
 }

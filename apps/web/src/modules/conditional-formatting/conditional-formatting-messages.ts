@@ -1,5 +1,30 @@
 export type ConditionalFormattingMessageSchema = {
   conditionalFormatting: {
+    setFormat: string;
+    customFormat: string;
+    and: string;
+    redFillText: string;
+    yellowFillText: string;
+    greenFillText: string;
+    redFill: string;
+    redText: string;
+    redBorder: string;
+    quickGreaterThan: string;
+    quickLessThan: string;
+    quickBetween: string;
+    quickEqual: string;
+    quickContains: string;
+    quickDate: string;
+    quickDuplicate: string;
+    quickTop10Items: string;
+    quickTop10Percent: string;
+    quickBottom10Items: string;
+    quickBottom10Percent: string;
+    quickAboveAverage: string;
+    quickBelowAverage: string;
+    quickSelection: string;
+    invalidCount: string;
+
     selectRuleType: string;
     editRuleDescription: string;
     ruleAllValues: string;

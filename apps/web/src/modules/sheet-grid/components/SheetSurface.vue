@@ -124,6 +124,7 @@ function rebuildScene(): void {
     props.geometry,
     props.frame.layout,
     props.rows,
+    props.display.getCellStyle,
   );
   invalidate();
 }

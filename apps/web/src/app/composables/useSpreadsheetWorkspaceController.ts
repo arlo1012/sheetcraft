@@ -212,6 +212,7 @@ export type ConditionalFormattingSelection = {
   generation: number;
   range: CellRange;
   rules: SheetConditionalFormatRule[];
+  sampleValue?: string | number | boolean | null;
 };
 
 export function useSpreadsheetWorkspaceController(
@@ -1003,9 +1004,12 @@ export function useSpreadsheetWorkspaceController(
   function captureConditionalFormattingSelection(): ConditionalFormattingSelection | undefined {
     if (activeSheet.value.properties.protected) return;
     const range = activeSelectionRange.value;
+    const value = activeSheetEvaluator.value.getComputedValue(range.start);
     return {
       sheetId: activeSheet.value.id,
       generation: workbookGeneration.value,
+      sampleValue:
+        typeof value === "object" && value !== null ? formatComputedValueForDisplay(value) : value,
       range: { start: { ...range.start }, end: { ...range.end } },
       rules: (activeSheet.value.conditionalFormats ?? []).map(cloneConditionalFormatRule),
     };

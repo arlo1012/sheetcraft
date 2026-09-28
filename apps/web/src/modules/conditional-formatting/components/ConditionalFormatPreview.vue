@@ -3,7 +3,17 @@ import type {
   ConditionalFormatCondition,
   ConditionalFormatStyle,
 } from "@idea10/core/conditional-formatting";
+import { applyConditionalFormatStyle } from "@idea10/core/conditional-formatting";
+import { formatCellNumberValue } from "@idea10/core/number-format";
+import type { CellStyle } from "@idea10/core/style";
 import { computed, onBeforeUnmount, ref, watchPostEffect } from "vue";
+import { getCellBorderCss } from "../../../shared/borders/borderPresentation";
+import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
+import {
+  getCellTextDecorationStyle,
+  getCellTextScriptStyle,
+  getCellTextTypographyStyle,
+} from "../../../shared/cell-text/font-presentation";
 import { paintConditionalFormatVisual } from "../../../shared/conditional-formatting/conditional-format-painter";
 import { useAppI18n } from "../../../shared/i18n";
 
@@ -26,17 +36,42 @@ const visual = computed(
 const dimensions = ref({ width: 90, height: 24 });
 let observer: ResizeObserver | undefined;
 
+const effectiveStyle = computed<Readonly<CellStyle> | undefined>(() =>
+  applyConditionalFormatStyle(undefined, props.format),
+);
+const numberPresentation = computed(() => {
+  const numberFormat = effectiveStyle.value?.numberFormat;
+  return numberFormat ? formatCellNumberValue(1234.5, numberFormat) : undefined;
+});
 const swatchStyle = computed(() => ({
-  backgroundColor: props.format?.fillColor,
-  color: props.format?.textColor,
-  fontWeight: props.format?.bold ? 700 : 400,
-  fontStyle: props.format?.italic ? "italic" : "normal",
+  ...getCellFillStyle(effectiveStyle.value),
+  ...getCellTextTypographyStyle(effectiveStyle.value, { includeDecorations: false }),
+  ...getCellTextDecorationStyle(effectiveStyle.value),
+  ...getCellTextScriptStyle(effectiveStyle.value),
+  ...(effectiveStyle.value?.borderTop
+    ? { borderTop: getCellBorderCss(effectiveStyle.value.borderTop) }
+    : {}),
+  ...(effectiveStyle.value?.borderRight
+    ? { borderRight: getCellBorderCss(effectiveStyle.value.borderRight) }
+    : {}),
+  ...(effectiveStyle.value?.borderBottom
+    ? { borderBottom: getCellBorderCss(effectiveStyle.value.borderBottom) }
+    : {}),
+  ...(effectiveStyle.value?.borderLeft
+    ? { borderLeft: getCellBorderCss(effectiveStyle.value.borderLeft) }
+    : {}),
+  ...(!effectiveStyle.value?.textColor && numberPresentation.value?.color
+    ? { color: numberPresentation.value.color }
+    : {}),
   ...(props.condition?.kind === "colorScale"
     ? {
         background: `linear-gradient(90deg, ${props.condition.stops.map((stop) => stop.color).join(", ")})`,
       }
     : {}),
 }));
+const previewText = computed(
+  () => numberPresentation.value?.text ?? t("conditionalFormatting.preview"),
+);
 
 function setDimensions(): void {
   if (!canvas.value) return;
@@ -151,9 +186,7 @@ watchPostEffect(() => {
       class="conditional-format-preview__visual"
       aria-hidden="true"
     />
-    <span v-else-if="condition?.kind !== 'colorScale'">{{
-      t("conditionalFormatting.preview")
-    }}</span>
+    <span v-else-if="condition?.kind !== 'colorScale'">{{ previewText }}</span>
   </span>
 </template>
 

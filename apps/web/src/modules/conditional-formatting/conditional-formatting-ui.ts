@@ -12,11 +12,6 @@ import {
 
 export type ConditionalFormatKind = SheetConditionalFormatRule["condition"]["kind"];
 
-export const DEFAULT_CONDITIONAL_FORMAT_STYLE = {
-  fillColor: "#FDE2E1",
-  textColor: "#9C0006",
-} as const;
-
 export function createConditionalFormatRuleId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `conditional-format-${Date.now()}-${Math.random()}`;
 }

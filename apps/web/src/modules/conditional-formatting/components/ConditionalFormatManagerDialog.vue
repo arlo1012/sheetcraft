@@ -12,6 +12,8 @@ import {
   formatConditionalFormatRanges,
   parseConditionalFormatRanges,
 } from "../conditional-formatting-ui";
+import ConditionalFormatQuickDialog from "./ConditionalFormatQuickDialog.vue";
+import { isConditionalFormatQuickDialogKind } from "../conditional-format-quick-rules";
 import ConditionalFormatPreview from "./ConditionalFormatPreview.vue";
 import ConditionalFormatEditorDialog, {
   type ConditionalFormatEditorKind,
@@ -22,6 +24,8 @@ const props = defineProps<{
   rules: readonly SheetConditionalFormatRule[];
   selectionRanges: string;
   createKind?: ConditionalFormatEditorKind;
+  sampleValue?: string | number | boolean | null;
+  dateSystem?: "1900" | "1904";
 }>();
 const emit = defineEmits<{
   close: [];
@@ -207,11 +211,23 @@ watch(() => [props.visible, props.rules, props.createKind], reset, {
       </p>
     </section>
   </Dialog>
+  <ConditionalFormatQuickDialog
+    v-if="editorVisible && isConditionalFormatQuickDialogKind(createKind) && !editingRule"
+    :kind="createKind"
+    :ranges="selectionRanges"
+    :sample-value="sampleValue"
+    :date-system="dateSystem"
+    @save="saveRule"
+    @close="closeEditor"
+  />
   <ConditionalFormatEditorDialog
+    v-else
     :visible="editorVisible"
     :rule="editingRule"
     :ranges="selectionRanges"
     :initial-kind="createKind"
+    :sample-value="sampleValue"
+    :date-system="dateSystem"
     @save="saveRule"
     @close="closeEditor"
   />

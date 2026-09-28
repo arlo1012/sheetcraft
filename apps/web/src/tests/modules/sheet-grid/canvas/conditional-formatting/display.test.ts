@@ -50,4 +50,41 @@ describe("conditional formatting display", () => {
     expect(snapshot.getCellStyle({ row: 2, column: 0 })?.fillColor).toBe("#ff0000");
     expect(sheet.cells.has("2:0")).toBe(false);
   });
+
+  test("exposes conditional number, font, pattern and border styles to canvas consumers", () => {
+    const sheet = getActiveSheet(createWorkbook({ id: "test", sheetId: "sheet" }));
+    const address = { row: 0, column: 0 };
+    setCellValue(sheet, address, 12.5);
+    sheet.conditionalFormats = [
+      {
+        id: "complete-style",
+        anchor: address,
+        ranges: [{ start: address, end: address }],
+        condition: { kind: "cellValue", operator: "greaterThan", value: 10 },
+        style: {
+          numberFormat: { kind: "number", fractionDigits: 2, useGrouping: false },
+          fontFamily: "serif",
+          fontSize: 18,
+          underline: true,
+          fillPattern: "darkGrid",
+          fillPatternColor: "#112233",
+          borderBottom: { style: "medium", color: "#7f6000" },
+        },
+      },
+    ];
+
+    expect(
+      createSheetDisplaySnapshot({ sheet, evaluator: createSheetEvaluator(sheet) }).getCellStyle(
+        address,
+      ),
+    ).toMatchObject({
+      numberFormat: { kind: "number", fractionDigits: 2 },
+      fontFamily: "serif",
+      fontSize: 18,
+      underline: true,
+      fillPattern: "darkGrid",
+      fillPatternColor: "#112233",
+      borderBottom: { style: "medium", color: "#7f6000" },
+    });
+  });
 });

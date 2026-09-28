@@ -2,12 +2,21 @@ import { strFromU8, strToU8, unzipSync } from "fflate/browser";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellRange } from "@idea10/core/workbook";
 import {
   normalizeConditionalFormatRules,
+  type ConditionalFormatStyle,
   type ConditionalFormatIconSet,
   type ConditionalFormatThreshold,
   type SheetConditionalFormatRule,
 } from "@idea10/core/conditional-formatting";
 import { translateFormulaForCopy } from "@idea10/core/formula";
+import {
+  CELL_BORDER_LINE_STYLES,
+  CELL_FILL_PATTERNS,
+  type CellBorder,
+  type CellFillGradient,
+  type CellFillPatternStyle,
+} from "@idea10/core/style";
 import { CompatibilityReportBuilder } from "./report.js";
+import { fromExcelNumberFormat, toExcelNumberFormat } from "./number-format.js";
 
 type ConditionalFormatRead = {
   rules: SheetConditionalFormatRule[];
@@ -125,7 +134,7 @@ function rgb(value: string | undefined): string | undefined {
   return `#${value.slice(-6).toUpperCase()}`;
 }
 
-function differentialBoolean(xml: string, element: "b" | "i"): boolean | undefined {
+function differentialBoolean(xml: string, element: string): boolean | undefined {
   const attrs = new RegExp(`<(?:[a-z_][\\w.-]*:)?${element}\\b([^>]*)\\/?\\s*>`, "i").exec(
     xml,
   )?.[1];
@@ -133,7 +142,6 @@ function differentialBoolean(xml: string, element: "b" | "i"): boolean | undefin
   return !/^(0|false)$/i.test(attribute(attrs, "val") ?? "1");
 }
 
-/** Read only the differential-style subset represented by the first release. */
 function readDxf(xml: string | undefined): {
   style: SheetConditionalFormatRule["style"];
   unsupported: boolean;
@@ -141,54 +149,185 @@ function readDxf(xml: string | undefined): {
   if (!xml) return { style: {}, unsupported: false };
   let unsupported = false;
   const style: SheetConditionalFormatRule["style"] = {};
-  const font = /<(?:[a-z_][\w.-]*:)?font\b[^>]*>([\s\S]*?)<\/(?:[a-z_][\w.-]*:)?font>/i.exec(
-    xml,
-  )?.[1];
+  const font = childElements(xml, "font")[0]?.body;
   if (font !== undefined) {
     const bold = differentialBoolean(font, "b");
     const italic = differentialBoolean(font, "i");
+    const strikethrough = differentialBoolean(font, "strike");
     if (bold !== undefined) style.bold = bold;
     if (italic !== undefined) style.italic = italic;
-    const color = /<(?:[a-z_][\w.-]*:)?color\b([^>]*)\/?\s*>/i.exec(font)?.[1];
-    if (color !== undefined) {
-      const value = rgb(attribute(color, "rgb"));
-      if (value) style.textColor = value;
+    if (strikethrough !== undefined) style.strikethrough = strikethrough;
+    const name = childElements(font, "name")[0];
+    if (name) {
+      const value = attribute(name.attributes, "val");
+      if (value && value.length <= 80) style.fontFamily = value;
       else unsupported = true;
     }
-    // Other differential font attributes cannot be represented by the v1 style.
+    const size = childElements(font, "sz")[0];
+    if (size) {
+      const value = Number(attribute(size.attributes, "val"));
+      if (Number.isInteger(value) && value >= 8 && value <= 72) style.fontSize = value;
+      else unsupported = true;
+    }
+    const underline = childElements(font, "u")[0];
+    if (underline) {
+      const value = attribute(underline.attributes, "val") ?? "single";
+      if (value === "none") style.underline = false;
+      else if (value === "single") style.underline = true;
+      else if (value === "double" || value === "singleAccounting" || value === "doubleAccounting")
+        style.underline = value;
+      else unsupported = true;
+    }
+    const script = childElements(font, "vertAlign")[0];
+    if (script) {
+      const value = attribute(script.attributes, "val");
+      if (value === "superscript" || value === "subscript") style.fontScript = value;
+      else if (value === "baseline") style.fontScript = false;
+      else unsupported = true;
+    }
+    const color = childElements(font, "color")[0];
+    if (color) {
+      const value = rgb(attribute(color.attributes, "rgb"));
+      if (value) style.textColor = value;
+      else if (truthy(attribute(color.attributes, "auto"))) style.textColor = false;
+      else unsupported = true;
+    }
+    const allowed = new Set(["b", "i", "strike", "name", "sz", "u", "vertAlign", "color"]);
     if (
-      /<(?:u|strike|vertAlign|sz|name|family|scheme|charset|outline|shadow|condense|extend)\b/i.test(
-        font,
+      [...font.matchAll(/<\/?(?:[a-z_][\w.-]*:)?([a-z_][\w.-]*)\b[^>]*>/gi)].some(
+        (entry) => !allowed.has(entry[1] ?? ""),
       )
     )
       unsupported = true;
   }
-  const fill = /<(?:[a-z_][\w.-]*:)?fill\b[^>]*>([\s\S]*?)<\/(?:[a-z_][\w.-]*:)?fill>/i.exec(
-    xml,
-  )?.[1];
+  const fill = childElements(xml, "fill")[0]?.body;
   if (fill !== undefined) {
-    const pattern =
-      /<(?:[a-z_][\w.-]*:)?patternFill\b([^>]*)>([\s\S]*?)<\/(?:[a-z_][\w.-]*:)?patternFill>|<(?:[a-z_][\w.-]*:)?patternFill\b([^>]*)\/?\s*>/i.exec(
-        fill,
-      );
-    const attrs = pattern?.[1] ?? pattern?.[3];
-    const body = pattern?.[2] ?? "";
-    const patternType = attribute(attrs ?? "", "patternType");
-    if (!pattern || (patternType !== undefined && patternType !== "solid")) unsupported = true;
-    else {
-      const foreground = /<(?:[a-z_][\w.-]*:)?fgColor\b([^>]*)\/?\s*>/i.exec(body)?.[1];
-      const background = /<(?:[a-z_][\w.-]*:)?bgColor\b([^>]*)\/?\s*>/i.exec(body)?.[1];
-      // ISO SpreadsheetML uses fgColor for an explicit solid fill. DXF writers
-      // such as XlsxWriter can instead omit patternType and emit bgColor, so
-      // accept that external form without accepting a non-solid pattern.
-      const color =
-        patternType === "solid" ? (foreground ?? background) : (background ?? foreground);
-      const value = rgb(attribute(color ?? "", "rgb"));
-      if (value) style.fillColor = value;
-      else unsupported = true;
-    }
+    const pattern = childElements(fill, "patternFill")[0];
+    const gradient = childElements(fill, "gradientFill")[0];
+    if (pattern && gradient) unsupported = true;
+    else if (pattern) {
+      const declaredPatternType = attribute(pattern.attributes, "patternType");
+      const foreground = childElements(pattern.body, "fgColor")[0];
+      const background = childElements(pattern.body, "bgColor")[0];
+      const foregroundColor = foreground && rgb(attribute(foreground.attributes, "rgb"));
+      const backgroundColor = background && rgb(attribute(background.attributes, "rgb"));
+      // Some DXF writers omit patternType but use bgColor for a solid fill.
+      const patternType = declaredPatternType ?? (foreground || background ? "solid" : "none");
+      if (patternType === "none") {
+        style.fillColor = false;
+        style.fillPattern = false;
+        style.fillGradient = false;
+      } else if (patternType === "solid") {
+        const value = foregroundColor ?? backgroundColor;
+        if (value) style.fillColor = value;
+        else unsupported = true;
+      } else if ((CELL_FILL_PATTERNS as readonly string[]).includes(patternType)) {
+        style.fillPattern = patternType as CellFillPatternStyle;
+        if (foreground && !foregroundColor) unsupported = true;
+        if (background && !backgroundColor) unsupported = true;
+        if (foregroundColor) style.fillPatternColor = foregroundColor;
+        if (backgroundColor) style.fillColor = backgroundColor;
+      } else unsupported = true;
+    } else if (gradient) {
+      const stops = childElements(gradient.body, "stop").map((stop) => {
+        const position = Number(attribute(stop.attributes, "position"));
+        const color = childElements(stop.body, "color")[0];
+        const value = color && rgb(attribute(color.attributes, "rgb"));
+        return Number.isFinite(position) && position >= 0 && position <= 1 && value
+          ? { position, color: value }
+          : undefined;
+      });
+      const validStops =
+        stops.every((stop): stop is { position: number; color: string } => !!stop) &&
+        stops.length >= 2 &&
+        stops[0]?.position === 0 &&
+        stops.at(-1)?.position === 1 &&
+        stops.every((stop, index) => index === 0 || stop!.position > stops[index - 1]!.position);
+      const type = attribute(gradient.attributes, "type");
+      const number = (name: string, fallback?: number) => {
+        const value = Number(attribute(gradient.attributes, name));
+        return Number.isFinite(value) && value >= 0 && value <= 1 ? value : fallback;
+      };
+      if (!validStops) unsupported = true;
+      else if (type === "path") {
+        const left = number("left", 0);
+        const right = number("right", left);
+        const top = number("top", 0);
+        const bottom = number("bottom", top);
+        if (left === undefined || right === undefined || top === undefined || bottom === undefined)
+          unsupported = true;
+        else style.fillGradient = { type: "path", left, right, top, bottom, stops };
+      } else {
+        const angle = Number(attribute(gradient.attributes, "degree") ?? "0");
+        if (!Number.isFinite(angle)) unsupported = true;
+        else style.fillGradient = { type: "linear", angle, stops };
+      }
+    } else unsupported = true;
   }
-  if (/<(?:[a-z_][\w.-]*:)?(?:numFmt|alignment|border|protection)\b/i.test(xml)) unsupported = true;
+  const numberFormat = childElements(xml, "numFmt")[0];
+  if (numberFormat) {
+    const parsed = fromExcelNumberFormat(attribute(numberFormat.attributes, "formatCode"));
+    if (parsed) style.numberFormat = parsed;
+    else if (parsed === null) style.numberFormat = false;
+    else if (parsed === undefined) unsupported = true;
+  }
+  const border = childElements(xml, "border")[0];
+  if (border) {
+    const sides: Array<
+      [
+        keyof Pick<
+          ConditionalFormatStyle,
+          "borderTop" | "borderRight" | "borderBottom" | "borderLeft"
+        >,
+        string,
+      ]
+    > = [
+      ["borderTop", "top"],
+      ["borderRight", "right"],
+      ["borderBottom", "bottom"],
+      ["borderLeft", "left"],
+    ];
+    const readBorder = (entry: {
+      attributes: string;
+      body: string;
+    }): CellBorder | false | undefined => {
+      const lineStyle = attribute(entry.attributes, "style");
+      if (lineStyle === undefined) return false;
+      const color = childElements(entry.body, "color")[0];
+      const value = color && rgb(attribute(color.attributes, "rgb"));
+      return value && (CELL_BORDER_LINE_STYLES as readonly string[]).includes(lineStyle)
+        ? { style: lineStyle as CellBorder["style"], color: value }
+        : undefined;
+    };
+    for (const [key, name] of sides) {
+      const entry = childElements(border.body, name)[0];
+      if (!entry) continue;
+      const value = readBorder(entry);
+      if (value === undefined) unsupported = true;
+      else style[key] = value;
+    }
+    const diagonal = childElements(border.body, "diagonal")[0];
+    if (diagonal) {
+      const value = readBorder(diagonal);
+      const up = attribute(border.attributes, "diagonalUp");
+      const down = attribute(border.attributes, "diagonalDown");
+      if (value === undefined) unsupported = true;
+      else {
+        if (truthy(up)) style.borderDiagonalUp = value;
+        else if (/^(0|false)$/i.test(up ?? "")) style.borderDiagonalUp = false;
+        if (truthy(down)) style.borderDiagonalDown = value;
+        else if (/^(0|false)$/i.test(down ?? "")) style.borderDiagonalDown = false;
+      }
+    }
+    const allowed = new Set(["top", "right", "bottom", "left", "diagonal"]);
+    if (
+      [...border.body.matchAll(/<\/?(?:[a-z_][\w.-]*:)?([a-z_][\w.-]*)\b[^>]*>/gi)].some(
+        (entry) => !allowed.has(entry[1] ?? "") && entry[1] !== "color",
+      )
+    )
+      unsupported = true;
+  }
+  if (/<(?:[a-z_][\w.-]*:)?(?:alignment|protection)\b/i.test(xml)) unsupported = true;
   return { style, unsupported };
 }
 
@@ -682,15 +821,131 @@ export function readXlsxConditionalFormatMetadata(
   });
 }
 
-function dxfXml(style: SheetConditionalFormatRule["style"]): string {
+function dxfColor(tag: string, color: string): string {
+  return `<${tag} rgb="FF${color.slice(1).toUpperCase()}"/>`;
+}
+
+function dxfGradientXml(gradient: CellFillGradient): string {
+  const attributes =
+    gradient.type === "linear"
+      ? ` degree="${gradient.angle}"`
+      : ` type="path" left="${gradient.left}" right="${gradient.right}" top="${gradient.top}" bottom="${gradient.bottom}"`;
+  return `<gradientFill${attributes}>${gradient.stops.map((stop) => `<stop position="${stop.position}">${dxfColor("color", stop.color)}</stop>`).join("")}</gradientFill>`;
+}
+
+function dxfBorderXml(style: ConditionalFormatStyle): string {
+  const sides: Array<
+    [
+      keyof Pick<
+        ConditionalFormatStyle,
+        "borderTop" | "borderRight" | "borderBottom" | "borderLeft"
+      >,
+      string,
+    ]
+  > = [
+    ["borderTop", "top"],
+    ["borderRight", "right"],
+    ["borderBottom", "bottom"],
+    ["borderLeft", "left"],
+  ];
+  const sideXml = sides
+    .map(([key, name]) => {
+      const border = style[key];
+      if (border === undefined) return "";
+      if (border === false || border === null) return `<${name}/>`;
+      return `<${name} style="${border.style}">${dxfColor("color", border.color)}</${name}>`;
+    })
+    .join("");
+  const up = style.borderDiagonalUp;
+  const down = style.borderDiagonalDown;
+  if (up === undefined && down === undefined) return sideXml ? `<border>${sideXml}</border>` : "";
+  const diagonal =
+    up && typeof up === "object" ? up : down && typeof down === "object" ? down : false;
+  const diagonalXml =
+    diagonal === false
+      ? "<diagonal/>"
+      : `<diagonal style="${diagonal.style}">${dxfColor("color", diagonal.color)}</diagonal>`;
+  return `<border${up === undefined ? "" : ` diagonalUp="${typeof up === "object" ? 1 : 0}"`}${down === undefined ? "" : ` diagonalDown="${typeof down === "object" ? 1 : 0}"`}>${sideXml}${diagonalXml}</border>`;
+}
+
+function dxfFillXml(style: ConditionalFormatStyle): string {
+  if (style.fillGradient && typeof style.fillGradient === "object")
+    return `<fill>${dxfGradientXml(style.fillGradient)}</fill>`;
+  if (typeof style.fillPattern === "string")
+    return `<fill><patternFill patternType="${style.fillPattern}">${typeof style.fillPatternColor === "string" ? dxfColor("fgColor", style.fillPatternColor) : ""}${typeof style.fillColor === "string" ? dxfColor("bgColor", style.fillColor) : ""}</patternFill></fill>`;
+  if (typeof style.fillColor === "string")
+    return `<fill><patternFill patternType="solid">${dxfColor("fgColor", style.fillColor)}${dxfColor("bgColor", style.fillColor)}</patternFill></fill>`;
+  if (
+    (style.fillPattern === false ||
+      style.fillPattern === null ||
+      style.fillGradient === false ||
+      style.fillGradient === null) &&
+    (style.fillColor === false || style.fillColor === null)
+  )
+    return '<fill><patternFill patternType="none"/></fill>';
+  return "";
+}
+
+function dxfXml(style: ConditionalFormatStyle): string {
+  const fontFamily = typeof style.fontFamily === "string" ? style.fontFamily : undefined;
+  const fontSize = typeof style.fontSize === "number" ? style.fontSize : undefined;
+  const textColor = typeof style.textColor === "string" ? style.textColor : undefined;
+  const underline = style.underline;
   const font =
-    style.bold !== undefined || style.italic !== undefined || style.textColor
-      ? `<font>${style.bold === undefined ? "" : `<b val="${style.bold ? 1 : 0}"/>`}${style.italic === undefined ? "" : `<i val="${style.italic ? 1 : 0}"/>`}${style.textColor ? `<color rgb="FF${style.textColor.slice(1).toUpperCase()}"/>` : ""}</font>`
+    fontFamily !== undefined ||
+    fontSize !== undefined ||
+    style.bold !== undefined ||
+    style.italic !== undefined ||
+    style.underline !== undefined ||
+    style.strikethrough !== undefined ||
+    style.fontScript !== undefined ||
+    textColor !== undefined
+      ? `<font>${fontFamily === undefined ? "" : `<name val="${encodeXml(fontFamily)}"/>`}${fontSize === undefined ? "" : `<sz val="${fontSize}"/>`}${style.bold === undefined || style.bold === null ? "" : `<b val="${style.bold ? 1 : 0}"/>`}${style.italic === undefined || style.italic === null ? "" : `<i val="${style.italic ? 1 : 0}"/>`}${underline === undefined || underline === null ? "" : underline === true ? "<u/>" : `<u val="${underline === false ? "none" : underline}"/>`}${style.strikethrough === undefined || style.strikethrough === null ? "" : `<strike val="${style.strikethrough ? 1 : 0}"/>`}${style.fontScript === undefined || style.fontScript === null ? "" : `<vertAlign val="${style.fontScript === false ? "baseline" : style.fontScript}"/>`}${textColor === undefined ? (style.textColor === false ? '<color auto="1"/>' : "") : dxfColor("color", textColor)}</font>`
       : "";
-  const fill = style.fillColor
-    ? `<fill><patternFill patternType="solid"><fgColor rgb="FF${style.fillColor.slice(1).toUpperCase()}"/><bgColor rgb="FF${style.fillColor.slice(1).toUpperCase()}"/></patternFill></fill>`
-    : "";
-  return `<dxf>${font}${fill}</dxf>`;
+  const fill = dxfFillXml(style);
+  const numberFormat =
+    style.numberFormat && typeof style.numberFormat === "object"
+      ? `<numFmt numFmtId="164" formatCode="${encodeXml(toExcelNumberFormat(style.numberFormat))}"/>`
+      : style.numberFormat === false || style.numberFormat === null
+        ? '<numFmt numFmtId="0" formatCode="General"/>'
+        : "";
+  return `<dxf>${numberFormat}${font}${fill}${dxfBorderXml(style)}</dxf>`;
+}
+
+function hasDxfOmission(style: ConditionalFormatStyle): boolean {
+  const diagonalConflict = Boolean(
+    style.borderDiagonalUp &&
+    typeof style.borderDiagonalUp === "object" &&
+    style.borderDiagonalDown &&
+    typeof style.borderDiagonalDown === "object" &&
+    (style.borderDiagonalUp.style !== style.borderDiagonalDown.style ||
+      style.borderDiagonalUp.color !== style.borderDiagonalDown.color),
+  );
+  const replacesFill =
+    typeof style.fillColor === "string" ||
+    typeof style.fillPattern === "string" ||
+    (style.fillGradient !== null && typeof style.fillGradient === "object");
+  const clearsEntireFill =
+    (style.fillPattern === false ||
+      style.fillPattern === null ||
+      style.fillGradient === false ||
+      style.fillGradient === null) &&
+    (style.fillColor === false || style.fillColor === null);
+  return (
+    style.fontFamily === false ||
+    style.fontFamily === null ||
+    style.fontSize === false ||
+    style.fontSize === null ||
+    style.fillPatternColor === false ||
+    style.fillPatternColor === null ||
+    (!replacesFill &&
+      !clearsEntireFill &&
+      (style.fillPattern === false ||
+        style.fillPattern === null ||
+        style.fillGradient === false ||
+        style.fillGradient === null)) ||
+    diagonalConflict
+  );
 }
 
 function quoteFormulaText(text: string): string {
@@ -879,11 +1134,22 @@ export function writeXlsxConditionalFormats(
             "warning",
             `sheet${sheetIndex + 1}.conditionalFormatting.${rule.id}.dataBarExtension`,
           );
-        if (rule.condition.kind === "iconSet" && Object.keys(rule.style).length)
+        if (
+          (rule.condition.kind === "iconSet" ||
+            rule.condition.kind === "dataBar" ||
+            rule.condition.kind === "colorScale") &&
+          Object.keys(rule.style).length
+        )
           report?.add(
             "style-omitted",
             "warning",
-            `sheet${sheetIndex + 1}.conditionalFormatting.${rule.id}.iconSetStyle`,
+            `sheet${sheetIndex + 1}.conditionalFormatting.${rule.id}.visualStyle`,
+          );
+        if (hasDxfOmission(rule.style))
+          report?.add(
+            "style-omitted",
+            "warning",
+            `sheet${sheetIndex + 1}.conditionalFormatting.${rule.id}.dxfStyle`,
           );
         if (x14) x14Body += x14;
         priority += 1;
