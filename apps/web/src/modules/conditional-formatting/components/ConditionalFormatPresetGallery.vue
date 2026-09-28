@@ -102,7 +102,7 @@ function scaleSamples(colors: readonly string[]): string[] {
 function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalFormatIconSet): void {
   if (!element) return;
   const density = window.devicePixelRatio || 1;
-  const width = 104;
+  const width = 100;
   const height = 22;
   element.width = Math.round(width * density);
   element.height = Math.round(height * density);
@@ -114,7 +114,7 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
   for (let index = 0; index < count; index += 1)
     paintConditionalFormatVisual(
       context,
-      { x: index * 20, y: 0, width: 20, height: 22 },
+      { x: (width - count * 20) / 2 + index * 20, y: 0, width: 20, height: 22 },
       {
         iconSet: { iconSet, iconIndex: count - index - 1, showValue: true },
       },
@@ -140,8 +140,11 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
         :title="`${labelForBar(preset.color)} · ${t('conditionalFormatting.gradient')}`"
         @click="emit('select', preset.kind)"
       >
-        <span class="mini-sheet mini-sheet--bar" :style="{ '--bar-color': preset.color }"
-          ><i v-for="width in [22, 46, 70, 38]" :key="width" :style="{ width: `${width}%` }"
+        <span
+          class="mini-sheet mini-sheet--bar"
+          aria-hidden="true"
+          :style="{ '--bar-color': preset.color }"
+          ><i v-for="width in [86, 58, 32]" :key="width" :style="{ width: `${width}%` }"
         /></span>
       </button>
     </div>
@@ -159,8 +162,9 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
       >
         <span
           class="mini-sheet mini-sheet--bar mini-sheet--solid"
+          aria-hidden="true"
           :style="{ '--bar-color': preset.color }"
-          ><i v-for="width in [22, 46, 70, 38]" :key="width" :style="{ width: `${width}%` }"
+          ><i v-for="width in [86, 58, 32]" :key="width" :style="{ width: `${width}%` }"
         /></span>
       </button>
     </div>
@@ -181,7 +185,7 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
         :title="labelForScale(preset.kind)"
         @click="emit('select', preset.kind)"
       >
-        <span class="mini-sheet mini-sheet--scale"
+        <span class="mini-sheet mini-sheet--scale" aria-hidden="true"
           ><i
             v-for="(color, index) in scaleSamples(preset.colors)"
             :key="`${color}-${index}`"
@@ -214,7 +218,7 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
         >
           <canvas
             :ref="(element) => paintIcons(element as HTMLCanvasElement | null, iconSet)"
-            width="104"
+            width="100"
             height="22"
             aria-hidden="true"
           />
@@ -226,93 +230,116 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
 
 <style scoped lang="scss">
 .conditional-format-gallery {
-  width: 254px;
-  padding: 6px 8px 8px;
+  width: 240px;
 
   h3 {
-    margin: 4px 2px 5px;
+    margin: 0;
+    padding: 2px 12px;
+    background: var(--idea-surface-secondary);
     color: var(--idea-text-secondary);
     font-size: var(--idea-font-size-body-small);
-    font-weight: 500;
+    line-height: var(--idea-line-height-body-medium);
+    font-weight: var(--idea-font-weight-medium);
   }
 
   &__tiles {
     display: grid;
-    gap: 5px;
+    gap: 2px 4px;
+    padding: 6px 8px;
   }
   &__tiles--three {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   &__tiles--two {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-block: 4px;
   }
 
   &__tile,
   &__icon-tile {
+    display: grid;
+    place-items: center;
     min-width: 0;
+    padding: 0;
     border: 1px solid transparent;
-    border-radius: 4px;
+    border-radius: var(--idea-radius-small);
     background: transparent;
     color: inherit;
     cursor: pointer;
 
-    &:hover,
-    &:focus-visible {
-      border-color: var(--td-brand-color);
+    &:hover {
       background: var(--idea-surface-hover);
-      outline: none;
+      border-color: var(--idea-border-control);
+    }
+    &:focus-visible {
+      background: var(--idea-surface-hover);
+      outline: 1px solid var(--idea-action-primary);
+      outline-offset: -1px;
+    }
+    &:active {
+      background: var(--idea-surface-active);
     }
   }
 
   &__tile {
-    padding: 3px;
-  }
-  &--icons {
-    width: 258px;
-  }
-  &__icon-group + &__icon-group {
-    margin-top: 8px;
+    height: 46px;
   }
   &__icon-tile {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 28px;
-    padding: 3px 4px;
-
+    height: 26px;
     canvas {
-      width: 104px;
+      display: block;
+      width: 100px;
       height: 22px;
-      max-width: 100%;
     }
   }
 }
 
 .mini-sheet {
   display: grid;
-  gap: 1px;
-  padding: 3px;
-  border: 1px solid var(--idea-border-subtle);
-  background:
-    repeating-linear-gradient(90deg, transparent 0 31px, var(--idea-border-subtle) 32px),
-    repeating-linear-gradient(0deg, transparent 0 10px, var(--idea-border-subtle) 11px);
+  width: 46px;
+  height: 36px;
+  overflow: hidden;
+  border: 1px solid var(--idea-border-control);
+  background: var(--idea-surface-panel);
 
   i {
     display: block;
-    height: 7px;
+    min-height: 0;
   }
-  &--bar i {
-    background: linear-gradient(
-      90deg,
-      var(--bar-color),
-      color-mix(in srgb, var(--bar-color) 38%, transparent)
+  &--bar {
+    grid-template-rows: repeat(3, 1fr);
+    gap: 3px;
+    padding: 3px 2px;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0 10px,
+      var(--idea-border-subtle) 10px 11px
     );
+    i {
+      background: linear-gradient(
+        90deg,
+        var(--bar-color),
+        color-mix(in srgb, var(--bar-color) 18%, var(--idea-surface-panel))
+      );
+    }
   }
   &--bar.mini-sheet--solid i {
     background: var(--bar-color);
   }
-  &--scale i {
-    height: 8px;
+  &--scale {
+    grid-template-rows: repeat(5, 1fr);
+    gap: 1px;
+    background: var(--idea-surface-panel);
+    i {
+      background-image: linear-gradient(
+        90deg,
+        transparent 32%,
+        rgba(255, 255, 255, 0.6) 32% 34%,
+        transparent 34% 66%,
+        rgba(255, 255, 255, 0.6) 66% 68%,
+        transparent 68%
+      );
+    }
   }
 }
 </style>
