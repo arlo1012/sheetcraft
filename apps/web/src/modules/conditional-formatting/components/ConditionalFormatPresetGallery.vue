@@ -114,7 +114,7 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
   for (let index = 0; index < count; index += 1)
     paintConditionalFormatVisual(
       context,
-      { x: (width - count * 20) / 2 + index * 20, y: 0, width: 20, height: 22 },
+      { x: index * 20, y: 0, width: 20, height: 22 },
       {
         iconSet: { iconSet, iconIndex: count - index - 1, showValue: true },
       },
@@ -261,18 +261,17 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
     place-items: center;
     min-width: 0;
     padding: 0;
-    border: 1px solid transparent;
+    border: 0;
     border-radius: var(--idea-radius-small);
     background: transparent;
     color: inherit;
     cursor: pointer;
 
     &:hover {
-      background: var(--idea-surface-hover);
-      border-color: var(--idea-border-control);
+      background: var(--idea-surface-secondary);
     }
     &:focus-visible {
-      background: var(--idea-surface-hover);
+      background: var(--idea-surface-secondary);
       outline: 1px solid var(--idea-action-primary);
       outline-offset: -1px;
     }
@@ -285,7 +284,9 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
     height: 46px;
   }
   &__icon-tile {
+    justify-items: start;
     height: 26px;
+    padding-inline: 4px;
     canvas {
       display: block;
       width: 100px;
