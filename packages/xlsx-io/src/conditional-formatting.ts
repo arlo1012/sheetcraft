@@ -308,6 +308,25 @@ function thresholdXml(threshold: ConditionalFormatThreshold): string {
     : `<cfvo type="${threshold.kind}" val="${threshold.value}"/>`;
 }
 
+function x14ThresholdXml(threshold: ConditionalFormatThreshold): string {
+  const kind = threshold.kind === "min" || threshold.kind === "max" ? "percent" : threshold.kind;
+  const value = threshold.kind === "min" ? 0 : threshold.kind === "max" ? 100 : threshold.value;
+  return `<x14:cfvo type="${kind}"><xm:f>${value}</xm:f></x14:cfvo>`;
+}
+
+function readX14Threshold(entry: {
+  attributes: string;
+  body: string;
+}): ConditionalFormatThreshold | null {
+  const kind = attribute(entry.attributes, "type");
+  if (kind === "min" || kind === "max") return { kind };
+  if (kind !== "num" && kind !== "percent" && kind !== "percentile") return null;
+  const formula = childElements(entry.body, "f")[0]?.body.trim();
+  if (!formula) return null;
+  const value = Number(formula);
+  return Number.isFinite(value) ? { kind, value } : null;
+}
+
 function readColor(attributes: string): string | undefined {
   return rgb(attribute(attributes, "rgb"));
 }
@@ -470,7 +489,9 @@ function readVisualCondition(
         iconSet: name,
         thresholds: thresholds as ConditionalFormatThreshold[],
         ...(truthy(attribute(iconSet.attributes, "reverse")) ? { reverse: true } : {}),
-        ...(attribute(iconSet.attributes, "showValue") === "0" ? { showValue: false } : {}),
+        ...(/^(0|false)$/i.test(attribute(iconSet.attributes, "showValue") ?? "")
+          ? { showValue: false }
+          : {}),
       },
       unsupported: hasUnsupportedThresholdSemantics(cfvo),
     };
@@ -489,10 +510,6 @@ export function readXlsxConditionalFormats(
   const priorities = new Map<string, number>();
   let unsupported = false;
   let ordinal = 0;
-  if (/<x14:conditionalFormatting\b/i.test(worksheetXml)) {
-    unsupported = true;
-    report.add("feature-omitted", "warning", `sheet${sheetIndex + 1}.conditionalFormatting.x14`);
-  }
   for (const container of worksheetXml.matchAll(
     /<(?!(?:x14|x14ac):)(?:[a-z_][\w.-]*:)?conditionalFormatting\b([^>]*)>([\s\S]*?)<\/(?!(?:x14|x14ac):)(?:[a-z_][\w.-]*:)?conditionalFormatting>/gi,
   )) {
@@ -541,6 +558,71 @@ export function readXlsxConditionalFormats(
         condition,
         style: dxf.style,
         ...(stopIfTrue ? { stopIfTrue: true } : {}),
+      };
+      try {
+        rules.push(normalizeConditionalFormatRules([candidate])[0]!);
+      } catch {
+        unsupported = true;
+        priorities.delete(id);
+        report.add("feature-omitted", "warning", location);
+      }
+    }
+  }
+  for (const container of worksheetXml.matchAll(
+    /<x14:conditionalFormatting\b([^>]*)>([\s\S]*?)<\/x14:conditionalFormatting>/gi,
+  )) {
+    const containerAttributes = container[1] ?? "";
+    const containerBody = container[2] ?? "";
+    const ranges = rangesFromSqref(childElements(containerBody, "sqref")[0]?.body.trim());
+    for (const rule of childElements(containerBody, "cfRule")) {
+      ordinal += 1;
+      const location = `sheet${sheetIndex + 1}.conditionalFormatting[${ordinal}]`;
+      const type = attribute(rule.attributes, "type");
+      const iconSet = childElements(rule.body, "iconSet")[0];
+      const ruleOutsideIconSet = rule.body.replace(
+        /<x14:iconSet\b[^>]*>[\s\S]*?<\/x14:iconSet>/gi,
+        "",
+      );
+      const name = iconSet
+        ? ICON_SET_FROM_XLSX[attribute(iconSet.attributes, "iconSet") ?? ""]
+        : undefined;
+      const cfvo = iconSet ? childElements(iconSet.body, "cfvo") : [];
+      const thresholds = cfvo.map(readX14Threshold);
+      if (
+        type !== "iconSet" ||
+        !ranges ||
+        !iconSet ||
+        !name ||
+        !X14_ONLY_ICON_SETS.has(name) ||
+        truthy(attribute(containerAttributes, "activePresent")) ||
+        truthy(attribute(rule.attributes, "activePresent")) ||
+        truthy(attribute(iconSet.attributes, "custom")) ||
+        childElements(iconSet.body, "cfIcon").length > 0 ||
+        childElements(ruleOutsideIconSet, "f").length > 0 ||
+        thresholds.some((value) => !value) ||
+        hasUnsupportedThresholdSemantics(cfvo)
+      ) {
+        unsupported = true;
+        report.add("feature-omitted", "warning", location);
+        continue;
+      }
+      const id = `xlsx-conditional-format-${sheetIndex + 1}-${ordinal}`;
+      priorities.set(id, Number(attribute(rule.attributes, "priority")) || ordinal);
+      const candidate: SheetConditionalFormatRule = {
+        id,
+        ranges,
+        anchor: { ...ranges[0]!.start },
+        condition: {
+          kind: "iconSet",
+          iconSet: name,
+          thresholds: thresholds as ConditionalFormatThreshold[],
+          ...(truthy(attribute(iconSet.attributes, "reverse")) ? { reverse: true } : {}),
+          ...(/^(0|false)$/i.test(attribute(iconSet.attributes, "showValue") ?? "")
+            ? { showValue: false }
+            : {}),
+        },
+        style: {},
+        ...(truthy(attribute(rule.attributes, "stopIfTrue")) ? { stopIfTrue: true } : {}),
       };
       try {
         rules.push(normalizeConditionalFormatRules([candidate])[0]!);
@@ -680,6 +762,36 @@ function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId: numb
   return `<cfRule type="iconSet" priority="${priority}"><iconSet iconSet="${ICON_SET_TO_XLSX[condition.iconSet]}"${condition.reverse ? ' reverse="1"' : ""}${condition.showValue === false ? ' showValue="0"' : ""}>${condition.thresholds.map(thresholdXml).join("")}</iconSet></cfRule>`;
 }
 
+function x14RuleXml(rule: SheetConditionalFormatRule, priority: number): string | null {
+  const condition = rule.condition;
+  if (condition.kind !== "iconSet" || !X14_ONLY_ICON_SETS.has(condition.iconSet)) return null;
+  const id = priority.toString(16).padStart(12, "0").toUpperCase();
+  return `<x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:cfRule type="iconSet" priority="${priority}" id="{00000000-0000-0000-0000-${id}}"${rule.stopIfTrue ? ' stopIfTrue="1"' : ""}><x14:iconSet iconSet="${ICON_SET_TO_XLSX[condition.iconSet]}"${condition.reverse ? ' reverse="1"' : ""}${condition.showValue === false ? ' showValue="0"' : ""}>${condition.thresholds.map(x14ThresholdXml).join("")}</x14:iconSet></x14:cfRule><xm:sqref>${rule.ranges.map(rangeReference).join(" ")}</xm:sqref></x14:conditionalFormatting>`;
+}
+
+function appendX14ConditionalFormatting(xml: string, body: string): string {
+  if (!body) return xml;
+  const extension = `<ext uri="{78C0D931-6437-407d-A8EE-F0AAD7539E65}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:conditionalFormattings>${body}</x14:conditionalFormattings></ext>`;
+  const tags = /<\/?(?:[a-z_][\w.-]*:)?[a-z_][\w.-]*\b[^>]*>/gi;
+  let depth = 0;
+  for (const tag of xml.matchAll(tags)) {
+    const source = tag[0];
+    const closing = source.startsWith("</");
+    const selfClosing = source.endsWith("/>");
+    const name = /^<\/?(?:[a-z_][\w.-]*:)?([a-z_][\w.-]*)\b/i.exec(source)?.[1];
+    if (name === "extLst" && selfClosing && depth === 1)
+      return `${xml.slice(0, tag.index)}<extLst>${extension}</extLst>${xml.slice(tag.index + source.length)}`;
+    if (closing) {
+      if (name === "extLst" && depth === 2)
+        return `${xml.slice(0, tag.index)}${extension}${xml.slice(tag.index)}`;
+      depth -= 1;
+    } else if (!selfClosing) {
+      depth += 1;
+    }
+  }
+  return xml.replace(/<\/worksheet>/i, `<extLst>${extension}</extLst></worksheet>`);
+}
+
 /** Add first-release conditional formats after ExcelJS has produced its base archive. */
 export function writeXlsxConditionalFormats(
   entries: Record<string, Uint8Array>,
@@ -688,19 +800,7 @@ export function writeXlsxConditionalFormats(
 ): void {
   const styles = entries["xl/styles.xml"];
   if (!styles) throw new Error("Missing generated XLSX styles.");
-  const serializableSheets = sheets.map((rules, sheetIndex) =>
-    rules.filter((rule) => {
-      if (rule.condition.kind !== "iconSet" || !X14_ONLY_ICON_SETS.has(rule.condition.iconSet))
-        return true;
-      report?.add(
-        "feature-omitted",
-        "warning",
-        `sheet${sheetIndex + 1}.conditionalFormatting.${rule.id}.${rule.condition.iconSet}`,
-      );
-      return false;
-    }),
-  );
-  const allRules = serializableSheets.flat();
+  const allRules = sheets.flat();
   if (!allRules.length) return;
   const dxfs = allRules.map((rule) => dxfXml(rule.style));
   const stylesXml = strFromU8(styles);
@@ -713,15 +813,17 @@ export function writeXlsxConditionalFormats(
   );
   let priority = 1;
   let dxfId = 0;
-  for (const [sheetIndex, rules] of serializableSheets.entries()) {
+  for (const [sheetIndex, rules] of sheets.entries()) {
     if (!rules.length) continue;
     const path = `xl/worksheets/sheet${sheetIndex + 1}.xml`;
     const entry = entries[path];
     if (!entry) continue;
     const xml = strFromU8(entry);
+    let x14Body = "";
     const body = rules
       .map((rule) => {
-        const next = ruleXml(rule, priority, dxfId);
+        const x14 = x14RuleXml(rule, priority);
+        const next = x14 ?? ruleXml(rule, priority, dxfId);
         if (
           rule.condition.kind === "dataBar" &&
           (rule.condition.negativeColor !== undefined || rule.condition.gradient === false)
@@ -731,18 +833,26 @@ export function writeXlsxConditionalFormats(
             "warning",
             `sheet${sheetIndex + 1}.conditionalFormatting.${rule.id}.dataBarExtension`,
           );
+        if (rule.condition.kind === "iconSet" && Object.keys(rule.style).length)
+          report?.add(
+            "style-omitted",
+            "warning",
+            `sheet${sheetIndex + 1}.conditionalFormatting.${rule.id}.iconSetStyle`,
+          );
+        if (x14) x14Body += x14;
         priority += 1;
         dxfId += 1;
-        return `<conditionalFormatting sqref="${rule.ranges.map(rangeReference).join(" ")}">${next}</conditionalFormatting>`;
+        return x14
+          ? ""
+          : `<conditionalFormatting sqref="${rule.ranges.map(rangeReference).join(" ")}">${next}</conditionalFormatting>`;
       })
       .join("");
     // Schema order: after merges and before data validations/extensions.
     const target =
       /<dataValidations\b|<hyperlinks\b|<printOptions\b|<pageMargins\b|<pageSetup\b|<extLst\b|<\/worksheet>/i;
-    entries[path] = strToU8(
-      target.test(xml)
-        ? xml.replace(target, `${body}$&`)
-        : xml.replace(/<\/worksheet>/i, `${body}</worksheet>`),
-    );
+    const withBaseRules = target.test(xml)
+      ? xml.replace(target, `${body}$&`)
+      : xml.replace(/<\/worksheet>/i, `${body}</worksheet>`);
+    entries[path] = strToU8(appendX14ConditionalFormatting(withBaseRules, x14Body));
   }
 }

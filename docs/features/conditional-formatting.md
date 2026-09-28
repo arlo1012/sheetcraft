@@ -55,8 +55,13 @@ True survive round trips. Formula export rebases to the first emitted range so
 partial clears do not shift reference meaning. Unsupported rule types and style
 fields produce compatibility diagnostics; malformed individual rules are omitted
 with a diagnostic rather than silently replacing them or failing all valid rules.
-The adapter does not yet write the x14-only Five Boxes, Three Stars, and Three Triangles icon sets or extended solid
-and negative-color data bars. See [XLSX IO](../xlsx-io.md) for the supported subset.
+All 20 icon sets are preserved, including Five Boxes, Three Stars, and Three
+Triangles through the OOXML x14 extension. Normal and reversed icon order,
+thresholds, and icon-only display survive import/export. Base and extension rules
+share the same priority order, so an extension rule does not disappear and expose
+a lower-priority icon set after export.
+Extended solid and negative-color data bars remain outside the supported subset.
+See [XLSX IO](../xlsx-io.md) for details.
 
 Conditional borders and conditional number formats remain outside this release.
 The existing sort-by-color feature still uses manual cell colors. Existing

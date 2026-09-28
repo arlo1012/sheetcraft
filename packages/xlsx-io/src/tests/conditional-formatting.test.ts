@@ -260,44 +260,6 @@ describe("XLSX conditional formatting", () => {
     expect(xml).not.toContain('gradient="0"');
   });
 
-  test.each([
-    ["threeStars", "3Stars", 3],
-    ["threeTriangles", "3Triangles", 3],
-    ["fiveBoxes", "5Boxes", 5],
-  ] as const)(
-    "omits x14-only %s instead of writing it as a base icon set",
-    async (iconSet, xlsxName, count) => {
-      const workbook = createWorkbook({
-        id: `${iconSet}-icon-set`,
-        sheetId: "sheet",
-      });
-      const sheet = getActiveSheet(workbook);
-      sheet.conditionalFormats = [
-        {
-          id: iconSet,
-          ranges: [{ start: { row: 0, column: 0 }, end: { row: 3, column: 0 } }],
-          anchor: { row: 0, column: 0 },
-          condition: {
-            kind: "iconSet",
-            iconSet,
-            thresholds: Array.from({ length: count }, (_, index) => ({
-              kind: "percent" as const,
-              value: Math.round((index / (count - 1)) * 100),
-            })),
-          },
-          style: {},
-        },
-      ];
-      const encoded = await encodeXlsx(workbook);
-      expect(encoded.report.issues).toEqual(
-        expect.arrayContaining([expect.objectContaining({ code: "feature-omitted" })]),
-      );
-      expect(strFromU8(unzipSync(encoded.bytes)["xl/worksheets/sheet1.xml"]!)).not.toContain(
-        `iconSet="${xlsxName}"`,
-      );
-    },
-  );
-
   test("uses the standard 3TrafficLights1 default when an iconSet attribute is omitted", async () => {
     const workbook = createWorkbook({ id: "icon-default", sheetId: "sheet" });
     const encoded = await encodeXlsx(workbook);
