@@ -102,7 +102,7 @@ function scaleSamples(colors: readonly string[]): string[] {
 function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalFormatIconSet): void {
   if (!element) return;
   const density = window.devicePixelRatio || 1;
-  const width = 100;
+  const width = 120;
   const height = 22;
   element.width = Math.round(width * density);
   element.height = Math.round(height * density);
@@ -114,9 +114,13 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
   for (let index = 0; index < count; index += 1)
     paintConditionalFormatVisual(
       context,
-      { x: index * 20, y: 0, width: 20, height: 22 },
+      { x: index * 24, y: 0, width: 24, height: 22 },
       {
-        iconSet: { iconSet, iconIndex: count - index - 1, showValue: true },
+        iconSet: {
+          iconSet,
+          iconIndex: iconSet.endsWith("Ratings") ? index : count - index - 1,
+          showValue: true,
+        },
       },
     );
 }
@@ -218,7 +222,7 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
         >
           <canvas
             :ref="(element) => paintIcons(element as HTMLCanvasElement | null, iconSet)"
-            width="100"
+            width="120"
             height="22"
             aria-hidden="true"
           />
@@ -250,7 +254,11 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
   &__tiles--three {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  &--icons {
+    width: 276px;
+  }
   &__tiles--two {
+    row-gap: 6px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     padding-block: 4px;
   }
@@ -289,7 +297,7 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
     padding-inline: 4px;
     canvas {
       display: block;
-      width: 100px;
+      width: 120px;
       height: 22px;
     }
   }

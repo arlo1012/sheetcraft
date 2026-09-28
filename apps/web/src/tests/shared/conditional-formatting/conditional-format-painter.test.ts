@@ -15,6 +15,8 @@ function context() {
     fill: vi.fn(),
     stroke: vi.fn(),
     fillRect: vi.fn(),
+    strokeRect: vi.fn(),
+    scale: vi.fn(),
     arc: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),
@@ -121,7 +123,7 @@ describe("conditional format canvas painter", () => {
     paintConditionalFormatVisual(ratings, rect, {
       iconSet: { iconSet: "fiveRatings", iconIndex: 3, showValue: true },
     });
-    expect(ratings.fillRect).toHaveBeenCalledTimes(5);
+    expect(ratings.fillRect).toHaveBeenCalledTimes(4);
     const quarters = context();
     paintConditionalFormatVisual(quarters, rect, {
       iconSet: { iconSet: "fiveQuarters", iconIndex: 3, showValue: true },
@@ -142,7 +144,7 @@ describe("conditional format canvas painter", () => {
     });
     expect(diamond.arc).not.toHaveBeenCalled();
     expect(diamond.lineTo).toHaveBeenCalledTimes(3);
-    expect(diamond.fillStyle).toBe("#db4c3f");
+    expect(diamond.fillStyle).toBe("#DF5934");
     const triangle = context();
     paintConditionalFormatVisual(triangle, rect, {
       iconSet: { iconSet: "threeSigns", iconIndex: 1, showValue: true },
@@ -158,7 +160,7 @@ describe("conditional format canvas painter", () => {
     paintConditionalFormatVisual(topArrow, rect, {
       iconSet: { iconSet: "fiveArrows", iconIndex: 4, showValue: true },
     });
-    expect(topArrow.fillStyle).toBe("#2fa84f");
+    expect(topArrow.fillStyle).toBe("#70AC98");
     const fourArrow = context();
     paintConditionalFormatVisual(fourArrow, rect, {
       iconSet: { iconSet: "fourArrows", iconIndex: 0, showValue: true },
@@ -168,12 +170,14 @@ describe("conditional format canvas painter", () => {
     paintConditionalFormatVisual(emptyQuarter, rect, {
       iconSet: { iconSet: "fiveQuarters", iconIndex: 0, showValue: true },
     });
-    expect(emptyQuarter.fill).not.toHaveBeenCalled();
+    expect(emptyQuarter.fill).toHaveBeenCalledOnce();
+    expect(emptyQuarter.fillStyle).toBe("#FFFFFF");
     const fullQuarter = context();
     paintConditionalFormatVisual(fullQuarter, rect, {
       iconSet: { iconSet: "fiveQuarters", iconIndex: 4, showValue: true },
     });
-    expect(fullQuarter.fill).toHaveBeenCalledOnce();
+    expect(fullQuarter.fill).toHaveBeenCalledTimes(2);
+    expect(fullQuarter.fillStyle).toBe("#555756");
   });
 
   test("renders the missing WPS triangle/star sets and authentic four/five-level shapes", () => {
@@ -182,13 +186,14 @@ describe("conditional format canvas painter", () => {
     paintConditionalFormatVisual(downTriangle, rect, {
       iconSet: { iconSet: "threeTriangles", iconIndex: 0, showValue: true },
     });
-    expect(downTriangle.fillStyle).toBe("#db4c3f");
+    expect(downTriangle.fillStyle).toBe("#DF5934");
     expect(downTriangle.lineTo).toHaveBeenCalledTimes(2);
     const middleTriangle = context();
     paintConditionalFormatVisual(middleTriangle, rect, {
       iconSet: { iconSet: "threeTriangles", iconIndex: 1, showValue: true },
     });
-    expect(middleTriangle.fillRect).toHaveBeenCalledOnce();
+    expect(middleTriangle.lineTo).toHaveBeenCalledTimes(3);
+    expect(middleTriangle.stroke).toHaveBeenCalledOnce();
     const halfStar = context();
     paintConditionalFormatVisual(halfStar, rect, {
       iconSet: { iconSet: "threeStars", iconIndex: 1, showValue: true },
@@ -199,12 +204,12 @@ describe("conditional format canvas painter", () => {
     paintConditionalFormatVisual(redToBlack, rect, {
       iconSet: { iconSet: "fourRedToBlack", iconIndex: 0, showValue: true },
     });
-    expect(redToBlack.fillStyle).toBe("#24292f");
+    expect(redToBlack.fillStyle).toBe("#555756");
     const lights = context();
     paintConditionalFormatVisual(lights, rect, {
       iconSet: { iconSet: "fourTrafficLights", iconIndex: 0, showValue: true },
     });
-    expect(lights.fillStyle).toBe("#3f454d");
+    expect(lights.fillStyle).toBe("#555756");
     const boxes = context();
     paintConditionalFormatVisual(boxes, rect, {
       iconSet: { iconSet: "fiveBoxes", iconIndex: 3, showValue: true },
