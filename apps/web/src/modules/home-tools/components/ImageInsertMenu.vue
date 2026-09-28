@@ -80,6 +80,5 @@ function insertImage(mode: "cell" | "floating"): void {
 .image-insert-menu {
   position: fixed;
   z-index: 80;
-  min-width: 168px;
 }
 </style>

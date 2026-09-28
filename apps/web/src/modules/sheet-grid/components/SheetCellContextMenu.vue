@@ -180,12 +180,7 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
 
 <template>
   <Teleport to="body">
-    <div
-      ref="panelRef"
-      class="sheet-cell-context-menu-panel"
-      :class="{ 'sheet-cell-context-menu-panel--formatted': state }"
-      :style="floatingStyles"
-    >
+    <div ref="panelRef" class="sheet-cell-context-menu-panel" :style="floatingStyles">
       <SheetContextFormatToolbar
         v-if="state"
         :state="state"
@@ -434,18 +429,14 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
   z-index: 100;
   display: grid;
   gap: 6px;
-  width: 236px;
-  &--formatted {
-    width: 302px;
-  }
+  width: max-content;
 }
 .sheet-cell-context-menu {
-  width: 236px;
+  width: max-content;
   border-radius: var(--idea-radius-default);
   &--submenu {
     z-index: 101;
     width: max-content;
-    min-width: 210px;
     border-radius: var(--idea-radius-default);
   }
   &--counted {

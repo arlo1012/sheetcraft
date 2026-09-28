@@ -284,7 +284,6 @@ watch(
   &__rotate-menu {
     position: fixed;
     z-index: 91;
-    min-width: 164px;
   }
 }
 </style>

@@ -73,7 +73,6 @@ function convert(mode: CellValueConversionMode): void {
 
   &__surface {
     z-index: 80;
-    min-width: 190px;
   }
 }
 </style>

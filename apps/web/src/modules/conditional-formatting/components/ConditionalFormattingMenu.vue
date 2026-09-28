@@ -358,7 +358,6 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
   &__submenu {
     z-index: 50;
     width: max-content;
-    min-width: 218px;
   }
   &__submenu {
     z-index: 51;

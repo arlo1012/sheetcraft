@@ -72,7 +72,6 @@ function choose(kind: "goalSeek" | "planning" | "dataTable") {
   &__menu {
     position: fixed;
     z-index: 80;
-    min-width: 180px;
   }
 }
 </style>

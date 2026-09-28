@@ -126,7 +126,6 @@ function openErrorCheckOptions(): void {
   &__menu {
     position: fixed;
     z-index: 80;
-    min-width: 190px;
   }
 }
 </style>

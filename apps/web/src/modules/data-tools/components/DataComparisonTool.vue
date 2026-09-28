@@ -80,7 +80,6 @@ function choose(action: DataComparisonAction): void {
   &__menu {
     position: fixed;
     z-index: 80;
-    min-width: 196px;
   }
 }
 </style>

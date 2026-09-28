@@ -70,7 +70,6 @@ function custom(): void {
   &__menu {
     position: fixed;
     z-index: 80;
-    min-width: 170px;
   }
 }
 </style>

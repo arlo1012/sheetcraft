@@ -90,6 +90,5 @@ function onKeydown(event: KeyboardEvent): void {
 <style scoped lang="scss">
 .sheet-floating-image-context-menu {
   z-index: 100;
-  width: 208px;
 }
 </style>

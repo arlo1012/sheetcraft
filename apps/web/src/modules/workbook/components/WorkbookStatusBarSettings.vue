@@ -182,7 +182,6 @@ function selectNumberFormat(numberFormat: StatusBarNumberFormat): void {
   &__menu {
     position: fixed;
     z-index: 80;
-    min-width: 178px;
   }
 }
 </style>

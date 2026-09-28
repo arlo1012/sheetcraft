@@ -135,7 +135,6 @@ function openCellFormat(): void {
 
   &__surface {
     z-index: 80;
-    min-width: 150px;
     max-height: min(480px, calc(100vh - var(--idea-space-4) - var(--idea-space-4)));
   }
 }

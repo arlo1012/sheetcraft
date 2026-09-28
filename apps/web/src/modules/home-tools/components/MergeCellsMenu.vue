@@ -255,7 +255,6 @@ function onSameMenuKeydown(event: KeyboardEvent): void {
 .merge-cells-menu {
   position: fixed;
   z-index: 80;
-  min-width: 168px;
 
   &--same {
     z-index: 81;

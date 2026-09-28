@@ -673,7 +673,6 @@ watch(
 
   &__surface {
     z-index: 80;
-    min-width: 210px;
   }
 
   &__submenu {

@@ -76,6 +76,5 @@ function select(direction: "ascending" | "descending"): void {
 .sort-menu {
   position: fixed;
   z-index: 80;
-  min-width: 168px;
 }
 </style>

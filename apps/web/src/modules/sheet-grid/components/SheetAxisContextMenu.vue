@@ -279,10 +279,10 @@ onMounted(() => void nextTick(() => menuSurfaceRef.value?.focusFirstItem()));
   z-index: 100;
   display: grid;
   gap: 6px;
-  width: 302px;
+  width: max-content;
 }
 .sheet-axis-context-menu {
-  width: 236px;
+  width: max-content;
   border-radius: var(--idea-radius-default);
   &--unframed {
     border-radius: var(--idea-radius-default);

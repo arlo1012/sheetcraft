@@ -135,7 +135,6 @@ const { open, floatingStyles, toggleMenu, onTriggerKeydown } = useMenu({
   }
 
   &__menu {
-    min-width: 180px;
   }
 }
 </style>

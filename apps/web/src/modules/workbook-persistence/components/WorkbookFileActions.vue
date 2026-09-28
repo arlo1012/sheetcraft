@@ -272,6 +272,5 @@ function onFileChange(event: Event): void {
 .workbook-file-menu {
   position: fixed;
   z-index: 80;
-  min-width: 210px;
 }
 </style>

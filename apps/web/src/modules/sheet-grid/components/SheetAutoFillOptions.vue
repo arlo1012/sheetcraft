@@ -206,7 +206,6 @@ function selectMode(mode: CellFillMode): void {
 
   &__menu {
     z-index: 96;
-    min-width: 156px;
     outline: none;
   }
 }

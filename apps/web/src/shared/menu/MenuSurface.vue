@@ -117,6 +117,7 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
 <style scoped lang="scss">
 .idea-menu-surface {
   display: grid;
+  width: max-content;
   max-width: calc(100vw - var(--idea-space-4) - var(--idea-space-4));
   max-height: calc(100vh - var(--idea-space-4) - var(--idea-space-4));
   padding: var(--idea-menu-padding);

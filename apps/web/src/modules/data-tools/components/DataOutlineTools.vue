@@ -151,7 +151,6 @@ function onClearOutline(): void {
   &__menu {
     position: fixed;
     z-index: 80;
-    min-width: 150px;
   }
 }
 </style>

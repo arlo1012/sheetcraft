@@ -379,13 +379,11 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
   &__menu {
     position: fixed;
     z-index: 80;
-    min-width: 196px;
   }
 
   &__submenu {
     position: fixed;
     z-index: 81;
-    min-width: 172px;
   }
 }
 </style>

@@ -226,7 +226,7 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
 
 <style scoped lang="scss">
 .conditional-format-gallery {
-  width: 326px;
+  width: 254px;
   padding: 6px 8px 8px;
 
   h3 {
@@ -268,7 +268,7 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
     padding: 3px;
   }
   &--icons {
-    width: 362px;
+    width: 258px;
   }
   &__icon-group + &__icon-group {
     margin-top: 8px;

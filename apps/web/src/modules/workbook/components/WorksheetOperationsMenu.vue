@@ -361,7 +361,6 @@ watch(
 .worksheet-operations-menu {
   position: fixed;
   z-index: 80;
-  min-width: 184px;
 }
 .worksheet-operations-menu__hidden-sheets {
   display: grid;

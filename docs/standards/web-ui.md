@@ -98,6 +98,9 @@ CSS pixels at 100% scale; size and line height are a pair.
 - List menus use `useMenu` + `MenuSurface` for opening, keyboard navigation,
   dismissal, and focus restoration across ribbon, status bar, and Sheet. Form panels
   and cascading submenus retain domain-specific focus/state rules.
+- First- and second-level text menus size to their content. Avoid fixed widths or
+  minimum widths that add empty space; reserve explicit widths for input controls,
+  searchable value lists, and compact preset grids.
 - Use `MenuItem` for commands and `MenuRadioItem` for single choices; features supply
   checked state, labels, and actions. Menu padding, row height, indicators, radii,
   and shadows stay shared; consumers set only width, height limits, stacking, and placement.
