@@ -4,6 +4,46 @@ import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 
 describe("XLSX conditional formatting", () => {
+  test("writes a compatibility Dxf fill and accepts XlsxWriter-style background-only DXFs", async () => {
+    const workbook = createWorkbook({ id: "dxf-fill", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    sheet.conditionalFormats = [
+      {
+        id: "pink-fill",
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
+        anchor: { row: 0, column: 0 },
+        condition: { kind: "cellValue", operator: "greaterThan", value: 0 },
+        style: { fillColor: "#FDE2E1", textColor: "#9C0006" },
+      },
+    ];
+    const encoded = await encodeXlsx(workbook);
+    const entries = unzipSync(encoded.bytes);
+    const styles = strFromU8(entries["xl/styles.xml"]!);
+    // Keep the standard solid foreground and a matching background fallback.
+    expect(styles).toContain(
+      '<patternFill patternType="solid"><fgColor rgb="FFFDE2E1"/><bgColor rgb="FFFDE2E1"/></patternFill>',
+    );
+
+    const explicitSolid = unzipSync(encoded.bytes);
+    explicitSolid["xl/styles.xml"] = strToU8(
+      styles.replace('bgColor rgb="FFFDE2E1"', 'bgColor rgb="FF00FF00"'),
+    );
+    expect(
+      getActiveSheet((await decodeXlsx(zipSync(explicitSolid))).workbook).conditionalFormats?.[0]
+        ?.style.fillColor,
+    ).toBe("#FDE2E1");
+
+    entries["xl/styles.xml"] = strToU8(
+      styles.replace(
+        '<patternFill patternType="solid"><fgColor rgb="FFFDE2E1"/><bgColor rgb="FFFDE2E1"/></patternFill>',
+        '<patternFill><bgColor rgb="FFFDE2E1"/></patternFill>',
+      ),
+    );
+    const restored = getActiveSheet((await decodeXlsx(zipSync(entries))).workbook)
+      .conditionalFormats?.[0];
+    expect(restored?.style.fillColor).toBe("#FDE2E1");
+  });
+
   test.each([
     ["threeSymbols", "3Symbols2"],
     ["threeSymbolsCircled", "3Symbols"],

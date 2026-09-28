@@ -6,6 +6,7 @@ import { paintConditionalFormatVisual } from "../../../shared/conditional-format
 import { paintCellText } from "./cell-text-painter";
 import type { SheetCanvasScene } from "./cell-scene";
 import { paintCellImage, type CanvasImageCache } from "./image-painter";
+import { paintGridLines } from "./grid-line-painter";
 
 export type SheetCanvasPalette = {
   background: string;
@@ -56,19 +57,7 @@ export function paintSheetScene(
     for (const cell of paneScene.cells) paintCellFill(context, cell.rect, cell.style);
     for (const cell of paneScene.cells)
       paintConditionalFormatVisual(context, cell.rect, cell.content.conditionalFormatVisual);
-    if (options.showGridLines) {
-      context.beginPath();
-      context.strokeStyle = palette.gridLine;
-      context.lineWidth = 1;
-      for (const { rect } of paneScene.cells) {
-        const right = rect.x + rect.width - 0.5;
-        const bottom = rect.y + rect.height - 0.5;
-        context.moveTo(rect.x, bottom);
-        context.lineTo(right, bottom);
-        context.lineTo(right, rect.y);
-      }
-      context.stroke();
-    }
+    if (options.showGridLines) paintGridLines(context, paneScene.cells, palette.gridLine);
     const drawnSpans = new Set<string>();
     for (const cell of paneScene.cells) {
       const { content, contentRect, span } = cell;

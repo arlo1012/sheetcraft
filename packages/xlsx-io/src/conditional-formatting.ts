@@ -173,10 +173,17 @@ function readDxf(xml: string | undefined): {
       );
     const attrs = pattern?.[1] ?? pattern?.[3];
     const body = pattern?.[2] ?? "";
-    if (!pattern || attribute(attrs ?? "", "patternType") !== "solid") unsupported = true;
+    const patternType = attribute(attrs ?? "", "patternType");
+    if (!pattern || (patternType !== undefined && patternType !== "solid")) unsupported = true;
     else {
-      const color = /<(?:[a-z_][\w.-]*:)?fgColor\b([^>]*)\/?\s*>/i.exec(body)?.[1];
-      const value = rgb(color ? attribute(color, "rgb") : undefined);
+      const foreground = /<(?:[a-z_][\w.-]*:)?fgColor\b([^>]*)\/?\s*>/i.exec(body)?.[1];
+      const background = /<(?:[a-z_][\w.-]*:)?bgColor\b([^>]*)\/?\s*>/i.exec(body)?.[1];
+      // ISO SpreadsheetML uses fgColor for an explicit solid fill. DXF writers
+      // such as XlsxWriter can instead omit patternType and emit bgColor, so
+      // accept that external form without accepting a non-solid pattern.
+      const color =
+        patternType === "solid" ? (foreground ?? background) : (background ?? foreground);
+      const value = rgb(attribute(color ?? "", "rgb"));
       if (value) style.fillColor = value;
       else unsupported = true;
     }
@@ -599,7 +606,7 @@ function dxfXml(style: SheetConditionalFormatRule["style"]): string {
       ? `<font>${style.bold === undefined ? "" : `<b val="${style.bold ? 1 : 0}"/>`}${style.italic === undefined ? "" : `<i val="${style.italic ? 1 : 0}"/>`}${style.textColor ? `<color rgb="FF${style.textColor.slice(1).toUpperCase()}"/>` : ""}</font>`
       : "";
   const fill = style.fillColor
-    ? `<fill><patternFill patternType="solid"><fgColor rgb="FF${style.fillColor.slice(1).toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`
+    ? `<fill><patternFill patternType="solid"><fgColor rgb="FF${style.fillColor.slice(1).toUpperCase()}"/><bgColor rgb="FF${style.fillColor.slice(1).toUpperCase()}"/></patternFill></fill>`
     : "";
   return `<dxf>${font}${fill}</dxf>`;
 }
