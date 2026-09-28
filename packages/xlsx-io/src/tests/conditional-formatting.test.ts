@@ -4,6 +4,50 @@ import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 
 describe("XLSX conditional formatting", () => {
+  test.each([
+    ["threeSymbols", "3Symbols2"],
+    ["threeSymbolsCircled", "3Symbols"],
+  ] as const)("exports %s using the standard %s icon set", async (iconSet, xlsxName) => {
+    const workbook = createWorkbook({ id: "symbol-export", sheetId: "sheet" });
+    getActiveSheet(workbook).conditionalFormats = [
+      {
+        id: "symbols",
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 2, column: 0 } }],
+        anchor: { row: 0, column: 0 },
+        condition: {
+          kind: "iconSet",
+          iconSet,
+          thresholds: [
+            { kind: "percent", value: 0 },
+            { kind: "percent", value: 33 },
+            { kind: "percent", value: 67 },
+          ],
+        },
+        style: {},
+      },
+    ];
+    const encoded = await encodeXlsx(workbook);
+    const xml = strFromU8(unzipSync(encoded.bytes)["xl/worksheets/sheet1.xml"]!);
+    expect(xml).toContain(`iconSet="${xlsxName}"`);
+  });
+
+  test.each([
+    ["3Symbols", "threeSymbolsCircled"],
+    ["3Symbols2", "threeSymbols"],
+  ] as const)("imports the standard %s icon set as %s", async (xlsxName, iconSet) => {
+    const workbook = createWorkbook({ id: "symbol-import", sheetId: "sheet" });
+    const entries = unzipSync((await encodeXlsx(workbook)).bytes);
+    entries["xl/worksheets/sheet1.xml"] = strToU8(
+      strFromU8(entries["xl/worksheets/sheet1.xml"]!).replace(
+        /<\/worksheet>/i,
+        `<conditionalFormatting sqref="A1:A3"><cfRule type="iconSet" priority="1"><iconSet iconSet="${xlsxName}"><cfvo type="percent" val="0"/><cfvo type="percent" val="33"/><cfvo type="percent" val="67"/></iconSet></cfRule></conditionalFormatting></worksheet>`,
+      ),
+    );
+    const rules = getActiveSheet((await decodeXlsx(zipSync(entries))).workbook).conditionalFormats;
+    expect(rules).toHaveLength(1);
+    expect(rules?.[0]?.condition).toMatchObject({ kind: "iconSet", iconSet });
+  });
+
   test("roundtrips rank, average, date and visual conditional-formatting rules", async () => {
     const workbook = createWorkbook({
       id: "extended-conditional-format",

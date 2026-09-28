@@ -312,8 +312,9 @@ const ICON_SET_FROM_XLSX: Record<string, ConditionalFormatIconSet> = {
   "3TrafficLights1": "threeTrafficLights",
   "3TrafficLights2": "threeTrafficLightsRimmed",
   "3Signs": "threeSigns",
-  "3Symbols": "threeSymbols",
-  "3Symbols2": "threeSymbolsCircled",
+  // OOXML names the circled variant 3Symbols and the plain variant 3Symbols2.
+  "3Symbols": "threeSymbolsCircled",
+  "3Symbols2": "threeSymbols",
   "4Arrows": "fourArrows",
   "4ArrowsGray": "fourArrowsGray",
   "4RedToBlack": "fourRedToBlack",
