@@ -110,7 +110,13 @@ watch(
       <template #valueDisplay>
         <span class="panel-select__value"><slot name="value" /></span>
       </template>
-      <template #suffixIcon><ChevronDown :size="14" aria-hidden="true" /></template>
+      <template #suffixIcon>
+        <ChevronDown
+          class="idea-panel-select__arrow"
+          :class="{ 'is-open': open, 'is-disabled': disabled }"
+          aria-hidden="true"
+        />
+      </template>
       <template #panel>
         <div
           v-if="open"
