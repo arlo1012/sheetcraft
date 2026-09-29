@@ -1129,18 +1129,17 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     gap: 8px;
     min-width: 0;
   }
-  &__bar-appearance {
+  &__bar-appearance,
+  &__bar-actions {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
   }
   &__bar-actions {
-    display: grid;
-    grid-template-columns: auto minmax(180px, 1fr);
-    align-items: end;
-    gap: 12px;
-    > button {
-      margin-block-end: 2px;
+    align-items: center;
+    > :last-child {
+      grid-column: span 3;
+      min-width: 0;
     }
   }
   &__preview {
@@ -1171,6 +1170,9 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     }
     &__bar-actions {
       grid-template-columns: 1fr;
+      > :last-child {
+        grid-column: auto;
+      }
     }
   }
   &__error {
