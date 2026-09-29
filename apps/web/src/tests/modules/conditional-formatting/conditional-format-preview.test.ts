@@ -1,9 +1,63 @@
 import { mount } from "@vue/test-utils";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import ConditionalFormatPreview from "../../../modules/conditional-formatting/components/ConditionalFormatPreview.vue";
+import { paintConditionalFormatVisual } from "../../../shared/conditional-formatting/conditional-format-painter";
 import { createAppI18n } from "../../../shared/i18n";
 
+vi.mock("../../../shared/conditional-formatting/conditional-format-painter", () => ({
+  paintConditionalFormatVisual: vi.fn(),
+}));
+
 describe("conditional format preview", () => {
+  test("previews data-bar direction, border and axis changes in the inset control", async () => {
+    const context = { setTransform: vi.fn(), clearRect: vi.fn() };
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(context as unknown as CanvasRenderingContext2D);
+    const condition = {
+      kind: "dataBar" as const,
+      minimum: { kind: "autoMin" as const },
+      maximum: { kind: "autoMax" as const },
+      color: "#638ec6",
+      borderColor: "#112233",
+      axisPosition: "middle" as const,
+      axisColor: "#ff0000",
+      direction: "rightToLeft" as const,
+      gradient: false,
+    };
+    const wrapper = mount(ConditionalFormatPreview, {
+      props: { wide: true, condition },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
+    try {
+      expect(wrapper.classes()).toContain("conditional-format-preview--color-control");
+      expect(paintConditionalFormatVisual).toHaveBeenLastCalledWith(
+        context,
+        expect.objectContaining({ height: 22 }),
+        {
+          dataBar: expect.objectContaining({
+            start: expect.closeTo(0.05),
+            end: 0.5,
+            axis: 0.5,
+            borderColor: "#112233",
+            axisColor: "#ff0000",
+            negative: false,
+            gradient: false,
+          }),
+        },
+      );
+      await wrapper.setProps({
+        condition: { ...condition, direction: "leftToRight", axisPosition: "none" },
+      });
+      expect(paintConditionalFormatVisual).toHaveBeenLastCalledWith(context, expect.anything(), {
+        dataBar: expect.objectContaining({ start: 0, end: 0.9, axis: 0, axisPosition: "none" }),
+      });
+    } finally {
+      wrapper.unmount();
+      getContext.mockRestore();
+    }
+  });
+
   test("uses the effective custom style for number, typography, fill and borders", () => {
     const wrapper = mount(ConditionalFormatPreview, {
       props: {

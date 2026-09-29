@@ -4,10 +4,13 @@ import { nextTick } from "vue";
 import { FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
+import { Select } from "tdesign-vue-next/es/select";
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
 import ConditionalFormatEditorDialog from "../../../modules/conditional-formatting/components/ConditionalFormatEditorDialog.vue";
 import ConditionalFormatIconRules from "../../../modules/conditional-formatting/components/ConditionalFormatIconRules.vue";
+import DataBarAdvancedSettingsDialog from "../../../modules/conditional-formatting/components/DataBarAdvancedSettingsDialog.vue";
 import ConditionalFormatThresholdField from "../../../modules/conditional-formatting/components/ConditionalFormatThresholdField.vue";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import type { ConditionalFormatQuickRule } from "../../../modules/conditional-formatting/components/ConditionalFormattingMenu.vue";
 import { createAppI18n } from "../../../shared/i18n";
 
@@ -173,8 +176,80 @@ describe("advanced conditional format editor", () => {
     await confirm();
     const saved = wrapper.emitted("save")?.[0]?.[0] as SheetConditionalFormatRule;
     expect(saved.condition).toMatchObject({ kind: "dataBar", color: "#638EC6" });
+    expect(saved.condition).toMatchObject({
+      minimum: { kind: "autoMin" },
+      maximum: { kind: "autoMax" },
+      direction: "context",
+      axisPosition: "automatic",
+      axisColor: "#000000",
+    });
     expect(saved.condition).not.toMatchObject({ gradient: false });
     expect(saved.condition).not.toHaveProperty("negativeColor");
+  });
+
+  test("saves the complete data-bar configuration and cancels nested edits", async () => {
+    const wrapper = editor("dataBar");
+    const barOnly = wrapper.find('input[type="checkbox"]');
+    await barOnly.setValue(true);
+    const border = wrapper
+      .findAllComponents(FormItem)
+      .find((item) => item.props("label") === "Border")!
+      .findComponent(Select);
+    border.vm.$emit("update:modelValue", true);
+    const direction = wrapper
+      .findAllComponents(Select)
+      .find((item) => item.attributes("aria-label") === "Bar direction")!;
+    direction.vm.$emit("update:modelValue", "rightToLeft");
+    await nextTick();
+
+    const openAdvanced = () =>
+      new DOMWrapper(
+        [...document.body.querySelectorAll("button")].find((button) =>
+          button.textContent?.trim().startsWith("Negative values and axis"),
+        )!,
+      );
+    await openAdvanced().trigger("click");
+    let advanced = wrapper.getComponent(DataBarAdvancedSettingsDialog);
+    advanced.findAllComponents(ColorPaletteSelect)[0]!.vm.$emit("select", "#00AA00");
+    advanced
+      .findAllComponents(Select)
+      .find((item) => item.attributes("aria-label") === "Axis position")!
+      .vm.$emit("update:modelValue", "middle");
+    await nextTick();
+    const cancel = [...document.body.querySelectorAll("button")]
+      .filter((button) => button.textContent?.trim() === "Cancel")
+      .at(-1);
+    await new DOMWrapper(cancel!).trigger("click");
+
+    await openAdvanced().trigger("click");
+    advanced = wrapper.getComponent(DataBarAdvancedSettingsDialog);
+    expect(advanced.findAllComponents(ColorPaletteSelect)[0]!.props("modelValue")).toBeUndefined();
+    advanced.findAllComponents(ColorPaletteSelect)[0]!.vm.$emit("select", "#F8696B");
+    advanced.findAllComponents(ColorPaletteSelect)[1]!.vm.$emit("select", "#AA2020");
+    advanced.findAllComponents(ColorPaletteSelect)[2]!.vm.$emit("select", "#343434");
+    advanced
+      .findAllComponents(Select)
+      .find((item) => item.attributes("aria-label") === "Axis position")!
+      .vm.$emit("update:modelValue", "middle");
+    await nextTick();
+    const advancedConfirm = [...document.body.querySelectorAll("button")]
+      .filter((button) => button.textContent?.trim() === "OK")
+      .at(-1);
+    await new DOMWrapper(advancedConfirm!).trigger("click");
+    await confirm();
+    expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({
+      condition: {
+        minimum: { kind: "autoMin" },
+        maximum: { kind: "autoMax" },
+        showValue: false,
+        borderColor: "#638EC6",
+        negativeColor: "#F8696B",
+        negativeBorderColor: "#AA2020",
+        direction: "rightToLeft",
+        axisPosition: "middle",
+        axisColor: "#343434",
+      },
+    });
   });
 
   test("preserves imported average qualifiers while editing its style", async () => {

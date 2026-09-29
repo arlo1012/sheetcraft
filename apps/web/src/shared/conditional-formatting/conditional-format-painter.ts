@@ -33,20 +33,47 @@ function paintDataBar(
   const y = rect.y + 3;
   const height = Math.max(0, rect.height - 6);
   if (barWidth > 0 && height > 0) {
-    const negative = Math.min(start, end) < axis;
+    const negative =
+      visual.negative ??
+      (visual.direction === "rightToLeft"
+        ? Math.max(start, end) > axis
+        : Math.min(start, end) < axis);
     const color = negative ? (visual.negativeColor ?? visual.color) : visual.color;
+    const solidAtRight =
+      visual.axisPosition === "none"
+        ? visual.direction === "rightToLeft"
+        : negative !== (visual.direction === "rightToLeft");
     context.fillStyle = visual.gradient
       ? (() => {
           const gradient = context.createLinearGradient(x, y, x + barWidth, y);
-          gradient.addColorStop(0, negative ? `${color}66` : color);
-          gradient.addColorStop(1, negative ? color : `${color}66`);
+          gradient.addColorStop(0, solidAtRight ? `${color}66` : color);
+          gradient.addColorStop(1, solidAtRight ? color : `${color}66`);
           return gradient;
         })()
       : color;
     context.fillRect(x, y, barWidth, height);
+    if (visual.borderColor) {
+      context.strokeStyle = negative
+        ? (visual.negativeBorderColor ?? visual.borderColor)
+        : visual.borderColor;
+      context.lineWidth = 1;
+      // Keep the complete outline inside the bar, including short bars.
+      const strokeInset = Math.min(0.5, barWidth / 2, height / 2);
+      context.strokeRect(
+        x + strokeInset,
+        y + strokeInset,
+        Math.max(0, barWidth - strokeInset * 2),
+        Math.max(0, height - strokeInset * 2),
+      );
+    }
   }
-  if (axis > rect.x + inset && axis < rect.x + rect.width - inset) {
-    context.strokeStyle = "rgba(69, 76, 85, 0.6)";
+  if (
+    visual.axisVisible !== false &&
+    visual.axisPosition !== "none" &&
+    axis > rect.x + inset &&
+    axis < rect.x + rect.width - inset
+  ) {
+    context.strokeStyle = visual.axisColor ?? "#000000";
     context.lineWidth = 1;
     context.beginPath();
     context.moveTo(Math.round(axis) + 0.5, y);

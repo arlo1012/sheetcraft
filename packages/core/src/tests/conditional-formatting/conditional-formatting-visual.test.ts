@@ -245,6 +245,11 @@ describe("conditional-formatting visuals", () => {
         negativeColor: "#ff0000",
         gradient: true,
         showValue: false,
+        axisColor: "#000000",
+        axisPosition: "automatic",
+        axisVisible: true,
+        direction: "context",
+        negative: true,
       },
       iconSet: { iconSet: "threeArrows", iconIndex: 0, showValue: true },
     });
@@ -272,7 +277,19 @@ describe("conditional-formatting visuals", () => {
       [1],
     );
     expect(createConditionalFormatVisualResolver(sheet, evaluator)({ row: 0, column: 0 })).toEqual({
-      dataBar: { start: 0, end: 1, axis: 0, color: "#00ff00", gradient: true, showValue: true },
+      dataBar: {
+        start: 0,
+        end: 1,
+        axis: 0,
+        color: "#00ff00",
+        gradient: true,
+        showValue: true,
+        axisColor: "#000000",
+        axisPosition: "automatic",
+        axisVisible: false,
+        direction: "context",
+        negative: false,
+      },
     });
     expect(
       createConditionalFormatResolver(sheet, evaluator)({ row: 0, column: 0 }),
@@ -333,5 +350,119 @@ describe("conditional-formatting visuals", () => {
         equalNegative.evaluator,
       )({ row: 0, column: 0 })?.dataBar,
     ).toMatchObject({ start: 0, end: 1, axis: 1, color: "#ff0000" });
+  });
+
+  test("supports automatic bounds, axis modes, and right-to-left data bars", () => {
+    const automatic = resolver(
+      [
+        rule("auto", {
+          kind: "dataBar",
+          minimum: { kind: "autoMin" },
+          maximum: { kind: "autoMax" },
+          color: "#00ff00",
+        }),
+      ],
+      [2, 10],
+    );
+    expect(
+      createConditionalFormatVisualResolver(
+        automatic.sheet,
+        automatic.evaluator,
+      )({ row: 1, column: 0 })?.dataBar,
+    ).toMatchObject({ start: 0, end: 1, axis: 0, axisVisible: false });
+
+    const middle = resolver(
+      [
+        rule("middle", {
+          kind: "dataBar",
+          minimum: { kind: "num", value: -10 },
+          maximum: { kind: "num", value: 10 },
+          color: "#00ff00",
+          negativeColor: "#ff0000",
+          borderColor: "#008800",
+          negativeBorderColor: "#880000",
+          axisPosition: "middle",
+          axisColor: "#123456",
+          direction: "rightToLeft",
+        }),
+      ],
+      [-10, 10],
+    );
+    expect(
+      createConditionalFormatVisualResolver(middle.sheet, middle.evaluator)({ row: 0, column: 0 })
+        ?.dataBar,
+    ).toMatchObject({
+      start: 0.5,
+      end: 1,
+      axis: 0.5,
+      color: "#ff0000",
+      negative: true,
+      borderColor: "#008800",
+      negativeBorderColor: "#880000",
+      axisColor: "#123456",
+      axisPosition: "middle",
+      direction: "rightToLeft",
+    });
+    expect(
+      createConditionalFormatVisualResolver(middle.sheet, middle.evaluator)({ row: 1, column: 0 })
+        ?.dataBar,
+    ).toMatchObject({ start: 0, end: 0.5, axis: 0.5, negative: false });
+
+    const noAxis = resolver(
+      [
+        rule("none", {
+          kind: "dataBar",
+          minimum: { kind: "num", value: -10 },
+          maximum: { kind: "num", value: 10 },
+          color: "#00ff00",
+          axisPosition: "none",
+        }),
+      ],
+      [-10, 10],
+    );
+    expect(
+      createConditionalFormatVisualResolver(noAxis.sheet, noAxis.evaluator)({ row: 1, column: 0 })
+        ?.dataBar,
+    ).toMatchObject({
+      start: 0,
+      end: 1,
+      axis: 0,
+      axisPosition: "none",
+      axisVisible: false,
+    });
+  });
+
+  test("accepts automatic bounds only in their matching data-bar position", () => {
+    expect(() =>
+      normalizeConditionalFormatRules([
+        rule("valid", {
+          kind: "dataBar",
+          minimum: { kind: "autoMin" },
+          maximum: { kind: "autoMax" },
+          color: "#00ff00",
+        }),
+      ]),
+    ).not.toThrow();
+    expect(() =>
+      normalizeConditionalFormatRules([
+        rule("wrong-bound", {
+          kind: "dataBar",
+          minimum: { kind: "autoMax" },
+          maximum: { kind: "max" },
+          color: "#00ff00",
+        }),
+      ]),
+    ).toThrow("conditional-formatting");
+    expect(() =>
+      normalizeConditionalFormatRules([
+        rule("color-scale", {
+          kind: "colorScale",
+          stops: [
+            { threshold: { kind: "autoMin" }, color: "#000000" },
+            { threshold: { kind: "max" }, color: "#ffffff" },
+          ],
+        }),
+      ]),
+    ).toThrow("conditional-formatting");
   });
 });

@@ -94,6 +94,10 @@ export type ConditionalFormatDatePeriod =
 export type ConditionalFormatThreshold =
   | { kind: "min" }
   | { kind: "max" }
+  /** Data-bar only: the lesser of zero and the range minimum. */
+  | { kind: "autoMin" }
+  /** Data-bar only: the greater of zero and the range maximum. */
+  | { kind: "autoMax" }
   | { kind: "num" | "percent" | "percentile"; value: number }
   | { kind: "formula"; formula: string };
 
@@ -134,8 +138,17 @@ export type ConditionalFormatVisual = {
     axis: number;
     color: string;
     negativeColor?: string;
+    borderColor?: string;
+    negativeBorderColor?: string;
     gradient: boolean;
     showValue: boolean;
+    axisColor?: string;
+    axisPosition?: "automatic" | "middle" | "none";
+    /** Whether the axis should be painted for the rule's current numeric scope. */
+    axisVisible?: boolean;
+    direction?: "context" | "leftToRight" | "rightToLeft";
+    /** The source value is negative, even when the selected axis hides that distinction. */
+    negative?: boolean;
   };
   iconSet?: { iconSet: ConditionalFormatIconSet; iconIndex: number; showValue: boolean };
 };
@@ -173,8 +186,13 @@ export type ConditionalFormatCondition =
       maximum: ConditionalFormatThreshold;
       color: string;
       negativeColor?: string;
+      borderColor?: string;
+      negativeBorderColor?: string;
       gradient?: boolean;
       showValue?: boolean;
+      direction?: "context" | "leftToRight" | "rightToLeft";
+      axisPosition?: "automatic" | "middle" | "none";
+      axisColor?: string;
     }
   | {
       kind: "colorScale";
@@ -292,9 +310,18 @@ function normalizeColor(color: unknown, field: string): string {
 function normalizeThreshold(
   value: ConditionalFormatThreshold,
   field: string,
+  dataBarBound?: "minimum" | "maximum",
 ): ConditionalFormatThreshold {
   if (!value || typeof value !== "object") invalid(field, value);
   if (value.kind === "min" || value.kind === "max") return { kind: value.kind };
+  if (value.kind === "autoMin" || value.kind === "autoMax") {
+    if (
+      (value.kind === "autoMin" && dataBarBound !== "minimum") ||
+      (value.kind === "autoMax" && dataBarBound !== "maximum")
+    )
+      invalid(`${field}.kind`, value.kind);
+    return { kind: value.kind };
+  }
   if (value.kind === "formula") {
     if (typeof value.formula !== "string" || !parseFormula(value.formula).ok)
       invalid(`${field}.formula`, value.formula);
@@ -329,7 +356,13 @@ function assertThresholdOrder(
   for (let index = 1; index < thresholds.length; index += 1) {
     const previous = thresholds[index - 1]!;
     const next = thresholds[index]!;
-    if (previous.kind === "max" || next.kind === "min") invalid(`${field}.${index}`, next);
+    if (
+      previous.kind === "max" ||
+      previous.kind === "autoMax" ||
+      next.kind === "min" ||
+      next.kind === "autoMin"
+    )
+      invalid(`${field}.${index}`, next);
     if (
       previous.kind === next.kind &&
       "value" in previous &&
@@ -420,8 +453,22 @@ function normalizeCondition(condition: ConditionalFormatCondition): ConditionalF
       invalid("condition.gradient", condition.gradient);
     if (condition.showValue !== undefined && typeof condition.showValue !== "boolean")
       invalid("condition.showValue", condition.showValue);
-    const minimum = normalizeThreshold(condition.minimum, "condition.minimum");
-    const maximum = normalizeThreshold(condition.maximum, "condition.maximum");
+    if (
+      condition.direction !== undefined &&
+      condition.direction !== "context" &&
+      condition.direction !== "leftToRight" &&
+      condition.direction !== "rightToLeft"
+    )
+      invalid("condition.direction", condition.direction);
+    if (
+      condition.axisPosition !== undefined &&
+      condition.axisPosition !== "automatic" &&
+      condition.axisPosition !== "middle" &&
+      condition.axisPosition !== "none"
+    )
+      invalid("condition.axisPosition", condition.axisPosition);
+    const minimum = normalizeThreshold(condition.minimum, "condition.minimum", "minimum");
+    const maximum = normalizeThreshold(condition.maximum, "condition.maximum", "maximum");
     assertThresholdOrder([minimum, maximum], "condition");
     return {
       kind: "dataBar",
@@ -431,8 +478,24 @@ function normalizeCondition(condition: ConditionalFormatCondition): ConditionalF
       ...(condition.negativeColor === undefined
         ? {}
         : { negativeColor: normalizeColor(condition.negativeColor, "condition.negativeColor") }),
+      ...(condition.borderColor === undefined
+        ? {}
+        : { borderColor: normalizeColor(condition.borderColor, "condition.borderColor") }),
+      ...(condition.negativeBorderColor === undefined
+        ? {}
+        : {
+            negativeBorderColor: normalizeColor(
+              condition.negativeBorderColor,
+              "condition.negativeBorderColor",
+            ),
+          }),
       ...(condition.gradient === false ? { gradient: false } : {}),
       ...(condition.showValue === false ? { showValue: false } : {}),
+      ...(condition.direction === undefined ? {} : { direction: condition.direction }),
+      ...(condition.axisPosition === undefined ? {} : { axisPosition: condition.axisPosition }),
+      ...(condition.axisColor === undefined
+        ? {}
+        : { axisColor: normalizeColor(condition.axisColor, "condition.axisColor") }),
     };
   }
   if (condition.kind === "colorScale") {
@@ -873,6 +936,8 @@ function resolveThreshold(
   if (!summary) return undefined;
   if (threshold.kind === "min") return summary.minimum;
   if (threshold.kind === "max") return summary.maximum;
+  if (threshold.kind === "autoMin") return Math.min(0, summary.minimum);
+  if (threshold.kind === "autoMax") return Math.max(0, summary.maximum);
   if (threshold.kind === "num") return threshold.value;
   if (threshold.kind === "percent")
     return summary.minimum + ((summary.maximum - summary.minimum) * threshold.value) / 100;
@@ -1217,34 +1282,73 @@ export function createConditionalFormatVisualResolver(
         const maximum = resolveThreshold(rule.condition.maximum, summary, rule, address, evaluator);
         if (minimum !== undefined && maximum !== undefined && maximum >= minimum) {
           const width = maximum - minimum;
-          const position =
-            width === 0 ? (value < 0 ? 0 : 1) : Math.max(0, Math.min(1, (value - minimum) / width));
-          const axis =
-            width === 0 ? (value < 0 ? 1 : 0) : Math.max(0, Math.min(1, -minimum / width));
-          dataBar =
-            value < 0
-              ? {
-                  start: Math.min(position, axis),
-                  end: Math.max(position, axis),
-                  axis,
-                  color: rule.condition.negativeColor ?? rule.condition.color,
-                  ...(rule.condition.negativeColor === undefined
-                    ? {}
-                    : { negativeColor: rule.condition.negativeColor }),
-                  gradient: rule.condition.gradient !== false,
-                  showValue: rule.condition.showValue !== false,
-                }
-              : {
-                  start: Math.min(axis, position),
-                  end: Math.max(axis, position),
-                  axis,
-                  color: rule.condition.color,
-                  ...(rule.condition.negativeColor === undefined
-                    ? {}
-                    : { negativeColor: rule.condition.negativeColor }),
-                  gradient: rule.condition.gradient !== false,
-                  showValue: rule.condition.showValue !== false,
-                };
+          const axisPosition = rule.condition.axisPosition ?? "automatic";
+          const direction = rule.condition.direction ?? "context";
+          const negative = value < 0;
+          let start: number;
+          let end: number;
+          let axis: number;
+
+          if (axisPosition === "middle") {
+            axis = 0.5;
+            if (negative) {
+              const ratio = minimum < 0 ? Math.max(0, Math.min(1, value / minimum)) : 0;
+              start = axis - axis * ratio;
+              end = axis;
+            } else {
+              const ratio = maximum > 0 ? Math.max(0, Math.min(1, value / maximum)) : 0;
+              start = axis;
+              end = axis + (1 - axis) * ratio;
+            }
+          } else if (axisPosition === "none") {
+            axis = 0;
+            const position = width === 0 ? 1 : Math.max(0, Math.min(1, (value - minimum) / width));
+            start = 0;
+            end = position;
+          } else {
+            axis = width === 0 ? (negative ? 1 : 0) : Math.max(0, Math.min(1, -minimum / width));
+            const position =
+              width === 0
+                ? negative
+                  ? 0
+                  : 1
+                : Math.max(0, Math.min(1, (value - minimum) / width));
+            start = Math.min(axis, position);
+            end = Math.max(axis, position);
+          }
+
+          // The sheet model has no right-to-left layout flag yet. Context therefore uses the
+          // workbook's current left-to-right default; an explicit RTL data-bar mirrors geometry.
+          if (direction === "rightToLeft") {
+            const mirroredStart = 1 - end;
+            end = 1 - start;
+            start = mirroredStart;
+            axis = 1 - axis;
+          }
+          dataBar = {
+            start,
+            end,
+            axis,
+            color: negative
+              ? (rule.condition.negativeColor ?? rule.condition.color)
+              : rule.condition.color,
+            ...(rule.condition.negativeColor === undefined
+              ? {}
+              : { negativeColor: rule.condition.negativeColor }),
+            ...(rule.condition.borderColor === undefined
+              ? {}
+              : { borderColor: rule.condition.borderColor }),
+            ...(rule.condition.negativeBorderColor === undefined
+              ? {}
+              : { negativeBorderColor: rule.condition.negativeBorderColor }),
+            gradient: rule.condition.gradient !== false,
+            showValue: rule.condition.showValue !== false,
+            axisColor: rule.condition.axisColor ?? "#000000",
+            axisPosition,
+            axisVisible: axisPosition !== "none" && (summary?.minimum ?? value) < 0,
+            direction,
+            negative,
+          };
         }
       }
       if (rule.condition.kind === "iconSet" && iconSet === undefined && typeof value === "number") {

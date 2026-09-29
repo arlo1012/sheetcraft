@@ -93,8 +93,8 @@ export function getConditionalFormatPreset(kind: string): ConditionalFormatCondi
     if (!match) return undefined;
     return {
       kind: "dataBar",
-      minimum: { kind: "min" },
-      maximum: { kind: "max" },
+      minimum: { kind: "autoMin" },
+      maximum: { kind: "autoMax" },
       color: BAR_COLORS[match[1] as BarColor],
       gradient: !match[2],
       showValue: true,

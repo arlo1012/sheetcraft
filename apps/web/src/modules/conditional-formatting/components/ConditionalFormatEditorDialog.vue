@@ -24,6 +24,9 @@ import { conditionalFormatPresetStyle } from "../conditional-format-quick-rules"
 import ConditionalFormatPreview from "./ConditionalFormatPreview.vue";
 import ConditionalFormatThresholdField from "./ConditionalFormatThresholdField.vue";
 import ConditionalFormatIconRules from "./ConditionalFormatIconRules.vue";
+import DataBarAdvancedSettingsDialog, {
+  type DataBarAdvancedSettings,
+} from "./DataBarAdvancedSettingsDialog.vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import OptionList from "../../../shared/option-list/OptionList.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
@@ -92,8 +95,13 @@ type EditorDraft = {
   maximumValue: string;
   barColor: string;
   negativeColor: string | undefined;
+  borderColor: string | undefined;
+  negativeBorderColor: string | undefined;
   gradient: boolean;
   showValue: boolean;
+  direction: "context" | "leftToRight" | "rightToLeft";
+  axisPosition: "automatic" | "middle" | "none";
+  axisColor: string;
   scaleStops: 2 | 3;
   middleKind: ThresholdKind;
   middleValue: string;
@@ -127,6 +135,7 @@ const format = ref<ConditionalFormatStyle>(
     : conditionalFormatPresetStyle("redFillText"),
 );
 const customVisible = ref(false);
+const dataBarAdvancedVisible = ref(false);
 const pickingRange = ref(false);
 async function selectRange(current: string): Promise<string | undefined> {
   pickingRange.value = true;
@@ -144,7 +153,7 @@ async function selectValueReference(current: string): Promise<string | undefined
     pickingRange.value = false;
   }
 }
-const showIconsOnly = computed({
+const showVisualOnly = computed({
   get: () => !draft.showValue,
   set: (value: boolean) => {
     draft.showValue = !value;
@@ -197,7 +206,7 @@ const visualStyle = computed({
   get: () => (draft.kind === "colorScale" ? `scale${draft.scaleStops}` : draft.kind),
   set: (value: string) => {
     if (value === "scale2" || value === "scale3") {
-      draft.kind = "colorScale";
+      updateKind("colorScale");
       draft.scaleStops = value === "scale2" ? 2 : 3;
     } else updateKind(value as ConditionKind);
   },
@@ -257,7 +266,7 @@ const needsSecondValue = computed(
 );
 const formulaPlaceholder = '=$D2="Overdue"';
 function threshold(kind: ThresholdKind, value: string): ConditionalFormatThreshold {
-  if (kind === "min" || kind === "max") return { kind };
+  if (kind === "min" || kind === "max" || kind === "autoMin" || kind === "autoMax") return { kind };
   if (kind === "formula") return { kind, formula: value };
   return { kind, value: value.trim() === "" ? Number.NaN : Number(value) };
 }
@@ -295,6 +304,7 @@ function createDraft(rule = props.rule): EditorDraft {
       }),
     );
   const c = displayedRule?.condition ?? getConditionalFormatPreset(props.initialKind ?? "");
+  const draftKind = c?.kind ?? quickKind(props.initialKind);
   const scale = c?.kind === "colorScale" ? c : undefined;
   const stop = (i: number) => scale?.stops[i];
   const min = c?.kind === "dataBar" ? c.minimum : stop(0)?.threshold;
@@ -320,7 +330,7 @@ function createDraft(rule = props.rule): EditorDraft {
   return {
     id: rule?.id ?? createConditionalFormatRuleId(),
     ranges: rule ? formatConditionalFormatRanges(rule.ranges) : props.ranges,
-    kind: c?.kind ?? quickKind(props.initialKind),
+    kind: draftKind,
     operator:
       c?.kind === "cellValue" || c?.kind === "text"
         ? c.operator
@@ -371,12 +381,14 @@ function createDraft(rule = props.rule): EditorDraft {
             ? props.initialKind
             : "today") as string),
     stopIfTrue: Boolean(rule?.stopIfTrue),
-    minimumKind: min?.kind ?? "min",
+    minimumKind: min?.kind ?? (draftKind === "dataBar" ? "autoMin" : "min"),
     minimumValue: minValue,
-    maximumKind: max?.kind ?? "max",
+    maximumKind: max?.kind ?? (draftKind === "dataBar" ? "autoMax" : "max"),
     maximumValue: maxValue,
     barColor: c?.kind === "dataBar" ? c.color : "#638EC6",
     negativeColor: c?.kind === "dataBar" ? c.negativeColor : undefined,
+    borderColor: c?.kind === "dataBar" ? c.borderColor : undefined,
+    negativeBorderColor: c?.kind === "dataBar" ? c.negativeBorderColor : undefined,
     gradient: c?.kind === "dataBar" ? c.gradient !== false : true,
     showValue:
       c?.kind === "dataBar"
@@ -384,6 +396,9 @@ function createDraft(rule = props.rule): EditorDraft {
         : c?.kind === "iconSet"
           ? c.showValue !== false
           : true,
+    direction: c?.kind === "dataBar" ? (c.direction ?? "context") : "context",
+    axisPosition: c?.kind === "dataBar" ? (c.axisPosition ?? "automatic") : "automatic",
+    axisColor: c?.kind === "dataBar" ? (c.axisColor ?? "#000000") : "#000000",
     scaleStops: c?.kind === "colorScale" ? (c.stops.length as 2 | 3) : 3,
     middleKind: middle?.kind ?? "percentile",
     middleValue: middleValue,
@@ -407,13 +422,23 @@ function resetDraft() {
     ? cloneConditionalFormatRule(props.rule).style
     : conditionalFormatPresetStyle("redFillText");
   customVisible.value = false;
+  dataBarAdvancedVisible.value = false;
   Object.assign(draft, createDraft());
   Object.assign(error, { ranges: "", value: "", formula: "", format: "" });
 }
 function updateKind(kind: ConditionKind) {
+  const wasDataBar = draft.kind === "dataBar";
   draft.kind = kind;
   if (kind === "text") draft.operator = "contains";
   if (kind === "cellValue") draft.operator = "greaterThan";
+  if (kind === "dataBar") {
+    draft.minimumKind = "autoMin";
+    draft.maximumKind = "autoMax";
+  }
+  if (wasDataBar && kind !== "dataBar") {
+    if (draft.minimumKind === "autoMin") draft.minimumKind = "min";
+    if (draft.maximumKind === "autoMax") draft.maximumKind = "max";
+  }
 }
 function updateOperand(value: string, second = false): void {
   if (second) {
@@ -457,8 +482,15 @@ function buildVisualCondition(): SheetConditionalFormatRule["condition"] | undef
       maximum: threshold(draft.maximumKind, draft.maximumValue),
       color: draft.barColor,
       ...(draft.negativeColor === undefined ? {} : { negativeColor: draft.negativeColor }),
+      ...(draft.borderColor === undefined ? {} : { borderColor: draft.borderColor }),
+      ...(draft.negativeBorderColor === undefined
+        ? {}
+        : { negativeBorderColor: draft.negativeBorderColor }),
       gradient: draft.gradient,
       showValue: draft.showValue,
+      direction: draft.direction,
+      axisPosition: draft.axisPosition,
+      axisColor: draft.axisColor,
     };
   if (draft.kind === "colorScale") {
     const stops = [
@@ -593,13 +625,20 @@ function save() {
     );
   }
 }
+function updateDataBarAdvancedSettings(settings: DataBarAdvancedSettings): void {
+  draft.negativeColor = settings.negativeColor;
+  draft.negativeBorderColor = settings.negativeBorderColor;
+  draft.axisPosition = settings.axisPosition;
+  draft.axisColor = settings.axisColor;
+  dataBarAdvancedVisible.value = false;
+}
 watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
   deep: true,
 });
 </script>
 <template>
   <Dialog
-    :visible="visible && !customVisible && !pickingRange"
+    :visible="visible && !customVisible && !pickingRange && !dataBarAdvancedVisible"
     :header="rule ? t('conditionalFormatting.editRule') : t('conditionalFormatting.newRule')"
     :confirm-btn="{ content: t('conditionalFormatting.save') }"
     :cancel-btn="t('conditionalFormatting.cancel')"
@@ -647,6 +686,9 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           <TFormItem :label="t('conditionalFormatting.formatStyle')">
             <TSelect v-model="visualStyle" :options="visualOptions" />
           </TFormItem>
+          <TCheckbox v-if="draft.kind === 'dataBar'" v-model="showVisualOnly">{{
+            t("conditionalFormatting.showBarOnly")
+          }}</TCheckbox>
           <TButton
             v-if="draft.kind === 'iconSet'"
             variant="outline"
@@ -679,7 +721,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
                 </TOption>
               </TSelect>
             </TFormItem>
-            <TCheckbox v-model="showIconsOnly">{{
+            <TCheckbox v-model="showVisualOnly">{{
               t("conditionalFormatting.showIconsOnly")
             }}</TCheckbox>
           </template>
@@ -773,12 +815,17 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
         <template v-else-if="draft.kind === 'dataBar' || draft.kind === 'colorScale'">
           <div
             class="conditional-format-editor__thresholds"
-            :class="{ 'has-midpoint': draft.kind === 'colorScale' && draft.scaleStops === 3 }"
+            :class="{
+              'has-midpoint': draft.kind === 'colorScale' && draft.scaleStops === 3,
+              'is-data-bar': draft.kind === 'dataBar',
+            }"
           >
             <div class="conditional-format-editor__row-labels" aria-hidden="true">
               <span></span><span>{{ t("conditionalFormatting.thresholdType") }}</span
               ><span>{{ t("conditionalFormatting.value") }}</span
-              ><span>{{ t("conditionalFormatting.color") }}</span>
+              ><span v-if="draft.kind === 'colorScale'">{{
+                t("conditionalFormatting.color")
+              }}</span>
             </div>
             <div
               class="conditional-format-editor__threshold-column"
@@ -790,6 +837,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
                 v-model:kind="draft.minimumKind"
                 v-model:value="draft.minimumValue"
                 stacked
+                :data-bar-bound="draft.kind === 'dataBar' ? 'minimum' : undefined"
                 :label="t('conditionalFormatting.minimum')"
                 :select-value-reference="
                   props.selectValueReference ? selectValueReference : undefined
@@ -802,14 +850,6 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
                 default-color="#F8696B"
                 :default-label="t('conditionalFormatting.automatic')"
                 @select="draft.minColor = $event ?? '#F8696B'"
-              />
-              <ColorPaletteSelect
-                v-else
-                :model-value="draft.barColor"
-                :label="t('conditionalFormatting.barColor')"
-                default-color="#638EC6"
-                :default-label="t('conditionalFormatting.automatic')"
-                @select="draft.barColor = $event ?? '#638EC6'"
               />
             </div>
             <div
@@ -846,6 +886,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
                 v-model:kind="draft.maximumKind"
                 v-model:value="draft.maximumValue"
                 stacked
+                :data-bar-bound="draft.kind === 'dataBar' ? 'maximum' : undefined"
                 :label="t('conditionalFormatting.maximum')"
                 :select-value-reference="
                   props.selectValueReference ? selectValueReference : undefined
@@ -859,21 +900,77 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
                 :default-label="t('conditionalFormatting.automatic')"
                 @select="draft.maxColor = $event ?? '#63BE7B'"
               />
-              <TSelect
-                v-else
-                v-model="draft.gradient"
-                :options="[
-                  { value: true, label: t('conditionalFormatting.gradient') },
-                  { value: false, label: t('conditionalFormatting.solid') },
-                ]"
-              />
             </div>
           </div>
-          <div v-if="draft.kind === 'dataBar'" class="conditional-format-editor__toggles">
-            <TCheckbox v-model="draft.showValue">{{
-              t("conditionalFormatting.showValue")
-            }}</TCheckbox>
-          </div>
+          <section v-if="draft.kind === 'dataBar'" class="conditional-format-editor__section">
+            <h3>{{ t("conditionalFormatting.barAppearance") }}</h3>
+            <div class="conditional-format-editor__bar-appearance">
+              <TFormItem label-align="top" :label="t('conditionalFormatting.barFill')">
+                <TSelect
+                  v-model="draft.gradient"
+                  :aria-label="t('conditionalFormatting.barFill')"
+                  :options="[
+                    { value: false, label: t('conditionalFormatting.solid') },
+                    { value: true, label: t('conditionalFormatting.gradient') },
+                  ]"
+                />
+              </TFormItem>
+              <TFormItem label-align="top" :label="t('conditionalFormatting.color')">
+                <ColorPaletteSelect
+                  :model-value="draft.barColor"
+                  :label="t('conditionalFormatting.barColor')"
+                  default-color="#638EC6"
+                  :default-label="t('conditionalFormatting.automatic')"
+                  @select="draft.barColor = $event ?? '#638EC6'"
+                />
+              </TFormItem>
+              <TFormItem label-align="top" :label="t('conditionalFormatting.border')">
+                <TSelect
+                  :model-value="draft.borderColor !== undefined"
+                  :aria-label="t('conditionalFormatting.border')"
+                  :options="[
+                    { value: false, label: t('conditionalFormatting.noBorder') },
+                    { value: true, label: t('conditionalFormatting.solidBorder') },
+                  ]"
+                  @update:model-value="
+                    draft.borderColor = $event ? (draft.borderColor ?? draft.barColor) : undefined
+                  "
+                />
+              </TFormItem>
+              <TFormItem label-align="top" :label="t('conditionalFormatting.borderColor')">
+                <ColorPaletteSelect
+                  :model-value="draft.borderColor"
+                  :label="t('conditionalFormatting.borderColor')"
+                  :default-color="draft.barColor"
+                  :default-label="t('conditionalFormatting.sameAsBar')"
+                  :disabled="draft.borderColor === undefined"
+                  @select="draft.borderColor = $event ?? draft.barColor"
+                />
+              </TFormItem>
+            </div>
+            <div class="conditional-format-editor__bar-actions">
+              <TButton variant="outline" @click="dataBarAdvancedVisible = true">{{
+                t("conditionalFormatting.negativeAndAxis")
+              }}</TButton>
+              <TFormItem :label="t('conditionalFormatting.barDirection')">
+                <TSelect
+                  v-model="draft.direction"
+                  :aria-label="t('conditionalFormatting.barDirection')"
+                  :options="[
+                    { value: 'context', label: t('conditionalFormatting.directionContext') },
+                    {
+                      value: 'leftToRight',
+                      label: t('conditionalFormatting.directionLeftToRight'),
+                    },
+                    {
+                      value: 'rightToLeft',
+                      label: t('conditionalFormatting.directionRightToLeft'),
+                    },
+                  ]"
+                />
+              </TFormItem>
+            </div>
+          </section>
         </template>
         <ConditionalFormatIconRules
           v-else-if="draft.kind === 'iconSet' && previewCondition?.kind === 'iconSet'"
@@ -932,6 +1029,19 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
       </p>
     </TForm>
   </Dialog>
+  <DataBarAdvancedSettingsDialog
+    :visible="dataBarAdvancedVisible"
+    :settings="{
+      negativeColor: draft.negativeColor,
+      negativeBorderColor: draft.negativeBorderColor,
+      axisPosition: draft.axisPosition,
+      axisColor: draft.axisColor,
+    }"
+    :positive-color="draft.barColor"
+    :positive-border-color="draft.borderColor"
+    @close="dataBarAdvancedVisible = false"
+    @save="updateDataBarAdvancedSettings"
+  />
 </template>
 <style scoped lang="scss">
 .conditional-format-editor {
@@ -997,6 +1107,14 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     &.has-midpoint {
       grid-template-columns: 80px repeat(3, minmax(0, 1fr));
     }
+    &.is-data-bar {
+      .conditional-format-editor__row-labels {
+        grid-template-rows: 20px repeat(2, 28px);
+      }
+      .conditional-format-editor__threshold-column {
+        grid-template-rows: 20px 64px;
+      }
+    }
   }
   &__row-labels {
     display: grid;
@@ -1012,10 +1130,19 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     gap: 8px;
     min-width: 0;
   }
-  &__toggles {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
+  &__bar-appearance {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+  &__bar-actions {
+    display: grid;
+    grid-template-columns: auto minmax(180px, 1fr);
+    align-items: end;
+    gap: 12px;
+    > button {
+      margin-block-end: 2px;
+    }
   }
   &__preview {
     display: grid;
@@ -1039,6 +1166,12 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     &__inline {
       grid-template-columns: minmax(0, 1fr) 80px auto;
       gap: 8px;
+    }
+    &__bar-appearance {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    &__bar-actions {
+      grid-template-columns: 1fr;
     }
   }
   &__error {

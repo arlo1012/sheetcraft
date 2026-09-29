@@ -43,7 +43,82 @@ function iconRule(id: string, iconSet: ConditionalFormatIconSet, reverse = false
   };
 }
 
-describe("XLSX x14 icon-set conditional formatting", () => {
+describe("XLSX x14 visual conditional formatting", () => {
+  test("imports an Excel-style linked data-bar extension that inherits base fields", () => {
+    const report = new CompatibilityReportBuilder();
+    const xml = `<worksheet><conditionalFormatting sqref="A1:A3"><cfRule type="dataBar" priority="1"><dataBar showValue="0"><cfvo type="min"/><cfvo type="max"/><color rgb="FF638EC6"/></dataBar><extLst><ext uri="{B025F937-C7B1-47D3-B67F-A62EFF666E3E}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:id>{D0A6F76B-7C0B-4E89-A7A3-0DB2B85E7A1E}</x14:id></ext></extLst></cfRule></conditionalFormatting><extLst><ext uri="{78C0D931-6437-407d-A8EE-F0AAD7539E65}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:conditionalFormattings><x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:cfRule type="dataBar" id="{D0A6F76B-7C0B-4E89-A7A3-0DB2B85E7A1E}"><x14:dataBar border="1" gradient="0" negativeBarColorSameAsPositive="1" axisPosition="none"><x14:borderColor rgb="FF2F5597"/></x14:dataBar></x14:cfRule><xm:sqref>A1:A3</xm:sqref></x14:conditionalFormatting></x14:conditionalFormattings></ext></extLst></worksheet>`;
+    expect(readXlsxConditionalFormats(xml, undefined, 0, report).rules).toMatchObject([
+      {
+        condition: {
+          kind: "dataBar",
+          minimum: { kind: "min" },
+          maximum: { kind: "max" },
+          color: "#638EC6",
+          borderColor: "#2F5597",
+          gradient: false,
+          showValue: false,
+          axisPosition: "none",
+        },
+      },
+    ]);
+    expect(report.build().issues).toEqual([]);
+  });
+
+  test("roundtrips the complete Office 2010 data-bar appearance through its linked base rule", async () => {
+    const workbook = createWorkbook({ id: "x14-data-bar", sheetId: "sheet" });
+    getActiveSheet(workbook).conditionalFormats = [
+      {
+        id: "bar",
+        ranges: [range],
+        anchor: range.start,
+        condition: {
+          kind: "dataBar",
+          minimum: { kind: "autoMin" },
+          maximum: { kind: "autoMax" },
+          color: "#638EC6",
+          borderColor: "#2F5597",
+          negativeColor: "#F8696B",
+          negativeBorderColor: "#C00000",
+          gradient: false,
+          showValue: false,
+          direction: "rightToLeft",
+          axisPosition: "middle",
+          axisColor: "#101010",
+        },
+        style: {},
+      },
+    ];
+    const encoded = await encodeXlsx(workbook);
+    const xml = strFromU8(unzipSync(encoded.bytes)["xl/worksheets/sheet1.xml"]!);
+    const id = /<x14:id>(\{[^<]+\})<\/x14:id>/.exec(xml)?.[1];
+    expect(id).toBeTruthy();
+    expect(xml).toContain(`<x14:cfRule type="dataBar" id="${id}">`);
+    expect(xml).toContain('<x14:cfvo type="autoMin"/>');
+    expect(xml).toContain('<x14:cfvo type="autoMax"/>');
+    expect(xml).toContain('border="1"');
+    expect(xml).toContain('direction="rightToLeft"');
+    expect(xml).toContain('axisPosition="middle"');
+    expect(xml).toContain('<x14:negativeBorderColor rgb="FFC00000"/>');
+    const restored = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook).conditionalFormats;
+    expect(restored).toHaveLength(1);
+    expect(restored?.[0]).toMatchObject({
+      condition: {
+        kind: "dataBar",
+        minimum: { kind: "autoMin" },
+        maximum: { kind: "autoMax" },
+        color: "#638EC6",
+        borderColor: "#2F5597",
+        negativeColor: "#F8696B",
+        negativeBorderColor: "#C00000",
+        gradient: false,
+        showValue: false,
+        direction: "rightToLeft",
+        axisPosition: "middle",
+        axisColor: "#101010",
+      },
+    });
+  });
+
   test.each(["threeStars", "threeTriangles"] as const)(
     "keeps %s visible over a lower-priority ratings rule after export",
     async (iconSet) => {

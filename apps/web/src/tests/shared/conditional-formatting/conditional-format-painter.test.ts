@@ -99,6 +99,104 @@ describe("conditional format canvas painter", () => {
     expect(canvas.drawImage).toBeUndefined();
   });
 
+  test("paints positive and negative borders inside the bar and uses the configured axis color", () => {
+    const canvas = context();
+    const dataBar = {
+      start: 0.5,
+      end: 1,
+      axis: 0.5,
+      color: "#638ec6",
+      borderColor: "#112233",
+      negativeBorderColor: "#aa0000",
+      axisColor: "#008800",
+      gradient: false,
+      showValue: false,
+      negative: false,
+    };
+    paintConditionalFormatVisual(canvas, { x: 0, y: 0, width: 100, height: 24 }, { dataBar });
+    expect(canvas.strokeRect).toHaveBeenCalledWith(50.5, 3.5, 47, 17);
+    expect(canvas.strokeStyle).toBe("#008800");
+    expect(canvas.stroke).toHaveBeenCalledOnce();
+
+    const negative = context();
+    paintConditionalFormatVisual(
+      negative,
+      { x: 0, y: 0, width: 100, height: 24 },
+      { dataBar: { ...dataBar, negative: true, axisPosition: "none" } },
+    );
+    expect(negative.strokeStyle).toBe("#aa0000");
+    expect(negative.strokeRect).toHaveBeenCalledOnce();
+    expect(negative.stroke).not.toHaveBeenCalled();
+
+    const borderless = context();
+    paintConditionalFormatVisual(
+      borderless,
+      { x: 0, y: 0, width: 100, height: 24 },
+      { dataBar: { ...dataBar, borderColor: undefined, negative: true } },
+    );
+    expect(borderless.strokeRect).not.toHaveBeenCalled();
+
+    const positiveOnly = context();
+    paintConditionalFormatVisual(
+      positiveOnly,
+      { x: 0, y: 0, width: 100, height: 24 },
+      { dataBar: { ...dataBar, axisPosition: "middle", axisVisible: false } },
+    );
+    expect(positiveOnly.strokeRect).toHaveBeenCalledOnce();
+    expect(positiveOnly.stroke).not.toHaveBeenCalled();
+  });
+
+  test("keeps RTL bar colors tied to value sign and mirrors the gradient", () => {
+    const dataBar = {
+      start: 0,
+      end: 0.5,
+      axis: 0.5,
+      color: "#638ec6",
+      negativeColor: "#ff0000",
+      gradient: true,
+      showValue: true,
+      direction: "rightToLeft" as const,
+      negative: false,
+    };
+    const positive = context();
+    paintConditionalFormatVisual(positive, { x: 0, y: 0, width: 100, height: 24 }, { dataBar });
+    expect(positive.gradient.addColorStop).toHaveBeenNthCalledWith(1, 0, "#638ec666");
+    expect(positive.gradient.addColorStop).toHaveBeenNthCalledWith(2, 1, "#638ec6");
+
+    const negative = context();
+    paintConditionalFormatVisual(
+      negative,
+      { x: 0, y: 0, width: 100, height: 24 },
+      { dataBar: { ...dataBar, start: 0.5, end: 1, negative: true } },
+    );
+    expect(negative.gradient.addColorStop).toHaveBeenNthCalledWith(1, 0, "#ff0000");
+    expect(negative.gradient.addColorStop).toHaveBeenNthCalledWith(2, 1, "#ff000066");
+  });
+
+  test("without an axis negative bars use the same gradient direction as positive bars", () => {
+    const canvas = context();
+    paintConditionalFormatVisual(
+      canvas,
+      { x: 0, y: 0, width: 100, height: 24 },
+      {
+        dataBar: {
+          start: 0,
+          end: 0.5,
+          axis: 0,
+          color: "#638ec6",
+          negativeColor: "#ff0000",
+          gradient: true,
+          showValue: true,
+          negative: true,
+          axisPosition: "none",
+        },
+      },
+    );
+    expect(canvas.gradient.addColorStop).toHaveBeenNthCalledWith(1, 0, "#ff0000");
+    expect(canvas.gradient.addColorStop).toHaveBeenNthCalledWith(2, 1, "#ff000066");
+    expect(canvas.stroke).not.toHaveBeenCalled();
+  });
+
   test("keeps arrow directions, symbols, ratings, quarters, and boxes as distinct native shapes", () => {
     const rect = { x: 0, y: 0, width: 80, height: 24 };
     const arrows = context();

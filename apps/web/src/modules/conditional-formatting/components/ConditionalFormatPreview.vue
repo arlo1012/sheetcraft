@@ -35,6 +35,7 @@ const visual = computed(
   () => props.condition?.kind === "dataBar" || props.condition?.kind === "iconSet",
 );
 const insetColorScale = computed(() => props.wide && props.condition?.kind === "colorScale");
+const insetDataBar = computed(() => props.wide && props.condition?.kind === "dataBar");
 const dimensions = ref({ width: 90, height: 24 });
 let observer: ResizeObserver | undefined;
 
@@ -83,7 +84,7 @@ function setDimensions(): void {
       : props.wide
         ? {
             width: Math.max(120, Math.round(canvas.value.clientWidth)),
-            height: 40,
+            height: insetDataBar.value ? 22 : 40,
           }
         : { width: 90, height: 24 };
 }
@@ -104,6 +105,7 @@ watchPostEffect(() => {
   // dimensions, so it cannot create a canvas resize loop.
   void props.wide;
   void props.iconIndex;
+  void insetDataBar.value;
   setDimensions();
 });
 
@@ -119,28 +121,30 @@ watchPostEffect(() => {
   context.clearRect(0, 0, width, height);
   const condition = props.condition;
   if (condition?.kind === "dataBar") {
-    const end = condition.negativeColor ? 0.68 : 0.8;
+    const axis = condition.axisPosition === "middle" ? 0.5 : 0;
+    const end = axis + (1 - axis) * 0.9;
+    const rtl = condition.direction === "rightToLeft";
     paintConditionalFormatVisual(
       context,
       { x: 0, y: 0, width, height },
       {
         dataBar: {
-          start: 0,
-          end,
-          axis: 0,
+          start: rtl ? 1 - end : axis,
+          end: rtl ? 1 - axis : end,
+          axis: rtl ? 1 - axis : axis,
           color: condition.color,
           negativeColor: condition.negativeColor,
+          borderColor: condition.borderColor,
+          negativeBorderColor: condition.negativeBorderColor,
+          direction: condition.direction,
+          axisPosition: condition.axisPosition,
+          axisColor: condition.axisColor,
+          negative: false,
           gradient: condition.gradient !== false,
           showValue: condition.showValue !== false,
         },
       },
     );
-    if (props.wide && condition.showValue !== false) {
-      context.fillStyle = "#525a65";
-      context.font = "12px sans-serif";
-      context.textBaseline = "middle";
-      context.fillText("80", Math.min(width - 22, width * end + 7), height / 2);
-    }
   }
   if (condition?.kind === "iconSet") {
     const count = condition.thresholds.length;
@@ -178,7 +182,8 @@ watchPostEffect(() => {
       'conditional-format-preview--wide': wide,
       'conditional-format-preview--compact': compact,
       'conditional-format-preview--single-icon': iconIndex !== undefined,
-      'conditional-format-preview--color-control': insetColorScale,
+      'conditional-format-preview--color-control': insetColorScale || insetDataBar,
+      'conditional-format-preview--data-bar': insetDataBar,
     }"
     :style="insetColorScale ? undefined : swatchStyle"
     role="img"
@@ -245,6 +250,14 @@ watchPostEffect(() => {
     min-width: 0;
     height: 16px;
     border-radius: var(--idea-radius-small);
+  }
+
+  &--data-bar {
+    // The canvas painter supplies the remaining 2px of the control's 8px inset.
+    padding-inline: 6px;
+    .conditional-format-preview__visual {
+      height: 22px;
+    }
   }
 
   &--single-icon {

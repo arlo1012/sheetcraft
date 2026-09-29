@@ -9,6 +9,7 @@ const props = defineProps<{
   kind: ConditionalFormatThreshold["kind"];
   value: string;
   stacked?: boolean;
+  dataBarBound?: "minimum" | "maximum";
   label?: string;
   selectValueReference?: (current: string) => Promise<string | undefined>;
 }>();
@@ -17,9 +18,16 @@ const emit = defineEmits<{
   "update:value": [value: string];
 }>();
 const { t } = useAppI18n();
-const automatic = computed(() => props.kind === "min" || props.kind === "max");
+const automatic = computed(() => ["min", "max", "autoMin", "autoMax"].includes(props.kind));
 const options = computed(() =>
-  ["min", "num", "percent", "percentile", "formula", "max"].map((value) => ({
+  [
+    ...(props.dataBarBound === "minimum" ? ["autoMin", "min"] : ["min"]),
+    "num",
+    "percent",
+    "percentile",
+    "formula",
+    ...(props.dataBarBound === "maximum" ? ["autoMax", "max"] : ["max"]),
+  ].map((value) => ({
     value,
     label: t(`conditionalFormatting.${value}` as MessageKey),
   })),
@@ -45,11 +53,13 @@ function updateValue(value: string): void {
       :placeholder="
         props.kind === 'min'
           ? t('conditionalFormatting.min')
-          : props.kind === 'max'
-            ? t('conditionalFormatting.max')
-            : t('conditionalFormatting.thresholdValueHint')
+          : props.kind === 'autoMin' || props.kind === 'autoMax'
+            ? t('conditionalFormatting.automatic')
+            : props.kind === 'max'
+              ? t('conditionalFormatting.max')
+              : t('conditionalFormatting.thresholdValueHint')
       "
-      :show-picker="!automatic"
+      :show-picker="Boolean(dataBarBound) || !automatic"
       :select-reference="selectValueReference"
       @update:model-value="updateValue"
     />

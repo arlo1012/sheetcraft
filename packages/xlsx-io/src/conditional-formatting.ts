@@ -464,9 +464,11 @@ function thresholdXml(
 ): string {
   return threshold.kind === "min" || threshold.kind === "max"
     ? `<cfvo type="${threshold.kind}"/>`
-    : threshold.kind === "formula"
-      ? `<cfvo type="formula" val="${encodeXml(formulaForXlsx(threshold.formula, rowOffset, columnOffset))}"/>`
-      : `<cfvo type="${threshold.kind}" val="${threshold.value}"/>`;
+    : threshold.kind === "autoMin" || threshold.kind === "autoMax"
+      ? `<cfvo type="${threshold.kind === "autoMin" ? "min" : "max"}"/>`
+      : threshold.kind === "formula"
+        ? `<cfvo type="formula" val="${encodeXml(formulaForXlsx(threshold.formula, rowOffset, columnOffset))}"/>`
+        : `<cfvo type="${threshold.kind}" val="${threshold.value}"/>`;
 }
 
 function x14ThresholdXml(
@@ -480,9 +482,11 @@ function x14ThresholdXml(
       ? "0"
       : threshold.kind === "max"
         ? "100"
-        : threshold.kind === "formula"
-          ? formulaForXlsx(threshold.formula, rowOffset, columnOffset)
-          : String(threshold.value);
+        : threshold.kind === "autoMin" || threshold.kind === "autoMax"
+          ? "0"
+          : threshold.kind === "formula"
+            ? formulaForXlsx(threshold.formula, rowOffset, columnOffset)
+            : String(threshold.value);
   return `<x14:cfvo type="${kind}"><xm:f>${encodeXml(value)}</xm:f></x14:cfvo>`;
 }
 
@@ -503,8 +507,116 @@ function readX14Threshold(entry: {
   return Number.isFinite(value) ? { kind, value } : null;
 }
 
+/** x14 adds autoMin/autoMax for data bars. They are deliberately not accepted
+ * by the generic threshold reader: icon sets and colour scales cannot use them. */
+function readX14DataBarThreshold(entry: {
+  attributes: string;
+  body: string;
+}): ConditionalFormatThreshold | null {
+  const kind = attribute(entry.attributes, "type");
+  if (kind === "autoMin") return { kind: "autoMin" };
+  if (kind === "autoMax") return { kind: "autoMax" };
+  return readX14Threshold(entry);
+}
+
+function baseDataBarThreshold(threshold: ConditionalFormatThreshold): ConditionalFormatThreshold {
+  // Office 2007 does not know the automatic-zero bounds. Its closest usable
+  // fallback is the range min/max; Office 2010+ reads the linked x14 rule.
+  if (threshold.kind === "autoMin") return { kind: "min" };
+  if (threshold.kind === "autoMax") return { kind: "max" };
+  return threshold;
+}
+
+function x14DataBarThresholdXml(
+  threshold: ConditionalFormatThreshold,
+  rowOffset = 0,
+  columnOffset = 0,
+): string {
+  if (threshold.kind === "autoMin" || threshold.kind === "autoMax")
+    return `<x14:cfvo type="${threshold.kind}"/>`;
+  if (threshold.kind === "min" || threshold.kind === "max")
+    return `<x14:cfvo type="${threshold.kind}"/>`;
+  return x14ThresholdXml(threshold, rowOffset, columnOffset);
+}
+
 function readColor(attributes: string): string | undefined {
   return rgb(attribute(attributes, "rgb"));
+}
+
+function dataBarBaseExtensionId(attributes: string, body: string): string | undefined {
+  // Excel links its standard rule through a rule-local extLst. Accept the
+  // attribute form too, because a few producers emit that nonstandard shape.
+  return (childElements(body, "id")[0]?.body.trim() || attribute(attributes, "id"))?.toUpperCase();
+}
+
+type DataBarCondition = Extract<SheetConditionalFormatRule["condition"], { kind: "dataBar" }>;
+
+function readX14DataBar(
+  entry: { attributes: string; body: string },
+  base: DataBarCondition,
+): DataBarCondition | null {
+  const cfvo = childElements(entry.body, "cfvo");
+  const minimum = cfvo[0] ? readX14DataBarThreshold(cfvo[0]) : base.minimum;
+  const maximum = cfvo[1] ? readX14DataBarThreshold(cfvo[1]) : base.maximum;
+  const fillColor =
+    readColor(childElements(entry.body, "fillColor")[0]?.attributes ?? "") ?? base.color;
+  const border = truthy(attribute(entry.attributes, "border"));
+  const negativeSame = truthy(attribute(entry.attributes, "negativeBarColorSameAsPositive"));
+  const negativeBorderSame =
+    attribute(entry.attributes, "negativeBarBorderColorSameAsPositive") === undefined ||
+    truthy(attribute(entry.attributes, "negativeBarBorderColorSameAsPositive"));
+  const axisPosition = attribute(entry.attributes, "axisPosition") ?? "automatic";
+  const direction = attribute(entry.attributes, "direction") ?? "context";
+  const borderColor = readColor(childElements(entry.body, "borderColor")[0]?.attributes ?? "");
+  const negativeColor = readColor(
+    childElements(entry.body, "negativeFillColor")[0]?.attributes ?? "",
+  );
+  const negativeBorderColor = readColor(
+    childElements(entry.body, "negativeBorderColor")[0]?.attributes ?? "",
+  );
+  const axisColor = readColor(childElements(entry.body, "axisColor")[0]?.attributes ?? "");
+  if (
+    (cfvo.length !== 0 && cfvo.length !== 2) ||
+    !minimum ||
+    !maximum ||
+    !fillColor ||
+    hasUnsupportedThresholdSemantics(cfvo) ||
+    (border && !borderColor) ||
+    (!negativeSame && !negativeColor) ||
+    (border && !negativeBorderSame && !negativeBorderColor) ||
+    (axisPosition !== "automatic" && axisPosition !== "middle" && axisPosition !== "none") ||
+    (direction !== "context" && direction !== "leftToRight" && direction !== "rightToLeft") ||
+    (axisPosition !== "none" && !axisColor)
+  )
+    return null;
+  return {
+    kind: "dataBar",
+    minimum,
+    maximum,
+    color: fillColor,
+    ...(border ? { borderColor: borderColor! } : {}),
+    ...(negativeSame ? {} : { negativeColor: negativeColor! }),
+    ...(border && !negativeBorderSame ? { negativeBorderColor: negativeBorderColor! } : {}),
+    ...(attribute(entry.attributes, "gradient") === undefined
+      ? base.gradient === false
+        ? { gradient: false }
+        : {}
+      : attribute(entry.attributes, "gradient") === "0" ||
+          /^false$/i.test(attribute(entry.attributes, "gradient") ?? "")
+        ? { gradient: false }
+        : {}),
+    ...(attribute(entry.attributes, "showValue") === undefined
+      ? base.showValue === false
+        ? { showValue: false }
+        : {}
+      : attribute(entry.attributes, "showValue") === "0" ||
+          /^false$/i.test(attribute(entry.attributes, "showValue") ?? "")
+        ? { showValue: false }
+        : {}),
+    ...(direction === "context" ? {} : { direction }),
+    ...(axisPosition === "automatic" ? {} : { axisPosition }),
+    ...(axisPosition === "none" || axisColor === "#000000" ? {} : { axisColor: axisColor! }),
+  };
 }
 
 const ICON_SET_FROM_XLSX: Record<string, ConditionalFormatIconSet> = {
@@ -684,6 +796,7 @@ export function readXlsxConditionalFormats(
   const dxfs = readDxfs(stylesXml);
   const rules: SheetConditionalFormatRule[] = [];
   const priorities = new Map<string, number>();
+  const dataBarsByExtensionId = new Map<string, number>();
   let unsupported = false;
   let ordinal = 0;
   for (const container of worksheetXml.matchAll(
@@ -737,6 +850,9 @@ export function readXlsxConditionalFormats(
       };
       try {
         rules.push(normalizeConditionalFormatRules([candidate])[0]!);
+        const extensionId = dataBarBaseExtensionId(attrs, rule[2] ?? "");
+        if (condition.kind === "dataBar" && extensionId)
+          dataBarsByExtensionId.set(extensionId.toUpperCase(), rules.length - 1);
       } catch {
         unsupported = true;
         priorities.delete(id);
@@ -754,6 +870,38 @@ export function readXlsxConditionalFormats(
       ordinal += 1;
       const location = `sheet${sheetIndex + 1}.conditionalFormatting[${ordinal}]`;
       const type = attribute(rule.attributes, "type");
+      if (type === "dataBar") {
+        const extensionId = attribute(rule.attributes, "id")?.toUpperCase();
+        const index =
+          extensionId === undefined ? undefined : dataBarsByExtensionId.get(extensionId);
+        const base = index === undefined ? undefined : rules[index];
+        const dataBar =
+          base?.condition.kind === "dataBar"
+            ? readX14DataBar(
+                childElements(rule.body, "dataBar")[0] ?? { attributes: "", body: "" },
+                base.condition,
+              )
+            : null;
+        if (index === undefined || !dataBar || !ranges) {
+          unsupported = true;
+          report.add("feature-omitted", "warning", location);
+          continue;
+        }
+        if (!base || base.condition.kind !== "dataBar") {
+          unsupported = true;
+          report.add("feature-omitted", "warning", location);
+          continue;
+        }
+        try {
+          rules[index] = normalizeConditionalFormatRules([
+            { ...base, ranges, anchor: { ...ranges[0]!.start }, condition: dataBar },
+          ])[0]!;
+        } catch {
+          unsupported = true;
+          report.add("feature-omitted", "warning", location);
+        }
+        continue;
+      }
       const iconSet = childElements(rule.body, "iconSet")[0];
       const ruleOutsideIconSet = rule.body.replace(
         /<x14:iconSet\b[^>]*>[\s\S]*?<\/x14:iconSet>/gi,
@@ -1006,6 +1154,28 @@ function cellFormulaValue(
       : formulaForXlsx(value.formula, rowOffset, columnOffset);
 }
 
+function dataBarExtensionId(priority: number): string {
+  return `{00000000-0000-0000-0000-${priority.toString(16).padStart(12, "0").toUpperCase()}}`;
+}
+
+function needsDataBarExtension(condition: DataBarCondition): boolean {
+  return (
+    condition.minimum.kind === "autoMin" ||
+    condition.maximum.kind === "autoMax" ||
+    condition.borderColor !== undefined ||
+    condition.negativeColor !== undefined ||
+    condition.negativeBorderColor !== undefined ||
+    condition.gradient === false ||
+    (condition.direction !== undefined && condition.direction !== "context") ||
+    (condition.axisPosition !== undefined && condition.axisPosition !== "automatic") ||
+    (condition.axisColor !== undefined && condition.axisColor.toUpperCase() !== "#000000")
+  );
+}
+
+function dataBarBaseExtensionXml(priority: number): string {
+  return `<extLst><ext uri="{B025F937-C7B1-47D3-B67F-A62EFF666E3E}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:id>${dataBarExtensionId(priority)}</x14:id></ext></extLst>`;
+}
+
 function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId?: number): string {
   const dxf = dxfId === undefined ? "" : ` dxfId="${dxfId}"`;
   const stop = rule.stopIfTrue ? ' stopIfTrue="1"' : "";
@@ -1057,7 +1227,7 @@ function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId?: num
   if (condition.kind === "date")
     return `<cfRule type="timePeriod" priority="${priority}"${dxf}${stop} timePeriod="${condition.period}"/>`;
   if (condition.kind === "dataBar") {
-    return `<cfRule type="dataBar" priority="${priority}"><dataBar${condition.showValue === false ? ' showValue="0"' : ""}>${thresholdXml(condition.minimum)}${thresholdXml(condition.maximum)}<color rgb="FF${condition.color.slice(1).toUpperCase()}"/></dataBar></cfRule>`;
+    return `<cfRule type="dataBar" priority="${priority}"><dataBar${condition.showValue === false ? ' showValue="0"' : ""}>${thresholdXml(baseDataBarThreshold(condition.minimum), rowOffset, columnOffset)}${thresholdXml(baseDataBarThreshold(condition.maximum), rowOffset, columnOffset)}<color rgb="FF${condition.color.slice(1).toUpperCase()}"/></dataBar>${needsDataBarExtension(condition) ? dataBarBaseExtensionXml(priority) : ""}</cfRule>`;
   }
   if (condition.kind === "colorScale")
     return `<cfRule type="colorScale" priority="${priority}"><colorScale>${condition.stops.map((stop) => thresholdXml(stop.threshold)).join("")}${condition.stops.map((stop) => `<color rgb="FF${stop.color.slice(1).toUpperCase()}"/>`).join("")}</colorScale></cfRule>`;
@@ -1066,6 +1236,18 @@ function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId?: num
 
 function x14RuleXml(rule: SheetConditionalFormatRule, priority: number): string | null {
   const condition = rule.condition;
+  if (condition.kind === "dataBar") {
+    if (!needsDataBarExtension(condition)) return null;
+    const rangeAnchor = rule.ranges[0]!.start;
+    const rowOffset = rangeAnchor.row - rule.anchor.row;
+    const columnOffset = rangeAnchor.column - rule.anchor.column;
+    const axisPosition = condition.axisPosition ?? "automatic";
+    const direction = condition.direction ?? "context";
+    const axisColor = condition.axisColor ?? "#000000";
+    const border = condition.borderColor !== undefined;
+    const negativeBorderColor = border ? condition.negativeBorderColor : undefined;
+    return `<x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:cfRule type="dataBar" id="${dataBarExtensionId(priority)}"><x14:dataBar${condition.showValue === false ? ' showValue="0"' : ""}${border ? ' border="1"' : ""}${condition.gradient === false ? ' gradient="0"' : ""}${direction === "context" ? "" : ` direction="${direction}"`}${condition.negativeColor === undefined ? ' negativeBarColorSameAsPositive="1"' : ""}${negativeBorderColor === undefined ? "" : ' negativeBarBorderColorSameAsPositive="0"'}${axisPosition === "automatic" ? "" : ` axisPosition="${axisPosition}"`}>${x14DataBarThresholdXml(condition.minimum, rowOffset, columnOffset)}${x14DataBarThresholdXml(condition.maximum, rowOffset, columnOffset)}${border ? `<x14:borderColor rgb="FF${condition.borderColor!.slice(1).toUpperCase()}"/>` : ""}${condition.negativeColor === undefined ? "" : `<x14:negativeFillColor rgb="FF${condition.negativeColor.slice(1).toUpperCase()}"/>`}${negativeBorderColor === undefined ? "" : `<x14:negativeBorderColor rgb="FF${negativeBorderColor.slice(1).toUpperCase()}"/>`}${axisPosition === "none" ? "" : `<x14:axisColor rgb="FF${axisColor.slice(1).toUpperCase()}"/>`}</x14:dataBar></x14:cfRule><xm:sqref>${rule.ranges.map(rangeReference).join(" ")}</xm:sqref></x14:conditionalFormatting>`;
+  }
   if (condition.kind !== "iconSet" || !X14_ONLY_ICON_SETS.has(condition.iconSet)) return null;
   const id = priority.toString(16).padStart(12, "0").toUpperCase();
   return `<x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:cfRule type="iconSet" priority="${priority}" id="{00000000-0000-0000-0000-${id}}"${rule.stopIfTrue ? ' stopIfTrue="1"' : ""}><x14:iconSet iconSet="${ICON_SET_TO_XLSX[condition.iconSet]}"${condition.reverse ? ' reverse="1"' : ""}${condition.showValue === false ? ' showValue="0"' : ""}>${condition.thresholds.map((threshold) => x14ThresholdXml(threshold)).join("")}</x14:iconSet></x14:cfRule><xm:sqref>${rule.ranges.map(rangeReference).join(" ")}</xm:sqref></x14:conditionalFormatting>`;
@@ -1171,16 +1353,10 @@ export function writeXlsxConditionalFormats(
     const body = rules
       .map((rule) => {
         const x14 = x14RuleXml(rule, priority);
-        const next = x14 ?? ruleXml(rule, priority, ruleStyleIds.get(rule));
-        if (
-          rule.condition.kind === "dataBar" &&
-          (rule.condition.negativeColor !== undefined || rule.condition.gradient === false)
-        )
-          report?.add(
-            "feature-omitted",
-            "warning",
-            `sheet${sheetIndex + 1}.conditionalFormatting.${rule.id}.dataBarExtension`,
-          );
+        const linkedDataBar = rule.condition.kind === "dataBar";
+        const next = linkedDataBar
+          ? ruleXml(rule, priority, ruleStyleIds.get(rule))
+          : (x14 ?? ruleXml(rule, priority, ruleStyleIds.get(rule)));
         if (
           (rule.condition.kind === "iconSet" ||
             rule.condition.kind === "dataBar" ||
@@ -1200,7 +1376,7 @@ export function writeXlsxConditionalFormats(
           );
         if (x14) x14Body += x14;
         priority += 1;
-        return x14
+        return x14 && !linkedDataBar
           ? ""
           : `<conditionalFormatting sqref="${rule.ranges.map(rangeReference).join(" ")}">${next}</conditionalFormatting>`;
       })

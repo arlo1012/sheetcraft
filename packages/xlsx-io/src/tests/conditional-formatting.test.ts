@@ -229,7 +229,7 @@ describe("XLSX conditional formatting", () => {
     );
   });
 
-  test("reports data-bar extensions it cannot encode", async () => {
+  test("encodes data-bar extensions without compatibility loss", async () => {
     const workbook = createWorkbook({
       id: "data-bar-extension",
       sheetId: "sheet",
@@ -252,12 +252,12 @@ describe("XLSX conditional formatting", () => {
       },
     ];
     const encoded = await encodeXlsx(workbook);
-    expect(encoded.report.issues).toEqual(
+    expect(encoded.report.issues).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ code: "feature-omitted" })]),
     );
     const xml = strFromU8(unzipSync(encoded.bytes)["xl/worksheets/sheet1.xml"]!);
-    expect(xml).not.toContain("negativeFillColor");
-    expect(xml).not.toContain('gradient="0"');
+    expect(xml).toContain("negativeFillColor");
+    expect(xml).toContain('gradient="0"');
   });
 
   test("uses the standard 3TrafficLights1 default when an iconSet attribute is omitted", async () => {
