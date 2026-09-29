@@ -5,6 +5,7 @@ import { FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
 import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Select } from "tdesign-vue-next/es/select";
+import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
 import ConditionalFormatEditorDialog from "../../../modules/conditional-formatting/components/ConditionalFormatEditorDialog.vue";
 import ConditionalFormatIconRules from "../../../modules/conditional-formatting/components/ConditionalFormatIconRules.vue";
@@ -210,9 +211,10 @@ describe("advanced conditional format editor", () => {
       );
     await openAdvanced().trigger("click");
     let advanced = wrapper.getComponent(DataBarAdvancedSettingsDialog);
+    await advanced.findAllComponents(Radio)[0]!.trigger("click");
     advanced.findAllComponents(ColorPaletteSelect)[0]!.vm.$emit("select", "#00AA00");
     advanced
-      .findAllComponents(Select)
+      .findAllComponents(RadioGroup)
       .find((item) => item.attributes("aria-label") === "Axis position")!
       .vm.$emit("update:modelValue", "middle");
     await nextTick();
@@ -223,12 +225,15 @@ describe("advanced conditional format editor", () => {
 
     await openAdvanced().trigger("click");
     advanced = wrapper.getComponent(DataBarAdvancedSettingsDialog);
-    expect(advanced.findAllComponents(ColorPaletteSelect)[0]!.props("modelValue")).toBeUndefined();
+    expect(advanced.findAllComponents(ColorPaletteSelect)[0]!.props("modelValue")).toBe("#FF0000");
+    expect(advanced.findAllComponents(ColorPaletteSelect)[0]!.props("disabled")).toBe(true);
+    await advanced.findAllComponents(Radio)[0]!.trigger("click");
+    await advanced.findAllComponents(Radio)[2]!.trigger("click");
     advanced.findAllComponents(ColorPaletteSelect)[0]!.vm.$emit("select", "#F8696B");
     advanced.findAllComponents(ColorPaletteSelect)[1]!.vm.$emit("select", "#AA2020");
     advanced.findAllComponents(ColorPaletteSelect)[2]!.vm.$emit("select", "#343434");
     advanced
-      .findAllComponents(Select)
+      .findAllComponents(RadioGroup)
       .find((item) => item.attributes("aria-label") === "Axis position")!
       .vm.$emit("update:modelValue", "middle");
     await nextTick();

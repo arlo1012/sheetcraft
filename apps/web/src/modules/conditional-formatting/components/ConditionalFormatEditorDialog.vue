@@ -1037,7 +1037,6 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
       axisPosition: draft.axisPosition,
       axisColor: draft.axisColor,
     }"
-    :positive-color="draft.barColor"
     :positive-border-color="draft.borderColor"
     @close="dataBarAdvancedVisible = false"
     @save="updateDataBarAdvancedSettings"

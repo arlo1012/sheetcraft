@@ -130,6 +130,7 @@ watch(
 
 <style scoped lang="scss">
 .cell-format-panel-select {
+  width: 100%;
   min-width: 0;
 
   &__value {

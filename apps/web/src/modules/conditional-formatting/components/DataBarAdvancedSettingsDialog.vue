@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
-import { Select as TSelect } from "tdesign-vue-next/es/select";
-import { computed, reactive, watch } from "vue";
+import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
+import { reactive, watch } from "vue";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { useAppI18n } from "../../../shared/i18n";
 
@@ -16,7 +15,6 @@ export type DataBarAdvancedSettings = {
 const props = defineProps<{
   visible: boolean;
   settings: DataBarAdvancedSettings;
-  positiveColor: string;
   positiveBorderColor?: string;
 }>();
 const emit = defineEmits<{
@@ -24,18 +22,28 @@ const emit = defineEmits<{
   save: [settings: DataBarAdvancedSettings];
 }>();
 const { t } = useAppI18n();
-const draft = reactive<DataBarAdvancedSettings>({ ...props.settings });
-const axisOptions = computed(() => [
-  { value: "automatic", label: t("conditionalFormatting.axisAutomatic") },
-  { value: "middle", label: t("conditionalFormatting.axisMiddle") },
-  { value: "none", label: t("conditionalFormatting.axisNone") },
-]);
+function createDraft() {
+  return {
+    negativeColor: props.settings.negativeColor ?? "#FF0000",
+    negativeBorderColor: props.settings.negativeBorderColor ?? "#FF0000",
+    sameFill: props.settings.negativeColor === undefined,
+    sameBorder: props.settings.negativeBorderColor === undefined,
+    axisPosition: props.settings.axisPosition,
+    axisColor: props.settings.axisColor,
+  };
+}
+const draft = reactive(createDraft());
 
 function resetDraft(): void {
-  Object.assign(draft, props.settings);
+  Object.assign(draft, createDraft());
 }
 function save(): void {
-  emit("save", { ...draft });
+  emit("save", {
+    negativeColor: draft.sameFill ? undefined : draft.negativeColor,
+    negativeBorderColor: draft.sameBorder ? undefined : draft.negativeBorderColor,
+    axisPosition: draft.axisPosition,
+    axisColor: draft.axisColor,
+  });
 }
 watch(
   () => [props.visible, props.settings] as const,
@@ -49,7 +57,7 @@ watch(
 <template>
   <Dialog
     :visible="visible"
-    :header="t('conditionalFormatting.negativeAndAxis')"
+    :header="t('conditionalFormatting.negativeAndAxisTitle')"
     :confirm-btn="{ content: t('conditionalFormatting.save') }"
     :cancel-btn="t('conditionalFormatting.cancel')"
     :close-on-overlay-click="false"
@@ -58,46 +66,67 @@ watch(
     @confirm="save"
     @close="emit('close')"
   >
-    <TForm class="data-bar-advanced-settings" layout="vertical">
+    <div class="data-bar-advanced-settings">
       <section>
-        <h3>{{ t("conditionalFormatting.negativeBarAppearance") }}</h3>
-        <div class="data-bar-advanced-settings__colors">
-          <TFormItem label-align="top" :label="t('conditionalFormatting.negativeFillColor')">
-            <ColorPaletteSelect
-              :model-value="draft.negativeColor"
-              :label="t('conditionalFormatting.negativeFillColor')"
-              :default-color="positiveColor"
-              :default-label="t('conditionalFormatting.sameAsPositive')"
-              @select="draft.negativeColor = $event ?? undefined"
-            />
-          </TFormItem>
-          <TFormItem label-align="top" :label="t('conditionalFormatting.negativeBorderColor')">
-            <ColorPaletteSelect
-              :model-value="draft.negativeBorderColor"
-              :label="t('conditionalFormatting.negativeBorderColor')"
-              :default-color="positiveBorderColor ?? '#FFFFFF'"
-              :default-label="
-                positiveBorderColor
-                  ? t('conditionalFormatting.sameAsPositive')
-                  : t('conditionalFormatting.noBorder')
-              "
-              :disabled="!positiveBorderColor"
-              @select="draft.negativeBorderColor = $event ?? undefined"
-            />
-          </TFormItem>
-        </div>
+        <h3>{{ t("conditionalFormatting.negativeFillColor") }}</h3>
+        <TRadioGroup
+          v-model="draft.sameFill"
+          direction="vertical"
+          :aria-label="t('conditionalFormatting.negativeFillColor')"
+        >
+          <div class="data-bar-advanced-settings__color-row">
+            <TRadio :value="false">{{ t("conditionalFormatting.fillColor") }}</TRadio>
+            <div class="data-bar-advanced-settings__color-control">
+              <ColorPaletteSelect
+                :model-value="draft.negativeColor"
+                :label="t('conditionalFormatting.negativeFillColor')"
+                default-color="#FF0000"
+                :disabled="draft.sameFill"
+                @select="draft.negativeColor = $event ?? '#FF0000'"
+              />
+            </div>
+          </div>
+          <TRadio :value="true">{{ t("conditionalFormatting.samePositiveFill") }}</TRadio>
+        </TRadioGroup>
+      </section>
+      <section>
+        <h3>{{ t("conditionalFormatting.negativeBorderColor") }}</h3>
+        <TRadioGroup
+          v-model="draft.sameBorder"
+          direction="vertical"
+          :disabled="!positiveBorderColor"
+          :aria-label="t('conditionalFormatting.negativeBorderColor')"
+        >
+          <div class="data-bar-advanced-settings__color-row">
+            <TRadio :value="false">{{ t("conditionalFormatting.borderColor") }}</TRadio>
+            <div class="data-bar-advanced-settings__color-control">
+              <ColorPaletteSelect
+                :model-value="draft.negativeBorderColor"
+                :label="t('conditionalFormatting.negativeBorderColor')"
+                default-color="#FF0000"
+                :disabled="!positiveBorderColor || draft.sameBorder"
+                @select="draft.negativeBorderColor = $event ?? '#FF0000'"
+              />
+            </div>
+          </div>
+          <TRadio :value="true">{{ t("conditionalFormatting.samePositiveBorder") }}</TRadio>
+        </TRadioGroup>
       </section>
       <section>
         <h3>{{ t("conditionalFormatting.axis") }}</h3>
-        <div class="data-bar-advanced-settings__colors">
-          <TFormItem label-align="top" :label="t('conditionalFormatting.axisPosition')">
-            <TSelect
-              v-model="draft.axisPosition"
-              :aria-label="t('conditionalFormatting.axisPosition')"
-              :options="axisOptions"
-            />
-          </TFormItem>
-          <TFormItem label-align="top" :label="t('conditionalFormatting.axisColor')">
+        <p>{{ t("conditionalFormatting.axisDescription") }}</p>
+        <TRadioGroup
+          v-model="draft.axisPosition"
+          direction="vertical"
+          :aria-label="t('conditionalFormatting.axisPosition')"
+        >
+          <TRadio value="automatic">{{ t("conditionalFormatting.axisAutomatic") }}</TRadio>
+          <TRadio value="middle">{{ t("conditionalFormatting.axisMiddle") }}</TRadio>
+          <TRadio value="none">{{ t("conditionalFormatting.axisNone") }}</TRadio>
+        </TRadioGroup>
+        <div class="data-bar-advanced-settings__color-row">
+          <span>{{ t("conditionalFormatting.axisColor") }}</span>
+          <div class="data-bar-advanced-settings__color-control">
             <ColorPaletteSelect
               :model-value="draft.axisColor"
               :label="t('conditionalFormatting.axisColor')"
@@ -105,17 +134,17 @@ watch(
               :disabled="draft.axisPosition === 'none'"
               @select="draft.axisColor = $event ?? '#000000'"
             />
-          </TFormItem>
+          </div>
         </div>
       </section>
-    </TForm>
+    </div>
   </Dialog>
 </template>
 
 <style scoped lang="scss">
 .data-bar-advanced-settings {
   display: grid;
-  gap: 20px;
+  gap: 16px;
 
   section {
     display: grid;
@@ -123,22 +152,33 @@ watch(
   }
 
   h3 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     margin: 0;
     font-size: var(--idea-font-size-body-medium);
     line-height: var(--idea-line-height-body-medium);
     font-weight: var(--idea-font-weight-semibold);
-  }
-
-  &__colors {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  @media (max-width: 480px) {
-    &__colors {
-      grid-template-columns: 1fr;
+    &::after {
+      content: "";
+      flex: 1;
+      border-top: 1px solid var(--idea-border-subtle);
     }
+  }
+
+  p {
+    margin: 0;
+  }
+
+  &__color-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__color-control {
+    width: 100px;
+    flex: none;
   }
 }
 </style>

@@ -206,10 +206,12 @@ export type ConditionalFormattingMessageSchema = {
     directionLeftToRight: string;
     directionRightToLeft: string;
     negativeAndAxis: string;
-    negativeBarAppearance: string;
+    negativeAndAxisTitle: string;
     negativeFillColor: string;
     negativeBorderColor: string;
-    sameAsPositive: string;
+    samePositiveFill: string;
+    samePositiveBorder: string;
+    axisDescription: string;
     axis: string;
     axisPosition: string;
     axisColor: string;
