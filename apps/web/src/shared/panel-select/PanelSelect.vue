@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, watch, watchPostEffect } from "vue";
-import { ChevronDown } from "lucide-vue-next";
+import TSelectArrow from "tdesign-vue-next/es/common-components/fake-arrow";
 import { SelectInput as TSelectInput } from "tdesign-vue-next/es/select-input";
 import type { PopupProps } from "tdesign-vue-next/es/popup";
 
@@ -111,11 +111,7 @@ watch(
         <span class="panel-select__value"><slot name="value" /></span>
       </template>
       <template #suffixIcon>
-        <ChevronDown
-          class="idea-panel-select__arrow"
-          :class="{ 'is-open': open, 'is-disabled': disabled }"
-          aria-hidden="true"
-        />
+        <TSelectArrow :is-active="open" aria-hidden="true" />
       </template>
       <template #panel>
         <div

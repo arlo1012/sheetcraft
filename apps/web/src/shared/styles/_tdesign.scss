@@ -289,22 +289,12 @@
   }
 }
 
-// SelectInput leaves its suffix icon to the caller; match Select's indicator states.
-.idea-panel-select__arrow {
-  width: var(--idea-control-icon-size);
-  height: var(--idea-control-icon-size);
+// SelectInput supplies no indicator; share Select's native arrow and color mapping.
+.idea-panel-select .t-fake-arrow {
   color: var(--td-text-color-placeholder);
-  transition:
-    transform 0.2s ease,
-    color 0.2s linear;
 
-  &.is-open {
+  &.t-fake-arrow--active {
     color: var(--td-brand-color);
-    transform: rotate(180deg);
-  }
-
-  &.is-disabled {
-    color: var(--td-text-color-disabled);
   }
 }
 
