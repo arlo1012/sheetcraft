@@ -4,6 +4,7 @@ import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { toWorkbookErrorData } from "@idea10/core/errors";
 import {
   normalizeConditionalFormatRules,
   type ConditionalFormatCondition,
@@ -21,12 +22,15 @@ import {
   type ConditionalFormatQuickDialogKind,
 } from "../conditional-format-quick-rules";
 import ConditionalFormatStyleSelect from "./ConditionalFormatStyleSelect.vue";
+import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
+import { parseConditionalFormatValueOperand } from "../conditional-formatting-ui";
 
 const props = defineProps<{
   kind: ConditionalFormatQuickDialogKind;
   ranges: string;
   sampleValue?: string | number | boolean | null;
   dateSystem?: "1900" | "1904";
+  selectValueReference?: (current: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{ save: [rule: SheetConditionalFormatRule]; close: [] }>();
 const { t } = useAppI18n();
@@ -37,6 +41,7 @@ const unique = ref(false);
 const datePeriod = ref<ConditionalFormatDatePeriod>("yesterday");
 const format = ref<ConditionalFormatStyle>(conditionalFormatPresetStyle("redFillText"));
 const customVisible = ref(false);
+const pickingReference = ref(false);
 const error = ref("");
 const isRank = computed(() =>
   ["top10Items", "top10Percent", "bottom10Items", "bottom10Percent"].includes(props.kind),
@@ -67,8 +72,13 @@ const dateOptions = computed(() =>
     ] as const
   ).map((value) => ({ value, label: t(`conditionalFormatting.${value}`) })),
 );
-function operand(text: string): number | string {
-  return Number.isFinite(Number(text.trim())) ? Number(text.trim()) : text;
+async function selectValueReference(current: string): Promise<string | undefined> {
+  pickingReference.value = true;
+  try {
+    return await props.selectValueReference?.(current);
+  } finally {
+    pickingReference.value = false;
+  }
 }
 function save() {
   error.value = "";
@@ -107,8 +117,10 @@ function save() {
         : {
             kind: "cellValue",
             operator: props.kind as "greaterThan" | "lessThan" | "equal" | "between",
-            value: operand(value.value),
-            ...(props.kind === "between" ? { secondValue: operand(secondValue.value) } : {}),
+            value: parseConditionalFormatValueOperand(value.value),
+            ...(props.kind === "between"
+              ? { secondValue: parseConditionalFormatValueOperand(secondValue.value) }
+              : {}),
           };
   }
   try {
@@ -124,8 +136,13 @@ function save() {
         },
       ])[0]!,
     );
-  } catch {
-    error.value = t("conditionalFormatting.invalidFormat");
+  } catch (cause) {
+    const field = toWorkbookErrorData(cause).details?.field;
+    error.value = t(
+      field === "condition.value" || field === "condition.secondValue"
+        ? "conditionalFormatting.invalidFormula"
+        : "conditionalFormatting.invalidFormat",
+    );
   }
 }
 watch(
@@ -147,7 +164,7 @@ watch(
     role="dialog"
     aria-modal="true"
     :aria-label="title"
-    :visible="!customVisible"
+    :visible="!customVisible && !pickingReference"
     :header="title"
     :confirm-btn="t('conditionalFormatting.save')"
     :cancel-btn="t('conditionalFormatting.cancel')"
@@ -228,14 +245,14 @@ watch(
             autofocus
             @enter="save"
           />
-          <TInputNumber
+          <RangeReferenceInput
             v-else
-            :model-value="value"
-            :aria-label="t('conditionalFormatting.value')"
-            theme="column"
-            class="idea-input-number--persistent-controls"
+            v-model="value"
+            :label="t('conditionalFormatting.value')"
+            :placeholder="t('conditionalFormatting.valueReferenceHint')"
+            :show-picker="true"
             autofocus
-            @update:model-value="value = String($event ?? '')"
+            :select-reference="props.selectValueReference ? selectValueReference : undefined"
             @enter="save"
           />
         </div>
@@ -246,12 +263,12 @@ watch(
             role="group"
             :aria-label="t('conditionalFormatting.secondValue')"
           >
-            <TInputNumber
-              :model-value="secondValue"
-              :aria-label="t('conditionalFormatting.secondValue')"
-              theme="column"
-              class="idea-input-number--persistent-controls"
-              @update:model-value="secondValue = String($event ?? '')"
+            <RangeReferenceInput
+              v-model="secondValue"
+              :label="t('conditionalFormatting.secondValue')"
+              :placeholder="t('conditionalFormatting.valueReferenceHint')"
+              :show-picker="true"
+              :select-reference="props.selectValueReference ? selectValueReference : undefined"
               @enter="save"
             />
           </div>

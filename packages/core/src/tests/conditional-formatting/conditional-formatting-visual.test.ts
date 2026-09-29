@@ -86,6 +86,69 @@ describe("conditional-formatting extended predicates", () => {
         }),
       ]),
     ).toThrow("conditional-formatting");
+    for (const formula of ["=SUM(A:A)", "=SUM($A:A)", "=SUM(1:1)", "=SUM($1:1)"]) {
+      expect(() =>
+        normalizeConditionalFormatRules([
+          rule("relative-axis", {
+            kind: "dataBar",
+            minimum: { kind: "formula", formula },
+            maximum: { kind: "max" },
+            color: "#00ff00",
+          }),
+        ]),
+      ).toThrow("conditional-formatting");
+    }
+    expect(() =>
+      normalizeConditionalFormatRules([
+        rule("absolute-axis", {
+          kind: "dataBar",
+          minimum: { kind: "formula", formula: "=SUM($A:$A)+SUM($1:$1)" },
+          maximum: { kind: "max" },
+          color: "#00ff00",
+        }),
+      ]),
+    ).not.toThrow();
+    expect(() =>
+      normalizeConditionalFormatRules([
+        rule("array-constant", {
+          kind: "dataBar",
+          minimum: { kind: "formula", formula: "=SUM({1,2})" },
+          maximum: { kind: "max" },
+          color: "#00ff00",
+        }),
+      ]),
+    ).toThrow("conditional-formatting");
+  });
+
+  test("evaluates absolute formula thresholds and rejects relative CFVO references", () => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    setCellValue(sheet, { row: 0, column: 0 }, 5);
+    setCellValue(sheet, { row: 0, column: 1 }, 4);
+    sheet.conditionalFormats = [
+      rule("bar", {
+        kind: "dataBar",
+        minimum: { kind: "formula", formula: "=$B$1" },
+        maximum: { kind: "formula", formula: "=10" },
+        color: "#00ff00",
+      }),
+    ];
+    expect(
+      createConditionalFormatVisualResolver(
+        sheet,
+        createWorkbookEvaluator(workbook, sheet.id),
+      )({ row: 0, column: 0 })?.dataBar,
+    ).toMatchObject({ start: 0, end: 1 / 6, axis: 0 });
+    expect(() =>
+      normalizeConditionalFormatRules([
+        rule("relative", {
+          kind: "dataBar",
+          minimum: { kind: "formula", formula: "=B1" },
+          maximum: { kind: "max" },
+          color: "#00ff00",
+        }),
+      ]),
+    ).toThrow("conditional-formatting");
   });
 
   test("uses rank semantics that include boundary ties and rounds top percentages up", () => {

@@ -1,14 +1,57 @@
 import { describe, expect, test } from "vitest";
+import { ref } from "vue";
 import {
+  createSheet,
   createSheetEvaluator,
+  createWorkbookEvaluator,
   createWorkbook,
   getActiveSheet,
+  insertSheet,
   setCellValue,
   setCellStyle,
 } from "@idea10/core/workbook";
-import { createSheetDisplaySnapshot } from "../../../../../modules/sheet-grid/canvas/sheet-display-snapshot";
+import {
+  createSheetDisplaySnapshot,
+  useSheetDisplaySnapshot,
+} from "../../../../../modules/sheet-grid/canvas/sheet-display-snapshot";
 
 describe("conditional formatting display", () => {
+  test("refreshes a cached comparison when its referenced cell on another sheet changes", () => {
+    const workbook = createWorkbook({ id: "test", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    const limits = createSheet("Limits", "limits");
+    insertSheet(workbook, limits);
+    const address = { row: 0, column: 0 };
+    setCellValue(sheet, address, 70);
+    setCellValue(limits, address, 60);
+    sheet.conditionalFormats = [
+      {
+        id: "reference",
+        anchor: address,
+        ranges: [{ start: address, end: address }],
+        condition: {
+          kind: "cellValue",
+          operator: "greaterThan",
+          value: { formula: "=Limits!$A$1" },
+        },
+        style: { fillColor: "#ff0000" },
+      },
+    ];
+    const revision = ref(1);
+    const display = useSheetDisplaySnapshot({
+      getSheet: () => sheet,
+      getEvaluator: () => createWorkbookEvaluator(workbook, sheet.id),
+      getRevision: () => revision.value,
+    });
+    expect(display.value.getCellStyle(address)?.fillColor).toBe("#ff0000");
+    setCellValue(limits, address, 80);
+    revision.value++;
+    expect(display.value.getCellStyle(address)?.fillColor).toBeUndefined();
+    setCellValue(limits, address, 60);
+    revision.value++;
+    expect(display.value.getCellStyle(address)?.fillColor).toBe("#ff0000");
+  });
+
   test("refreshes after edits and restores original formatting without mutating it", () => {
     const sheet = getActiveSheet(createWorkbook({ id: "test", sheetId: "sheet" }));
     const address = { row: 0, column: 0 };

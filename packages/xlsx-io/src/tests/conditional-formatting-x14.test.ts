@@ -105,6 +105,34 @@ describe("XLSX x14 icon-set conditional formatting", () => {
     });
   });
 
+  test("roundtrips x14 formula thresholds with absolute references", async () => {
+    const workbook = createWorkbook({ id: "x14-formula-thresholds", sheetId: "sheet" });
+    const rule = iconRule("stars", "threeStars");
+    rule.ranges = [{ start: { row: 3, column: 0 }, end: { row: 7, column: 0 } }];
+    rule.anchor = { row: 1, column: 0 };
+    rule.condition.thresholds = [
+      { kind: "formula", formula: "=$B$2+$C$1" },
+      { kind: "formula", formula: "=$D$2" },
+      { kind: "formula", formula: "=$E$1" },
+    ];
+    getActiveSheet(workbook).conditionalFormats = [rule];
+    const encoded = await encodeXlsx(workbook);
+    const xml = strFromU8(unzipSync(encoded.bytes)["xl/worksheets/sheet1.xml"]!);
+    expect(xml).toContain('<x14:cfvo type="formula"><xm:f>$B$2+$C$1</xm:f></x14:cfvo>');
+    expect(xml).toContain('<x14:cfvo type="formula"><xm:f>$D$2</xm:f></x14:cfvo>');
+    expect(
+      getActiveSheet((await decodeXlsx(encoded.bytes)).workbook).conditionalFormats?.[0],
+    ).toMatchObject({
+      condition: {
+        thresholds: [
+          { kind: "formula", formula: "=$B$2+$C$1" },
+          { kind: "formula", formula: "=$D$2" },
+          { kind: "formula", formula: "=$E$1" },
+        ],
+      },
+    });
+  });
+
   test.each(['custom="1"', 'activePresent="1"'])(
     "reports unsupported x14 icon behavior instead of silently changing it: %s",
     (attributes) => {

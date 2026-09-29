@@ -1,6 +1,8 @@
 import { clearConditionalFormatRanges } from "./conditional-formatting-transfer.js";
 import {
   cloneConditionalFormatRule,
+  conditionalFormatFormulaSources,
+  mapConditionalFormatFormulas,
   type SheetConditionalFormatRule,
 } from "./conditional-formatting.js";
 import { WorkbookDomainError } from "./errors.js";
@@ -81,7 +83,7 @@ export function assertConditionalFormatCrossSheetMoveSupported(
   const pattern = qualifiedSheetReferencePattern(target.name);
   for (const sheet of workbook.sheets.values()) {
     for (const rule of sheet.conditionalFormats ?? []) {
-      if (rule.condition.kind !== "formula" || !pattern.test(rule.condition.formula)) continue;
+      if (!conditionalFormatFormulaSources(rule).some((formula) => pattern.test(formula))) continue;
       const scopeSize = rangeSize(rule.ranges);
       const singleCell =
         scopeSize === 1 &&
@@ -141,28 +143,29 @@ function uniqueId(ids: Set<string>, base: string): string {
   return id;
 }
 
-function contextualFormula(rule: SheetConditionalFormatRule, address: CellAddress): string {
-  if (rule.condition.kind !== "formula")
-    throw new Error("Expected a formula conditional-format rule.");
-  return translateFormulaForCopy(rule.condition.formula, {
-    row: address.row - rule.anchor.row,
-    column: address.column - rule.anchor.column,
-  });
+function contextualRule(
+  rule: SheetConditionalFormatRule,
+  address: CellAddress,
+): SheetConditionalFormatRule {
+  return mapConditionalFormatFormulas(rule, (formula) =>
+    translateFormulaForCopy(formula, {
+      row: address.row - rule.anchor.row,
+      column: address.column - rule.anchor.column,
+    }),
+  );
 }
 
 function formulaRuleAt(
-  rule: SheetConditionalFormatRule,
   id: string,
   range: CellRange,
-  formula: string,
+  contextual: SheetConditionalFormatRule,
 ): SheetConditionalFormatRule {
-  const next = cloneConditionalFormatRule(rule);
+  const next = cloneConditionalFormatRule(contextual);
   return {
     ...next,
     id,
     ranges: [range],
     anchor: { ...range.start },
-    condition: { kind: "formula", formula },
   };
 }
 
@@ -196,22 +199,21 @@ function formulaMayReferenceSource(
   ranges: readonly CellRange[],
   source: CellRange,
 ): boolean {
-  if (rule.condition.kind !== "formula") return false;
-  const references = collectFormulaReferences(rule.condition.formula);
-  const formulaRanges = collectFormulaRanges(rule.condition.formula);
+  const formulas = conditionalFormatFormulaSources(rule);
   for (const scope of ranges) {
-    for (const reference of references) {
-      if (reference.sheetName) continue;
-      if (
-        intersectsReferenceScope(
-          translatedReference(reference, rule.anchor, scope.start),
-          translatedReference(reference, rule.anchor, scope.end),
-          source,
+    for (const formula of formulas)
+      for (const reference of collectFormulaReferences(formula)) {
+        if (reference.sheetName) continue;
+        if (
+          intersectsReferenceScope(
+            translatedReference(reference, rule.anchor, scope.start),
+            translatedReference(reference, rule.anchor, scope.end),
+            source,
+          )
         )
-      )
-        return true;
-    }
-    for (const formulaRange of formulaRanges) {
+          return true;
+      }
+    for (const formulaRange of formulas.flatMap(collectFormulaRanges)) {
       if (formulaRange.start.sheetName) continue;
       if (
         intersectsReferenceScope(
@@ -256,10 +258,8 @@ function formulaScopesForMove(
   if (!ranges.length) return [];
   const outputRanges = ranges.map((range) => ({ start: map(range.start), end: map(range.end) }));
   const first = { from: ranges[0]!.start, to: map(ranges[0]!.start) };
-  const baseFormula = transformFormulaForMove(
-    contextualFormula(rule, first.from),
-    source,
-    destination,
+  const baseRule = mapConditionalFormatFormulas(contextualRule(rule, first.from), (formula) =>
+    transformFormulaForMove(formula, source, destination),
   );
   if (!formulaMayReferenceSource(rule, ranges, source)) {
     return [
@@ -268,7 +268,7 @@ function formulaScopesForMove(
         id: firstId,
         ranges: outputRanges,
         anchor: { ...first.to },
-        condition: { kind: "formula", formula: baseFormula },
+        condition: baseRule.condition,
       },
     ];
   }
@@ -280,16 +280,22 @@ function formulaScopesForMove(
     );
   }
   const contexts = expandContexts(ranges, map);
-  const formulas = contexts.map((context) =>
-    transformFormulaForMove(contextualFormula(rule, context.from), source, destination),
+  const contextualRules = contexts.map((context) =>
+    mapConditionalFormatFormulas(contextualRule(rule, context.from), (formula) =>
+      transformFormulaForMove(formula, source, destination),
+    ),
   );
   const isUniform = contexts.every(
     (context, index) =>
-      formulas[index] ===
-      translateFormulaForCopy(baseFormula, {
-        row: context.to.row - first.to.row,
-        column: context.to.column - first.to.column,
-      }),
+      JSON.stringify(contextualRules[index]!.condition) ===
+      JSON.stringify(
+        mapConditionalFormatFormulas(baseRule, (formula) =>
+          translateFormulaForCopy(formula, {
+            row: context.to.row - first.to.row,
+            column: context.to.column - first.to.column,
+          }),
+        ).condition,
+      ),
   );
   if (isUniform) {
     return [
@@ -298,16 +304,15 @@ function formulaScopesForMove(
         id: firstId,
         ranges: outputRanges,
         anchor: { ...first.to },
-        condition: { kind: "formula", formula: baseFormula },
+        condition: baseRule.condition,
       },
     ];
   }
   return contexts.map((context, index) =>
     formulaRuleAt(
-      rule,
       index === 0 ? firstId : uniqueId(ids, rule.id),
       { start: context.to, end: { ...context.to } },
-      formulas[index]!,
+      contextualRules[index]!,
     ),
   );
 }
@@ -342,7 +347,7 @@ export function moveConditionalFormatRules(
 
     const remaining: SheetConditionalFormatRule[] = !remainingRanges.length
       ? []
-      : rule.condition.kind !== "formula"
+      : !conditionalFormatFormulaSources(rule).length
         ? [{ ...rule, ranges: remainingRanges }]
         : formulaScopesForMove(
             rule,
@@ -357,7 +362,7 @@ export function moveConditionalFormatRules(
     result.push(...remaining);
     if (!movedRanges.length) continue;
     const movedId = remaining.length ? uniqueId(ids, rule.id) : rule.id;
-    if (rule.condition.kind !== "formula") {
+    if (!conditionalFormatFormulaSources(rule).length) {
       result.push({
         ...rule,
         id: movedId,

@@ -398,6 +398,7 @@ const cellFormatInitialTab = ref<CellFormatTab>("border");
 const conditionalFormattingSelection = shallowRef<ConditionalFormattingSelection>();
 const conditionalFormatQuickRule = ref<ConditionalFormatQuickRule>();
 const conditionalFormatRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const conditionalFormatPickingValue = ref(false);
 const { active: pickingConditionalFormatRange, reference: pickedConditionalFormatReference } =
   conditionalFormatRangePicker;
 watch(workbookGeneration, () => {
@@ -473,6 +474,39 @@ async function selectConditionalFormatReference(current: string): Promise<string
   const target = resolveRangeReference(workbook, selected, sheetId);
   if (!target || target.sheetId !== sheetId) return undefined;
   return formatConditionalFormatRanges([target.range]);
+}
+
+async function selectConditionalFormatValueReference(current: string): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const generation = workbookGeneration.value;
+  const sheetId = activeSheet.value.id;
+  conditionalFormatPickingValue.value = true;
+  try {
+    const selected = await conditionalFormatRangePicker.selectReference(current, {
+      singleCell: true,
+    });
+    if (
+      session.workbook !== workbook ||
+      workbookGeneration.value !== generation ||
+      !conditionalFormattingSelection.value
+    )
+      return undefined;
+    if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
+    if (selected === undefined) return undefined;
+    const target = resolveRangeReference(workbook, selected, sheetId);
+    if (
+      !target ||
+      target.range.start.row !== target.range.end.row ||
+      target.range.start.column !== target.range.end.column
+    )
+      return undefined;
+    const reference = formatRangeReference(workbook.sheets.get(target.sheetId)!.name, target.range);
+    return target.sheetId === sheetId
+      ? `=${reference.slice(reference.lastIndexOf("!") + 1)}`
+      : reference;
+  } finally {
+    conditionalFormatPickingValue.value = false;
+  }
 }
 
 function saveConditionalFormats(rules: Parameters<typeof setConditionalFormats>[0]): void {
@@ -1801,6 +1835,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :sample-value="conditionalFormattingSelection.sampleValue"
       :date-system="session.workbook.dateSystem"
       :select-reference="selectConditionalFormatReference"
+      :select-value-reference="selectConditionalFormatValueReference"
       @save="saveConditionalFormats"
       @close="closeConditionalFormatting"
     />
@@ -1808,7 +1843,13 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       v-if="pickingConditionalFormatRange"
       :reference="pickedConditionalFormatReference"
       :edit-session-id="cellEditSession.id"
-      :title="t('conditionalFormatting.appliesTo')"
+      :title="
+        t(
+          conditionalFormatPickingValue
+            ? 'conditionalFormatting.value'
+            : 'conditionalFormatting.appliesTo',
+        )
+      "
       @confirm="conditionalFormatRangePicker.confirm"
       @cancel="conditionalFormatRangePicker.cancel"
     />

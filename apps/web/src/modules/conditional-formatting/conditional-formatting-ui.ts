@@ -1,5 +1,6 @@
 import {
   cloneConditionalFormatRule as cloneCoreConditionalFormatRule,
+  type ConditionalFormatOperand,
   type SheetConditionalFormatRule,
 } from "@idea10/core/conditional-formatting";
 import { formatCellAddress } from "@idea10/core/coordinates";
@@ -9,6 +10,41 @@ import {
   type CellAddress,
   type CellRange,
 } from "@idea10/core/workbook";
+
+export type ConditionalFormatValueOperand = ConditionalFormatOperand;
+
+/**
+ * Converts the compact value syntax used by conditional-format controls into
+ * the persisted operand. A leading equals sign is a formula; quoting or
+ * an Excel-style leading apostrophe forces a literal value (including
+ * numeric-looking and =-leading strings).
+ */
+export function parseConditionalFormatValueOperand(
+  input: string,
+  preserveLiteral = false,
+): ConditionalFormatValueOperand {
+  if (preserveLiteral) return input;
+  const value = input.trim();
+  if (
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'")))
+  )
+    return value.slice(1, -1).replace(/\\([\\"'])/g, "$1");
+  if (value.startsWith("'")) return value.slice(1);
+  if (value.startsWith("=")) return { formula: value };
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : input;
+}
+
+export function formatConditionalFormatValueOperand(operand: ConditionalFormatValueOperand): {
+  value: string;
+  literal: boolean;
+} {
+  if (typeof operand === "number") return { value: String(operand), literal: false };
+  if (typeof operand === "string") return { value: operand, literal: true };
+  return { value: operand.formula, literal: false };
+}
 
 export type ConditionalFormatKind = SheetConditionalFormatRule["condition"]["kind"];
 

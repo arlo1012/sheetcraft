@@ -33,6 +33,8 @@ import {
 } from "../formula/workbook-references.js";
 import {
   cloneConditionalFormatRule,
+  conditionalFormatFormulaSources,
+  mapConditionalFormatFormulas,
   type SheetConditionalFormatRule,
 } from "../conditional-formatting.js";
 import {
@@ -123,11 +125,12 @@ function assertConditionalFormatReferencesCanTransform(
   for (const sourceSheet of workbook.sheets.values()) {
     if (sourceSheet.id === targetSheetId) continue;
     for (const rule of sourceSheet.conditionalFormats ?? []) {
-      if (rule.condition.kind !== "formula") continue;
-      const hasRelativeQualifiedReference = collectFormulaReferences(rule.condition.formula).some(
-        (reference) =>
-          reference.sheetName?.toLowerCase() === targetName &&
-          (axis === "row" ? !reference.rowAbsolute : !reference.columnAbsolute),
+      const hasRelativeQualifiedReference = conditionalFormatFormulaSources(rule).some((formula) =>
+        collectFormulaReferences(formula).some(
+          (reference) =>
+            reference.sheetName?.toLowerCase() === targetName &&
+            (axis === "row" ? !reference.rowAbsolute : !reference.columnAbsolute),
+        ),
       );
       if (!hasRelativeQualifiedReference) continue;
       const anchorIndex = axis === "row" ? rule.anchor.row : rule.anchor.column;
@@ -195,6 +198,7 @@ function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
           conditionalFormatFormulaSources: slice.conditionalFormatFormulaSources.map((formula) => ({
             sheetId: formula.sheetId,
             ruleId: formula.ruleId,
+            ...(formula.formulaIndex === undefined ? {} : { formulaIndex: formula.formulaIndex }),
             source: formula.source,
           })),
         }
@@ -435,8 +439,8 @@ function transformConditionalFormatsForAxis(
         : axis === "row"
           ? { row: transformedAnchor, column: rule.anchor.column }
           : { row: rule.anchor.row, column: transformedAnchor };
-    let condition = rule.condition;
-    if (condition.kind === "formula") {
+    let transformedRule = rule;
+    if (conditionalFormatFormulaSources(rule).length) {
       // A deleted anchor is replaced by the first surviving applied cell. Move
       // relative references to that former cell before the deletion transform,
       // so `=A1` remains meaningful instead of becoming `#REF!`.
@@ -451,17 +455,17 @@ function transformConditionalFormatsForAxis(
           : rule.anchor;
       const rebased =
         transformedAnchor === null
-          ? translateFormulaForCopy(condition.formula, {
-              row: sourceAnchor.row - rule.anchor.row,
-              column: sourceAnchor.column - rule.anchor.column,
-            })
-          : condition.formula;
-      condition = {
-        kind: "formula",
-        formula: transformFormulaForAxis(rebased, { axis, operation, index, count }),
-      };
+          ? (formula: string) =>
+              translateFormulaForCopy(formula, {
+                row: sourceAnchor.row - rule.anchor.row,
+                column: sourceAnchor.column - rule.anchor.column,
+              })
+          : (formula: string) => formula;
+      transformedRule = mapConditionalFormatFormulas(rule, (formula) =>
+        transformFormulaForAxis(rebased(formula), { axis, operation, index, count }),
+      );
     }
-    return [cloneConditionalFormatRule({ ...rule, ranges, anchor, condition })];
+    return [cloneConditionalFormatRule({ ...transformedRule, ranges, anchor })];
   });
 }
 
@@ -1296,7 +1300,10 @@ export function applySheetAxisCommand(
       const current = workbook.sheets
         .get(formula.sheetId)
         ?.conditionalFormats?.find((rule) => rule.id === formula.ruleId);
-      return current?.condition.kind === "formula" && current.condition.formula !== formula.source;
+      return (
+        current &&
+        conditionalFormatFormulaSources(current)[formula.formulaIndex ?? 0] !== formula.source
+      );
     }) ||
     JSON.stringify(slice.definedNames) !== JSON.stringify([...workbook.definedNames.values()]);
   return changed || metadataChanged || externalChanged
@@ -1459,19 +1466,15 @@ function transformSheetMetadataForAxisMove(
         axis === "row"
           ? { row: map(rule.anchor.row), column: rule.anchor.column }
           : { row: rule.anchor.row, column: map(rule.anchor.column) };
-      const condition =
-        rule.condition.kind === "formula"
-          ? {
-              kind: "formula" as const,
-              formula: transformFormulaForAxisMove(rule.condition.formula, {
-                axis,
-                index,
-                count,
-                toIndex,
-              }),
-            }
-          : rule.condition;
-      return cloneConditionalFormatRule({ ...rule, ranges, anchor, condition });
+      const transformedRule = mapConditionalFormatFormulas(rule, (formula) =>
+        transformFormulaForAxisMove(formula, {
+          axis,
+          index,
+          count,
+          toIndex,
+        }),
+      );
+      return cloneConditionalFormatRule({ ...transformedRule, ranges, anchor });
     }),
   };
 }

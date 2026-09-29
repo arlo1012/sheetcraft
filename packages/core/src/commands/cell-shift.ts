@@ -1,4 +1,5 @@
 import { collectFormulaRanges, transformFormulaReferences } from "../formula/references.js";
+import { conditionalFormatFormulaSources } from "../conditional-formatting.js";
 import { rewriteQualifiedReferencesForSheet } from "../formula/workbook-references.js";
 import {
   MAX_SHEET_COLUMNS,
@@ -269,21 +270,21 @@ function assertFormulaRangesAreSafe(
       }
     }
     for (const rule of sourceSheet.conditionalFormats ?? []) {
-      if (rule.condition.kind !== "formula") continue;
-      for (const formulaRange of collectFormulaRanges(rule.condition.formula)) {
-        const qualified = formulaRange.start.sheetName;
-        const targetsSheet = qualified
-          ? qualified.toLowerCase() === targetName
-          : sourceSheet.id === sheetId;
-        if (!targetsSheet) continue;
-        const reference = { start: formulaRange.start, end: formulaRange.end };
-        if (!intersects(reference, movement)) continue;
-        throw invalidCommandPayload(
-          "range",
-          range,
-          "Cell shifts intersecting a conditional-format formula reference are not supported.",
-        );
-      }
+      for (const formula of conditionalFormatFormulaSources(rule))
+        for (const formulaRange of collectFormulaRanges(formula)) {
+          const qualified = formulaRange.start.sheetName;
+          const targetsSheet = qualified
+            ? qualified.toLowerCase() === targetName
+            : sourceSheet.id === sheetId;
+          if (!targetsSheet) continue;
+          const reference = { start: formulaRange.start, end: formulaRange.end };
+          if (!intersects(reference, movement)) continue;
+          throw invalidCommandPayload(
+            "range",
+            range,
+            "Cell shifts intersecting a conditional-format formula reference are not supported.",
+          );
+        }
     }
   }
 }

@@ -94,6 +94,7 @@ export const conditionalFormattingEnUS = {
     text: "Text",
     value: "Value",
     secondValue: "Second value",
+    valueReferenceHint: "e.g. 10, text, or =$D$1",
     formulaHint: "Start with = and write the formula relative to the top-left cell of the range.",
     invalidRange: "Enter a valid A1 cell range.",
     invalidValue: "Enter a condition value.",
@@ -142,6 +143,8 @@ export const conditionalFormattingEnUS = {
     threshold: "Threshold",
     invalidThresholds:
       "Use valid thresholds in ascending order; percentages must be between 0 and 100.",
+    invalidThresholdFormula:
+      "Enter a valid numeric formula using absolute cell references, such as =$D$1.",
     minimum: "Minimum",
     midpoint: "Midpoint",
     maximum: "Maximum",

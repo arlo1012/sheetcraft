@@ -320,6 +320,136 @@ describe("XLSX conditional formatting", () => {
     });
   });
 
+  test("roundtrips formula comparison operands, numeric values and literal strings", async () => {
+    const workbook = createWorkbook({ id: "comparison-operands", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    const range = { start: { row: 3, column: 0 }, end: { row: 8, column: 0 } };
+    sheet.conditionalFormats = [
+      {
+        id: "references",
+        ranges: [range],
+        // A retained lower range must rebase formula operands to A4.
+        anchor: { row: 1, column: 0 },
+        condition: {
+          kind: "cellValue",
+          operator: "between",
+          value: { formula: "=B2+$C$1" },
+          secondValue: { formula: "=D2" },
+        },
+        style: { fillColor: "#DBEAFE" },
+      },
+      {
+        id: "literal",
+        ranges: [range],
+        anchor: range.start,
+        condition: { kind: "cellValue", operator: "equal", value: "Done" },
+        style: { fillColor: "#DCFCE7" },
+      },
+      {
+        id: "number",
+        ranges: [range],
+        anchor: range.start,
+        condition: { kind: "cellValue", operator: "greaterThan", value: 42 },
+        style: { fillColor: "#FEE2E2" },
+      },
+    ];
+
+    const encoded = await encodeXlsx(workbook);
+    const xml = strFromU8(unzipSync(encoded.bytes)["xl/worksheets/sheet1.xml"]!);
+    expect(xml).toContain("<formula>B4+$C$1</formula><formula>D4</formula>");
+    expect(xml).toContain("<formula>&quot;Done&quot;</formula>");
+    expect(xml).toContain("<formula>42</formula>");
+    expect(getActiveSheet((await decodeXlsx(encoded.bytes)).workbook).conditionalFormats).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          condition: {
+            kind: "cellValue",
+            operator: "between",
+            value: { formula: "=B4+$C$1" },
+            secondValue: { formula: "=D4" },
+          },
+        }),
+        expect.objectContaining({
+          condition: { kind: "cellValue", operator: "equal", value: "Done" },
+        }),
+        expect.objectContaining({
+          condition: { kind: "cellValue", operator: "greaterThan", value: 42 },
+        }),
+      ]),
+    );
+  });
+
+  test("imports general cellIs formula operands from raw OOXML", async () => {
+    const workbook = createWorkbook({ id: "raw-comparison-operand", sheetId: "sheet" });
+    const entries = unzipSync((await encodeXlsx(workbook)).bytes);
+    entries["xl/worksheets/sheet1.xml"] = strToU8(
+      strFromU8(entries["xl/worksheets/sheet1.xml"]!).replace(
+        /<\/worksheet>/i,
+        '<conditionalFormatting sqref="A1"><cfRule type="cellIs" operator="greaterThan" priority="1" stopIfTrue="1"><formula>SUM($B$1:B1)</formula></cfRule></conditionalFormatting></worksheet>',
+      ),
+    );
+    const condition = getActiveSheet((await decodeXlsx(zipSync(entries))).workbook)
+      .conditionalFormats?.[0]?.condition;
+    expect(condition).toEqual({
+      kind: "cellValue",
+      operator: "greaterThan",
+      value: { formula: "=SUM($B$1:B1)" },
+    });
+  });
+
+  test("roundtrips standard cfvo formula thresholds with absolute references", async () => {
+    const workbook = createWorkbook({ id: "formula-thresholds", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    sheet.conditionalFormats = [
+      {
+        id: "formula-icon-thresholds",
+        ranges: [{ start: { row: 3, column: 0 }, end: { row: 8, column: 0 } }],
+        anchor: { row: 1, column: 0 },
+        condition: {
+          kind: "iconSet",
+          iconSet: "threeArrows",
+          thresholds: [
+            { kind: "formula", formula: "=$B$2+$C$1" },
+            { kind: "formula", formula: "=$D$2" },
+            { kind: "formula", formula: "=$E$1" },
+          ],
+        },
+        style: {},
+      },
+    ];
+    const encoded = await encodeXlsx(workbook);
+    const xml = strFromU8(unzipSync(encoded.bytes)["xl/worksheets/sheet1.xml"]!);
+    expect(xml).toContain('type="formula" val="$B$2+$C$1"');
+    expect(xml).toContain('type="formula" val="$D$2"');
+    expect(
+      getActiveSheet((await decodeXlsx(encoded.bytes)).workbook).conditionalFormats?.[0],
+    ).toMatchObject({
+      condition: {
+        thresholds: [
+          { kind: "formula", formula: "=$B$2+$C$1" },
+          { kind: "formula", formula: "=$D$2" },
+          { kind: "formula", formula: "=$E$1" },
+        ],
+      },
+    });
+  });
+
+  test("omits raw cfvo formula thresholds with relative references", async () => {
+    const workbook = createWorkbook({ id: "relative-cfvo", sheetId: "sheet" });
+    const entries = unzipSync((await encodeXlsx(workbook)).bytes);
+    entries["xl/worksheets/sheet1.xml"] = strToU8(
+      strFromU8(entries["xl/worksheets/sheet1.xml"]!).replace(
+        /<\/worksheet>/i,
+        '<conditionalFormatting sqref="A1:A3"><cfRule type="iconSet" priority="1"><iconSet iconSet="3Arrows"><cfvo type="formula" val="B1"/><cfvo type="formula" val="$C$1"/><cfvo type="formula" val="$D$1"/></iconSet></cfRule></conditionalFormatting></worksheet>',
+      ),
+    );
+    const decoded = await decodeXlsx(zipSync(entries));
+    expect(getActiveSheet(decoded.workbook).conditionalFormats).toHaveLength(0);
+    expect(decoded.report.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "feature-omitted" })]),
+    );
+  });
+
   test("roundtrips ordered rules, their ranges, differential style and formula source", async () => {
     const workbook = createWorkbook({
       id: "conditional-formatting",

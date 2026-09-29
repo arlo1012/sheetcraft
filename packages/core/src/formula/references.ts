@@ -3,6 +3,7 @@ import {
   MAX_FORMULA_COLUMNS,
   MAX_FORMULA_ROWS,
   type FormulaAddress,
+  type FormulaAxisRange,
   type FormulaAst,
   type FormulaAxisTransform,
   type FormulaCopyOffset,
@@ -110,6 +111,28 @@ export function collectFormulaRanges(sourceOrAst: string | FormulaAst): FormulaR
     }
   });
   return ranges;
+}
+
+/** Collects whole-row and whole-column ranges, including their absolute markers. */
+export function collectFormulaAxisRanges(sourceOrAst: string | FormulaAst): FormulaAxisRange[] {
+  const ast = getAst(sourceOrAst);
+  if (!ast) return [];
+  const ranges: FormulaAxisRange[] = [];
+  walkExpression(ast.expression, (expression) => {
+    if (expression.kind === "axis-range") ranges.push({ ...expression.range });
+  });
+  return ranges;
+}
+
+/** Whether a formula contains an array constant, which some persisted formula slots forbid. */
+export function formulaHasArrayConstant(sourceOrAst: string | FormulaAst): boolean {
+  const ast = getAst(sourceOrAst);
+  if (!ast) return false;
+  let found = false;
+  walkExpression(ast.expression, (expression) => {
+    if (expression.kind === "array") found = true;
+  });
+  return found;
 }
 
 /** Collects references/ranges from an expression selected by the runtime scheduler. */

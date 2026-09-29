@@ -107,6 +107,26 @@ describe("fixed conditional-format shortcut dialogs", () => {
       style: conditionalFormatPresetStyle("redFillText"),
     });
   });
+  test("accepts cell-reference formulas and explicitly quoted literal values", async () => {
+    const formula = quick("greaterThan");
+    formula.findComponent(Input).vm.$emit("update:modelValue", "=$D$1");
+    await nextTick();
+    await confirm(formula);
+    expect(formula.emitted("save")?.[0]?.[0]).toMatchObject({
+      condition: { kind: "cellValue", value: { formula: "=$D$1" } },
+    });
+    formula.unmount();
+    mounted.splice(mounted.indexOf(formula), 1);
+    document.body.replaceChildren();
+
+    const literal = quick("equal");
+    literal.findComponent(Input).vm.$emit("update:modelValue", '"001"');
+    await nextTick();
+    await confirm(literal);
+    expect(literal.emitted("save")?.[0]?.[0]).toMatchObject({
+      condition: { kind: "cellValue", value: "001" },
+    });
+  });
   test("saves a custom number format and four-edge red border", async () => {
     const wrapper = quick("aboveAverage");
     const picker = wrapper.findComponent(ConditionalFormatStyleSelect);
@@ -128,5 +148,14 @@ describe("fixed conditional-format shortcut dialogs", () => {
         borderLeft: { style: "thin", color: "#9c0006" },
       },
     });
+  });
+
+  test("reports an invalid comparison formula without saving", async () => {
+    const wrapper = quick("greaterThan");
+    wrapper.findComponent(Input).vm.$emit("update:modelValue", "=SUM(");
+    await nextTick();
+    await confirm(wrapper);
+    expect(wrapper.emitted("save")).toBeUndefined();
+    expect(document.body.textContent).toContain("formula");
   });
 });

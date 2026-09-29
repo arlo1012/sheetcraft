@@ -7,26 +7,29 @@ import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { computed } from "vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
+import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import ConditionalFormatPreview from "./ConditionalFormatPreview.vue";
 
 const props = defineProps<{
   condition: Extract<ConditionalFormatCondition, { kind: "iconSet" }>;
+  selectValueReference?: (current: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{
   updateKind: [index: number, kind: ConditionalFormatThreshold["kind"]];
-  updateValue: [index: number, value: number];
+  updateValue: [index: number, value: string];
 }>();
 const { t } = useAppI18n();
 const rows = computed(() =>
   props.condition.thresholds.map((entry, index) => ({ entry, index })).reverse(),
 );
 const options = computed(() =>
-  (["num", "percent", "percentile", "min", "max"] as const).map((value) => ({
+  (["num", "percent", "percentile", "formula", "min", "max"] as const).map((value) => ({
     value,
     label: t(`conditionalFormatting.${value}` as MessageKey),
   })),
 );
 function boundLabel(entry: ConditionalFormatThreshold): string {
+  if (entry.kind === "formula") return entry.formula;
   if (!("value" in entry)) return t(`conditionalFormatting.${entry.kind}`);
   return entry.kind === "num"
     ? String(entry.value)
@@ -70,6 +73,7 @@ function boundLabel(entry: ConditionalFormatThreshold): string {
         >
         <template v-if="index > 0">
           <TInputNumber
+            v-if="entry.kind !== 'formula'"
             :model-value="'value' in entry ? entry.value : undefined"
             :disabled="entry.kind === 'min' || entry.kind === 'max'"
             :placeholder="
@@ -86,9 +90,18 @@ function boundLabel(entry: ConditionalFormatThreshold): string {
               emit(
                 'updateValue',
                 index,
-                $event === '' || $event === undefined ? Number.NaN : Number($event),
+                $event === '' || $event === undefined ? '' : String($event),
               )
             "
+          />
+          <RangeReferenceInput
+            v-else
+            :model-value="entry.formula"
+            :aria-label="`${t('conditionalFormatting.threshold')} ${index + 1} · ${t('conditionalFormatting.value')}`"
+            placeholder="=$D$1"
+            :show-picker="true"
+            :select-reference="selectValueReference"
+            @update:model-value="emit('updateValue', index, $event)"
           />
           <TSelect
             :model-value="entry.kind"

@@ -460,6 +460,8 @@ export type FormulaSourceRestore = {
 export type ConditionalFormatFormulaSourceRestore = {
   sheetId: string;
   ruleId: string;
+  /** Formula slot within the rule; omitted by older command snapshots. */
+  formulaIndex?: number;
   source: string;
 };
 

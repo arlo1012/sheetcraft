@@ -1,5 +1,6 @@
 import {
   cloneConditionalFormatRule,
+  mapConditionalFormatFormulas,
   type SheetConditionalFormatRule,
 } from "./conditional-formatting.js";
 import { translateFormulaForCopy } from "./formula/references.js";
@@ -125,11 +126,12 @@ export function copyConditionalFormatRules(
     ids.add(id);
     const anchor = { ...ranges[0]!.start };
     const copy = cloneConditionalFormatRule(rule);
-    if (copy.condition.kind === "formula")
-      copy.condition.formula = translateFormulaForCopy(copy.condition.formula, {
+    const translated = mapConditionalFormatFormulas(copy, (formula) =>
+      translateFormulaForCopy(formula, {
         row: anchor.row - rule.anchor.row,
         column: anchor.column - rule.anchor.column,
-      });
-    return [{ ...copy, id, ranges, anchor }];
+      }),
+    );
+    return [{ ...translated, id, ranges, anchor }];
   });
 }

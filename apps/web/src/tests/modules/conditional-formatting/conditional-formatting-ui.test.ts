@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   conditionalFormatRangesIntersect,
   formatConditionalFormatRanges,
+  parseConditionalFormatValueOperand,
   parseConditionalFormatRanges,
 } from "../../../modules/conditional-formatting/conditional-formatting-ui";
 
@@ -29,5 +30,15 @@ describe("conditional formatting A1 ranges", () => {
         { start: { row: 2, column: 1 }, end: { row: 2, column: 1 } },
       ]),
     ).toBe(true);
+  });
+
+  test("parses literal values, escaped values, and formula operands", () => {
+    expect(parseConditionalFormatValueOperand("12")).toBe(12);
+    expect(parseConditionalFormatValueOperand("Overdue")).toBe("Overdue");
+    expect(parseConditionalFormatValueOperand("=$D$1")).toEqual({ formula: "=$D$1" });
+    expect(parseConditionalFormatValueOperand('"001"')).toBe("001");
+    expect(parseConditionalFormatValueOperand("'=001")).toBe("=001");
+    expect(parseConditionalFormatValueOperand("  overdue  ")).toBe("  overdue  ");
+    expect(parseConditionalFormatValueOperand("\\server")).toBe("\\server");
   });
 });

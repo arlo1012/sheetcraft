@@ -49,11 +49,9 @@ describe("advanced conditional format editor", () => {
       const wrapper = editor(initial);
       for (const field of wrapper.findAllComponents(FormItem)) {
         if (field.props("label") === "Value")
-          initial === "contains"
-            ? field.findComponent(Input).vm.$emit("update:modelValue", "12")
-            : field.findComponent(InputNumber).vm.$emit("update:modelValue", 12);
+          field.findComponent(Input).vm.$emit("update:modelValue", "12");
         if (field.props("label") === "Second value")
-          field.findComponent(InputNumber).vm.$emit("update:modelValue", 24);
+          field.findComponent(Input).vm.$emit("update:modelValue", "24");
       }
       await nextTick();
       await confirm();
@@ -89,7 +87,7 @@ describe("advanced conditional format editor", () => {
     );
     const fields = wrapper.findAllComponents(ConditionalFormatThresholdField);
     expect(fields).toHaveLength(2);
-    fields[1]!.vm.$emit("update:value", 200);
+    fields[1]!.vm.$emit("update:value", "200");
     await nextTick();
     await confirm();
     expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({
@@ -99,6 +97,39 @@ describe("advanced conditional format editor", () => {
           { threshold: { kind: "num", value: 200 } },
         ],
       },
+    });
+  });
+
+  test("rejects an empty numeric threshold and preserves an absolute formula threshold", async () => {
+    const invalid = editor(
+      undefined,
+      rule({
+        kind: "dataBar",
+        minimum: { kind: "num", value: 0 },
+        maximum: { kind: "num", value: 10 },
+        color: "#638EC6",
+      }),
+    );
+    invalid.findAllComponents(ConditionalFormatThresholdField)[1]!.vm.$emit("update:value", "");
+    await nextTick();
+    await confirm();
+    expect(invalid.emitted("save")).toBeUndefined();
+    invalid.unmount();
+    mounted.splice(mounted.indexOf(invalid), 1);
+    document.body.replaceChildren();
+
+    const formula = editor(
+      undefined,
+      rule({
+        kind: "dataBar",
+        minimum: { kind: "formula", formula: "=$D$1" },
+        maximum: { kind: "max" },
+        color: "#638EC6",
+      }),
+    );
+    await confirm();
+    expect(formula.emitted("save")?.[0]?.[0]).toMatchObject({
+      condition: { minimum: { kind: "formula", formula: "=$D$1" } },
     });
   });
 
@@ -124,6 +155,17 @@ describe("advanced conditional format editor", () => {
         thresholds: [{ kind: "min" }, { kind: "num", value: 30 }, { kind: "num", value: 80 }],
       },
     });
+  });
+
+  test("explains the absolute-reference requirement for a formula threshold", async () => {
+    const wrapper = editor("barBlue");
+    const minimum = wrapper.findAllComponents(ConditionalFormatThresholdField)[0]!;
+    minimum.vm.$emit("update:kind", "formula");
+    minimum.vm.$emit("update:value", "=D1");
+    await nextTick();
+    await confirm();
+    expect(wrapper.emitted("save")).toBeUndefined();
+    expect(document.body.textContent).toContain("absolute cell references");
   });
 
   test("keeps a standard data-bar preset free of unrequested XLSX extensions", async () => {

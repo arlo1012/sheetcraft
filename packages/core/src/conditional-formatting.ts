@@ -1,6 +1,11 @@
 import { WorkbookDomainError, toWorkbookErrorDetail } from "./errors.js";
 import { parseFormula } from "./formula/parser.js";
-import { translateFormulaForCopy } from "./formula/references.js";
+import {
+  collectFormulaAxisRanges,
+  collectFormulaReferences,
+  formulaHasArrayConstant,
+  translateFormulaForCopy,
+} from "./formula/references.js";
 import { excelSerialToDateParts, type ExcelDateSystem } from "./formula/date-system.js";
 import { isFormulaError, type FormulaValue } from "./formula/types.js";
 import { mergeCellStyle, normalizeCellStyle, type CellStyle } from "./style.js";
@@ -89,7 +94,11 @@ export type ConditionalFormatDatePeriod =
 export type ConditionalFormatThreshold =
   | { kind: "min" }
   | { kind: "max" }
-  | { kind: "num" | "percent" | "percentile"; value: number };
+  | { kind: "num" | "percent" | "percentile"; value: number }
+  | { kind: "formula"; formula: string };
+
+/** A literal comparison value, or a formula evaluated for each applied cell. */
+export type ConditionalFormatOperand = number | string | { formula: string };
 
 export type ConditionalFormatColorScaleStop = {
   threshold: ConditionalFormatThreshold;
@@ -148,8 +157,8 @@ export type ConditionalFormatCondition =
         | "notEqual"
         | "between"
         | "notBetween";
-      value: number | string;
-      secondValue?: number | string;
+      value: ConditionalFormatOperand;
+      secondValue?: ConditionalFormatOperand;
     }
   | { kind: "text"; operator: "contains" | "notContains" | "beginsWith" | "endsWith"; text: string }
   | { kind: "blank"; blank: boolean }
@@ -286,6 +295,21 @@ function normalizeThreshold(
 ): ConditionalFormatThreshold {
   if (!value || typeof value !== "object") invalid(field, value);
   if (value.kind === "min" || value.kind === "max") return { kind: value.kind };
+  if (value.kind === "formula") {
+    if (typeof value.formula !== "string" || !parseFormula(value.formula).ok)
+      invalid(`${field}.formula`, value.formula);
+    if (
+      collectFormulaReferences(value.formula).some(
+        (reference) => !reference.rowAbsolute || !reference.columnAbsolute,
+      ) ||
+      collectFormulaAxisRanges(value.formula).some(
+        (range) => !range.startAbsolute || !range.endAbsolute,
+      ) ||
+      formulaHasArrayConstant(value.formula)
+    )
+      invalid(`${field}.formula`, value.formula);
+    return { kind: "formula", formula: value.formula };
+  }
   if (value.kind !== "num" && value.kind !== "percent" && value.kind !== "percentile")
     return invalid(`${field}.kind`, (value as { kind?: unknown }).kind);
   if (typeof value.value !== "number" || !Number.isFinite(value.value))
@@ -320,21 +344,19 @@ function normalizeCondition(condition: ConditionalFormatCondition): ConditionalF
   if (!condition || typeof condition !== "object") invalid("condition", condition);
   if (condition.kind === "cellValue") {
     if (!VALUE_OPERATORS.has(condition.operator)) invalid("condition.operator", condition.operator);
-    if (!isComparable(condition.value)) invalid("condition.value", condition.value);
+    const value = normalizeOperand(condition.value, "condition.value");
     const requiresSecond = condition.operator === "between" || condition.operator === "notBetween";
-    if (requiresSecond && !isComparable(condition.secondValue))
+    if (requiresSecond && condition.secondValue === undefined)
       invalid("condition.secondValue", condition.secondValue);
-    if (
-      !requiresSecond &&
-      condition.secondValue !== undefined &&
-      !isComparable(condition.secondValue)
-    )
-      invalid("condition.secondValue", condition.secondValue);
+    const secondValue =
+      condition.secondValue === undefined
+        ? undefined
+        : normalizeOperand(condition.secondValue, "condition.secondValue");
     return {
       kind: "cellValue",
       operator: condition.operator,
-      value: condition.value,
-      ...(condition.secondValue === undefined ? {} : { secondValue: condition.secondValue }),
+      value,
+      ...(secondValue === undefined ? {} : { secondValue }),
     };
   }
   if (condition.kind === "text") {
@@ -540,8 +562,99 @@ export function cloneConditionalFormatRule(
   return normalizeConditionalFormatRules([rule])[0]!;
 }
 
+/** Returns every formula stored by a rule, including dynamic operands and thresholds. */
+export function conditionalFormatFormulaSources(rule: SheetConditionalFormatRule): string[] {
+  const condition = rule.condition;
+  if (condition.kind === "formula") return [condition.formula];
+  const sources: string[] = [];
+  const addOperand = (operand: ConditionalFormatOperand | undefined) => {
+    if (operand && typeof operand === "object") sources.push(operand.formula);
+  };
+  const addThreshold = (threshold: ConditionalFormatThreshold) => {
+    if (threshold.kind === "formula") sources.push(threshold.formula);
+  };
+  if (condition.kind === "cellValue") {
+    addOperand(condition.value);
+    addOperand(condition.secondValue);
+  } else if (condition.kind === "dataBar") {
+    addThreshold(condition.minimum);
+    addThreshold(condition.maximum);
+  } else if (condition.kind === "colorScale") {
+    for (const stop of condition.stops) addThreshold(stop.threshold);
+  } else if (condition.kind === "iconSet") {
+    for (const threshold of condition.thresholds) addThreshold(threshold);
+  }
+  return sources;
+}
+
+/** Applies a source transformation to every formula stored by a rule. */
+export function mapConditionalFormatFormulas(
+  rule: SheetConditionalFormatRule,
+  transform: (source: string) => string,
+): SheetConditionalFormatRule {
+  const mapOperand = (operand: ConditionalFormatOperand | undefined) =>
+    operand && typeof operand === "object" ? { formula: transform(operand.formula) } : operand;
+  const mapThreshold = (threshold: ConditionalFormatThreshold): ConditionalFormatThreshold =>
+    threshold.kind === "formula"
+      ? { kind: "formula", formula: transform(threshold.formula) }
+      : threshold;
+  const condition = rule.condition;
+  if (condition.kind === "formula")
+    return { ...rule, condition: { kind: "formula", formula: transform(condition.formula) } };
+  if (condition.kind === "cellValue")
+    return {
+      ...rule,
+      condition: {
+        ...condition,
+        value: mapOperand(condition.value)!,
+        ...(condition.secondValue === undefined
+          ? {}
+          : { secondValue: mapOperand(condition.secondValue) }),
+      },
+    };
+  if (condition.kind === "dataBar")
+    return {
+      ...rule,
+      condition: {
+        ...condition,
+        minimum: mapThreshold(condition.minimum),
+        maximum: mapThreshold(condition.maximum),
+      },
+    };
+  if (condition.kind === "colorScale")
+    return {
+      ...rule,
+      condition: {
+        ...condition,
+        stops: condition.stops.map((stop) => ({
+          ...stop,
+          threshold: mapThreshold(stop.threshold),
+        })) as typeof condition.stops,
+      },
+    };
+  if (condition.kind === "iconSet")
+    return {
+      ...rule,
+      condition: { ...condition, thresholds: condition.thresholds.map(mapThreshold) },
+    };
+  return rule;
+}
+
 function isComparable(value: unknown): value is number | string {
   return (typeof value === "number" && Number.isFinite(value)) || typeof value === "string";
+}
+
+function normalizeOperand(value: unknown, field: string): ConditionalFormatOperand {
+  if (isComparable(value)) return value;
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof (value as { formula?: unknown }).formula === "string" &&
+    parseFormula((value as { formula: string }).formula).ok
+  )
+    return { formula: (value as { formula: string }).formula };
+  return invalid(field, value);
 }
 
 function inRange(address: CellAddress, range: CellRange): boolean {
@@ -567,9 +680,11 @@ function formulaValueKey(value: FormulaValue): string | undefined {
 function cellValueMatches(
   value: FormulaValue,
   condition: Extract<ConditionalFormatCondition, { kind: "cellValue" }>,
+  target: number | string | undefined,
+  secondTarget: number | string | undefined,
 ): boolean {
   if (isFormulaError(value) || value === null || typeof value === "boolean") return false;
-  const target = condition.value;
+  if (target === undefined) return false;
   if (typeof value !== typeof target) return condition.operator === "notEqual";
   const comparableValue = typeof value === "string" ? value.toLocaleLowerCase() : value;
   const comparableTarget = typeof target === "string" ? target.toLocaleLowerCase() : target;
@@ -590,12 +705,9 @@ function cellValueMatches(
       return compare !== 0;
     case "between":
     case "notBetween": {
-      if (condition.secondValue === undefined || typeof condition.secondValue !== typeof value)
-        return false;
+      if (secondTarget === undefined || typeof secondTarget !== typeof value) return false;
       const secondValue =
-        typeof condition.secondValue === "string"
-          ? condition.secondValue.toLocaleLowerCase()
-          : condition.secondValue;
+        typeof secondTarget === "string" ? secondTarget.toLocaleLowerCase() : secondTarget;
       const lower = comparableTarget <= secondValue ? comparableTarget : secondValue;
       const upper = comparableTarget <= secondValue ? secondValue : comparableTarget;
       const matches = comparableValue >= lower && comparableValue <= upper;
@@ -627,21 +739,56 @@ type ConditionalFormulaEvaluator = SheetEvaluator & {
   evaluateFormula?: (source: string, address: CellAddress) => FormulaValue;
 };
 
+function evaluateConditionalFormula(
+  source: string,
+  rule: SheetConditionalFormatRule,
+  address: CellAddress,
+  evaluator: ConditionalFormulaEvaluator,
+): FormulaValue | undefined {
+  if (!evaluator.evaluateFormula) return undefined;
+  try {
+    return evaluator.evaluateFormula(
+      translateFormulaForCopy(source, {
+        row: address.row - rule.anchor.row,
+        column: address.column - rule.anchor.column,
+      }),
+      address,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveOperand(
+  operand: ConditionalFormatOperand | undefined,
+  rule: SheetConditionalFormatRule,
+  address: CellAddress,
+  evaluator: ConditionalFormulaEvaluator,
+): number | string | undefined {
+  if (operand === undefined) return undefined;
+  if (typeof operand === "number" || typeof operand === "string") return operand;
+  const value = evaluateConditionalFormula(operand.formula, rule, address, evaluator);
+  return (typeof value === "number" && Number.isFinite(value)) || typeof value === "string"
+    ? value
+    : undefined;
+}
+
 function formulaMatches(
   rule: SheetConditionalFormatRule,
   address: CellAddress,
   evaluator: ConditionalFormulaEvaluator,
 ): boolean {
-  if (!evaluator.evaluateFormula) return false;
-  const source = translateFormulaForCopy(
+  const value = evaluateConditionalFormula(
     rule.condition.kind === "formula" ? rule.condition.formula : "",
-    {
-      row: address.row - rule.anchor.row,
-      column: address.column - rule.anchor.column,
-    },
+    rule,
+    address,
+    evaluator,
   );
-  const value = evaluator.evaluateFormula(source, address);
-  return !isFormulaError(value) && (value === true || (typeof value === "number" && value !== 0));
+  return (
+    value !== undefined &&
+    !isFormulaError(value) &&
+    (value === true || (typeof value === "number" && value !== 0))
+  );
 }
 
 function collectSparseAddresses(sheet: Sheet, evaluator: SheetEvaluator): CellAddress[] {
@@ -714,7 +861,15 @@ function createNumericSummary(values: number[]): NumericSummary | undefined {
 function resolveThreshold(
   threshold: ConditionalFormatThreshold,
   summary: NumericSummary | undefined,
+  rule?: SheetConditionalFormatRule,
+  address?: CellAddress,
+  evaluator?: ConditionalFormulaEvaluator,
 ): number | undefined {
+  if (threshold.kind === "formula") {
+    if (!rule || !address || !evaluator) return undefined;
+    const value = evaluateConditionalFormula(threshold.formula, rule, address, evaluator);
+    return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  }
   if (!summary) return undefined;
   if (threshold.kind === "min") return summary.minimum;
   if (threshold.kind === "max") return summary.maximum;
@@ -745,11 +900,14 @@ function colorScaleColor(
   value: FormulaValue,
   condition: Extract<ConditionalFormatCondition, { kind: "colorScale" }>,
   summary: NumericSummary | undefined,
+  rule?: SheetConditionalFormatRule,
+  address?: CellAddress,
+  evaluator?: ConditionalFormulaEvaluator,
 ): string | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
   const resolved = condition.stops.map((stop) => ({
     ...stop,
-    value: resolveThreshold(stop.threshold, summary),
+    value: resolveThreshold(stop.threshold, summary, rule, address, evaluator),
   }));
   if (resolved.some((stop) => stop.value === undefined)) return undefined;
   if (resolved.some((stop, index) => index > 0 && stop.value! < resolved[index - 1]!.value!))
@@ -900,7 +1058,12 @@ export function createConditionalFormatResolver(
       const value = evaluator.getComputedValue(address);
       const matches =
         rule.condition.kind === "cellValue"
-          ? cellValueMatches(value, rule.condition)
+          ? cellValueMatches(
+              value,
+              rule.condition,
+              resolveOperand(rule.condition.value, rule, address, evaluator),
+              resolveOperand(rule.condition.secondValue, rule, address, evaluator),
+            )
           : rule.condition.kind === "text"
             ? textMatches(value, rule.condition)
             : rule.condition.kind === "blank"
@@ -924,8 +1087,14 @@ export function createConditionalFormatResolver(
                     : rule.condition.kind === "date"
                       ? dateMatches(value, rule.condition.period, options, clock)
                       : rule.condition.kind === "colorScale"
-                        ? colorScaleColor(value, rule.condition, getNumericSummary(rule)) !==
-                          undefined
+                        ? colorScaleColor(
+                            value,
+                            rule.condition,
+                            getNumericSummary(rule),
+                            rule,
+                            address,
+                            evaluator,
+                          ) !== undefined
                         : rule.condition.kind === "formula"
                           ? formulaMatches(rule, address, evaluator)
                           : rule.condition.kind === "dataBar" || rule.condition.kind === "iconSet"
@@ -934,7 +1103,14 @@ export function createConditionalFormatResolver(
       if (!matches) continue;
       const calculatedFill =
         rule.condition.kind === "colorScale"
-          ? colorScaleColor(value, rule.condition, getNumericSummary(rule))
+          ? colorScaleColor(
+              value,
+              rule.condition,
+              getNumericSummary(rule),
+              rule,
+              address,
+              evaluator,
+            )
           : undefined;
       for (const key of CONDITIONAL_NON_FILL_STYLE_KEYS) {
         if (Object.hasOwn(overlay, key)) continue;
@@ -1002,7 +1178,13 @@ export function createConditionalFormatVisualResolver(
     value: FormulaValue,
   ): boolean => {
     const condition = rule.condition;
-    if (condition.kind === "cellValue") return cellValueMatches(value, condition);
+    if (condition.kind === "cellValue")
+      return cellValueMatches(
+        value,
+        condition,
+        resolveOperand(condition.value, rule, address, evaluator),
+        resolveOperand(condition.secondValue, rule, address, evaluator),
+      );
     if (condition.kind === "text") return textMatches(value, condition);
     if (condition.kind === "blank")
       return (
@@ -1031,8 +1213,8 @@ export function createConditionalFormatVisualResolver(
       if (!matches(rule, address, value)) continue;
       if (rule.condition.kind === "dataBar" && dataBar === undefined && typeof value === "number") {
         const summary = summaryFor(rule);
-        const minimum = resolveThreshold(rule.condition.minimum, summary);
-        const maximum = resolveThreshold(rule.condition.maximum, summary);
+        const minimum = resolveThreshold(rule.condition.minimum, summary, rule, address, evaluator);
+        const maximum = resolveThreshold(rule.condition.maximum, summary, rule, address, evaluator);
         if (minimum !== undefined && maximum !== undefined && maximum >= minimum) {
           const width = maximum - minimum;
           const position =
@@ -1067,7 +1249,7 @@ export function createConditionalFormatVisualResolver(
       }
       if (rule.condition.kind === "iconSet" && iconSet === undefined && typeof value === "number") {
         const thresholds = rule.condition.thresholds.map((threshold) =>
-          resolveThreshold(threshold, summaryFor(rule)),
+          resolveThreshold(threshold, summaryFor(rule), rule, address, evaluator),
         );
         if (
           thresholds.every((threshold) => threshold !== undefined) &&

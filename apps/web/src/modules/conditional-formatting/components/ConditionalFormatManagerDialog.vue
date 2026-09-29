@@ -9,6 +9,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import {
   cloneConditionalFormatRule,
   conditionalFormatRangesIntersect,
+  formatConditionalFormatValueOperand,
   formatConditionalFormatRanges,
   parseConditionalFormatRanges,
 } from "../conditional-formatting-ui";
@@ -27,6 +28,7 @@ const props = defineProps<{
   sampleValue?: string | number | boolean | null;
   dateSystem?: "1900" | "1904";
   selectReference?: (current: string) => Promise<string | undefined>;
+  selectValueReference?: (current: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{
   close: [];
@@ -65,8 +67,14 @@ function describeRule(rule: SheetConditionalFormatRule): string {
     return c.unique ? t("conditionalFormatting.unique") : t("conditionalFormatting.duplicate");
   if (c.kind === "text")
     return `${t(`conditionalFormatting.${c.operator}` as "conditionalFormatting.contains")}: ${c.text}`;
-  if (c.kind === "cellValue")
-    return `${t(`conditionalFormatting.${c.operator}` as "conditionalFormatting.greaterThan")}: ${c.value}${c.secondValue === undefined ? "" : `, ${c.secondValue}`}`;
+  if (c.kind === "cellValue") {
+    const value = formatConditionalFormatValueOperand(c.value).value;
+    const secondValue =
+      c.secondValue === undefined
+        ? undefined
+        : formatConditionalFormatValueOperand(c.secondValue).value;
+    return `${t(`conditionalFormatting.${c.operator}` as "conditionalFormatting.greaterThan")}: ${value}${secondValue === undefined ? "" : `, ${secondValue}`}`;
+  }
   if (c.kind === "rank")
     return `${c.bottom ? t("conditionalFormatting.bottom") : t("conditionalFormatting.top")}: ${c.count}${c.percent ? "%" : ""}`;
   if (c.kind === "average")
@@ -218,6 +226,7 @@ watch(() => [props.visible, props.rules, props.createKind], reset, {
     :ranges="selectionRanges"
     :sample-value="sampleValue"
     :date-system="dateSystem"
+    :select-value-reference="selectValueReference"
     @save="saveRule"
     @close="closeEditor"
   />
@@ -230,6 +239,7 @@ watch(() => [props.visible, props.rules, props.createKind], reset, {
     :sample-value="sampleValue"
     :date-system="dateSystem"
     :select-reference="selectReference"
+    :select-value-reference="selectValueReference"
     @save="saveRule"
     @close="closeEditor"
   />

@@ -29,8 +29,20 @@ use sparse cell values and spill projections, avoiding a rectangular full-sheet
 scan. Ranking and visual thresholds use numeric values from the entire rule scope,
 deduplicating overlapping areas and excluding blanks, text, and errors. Whole-column
 rules can therefore remain sparse. Visual thresholds support minimum, maximum,
-number, percent of the value range, and percentile. Formula thresholds are not
-supported.
+number, percent of the value range, percentile, and numeric formulas or cell
+references. A visual threshold formula must resolve to a finite number; text,
+blank, and error results do not produce a visual rule. References in visual
+threshold formulas must be absolute, following the
+[OOXML CFVO contract](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/15094f93-f587-4f4e-be74-1fbdc93da768).
+
+Cell-value comparisons accept numbers, literal text, and formula operands. Values
+starting with `=` are formulas; leading apostrophes preserve literal text such as
+`'001` or `'=A1`. Imported string values retain their type when edited. Both bounds
+of a between comparison can reference cells. The value picker selects one cell,
+uses absolute references by default, and supports another worksheet without
+changing the rule's application range. Typed relative references in comparisons
+remain relative to the rule anchor. Referenced values are recalculated with
+document revisions.
 
 Commands provide atomic edits and undo/redo. Clearing a selection subtracts only
 that rectangle from rule scopes, retaining outside areas and the original anchor.

@@ -110,6 +110,45 @@ describe("conditional-formatting resolver", () => {
     expect(resolve({ row: 1, column: 1 })).toBeUndefined();
   });
 
+  test("evaluates formula operands per target while retaining literal strings", () => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    setCellValue(sheet, { row: 0, column: 0 }, 4);
+    setCellValue(sheet, { row: 1, column: 0 }, 8);
+    setCellValue(sheet, { row: 0, column: 1 }, 3);
+    setCellValue(sheet, { row: 1, column: 1 }, 9);
+    setCellValue(sheet, { row: 0, column: 2 }, "open");
+    sheet.conditionalFormats = [
+      rule(
+        "relative",
+        { kind: "cellValue", operator: "greaterThan", value: { formula: "=B1" } },
+        { fillColor: "#123456" },
+      ),
+      rule(
+        "literal",
+        { kind: "cellValue", operator: "equal", value: "open" },
+        { textColor: "#654321" },
+      ),
+    ];
+    const resolve = createConditionalFormatResolver(
+      sheet,
+      createWorkbookEvaluator(workbook, sheet.id),
+    );
+    expect(resolve({ row: 0, column: 0 })).toEqual({ fillColor: "#123456" });
+    expect(resolve({ row: 1, column: 0 })).toBeUndefined();
+    expect(resolve({ row: 0, column: 2 })).toEqual({ textColor: "#654321" });
+    setCellValue(sheet, { row: 0, column: 1 }, 5);
+    expect(
+      createConditionalFormatResolver(
+        sheet,
+        createWorkbookEvaluator(workbook, sheet.id),
+      )({
+        row: 0,
+        column: 0,
+      }),
+    ).toBeUndefined();
+  });
+
   test("handles blanks, errors, and duplicate values without treating errors as duplicates", () => {
     const workbook = createTestWorkbook();
     const sheet = getActiveSheet(workbook);

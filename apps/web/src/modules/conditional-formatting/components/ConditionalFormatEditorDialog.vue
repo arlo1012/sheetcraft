@@ -2,12 +2,14 @@
 import {
   normalizeConditionalFormatRules,
   cloneConditionalFormatRule,
+  mapConditionalFormatFormulas,
   type ConditionalFormatStyle,
   type ConditionalFormatIconSet,
   type ConditionalFormatThreshold,
   type SheetConditionalFormatRule,
 } from "@idea10/core/conditional-formatting";
 import { translateFormulaForCopy } from "@idea10/core/formula";
+import { toWorkbookErrorData } from "@idea10/core/errors";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -32,7 +34,9 @@ import {
 } from "../conditional-format-presets";
 import {
   createConditionalFormatRuleId,
+  formatConditionalFormatValueOperand,
   formatConditionalFormatRanges,
+  parseConditionalFormatValueOperand,
   parseConditionalFormatRanges,
 } from "../conditional-formatting-ui";
 
@@ -83,16 +87,16 @@ type EditorDraft = {
   datePeriod: string;
   stopIfTrue: boolean;
   minimumKind: ThresholdKind;
-  minimumValue: number;
+  minimumValue: string;
   maximumKind: ThresholdKind;
-  maximumValue: number;
+  maximumValue: string;
   barColor: string;
   negativeColor: string | undefined;
   gradient: boolean;
   showValue: boolean;
   scaleStops: 2 | 3;
   middleKind: ThresholdKind;
-  middleValue: number;
+  middleValue: string;
   minColor: string;
   midColor: string;
   maxColor: string;
@@ -108,6 +112,7 @@ const props = defineProps<{
   sampleValue?: string | number | boolean | null;
   dateSystem?: "1900" | "1904";
   selectReference?: (current: string) => Promise<string | undefined>;
+  selectValueReference?: (current: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{
   close: [];
@@ -127,6 +132,14 @@ async function selectRange(current: string): Promise<string | undefined> {
   pickingRange.value = true;
   try {
     return await props.selectReference?.(current);
+  } finally {
+    pickingRange.value = false;
+  }
+}
+async function selectValueReference(current: string): Promise<string | undefined> {
+  pickingRange.value = true;
+  try {
+    return await props.selectValueReference?.(current);
   } finally {
     pickingRange.value = false;
   }
@@ -243,8 +256,10 @@ const needsSecondValue = computed(
   () => draft.kind === "cellValue" && ["between", "notBetween"].includes(draft.operator),
 );
 const formulaPlaceholder = '=$D2="Overdue"';
-function threshold(kind: ThresholdKind, value: number): ConditionalFormatThreshold {
-  return kind === "min" || kind === "max" ? { kind } : { kind, value };
+function threshold(kind: ThresholdKind, value: string): ConditionalFormatThreshold {
+  if (kind === "min" || kind === "max") return { kind };
+  if (kind === "formula") return { kind, formula: value };
+  return { kind, value: value.trim() === "" ? Number.NaN : Number(value) };
 }
 function quickKind(kind: ConditionalFormatEditorKind | undefined): ConditionKind {
   if (["greaterThan", "lessThan", "between", "equal"].includes(kind ?? "")) return "cellValue";
@@ -271,16 +286,37 @@ function quickKind(kind: ConditionalFormatEditorKind | undefined): ConditionKind
 }
 
 function createDraft(rule = props.rule): EditorDraft {
-  const c = rule?.condition ?? getConditionalFormatPreset(props.initialKind ?? "");
+  const displayedRule =
+    rule &&
+    mapConditionalFormatFormulas(rule, (formula) =>
+      translateFormulaForCopy(formula, {
+        row: rule.ranges[0]!.start.row - rule.anchor.row,
+        column: rule.ranges[0]!.start.column - rule.anchor.column,
+      }),
+    );
+  const c = displayedRule?.condition ?? getConditionalFormatPreset(props.initialKind ?? "");
   const scale = c?.kind === "colorScale" ? c : undefined;
   const stop = (i: number) => scale?.stops[i];
   const min = c?.kind === "dataBar" ? c.minimum : stop(0)?.threshold;
   const max =
     c?.kind === "dataBar" ? c.maximum : stop(scale ? scale.stops.length - 1 : 2)?.threshold;
   const middle = stop(1)?.threshold;
-  const minValue = min && "value" in min ? min.value : 0;
-  const maxValue = max && "value" in max ? max.value : 100;
-  const middleValue = middle && "value" in middle ? middle.value : 50;
+  const minValue =
+    min && "value" in min ? String(min.value) : min?.kind === "formula" ? min.formula : "0";
+  const maxValue =
+    max && "value" in max ? String(max.value) : max?.kind === "formula" ? max.formula : "100";
+  const middleValue =
+    middle && "value" in middle
+      ? String(middle.value)
+      : middle?.kind === "formula"
+        ? middle.formula
+        : "50";
+  const valueOperand =
+    c?.kind === "cellValue" ? formatConditionalFormatValueOperand(c.value) : undefined;
+  const secondValueOperand =
+    c?.kind === "cellValue" && c.secondValue !== undefined
+      ? formatConditionalFormatValueOperand(c.secondValue)
+      : undefined;
   return {
     id: rule?.id ?? createConditionalFormatRuleId(),
     ranges: rule ? formatConditionalFormatRanges(rule.ranges) : props.ranges,
@@ -293,19 +329,18 @@ function createDraft(rule = props.rule): EditorDraft {
           : ["lessThan", "between", "equal"].includes(props.initialKind ?? "")
             ? props.initialKind!
             : "greaterThan",
-    value: c?.kind === "cellValue" ? String(c.value) : c?.kind === "text" ? c.text : "",
-    valueIsString: c?.kind === "cellValue" && typeof c.value === "string",
-    secondValue: c?.kind === "cellValue" ? String(c.secondValue ?? "") : "",
-    secondValueIsString: c?.kind === "cellValue" && typeof c.secondValue === "string",
+    value:
+      c?.kind === "cellValue" && valueOperand
+        ? valueOperand.value
+        : c?.kind === "text"
+          ? c.text
+          : "",
+    valueIsString: valueOperand?.literal ?? false,
+    secondValue: c?.kind === "cellValue" && secondValueOperand ? secondValueOperand.value : "",
+    secondValueIsString: secondValueOperand?.literal ?? false,
     blank: c?.kind === "blank" ? c.blank : true,
     unique: c?.kind === "duplicate" ? c.unique : false,
-    formula:
-      c?.kind === "formula" && rule
-        ? translateFormulaForCopy(c.formula, {
-            row: rule.ranges[0]!.start.row - rule.anchor.row,
-            column: rule.ranges[0]!.start.column - rule.anchor.column,
-          })
-        : "",
+    formula: c?.kind === "formula" ? c.formula : "",
     count: c?.kind === "rank" ? c.count : 10,
     percent:
       c?.kind === "rank"
@@ -380,16 +415,27 @@ function updateKind(kind: ConditionKind) {
   if (kind === "text") draft.operator = "contains";
   if (kind === "cellValue") draft.operator = "greaterThan";
 }
+function updateOperand(value: string, second = false): void {
+  if (second) {
+    draft.secondValue = value;
+    draft.secondValueIsString = false;
+  } else {
+    draft.value = value;
+    draft.valueIsString = false;
+  }
+}
 function setIconThresholdKind(index: number, kind: ThresholdKind): void {
   const previous = draft.iconThresholds[index];
   draft.iconThresholds[index] = threshold(
     kind,
     previous && "value" in previous
-      ? previous.value
-      : Math.round((index / draft.iconThresholds.length) * 100),
+      ? String(previous.value)
+      : previous?.kind === "formula"
+        ? previous.formula
+        : String(Math.round((index / draft.iconThresholds.length) * 100)),
   );
 }
-function setIconThresholdValue(index: number, value: number): void {
+function setIconThresholdValue(index: number, value: string): void {
   const previous = draft.iconThresholds[index];
   if (previous) draft.iconThresholds[index] = threshold(previous.kind, value);
 }
@@ -399,7 +445,7 @@ watch(
     const count = kind.startsWith("three") ? 3 : kind.startsWith("four") ? 4 : 5;
     if (draft.iconThresholds.length !== count)
       draft.iconThresholds = Array.from({ length: count }, (_, index) =>
-        threshold("percent", Math.round((index / count) * 100)),
+        threshold("percent", String(Math.round((index / count) * 100))),
       );
   },
 );
@@ -439,7 +485,9 @@ function buildVisualCondition(): SheetConditionalFormatRule["condition"] | undef
     const thresholds =
       draft.iconThresholds.length === n
         ? draft.iconThresholds.map((threshold) => ({ ...threshold }))
-        : Array.from({ length: n }, (_, i) => threshold("percent", Math.round((i / n) * 100)));
+        : Array.from({ length: n }, (_, i) =>
+            threshold("percent", String(Math.round((i / n) * 100))),
+          );
     return {
       kind: "iconSet",
       iconSet: draft.iconSet,
@@ -488,16 +536,12 @@ function buildCondition(): SheetConditionalFormatRule["condition"] | null {
       operator: draft.operator as never,
       text: draft.value,
     };
-  const operand = (text: string, preserveString: boolean): string | number =>
-    preserveString || !Number.isFinite(Number(text)) ? text : Number(text);
-  const value = operand(draft.value, draft.valueIsString),
-    secondValue = operand(draft.secondValue, draft.secondValueIsString);
-  if (
-    (typeof value === "number" && !Number.isFinite(value)) ||
-    (needsSecondValue.value &&
-      (!draft.secondValue.trim() ||
-        (typeof secondValue === "number" && !Number.isFinite(secondValue))))
-  ) {
+  const value = parseConditionalFormatValueOperand(draft.value, draft.valueIsString);
+  const secondValue = parseConditionalFormatValueOperand(
+    draft.secondValue,
+    draft.secondValueIsString,
+  );
+  if (needsSecondValue.value && !draft.secondValue.trim()) {
     error.value = t("conditionalFormatting.invalidValue");
     return null;
   }
@@ -530,7 +574,18 @@ function save() {
   };
   try {
     emit("save", normalizeConditionalFormatRules([candidate])[0]!);
-  } catch {
+  } catch (cause) {
+    const field = toWorkbookErrorData(cause).details?.field;
+    if (typeof field === "string" && field.endsWith(".formula")) {
+      if (category.value === "visual")
+        error.format = t("conditionalFormatting.invalidThresholdFormula");
+      else error.formula = t("conditionalFormatting.invalidFormula");
+      return;
+    }
+    if (field === "condition.value" || field === "condition.secondValue") {
+      error.value = t("conditionalFormatting.invalidFormula");
+      return;
+    }
     error.format = t(
       ["dataBar", "colorScale", "iconSet"].includes(draft.kind)
         ? "conditionalFormatting.invalidThresholds"
@@ -658,14 +713,15 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
             :label="t('conditionalFormatting.value')"
             :tips="error.value"
           >
-            <TInput v-if="draft.kind === 'text' || draft.valueIsString" v-model="draft.value" />
-            <TInputNumber
+            <TInput v-if="draft.kind === 'text'" v-model="draft.value" />
+            <RangeReferenceInput
               v-else
               :model-value="draft.value"
-              :aria-label="t('conditionalFormatting.value')"
-              theme="column"
-              class="idea-input-number--persistent-controls"
-              @update:model-value="draft.value = String($event ?? '')"
+              :label="t('conditionalFormatting.value')"
+              :placeholder="t('conditionalFormatting.valueReferenceHint')"
+              :show-picker="true"
+              :select-reference="props.selectValueReference ? selectValueReference : undefined"
+              @update:model-value="updateOperand($event)"
             />
           </TFormItem>
           <TFormItem
@@ -673,14 +729,13 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
             label-align="top"
             :label="t('conditionalFormatting.secondValue')"
           >
-            <TInput v-if="draft.secondValueIsString" v-model="draft.secondValue" />
-            <TInputNumber
-              v-else
+            <RangeReferenceInput
               :model-value="draft.secondValue"
-              :aria-label="t('conditionalFormatting.secondValue')"
-              theme="column"
-              class="idea-input-number--persistent-controls"
-              @update:model-value="draft.secondValue = String($event ?? '')"
+              :label="t('conditionalFormatting.secondValue')"
+              :placeholder="t('conditionalFormatting.valueReferenceHint')"
+              :show-picker="true"
+              :select-reference="props.selectValueReference ? selectValueReference : undefined"
+              @update:model-value="updateOperand($event, true)"
             />
           </TFormItem>
         </div>
@@ -736,6 +791,9 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
                 v-model:value="draft.minimumValue"
                 stacked
                 :label="t('conditionalFormatting.minimum')"
+                :select-value-reference="
+                  props.selectValueReference ? selectValueReference : undefined
+                "
               />
               <ColorPaletteSelect
                 v-if="draft.kind === 'colorScale'"
@@ -766,6 +824,9 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
                 v-model:value="draft.middleValue"
                 stacked
                 :label="t('conditionalFormatting.midpoint')"
+                :select-value-reference="
+                  props.selectValueReference ? selectValueReference : undefined
+                "
               />
               <ColorPaletteSelect
                 :model-value="draft.midColor"
@@ -786,6 +847,9 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
                 v-model:value="draft.maximumValue"
                 stacked
                 :label="t('conditionalFormatting.maximum')"
+                :select-value-reference="
+                  props.selectValueReference ? selectValueReference : undefined
+                "
               />
               <ColorPaletteSelect
                 v-if="draft.kind === 'colorScale'"
@@ -814,6 +878,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
         <ConditionalFormatIconRules
           v-else-if="draft.kind === 'iconSet' && previewCondition?.kind === 'iconSet'"
           :condition="previewCondition"
+          :select-value-reference="props.selectValueReference ? selectValueReference : undefined"
           @update-kind="setIconThresholdKind"
           @update-value="setIconThresholdValue"
         />

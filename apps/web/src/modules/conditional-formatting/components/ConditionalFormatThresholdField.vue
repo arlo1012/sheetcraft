@@ -4,20 +4,22 @@ import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { computed } from "vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
+import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 
 const props = defineProps<{
   kind: ConditionalFormatThreshold["kind"];
-  value: number;
+  value: string;
   stacked?: boolean;
   label?: string;
+  selectValueReference?: (current: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{
   "update:kind": [value: ConditionalFormatThreshold["kind"]];
-  "update:value": [value: number];
+  "update:value": [value: string];
 }>();
 const { t } = useAppI18n();
 const options = computed(() =>
-  ["min", "num", "percent", "percentile", "max"].map((value) => ({
+  ["min", "num", "percent", "percentile", "formula", "max"].map((value) => ({
     value,
     label: t(`conditionalFormatting.${value}` as MessageKey),
   })),
@@ -32,7 +34,7 @@ const options = computed(() =>
       @update:model-value="emit('update:kind', $event as ConditionalFormatThreshold['kind'])"
     />
     <TInputNumber
-      v-if="stacked || (props.kind !== 'min' && props.kind !== 'max')"
+      v-if="(stacked || (props.kind !== 'min' && props.kind !== 'max')) && props.kind !== 'formula'"
       :disabled="props.kind === 'min' || props.kind === 'max'"
       :aria-label="`${label ?? t('conditionalFormatting.threshold')} · ${t('conditionalFormatting.value')}`"
       :placeholder="
@@ -48,8 +50,17 @@ const options = computed(() =>
       :min="props.kind === 'percent' || props.kind === 'percentile' ? 0 : undefined"
       :max="props.kind === 'percent' || props.kind === 'percentile' ? 100 : undefined"
       @update:model-value="
-        emit('update:value', $event === '' || $event === undefined ? Number.NaN : Number($event))
+        emit('update:value', $event === '' || $event === undefined ? '' : String($event))
       "
+    />
+    <RangeReferenceInput
+      v-else-if="props.kind === 'formula'"
+      :model-value="props.value"
+      :label="`${label ?? t('conditionalFormatting.threshold')} · ${t('conditionalFormatting.value')}`"
+      placeholder="=$D$1"
+      :show-picker="true"
+      :select-reference="selectValueReference"
+      @update:model-value="emit('update:value', $event)"
     />
   </div>
 </template>

@@ -755,6 +755,41 @@ describe("sheet axis structure commands", () => {
     });
   });
 
+  test("rewrites every dynamic conditional-format operand independently through structural edits", () => {
+    const session = createTestWorkbookSession();
+    const source = getActiveSheet(session.workbook);
+    setCellValue(source, { row: 1, column: 0 }, 1);
+    setCellValue(source, { row: 2, column: 0 }, 2);
+    executeWorkbookCommand(session, createAddSheetCommand(session.workbook, { id: "other" }));
+    const other = session.workbook.sheets.get("other")!;
+    other.conditionalFormats = [
+      {
+        id: "dynamic-operands",
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
+        anchor: { row: 0, column: 0 },
+        condition: {
+          kind: "cellValue",
+          operator: "between",
+          value: { formula: "=Sheet1!A2" },
+          secondValue: { formula: "=Sheet1!A3" },
+        },
+        style: { fillColor: "#FF0000" },
+      },
+    ];
+    expect(
+      executeWorkbookCommand(session, createInsertSheetAxisCommand(source.id, "row", 1, 1)),
+    ).toBe(true);
+    expect(other.conditionalFormats?.[0]?.condition).toMatchObject({
+      value: { formula: "=Sheet1!A3" },
+      secondValue: { formula: "=Sheet1!A4" },
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(other.conditionalFormats?.[0]?.condition).toMatchObject({
+      value: { formula: "=Sheet1!A2" },
+      secondValue: { formula: "=Sheet1!A3" },
+    });
+  });
+
   test("rejects external relative conditional formulas applied over multiple changed-axis cells", () => {
     const session = createTestWorkbookSession();
     const source = getActiveSheet(session.workbook);

@@ -92,6 +92,7 @@ export type ConditionalFormattingMessageSchema = {
     text: string;
     value: string;
     secondValue: string;
+    valueReferenceHint: string;
     formulaHint: string;
     invalidRange: string;
     invalidValue: string;
@@ -139,6 +140,7 @@ export type ConditionalFormattingMessageSchema = {
     nextMonth: string;
     threshold: string;
     invalidThresholds: string;
+    invalidThresholdFormula: string;
     minimum: string;
     midpoint: string;
     maximum: string;

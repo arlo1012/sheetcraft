@@ -1,9 +1,11 @@
 import { strFromU8, strToU8, unzipSync } from "fflate/browser";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellRange } from "@idea10/core/workbook";
 import {
+  conditionalFormatFormulaSources,
   normalizeConditionalFormatRules,
   type ConditionalFormatStyle,
   type ConditionalFormatIconSet,
+  type ConditionalFormatOperand,
   type ConditionalFormatThreshold,
   type SheetConditionalFormatRule,
 } from "@idea10/core/conditional-formatting";
@@ -352,13 +354,16 @@ function formulae(body: string): string[] {
   ].map((match) => decodeXml(match[1] ?? ""));
 }
 
-/** A cellIs formula is either a number or a quoted literal in the Core v1 model. */
-function asValue(value: string | undefined): number | string | undefined {
+/** A cellIs formula may be a literal or an arbitrary Core formula expression. */
+function asOperand(value: string | undefined): ConditionalFormatOperand | undefined {
   if (value === undefined) return undefined;
   const trimmed = value.trim();
   if (/^"(?:[^"]|"")*"$/.test(trimmed)) return trimmed.slice(1, -1).replace(/""/g, '"');
   const numeric = Number(trimmed);
-  return trimmed !== "" && Number.isFinite(numeric) ? numeric : undefined;
+  if (trimmed !== "" && Number.isFinite(numeric)) return numeric;
+  return trimmed !== ""
+    ? { formula: trimmed.startsWith("=") ? trimmed : `=${trimmed}` }
+    : undefined;
 }
 
 function readCondition(
@@ -376,9 +381,9 @@ function readCondition(
       )
     )
       return null;
-    const value = asValue(values[0]);
+    const value = asOperand(values[0]);
     if (value === undefined) return null;
-    const secondValue = asValue(values[1]);
+    const secondValue = asOperand(values[1]);
     if (/^(between|notBetween)$/.test(operator) && secondValue === undefined) return null;
     return {
       kind: "cellValue",
@@ -432,6 +437,10 @@ function childElements(body: string, name: string): Array<{ attributes: string; 
 function readThreshold(attributes: string): ConditionalFormatThreshold | null {
   const kind = attribute(attributes, "type");
   if (kind === "min" || kind === "max") return { kind };
+  if (kind === "formula") {
+    const formula = attribute(attributes, "val")?.trim();
+    return formula ? { kind, formula: formula.startsWith("=") ? formula : `=${formula}` } : null;
+  }
   if (kind !== "num" && kind !== "percent" && kind !== "percentile") return null;
   const value = Number(attribute(attributes, "val"));
   return Number.isFinite(value) ? { kind, value } : null;
@@ -441,16 +450,40 @@ function hasUnsupportedThresholdSemantics(entries: readonly { attributes: string
   return entries.some((entry) => /^(0|false)$/i.test(attribute(entry.attributes, "gte") ?? "1"));
 }
 
-function thresholdXml(threshold: ConditionalFormatThreshold): string {
-  return threshold.kind === "min" || threshold.kind === "max"
-    ? `<cfvo type="${threshold.kind}"/>`
-    : `<cfvo type="${threshold.kind}" val="${threshold.value}"/>`;
+function formulaForXlsx(formula: string, rowOffset: number, columnOffset: number): string {
+  return translateFormulaForCopy(formula, { row: rowOffset, column: columnOffset }).replace(
+    /^=/,
+    "",
+  );
 }
 
-function x14ThresholdXml(threshold: ConditionalFormatThreshold): string {
+function thresholdXml(
+  threshold: ConditionalFormatThreshold,
+  rowOffset = 0,
+  columnOffset = 0,
+): string {
+  return threshold.kind === "min" || threshold.kind === "max"
+    ? `<cfvo type="${threshold.kind}"/>`
+    : threshold.kind === "formula"
+      ? `<cfvo type="formula" val="${encodeXml(formulaForXlsx(threshold.formula, rowOffset, columnOffset))}"/>`
+      : `<cfvo type="${threshold.kind}" val="${threshold.value}"/>`;
+}
+
+function x14ThresholdXml(
+  threshold: ConditionalFormatThreshold,
+  rowOffset = 0,
+  columnOffset = 0,
+): string {
   const kind = threshold.kind === "min" || threshold.kind === "max" ? "percent" : threshold.kind;
-  const value = threshold.kind === "min" ? 0 : threshold.kind === "max" ? 100 : threshold.value;
-  return `<x14:cfvo type="${kind}"><xm:f>${value}</xm:f></x14:cfvo>`;
+  const value =
+    threshold.kind === "min"
+      ? "0"
+      : threshold.kind === "max"
+        ? "100"
+        : threshold.kind === "formula"
+          ? formulaForXlsx(threshold.formula, rowOffset, columnOffset)
+          : String(threshold.value);
+  return `<x14:cfvo type="${kind}"><xm:f>${encodeXml(value)}</xm:f></x14:cfvo>`;
 }
 
 function readX14Threshold(entry: {
@@ -459,8 +492,12 @@ function readX14Threshold(entry: {
 }): ConditionalFormatThreshold | null {
   const kind = attribute(entry.attributes, "type");
   if (kind === "min" || kind === "max") return { kind };
+  if (kind === "formula") {
+    const formula = decodeXml(childElements(entry.body, "f")[0]?.body ?? "").trim();
+    return formula ? { kind, formula: formula.startsWith("=") ? formula : `=${formula}` } : null;
+  }
   if (kind !== "num" && kind !== "percent" && kind !== "percentile") return null;
-  const formula = childElements(entry.body, "f")[0]?.body.trim();
+  const formula = decodeXml(childElements(entry.body, "f")[0]?.body ?? "").trim();
   if (!formula) return null;
   const value = Number(formula);
   return Number.isFinite(value) ? { kind, value } : null;
@@ -957,8 +994,16 @@ function searchFormulaText(text: string): string {
   return quoteFormulaText(text).replace(/[~*?]/g, "~$&");
 }
 
-function cellFormulaValue(value: number | string): string {
-  return typeof value === "number" ? String(value) : `"${quoteFormulaText(value)}"`;
+function cellFormulaValue(
+  value: ConditionalFormatOperand,
+  rowOffset: number,
+  columnOffset: number,
+): string {
+  return typeof value === "number"
+    ? String(value)
+    : typeof value === "string"
+      ? `"${quoteFormulaText(value)}"`
+      : formulaForXlsx(value.formula, rowOffset, columnOffset);
 }
 
 function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId?: number): string {
@@ -967,14 +1012,16 @@ function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId?: num
   // OOXML conditions are evaluated relative to the first sqref cell. The Core
   // anchor can survive a partial clear, so rebase before serializing it.
   const rangeAnchor = rule.ranges[0]!.start;
+  const rowOffset = rangeAnchor.row - rule.anchor.row;
+  const columnOffset = rangeAnchor.column - rule.anchor.column;
   const anchor = `${columnLabel(rangeAnchor.column)}${rangeAnchor.row + 1}`;
   const condition = rule.condition;
   if (condition.kind === "cellValue") {
     const values = [condition.value, condition.secondValue].filter((value) => value !== undefined);
-    return `<cfRule type="cellIs" operator="${condition.operator}" priority="${priority}"${dxf}${stop}>${values.map((value) => `<formula>${encodeXml(cellFormulaValue(value))}</formula>`).join("")}</cfRule>`;
+    return `<cfRule type="cellIs" operator="${condition.operator}" priority="${priority}"${dxf}${stop}>${values.map((value) => `<formula>${encodeXml(cellFormulaValue(value, rowOffset, columnOffset))}</formula>`).join("")}</cfRule>`;
   }
   if (condition.kind === "formula")
-    return `<cfRule type="expression" priority="${priority}"${dxf}${stop}><formula>${encodeXml(translateFormulaForCopy(condition.formula, { row: rangeAnchor.row - rule.anchor.row, column: rangeAnchor.column - rule.anchor.column }).replace(/^=/, ""))}</formula></cfRule>`;
+    return `<cfRule type="expression" priority="${priority}"${dxf}${stop}><formula>${encodeXml(formulaForXlsx(condition.formula, rowOffset, columnOffset))}</formula></cfRule>`;
   if (condition.kind === "text") {
     const type = (
       {
@@ -1014,14 +1061,14 @@ function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId?: num
   }
   if (condition.kind === "colorScale")
     return `<cfRule type="colorScale" priority="${priority}"><colorScale>${condition.stops.map((stop) => thresholdXml(stop.threshold)).join("")}${condition.stops.map((stop) => `<color rgb="FF${stop.color.slice(1).toUpperCase()}"/>`).join("")}</colorScale></cfRule>`;
-  return `<cfRule type="iconSet" priority="${priority}"><iconSet iconSet="${ICON_SET_TO_XLSX[condition.iconSet]}"${condition.reverse ? ' reverse="1"' : ""}${condition.showValue === false ? ' showValue="0"' : ""}>${condition.thresholds.map(thresholdXml).join("")}</iconSet></cfRule>`;
+  return `<cfRule type="iconSet" priority="${priority}"><iconSet iconSet="${ICON_SET_TO_XLSX[condition.iconSet]}"${condition.reverse ? ' reverse="1"' : ""}${condition.showValue === false ? ' showValue="0"' : ""}>${condition.thresholds.map((threshold) => thresholdXml(threshold)).join("")}</iconSet></cfRule>`;
 }
 
 function x14RuleXml(rule: SheetConditionalFormatRule, priority: number): string | null {
   const condition = rule.condition;
   if (condition.kind !== "iconSet" || !X14_ONLY_ICON_SETS.has(condition.iconSet)) return null;
   const id = priority.toString(16).padStart(12, "0").toUpperCase();
-  return `<x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:cfRule type="iconSet" priority="${priority}" id="{00000000-0000-0000-0000-${id}}"${rule.stopIfTrue ? ' stopIfTrue="1"' : ""}><x14:iconSet iconSet="${ICON_SET_TO_XLSX[condition.iconSet]}"${condition.reverse ? ' reverse="1"' : ""}${condition.showValue === false ? ' showValue="0"' : ""}>${condition.thresholds.map(x14ThresholdXml).join("")}</x14:iconSet></x14:cfRule><xm:sqref>${rule.ranges.map(rangeReference).join(" ")}</xm:sqref></x14:conditionalFormatting>`;
+  return `<x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:cfRule type="iconSet" priority="${priority}" id="{00000000-0000-0000-0000-${id}}"${rule.stopIfTrue ? ' stopIfTrue="1"' : ""}><x14:iconSet iconSet="${ICON_SET_TO_XLSX[condition.iconSet]}"${condition.reverse ? ' reverse="1"' : ""}${condition.showValue === false ? ' showValue="0"' : ""}>${condition.thresholds.map((threshold) => x14ThresholdXml(threshold)).join("")}</x14:iconSet></x14:cfRule><xm:sqref>${rule.ranges.map(rangeReference).join(" ")}</xm:sqref></x14:conditionalFormatting>`;
 }
 
 function appendX14ConditionalFormatting(xml: string, body: string): string {
@@ -1056,7 +1103,7 @@ function compactExportRules(
 ): SheetConditionalFormatRule[] {
   const seen = new Set<string>();
   return normalizeConditionalFormatRules(rules).filter((rule) => {
-    if (rule.condition.kind === "formula") return true;
+    if (conditionalFormatFormulaSources(rule).length) return true;
     const key = JSON.stringify({
       ranges: rule.ranges,
       anchor: rule.anchor,
