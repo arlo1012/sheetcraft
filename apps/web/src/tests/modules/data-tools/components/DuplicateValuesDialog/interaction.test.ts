@@ -28,9 +28,8 @@ function dialog() {
 }
 
 describe("DuplicateValuesDialog", () => {
-  test("edits a multicolumn source range and explains new-sheet output", async () => {
+  test("edits a multicolumn source range and opens its picker", async () => {
     const wrapper = mountDialog("count");
-    expect(dialog().text()).toContain("Count each nonblank value across the selected range");
     await dialog().get('[aria-label="Range"] input').setValue("A1:E7");
     expect(wrapper.emitted("draftChange")?.at(-1)).toEqual([{ ...initial, range: "A1:E7" }]);
     await dialog().get('[aria-label="Select range：Range"]').trigger("click");

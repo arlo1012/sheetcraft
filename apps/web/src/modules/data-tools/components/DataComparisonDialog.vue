@@ -147,16 +147,13 @@ watch(
             placeholder="A1:C10"
             :aria-label="t('dataTools.comparison.firstRange')"
           >
-            <template #suffix>
-              <TButton
-                variant="text"
-                shape="square"
-                :disabled="busy"
+            <template #suffixIcon>
+              <SquareMousePointer
+                class="idea-input-action-icon"
+                :aria-disabled="busy"
                 :aria-label="`${t('dataTools.comparison.pickRange')}：${t('dataTools.comparison.firstRange')}`"
-                :title="t('formulaTools.selectRange')"
-                @click="emit('pickRange', 'firstRange')"
-                ><SquareMousePointer :size="16" aria-hidden="true" />
-              </TButton>
+                @click="!busy && emit('pickRange', 'firstRange')"
+              />
             </template>
           </TInput>
         </TFormItem>
@@ -172,16 +169,13 @@ watch(
             placeholder="E1:G10"
             :aria-label="t('dataTools.comparison.secondRange')"
           >
-            <template #suffix>
-              <TButton
-                variant="text"
-                shape="square"
-                :disabled="busy"
+            <template #suffixIcon>
+              <SquareMousePointer
+                class="idea-input-action-icon"
+                :aria-disabled="busy"
                 :aria-label="`${t('dataTools.comparison.pickRange')}：${t('dataTools.comparison.secondRange')}`"
-                :title="t('formulaTools.selectRange')"
-                @click="emit('pickRange', 'secondRange')"
-                ><SquareMousePointer :size="16" aria-hidden="true" />
-              </TButton>
+                @click="!busy && emit('pickRange', 'secondRange')"
+              />
             </template>
           </TInput>
         </TFormItem>

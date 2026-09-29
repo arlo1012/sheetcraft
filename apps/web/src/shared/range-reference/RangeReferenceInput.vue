@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { SquareMousePointer } from "lucide-vue-next";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { nextTick, ref } from "vue";
 import { useAppI18n } from "../i18n";
+import { SquareMousePointer } from "lucide-vue-next";
 
 const props = defineProps<{
   disabled?: boolean;
@@ -59,7 +58,7 @@ function insertSelectedReference(selected: string): number {
 }
 
 async function pickReference(): Promise<void> {
-  if (props.disabled) return;
+  if (props.disabled || !props.selectReference) return;
   saveSelection();
   const savedSelection = selection;
   const current = reference.value;
@@ -88,27 +87,16 @@ async function pickReference(): Promise<void> {
       autocomplete="off"
       @enter="emit('enter')"
     >
-      <template #suffix>
-        <TButton
+      <template #suffixIcon>
+        <SquareMousePointer
+          class="idea-input-action-icon"
           v-if="showPicker !== false"
-          class="range-reference-input__picker"
-          variant="text"
-          shape="square"
-          :disabled="disabled || !selectReference"
+          :aria-disabled="disabled || !selectReference"
           :aria-label="pickLabel ?? t('formulaTools.selectRange')"
-          :title="pickLabel ?? t('formulaTools.selectRange')"
           data-select-formula-reference
           @click="pickReference"
-        >
-          <SquareMousePointer :size="16" aria-hidden="true" />
-        </TButton>
+        />
       </template>
     </TInput>
   </div>
 </template>
-
-<style scoped lang="scss">
-.range-reference-input__picker:hover {
-  --td-bg-color-container-hover: transparent;
-}
-</style>

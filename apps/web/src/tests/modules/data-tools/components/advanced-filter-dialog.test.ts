@@ -47,8 +47,7 @@ describe("AdvancedFilterDialog", () => {
       props: { visible: true, initial },
     });
     mounted.push(wrapper);
-    const buttons = wrapper.findAllComponents({ name: "TButton" });
-    buttons[0]!.vm.$emit("click");
+    await wrapper.get('[aria-label="Select range：List range"]').trigger("click");
     expect(wrapper.emitted("pickRange")?.[0]).toEqual(["listRange"]);
     await wrapper.setProps({ picking: "criteriaRange" });
     expect(wrapper.findComponent({ name: "TDialog" }).props("visible")).toBe(false);

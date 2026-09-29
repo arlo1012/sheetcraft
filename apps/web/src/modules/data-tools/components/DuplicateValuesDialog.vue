@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { SquareMousePointer } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
@@ -86,17 +85,13 @@ watch(
             placeholder="A1:A10"
             :aria-label="t('dataTools.duplicates.range')"
           >
-            <template #suffix
-              ><TButton
-                variant="text"
-                shape="square"
-                :disabled="busy"
+            <template #suffixIcon
+              ><SquareMousePointer
+                class="idea-input-action-icon"
+                :aria-disabled="busy"
                 :aria-label="`${t('dataTools.duplicates.pickRange')}：${t('dataTools.duplicates.range')}`"
-                :title="t('formulaTools.selectRange')"
-                @click="emit('pickRange')"
-                ><template #icon
-                  ><SquareMousePointer :size="16" aria-hidden="true" /></template></TButton
-            ></template>
+                @click="!busy && emit('pickRange')"
+            /></template>
           </TInput>
         </TFormItem>
         <TFormItem v-if="mode === 'count'">

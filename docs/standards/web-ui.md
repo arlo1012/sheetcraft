@@ -56,6 +56,8 @@ CSS pixels at 100% scale; size and line height are a pair.
   content, and footer. Keep row/control padding and gaps separate. Menu hover and
   selection backgrounds span the width. Suggestions, tooltips, input assists, and
   compact floating toolbars retain their own density.
+- Input prefix/suffix icons use the control's icon slots directly, without a Button
+  wrapper. Keep only the interaction needed by the action; the input owns spacing.
 - `InputNumber`: use `theme="column"` and
   `idea-input-number--persistent-controls`. Wrap in a labelled group, not a native
   label that forwards events to its buttons. Compact number-format fields use

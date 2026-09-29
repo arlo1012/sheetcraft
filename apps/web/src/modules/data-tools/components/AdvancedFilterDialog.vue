@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { SquareMousePointer } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -81,17 +80,13 @@ const canApply = computed(() =>
           autocomplete="off"
           placeholder="A1:C10"
         >
-          <template #suffix
-            ><TButton
-              class="advanced-filter-dialog__range-picker"
-              variant="text"
-              shape="square"
-              :disabled="busy"
+          <template #suffixIcon
+            ><SquareMousePointer
+              class="idea-input-action-icon"
+              :aria-disabled="busy"
               :aria-label="`${t('dataTools.advanced.pickRange')}：${t('dataTools.advanced.listRange')}`"
-              :title="t('formulaTools.selectRange')"
-              @click="emit('pickRange', 'listRange')"
-              ><SquareMousePointer :size="16" aria-hidden="true" /></TButton
-          ></template>
+              @click="!busy && emit('pickRange', 'listRange')"
+          /></template>
         </TInput>
       </label>
       <label class="advanced-filter-dialog__field"
@@ -103,17 +98,13 @@ const canApply = computed(() =>
           autocomplete="off"
           placeholder="E1:F3"
         >
-          <template #suffix
-            ><TButton
-              class="advanced-filter-dialog__range-picker"
-              variant="text"
-              shape="square"
-              :disabled="busy"
+          <template #suffixIcon
+            ><SquareMousePointer
+              class="idea-input-action-icon"
+              :aria-disabled="busy"
               :aria-label="`${t('dataTools.advanced.pickRange')}：${t('dataTools.advanced.criteriaRange')}`"
-              :title="t('formulaTools.selectRange')"
-              @click="emit('pickRange', 'criteriaRange')"
-              ><SquareMousePointer :size="16" aria-hidden="true" /></TButton
-          ></template>
+              @click="!busy && emit('pickRange', 'criteriaRange')"
+          /></template>
         </TInput>
       </label>
       <label
@@ -127,17 +118,13 @@ const canApply = computed(() =>
           autocomplete="off"
           placeholder="H1"
         >
-          <template #suffix
-            ><TButton
-              class="advanced-filter-dialog__range-picker"
-              variant="text"
-              shape="square"
-              :disabled="busy || draft.mode === 'inPlace'"
+          <template #suffixIcon
+            ><SquareMousePointer
+              class="idea-input-action-icon"
+              :aria-disabled="busy || draft.mode === 'inPlace'"
               :aria-label="`${t('dataTools.advanced.pickRange')}：${t('dataTools.advanced.copyTo')}`"
-              :title="t('formulaTools.selectRange')"
-              @click="emit('pickRange', 'destination')"
-              ><SquareMousePointer :size="16" aria-hidden="true" /></TButton
-          ></template>
+              @click="!(busy || draft.mode === 'inPlace') && emit('pickRange', 'destination')"
+          /></template>
         </TInput>
       </label>
       <TCheckbox v-model="draft.uniqueOnly" :disabled="busy">{{
@@ -175,9 +162,6 @@ const canApply = computed(() =>
     margin: 0;
     color: var(--idea-text-secondary);
     font-size: var(--idea-font-size-body-small);
-  }
-  &__range-picker:hover {
-    --td-bg-color-container-hover: transparent;
   }
   &__error {
     margin: 0;

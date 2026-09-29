@@ -274,6 +274,16 @@
   visibility: hidden;
 }
 
+.idea-input-action-icon {
+  width: var(--idea-control-icon-size);
+  height: var(--idea-control-icon-size);
+  cursor: pointer;
+
+  &[aria-disabled="true"] {
+    cursor: default;
+  }
+}
+
 // Custom panel selects render the selected preview across the input's value area.
 // SelectInput places valueDisplay in its prefix; the native input remains focusable.
 .idea-panel-select .t-input {
