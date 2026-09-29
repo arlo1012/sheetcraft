@@ -469,12 +469,8 @@
   --idea-input-number-stepper-width: 16px;
 
   .t-input {
-    padding-left: var(--idea-input-number-padding);
-    padding-right: calc(var(--idea-input-number-stepper-width) + var(--idea-input-number-padding));
-  }
-
-  .conditional-format-editor & .t-input {
     padding-left: var(--td-comp-paddingLR-s);
+    padding-right: calc(var(--idea-input-number-stepper-width) + var(--idea-input-number-padding));
   }
 
   &.t-size-s {
