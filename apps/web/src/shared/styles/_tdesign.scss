@@ -364,6 +364,28 @@
   margin-bottom: var(--td-comp-margin-xl);
 }
 
+// Grid forms own row gaps; keep feedback in flow instead of reserving extra margins.
+.t-form.idea-form-grid:not(.t-form-inline) {
+  .t-form__item {
+    margin: 0;
+  }
+  .t-form__controls,
+  .t-form__controls-content {
+    min-height: var(--td-comp-size-m);
+  }
+  .t-form__label {
+    line-height: var(--td-comp-size-m);
+  }
+  .t-form__controls-content > * {
+    min-width: 0;
+  }
+  .t-input__extra {
+    position: static;
+    white-space: normal;
+    overflow: visible;
+  }
+}
+
 .t-tabs__header {
   --td-comp-size-xxl: 32px;
   --td-comp-size-xxxxl: 40px;

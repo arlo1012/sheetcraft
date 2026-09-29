@@ -26,6 +26,7 @@ const props = defineProps<{
   createKind?: ConditionalFormatEditorKind;
   sampleValue?: string | number | boolean | null;
   dateSystem?: "1900" | "1904";
+  selectReference?: (current: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{
   close: [];
@@ -228,6 +229,7 @@ watch(() => [props.visible, props.rules, props.createKind], reset, {
     :initial-kind="createKind"
     :sample-value="sampleValue"
     :date-system="dateSystem"
+    :select-reference="selectReference"
     @save="saveRule"
     @close="closeEditor"
   />

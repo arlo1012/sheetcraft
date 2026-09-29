@@ -8,18 +8,20 @@ import {
   type SheetConditionalFormatRule,
 } from "@idea10/core/conditional-formatting";
 import { translateFormulaForCopy } from "@idea10/core/formula";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
-import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { Select as TSelect, Option as TOption } from "tdesign-vue-next/es/select";
 import { computed, reactive, ref, watch } from "vue";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import ConditionalFormatStyleSelect from "./ConditionalFormatStyleSelect.vue";
 import { conditionalFormatPresetStyle } from "../conditional-format-quick-rules";
 import ConditionalFormatPreview from "./ConditionalFormatPreview.vue";
 import ConditionalFormatThresholdField from "./ConditionalFormatThresholdField.vue";
+import ConditionalFormatIconRules from "./ConditionalFormatIconRules.vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import OptionList from "../../../shared/option-list/OptionList.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
@@ -105,6 +107,7 @@ const props = defineProps<{
   initialKind?: ConditionalFormatEditorKind;
   sampleValue?: string | number | boolean | null;
   dateSystem?: "1900" | "1904";
+  selectReference?: (current: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{
   close: [];
@@ -119,6 +122,34 @@ const format = ref<ConditionalFormatStyle>(
     : conditionalFormatPresetStyle("redFillText"),
 );
 const customVisible = ref(false);
+const pickingRange = ref(false);
+async function selectRange(current: string): Promise<string | undefined> {
+  pickingRange.value = true;
+  try {
+    return await props.selectReference?.(current);
+  } finally {
+    pickingRange.value = false;
+  }
+}
+const showIconsOnly = computed({
+  get: () => !draft.showValue,
+  set: (value: boolean) => {
+    draft.showValue = !value;
+  },
+});
+function iconOptionCondition(
+  iconSet: ConditionalFormatIconSet,
+): SheetConditionalFormatRule["condition"] {
+  const count = iconSet.startsWith("three") ? 3 : iconSet.startsWith("four") ? 4 : 5;
+  return {
+    kind: "iconSet",
+    iconSet,
+    thresholds: Array.from({ length: count }, (_, index) => ({
+      kind: "percent",
+      value: (index * 100) / count,
+    })),
+  };
+}
 const error = reactive({ ranges: "", value: "", formula: "", format: "" });
 type RuleCategory = "visual" | "containing" | "rank" | "average" | "duplicate" | "formula";
 const categoryOptions = computed(
@@ -513,7 +544,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
 </script>
 <template>
   <Dialog
-    :visible="visible && !customVisible"
+    :visible="visible && !customVisible && !pickingRange"
     :header="rule ? t('conditionalFormatting.editRule') : t('conditionalFormatting.newRule')"
     :confirm-btn="{ content: t('conditionalFormatting.save') }"
     :cancel-btn="t('conditionalFormatting.cancel')"
@@ -523,7 +554,12 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     @confirm="save"
     @close="emit('close')"
   >
-    <TForm class="conditional-format-editor" layout="vertical">
+    <TForm
+      class="conditional-format-editor idea-form-grid"
+      layout="vertical"
+      label-align="left"
+      :label-width="88"
+    >
       <section class="conditional-format-editor__section">
         <h3>{{ t("conditionalFormatting.selectRuleType") }}</h3>
         <OptionList
@@ -538,7 +574,9 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
         <RangeReferenceInput
           v-model="draft.ranges"
           :label="t('conditionalFormatting.appliesTo')"
-          :show-picker="false"
+          class="conditional-format-editor__range"
+          :show-picker="true"
+          :select-reference="selectReference ? selectRange : undefined"
         />
       </TFormItem>
       <section class="conditional-format-editor__section">
@@ -546,13 +584,47 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
         <p class="conditional-format-editor__description">
           {{ categoryOptions.find((option) => option.value === category)?.label }}
         </p>
-        <TFormItem
-          v-if="category === 'visual'"
-          :label="t('conditionalFormatting.formatStyle')"
-          class="conditional-format-editor__style"
-        >
-          <TSelect v-model="visualStyle" :options="visualOptions" />
-        </TFormItem>
+        <div v-if="category === 'visual'" class="conditional-format-editor__visual-settings">
+          <TFormItem :label="t('conditionalFormatting.formatStyle')">
+            <TSelect v-model="visualStyle" :options="visualOptions" />
+          </TFormItem>
+          <TButton
+            v-if="draft.kind === 'iconSet'"
+            variant="outline"
+            :aria-pressed="draft.reverse"
+            @click="draft.reverse = !draft.reverse"
+            >{{ t("conditionalFormatting.reverse") }}</TButton
+          >
+          <template v-if="draft.kind === 'iconSet'">
+            <TFormItem :label="t('conditionalFormatting.iconSet')">
+              <TSelect v-model="draft.iconSet" :aria-label="t('conditionalFormatting.iconSet')">
+                <template #valueDisplay>
+                  <ConditionalFormatPreview
+                    compact
+                    :condition="iconOptionCondition(draft.iconSet)"
+                  />
+                </template>
+                <TOption
+                  v-for="option in iconOptions"
+                  :key="option.value"
+                  :value="option.value"
+                  :label="option.label"
+                >
+                  <span class="conditional-format-editor__icon-option">
+                    <ConditionalFormatPreview
+                      compact
+                      :condition="iconOptionCondition(option.value)"
+                    />
+                    <span>{{ option.label }}</span>
+                  </span>
+                </TOption>
+              </TSelect>
+            </TFormItem>
+            <TCheckbox v-model="showIconsOnly">{{
+              t("conditionalFormatting.showIconsOnly")
+            }}</TCheckbox>
+          </template>
+        </div>
         <TFormItem v-if="category === 'containing'" :label="t('conditionalFormatting.condition')">
           <TSelect
             :model-value="draft.kind"
@@ -565,6 +637,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           class="conditional-format-editor__criteria"
         >
           <TFormItem
+            label-align="top"
             :label="
               draft.kind === 'text'
                 ? t('conditionalFormatting.text')
@@ -576,7 +649,11 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
               :options="draft.kind === 'text' ? textOptions : comparisonOptions"
             />
           </TFormItem>
-          <TFormItem :label="t('conditionalFormatting.value')" :tips="error.value">
+          <TFormItem
+            label-align="top"
+            :label="t('conditionalFormatting.value')"
+            :tips="error.value"
+          >
             <TInput v-if="draft.kind === 'text' || draft.valueIsString" v-model="draft.value" />
             <TInputNumber
               v-else
@@ -587,7 +664,11 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
               @update:model-value="draft.value = String($event ?? '')"
             />
           </TFormItem>
-          <TFormItem v-if="needsSecondValue" :label="t('conditionalFormatting.secondValue')">
+          <TFormItem
+            v-if="needsSecondValue"
+            label-align="top"
+            :label="t('conditionalFormatting.secondValue')"
+          >
             <TInput v-if="draft.secondValueIsString" v-model="draft.secondValue" />
             <TInputNumber
               v-else
@@ -726,50 +807,12 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
             }}</TCheckbox>
           </div>
         </template>
-        <template v-else-if="draft.kind === 'iconSet'">
-          <TFormItem :label="t('conditionalFormatting.iconSet')"
-            ><TSelect v-model="draft.iconSet" :options="iconOptions"
-          /></TFormItem>
-          <div class="conditional-format-editor__icon-thresholds">
-            <div
-              v-for="{ entry, index } in draft.iconThresholds
-                .map((entry, index) => ({ entry, index }))
-                .reverse()"
-              :key="index"
-              class="conditional-format-editor__icon-row"
-              role="group"
-              :aria-label="`${t('conditionalFormatting.threshold')} ${index + 1}`"
-            >
-              <ConditionalFormatPreview :condition="previewCondition" :icon-index="index" />
-              <span>{{
-                t(
-                  index
-                    ? "conditionalFormatting.greaterThanOrEqual"
-                    : "conditionalFormatting.lessThan",
-                )
-              }}</span>
-              <ConditionalFormatThresholdField
-                v-if="index > 0"
-                :kind="entry.kind"
-                :value="'value' in entry ? entry.value : 0"
-                :label="`${t('conditionalFormatting.threshold')} ${index + 1}`"
-                @update:kind="setIconThresholdKind(index, $event)"
-                @update:value="setIconThresholdValue(index, $event)"
-              />
-              <span v-else>{{
-                "value" in draft.iconThresholds[1]!
-                  ? draft.iconThresholds[1]!.value
-                  : t(`conditionalFormatting.${draft.iconThresholds[1]!.kind}` as MessageKey)
-              }}</span>
-            </div>
-          </div>
-          <div class="conditional-format-editor__toggles">
-            <TCheckbox v-model="draft.reverse">{{ t("conditionalFormatting.reverse") }}</TCheckbox
-            ><TCheckbox v-model="draft.showValue">{{
-              t("conditionalFormatting.showValue")
-            }}</TCheckbox>
-          </div>
-        </template>
+        <ConditionalFormatIconRules
+          v-else-if="draft.kind === 'iconSet' && previewCondition?.kind === 'iconSet'"
+          :condition="previewCondition"
+          @update-kind="setIconThresholdKind"
+          @update-value="setIconThresholdValue"
+        />
         <TFormItem v-else-if="draft.kind === 'blank'" :label="t('conditionalFormatting.condition')"
           ><TSelect
             v-model="draft.blank"
@@ -803,7 +846,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
             @custom-visible="customVisible = $event"
           />
         </TFormItem>
-        <div class="conditional-format-editor__preview">
+        <div v-if="draft.kind !== 'iconSet'" class="conditional-format-editor__preview">
           <span>{{ t("conditionalFormatting.preview") }}</span
           ><ConditionalFormatPreview
             wide
@@ -842,8 +885,26 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     margin: 0;
     color: var(--idea-text-secondary);
   }
-  &__style {
-    max-width: 290px;
+  &__range {
+    width: 100%;
+  }
+  &__visual-settings {
+    display: grid;
+    grid-template-columns: minmax(0, 320px) auto;
+    align-items: center;
+    justify-content: start;
+    gap: 8px 12px;
+    > * {
+      min-width: 0;
+    }
+    > button {
+      justify-self: start;
+    }
+  }
+  &__icon-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   &__criteria {
     display: flex;
@@ -862,10 +923,10 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
   }
   &__thresholds {
     display: grid;
-    grid-template-columns: 56px repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    grid-template-columns: 80px repeat(2, minmax(0, 1fr));
+    gap: 8px;
     &.has-midpoint {
-      grid-template-columns: 56px repeat(3, minmax(0, 1fr));
+      grid-template-columns: 80px repeat(3, minmax(0, 1fr));
     }
   }
   &__row-labels {
@@ -886,22 +947,26 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     flex-wrap: wrap;
     gap: 16px;
   }
-  &__icon-thresholds {
-    display: grid;
-    gap: 6px;
-  }
-  &__icon-row {
-    display: grid;
-    grid-template-columns: 32px auto minmax(0, 1fr);
-    align-items: center;
-    gap: 12px;
-  }
   &__preview {
     display: grid;
-    grid-template-columns: 56px minmax(0, 1fr);
+    grid-template-columns: 80px minmax(0, 1fr);
     align-items: center;
-    gap: 12px;
-    margin-top: 4px;
+    gap: 8px;
+  }
+  .idea-input-number--persistent-controls {
+    width: 100%;
+  }
+  @media (max-width: 560px) {
+    &__visual-settings {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    &__criteria {
+      flex-direction: column;
+    }
+    &__inline {
+      grid-template-columns: minmax(0, 1fr) 80px auto;
+      gap: 8px;
+    }
   }
   &__error {
     color: var(--idea-status-error);

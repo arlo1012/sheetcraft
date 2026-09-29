@@ -3,8 +3,10 @@ import { afterEach, describe, expect, test } from "vitest";
 import { nextTick } from "vue";
 import { FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
+import { InputNumber } from "tdesign-vue-next/es/input-number";
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
 import ConditionalFormatEditorDialog from "../../../modules/conditional-formatting/components/ConditionalFormatEditorDialog.vue";
+import ConditionalFormatIconRules from "../../../modules/conditional-formatting/components/ConditionalFormatIconRules.vue";
 import ConditionalFormatThresholdField from "../../../modules/conditional-formatting/components/ConditionalFormatThresholdField.vue";
 import type { ConditionalFormatQuickRule } from "../../../modules/conditional-formatting/components/ConditionalFormattingMenu.vue";
 import { createAppI18n } from "../../../shared/i18n";
@@ -47,9 +49,11 @@ describe("advanced conditional format editor", () => {
       const wrapper = editor(initial);
       for (const field of wrapper.findAllComponents(FormItem)) {
         if (field.props("label") === "Value")
-          field.findComponent(Input).vm.$emit("update:modelValue", "12");
+          initial === "contains"
+            ? field.findComponent(Input).vm.$emit("update:modelValue", "12")
+            : field.findComponent(InputNumber).vm.$emit("update:modelValue", 12);
         if (field.props("label") === "Second value")
-          field.findComponent(Input).vm.$emit("update:modelValue", "24");
+          field.findComponent(InputNumber).vm.$emit("update:modelValue", 24);
       }
       await nextTick();
       await confirm();
@@ -58,7 +62,9 @@ describe("advanced conditional format editor", () => {
   );
 
   test("accepts text in an equal-to rule", async () => {
-    const wrapper = editor("equal");
+    const imported = rule({ kind: "cellValue", operator: "equal", value: "Overdue" });
+    imported.style = { fillColor: "#FDE2E1" };
+    const wrapper = editor(undefined, imported);
     const field = wrapper
       .findAllComponents(FormItem)
       .find((item) => item.props("label") === "Value")!;
@@ -106,9 +112,10 @@ describe("advanced conditional format editor", () => {
         reverse: true,
       }),
     );
-    const fields = wrapper.findAllComponents(ConditionalFormatThresholdField);
-    expect(fields).toHaveLength(2);
-    fields[1]!.vm.$emit("update:value", 30);
+    const iconRules = wrapper.getComponent(ConditionalFormatIconRules);
+    const inputs = iconRules.findAllComponents(InputNumber);
+    expect(inputs).toHaveLength(2);
+    inputs[1]!.vm.$emit("update:modelValue", 30);
     await nextTick();
     await confirm();
     expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({

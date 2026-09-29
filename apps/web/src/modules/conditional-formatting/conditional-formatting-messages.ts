@@ -39,6 +39,11 @@ export type ConditionalFormattingMessageSchema = {
     color: string;
     lightBlueBar: string;
     purpleBar: string;
+    icon: string;
+    iconRules: string;
+    whenValue: string;
+    belowAnd: string;
+    showIconsOnly: string;
     iconDirection: string;
     iconShapes: string;
     iconMarkers: string;

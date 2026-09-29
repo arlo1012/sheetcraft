@@ -23,6 +23,7 @@ const props = withDefaults(
     format?: ConditionalFormatStyle;
     /** Uses the dialog-width visual sample while preserving the manager's compact default. */
     wide?: boolean;
+    compact?: boolean;
     /** Renders one icon-set glyph for a threshold row instead of the complete icon set. */
     iconIndex?: number;
   }>(),
@@ -174,6 +175,7 @@ watchPostEffect(() => {
     class="conditional-format-preview"
     :class="{
       'conditional-format-preview--wide': wide,
+      'conditional-format-preview--compact': compact,
       'conditional-format-preview--single-icon': iconIndex !== undefined,
     }"
     :style="swatchStyle"
@@ -213,6 +215,12 @@ watchPostEffect(() => {
       width: 100%;
       height: 40px;
     }
+  }
+
+  &--compact {
+    width: 90px;
+    height: 24px;
+    border: 0;
   }
 
   &--single-icon {
