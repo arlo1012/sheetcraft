@@ -473,6 +473,10 @@
     padding-right: calc(var(--idea-input-number-stepper-width) + var(--idea-input-number-padding));
   }
 
+  .conditional-format-editor & .t-input {
+    padding-left: var(--td-comp-paddingLR-s);
+  }
+
   &.t-size-s {
     --idea-input-number-icon-size: 12px;
   }
