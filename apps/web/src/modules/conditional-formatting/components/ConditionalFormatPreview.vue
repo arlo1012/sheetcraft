@@ -34,6 +34,7 @@ const canvas = ref<HTMLCanvasElement>();
 const visual = computed(
   () => props.condition?.kind === "dataBar" || props.condition?.kind === "iconSet",
 );
+const insetColorScale = computed(() => props.wide && props.condition?.kind === "colorScale");
 const dimensions = ref({ width: 90, height: 24 });
 let observer: ResizeObserver | undefined;
 
@@ -177,13 +178,20 @@ watchPostEffect(() => {
       'conditional-format-preview--wide': wide,
       'conditional-format-preview--compact': compact,
       'conditional-format-preview--single-icon': iconIndex !== undefined,
+      'conditional-format-preview--color-control': insetColorScale,
     }"
-    :style="swatchStyle"
+    :style="insetColorScale ? undefined : swatchStyle"
     role="img"
     :aria-label="t('conditionalFormatting.preview')"
   >
+    <span
+      v-if="insetColorScale"
+      class="conditional-format-preview__swatch"
+      :style="swatchStyle"
+      aria-hidden="true"
+    />
     <canvas
-      v-if="visual"
+      v-else-if="visual"
       ref="canvas"
       class="conditional-format-preview__visual"
       aria-hidden="true"
@@ -221,6 +229,22 @@ watchPostEffect(() => {
     width: 90px;
     height: 24px;
     border: 0;
+  }
+
+  &--color-control {
+    box-sizing: border-box;
+    height: 28px;
+    padding: 0 8px;
+    border-color: var(--idea-border-strong);
+    border-radius: var(--idea-radius-default);
+    background: var(--idea-surface-special);
+  }
+
+  &__swatch {
+    flex: 1;
+    min-width: 0;
+    height: 16px;
+    border-radius: var(--idea-radius-small);
   }
 
   &--single-icon {
