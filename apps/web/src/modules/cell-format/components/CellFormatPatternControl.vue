@@ -5,7 +5,7 @@ import { Input as TInput } from "tdesign-vue-next/es/input";
 import { CELL_FILL_PATTERNS, type CellFillPatternStyle } from "@idea10/core/style";
 import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
 import { useAppI18n } from "../../../shared/i18n";
-import CellFormatPanelSelect from "./CellFormatPanelSelect.vue";
+import PanelSelect from "../../../shared/panel-select/PanelSelect.vue";
 
 type PatternValue = CellFillPatternStyle | "none";
 const props = defineProps<{
@@ -80,7 +80,7 @@ function onKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-  <CellFormatPanelSelect
+  <PanelSelect
     class="cell-format-pattern-control"
     :model-value="modelValue"
     :label="t('cellFormat.patternStyle')"
@@ -137,7 +137,7 @@ function onKeydown(event: KeyboardEvent): void {
         </p>
       </div>
     </template>
-  </CellFormatPanelSelect>
+  </PanelSelect>
 </template>
 
 <style scoped lang="scss">

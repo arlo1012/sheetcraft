@@ -11,7 +11,7 @@ import BorderLinePreview from "../../../shared/borders/BorderLinePreview.vue";
 import BorderLineStylePanel from "../../../shared/borders/BorderLineStylePanel.vue";
 import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
 import CellFormatBorderPreview from "./CellFormatBorderPreview.vue";
-import CellFormatColorControl from "./CellFormatColorControl.vue";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import type { CellFormatBorderCapabilities } from "../border-capabilities";
 
@@ -205,7 +205,7 @@ const previewState = computed<SelectionBorderState>(() => ({
         </div>
         <div class="cell-format-border-panel__field">
           <span>{{ t("format.borderColor") }}</span>
-          <CellFormatColorControl
+          <ColorPaletteSelect
             :model-value="color"
             :label="t('format.borderColor')"
             :default-color="DEFAULT_BORDER.color"

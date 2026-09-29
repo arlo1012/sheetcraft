@@ -1,7 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import type { CellFillGradient } from "@idea10/core/style";
-import CellFormatColorControl from "../../../../../modules/cell-format/components/CellFormatColorControl.vue";
+import ColorPaletteSelect from "../../../../../shared/color/ColorPaletteSelect.vue";
 import CellFormatFillEffectsDialog from "../../../../../modules/cell-format/components/CellFormatFillEffectsDialog.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 
@@ -40,7 +40,7 @@ describe("CellFormatFillEffectsDialog", () => {
 
   test("keeps edits in the dialog draft when cancelled", async () => {
     const wrapper = mountDialog();
-    wrapper.getComponent(CellFormatColorControl).vm.$emit("select", "#aabbcc");
+    wrapper.getComponent(ColorPaletteSelect).vm.$emit("select", "#aabbcc");
     await wrapper.vm.$nextTick();
     expect(wrapper.get("[data-fill-effects-preview]").attributes("style")).toContain(
       "linear-gradient",
@@ -53,7 +53,7 @@ describe("CellFormatFillEffectsDialog", () => {
 
   test("maps automatic color selections to each gradient color default", async () => {
     const wrapper = mountDialog();
-    const controls = wrapper.findAllComponents(CellFormatColorControl);
+    const controls = wrapper.findAllComponents(ColorPaletteSelect);
     controls[0]!.vm.$emit("select", null);
     controls[1]!.vm.$emit("select", null);
     await wrapper.vm.$nextTick();

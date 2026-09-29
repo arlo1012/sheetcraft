@@ -3,15 +3,15 @@ import { afterEach, describe, expect, test } from "vitest";
 import { nextTick } from "vue";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { SelectInput as TSelectInput } from "tdesign-vue-next/es/select-input";
-import CellFormatColorControl from "../../../../../modules/cell-format/components/CellFormatColorControl.vue";
-import { createAppI18n } from "../../../../../shared/i18n";
+import ColorPaletteSelect from "../../../../shared/color/ColorPaletteSelect.vue";
+import { createAppI18n } from "../../../../shared/i18n";
 
 const mounted: Array<{ host: HTMLElement; wrapper: { unmount(): void } }> = [];
 
 function mountControl(props: Record<string, unknown> = {}) {
   const host = document.createElement("div");
   document.body.append(host);
-  const wrapper = mount(CellFormatColorControl, {
+  const wrapper = mount(ColorPaletteSelect, {
     attachTo: host,
     props: {
       modelValue: "#ff0000",
@@ -52,7 +52,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-describe("CellFormatColorControl", () => {
+describe("ColorPaletteSelect", () => {
   test("does not open a disabled control", async () => {
     const wrapper = mountControl({ disabled: true });
     const trigger = wrapper.get<HTMLInputElement>("input");

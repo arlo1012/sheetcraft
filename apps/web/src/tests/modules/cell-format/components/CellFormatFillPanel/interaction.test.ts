@@ -5,7 +5,7 @@ import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
 import type { CellFillGradient, CellStylePatch } from "@idea10/core/style";
 import CellFormatFillPanel from "../../../../../modules/cell-format/components/CellFormatFillPanel.vue";
 import CellFormatFillEffectsDialog from "../../../../../modules/cell-format/components/CellFormatFillEffectsDialog.vue";
-import CellFormatColorControl from "../../../../../modules/cell-format/components/CellFormatColorControl.vue";
+import ColorPaletteSelect from "../../../../../shared/color/ColorPaletteSelect.vue";
 import CellFormatPatternControl from "../../../../../modules/cell-format/components/CellFormatPatternControl.vue";
 import ColorPalette from "../../../../../shared/color/ColorPalette.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
@@ -75,7 +75,7 @@ describe("CellFormatFillPanel", () => {
     expect(
       panel.get<HTMLElement>("[data-cell-format-fill-preview]").element.style.backgroundImage,
     ).toContain("data:image/svg+xml");
-    panel.findAllComponents(CellFormatColorControl)[0]!.vm.$emit("select", null);
+    panel.findAllComponents(ColorPaletteSelect)[0]!.vm.$emit("select", null);
     await wrapper.vm.$nextTick();
     expect(patch()).toMatchObject({ fillPatternColor: "#000000" });
   });

@@ -14,7 +14,7 @@ import {
 import { useAppI18n } from "../../../shared/i18n";
 import { useFontFormatPanel } from "../font/useFontFormatPanel";
 import OptionList from "../../../shared/option-list/OptionList.vue";
-import CellFormatColorControl from "./CellFormatColorControl.vue";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 
 const props = defineProps<{
   state: SelectionCellStyleState;
@@ -174,7 +174,7 @@ const previewText = computed(() =>
       </div>
       <div class="cell-format-font__field" role="group" :aria-label="t('format.textColor')">
         <span>{{ t("format.textColor") }}</span>
-        <CellFormatColorControl
+        <ColorPaletteSelect
           :model-value="color"
           :mixed="colorMixed"
           :label="t('format.textColor')"

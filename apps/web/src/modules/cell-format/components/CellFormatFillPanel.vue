@@ -12,7 +12,7 @@ import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
 import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
 import { useAppI18n } from "../../../shared/i18n";
-import CellFormatColorControl from "./CellFormatColorControl.vue";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import CellFormatFillEffectsDialog from "./CellFormatFillEffectsDialog.vue";
 import CellFormatPatternControl from "./CellFormatPatternControl.vue";
 
@@ -141,7 +141,7 @@ function setGradient(gradient: CellFillGradient): void {
           :aria-label="t('cellFormat.patternColor')"
         >
           <span>{{ t("cellFormat.patternColor") }}</span>
-          <CellFormatColorControl
+          <ColorPaletteSelect
             :model-value="fill?.fillPatternColor"
             :label="t('cellFormat.patternColor')"
             :disabled="!fill?.fillPattern && !isMixed('fillPattern')"

@@ -5,7 +5,7 @@ import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/
 import { cloneCellFillGradient, type CellFillGradient } from "@idea10/core/style";
 import { getCellFillStyle } from "../../../shared/cell-fill/fill-presentation";
 import { useAppI18n } from "../../../shared/i18n";
-import CellFormatColorControl from "./CellFormatColorControl.vue";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import {
   buildGradientPreset,
   gradientVariantCount,
@@ -139,7 +139,7 @@ watch(() => props.gradient, resetDraft, { immediate: true });
         <h3>{{ t("cellFormat.fillEffectsColors") }}</h3>
         <div class="cell-format-fill-effects__color" data-fill-effects-color="1">
           <span>{{ t("cellFormat.fillColor1") }}</span>
-          <CellFormatColorControl
+          <ColorPaletteSelect
             :model-value="color1"
             :default-color="defaultColor"
             :label="t('cellFormat.fillColor1')"
@@ -148,7 +148,7 @@ watch(() => props.gradient, resetDraft, { immediate: true });
         </div>
         <div class="cell-format-fill-effects__color" data-fill-effects-color="2">
           <span>{{ t("cellFormat.fillColor2") }}</span>
-          <CellFormatColorControl
+          <ColorPaletteSelect
             :model-value="color2"
             :default-color="DEFAULT_SECOND_COLOR"
             :label="t('cellFormat.fillColor2')"

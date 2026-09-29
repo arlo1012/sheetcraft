@@ -98,7 +98,7 @@ watch(
 </script>
 
 <template>
-  <div ref="control" class="cell-format-panel-select idea-panel-select">
+  <div ref="control" class="panel-select idea-panel-select">
     <TSelectInput
       :value="{ value: modelValue, label: valueLabel }"
       :disabled="disabled"
@@ -108,7 +108,7 @@ watch(
       @popup-visible-change="open = !disabled && $event"
     >
       <template #valueDisplay>
-        <span class="cell-format-panel-select__value"><slot name="value" /></span>
+        <span class="panel-select__value"><slot name="value" /></span>
       </template>
       <template #suffixIcon><ChevronDown :size="14" aria-hidden="true" /></template>
       <template #panel>
@@ -116,7 +116,7 @@ watch(
           v-if="open"
           :id="panelId"
           ref="panel"
-          class="cell-format-panel-select__panel"
+          class="panel-select__panel"
           role="dialog"
           :aria-label="label"
           @keydown="onPanelKeydown"
@@ -129,7 +129,7 @@ watch(
 </template>
 
 <style scoped lang="scss">
-.cell-format-panel-select {
+.panel-select {
   min-width: 0;
 
   &__value {

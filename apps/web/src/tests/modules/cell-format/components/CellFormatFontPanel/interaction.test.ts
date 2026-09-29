@@ -7,7 +7,7 @@ import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
 import type { CellStylePatch } from "@idea10/core/style";
 import CellFormatFontPanel from "../../../../../modules/cell-format/components/CellFormatFontPanel.vue";
-import CellFormatColorControl from "../../../../../modules/cell-format/components/CellFormatColorControl.vue";
+import ColorPaletteSelect from "../../../../../shared/color/ColorPaletteSelect.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 
 function mountPanel(state = createDefaultSelectionCellStyleState()) {
@@ -184,7 +184,7 @@ describe("CellFormatFontPanel", () => {
     state.textColor = { value: "#ff0000", mixed: false };
     const { wrapper, panel, patch } = mountPanel(state);
     try {
-      panel.getComponent(CellFormatColorControl).vm.$emit("select", null);
+      panel.getComponent(ColorPaletteSelect).vm.$emit("select", null);
       await wrapper.vm.$nextTick();
       expect(patch()).toEqual({ textColor: null });
       expect(panel.get<HTMLElement>("[data-cell-format-font-preview]").element.style.color).toBe(
