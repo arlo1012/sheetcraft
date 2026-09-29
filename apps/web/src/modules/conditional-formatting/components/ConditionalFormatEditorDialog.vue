@@ -557,7 +557,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     <TForm
       class="conditional-format-editor idea-form-grid"
       layout="vertical"
-      label-align="left"
+      label-align="right"
       :label-width="88"
     >
       <section class="conditional-format-editor__section">
@@ -570,7 +570,11 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           @select="selectCategory"
         />
       </section>
-      <TFormItem :label="t('conditionalFormatting.appliesTo')" :tips="error.ranges">
+      <TFormItem
+        :label="t('conditionalFormatting.appliesTo')"
+        :tips="error.ranges"
+        label-align="left"
+      >
         <RangeReferenceInput
           v-model="draft.ranges"
           :label="t('conditionalFormatting.appliesTo')"
@@ -934,6 +938,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     grid-template-rows: 20px repeat(3, 28px);
     gap: 8px;
     align-items: center;
+    text-align: right;
     color: var(--idea-text-secondary);
   }
   &__threshold-column {
@@ -952,6 +957,9 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     grid-template-columns: 80px minmax(0, 1fr);
     align-items: center;
     gap: 8px;
+    > span {
+      text-align: right;
+    }
   }
   .idea-input-number--persistent-controls {
     width: 100%;
