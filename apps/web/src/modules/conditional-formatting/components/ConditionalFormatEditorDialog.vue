@@ -576,12 +576,28 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
               :options="draft.kind === 'text' ? textOptions : comparisonOptions"
             />
           </TFormItem>
-          <TFormItem :label="t('conditionalFormatting.value')" :tips="error.value"
-            ><TInput v-model="draft.value"
-          /></TFormItem>
-          <TFormItem v-if="needsSecondValue" :label="t('conditionalFormatting.secondValue')"
-            ><TInput v-model="draft.secondValue"
-          /></TFormItem>
+          <TFormItem :label="t('conditionalFormatting.value')" :tips="error.value">
+            <TInput v-if="draft.kind === 'text' || draft.valueIsString" v-model="draft.value" />
+            <TInputNumber
+              v-else
+              :model-value="draft.value"
+              :aria-label="t('conditionalFormatting.value')"
+              theme="column"
+              class="idea-input-number--persistent-controls"
+              @update:model-value="draft.value = String($event ?? '')"
+            />
+          </TFormItem>
+          <TFormItem v-if="needsSecondValue" :label="t('conditionalFormatting.secondValue')">
+            <TInput v-if="draft.secondValueIsString" v-model="draft.secondValue" />
+            <TInputNumber
+              v-else
+              :model-value="draft.secondValue"
+              :aria-label="t('conditionalFormatting.secondValue')"
+              theme="column"
+              class="idea-input-number--persistent-controls"
+              @update:model-value="draft.secondValue = String($event ?? '')"
+            />
+          </TFormItem>
         </div>
         <TFormItem v-else-if="draft.kind === 'rank'" :label="t('conditionalFormatting.count')">
           <div class="conditional-format-editor__inline">

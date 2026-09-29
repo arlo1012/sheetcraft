@@ -222,9 +222,20 @@ watch(
           :aria-label="t('conditionalFormatting.value')"
         >
           <TInput
+            v-if="kind === 'contains'"
             v-model="value"
             :aria-label="t('conditionalFormatting.value')"
             autofocus
+            @enter="save"
+          />
+          <TInputNumber
+            v-else
+            :model-value="value"
+            :aria-label="t('conditionalFormatting.value')"
+            theme="column"
+            class="idea-input-number--persistent-controls"
+            autofocus
+            @update:model-value="value = String($event ?? '')"
             @enter="save"
           />
         </div>
@@ -235,9 +246,12 @@ watch(
             role="group"
             :aria-label="t('conditionalFormatting.secondValue')"
           >
-            <TInput
-              v-model="secondValue"
+            <TInputNumber
+              :model-value="secondValue"
               :aria-label="t('conditionalFormatting.secondValue')"
+              theme="column"
+              class="idea-input-number--persistent-controls"
+              @update:model-value="secondValue = String($event ?? '')"
               @enter="save"
             />
           </div>
