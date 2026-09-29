@@ -95,6 +95,7 @@ export const conditionalFormattingEnUS = {
     value: "Value",
     secondValue: "Second value",
     valueReferenceHint: "e.g. 10, text, or =$D$1",
+    thresholdValueHint: "e.g. 10 or =$D$1",
     formulaHint: "Start with = and write the formula relative to the top-left cell of the range.",
     invalidRange: "Enter a valid A1 cell range.",
     invalidValue: "Enter a condition value.",

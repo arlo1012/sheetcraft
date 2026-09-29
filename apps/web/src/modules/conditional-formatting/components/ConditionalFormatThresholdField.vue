@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { ConditionalFormatThreshold } from "@idea10/core/conditional-formatting";
-import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { computed } from "vue";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
@@ -18,12 +17,17 @@ const emit = defineEmits<{
   "update:value": [value: string];
 }>();
 const { t } = useAppI18n();
+const automatic = computed(() => props.kind === "min" || props.kind === "max");
 const options = computed(() =>
   ["min", "num", "percent", "percentile", "formula", "max"].map((value) => ({
     value,
     label: t(`conditionalFormatting.${value}` as MessageKey),
   })),
 );
+function updateValue(value: string): void {
+  if (value.trim().startsWith("=") && props.kind !== "formula") emit("update:kind", "formula");
+  emit("update:value", value);
+}
 </script>
 <template>
   <div class="threshold-field" :class="{ 'is-stacked': stacked }">
@@ -33,34 +37,21 @@ const options = computed(() =>
       :aria-label="`${label ?? t('conditionalFormatting.threshold')} · ${t('conditionalFormatting.thresholdType')}`"
       @update:model-value="emit('update:kind', $event as ConditionalFormatThreshold['kind'])"
     />
-    <TInputNumber
-      v-if="(stacked || (props.kind !== 'min' && props.kind !== 'max')) && props.kind !== 'formula'"
-      :disabled="props.kind === 'min' || props.kind === 'max'"
-      :aria-label="`${label ?? t('conditionalFormatting.threshold')} · ${t('conditionalFormatting.value')}`"
+    <RangeReferenceInput
+      v-if="stacked || !automatic"
+      :disabled="automatic"
+      :model-value="automatic ? '' : props.value"
+      :label="`${label ?? t('conditionalFormatting.threshold')} · ${t('conditionalFormatting.value')}`"
       :placeholder="
         props.kind === 'min'
           ? t('conditionalFormatting.min')
           : props.kind === 'max'
             ? t('conditionalFormatting.max')
-            : undefined
+            : t('conditionalFormatting.thresholdValueHint')
       "
-      :model-value="props.kind === 'min' || props.kind === 'max' ? undefined : props.value"
-      class="idea-input-number--persistent-controls"
-      theme="column"
-      :min="props.kind === 'percent' || props.kind === 'percentile' ? 0 : undefined"
-      :max="props.kind === 'percent' || props.kind === 'percentile' ? 100 : undefined"
-      @update:model-value="
-        emit('update:value', $event === '' || $event === undefined ? '' : String($event))
-      "
-    />
-    <RangeReferenceInput
-      v-else-if="props.kind === 'formula'"
-      :model-value="props.value"
-      :label="`${label ?? t('conditionalFormatting.threshold')} · ${t('conditionalFormatting.value')}`"
-      placeholder="=$D$1"
-      :show-picker="true"
+      :show-picker="!automatic"
       :select-reference="selectValueReference"
-      @update:model-value="emit('update:value', $event)"
+      @update:model-value="updateValue"
     />
   </div>
 </template>
@@ -73,8 +64,5 @@ const options = computed(() =>
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 28px 28px;
   }
-}
-.idea-input-number--persistent-controls {
-  width: 100%;
 }
 </style>
