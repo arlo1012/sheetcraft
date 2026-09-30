@@ -96,6 +96,8 @@ export const conditionalFormattingZhCN = {
     editRuleAction: "编辑规则…",
     selection: "当前选区",
     sheet: "当前工作表",
+    sheetScope: "表：{name}",
+    actions: "操作",
     appliesTo: "应用于",
     condition: "条件",
     format: "格式",

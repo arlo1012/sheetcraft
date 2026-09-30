@@ -38,14 +38,47 @@ const visualRule: SheetConditionalFormatRule = {
   },
   style: {},
 };
+type ManagerSheet = {
+  id: string;
+  name: string;
+  rules: readonly SheetConditionalFormatRule[];
+  selectionRanges: string;
+  protected?: boolean;
+};
+const summarySheet: ManagerSheet = {
+  id: "summary",
+  name: "Summary",
+  rules: [textRule],
+  selectionRanges: "A1:A3",
+};
+const detailsSheet: ManagerSheet = {
+  id: "details",
+  name: "Details",
+  rules: [
+    {
+      ...textRule,
+      condition: { kind: "text", operator: "contains", text: "urgent" },
+      ranges: [{ start: { row: 5, column: 2 }, end: { row: 5, column: 2 } }],
+      anchor: { row: 5, column: 2 },
+    },
+  ],
+  selectionRanges: "C6",
+};
 
 function mountManager(
   rules: readonly SheetConditionalFormatRule[],
   selectReference?: (current: string) => Promise<string | undefined>,
+  multiSheet?: { sheets: readonly ManagerSheet[]; sheetId: string },
 ) {
   const wrapper = mount(ConditionalFormatManagerDialog, {
     attachTo: document.body,
-    props: { visible: true, rules, selectionRanges: "A1:A3", selectReference },
+    props: {
+      visible: true,
+      rules,
+      selectionRanges: "A1:A3",
+      selectReference,
+      ...multiSheet,
+    },
     global: { plugins: [createAppI18n("en-US")] },
   });
   mounted.push(wrapper);
@@ -60,17 +93,19 @@ test("selects the first displayed rule when the manager opens", () => {
   const wrapper = mountManager([textRule, secondRule]);
 
   expect(wrapper.get('[data-cf-rule="text-rule"]').attributes("aria-selected")).toBe("true");
-  expect(wrapper.get('[data-cf-action="edit"]').attributes("disabled")).toBeUndefined();
+  expect(
+    wrapper.get('[data-cf-rule="text-rule"] [data-cf-action="edit"]').attributes("aria-disabled"),
+  ).toBeUndefined();
 });
 
 test("moves the selected sheet rule and saves its changed priority", async () => {
   const wrapper = mountManager([textRule, secondRule]);
-  expect(wrapper.get("[data-cf-scope]").exists()).toBe(true);
+  expect(wrapper.find("[data-cf-scope]").exists()).toBe(true);
   wrapper.getComponent(Select).vm.$emit("update:modelValue", "sheet");
   await wrapper.vm.$nextTick();
 
   await wrapper.get('[data-cf-rule="second-rule"]').trigger("click");
-  await wrapper.get('[data-cf-action="up"]').trigger("click");
+  await wrapper.get('[data-cf-rule="second-rule"] [data-cf-action="up"]').trigger("click");
   saveManager(wrapper);
 
   const saved = wrapper.emitted("save")?.[0]?.[0] as SheetConditionalFormatRule[] | undefined;
@@ -80,7 +115,7 @@ test("moves the selected sheet rule and saves its changed priority", async () =>
 test("deleting a selected rule stays in the draft when the manager is cancelled", async () => {
   const rules = [textRule, secondRule];
   const wrapper = mountManager(rules);
-  await wrapper.get('[data-cf-action="delete"]').trigger("click");
+  await wrapper.get('[data-cf-rule="text-rule"] [data-cf-action="delete"]').trigger("click");
 
   expect(wrapper.find('[data-cf-rule="text-rule"]').exists()).toBe(false);
   wrapper.getComponent(Dialog).vm.$emit("close");
@@ -137,4 +172,91 @@ test("updates stop-if-true for ordinary rules and disables it for visual rules",
     { id: "text-rule", stopIfTrue: true },
     { id: "visual-rule" },
   ]);
+});
+
+test("keeps same-id rules isolated while changing the displayed sheet", async () => {
+  const wrapper = mountManager([], undefined, {
+    sheets: [summarySheet, detailsSheet],
+    sheetId: "summary",
+  });
+  expect(wrapper.get('[data-cf-rule="text-rule"]').text()).toContain("Text contains: late");
+
+  wrapper.getComponent(Select).vm.$emit("update:modelValue", "sheet:details");
+  await wrapper.vm.$nextTick();
+  expect(wrapper.get('[data-cf-rule="text-rule"]').text()).toContain("Text contains: urgent");
+  await wrapper.get('[data-cf-range="text-rule"] input').setValue("D7");
+  saveManager(wrapper);
+
+  expect(wrapper.emitted("saveSheets")?.[0]?.[0]).toMatchObject([
+    {
+      sheetId: "details",
+      rules: [
+        {
+          id: "text-rule",
+          ranges: [{ start: { row: 6, column: 3 }, end: { row: 6, column: 3 } }],
+        },
+      ],
+    },
+  ]);
+  expect(summarySheet.rules[0]?.ranges).toEqual(textRule.ranges);
+});
+
+test("retains drafts for two sheets and saves only their separate changes", async () => {
+  const wrapper = mountManager([], undefined, {
+    sheets: [summarySheet, detailsSheet],
+    sheetId: "summary",
+  });
+  await wrapper.get('[data-cf-range="text-rule"] input').setValue("B2");
+  wrapper.getComponent(Select).vm.$emit("update:modelValue", "sheet:details");
+  await wrapper.vm.$nextTick();
+  await wrapper.get('[data-cf-range="text-rule"] input').setValue("D7");
+  wrapper.getComponent(Select).vm.$emit("update:modelValue", "sheet:summary");
+  await wrapper.vm.$nextTick();
+  expect(wrapper.get<HTMLInputElement>('[data-cf-range="text-rule"] input').element.value).toBe(
+    "B2",
+  );
+  saveManager(wrapper);
+
+  expect(wrapper.emitted("saveSheets")?.[0]?.[0]).toMatchObject([
+    {
+      sheetId: "summary",
+      rules: [{ id: "text-rule", ranges: [{ start: { row: 1, column: 1 } }] }],
+    },
+    {
+      sheetId: "details",
+      rules: [{ id: "text-rule", ranges: [{ start: { row: 6, column: 3 } }] }],
+    },
+  ]);
+});
+
+test("cancelling a multi-sheet edit leaves both input sheets unchanged", async () => {
+  const sheets = [summarySheet, detailsSheet];
+  const wrapper = mountManager([], undefined, { sheets, sheetId: "summary" });
+  await wrapper.get('[data-cf-range="text-rule"] input').setValue("B2");
+  wrapper.getComponent(Dialog).vm.$emit("close");
+
+  expect(wrapper.emitted("saveSheets")).toBeUndefined();
+  expect(sheets[0]?.rules[0]?.ranges).toEqual(textRule.ranges);
+  expect(sheets[1]?.rules[0]?.ranges).toEqual(detailsSheet.rules[0]?.ranges);
+});
+
+test("makes protected sheets read-only", async () => {
+  const protectedSheet: ManagerSheet = { ...detailsSheet, id: "locked", protected: true };
+  const wrapper = mountManager([], undefined, {
+    sheets: [summarySheet, protectedSheet],
+    sheetId: "summary",
+  });
+  wrapper.getComponent(Select).vm.$emit("update:modelValue", "sheet:locked");
+  await wrapper.vm.$nextTick();
+
+  expect(wrapper.get('[data-cf-action="new"]').attributes("disabled")).toBeDefined();
+  for (const action of ["edit", "delete", "up", "down"]) {
+    expect(
+      wrapper
+        .get(`[data-cf-rule="text-rule"] [data-cf-action="${action}"]`)
+        .attributes("aria-disabled"),
+    ).toBe("true");
+  }
+  expect(wrapper.get('[data-cf-range="text-rule"] input').attributes("disabled")).toBeDefined();
+  expect(wrapper.get('[data-cf-stop="text-rule"] input').attributes("disabled")).toBeDefined();
 });

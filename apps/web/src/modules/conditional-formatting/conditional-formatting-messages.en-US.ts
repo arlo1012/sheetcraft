@@ -96,6 +96,8 @@ export const conditionalFormattingEnUS = {
     editRuleAction: "Edit rule…",
     selection: "Current selection",
     sheet: "Current worksheet",
+    sheetScope: "Sheet: {name}",
+    actions: "Actions",
     appliesTo: "Applies to",
     condition: "Condition",
     format: "Format",

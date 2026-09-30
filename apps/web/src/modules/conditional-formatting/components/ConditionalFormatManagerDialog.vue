@@ -4,7 +4,7 @@ import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { computed, ref, watch } from "vue";
-import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-vue-next";
+import { Plus } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   cloneConditionalFormatRule,
@@ -16,6 +16,10 @@ import {
 import ConditionalFormatQuickDialog from "./ConditionalFormatQuickDialog.vue";
 import { isConditionalFormatQuickDialogKind } from "../conditional-format-quick-rules";
 import ConditionalFormatRulesTable from "./ConditionalFormatRulesTable.vue";
+import type {
+  ConditionalFormatManagerSheet,
+  ConditionalFormatSheetChange,
+} from "../conditional-format-manager-types";
 import ConditionalFormatEditorDialog, {
   type ConditionalFormatEditorKind,
 } from "./ConditionalFormatEditorDialog.vue";
@@ -23,44 +27,73 @@ import ConditionalFormatEditorDialog, {
 const props = defineProps<{
   visible: boolean;
   rules: readonly SheetConditionalFormatRule[];
+  sheets?: readonly ConditionalFormatManagerSheet[];
+  sheetId?: string;
   selectionRanges: string;
   createKind?: ConditionalFormatEditorKind;
   sampleValue?: string | number | boolean | null;
   dateSystem?: "1900" | "1904";
-  selectReference?: (current: string) => Promise<string | undefined>;
-  selectValueReference?: (current: string) => Promise<string | undefined>;
+  selectReference?: (current: string, sheetId?: string) => Promise<string | undefined>;
+  selectValueReference?: (current: string, sheetId?: string) => Promise<string | undefined>;
 }>();
 const emit = defineEmits<{
   close: [];
   save: [rules: SheetConditionalFormatRule[]];
+  saveSheets: [changes: ConditionalFormatSheetChange[]];
 }>();
 const { t } = useAppI18n();
-const scope = ref<"selection" | "sheet">("selection");
+const scope = ref("selection");
 const editingRule = ref<SheetConditionalFormatRule>();
 const editorVisible = ref(false);
-const draftRules = ref<SheetConditionalFormatRule[]>([]);
 const selectedId = ref<string>();
-const rangeDrafts = ref<Record<string, string>>({});
-const rangeErrors = ref<Record<string, string>>({});
+type SheetDraft = {
+  rules: SheetConditionalFormatRule[];
+  ranges: Record<string, string>;
+  errors: Record<string, string>;
+  dirty: boolean;
+};
+const sheetDrafts = ref(new Map<string, SheetDraft>());
+const initialSheetId = computed(() => props.sheetId ?? "current");
+const currentSheetId = computed(() =>
+  scope.value.startsWith("sheet:") ? scope.value.slice(6) : initialSheetId.value,
+);
+const currentSheet = computed(() =>
+  props.sheets?.find((sheet) => sheet.id === currentSheetId.value),
+);
+const readonly = computed(() => Boolean(currentSheet.value?.protected));
+const currentDraft = computed(() => sheetDrafts.value.get(currentSheetId.value)!);
+const draftRules = computed({
+  get: () => currentDraft.value?.rules ?? [],
+  set: (value: SheetConditionalFormatRule[]) => {
+    currentDraft.value.rules = value;
+  },
+});
+const rangeDrafts = computed(() => currentDraft.value.ranges);
+const rangeErrors = computed(() => currentDraft.value.errors);
+const scopeOptions = computed(() => [
+  { value: "selection", label: t("conditionalFormatting.selection") },
+  { value: "sheet", label: t("conditionalFormatting.sheet") },
+  ...(props.sheets ?? []).map((sheet) => ({
+    value: `sheet:${sheet.id}`,
+    label: t("conditionalFormatting.sheetScope", { name: sheet.name }),
+  })),
+]);
+const editorSelectionRanges = computed(
+  () => currentSheet.value?.selectionRanges ?? props.selectionRanges,
+);
 const error = ref("");
 const pickingRange = ref(false);
 let editSession = 0;
 
 const displayedRules = computed(() =>
-  scope.value === "sheet"
-    ? draftRules.value
-    : draftRules.value.filter((rule) =>
+  scope.value === "selection"
+    ? draftRules.value.filter((rule) =>
         conditionalFormatRangesIntersect(
           rule.ranges,
           parseConditionalFormatRanges(props.selectionRanges) ?? [],
         ),
-      ),
-);
-const selectedRule = computed(() =>
-  displayedRules.value.find((rule) => rule.id === selectedId.value),
-);
-const selectedIndex = computed(() =>
-  displayedRules.value.findIndex((rule) => rule.id === selectedId.value),
+      )
+    : draftRules.value,
 );
 const tableRows = computed(() =>
   displayedRules.value.map((rule) => ({
@@ -74,11 +107,21 @@ const tableRows = computed(() =>
 
 function reset(): void {
   editSession += 1;
-  draftRules.value = props.rules.map(cloneConditionalFormatRule);
-  rangeDrafts.value = Object.fromEntries(
-    draftRules.value.map((rule) => [rule.id, formatConditionalFormatRanges(rule.ranges)]),
-  );
-  rangeErrors.value = {};
+  const drafts = new Map<string, SheetDraft>();
+  const addSheet = (id: string, source: readonly SheetConditionalFormatRule[]) => {
+    const rules = source.map(cloneConditionalFormatRule);
+    drafts.set(id, {
+      rules,
+      ranges: Object.fromEntries(
+        rules.map((rule) => [rule.id, formatConditionalFormatRanges(rule.ranges)]),
+      ),
+      errors: {},
+      dirty: false,
+    });
+  };
+  for (const sheet of props.sheets ?? []) addSheet(sheet.id, sheet.rules);
+  if (!drafts.has(initialSheetId.value)) addSheet(initialSheetId.value, props.rules);
+  sheetDrafts.value = drafts;
   error.value = "";
   pickingRange.value = false;
   scope.value = "selection";
@@ -119,26 +162,27 @@ function describeRule(rule: SheetConditionalFormatRule): string {
   return `${t("conditionalFormatting.iconSets")}: ${t(`conditionalFormatting.${c.iconSet}` as "conditionalFormatting.threeArrows")}`;
 }
 function addRule(): void {
+  if (readonly.value) return;
   editingRule.value = undefined;
   editorVisible.value = true;
 }
 
 function editRule(rule: SheetConditionalFormatRule): void {
+  if (readonly.value) return;
   const ranges = readRanges(rule);
   if (!ranges) return;
   selectedId.value = rule.id;
   editingRule.value = cloneConditionalFormatRule({ ...rule, ranges });
   editorVisible.value = true;
 }
-function editSelected(): void {
-  if (selectedRule.value) editRule(selectedRule.value);
-}
 function editRow(id: string): void {
   const rule = displayedRules.value.find((candidate) => candidate.id === id);
   if (rule) editRule(rule);
 }
 function updateRange(id: string, value: string): void {
+  if (readonly.value) return;
   rangeDrafts.value[id] = value;
+  currentDraft.value.dirty = true;
   delete rangeErrors.value[id];
 }
 function readRanges(rule: SheetConditionalFormatRule) {
@@ -148,11 +192,13 @@ function readRanges(rule: SheetConditionalFormatRule) {
   return ranges;
 }
 function updateStop(id: string, value: boolean): void {
+  if (readonly.value) return;
   const index = draftRules.value.findIndex((rule) => rule.id === id);
   const rule = draftRules.value[index];
   if (!rule || ["dataBar", "colorScale", "iconSet"].includes(rule.condition.kind)) return;
   try {
     draftRules.value[index] = cloneConditionalFormatRule({ ...rule, stopIfTrue: value });
+    currentDraft.value.dirty = true;
     error.value = "";
   } catch {
     error.value = t("conditionalFormatting.invalidFormat");
@@ -162,20 +208,28 @@ async function selectRange(current: string): Promise<string | undefined> {
   const session = editSession;
   pickingRange.value = true;
   try {
-    const selected = await props.selectReference?.(current);
+    const selected = await props.selectReference?.(
+      current,
+      props.sheetId ? currentSheetId.value : undefined,
+    );
     return session === editSession ? selected : undefined;
   } finally {
     if (session === editSession) pickingRange.value = false;
   }
 }
+async function selectValueRange(current: string): Promise<string | undefined> {
+  return props.selectValueReference?.(current, props.sheetId ? currentSheetId.value : undefined);
+}
 
 function saveRule(rule: SheetConditionalFormatRule): void {
+  if (readonly.value) return;
   const index = draftRules.value.findIndex((candidate) => candidate.id === rule.id);
   if (index < 0) draftRules.value.unshift(rule);
   else draftRules.value.splice(index, 1, rule);
   rangeDrafts.value[rule.id] = formatConditionalFormatRanges(rule.ranges);
   delete rangeErrors.value[rule.id];
   selectedId.value = rule.id;
+  currentDraft.value.dirty = true;
   if (props.createKind) {
     emit("save", draftRules.value.map(cloneConditionalFormatRule));
     return;
@@ -188,22 +242,18 @@ function closeEditor(): void {
   else editorVisible.value = false;
 }
 
-function removeRule(rule: SheetConditionalFormatRule): void {
-  draftRules.value = draftRules.value.filter((candidate) => candidate.id !== rule.id);
-  delete rangeDrafts.value[rule.id];
-  delete rangeErrors.value[rule.id];
-}
-function removeSelected(): void {
-  if (selectedRule.value) removeRule(selectedRule.value);
-}
-function moveSelected(offset: -1 | 1): void {
-  if (selectedRule.value) move(selectedRule.value, offset);
+function removeRule(id: string): void {
+  if (readonly.value) return;
+  draftRules.value = draftRules.value.filter((candidate) => candidate.id !== id);
+  delete rangeDrafts.value[id];
+  delete rangeErrors.value[id];
+  currentDraft.value.dirty = true;
 }
 
-function move(rule: SheetConditionalFormatRule, offset: -1 | 1): void {
-  if (scope.value !== "sheet") return;
-  const index = draftRules.value.findIndex((candidate) => candidate.id === rule.id);
-  const displayedIndex = displayedRules.value.findIndex((candidate) => candidate.id === rule.id);
+function move(id: string, offset: -1 | 1): void {
+  if (scope.value === "selection" || readonly.value) return;
+  const index = draftRules.value.findIndex((candidate) => candidate.id === id);
+  const displayedIndex = displayedRules.value.findIndex((candidate) => candidate.id === id);
   const nextDisplayedIndex = displayedIndex + offset;
   if (index < 0 || displayedIndex < 0 || nextDisplayedIndex < 0) return;
   const neighbor = displayedRules.value[nextDisplayedIndex];
@@ -214,27 +264,35 @@ function move(rule: SheetConditionalFormatRule, offset: -1 | 1): void {
     draftRules.value[neighborIndex]!,
     draftRules.value[index]!,
   ];
+  currentDraft.value.dirty = true;
 }
 
 function save(): void {
-  rangeErrors.value = {};
-  const rules: SheetConditionalFormatRule[] = [];
-  for (const rule of draftRules.value) {
-    const ranges = readRanges(rule);
-    if (ranges) rules.push(cloneConditionalFormatRule({ ...rule, ranges }));
+  const changes: ConditionalFormatSheetChange[] = [];
+  for (const [sheetId, draft] of sheetDrafts.value) {
+    if (props.sheets && !draft.dirty) continue;
+    draft.errors = {};
+    const rules: SheetConditionalFormatRule[] = [];
+    for (const rule of draft.rules) {
+      const input = draft.ranges[rule.id] ?? formatConditionalFormatRanges(rule.ranges);
+      const ranges = parseConditionalFormatRanges(input.trim().replace(/^=/, ""));
+      if (ranges) rules.push(cloneConditionalFormatRule({ ...rule, ranges }));
+      else draft.errors[rule.id] = t("conditionalFormatting.invalidRange");
+    }
+    if (Object.keys(draft.errors).length) {
+      scope.value = sheetId === initialSheetId.value ? "sheet" : `sheet:${sheetId}`;
+      selectedId.value = Object.keys(draft.errors)[0];
+      return;
+    }
+    changes.push({ sheetId, rules });
   }
-  if (Object.keys(rangeErrors.value).length) {
-    // A range draft may belong to a row hidden by the selection scope.
-    scope.value = "sheet";
-    selectedId.value = Object.keys(rangeErrors.value)[0];
-    return;
-  }
-  emit("save", rules);
+  if (props.sheets) emit("saveSheets", changes);
+  else emit("save", changes[0]?.rules ?? []);
 }
 watch(displayedRules, (rules) => {
   if (!rules.some((rule) => rule.id === selectedId.value)) selectedId.value = rules[0]?.id;
 });
-watch(() => [props.visible, props.rules, props.createKind], reset, {
+watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.sheetId], reset, {
   deep: true,
   immediate: true,
 });
@@ -246,7 +304,7 @@ watch(() => [props.visible, props.rules, props.createKind], reset, {
     :header="t('conditionalFormatting.manageRules')"
     :confirm-btn="{ content: t('conditionalFormatting.save') }"
     :cancel-btn="t('conditionalFormatting.cancel')"
-    width="min(900px, calc(100vw - 32px))"
+    width="min(1000px, calc(100vw - 32px))"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
     placement="center"
@@ -264,71 +322,31 @@ watch(() => [props.visible, props.rules, props.createKind], reset, {
           v-model="scope"
           class="conditional-format-manager__scope-select"
           data-cf-scope
+          filterable
           :aria-label="t('conditionalFormatting.ruleScope')"
-          :options="[
-            { value: 'selection', label: t('conditionalFormatting.selection') },
-            { value: 'sheet', label: t('conditionalFormatting.sheet') },
-          ]"
+          :options="scopeOptions"
         />
-      </div>
-      <div class="conditional-format-manager__toolbar">
         <TButton
+          class="conditional-format-manager__new"
           variant="outline"
           data-cf-action="new"
           :aria-label="t('conditionalFormatting.newRule')"
+          :disabled="readonly"
           @click="addRule"
         >
           <template #icon><Plus /></template>{{ t("conditionalFormatting.newRuleAction") }}
         </TButton>
-        <TButton
-          variant="outline"
-          data-cf-action="edit"
-          :aria-label="t('conditionalFormatting.editRule')"
-          :disabled="!selectedRule"
-          @click="editSelected"
-        >
-          <template #icon><Pencil /></template>{{ t("conditionalFormatting.editRuleAction") }}
-        </TButton>
-        <TButton
-          variant="outline"
-          data-cf-action="delete"
-          :aria-label="t('conditionalFormatting.deleteRule')"
-          :disabled="!selectedRule"
-          @click="removeSelected"
-        >
-          <template #icon><Trash2 /></template>{{ t("conditionalFormatting.deleteRule") }}
-        </TButton>
-        <TButton
-          variant="outline"
-          shape="square"
-          data-cf-action="up"
-          :aria-label="t('conditionalFormatting.moveUp')"
-          :title="t('conditionalFormatting.moveUp')"
-          :disabled="scope !== 'sheet' || selectedIndex <= 0"
-          @click="moveSelected(-1)"
-        >
-          <template #icon><ArrowUp /></template>
-        </TButton>
-        <TButton
-          variant="outline"
-          shape="square"
-          data-cf-action="down"
-          :aria-label="t('conditionalFormatting.moveDown')"
-          :title="t('conditionalFormatting.moveDown')"
-          :disabled="
-            scope !== 'sheet' || selectedIndex < 0 || selectedIndex >= displayedRules.length - 1
-          "
-          @click="moveSelected(1)"
-        >
-          <template #icon><ArrowDown /></template>
-        </TButton>
       </div>
       <ConditionalFormatRulesTable
         :rows="tableRows"
+        :reorderable="scope !== 'selection'"
+        :readonly="readonly"
         :selected-id="selectedId"
         :select-reference="props.selectReference ? selectRange : undefined"
         @select="selectedId = $event"
         @edit="editRow"
+        @remove="removeRule"
+        @move="move"
         @update-range="updateRange"
         @update-stop="updateStop"
       />
@@ -338,10 +356,10 @@ watch(() => [props.visible, props.rules, props.createKind], reset, {
   <ConditionalFormatQuickDialog
     v-if="editorVisible && isConditionalFormatQuickDialogKind(createKind) && !editingRule"
     :kind="createKind"
-    :ranges="selectionRanges"
-    :sample-value="sampleValue"
+    :ranges="editorSelectionRanges"
+    :sample-value="currentSheetId === initialSheetId ? sampleValue : undefined"
     :date-system="dateSystem"
-    :select-value-reference="selectValueReference"
+    :select-value-reference="props.selectValueReference ? selectValueRange : undefined"
     @save="saveRule"
     @close="closeEditor"
   />
@@ -349,12 +367,12 @@ watch(() => [props.visible, props.rules, props.createKind], reset, {
     v-else
     :visible="editorVisible"
     :rule="editingRule"
-    :ranges="selectionRanges"
+    :ranges="editorSelectionRanges"
     :initial-kind="createKind"
-    :sample-value="sampleValue"
+    :sample-value="currentSheetId === initialSheetId ? sampleValue : undefined"
     :date-system="dateSystem"
-    :select-reference="selectReference"
-    :select-value-reference="selectValueReference"
+    :select-reference="props.selectReference ? selectRange : undefined"
+    :select-value-reference="props.selectValueReference ? selectValueRange : undefined"
     @save="saveRule"
     @close="closeEditor"
   />
@@ -363,7 +381,7 @@ watch(() => [props.visible, props.rules, props.createKind], reset, {
 <style scoped lang="scss">
 .conditional-format-manager {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   height: min(340px, calc(100dvh - 180px));
   min-height: 0;
   gap: 12px;
@@ -375,11 +393,9 @@ watch(() => [props.visible, props.rules, props.createKind], reset, {
   &__scope-select {
     width: 180px;
   }
-  &__toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
+  &__new {
+    margin-left: auto;
+    flex-shrink: 0;
     svg {
       width: var(--idea-action-icon-size);
       height: var(--idea-action-icon-size);

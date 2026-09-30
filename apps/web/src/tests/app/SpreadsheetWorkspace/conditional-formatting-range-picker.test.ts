@@ -163,14 +163,11 @@ test("preserves a same-sheet multi-cell text pick, rejects it bare, and saves an
   wrapper.getComponent(SpreadsheetRibbon).vm.$emit("manageConditionalFormats");
   await flushPromises();
   const manager = wrapper.getComponent(ConditionalFormatManagerDialog);
-  expect(manager.get("[data-cf-scope]").exists()).toBe(true);
+  expect(manager.get("[data-cf-scope]")).toBeDefined();
   manager.getComponent(Select).vm.$emit("update:modelValue", "sheet");
   await flushPromises();
-  const edit = document.body.querySelector<HTMLButtonElement>(
-    '[aria-label="Edit conditional formatting rule"]',
-  );
-  if (!edit) throw new Error("Missing saved conditional-format edit action.");
-  await new DOMWrapper(edit).trigger("click");
+  const edit = manager.get('[data-cf-action="edit"]');
+  await edit.trigger("click");
   await flushPromises();
   const criteria = wrapper.getComponent(ConditionalFormatContainingCriteria);
   expect(criteria.props("type")).toBe("text");
@@ -225,4 +222,43 @@ test("picks a value from another sheet and returns to the rule sheet", async () 
   await flushPromises();
   expect(wrapper.getComponent(SheetGrid).props("sheet").name).toBe("Summary");
   expect(field.get<HTMLInputElement>("input").element.value).toBe("=Details!$B$2");
+});
+
+test("edits a Details rule in place, restores Summary after picking, and saves only Details", async () => {
+  const wrapper = await mountWorkspace();
+  wrapper.getComponent(SpreadsheetRibbon).vm.$emit("manageConditionalFormats");
+  await flushPromises();
+
+  const manager = wrapper.getComponent(ConditionalFormatManagerDialog);
+  manager.getComponent(Select).vm.$emit("update:modelValue", "sheet:details");
+  await flushPromises();
+  await manager.get('[data-cf-action="new"]').trigger("click");
+  await flushPromises();
+
+  const editor = wrapper.getComponent(ConditionalFormatEditorDialog);
+  await editor.get("[data-select-formula-reference]").trigger("click");
+  await flushPromises();
+  expect(wrapper.getComponent(SheetGrid).props("sheet").name).toBe("Details");
+  expect(wrapper.getComponent(RangeReferencePicker).props("reference")).toBe("A1");
+  wrapper.getComponent(RangeReferencePicker).vm.$emit("confirm");
+  await flushPromises();
+  expect(wrapper.getComponent(SheetGrid).props("sheet").name).toBe("Summary");
+
+  editor.vm.$emit("save", {
+    id: "details-rule",
+    ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
+    anchor: { row: 0, column: 0 },
+    condition: { kind: "cellValue", operator: "greaterThan", value: 1 },
+    style: { fillColor: "#FDE2E1" },
+  });
+  await flushPromises();
+  manager.getComponent(Dialog).vm.$emit("confirm");
+  await flushPromises();
+
+  expect(wrapper.getComponent(SheetGrid).props("sheet").conditionalFormats).toEqual([]);
+  wrapper.getComponent(WorkbookStatusBar).vm.$emit("select", "details");
+  await flushPromises();
+  expect(wrapper.getComponent(SheetGrid).props("sheet").conditionalFormats).toEqual([
+    expect.objectContaining({ id: "details-rule" }),
+  ]);
 });

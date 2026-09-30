@@ -74,7 +74,7 @@ describe("conditional formatting dialogs", () => {
     mounted.push(wrapper);
 
     expect(document.body.textContent).toContain("New conditional formatting rule");
-    expect(wrapper.getComponent(RangeReferenceInput).exists()).toBe(true);
+    expect(wrapper.findComponent(RangeReferenceInput).exists()).toBe(true);
   });
 
   test("limits priority changes to the current-sheet rule scope", () => {
@@ -87,8 +87,8 @@ describe("conditional formatting dialogs", () => {
     mounted.push(wrapper);
 
     expect(
-      document.body.querySelector<HTMLButtonElement>('[aria-label="Move down"]')?.disabled,
-    ).toBe(true);
+      wrapper.get('[data-cf-rule="text-rule"] [data-cf-action="down"]').attributes("aria-disabled"),
+    ).toBe("true");
   });
 
   test("preserves text and explicit false format attributes when editing", async () => {

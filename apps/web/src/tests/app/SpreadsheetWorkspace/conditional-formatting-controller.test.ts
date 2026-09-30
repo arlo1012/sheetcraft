@@ -2,7 +2,7 @@ import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
-import { createWorkbook, MAX_SHEET_ROWS } from "@idea10/core/workbook";
+import { createSheet, createWorkbook, insertSheet, MAX_SHEET_ROWS } from "@idea10/core/workbook";
 import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { createAppI18n } from "../../../shared/i18n";
@@ -26,6 +26,73 @@ function mountController(): Controller {
 afterEach(() => wrapper?.unmount());
 
 describe("conditional formatting workspace commands", () => {
+  test("saves only changed manager sheets while keeping each sheet's rules separate", () => {
+    const controller = mountController();
+    const first = controller.activeSheet.value;
+    const second = createSheet("Details", "details");
+    insertSheet(controller.session.workbook, second);
+    const generation = controller.workbookGeneration.value;
+    const firstRule = {
+      id: "first-rule",
+      ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
+      anchor: { row: 0, column: 0 },
+      condition: { kind: "cellValue" as const, operator: "greaterThan" as const, value: 1 },
+      style: { fillColor: "#FDE2E1" },
+    };
+    const secondRule = {
+      ...firstRule,
+      id: "second-rule",
+      condition: { ...firstRule.condition, value: 2 },
+    };
+    second.conditionalFormats = [secondRule];
+
+    expect(
+      controller.setConditionalFormatsForSheets(
+        [{ sheetId: first.id, rules: [firstRule] }],
+        generation,
+      ),
+    ).toBe(true);
+    expect(first.conditionalFormats).toEqual([firstRule]);
+    expect(second.conditionalFormats).toEqual([secondRule]);
+    expect(controller.session.history.undoStack).toHaveLength(1);
+  });
+
+  test("rejects all manager changes when a target is protected or the draft is stale", () => {
+    const controller = mountController();
+    const first = controller.activeSheet.value;
+    const second = createSheet("Details", "details");
+    insertSheet(controller.session.workbook, second);
+    const generation = controller.workbookGeneration.value;
+    const rule = {
+      id: "rule",
+      ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
+      anchor: { row: 0, column: 0 },
+      condition: { kind: "cellValue" as const, operator: "greaterThan" as const, value: 1 },
+      style: { fillColor: "#FDE2E1" },
+    };
+    second.properties.protected = true;
+
+    expect(
+      controller.setConditionalFormatsForSheets(
+        [
+          { sheetId: first.id, rules: [rule] },
+          { sheetId: second.id, rules: [rule] },
+        ],
+        generation,
+      ),
+    ).toBe(false);
+    expect(first.conditionalFormats).toEqual([]);
+    expect(second.conditionalFormats).toEqual([]);
+    expect(controller.session.history.undoStack).toHaveLength(0);
+
+    second.properties.protected = false;
+    controller.replaceWorkbook(createWorkbook({ idFactory: createSequentialIdFactory() }));
+    expect(
+      controller.setConditionalFormatsForSheets([{ sheetId: first.id, rules: [rule] }], generation),
+    ).toBe(false);
+    expect(controller.session.history.undoStack).toHaveLength(0);
+  });
+
   test("allows sparse whole-column rules and restores partial clearing with undo", () => {
     const controller = mountController();
     const start = { row: 0, column: 0 };

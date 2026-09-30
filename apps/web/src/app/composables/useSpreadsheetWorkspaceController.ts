@@ -56,6 +56,7 @@ import {
   cloneConditionalFormatRule,
   type SheetConditionalFormatRule,
 } from "@idea10/core/conditional-formatting";
+import type { ConditionalFormatSheetChange } from "../../modules/conditional-formatting/conditional-format-manager-types";
 import { getCellMatrixSize, tileCellMatrix, type CellValueMatrix } from "@idea10/core/clipboard";
 import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
 import {
@@ -1027,6 +1028,29 @@ export function useSpreadsheetWorkspaceController(
     return true;
   }
 
+  /**
+   * Applies the manager's changed sheets as individual Core commands.  Validate and
+   * construct every command before mutation so a later protected/missing sheet
+   * cannot leave an earlier sheet saved on its own.
+   */
+  function setConditionalFormatsForSheets(
+    changes: readonly ConditionalFormatSheetChange[],
+    generation: number,
+  ): boolean {
+    if (generation !== workbookGeneration.value) return false;
+
+    const commands: WorkbookCommand[] = [];
+    for (const change of changes) {
+      const sheet = session.workbook.sheets.get(change.sheetId);
+      if (!sheet || sheet.properties.protected) return false;
+      if (JSON.stringify(sheet.conditionalFormats ?? []) === JSON.stringify(change.rules)) continue;
+      commands.push(createSetSheetConditionalFormatsCommand(change.sheetId, change.rules));
+    }
+
+    for (const command of commands) execute(command, "format.cells");
+    return true;
+  }
+
   function clearConditionalFormats(scope: "selection" | "sheet"): boolean {
     const sheet = activeSheet.value;
     if (sheet.properties.protected) return false;
@@ -1624,6 +1648,7 @@ export function useSpreadsheetWorkspaceController(
     captureCellFormatSelection,
     captureConditionalFormattingSelection,
     setConditionalFormats,
+    setConditionalFormatsForSheets,
     clearConditionalFormats,
     applyCellFormat,
     updateBorderFormat,

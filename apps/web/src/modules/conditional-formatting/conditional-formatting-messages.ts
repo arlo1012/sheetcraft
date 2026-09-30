@@ -94,6 +94,8 @@ export type ConditionalFormattingMessageSchema = {
     editRuleAction: string;
     selection: string;
     sheet: string;
+    sheetScope: string;
+    actions: string;
     appliesTo: string;
     condition: string;
     format: string;
