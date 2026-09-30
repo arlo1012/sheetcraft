@@ -1,7 +1,7 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, expect, test, vi } from "vitest";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { RadioGroup } from "tdesign-vue-next/es/radio";
+import { Select } from "tdesign-vue-next/es/select";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { createSheet, createWorkbook, insertSheet } from "@idea10/core/workbook";
 import { serializeWorkbook, type WorkbookSnapshot } from "@idea10/core/serialization";
@@ -69,9 +69,7 @@ test("confirms a picked current-sheet range and preserves the draft when cancell
   await flushPromises();
 
   const manager = wrapper.getComponent(ConditionalFormatManagerDialog);
-  const addRule = [...document.body.querySelectorAll<HTMLButtonElement>("button")].find(
-    (button) => button.textContent?.trim() === "New conditional formatting rule",
-  );
+  const addRule = document.body.querySelector<HTMLButtonElement>('[data-cf-action="new"]');
   if (!addRule) throw new Error("Missing new conditional-formatting rule button.");
   await new DOMWrapper(addRule).trigger("click");
   await flushPromises();
@@ -164,10 +162,9 @@ test("preserves a same-sheet multi-cell text pick, rejects it bare, and saves an
 
   wrapper.getComponent(SpreadsheetRibbon).vm.$emit("manageConditionalFormats");
   await flushPromises();
-  wrapper
-    .getComponent(ConditionalFormatManagerDialog)
-    .getComponent(RadioGroup)
-    .vm.$emit("update:modelValue", "sheet");
+  const manager = wrapper.getComponent(ConditionalFormatManagerDialog);
+  expect(manager.get("[data-cf-scope]").exists()).toBe(true);
+  manager.getComponent(Select).vm.$emit("update:modelValue", "sheet");
   await flushPromises();
   const edit = document.body.querySelector<HTMLButtonElement>(
     '[aria-label="Edit conditional formatting rule"]',

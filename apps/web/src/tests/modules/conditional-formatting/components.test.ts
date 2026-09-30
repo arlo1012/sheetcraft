@@ -6,6 +6,7 @@ import ConditionalFormatManagerDialog from "../../../modules/conditional-formatt
 import ConditionalFormatContainingCriteria from "../../../modules/conditional-formatting/components/ConditionalFormatContainingCriteria.vue";
 import ConditionalFormatStyleDialog from "../../../modules/conditional-formatting/components/ConditionalFormatStyleDialog.vue";
 import { createAppI18n } from "../../../shared/i18n";
+import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
 
 const mounted: Array<{ unmount(): void }> = [];
@@ -73,11 +74,7 @@ describe("conditional formatting dialogs", () => {
     mounted.push(wrapper);
 
     expect(document.body.textContent).toContain("New conditional formatting rule");
-    expect(
-      [...document.body.querySelectorAll("input")].some(
-        (input) => input.getAttribute("placeholder") === '=$D2="Overdue"',
-      ),
-    ).toBe(true);
+    expect(wrapper.getComponent(RangeReferenceInput).exists()).toBe(true);
   });
 
   test("limits priority changes to the current-sheet rule scope", () => {

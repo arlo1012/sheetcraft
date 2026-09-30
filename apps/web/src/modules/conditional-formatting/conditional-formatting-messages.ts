@@ -89,6 +89,9 @@ export type ConditionalFormattingMessageSchema = {
     moveDown: string;
     noRules: string;
     ruleScope: string;
+    rulePriority: string;
+    newRuleAction: string;
+    editRuleAction: string;
     selection: string;
     sheet: string;
     appliesTo: string;
