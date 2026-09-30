@@ -86,6 +86,29 @@ describe("workbook formula reference rewrites", () => {
       createWorkbookEvaluator(workbook, sheet.id).getComputedValue({ row: 1, column: 0 }),
     ).toBe(4);
   });
+
+  test("rewrites a dynamic text criterion when its source sheet is renamed", () => {
+    const workbook = createTestWorkbook();
+    const data = createSheet("Data", "data");
+    insertSheet(workbook, data);
+    const sheet = getActiveSheet(workbook);
+    sheet.conditionalFormats = [
+      {
+        id: "text-source",
+        ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
+        anchor: { row: 0, column: 0 },
+        condition: { kind: "text", operator: "contains", text: { formula: "=Data!$A$1" } },
+        style: { fillColor: "#ff0000" },
+      },
+    ];
+
+    applyWorkbookCommand(workbook, createRenameSheetCommand(data.id, "Actuals"));
+    expect(sheet.conditionalFormats?.[0]?.condition).toEqual({
+      kind: "text",
+      operator: "contains",
+      text: { formula: "=Actuals!$A$1" },
+    });
+  });
 });
 
 test("renaming through history restores only formulas actually transformed", () => {

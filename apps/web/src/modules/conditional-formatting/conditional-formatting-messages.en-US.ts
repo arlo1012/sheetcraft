@@ -113,6 +113,8 @@ export const conditionalFormattingEnUS = {
     invalidRange: "Enter a valid A1 cell range.",
     invalidValue: "Enter a condition value.",
     invalidFormula: "Enter a formula that starts with =.",
+    singleValueRequired:
+      "Use a single-cell reference or a function that returns one value, such as =SUM(A1:A5).",
     invalidFormat: "Choose at least one format.",
     fillColor: "Fill color",
     textColor: "Text color",

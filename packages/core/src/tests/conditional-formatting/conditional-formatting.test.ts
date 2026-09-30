@@ -1,11 +1,14 @@
 import { describe, expect, test } from "vitest";
 import {
   applyConditionalFormatStyle,
+  conditionalFormatFormulaSources,
   createConditionalFormatResolver,
   createConditionalFormatVisualResolver,
+  mapConditionalFormatFormulas,
   normalizeConditionalFormatRules,
   type SheetConditionalFormatRule,
 } from "../../conditional-formatting.js";
+import { copyConditionalFormatRules } from "../../conditional-formatting-transfer.js";
 import { createTestWorkbook } from "../helpers.js";
 import {
   createWorkbookEvaluator,
@@ -154,6 +157,131 @@ describe("conditional-formatting resolver", () => {
         column: 0,
       }),
     ).toBeUndefined();
+  });
+
+  test("evaluates text criteria from formulas while retaining literal equals signs and leading zeroes", () => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    setCellValue(sheet, { row: 0, column: 0 }, "Open case");
+    setCellValue(sheet, { row: 1, column: 0 }, "Closed case");
+    setCellValue(sheet, { row: 0, column: 1 }, "open");
+    setCellValue(sheet, { row: 1, column: 1 }, "closed");
+    setCellValue(sheet, { row: 0, column: 2 }, 7);
+    setCellValue(sheet, { row: 0, column: 3 }, "ID7");
+    sheet.conditionalFormats = [
+      rule(
+        "relative-text",
+        { kind: "text", operator: "contains", text: { formula: "=B1" } },
+        { fillColor: "#123456" },
+      ),
+      {
+        id: "numeric-text",
+        ranges: [{ start: { row: 0, column: 3 }, end: { row: 0, column: 3 } }],
+        anchor: { row: 0, column: 3 },
+        condition: { kind: "text", operator: "contains", text: { formula: "=$C$1" } },
+        style: { bold: true },
+      },
+    ];
+    const resolve = createConditionalFormatResolver(
+      sheet,
+      createWorkbookEvaluator(workbook, sheet.id),
+    );
+    expect(resolve({ row: 0, column: 0 })).toEqual({ fillColor: "#123456" });
+    expect(resolve({ row: 1, column: 0 })).toEqual({ fillColor: "#123456" });
+    expect(resolve({ row: 0, column: 3 })).toEqual({ bold: true });
+    expect(
+      normalizeConditionalFormatRules([
+        rule("literal", { kind: "text", operator: "contains", text: "=007" }, { bold: true }),
+      ])[0]?.condition,
+    ).toEqual({ kind: "text", operator: "contains", text: "=007" });
+  });
+
+  test("collects and maps text-criterion formulas with other conditional formulas", () => {
+    const source = rule(
+      "text-reference",
+      { kind: "text", operator: "contains", text: { formula: "=B1" } },
+      { fillColor: "#123456" },
+    );
+    expect(conditionalFormatFormulaSources(source)).toEqual(["=B1"]);
+    expect(
+      mapConditionalFormatFormulas(source, (formula) => formula.replace("B1", "$B$2")),
+    ).toEqual(
+      expect.objectContaining({
+        condition: { kind: "text", operator: "contains", text: { formula: "=$B$2" } },
+      }),
+    );
+  });
+
+  test("copies dynamic text criteria with their relative formula references", () => {
+    const source = rule(
+      "text-copy",
+      { kind: "text", operator: "contains", text: { formula: "=B1" } },
+      { fillColor: "#123456" },
+    );
+    const copied = copyConditionalFormatRules(
+      [source],
+      { start: { row: 0, column: 0 }, end: { row: 9, column: 9 } },
+      { start: { row: 0, column: 2 }, end: { row: 9, column: 11 } },
+    );
+    expect(copied[0]).toMatchObject({
+      anchor: { row: 0, column: 2 },
+      condition: { kind: "text", operator: "contains", text: { formula: "=D1" } },
+    });
+  });
+
+  test("rejects bare multi-cell references while accepting scalar formulas and one-cell ranges", () => {
+    const base = {
+      id: "formula-shape",
+      ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
+      anchor: { row: 0, column: 0 },
+      style: { bold: true },
+    } as const;
+    const ruleWith = (condition: SheetConditionalFormatRule["condition"]) => ({
+      ...base,
+      condition,
+    });
+    expect(() =>
+      normalizeConditionalFormatRules([
+        ruleWith({ kind: "text", operator: "contains", text: { formula: "=Data!$A$1:$A$2" } }),
+      ]),
+    ).toThrow(/condition\.text\.range/);
+    expect(() =>
+      normalizeConditionalFormatRules([
+        ruleWith({ kind: "cellValue", operator: "equal", value: { formula: "=A1:B2" } }),
+      ]),
+    ).toThrow(/condition\.value\.range/);
+    expect(() =>
+      normalizeConditionalFormatRules([ruleWith({ kind: "formula", formula: "=A:A" })]),
+    ).toThrow(/condition\.formula\.range/);
+    expect(() =>
+      normalizeConditionalFormatRules([
+        ruleWith({
+          kind: "dataBar",
+          minimum: { kind: "formula", formula: "=$A$1:$A$2" },
+          maximum: { kind: "max" },
+          color: "#123456",
+        }),
+      ]),
+    ).toThrow(/condition\.minimum\.formula\.range/);
+    expect(
+      normalizeConditionalFormatRules([
+        ruleWith({ kind: "text", operator: "contains", text: { formula: "=CONCAT(A1:B1)" } }),
+      ])[0]?.condition,
+    ).toMatchObject({ kind: "text", operator: "contains" });
+    expect(
+      normalizeConditionalFormatRules([ruleWith({ kind: "formula", formula: "=A1:A1" })])[0]
+        ?.condition,
+    ).toEqual({ kind: "formula", formula: "=A1:A1" });
+    expect(() =>
+      normalizeConditionalFormatRules([
+        ruleWith({ kind: "text", operator: "contains", text: { formula: "=SUM(" } }),
+      ]),
+    ).toThrow(/condition\.text/);
+    expect(() =>
+      normalizeConditionalFormatRules([
+        ruleWith({ kind: "cellValue", operator: "equal", value: { formula: "=SUM(" } }),
+      ]),
+    ).toThrow(/condition\.value/);
   });
 
   test("handles blanks, errors, and duplicate values without treating errors as duplicates", () => {

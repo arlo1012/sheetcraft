@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Input as TInput } from "tdesign-vue-next/es/input";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { toWorkbookErrorData } from "@idea10/core/errors";
@@ -23,7 +22,10 @@ import {
 } from "../conditional-format-quick-rules";
 import ConditionalFormatStyleSelect from "./ConditionalFormatStyleSelect.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
-import { parseConditionalFormatValueOperand } from "../conditional-formatting-ui";
+import {
+  parseConditionalFormatValueOperand,
+  parseConditionalFormatTextOperand,
+} from "../conditional-formatting-ui";
 
 const props = defineProps<{
   kind: ConditionalFormatQuickDialogKind;
@@ -113,7 +115,11 @@ function save() {
     }
     condition =
       props.kind === "contains"
-        ? { kind: "text", operator: "contains", text: value.value }
+        ? {
+            kind: "text",
+            operator: "contains",
+            text: parseConditionalFormatTextOperand(value.value),
+          }
         : {
             kind: "cellValue",
             operator: props.kind as "greaterThan" | "lessThan" | "equal" | "between",
@@ -138,8 +144,12 @@ function save() {
     );
   } catch (cause) {
     const field = toWorkbookErrorData(cause).details?.field;
+    if (typeof field === "string" && field.endsWith(".range")) {
+      error.value = t("conditionalFormatting.singleValueRequired");
+      return;
+    }
     error.value = t(
-      field === "condition.value" || field === "condition.secondValue"
+      field === "condition.value" || field === "condition.secondValue" || field === "condition.text"
         ? "conditionalFormatting.invalidFormula"
         : "conditionalFormatting.invalidFormat",
     );
@@ -238,15 +248,7 @@ watch(
           role="group"
           :aria-label="t('conditionalFormatting.value')"
         >
-          <TInput
-            v-if="kind === 'contains'"
-            v-model="value"
-            :aria-label="t('conditionalFormatting.value')"
-            autofocus
-            @enter="save"
-          />
           <RangeReferenceInput
-            v-else
             v-model="value"
             :label="t('conditionalFormatting.value')"
             :placeholder="t('conditionalFormatting.valueReferenceHint')"

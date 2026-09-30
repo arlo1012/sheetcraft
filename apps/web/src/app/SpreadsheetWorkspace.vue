@@ -482,9 +482,7 @@ async function selectConditionalFormatValueReference(current: string): Promise<s
   const sheetId = activeSheet.value.id;
   conditionalFormatPickingValue.value = true;
   try {
-    const selected = await conditionalFormatRangePicker.selectReference(current, {
-      singleCell: true,
-    });
+    const selected = await conditionalFormatRangePicker.selectReference(current);
     if (
       session.workbook !== workbook ||
       workbookGeneration.value !== generation ||
@@ -494,12 +492,7 @@ async function selectConditionalFormatValueReference(current: string): Promise<s
     if (activeSheet.value.id !== sheetId && workbook.sheets.has(sheetId)) selectSheet(sheetId);
     if (selected === undefined) return undefined;
     const target = resolveRangeReference(workbook, selected, sheetId);
-    if (
-      !target ||
-      target.range.start.row !== target.range.end.row ||
-      target.range.start.column !== target.range.end.column
-    )
-      return undefined;
+    if (!target) return undefined;
     const reference = formatRangeReference(workbook.sheets.get(target.sheetId)!.name, target.range);
     return target.sheetId === sheetId
       ? `=${reference.slice(reference.lastIndexOf("!") + 1)}`

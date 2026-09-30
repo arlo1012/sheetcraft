@@ -113,6 +113,7 @@ export const conditionalFormattingZhCN = {
     invalidRange: "请输入有效的 A1 单元格区域。",
     invalidValue: "请输入条件值。",
     invalidFormula: "请输入以 = 开头的公式。",
+    singleValueRequired: "请引用单个单元格，或使用返回单个值的函数处理区域，例如 =SUM(A1:A5)。",
     invalidFormat: "请至少选择一种格式。",
     fillColor: "填充颜色",
     textColor: "字体颜色",

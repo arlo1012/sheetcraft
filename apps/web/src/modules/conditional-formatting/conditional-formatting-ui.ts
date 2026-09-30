@@ -1,6 +1,7 @@
 import {
   cloneConditionalFormatRule as cloneCoreConditionalFormatRule,
   type ConditionalFormatOperand,
+  type ConditionalFormatTextOperand,
   type SheetConditionalFormatRule,
 } from "@idea10/core/conditional-formatting";
 import { formatCellAddress } from "@idea10/core/coordinates";
@@ -44,6 +45,15 @@ export function formatConditionalFormatValueOperand(operand: ConditionalFormatVa
   if (typeof operand === "number") return { value: String(operand), literal: false };
   if (typeof operand === "string") return { value: operand, literal: true };
   return { value: operand.formula, literal: false };
+}
+
+/** Text conditions keep numeric-looking literals intact while accepting formulas. */
+export function parseConditionalFormatTextOperand(
+  input: string,
+  preserveLiteral = false,
+): ConditionalFormatTextOperand {
+  const operand = parseConditionalFormatValueOperand(input, preserveLiteral);
+  return typeof operand === "number" ? input : operand;
 }
 
 export type ConditionalFormatKind = SheetConditionalFormatRule["condition"]["kind"];

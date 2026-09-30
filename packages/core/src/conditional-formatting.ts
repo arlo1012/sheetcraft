@@ -107,6 +107,9 @@ export type ConditionalFormatIconThreshold = ConditionalFormatThreshold & { incl
 /** A literal comparison value, or a formula evaluated for each applied cell. */
 export type ConditionalFormatOperand = number | string | { formula: string };
 
+/** A literal text criterion, or a formula evaluated for each applied cell. */
+export type ConditionalFormatTextOperand = string | { formula: string };
+
 export type ConditionalFormatColorScaleStop = {
   threshold: ConditionalFormatThreshold;
   color: string;
@@ -178,7 +181,11 @@ export type ConditionalFormatCondition =
       value: ConditionalFormatOperand;
       secondValue?: ConditionalFormatOperand;
     }
-  | { kind: "text"; operator: "contains" | "notContains" | "beginsWith" | "endsWith"; text: string }
+  | {
+      kind: "text";
+      operator: "contains" | "notContains" | "beginsWith" | "endsWith";
+      text: ConditionalFormatTextOperand;
+    }
   | { kind: "blank"; blank: boolean }
   /** Matches computed formula-error values; literal error-token text does not match. */
   | { kind: "error"; error: boolean }
@@ -335,6 +342,25 @@ function normalizeColor(color: unknown, field: string): string {
   return color;
 }
 
+/**
+ * Conditional-format formula slots accept scalar formulas. A bare multi-cell
+ * reference is an array result in conditional formatting, so require callers
+ * to make the reduction explicit (for example, SUM or CONCAT).
+ */
+function normalizeConditionalFormulaSource(value: unknown, field: string): string {
+  if (typeof value !== "string") invalid(field, value);
+  const parsed = parseFormula(value);
+  if (!parsed.ok) invalid(field, value);
+  const expression = parsed.ast.expression;
+  const multiCellRange =
+    expression.kind === "axis-range" ||
+    (expression.kind === "range" &&
+      (expression.range.start.row !== expression.range.end.row ||
+        expression.range.start.column !== expression.range.end.column));
+  if (multiCellRange) invalid(`${field}.range`, value);
+  return value;
+}
+
 function normalizeThreshold(
   value: ConditionalFormatThreshold,
   field: string,
@@ -351,19 +377,18 @@ function normalizeThreshold(
     return { kind: value.kind };
   }
   if (value.kind === "formula") {
-    if (typeof value.formula !== "string" || !parseFormula(value.formula).ok)
-      invalid(`${field}.formula`, value.formula);
+    const formula = normalizeConditionalFormulaSource(value.formula, `${field}.formula`);
     if (
-      collectFormulaReferences(value.formula).some(
+      collectFormulaReferences(formula).some(
         (reference) => !reference.rowAbsolute || !reference.columnAbsolute,
       ) ||
-      collectFormulaAxisRanges(value.formula).some(
+      collectFormulaAxisRanges(formula).some(
         (range) => !range.startAbsolute || !range.endAbsolute,
       ) ||
-      formulaHasArrayConstant(value.formula)
+      formulaHasArrayConstant(formula)
     )
-      invalid(`${field}.formula`, value.formula);
-    return { kind: "formula", formula: value.formula };
+      invalid(`${field}.formula`, formula);
+    return { kind: "formula", formula };
   }
   if (value.kind !== "num" && value.kind !== "percent" && value.kind !== "percentile")
     return invalid(`${field}.kind`, (value as { kind?: unknown }).kind);
@@ -432,8 +457,11 @@ function normalizeCondition(condition: ConditionalFormatCondition): ConditionalF
   }
   if (condition.kind === "text") {
     if (!TEXT_OPERATORS.has(condition.operator)) invalid("condition.operator", condition.operator);
-    if (typeof condition.text !== "string") invalid("condition.text", condition.text);
-    return { kind: "text", operator: condition.operator, text: condition.text };
+    return {
+      kind: "text",
+      operator: condition.operator,
+      text: normalizeTextOperand(condition.text, "condition.text"),
+    };
   }
   if (condition.kind === "blank") {
     if (typeof condition.blank !== "boolean") invalid("condition.blank", condition.blank);
@@ -448,9 +476,10 @@ function normalizeCondition(condition: ConditionalFormatCondition): ConditionalF
     return { kind: "duplicate", unique: condition.unique };
   }
   if (condition.kind === "formula") {
-    if (typeof condition.formula !== "string" || !parseFormula(condition.formula).ok)
-      invalid("condition.formula", condition.formula);
-    return { kind: "formula", formula: condition.formula };
+    return {
+      kind: "formula",
+      formula: normalizeConditionalFormulaSource(condition.formula, "condition.formula"),
+    };
   }
   if (condition.kind === "rank") {
     if (
@@ -700,6 +729,8 @@ export function conditionalFormatFormulaSources(rule: SheetConditionalFormatRule
   if (condition.kind === "cellValue") {
     addOperand(condition.value);
     addOperand(condition.secondValue);
+  } else if (condition.kind === "text") {
+    if (typeof condition.text === "object") sources.push(condition.text.formula);
   } else if (condition.kind === "dataBar") {
     addThreshold(condition.minimum);
     addThreshold(condition.maximum);
@@ -736,6 +767,17 @@ export function mapConditionalFormatFormulas(
           : { secondValue: mapOperand(condition.secondValue) }),
       },
     };
+  if (condition.kind === "text")
+    return {
+      ...rule,
+      condition: {
+        ...condition,
+        text:
+          typeof condition.text === "object"
+            ? { formula: transform(condition.text.formula) }
+            : condition.text,
+      },
+    };
   if (condition.kind === "dataBar")
     return {
       ...rule,
@@ -770,14 +812,20 @@ function isComparable(value: unknown): value is number | string {
 
 function normalizeOperand(value: unknown, field: string): ConditionalFormatOperand {
   if (isComparable(value)) return value;
+  return normalizeTextOperand(value, field);
+}
+
+function normalizeTextOperand(value: unknown, field: string): ConditionalFormatTextOperand {
+  if (typeof value === "string") return value;
   if (
     value &&
     typeof value === "object" &&
     !Array.isArray(value) &&
-    typeof (value as { formula?: unknown }).formula === "string" &&
-    parseFormula((value as { formula: string }).formula).ok
+    typeof (value as { formula?: unknown }).formula === "string"
   )
-    return { formula: (value as { formula: string }).formula };
+    return {
+      formula: normalizeConditionalFormulaSource((value as { formula: string }).formula, field),
+    };
   return invalid(field, value);
 }
 
@@ -843,19 +891,20 @@ function cellValueMatches(
 function textMatches(
   value: FormulaValue,
   condition: Extract<ConditionalFormatCondition, { kind: "text" }>,
+  query: string | undefined,
 ): boolean {
-  if (isFormulaError(value) || value === null) return false;
+  if (isFormulaError(value) || value === null || query === undefined) return false;
   const text = String(value).toLocaleLowerCase();
-  const query = condition.text.toLocaleLowerCase();
+  const comparableQuery = query.toLocaleLowerCase();
   switch (condition.operator) {
     case "contains":
-      return text.includes(query);
+      return text.includes(comparableQuery);
     case "notContains":
-      return !text.includes(query);
+      return !text.includes(comparableQuery);
     case "beginsWith":
-      return text.startsWith(query);
+      return text.startsWith(comparableQuery);
     case "endsWith":
-      return text.endsWith(query);
+      return text.endsWith(comparableQuery);
   }
 }
 
@@ -894,6 +943,19 @@ function resolveOperand(
   const value = evaluateConditionalFormula(operand.formula, rule, address, evaluator);
   return (typeof value === "number" && Number.isFinite(value)) || typeof value === "string"
     ? value
+    : undefined;
+}
+
+function resolveTextOperand(
+  operand: ConditionalFormatTextOperand,
+  rule: SheetConditionalFormatRule,
+  address: CellAddress,
+  evaluator: ConditionalFormulaEvaluator,
+): string | undefined {
+  if (typeof operand === "string") return operand;
+  const value = evaluateConditionalFormula(operand.formula, rule, address, evaluator);
+  return (typeof value === "number" && Number.isFinite(value)) || typeof value === "string"
+    ? String(value)
     : undefined;
 }
 
@@ -1191,7 +1253,11 @@ export function createConditionalFormatResolver(
               resolveOperand(rule.condition.secondValue, rule, address, evaluator),
             )
           : rule.condition.kind === "text"
-            ? textMatches(value, rule.condition)
+            ? textMatches(
+                value,
+                rule.condition,
+                resolveTextOperand(rule.condition.text, rule, address, evaluator),
+              )
             : rule.condition.kind === "blank"
               ? isFormulaError(value)
                 ? false
@@ -1313,7 +1379,12 @@ export function createConditionalFormatVisualResolver(
         resolveOperand(condition.value, rule, address, evaluator),
         resolveOperand(condition.secondValue, rule, address, evaluator),
       );
-    if (condition.kind === "text") return textMatches(value, condition);
+    if (condition.kind === "text")
+      return textMatches(
+        value,
+        condition,
+        resolveTextOperand(condition.text, rule, address, evaluator),
+      );
     if (condition.kind === "blank")
       return (
         !isFormulaError(value) &&

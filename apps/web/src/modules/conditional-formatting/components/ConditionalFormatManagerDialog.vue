@@ -68,7 +68,7 @@ function describeRule(rule: SheetConditionalFormatRule): string {
   if (c.kind === "duplicate")
     return c.unique ? t("conditionalFormatting.unique") : t("conditionalFormatting.duplicate");
   if (c.kind === "text")
-    return `${t(`conditionalFormatting.${c.operator}` as "conditionalFormatting.contains")}: ${c.text}`;
+    return `${t(`conditionalFormatting.${c.operator}` as "conditionalFormatting.contains")}: ${formatConditionalFormatValueOperand(c.text).value}`;
   if (c.kind === "cellValue") {
     const value = formatConditionalFormatValueOperand(c.value).value;
     const secondValue =

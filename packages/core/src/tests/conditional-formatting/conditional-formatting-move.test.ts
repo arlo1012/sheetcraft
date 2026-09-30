@@ -109,6 +109,26 @@ describe("moveConditionalFormatRules", () => {
     expect(restored).toEqual(original);
   });
 
+  test("moves dynamic text criteria with their relative formula references", () => {
+    const original = [
+      rule("text", [range(0, 0, 1, 0)], {
+        kind: "text",
+        operator: "contains",
+        text: { formula: "=A1" },
+      }),
+    ];
+    const moved = moveConditionalFormatRules(original, range(0, 0, 1, 0), cell(0, 1));
+    expect(moved).toEqual([
+      expect.objectContaining({
+        id: "text",
+        ranges: [range(0, 1, 1, 1)],
+        anchor: cell(0, 1),
+        condition: { kind: "text", operator: "contains", text: { formula: "=B1" } },
+      }),
+    ]);
+    expect(moveConditionalFormatRules(moved, range(0, 1, 1, 1), cell(0, 0))).toEqual(original);
+  });
+
   test("splits partial formula scopes and adjusts external formula references to moved cells", () => {
     const partial = moveConditionalFormatRules(
       [rule("partial", [range(0, 0, 1, 0)], { kind: "formula", formula: "=A1>0" })],

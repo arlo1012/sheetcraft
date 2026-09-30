@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
@@ -95,14 +94,7 @@ const needsSecondValue = computed(
           :aria-label="t('conditionalFormatting.comparison')"
         />
         <div class="containing-criteria__values" :class="{ 'has-second': needsSecondValue }">
-          <TInput
-            v-if="contentType === 'text'"
-            :model-value="value"
-            :aria-label="t('conditionalFormatting.value')"
-            @update:model-value="emit('update:value', String($event))"
-          />
           <RangeReferenceInput
-            v-else
             :model-value="value"
             :label="t('conditionalFormatting.value')"
             :show-picker="true"

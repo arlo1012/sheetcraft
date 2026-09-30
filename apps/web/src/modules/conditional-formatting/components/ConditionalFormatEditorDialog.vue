@@ -45,6 +45,7 @@ import {
   formatConditionalFormatValueOperand,
   formatConditionalFormatRanges,
   parseConditionalFormatValueOperand,
+  parseConditionalFormatTextOperand,
   parseConditionalFormatRanges,
 } from "../conditional-formatting-ui";
 
@@ -307,7 +308,11 @@ function createDraft(rule = props.rule): EditorDraft {
         ? middle.formula
         : "50";
   const valueOperand =
-    c?.kind === "cellValue" ? formatConditionalFormatValueOperand(c.value) : undefined;
+    c?.kind === "cellValue"
+      ? formatConditionalFormatValueOperand(c.value)
+      : c?.kind === "text"
+        ? formatConditionalFormatValueOperand(c.text)
+        : undefined;
   const secondValueOperand =
     c?.kind === "cellValue" && c.secondValue !== undefined
       ? formatConditionalFormatValueOperand(c.secondValue)
@@ -324,12 +329,7 @@ function createDraft(rule = props.rule): EditorDraft {
           : ["lessThan", "between", "equal"].includes(props.initialKind ?? "")
             ? props.initialKind!
             : "greaterThan",
-    value:
-      c?.kind === "cellValue" && valueOperand
-        ? valueOperand.value
-        : c?.kind === "text"
-          ? c.text
-          : "",
+    value: valueOperand?.value ?? "",
     valueIsString: valueOperand?.literal ?? false,
     secondValue: c?.kind === "cellValue" && secondValueOperand ? secondValueOperand.value : "",
     secondValueIsString: secondValueOperand?.literal ?? false,
@@ -592,7 +592,7 @@ function buildCondition(): SheetConditionalFormatRule["condition"] | null {
     return {
       kind: "text",
       operator: draft.operator as never,
-      text: draft.value,
+      text: parseConditionalFormatTextOperand(draft.value, draft.valueIsString),
     };
   const value = parseConditionalFormatValueOperand(draft.value, draft.valueIsString);
   const secondValue = parseConditionalFormatValueOperand(
@@ -634,13 +634,24 @@ function save() {
     emit("save", normalizeConditionalFormatRules([candidate])[0]!);
   } catch (cause) {
     const field = toWorkbookErrorData(cause).details?.field;
+    if (typeof field === "string" && field.endsWith(".range")) {
+      const message = t("conditionalFormatting.singleValueRequired");
+      if (category.value === "visual") error.format = message;
+      else if (draft.kind === "formula") error.formula = message;
+      else error.value = message;
+      return;
+    }
     if (typeof field === "string" && field.endsWith(".formula")) {
       if (category.value === "visual")
         error.format = t("conditionalFormatting.invalidThresholdFormula");
       else error.formula = t("conditionalFormatting.invalidFormula");
       return;
     }
-    if (field === "condition.value" || field === "condition.secondValue") {
+    if (
+      field === "condition.value" ||
+      field === "condition.secondValue" ||
+      field === "condition.text"
+    ) {
       error.value = t("conditionalFormatting.invalidFormula");
       return;
     }

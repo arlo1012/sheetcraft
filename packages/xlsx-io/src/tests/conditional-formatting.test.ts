@@ -296,6 +296,78 @@ describe("XLSX conditional formatting", () => {
     expect(xml).toContain("SEARCH(&quot;A~*~?~~&quot;,A1)");
   });
 
+  test.each([
+    [
+      "contains",
+      'IFERROR(AND(NOT(ISBLANK(A4)),NOT(ISERROR(A4)),OR(ISTEXT((C4)),ISNUMBER((C4))),NOT(ISERROR(SEARCH(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE((C4)&"","~","~~"),"*","~*"),"?","~?"),A4)))),FALSE)',
+    ],
+    [
+      "notContains",
+      'IFERROR(AND(NOT(ISBLANK(A4)),NOT(ISERROR(A4)),OR(ISTEXT((C4)),ISNUMBER((C4))),ISERROR(SEARCH(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE((C4)&"","~","~~"),"*","~*"),"?","~?"),A4))),FALSE)',
+    ],
+    [
+      "beginsWith",
+      'IFERROR(AND(NOT(ISBLANK(A4)),NOT(ISERROR(A4)),OR(ISTEXT((C4)),ISNUMBER((C4))),LEFT(A4,LEN((C4)&""))=(C4)&""),FALSE)',
+    ],
+    [
+      "endsWith",
+      'IFERROR(AND(NOT(ISBLANK(A4)),NOT(ISERROR(A4)),OR(ISTEXT((C4)),ISNUMBER((C4))),RIGHT(A4,LEN((C4)&""))=(C4)&""),FALSE)',
+    ],
+  ] as const)(
+    "roundtrips dynamic text %s criteria as a canonical expression",
+    async (operator, formula) => {
+      const workbook = createWorkbook({ id: `dynamic-text-${operator}`, sheetId: "sheet" });
+      const sheet = getActiveSheet(workbook);
+      sheet.conditionalFormats = [
+        {
+          id: `dynamic-text-${operator}`,
+          ranges: [{ start: { row: 3, column: 0 }, end: { row: 7, column: 0 } }],
+          // The formula was created against A2 and must rebase to A4 for XLSX.
+          anchor: { row: 1, column: 0 },
+          condition: { kind: "text", operator, text: { formula: "=C2" } },
+          style: { fillColor: "#FEE2E2" },
+        },
+      ];
+      const encoded = await encodeXlsx(workbook);
+      const xml = strFromU8(unzipSync(encoded.bytes)["xl/worksheets/sheet1.xml"]!);
+      expect(xml).toContain('<cfRule type="expression"');
+      expect(xml).toContain(
+        `<formula>${formula.replaceAll("&", "&amp;").replaceAll('"', "&quot;")}</formula>`,
+      );
+
+      expect(
+        getActiveSheet((await decodeXlsx(encoded.bytes)).workbook).conditionalFormats,
+      ).toMatchObject([
+        {
+          anchor: { row: 3, column: 0 },
+          condition: { kind: "text", operator, text: { formula: "=C4" } },
+        },
+      ]);
+    },
+  );
+
+  test("keeps anchor-mismatched canonical text expressions as formula conditions", async () => {
+    const workbook = createWorkbook({ id: "mismatched-text-expression", sheetId: "sheet" });
+    const entries = unzipSync((await encodeXlsx(workbook)).bytes);
+    entries["xl/worksheets/sheet1.xml"] = strToU8(
+      strFromU8(entries["xl/worksheets/sheet1.xml"]!).replace(
+        /<\/worksheet>/i,
+        '<conditionalFormatting sqref="A1"><cfRule type="expression" priority="1" stopIfTrue="1"><formula>IFERROR(AND(NOT(ISBLANK(A2)),NOT(ISERROR(A2)),OR(ISTEXT((C1)),ISNUMBER((C1))),NOT(ISERROR(SEARCH(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE((C1)&amp;&quot;&quot;,&quot;~&quot;,&quot;~~&quot;),&quot;*&quot;,&quot;~*&quot;),&quot;?&quot;,&quot;~?&quot;),A2)))),FALSE)</formula></cfRule></conditionalFormatting></worksheet>',
+      ),
+    );
+    expect(
+      getActiveSheet((await decodeXlsx(zipSync(entries))).workbook).conditionalFormats,
+    ).toMatchObject([
+      {
+        condition: {
+          kind: "formula",
+          formula:
+            '=IFERROR(AND(NOT(ISBLANK(A2)),NOT(ISERROR(A2)),OR(ISTEXT((C1)),ISNUMBER((C1))),NOT(ISERROR(SEARCH(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE((C1)&"","~","~~"),"*","~*"),"?","~?"),A2)))),FALSE)',
+        },
+      },
+    ]);
+  });
+
   test("rebases a formula when a partial clear leaves its original Core anchor behind", async () => {
     const workbook = createWorkbook({ id: "cleared-format", sheetId: "sheet" });
     const sheet = getActiveSheet(workbook);

@@ -111,6 +111,7 @@ export type ConditionalFormattingMessageSchema = {
     invalidRange: string;
     invalidValue: string;
     invalidFormula: string;
+    singleValueRequired: string;
     invalidFormat: string;
     fillColor: string;
     textColor: string;

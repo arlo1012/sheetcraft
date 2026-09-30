@@ -1,5 +1,10 @@
 import { strFromU8, strToU8, unzipSync } from "fflate/browser";
-import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, type CellRange } from "@idea10/core/workbook";
+import {
+  MAX_SHEET_COLUMNS,
+  MAX_SHEET_ROWS,
+  type CellRange,
+  type CellAddress,
+} from "@idea10/core/workbook";
 import {
   conditionalFormatFormulaSources,
   normalizeConditionalFormatRules,
@@ -7,6 +12,7 @@ import {
   type ConditionalFormatIconSet,
   type ConditionalFormatIconThreshold,
   type ConditionalFormatOperand,
+  type ConditionalFormatTextOperand,
   type ConditionalFormatThreshold,
   type SheetConditionalFormatRule,
 } from "@idea10/core/conditional-formatting";
@@ -367,11 +373,60 @@ function asOperand(value: string | undefined): ConditionalFormatOperand | undefi
     : undefined;
 }
 
+const DYNAMIC_SEARCH_PREFIX = "SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(";
+const DYNAMIC_SEARCH_SUFFIX = ',"~","~~"),"*","~*"),"?","~?")';
+
+function textFormulaOperand(value: string): ConditionalFormatTextOperand | null {
+  const formula = value.trim();
+  return formula ? { formula: formula.startsWith("=") ? formula : `=${formula}` } : null;
+}
+
+function dynamicTextExpression(
+  operator: Extract<SheetConditionalFormatRule["condition"], { kind: "text" }>["operator"],
+  operand: string,
+  anchor: string,
+): string {
+  const source = `(${operand})`;
+  const text = `${source}&""`;
+  const predicate =
+    operator === "contains"
+      ? `NOT(ISERROR(SEARCH(${dynamicSearchFormula(text)},${anchor})))`
+      : operator === "notContains"
+        ? `ISERROR(SEARCH(${dynamicSearchFormula(text)},${anchor}))`
+        : operator === "beginsWith"
+          ? `LEFT(${anchor},LEN(${text}))=${text}`
+          : `RIGHT(${anchor},LEN(${text}))=${text}`;
+  return `IFERROR(AND(NOT(ISBLANK(${anchor})),NOT(ISERROR(${anchor})),OR(ISTEXT(${source}),ISNUMBER(${source})),${predicate}),FALSE)`;
+}
+
+/** Recognize only the exact guarded expression shapes emitted for dynamic text criteria. */
+function readDynamicTextCondition(
+  formula: string | undefined,
+  rangeAnchor: CellAddress | undefined,
+): Extract<SheetConditionalFormatRule["condition"], { kind: "text" }> | null {
+  if (formula === undefined || rangeAnchor === undefined) return null;
+  const value = formula.trim();
+  const anchor = `${columnLabel(rangeAnchor.column)}${rangeAnchor.row + 1}`;
+  const escapedAnchor = anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(
+    `^IFERROR\\(AND\\(NOT\\(ISBLANK\\(${escapedAnchor}\\)\\),NOT\\(ISERROR\\(${escapedAnchor}\\)\\),OR\\(ISTEXT\\(\\((.+)\\)\\),ISNUMBER\\(\\(.+\\)\\),.+\\),FALSE\\)$`,
+  ).exec(value);
+  if (!match) return null;
+  const operand = match[1] ?? "";
+  const text = textFormulaOperand(operand);
+  if (!text) return null;
+  for (const operator of ["contains", "notContains", "beginsWith", "endsWith"] as const)
+    if (dynamicTextExpression(operator, operand, anchor) === value)
+      return { kind: "text", operator, text };
+  return null;
+}
+
 function readCondition(
   type: string,
   operator: string | undefined,
   body: string,
   attrs: string,
+  rangeAnchor?: CellAddress,
 ): SheetConditionalFormatRule["condition"] | null {
   const values = formulae(body);
   if (type === "cellIs") {
@@ -398,6 +453,8 @@ function readCondition(
   }
   if (type === "expression") {
     if (values[0] === undefined) return null;
+    const dynamicText = readDynamicTextCondition(values[0], rangeAnchor);
+    if (dynamicText) return dynamicText;
     return {
       kind: "formula",
       formula: values[0].startsWith("=") ? values[0] : `=${values[0]}`,
@@ -897,7 +954,7 @@ export function readXlsxConditionalFormats(
       const visual = readVisualCondition(type, rule[2] ?? "", attrs);
       const condition = ranges
         ? (visual?.condition ??
-          readCondition(type, attribute(attrs, "operator"), rule[2] ?? "", attrs))
+          readCondition(type, attribute(attrs, "operator"), rule[2] ?? "", attrs, ranges[0]?.start))
         : null;
       const dxfId = Number(attribute(attrs, "dxfId"));
       const dxf =
@@ -1256,6 +1313,20 @@ function searchFormulaText(text: string): string {
   return quoteFormulaText(text).replace(/[~*?]/g, "~$&");
 }
 
+function textOperandFormula(
+  operand: ConditionalFormatTextOperand,
+  rowOffset: number,
+  columnOffset: number,
+): string {
+  return typeof operand === "string"
+    ? `"${searchFormulaText(operand)}"`
+    : formulaForXlsx(operand.formula, rowOffset, columnOffset);
+}
+
+function dynamicSearchFormula(operand: string): string {
+  return `${DYNAMIC_SEARCH_PREFIX}${operand}${DYNAMIC_SEARCH_SUFFIX}`;
+}
+
 function cellFormulaValue(
   value: ConditionalFormatOperand,
   rowOffset: number,
@@ -1340,6 +1411,11 @@ function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId?: num
   if (condition.kind === "formula")
     return `<cfRule type="expression" priority="${priority}"${dxf}${stop}><formula>${encodeXml(formulaForXlsx(condition.formula, rowOffset, columnOffset))}</formula></cfRule>`;
   if (condition.kind === "text") {
+    if (typeof condition.text !== "string") {
+      const operand = textOperandFormula(condition.text, rowOffset, columnOffset);
+      const formula = dynamicTextExpression(condition.operator, operand, anchor);
+      return `<cfRule type="expression" priority="${priority}"${dxf}${stop}><formula>${encodeXml(formula)}</formula></cfRule>`;
+    }
     const type = (
       {
         contains: "containsText",
