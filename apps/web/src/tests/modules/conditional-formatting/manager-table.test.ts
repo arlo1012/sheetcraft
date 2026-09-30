@@ -112,6 +112,26 @@ test("moves the selected sheet rule and saves its changed priority", async () =>
   expect(saved?.map((rule) => rule.id)).toEqual(["second-rule", "text-rule"]);
 });
 
+test("reorders visible selection rules while retaining hidden rules and guarding boundaries", async () => {
+  const otherVisibleRule = { ...textRule, id: "other-visible" };
+  const wrapper = mountManager([textRule, secondRule, otherVisibleRule]);
+  const action = (id: string, direction: string) =>
+    wrapper.get(`[data-cf-rule="${id}"] [data-cf-action="${direction}"]`);
+
+  expect(action("text-rule", "up").attributes("aria-disabled")).toBe("true");
+  expect(action("text-rule", "down").attributes("aria-disabled")).toBeUndefined();
+  expect(action("other-visible", "down").attributes("aria-disabled")).toBe("true");
+  await action("other-visible", "down").trigger("click");
+  await action("text-rule", "down").trigger("click");
+  expect(action("text-rule", "down").attributes("aria-disabled")).toBe("true");
+  expect(action("text-rule", "up").attributes("aria-disabled")).toBeUndefined();
+
+  saveManager(wrapper);
+  const saved = wrapper.emitted("save")?.[0]?.[0] as SheetConditionalFormatRule[];
+  expect(saved.map((rule) => rule.id)).toEqual(["other-visible", "second-rule", "text-rule"]);
+  expect(saved[1]).toEqual(secondRule);
+});
+
 test("deleting a selected rule stays in the draft when the manager is cancelled", async () => {
   const rules = [textRule, secondRule];
   const wrapper = mountManager(rules);

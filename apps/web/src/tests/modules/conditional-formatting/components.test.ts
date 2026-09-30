@@ -77,7 +77,7 @@ describe("conditional formatting dialogs", () => {
     expect(wrapper.findComponent(RangeReferenceInput).exists()).toBe(true);
   });
 
-  test("limits priority changes to the current-sheet rule scope", () => {
+  test("allows priority changes in the current selection scope", () => {
     const secondRule = { ...textRule, id: "second-rule" };
     const wrapper = mount(ConditionalFormatManagerDialog, {
       attachTo: document.body,
@@ -88,7 +88,7 @@ describe("conditional formatting dialogs", () => {
 
     expect(
       wrapper.get('[data-cf-rule="text-rule"] [data-cf-action="down"]').attributes("aria-disabled"),
-    ).toBe("true");
+    ).toBeUndefined();
   });
 
   test("preserves text and explicit false format attributes when editing", async () => {

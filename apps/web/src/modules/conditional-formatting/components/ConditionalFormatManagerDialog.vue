@@ -251,7 +251,7 @@ function removeRule(id: string): void {
 }
 
 function move(id: string, offset: -1 | 1): void {
-  if (scope.value === "selection" || readonly.value) return;
+  if (readonly.value) return;
   const index = draftRules.value.findIndex((candidate) => candidate.id === id);
   const displayedIndex = displayedRules.value.findIndex((candidate) => candidate.id === id);
   const nextDisplayedIndex = displayedIndex + offset;
@@ -339,7 +339,7 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
       </div>
       <ConditionalFormatRulesTable
         :rows="tableRows"
-        :reorderable="scope !== 'selection'"
+        :reorderable="true"
         :readonly="readonly"
         :selected-id="selectedId"
         :select-reference="props.selectReference ? selectRange : undefined"
