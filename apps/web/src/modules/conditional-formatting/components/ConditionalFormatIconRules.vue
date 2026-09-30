@@ -125,6 +125,10 @@ function iconLabel(icon: Exclude<IconChoice, null>): string {
         <TSelect
           class="icon-rules__icon-select"
           :model-value="iconValue(index)"
+          :popup-props="{
+            overlayClassName: 'idea-icon-grid-options',
+            overlayInnerStyle: { width: '224px' },
+          }"
           :aria-label="`${t('conditionalFormatting.icon')} ${index + 1}`"
           @update:model-value="updateIcon(index, $event as string)"
         >
@@ -132,16 +136,19 @@ function iconLabel(icon: Exclude<IconChoice, null>): string {
             <span v-if="selectedIcon(index) === null" class="icon-rules__no-icon">—</span>
             <ConditionalFormatPreview v-else compact :condition="condition" :icon-index="index" />
           </template>
-          <TOption value="none" :label="t('conditionalFormatting.noIcon')">
-            <span class="icon-rules__option icon-rules__no-icon"
-              >— {{ t("conditionalFormatting.noIcon") }}</span
-            >
+          <TOption
+            class="idea-icon-grid-options__none"
+            value="none"
+            :label="t('conditionalFormatting.noIcon')"
+          >
+            {{ t("conditionalFormatting.noIcon") }}
           </TOption>
           <TOption
             v-for="choice in iconChoices"
             :key="choice.value"
             :value="choice.value"
             :label="iconLabel(choice.icon)"
+            :title="iconLabel(choice.icon)"
           >
             <ConditionalFormatPreview
               compact
@@ -258,11 +265,6 @@ function iconLabel(icon: Exclude<IconChoice, null>): string {
   }
   &__no-icon {
     color: var(--idea-text-secondary);
-  }
-  &__option {
-    display: inline-flex;
-    align-items: center;
-    min-height: 24px;
   }
   &__legacy-value {
     padding-inline: 8px;

@@ -43,7 +43,7 @@ export const conditionalFormattingZhCN = {
     lightBlueBar: "浅蓝色数据条",
     purpleBar: "紫色数据条",
     icon: "图标",
-    noIcon: "无图标",
+    noIcon: "无单元格图标",
     iconRules: "根据下列规则显示各个图标：",
     whenValue: "当值是",
     belowAnd: "当值 < {value} 且",
