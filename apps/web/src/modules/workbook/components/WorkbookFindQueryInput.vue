@@ -134,6 +134,11 @@ defineExpose({ focus, insertText });
   &__arrow {
     cursor: pointer;
 
+    &:focus-visible {
+      outline: 2px solid var(--idea-action-primary);
+      outline-offset: 2px;
+    }
+
     &.is-open {
       transform: rotate(180deg);
     }

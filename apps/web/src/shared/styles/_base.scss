@@ -26,6 +26,11 @@
     font: inherit;
   }
 
+  // Mouse interaction should not add the browser's default ring to icon actions.
+  :where(button, [role="button"], svg):focus:not(:focus-visible) {
+    outline: none;
+  }
+
   .ui-visually-hidden {
     position: absolute;
     width: 1px;
