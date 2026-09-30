@@ -186,6 +186,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
             @keydown.space.prevent.stop="removeAction(row.id)"
           />
           <ArrowUp
+            v-if="reorderable && !readonly"
             class="conditional-format-rules-table__action"
             data-cf-action="up"
             role="button"
@@ -198,6 +199,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
             @keydown.space.prevent.stop="moveAction(row.id, rowIndex, -1)"
           />
           <ArrowDown
+            v-if="reorderable && !readonly"
             class="conditional-format-rules-table__action"
             data-cf-action="down"
             role="button"

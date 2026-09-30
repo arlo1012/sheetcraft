@@ -104,6 +104,12 @@ test("moves the selected sheet rule and saves its changed priority", async () =>
   wrapper.getComponent(Select).vm.$emit("update:modelValue", "sheet");
   await wrapper.vm.$nextTick();
 
+  expect(
+    wrapper.get('[data-cf-rule="text-rule"] [data-cf-action="up"]').attributes("aria-disabled"),
+  ).toBe("true");
+  expect(
+    wrapper.get('[data-cf-rule="second-rule"] [data-cf-action="down"]').attributes("aria-disabled"),
+  ).toBe("true");
   await wrapper.get('[data-cf-rule="second-rule"]').trigger("click");
   await wrapper.get('[data-cf-rule="second-rule"] [data-cf-action="up"]').trigger("click");
   saveManager(wrapper);
@@ -112,23 +118,15 @@ test("moves the selected sheet rule and saves its changed priority", async () =>
   expect(saved?.map((rule) => rule.id)).toEqual(["second-rule", "text-rule"]);
 });
 
-test("reorders visible selection rules while retaining hidden rules and guarding boundaries", async () => {
+test("hides sorting in a filtered selection so hidden rule priorities remain unchanged", () => {
   const otherVisibleRule = { ...textRule, id: "other-visible" };
   const wrapper = mountManager([textRule, secondRule, otherVisibleRule]);
-  const action = (id: string, direction: string) =>
-    wrapper.get(`[data-cf-rule="${id}"] [data-cf-action="${direction}"]`);
-
-  expect(action("text-rule", "up").attributes("aria-disabled")).toBe("true");
-  expect(action("text-rule", "down").attributes("aria-disabled")).toBeUndefined();
-  expect(action("other-visible", "down").attributes("aria-disabled")).toBe("true");
-  await action("other-visible", "down").trigger("click");
-  await action("text-rule", "down").trigger("click");
-  expect(action("text-rule", "down").attributes("aria-disabled")).toBe("true");
-  expect(action("text-rule", "up").attributes("aria-disabled")).toBeUndefined();
+  expect(wrapper.find('[data-cf-action="up"]').exists()).toBe(false);
+  expect(wrapper.find('[data-cf-action="down"]').exists()).toBe(false);
 
   saveManager(wrapper);
   const saved = wrapper.emitted("save")?.[0]?.[0] as SheetConditionalFormatRule[];
-  expect(saved.map((rule) => rule.id)).toEqual(["other-visible", "second-rule", "text-rule"]);
+  expect(saved.map((rule) => rule.id)).toEqual(["text-rule", "second-rule", "other-visible"]);
   expect(saved[1]).toEqual(secondRule);
 });
 
@@ -270,13 +268,15 @@ test("makes protected sheets read-only", async () => {
   await wrapper.vm.$nextTick();
 
   expect(wrapper.get('[data-cf-action="new"]').attributes("disabled")).toBeDefined();
-  for (const action of ["edit", "delete", "up", "down"]) {
+  for (const action of ["edit", "delete"]) {
     expect(
       wrapper
         .get(`[data-cf-rule="text-rule"] [data-cf-action="${action}"]`)
         .attributes("aria-disabled"),
     ).toBe("true");
   }
+  expect(wrapper.find('[data-cf-action="up"]').exists()).toBe(false);
+  expect(wrapper.find('[data-cf-action="down"]').exists()).toBe(false);
   expect(wrapper.get('[data-cf-range="text-rule"] input').attributes("disabled")).toBeDefined();
   expect(wrapper.get('[data-cf-stop="text-rule"] input').attributes("disabled")).toBeDefined();
 });
