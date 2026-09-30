@@ -22,6 +22,7 @@ import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import ConditionalFormatStyleSelect from "./ConditionalFormatStyleSelect.vue";
 import ConditionalFormatStyleDialog from "./ConditionalFormatStyleDialog.vue";
 import ConditionalFormatRankCriteria from "./ConditionalFormatRankCriteria.vue";
+import ConditionalFormatAverageCriteria from "./ConditionalFormatAverageCriteria.vue";
 import ConditionalFormatContainingCriteria, {
   type ContainingRuleType,
 } from "./ConditionalFormatContainingCriteria.vue";
@@ -200,7 +201,8 @@ const category = computed<RuleCategory>(() =>
       : (draft.kind as RuleCategory),
 );
 const hasInlineFormat = computed(
-  () => category.value === "containing" || category.value === "rank",
+  () =>
+    category.value === "containing" || category.value === "rank" || category.value === "average",
 );
 function selectCategory(value: RuleCategory) {
   if (value === category.value) return;
@@ -734,7 +736,9 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
               ? t("conditionalFormatting.containingDescription")
               : category === "rank"
                 ? t("conditionalFormatting.rankDescription")
-                : categoryOptions.find((option) => option.value === category)?.label
+                : category === "average"
+                  ? t("conditionalFormatting.averageDescription")
+                  : categoryOptions.find((option) => option.value === category)?.label
           }}
         </p>
         <div v-if="category === 'visual'" class="conditional-format-editor__visual-settings">
@@ -801,15 +805,12 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           v-model:percent="draft.percent"
           :error="error.value"
         />
-        <TFormItem v-else-if="draft.kind === 'average'" :label="t('conditionalFormatting.average')">
-          <TSelect
-            v-model="draft.above"
-            :options="[
-              { value: true, label: t('conditionalFormatting.aboveAverage') },
-              { value: false, label: t('conditionalFormatting.belowAverage') },
-            ]"
-          />
-        </TFormItem>
+        <ConditionalFormatAverageCriteria
+          v-else-if="draft.kind === 'average'"
+          v-model:above="draft.above"
+          v-model:equal-average="draft.equalAverage"
+          v-model:std-dev="draft.stdDev"
+        />
         <template v-else-if="draft.kind === 'dataBar' || draft.kind === 'colorScale'">
           <div
             class="conditional-format-editor__thresholds"

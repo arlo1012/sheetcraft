@@ -44,6 +44,14 @@ export type ConditionalFormattingMessageSchema = {
     rankDescription: string;
     rankPercent: string;
     ruleAverage: string;
+    averageDescription: string;
+    averageScope: string;
+    averageAbove: string;
+    averageBelow: string;
+    averageEqualAbove: string;
+    averageEqualBelow: string;
+    averageDeviationAbove: string;
+    averageDeviationBelow: string;
     ruleDuplicate: string;
     formatStyle: string;
     twoColorScale: string;
