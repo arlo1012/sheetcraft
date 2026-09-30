@@ -36,14 +36,37 @@ const thresholdOptionsBase = computed(() =>
     ),
   })),
 );
-const iconChoices = computed(() =>
-  iconSetPresetTiles.flatMap((iconSet) =>
-    Array.from({ length: iconCount(iconSet) }, (_, iconIndex) => ({
-      value: `${iconSet}:${iconIndex}`,
-      icon: { iconSet, iconIndex } satisfies Exclude<IconChoice, null>,
-    })),
-  ),
-);
+const iconChoices = computed(() => {
+  const choices = new Map<string, Exclude<IconChoice, null>>();
+  for (const iconSet of iconSetPresetTiles) {
+    for (let iconIndex = 0; iconIndex < iconCount(iconSet); iconIndex++) {
+      const icon = { iconSet, iconIndex };
+      const key = iconAppearanceKey(icon);
+      if (!choices.has(key)) choices.set(key, icon);
+    }
+  }
+  return Array.from(choices, ([value, icon]) => ({ value, icon }));
+});
+// Several preset families share the same glyph. Use its appearance for picker
+// identity only; opening the picker must not rewrite the stored icon reference.
+function iconAppearanceKey({ iconSet, iconIndex }: Exclude<IconChoice, null>): string {
+  if (iconSet.includes("Arrows")) {
+    const count = iconCount(iconSet);
+    const direction =
+      count === 3 ? [0, 2, 4][iconIndex] : count === 4 ? [0, 1, 3, 4][iconIndex] : iconIndex;
+    return `arrows:${iconSet.endsWith("Gray") ? "gray" : "color"}:${direction}`;
+  }
+  if (iconSet === "fourRatings") return `fiveRatings:${iconIndex + 1}`;
+  if (iconSet === "threeSigns" && iconIndex === 2) return "threeTrafficLights:2";
+  if (iconSet === "fourTrafficLights" && iconIndex >= 2)
+    return `threeTrafficLights:${iconIndex - 1}`;
+  if (iconSet === "fourRedToBlack") {
+    if (iconIndex === 3) return "threeTrafficLights:0";
+    if (iconIndex === 0) return "fourTrafficLights:0";
+  }
+  if (iconSet === "fiveQuarters" && iconIndex === 4) return "fourTrafficLights:0";
+  return `${iconSet}:${iconIndex}`;
+}
 function iconCount(iconSet: ConditionalFormatIconSet): number {
   return iconSet.startsWith("three") ? 3 : iconSet.startsWith("four") ? 4 : 5;
 }
@@ -65,7 +88,7 @@ function selectedIcon(index: number): IconChoice {
 }
 function iconValue(index: number): string {
   const icon = selectedIcon(index);
-  return icon ? `${icon.iconSet}:${icon.iconIndex}` : "none";
+  return icon ? iconAppearanceKey(icon) : "none";
 }
 function updateIcon(index: number, value: string): void {
   if (value === "none") return emit("updateIcon", index, null);
