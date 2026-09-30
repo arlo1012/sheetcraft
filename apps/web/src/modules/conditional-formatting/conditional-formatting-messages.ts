@@ -41,6 +41,8 @@ export type ConditionalFormattingMessageSchema = {
     editFormat: string;
     noFormat: string;
     ruleRank: string;
+    rankDescription: string;
+    rankPercent: string;
     ruleAverage: string;
     ruleDuplicate: string;
     formatStyle: string;

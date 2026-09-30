@@ -43,6 +43,8 @@ export const conditionalFormattingZhCN = {
     editFormat: "格式…",
     noFormat: "未设定格式",
     ruleRank: "仅对排名靠前或靠后的数值设置格式",
+    rankDescription: "为以下排名内的值设置格式：",
+    rankPercent: "所选范围的百分比",
     ruleAverage: "仅对高于或低于平均值的数值设置格式",
     ruleDuplicate: "仅对唯一值或重复值设置格式",
     formatStyle: "格式样式",

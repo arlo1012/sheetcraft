@@ -43,6 +43,8 @@ export const conditionalFormattingEnUS = {
     editFormat: "Format…",
     noFormat: "No format set",
     ruleRank: "Format only top or bottom ranked values",
+    rankDescription: "Format values that rank in the:",
+    rankPercent: "% of the selected range",
     ruleAverage: "Format only values above or below average",
     ruleDuplicate: "Format only unique or duplicate values",
     formatStyle: "Format style",

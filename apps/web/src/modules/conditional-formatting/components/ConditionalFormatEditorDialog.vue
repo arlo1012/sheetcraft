@@ -16,12 +16,12 @@ import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect, Option as TOption } from "tdesign-vue-next/es/select";
 import { computed, reactive, ref, watch } from "vue";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import ConditionalFormatStyleSelect from "./ConditionalFormatStyleSelect.vue";
 import ConditionalFormatStyleDialog from "./ConditionalFormatStyleDialog.vue";
+import ConditionalFormatRankCriteria from "./ConditionalFormatRankCriteria.vue";
 import ConditionalFormatContainingCriteria, {
   type ContainingRuleType,
 } from "./ConditionalFormatContainingCriteria.vue";
@@ -198,6 +198,9 @@ const category = computed<RuleCategory>(() =>
     : ["cellValue", "text", "blank", "date", "error"].includes(draft.kind)
       ? "containing"
       : (draft.kind as RuleCategory),
+);
+const hasInlineFormat = computed(
+  () => category.value === "containing" || category.value === "rank",
 );
 function selectCategory(value: RuleCategory) {
   if (value === category.value) return;
@@ -560,13 +563,22 @@ function buildCondition(): SheetConditionalFormatRule["condition"] | null {
   if (draft.kind === "blank") return { kind: "blank", blank: draft.blank };
   if (draft.kind === "error") return { kind: "error", error: draft.hasError };
   if (draft.kind === "duplicate") return { kind: "duplicate", unique: draft.unique };
-  if (draft.kind === "rank")
+  if (draft.kind === "rank") {
+    if (
+      !Number.isInteger(draft.count) ||
+      draft.count < 1 ||
+      draft.count > (draft.percent ? 100 : 1000)
+    ) {
+      error.value = t("conditionalFormatting.invalidCount");
+      return null;
+    }
     return {
       kind: "rank",
       count: draft.count,
       percent: draft.percent || undefined,
       bottom: draft.bottom || undefined,
     };
+  }
   if (draft.kind === "average")
     return {
       kind: "average",
@@ -720,7 +732,9 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           {{
             category === "containing"
               ? t("conditionalFormatting.containingDescription")
-              : categoryOptions.find((option) => option.value === category)?.label
+              : category === "rank"
+                ? t("conditionalFormatting.rankDescription")
+                : categoryOptions.find((option) => option.value === category)?.label
           }}
         </p>
         <div v-if="category === 'visual'" class="conditional-format-editor__visual-settings">
@@ -780,25 +794,13 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           @update:value="updateOperand($event)"
           @update:second-value="updateOperand($event, true)"
         />
-        <TFormItem v-else-if="draft.kind === 'rank'" :label="t('conditionalFormatting.count')">
-          <div class="conditional-format-editor__inline">
-            <TSelect
-              v-model="draft.bottom"
-              :options="[
-                { value: false, label: t('conditionalFormatting.top') },
-                { value: true, label: t('conditionalFormatting.bottom') },
-              ]"
-            />
-            <TInputNumber
-              v-model="draft.count"
-              class="idea-input-number--persistent-controls"
-              theme="column"
-              :min="1"
-              :max="draft.percent ? 100 : 999999"
-            />
-            <TCheckbox v-model="draft.percent">{{ t("conditionalFormatting.percent") }}</TCheckbox>
-          </div>
-        </TFormItem>
+        <ConditionalFormatRankCriteria
+          v-else-if="draft.kind === 'rank'"
+          v-model:bottom="draft.bottom"
+          v-model:count="draft.count"
+          v-model:percent="draft.percent"
+          :error="error.value"
+        />
         <TFormItem v-else-if="draft.kind === 'average'" :label="t('conditionalFormatting.average')">
           <TSelect
             v-model="draft.above"
@@ -994,7 +996,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           :tips="error.formula || t('conditionalFormatting.formulaHint')"
           ><TInput v-model="draft.formula" :placeholder="formulaPlaceholder"
         /></TFormItem>
-        <div v-if="category === 'containing'" class="conditional-format-editor__containing-format">
+        <div v-if="hasInlineFormat" class="conditional-format-editor__rule-format">
           <span>{{ t("conditionalFormatting.preview") }}</span>
           <ConditionalFormatPreview
             wide
@@ -1015,7 +1017,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           />
         </TFormItem>
         <div
-          v-if="draft.kind !== 'iconSet' && category !== 'containing'"
+          v-if="draft.kind !== 'iconSet' && !hasInlineFormat"
           class="conditional-format-editor__preview"
         >
           <span>{{ t("conditionalFormatting.preview") }}</span
@@ -1032,7 +1034,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     </TForm>
   </Dialog>
   <ConditionalFormatStyleDialog
-    v-if="category === 'containing' && customVisible"
+    v-if="hasInlineFormat && customVisible"
     :style="format"
     :sample-value="sampleValue"
     :date-system="dateSystem"
@@ -1092,7 +1094,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
       justify-self: start;
     }
   }
-  &__containing-format {
+  &__rule-format {
     display: grid;
     grid-template-columns: 80px minmax(0, 1fr) auto;
     align-items: center;
@@ -1101,13 +1103,6 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
       text-align: right;
       color: var(--idea-text-secondary);
     }
-  }
-  &__inline {
-    display: grid;
-    grid-template-columns: 1fr 120px auto;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
   }
   &__thresholds {
     display: grid;
@@ -1161,16 +1156,9 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
       text-align: right;
     }
   }
-  .idea-input-number--persistent-controls {
-    width: 100%;
-  }
   @media (max-width: 560px) {
     &__visual-settings {
       grid-template-columns: minmax(0, 1fr);
-    }
-    &__inline {
-      grid-template-columns: minmax(0, 1fr) 80px auto;
-      gap: 8px;
     }
     &__bar-appearance {
       grid-template-columns: repeat(2, minmax(0, 1fr));
