@@ -1,4 +1,5 @@
 import { mount } from "@vue/test-utils";
+import type { ConditionalFormatCondition } from "@idea10/core/conditional-formatting";
 import { describe, expect, test, vi } from "vitest";
 import ConditionalFormatPreview from "../../../modules/conditional-formatting/components/ConditionalFormatPreview.vue";
 import { paintConditionalFormatVisual } from "../../../shared/conditional-formatting/conditional-format-painter";
@@ -9,6 +10,47 @@ vi.mock("../../../shared/conditional-formatting/conditional-format-painter", () 
 }));
 
 describe("conditional format preview", () => {
+  test("previews custom row icons, reversal and the no-icon choice", async () => {
+    const context = { setTransform: vi.fn(), clearRect: vi.fn() };
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(context as unknown as CanvasRenderingContext2D);
+    const condition: Extract<ConditionalFormatCondition, { kind: "iconSet" }> = {
+      kind: "iconSet",
+      iconSet: "threeTrafficLights",
+      thresholds: [
+        { kind: "percent", value: 0 },
+        { kind: "percent", value: 33 },
+        { kind: "percent", value: 67 },
+      ],
+      icons: [
+        { iconSet: "threeFlags", iconIndex: 1 },
+        null,
+        { iconSet: "fiveArrows", iconIndex: 4 },
+      ],
+    };
+    const wrapper = mount(ConditionalFormatPreview, {
+      props: { condition, iconIndex: 0, compact: true },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
+    try {
+      expect(paintConditionalFormatVisual).toHaveBeenLastCalledWith(context, expect.anything(), {
+        iconSet: { iconSet: "threeFlags", iconIndex: 1, showValue: true },
+      });
+      await wrapper.setProps({ condition: { ...condition, reverse: true } });
+      expect(paintConditionalFormatVisual).toHaveBeenLastCalledWith(context, expect.anything(), {
+        iconSet: { iconSet: "fiveArrows", iconIndex: 4, showValue: true },
+      });
+      vi.mocked(paintConditionalFormatVisual).mockClear();
+      await wrapper.setProps({ iconIndex: 1 });
+      expect(paintConditionalFormatVisual).not.toHaveBeenCalled();
+      expect(context.clearRect).toHaveBeenCalled();
+    } finally {
+      wrapper.unmount();
+      getContext.mockRestore();
+    }
+  });
+
   test("previews data-bar direction, border and axis changes in the inset control", async () => {
     const context = { setTransform: vi.fn(), clearRect: vi.fn() };
     const getContext = vi

@@ -44,8 +44,13 @@ const conditions: ConditionalFormatCondition[] = [
     showValue: false,
     thresholds: [
       { kind: "percent", value: 0 },
-      { kind: "percent", value: 33 },
+      { kind: "percent", value: 33, inclusive: false },
       { kind: "percent", value: 67 },
+    ],
+    icons: [
+      { iconSet: "threeFlags", iconIndex: 0 },
+      null,
+      { iconSet: "threeTrafficLights", iconIndex: 2 },
     ],
   },
 ];

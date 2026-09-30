@@ -101,6 +101,9 @@ export type ConditionalFormatThreshold =
   | { kind: "num" | "percent" | "percentile"; value: number }
   | { kind: "formula"; formula: string };
 
+/** An icon-set threshold. Omit `inclusive` for Excel's default `>=` comparison. */
+export type ConditionalFormatIconThreshold = ConditionalFormatThreshold & { inclusive?: boolean };
+
 /** A literal comparison value, or a formula evaluated for each applied cell. */
 export type ConditionalFormatOperand = number | string | { formula: string };
 
@@ -150,7 +153,9 @@ export type ConditionalFormatVisual = {
     /** The source value is negative, even when the selected axis hides that distinction. */
     negative?: boolean;
   };
-  iconSet?: { iconSet: ConditionalFormatIconSet; iconIndex: number; showValue: boolean };
+  iconSet?:
+    | { iconSet: ConditionalFormatIconSet; iconIndex: number; showValue: boolean; hidden?: false }
+    | { showValue: boolean; hidden: true };
 };
 
 export type ConditionalFormatResolverOptions = {
@@ -207,7 +212,12 @@ export type ConditionalFormatCondition =
   | {
       kind: "iconSet";
       iconSet: ConditionalFormatIconSet;
-      thresholds: ConditionalFormatThreshold[];
+      thresholds: ConditionalFormatIconThreshold[];
+      /**
+       * Optional icon choices in ascending threshold order. A null entry suppresses
+       * that icon while retaining the value-display setting.
+       */
+      icons?: ({ iconSet: ConditionalFormatIconSet; iconIndex: number } | null)[];
       reverse?: boolean;
       showValue?: boolean;
     };
@@ -279,6 +289,22 @@ function iconSetSize(iconSet: ConditionalFormatIconSet): number {
   return iconSet.startsWith("three") ? 3 : iconSet.startsWith("four") ? 4 : 5;
 }
 
+/**
+ * Resolves the glyph to render for an ascending icon-set threshold index.
+ * Reversing applies to the displayed glyph assignment, including custom choices.
+ */
+export function getConditionalFormatIcon(
+  condition: Extract<ConditionalFormatCondition, { kind: "iconSet" }>,
+  thresholdIndex: number,
+): { iconSet: ConditionalFormatIconSet; iconIndex: number } | null {
+  const index = condition.reverse
+    ? condition.thresholds.length - 1 - thresholdIndex
+    : thresholdIndex;
+  return condition.icons === undefined
+    ? { iconSet: condition.iconSet, iconIndex: index }
+    : (condition.icons[index] ?? null);
+}
+
 function invalid(field: string, value: unknown): never {
   throw new WorkbookDomainError(
     { code: "invalid_command_payload", details: { field, value: toWorkbookErrorDetail(value) } },
@@ -347,6 +373,16 @@ function normalizeThreshold(
   )
     invalid(`${field}.value`, value.value);
   return { kind: value.kind, value: value.value };
+}
+
+function normalizeIconThreshold(
+  value: ConditionalFormatIconThreshold,
+  field: string,
+): ConditionalFormatIconThreshold {
+  const threshold = normalizeThreshold(value, field);
+  if (value.inclusive !== undefined && typeof value.inclusive !== "boolean")
+    invalid(`${field}.inclusive`, value.inclusive);
+  return { ...threshold, ...(value.inclusive === false ? { inclusive: false } : {}) };
 }
 
 function assertThresholdOrder(
@@ -532,13 +568,32 @@ function normalizeCondition(condition: ConditionalFormatCondition): ConditionalF
     if (condition.showValue !== undefined && typeof condition.showValue !== "boolean")
       invalid("condition.showValue", condition.showValue);
     const thresholds = condition.thresholds.map((threshold, index) =>
-      normalizeThreshold(threshold, `condition.thresholds.${index}`),
+      normalizeIconThreshold(threshold, `condition.thresholds.${index}`),
     );
     assertThresholdOrder(thresholds, "condition.thresholds");
+    let icons: ({ iconSet: ConditionalFormatIconSet; iconIndex: number } | null)[] | undefined;
+    if (condition.icons !== undefined) {
+      if (!Array.isArray(condition.icons) || condition.icons.length !== thresholds.length)
+        invalid("condition.icons", condition.icons);
+      icons = condition.icons.map((icon, index) => {
+        if (icon === null) return null;
+        if (!icon || typeof icon !== "object") invalid(`condition.icons.${index}`, icon);
+        if (!ICON_SETS.has(icon.iconSet)) invalid(`condition.icons.${index}.iconSet`, icon.iconSet);
+        if (
+          typeof icon.iconIndex !== "number" ||
+          !Number.isInteger(icon.iconIndex) ||
+          icon.iconIndex < 0 ||
+          icon.iconIndex >= iconSetSize(icon.iconSet)
+        )
+          invalid(`condition.icons.${index}.iconIndex`, icon.iconIndex);
+        return { iconSet: icon.iconSet, iconIndex: icon.iconIndex };
+      });
+    }
     return {
       kind: "iconSet",
       iconSet: condition.iconSet,
       thresholds,
+      ...(icons === undefined ? {} : { icons }),
       ...(condition.reverse ? { reverse: true } : {}),
       ...(condition.showValue === false ? { showValue: false } : {}),
     };
@@ -657,10 +712,10 @@ export function mapConditionalFormatFormulas(
 ): SheetConditionalFormatRule {
   const mapOperand = (operand: ConditionalFormatOperand | undefined) =>
     operand && typeof operand === "object" ? { formula: transform(operand.formula) } : operand;
-  const mapThreshold = (threshold: ConditionalFormatThreshold): ConditionalFormatThreshold =>
-    threshold.kind === "formula"
-      ? { kind: "formula", formula: transform(threshold.formula) }
-      : threshold;
+  const mapThreshold = <T extends ConditionalFormatThreshold>(threshold: T): T =>
+    (threshold.kind === "formula"
+      ? { ...threshold, formula: transform(threshold.formula) }
+      : threshold) as T;
   const condition = rule.condition;
   if (condition.kind === "formula")
     return { ...rule, condition: { kind: "formula", formula: transform(condition.formula) } };
@@ -1359,15 +1414,19 @@ export function createConditionalFormatVisualResolver(
           thresholds.every((threshold) => threshold !== undefined) &&
           !thresholds.some((threshold, index) => index > 0 && threshold! < thresholds[index - 1]!)
         ) {
-          let iconIndex = 0;
+          let thresholdIndex = 0;
           for (let index = 0; index < thresholds.length; index += 1)
-            if (value >= thresholds[index]!) iconIndex = index;
-          if (rule.condition.reverse) iconIndex = thresholds.length - 1 - iconIndex;
-          iconSet = {
-            iconSet: rule.condition.iconSet,
-            iconIndex,
-            showValue: rule.condition.showValue !== false,
-          };
+            if (
+              value > thresholds[index]! ||
+              (value === thresholds[index]! &&
+                rule.condition.thresholds[index]!.inclusive !== false)
+            )
+              thresholdIndex = index;
+          const icon = getConditionalFormatIcon(rule.condition, thresholdIndex);
+          iconSet =
+            icon === null
+              ? { hidden: true, showValue: rule.condition.showValue !== false }
+              : { ...icon, showValue: rule.condition.showValue !== false };
         }
       }
       if (rule.stopIfTrue) break;

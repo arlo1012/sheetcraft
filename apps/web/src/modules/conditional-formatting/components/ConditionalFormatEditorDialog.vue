@@ -5,6 +5,7 @@ import {
   mapConditionalFormatFormulas,
   type ConditionalFormatStyle,
   type ConditionalFormatIconSet,
+  type ConditionalFormatIconThreshold,
   type ConditionalFormatThreshold,
   type SheetConditionalFormatRule,
 } from "@idea10/core/conditional-formatting";
@@ -109,7 +110,8 @@ type EditorDraft = {
   midColor: string;
   maxColor: string;
   iconSet: ConditionalFormatIconSet;
-  iconThresholds: ConditionalFormatThreshold[];
+  iconThresholds: ConditionalFormatIconThreshold[];
+  iconIcons: ({ iconSet: ConditionalFormatIconSet; iconIndex: number } | null)[] | undefined;
   reverse: boolean;
 };
 const props = defineProps<{
@@ -414,6 +416,8 @@ function createDraft(rule = props.rule): EditorDraft {
             { kind: "percent", value: 33 },
             { kind: "percent", value: 67 },
           ],
+    iconIcons:
+      c?.kind === "iconSet" ? c.icons?.map((icon) => (icon ? { ...icon } : null)) : undefined,
     reverse: c?.kind === "iconSet" ? Boolean(c.reverse) : false,
   };
 }
@@ -451,7 +455,7 @@ function updateOperand(value: string, second = false): void {
 }
 function setIconThresholdKind(index: number, kind: ThresholdKind): void {
   const previous = draft.iconThresholds[index];
-  draft.iconThresholds[index] = threshold(
+  const next = threshold(
     kind,
     previous && "value" in previous
       ? String(previous.value)
@@ -459,10 +463,44 @@ function setIconThresholdKind(index: number, kind: ThresholdKind): void {
         ? previous.formula
         : String(Math.round((index / draft.iconThresholds.length) * 100)),
   );
+  draft.iconThresholds[index] = {
+    ...next,
+    ...(previous?.inclusive === false ? { inclusive: false } : {}),
+  };
 }
 function setIconThresholdValue(index: number, value: string): void {
   const previous = draft.iconThresholds[index];
-  if (previous) draft.iconThresholds[index] = threshold(previous.kind, value);
+  if (!previous) return;
+  const kind = value.trim().startsWith("=") ? "formula" : previous.kind;
+  draft.iconThresholds[index] = {
+    ...threshold(kind, value),
+    ...(previous.inclusive === false ? { inclusive: false } : {}),
+  };
+}
+function setIconThresholdInclusive(index: number, inclusive: boolean): void {
+  const previous = draft.iconThresholds[index];
+  if (!previous) return;
+  draft.iconThresholds[index] = { ...previous, inclusive: inclusive ? undefined : false };
+}
+function setIconSet(iconSet: ConditionalFormatIconSet): void {
+  if (draft.iconSet === iconSet) return;
+  draft.iconSet = iconSet;
+  draft.iconIcons = undefined;
+}
+function setIcon(
+  index: number,
+  icon: { iconSet: ConditionalFormatIconSet; iconIndex: number } | null,
+): void {
+  const length = draft.iconThresholds.length;
+  const rawIndex = draft.reverse ? length - index - 1 : index;
+  const icons =
+    draft.iconIcons ??
+    Array.from({ length }, (_, iconIndex) => ({
+      iconSet: draft.iconSet,
+      iconIndex,
+    }));
+  icons[rawIndex] = icon;
+  draft.iconIcons = icons;
 }
 watch(
   () => draft.iconSet,
@@ -472,6 +510,7 @@ watch(
       draft.iconThresholds = Array.from({ length: count }, (_, index) =>
         threshold("percent", String(Math.round((index / count) * 100))),
       );
+    if (draft.iconIcons && draft.iconIcons.length !== count) draft.iconIcons = undefined;
   },
 );
 function buildVisualCondition(): SheetConditionalFormatRule["condition"] | undefined {
@@ -524,6 +563,9 @@ function buildVisualCondition(): SheetConditionalFormatRule["condition"] | undef
       kind: "iconSet",
       iconSet: draft.iconSet,
       thresholds,
+      ...(draft.iconIcons === undefined
+        ? {}
+        : { icons: draft.iconIcons.map((icon) => (icon ? { ...icon } : null)) }),
       reverse: draft.reverse || undefined,
       showValue: draft.showValue,
     };
@@ -697,8 +739,12 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
             >{{ t("conditionalFormatting.reverse") }}</TButton
           >
           <template v-if="draft.kind === 'iconSet'">
-            <TFormItem :label="t('conditionalFormatting.iconSet')">
-              <TSelect v-model="draft.iconSet" :aria-label="t('conditionalFormatting.iconSet')">
+            <TFormItem :label="t('conditionalFormatting.iconStyle')">
+              <TSelect
+                :model-value="draft.iconSet"
+                :aria-label="t('conditionalFormatting.iconSet')"
+                @update:model-value="setIconSet($event as ConditionalFormatIconSet)"
+              >
                 <template #valueDisplay>
                   <ConditionalFormatPreview
                     compact
@@ -978,6 +1024,8 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           :select-value-reference="props.selectValueReference ? selectValueReference : undefined"
           @update-kind="setIconThresholdKind"
           @update-value="setIconThresholdValue"
+          @update-inclusive="setIconThresholdInclusive"
+          @update-icon="setIcon"
         />
         <TFormItem v-else-if="draft.kind === 'blank'" :label="t('conditionalFormatting.condition')"
           ><TSelect

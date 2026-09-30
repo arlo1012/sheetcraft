@@ -206,6 +206,69 @@ describe("conditional-formatting extended predicates", () => {
 });
 
 describe("conditional-formatting visuals", () => {
+  test("honors exclusive icon thresholds, custom glyphs, hidden icons, and reverse order", () => {
+    const base = {
+      kind: "iconSet" as const,
+      iconSet: "threeArrows" as const,
+      thresholds: [
+        { kind: "num" as const, value: 0 },
+        { kind: "num" as const, value: 10, inclusive: false },
+        { kind: "num" as const, value: 20 },
+      ],
+      icons: [
+        { iconSet: "threeFlags" as const, iconIndex: 1 },
+        null,
+        { iconSet: "threeTrafficLights" as const, iconIndex: 2 },
+      ],
+    };
+    const forward = resolver([rule("icons", base)], [0, 10, 20]);
+    const resolveForward = createConditionalFormatVisualResolver(forward.sheet, forward.evaluator);
+    expect(resolveForward({ row: 0, column: 0 })?.iconSet).toEqual({
+      iconSet: "threeFlags",
+      iconIndex: 1,
+      showValue: true,
+    });
+    // A strict `> 10` boundary stays in the previous bucket.
+    expect(resolveForward({ row: 1, column: 0 })?.iconSet).toEqual({
+      iconSet: "threeFlags",
+      iconIndex: 1,
+      showValue: true,
+    });
+    expect(resolveForward({ row: 2, column: 0 })?.iconSet).toEqual({
+      iconSet: "threeTrafficLights",
+      iconIndex: 2,
+      showValue: true,
+    });
+
+    const hidden = resolver(
+      [
+        rule("hidden", {
+          ...base,
+          thresholds: [
+            { kind: "num", value: 0 },
+            { kind: "num", value: 10 },
+            { kind: "num", value: 20 },
+          ],
+          showValue: false,
+        }),
+      ],
+      [0, 10, 20],
+    );
+    expect(
+      createConditionalFormatVisualResolver(hidden.sheet, hidden.evaluator)({ row: 1, column: 0 }),
+    ).toEqual({ iconSet: { hidden: true, showValue: false } });
+
+    const reversed = resolver([rule("reversed", { ...base, reverse: true })], [10]);
+    expect(
+      createConditionalFormatVisualResolver(
+        reversed.sheet,
+        reversed.evaluator,
+      )({ row: 0, column: 0 }),
+    ).toEqual({
+      iconSet: { iconSet: "threeTrafficLights", iconIndex: 2, showValue: true },
+    });
+  });
+
   test("provides interpolated color-scale fills and combines first data-bar and icon-set visuals", () => {
     const { sheet, evaluator } = resolver(
       [

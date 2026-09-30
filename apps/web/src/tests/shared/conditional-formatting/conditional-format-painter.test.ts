@@ -30,6 +30,19 @@ function context() {
 }
 
 describe("conditional format canvas painter", () => {
+  test("the no-icon choice neither paints a glyph nor reserves text space", () => {
+    const canvas = context();
+    const rect = { x: 0, y: 0, width: 80, height: 24 };
+    const visual = {
+      iconSet: { hidden: true as const, showValue: false },
+    };
+    expect(getConditionalFormatIconSlot(rect, visual)).toBe(0);
+    paintConditionalFormatVisual(canvas, rect, visual);
+    expect(canvas.beginPath).not.toHaveBeenCalled();
+    expect(canvas.fill).not.toHaveBeenCalled();
+    expect(canvas.fillRect).not.toHaveBeenCalled();
+  });
+
   test("paints a negative data bar from its axis with the negative color and a visible axis", () => {
     const canvas = context();
     paintConditionalFormatVisual(

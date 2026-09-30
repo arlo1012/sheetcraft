@@ -3,7 +3,6 @@ import { afterEach, describe, expect, test } from "vitest";
 import { nextTick } from "vue";
 import { FormItem } from "tdesign-vue-next/es/form";
 import { Input } from "tdesign-vue-next/es/input";
-import { InputNumber } from "tdesign-vue-next/es/input-number";
 import { Select } from "tdesign-vue-next/es/select";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
@@ -11,6 +10,7 @@ import ConditionalFormatEditorDialog from "../../../modules/conditional-formatti
 import ConditionalFormatIconRules from "../../../modules/conditional-formatting/components/ConditionalFormatIconRules.vue";
 import DataBarAdvancedSettingsDialog from "../../../modules/conditional-formatting/components/DataBarAdvancedSettingsDialog.vue";
 import ConditionalFormatThresholdField from "../../../modules/conditional-formatting/components/ConditionalFormatThresholdField.vue";
+import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import type { ConditionalFormatQuickRule } from "../../../modules/conditional-formatting/components/ConditionalFormattingMenu.vue";
 import { createAppI18n } from "../../../shared/i18n";
@@ -20,10 +20,14 @@ afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount();
   document.body.replaceChildren();
 });
-function editor(initialKind?: ConditionalFormatQuickRule, rule?: SheetConditionalFormatRule) {
+function editor(
+  initialKind?: ConditionalFormatQuickRule,
+  rule?: SheetConditionalFormatRule,
+  selectValueReference?: (current: string) => Promise<string | undefined>,
+) {
   const wrapper = mount(ConditionalFormatEditorDialog, {
     attachTo: document.body,
-    props: { visible: true, ranges: "A1:A5", initialKind, rule },
+    props: { visible: true, ranges: "A1:A5", initialKind, rule, selectValueReference },
     global: { plugins: [createAppI18n("en-US")] },
   });
   mounted.push(wrapper);
@@ -148,9 +152,9 @@ describe("advanced conditional format editor", () => {
       }),
     );
     const iconRules = wrapper.getComponent(ConditionalFormatIconRules);
-    const inputs = iconRules.findAllComponents(InputNumber);
+    const inputs = iconRules.findAllComponents(RangeReferenceInput);
     expect(inputs).toHaveLength(2);
-    inputs[1]!.vm.$emit("update:modelValue", 30);
+    inputs[1]!.vm.$emit("update:modelValue", "30");
     await nextTick();
     await confirm();
     expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({
@@ -159,6 +163,110 @@ describe("advanced conditional format editor", () => {
         thresholds: [{ kind: "min" }, { kind: "num", value: 30 }, { kind: "num", value: 80 }],
       },
     });
+  });
+
+  test("saves custom icons, strict cutoffs, and a typed formula cutoff", async () => {
+    const wrapper = editor(
+      undefined,
+      rule({
+        kind: "iconSet",
+        iconSet: "threeTrafficLights",
+        thresholds: [
+          { kind: "percent", value: 0 },
+          { kind: "percent", value: 33 },
+          { kind: "percent", value: 67 },
+        ],
+        reverse: true,
+      }),
+    );
+    const iconRules = wrapper.getComponent(ConditionalFormatIconRules);
+    iconRules.vm.$emit("updateIcon", 2, { iconSet: "threeStars", iconIndex: 1 });
+    iconRules.vm.$emit("updateIcon", 1, null);
+    iconRules.vm.$emit("updateInclusive", 2, false);
+    iconRules.vm.$emit("updateValue", 2, "=$D$1");
+    await nextTick();
+    await confirm();
+    expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({
+      condition: {
+        thresholds: [
+          { kind: "percent", value: 0 },
+          { kind: "percent", value: 33 },
+          { kind: "formula", formula: "=$D$1", inclusive: false },
+        ],
+        reverse: true,
+        icons: [
+          { iconSet: "threeStars", iconIndex: 1 },
+          null,
+          { iconSet: "threeTrafficLights", iconIndex: 2 },
+        ],
+      },
+    });
+  });
+
+  test("uses the range picker for an icon cutoff and saves it as a formula", async () => {
+    const wrapper = editor(
+      undefined,
+      rule({
+        kind: "iconSet",
+        iconSet: "threeTrafficLights",
+        thresholds: [
+          { kind: "percent", value: 0 },
+          { kind: "percent", value: 33 },
+          { kind: "percent", value: 67 },
+        ],
+      }),
+      async () => "=$E$1",
+    );
+    const iconRules = wrapper.getComponent(ConditionalFormatIconRules);
+    await iconRules
+      .findAllComponents(RangeReferenceInput)[0]!
+      .find("[data-select-formula-reference]")
+      .trigger("click");
+    await nextTick();
+    await confirm();
+    expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({
+      condition: {
+        thresholds: [
+          { kind: "percent", value: 0 },
+          { kind: "percent", value: 33 },
+          { kind: "formula", formula: "=$E$1" },
+        ],
+      },
+    });
+  });
+
+  test("restores an inclusive cutoff and clears custom glyphs on icon-style changes", async () => {
+    const wrapper = editor(
+      undefined,
+      rule({
+        kind: "iconSet",
+        iconSet: "threeTrafficLights",
+        thresholds: [
+          { kind: "percent", value: 0 },
+          { kind: "percent", value: 33 },
+          { kind: "percent", value: 67, inclusive: false },
+        ],
+        icons: [
+          { iconSet: "threeStars", iconIndex: 0 },
+          { iconSet: "threeTrafficLights", iconIndex: 1 },
+          { iconSet: "threeTrafficLights", iconIndex: 2 },
+        ],
+      }),
+    );
+    wrapper.getComponent(ConditionalFormatIconRules).vm.$emit("updateInclusive", 2, true);
+    wrapper
+      .findAllComponents(Select)
+      .find((select) => select.attributes("aria-label") === "Icon set")!
+      .vm.$emit("update:modelValue", "threeArrows");
+    await nextTick();
+    await confirm();
+    const saved = wrapper.emitted("save")?.[0]?.[0] as SheetConditionalFormatRule;
+    expect(saved.condition).toMatchObject({ kind: "iconSet", iconSet: "threeArrows" });
+    expect(saved.condition).not.toHaveProperty("icons");
+    expect(
+      (saved.condition as Extract<SheetConditionalFormatRule["condition"], { kind: "iconSet" }>)
+        .thresholds[2],
+    ).not.toHaveProperty("inclusive");
   });
 
   test("explains the absolute-reference requirement for a formula threshold", async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { MergedCellRangeResolver } from "@idea10/core";
+import type { ConditionalFormatCondition } from "@idea10/core/conditional-formatting";
 import {
   createSheet,
   createSheetEvaluator,
@@ -206,9 +207,9 @@ describe("Canvas cell presentation cache", () => {
     expect(first.content.conditionalFormatVisual?.dataBar?.end).toBe(0);
     expect(second.content.conditionalFormatVisual?.dataBar?.end).toBeCloseTo(0.5);
     expect(third.content.conditionalFormatVisual?.dataBar?.end).toBe(1);
-    expect(first.content.conditionalFormatVisual?.iconSet?.iconIndex).toBe(0);
-    expect(second.content.conditionalFormatVisual?.iconSet?.iconIndex).toBe(1);
-    expect(third.content.conditionalFormatVisual?.iconSet?.iconIndex).toBe(2);
+    expect(first.content.conditionalFormatVisual?.iconSet).toMatchObject({ iconIndex: 0 });
+    expect(second.content.conditionalFormatVisual?.iconSet).toMatchObject({ iconIndex: 1 });
+    expect(third.content.conditionalFormatVisual?.iconSet).toMatchObject({ iconIndex: 2 });
   });
 
   test("updates changed styles, locale and loaded font metrics", () => {
@@ -299,7 +300,7 @@ describe("Canvas cell presentation cache", () => {
       end: expect.any(Number),
       axis: expect.any(Number),
     });
-    expect(positive.conditionalFormatVisual?.iconSet?.iconIndex).toBe(2);
+    expect(positive.conditionalFormatVisual?.iconSet).toMatchObject({ iconIndex: 2 });
   });
 
   test("keeps a visible value clear of its icon set slot", () => {
@@ -307,17 +308,18 @@ describe("Canvas cell presentation cache", () => {
     setCellValue(sheet, { row: 0, column: 0 }, 40);
     setCellStyle(sheet, { row: 0, column: 0 }, { horizontalAlign: "left" });
     const before = cell(render(), 0, 0).content.textLayout!;
+    const condition: Extract<ConditionalFormatCondition, { kind: "iconSet" }> = {
+      kind: "iconSet",
+      iconSet: "threeArrows",
+      thresholds: [{ kind: "min" }, { kind: "percent", value: 50 }, { kind: "max" }],
+      showValue: true,
+    };
     sheet.conditionalFormats = [
       {
         id: "icons",
         anchor: { row: 0, column: 0 },
         ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
-        condition: {
-          kind: "iconSet",
-          iconSet: "threeArrows",
-          thresholds: [{ kind: "min" }, { kind: "percent", value: 50 }, { kind: "max" }],
-          showValue: true,
-        },
+        condition,
         style: {},
       },
     ];
@@ -325,5 +327,17 @@ describe("Canvas cell presentation cache", () => {
     const after = cell(render(), 0, 0).content;
     expect(after.text).toBe("40");
     expect(after.textLayout?.x).toBeGreaterThan(before.x);
+
+    condition.icons = [null, null, null];
+    refreshDisplay();
+    const noIcon = cell(render(), 0, 0).content;
+    expect(noIcon.conditionalFormatVisual?.iconSet).toEqual({ hidden: true, showValue: true });
+    expect(noIcon.text).toBe("40");
+    expect(noIcon.textLayout?.x).toBe(before.x);
+
+    condition.showValue = false;
+    refreshDisplay();
+    expect(cell(render(), 0, 0).content.text).toBe("");
+    expect(cell(render(), 0, 0).content.textLayout).toBeUndefined();
   });
 });

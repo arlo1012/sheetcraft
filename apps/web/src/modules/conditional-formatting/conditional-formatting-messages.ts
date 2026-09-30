@@ -40,6 +40,7 @@ export type ConditionalFormattingMessageSchema = {
     lightBlueBar: string;
     purpleBar: string;
     icon: string;
+    noIcon: string;
     iconRules: string;
     whenValue: string;
     belowAnd: string;
@@ -124,6 +125,7 @@ export type ConditionalFormattingMessageSchema = {
     dataBar: string;
     colorScale: string;
     iconSet: string;
+    iconStyle: string;
     count: string;
     top: string;
     bottom: string;

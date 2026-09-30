@@ -3,7 +3,10 @@ import type {
   ConditionalFormatCondition,
   ConditionalFormatStyle,
 } from "@idea10/core/conditional-formatting";
-import { applyConditionalFormatStyle } from "@idea10/core/conditional-formatting";
+import {
+  applyConditionalFormatStyle,
+  getConditionalFormatIcon,
+} from "@idea10/core/conditional-formatting";
 import { formatCellNumberValue } from "@idea10/core/number-format";
 import type { CellStyle } from "@idea10/core/style";
 import { computed, onBeforeUnmount, ref, watchPostEffect } from "vue";
@@ -153,7 +156,8 @@ watchPostEffect(() => {
         ? Array.from({ length: count }, (_, index) => index)
         : [props.iconIndex];
     indexes.forEach((index, position) => {
-      const renderedIndex = condition.reverse ? count - index - 1 : index;
+      const icon = getConditionalFormatIcon(condition, index);
+      if (!icon) return;
       paintConditionalFormatVisual(
         context,
         {
@@ -164,8 +168,7 @@ watchPostEffect(() => {
         },
         {
           iconSet: {
-            iconSet: condition.iconSet,
-            iconIndex: renderedIndex,
+            ...icon,
             showValue: condition.showValue !== false,
           },
         },
@@ -264,6 +267,10 @@ watchPostEffect(() => {
     width: 28px;
     height: 28px;
     .conditional-format-preview__visual {
+      width: 24px;
+      height: 24px;
+    }
+    &.conditional-format-preview--compact {
       width: 24px;
       height: 24px;
     }

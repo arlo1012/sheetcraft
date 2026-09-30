@@ -133,7 +133,10 @@ describe("XLSX x14 visual conditional formatting", () => {
         createWorkbookEvaluator(restored, importedSheet.id),
       );
       expect(
-        Array.from({ length: 5 }, (_, row) => resolve({ row, column: 0 })?.iconSet?.iconSet),
+        Array.from({ length: 5 }, (_, row) => {
+          const icon = resolve({ row, column: 0 })?.iconSet;
+          return icon && !icon.hidden ? icon.iconSet : undefined;
+        }),
       ).toEqual(Array(5).fill(iconSet));
     },
   );
@@ -206,6 +209,106 @@ describe("XLSX x14 visual conditional formatting", () => {
         ],
       },
     });
+  });
+
+  test("writes custom icons in display order, including strict thresholds and hidden levels", async () => {
+    const workbook = createWorkbook({ id: "custom-icons", sheetId: "sheet" });
+    getActiveSheet(workbook).conditionalFormats = [
+      {
+        ...iconRule("custom", "threeArrows", true),
+        condition: {
+          kind: "iconSet",
+          iconSet: "threeArrows",
+          thresholds: [
+            { kind: "percent", value: 0, inclusive: false },
+            { kind: "percent", value: 33 },
+            { kind: "percent", value: 67 },
+          ],
+          icons: [
+            { iconSet: "threeTrafficLights", iconIndex: 0 },
+            null,
+            { iconSet: "fiveQuarters", iconIndex: 4 },
+          ],
+          reverse: true,
+          showValue: false,
+        },
+      },
+    ];
+
+    const encoded = await encodeXlsx(workbook);
+    const xml = strFromU8(unzipSync(encoded.bytes)["xl/worksheets/sheet1.xml"]!);
+    const id = /<x14:id>(\{[^<]+\})<\/x14:id>/.exec(xml)?.[1];
+    expect(id).toBeTruthy();
+    expect(xml).toContain(`<x14:cfRule type="iconSet" priority="1" id="${id}">`);
+    expect(xml).toContain('<x14:iconSet iconSet="3Arrows" custom="1" showValue="0">');
+    expect(xml).toContain('<x14:cfvo type="percent" gte="0"><xm:f>0</xm:f></x14:cfvo>');
+    expect(xml).toContain(
+      '<x14:cfIcon iconSet="5Quarters" iconId="4"/><x14:cfIcon iconSet="NoIcons" iconId="0"/><x14:cfIcon iconSet="3TrafficLights1" iconId="0"/>',
+    );
+    expect(xml).not.toContain('custom="1" reverse=');
+
+    const restored = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook).conditionalFormats;
+    expect(restored).toHaveLength(1);
+    expect(restored?.[0]?.condition).toMatchObject({
+      kind: "iconSet",
+      thresholds: [
+        { kind: "percent", value: 0, inclusive: false },
+        { kind: "percent", value: 33 },
+        { kind: "percent", value: 67 },
+      ],
+      icons: [
+        { iconSet: "fiveQuarters", iconIndex: 4 },
+        null,
+        { iconSet: "threeTrafficLights", iconIndex: 0 },
+      ],
+    });
+    expect(restored?.[0]?.condition).not.toMatchObject({ reverse: true });
+  });
+
+  test("imports a linked Excel custom-icon rule without applying its ignored reverse attribute", () => {
+    const report = new CompatibilityReportBuilder();
+    const id = "{AA6A1E20-8D22-4EBE-8E0C-4D22D2B9E30A}";
+    const xml = `<worksheet><conditionalFormatting sqref="A1:A3"><cfRule type="iconSet" priority="1"><iconSet iconSet="3Arrows"><cfvo type="percent" val="0" gte="false"/><cfvo type="percent" val="33"/><cfvo type="percent" val="67"/></iconSet><extLst><ext uri="{B025F937-C7B1-47D3-B67F-A62EFF666E3E}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:id>${id}</x14:id></ext></extLst></cfRule></conditionalFormatting><extLst><ext uri="{78C0D931-6437-407d-A8EE-F0AAD7539E65}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:conditionalFormattings><x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:cfRule type="iconSet" priority="1" id="${id}"><x14:iconSet iconSet="3Arrows" custom="true" reverse="true"><x14:cfvo type="percent" gte="false"><xm:f>0</xm:f></x14:cfvo><x14:cfvo type="percent"><xm:f>33</xm:f></x14:cfvo><x14:cfvo type="percent"><xm:f>67</xm:f></x14:cfvo><x14:cfIcon iconSet="5Quarters" iconId="4"/><x14:cfIcon iconSet="NoIcons" iconId="0"/><x14:cfIcon iconSet="3TrafficLights1" iconId="2"/></x14:iconSet></x14:cfRule><xm:sqref>A1:A3</xm:sqref></x14:conditionalFormatting></x14:conditionalFormattings></ext></extLst></worksheet>`;
+    expect(readXlsxConditionalFormats(xml, undefined, 0, report).rules).toMatchObject([
+      {
+        condition: {
+          kind: "iconSet",
+          iconSet: "threeArrows",
+          thresholds: [
+            { kind: "percent", value: 0, inclusive: false },
+            { kind: "percent", value: 33 },
+            { kind: "percent", value: 67 },
+          ],
+          icons: [
+            { iconSet: "fiveQuarters", iconIndex: 4 },
+            null,
+            { iconSet: "threeTrafficLights", iconIndex: 2 },
+          ],
+        },
+      },
+    ]);
+    expect(report.build().issues).toEqual([]);
+  });
+
+  test("keeps a linked custom rule's base priority and omitted rule settings", () => {
+    const report = new CompatibilityReportBuilder();
+    const id = "{1881E5C0-A51F-4E56-BDEA-676157584B1D}";
+    const xml = `<worksheet><conditionalFormatting sqref="A1:A3"><cfRule type="iconSet" priority="1" stopIfTrue="1"><iconSet iconSet="3Arrows" showValue="0"><cfvo type="percent" val="0"/><cfvo type="percent" val="33"/><cfvo type="percent" val="67"/></iconSet><extLst><ext uri="{B025F937-C7B1-47D3-B67F-A62EFF666E3E}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:id>${id}</x14:id></ext></extLst></cfRule></conditionalFormatting><conditionalFormatting sqref="B1:B3"><cfRule type="iconSet" priority="2"><iconSet iconSet="3Flags"><cfvo type="percent" val="0"/><cfvo type="percent" val="33"/><cfvo type="percent" val="67"/></iconSet></cfRule></conditionalFormatting><extLst><ext uri="{78C0D931-6437-407d-A8EE-F0AAD7539E65}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:conditionalFormattings><x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:cfRule type="iconSet" id="${id}"><x14:iconSet iconSet="3Arrows" custom="1"><x14:cfvo type="percent"><xm:f>0</xm:f></x14:cfvo><x14:cfvo type="percent"><xm:f>33</xm:f></x14:cfvo><x14:cfvo type="percent"><xm:f>67</xm:f></x14:cfvo><x14:cfIcon iconSet="3TrafficLights1" iconId="0"/><x14:cfIcon iconSet="NoIcons" iconId="0"/><x14:cfIcon iconSet="5Quarters" iconId="4"/></x14:iconSet></x14:cfRule><xm:sqref>A1:A3</xm:sqref></x14:conditionalFormatting></x14:conditionalFormattings></ext></extLst></worksheet>`;
+    const rules = readXlsxConditionalFormats(xml, undefined, 0, report).rules;
+    expect(rules.map((rule) => rule.ranges[0]!.start.column)).toEqual([0, 1]);
+    expect(rules[0]).toMatchObject({
+      stopIfTrue: true,
+      condition: {
+        kind: "iconSet",
+        showValue: false,
+        icons: [
+          { iconSet: "threeTrafficLights", iconIndex: 0 },
+          null,
+          { iconSet: "fiveQuarters", iconIndex: 4 },
+        ],
+      },
+    });
+    expect(report.build().issues).toEqual([]);
   });
 
   test.each(['custom="1"', 'activePresent="1"'])(

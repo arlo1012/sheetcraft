@@ -5,6 +5,7 @@ import {
   normalizeConditionalFormatRules,
   type ConditionalFormatStyle,
   type ConditionalFormatIconSet,
+  type ConditionalFormatIconThreshold,
   type ConditionalFormatOperand,
   type ConditionalFormatThreshold,
   type SheetConditionalFormatRule,
@@ -446,6 +447,15 @@ function readThreshold(attributes: string): ConditionalFormatThreshold | null {
   return Number.isFinite(value) ? { kind, value } : null;
 }
 
+/** `gte` is meaningful only for icon-set thresholds. Its default is `true`. */
+function readIconThreshold(attributes: string): ConditionalFormatIconThreshold | null {
+  const threshold = readThreshold(attributes);
+  if (!threshold) return null;
+  return /^(0|false)$/i.test(attribute(attributes, "gte") ?? "")
+    ? { ...threshold, inclusive: false }
+    : threshold;
+}
+
 function hasUnsupportedThresholdSemantics(entries: readonly { attributes: string }[]): boolean {
   return entries.some((entry) => /^(0|false)$/i.test(attribute(entry.attributes, "gte") ?? "1"));
 }
@@ -471,6 +481,21 @@ function thresholdXml(
         : `<cfvo type="${threshold.kind}" val="${threshold.value}"/>`;
 }
 
+function iconThresholdXml(
+  threshold: ConditionalFormatIconThreshold,
+  rowOffset = 0,
+  columnOffset = 0,
+): string {
+  const inclusive = threshold.inclusive === false ? ' gte="0"' : "";
+  return threshold.kind === "min" || threshold.kind === "max"
+    ? `<cfvo type="${threshold.kind}"${inclusive}/>`
+    : threshold.kind === "autoMin" || threshold.kind === "autoMax"
+      ? `<cfvo type="${threshold.kind === "autoMin" ? "min" : "max"}"${inclusive}/>`
+      : threshold.kind === "formula"
+        ? `<cfvo type="formula" val="${encodeXml(formulaForXlsx(threshold.formula, rowOffset, columnOffset))}"${inclusive}/>`
+        : `<cfvo type="${threshold.kind}" val="${threshold.value}"${inclusive}/>`;
+}
+
 function x14ThresholdXml(
   threshold: ConditionalFormatThreshold,
   rowOffset = 0,
@@ -490,6 +515,26 @@ function x14ThresholdXml(
   return `<x14:cfvo type="${kind}"><xm:f>${encodeXml(value)}</xm:f></x14:cfvo>`;
 }
 
+function x14IconThresholdXml(
+  threshold: ConditionalFormatIconThreshold,
+  rowOffset = 0,
+  columnOffset = 0,
+): string {
+  const gte = threshold.inclusive === false ? ' gte="0"' : "";
+  const kind = threshold.kind === "min" || threshold.kind === "max" ? "percent" : threshold.kind;
+  const value =
+    threshold.kind === "min"
+      ? "0"
+      : threshold.kind === "max"
+        ? "100"
+        : threshold.kind === "autoMin" || threshold.kind === "autoMax"
+          ? "0"
+          : threshold.kind === "formula"
+            ? formulaForXlsx(threshold.formula, rowOffset, columnOffset)
+            : String(threshold.value);
+  return `<x14:cfvo type="${kind}"${gte}><xm:f>${encodeXml(value)}</xm:f></x14:cfvo>`;
+}
+
 function readX14Threshold(entry: {
   attributes: string;
   body: string;
@@ -505,6 +550,17 @@ function readX14Threshold(entry: {
   if (!formula) return null;
   const value = Number(formula);
   return Number.isFinite(value) ? { kind, value } : null;
+}
+
+function readX14IconThreshold(entry: {
+  attributes: string;
+  body: string;
+}): ConditionalFormatIconThreshold | null {
+  const threshold = readX14Threshold(entry);
+  if (!threshold) return null;
+  return /^(0|false)$/i.test(attribute(entry.attributes, "gte") ?? "")
+    ? { ...threshold, inclusive: false }
+    : threshold;
 }
 
 /** x14 adds autoMin/autoMax for data bars. They are deliberately not accepted
@@ -543,7 +599,7 @@ function readColor(attributes: string): string | undefined {
   return rgb(attribute(attributes, "rgb"));
 }
 
-function dataBarBaseExtensionId(attributes: string, body: string): string | undefined {
+function baseVisualExtensionId(attributes: string, body: string): string | undefined {
   // Excel links its standard rule through a rule-local extLst. Accept the
   // attribute form too, because a few producers emit that nonstandard shape.
   return (childElements(body, "id")[0]?.body.trim() || attribute(attributes, "id"))?.toUpperCase();
@@ -650,6 +706,32 @@ const X14_ONLY_ICON_SETS = new Set<ConditionalFormatIconSet>([
 const ICON_SET_TO_XLSX: Record<ConditionalFormatIconSet, string> = Object.fromEntries(
   Object.entries(ICON_SET_FROM_XLSX).map(([name, value]) => [value, name]),
 ) as Record<ConditionalFormatIconSet, string>;
+
+function iconSetSize(iconSet: ConditionalFormatIconSet): number {
+  return iconSet.startsWith("three") ? 3 : iconSet.startsWith("four") ? 4 : 5;
+}
+
+function readCustomIcons(
+  entries: readonly { attributes: string }[],
+  count: number,
+): ({ iconSet: ConditionalFormatIconSet; iconIndex: number } | null)[] | null {
+  if (entries.length !== count) return null;
+  const icons: ({ iconSet: ConditionalFormatIconSet; iconIndex: number } | null)[] = [];
+  for (const entry of entries) {
+    const xlsxIconSet = attribute(entry.attributes, "iconSet");
+    const index = Number(attribute(entry.attributes, "iconId"));
+    if (!xlsxIconSet || !Number.isInteger(index) || index < 0) return null;
+    if (xlsxIconSet === "NoIcons") {
+      if (index !== 0) return null;
+      icons.push(null);
+      continue;
+    }
+    const iconSet = ICON_SET_FROM_XLSX[xlsxIconSet];
+    if (!iconSet || index >= iconSetSize(iconSet)) return null;
+    icons.push({ iconSet, iconIndex: index });
+  }
+  return icons;
+}
 
 function readVisualCondition(
   type: string,
@@ -766,22 +848,21 @@ function readVisualCondition(
       ? ICON_SET_FROM_XLSX[attribute(iconSet.attributes, "iconSet") ?? "3TrafficLights1"]
       : undefined;
     const thresholds = iconSet
-      ? childElements(iconSet.body, "cfvo").map((entry) => readThreshold(entry.attributes))
+      ? childElements(iconSet.body, "cfvo").map((entry) => readIconThreshold(entry.attributes))
       : [];
-    const cfvo = iconSet ? childElements(iconSet.body, "cfvo") : [];
     if (!iconSet || !name || X14_ONLY_ICON_SETS.has(name) || thresholds.some((value) => !value))
       return { condition: null, unsupported: true };
     return {
       condition: {
         kind: "iconSet",
         iconSet: name,
-        thresholds: thresholds as ConditionalFormatThreshold[],
+        thresholds: thresholds as ConditionalFormatIconThreshold[],
         ...(truthy(attribute(iconSet.attributes, "reverse")) ? { reverse: true } : {}),
         ...(/^(0|false)$/i.test(attribute(iconSet.attributes, "showValue") ?? "")
           ? { showValue: false }
           : {}),
       },
-      unsupported: hasUnsupportedThresholdSemantics(cfvo),
+      unsupported: false,
     };
   }
   return null;
@@ -797,6 +878,7 @@ export function readXlsxConditionalFormats(
   const rules: SheetConditionalFormatRule[] = [];
   const priorities = new Map<string, number>();
   const dataBarsByExtensionId = new Map<string, number>();
+  const iconSetsByExtensionId = new Map<string, number>();
   let unsupported = false;
   let ordinal = 0;
   for (const container of worksheetXml.matchAll(
@@ -850,9 +932,11 @@ export function readXlsxConditionalFormats(
       };
       try {
         rules.push(normalizeConditionalFormatRules([candidate])[0]!);
-        const extensionId = dataBarBaseExtensionId(attrs, rule[2] ?? "");
+        const extensionId = baseVisualExtensionId(attrs, rule[2] ?? "");
         if (condition.kind === "dataBar" && extensionId)
           dataBarsByExtensionId.set(extensionId.toUpperCase(), rules.length - 1);
+        if (condition.kind === "iconSet" && extensionId)
+          iconSetsByExtensionId.set(extensionId.toUpperCase(), rules.length - 1);
       } catch {
         unsupported = true;
         priorities.delete(id);
@@ -908,30 +992,45 @@ export function readXlsxConditionalFormats(
         "",
       );
       const name = iconSet
-        ? ICON_SET_FROM_XLSX[attribute(iconSet.attributes, "iconSet") ?? ""]
+        ? ICON_SET_FROM_XLSX[attribute(iconSet.attributes, "iconSet") ?? "3TrafficLights1"]
         : undefined;
       const cfvo = iconSet ? childElements(iconSet.body, "cfvo") : [];
-      const thresholds = cfvo.map(readX14Threshold);
+      const thresholds = cfvo.map(readX14IconThreshold);
+      const custom = iconSet && truthy(attribute(iconSet.attributes, "custom"));
+      const icons = iconSet
+        ? readCustomIcons(childElements(iconSet.body, "cfIcon"), cfvo.length)
+        : null;
+      const extensionId = attribute(rule.attributes, "id")?.toUpperCase();
+      const baseIndex =
+        extensionId === undefined ? undefined : iconSetsByExtensionId.get(extensionId);
       if (
         type !== "iconSet" ||
         !ranges ||
         !iconSet ||
         !name ||
-        !X14_ONLY_ICON_SETS.has(name) ||
         truthy(attribute(containerAttributes, "activePresent")) ||
         truthy(attribute(rule.attributes, "activePresent")) ||
-        truthy(attribute(iconSet.attributes, "custom")) ||
-        childElements(iconSet.body, "cfIcon").length > 0 ||
         childElements(ruleOutsideIconSet, "f").length > 0 ||
         thresholds.some((value) => !value) ||
-        hasUnsupportedThresholdSemantics(cfvo)
+        (custom ? !icons : childElements(iconSet.body, "cfIcon").length > 0) ||
+        (!custom && !X14_ONLY_ICON_SETS.has(name))
       ) {
         unsupported = true;
         report.add("feature-omitted", "warning", location);
         continue;
       }
-      const id = `xlsx-conditional-format-${sheetIndex + 1}-${ordinal}`;
-      priorities.set(id, Number(attribute(rule.attributes, "priority")) || ordinal);
+      const id =
+        baseIndex === undefined
+          ? `xlsx-conditional-format-${sheetIndex + 1}-${ordinal}`
+          : rules[baseIndex]!.id;
+      const base = baseIndex === undefined ? undefined : rules[baseIndex];
+      const priorityAttribute = attribute(rule.attributes, "priority");
+      // Linked x14 rules commonly omit priority: their base rule remains the
+      // ordering authority. An explicit extension priority still takes effect.
+      if (baseIndex === undefined || priorityAttribute !== undefined)
+        priorities.set(id, Number(priorityAttribute) || ordinal);
+      const showValueAttribute = attribute(iconSet.attributes, "showValue");
+      const stopIfTrueAttribute = attribute(rule.attributes, "stopIfTrue");
       const candidate: SheetConditionalFormatRule = {
         id,
         ranges,
@@ -939,20 +1038,33 @@ export function readXlsxConditionalFormats(
         condition: {
           kind: "iconSet",
           iconSet: name,
-          thresholds: thresholds as ConditionalFormatThreshold[],
-          ...(truthy(attribute(iconSet.attributes, "reverse")) ? { reverse: true } : {}),
-          ...(/^(0|false)$/i.test(attribute(iconSet.attributes, "showValue") ?? "")
-            ? { showValue: false }
-            : {}),
+          thresholds: thresholds as ConditionalFormatIconThreshold[],
+          ...(custom ? { icons: icons! } : {}),
+          ...(!custom && truthy(attribute(iconSet.attributes, "reverse")) ? { reverse: true } : {}),
+          ...(showValueAttribute === undefined
+            ? base?.condition.kind === "iconSet" && base.condition.showValue === false
+              ? { showValue: false }
+              : {}
+            : /^(0|false)$/i.test(showValueAttribute)
+              ? { showValue: false }
+              : {}),
         },
-        style: {},
-        ...(truthy(attribute(rule.attributes, "stopIfTrue")) ? { stopIfTrue: true } : {}),
+        style: base?.style ?? {},
+        ...(stopIfTrueAttribute === undefined
+          ? base?.stopIfTrue
+            ? { stopIfTrue: true }
+            : {}
+          : truthy(stopIfTrueAttribute)
+            ? { stopIfTrue: true }
+            : {}),
       };
       try {
-        rules.push(normalizeConditionalFormatRules([candidate])[0]!);
+        const normalized = normalizeConditionalFormatRules([candidate])[0]!;
+        if (baseIndex === undefined) rules.push(normalized);
+        else rules[baseIndex] = normalized;
       } catch {
         unsupported = true;
-        priorities.delete(id);
+        if (baseIndex === undefined) priorities.delete(id);
         report.add("feature-omitted", "warning", location);
       }
     }
@@ -1176,6 +1288,39 @@ function dataBarBaseExtensionXml(priority: number): string {
   return `<extLst><ext uri="{B025F937-C7B1-47D3-B67F-A62EFF666E3E}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:id>${dataBarExtensionId(priority)}</x14:id></ext></extLst>`;
 }
 
+function needsIconSetExtension(
+  condition: Extract<SheetConditionalFormatRule["condition"], { kind: "iconSet" }>,
+): boolean {
+  return condition.icons !== undefined;
+}
+
+function iconSetBaseFallback(iconSet: ConditionalFormatIconSet): ConditionalFormatIconSet {
+  if (!X14_ONLY_ICON_SETS.has(iconSet)) return iconSet;
+  return iconSetSize(iconSet) === 3
+    ? "threeTrafficLights"
+    : iconSetSize(iconSet) === 4
+      ? "fourArrows"
+      : "fiveArrows";
+}
+
+function iconSetBaseExtensionXml(priority: number): string {
+  return `<extLst><ext uri="{B025F937-C7B1-47D3-B67F-A62EFF666E3E}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:id>${dataBarExtensionId(priority)}</x14:id></ext></extLst>`;
+}
+
+function customIconXml(
+  icons: readonly ({ iconSet: ConditionalFormatIconSet; iconIndex: number } | null)[],
+  reverse: boolean,
+): string {
+  const assignments = reverse ? [...icons].reverse() : icons;
+  return assignments
+    .map((icon) =>
+      icon === null
+        ? '<x14:cfIcon iconSet="NoIcons" iconId="0"/>'
+        : `<x14:cfIcon iconSet="${ICON_SET_TO_XLSX[icon.iconSet]}" iconId="${icon.iconIndex}"/>`,
+    )
+    .join("");
+}
+
 function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId?: number): string {
   const dxf = dxfId === undefined ? "" : ` dxfId="${dxfId}"`;
   const stop = rule.stopIfTrue ? ' stopIfTrue="1"' : "";
@@ -1231,7 +1376,9 @@ function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId?: num
   }
   if (condition.kind === "colorScale")
     return `<cfRule type="colorScale" priority="${priority}"><colorScale>${condition.stops.map((stop) => thresholdXml(stop.threshold)).join("")}${condition.stops.map((stop) => `<color rgb="FF${stop.color.slice(1).toUpperCase()}"/>`).join("")}</colorScale></cfRule>`;
-  return `<cfRule type="iconSet" priority="${priority}"><iconSet iconSet="${ICON_SET_TO_XLSX[condition.iconSet]}"${condition.reverse ? ' reverse="1"' : ""}${condition.showValue === false ? ' showValue="0"' : ""}>${condition.thresholds.map((threshold) => thresholdXml(threshold)).join("")}</iconSet></cfRule>`;
+  const fallback = iconSetBaseFallback(condition.iconSet);
+  const extension = needsIconSetExtension(condition);
+  return `<cfRule type="iconSet" priority="${priority}"><iconSet iconSet="${ICON_SET_TO_XLSX[fallback]}"${condition.reverse ? ' reverse="1"' : ""}${condition.showValue === false ? ' showValue="0"' : ""}>${condition.thresholds.map((threshold) => iconThresholdXml(threshold, rowOffset, columnOffset)).join("")}</iconSet>${extension ? iconSetBaseExtensionXml(priority) : ""}</cfRule>`;
 }
 
 function x14RuleXml(rule: SheetConditionalFormatRule, priority: number): string | null {
@@ -1248,9 +1395,14 @@ function x14RuleXml(rule: SheetConditionalFormatRule, priority: number): string 
     const negativeBorderColor = border ? condition.negativeBorderColor : undefined;
     return `<x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:cfRule type="dataBar" id="${dataBarExtensionId(priority)}"><x14:dataBar${condition.showValue === false ? ' showValue="0"' : ""}${border ? ' border="1"' : ""}${condition.gradient === false ? ' gradient="0"' : ""}${direction === "context" ? "" : ` direction="${direction}"`}${condition.negativeColor === undefined ? ' negativeBarColorSameAsPositive="1"' : ""}${negativeBorderColor === undefined ? "" : ' negativeBarBorderColorSameAsPositive="0"'}${axisPosition === "automatic" ? "" : ` axisPosition="${axisPosition}"`}>${x14DataBarThresholdXml(condition.minimum, rowOffset, columnOffset)}${x14DataBarThresholdXml(condition.maximum, rowOffset, columnOffset)}${border ? `<x14:borderColor rgb="FF${condition.borderColor!.slice(1).toUpperCase()}"/>` : ""}${condition.negativeColor === undefined ? "" : `<x14:negativeFillColor rgb="FF${condition.negativeColor.slice(1).toUpperCase()}"/>`}${negativeBorderColor === undefined ? "" : `<x14:negativeBorderColor rgb="FF${negativeBorderColor.slice(1).toUpperCase()}"/>`}${axisPosition === "none" ? "" : `<x14:axisColor rgb="FF${axisColor.slice(1).toUpperCase()}"/>`}</x14:dataBar></x14:cfRule><xm:sqref>${rule.ranges.map(rangeReference).join(" ")}</xm:sqref></x14:conditionalFormatting>`;
   }
-  if (condition.kind !== "iconSet" || !X14_ONLY_ICON_SETS.has(condition.iconSet)) return null;
+  if (
+    condition.kind !== "iconSet" ||
+    (!X14_ONLY_ICON_SETS.has(condition.iconSet) && !needsIconSetExtension(condition))
+  )
+    return null;
   const id = priority.toString(16).padStart(12, "0").toUpperCase();
-  return `<x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:cfRule type="iconSet" priority="${priority}" id="{00000000-0000-0000-0000-${id}}"${rule.stopIfTrue ? ' stopIfTrue="1"' : ""}><x14:iconSet iconSet="${ICON_SET_TO_XLSX[condition.iconSet]}"${condition.reverse ? ' reverse="1"' : ""}${condition.showValue === false ? ' showValue="0"' : ""}>${condition.thresholds.map((threshold) => x14ThresholdXml(threshold)).join("")}</x14:iconSet></x14:cfRule><xm:sqref>${rule.ranges.map(rangeReference).join(" ")}</xm:sqref></x14:conditionalFormatting>`;
+  const custom = needsIconSetExtension(condition);
+  return `<x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><x14:cfRule type="iconSet" priority="${priority}" id="{00000000-0000-0000-0000-${id}}"${rule.stopIfTrue ? ' stopIfTrue="1"' : ""}><x14:iconSet iconSet="${ICON_SET_TO_XLSX[condition.iconSet]}"${custom ? ' custom="1"' : ""}${!custom && condition.reverse ? ' reverse="1"' : ""}${condition.showValue === false ? ' showValue="0"' : ""}>${condition.thresholds.map((threshold) => x14IconThresholdXml(threshold)).join("")}${custom ? customIconXml(condition.icons!, Boolean(condition.reverse)) : ""}</x14:iconSet></x14:cfRule><xm:sqref>${rule.ranges.map(rangeReference).join(" ")}</xm:sqref></x14:conditionalFormatting>`;
 }
 
 function appendX14ConditionalFormatting(xml: string, body: string): string {
@@ -1354,7 +1506,10 @@ export function writeXlsxConditionalFormats(
       .map((rule) => {
         const x14 = x14RuleXml(rule, priority);
         const linkedDataBar = rule.condition.kind === "dataBar";
-        const next = linkedDataBar
+        const linkedIconSet =
+          rule.condition.kind === "iconSet" && needsIconSetExtension(rule.condition);
+        const linkedVisual = linkedDataBar || linkedIconSet;
+        const next = linkedVisual
           ? ruleXml(rule, priority, ruleStyleIds.get(rule))
           : (x14 ?? ruleXml(rule, priority, ruleStyleIds.get(rule)));
         if (
@@ -1376,7 +1531,7 @@ export function writeXlsxConditionalFormats(
           );
         if (x14) x14Body += x14;
         priority += 1;
-        return x14 && !linkedDataBar
+        return x14 && !linkedVisual
           ? ""
           : `<conditionalFormatting sqref="${rule.ranges.map(rangeReference).join(" ")}">${next}</conditionalFormatting>`;
       })

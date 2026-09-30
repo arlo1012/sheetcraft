@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import type {
   ConditionalFormatCondition,
+  ConditionalFormatIconSet,
+  ConditionalFormatIconThreshold,
   ConditionalFormatThreshold,
 } from "@idea10/core/conditional-formatting";
-import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
-import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { getConditionalFormatIcon } from "@idea10/core/conditional-formatting";
+import { Option as TOption, Select as TSelect } from "tdesign-vue-next/es/select";
 import { computed } from "vue";
+import { iconSetPresetTiles } from "../conditional-format-presets";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import ConditionalFormatPreview from "./ConditionalFormatPreview.vue";
 
+type IconChoice = { iconSet: ConditionalFormatIconSet; iconIndex: number } | null;
 const props = defineProps<{
   condition: Extract<ConditionalFormatCondition, { kind: "iconSet" }>;
   selectValueReference?: (current: string) => Promise<string | undefined>;
@@ -17,23 +21,85 @@ const props = defineProps<{
 const emit = defineEmits<{
   updateKind: [index: number, kind: ConditionalFormatThreshold["kind"]];
   updateValue: [index: number, value: string];
+  updateInclusive: [index: number, inclusive: boolean];
+  updateIcon: [index: number, icon: IconChoice];
 }>();
 const { t } = useAppI18n();
 const rows = computed(() =>
   props.condition.thresholds.map((entry, index) => ({ entry, index })).reverse(),
 );
-const options = computed(() =>
-  (["num", "percent", "percentile", "formula", "min", "max"] as const).map((value) => ({
+const thresholdOptionsBase = computed(() =>
+  (["num", "percent", "percentile", "formula"] as const).map((value) => ({
     value,
     label: t(`conditionalFormatting.${value}` as MessageKey),
   })),
 );
-function boundLabel(entry: ConditionalFormatThreshold): string {
+const iconChoices = computed(() =>
+  iconSetPresetTiles.flatMap((iconSet) =>
+    Array.from({ length: iconCount(iconSet) }, (_, iconIndex) => ({
+      value: `${iconSet}:${iconIndex}`,
+      icon: { iconSet, iconIndex } satisfies Exclude<IconChoice, null>,
+    })),
+  ),
+);
+function iconCount(iconSet: ConditionalFormatIconSet): number {
+  return iconSet.startsWith("three") ? 3 : iconSet.startsWith("four") ? 4 : 5;
+}
+function iconCondition(
+  iconSet: ConditionalFormatIconSet,
+): Extract<ConditionalFormatCondition, { kind: "iconSet" }> {
+  const count = iconCount(iconSet);
+  return {
+    kind: "iconSet",
+    iconSet,
+    thresholds: Array.from({ length: count }, (_, index) => ({
+      kind: "percent",
+      value: (index * 100) / count,
+    })),
+  };
+}
+function selectedIcon(index: number): IconChoice {
+  return getConditionalFormatIcon(props.condition, index);
+}
+function iconValue(index: number): string {
+  const icon = selectedIcon(index);
+  return icon ? `${icon.iconSet}:${icon.iconIndex}` : "none";
+}
+function updateIcon(index: number, value: string): void {
+  if (value === "none") return emit("updateIcon", index, null);
+  const choice = iconChoices.value.find((option) => option.value === value);
+  if (choice) emit("updateIcon", index, choice.icon);
+}
+function thresholdOptions(entry: ConditionalFormatIconThreshold) {
+  const options = thresholdOptionsBase.value;
+  return entry.kind === "min" || entry.kind === "max"
+    ? [...options, { value: entry.kind, label: t(`conditionalFormatting.${entry.kind}`) }]
+    : options;
+}
+function hasValue(
+  entry: ConditionalFormatIconThreshold,
+): entry is Extract<
+  ConditionalFormatIconThreshold,
+  { kind: "num" | "percent" | "percentile" | "formula" }
+> {
+  return (
+    entry.kind === "num" ||
+    entry.kind === "percent" ||
+    entry.kind === "percentile" ||
+    entry.kind === "formula"
+  );
+}
+function boundLabel(entry: ConditionalFormatIconThreshold): string {
   if (entry.kind === "formula") return entry.formula;
-  if (!("value" in entry)) return t(`conditionalFormatting.${entry.kind}`);
-  return entry.kind === "num"
+  return hasValue(entry)
     ? String(entry.value)
-    : `${entry.value} (${t(`conditionalFormatting.${entry.kind}`)})`;
+    : t(`conditionalFormatting.${entry.kind}` as MessageKey);
+}
+function upperComparator(entry: ConditionalFormatIconThreshold): string {
+  return entry.inclusive === false ? "≤" : "<";
+}
+function iconLabel(icon: Exclude<IconChoice, null>): string {
+  return `${t(`conditionalFormatting.${icon.iconSet}` as MessageKey)} ${icon.iconIndex + 1}`;
 }
 </script>
 
@@ -43,9 +109,7 @@ function boundLabel(entry: ConditionalFormatThreshold): string {
     <div class="icon-rules__table">
       <div class="icon-rules__header" aria-hidden="true">
         <span>{{ t("conditionalFormatting.icon") }}</span>
-        <span class="icon-rules__condition-heading">{{
-          t("conditionalFormatting.condition")
-        }}</span>
+        <span class="icon-rules__condition-heading" />
         <span>{{ t("conditionalFormatting.value") }}</span>
         <span>{{ t("conditionalFormatting.thresholdType") }}</span>
       </div>
@@ -56,72 +120,85 @@ function boundLabel(entry: ConditionalFormatThreshold): string {
         role="group"
         :aria-label="`${t('conditionalFormatting.threshold')} ${index + 1}`"
       >
-        <ConditionalFormatPreview :condition="condition" :icon-index="index" />
-        <span class="icon-rules__when">{{
-          index > 0 && index < condition.thresholds.length - 1
-            ? t("conditionalFormatting.belowAnd", {
-                value: boundLabel(condition.thresholds[index + 1]!),
-              })
-            : t("conditionalFormatting.whenValue")
-        }}</span>
-        <span
-          class="icon-rules__operator"
-          :aria-label="
-            t(index ? 'conditionalFormatting.greaterThanOrEqual' : 'conditionalFormatting.lessThan')
-          "
-          >{{ index ? "≥" : "<" }}</span
+        <TSelect
+          class="icon-rules__icon-select"
+          :model-value="iconValue(index)"
+          :aria-label="`${t('conditionalFormatting.icon')} ${index + 1}`"
+          @update:model-value="updateIcon(index, $event as string)"
         >
+          <template #valueDisplay>
+            <span v-if="selectedIcon(index) === null" class="icon-rules__no-icon">—</span>
+            <ConditionalFormatPreview v-else compact :condition="condition" :icon-index="index" />
+          </template>
+          <TOption value="none" :label="t('conditionalFormatting.noIcon')">
+            <span class="icon-rules__option icon-rules__no-icon"
+              >— {{ t("conditionalFormatting.noIcon") }}</span
+            >
+          </TOption>
+          <TOption
+            v-for="choice in iconChoices"
+            :key="choice.value"
+            :value="choice.value"
+            :label="iconLabel(choice.icon)"
+          >
+            <ConditionalFormatPreview
+              compact
+              :condition="iconCondition(choice.icon.iconSet)"
+              :icon-index="choice.icon.iconIndex"
+            />
+          </TOption>
+        </TSelect>
         <template v-if="index > 0">
-          <TInputNumber
-            v-if="entry.kind !== 'formula'"
-            :model-value="'value' in entry ? entry.value : undefined"
-            :disabled="entry.kind === 'min' || entry.kind === 'max'"
-            :placeholder="
-              entry.kind === 'min' || entry.kind === 'max'
-                ? t(`conditionalFormatting.${entry.kind}`)
-                : undefined
-            "
-            :aria-label="`${t('conditionalFormatting.threshold')} ${index + 1} · ${t('conditionalFormatting.value')}`"
-            theme="column"
-            class="idea-input-number--persistent-controls"
-            :min="entry.kind === 'percent' || entry.kind === 'percentile' ? 0 : undefined"
-            :max="entry.kind === 'percent' || entry.kind === 'percentile' ? 100 : undefined"
-            @update:model-value="
-              emit(
-                'updateValue',
-                index,
-                $event === '' || $event === undefined ? '' : String($event),
-              )
-            "
+          <span v-if="index === condition.thresholds.length - 1" class="icon-rules__when">{{
+            t("conditionalFormatting.whenValue")
+          }}</span>
+          <span
+            v-else
+            class="icon-rules__when"
+            :title="`${t('conditionalFormatting.whenValue')} ${upperComparator(condition.thresholds[index + 1]!)} ${boundLabel(condition.thresholds[index + 1]!)} ${t('conditionalFormatting.and')}`"
+          >
+            {{ t("conditionalFormatting.whenValue") }}
+            {{ upperComparator(condition.thresholds[index + 1]!) }}
+            {{ boundLabel(condition.thresholds[index + 1]!) }} {{ t("conditionalFormatting.and") }}
+          </span>
+          <TSelect
+            class="icon-rules__operator"
+            :model-value="entry.inclusive === false ? 'strict' : 'inclusive'"
+            :options="[
+              { value: 'inclusive', label: '≥' },
+              { value: 'strict', label: '>' },
+            ]"
+            :aria-label="`${t('conditionalFormatting.threshold')} ${index + 1} ${t('conditionalFormatting.condition')}`"
+            @update:model-value="emit('updateInclusive', index, $event !== 'strict')"
           />
           <RangeReferenceInput
-            v-else
-            :model-value="entry.formula"
-            :aria-label="`${t('conditionalFormatting.threshold')} ${index + 1} · ${t('conditionalFormatting.value')}`"
-            placeholder="=$D$1"
+            v-if="hasValue(entry)"
+            :model-value="entry.kind === 'formula' ? entry.formula : String(entry.value)"
+            :label="`${t('conditionalFormatting.threshold')} ${index + 1} · ${t('conditionalFormatting.value')}`"
+            :placeholder="t('conditionalFormatting.thresholdValueHint')"
             :show-picker="true"
             :select-reference="selectValueReference"
             @update:model-value="emit('updateValue', index, $event)"
           />
+          <span v-else class="icon-rules__legacy-value">{{ boundLabel(entry) }}</span>
           <TSelect
             :model-value="entry.kind"
-            :options="options"
+            :options="thresholdOptions(entry)"
             :aria-label="`${t('conditionalFormatting.threshold')} ${index + 1} · ${t('conditionalFormatting.thresholdType')}`"
             @update:model-value="
               emit('updateKind', index, $event as ConditionalFormatThreshold['kind'])
             "
           />
         </template>
-        <template v-else>
-          <span class="icon-rules__bound">{{
-            "value" in condition.thresholds[1]!
-              ? condition.thresholds[1]!.value
-              : t(`conditionalFormatting.${condition.thresholds[1]!.kind}` as MessageKey)
-          }}</span>
-          <span class="icon-rules__bound">{{
-            t(`conditionalFormatting.${condition.thresholds[1]!.kind}` as MessageKey)
-          }}</span>
-        </template>
+        <span
+          v-else
+          class="icon-rules__last-bound"
+          :title="`${t('conditionalFormatting.whenValue')} ${upperComparator(condition.thresholds[1]!)} ${boundLabel(condition.thresholds[1]!)}`"
+        >
+          {{ t("conditionalFormatting.whenValue") }}
+          {{ upperComparator(condition.thresholds[1]!) }}
+          {{ boundLabel(condition.thresholds[1]!) }}
+        </span>
       </div>
     </div>
   </section>
@@ -132,6 +209,7 @@ function boundLabel(entry: ConditionalFormatThreshold): string {
   display: grid;
   gap: 8px;
   min-width: 0;
+
   h4 {
     margin: 0;
     font: inherit;
@@ -139,7 +217,7 @@ function boundLabel(entry: ConditionalFormatThreshold): string {
   }
   &__table {
     display: grid;
-    grid-template-columns: 40px minmax(100px, 1fr) 28px minmax(80px, 1fr) minmax(100px, 1fr);
+    grid-template-columns: 64px minmax(100px, 1fr) 64px minmax(100px, 1fr) minmax(100px, 1fr);
     gap: 8px;
     overflow-x: auto;
   }
@@ -149,6 +227,7 @@ function boundLabel(entry: ConditionalFormatThreshold): string {
     grid-template-columns: subgrid;
     grid-column: 1 / -1;
     align-items: center;
+    min-height: 30px;
     > * {
       min-width: 0;
     }
@@ -159,14 +238,29 @@ function boundLabel(entry: ConditionalFormatThreshold): string {
   &__condition-heading {
     grid-column: span 2;
   }
-  &__operator {
-    text-align: center;
+  &__operator,
+  &__icon-select {
+    width: 64px;
   }
-  &__bound {
+  &__when,
+  &__last-bound {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  &__last-bound {
+    grid-column: 2 / -1;
+  }
+  &__no-icon {
+    color: var(--idea-text-secondary);
+  }
+  &__option {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+  }
+  &__legacy-value {
     padding-inline: 8px;
-  }
-  .idea-input-number--persistent-controls {
-    width: 100%;
   }
 }
 </style>

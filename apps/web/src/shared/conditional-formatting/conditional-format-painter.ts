@@ -10,7 +10,7 @@ export function getConditionalFormatIconSlot(
   rect: Rect,
   visual: ConditionalFormatVisual | undefined,
 ): number {
-  if (!visual?.iconSet) return 0;
+  if (!visual?.iconSet || visual.iconSet.hidden) return 0;
   return Math.max(0, Math.min(rect.height - 4, 18) + ICON_GAP);
 }
 
@@ -90,6 +90,6 @@ export function paintConditionalFormatVisual(
 ): void {
   if (!visual) return;
   if (visual.dataBar) paintDataBar(context, rect, visual.dataBar);
-  if (visual.iconSet)
+  if (visual.iconSet && !visual.iconSet.hidden)
     paintConditionalFormatIcon(context, rect, visual.iconSet.iconSet, visual.iconSet.iconIndex);
 }
