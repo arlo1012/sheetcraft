@@ -23,6 +23,7 @@ import ConditionalFormatStyleSelect from "./ConditionalFormatStyleSelect.vue";
 import ConditionalFormatStyleDialog from "./ConditionalFormatStyleDialog.vue";
 import ConditionalFormatRankCriteria from "./ConditionalFormatRankCriteria.vue";
 import ConditionalFormatAverageCriteria from "./ConditionalFormatAverageCriteria.vue";
+import ConditionalFormatDuplicateCriteria from "./ConditionalFormatDuplicateCriteria.vue";
 import ConditionalFormatContainingCriteria, {
   type ContainingRuleType,
 } from "./ConditionalFormatContainingCriteria.vue";
@@ -200,10 +201,21 @@ const category = computed<RuleCategory>(() =>
       ? "containing"
       : (draft.kind as RuleCategory),
 );
-const hasInlineFormat = computed(
-  () =>
-    category.value === "containing" || category.value === "rank" || category.value === "average",
-);
+const hasInlineFormat = computed(() => category.value !== "visual" && category.value !== "formula");
+const ruleDescription = computed(() => {
+  switch (category.value) {
+    case "containing":
+      return t("conditionalFormatting.containingDescription");
+    case "rank":
+      return t("conditionalFormatting.rankDescription");
+    case "average":
+      return t("conditionalFormatting.averageDescription");
+    case "duplicate":
+      return t("conditionalFormatting.duplicateDescription");
+    default:
+      return categoryOptions.value.find((option) => option.value === category.value)?.label;
+  }
+});
 function selectCategory(value: RuleCategory) {
   if (value === category.value) return;
   updateKind(value === "visual" ? "colorScale" : value === "containing" ? "cellValue" : value);
@@ -731,15 +743,7 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
       <section class="conditional-format-editor__section">
         <h3>{{ t("conditionalFormatting.editRuleDescription") }}</h3>
         <p class="conditional-format-editor__description">
-          {{
-            category === "containing"
-              ? t("conditionalFormatting.containingDescription")
-              : category === "rank"
-                ? t("conditionalFormatting.rankDescription")
-                : category === "average"
-                  ? t("conditionalFormatting.averageDescription")
-                  : categoryOptions.find((option) => option.value === category)?.label
-          }}
+          {{ ruleDescription }}
         </p>
         <div v-if="category === 'visual'" class="conditional-format-editor__visual-settings">
           <TFormItem :label="t('conditionalFormatting.formatStyle')">
@@ -980,16 +984,10 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           @update-inclusive="setIconThresholdInclusive"
           @update-icon="setIcon"
         />
-        <TFormItem
+        <ConditionalFormatDuplicateCriteria
           v-else-if="draft.kind === 'duplicate'"
-          :label="t('conditionalFormatting.condition')"
-          ><TSelect
-            v-model="draft.unique"
-            :options="[
-              { value: false, label: t('conditionalFormatting.duplicate') },
-              { value: true, label: t('conditionalFormatting.unique') },
-            ]"
-        /></TFormItem>
+          v-model:unique="draft.unique"
+        />
         <TFormItem
           v-else-if="draft.kind === 'formula'"
           :label="t('conditionalFormatting.formula')"

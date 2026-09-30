@@ -53,6 +53,10 @@ export type ConditionalFormattingMessageSchema = {
     averageDeviationAbove: string;
     averageDeviationBelow: string;
     ruleDuplicate: string;
+    duplicateDescription: string;
+    duplicateScope: string;
+    duplicateChoice: string;
+    uniqueChoice: string;
     formatStyle: string;
     twoColorScale: string;
     threeColorScale: string;
