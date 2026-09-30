@@ -15,11 +15,9 @@ import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
-import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect, Option as TOption } from "tdesign-vue-next/es/select";
 import { computed, reactive, ref, watch } from "vue";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
-import ConditionalFormatStyleSelect from "./ConditionalFormatStyleSelect.vue";
 import ConditionalFormatStyleDialog from "./ConditionalFormatStyleDialog.vue";
 import ConditionalFormatRankCriteria from "./ConditionalFormatRankCriteria.vue";
 import ConditionalFormatAverageCriteria from "./ConditionalFormatAverageCriteria.vue";
@@ -201,7 +199,7 @@ const category = computed<RuleCategory>(() =>
       ? "containing"
       : (draft.kind as RuleCategory),
 );
-const hasInlineFormat = computed(() => category.value !== "visual" && category.value !== "formula");
+const hasInlineFormat = computed(() => category.value !== "visual");
 const ruleDescription = computed(() => {
   switch (category.value) {
     case "containing":
@@ -212,6 +210,8 @@ const ruleDescription = computed(() => {
       return t("conditionalFormatting.averageDescription");
     case "duplicate":
       return t("conditionalFormatting.duplicateDescription");
+    case "formula":
+      return t("conditionalFormatting.formulaDescription");
     default:
       return categoryOptions.value.find((option) => option.value === category.value)?.label;
   }
@@ -267,7 +267,6 @@ const iconOptions = computed(() =>
 const needsSecondValue = computed(
   () => draft.kind === "cellValue" && ["between", "notBetween"].includes(draft.operator),
 );
-const formulaPlaceholder = '=$D2="Overdue"';
 function threshold(kind: ThresholdKind, value: string): ConditionalFormatThreshold {
   if (kind === "min" || kind === "max" || kind === "autoMin" || kind === "autoMax") return { kind };
   if (kind === "formula") return { kind, formula: value };
@@ -988,13 +987,19 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           v-else-if="draft.kind === 'duplicate'"
           v-model:unique="draft.unique"
         />
-        <TFormItem
-          v-else-if="draft.kind === 'formula'"
-          :label="t('conditionalFormatting.formula')"
-          label-align="top"
-          :tips="error.formula || t('conditionalFormatting.formulaHint')"
-          ><TInput v-model="draft.formula" :placeholder="formulaPlaceholder"
-        /></TFormItem>
+        <div v-else-if="draft.kind === 'formula'" class="conditional-format-editor__formula">
+          <RangeReferenceInput
+            v-model="draft.formula"
+            :label="t('conditionalFormatting.formulaDescription')"
+            :show-picker="true"
+            :insert-reference="true"
+            :select-reference="props.selectValueReference ? selectValueReference : undefined"
+            @enter="save"
+          />
+          <p v-if="error.formula" class="conditional-format-editor__error" role="alert">
+            {{ error.formula }}
+          </p>
+        </div>
         <div v-if="hasInlineFormat" class="conditional-format-editor__rule-format">
           <span>{{ t("conditionalFormatting.preview") }}</span>
           <ConditionalFormatPreview
@@ -1007,14 +1012,6 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
             t("conditionalFormatting.editFormat")
           }}</TButton>
         </div>
-        <TFormItem v-else-if="category !== 'visual'" :label="t('conditionalFormatting.format')">
-          <ConditionalFormatStyleSelect
-            v-model="format"
-            :sample-value="sampleValue"
-            :date-system="dateSystem"
-            @custom-visible="customVisible = $event"
-          />
-        </TFormItem>
         <div
           v-if="draft.kind !== 'iconSet' && !hasInlineFormat"
           class="conditional-format-editor__preview"
@@ -1076,6 +1073,10 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
   &__description {
     margin: 0;
     color: var(--idea-text-secondary);
+  }
+  &__formula {
+    display: grid;
+    gap: 8px;
   }
   &__range {
     width: 100%;

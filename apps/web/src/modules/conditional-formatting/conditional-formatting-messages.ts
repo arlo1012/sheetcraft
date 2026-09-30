@@ -122,6 +122,7 @@ export type ConditionalFormattingMessageSchema = {
     valueReferenceHint: string;
     thresholdValueHint: string;
     formulaHint: string;
+    formulaDescription: string;
     invalidRange: string;
     invalidValue: string;
     invalidFormula: string;

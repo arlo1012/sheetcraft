@@ -124,6 +124,7 @@ export const conditionalFormattingZhCN = {
     valueReferenceHint: "例如 10、文本或 =$D$1",
     thresholdValueHint: "例如 10 或 =$D$1",
     formulaHint: "公式应以 = 开头，并相对于应用范围左上角编写。",
+    formulaDescription: "只为满足以下条件的单元格设置格式：",
     invalidRange: "请输入有效的 A1 单元格区域。",
     invalidValue: "请输入条件值。",
     invalidFormula: "请输入以 = 开头的公式。",

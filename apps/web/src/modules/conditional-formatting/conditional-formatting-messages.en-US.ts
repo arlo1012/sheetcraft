@@ -124,6 +124,7 @@ export const conditionalFormattingEnUS = {
     valueReferenceHint: "e.g. 10, text, or =$D$1",
     thresholdValueHint: "e.g. 10 or =$D$1",
     formulaHint: "Start with = and write the formula relative to the top-left cell of the range.",
+    formulaDescription: "Format cells where this formula is true:",
     invalidRange: "Enter a valid A1 cell range.",
     invalidValue: "Enter a condition value.",
     invalidFormula: "Enter a formula that starts with =.",
