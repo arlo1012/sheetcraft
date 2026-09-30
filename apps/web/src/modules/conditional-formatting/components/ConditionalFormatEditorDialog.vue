@@ -757,13 +757,10 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
                   :value="option.value"
                   :label="option.label"
                 >
-                  <span class="conditional-format-editor__icon-option">
-                    <ConditionalFormatPreview
-                      compact
-                      :condition="iconOptionCondition(option.value)"
-                    />
-                    <span>{{ option.label }}</span>
-                  </span>
+                  <ConditionalFormatPreview
+                    compact
+                    :condition="iconOptionCondition(option.value)"
+                  />
                 </TOption>
               </TSelect>
             </TFormItem>
@@ -1126,11 +1123,6 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
     > button {
       justify-self: start;
     }
-  }
-  &__icon-option {
-    display: flex;
-    align-items: center;
-    gap: 8px;
   }
   &__criteria {
     display: flex;
