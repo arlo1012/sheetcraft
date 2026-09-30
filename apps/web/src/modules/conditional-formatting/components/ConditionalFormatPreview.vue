@@ -234,6 +234,7 @@ watchPostEffect(() => {
   }
 
   &--compact {
+    display: flex;
     width: 90px;
     height: 24px;
     border: 0;
