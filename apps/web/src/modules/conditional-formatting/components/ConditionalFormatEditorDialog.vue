@@ -94,7 +94,6 @@ type EditorDraft = {
   equalAverage?: boolean;
   stdDev?: number;
   datePeriod: string;
-  stopIfTrue: boolean;
   minimumKind: ThresholdKind;
   minimumValue: string;
   maximumKind: ThresholdKind;
@@ -367,7 +366,6 @@ function createDraft(rule = props.rule): EditorDraft {
           ].includes(props.initialKind ?? "")
             ? props.initialKind
             : "today") as string),
-    stopIfTrue: Boolean(rule?.stopIfTrue),
     minimumKind: min?.kind ?? (draftKind === "dataBar" ? "autoMin" : "min"),
     minimumValue: minValue,
     maximumKind: max?.kind ?? (draftKind === "dataBar" ? "autoMax" : "max"),
@@ -630,7 +628,7 @@ function save() {
       draft.kind === "dataBar" || draft.kind === "colorScale" || draft.kind === "iconSet"
         ? {}
         : format.value,
-    ...(draft.stopIfTrue && category.value !== "visual" ? { stopIfTrue: true } : {}),
+    ...(props.rule?.stopIfTrue && category.value !== "visual" ? { stopIfTrue: true } : {}),
   };
   try {
     emit("save", normalizeConditionalFormatRules([candidate])[0]!);
@@ -988,7 +986,8 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
         <div v-if="category === 'containing'" class="conditional-format-editor__containing-format">
           <span>{{ t("conditionalFormatting.preview") }}</span>
           <ConditionalFormatPreview
-            class="conditional-format-editor__format-preview"
+            wide
+            control
             :format="format"
             :text="Object.keys(format).length ? undefined : t('conditionalFormatting.noFormat')"
           />
@@ -1016,9 +1015,6 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           />
         </div>
       </section>
-      <TCheckbox v-if="category !== 'visual'" v-model="draft.stopIfTrue">{{
-        t("conditionalFormatting.stopIfTrue")
-      }}</TCheckbox>
       <p v-if="error.format" class="conditional-format-editor__error" role="alert">
         {{ error.format }}
       </p>
@@ -1087,15 +1083,13 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
   }
   &__containing-format {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: 80px minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
-  }
-  &__format-preview {
-    width: 100%;
-    min-width: 0;
-    height: 28px;
-    box-sizing: border-box;
+    > span:first-child {
+      text-align: right;
+      color: var(--idea-text-secondary);
+    }
   }
   &__inline {
     display: grid;

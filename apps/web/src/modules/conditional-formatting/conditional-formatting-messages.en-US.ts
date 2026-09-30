@@ -113,7 +113,7 @@ export const conditionalFormattingEnUS = {
     invalidRange: "Enter a valid A1 cell range.",
     invalidValue: "Enter a condition value.",
     invalidFormula: "Enter a formula that starts with =.",
-    invalidFormat: "Choose at least one format, or enable Stop if true.",
+    invalidFormat: "Choose at least one format.",
     fillColor: "Fill color",
     textColor: "Text color",
     bold: "Bold",

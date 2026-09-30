@@ -113,7 +113,7 @@ export const conditionalFormattingZhCN = {
     invalidRange: "请输入有效的 A1 单元格区域。",
     invalidValue: "请输入条件值。",
     invalidFormula: "请输入以 = 开头的公式。",
-    invalidFormat: "请至少选择一种格式，或启用条件满足时停止。",
+    invalidFormat: "请至少选择一种格式。",
     fillColor: "填充颜色",
     textColor: "字体颜色",
     bold: "加粗",

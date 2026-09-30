@@ -28,6 +28,8 @@ const props = withDefaults(
     /** Uses the dialog-width visual sample while preserving the manager's compact default. */
     wide?: boolean;
     compact?: boolean;
+    /** Insets a formatted text sample inside the standard preview control frame. */
+    control?: boolean;
     /** Renders one icon-set glyph for a threshold row instead of the complete icon set. */
     iconIndex?: number;
   }>(),
@@ -186,10 +188,10 @@ watchPostEffect(() => {
       'conditional-format-preview--wide': wide,
       'conditional-format-preview--compact': compact,
       'conditional-format-preview--single-icon': iconIndex !== undefined,
-      'conditional-format-preview--color-control': insetColorScale || insetDataBar,
+      'conditional-format-preview--color-control': insetColorScale || insetDataBar || control,
       'conditional-format-preview--data-bar': insetDataBar,
     }"
-    :style="insetColorScale ? undefined : swatchStyle"
+    :style="insetColorScale || control ? undefined : swatchStyle"
     role="img"
     :aria-label="t('conditionalFormatting.preview')"
   >
@@ -205,7 +207,12 @@ watchPostEffect(() => {
       class="conditional-format-preview__visual"
       aria-hidden="true"
     />
-    <span v-else-if="condition?.kind !== 'colorScale'">{{ previewText }}</span>
+    <span
+      v-else-if="condition?.kind !== 'colorScale'"
+      :class="{ 'conditional-format-preview__sample': control }"
+      :style="control ? swatchStyle : undefined"
+      >{{ previewText }}</span
+    >
   </span>
 </template>
 
@@ -255,6 +262,15 @@ watchPostEffect(() => {
     min-width: 0;
     height: 16px;
     border-radius: var(--idea-radius-small);
+  }
+
+  &__sample {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-width: 0;
+    height: 20px;
   }
 
   &--data-bar {
