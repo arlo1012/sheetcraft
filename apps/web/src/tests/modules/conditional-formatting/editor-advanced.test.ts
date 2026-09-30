@@ -2,7 +2,6 @@ import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import { nextTick } from "vue";
 import { FormItem } from "tdesign-vue-next/es/form";
-import { Input } from "tdesign-vue-next/es/input";
 import { Select } from "tdesign-vue-next/es/select";
 import { Radio, RadioGroup } from "tdesign-vue-next/es/radio";
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
@@ -10,6 +9,7 @@ import ConditionalFormatEditorDialog from "../../../modules/conditional-formatti
 import ConditionalFormatIconRules from "../../../modules/conditional-formatting/components/ConditionalFormatIconRules.vue";
 import DataBarAdvancedSettingsDialog from "../../../modules/conditional-formatting/components/DataBarAdvancedSettingsDialog.vue";
 import ConditionalFormatThresholdField from "../../../modules/conditional-formatting/components/ConditionalFormatThresholdField.vue";
+import ConditionalFormatContainingCriteria from "../../../modules/conditional-formatting/components/ConditionalFormatContainingCriteria.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import type { ConditionalFormatQuickRule } from "../../../modules/conditional-formatting/components/ConditionalFormattingMenu.vue";
@@ -55,12 +55,9 @@ describe("advanced conditional format editor", () => {
     "keeps the selected %s quick operator",
     async (initial) => {
       const wrapper = editor(initial);
-      for (const field of wrapper.findAllComponents(FormItem)) {
-        if (field.props("label") === "Value")
-          field.findComponent(Input).vm.$emit("update:modelValue", "12");
-        if (field.props("label") === "Second value")
-          field.findComponent(Input).vm.$emit("update:modelValue", "24");
-      }
+      const criteria = wrapper.getComponent(ConditionalFormatContainingCriteria);
+      criteria.vm.$emit("update:value", initial === "contains" ? "late" : "12");
+      if (initial === "between") criteria.vm.$emit("update:secondValue", "24");
       await nextTick();
       await confirm();
       expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({ condition: { operator: initial } });
@@ -71,10 +68,7 @@ describe("advanced conditional format editor", () => {
     const imported = rule({ kind: "cellValue", operator: "equal", value: "Overdue" });
     imported.style = { fillColor: "#FDE2E1" };
     const wrapper = editor(undefined, imported);
-    const field = wrapper
-      .findAllComponents(FormItem)
-      .find((item) => item.props("label") === "Value")!;
-    field.findComponent(Input).vm.$emit("update:modelValue", "Overdue");
+    wrapper.getComponent(ConditionalFormatContainingCriteria).vm.$emit("update:value", "Overdue");
     await nextTick();
     await confirm();
     expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({

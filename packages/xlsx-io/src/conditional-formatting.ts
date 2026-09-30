@@ -418,6 +418,8 @@ function readCondition(
   }
   if (type === "containsBlanks" || type === "notContainsBlanks")
     return { kind: "blank", blank: type === "containsBlanks" };
+  if (type === "containsErrors" || type === "notContainsErrors")
+    return { kind: "error", error: type === "containsErrors" };
   if (type === "duplicateValues" || type === "uniqueValues")
     return { kind: "duplicate", unique: type === "uniqueValues" };
   return null;
@@ -1359,6 +1361,11 @@ function ruleXml(rule: SheetConditionalFormatRule, priority: number, dxfId?: num
   if (condition.kind === "blank") {
     const type = condition.blank ? "containsBlanks" : "notContainsBlanks";
     const formula = condition.blank ? `LEN(TRIM(${anchor}))=0` : `LEN(TRIM(${anchor}))>0`;
+    return `<cfRule type="${type}" priority="${priority}"${dxf}${stop}><formula>${formula}</formula></cfRule>`;
+  }
+  if (condition.kind === "error") {
+    const type = condition.error ? "containsErrors" : "notContainsErrors";
+    const formula = condition.error ? `ISERROR(${anchor})` : `NOT(ISERROR(${anchor}))`;
     return `<cfRule type="${type}" priority="${priority}"${dxf}${stop}><formula>${formula}</formula></cfRule>`;
   }
   if (condition.kind === "duplicate") {

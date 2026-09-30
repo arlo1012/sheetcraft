@@ -21,6 +21,10 @@ import { Select as TSelect, Option as TOption } from "tdesign-vue-next/es/select
 import { computed, reactive, ref, watch } from "vue";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import ConditionalFormatStyleSelect from "./ConditionalFormatStyleSelect.vue";
+import ConditionalFormatStyleDialog from "./ConditionalFormatStyleDialog.vue";
+import ConditionalFormatContainingCriteria, {
+  type ContainingRuleType,
+} from "./ConditionalFormatContainingCriteria.vue";
 import { conditionalFormatPresetStyle } from "../conditional-format-quick-rules";
 import ConditionalFormatPreview from "./ConditionalFormatPreview.vue";
 import ConditionalFormatThresholdField from "./ConditionalFormatThresholdField.vue";
@@ -80,6 +84,7 @@ type EditorDraft = {
   secondValue: string;
   secondValueIsString: boolean;
   blank: boolean;
+  hasError: boolean;
   unique: boolean;
   formula: string;
   count: number;
@@ -190,7 +195,7 @@ const categoryOptions = computed(
 const category = computed<RuleCategory>(() =>
   ["dataBar", "colorScale", "iconSet"].includes(draft.kind)
     ? "visual"
-    : ["cellValue", "text", "blank", "date"].includes(draft.kind)
+    : ["cellValue", "text", "blank", "date", "error"].includes(draft.kind)
       ? "containing"
       : (draft.kind as RuleCategory),
 );
@@ -198,12 +203,29 @@ function selectCategory(value: RuleCategory) {
   if (value === category.value) return;
   updateKind(value === "visual" ? "colorScale" : value === "containing" ? "cellValue" : value);
 }
-const containingOptions = computed(() =>
-  ["cellValue", "text", "blank", "date"].map((value) => ({
-    value,
-    label: t(`conditionalFormatting.${value === "blank" ? "blanks" : value}` as MessageKey),
-  })),
-);
+const containingType = computed<ContainingRuleType>({
+  get: () =>
+    draft.kind === "blank"
+      ? draft.blank
+        ? "blank"
+        : "nonBlank"
+      : draft.kind === "error"
+        ? draft.hasError
+          ? "error"
+          : "nonError"
+        : (draft.kind as ContainingRuleType),
+  set: (value) => {
+    if (value === containingType.value) return;
+    if (value === "blank" || value === "nonBlank") {
+      updateKind("blank");
+      draft.blank = value === "blank";
+    } else if (value === "error" || value === "nonError") {
+      updateKind("error");
+      draft.hasError = value === "error";
+    } else updateKind(value);
+    error.value = "";
+  },
+});
 const visualStyle = computed({
   get: () => (draft.kind === "colorScale" ? `scale${draft.scaleStops}` : draft.kind),
   set: (value: string) => {
@@ -219,44 +241,6 @@ const visualOptions = computed(() => [
   { value: "dataBar", label: t("conditionalFormatting.dataBars") },
   { value: "iconSet", label: t("conditionalFormatting.iconSets") },
 ]);
-const comparisonOptions = computed(() =>
-  [
-    "greaterThan",
-    "greaterThanOrEqual",
-    "lessThan",
-    "lessThanOrEqual",
-    "equal",
-    "notEqual",
-    "between",
-    "notBetween",
-  ].map((value) => ({
-    value,
-    label: t(`conditionalFormatting.${value}` as MessageKey),
-  })),
-);
-const textOptions = computed(() =>
-  ["contains", "notContains", "beginsWith", "endsWith"].map((value) => ({
-    value,
-    label: t(`conditionalFormatting.${value}` as MessageKey),
-  })),
-);
-const dateOptions = computed(() =>
-  [
-    "yesterday",
-    "today",
-    "tomorrow",
-    "last7Days",
-    "lastWeek",
-    "thisWeek",
-    "nextWeek",
-    "lastMonth",
-    "thisMonth",
-    "nextMonth",
-  ].map((value) => ({
-    value,
-    label: t(`conditionalFormatting.${value}` as MessageKey),
-  })),
-);
 const iconOptions = computed(() =>
   iconSets.map((value) => ({
     value,
@@ -351,6 +335,7 @@ function createDraft(rule = props.rule): EditorDraft {
     secondValue: c?.kind === "cellValue" && secondValueOperand ? secondValueOperand.value : "",
     secondValueIsString: secondValueOperand?.literal ?? false,
     blank: c?.kind === "blank" ? c.blank : true,
+    hasError: c?.kind === "error" ? c.error : true,
     unique: c?.kind === "duplicate" ? c.unique : false,
     formula: c?.kind === "formula" ? c.formula : "",
     count: c?.kind === "rank" ? c.count : 10,
@@ -434,7 +419,7 @@ function updateKind(kind: ConditionKind) {
   const wasDataBar = draft.kind === "dataBar";
   draft.kind = kind;
   if (kind === "text") draft.operator = "contains";
-  if (kind === "cellValue") draft.operator = "greaterThan";
+  if (kind === "cellValue") draft.operator = "between";
   if (kind === "dataBar") {
     draft.minimumKind = "autoMin";
     draft.maximumKind = "autoMax";
@@ -575,6 +560,7 @@ function buildVisualCondition(): SheetConditionalFormatRule["condition"] | undef
 const previewCondition = computed(buildVisualCondition);
 function buildCondition(): SheetConditionalFormatRule["condition"] | null {
   if (draft.kind === "blank") return { kind: "blank", blank: draft.blank };
+  if (draft.kind === "error") return { kind: "error", error: draft.hasError };
   if (draft.kind === "duplicate") return { kind: "duplicate", unique: draft.unique };
   if (draft.kind === "rank")
     return {
@@ -722,7 +708,11 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
       <section class="conditional-format-editor__section">
         <h3>{{ t("conditionalFormatting.editRuleDescription") }}</h3>
         <p class="conditional-format-editor__description">
-          {{ categoryOptions.find((option) => option.value === category)?.label }}
+          {{
+            category === "containing"
+              ? t("conditionalFormatting.containingDescription")
+              : categoryOptions.find((option) => option.value === category)?.label
+          }}
         </p>
         <div v-if="category === 'visual'" class="conditional-format-editor__visual-settings">
           <TFormItem :label="t('conditionalFormatting.formatStyle')">
@@ -769,61 +759,18 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
             }}</TCheckbox>
           </template>
         </div>
-        <TFormItem v-if="category === 'containing'" :label="t('conditionalFormatting.condition')">
-          <TSelect
-            :model-value="draft.kind"
-            :options="containingOptions"
-            @update:model-value="updateKind"
-          />
-        </TFormItem>
-        <div
-          v-if="draft.kind === 'cellValue' || draft.kind === 'text'"
-          class="conditional-format-editor__criteria"
-        >
-          <TFormItem
-            label-align="top"
-            :label="
-              draft.kind === 'text'
-                ? t('conditionalFormatting.text')
-                : t('conditionalFormatting.cellValue')
-            "
-          >
-            <TSelect
-              v-model="draft.operator"
-              :options="draft.kind === 'text' ? textOptions : comparisonOptions"
-            />
-          </TFormItem>
-          <TFormItem
-            label-align="top"
-            :label="t('conditionalFormatting.value')"
-            :tips="error.value"
-          >
-            <TInput v-if="draft.kind === 'text'" v-model="draft.value" />
-            <RangeReferenceInput
-              v-else
-              :model-value="draft.value"
-              :label="t('conditionalFormatting.value')"
-              :placeholder="t('conditionalFormatting.valueReferenceHint')"
-              :show-picker="true"
-              :select-reference="props.selectValueReference ? selectValueReference : undefined"
-              @update:model-value="updateOperand($event)"
-            />
-          </TFormItem>
-          <TFormItem
-            v-if="needsSecondValue"
-            label-align="top"
-            :label="t('conditionalFormatting.secondValue')"
-          >
-            <RangeReferenceInput
-              :model-value="draft.secondValue"
-              :label="t('conditionalFormatting.secondValue')"
-              :placeholder="t('conditionalFormatting.valueReferenceHint')"
-              :show-picker="true"
-              :select-reference="props.selectValueReference ? selectValueReference : undefined"
-              @update:model-value="updateOperand($event, true)"
-            />
-          </TFormItem>
-        </div>
+        <ConditionalFormatContainingCriteria
+          v-if="category === 'containing'"
+          v-model:type="containingType"
+          v-model:operator="draft.operator"
+          v-model:date-period="draft.datePeriod"
+          :value="draft.value"
+          :second-value="draft.secondValue"
+          :error="error.value"
+          :select-value-reference="props.selectValueReference ? selectValueReference : undefined"
+          @update:value="updateOperand($event)"
+          @update:second-value="updateOperand($event, true)"
+        />
         <TFormItem v-else-if="draft.kind === 'rank'" :label="t('conditionalFormatting.count')">
           <div class="conditional-format-editor__inline">
             <TSelect
@@ -852,9 +799,6 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
             ]"
           />
         </TFormItem>
-        <TFormItem v-else-if="draft.kind === 'date'" :label="t('conditionalFormatting.datePeriod')"
-          ><TSelect v-model="draft.datePeriod" :options="dateOptions"
-        /></TFormItem>
         <template v-else-if="draft.kind === 'dataBar' || draft.kind === 'colorScale'">
           <div
             class="conditional-format-editor__thresholds"
@@ -1024,14 +968,6 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           @update-inclusive="setIconThresholdInclusive"
           @update-icon="setIcon"
         />
-        <TFormItem v-else-if="draft.kind === 'blank'" :label="t('conditionalFormatting.condition')"
-          ><TSelect
-            v-model="draft.blank"
-            :options="[
-              { value: true, label: t('conditionalFormatting.blanks') },
-              { value: false, label: t('conditionalFormatting.nonBlanks') },
-            ]"
-        /></TFormItem>
         <TFormItem
           v-else-if="draft.kind === 'duplicate'"
           :label="t('conditionalFormatting.condition')"
@@ -1049,7 +985,18 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
           :tips="error.formula || t('conditionalFormatting.formulaHint')"
           ><TInput v-model="draft.formula" :placeholder="formulaPlaceholder"
         /></TFormItem>
-        <TFormItem v-if="category !== 'visual'" :label="t('conditionalFormatting.format')">
+        <div v-if="category === 'containing'" class="conditional-format-editor__containing-format">
+          <span>{{ t("conditionalFormatting.preview") }}</span>
+          <ConditionalFormatPreview
+            class="conditional-format-editor__format-preview"
+            :format="format"
+            :text="Object.keys(format).length ? undefined : t('conditionalFormatting.noFormat')"
+          />
+          <TButton variant="outline" @click="customVisible = true">{{
+            t("conditionalFormatting.editFormat")
+          }}</TButton>
+        </div>
+        <TFormItem v-else-if="category !== 'visual'" :label="t('conditionalFormatting.format')">
           <ConditionalFormatStyleSelect
             v-model="format"
             :sample-value="sampleValue"
@@ -1057,7 +1004,10 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
             @custom-visible="customVisible = $event"
           />
         </TFormItem>
-        <div v-if="draft.kind !== 'iconSet'" class="conditional-format-editor__preview">
+        <div
+          v-if="draft.kind !== 'iconSet' && category !== 'containing'"
+          class="conditional-format-editor__preview"
+        >
           <span>{{ t("conditionalFormatting.preview") }}</span
           ><ConditionalFormatPreview
             wide
@@ -1074,6 +1024,17 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
       </p>
     </TForm>
   </Dialog>
+  <ConditionalFormatStyleDialog
+    v-if="category === 'containing' && customVisible"
+    :style="format"
+    :sample-value="sampleValue"
+    :date-system="dateSystem"
+    @confirm="
+      format = $event;
+      customVisible = false;
+    "
+    @cancel="customVisible = false"
+  />
   <DataBarAdvancedSettingsDialog
     :visible="dataBarAdvancedVisible"
     :settings="{
@@ -1124,13 +1085,17 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
       justify-self: start;
     }
   }
-  &__criteria {
-    display: flex;
+  &__containing-format {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
     gap: 8px;
-    > * {
-      flex: 1;
-      min-width: 0;
-    }
+  }
+  &__format-preview {
+    width: 100%;
+    min-width: 0;
+    height: 28px;
+    box-sizing: border-box;
   }
   &__inline {
     display: grid;
@@ -1197,9 +1162,6 @@ watch(() => [props.visible, props.rule, props.ranges], resetDraft, {
   @media (max-width: 560px) {
     &__visual-settings {
       grid-template-columns: minmax(0, 1fr);
-    }
-    &__criteria {
-      flex-direction: column;
     }
     &__inline {
       grid-template-columns: minmax(0, 1fr) 80px auto;

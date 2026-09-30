@@ -24,6 +24,7 @@ const props = withDefaults(
   defineProps<{
     condition?: ConditionalFormatCondition;
     format?: ConditionalFormatStyle;
+    text?: string;
     /** Uses the dialog-width visual sample while preserving the manager's compact default. */
     wide?: boolean;
     compact?: boolean;
@@ -76,7 +77,7 @@ const swatchStyle = computed(() => ({
     : {}),
 }));
 const previewText = computed(
-  () => numberPresentation.value?.text ?? t("conditionalFormatting.preview"),
+  () => props.text ?? numberPresentation.value?.text ?? t("conditionalFormatting.preview"),
 );
 
 function setDimensions(): void {

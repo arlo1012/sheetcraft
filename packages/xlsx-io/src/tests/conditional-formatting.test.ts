@@ -397,6 +397,36 @@ describe("XLSX conditional formatting", () => {
     });
   });
 
+  test("imports and exports error conditional-formatting rules", async () => {
+    const workbook = createWorkbook({ id: "error-conditional-format", sheetId: "sheet" });
+    const entries = unzipSync((await encodeXlsx(workbook)).bytes);
+    entries["xl/worksheets/sheet1.xml"] = strToU8(
+      strFromU8(entries["xl/worksheets/sheet1.xml"]!).replace(
+        /<\/worksheet>/i,
+        '<conditionalFormatting sqref="A1:A3"><cfRule type="containsErrors" priority="1" stopIfTrue="1"><formula>ISERROR(A1)</formula></cfRule></conditionalFormatting><conditionalFormatting sqref="B2:B4"><cfRule type="notContainsErrors" priority="2" stopIfTrue="1"><formula>NOT(ISERROR(B2))</formula></cfRule></conditionalFormatting></worksheet>',
+      ),
+    );
+    const decoded = await decodeXlsx(zipSync(entries));
+    const rules = getActiveSheet(decoded.workbook).conditionalFormats;
+    expect(rules).toMatchObject([
+      { condition: { kind: "error", error: true } },
+      { condition: { kind: "error", error: false } },
+    ]);
+
+    const exported = await encodeXlsx(decoded.workbook);
+    const xml = strFromU8(unzipSync(exported.bytes)["xl/worksheets/sheet1.xml"]!);
+    expect(xml).toContain('<cfRule type="containsErrors" priority="1"');
+    expect(xml).toContain("<formula>ISERROR(A1)</formula>");
+    expect(xml).toContain('<cfRule type="notContainsErrors" priority="2"');
+    expect(xml).toContain("<formula>NOT(ISERROR(B2))</formula>");
+    expect(
+      getActiveSheet((await decodeXlsx(exported.bytes)).workbook).conditionalFormats,
+    ).toMatchObject([
+      { condition: { kind: "error", error: true } },
+      { condition: { kind: "error", error: false } },
+    ]);
+  });
+
   test("roundtrips standard cfvo formula thresholds with absolute references", async () => {
     const workbook = createWorkbook({ id: "formula-thresholds", sheetId: "sheet" });
     const sheet = getActiveSheet(workbook);

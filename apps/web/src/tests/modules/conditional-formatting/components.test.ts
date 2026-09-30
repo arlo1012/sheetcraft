@@ -1,7 +1,10 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
+import { nextTick } from "vue";
 import ConditionalFormatEditorDialog from "../../../modules/conditional-formatting/components/ConditionalFormatEditorDialog.vue";
 import ConditionalFormatManagerDialog from "../../../modules/conditional-formatting/components/ConditionalFormatManagerDialog.vue";
+import ConditionalFormatContainingCriteria from "../../../modules/conditional-formatting/components/ConditionalFormatContainingCriteria.vue";
+import ConditionalFormatStyleDialog from "../../../modules/conditional-formatting/components/ConditionalFormatStyleDialog.vue";
 import { createAppI18n } from "../../../shared/i18n";
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
 
@@ -120,6 +123,79 @@ describe("conditional formatting dialogs", () => {
     expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({
       condition: { kind: "cellValue", operator: "equal", value: "001" },
     });
+  });
+
+  test.each([
+    ["blank", { kind: "blank", blank: true }],
+    ["nonBlank", { kind: "blank", blank: false }],
+    ["error", { kind: "error", error: true }],
+    ["nonError", { kind: "error", error: false }],
+  ] as const)("preserves %s containing rule when saved and reopened", async (type, condition) => {
+    const first = mountEditor(undefined, "between");
+    first.getComponent(ConditionalFormatContainingCriteria).vm.$emit("update:type", type);
+    await nextTick();
+    await confirmButton().trigger("click");
+    const saved = first.emitted("save")?.[0]?.[0] as SheetConditionalFormatRule;
+    expect(saved.condition).toEqual(condition);
+    first.unmount();
+    mounted.splice(mounted.indexOf(first), 1);
+    document.body.replaceChildren();
+
+    const reopened = mountEditor(saved);
+    expect(reopened.getComponent(ConditionalFormatContainingCriteria).props("type")).toBe(type);
+    await confirmButton().trigger("click");
+    expect(reopened.emitted("save")?.[0]?.[0]).toMatchObject({ condition });
+  });
+
+  test("keeps between references, text, and dates when editing their containing rules", async () => {
+    const conditions = [
+      {
+        kind: "cellValue" as const,
+        operator: "between" as const,
+        value: { formula: "=$D$1" },
+        secondValue: { formula: "=$E$1" },
+      },
+      { kind: "text" as const, operator: "beginsWith" as const, text: "Late" },
+      { kind: "date" as const, period: "nextMonth" as const },
+    ];
+    for (const condition of conditions) {
+      const wrapper = mountEditor({ ...textRule, id: condition.kind, condition });
+      await confirmButton().trigger("click");
+      expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({ condition });
+      wrapper.unmount();
+      mounted.splice(mounted.indexOf(wrapper), 1);
+      document.body.replaceChildren();
+    }
+  });
+
+  test("retains format on cancel and uses the confirmed containing-rule format", async () => {
+    const wrapper = mountEditor(textRule);
+    const editFormat = [...document.body.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Format…",
+    );
+    if (!editFormat) throw new Error("Missing containing-rule format action.");
+    await new DOMWrapper(editFormat).trigger("click");
+    const style = wrapper.getComponent(ConditionalFormatStyleDialog);
+    style.vm.$emit("cancel");
+    await nextTick();
+    await confirmButton().trigger("click");
+    expect(wrapper.emitted("save")?.[0]?.[0]).toMatchObject({ style: textRule.style });
+
+    wrapper.unmount();
+    mounted.splice(mounted.indexOf(wrapper), 1);
+    document.body.replaceChildren();
+    const confirmed = mountEditor(textRule);
+    const formatButton = [...document.body.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Format…",
+    );
+    if (!formatButton) throw new Error("Missing containing-rule format action.");
+    await new DOMWrapper(formatButton).trigger("click");
+    confirmed
+      .getComponent(ConditionalFormatStyleDialog)
+      .vm.$emit("confirm", { fillColor: "#00FF00" });
+    await nextTick();
+    await confirmButton().trigger("click");
+    expect(confirmed.emitted("save")?.[0]?.[0]).toMatchObject({ style: { fillColor: "#00FF00" } });
   });
 
   test("does not emit an invalid formula or incomplete between rule", async () => {

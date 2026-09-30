@@ -2,11 +2,18 @@ import { describe, expect, test } from "vitest";
 import {
   applyConditionalFormatStyle,
   createConditionalFormatResolver,
+  createConditionalFormatVisualResolver,
   normalizeConditionalFormatRules,
   type SheetConditionalFormatRule,
 } from "../../conditional-formatting.js";
 import { createTestWorkbook } from "../helpers.js";
-import { createWorkbookEvaluator, getActiveSheet, setCellValue } from "../../workbook.js";
+import {
+  createWorkbookEvaluator,
+  getActiveSheet,
+  setCellContent,
+  setCellValue,
+} from "../../workbook.js";
+import { createFormulaError } from "../../formula/types.js";
 
 const range = { start: { row: 0, column: 0 }, end: { row: 9, column: 9 } };
 function rule(
@@ -172,6 +179,67 @@ describe("conditional-formatting resolver", () => {
     expect(resolve({ row: 4, column: 0 })).toBeUndefined();
   });
 
+  test("matches only computed formula errors and can select non-errors", () => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    setCellContent(
+      sheet,
+      { row: 0, column: 0 },
+      {
+        kind: "error",
+        error: createFormulaError("DIV0"),
+      },
+    );
+    setCellValue(sheet, { row: 1, column: 0 }, "#DIV/0!");
+    setCellValue(sheet, { row: 2, column: 0 }, 4);
+    setCellContent(
+      sheet,
+      { row: 3, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=1/0" },
+      },
+    );
+    sheet.conditionalFormats = [
+      rule("errors", { kind: "error", error: true }, { fillColor: "#ff0000" }),
+      rule("non-errors", { kind: "error", error: false }, { textColor: "#0000ff" }),
+    ];
+    const resolve = createConditionalFormatResolver(
+      sheet,
+      createWorkbookEvaluator(workbook, sheet.id),
+    );
+    expect(resolve({ row: 0, column: 0 })).toEqual({ fillColor: "#ff0000" });
+    expect(resolve({ row: 1, column: 0 })).toEqual({ textColor: "#0000ff" });
+    expect(resolve({ row: 2, column: 0 })).toEqual({ textColor: "#0000ff" });
+    expect(resolve({ row: 3, column: 0 })).toEqual({ fillColor: "#ff0000" });
+    expect(resolve({ row: 4, column: 0 })).toEqual({ textColor: "#0000ff" });
+  });
+
+  test.each([true, false])("honors stop-if-true for error=%s before visual rules", (error) => {
+    const workbook = createTestWorkbook();
+    const sheet = getActiveSheet(workbook);
+    setCellValue(sheet, { row: 0, column: 0 }, 4);
+    sheet.conditionalFormats = [
+      { ...rule("stop", { kind: "error", error }, {}), stopIfTrue: true },
+      rule(
+        "bar",
+        {
+          kind: "dataBar",
+          minimum: { kind: "num", value: 0 },
+          maximum: { kind: "num", value: 10 },
+          color: "#ff0000",
+        },
+        {},
+      ),
+    ];
+    const visual = createConditionalFormatVisualResolver(
+      sheet,
+      createWorkbookEvaluator(workbook, sheet.id),
+    )({ row: 0, column: 0 });
+    if (error) expect(visual?.dataBar).toBeDefined();
+    else expect(visual).toBeUndefined();
+  });
+
   test("keeps the persisted style immutable and clears incompatible fill representations", () => {
     const base = {
       fillGradient: {
@@ -216,6 +284,19 @@ describe("conditional-formatting normalization", () => {
       normalizeConditionalFormatRules([
         rule("same", { kind: "formula", formula: "=A1" }, { fillColor: "#abcdef" }),
         rule("same", { kind: "formula", formula: "=" }, { fillColor: "#abcdef" }),
+      ]),
+    ).toThrow("conditional-formatting");
+  });
+
+  test("normalizes error conditions and rejects non-boolean error flags", () => {
+    expect(
+      normalizeConditionalFormatRules([
+        rule("errors", { kind: "error", error: true }, { fillColor: "#abcdef" }),
+      ])[0]?.condition,
+    ).toEqual({ kind: "error", error: true });
+    expect(() =>
+      normalizeConditionalFormatRules([
+        rule("invalid-errors", { kind: "error", error: "true" } as never, { fillColor: "#abcdef" }),
       ]),
     ).toThrow("conditional-formatting");
   });

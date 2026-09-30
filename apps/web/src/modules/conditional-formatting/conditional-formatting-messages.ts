@@ -29,6 +29,17 @@ export type ConditionalFormattingMessageSchema = {
     editRuleDescription: string;
     ruleAllValues: string;
     ruleContaining: string;
+    containingDescription: string;
+    specificText: string;
+    occurringDate: string;
+    blankValues: string;
+    nonBlankValues: string;
+    errors: string;
+    nonErrors: string;
+    comparison: string;
+    rangeTo: string;
+    editFormat: string;
+    noFormat: string;
     ruleRank: string;
     ruleAverage: string;
     ruleDuplicate: string;

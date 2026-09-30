@@ -60,6 +60,8 @@ function reset(): void {
 
 function describeRule(rule: SheetConditionalFormatRule): string {
   const c = rule.condition;
+  if (c.kind === "error")
+    return c.error ? t("conditionalFormatting.errors") : t("conditionalFormatting.nonErrors");
   if (c.kind === "formula") return c.formula;
   if (c.kind === "blank")
     return c.blank ? t("conditionalFormatting.blanks") : t("conditionalFormatting.nonBlanks");

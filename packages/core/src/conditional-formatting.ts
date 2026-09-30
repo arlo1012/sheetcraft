@@ -180,6 +180,8 @@ export type ConditionalFormatCondition =
     }
   | { kind: "text"; operator: "contains" | "notContains" | "beginsWith" | "endsWith"; text: string }
   | { kind: "blank"; blank: boolean }
+  /** Matches computed formula-error values; literal error-token text does not match. */
+  | { kind: "error"; error: boolean }
   | { kind: "duplicate"; unique: boolean }
   | { kind: "formula"; formula: string }
   | { kind: "rank"; count: number; percent?: boolean; bottom?: boolean }
@@ -436,6 +438,10 @@ function normalizeCondition(condition: ConditionalFormatCondition): ConditionalF
   if (condition.kind === "blank") {
     if (typeof condition.blank !== "boolean") invalid("condition.blank", condition.blank);
     return { kind: "blank", blank: condition.blank };
+  }
+  if (condition.kind === "error") {
+    if (typeof condition.error !== "boolean") invalid("condition.error", condition.error);
+    return { kind: "error", error: condition.error };
   }
   if (condition.kind === "duplicate") {
     if (typeof condition.unique !== "boolean") invalid("condition.unique", condition.unique);
@@ -1191,35 +1197,37 @@ export function createConditionalFormatResolver(
                 ? false
                 : (value === null || (typeof value === "string" && /^[ ]*$/.test(value))) ===
                   rule.condition.blank
-              : rule.condition.kind === "duplicate"
-                ? (() => {
-                    const duplicateKey = formulaValueKey(value);
-                    const count =
-                      duplicateKey === undefined
-                        ? 0
-                        : (getDuplicateCounts(rule).get(duplicateKey) ?? 0);
-                    return rule.condition.unique ? count === 1 : count > 1;
-                  })()
-                : rule.condition.kind === "rank"
-                  ? rankMatches(value, rule.condition, getNumericSummary(rule))
-                  : rule.condition.kind === "average"
-                    ? averageMatches(value, rule.condition, getNumericSummary(rule))
-                    : rule.condition.kind === "date"
-                      ? dateMatches(value, rule.condition.period, options, clock)
-                      : rule.condition.kind === "colorScale"
-                        ? colorScaleColor(
-                            value,
-                            rule.condition,
-                            getNumericSummary(rule),
-                            rule,
-                            address,
-                            evaluator,
-                          ) !== undefined
-                        : rule.condition.kind === "formula"
-                          ? formulaMatches(rule, address, evaluator)
-                          : rule.condition.kind === "dataBar" || rule.condition.kind === "iconSet"
-                            ? typeof value === "number" && Number.isFinite(value)
-                            : false;
+              : rule.condition.kind === "error"
+                ? isFormulaError(value) === rule.condition.error
+                : rule.condition.kind === "duplicate"
+                  ? (() => {
+                      const duplicateKey = formulaValueKey(value);
+                      const count =
+                        duplicateKey === undefined
+                          ? 0
+                          : (getDuplicateCounts(rule).get(duplicateKey) ?? 0);
+                      return rule.condition.unique ? count === 1 : count > 1;
+                    })()
+                  : rule.condition.kind === "rank"
+                    ? rankMatches(value, rule.condition, getNumericSummary(rule))
+                    : rule.condition.kind === "average"
+                      ? averageMatches(value, rule.condition, getNumericSummary(rule))
+                      : rule.condition.kind === "date"
+                        ? dateMatches(value, rule.condition.period, options, clock)
+                        : rule.condition.kind === "colorScale"
+                          ? colorScaleColor(
+                              value,
+                              rule.condition,
+                              getNumericSummary(rule),
+                              rule,
+                              address,
+                              evaluator,
+                            ) !== undefined
+                          : rule.condition.kind === "formula"
+                            ? formulaMatches(rule, address, evaluator)
+                            : rule.condition.kind === "dataBar" || rule.condition.kind === "iconSet"
+                              ? typeof value === "number" && Number.isFinite(value)
+                              : false;
       if (!matches) continue;
       const calculatedFill =
         rule.condition.kind === "colorScale"
@@ -1311,6 +1319,7 @@ export function createConditionalFormatVisualResolver(
         !isFormulaError(value) &&
         (value === null || (typeof value === "string" && /^[ ]*$/.test(value))) === condition.blank
       );
+    if (condition.kind === "error") return isFormulaError(value) === condition.error;
     if (condition.kind === "duplicate") {
       const duplicateKey = formulaValueKey(value);
       const count = duplicateKey === undefined ? 0 : (duplicatesFor(rule).get(duplicateKey) ?? 0);
