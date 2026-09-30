@@ -29,7 +29,9 @@ const options = computed(() =>
     ...(props.dataBarBound === "maximum" ? ["autoMax", "max"] : ["max"]),
   ].map((value) => ({
     value,
-    label: t(`conditionalFormatting.${value}` as MessageKey),
+    label: t(
+      `conditionalFormatting.${value === "formula" ? "thresholdFormula" : value}` as MessageKey,
+    ),
   })),
 );
 function updateValue(value: string): void {

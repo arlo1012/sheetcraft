@@ -38,6 +38,7 @@ export const conditionalFormattingZhCN = {
     twoColorScale: "双色刻度",
     threeColorScale: "三色刻度",
     thresholdType: "类型",
+    thresholdFormula: "公式",
     color: "颜色",
     lightBlueBar: "浅蓝色数据条",
     purpleBar: "紫色数据条",

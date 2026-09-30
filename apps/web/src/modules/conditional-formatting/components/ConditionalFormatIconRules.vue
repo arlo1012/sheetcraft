@@ -29,9 +29,11 @@ const rows = computed(() =>
   props.condition.thresholds.map((entry, index) => ({ entry, index })).reverse(),
 );
 const thresholdOptionsBase = computed(() =>
-  (["num", "percent", "percentile", "formula"] as const).map((value) => ({
+  (["num", "percent", "formula", "percentile"] as const).map((value) => ({
     value,
-    label: t(`conditionalFormatting.${value}` as MessageKey),
+    label: t(
+      `conditionalFormatting.${value === "formula" ? "thresholdFormula" : value}` as MessageKey,
+    ),
   })),
 );
 const iconChoices = computed(() =>
@@ -227,13 +229,16 @@ function iconLabel(icon: Exclude<IconChoice, null>): string {
     grid-template-columns: subgrid;
     grid-column: 1 / -1;
     align-items: center;
-    min-height: 30px;
     > * {
       min-width: 0;
     }
   }
   &__header {
+    min-height: 20px;
     color: var(--idea-text-secondary);
+  }
+  &__row {
+    min-height: 28px;
   }
   &__condition-heading {
     grid-column: span 2;

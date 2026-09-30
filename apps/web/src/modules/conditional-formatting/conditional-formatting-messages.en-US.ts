@@ -38,6 +38,7 @@ export const conditionalFormattingEnUS = {
     twoColorScale: "2-color scale",
     threeColorScale: "3-color scale",
     thresholdType: "Type",
+    thresholdFormula: "Formula",
     color: "Color",
     lightBlueBar: "Light blue data bar",
     purpleBar: "Purple data bar",

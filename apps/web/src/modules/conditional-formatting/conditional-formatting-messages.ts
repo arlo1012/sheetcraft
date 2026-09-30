@@ -36,6 +36,7 @@ export type ConditionalFormattingMessageSchema = {
     twoColorScale: string;
     threeColorScale: string;
     thresholdType: string;
+    thresholdFormula: string;
     color: string;
     lightBlueBar: string;
     purpleBar: string;
