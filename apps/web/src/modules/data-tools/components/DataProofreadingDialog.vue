@@ -40,7 +40,7 @@ const emit = defineEmits<{
 }>();
 const { t, locale } = useAppI18n();
 const rows = computed(() => [...props.issues]);
-const columns = computed<PrimaryTableCol<DataProofreadingIssue>[]>(() => [
+const columns = computed<PrimaryTableCol[]>(() => [
   {
     colKey: "row-select",
     type: "multiple",
@@ -66,6 +66,10 @@ const selected = computed(() => new Set(props.selectedIds));
 const safeSelectedCount = computed(
   () => props.issues.filter((issue) => issue.safe && selected.value.has(issue.id)).length,
 );
+
+function issueTypeLabel(type: DataProofreadingIssueKind): string {
+  return t(`proofreading.types.${type}`);
+}
 
 function updateRange(range: string): void {
   emit("draftChange", { range });
@@ -133,7 +137,7 @@ function selectIssues(keys: Array<string | number>): void {
         @select-change="selectIssues"
       >
         <template #type="{ row }">
-          {{ t(`proofreading.types.${row.type}`) }}
+          {{ issueTypeLabel(row.type) }}
         </template>
         <template #reason="{ row }">
           {{ t(`proofreading.reasons.${row.reason}`) }}
