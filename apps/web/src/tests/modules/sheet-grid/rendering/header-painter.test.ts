@@ -49,6 +49,34 @@ function createFrame(gutter = 0, rowOutlineGutter = 0, columnOutlineGutter = 0) 
 }
 
 describe("header painter", () => {
+  test("leaves paper margins and page gaps on the desktop backdrop instead of painting a continuous heading bar", () => {
+    const context = createContext();
+    const fills: Array<string | CanvasGradient | CanvasPattern> = [];
+    vi.mocked(context.fillRect).mockImplementation(() => fills.push(context.fillStyle));
+    const base = createFrame();
+    const frame = createSheetRenderFrame(
+      base.layout,
+      { width: 62, height: 50 },
+      1,
+      { width: 36, height: 24 },
+      { x: 26, y: 26 },
+    );
+    paintSheetHeaders(context, {
+      frame,
+      selection: { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0, mode: "cells" },
+      quickTools: { enabled: false, gutter: 0 },
+      palette: DEFAULT_SHEET_HEADER_PALETTE,
+      backdrop: "#e5e7eb",
+    });
+    expect(fills.slice(0, 2)).toEqual(["#e5e7eb", "#e5e7eb"]);
+    expect(context.fillText).toHaveBeenCalledWith("A", 82, 37.5);
+    expect(context.fillText).toHaveBeenCalledWith("1", 43.5, 60);
+    expect(context.lineTo).not.toHaveBeenCalledWith(
+      frame.size.width,
+      frame.headerSize.height - 0.5,
+    );
+  });
+
   test.each([0, 16])(
     "keeps row labels fixed-width beside the outline lane with quick gutter %i",
     (gutter) => {

@@ -88,6 +88,63 @@ describe("page layout", () => {
     ).toEqual({ row: 0, column: nextColumnPage.range.start.column });
   });
 
+  test("projects scaled paper with leading and trailing view padding", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 30,
+      columnCount: 6,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({ rowCount: 30, defaultRowHeight: 20 });
+    const setup = { ...DEFAULT_SHEET_PAGE_SETUP, scale: 200 };
+    const pagination = createSheetPagination({
+      geometry,
+      rows,
+      setup,
+      printRange: { start: { row: 0, column: 0 }, end: { row: 29, column: 5 } },
+    });
+    const pagePadding = 10;
+    const shown = createPageLayoutProjection({ geometry, rows, pagination, pagePadding });
+    const hidden = createPageLayoutProjection({
+      geometry,
+      rows,
+      pagination,
+      pagePadding,
+      showWhiteSpace: false,
+    });
+    const lastShown = shown.getPage(
+      pagination.pageRows.length - 1,
+      pagination.pageColumns.length - 1,
+    )!;
+    const lastHidden = hidden.getPage(
+      pagination.pageRows.length - 1,
+      pagination.pageColumns.length - 1,
+    )!;
+
+    expect(shown.getPage(0, 0)!.paperRect).toMatchObject({ x: pagePadding, y: pagePadding });
+    expect(shown.geometry.getTotalSize()).toMatchObject({
+      width: lastShown.paperRect.x + lastShown.paperRect.width + pagePadding,
+      height: lastShown.paperRect.y + lastShown.paperRect.height + pagePadding,
+    });
+    expect(hidden.geometry.getTotalSize()).toMatchObject({
+      width: lastHidden.paperRect.x + lastHidden.paperRect.width + pagePadding,
+      height: lastHidden.paperRect.y + lastHidden.paperRect.height + pagePadding,
+    });
+    expect(
+      shown.geometry.getCellAtPoint({ x: pagePadding - 0.01, y: pagePadding - 0.01 }),
+    ).toBeNull();
+    expect(shown.getVisiblePages({ x: 0, y: 0, width: pagePadding, height: pagePadding })).toEqual(
+      [],
+    );
+
+    const address = {
+      row: pagination.pageRows.at(-1)!.start,
+      column: pagination.pageColumns.at(-1)!.start,
+    };
+    const rect = hidden.geometry.getCellRect(address);
+    expect(hidden.geometry.getCellAtPoint({ x: rect.x + 1, y: rect.y + 1 })).toEqual(address);
+  });
+
   test("splits selection fragments at page gaps while retaining one viewport contract", () => {
     const { geometry, rows, pagination } = fixture();
     const layout = createPageLayoutViewportLayout({

@@ -41,6 +41,7 @@ import {
   clipPageContents,
   paintPageBreakPreviewBackground,
   paintPageLayoutBackground,
+  PAGE_LAYOUT_DESKTOP_COLOR,
   paintPageBreakPreview,
 } from "../../page-layout/rendering/page-view-painter";
 
@@ -227,6 +228,7 @@ function paint(): void {
     paintSheetHeaders(context, {
       ...props.headers,
       frame,
+      backdrop: props.pageView?.mode === "page-layout" ? PAGE_LAYOUT_DESKTOP_COLOR : undefined,
       palette: {
         ...props.environment.headers,
         font: props.environment.headers.font.replace(

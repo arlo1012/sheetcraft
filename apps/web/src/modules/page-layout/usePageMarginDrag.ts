@@ -23,6 +23,7 @@ export function usePageMarginDrag(options: {
 }) {
   const cursor = ref<string>();
   const activeMargin = ref<SheetPageMargin>();
+  const pointerPosition = ref<Point>();
   let disposed = false;
   let drag:
     | {
@@ -39,6 +40,7 @@ export function usePageMarginDrag(options: {
     drag = undefined;
     cursor.value = undefined;
     activeMargin.value = undefined;
+    pointerPosition.value = undefined;
     options.onPreview();
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", finish);
@@ -59,6 +61,7 @@ export function usePageMarginDrag(options: {
       return;
     }
     const surface = options.getSurfacePoint(event);
+    pointerPosition.value = surface;
     const origin = options.getSurfacePoint(drag.startEvent);
     const horizontal = drag.margin === "left" || drag.margin === "right";
     const delta = horizontal ? surface.x - origin.x : surface.y - origin.y;
@@ -109,6 +112,7 @@ export function usePageMarginDrag(options: {
       setup: cloneSheetPageSetup(options.getSetup()),
     };
     activeMargin.value = margin;
+    pointerPosition.value = options.getSurfacePoint(event);
     cursor.value = margin === "left" || margin === "right" ? "col-resize" : "row-resize";
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", finish);
@@ -120,5 +124,5 @@ export function usePageMarginDrag(options: {
     disposed = true;
     stop();
   });
-  return { start, stop, cursor, activeMargin };
+  return { start, stop, cursor, activeMargin, pointerPosition };
 }

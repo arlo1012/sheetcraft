@@ -37,6 +37,9 @@ const props = withDefaults(
     now?: Date;
     actionRequest?: HeaderFooterActionRequest;
     fontScale?: number;
+    placeholder?: string;
+    rowActive?: boolean;
+    uiScale?: number;
   }>(),
   {
     variant: "odd",
@@ -44,6 +47,9 @@ const props = withDefaults(
     now: undefined,
     actionRequest: undefined,
     fontScale: 1,
+    placeholder: undefined,
+    rowActive: false,
+    uiScale: 1,
   },
 );
 const emit = defineEmits<{
@@ -205,7 +211,7 @@ watch(
 <template>
   <label
     class="page-header-footer-field"
-    :class="{ 'is-editing': editing }"
+    :class="{ 'is-editing': editing, 'is-row-active': rowActive }"
     :style="{ textAlign: part }"
   >
     <span class="ui-visually-hidden">{{ label }}</span>
@@ -245,6 +251,9 @@ watch(
       @focus="focus"
       @click="focus"
     >
+      <span v-if="!value && placeholder" class="page-header-footer-field__placeholder">{{
+        placeholder
+      }}</span>
       <span
         v-for="(run, index) in previewRuns"
         :key="index"
@@ -277,6 +286,21 @@ watch(
     text-align: inherit;
     white-space: pre;
     cursor: text;
+  }
+  &__placeholder {
+    color: var(--idea-text-muted);
+    font-family: var(--idea-font-sans);
+    font-size: calc(20px * v-bind(uiScale));
+    line-height: calc(24px * v-bind(uiScale));
+  }
+  &.is-row-active &__preview {
+    outline: 1px solid var(--idea-border-control);
+    outline-offset: -1px;
+  }
+  &.is-editing &__preview,
+  &.is-editing :deep(textarea) {
+    outline: 2px solid var(--idea-action-primary);
+    outline-offset: -1px;
   }
   &.is-editing :deep(textarea) {
     min-height: 28px;

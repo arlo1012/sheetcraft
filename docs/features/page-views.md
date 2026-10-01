@@ -33,13 +33,19 @@ Page Setup can reset all manual breaks and change the printable range.
 ## Page layout
 
 Cells are projected onto separate paper rectangles with physical margins,
-rulers, and page gaps. Selection, navigation, editing, borders, and images
+rulers, and page gaps. A view-only 20-pixel desktop inset surrounds the paper;
+its physical size is independent of percentage print scaling. Selection, navigation, editing, borders, and images
 use that same coordinate projection. Paper margins and gaps do not select cells;
 a selection crossing pages remains one logical range with separate visual
 fragments. Allocated blank cells remain editable outside the printable range.
 
-The top and left rulers share paper/content coordinates with the cells and can
-use millimetres, centimetres, or inches. View controls toggle rulers, margin
+The top and left rulers sit outside the row/column headings, which paint only
+their visible cell fragments. They share paper/content coordinates with the cells
+and use millimetres, centimetres, or inches. Zero remains at the content origin;
+margin ticks count back toward the paper edge. The selected rows and columns are
+projected onto the ruler strips. Ruler margin markers remain available when the
+paper margin handles are hidden; dragging shows a solid guide and a live value
+in the selected unit, removed on release or cancellation. View controls toggle rulers, margin
 handles, and page white space. Double-click a page edge to collapse or restore
 its top/bottom white space; Enter/Space on that edge also works. Collapsing is
 session state, preserves the active cell, and hides header/footer editing.
@@ -50,7 +56,11 @@ cancellation, window blur, changing views/sheets, or becoming read-only discards
 the draft. Arrow keys adjust by 0.1 mm and Shift+Arrow by 1 mm. Margins retain at
 least 1 mm of printable body; header/footer offsets stay within their body margins.
 
-Each page exposes left, center, and right header/footer fields. They support
+Each page exposes left, center, and right header/footer fields. Empty sections
+show a centered Add header/Add footer hint. Hovering or editing reveals the
+three section outlines, with the active field highlighted. Header/footer tools
+occupy a contextual tab in the existing Ribbon panel, preserving the paper
+position instead of inserting another toolbar row. They support
 multiline text and independent first, odd, and even page settings. The contextual
 editor inserts page number, page count, sheet name, file name, date, and time
 fields at the caret, and applies a font, point size, bold, italic, underline, or

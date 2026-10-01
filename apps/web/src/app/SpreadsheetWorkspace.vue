@@ -1465,7 +1465,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     class="spreadsheet-workspace"
     :class="{
       'is-formula-bar-hidden': !showFormulaBar,
-      'is-header-footer-editing': Boolean(headerFooterContext),
     }"
     :aria-label="t('workspace.editor')"
     :aria-busy="loading || fileBusy || imageBusy || xlsxBusy"
@@ -1481,6 +1480,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @change="imageActions.onFileChange"
     />
     <SpreadsheetRibbon
+      :header-footer-editing="
+        Boolean(headerFooterContext) && activeViewMode === 'page-layout' && showPageWhiteSpace
+      "
       :state="activeSelectionStyle"
       :disabled="!isFormattingSupported || activeSheet.properties.protected"
       :conditional-formatting-disabled="activeSheet.properties.protected"
@@ -1678,15 +1680,18 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           </template>
         </WorkbookFileActions>
       </template>
+      <template #header-footer-tools>
+        <PageHeaderFooterToolbar
+          v-if="headerFooterContext && activeViewMode === 'page-layout' && showPageWhiteSpace"
+          :setup="activePageSetup"
+          :context="headerFooterContext"
+          :disabled="activeSheet.properties.protected"
+          @action="sendHeaderFooterAction"
+          @options-change="updateHeaderFooterOptions"
+        />
+      </template>
     </SpreadsheetRibbon>
-    <PageHeaderFooterToolbar
-      v-if="headerFooterContext && activeViewMode === 'page-layout' && showPageWhiteSpace"
-      :setup="activePageSetup"
-      :context="headerFooterContext"
-      :disabled="activeSheet.properties.protected"
-      @action="sendHeaderFooterAction"
-      @options-change="updateHeaderFooterOptions"
-    />
+
     <DataToolsDialogs
       :sort-visible="dataSortVisible"
       :text-to-columns-visible="dataTextToColumnsVisible"
@@ -2402,13 +2407,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
 
   &.is-formula-bar-hidden {
     grid-template-rows: auto auto minmax(0, 1fr) 49px;
-  }
-
-  &.is-header-footer-editing {
-    grid-template-rows: auto auto auto auto minmax(0, 1fr) 49px;
-    &.is-formula-bar-hidden {
-      grid-template-rows: auto auto auto minmax(0, 1fr) 49px;
-    }
   }
 
   &__image-input {

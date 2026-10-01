@@ -44,6 +44,7 @@ export function useSheetViewport(options: {
   getPageSetup?: () => SheetPageSetup;
   getPrintRange?: () => CellRange;
   getShowPageWhiteSpace?: () => boolean;
+  getPagePadding?: () => number;
   getScale?: () => number;
   initialExtent: GridExtent;
   getGridExtentPolicy: () => GridExtentPolicy;
@@ -143,6 +144,7 @@ export function useSheetViewport(options: {
           rows: baseRows.value,
           pagination: pagination.value,
           showWhiteSpace: options.getShowPageWhiteSpace?.() ?? true,
+          pagePadding: options.getPagePadding?.() ?? 0,
         })
       : undefined,
   );
@@ -180,6 +182,7 @@ export function useSheetViewport(options: {
         rows: baseRows.value,
         pagination: pagination.value,
         showWhiteSpace: options.getShowPageWhiteSpace?.() ?? true,
+        pagePadding: options.getPagePadding?.() ?? 0,
         bodyScrollPosition: scrollPosition,
         viewportSize,
         overscan: 2,

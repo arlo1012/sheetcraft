@@ -1,6 +1,8 @@
 import type { Point, Rect, Size } from "@idea10/sheet-engine/geometry";
 import type { PageViewPaintState } from "../page-view-types";
 
+export const PAGE_LAYOUT_DESKTOP_COLOR = "#e5e7eb";
+
 const BREAK_COLOR = "#2672d9";
 
 function translated(rect: Rect, scroll: Point): Rect {
@@ -92,7 +94,7 @@ export function paintPageLayoutBackground(
   viewport: Size,
   paperColor: string,
 ): void {
-  context.fillStyle = "#e5e7eb";
+  context.fillStyle = PAGE_LAYOUT_DESKTOP_COLOR;
   context.fillRect(0, 0, viewport.width, viewport.height);
   for (const page of state.pages) {
     const paper = translated(page.paperRect, scroll);

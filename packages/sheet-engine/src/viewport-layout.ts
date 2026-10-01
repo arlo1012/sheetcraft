@@ -159,11 +159,11 @@ export function createSheetViewportLayout(options: {
       : freeze.columns === 0
         ? 0
         : geometry.getColumnOffset(freeze.columns);
-  const frozenBoundary = rows.getBoundaryOffset(freeze.rows);
+  const frozenBoundary = freeze.rows === 0 ? 0 : rows.getBoundaryOffset(freeze.rows);
   if (frozenBoundary === null) {
     throw new RangeError("Frozen row boundary is outside the row visibility index.");
   }
-  const frozenHeight: number = frozenBoundary;
+  const frozenHeight = frozenBoundary;
   const frozenSize = { width: frozenWidth, height: frozenHeight };
   const frozenViewportWidth = Math.min(viewportSize.width, frozenWidth);
   const frozenViewportHeight = Math.min(viewportSize.height, frozenHeight);

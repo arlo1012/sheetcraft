@@ -1,11 +1,12 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
+import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
 import PageLayoutRulers, {
-  PAGE_LAYOUT_RULER_SIZE,
   createPageLayoutRulerModel,
 } from "../../../../modules/page-layout/components/PageLayoutRulers.vue";
 import type { PageViewPaintState } from "../../../../modules/page-layout/page-view-types";
 import type { SheetRenderFrame } from "../../../../modules/sheet-grid/rendering/sheet-render-frame";
+import { createAppI18n } from "../../../../shared/i18n";
 
 const state: PageViewPaintState = {
   mode: "page-layout",
@@ -37,8 +38,8 @@ describe("PageLayoutRulers", () => {
   test("projects paper margins and the content zero point into both rulers", () => {
     const model = createPageLayoutRulerModel({ state, frame, unit: "mm" });
 
-    expect(model.horizontal.bands[0]).toEqual({ start: 0, end: 70 });
-    expect(model.vertical.bands[0]).toEqual({ start: 0, end: 80 });
+    expect(model.horizontal.bands[0]).toMatchObject({ start: 0, end: 70 });
+    expect(model.vertical.bands[0]).toMatchObject({ start: 0, end: 80 });
     expect(model.horizontal.ticks.find((tick) => tick.label === "0")).toMatchObject({
       position: 70,
       major: true,
@@ -56,29 +57,44 @@ describe("PageLayoutRulers", () => {
       unit: "cm",
     });
 
-    expect(scaled.horizontal.bands[0]).toEqual({ start: 0, end: 70 });
+    expect(scaled.horizontal.bands[0]).toMatchObject({ start: 0, end: 70 });
     expect(scaled.horizontal.ticks.find((tick) => tick.label === "0")?.position).toBe(70);
     expect(scaled.horizontal.ticks.some((tick) => tick.label === "5")).toBe(true);
     expect(scaled.horizontal.ticks.some((tick) => tick.label === "10")).toBe(true);
   });
 
-  test("renders top and left non-interactive ruler strips", () => {
+  test("never projects negative or minor ticks into the page gap", () => {
+    const firstPage = state.pages[0]!;
+    const gapped = {
+      ...state,
+      pages: [
+        {
+          ...firstPage,
+          paperRect: { ...firstPage.paperRect, x: 100 },
+          contentRect: { ...firstPage.contentRect, x: 170 },
+        },
+      ],
+    };
+    const model = createPageLayoutRulerModel({ state: gapped, frame, unit: "mm" });
+
+    expect(model.horizontal.ticks.every((tick) => tick.position >= 100)).toBe(true);
+  });
+
+  test("renders ruler strips in the outer top and left lanes", () => {
     const wrapper = mount(PageLayoutRulers, {
-      props: { state, frame, unit: "mm", label: "Page rulers" },
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { state, frame, setup: DEFAULT_SHEET_PAGE_SETUP, unit: "mm", label: "Page rulers" },
     });
 
-    expect(wrapper.get("[data-page-layout-rulers]").attributes("role")).toBe("img");
-    expect(wrapper.get('[data-page-ruler="horizontal"]').attributes("style")).toContain(
-      `top: ${frame.body.y - PAGE_LAYOUT_RULER_SIZE}px`,
-    );
-    expect(wrapper.get('[data-page-ruler="vertical"]').attributes("style")).toContain(
-      `left: ${frame.body.x - PAGE_LAYOUT_RULER_SIZE}px`,
-    );
+    expect(wrapper.get("[data-page-layout-rulers]").attributes("role")).toBe("group");
+    expect(wrapper.get('[data-page-ruler="horizontal"]').attributes("style")).toContain("top: 0px");
+    expect(wrapper.get('[data-page-ruler="vertical"]').attributes("style")).toContain("left: 0px");
     expect(wrapper.findAll(".page-layout-rulers__margin")).toHaveLength(4);
   });
   test("uses print scale only to keep the visual strip and labels proportionate", () => {
     const wrapper = mount(PageLayoutRulers, {
-      props: { state, frame, unit: "mm", printScale: 2 },
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { state, frame, setup: DEFAULT_SHEET_PAGE_SETUP, unit: "mm", printScale: 2 },
     });
 
     expect(wrapper.get('[data-page-ruler="horizontal"]').attributes("style")).toContain(
@@ -87,6 +103,29 @@ describe("PageLayoutRulers", () => {
     expect(wrapper.get('[data-page-ruler="horizontal"]').attributes("viewBox")).toContain(" 13");
     expect(wrapper.get(".page-layout-rulers__label").attributes("style")).toContain(
       "font-size: 6px",
+    );
+  });
+
+  test("shows localized drag value and hides vertical markers with collapsed white space", () => {
+    const wrapper = mount(PageLayoutRulers, {
+      global: { plugins: [createAppI18n("en-US")] },
+      props: {
+        state: { ...state, showWhiteSpace: false },
+        frame,
+        setup: {
+          ...DEFAULT_SHEET_PAGE_SETUP,
+          margins: { ...DEFAULT_SHEET_PAGE_SETUP.margins, left: 11.6 },
+        },
+        unit: "cm",
+        activeMargin: "left",
+        dragPoint: { x: 20, y: 20 },
+      },
+    });
+
+    expect(wrapper.get("[data-page-margin-value]").text()).toBe("1.16 Centimetres");
+    expect(wrapper.find('[data-page-ruler-margin="top"]').exists()).toBe(false);
+    expect(wrapper.get('[data-page-ruler-margin="left"]').classes()).toContain(
+      "page-layout-rulers__marker",
     );
   });
 });

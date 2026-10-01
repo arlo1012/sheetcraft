@@ -33,6 +33,20 @@ function createLayout(options?: {
 }
 
 describe("sheet render frame", () => {
+  test("places headings after outer ruler lanes without changing body hit coordinates", () => {
+    const frame = createSheetRenderFrame(
+      createLayout(),
+      { width: 62, height: 50 },
+      1,
+      { width: 36, height: 24 },
+      { x: 26, y: 26 },
+    );
+    expect(frame.rowHeaders[1]?.clip).toMatchObject({ x: 26, y: 50, width: 36 });
+    expect(frame.columnHeaders[1]?.clip).toMatchObject({ x: 62, y: 26, height: 24 });
+    expect(getSurfaceCell(frame, { x: 70, y: 30 })).toBeNull();
+    expect(getSurfaceCell(frame, { x: 63, y: 51 })).toEqual({ row: 0, column: 0 });
+  });
+
   test("keeps empty frozen header panes harmless when no panes are frozen", () => {
     const frame = createSheetRenderFrame(createLayout(), { width: 36, height: 24 }, 1);
 

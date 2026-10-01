@@ -76,6 +76,8 @@ export type HeaderPaintState = Readonly<{
   hovered?: HeaderHit;
   focused?: HeaderFocus;
   palette: SheetHeaderPalette;
+  /** Separated paper keeps non-heading space on the desktop backdrop. */
+  backdrop?: string;
 }>;
 
 function isAxisSelected(
@@ -195,21 +197,23 @@ function paintAxisItem(
 ): void {
   const { palette, quickTools, selection, hovered, focused } = state;
   const gutter = quickTools.gutter;
-  const rowLabelStart = gutter + (quickTools.rowOutlineGutter ?? 0);
-  const columnLabelStart = gutter + (quickTools.columnOutlineGutter ?? 0);
+  const rowLabelInset = gutter + (quickTools.rowOutlineGutter ?? 0);
+  const columnLabelInset = gutter + (quickTools.columnOutlineGutter ?? 0);
+  const rowLabelStart = frame.headingOrigin.x + rowLabelInset;
+  const columnLabelStart = frame.headingOrigin.y + columnLabelInset;
   const rect =
     axis === "row"
       ? {
           x: rowLabelStart,
           y: item.offset,
-          width: Math.max(0, frame.headingSize.width - rowLabelStart - 1),
+          width: Math.max(0, frame.headingSize.width - rowLabelInset - 1),
           height: item.size,
         }
       : {
           x: item.offset,
           y: columnLabelStart,
           width: item.size,
-          height: Math.max(0, frame.headingSize.height - columnLabelStart - 1),
+          height: Math.max(0, frame.headingSize.height - columnLabelInset - 1),
         };
   if (rect.width <= 0 || rect.height <= 0) return;
   const axisSelected = isAxisSelected(axis, item.index, selection);
@@ -250,8 +254,8 @@ function paintAxisItem(
 
   const revealed = quickTools.enabled && isRevealedItem(axis, item.index, hovered, focused);
   if (revealed) {
-    const gripX = axis === "row" ? gutter / 2 : item.offset + item.size / 2;
-    const gripY = axis === "row" ? item.offset + item.size / 2 : gutter / 2;
+    const gripX = axis === "row" ? frame.headingOrigin.x + gutter / 2 : item.offset + item.size / 2;
+    const gripY = axis === "row" ? item.offset + item.size / 2 : frame.headingOrigin.y + gutter / 2;
     paintGripIcon(
       context,
       gripX,
@@ -263,8 +267,8 @@ function paintAxisItem(
     if (shouldShowBoundary(axis, item.index, true, selection)) {
       paintPlus(
         context,
-        axis === "row" ? gutter / 2 : item.offset,
-        axis === "row" ? item.offset : gutter / 2,
+        axis === "row" ? frame.headingOrigin.x + gutter / 2 : item.offset,
+        axis === "row" ? item.offset : frame.headingOrigin.y + gutter / 2,
         palette,
         hoverIsBoundary && hovered?.index === item.index,
       );
@@ -272,8 +276,8 @@ function paintAxisItem(
     if (shouldShowBoundary(axis, item.index, false, selection)) {
       paintPlus(
         context,
-        axis === "row" ? gutter / 2 : item.offset + item.size,
-        axis === "row" ? item.offset + item.size : gutter / 2,
+        axis === "row" ? frame.headingOrigin.x + gutter / 2 : item.offset + item.size,
+        axis === "row" ? item.offset + item.size : frame.headingOrigin.y + gutter / 2,
         palette,
         hoverIsBoundary && hovered?.index === item.index + 1,
       );
@@ -305,19 +309,21 @@ export function paintSheetHeaders(
   const { frame, palette, quickTools, selection, focused, hovered } = state;
   const { width, height } = frame.size;
   context.save();
-  context.fillStyle = palette.background;
+  context.fillStyle = state.backdrop ?? palette.background;
   context.fillRect(0, 0, width, frame.headerSize.height);
   context.fillRect(0, 0, frame.headerSize.width, height);
   paintAxisHeaders(context, "column", frame.columnHeaders, state);
   paintAxisHeaders(context, "row", frame.rowHeaders, state);
 
-  const rowLabelStart = quickTools.gutter + (quickTools.rowOutlineGutter ?? 0);
-  const columnLabelStart = quickTools.gutter + (quickTools.columnOutlineGutter ?? 0);
+  const rowLabelInset = quickTools.gutter + (quickTools.rowOutlineGutter ?? 0);
+  const columnLabelInset = quickTools.gutter + (quickTools.columnOutlineGutter ?? 0);
+  const rowLabelStart = frame.headingOrigin.x + rowLabelInset;
+  const columnLabelStart = frame.headingOrigin.y + columnLabelInset;
   const corner = {
     x: rowLabelStart,
     y: columnLabelStart,
-    width: Math.max(0, frame.headingSize.width - rowLabelStart),
-    height: Math.max(0, frame.headingSize.height - columnLabelStart),
+    width: Math.max(0, frame.headingSize.width - rowLabelInset),
+    height: Math.max(0, frame.headingSize.height - columnLabelInset),
   };
   context.fillStyle =
     selection.mode === "all"
@@ -328,12 +334,16 @@ export function paintSheetHeaders(
   context.fillRect(corner.x, corner.y, corner.width, corner.height);
   context.strokeStyle = palette.border;
   context.lineWidth = 1;
-  context.beginPath();
-  context.moveTo(frame.headerSize.width - 0.5, corner.y);
-  context.lineTo(frame.headerSize.width - 0.5, height);
-  context.moveTo(corner.x, frame.headerSize.height - 0.5);
-  context.lineTo(width, frame.headerSize.height - 0.5);
-  context.stroke();
+  if (state.backdrop) {
+    context.strokeRect(corner.x + 0.5, corner.y + 0.5, corner.width - 1, corner.height - 1);
+  } else {
+    context.beginPath();
+    context.moveTo(frame.headerSize.width - 0.5, corner.y);
+    context.lineTo(frame.headerSize.width - 0.5, height);
+    context.moveTo(corner.x, frame.headerSize.height - 0.5);
+    context.lineTo(width, frame.headerSize.height - 0.5);
+    context.stroke();
+  }
   context.fillStyle = selection.mode === "all" ? palette.action : palette.cornerText;
   context.beginPath();
   const triangleRight = corner.x + corner.width - 7;

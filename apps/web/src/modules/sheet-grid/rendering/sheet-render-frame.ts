@@ -25,6 +25,8 @@ export type SheetRenderFrame = Readonly<{
   headerSize: Size;
   /** Visual heading labels can leave room for a ruler lane before the body. */
   headingSize: Size;
+  /** Outer ruler lanes precede the fixed heading labels in page layout. */
+  headingOrigin: Point;
   size: Size;
   body: Rect;
   panes: Readonly<Record<FrozenPaneId, RenderPane>>;
@@ -37,6 +39,7 @@ export function createSheetRenderFrame(
   headerSize: Size,
   scale: number,
   headingSize: Size = headerSize,
+  headingOrigin: Point = { x: 0, y: 0 },
 ): SheetRenderFrame {
   const panes = {} as Record<FrozenPaneId, RenderPane>;
   for (const id of ["topLeft", "top", "left", "body"] as const) {
@@ -59,7 +62,7 @@ export function createSheetRenderFrame(
   const rowHeaders = (["topLeft", "left"] as const).map((id, index): HeaderPane => ({
     id: index === 0 ? "frozen" : "body",
     clip: {
-      x: 0,
+      x: headingOrigin.x,
       y: headerSize.height + panes[id].clip.y,
       width: headingSize.width,
       height: panes[id].clip.height,
@@ -73,7 +76,7 @@ export function createSheetRenderFrame(
     id: index === 0 ? "frozen" : "body",
     clip: {
       x: headerSize.width + panes[id].clip.x,
-      y: 0,
+      y: headingOrigin.y,
       width: panes[id].clip.width,
       height: headingSize.height,
     },
@@ -87,6 +90,7 @@ export function createSheetRenderFrame(
     scale,
     headerSize,
     headingSize,
+    headingOrigin,
     size: {
       width: headerSize.width + layout.viewportSize.width,
       height: headerSize.height + layout.viewportSize.height,

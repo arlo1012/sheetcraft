@@ -734,9 +734,13 @@ export function createPageLayoutProjection(options: {
   pagination: SheetPagination;
   /** Hides top/bottom paper white space without changing print pagination. */
   showWhiteSpace?: boolean;
+  /** View-only space around the projected paper surface. */
+  pagePadding?: number;
 }): PageLayoutProjection {
   const { geometry: base, rows: source, pagination } = options;
   const showWhiteSpace = options.showWhiteSpace ?? true;
+  const pagePadding = options.pagePadding ?? 0;
+  const interPageGap = (showWhiteSpace ? PAGE_GAP : HIDDEN_WHITE_SPACE_GAP) / pagination.printScale;
   const paperStride = {
     width: pagination.paperSize.width + PAGE_GAP / pagination.printScale,
     height: showWhiteSpace
@@ -749,45 +753,59 @@ export function createPageLayoutProjection(options: {
     left: firstPaper.contentRect.x - firstPaper.paperRect.x,
     top: showWhiteSpace ? firstPaper.contentRect.y - firstPaper.paperRect.y : 0,
   };
+  const totalWidth = Math.max(
+    base.getTotalSize().width + pagePadding * 2,
+    pagination.pageColumns.length * paperStride.width -
+      PAGE_GAP / pagination.printScale +
+      pagePadding * 2,
+  );
+  const totalHeight = Math.max(
+    source.getTotalHeight() + pagePadding * 2,
+    pagination.pageRows.length * paperStride.height - interPageGap + pagePadding * 2,
+  );
   function getPage(rowPage: number, columnPage: number): SheetPage | null {
     const page = pagination.getPage(rowPage, columnPage);
-    if (!page || showWhiteSpace) return page;
-    const paperRect = {
-      x: page.paperRect.x,
-      y: rowPage * paperStride.height,
-      width: page.paperRect.width,
-      height: pagination.contentSize.height,
-    };
+    if (!page) return null;
+    const paperRect = showWhiteSpace
+      ? { ...page.paperRect }
+      : {
+          x: page.paperRect.x,
+          y: rowPage * paperStride.height,
+          width: page.paperRect.width,
+          height: pagination.contentSize.height,
+        };
+    paperRect.x += pagePadding;
+    paperRect.y += pagePadding;
     return {
       ...page,
       paperRect,
       contentRect: {
-        x: page.contentRect.x,
-        y: paperRect.y,
+        x: (showWhiteSpace ? page.contentRect.x : page.paperRect.x + margin.left) + pagePadding,
+        y: (showWhiteSpace ? page.contentRect.y : paperRect.y - pagePadding) + pagePadding,
         width: page.contentRect.width,
-        height: pagination.contentSize.height,
+        height: showWhiteSpace ? page.contentRect.height : pagination.contentSize.height,
       },
     };
   }
   function getVisiblePages(rect: Rect): SheetPage[] {
     if (rect.width <= 0 || rect.height <= 0) return [];
     const startRow = clamp(
-      Math.floor(rect.y / paperStride.height),
+      Math.floor((rect.y - pagePadding) / paperStride.height),
       0,
       pagination.pageRows.length - 1,
     );
     const endRow = clamp(
-      Math.floor((rect.y + rect.height - 0.000001) / paperStride.height),
+      Math.floor((rect.y + rect.height - pagePadding - 0.000001) / paperStride.height),
       0,
       pagination.pageRows.length - 1,
     );
     const startColumn = clamp(
-      Math.floor(rect.x / paperStride.width),
+      Math.floor((rect.x - pagePadding) / paperStride.width),
       0,
       pagination.pageColumns.length - 1,
     );
     const endColumn = clamp(
-      Math.floor((rect.x + rect.width - 0.000001) / paperStride.width),
+      Math.floor((rect.x + rect.width - pagePadding - 0.000001) / paperStride.width),
       0,
       pagination.pageColumns.length - 1,
     );
@@ -804,22 +822,31 @@ export function createPageLayoutProjection(options: {
   function rowOffset(row: number): number | null {
     const pageIndex = rowPageFor(row);
     const page = pagination.pageRows[pageIndex];
-    return page
-      ? pageIndex * paperStride.height + margin.top + (source.getBoundaryOffset(row)! - page.offset)
-      : source.getBoundaryOffset(row);
+    if (page)
+      return (
+        pagePadding +
+        pageIndex * paperStride.height +
+        margin.top +
+        (source.getBoundaryOffset(row)! - page.offset)
+      );
+    const offset = source.getBoundaryOffset(row);
+    return offset === null ? null : offset + pagePadding;
   }
   function columnOffset(column: number): number | null {
     const pageIndex = columnPageFor(column);
     const page = pagination.pageColumns[pageIndex];
     return page
-      ? pageIndex * paperStride.width + margin.left + (base.getColumnOffset(column) - page.offset)
-      : base.getColumnOffset(column);
+      ? pagePadding +
+          pageIndex * paperStride.width +
+          margin.left +
+          (base.getColumnOffset(column) - page.offset)
+      : base.getColumnOffset(column) + pagePadding;
   }
   function columnAtOffset(x: number): number | null {
-    const pageIndex = Math.floor(x / paperStride.width);
+    const pageIndex = Math.floor((x - pagePadding) / paperStride.width);
     const page = pagination.pageColumns[pageIndex];
     if (!page) return null;
-    const local = x - pageIndex * paperStride.width - margin.left;
+    const local = x - pagePadding - pageIndex * paperStride.width - margin.left;
     if (local < 0 || local >= page.size) return null;
     const raw = page.offset + local;
     const column = base.getCellAtPoint({ x: raw, y: 0 })?.column ?? null;
@@ -838,24 +865,24 @@ export function createPageLayoutProjection(options: {
       return row === null ? null : rowOffset(row);
     },
     getBoundaryOffset(row) {
-      if (row === source.rowCount)
-        return Math.max(
-          source.getTotalHeight(),
-          pagination.pageRows.length * paperStride.height - PAGE_GAP,
-        );
+      if (row === source.rowCount) return totalHeight;
       const pageIndex = rowPageFor(row);
       const page = pagination.pageRows[pageIndex];
-      return page
-        ? pageIndex * paperStride.height +
-            margin.top +
-            (source.getBoundaryOffset(row)! - page.offset)
-        : source.getBoundaryOffset(row);
+      if (page)
+        return (
+          pagePadding +
+          pageIndex * paperStride.height +
+          margin.top +
+          (source.getBoundaryOffset(row)! - page.offset)
+        );
+      const offset = source.getBoundaryOffset(row);
+      return offset === null ? null : offset + pagePadding;
     },
     getLogicalRowAtOffset(offset) {
-      const pageIndex = Math.floor(offset / paperStride.height);
+      const pageIndex = Math.floor((offset - pagePadding) / paperStride.height);
       const page = pagination.pageRows[pageIndex];
       if (!page) return null;
-      const local = offset - pageIndex * paperStride.height - margin.top;
+      const local = offset - pagePadding - pageIndex * paperStride.height - margin.top;
       if (local < 0 || local >= page.size) return null;
       const row = source.getLogicalRowAtOffset(page.offset + local);
       return row !== null && row >= page.start && row <= page.end ? row : null;
@@ -863,18 +890,18 @@ export function createPageLayoutProjection(options: {
     getVisibleRowsInViewport(offset, height, overscan = 0) {
       const result: VisibleRow[] = [];
       const first = clamp(
-        Math.floor(offset / paperStride.height),
+        Math.floor((offset - pagePadding) / paperStride.height),
         0,
         pagination.pageRows.length - 1,
       );
       const last = clamp(
-        Math.floor((offset + Math.max(0, height) - 0.000001) / paperStride.height),
+        Math.floor((offset + Math.max(0, height) - pagePadding - 0.000001) / paperStride.height),
         0,
         pagination.pageRows.length - 1,
       );
       for (let pageIndex = first; pageIndex <= last; pageIndex += 1) {
         const page = pagination.pageRows[pageIndex]!;
-        const pageTop = pageIndex * paperStride.height + margin.top;
+        const pageTop = pagePadding + pageIndex * paperStride.height + margin.top;
         const localStart = Math.max(0, offset - pageTop);
         const localEnd = Math.min(page.size, offset + height - pageTop);
         if (localEnd <= localStart) continue;
@@ -897,8 +924,7 @@ export function createPageLayoutProjection(options: {
       }
       return result;
     },
-    getTotalHeight: () =>
-      Math.max(source.getTotalHeight(), pagination.pageRows.length * paperStride.height - PAGE_GAP),
+    getTotalHeight: () => totalHeight,
   };
   const projected: SheetGeometry = {
     ...base,
@@ -913,14 +939,8 @@ export function createPageLayoutProjection(options: {
       return value;
     },
     getTotalSize: () => ({
-      width: Math.max(
-        base.getTotalSize().width,
-        pagination.pageColumns.length * paperStride.width - PAGE_GAP,
-      ),
-      height: Math.max(
-        source.getTotalHeight(),
-        pagination.pageRows.length * paperStride.height - PAGE_GAP,
-      ),
+      width: totalWidth,
+      height: totalHeight,
     }),
     getCellRect(address) {
       const x = columnOffset(address.column);
@@ -950,8 +970,16 @@ export function createPageLayoutProjection(options: {
         height: Math.max(1, viewport.height),
       });
       const nearest = getPage(
-        clamp(Math.floor(scroll.y / paperStride.height), 0, pagination.pageRows.length - 1),
-        clamp(Math.floor(scroll.x / paperStride.width), 0, pagination.pageColumns.length - 1),
+        clamp(
+          Math.floor((scroll.y - pagePadding) / paperStride.height),
+          0,
+          pagination.pageRows.length - 1,
+        ),
+        clamp(
+          Math.floor((scroll.x - pagePadding) / paperStride.width),
+          0,
+          pagination.pageColumns.length - 1,
+        ),
       );
       const visible = pages.length > 0 ? pages : nearest ? [nearest] : [];
       const fallback = pagination.printRange;
@@ -985,6 +1013,7 @@ export function createPageLayoutViewportLayout(options: {
   mergeResolver?: MergeResolver;
   overscan?: number;
   showWhiteSpace?: boolean;
+  pagePadding?: number;
 }): SheetViewportLayout {
   const projection = createPageLayoutProjection(options);
   const base = createSheetViewportLayout({

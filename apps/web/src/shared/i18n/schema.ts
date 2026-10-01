@@ -826,6 +826,11 @@ export type MessageSchema = ToolMessageSchema & {
     restoreWhiteSpace: string;
     marginValue: string;
     marginDragHint: string;
+    marginDragValue: string;
+    headerFooterTools: string;
+    headerFooterFormatting: string;
+    headerFooterFields: string;
+    headerFooterOptions: string;
     headerFooterFont: string;
     headerFooterFontSize: string;
     headerFooterBold: string;

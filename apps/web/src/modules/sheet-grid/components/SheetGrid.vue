@@ -355,6 +355,7 @@ const headingSize = computed(() => ({
       pageUiScale.value
     : 0,
 }));
+const headingOrigin = computed(() => ({ x: rulerInset.value, y: rulerInset.value }));
 const headerSize = computed(() => ({
   width: headingSize.value.width + rulerInset.value,
   height: headingSize.value.height + rulerInset.value,
@@ -512,6 +513,7 @@ const {
 } = useSheetViewport({
   getViewMode: () => props.viewMode,
   getShowPageWhiteSpace: () => props.showPageWhiteSpace,
+  getPagePadding: () => 20 / pageUiScale.value,
   getPageSetup: () => pageSetup.value,
   getPrintRange: () =>
     pageSetup.value.printArea ?? {
@@ -809,7 +811,13 @@ watch(quickToolsAvailable, (available) => {
 });
 
 const renderFrame = computed(() =>
-  createSheetRenderFrame(layout.value, headerSize.value, scale.value, headingSize.value),
+  createSheetRenderFrame(
+    layout.value,
+    headerSize.value,
+    scale.value,
+    headingSize.value,
+    headingOrigin.value,
+  ),
 );
 const pageView = computed<PageViewPaintState | undefined>(() => {
   const pages = pagination.value;
@@ -868,7 +876,10 @@ const pageMarginDrag = usePageMarginDrag({
   getSetup: () => pageSetup.value,
   getSurfacePoint: surfacePoint,
   isDisabled: () =>
-    props.readOnly || !props.showPageMargins || isEditing.value || Boolean(getReferenceEditor()),
+    props.readOnly ||
+    (!props.showPageMargins && !props.showPageRulers) ||
+    isEditing.value ||
+    Boolean(getReferenceEditor()),
   onBeforeStart: () => {
     if (headerFooterOverlayRef.value?.flushPendingEdit() === false) return false;
     pageBreakDrag.stop();
@@ -900,6 +911,7 @@ watch(
     props.pageSetup,
     props.sheet.pageSetup,
     props.showPageMargins,
+    props.showPageRulers,
     props.showPageWhiteSpace,
   ],
   () => {
@@ -1070,11 +1082,7 @@ function surfacePoint(event: MouseEvent) {
 }
 function isRulerPoint(point: { x: number; y: number }): boolean {
   const inset = rulerInset.value;
-  return (
-    inset > 0 &&
-    ((point.x >= headingSize.value.width && point.x < headerSize.value.width) ||
-      (point.y >= headingSize.value.height && point.y < headerSize.value.height))
-  );
+  return inset > 0 && (point.x < inset || point.y < inset);
 }
 function onSurfacePointerDown(event: PointerEvent): void {
   if (headerFooterOverlayRef.value?.flushPendingEdit() === false) return;
@@ -2697,16 +2705,31 @@ defineExpose({
       :state="pageView"
       :frame="renderFrame"
       :unit="pageRulerUnit"
+      :setup="pageSetup"
+      :selection="selectedRange"
+      :active-margin="pageMarginDrag.activeMargin.value"
+      :drag-point="pageMarginDrag.pointerPosition.value"
+      :disabled="readOnly"
       :print-scale="pageUiScale"
       :label="t('pageLayout.rulers')"
+      @margin-start="pageMarginDrag.start"
+      @margin-adjust="adjustPageMargin"
     />
     <PageLayoutMargins
-      v-if="viewMode === 'page-layout' && pageView && showPageMargins"
+      v-if="
+        viewMode === 'page-layout' &&
+        pageView &&
+        (showPageMargins || pageMarginDrag.activeMargin.value)
+      "
       :state="pageView"
       :frame="renderFrame"
       :setup="pageSetup"
       :disabled="readOnly"
       :active-margin="pageMarginDrag.activeMargin.value"
+      :drag-point="pageMarginDrag.pointerPosition.value"
+      :unit="pageRulerUnit"
+      :show-handles="showPageMargins"
+      :show-drag-value="!showPageRulers"
       @start="pageMarginDrag.start"
       @adjust="adjustPageMargin"
     />

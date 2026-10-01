@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, type CSSProperties } from "vue";
+import { useAppI18n } from "../../../shared/i18n";
 import { getSheetHeaderFooterOptions, type SheetPageSetup } from "@idea10/core/page-setup";
 import { parseHeaderFooterRuns } from "../header-footer-text";
 import type {
@@ -37,6 +38,7 @@ const emit = defineEmits<{
   ];
   edit: [context: HeaderFooterEditContext | undefined];
 }>();
+const { t } = useAppI18n();
 const headerFooter = computed(() => getSheetHeaderFooterOptions(props.setup));
 const now = new Date();
 type HeaderFooterFieldHandle = { finishEditing: () => boolean; hasPendingEdit: () => boolean };
@@ -148,6 +150,16 @@ function style(page: PageViewPage, section: HeaderFooterSection): CSSProperties 
     boxSizing: "border-box",
   };
 }
+function sectionEmpty(section: HeaderFooterSection, page: PageViewPage): boolean {
+  return (["left", "center", "right"] as const).every((part) => value(section, part, page) === "");
+}
+function rowActive(section: HeaderFooterSection, page: PageViewPage): boolean {
+  return (
+    activeContext.value?.section === section &&
+    activeContext.value.variant === variant(page) &&
+    activeContext.value.pageNumber === page.pageNumber
+  );
+}
 function emitChange(
   section: HeaderFooterSection,
   part: HeaderFooterPart,
@@ -178,6 +190,7 @@ function emitChange(
         class="page-header-footer-overlay__row"
         :style="style(page, 'header')"
         :data-paper-number="page.pageNumber"
+        :class="{ 'is-row-active': rowActive('header', page) }"
       >
         <PageHeaderFooterField
           ref="fields"
@@ -191,6 +204,8 @@ function emitChange(
           :file-name="fileName"
           :now="now"
           :font-scale="fontScale()"
+          :ui-scale="state.uiScale ?? 1"
+          :row-active="rowActive('header', page)"
           :disabled="disabled"
           :action-request="actionRequest"
           @change="emitChange('header', 'left', page, $event)"
@@ -201,6 +216,7 @@ function emitChange(
           :value="value('header', 'center', page)"
           section="header"
           part="center"
+          :placeholder="sectionEmpty('header', page) ? t('pageLayout.addHeader') : undefined"
           :variant="variant(page)"
           :page-number="page.pageNumber"
           :page-count="pageCount"
@@ -208,6 +224,8 @@ function emitChange(
           :file-name="fileName"
           :now="now"
           :font-scale="fontScale()"
+          :ui-scale="state.uiScale ?? 1"
+          :row-active="rowActive('header', page)"
           :disabled="disabled"
           :action-request="actionRequest"
           @change="emitChange('header', 'center', page, $event)"
@@ -225,13 +243,19 @@ function emitChange(
           :file-name="fileName"
           :now="now"
           :font-scale="fontScale()"
+          :ui-scale="state.uiScale ?? 1"
+          :row-active="rowActive('header', page)"
           :disabled="disabled"
           :action-request="actionRequest"
           @change="emitChange('header', 'right', page, $event)"
           @edit="onFieldEdit($event, page, 'header', 'right')"
         />
       </div>
-      <div class="page-header-footer-overlay__row" :style="style(page, 'footer')">
+      <div
+        class="page-header-footer-overlay__row"
+        :style="style(page, 'footer')"
+        :class="{ 'is-row-active': rowActive('footer', page) }"
+      >
         <PageHeaderFooterField
           ref="fields"
           :value="value('footer', 'left', page)"
@@ -244,6 +268,8 @@ function emitChange(
           :file-name="fileName"
           :now="now"
           :font-scale="fontScale()"
+          :ui-scale="state.uiScale ?? 1"
+          :row-active="rowActive('footer', page)"
           :disabled="disabled"
           :action-request="actionRequest"
           @change="emitChange('footer', 'left', page, $event)"
@@ -254,6 +280,7 @@ function emitChange(
           :value="value('footer', 'center', page)"
           section="footer"
           part="center"
+          :placeholder="sectionEmpty('footer', page) ? t('pageLayout.addFooter') : undefined"
           :variant="variant(page)"
           :page-number="page.pageNumber"
           :page-count="pageCount"
@@ -261,6 +288,8 @@ function emitChange(
           :file-name="fileName"
           :now="now"
           :font-scale="fontScale()"
+          :ui-scale="state.uiScale ?? 1"
+          :row-active="rowActive('footer', page)"
           :disabled="disabled"
           :action-request="actionRequest"
           @change="emitChange('footer', 'center', page, $event)"
@@ -278,6 +307,8 @@ function emitChange(
           :file-name="fileName"
           :now="now"
           :font-scale="fontScale()"
+          :ui-scale="state.uiScale ?? 1"
+          :row-active="rowActive('footer', page)"
           :disabled="disabled"
           :action-request="actionRequest"
           @change="emitChange('footer', 'right', page, $event)"

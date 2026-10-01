@@ -13,6 +13,7 @@ function createFixture(options?: {
   rowOutlineGutter?: number;
   columnOutlineGutter?: number;
   canFocus?: boolean;
+  headingOrigin?: { x: number; y: number };
 }) {
   const geometry = createSheetGeometry({
     rowCount: 8,
@@ -46,10 +47,15 @@ function createFixture(options?: {
       createSheetRenderFrame(
         layout,
         {
+          width: 36 + (options?.rowOutlineGutter ?? 0) + (options?.headingOrigin?.x ?? 0),
+          height: 24 + (options?.columnOutlineGutter ?? 0) + (options?.headingOrigin?.y ?? 0),
+        },
+        1,
+        {
           width: 36 + (options?.rowOutlineGutter ?? 0),
           height: 24 + (options?.columnOutlineGutter ?? 0),
         },
-        1,
+        options?.headingOrigin,
       ),
     getSelection: () => ({
       startRow: 0,
@@ -96,6 +102,23 @@ const trigger = {
 } as unknown as HTMLElement;
 
 describe("useHeaderInteraction", () => {
+  test("keeps outer ruler lanes clear while displaced headers retain axis and corner hits", () => {
+    const { interaction } = createFixture({ headingOrigin: { x: 26, y: 26 } });
+    expect(interaction.hitTest({ x: 10, y: 60 })).toBeUndefined();
+    expect(interaction.hitTest({ x: 70, y: 10 })).toBeUndefined();
+    expect(interaction.hitTest({ x: 30, y: 30 })).toEqual({ axis: "corner", action: "corner" });
+    expect(interaction.hitTest({ x: 70, y: 30 })).toMatchObject({
+      axis: "column",
+      index: 0,
+      action: "axis",
+    });
+    expect(interaction.hitTest({ x: 30, y: 60 })).toMatchObject({
+      axis: "row",
+      index: 0,
+      action: "axis",
+    });
+  });
+
   test.each([false, true])(
     "excludes outline space from row actions with quick tools %s",
     (quickTools) => {
