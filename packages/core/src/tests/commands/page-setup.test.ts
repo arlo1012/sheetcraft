@@ -6,8 +6,18 @@ import {
   tryApplyWorkbookCommand,
 } from "../../commands/index.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
-import { DEFAULT_SHEET_PAGE_SETUP, getPagePaperSize } from "../../page-setup.js";
-import { deserializeSheet, serializeSheet } from "../../serialization.js";
+import {
+  DEFAULT_SHEET_HEADER_FOOTER_OPTIONS,
+  DEFAULT_SHEET_PAGE_SETUP,
+  getPagePaperSize,
+  getSheetHeaderFooterOptions,
+} from "../../page-setup.js";
+import {
+  deserializeSheet,
+  deserializeWorkbook,
+  serializeSheet,
+  serializeWorkbook,
+} from "../../serialization.js";
 import { getActiveSheet } from "../../workbook.js";
 import { createTestWorkbookSession } from "../helpers.js";
 
@@ -98,5 +108,44 @@ describe("sheet page setup", () => {
         margins: { ...DEFAULT_SHEET_PAGE_SETUP.margins, top: 10, header: 11 },
       }),
     ).toThrow("Header and footer margins");
+  });
+
+  test("normalizes header/footer variants and restores them through command history", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const headerFooter = {
+      ...getSheetHeaderFooterOptions(DEFAULT_SHEET_PAGE_SETUP),
+      differentFirst: true,
+      differentOddEven: true,
+      scaleWithDocument: false,
+      alignWithMargins: false,
+      firstHeader: { left: "&F", center: "First", right: "&P" },
+      evenFooter: { left: "", center: "Even", right: "" },
+    };
+    expect(
+      executeWorkbookCommand(
+        session,
+        createSetSheetPageSetupCommand(sheet.id, {
+          ...DEFAULT_SHEET_PAGE_SETUP,
+          headerFooter,
+        }),
+      ),
+    ).toBe(true);
+    expect(sheet.pageSetup?.headerFooter).toEqual(headerFooter);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(sheet.pageSetup?.headerFooter).toEqual(DEFAULT_SHEET_HEADER_FOOTER_OPTIONS);
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(sheet.pageSetup?.headerFooter).toEqual(headerFooter);
+  });
+
+  test("migrates V13 page setup without header/footer options to canonical defaults", () => {
+    const session = createTestWorkbookSession();
+    const snapshot = structuredClone(serializeWorkbook(session.workbook));
+    snapshot.version = 13 as never;
+    delete snapshot.sheets[0]?.pageSetup?.headerFooter;
+    const restored = deserializeWorkbook(snapshot);
+    expect(
+      restored.sheets.get(getActiveSheet(session.workbook).id)?.pageSetup?.headerFooter,
+    ).toEqual(DEFAULT_SHEET_HEADER_FOOTER_OPTIONS);
   });
 });

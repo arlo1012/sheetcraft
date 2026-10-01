@@ -160,6 +160,30 @@ describe("XLSX IO", () => {
     expect((await decodeXlsx(encoded.bytes)).workbook.calculation).toEqual(workbook.calculation);
   });
 
+  test("preserves disabled first and even page header/footer content", async () => {
+    const workbook = createWorkbook({ id: "disabled-header-footer", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    sheet.pageSetup = {
+      ...DEFAULT_SHEET_PAGE_SETUP,
+      headerFooter: {
+        ...DEFAULT_SHEET_PAGE_SETUP.headerFooter!,
+        firstHeader: { left: "First retained", center: "", right: "" },
+        evenFooter: { left: "", center: "Even retained", right: "" },
+      },
+    };
+
+    const encoded = await encodeXlsx(workbook);
+    const worksheet = xlsxEntryText(encoded.bytes, "xl/worksheets/sheet1.xml");
+    expect(worksheet).toContain("<headerFooter>");
+    expect(worksheet).not.toContain('differentFirst="1"');
+    expect(worksheet).not.toContain('differentOddEven="1"');
+    expect(worksheet).toContain("<firstHeader>&amp;LFirst retained&amp;C&amp;R</firstHeader>");
+    expect(worksheet).toContain("<evenFooter>&amp;L&amp;CEven retained&amp;R</evenFooter>");
+    expect(
+      getActiveSheet((await decodeXlsx(encoded.bytes)).workbook).pageSetup?.headerFooter,
+    ).toEqual(sheet.pageSetup.headerFooter);
+  });
+
   test("roundtrips supported worksheet page setup and merges subtotal page breaks", async () => {
     const workbook = createWorkbook({
       id: "page-setup",
@@ -176,8 +200,23 @@ describe("XLSX IO", () => {
       printArea: { start: { row: 1, column: 2 }, end: { row: 8, column: 5 } },
       rowBreaks: [3, 6],
       columnBreaks: [2],
-      header: { left: "&A", center: "Page &P of &N", right: "Research && Development" },
+      header: {
+        left: '&"Arial"&12&B&I&U&KFF0000&D &T &F &Z &A &&',
+        center: "Page &P of &N",
+        right: "Research && Development",
+      },
       footer: { left: "Internal", center: "Page", right: "Confidential" },
+      headerFooter: {
+        ...DEFAULT_SHEET_PAGE_SETUP.headerFooter!,
+        differentFirst: true,
+        differentOddEven: true,
+        scaleWithDocument: false,
+        alignWithMargins: false,
+        firstHeader: { left: "First &P", center: "", right: "" },
+        firstFooter: { left: "", center: "First footer", right: "" },
+        evenHeader: { left: "Even &A", center: "", right: "" },
+        evenFooter: { left: "", center: "Even footer", right: "" },
+      },
       pageOrder: "overThenDown",
     };
     sheet.subtotalMetadata = [
@@ -198,8 +237,10 @@ describe("XLSX IO", () => {
       '<pageSetup paperSize="5" orientation="landscape" scale="85" pageOrder="overThenDown"/>',
     );
     expect(worksheet).toContain(
-      "<oddHeader>&amp;L&amp;A&amp;CPage &amp;P of &amp;N&amp;RResearch &amp;&amp; Development</oddHeader>",
+      '<headerFooter differentFirst="1" differentOddEven="1" scaleWithDoc="0" alignWithMargins="0"><oddHeader>&amp;L&amp;&quot;Arial&quot;&amp;12&amp;B&amp;I&amp;U&amp;KFF0000&amp;D &amp;T &amp;F &amp;Z &amp;A &amp;&amp;&amp;CPage &amp;P of &amp;N&amp;RResearch &amp;&amp; Development</oddHeader>',
     );
+    expect(worksheet).toContain("<evenHeader>&amp;LEven &amp;A&amp;C&amp;R</evenHeader>");
+    expect(worksheet).toContain("<firstFooter>&amp;L&amp;CFirst footer&amp;R</firstFooter>");
     expect(worksheet).toContain('<brk id="3" max="16383" man="1"/>');
     expect(worksheet).toContain('<brk id="5" max="16383" man="1"/>');
     expect(worksheet).toContain('<brk id="6" max="16383" man="1"/>');
@@ -222,6 +263,21 @@ describe("XLSX IO", () => {
     expect(
       getActiveSheet((await decodeXlsx(zipSync(entries))).workbook).pageSetup?.rowBreaks,
     ).toEqual([3, 5, 6]);
+
+    const imageEntries = unzipSync(encoded.bytes);
+    imageEntries["xl/worksheets/sheet1.xml"] = strToU8(
+      strFromU8(imageEntries["xl/worksheets/sheet1.xml"]!)
+        .replace("<oddHeader>", "<oddHeader>&amp;G")
+        .replace("</worksheet>", '<legacyDrawingHF r:id="rId1"/></worksheet>'),
+    );
+    expect((await decodeXlsx(zipSync(imageEntries))).report.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "feature-omitted",
+          locations: expect.arrayContaining(["Print plan.headerFooter.image"]),
+        }),
+      ]),
+    );
   });
 
   test("retains whole-axis and dynamic-array formula sources without materializing spills", async () => {

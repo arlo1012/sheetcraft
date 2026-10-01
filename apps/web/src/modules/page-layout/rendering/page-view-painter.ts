@@ -109,39 +109,7 @@ export function paintPageLayoutBackground(
     context.strokeStyle = "#d5d9e0";
     context.strokeRect(content.x, content.y, content.width, content.height);
     context.restore();
-    paintRulers(context, paper, content, state.millimetresPerUnit);
   }
-}
-
-function paintRulers(
-  context: CanvasRenderingContext2D,
-  paper: Rect,
-  content: Rect,
-  millimetresPerUnit: number,
-): void {
-  const step = 5 / millimetresPerUnit;
-  context.save();
-  context.strokeStyle = "#b2b8c2";
-  context.fillStyle = "#818896";
-  context.lineWidth = 0.5;
-  context.font = "10px sans-serif";
-  context.textAlign = "center";
-  context.textBaseline = "bottom";
-  context.beginPath();
-  for (let index = 0; index * step <= content.width; index += 1) {
-    const x = content.x + index * step;
-    const major = index % 2 === 0;
-    context.moveTo(x, paper.y + 5);
-    context.lineTo(x, paper.y + (major ? 12 : 9));
-    if (major) context.fillText(String(index * 5), x, paper.y + 25);
-  }
-  for (let index = 0; index * step <= content.height; index += 1) {
-    const y = content.y + index * step;
-    context.moveTo(paper.x + 5, y);
-    context.lineTo(paper.x + (index % 2 === 0 ? 12 : 9), y);
-  }
-  context.stroke();
-  context.restore();
 }
 
 /** Page-break preview keeps the continuous grid and marks its printable part. */

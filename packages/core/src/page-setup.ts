@@ -3,6 +3,28 @@ import type { CellRange } from "./workbook.js";
 
 export type SheetPaperSize = "a4" | "a3" | "letter" | "legal";
 export type SheetPageOrder = "downThenOver" | "overThenDown";
+export type SheetHeaderFooterParts = { left: string; center: string; right: string };
+export type SheetHeaderFooterOptions = {
+  differentFirst: boolean;
+  differentOddEven: boolean;
+  scaleWithDocument: boolean;
+  alignWithMargins: boolean;
+  firstHeader: SheetHeaderFooterParts;
+  firstFooter: SheetHeaderFooterParts;
+  evenHeader: SheetHeaderFooterParts;
+  evenFooter: SheetHeaderFooterParts;
+};
+
+export const DEFAULT_SHEET_HEADER_FOOTER_OPTIONS: SheetHeaderFooterOptions = {
+  differentFirst: false,
+  differentOddEven: false,
+  scaleWithDocument: true,
+  alignWithMargins: true,
+  firstHeader: { left: "", center: "", right: "" },
+  firstFooter: { left: "", center: "", right: "" },
+  evenHeader: { left: "", center: "", right: "" },
+  evenFooter: { left: "", center: "", right: "" },
+};
 
 export type SheetPageSetup = {
   paperSize: SheetPaperSize;
@@ -22,8 +44,12 @@ export type SheetPageSetup = {
   rowBreaks: number[];
   /** Zero-based first column of a new printed page. */
   columnBreaks: number[];
-  header: { left: string; center: string; right: string };
-  footer: { left: string; center: string; right: string };
+  /** Odd-page header text, using OOXML header/footer field syntax. */
+  header: SheetHeaderFooterParts;
+  /** Odd-page footer text, using OOXML header/footer field syntax. */
+  footer: SheetHeaderFooterParts;
+  /** Optional in source snapshots; normalized setups always include it. */
+  headerFooter?: SheetHeaderFooterOptions;
   pageOrder: SheetPageOrder;
 };
 
@@ -44,6 +70,7 @@ export const DEFAULT_SHEET_PAGE_SETUP: SheetPageSetup = {
   columnBreaks: [],
   header: { left: "", center: "", right: "" },
   footer: { left: "", center: "", right: "" },
+  headerFooter: DEFAULT_SHEET_HEADER_FOOTER_OPTIONS,
   pageOrder: "downThenOver",
 };
 
@@ -93,10 +120,7 @@ function normalizeBreaks(value: unknown, maximum: number, axis: string): number[
   return [...new Set(breaks)].sort((left, right) => left - right);
 }
 
-function normalizeParts(
-  value: unknown,
-  label: string,
-): { left: string; center: string; right: string } {
+function normalizeParts(value: unknown, label: string): SheetHeaderFooterParts {
   if (!value || typeof value !== "object")
     throw new TypeError(`${label} must have left, center, and right text.`);
   const parts = value as Record<string, unknown>;
@@ -109,6 +133,44 @@ function normalizeParts(
     return text;
   };
   return { left: validate("left"), center: validate("center"), right: validate("right") };
+}
+
+function normalizeHeaderFooterOptions(value: unknown): SheetHeaderFooterOptions {
+  if (value === undefined) value = DEFAULT_SHEET_HEADER_FOOTER_OPTIONS;
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new TypeError("Header/footer options must be an object.");
+  const options = value as Record<string, unknown>;
+  const boolean = (
+    name: "differentFirst" | "differentOddEven" | "scaleWithDocument" | "alignWithMargins",
+  ) => {
+    if (typeof options[name] !== "boolean")
+      throw new TypeError(`Header/footer option ${name} must be a boolean.`);
+    return options[name];
+  };
+  return {
+    differentFirst: boolean("differentFirst"),
+    differentOddEven: boolean("differentOddEven"),
+    scaleWithDocument: boolean("scaleWithDocument"),
+    alignWithMargins: boolean("alignWithMargins"),
+    firstHeader: normalizeParts(options.firstHeader, "First header"),
+    firstFooter: normalizeParts(options.firstFooter, "First footer"),
+    evenHeader: normalizeParts(options.evenHeader, "Even header"),
+    evenFooter: normalizeParts(options.evenFooter, "Even footer"),
+  };
+}
+
+/** Returns a detached canonical header/footer configuration, including legacy defaults. */
+export function cloneSheetHeaderFooterOptions(
+  options: SheetHeaderFooterOptions | undefined,
+): SheetHeaderFooterOptions {
+  return normalizeHeaderFooterOptions(options);
+}
+
+/** Reads the canonical header/footer configuration from a page setup. */
+export function getSheetHeaderFooterOptions(
+  pageSetup: Pick<SheetPageSetup, "headerFooter">,
+): SheetHeaderFooterOptions {
+  return cloneSheetHeaderFooterOptions(pageSetup.headerFooter);
 }
 
 /** Validates persisted page settings and returns a detached, canonical value. */
@@ -166,6 +228,7 @@ export function normalizeSheetPageSetup(value: unknown): SheetPageSetup {
     columnBreaks: normalizeBreaks(setup.columnBreaks, MAX_SHEET_COLUMNS, "Column"),
     header: normalizeParts(setup.header, "Header"),
     footer: normalizeParts(setup.footer, "Footer"),
+    headerFooter: normalizeHeaderFooterOptions(setup.headerFooter),
     pageOrder: setup.pageOrder,
   };
 }

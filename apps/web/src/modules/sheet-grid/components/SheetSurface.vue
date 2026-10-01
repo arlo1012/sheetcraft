@@ -224,7 +224,17 @@ function paint(): void {
   props.paintImages?.(context);
   context.restore();
   if (frame.headerSize.width || frame.headerSize.height)
-    paintSheetHeaders(context, { ...props.headers, frame, palette: props.environment.headers });
+    paintSheetHeaders(context, {
+      ...props.headers,
+      frame,
+      palette: {
+        ...props.environment.headers,
+        font: props.environment.headers.font.replace(
+          /([\d.]+)px/,
+          (_match, size) => `${Number(size) * (props.pageView?.uiScale ?? 1)}px`,
+        ),
+      },
+    });
   paintSheetChrome(context, frame, props.overlays, props.environment.overlays);
 }
 watch(

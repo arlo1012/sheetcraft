@@ -33,15 +33,36 @@ Page Setup can reset all manual breaks and change the printable range.
 ## Page layout
 
 Cells are projected onto separate paper rectangles with physical margins,
-ruler marks, and page gaps. Selection, navigation, editing, borders, and images
+rulers, and page gaps. Selection, navigation, editing, borders, and images
 use that same coordinate projection. Paper margins and gaps do not select cells;
 a selection crossing pages remains one logical range with separate visual
 fragments. Allocated blank cells remain editable outside the printable range.
 
-Each page exposes left, center, and right header/footer fields. They display
-`&P` as the page number, `&N` as the printed page count, `&A` as the sheet name,
-and `&&` as a literal ampersand. Focus edits the source text; Enter or blur
-commits, and Escape discards the draft. Core rejects page-setting changes on protected sheets. Freeze settings remain saved and take effect again in Normal view.
+The top and left rulers share paper/content coordinates with the cells and can
+use millimetres, centimetres, or inches. View controls toggle rulers, margin
+handles, and page white space. Double-click a page edge to collapse or restore
+its top/bottom white space; Enter/Space on that edge also works. Collapsing is
+session state, preserves the active cell, and hides header/footer editing.
+
+When margin handles are visible, all six physical margins can be dragged with
+a live pagination preview. Release submits one Core command; Escape, pointer
+cancellation, window blur, changing views/sheets, or becoming read-only discards
+the draft. Arrow keys adjust by 0.1 mm and Shift+Arrow by 1 mm. Margins retain at
+least 1 mm of printable body; header/footer offsets stay within their body margins.
+
+Each page exposes left, center, and right header/footer fields. They support
+multiline text and independent first, odd, and even page settings. The contextual
+editor inserts page number, page count, sheet name, file name, date, and time
+fields at the caret, and applies a font, point size, bold, italic, underline, or
+color to the edited section. Fields use readable localized markers while editing;
+XLSX control codes remain the stored representation. Imported mixed-format text
+is previewed with its styles and preserved verbatim when left unedited. Editing a
+section applies its chosen uniform format to that section.
+
+Enter inserts a new line; Ctrl/Cmd+Enter or blur commits, and Escape discards the
+draft. Header/footer options control first/odd/even variants, alignment with body
+margins, and scaling with the document. Core rejects page-setting changes on
+protected sheets. Freeze settings remain saved and take effect again in Normal view.
 
 ## Settings and persistence
 
@@ -50,22 +71,23 @@ percentage scaling from 10 to 400; six margins in millimetres; a single local A1
 print range; page order; and header/footer text. Leaving the range empty uses
 the content extent. Settings are validated before applying the command.
 
-Core V13 snapshots save `Sheet.pageSetup`; V1-V12 snapshots receive default
-settings. Axis insert/delete/move commands transform the print range and manual
+Core V14 snapshots save `Sheet.pageSetup` including header/footer options.
+V1-V12 snapshots receive default page settings; V13 receives default header/footer
+options while preserving its existing text. Axis insert/delete/move commands transform the print range and manual
 break positions. Sheet Engine owns pagination and paper projection without DOM
 dependencies; Web owns Canvas painting, text fields, and pointer interaction.
 
 XLSX import/export preserves supported paper, margin, scaling, page order,
-print area, manual row/column breaks, and odd-page header/footer settings.
+print area, manual row/column breaks, first/odd/even header/footer text, behavior
+flags, and supported text formatting.
 Automatic XLSX breaks remain automatic. Supported header/footer fields and
 literal ampersands retain their meaning when exported. Subtotal-owned row
 breaks are merged with the sheet's explicit manual breaks.
 
 The current contract does not include fit-to-page scaling, multiple print areas,
-repeated print titles, different first/even-page headers, header images or font
-formatting, printer configuration, or PDF/browser printing. Unsupported imported
-paper sizes, fit-to-page settings, and first/even headers are reported in the
-compatibility report.
+repeated print titles, header images, printer configuration, or PDF/browser
+printing. Unsupported imported paper sizes, fit-to-page settings, and header
+images are reported in the compatibility report.
 
 Reference descriptions: [Excel page breaks](https://support.microsoft.com/en-us/excel/view-page-breaks)
 and [WPS page break preview](https://www.wps.com/academy/how-to-view-page-break-preview-in-wps-spreadsheet-quick-tutorials-1861570/).

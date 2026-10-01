@@ -7,10 +7,24 @@ import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Button as TButton } from "tdesign-vue-next/es/button";
+import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
+import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
 import { formatCellAddress, parseCellAddress } from "@idea10/core/coordinates";
-import { cloneSheetPageSetup, type SheetPageSetup } from "@idea10/core/page-setup";
+import {
+  cloneSheetPageSetup,
+  getSheetHeaderFooterOptions,
+  type SheetHeaderFooterOptions,
+  type SheetHeaderFooterParts,
+  type SheetPageSetup,
+} from "@idea10/core/page-setup";
 import type { CellRange } from "@idea10/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
+import {
+  decodeHeaderFooterText,
+  encodeHeaderFooterText,
+  parseHeaderFooterRuns,
+} from "../header-footer-text";
+import { headerFooterLabels } from "../useHeaderFooterFields";
 
 const props = defineProps<{
   visible: boolean;
@@ -25,6 +39,18 @@ const draft = ref<SheetPageSetup>(cloneSheetPageSetup(props.setup));
 const printAreaText = ref("");
 const printAreaError = ref("");
 const setupError = ref("");
+type HeaderFooterVariant = "odd" | "first" | "even";
+type HeaderFooterSection = "header" | "footer";
+type HeaderFooterPart = keyof SheetHeaderFooterParts;
+type HeaderFooterEditorText = Record<
+  HeaderFooterVariant,
+  Record<HeaderFooterSection, SheetHeaderFooterParts>
+>;
+const headerFooterVariant = ref<HeaderFooterVariant>("odd");
+const headerFooter = ref<SheetHeaderFooterOptions>(getSheetHeaderFooterOptions(draft.value));
+const headerFooterText = ref<HeaderFooterEditorText>(emptyHeaderFooterEditorText());
+const changedHeaderFooterSections = new Set<string>();
+const fieldLabels = computed(() => headerFooterLabels(t));
 const paperOptions = computed(() => [
   { label: t("pageLayout.paperA4"), value: "a4" },
   { label: t("pageLayout.paperA3"), value: "a3" },
@@ -35,6 +61,96 @@ const orderOptions = computed(() => [
   { label: t("pageLayout.downThenOver"), value: "downThenOver" },
   { label: t("pageLayout.overThenDown"), value: "overThenDown" },
 ]);
+const headerFooterVariants = computed(() => [
+  { label: t("pageLayout.headerFooterOddPages"), value: "odd" },
+  { label: t("pageLayout.headerFooterFirstPage"), value: "first" },
+  { label: t("pageLayout.headerFooterEvenPages"), value: "even" },
+]);
+
+function emptyParts(): SheetHeaderFooterParts {
+  return { left: "", center: "", right: "" };
+}
+
+function emptyHeaderFooterEditorText(): HeaderFooterEditorText {
+  return {
+    odd: { header: emptyParts(), footer: emptyParts() },
+    first: { header: emptyParts(), footer: emptyParts() },
+    even: { header: emptyParts(), footer: emptyParts() },
+  };
+}
+
+function variantParts(
+  setup: SheetPageSetup,
+  options: SheetHeaderFooterOptions,
+  variant: HeaderFooterVariant,
+  section: HeaderFooterSection,
+): SheetHeaderFooterParts {
+  if (variant === "odd") return setup[section];
+  if (variant === "first") return section === "header" ? options.firstHeader : options.firstFooter;
+  return section === "header" ? options.evenHeader : options.evenFooter;
+}
+
+function sectionKey(
+  variant: HeaderFooterVariant,
+  section: HeaderFooterSection,
+  part: HeaderFooterPart,
+): string {
+  return `${variant}:${section}:${part}`;
+}
+
+function resetHeaderFooterText(): void {
+  const options = getSheetHeaderFooterOptions(draft.value);
+  headerFooter.value = options;
+  const text = emptyHeaderFooterEditorText();
+  for (const variant of ["odd", "first", "even"] as const)
+    for (const section of ["header", "footer"] as const) {
+      const source = variantParts(draft.value, options, variant, section);
+      for (const part of ["left", "center", "right"] as const)
+        text[variant][section][part] = decodeHeaderFooterText(source[part], fieldLabels.value);
+    }
+  headerFooterText.value = text;
+  changedHeaderFooterSections.clear();
+  headerFooterVariant.value = "odd";
+}
+
+function updateHeaderFooterText(
+  section: HeaderFooterSection,
+  part: HeaderFooterPart,
+  value: string,
+): void {
+  headerFooterText.value[headerFooterVariant.value][section][part] = value;
+  changedHeaderFooterSections.add(sectionKey(headerFooterVariant.value, section, part));
+}
+
+function applyHeaderFooterText(setup: SheetPageSetup): SheetPageSetup {
+  const options = headerFooter.value;
+  const result = cloneSheetPageSetup({ ...setup, headerFooter: options });
+  for (const variant of ["odd", "first", "even"] as const)
+    for (const section of ["header", "footer"] as const)
+      for (const part of ["left", "center", "right"] as const) {
+        if (!changedHeaderFooterSections.has(sectionKey(variant, section, part))) continue;
+        const source = variantParts(result, options, variant, section);
+        const format = parseHeaderFooterRuns(source[part])[0]?.format;
+        const encoded = encodeHeaderFooterText(
+          headerFooterText.value[variant][section][part],
+          fieldLabels.value,
+          format,
+        );
+        if (variant === "odd") result[section][part] = encoded;
+        else {
+          const target =
+            variant === "first"
+              ? section === "header"
+                ? result.headerFooter!.firstHeader
+                : result.headerFooter!.firstFooter
+              : section === "header"
+                ? result.headerFooter!.evenHeader
+                : result.headerFooter!.evenFooter;
+          target[part] = encoded;
+        }
+      }
+  return result;
+}
 
 function formatRange(range: CellRange | null): string {
   if (!range) return "";
@@ -71,6 +187,7 @@ function resetDraft(): void {
   printAreaText.value = formatRange(draft.value.printArea);
   printAreaError.value = "";
   setupError.value = "";
+  resetHeaderFooterText();
 }
 
 function confirm(): void {
@@ -81,7 +198,7 @@ function confirm(): void {
   }
   printAreaError.value = "";
   try {
-    const setup = cloneSheetPageSetup({ ...draft.value, printArea });
+    const setup = cloneSheetPageSetup({ ...applyHeaderFooterText(draft.value), printArea });
     setupError.value = "";
     emit("confirm", setup);
   } catch {
@@ -245,25 +362,63 @@ watch(
         :aria-label="t('pageLayout.header')"
       >
         <h3>{{ t("pageLayout.header") }}</h3>
+        <TRadioGroup v-model="headerFooterVariant" data-page-setup="header-footer-variant">
+          <TRadio
+            v-for="variant in headerFooterVariants"
+            :key="variant.value"
+            :value="variant.value"
+          >
+            {{ variant.label }}
+          </TRadio>
+        </TRadioGroup>
+        <div class="page-setup-dialog__header-footer-options">
+          <TCheckbox v-model="headerFooter.differentFirst" data-page-setup-option="different-first">
+            {{ t("pageLayout.headerFooterDifferentFirst") }}
+          </TCheckbox>
+          <TCheckbox
+            v-model="headerFooter.differentOddEven"
+            data-page-setup-option="different-odd-even"
+          >
+            {{ t("pageLayout.headerFooterDifferentOddEven") }}
+          </TCheckbox>
+          <TCheckbox
+            v-model="headerFooter.scaleWithDocument"
+            data-page-setup-option="scale-with-document"
+          >
+            {{ t("pageLayout.headerFooterScaleWithDocument") }}
+          </TCheckbox>
+          <TCheckbox
+            v-model="headerFooter.alignWithMargins"
+            data-page-setup-option="align-with-margins"
+          >
+            {{ t("pageLayout.headerFooterAlignWithMargins") }}
+          </TCheckbox>
+        </div>
         <TFormItem :label="t('pageLayout.headerLeft')">
-          <TInput
-            v-model="draft.header.left"
+          <TTextarea
+            :model-value="headerFooterText[headerFooterVariant].header.left"
+            @update:model-value="updateHeaderFooterText('header', 'left', $event)"
             :aria-label="t('pageLayout.headerLeft')"
             :maxlength="1024"
+            data-page-setup="header-left"
           />
         </TFormItem>
         <TFormItem :label="t('pageLayout.headerCenter')">
-          <TInput
-            v-model="draft.header.center"
+          <TTextarea
+            :model-value="headerFooterText[headerFooterVariant].header.center"
+            @update:model-value="updateHeaderFooterText('header', 'center', $event)"
             :aria-label="t('pageLayout.headerCenter')"
             :maxlength="1024"
+            data-page-setup="header-center"
           />
         </TFormItem>
         <TFormItem :label="t('pageLayout.headerRight')">
-          <TInput
-            v-model="draft.header.right"
+          <TTextarea
+            :model-value="headerFooterText[headerFooterVariant].header.right"
+            @update:model-value="updateHeaderFooterText('header', 'right', $event)"
             :aria-label="t('pageLayout.headerRight')"
             :maxlength="1024"
+            data-page-setup="header-right"
           />
         </TFormItem>
       </section>
@@ -274,24 +429,30 @@ watch(
       >
         <h3>{{ t("pageLayout.footer") }}</h3>
         <TFormItem :label="t('pageLayout.footerLeft')">
-          <TInput
-            v-model="draft.footer.left"
+          <TTextarea
+            :model-value="headerFooterText[headerFooterVariant].footer.left"
+            @update:model-value="updateHeaderFooterText('footer', 'left', $event)"
             :aria-label="t('pageLayout.footerLeft')"
             :maxlength="1024"
+            data-page-setup="footer-left"
           />
         </TFormItem>
         <TFormItem :label="t('pageLayout.footerCenter')">
-          <TInput
-            v-model="draft.footer.center"
+          <TTextarea
+            :model-value="headerFooterText[headerFooterVariant].footer.center"
+            @update:model-value="updateHeaderFooterText('footer', 'center', $event)"
             :aria-label="t('pageLayout.footerCenter')"
             :maxlength="1024"
+            data-page-setup="footer-center"
           />
         </TFormItem>
         <TFormItem :label="t('pageLayout.footerRight')">
-          <TInput
-            v-model="draft.footer.right"
+          <TTextarea
+            :model-value="headerFooterText[headerFooterVariant].footer.right"
+            @update:model-value="updateHeaderFooterText('footer', 'right', $event)"
             :aria-label="t('pageLayout.footerRight')"
             :maxlength="1024"
+            data-page-setup="footer-right"
           />
         </TFormItem>
       </section>
@@ -333,6 +494,13 @@ watch(
 .page-setup-dialog__section--wide h3,
 .page-setup-dialog__section--wide > :first-child {
   grid-column: 1 / -1;
+}
+.page-setup-dialog__header-footer-options {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--idea-space-2) var(--idea-space-3);
+  margin: var(--idea-space-2) 0;
 }
 .page-setup-dialog h3 {
   margin: 0 0 var(--idea-space-2);

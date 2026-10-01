@@ -202,14 +202,14 @@ function paintAxisItem(
       ? {
           x: rowLabelStart,
           y: item.offset,
-          width: Math.max(0, frame.headerSize.width - rowLabelStart - 1),
+          width: Math.max(0, frame.headingSize.width - rowLabelStart - 1),
           height: item.size,
         }
       : {
           x: item.offset,
           y: columnLabelStart,
           width: item.size,
-          height: Math.max(0, frame.headerSize.height - columnLabelStart - 1),
+          height: Math.max(0, frame.headingSize.height - columnLabelStart - 1),
         };
   if (rect.width <= 0 || rect.height <= 0) return;
   const axisSelected = isAxisSelected(axis, item.index, selection);
@@ -316,8 +316,8 @@ export function paintSheetHeaders(
   const corner = {
     x: rowLabelStart,
     y: columnLabelStart,
-    width: Math.max(0, frame.headerSize.width - rowLabelStart),
-    height: Math.max(0, frame.headerSize.height - columnLabelStart),
+    width: Math.max(0, frame.headingSize.width - rowLabelStart),
+    height: Math.max(0, frame.headingSize.height - columnLabelStart),
   };
   context.fillStyle =
     selection.mode === "all"

@@ -25,6 +25,7 @@ export type SheetPageBoundary = {
   index: number;
 };
 export type SheetPrintCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+export type SheetPageMargin = "top" | "bottom" | "left" | "right" | "header" | "footer";
 export type SheetPage = {
   rowPage: number;
   columnPage: number;
@@ -56,6 +57,8 @@ export type SheetPagination = {
 
 const PX_PER_MM = 96 / 25.4;
 const PAGE_GAP = 32;
+const HIDDEN_WHITE_SPACE_GAP = 2;
+const MIN_PRINTABLE_MM = 1;
 
 function rectIntersects(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
@@ -171,6 +174,59 @@ function snapBoundaryPastMerge(options: {
     if (next === target) return target;
     target = next;
   }
+}
+
+/** Returns a canonical, detached setup after one margin drag, or null for no change. */
+export function adjustSheetPageMargin(options: {
+  setup: SheetPageSetup;
+  margin: SheetPageMargin;
+  valueMm: number;
+}): SheetPageSetup | null {
+  if (!Number.isFinite(options.valueMm)) return null;
+  const setup = cloneSheetPageSetup(options.setup);
+  const paper = getPagePaperSize(setup);
+  const margins = { ...setup.margins };
+  const clampMargin = (value: number, minimum: number, maximum: number) =>
+    clamp(value, minimum, Math.max(minimum, maximum));
+  switch (options.margin) {
+    case "left":
+      margins.left = clampMargin(
+        options.valueMm,
+        0,
+        paper.width - margins.right - MIN_PRINTABLE_MM,
+      );
+      break;
+    case "right":
+      margins.right = clampMargin(
+        options.valueMm,
+        0,
+        paper.width - margins.left - MIN_PRINTABLE_MM,
+      );
+      break;
+    case "top":
+      margins.top = clampMargin(
+        options.valueMm,
+        margins.header,
+        paper.height - margins.bottom - MIN_PRINTABLE_MM,
+      );
+      break;
+    case "bottom":
+      margins.bottom = clampMargin(
+        options.valueMm,
+        margins.footer,
+        paper.height - margins.top - MIN_PRINTABLE_MM,
+      );
+      break;
+    case "header":
+      margins.header = clampMargin(options.valueMm, 0, margins.top);
+      break;
+    case "footer":
+      margins.footer = clampMargin(options.valueMm, 0, margins.bottom);
+      break;
+  }
+  if (margins[options.margin] === setup.margins[options.margin]) return null;
+  setup.margins = margins;
+  return setup;
 }
 
 /**
@@ -528,7 +584,8 @@ export function createSheetPagination(options: {
     ],
     merged,
   );
-  const stride = { width: paperSize.width + PAGE_GAP, height: paperSize.height + PAGE_GAP };
+  const pageGap = PAGE_GAP / printScale;
+  const stride = { width: paperSize.width + pageGap, height: paperSize.height + pageGap };
   const printedRows = rowPages.axes.filter(
     (axis) => axis.end >= printRange.start.row && axis.start <= printRange.end.row,
   );
@@ -665,6 +722,9 @@ export type PageLayoutProjection = {
   geometry: SheetGeometry;
   rows: RowVisibilityIndex;
   columnAtOffset: (x: number) => number | null;
+  /** Page rectangles in this projection's view-only white-space mode. */
+  getPage: (rowPage: number, columnPage: number) => SheetPage | null;
+  getVisiblePages: (rect: Rect) => SheetPage[];
 };
 
 /** Projects logical cell coordinates onto separated paper rectangles while retaining logical addresses. */
@@ -672,18 +732,73 @@ export function createPageLayoutProjection(options: {
   geometry: SheetGeometry;
   rows: RowVisibilityIndex;
   pagination: SheetPagination;
+  /** Hides top/bottom paper white space without changing print pagination. */
+  showWhiteSpace?: boolean;
 }): PageLayoutProjection {
   const { geometry: base, rows: source, pagination } = options;
+  const showWhiteSpace = options.showWhiteSpace ?? true;
   const paperStride = {
-    width: pagination.paperSize.width + PAGE_GAP,
-    height: pagination.paperSize.height + PAGE_GAP,
+    width: pagination.paperSize.width + PAGE_GAP / pagination.printScale,
+    height: showWhiteSpace
+      ? pagination.paperSize.height + PAGE_GAP / pagination.printScale
+      : pagination.contentSize.height + HIDDEN_WHITE_SPACE_GAP / pagination.printScale,
   };
   const firstPaper = pagination.getPage(0, 0);
   if (!firstPaper) throw new RangeError("Pagination must contain at least one page.");
   const margin = {
     left: firstPaper.contentRect.x - firstPaper.paperRect.x,
-    top: firstPaper.contentRect.y - firstPaper.paperRect.y,
+    top: showWhiteSpace ? firstPaper.contentRect.y - firstPaper.paperRect.y : 0,
   };
+  function getPage(rowPage: number, columnPage: number): SheetPage | null {
+    const page = pagination.getPage(rowPage, columnPage);
+    if (!page || showWhiteSpace) return page;
+    const paperRect = {
+      x: page.paperRect.x,
+      y: rowPage * paperStride.height,
+      width: page.paperRect.width,
+      height: pagination.contentSize.height,
+    };
+    return {
+      ...page,
+      paperRect,
+      contentRect: {
+        x: page.contentRect.x,
+        y: paperRect.y,
+        width: page.contentRect.width,
+        height: pagination.contentSize.height,
+      },
+    };
+  }
+  function getVisiblePages(rect: Rect): SheetPage[] {
+    if (rect.width <= 0 || rect.height <= 0) return [];
+    const startRow = clamp(
+      Math.floor(rect.y / paperStride.height),
+      0,
+      pagination.pageRows.length - 1,
+    );
+    const endRow = clamp(
+      Math.floor((rect.y + rect.height - 0.000001) / paperStride.height),
+      0,
+      pagination.pageRows.length - 1,
+    );
+    const startColumn = clamp(
+      Math.floor(rect.x / paperStride.width),
+      0,
+      pagination.pageColumns.length - 1,
+    );
+    const endColumn = clamp(
+      Math.floor((rect.x + rect.width - 0.000001) / paperStride.width),
+      0,
+      pagination.pageColumns.length - 1,
+    );
+    const pages: SheetPage[] = [];
+    for (let row = startRow; row <= endRow; row += 1)
+      for (let column = startColumn; column <= endColumn; column += 1) {
+        const page = getPage(row, column);
+        if (page && rectIntersects(page.paperRect, rect)) pages.push(page);
+      }
+    return pages;
+  }
   const rowPageFor = (row: number) => findAxisForLogicalIndex(pagination.pageRows, row);
   const columnPageFor = (column: number) => findAxisForLogicalIndex(pagination.pageColumns, column);
   function rowOffset(row: number): number | null {
@@ -828,13 +943,13 @@ export function createPageLayoutProjection(options: {
       return column === null || row === null ? null : { row, column };
     },
     getVisibleRange(scroll, viewport): VisibleCellRange {
-      const pages = pagination.getVisiblePages({
+      const pages = getVisiblePages({
         x: scroll.x,
         y: scroll.y,
         width: Math.max(1, viewport.width),
         height: Math.max(1, viewport.height),
       });
-      const nearest = pagination.getPage(
+      const nearest = getPage(
         clamp(Math.floor(scroll.y / paperStride.height), 0, pagination.pageRows.length - 1),
         clamp(Math.floor(scroll.x / paperStride.width), 0, pagination.pageColumns.length - 1),
       );
@@ -858,7 +973,7 @@ export function createPageLayoutProjection(options: {
       };
     },
   };
-  return { geometry: projected, rows, columnAtOffset };
+  return { geometry: projected, rows, columnAtOffset, getPage, getVisiblePages };
 }
 
 export function createPageLayoutViewportLayout(options: {
@@ -869,6 +984,7 @@ export function createPageLayoutViewportLayout(options: {
   bodyScrollPosition?: Point;
   mergeResolver?: MergeResolver;
   overscan?: number;
+  showWhiteSpace?: boolean;
 }): SheetViewportLayout {
   const projection = createPageLayoutProjection(options);
   const base = createSheetViewportLayout({
@@ -883,7 +999,7 @@ export function createPageLayoutViewportLayout(options: {
   });
   function pageFragments(range: CellRange): SheetViewportPaneRangeRect[] {
     const result: SheetViewportPaneRangeRect[] = [];
-    const visible = options.pagination.getVisiblePages({
+    const visible = projection.getVisiblePages({
       x: base.bodyScrollPosition.x,
       y: base.bodyScrollPosition.y,
       width: base.viewportSize.width,

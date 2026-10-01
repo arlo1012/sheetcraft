@@ -7,7 +7,9 @@ import {
   Settings2,
   TableProperties,
 } from "lucide-vue-next";
+import { computed } from "vue";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
+import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
@@ -17,22 +19,34 @@ import SheetZoomMenu from "../../../shared/sheet-view/SheetZoomMenu.vue";
 
 type SheetViewMode = "normal" | "page-break-preview" | "page-layout";
 
-const props = defineProps<{
-  editSessionId?: string;
-  viewMode: SheetViewMode;
-  showFormulaBar: boolean;
-  showHeaders: boolean;
-  showGridLines: boolean;
-  eyeComfortEnabled: boolean;
-  highlightEnabled: boolean;
-  highlightColor: string;
-  fullscreen: boolean;
-  fullscreenAvailable: boolean;
-  zoom: number;
-  freezeDisabled: boolean;
-  activeCell: { row: number; column: number };
-  freezePanes: { rows: number; columns: number };
-}>();
+const props = withDefaults(
+  defineProps<{
+    editSessionId?: string;
+    viewMode: SheetViewMode;
+    showFormulaBar: boolean;
+    showHeaders: boolean;
+    showGridLines: boolean;
+    eyeComfortEnabled: boolean;
+    highlightEnabled: boolean;
+    highlightColor: string;
+    fullscreen: boolean;
+    fullscreenAvailable: boolean;
+    zoom: number;
+    freezeDisabled: boolean;
+    activeCell: { row: number; column: number };
+    freezePanes: { rows: number; columns: number };
+    showPageRulers?: boolean;
+    showPageMargins?: boolean;
+    showPageWhiteSpace?: boolean;
+    pageRulerUnit?: "mm" | "cm" | "in";
+  }>(),
+  {
+    showPageRulers: true,
+    showPageMargins: false,
+    showPageWhiteSpace: true,
+    pageRulerUnit: "cm",
+  },
+);
 const emit = defineEmits<{
   "update:viewMode": [value: SheetViewMode];
   "update:showFormulaBar": [value: boolean];
@@ -42,6 +56,10 @@ const emit = defineEmits<{
   "update:highlightEnabled": [value: boolean];
   "update:highlightColor": [value: string];
   "update:zoom": [value: number];
+  "update:showPageRulers": [value: boolean];
+  "update:showPageMargins": [value: boolean];
+  "update:showPageWhiteSpace": [value: boolean];
+  "update:pageRulerUnit": [value: "mm" | "cm" | "in"];
   toggleFullscreen: [];
   fitSelection: [];
   freeze: [mode: "panes" | "top-row" | "first-column"];
@@ -49,6 +67,11 @@ const emit = defineEmits<{
   pageSetup: [];
 }>();
 const { t } = useAppI18n();
+const pageRulerUnitOptions = computed(() => [
+  { label: t("pageLayout.unitMillimetres"), value: "mm" },
+  { label: t("pageLayout.unitCentimetres"), value: "cm" },
+  { label: t("pageLayout.unitInches"), value: "in" },
+]);
 </script>
 
 <template>
@@ -139,6 +162,45 @@ const { t } = useAppI18n();
     </section>
 
     <section
+      v-if="viewMode === 'page-layout'"
+      class="view-toolbar__group"
+      data-ribbon-group="page-layout-rulers"
+      role="group"
+      :aria-label="t('pageLayout.rulers')"
+    >
+      <div class="view-toolbar__checks view-toolbar__checks--page-layout">
+        <TCheckbox
+          :model-value="showPageRulers"
+          data-page-layout-option="rulers"
+          @update:model-value="emit('update:showPageRulers', Boolean($event))"
+          >{{ t("pageLayout.showRulers") }}</TCheckbox
+        >
+        <TCheckbox
+          :model-value="showPageMargins"
+          data-page-layout-option="margins"
+          @update:model-value="emit('update:showPageMargins', Boolean($event))"
+          >{{ t("pageLayout.showMargins") }}</TCheckbox
+        >
+        <TCheckbox
+          :model-value="showPageWhiteSpace"
+          data-page-layout-option="white-space"
+          @update:model-value="emit('update:showPageWhiteSpace', Boolean($event))"
+          >{{ t("pageLayout.showWhiteSpace") }}</TCheckbox
+        >
+        <label>
+          <span class="ui-visually-hidden">{{ t("pageLayout.rulerUnits") }}</span>
+          <TSelect
+            :model-value="pageRulerUnit"
+            :options="pageRulerUnitOptions"
+            data-page-layout-option="ruler-unit"
+            size="small"
+            @update:model-value="emit('update:pageRulerUnit', $event as 'mm' | 'cm' | 'in')"
+          />
+        </label>
+      </div>
+    </section>
+
+    <section
       class="view-toolbar__group"
       data-ribbon-group="view-reading"
       role="group"
@@ -225,6 +287,9 @@ const { t } = useAppI18n();
     min-width: 150px;
     padding: 0 var(--idea-space-2);
     font-size: var(--idea-font-size-body-small);
+    &--page-layout {
+      grid-template-columns: max-content minmax(88px, 1fr);
+    }
   }
 }
 </style>

@@ -17,6 +17,9 @@ export type PageViewBreak = {
 
 export type PageViewPaintState = {
   mode: SheetViewMode;
+  showWhiteSpace?: boolean;
+  rulerSize?: number;
+  uiScale?: number;
   pages: readonly PageViewPage[];
   printRect: Rect;
   rowBreaks: readonly PageViewBreak[];

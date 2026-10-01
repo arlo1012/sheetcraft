@@ -140,8 +140,9 @@ export type WorkbookSnapshotV13 = Omit<WorkbookSnapshotV12, "version" | "sheets"
   version: 13;
   sheets: SheetSnapshot[];
 };
+export type WorkbookSnapshotV14 = Omit<WorkbookSnapshotV13, "version"> & { version: 14 };
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV13;
+export type WorkbookSnapshot = WorkbookSnapshotV14;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -153,7 +154,7 @@ export type SheetSnapshot = SheetSnapshotV7 & {
   conditionalFormats?: SheetConditionalFormatRule[];
   pageSetup?: SheetPageSetup;
 };
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -628,7 +629,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 13,
+    version: 14,
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
@@ -660,7 +661,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 10 &&
     record.version !== 11 &&
     record.version !== 12 &&
-    record.version !== 13
+    record.version !== 13 &&
+    record.version !== 14
   ) {
     throw new WorkbookDomainError(
       {

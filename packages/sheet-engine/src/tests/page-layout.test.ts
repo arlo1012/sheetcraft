@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import { createSheetGeometry } from "../geometry.js";
 import {
   adjustSheetPageBoundary,
+  adjustSheetPageMargin,
   adjustSheetPrintCorner,
   createPageLayoutProjection,
   createPageLayoutViewportLayout,
@@ -216,6 +217,64 @@ describe("page layout", () => {
     });
     expect(adjust("top-left", 2, 2)).toBeUndefined();
     expect(setup.printArea).toEqual({ start: { row: 2, column: 2 }, end: { row: 5, column: 5 } });
+  });
+
+  test("clamps page margins to usable paper and header/footer ownership", () => {
+    const setup = { ...DEFAULT_SHEET_PAGE_SETUP };
+    expect(adjustSheetPageMargin({ setup, margin: "top", valueMm: 0 })?.margins.top).toBe(
+      setup.margins.header,
+    );
+    expect(adjustSheetPageMargin({ setup, margin: "header", valueMm: 999 })?.margins.header).toBe(
+      setup.margins.top,
+    );
+    const left = adjustSheetPageMargin({ setup, margin: "left", valueMm: 999 })!;
+    expect(left.margins.left + left.margins.right).toBeLessThan(210);
+    expect(
+      adjustSheetPageMargin({ setup, margin: "left", valueMm: setup.margins.left }),
+    ).toBeNull();
+    expect(setup).toEqual(DEFAULT_SHEET_PAGE_SETUP);
+  });
+
+  test("hides vertical white space in the projection without changing page cells or fragments", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 30,
+      columnCount: 4,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({ rowCount: 30, defaultRowHeight: 20 });
+    const setup = { ...DEFAULT_SHEET_PAGE_SETUP, scale: 400 };
+    const range = { start: { row: 0, column: 0 }, end: { row: 29, column: 3 } };
+    const pagination = createSheetPagination({ geometry, rows, setup, printRange: range });
+    const shown = createPageLayoutProjection({ geometry, rows, pagination });
+    const hidden = createPageLayoutProjection({
+      geometry,
+      rows,
+      pagination,
+      showWhiteSpace: false,
+    });
+    const secondShown = shown.getPage(1, 0)!;
+    const secondHidden = hidden.getPage(1, 0)!;
+    expect(secondHidden.contentRect.y).toBeLessThan(secondShown.contentRect.y);
+    expect(secondHidden.paperRect.height).toBe(secondHidden.contentRect.height);
+    expect(
+      hidden.geometry.getCellAtPoint({
+        x: secondHidden.contentRect.x + 1,
+        y: secondHidden.contentRect.y + 1,
+      }),
+    ).toEqual({ row: secondHidden.range.start.row, column: secondHidden.range.start.column });
+    expect(hidden.getVisiblePages(secondHidden.paperRect)).toHaveLength(1);
+    const layout = createPageLayoutViewportLayout({
+      geometry,
+      rows,
+      pagination,
+      showWhiteSpace: false,
+      viewportSize: { width: 1000, height: 1000 },
+    });
+    expect(
+      layout.getRangeFragments({ start: { row: 0, column: 0 }, end: { row: 29, column: 3 } })
+        .length,
+    ).toBe(pagination.pageCount);
   });
 
   test("expands an automatic boundary by lowering scale so its old auto break cannot reappear", () => {

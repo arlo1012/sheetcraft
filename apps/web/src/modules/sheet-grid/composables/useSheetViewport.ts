@@ -43,6 +43,7 @@ export function useSheetViewport(options: {
   getViewMode?: () => SheetViewMode;
   getPageSetup?: () => SheetPageSetup;
   getPrintRange?: () => CellRange;
+  getShowPageWhiteSpace?: () => boolean;
   getScale?: () => number;
   initialExtent: GridExtent;
   getGridExtentPolicy: () => GridExtentPolicy;
@@ -141,6 +142,7 @@ export function useSheetViewport(options: {
           geometry: baseGeometry.value,
           rows: baseRows.value,
           pagination: pagination.value,
+          showWhiteSpace: options.getShowPageWhiteSpace?.() ?? true,
         })
       : undefined,
   );
@@ -177,6 +179,7 @@ export function useSheetViewport(options: {
         geometry: baseGeometry.value,
         rows: baseRows.value,
         pagination: pagination.value,
+        showWhiteSpace: options.getShowPageWhiteSpace?.() ?? true,
         bodyScrollPosition: scrollPosition,
         viewportSize,
         overscan: 2,
@@ -329,6 +332,16 @@ export function useSheetViewport(options: {
     viewMode,
     () => {
       setNativeScrollPosition({ x: 0, y: 0 });
+      ensureSelectionVisible(options.getSelection().active, "cells");
+      emitViewState();
+    },
+    { flush: "post" },
+  );
+
+  watch(
+    () => options.getShowPageWhiteSpace?.() ?? true,
+    () => {
+      if (viewMode.value !== "page-layout") return;
       ensureSelectionVisible(options.getSelection().active, "cells");
       emitViewState();
     },
@@ -513,6 +526,7 @@ export function useSheetViewport(options: {
     baseGeometry,
     baseRows,
     pagination,
+    pageProjection,
     geometry,
     getCellAtClientPoint,
     getCurrentViewState,

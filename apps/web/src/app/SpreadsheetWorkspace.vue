@@ -2,7 +2,16 @@
 import { formatCellAddress } from "@idea10/core/coordinates";
 import { cloneConditionalFormatRule } from "@idea10/core/conditional-formatting";
 import type { SheetGoToOptions } from "@idea10/core/go-to";
-import { computed, nextTick, ref, shallowRef, shallowReactive, useId, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  ref,
+  shallowRef,
+  shallowReactive,
+  useId,
+  watch,
+  type ComponentPublicInstance,
+} from "vue";
 import {
   createSetSheetOutlineGroupCollapsedCommand,
   createSetSheetOutlineLevelCommand,
@@ -13,6 +22,7 @@ import {
   cloneSheetPageSetup,
   DEFAULT_SHEET_PAGE_SETUP,
   type SheetPageSetup,
+  type SheetHeaderFooterOptions,
 } from "@idea10/core/page-setup";
 import type { SheetViewMode } from "@idea10/sheet-engine/page-layout";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
@@ -35,6 +45,14 @@ import DataProofreadingDialog from "../modules/data-tools/components/DataProofre
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import ViewToolbar from "../modules/view-tools/components/ViewToolbar.vue";
 import PageSetupDialog from "../modules/page-layout/components/PageSetupDialog.vue";
+import PageHeaderFooterToolbar from "../modules/page-layout/components/PageHeaderFooterToolbar.vue";
+import type {
+  HeaderFooterActionRequest,
+  HeaderFooterEditContext,
+  HeaderFooterEditorAction,
+  HeaderFooterVariant,
+} from "../modules/page-layout/header-footer-editor";
+import type { PageLayoutRulerUnit } from "../modules/page-layout/components/PageLayoutRulers.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
 import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
 import ConsolidateDialog from "../modules/data-tools/components/ConsolidateDialog.vue";
@@ -259,27 +277,74 @@ const {
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
 const pageViewModes = shallowReactive(new Map<string, SheetViewMode>());
 const pageSetupVisible = ref(false);
+const showPageRulers = ref(true);
+const showPageMargins = ref(false);
+const showPageWhiteSpace = ref(true);
+const pageRulerUnit = ref<PageLayoutRulerUnit>("cm");
+const headerFooterContext = shallowRef<HeaderFooterEditContext>();
+const headerFooterActionRequest = shallowRef<HeaderFooterActionRequest>();
+const sheetGridRef = shallowRef<InstanceType<typeof SheetGrid> | null>(null);
+function setSheetGridRef(value: Element | ComponentPublicInstance | null): void {
+  sheetGridRef.value = value as InstanceType<typeof SheetGrid> | null;
+  setGridNavigator(value);
+}
+function setPageWhiteSpace(value: boolean): void {
+  if (sheetGridRef.value?.flushPendingEdit() === false) return;
+  headerFooterContext.value = undefined;
+  showPageWhiteSpace.value = value;
+}
+function sendHeaderFooterAction(action: HeaderFooterEditorAction): void {
+  headerFooterActionRequest.value = {
+    sequence: (headerFooterActionRequest.value?.sequence ?? 0) + 1,
+    action,
+  };
+}
+function updateHeaderFooterOptions(headerFooter: SheetHeaderFooterOptions): void {
+  if (sheetGridRef.value?.flushPendingEdit() === false) return;
+  const setup = cloneSheetPageSetup(activePageSetup.value);
+  setup.headerFooter = headerFooter;
+  applyPageSetup(setup);
+}
+function openPageSetup(): void {
+  if (sheetGridRef.value?.flushPendingEdit() === false) return;
+  pageSetupVisible.value = true;
+}
 const activeViewMode = computed(() => pageViewModes.get(activeSheet.value.id) ?? "normal");
 const activePageSetup = computed(() => activeSheet.value.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
 function setViewMode(mode: SheetViewMode): void {
+  if (sheetGridRef.value?.flushPendingEdit() === false) return;
+  headerFooterContext.value = undefined;
   pageViewModes.set(activeSheet.value.id, mode);
   void nextTick(focusCellEditor);
 }
-function savePageSetup(setup: SheetPageSetup): void {
+function applyPageSetup(setup: SheetPageSetup): void {
   executeCommand(createSetSheetPageSetupCommand(activeSheet.value.id, setup));
+}
+function savePageSetup(setup: SheetPageSetup): void {
+  applyPageSetup(setup);
   pageSetupVisible.value = false;
   void nextTick(focusCellEditor);
 }
 function updatePageHeaderFooter(payload: {
   section: "header" | "footer";
   part: "left" | "center" | "right";
+  variant: HeaderFooterVariant;
   value: string;
 }): void {
   const setup = cloneSheetPageSetup(activePageSetup.value);
-  setup[payload.section][payload.part] = payload.value;
+  if (payload.variant === "odd") setup[payload.section][payload.part] = payload.value;
+  else if (setup.headerFooter) {
+    const key = `${payload.variant}${payload.section === "header" ? "Header" : "Footer"}` as
+      | "firstHeader"
+      | "firstFooter"
+      | "evenHeader"
+      | "evenFooter";
+    setup.headerFooter[key][payload.part] = payload.value;
+  }
   executeCommand(createSetSheetPageSetupCommand(activeSheet.value.id, setup));
 }
 watch(workbookGeneration, () => {
+  headerFooterContext.value = undefined;
   pageViewModes.clear();
   pageSetupVisible.value = false;
 });
@@ -287,6 +352,7 @@ watch(
   () => activeSheet.value.id,
   () => {
     pageSetupVisible.value = false;
+    headerFooterContext.value = undefined;
   },
 );
 const duplicateInputError = computed(() => {
@@ -1397,7 +1463,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
 <template>
   <section
     class="spreadsheet-workspace"
-    :class="{ 'is-formula-bar-hidden': !showFormulaBar }"
+    :class="{
+      'is-formula-bar-hidden': !showFormulaBar,
+      'is-header-footer-editing': Boolean(headerFooterContext),
+    }"
     :aria-label="t('workspace.editor')"
     :aria-busy="loading || fileBusy || imageBusy || xlsxBusy"
     @keydown.capture="onWorkspaceKeydown"
@@ -1478,7 +1547,12 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         <ViewToolbar
           :view-mode="activeViewMode"
           @update:view-mode="setViewMode"
-          @page-setup="pageSetupVisible = true"
+          @page-setup="openPageSetup"
+          v-model:show-page-rulers="showPageRulers"
+          v-model:show-page-margins="showPageMargins"
+          :show-page-white-space="showPageWhiteSpace"
+          @update:show-page-white-space="setPageWhiteSpace"
+          v-model:page-ruler-unit="pageRulerUnit"
           :edit-session-id="cellEditSession.id"
           :show-formula-bar="showFormulaBar"
           @update:show-formula-bar="setShowFormulaBar"
@@ -1605,6 +1679,14 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         </WorkbookFileActions>
       </template>
     </SpreadsheetRibbon>
+    <PageHeaderFooterToolbar
+      v-if="headerFooterContext && activeViewMode === 'page-layout' && showPageWhiteSpace"
+      :setup="activePageSetup"
+      :context="headerFooterContext"
+      :disabled="activeSheet.properties.protected"
+      @action="sendHeaderFooterAction"
+      @options-change="updateHeaderFooterOptions"
+    />
     <DataToolsDialogs
       :sort-visible="dataSortVisible"
       :text-to-columns-visible="dataTextToColumnsVisible"
@@ -2148,7 +2230,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       <SheetGrid
         :view-mode="activeViewMode"
         :page-setup="activePageSetup"
-        @page-setup-change="savePageSetup"
+        @page-setup-change="applyPageSetup"
+        :show-page-rulers="showPageRulers"
+        :show-page-margins="showPageMargins"
+        :show-page-white-space="showPageWhiteSpace"
+        @update:show-page-white-space="setPageWhiteSpace"
+        :page-ruler-unit="pageRulerUnit"
+        file-name="workbook.xlsx"
+        :header-footer-action-request="headerFooterActionRequest"
+        @header-footer-edit="headerFooterContext = $event"
         @header-footer-change="updatePageHeaderFooter"
         v-model:zoom="zoom"
         :show-headers="showHeaders"
@@ -2160,7 +2250,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         external-horizontal-scrollbar
         :read-only="activeSheet.properties.protected"
         :key="workbookGeneration"
-        :ref="setGridNavigator"
+        :ref="setSheetGridRef"
         :sheet="activeSheet"
         :evaluator="activeSheetEvaluator"
         :context-menu-state="contextMenuState"
@@ -2312,6 +2402,13 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
 
   &.is-formula-bar-hidden {
     grid-template-rows: auto auto minmax(0, 1fr) 49px;
+  }
+
+  &.is-header-footer-editing {
+    grid-template-rows: auto auto auto auto minmax(0, 1fr) 49px;
+    &.is-formula-bar-hidden {
+      grid-template-rows: auto auto auto minmax(0, 1fr) 49px;
+    }
   }
 
   &__image-input {

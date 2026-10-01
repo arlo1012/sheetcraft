@@ -21,6 +21,19 @@ import type { SheetViewMode } from "@idea10/sheet-engine/page-layout";
 import type { PageViewPaintState } from "../../page-layout/page-view-types";
 import PageHeaderFooterOverlay from "../../page-layout/components/PageHeaderFooterOverlay.vue";
 import { usePageBreakDrag } from "../../page-layout/usePageBreakDrag";
+import { usePageMarginDrag } from "../../page-layout/usePageMarginDrag";
+import { adjustSheetPageMargin } from "@idea10/sheet-engine/page-layout";
+import PageLayoutRulers, {
+  PAGE_LAYOUT_RULER_SIZE,
+  type PageLayoutRulerUnit,
+} from "../../page-layout/components/PageLayoutRulers.vue";
+import PageLayoutMargins from "../../page-layout/components/PageLayoutMargins.vue";
+import PageWhiteSpaceControls from "../../page-layout/components/PageWhiteSpaceControls.vue";
+import type {
+  HeaderFooterActionRequest,
+  HeaderFooterEditContext,
+  HeaderFooterVariant,
+} from "../../page-layout/header-footer-editor";
 import { columnIndexToLabel, getCellAddressLabel } from "@idea10/core/coordinates";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
@@ -206,6 +219,12 @@ const props = withDefaults(
     showAxisQuickTools?: boolean;
     viewMode?: SheetViewMode;
     pageSetup?: SheetPageSetup;
+    showPageRulers?: boolean;
+    showPageMargins?: boolean;
+    showPageWhiteSpace?: boolean;
+    pageRulerUnit?: PageLayoutRulerUnit;
+    fileName?: string;
+    headerFooterActionRequest?: HeaderFooterActionRequest;
     dateSystem?: ExcelDateSystem;
     /** Resolved for the active cell by the Web data-tools adapter. */
     validationInfo?: ActiveCellValidationInfo;
@@ -230,6 +249,10 @@ const props = withDefaults(
     showGridLines: true,
     showAxisQuickTools: false,
     viewMode: "normal",
+    showPageRulers: true,
+    showPageMargins: false,
+    showPageWhiteSpace: true,
+    pageRulerUnit: "cm",
     dateSystem: "1900",
   },
 );
@@ -237,8 +260,15 @@ const props = withDefaults(
 const emit = defineEmits<{
   contextAction: [request: SheetContextRequest];
   pageSetupChange: [setup: SheetPageSetup];
+  headerFooterEdit: [context: HeaderFooterEditContext | undefined];
+  "update:showPageWhiteSpace": [value: boolean];
   headerFooterChange: [
-    payload: { section: "header" | "footer"; part: "left" | "center" | "right"; value: string },
+    payload: {
+      section: "header" | "footer";
+      part: "left" | "center" | "right";
+      variant: HeaderFooterVariant;
+      value: string;
+    },
   ];
   updateFloatingImage: [image: FloatingImage];
   deleteFloatingImage: [id: string];
@@ -288,7 +318,9 @@ const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 28;
 const AXIS_TOOL_GUTTER = 20;
 const quickToolsGutter = computed(() =>
-  props.showHeaders && props.showAxisQuickTools ? AXIS_TOOL_GUTTER : 0,
+  props.viewMode === "normal" && props.showHeaders && props.showAxisQuickTools
+    ? AXIS_TOOL_GUTTER
+    : 0,
 );
 function getOutlineDepth(axis: SheetDimensionAxis): number {
   const groups = props.sheet.outlineGroups ?? [];
@@ -306,12 +338,29 @@ const columnOutlineDepth = computed(() => getOutlineDepth("column"));
 const rowOutlineGutter = computed(() => getOutlineGutterSize(rowOutlineDepth.value));
 const columnOutlineHeaderHeight = computed(() => getOutlineGutterSize(columnOutlineDepth.value));
 
-const headerSize = computed(() => ({
-  width: props.showHeaders ? ROW_HEADER_WIDTH + quickToolsGutter.value + rowOutlineGutter.value : 0,
+const pageUiScale = computed(() =>
+  props.viewMode === "page-layout" ? pageSetup.value.scale / 100 : 1,
+);
+const rulerInset = computed(() =>
+  props.viewMode === "page-layout" && props.showPageRulers
+    ? PAGE_LAYOUT_RULER_SIZE / pageUiScale.value
+    : 0,
+);
+const headingSize = computed(() => ({
+  width: props.showHeaders
+    ? (ROW_HEADER_WIDTH + quickToolsGutter.value + rowOutlineGutter.value) / pageUiScale.value
+    : 0,
   height: props.showHeaders
-    ? COLUMN_HEADER_HEIGHT + quickToolsGutter.value + columnOutlineHeaderHeight.value
+    ? (COLUMN_HEADER_HEIGHT + quickToolsGutter.value + columnOutlineHeaderHeight.value) /
+      pageUiScale.value
     : 0,
 }));
+const headerSize = computed(() => ({
+  width: headingSize.value.width + rulerInset.value,
+  height: headingSize.value.height + rulerInset.value,
+}));
+const headerFooterOverlayRef = ref<InstanceType<typeof PageHeaderFooterOverlay>>();
+
 const subtotalSummaryBelow = computed(() =>
   Object.fromEntries(
     (props.sheet.subtotalMetadata ?? []).map((metadata) => [
@@ -435,6 +484,7 @@ const {
   baseGeometry,
   baseRows,
   pagination,
+  pageProjection,
   geometry,
   getCellAtClientPoint,
   gridCanvasStyle,
@@ -461,6 +511,7 @@ const {
   viewportSize,
 } = useSheetViewport({
   getViewMode: () => props.viewMode,
+  getShowPageWhiteSpace: () => props.showPageWhiteSpace,
   getPageSetup: () => pageSetup.value,
   getPrintRange: () =>
     pageSetup.value.printArea ?? {
@@ -758,7 +809,7 @@ watch(quickToolsAvailable, (available) => {
 });
 
 const renderFrame = computed(() =>
-  createSheetRenderFrame(layout.value, headerSize.value, scale.value),
+  createSheetRenderFrame(layout.value, headerSize.value, scale.value, headingSize.value),
 );
 const pageView = computed<PageViewPaintState | undefined>(() => {
   const pages = pagination.value;
@@ -773,7 +824,12 @@ const pageView = computed<PageViewPaintState | undefined>(() => {
   const scroll = layout.value.bodyScrollPosition;
   return {
     mode: props.viewMode,
-    pages: pages.getVisiblePages({ x: scroll.x, y: scroll.y, ...viewportSize }, props.viewMode),
+    showWhiteSpace: props.showPageWhiteSpace,
+    rulerSize: rulerInset.value,
+    uiScale: 1 / pageUiScale.value,
+    pages:
+      pageProjection.value?.getVisiblePages({ x: scroll.x, y: scroll.y, ...viewportSize }) ??
+      pages.getVisiblePages({ x: scroll.x, y: scroll.y, ...viewportSize }, props.viewMode),
     printRect: { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) },
     rowBreaks: pages.rowBreaks,
     columnBreaks: pages.columnBreaks,
@@ -806,14 +862,56 @@ const pageBreakDrag = usePageBreakDrag({
   },
   onChange: (setup) => emit("pageSetupChange", setup),
 });
+const pageMarginDrag = usePageMarginDrag({
+  getState: () => pageView.value,
+  getFrame: () => renderFrame.value,
+  getSetup: () => pageSetup.value,
+  getSurfacePoint: surfacePoint,
+  isDisabled: () =>
+    props.readOnly || !props.showPageMargins || isEditing.value || Boolean(getReferenceEditor()),
+  onBeforeStart: () => {
+    if (headerFooterOverlayRef.value?.flushPendingEdit() === false) return false;
+    pageBreakDrag.stop();
+    pageMarginDrag.stop();
+    emit("headerFooterEdit", undefined);
+    stopDragSelection();
+    stopFormulaReferenceDrag();
+    stopDimensionResize();
+    stopAxisMoveDrag();
+    return true;
+  },
+  onPreview: (setup) => {
+    pageSetupDraft.value = setup;
+  },
+  onChange: (setup) => emit("pageSetupChange", setup),
+});
+function adjustPageMargin(payload: {
+  margin: Parameters<typeof adjustSheetPageMargin>[0]["margin"];
+  valueMm: number;
+}): void {
+  if (props.readOnly) return;
+  const setup = adjustSheetPageMargin({ setup: pageSetup.value, ...payload });
+  if (setup) emit("pageSetupChange", setup);
+}
 watch(
-  () => [props.sheet.id, props.readOnly, props.pageSetup, props.sheet.pageSetup],
-  () => pageBreakDrag.stop(),
+  () => [
+    props.sheet.id,
+    props.readOnly,
+    props.pageSetup,
+    props.sheet.pageSetup,
+    props.showPageMargins,
+    props.showPageWhiteSpace,
+  ],
+  () => {
+    pageBreakDrag.stop();
+    pageMarginDrag.stop();
+  },
 );
 watch(
   () => props.viewMode,
   () => {
     pageBreakDrag.stop();
+    pageMarginDrag.stop();
     stopDragSelection();
     stopFormulaReferenceDrag();
     stopDimensionResize();
@@ -953,6 +1051,7 @@ const overlayState = computed<SheetOverlayState>(() => {
 });
 const imageHoverCursor = ref<string>();
 const surfaceCursor = computed(() => {
+  if (pageMarginDrag.cursor.value) return pageMarginDrag.cursor.value;
   if (pageBreakDrag.cursor.value) return pageBreakDrag.cursor.value;
   const hit = headerState.value.hovered;
   if (dimensionResize.value)
@@ -969,9 +1068,20 @@ function surfacePoint(event: MouseEvent) {
     scale.value,
   );
 }
+function isRulerPoint(point: { x: number; y: number }): boolean {
+  const inset = rulerInset.value;
+  return (
+    inset > 0 &&
+    ((point.x >= headingSize.value.width && point.x < headerSize.value.width) ||
+      (point.y >= headingSize.value.height && point.y < headerSize.value.height))
+  );
+}
 function onSurfacePointerDown(event: PointerEvent): void {
+  if (headerFooterOverlayRef.value?.flushPendingEdit() === false) return;
+  emit("headerFooterEdit", undefined);
   if (pageBreakDrag.start(event)) return;
   const point = surfacePoint(event);
+  if (isRulerPoint(point)) return;
   if (headerInput.onPointerDown(point, event, event.currentTarget as HTMLElement)) return;
   if (imageLayerRef.value?.handleSurfacePointerDown(event, imagePoint(event))) return;
   if (event.button !== 0) return;
@@ -984,6 +1094,10 @@ function onSurfacePointerDown(event: PointerEvent): void {
 }
 function onSurfacePointerMove(event: PointerEvent): void {
   pageBreakDrag.hover(event);
+  if (isRulerPoint(surfacePoint(event))) {
+    headerInput.onPointerLeave();
+    return;
+  }
   headerInput.onPointerMove(surfacePoint(event));
   imageHoverCursor.value = imageLayerRef.value?.getSurfaceCursor(imagePoint(event));
 }
@@ -994,6 +1108,7 @@ function onSurfacePointerLeave(): void {
 }
 function onSurfaceContextMenu(event: MouseEvent): void {
   const point = surfacePoint(event);
+  if (isRulerPoint(point)) return;
   if (headerInput.onContextMenu(point, event, event.currentTarget as HTMLElement)) return;
   if (imageLayerRef.value?.handleSurfaceContextMenu(event, imagePoint(event))) return;
   const address = getSurfaceCell(renderFrame.value, point);
@@ -2366,6 +2481,7 @@ function clearClipboard(): void {
 }
 
 function flushPendingEdit(): boolean {
+  if (headerFooterOverlayRef.value?.flushPendingEdit() === false) return false;
   if (isComposing.value) {
     return false;
   }
@@ -2376,7 +2492,9 @@ function flushPendingEdit(): boolean {
 }
 
 function hasPendingEdit(): boolean {
-  return isComposing.value || isEditing.value;
+  return (
+    isComposing.value || isEditing.value || Boolean(headerFooterOverlayRef.value?.hasPendingEdit())
+  );
 }
 
 watch(
@@ -2561,14 +2679,42 @@ defineExpose({
       </template>
     </SheetSurface>
     <PageHeaderFooterOverlay
-      v-if="viewMode === 'page-layout' && pageView"
+      ref="headerFooterOverlayRef"
+      v-if="viewMode === 'page-layout' && pageView && showPageWhiteSpace"
       :state="pageView"
       :frame="renderFrame"
       :setup="pageSetup"
       :sheet-name="sheet.name"
       :disabled="readOnly"
       :page-count="pagination?.pageCount ?? 0"
+      :file-name="fileName ?? t('pageLayout.unnamedWorkbook')"
+      :action-request="headerFooterActionRequest"
       @change="emit('headerFooterChange', $event)"
+      @edit="emit('headerFooterEdit', $event)"
+    />
+    <PageLayoutRulers
+      v-if="viewMode === 'page-layout' && pageView && showPageRulers"
+      :state="pageView"
+      :frame="renderFrame"
+      :unit="pageRulerUnit"
+      :print-scale="pageUiScale"
+      :label="t('pageLayout.rulers')"
+    />
+    <PageLayoutMargins
+      v-if="viewMode === 'page-layout' && pageView && showPageMargins"
+      :state="pageView"
+      :frame="renderFrame"
+      :setup="pageSetup"
+      :disabled="readOnly"
+      :active-margin="pageMarginDrag.activeMargin.value"
+      @start="pageMarginDrag.start"
+      @adjust="adjustPageMargin"
+    />
+    <PageWhiteSpaceControls
+      v-if="viewMode === 'page-layout' && pageView"
+      :state="pageView"
+      :frame="renderFrame"
+      @toggle="emit('update:showPageWhiteSpace', !showPageWhiteSpace)"
     />
     <SheetCellNotice
       v-if="inputError"

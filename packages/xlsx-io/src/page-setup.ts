@@ -1,7 +1,9 @@
 import { strFromU8, strToU8, unzipSync, type Unzipped } from "fflate/browser";
 import {
   DEFAULT_SHEET_PAGE_SETUP,
+  getSheetHeaderFooterOptions,
   normalizeSheetPageSetup,
+  type SheetHeaderFooterOptions,
   type SheetPageSetup,
 } from "@idea10/core/page-setup";
 import type { CellRange, Sheet, Workbook } from "@idea10/core/workbook";
@@ -102,23 +104,16 @@ function parseHeaderFooter(value: string | undefined): SheetPageSetup["header"] 
     }
     const code = value[index + 1] ?? "";
     if (code === "&") {
-      // `&&` is the product's explicit literal-ampersand token. Retain both
-      // characters so a decode/encode cycle cannot change its meaning.
+      // Retain the raw literal-ampersand token so header/footer text roundtrips.
       parts[position] += "&&";
       index += 1;
     } else if (code === "L" || code === "C" || code === "R") {
       position = code === "L" ? "left" : code === "C" ? "center" : "right";
       index += 1;
-    } else if (code === "P" || code === "N" || code === "A") {
-      // Page number, page count, and worksheet name are supported raw tokens.
-      parts[position] += `&${code}`;
-      index += 1;
     } else {
-      // Other Excel header controls are outside the product contract. Expose
-      // them as a literal ampersand sequence, which the writer preserves as
-      // text instead of accidentally executing an unsupported control.
-      parts[position] += `&&${code}`;
-      index += code ? 1 : 0;
+      // Formatting, dates, fields, and unknown raw controls belong to the
+      // section text. Core stores them losslessly for the Web formatter.
+      parts[position] += "&";
     }
   }
   return parts;
@@ -127,26 +122,52 @@ function parseHeaderFooter(value: string | undefined): SheetPageSetup["header"] 
 function headerFooterXml(
   header: SheetPageSetup["header"],
   footer: SheetPageSetup["footer"],
+  options: SheetHeaderFooterOptions,
 ): string {
-  const encodeSectionText = (value: string) => {
-    let output = "";
-    for (let index = 0; index < value.length; index += 1) {
-      const character = value[index] ?? "";
-      if (character !== "&") {
-        output += character;
-        continue;
-      }
-      const token = value[index + 1] ?? "";
-      if (token === "&" || token === "P" || token === "N" || token === "A") {
-        output += `&${token}`;
-        index += 1;
-      } else output += "&&";
-    }
-    return output;
-  };
   const section = (value: SheetPageSetup["header"]) =>
-    `&L${encodeSectionText(value.left)}&C${encodeSectionText(value.center)}&R${encodeSectionText(value.right)}`;
-  return `<headerFooter><oddHeader>${encodeXml(section(header))}</oddHeader><oddFooter>${encodeXml(section(footer))}</oddFooter></headerFooter>`;
+    `&L${value.left}&C${value.center}&R${value.right}`;
+  const attributes = [
+    options.differentFirst ? ' differentFirst="1"' : "",
+    options.differentOddEven ? ' differentOddEven="1"' : "",
+    options.scaleWithDocument ? "" : ' scaleWithDoc="0"',
+    options.alignWithMargins ? "" : ' alignWithMargins="0"',
+  ].join("");
+  const hasContent = (value: SheetPageSetup["header"]) =>
+    value.left !== "" || value.center !== "" || value.right !== "";
+  const variants = [
+    `<oddHeader>${encodeXml(section(header))}</oddHeader>`,
+    `<oddFooter>${encodeXml(section(footer))}</oddFooter>`,
+    ...(options.differentOddEven || hasContent(options.evenHeader)
+      ? [`<evenHeader>${encodeXml(section(options.evenHeader))}</evenHeader>`]
+      : []),
+    ...(options.differentOddEven || hasContent(options.evenFooter)
+      ? [`<evenFooter>${encodeXml(section(options.evenFooter))}</evenFooter>`]
+      : []),
+    ...(options.differentFirst || hasContent(options.firstHeader)
+      ? [`<firstHeader>${encodeXml(section(options.firstHeader))}</firstHeader>`]
+      : []),
+    ...(options.differentFirst || hasContent(options.firstFooter)
+      ? [`<firstFooter>${encodeXml(section(options.firstFooter))}</firstFooter>`]
+      : []),
+  ];
+  return `<headerFooter${attributes}>${variants.join("")}</headerFooter>`;
+}
+
+function truthy(value: string | undefined): boolean {
+  return /^(1|true)$/i.test(value?.trim() ?? "");
+}
+
+function hasHeaderImageToken(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] !== "&") continue;
+    const token = value[index + 1] ?? "";
+    if (token === "&") {
+      index += 1;
+      continue;
+    }
+    if (token === "G") return true;
+  }
+  return false;
 }
 
 function readBreaks(xml: string, tag: "rowBreaks" | "colBreaks"): number[] {
@@ -227,8 +248,14 @@ export function readXlsxPageSetups(
     );
     const headerFooterAttributes = headerFooterElement?.[1] ?? "";
     const headerFooter = headerFooterElement?.[2];
-    const oddHeader = /<oddHeader\b[^>]*>([\s\S]*?)<\/oddHeader>/i.exec(headerFooter ?? "")?.[1];
-    const oddFooter = /<oddFooter\b[^>]*>([\s\S]*?)<\/oddFooter>/i.exec(headerFooter ?? "")?.[1];
+    const headerFooterText = (tag: string) =>
+      new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i").exec(headerFooter ?? "")?.[1];
+    const oddHeader = headerFooterText("oddHeader");
+    const oddFooter = headerFooterText("oddFooter");
+    const evenHeader = headerFooterText("evenHeader");
+    const evenFooter = headerFooterText("evenFooter");
+    const firstHeader = headerFooterText("firstHeader");
+    const firstFooter = headerFooterText("firstFooter");
     const rowBreaks = readBreaks(xml, "rowBreaks");
     const columnBreaks = readBreaks(xml, "colBreaks");
     const hasSetup =
@@ -240,11 +267,22 @@ export function readXlsxPageSetups(
       printAreas[index] !== null;
     if (!hasSetup) return undefined;
 
-    if (
-      /\bdifferent(?:OddEven|First)\s*=\s*(["'])(?:1|true)\1/i.test(headerFooterAttributes) ||
-      /<(?:even|first)(?:Header|Footer)\b/i.test(headerFooter ?? "")
-    )
-      report.add("feature-omitted", "warning", `${sheets[index]?.name ?? index + 1}.headerFooter`);
+    const rawHeaderFooterText = [
+      oddHeader,
+      oddFooter,
+      evenHeader,
+      evenFooter,
+      firstHeader,
+      firstFooter,
+    ]
+      .filter((value): value is string => value !== undefined)
+      .map(decodeXml);
+    if (rawHeaderFooterText.some(hasHeaderImageToken) || /<legacyDrawingHF\b/i.test(xml))
+      report.add(
+        "feature-omitted",
+        "warning",
+        `${sheets[index]?.name ?? index + 1}.headerFooter.image`,
+      );
 
     const paperId = parseNumber(attribute(setup ?? "", "paperSize"));
     const paperSize = paperId === undefined ? undefined : PAPER_SIZES.get(paperId);
@@ -287,6 +325,24 @@ export function readXlsxPageSetups(
       },
       header: parseHeaderFooter(oddHeader ? decodeXml(oddHeader) : undefined),
       footer: parseHeaderFooter(oddFooter ? decodeXml(oddFooter) : undefined),
+      ...(headerFooterElement
+        ? {
+            headerFooter: {
+              differentFirst: truthy(attribute(headerFooterAttributes, "differentFirst")),
+              differentOddEven: truthy(attribute(headerFooterAttributes, "differentOddEven")),
+              scaleWithDocument:
+                attribute(headerFooterAttributes, "scaleWithDoc") === undefined ||
+                truthy(attribute(headerFooterAttributes, "scaleWithDoc")),
+              alignWithMargins:
+                attribute(headerFooterAttributes, "alignWithMargins") === undefined ||
+                truthy(attribute(headerFooterAttributes, "alignWithMargins")),
+              firstHeader: parseHeaderFooter(firstHeader ? decodeXml(firstHeader) : undefined),
+              firstFooter: parseHeaderFooter(firstFooter ? decodeXml(firstFooter) : undefined),
+              evenHeader: parseHeaderFooter(evenHeader ? decodeXml(evenHeader) : undefined),
+              evenFooter: parseHeaderFooter(evenFooter ? decodeXml(evenFooter) : undefined),
+            },
+          }
+        : {}),
       printArea: printAreas[index],
       rowBreaks,
       columnBreaks,
@@ -366,7 +422,7 @@ export function writeXlsxPageSetups(
     xml = replaceElement(
       xml,
       "headerFooter",
-      headerFooterXml(setup.header, setup.footer),
+      headerFooterXml(setup.header, setup.footer, getSheetHeaderFooterOptions(setup)),
       /<sheetData\b[^>]*(?:\/>|>[\s\S]*?<\/sheetData>)/i,
     );
     xml = replaceElement(
