@@ -29,6 +29,7 @@ export function paintSheetScene(
   options: {
     palette: SheetCanvasPalette;
     showGridLines: boolean;
+    skipBackground?: boolean;
     editingCell?: CellAddress;
     errorCells?: ReadonlySet<string>;
     imageUrls?: ReadonlyMap<string, string>;
@@ -37,8 +38,10 @@ export function paintSheetScene(
   },
 ): void {
   const { palette } = options;
-  context.fillStyle = palette.background;
-  context.fillRect(0, 0, layout.viewportSize.width, layout.viewportSize.height);
+  if (!options.skipBackground) {
+    context.fillStyle = palette.background;
+    context.fillRect(0, 0, layout.viewportSize.width, layout.viewportSize.height);
+  }
   const visibleImageUrls = new Set<string>();
   for (const paneScene of scene.panes) {
     const pane = layout.panes[paneScene.id];

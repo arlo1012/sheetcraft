@@ -119,6 +119,12 @@ function toAxisItem(row: VisibleRow): ViewportAxisItem {
 export function createSheetViewportLayout(options: {
   geometry: SheetGeometry;
   rows: RowVisibilityIndex;
+  /**
+   * Resolves a column from a sheet-space x coordinate. Projection layouts may
+   * have no meaningful y=0 (for example, a page top margin), so they can
+   * supply an axis-only resolver instead of relying on geometry hit testing.
+   */
+  getColumnAtOffset?: (offset: number) => number | null;
   freeze?: Partial<FreezePanes>;
   bodyScrollPosition?: Point;
   viewportSize: Size;
@@ -401,9 +407,11 @@ export function createSheetViewportLayout(options: {
       point.y < frozenViewportHeight
         ? point.y
         : frozenHeight + bodyScrollPosition.y + point.y - frozenViewportHeight;
-    const column = geometry.getCellAtPoint({ x, y: 0 })?.column;
+    const column = options.getColumnAtOffset
+      ? options.getColumnAtOffset(x)
+      : (geometry.getCellAtPoint({ x, y: 0 })?.column ?? null);
     const row = rows.getLogicalRowAtOffset(y);
-    if (row === null || column === undefined) return null;
+    if (row === null || column === null || column === undefined) return null;
     return getAnchorForAddress({ row, column });
   }
 
@@ -419,9 +427,11 @@ export function createSheetViewportLayout(options: {
       0,
       Math.max(0, totalSize.height - Math.min(0.000001, totalSize.height / 2)),
     );
-    const column = geometry.getCellAtPoint({ x, y: 0 })?.column;
+    const column = options.getColumnAtOffset
+      ? options.getColumnAtOffset(x)
+      : (geometry.getCellAtPoint({ x, y: 0 })?.column ?? null);
     const row = rows.getLogicalRowAtOffset(y);
-    if (row === null || column === undefined) return null;
+    if (row === null || column === null || column === undefined) return null;
     return getAnchorForAddress({ row, column });
   }
 

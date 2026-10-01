@@ -42,6 +42,11 @@ import {
   transformMergedCellRangesForAxisInsert,
 } from "../merged-cells.js";
 import { cloneCellStyle } from "../style.js";
+import {
+  cloneSheetPageSetup,
+  DEFAULT_SHEET_PAGE_SETUP,
+  type SheetPageSetup,
+} from "../page-setup.js";
 import type {
   DeleteSheetAxisCommand,
   InsertSheetAxisCommand,
@@ -250,6 +255,7 @@ function cloneSheetMetadata(metadata: SheetMetadata): SheetMetadata {
       range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
     })),
     conditionalFormats: (metadata.conditionalFormats ?? []).map(cloneConditionalFormatRule),
+    pageSetup: cloneSheetPageSetup(metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
   };
 }
 
@@ -575,6 +581,14 @@ function transformSheetMetadataForAxis(
     operation === "insert"
       ? transformMergedCellRangesForAxisInsert(metadata.mergedCells, axis, index, count)
       : transformMergedCellRangesForAxisDelete(metadata.mergedCells, axis, index, count);
+  const pageSetup = transformPageSetupForAxis(
+    metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP,
+    axis,
+    index,
+    count,
+    maximum,
+    operation,
+  );
   return {
     freezePanes:
       axis === "row"
@@ -653,7 +667,33 @@ function transformSheetMetadataForAxis(
       maximum,
       operation,
     ),
+    pageSetup,
   };
+}
+
+function transformPageSetupForAxis(
+  pageSetup: SheetPageSetup,
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  maximum: number,
+  operation: "insert" | "delete",
+): SheetPageSetup {
+  const setup = cloneSheetPageSetup(pageSetup);
+  const range = setup.printArea
+    ? transformRangeForAxis(setup.printArea, axis, index, count, maximum, operation)
+    : null;
+  const transformBreaks = (breaks: number[]) =>
+    breaks.flatMap((value) => {
+      const next = transformAxisIndex(value, index, count, maximum, operation);
+      return next === null || next === 0 ? [] : [next];
+    });
+  return cloneSheetPageSetup({
+    ...setup,
+    printArea: range,
+    rowBreaks: axis === "row" ? transformBreaks(setup.rowBreaks) : setup.rowBreaks,
+    columnBreaks: axis === "column" ? transformBreaks(setup.columnBreaks) : setup.columnBreaks,
+  });
 }
 
 function compareAxisEntries(
@@ -1374,6 +1414,13 @@ function transformSheetMetadataForAxisMove(
   const map = (value: number) => transformAxisIndexForMove(value, index, count, toIndex);
   const moveRange = (range: CellRange) =>
     transformRangeForAxisMove(range, axis, index, count, toIndex);
+  const pageSetup = transformPageSetupForAxisMove(
+    metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP,
+    axis,
+    index,
+    count,
+    toIndex,
+  );
   return {
     freezePanes: { ...metadata.freezePanes },
     filter,
@@ -1476,7 +1523,32 @@ function transformSheetMetadataForAxisMove(
       );
       return cloneConditionalFormatRule({ ...transformedRule, ranges, anchor });
     }),
+    pageSetup,
   };
+}
+
+function transformPageSetupForAxisMove(
+  pageSetup: SheetPageSetup,
+  axis: SheetDimensionAxis,
+  index: number,
+  count: number,
+  toIndex: number,
+): SheetPageSetup {
+  const setup = cloneSheetPageSetup(pageSetup);
+  const map = (value: number) => transformAxisIndexForMove(value, index, count, toIndex);
+  const range = setup.printArea
+    ? transformRangeForAxisMove(setup.printArea, axis, index, count, toIndex)
+    : null;
+  return cloneSheetPageSetup({
+    ...setup,
+    printArea: range,
+    rowBreaks:
+      axis === "row" ? setup.rowBreaks.map(map).filter((value) => value > 0) : setup.rowBreaks,
+    columnBreaks:
+      axis === "column"
+        ? setup.columnBreaks.map(map).filter((value) => value > 0)
+        : setup.columnBreaks,
+  });
 }
 
 function assertFormulaRangesCanMove(
@@ -1586,6 +1658,7 @@ export function applyMoveSheetAxisCommand(
     subtotalMetadata: metadata.subtotalMetadata,
     duplicateRules: metadata.duplicateRules,
     conditionalFormats: metadata.conditionalFormats,
+    pageSetup: metadata.pageSetup,
     floatingImages: previousState.floatingImages.map((image) => ({
       ...image,
       anchor:

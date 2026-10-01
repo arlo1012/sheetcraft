@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { Eye, Maximize2, Minimize2, PanelsTopLeft, TableProperties } from "lucide-vue-next";
+import {
+  Eye,
+  Maximize2,
+  Minimize2,
+  PanelsTopLeft,
+  Settings2,
+  TableProperties,
+} from "lucide-vue-next";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
@@ -8,8 +15,11 @@ import SheetFreezeMenu from "../../../shared/sheet-view/SheetFreezeMenu.vue";
 import SheetHighlightControl from "../../../shared/sheet-view/SheetHighlightControl.vue";
 import SheetZoomMenu from "../../../shared/sheet-view/SheetZoomMenu.vue";
 
+type SheetViewMode = "normal" | "page-break-preview" | "page-layout";
+
 const props = defineProps<{
   editSessionId?: string;
+  viewMode: SheetViewMode;
   showFormulaBar: boolean;
   showHeaders: boolean;
   showGridLines: boolean;
@@ -24,6 +34,7 @@ const props = defineProps<{
   freezePanes: { rows: number; columns: number };
 }>();
 const emit = defineEmits<{
+  "update:viewMode": [value: SheetViewMode];
   "update:showFormulaBar": [value: boolean];
   "update:showHeaders": [value: boolean];
   "update:showGridLines": [value: boolean];
@@ -35,6 +46,7 @@ const emit = defineEmits<{
   fitSelection: [];
   freeze: [mode: "panes" | "top-row" | "first-column"];
   unfreeze: [];
+  pageSetup: [];
 }>();
 const { t } = useAppI18n();
 </script>
@@ -83,28 +95,36 @@ const { t } = useAppI18n();
         variant="tall"
         :label="t('statusBar.normalView')"
         :text="t('statusBar.normalView')"
-        :pressed="true"
+        :pressed="viewMode === 'normal'"
         data-view-tool="normal-view"
+        @activate="emit('update:viewMode', 'normal')"
         ><TableProperties aria-hidden="true"
       /></RibbonButton>
-      <!-- TODO: page-break preview and page-layout rendering require a dedicated paged viewport. -->
       <RibbonButton
         variant="tall"
         :label="t('viewTools.pageBreakPreview')"
         :text="t('viewTools.pageBreakPreview')"
-        disabled
-        :title="t('viewTools.unavailable')"
+        :pressed="viewMode === 'page-break-preview'"
         data-view-tool="page-break-preview"
+        @activate="emit('update:viewMode', 'page-break-preview')"
         ><PanelsTopLeft aria-hidden="true"
       /></RibbonButton>
       <RibbonButton
         variant="tall"
         :label="t('statusBar.pageLayoutView')"
         :text="t('statusBar.pageLayoutView')"
-        disabled
-        :title="t('viewTools.unavailable')"
+        :pressed="viewMode === 'page-layout'"
         data-view-tool="page-layout-view"
+        @activate="emit('update:viewMode', 'page-layout')"
         ><PanelsTopLeft aria-hidden="true"
+      /></RibbonButton>
+      <RibbonButton
+        variant="tall"
+        :label="t('pageLayout.pageSetup')"
+        :text="t('pageLayout.pageSetup')"
+        data-view-tool="page-setup"
+        @activate="emit('pageSetup')"
+        ><Settings2 aria-hidden="true"
       /></RibbonButton>
       <!-- TODO: custom views need persisted view-state snapshots, not a local visual toggle. -->
       <RibbonButton

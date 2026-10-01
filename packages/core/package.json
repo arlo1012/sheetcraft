@@ -79,6 +79,10 @@
       "types": "./dist/workbook.d.ts",
       "import": "./dist/workbook.js"
     },
+    "./page-setup": {
+      "types": "./dist/page-setup.d.ts",
+      "import": "./dist/page-setup.js"
+    },
     "./data-validation": {
       "types": "./dist/data-validation.d.ts",
       "import": "./dist/data-validation.js"

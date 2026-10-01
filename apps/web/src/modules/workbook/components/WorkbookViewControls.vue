@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { Eye, Maximize2, Minimize2, Minus, Plus } from "lucide-vue-next";
+import {
+  Eye,
+  FileText,
+  Maximize2,
+  Minimize2,
+  Minus,
+  PanelsTopLeft,
+  Plus,
+  Table2,
+} from "lucide-vue-next";
 import SheetHighlightControl from "../../../shared/sheet-view/SheetHighlightControl.vue";
 import SheetZoomMenu from "../../../shared/sheet-view/SheetZoomMenu.vue";
 import WorkbookDisplaySettings from "./WorkbookDisplaySettings.vue";
@@ -12,9 +21,12 @@ import {
   SHEET_ZOOM_STEP,
 } from "../../../shared/sheet-view/zoom";
 
+type SheetViewMode = "normal" | "page-break-preview" | "page-layout";
+
 const props = withDefaults(
   defineProps<{
     zoom?: number;
+    viewMode?: SheetViewMode;
     showHeaders?: boolean;
     showGridLines?: boolean;
     showAxisQuickTools?: boolean;
@@ -26,6 +38,7 @@ const props = withDefaults(
   }>(),
   {
     zoom: 100,
+    viewMode: "normal",
     showHeaders: true,
     showGridLines: true,
     showAxisQuickTools: false,
@@ -39,6 +52,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   "update:zoom": [zoom: number];
+  "update:viewMode": [value: SheetViewMode];
   "update:showHeaders": [value: boolean];
   "update:showGridLines": [value: boolean];
   "update:showAxisQuickTools": [value: boolean];
@@ -67,11 +81,7 @@ function onNativeSliderInput(event: Event): void {
 </script>
 
 <template>
-  <div
-    class="workbook-view-controls"
-    :aria-label="t('statusBar.viewAndZoom')"
-    role="group"
-  >
+  <div class="workbook-view-controls" :aria-label="t('statusBar.viewAndZoom')" role="group">
     <button
       type="button"
       class="workbook-view-controls__button workbook-view-controls__eye-comfort"
@@ -92,6 +102,44 @@ function onNativeSliderInput(event: Event): void {
       @update:show-grid-lines="emit('update:showGridLines', $event)"
       @update:show-axis-quick-tools="emit('update:showAxisQuickTools', $event)"
     />
+    <div class="workbook-view-controls__modes" role="group" :aria-label="t('viewTools.label')">
+      <button
+        type="button"
+        class="workbook-view-controls__button"
+        :class="{ 'is-active': viewMode === 'normal' }"
+        :aria-label="t('statusBar.normalView')"
+        :aria-pressed="viewMode === 'normal'"
+        :title="t('statusBar.normalView')"
+        data-view-control="normal-view"
+        @click="emit('update:viewMode', 'normal')"
+      >
+        <Table2 :size="15" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        class="workbook-view-controls__button"
+        :class="{ 'is-active': viewMode === 'page-break-preview' }"
+        :aria-label="t('viewTools.pageBreakPreview')"
+        :aria-pressed="viewMode === 'page-break-preview'"
+        :title="t('viewTools.pageBreakPreview')"
+        data-view-control="page-break-preview"
+        @click="emit('update:viewMode', 'page-break-preview')"
+      >
+        <PanelsTopLeft :size="15" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        class="workbook-view-controls__button"
+        :class="{ 'is-active': viewMode === 'page-layout' }"
+        :aria-label="t('statusBar.pageLayoutView')"
+        :aria-pressed="viewMode === 'page-layout'"
+        :title="t('statusBar.pageLayoutView')"
+        data-view-control="page-layout-view"
+        @click="emit('update:viewMode', 'page-layout')"
+      >
+        <FileText :size="15" aria-hidden="true" />
+      </button>
+    </div>
     <SheetHighlightControl
       :highlight-enabled="highlightEnabled"
       :highlight-color="highlightColor"
@@ -103,13 +151,9 @@ function onNativeSliderInput(event: Event): void {
       v-if="fullscreenAvailable"
       type="button"
       class="workbook-view-controls__button"
-      :aria-label="
-        t(fullscreen ? 'statusBar.exitFullscreen' : 'statusBar.fullscreen')
-      "
+      :aria-label="t(fullscreen ? 'statusBar.exitFullscreen' : 'statusBar.fullscreen')"
       :aria-pressed="fullscreen"
-      :title="
-        t(fullscreen ? 'statusBar.exitFullscreen' : 'statusBar.fullscreen')
-      "
+      :title="t(fullscreen ? 'statusBar.exitFullscreen' : 'statusBar.fullscreen')"
       data-view-control="fullscreen"
       @click="emit('toggleFullscreen')"
     >
@@ -117,11 +161,7 @@ function onNativeSliderInput(event: Event): void {
       <Maximize2 v-else :size="15" aria-hidden="true" />
     </button>
 
-    <div
-      class="workbook-view-controls__zoom"
-      role="group"
-      :aria-label="t('statusBar.zoomSlider')"
-    >
+    <div class="workbook-view-controls__zoom" role="group" :aria-label="t('statusBar.zoomSlider')">
       <button
         type="button"
         class="workbook-view-controls__button"
@@ -133,10 +173,7 @@ function onNativeSliderInput(event: Event): void {
       >
         <Minus :size="15" aria-hidden="true" />
       </button>
-      <div
-        class="workbook-view-controls__slider"
-        data-view-control="zoom-slider"
-      >
+      <div class="workbook-view-controls__slider" data-view-control="zoom-slider">
         <input
           class="workbook-view-controls__slider-input"
           type="range"
@@ -145,9 +182,7 @@ function onNativeSliderInput(event: Event): void {
           :max="MAX_SHEET_ZOOM"
           :step="1"
           :aria-label="t('statusBar.zoomSlider')"
-          :aria-valuetext="
-            t('statusBar.zoomLevel', { value: normalizeSheetZoom(zoom) })
-          "
+          :aria-valuetext="t('statusBar.zoomLevel', { value: normalizeSheetZoom(zoom) })"
           :style="{ '--zoom-progress': zoomProgress }"
           @input="onNativeSliderInput"
         />
@@ -224,6 +259,17 @@ function onNativeSliderInput(event: Event): void {
     }
   }
 
+  &__modes {
+    display: inline-flex;
+    margin-left: 2px;
+    border-right: 1px solid var(--idea-sheet-bar-border);
+
+    .workbook-view-controls__button.is-active {
+      background: var(--idea-action-focus);
+      color: var(--idea-action-primary);
+    }
+  }
+
   &__zoom {
     margin-left: 2px;
   }
@@ -264,8 +310,7 @@ function onNativeSliderInput(event: Event): void {
       border: 1px solid var(--idea-surface-panel);
       border-radius: 50%;
       background: var(--idea-action-primary);
-      box-shadow: 0 0 0 1px
-        color-mix(in srgb, var(--idea-action-primary), transparent 45%);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--idea-action-primary), transparent 45%);
     }
 
     &::-moz-range-track {
@@ -286,8 +331,7 @@ function onNativeSliderInput(event: Event): void {
       border: 1px solid var(--idea-surface-panel);
       border-radius: 50%;
       background: var(--idea-action-primary);
-      box-shadow: 0 0 0 1px
-        color-mix(in srgb, var(--idea-action-primary), transparent 45%);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--idea-action-primary), transparent 45%);
     }
 
     &:focus-visible::-webkit-slider-thumb {

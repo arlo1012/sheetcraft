@@ -34,6 +34,12 @@ import {
   paintSheetForeground,
   paintSheetChrome,
 } from "../rendering/overlay-painter";
+import type { PageViewPaintState } from "../../page-layout/page-view-types";
+import {
+  clipPageContents,
+  paintPageLayoutBackground,
+  paintPageBreakPreview,
+} from "../../page-layout/rendering/page-view-painter";
 
 const props = withDefaults(
   defineProps<{
@@ -42,6 +48,7 @@ const props = withDefaults(
     rows: RowVisibilityIndex;
     frame: SheetRenderFrame;
     environment: SheetRenderEnvironment;
+    pageView?: PageViewPaintState;
     headers: Omit<HeaderPaintState, "frame" | "palette">;
     overlays: SheetOverlayState;
     activeCell: CellAddress;
@@ -146,12 +153,23 @@ function paint(): void {
   context.fillRect(0, 0, frame.size.width, frame.size.height);
   context.save();
   context.translate(frame.body.x, frame.body.y);
+  if (props.pageView?.mode === "page-layout") {
+    paintPageLayoutBackground(
+      context,
+      props.pageView,
+      frame.layout.bodyScrollPosition,
+      frame.layout.viewportSize,
+      props.environment.cells.background,
+    );
+    clipPageContents(context, props.pageView, frame.layout.bodyScrollPosition);
+  }
   paintSheetScene(context, scene, frame.layout, {
     palette: {
       ...props.environment.cells,
       errorIndicator: props.errorIndicatorColor ?? props.environment.cells.errorIndicator,
     },
     showGridLines: props.showGridLines,
+    skipBackground: props.pageView?.mode === "page-layout",
     editingCell: props.editing ? props.activeCell : undefined,
     errorCells: props.errorCells,
     imageUrls: props.imageAssetUrls,
@@ -163,11 +181,22 @@ function paint(): void {
   paintSheetUnderlay(context, frame, props.overlays, props.environment.overlays);
   context.save();
   context.translate(frame.body.x, frame.body.y);
+  if (props.pageView?.mode === "page-layout")
+    clipPageContents(context, props.pageView, frame.layout.bodyScrollPosition);
   paintSheetBorders(context, borderPlan, frame.layout);
+  if (props.pageView?.mode === "page-break-preview")
+    paintPageBreakPreview(
+      context,
+      props.pageView,
+      frame.layout.bodyScrollPosition,
+      frame.layout.viewportSize,
+    );
   context.restore();
   paintSheetForeground(context, frame, props.overlays, props.environment.overlays, 0);
   context.save();
   context.translate(frame.body.x, frame.body.y);
+  if (props.pageView?.mode === "page-layout")
+    clipPageContents(context, props.pageView, frame.layout.bodyScrollPosition);
   props.paintImages?.(context);
   context.restore();
   if (frame.headerSize.width || frame.headerSize.height)
@@ -190,6 +219,11 @@ watch(
   { immediate: true, flush: "post" },
 );
 watch([() => props.frame, () => props.environment], () => invalidate(), { flush: "post" });
+watch(
+  () => props.pageView,
+  () => invalidate(),
+  { flush: "post" },
+);
 watch(
   [
     () => props.showGridLines,

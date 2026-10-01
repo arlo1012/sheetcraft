@@ -45,6 +45,12 @@ import {
 } from "./image-transform.js";
 import { normalizeOutlineGroups } from "./data-outline.js";
 import {
+  cloneSheetPageSetup,
+  DEFAULT_SHEET_PAGE_SETUP,
+  normalizeSheetPageSetup,
+  type SheetPageSetup,
+} from "./page-setup.js";
+import {
   cloneConditionalFormatRule,
   normalizeConditionalFormatRules,
   type SheetConditionalFormatRule,
@@ -141,6 +147,7 @@ export type SheetMetadata = {
   subtotalMetadata?: SheetSubtotalMetadata[];
   duplicateRules?: SheetDuplicateRule[];
   conditionalFormats?: SheetConditionalFormatRule[];
+  pageSetup?: SheetPageSetup;
 };
 
 export type DataValidationType =
@@ -249,6 +256,7 @@ export type Sheet = {
   subtotalMetadata?: SheetSubtotalMetadata[];
   duplicateRules?: SheetDuplicateRule[];
   conditionalFormats?: SheetConditionalFormatRule[];
+  pageSetup?: SheetPageSetup;
   floatingImages: FloatingImage[];
 };
 
@@ -278,6 +286,7 @@ export type SheetSparseState = {
   subtotalMetadata?: SheetSubtotalMetadata[];
   duplicateRules?: SheetDuplicateRule[];
   conditionalFormats?: SheetConditionalFormatRule[];
+  pageSetup?: SheetPageSetup;
   floatingImages: FloatingImage[];
 };
 
@@ -329,6 +338,7 @@ export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory)
     subtotalMetadata: [],
     duplicateRules: [],
     conditionalFormats: [],
+    pageSetup: cloneSheetPageSetup(DEFAULT_SHEET_PAGE_SETUP),
     floatingImages: [],
   };
 }
@@ -1878,6 +1888,7 @@ function normalizeSheetMetadata(
     | "subtotalMetadata"
     | "duplicateRules"
     | "conditionalFormats"
+    | "pageSetup"
   >,
 ): SheetMetadata {
   const freezePanes = normalizeFreezePanes(state.freezePanes);
@@ -1969,6 +1980,7 @@ function normalizeSheetMetadata(
     };
   });
   const conditionalFormats = normalizeConditionalFormatRules(state.conditionalFormats ?? []);
+  const pageSetup = normalizeSheetPageSetup(state.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
   if (new Set(dataValidations.map((rule) => rule.id)).size !== dataValidations.length)
     throw new Error("Duplicate data validation ID.");
   const outlineGroups = normalizeOutlineGroups(state.outlineGroups ?? []);
@@ -2014,6 +2026,7 @@ function normalizeSheetMetadata(
     subtotalMetadata,
     duplicateRules,
     conditionalFormats,
+    pageSetup,
   };
 }
 
@@ -2050,6 +2063,7 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
     range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
   }));
   sheet.conditionalFormats = (normalized.conditionalFormats ?? []).map(cloneConditionalFormatRule);
+  sheet.pageSetup = cloneSheetPageSetup(normalized.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
   return true;
 }
 
@@ -2164,6 +2178,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     subtotalMetadata: metadata.subtotalMetadata ?? [],
     duplicateRules: metadata.duplicateRules ?? [],
     conditionalFormats: metadata.conditionalFormats ?? [],
+    pageSetup: cloneSheetPageSetup(metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     floatingImages,
   };
 }
@@ -2257,6 +2272,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
       range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
     })),
     conditionalFormats: (sheet.conditionalFormats ?? []).map(cloneConditionalFormatRule),
+    pageSetup: cloneSheetPageSetup(sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
     floatingImages: sheet.floatingImages.map(cloneFloatingImage),
   });
 }
@@ -2313,6 +2329,7 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
     range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
   }));
   sheet.conditionalFormats = (nextState.conditionalFormats ?? []).map(cloneConditionalFormatRule);
+  sheet.pageSetup = cloneSheetPageSetup(nextState.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
   sheet.floatingImages = nextState.floatingImages.map(cloneFloatingImage);
   return true;
 }

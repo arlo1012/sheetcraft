@@ -6,8 +6,15 @@ import { computed, nextTick, ref, shallowRef, shallowReactive, useId, watch } fr
 import {
   createSetSheetOutlineGroupCollapsedCommand,
   createSetSheetOutlineLevelCommand,
+  createSetSheetPageSetupCommand,
   type CellFormatChange,
 } from "@idea10/core/commands";
+import {
+  cloneSheetPageSetup,
+  DEFAULT_SHEET_PAGE_SETUP,
+  type SheetPageSetup,
+} from "@idea10/core/page-setup";
+import type { SheetViewMode } from "@idea10/sheet-engine/page-layout";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { useWorkbookFullscreen } from "../modules/workbook/composables/useWorkbookFullscreen";
 import { useEyeComfortMode } from "../modules/workbook/composables/useEyeComfortMode";
@@ -27,6 +34,7 @@ import PlanningSolverDialog from "../modules/data-tools/components/PlanningSolve
 import DataProofreadingDialog from "../modules/data-tools/components/DataProofreadingDialog.vue";
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import ViewToolbar from "../modules/view-tools/components/ViewToolbar.vue";
+import PageSetupDialog from "../modules/page-layout/components/PageSetupDialog.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
 import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
 import ConsolidateDialog from "../modules/data-tools/components/ConsolidateDialog.vue";
@@ -249,6 +257,38 @@ const {
 } = useSpreadsheetWorkspaceController();
 
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
+const pageViewModes = shallowReactive(new Map<string, SheetViewMode>());
+const pageSetupVisible = ref(false);
+const activeViewMode = computed(() => pageViewModes.get(activeSheet.value.id) ?? "normal");
+const activePageSetup = computed(() => activeSheet.value.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
+function setViewMode(mode: SheetViewMode): void {
+  pageViewModes.set(activeSheet.value.id, mode);
+  void nextTick(focusCellEditor);
+}
+function savePageSetup(setup: SheetPageSetup): void {
+  executeCommand(createSetSheetPageSetupCommand(activeSheet.value.id, setup));
+  pageSetupVisible.value = false;
+  void nextTick(focusCellEditor);
+}
+function updatePageHeaderFooter(payload: {
+  section: "header" | "footer";
+  part: "left" | "center" | "right";
+  value: string;
+}): void {
+  const setup = cloneSheetPageSetup(activePageSetup.value);
+  setup[payload.section][payload.part] = payload.value;
+  executeCommand(createSetSheetPageSetupCommand(activeSheet.value.id, setup));
+}
+watch(workbookGeneration, () => {
+  pageViewModes.clear();
+  pageSetupVisible.value = false;
+});
+watch(
+  () => activeSheet.value.id,
+  () => {
+    pageSetupVisible.value = false;
+  },
+);
 const duplicateInputError = computed(() => {
   const feedback = validationFeedback.value;
   if (feedback?.source !== "duplicate" || feedback.target.sheetId !== activeSheet.value.id)
@@ -1175,9 +1215,7 @@ function chooseValidationValue(payload: {
 function retryValidationInput(): void {
   dismissValidationInput();
   void nextTick(() =>
-    cellEditSession.state.surface === "formula-bar"
-      ? focusFormulaBarOrGrid()
-      : focusCellEditor(),
+    cellEditSession.state.surface === "formula-bar" ? focusFormulaBarOrGrid() : focusCellEditor(),
   );
 }
 
@@ -1438,6 +1476,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     >
       <template #view-tools>
         <ViewToolbar
+          :view-mode="activeViewMode"
+          @update:view-mode="setViewMode"
+          @page-setup="pageSetupVisible = true"
           :edit-session-id="cellEditSession.id"
           :show-formula-bar="showFormulaBar"
           @update:show-formula-bar="setShowFormulaBar"
@@ -1451,7 +1492,11 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           :fullscreen-available="fullscreenAvailable"
           @toggle-fullscreen="toggleFullscreen"
           @fit-selection="fitSelectionToViewport"
-          :freeze-disabled="activeSheet.properties.protected || !dataToolState.freezeEnabled"
+          :freeze-disabled="
+            activeViewMode !== 'normal' ||
+            activeSheet.properties.protected ||
+            !dataToolState.freezeEnabled
+          "
           :active-cell="activeAddress"
           :freeze-panes="activeSheet.freezePanes"
           @freeze="freeze"
@@ -2096,10 +2141,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         dataToolsModalOpen ||
         formulaEditorVisible ||
         formulaInsertVisible ||
+        pageSetupVisible ||
         !!modalValidationFeedback
       "
     >
       <SheetGrid
+        :view-mode="activeViewMode"
+        :page-setup="activePageSetup"
+        @page-setup-change="savePageSetup"
+        @header-footer-change="updatePageHeaderFooter"
         v-model:zoom="zoom"
         :show-headers="showHeaders"
         :show-grid-lines="showGridLines"
@@ -2176,6 +2226,11 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @horizontal-scroll-change="updateHorizontalScrollState"
       />
     </div>
+    <PageSetupDialog
+      v-model:visible="pageSetupVisible"
+      :setup="activePageSetup"
+      @confirm="savePageSetup"
+    />
     <SheetColumnStatisticsDialog
       v-if="statisticsRange"
       :sheet="activeSheet"
@@ -2202,6 +2257,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @close="contextActions.closePanels()"
     />
     <WorkbookStatusBar
+      :view-mode="activeViewMode"
+      @update:view-mode="setViewMode"
       :edit-session-id="
         cellEditSession.state.draft.startsWith('=') ? cellEditSession.id : undefined
       "

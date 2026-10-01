@@ -17,6 +17,7 @@ export * from "./serialization.js";
 export * from "./style.js";
 export * from "./style-state.js";
 export * from "./workbook.js";
+export * from "./page-setup.js";
 export * from "./data-validation.js";
 export * from "./data-table.js";
 export * from "./data-outline.js";

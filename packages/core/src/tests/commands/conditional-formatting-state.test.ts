@@ -30,7 +30,7 @@ describe("conditional-formatting commands", () => {
       executeWorkbookCommand(session, createSetSheetConditionalFormatsCommand(sheet.id, [rule])),
     ).toBe(true);
     const persisted = serializeWorkbook(session.workbook);
-    expect(persisted.version).toBe(12);
+    expect(persisted.version).toBe(13);
     expect(deserializeWorkbook(persisted).sheets.get(sheet.id)?.conditionalFormats).toEqual([rule]);
     expect(deserializeSheet(serializeSheet(sheet)).conditionalFormats).toEqual([rule]);
     expect(undoWorkbookCommand(session)).toBe(true);

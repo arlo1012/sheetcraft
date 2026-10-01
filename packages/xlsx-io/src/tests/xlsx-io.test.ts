@@ -1,4 +1,5 @@
 import ExcelJSImport from "exceljs/dist/exceljs.min.js";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
 import { inflateRawSync } from "node:zlib";
 import {
   createSheet,
@@ -13,6 +14,7 @@ import {
   setColumnWidth,
   type Workbook,
 } from "@idea10/core/workbook";
+import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx, XlsxCompatibilityError } from "../index.js";
 
@@ -156,6 +158,70 @@ describe("XLSX IO", () => {
     expect(xml).toContain('iterateCount="37"');
     expect(xml).toContain('iterateDelta="0.00025"');
     expect((await decodeXlsx(encoded.bytes)).workbook.calculation).toEqual(workbook.calculation);
+  });
+
+  test("roundtrips supported worksheet page setup and merges subtotal page breaks", async () => {
+    const workbook = createWorkbook({
+      id: "page-setup",
+      sheetId: "sheet",
+      sheetName: "Print plan",
+    });
+    const sheet = getActiveSheet(workbook);
+    sheet.pageSetup = {
+      ...DEFAULT_SHEET_PAGE_SETUP,
+      paperSize: "legal",
+      orientation: "landscape",
+      margins: { top: 12.7, bottom: 25.4, left: 19.05, right: 6.35, header: 5.08, footer: 10.16 },
+      scale: 85,
+      printArea: { start: { row: 1, column: 2 }, end: { row: 8, column: 5 } },
+      rowBreaks: [3, 6],
+      columnBreaks: [2],
+      header: { left: "&A", center: "Page &P of &N", right: "Research && Development" },
+      footer: { left: "Internal", center: "Page", right: "Confidential" },
+      pageOrder: "overThenDown",
+    };
+    sheet.subtotalMetadata = [
+      {
+        id: "subtotal",
+        range: { start: { row: 0, column: 0 }, end: { row: 9, column: 0 } },
+        generatedRows: [],
+        pageBreakRows: [5],
+      },
+    ];
+
+    const encoded = await encodeXlsx(workbook);
+    const worksheet = xlsxEntryText(encoded.bytes, "xl/worksheets/sheet1.xml");
+    expect(worksheet).toContain(
+      '<pageMargins left="0.75" right="0.25" top="0.5" bottom="1" header="0.2" footer="0.4"/>',
+    );
+    expect(worksheet).toContain(
+      '<pageSetup paperSize="5" orientation="landscape" scale="85" pageOrder="overThenDown"/>',
+    );
+    expect(worksheet).toContain(
+      "<oddHeader>&amp;L&amp;A&amp;CPage &amp;P of &amp;N&amp;RResearch &amp;&amp; Development</oddHeader>",
+    );
+    expect(worksheet).toContain('<brk id="3" max="16383" man="1"/>');
+    expect(worksheet).toContain('<brk id="5" max="16383" man="1"/>');
+    expect(worksheet).toContain('<brk id="6" max="16383" man="1"/>');
+    expect(worksheet).toContain('<brk id="2" min="0" max="1048575" man="1"/>');
+    expect(xlsxEntryText(encoded.bytes, "xl/workbook.xml")).toContain(
+      '<definedName name="_xlnm.Print_Area" localSheetId="0">&apos;Print plan&apos;!$C$2:$F$9</definedName>',
+    );
+
+    const restored = getActiveSheet((await decodeXlsx(encoded.bytes)).workbook);
+    expect(restored.pageSetup).toEqual({
+      ...sheet.pageSetup,
+      rowBreaks: [3, 5, 6],
+    });
+
+    const entries = unzipSync(encoded.bytes);
+    const worksheetXml = strFromU8(entries["xl/worksheets/sheet1.xml"]!);
+    entries["xl/worksheets/sheet1.xml"] = strToU8(
+      worksheetXml.replace("</rowBreaks>", '<brk id="4" max="16383" man="0"/></rowBreaks>'),
+    );
+    expect(
+      getActiveSheet((await decodeXlsx(zipSync(entries))).workbook).pageSetup?.rowBreaks,
+    ).toEqual([3, 5, 6]);
   });
 
   test("retains whole-axis and dynamic-array formula sources without materializing spills", async () => {

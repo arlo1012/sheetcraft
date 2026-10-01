@@ -24,6 +24,7 @@ import {
   applySetSheetDimensionSizesCommand,
 } from "./dimensions.js";
 import { applySetSheetFilterCommand } from "./filter.js";
+import { applySetSheetPageSetupCommand } from "./page-setup.js";
 import { applyAdvancedFilterCommand } from "./advanced-filter.js";
 import { applySplitColumnCommand, applyRemoveDuplicatesCommand } from "./data-transforms.js";
 import { applyApplySubtotalsCommand, applyRemoveSubtotalsCommand } from "./subtotal.js";
@@ -130,6 +131,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "setSheetDefaultColumnWidth":
     case "restoreSheetDimensionState":
     case "setSheetFreezePanes":
+    case "setSheetPageSetup":
     case "mergeCells":
     case "unmergeCells":
     case "setSheetFilter":
@@ -230,6 +232,8 @@ export function applyWorkbookCommand(
         return applyRestoreSheetDimensionStateCommand(workbook, command);
       case "setSheetFreezePanes":
         return applySetSheetFreezePanesCommand(workbook, command);
+      case "setSheetPageSetup":
+        return applySetSheetPageSetupCommand(workbook, command);
       case "mergeCells":
         return applyMergeCellsCommand(workbook, command);
       case "unmergeCells":

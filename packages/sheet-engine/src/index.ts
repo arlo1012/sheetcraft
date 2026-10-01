@@ -6,6 +6,7 @@ export * from "./floating-image-transform.js";
 export * from "./fill-selection.js";
 export * from "./frozen-layout.js";
 export * from "./geometry.js";
+export * from "./page-layout.js";
 export * from "./row-height.js";
 export * from "./text-layout.js";
 export * from "./selection.js";

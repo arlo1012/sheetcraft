@@ -34,6 +34,7 @@ import {
   type Workbook,
   type DefinedName,
 } from "./workbook.js";
+import type { SheetPageSetup } from "./page-setup.js";
 import { createFormulaError, isFormulaErrorCode, type CellContent } from "./formula/types.js";
 
 export type CellSnapshotV1 = {
@@ -135,8 +136,12 @@ export type WorkbookSnapshotV9 = Omit<WorkbookSnapshotV8, "version"> & {
 export type WorkbookSnapshotV10 = Omit<WorkbookSnapshotV9, "version"> & { version: 10 };
 export type WorkbookSnapshotV11 = Omit<WorkbookSnapshotV10, "version"> & { version: 11 };
 export type WorkbookSnapshotV12 = Omit<WorkbookSnapshotV11, "version"> & { version: 12 };
+export type WorkbookSnapshotV13 = Omit<WorkbookSnapshotV12, "version" | "sheets"> & {
+  version: 13;
+  sheets: SheetSnapshot[];
+};
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV12;
+export type WorkbookSnapshot = WorkbookSnapshotV13;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -146,8 +151,9 @@ export type SheetSnapshot = SheetSnapshotV7 & {
   subtotalMetadata?: SheetSubtotalMetadata[];
   duplicateRules?: SheetDuplicateRule[];
   conditionalFormats?: SheetConditionalFormatRule[];
+  pageSetup?: SheetPageSetup;
 };
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -546,6 +552,10 @@ function parseSparseState(
             `${path}.conditionalFormats`,
           ) as SheetConditionalFormatRule[])
         : [],
+    pageSetup:
+      version >= 13 && Object.hasOwn(record, "pageSetup")
+        ? (record.pageSetup as SheetPageSetup)
+        : undefined,
     floatingImages:
       version >= 4
         ? asArray(record.floatingImages, `${path}.floatingImages`).map((image, index) =>
@@ -567,13 +577,15 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
     version = hasValue
       ? 1
-      : Object.hasOwn(record, "conditionalFormats")
-        ? 12
-        : Object.hasOwn(record, "properties")
-          ? 7
-          : Object.hasOwn(record, "floatingImages")
-            ? 6
-            : 3;
+      : Object.hasOwn(record, "pageSetup")
+        ? 13
+        : Object.hasOwn(record, "conditionalFormats")
+          ? 12
+          : Object.hasOwn(record, "properties")
+            ? 7
+            : Object.hasOwn(record, "floatingImages")
+              ? 6
+              : 3;
   }
   const id = asIdentifier(record.id, `${path}.id`);
   let name: string;
@@ -616,7 +628,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 12,
+    version: 13,
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
@@ -647,7 +659,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 9 &&
     record.version !== 10 &&
     record.version !== 11 &&
-    record.version !== 12
+    record.version !== 12 &&
+    record.version !== 13
   ) {
     throw new WorkbookDomainError(
       {
