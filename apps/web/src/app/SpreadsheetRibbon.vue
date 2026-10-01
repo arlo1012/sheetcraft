@@ -69,16 +69,17 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const activeCategory = ref<"home" | "formulas" | "data">("home");
+const activeCategory = ref<"home" | "formulas" | "data" | "view">("home");
 const homeTab = ref<HTMLButtonElement>();
 const formulaTab = ref<HTMLButtonElement>();
 const dataTab = ref<HTMLButtonElement>();
+const viewTab = ref<HTMLButtonElement>();
 const tabId = useId();
 
 function onCategoryKeydown(event: KeyboardEvent): void {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
-  const categories = ["home", "formulas", "data"] as const;
+  const categories = ["home", "formulas", "data", "view"] as const;
   const current = categories.indexOf(activeCategory.value);
   const index =
     event.key === "Home"
@@ -87,7 +88,7 @@ function onCategoryKeydown(event: KeyboardEvent): void {
         ? categories.length - 1
         : (current + (event.key === "ArrowRight" ? 1 : -1) + categories.length) % categories.length;
   activeCategory.value = categories[index]!;
-  void nextTick(() => [homeTab, formulaTab, dataTab][index]?.value?.focus());
+  void nextTick(() => [homeTab, formulaTab, dataTab, viewTab][index]?.value?.focus());
 }
 
 defineSlots<{
@@ -95,6 +96,7 @@ defineSlots<{
   "row-column-tools"?: () => unknown;
   "worksheet-tools"?: () => unknown;
   "data-tools"?: () => unknown;
+  "view-tools"?: () => unknown;
 }>();
 </script>
 
@@ -153,6 +155,21 @@ defineSlots<{
             @click="activeCategory = 'data'"
           >
             {{ t("ribbon.data") }}
+          </button>
+          <button
+            :id="`${tabId}-view`"
+            ref="viewTab"
+            class="spreadsheet-ribbon__category"
+            :class="{ 'is-active': activeCategory === 'view' }"
+            data-ribbon-category="view"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'view'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'view' ? 0 : -1"
+            @click="activeCategory = 'view'"
+          >
+            {{ t("ribbon.view") }}
           </button>
         </div>
         <slot name="file-actions" />
@@ -222,7 +239,8 @@ defineSlots<{
         @recalculate="emit('recalculate')"
         @interaction-end="emit('formulaInteractionEnd')"
       />
-      <slot v-else name="data-tools" />
+      <slot v-else-if="activeCategory === 'data'" name="data-tools" />
+      <slot v-else name="view-tools" />
     </section>
   </header>
 </template>

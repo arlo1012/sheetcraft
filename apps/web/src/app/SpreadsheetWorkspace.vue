@@ -26,6 +26,7 @@ import GoalSeekDialog from "../modules/data-tools/components/GoalSeekDialog.vue"
 import PlanningSolverDialog from "../modules/data-tools/components/PlanningSolverDialog.vue";
 import DataProofreadingDialog from "../modules/data-tools/components/DataProofreadingDialog.vue";
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
+import ViewToolbar from "../modules/view-tools/components/ViewToolbar.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
 import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
 import ConsolidateDialog from "../modules/data-tools/components/ConsolidateDialog.vue";
@@ -130,11 +131,13 @@ const findMode = ref<WorkbookFindMode>("find");
 
 function restoreSearchFocus(): void {
   if (!findDialogVisible.value) {
-    formulaBarRef.value?.focusSearch();
+    if (showFormulaBar.value) formulaBarRef.value?.focusSearch();
+    else focusCellEditor();
   }
 }
 const gridId = `workbook-grid-${useId()}`;
 const zoom = ref(100);
+const showFormulaBar = ref(true);
 const showHeaders = ref(true);
 const showGridLines = ref(true);
 const showAxisQuickTools = ref(false);
@@ -576,7 +579,7 @@ function onSelectSheet(sheetId: string): void {
   if (cellEditSession.state.active && cellEditSession.state.draft.startsWith("=")) {
     cellEditSession.activateSurface("formula-bar");
     selectSheet(sheetId);
-    void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
+    void nextTick(focusFormulaBarOrGrid);
     return;
   }
   if (cellEditSession.finish()) selectSheet(sheetId);
@@ -654,7 +657,7 @@ const formulaTools = useFormulaToolsController({
   editSession: cellEditSession,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
   execute: executeCommand,
-  focusFormulaBar: () => formulaBarRef.value?.focus({ preserveSelection: true }),
+  focusFormulaBar: focusFormulaBarOrGrid,
   recalculate,
 });
 const duplicateErrorChecks = useDuplicateErrorChecks({
@@ -722,7 +725,7 @@ function ignoreAllDuplicateErrors(): void {
 }
 function editErrorInFormulaBar(): void {
   if (!activeSheet.value.properties.protected) {
-    void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
+    void nextTick(focusFormulaBarOrGrid);
   }
 }
 watch([workbookGeneration, () => activeSheet.value.id], () => {
@@ -1173,7 +1176,7 @@ function retryValidationInput(): void {
   dismissValidationInput();
   void nextTick(() =>
     cellEditSession.state.surface === "formula-bar"
-      ? formulaBarRef.value?.focus({ preserveSelection: true })
+      ? focusFormulaBarOrGrid()
       : focusCellEditor(),
   );
 }
@@ -1216,7 +1219,7 @@ const formulaInsertVisible = ref(false);
 
 function closeFormulaInsert(): void {
   formulaInsertVisible.value = false;
-  void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
+  void nextTick(focusFormulaBarOrGrid);
 }
 
 function insertFunctionFromBar(name: string): void {
@@ -1230,7 +1233,7 @@ const formulaEditor = useFormulaEditorController({
   getAddress: () => activeAddress.value,
   editSession: cellEditSession,
   isBusy: () => loading.value || fileBusy.value || xlsxBusy.value || imageBusy.value,
-  focusFormulaBar: () => formulaBarRef.value?.focus({ preserveSelection: true }),
+  focusFormulaBar: focusFormulaBarOrGrid,
 });
 const {
   visible: formulaEditorVisible,
@@ -1289,6 +1292,20 @@ function onWorkspaceWheel(event: WheelEvent): void {
   );
 }
 
+function focusFormulaBarOrGrid(): void {
+  if (showFormulaBar.value) formulaBarRef.value?.focus({ preserveSelection: true });
+  else focusCellEditor();
+}
+
+function setShowFormulaBar(visible: boolean): void {
+  if (showFormulaBar.value === visible || (!visible && cellEditSession.state.composing)) return;
+  const transferDraft =
+    !visible && cellEditSession.state.active && cellEditSession.state.surface === "formula-bar";
+  if (transferDraft) cellEditSession.activateSurface("grid");
+  showFormulaBar.value = visible;
+  if (transferDraft) void nextTick(focusCellEditor);
+}
+
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (formulaEditorVisible.value || formulaInsertVisible.value) return;
   const picker = activeRangePicker.value;
@@ -1324,7 +1341,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     event.preventDefault();
     event.stopPropagation();
     if (cellEditSession.state.surface === "formula-bar") focusCellEditor();
-    else formulaBarRef.value?.focus({ preserveSelection: true });
+    else {
+      showFormulaBar.value = true;
+      void nextTick(() => formulaBarRef.value?.focus({ preserveSelection: true }));
+    }
     return;
   }
   if (event.key !== "Escape" || !formatPainterActive.value) {
@@ -1339,6 +1359,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
 <template>
   <section
     class="spreadsheet-workspace"
+    :class="{ 'is-formula-bar-hidden': !showFormulaBar }"
     :aria-label="t('workspace.editor')"
     :aria-busy="loading || fileBusy || imageBusy || xlsxBusy"
     @keydown.capture="onWorkspaceKeydown"
@@ -1415,6 +1436,28 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @undo="undo"
       @redo="redo"
     >
+      <template #view-tools>
+        <ViewToolbar
+          :edit-session-id="cellEditSession.id"
+          :show-formula-bar="showFormulaBar"
+          @update:show-formula-bar="setShowFormulaBar"
+          v-model:show-headers="showHeaders"
+          v-model:show-grid-lines="showGridLines"
+          v-model:eye-comfort-enabled="eyeComfortEnabled"
+          v-model:highlight-enabled="highlightEnabled"
+          v-model:highlight-color="highlightColor"
+          v-model:zoom="zoom"
+          :fullscreen="fullscreen"
+          :fullscreen-available="fullscreenAvailable"
+          @toggle-fullscreen="toggleFullscreen"
+          @fit-selection="fitSelectionToViewport"
+          :freeze-disabled="activeSheet.properties.protected || !dataToolState.freezeEnabled"
+          :active-cell="activeAddress"
+          :freeze-panes="activeSheet.freezePanes"
+          @freeze="freeze"
+          @unfreeze="unfreeze"
+        />
+      </template>
       <template #data-tools>
         <DataToolbar
           :disabled="dataToolsDisabled"
@@ -1924,6 +1967,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       />
     </div>
     <WorkbookFormulaBar
+      v-show="showFormulaBar"
       :read-only="formulaReadOnly"
       :key="workbookGeneration"
       ref="formulaBarRef"
@@ -2208,6 +2252,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
   min-height: 360px;
   overflow: hidden;
   background: var(--idea-surface-panel);
+
+  &.is-formula-bar-hidden {
+    grid-template-rows: auto auto minmax(0, 1fr) 49px;
+  }
 
   &__image-input {
     display: none;

@@ -710,6 +710,7 @@ export type MessageSchema = ToolMessageSchema & {
     label: string;
     categories: string;
     home: string;
+    view: string;
     homeTools: string;
     formulas: string;
     formulaTools: string;
@@ -797,6 +798,20 @@ export type MessageSchema = ToolMessageSchema & {
     pdfToEditable: string;
     pdfToImage: string;
     print: string;
+  };
+  viewTools: {
+    label: string;
+    display: string;
+    displaySettings: string;
+    formulaBar: string;
+    taskPane: string;
+    reading: string;
+    highlight: string;
+    zoom: string;
+    freeze: string;
+    pageBreakPreview: string;
+    customViews: string;
+    unavailable: string;
   };
   workspace: {
     editor: string;

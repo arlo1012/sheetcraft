@@ -207,6 +207,41 @@ describe("workspace formula authoring", () => {
     ).toBeNull();
   });
 
+  test("keeps an unfinished formula while changing view settings and hiding the formula bar", async () => {
+    const memory = createMemoryStore(createFormulaFixture());
+    const wrapper = await mountWorkspace(memory.store);
+    const formula = wrapper.get<HTMLTextAreaElement>("[data-formula-input]");
+    const editor = wrapper.get<HTMLTextAreaElement>("textarea.cell-editor");
+
+    await formula.trigger("focus");
+    await formula.setValue("=SUM(B1");
+    formula.element.setSelectionRange(7, 7);
+    await formula.trigger("select");
+    await wrapper.get('[data-ribbon-category="view"]').trigger("click");
+    await wrapper.get('[data-view-tool="zoom-menu"]').trigger("click");
+    const preset = new DOMWrapper(document.body).get<HTMLElement>('[data-zoom-preset="75"]');
+    preset.element.focus();
+    await preset.trigger("click");
+    await flushPromises();
+    expect(formula.element.value).toBe("=SUM(B1");
+    expect(memory.store.save).not.toHaveBeenCalled();
+    await wrapper.get('[data-view-option="formula-bar"] input').setValue(false);
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "WorkbookFormulaBar" }).isVisible()).toBe(false);
+    expect(wrapper.classes()).toContain("is-formula-bar-hidden");
+    expect(editor.element.value).toBe("=SUM(B1");
+    expect(document.activeElement).toBe(editor.element);
+    expect(memory.store.save).not.toHaveBeenCalled();
+
+    await editor.trigger("keydown", { key: "F2", ctrlKey: true });
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "WorkbookFormulaBar" }).isVisible()).toBe(true);
+    expect(formula.element.value).toBe("=SUM(B1");
+    expect(memory.store.save).not.toHaveBeenCalled();
+    await formula.trigger("keydown", { key: "Escape" });
+  });
+
   test("will not save or commit a formula-bar IME draft until its composition completes", async () => {
     const memory = createMemoryStore();
     const wrapper = await mountWorkspace(memory.store);

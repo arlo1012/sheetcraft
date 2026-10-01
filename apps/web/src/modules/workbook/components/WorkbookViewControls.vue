@@ -1,21 +1,9 @@
 <script setup lang="ts">
-import {
-  ChevronDown,
-  Eye,
-  Icon as LucideIcon,
-  Maximize2,
-  Minimize2,
-  Minus,
-  Plus,
-} from "lucide-vue-next";
-import type { IconNode } from "lucide-vue-next";
-import ColorPalette from "../../../shared/color/ColorPalette.vue";
-import { getContrastingForeground, mixHexColors } from "../../../shared/color/contrast";
-import { normalizeColor } from "../../../shared/color/palette";
-import WorkbookZoomMenu from "./WorkbookZoomMenu.vue";
+import { Eye, Maximize2, Minimize2, Minus, Plus } from "lucide-vue-next";
+import SheetHighlightControl from "../../../shared/sheet-view/SheetHighlightControl.vue";
+import SheetZoomMenu from "../../../shared/sheet-view/SheetZoomMenu.vue";
 import WorkbookDisplaySettings from "./WorkbookDisplaySettings.vue";
-import { computed, nextTick, ref, useId } from "vue";
-import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import { computed } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   MAX_SHEET_ZOOM,
@@ -23,31 +11,6 @@ import {
   normalizeSheetZoom,
   SHEET_ZOOM_STEP,
 } from "../../../shared/sheet-view/zoom";
-
-const HIGHLIGHT_ICON_NODE: IconNode = [
-  ["rect", { x: "9", y: "3", width: "6", height: "18", rx: "1" }],
-  ["rect", { x: "3", y: "9", width: "18", height: "6", rx: "1" }],
-];
-const PALE_HIGHLIGHT_COLORS = [
-  "#f3f5f7",
-  "#d6e5ff",
-  "#d6f1ff",
-  "#d3f3e2",
-  "#ffdcdb",
-  "#ffecdb",
-  "#fff5cc",
-  "#fbdbff",
-  "#ffdbea",
-  "#c5cad3",
-  "#adcbff",
-  "#ade4ff",
-  "#ace2c5",
-  "#ffb5b2",
-  "#ffcea3",
-  "#ffea99",
-  "#e7b4ff",
-  "#ffb2dc",
-];
 
 const props = withDefaults(
   defineProps<{
@@ -87,36 +50,9 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const colorTriggerRef = ref<HTMLButtonElement | null>(null);
-const colorPanelRef = ref<HTMLDivElement | null>(null);
-const colorPickerOpen = ref(false);
-const colorPanelId = `workbook-highlight-color-${useId().replaceAll(":", "")}`;
-const colorTriggerRefValue = computed(() => colorTriggerRef.value);
-const selectedColor = computed(() => normalizeColor(props.highlightColor) ?? "#22a06b");
-const highlightStyles = computed(() => {
-  const background = PALE_HIGHLIGHT_COLORS.includes(selectedColor.value)
-    ? selectedColor.value
-    : mixHexColors(selectedColor.value, "#FFFFFF", 0.2);
-  return {
-    "--highlight-background": background,
-    "--highlight-foreground": getContrastingForeground(background),
-  };
-});
 const zoomProgress = computed(
   () =>
     `${((normalizeSheetZoom(props.zoom) - MIN_SHEET_ZOOM) / (MAX_SHEET_ZOOM - MIN_SHEET_ZOOM)) * 100}%`,
-);
-const { floatingStyles, dismiss } = useDismissibleFloatingPanel(
-  colorTriggerRefValue,
-  colorPanelRef,
-  colorPickerOpen,
-  {
-    offset: 6,
-    placement: "top-end",
-    onDismiss: () => {
-      colorPickerOpen.value = false;
-    },
-  },
 );
 
 function updateZoom(value: number): void {
@@ -128,48 +64,14 @@ function onNativeSliderInput(event: Event): void {
     updateZoom(event.currentTarget.valueAsNumber);
   }
 }
-
-function toggleHighlight(): void {
-  emit("update:highlightEnabled", !props.highlightEnabled);
-}
-
-function openColorPicker(): void {
-  colorPickerOpen.value = true;
-  void nextTick(() => colorPanelRef.value?.focus());
-}
-
-function toggleColorPicker(): void {
-  if (colorPickerOpen.value) {
-    dismiss("programmatic", true);
-  } else {
-    openColorPicker();
-  }
-}
-
-function onColorTriggerKeydown(event: KeyboardEvent): void {
-  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
-    return;
-  }
-  event.preventDefault();
-  openColorPicker();
-}
-
-function selectHighlightColor(value: string | null): void {
-  if (value === null) {
-    emit("update:highlightEnabled", false);
-  } else {
-    const color = normalizeColor(value);
-    if (color) {
-      emit("update:highlightColor", color);
-      emit("update:highlightEnabled", true);
-    }
-  }
-  dismiss("programmatic", true);
-}
 </script>
 
 <template>
-  <div class="workbook-view-controls" :aria-label="t('statusBar.viewAndZoom')" role="group">
+  <div
+    class="workbook-view-controls"
+    :aria-label="t('statusBar.viewAndZoom')"
+    role="group"
+  >
     <button
       type="button"
       class="workbook-view-controls__button workbook-view-controls__eye-comfort"
@@ -190,52 +92,24 @@ function selectHighlightColor(value: string | null): void {
       @update:show-grid-lines="emit('update:showGridLines', $event)"
       @update:show-axis-quick-tools="emit('update:showAxisQuickTools', $event)"
     />
-    <div
-      class="workbook-view-controls__highlight"
-      :class="{ 'is-active': highlightEnabled }"
-      :style="highlightStyles"
-    >
-      <button
-        type="button"
-        class="workbook-view-controls__button workbook-view-controls__highlight-toggle"
-        :aria-label="t('statusBar.highlightRowColumn')"
-        :aria-pressed="highlightEnabled"
-        :title="t('statusBar.highlightRowColumnDescription')"
-        data-view-control="highlight-toggle"
-        @click="toggleHighlight"
-      >
-        <LucideIcon
-          name="HighlightRowColumn"
-          :iconNode="HIGHLIGHT_ICON_NODE"
-          :size="15"
-          :stroke-width="1.8"
-          aria-hidden="true"
-        />
-      </button>
-      <button
-        ref="colorTriggerRef"
-        type="button"
-        class="workbook-view-controls__button workbook-view-controls__color-trigger"
-        :aria-label="t('statusBar.highlightColor')"
-        :aria-controls="colorPickerOpen ? colorPanelId : undefined"
-        :aria-expanded="colorPickerOpen"
-        aria-haspopup="dialog"
-        :title="t('statusBar.highlightColor')"
-        data-view-control="highlight-color"
-        @click="toggleColorPicker"
-        @keydown="onColorTriggerKeydown"
-      >
-        <ChevronDown :size="12" aria-hidden="true" />
-      </button>
-    </div>
+    <SheetHighlightControl
+      :highlight-enabled="highlightEnabled"
+      :highlight-color="highlightColor"
+      @update:highlight-enabled="emit('update:highlightEnabled', $event)"
+      @update:highlight-color="emit('update:highlightColor', $event)"
+    />
 
     <button
       v-if="fullscreenAvailable"
       type="button"
       class="workbook-view-controls__button"
-      :aria-label="t(fullscreen ? 'statusBar.exitFullscreen' : 'statusBar.fullscreen')"
+      :aria-label="
+        t(fullscreen ? 'statusBar.exitFullscreen' : 'statusBar.fullscreen')
+      "
       :aria-pressed="fullscreen"
-      :title="t(fullscreen ? 'statusBar.exitFullscreen' : 'statusBar.fullscreen')"
+      :title="
+        t(fullscreen ? 'statusBar.exitFullscreen' : 'statusBar.fullscreen')
+      "
       data-view-control="fullscreen"
       @click="emit('toggleFullscreen')"
     >
@@ -243,7 +117,11 @@ function selectHighlightColor(value: string | null): void {
       <Maximize2 v-else :size="15" aria-hidden="true" />
     </button>
 
-    <div class="workbook-view-controls__zoom" role="group" :aria-label="t('statusBar.zoomSlider')">
+    <div
+      class="workbook-view-controls__zoom"
+      role="group"
+      :aria-label="t('statusBar.zoomSlider')"
+    >
       <button
         type="button"
         class="workbook-view-controls__button"
@@ -255,7 +133,10 @@ function selectHighlightColor(value: string | null): void {
       >
         <Minus :size="15" aria-hidden="true" />
       </button>
-      <div class="workbook-view-controls__slider" data-view-control="zoom-slider">
+      <div
+        class="workbook-view-controls__slider"
+        data-view-control="zoom-slider"
+      >
         <input
           class="workbook-view-controls__slider-input"
           type="range"
@@ -264,12 +145,14 @@ function selectHighlightColor(value: string | null): void {
           :max="MAX_SHEET_ZOOM"
           :step="1"
           :aria-label="t('statusBar.zoomSlider')"
-          :aria-valuetext="t('statusBar.zoomLevel', { value: normalizeSheetZoom(zoom) })"
+          :aria-valuetext="
+            t('statusBar.zoomLevel', { value: normalizeSheetZoom(zoom) })
+          "
           :style="{ '--zoom-progress': zoomProgress }"
           @input="onNativeSliderInput"
         />
       </div>
-      <WorkbookZoomMenu
+      <SheetZoomMenu
         :zoom="normalizeSheetZoom(zoom)"
         @select="updateZoom"
         @fit-selection="emit('fitSelection')"
@@ -286,29 +169,6 @@ function selectHighlightColor(value: string | null): void {
         <Plus :size="15" aria-hidden="true" />
       </button>
     </div>
-
-    <Teleport to="body">
-      <div
-        v-if="colorPickerOpen"
-        :id="colorPanelId"
-        ref="colorPanelRef"
-        class="workbook-view-controls__color-panel"
-        :style="floatingStyles"
-        role="dialog"
-        :aria-label="t('statusBar.highlightColor')"
-        tabindex="-1"
-      >
-        <ColorPalette
-          :model-value="highlightEnabled ? selectedColor : null"
-          :allowed-colors="PALE_HIGHLIGHT_COLORS"
-          :show-default="false"
-          :columns="9"
-          compact
-          clearable
-          @select="selectHighlightColor"
-        />
-      </div>
-    </Teleport>
   </div>
 </template>
 
@@ -320,22 +180,10 @@ function selectHighlightColor(value: string | null): void {
   height: 22px;
   color: var(--idea-text-secondary);
 
-  &__highlight,
   &__zoom {
     display: inline-flex;
     align-items: center;
     height: 100%;
-  }
-
-  &__highlight {
-    margin-right: 4px;
-    border-right: 1px solid var(--idea-sheet-bar-border);
-    border-radius: 2px;
-
-    &.is-active {
-      background: var(--highlight-background);
-      color: var(--highlight-foreground);
-    }
   }
 
   &__button {
@@ -374,18 +222,6 @@ function selectHighlightColor(value: string | null): void {
       background: var(--idea-action-focus);
       color: var(--idea-action-primary);
     }
-  }
-
-  &__highlight-toggle {
-    border-radius: 2px 0 0 2px;
-  }
-
-  &__color-trigger {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    border-radius: 0 2px 2px 0;
   }
 
   &__zoom {
@@ -428,7 +264,8 @@ function selectHighlightColor(value: string | null): void {
       border: 1px solid var(--idea-surface-panel);
       border-radius: 50%;
       background: var(--idea-action-primary);
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--idea-action-primary), transparent 45%);
+      box-shadow: 0 0 0 1px
+        color-mix(in srgb, var(--idea-action-primary), transparent 45%);
     }
 
     &::-moz-range-track {
@@ -449,7 +286,8 @@ function selectHighlightColor(value: string | null): void {
       border: 1px solid var(--idea-surface-panel);
       border-radius: 50%;
       background: var(--idea-action-primary);
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--idea-action-primary), transparent 45%);
+      box-shadow: 0 0 0 1px
+        color-mix(in srgb, var(--idea-action-primary), transparent 45%);
     }
 
     &:focus-visible::-webkit-slider-thumb {
@@ -464,27 +302,7 @@ function selectHighlightColor(value: string | null): void {
     }
   }
 
-  &__color-panel {
-    z-index: 90;
-    max-width: calc(100vw - var(--idea-space-4) - var(--idea-space-4));
-    max-height: calc(100vh - var(--idea-space-4) - var(--idea-space-4));
-    overflow: auto;
-    background: var(--idea-surface-panel);
-    border: 1px solid var(--idea-border-control);
-    border-radius: var(--idea-radius-medium);
-    box-shadow: var(--idea-shadow-floating);
-
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
-      outline-offset: 2px;
-    }
-  }
-
   @media (max-width: 640px) {
-    &__highlight {
-      margin-right: 2px;
-    }
-
     &__slider {
       width: 58px;
       min-width: 36px;
