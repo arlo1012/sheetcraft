@@ -233,7 +233,8 @@ function paint(): void {
         ...props.environment.headers,
         font: props.environment.headers.font.replace(
           /([\d.]+)px/,
-          (_match, size) => `${Number(size) * (props.pageView?.uiScale ?? 1)}px`,
+          (_match, size) =>
+            `${(props.pageView?.mode === "page-layout" ? 10 : Number(size)) * (props.pageView?.uiScale ?? 1)}px`,
         ),
       },
     });

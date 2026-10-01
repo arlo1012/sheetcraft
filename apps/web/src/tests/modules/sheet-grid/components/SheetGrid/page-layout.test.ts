@@ -73,8 +73,8 @@ describe("SheetGrid page-layout interaction", () => {
       const paper = state(grid).pages[0]!.paperRect;
       expect(paper.x * frame.scale).toBeCloseTo(20 * 1.5);
       expect(paper.y * frame.scale).toBeCloseTo(20 * 1.5);
-      expect(frame.headingOrigin.x * frame.scale).toBeCloseTo(26 * 1.5);
-      expect(frame.headingOrigin.y * frame.scale).toBeCloseTo(26 * 1.5);
+      expect(frame.headingOrigin.x * frame.scale).toBeCloseTo(18 * 1.5);
+      expect(frame.headingOrigin.y * frame.scale).toBeCloseTo(18 * 1.5);
     } finally {
       grid.wrapper.unmount();
     }
@@ -237,7 +237,7 @@ describe("SheetGrid page-layout interaction", () => {
       const initialFrame = getSheetRenderFrame(grid.wrapper);
       expect(
         (initialFrame.body.x - initialFrame.headingSize.width) * initialFrame.scale,
-      ).toBeCloseTo(26 * 1.5);
+      ).toBeCloseTo(18 * 1.5);
       const original = grid.sheet.pageSetup!.margins.left;
       await grid.wrapper
         .get('[data-page-margin="left"]')

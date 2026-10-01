@@ -7,7 +7,7 @@ import type { SheetRenderFrame } from "../../sheet-grid/rendering/sheet-render-f
 import type { PageMarginDragStart } from "../usePageMarginDrag";
 import type { PageViewPage, PageViewPaintState } from "../page-view-types";
 
-export const PAGE_LAYOUT_RULER_SIZE = 26;
+export const PAGE_LAYOUT_RULER_SIZE = 18;
 export type PageLayoutRulerUnit = "mm" | "cm" | "in";
 type Axis = "horizontal" | "vertical";
 type Band = { start: number; end: number; key: string };
@@ -168,6 +168,16 @@ const selected = computed(() =>
 );
 const horizontalPages = computed(() => uniquePages(props.state.pages, "horizontal"));
 const verticalPages = computed(() => uniquePages(props.state.pages, "vertical"));
+const activeVerticalPage = computed(() => {
+  const fragments = selected.value;
+  if (fragments.length === 0) return verticalPages.value[0];
+  const scrollY = scroll.value.y;
+  return verticalPages.value.find((page) => {
+    const start = page.contentRect.y - scrollY;
+    const end = start + page.contentRect.height;
+    return fragments.some((rect) => rect.y < end && rect.y + rect.height > start);
+  });
+});
 function markerPosition(page: PageViewPage, margin: SheetPageMargin): number {
   const vertical = margin === "left" || margin === "right";
   const paper = page.paperRect;
@@ -333,13 +343,13 @@ const tooltipStyle = computed(() => {
           :class="{ 'page-layout-rulers__tick--major': tick.major }"
           :x1="tick.position"
           :x2="tick.position"
-          :y1="size - (tick.major ? 10 / printScale : 6 / printScale)"
+          :y1="size - (tick.major ? 7 / printScale : 4 / printScale)"
           :y2="size"
         />
         <text
           v-if="tick.label"
           class="page-layout-rulers__label"
-          :style="{ fontSize: `${12 / printScale}px` }"
+          :style="{ fontSize: `${10 / printScale}px` }"
           :x="tick.position + 2"
           :y="10 / printScale"
         >
@@ -382,7 +392,7 @@ const tooltipStyle = computed(() => {
         <line
           class="page-layout-rulers__tick"
           :class="{ 'page-layout-rulers__tick--major': tick.major }"
-          :x1="size - (tick.major ? 10 / printScale : 6 / printScale)"
+          :x1="size - (tick.major ? 7 / printScale : 4 / printScale)"
           :x2="size"
           :y1="tick.position"
           :y2="tick.position"
@@ -390,8 +400,8 @@ const tooltipStyle = computed(() => {
         <text
           v-if="tick.label"
           class="page-layout-rulers__label"
-          :style="{ fontSize: `${12 / printScale}px` }"
-          :transform="`translate(${10 / printScale} ${tick.position - 2}) rotate(-90)`"
+          :style="{ fontSize: `${10 / printScale}px` }"
+          :transform="`translate(${7 / printScale} ${tick.position - 2}) rotate(-90)`"
         >
           {{ tick.label }}
         </text>
@@ -435,81 +445,27 @@ const tooltipStyle = computed(() => {
         @keydown="keydown('right', $event)"
       />
     </template>
-    <template v-if="state.showWhiteSpace !== false">
-      <template v-for="page in verticalPages" :key="`vertical-marker-${page.paperRect.y}`">
-        <button
-          v-if="markerVisible(page, 'top')"
-          type="button"
-          class="page-layout-rulers__marker page-layout-rulers__marker--vertical"
-          :class="{ 'is-active': activeMargin === 'top' }"
-          :style="style(page, 'top')"
-          :disabled="disabled"
-          role="slider"
-          :aria-label="marginName('top')"
-          aria-orientation="vertical"
-          :aria-valuemin="setup.margins.header"
-          :aria-valuemax="maximum('top')"
-          :aria-valuenow="setup.margins.top"
-          :aria-valuetext="marginValue('top')"
-          data-page-ruler-margin="top"
-          @pointerdown="emit('marginStart', { margin: 'top', page, event: $event })"
-          @keydown="keydown('top', $event)"
-        />
-        <button
-          v-if="markerVisible(page, 'bottom')"
-          type="button"
-          class="page-layout-rulers__marker page-layout-rulers__marker--vertical"
-          :class="{ 'is-active': activeMargin === 'bottom' }"
-          :style="style(page, 'bottom')"
-          :disabled="disabled"
-          role="slider"
-          :aria-label="marginName('bottom')"
-          aria-orientation="vertical"
-          :aria-valuemin="setup.margins.footer"
-          :aria-valuemax="maximum('bottom')"
-          :aria-valuenow="setup.margins.bottom"
-          :aria-valuetext="marginValue('bottom')"
-          data-page-ruler-margin="bottom"
-          @pointerdown="emit('marginStart', { margin: 'bottom', page, event: $event })"
-          @keydown="keydown('bottom', $event)"
-        />
-        <button
-          v-if="markerVisible(page, 'header')"
-          type="button"
-          class="page-layout-rulers__marker page-layout-rulers__marker--vertical"
-          :class="{ 'is-active': activeMargin === 'header' }"
-          :style="style(page, 'header')"
-          :disabled="disabled"
-          role="slider"
-          :aria-label="marginName('header')"
-          aria-orientation="vertical"
-          :aria-valuemin="0"
-          :aria-valuemax="maximum('header')"
-          :aria-valuenow="setup.margins.header"
-          :aria-valuetext="marginValue('header')"
-          data-page-ruler-margin="header"
-          @pointerdown="emit('marginStart', { margin: 'header', page, event: $event })"
-          @keydown="keydown('header', $event)"
-        />
-        <button
-          v-if="markerVisible(page, 'footer')"
-          type="button"
-          class="page-layout-rulers__marker page-layout-rulers__marker--vertical"
-          :class="{ 'is-active': activeMargin === 'footer' }"
-          :style="style(page, 'footer')"
-          :disabled="disabled"
-          role="slider"
-          :aria-label="marginName('footer')"
-          aria-orientation="vertical"
-          :aria-valuemin="0"
-          :aria-valuemax="maximum('footer')"
-          :aria-valuenow="setup.margins.footer"
-          :aria-valuetext="marginValue('footer')"
-          data-page-ruler-margin="footer"
-          @pointerdown="emit('marginStart', { margin: 'footer', page, event: $event })"
-          @keydown="keydown('footer', $event)"
-        />
-      </template>
+    <template v-if="state.showWhiteSpace !== false && activeVerticalPage">
+      <button
+        v-if="markerVisible(activeVerticalPage, 'top')"
+        type="button"
+        class="page-layout-rulers__marker page-layout-rulers__marker--vertical"
+        :class="{ 'is-active': activeMargin === 'top' }"
+        :style="style(activeVerticalPage, 'top')"
+        :disabled="disabled"
+        role="slider"
+        :aria-label="marginName('top')"
+        aria-orientation="vertical"
+        :aria-valuemin="setup.margins.header"
+        :aria-valuemax="maximum('top')"
+        :aria-valuenow="setup.margins.top"
+        :aria-valuetext="marginValue('top')"
+        data-page-ruler-margin="top"
+        @pointerdown="
+          emit('marginStart', { margin: 'top', page: activeVerticalPage, event: $event })
+        "
+        @keydown="keydown('top', $event)"
+      />
     </template>
     <output
       v-if="tooltip && dragPoint"
@@ -567,14 +523,25 @@ const tooltipStyle = computed(() => {
     &::after {
       content: "";
       position: absolute;
-      inset: 1px;
+      bottom: calc(1px / v-bind(printScale));
+      left: 50%;
+      width: calc(7px / v-bind(printScale));
+      height: calc(5px / v-bind(printScale));
       background: var(--idea-text-muted);
       clip-path: polygon(50% 0, 100% 100%, 0 100%);
+      transform: translateX(-50%);
     }
     &--vertical {
       cursor: row-resize;
       &::after {
+        top: 50%;
+        right: calc(1px / v-bind(printScale));
+        bottom: auto;
+        left: auto;
+        width: calc(5px / v-bind(printScale));
+        height: calc(7px / v-bind(printScale));
         clip-path: polygon(0 50%, 100% 0, 100% 100%);
+        transform: translateY(-50%);
       }
     }
     &:hover,

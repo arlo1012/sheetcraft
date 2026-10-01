@@ -316,6 +316,8 @@ const emit = defineEmits<{
 
 const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 28;
+const PAGE_LAYOUT_ROW_HEADER_WIDTH = 36;
+const PAGE_LAYOUT_COLUMN_HEADER_HEIGHT = 22;
 const AXIS_TOOL_GUTTER = 20;
 const quickToolsGutter = computed(() =>
   props.viewMode === "normal" && props.showHeaders && props.showAxisQuickTools
@@ -348,10 +350,17 @@ const rulerInset = computed(() =>
 );
 const headingSize = computed(() => ({
   width: props.showHeaders
-    ? (ROW_HEADER_WIDTH + quickToolsGutter.value + rowOutlineGutter.value) / pageUiScale.value
+    ? ((props.viewMode === "page-layout" ? PAGE_LAYOUT_ROW_HEADER_WIDTH : ROW_HEADER_WIDTH) +
+        quickToolsGutter.value +
+        rowOutlineGutter.value) /
+      pageUiScale.value
     : 0,
   height: props.showHeaders
-    ? (COLUMN_HEADER_HEIGHT + quickToolsGutter.value + columnOutlineHeaderHeight.value) /
+    ? ((props.viewMode === "page-layout"
+        ? PAGE_LAYOUT_COLUMN_HEADER_HEIGHT
+        : COLUMN_HEADER_HEIGHT) +
+        quickToolsGutter.value +
+        columnOutlineHeaderHeight.value) /
       pageUiScale.value
     : 0,
 }));

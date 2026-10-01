@@ -162,6 +162,49 @@ describe("page layout", () => {
     expect(fragments.every((fragment) => fragment.paneId === "body")).toBe(true);
   });
 
+  test("renders allocated columns on a later horizontal page outside the print range", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 8,
+      columnCount: 12,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({ rowCount: 8, defaultRowHeight: 20 });
+    const setup = { ...DEFAULT_SHEET_PAGE_SETUP, scale: 400 };
+    const pagination = createSheetPagination({
+      geometry,
+      rows,
+      setup,
+      printRange: { start: { row: 0, column: 0 }, end: { row: 1, column: 1 } },
+      layoutRange: { start: { row: 0, column: 0 }, end: { row: 7, column: 11 } },
+    });
+    const pagePadding = 5;
+    const projection = createPageLayoutProjection({ geometry, rows, pagination, pagePadding });
+    const secondPage = projection.getPage(0, 1)!;
+    const layout = createPageLayoutViewportLayout({
+      geometry,
+      rows,
+      pagination,
+      pagePadding,
+      viewportSize: { width: secondPage.contentRect.x + 160, height: 120 },
+    });
+    const secondColumn = secondPage.range.start.column;
+
+    expect(layout.panes.body.columns.map((column) => column.index)).toContain(secondColumn);
+    expect(
+      layout.getCellAtViewportPoint({
+        x: secondPage.contentRect.x + 1,
+        y: secondPage.contentRect.y + 1,
+      }),
+    ).toEqual({ row: 0, column: secondColumn });
+    expect(
+      layout.getRangeFragments({
+        start: { row: 0, column: secondColumn },
+        end: { row: 1, column: secondColumn },
+      }),
+    ).toHaveLength(1);
+  });
+
   test("adjusts all outer print boundaries without mutating the input setup", () => {
     const geometry = createSheetGeometry({
       rowCount: 12,

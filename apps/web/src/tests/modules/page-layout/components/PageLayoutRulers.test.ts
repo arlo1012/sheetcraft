@@ -98,11 +98,11 @@ describe("PageLayoutRulers", () => {
     });
 
     expect(wrapper.get('[data-page-ruler="horizontal"]').attributes("style")).toContain(
-      "height: 13px",
+      "height: 9px",
     );
-    expect(wrapper.get('[data-page-ruler="horizontal"]').attributes("viewBox")).toContain(" 13");
+    expect(wrapper.get('[data-page-ruler="horizontal"]').attributes("viewBox")).toContain(" 9");
     expect(wrapper.get(".page-layout-rulers__label").attributes("style")).toContain(
-      "font-size: 6px",
+      "font-size: 5px",
     );
   });
 

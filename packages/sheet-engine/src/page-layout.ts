@@ -963,25 +963,39 @@ export function createPageLayoutProjection(options: {
       return column === null || row === null ? null : { row, column };
     },
     getVisibleRange(scroll, viewport): VisibleCellRange {
-      const pages = getVisiblePages({
-        x: scroll.x,
-        y: scroll.y,
-        width: Math.max(1, viewport.width),
-        height: Math.max(1, viewport.height),
-      });
-      const nearest = getPage(
-        clamp(
-          Math.floor((scroll.y - pagePadding) / paperStride.height),
-          0,
-          pagination.pageRows.length - 1,
-        ),
-        clamp(
-          Math.floor((scroll.x - pagePadding) / paperStride.width),
-          0,
-          pagination.pageColumns.length - 1,
-        ),
+      // The viewport can begin in the view-only paper padding or a page gap.
+      // Derive its page window from the axes rather than paper intersections so
+      // header and grid item enumeration still reaches every horizontal page.
+      const firstRow = clamp(
+        Math.floor((scroll.y - pagePadding) / paperStride.height),
+        0,
+        pagination.pageRows.length - 1,
       );
-      const visible = pages.length > 0 ? pages : nearest ? [nearest] : [];
+      const lastRow = clamp(
+        Math.floor(
+          (scroll.y + Math.max(1, viewport.height) - pagePadding - 0.000001) / paperStride.height,
+        ),
+        0,
+        pagination.pageRows.length - 1,
+      );
+      const firstColumn = clamp(
+        Math.floor((scroll.x - pagePadding) / paperStride.width),
+        0,
+        pagination.pageColumns.length - 1,
+      );
+      const lastColumn = clamp(
+        Math.floor(
+          (scroll.x + Math.max(1, viewport.width) - pagePadding - 0.000001) / paperStride.width,
+        ),
+        0,
+        pagination.pageColumns.length - 1,
+      );
+      const visible: SheetPage[] = [];
+      for (let row = firstRow; row <= lastRow; row += 1)
+        for (let column = firstColumn; column <= lastColumn; column += 1) {
+          const page = getPage(row, column);
+          if (page) visible.push(page);
+        }
       const fallback = pagination.printRange;
       return {
         startRow: Math.min(...visible.map((page) => page.range.start.row), fallback.end.row),
