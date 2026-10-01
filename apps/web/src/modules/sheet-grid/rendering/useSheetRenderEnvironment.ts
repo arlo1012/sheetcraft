@@ -42,6 +42,7 @@ export function useSheetRenderEnvironment(getRoot: () => HTMLElement | null) {
   let observer: MutationObserver | undefined;
   let densityQuery: MediaQueryList | undefined;
   let mounted = false;
+  let environmentKey = "";
   function refresh(): void {
     const root = getRoot();
     if (!root) return;
@@ -53,7 +54,7 @@ export function useSheetRenderEnvironment(getRoot: () => HTMLElement | null) {
     const text = color("text-primary", "#202124");
     const mutedText = color("text-secondary", "#666");
     const action = color("action-primary", "#0052d9");
-    environment.value = {
+    const nextEnvironment: SheetRenderEnvironment = {
       density: window.devicePixelRatio || 1,
       fontFamily,
       cells: {
@@ -88,6 +89,10 @@ export function useSheetRenderEnvironment(getRoot: () => HTMLElement | null) {
         ),
       },
     };
+    const nextKey = JSON.stringify(nextEnvironment);
+    if (nextKey === environmentKey) return;
+    environmentKey = nextKey;
+    environment.value = nextEnvironment;
   }
   function observeDensity(): void {
     densityQuery?.removeEventListener("change", observeDensity);
@@ -99,10 +104,22 @@ export function useSheetRenderEnvironment(getRoot: () => HTMLElement | null) {
     mounted = true;
     observeDensity();
     observer = new MutationObserver(refresh);
+    // Canvas colors are resolved from the grid's computed style. A workspace
+    // display mode can override those variables on any ancestor of the grid,
+    // so observing documentElement alone misses that change and leaves the
+    // cached canvas palette stale.
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["class", "theme-mode", "style"],
     });
+    let target: HTMLElement | null = getRoot();
+    while (target && target !== document.documentElement) {
+      observer.observe(target, {
+        attributes: true,
+        attributeFilter: ["class", "theme-mode", "style"],
+      });
+      target = target.parentElement;
+    }
     void document.fonts?.ready.then(() => {
       if (mounted) refresh();
     });
