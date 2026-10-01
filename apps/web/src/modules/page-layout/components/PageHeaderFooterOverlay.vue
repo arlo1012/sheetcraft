@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties } from "vue";
+import { computed, type CSSProperties } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { getSheetHeaderFooterOptions, type SheetPageSetup } from "@idea10/core/page-setup";
 import { parseHeaderFooterRuns } from "../header-footer-text";
 import type {
-  HeaderFooterActionRequest,
-  HeaderFooterEditContext,
+  HeaderFooterEditTarget,
   HeaderFooterPart,
   HeaderFooterSection,
   HeaderFooterVariant,
@@ -23,82 +22,13 @@ const props = withDefaults(
     disabled: boolean;
     pageCount: number;
     fileName?: string;
-    actionRequest?: HeaderFooterActionRequest;
   }>(),
-  { fileName: "Workbook.xlsx", actionRequest: undefined },
+  { fileName: "Workbook.xlsx" },
 );
-const emit = defineEmits<{
-  change: [
-    payload: {
-      section: HeaderFooterSection;
-      part: HeaderFooterPart;
-      variant: HeaderFooterVariant;
-      value: string;
-    },
-  ];
-  edit: [context: HeaderFooterEditContext | undefined];
-}>();
+const emit = defineEmits<{ open: [target: HeaderFooterEditTarget] }>();
 const { t } = useAppI18n();
 const headerFooter = computed(() => getSheetHeaderFooterOptions(props.setup));
 const now = new Date();
-type HeaderFooterFieldHandle = { finishEditing: () => boolean; hasPendingEdit: () => boolean };
-const fields = ref<HeaderFooterFieldHandle[]>([]);
-const activeContext = ref<HeaderFooterEditContext>();
-const retainedPage = ref<PageViewPage>();
-const renderedPages = computed(() => {
-  const visible = props.state.pages;
-  const retained = retainedPage.value;
-  return retained && !visible.some((page) => page.pageNumber === retained.pageNumber)
-    ? [...visible, retained]
-    : visible;
-});
-function sameEditTarget(
-  context: HeaderFooterEditContext | undefined,
-  target: Pick<HeaderFooterEditContext, "section" | "part" | "variant" | "pageNumber">,
-): boolean {
-  if (!context) return false;
-  return (
-    context.section === target.section &&
-    context.part === target.part &&
-    context.variant === target.variant &&
-    context.pageNumber === target.pageNumber
-  );
-}
-function onFieldEdit(
-  context: HeaderFooterEditContext | undefined,
-  page: PageViewPage,
-  section: HeaderFooterSection,
-  part: HeaderFooterPart,
-): void {
-  const target = { section, part, variant: variant(page), pageNumber: page.pageNumber };
-  if (context !== undefined) {
-    activeContext.value = context;
-    retainedPage.value = page;
-    emit("edit", context);
-  } else if (sameEditTarget(activeContext.value, target)) {
-    activeContext.value = undefined;
-    retainedPage.value = undefined;
-    emit("edit", undefined);
-  }
-}
-watch(
-  () => props.state.pages,
-  (pages) => {
-    const retained = retainedPage.value;
-    const updated = retained && pages.find((page) => page.pageNumber === retained.pageNumber);
-    if (updated) retainedPage.value = updated;
-  },
-);
-function finishEditing(): boolean {
-  return fields.value.every((field) => field.finishEditing());
-}
-function flushPendingEdit(): boolean {
-  return finishEditing();
-}
-function hasPendingEdit(): boolean {
-  return fields.value.some((field) => field.hasPendingEdit());
-}
-defineExpose({ finishEditing, flushPendingEdit, hasPendingEdit });
 function variant(page: PageViewPage): HeaderFooterVariant {
   const pageNumber = page.pageNumber ?? 1;
   if (headerFooter.value.differentFirst && pageNumber === 1) return "first";
@@ -121,7 +51,7 @@ function fontScale(): number {
 function rowHeight(section: HeaderFooterSection, page: PageViewPage): number {
   const scale = fontScale();
   return Math.max(
-    28,
+    28 * (props.state.uiScale ?? 1),
     ...(["left", "center", "right"] as const).map((part) => {
       const runs = parseHeaderFooterRuns(value(section, part, page));
       const lines = Math.max(1, value(section, part, page).split(/\r?\n/).length);
@@ -130,10 +60,19 @@ function rowHeight(section: HeaderFooterSection, page: PageViewPage): number {
     }),
   );
 }
+function availableHeight(section: HeaderFooterSection): number {
+  const outer = props.setup.margins[section === "header" ? "top" : "bottom"];
+  return Math.max(0, (outer - props.setup.margins[section]) / props.state.millimetresPerUnit);
+}
+function sectionVisible(section: HeaderFooterSection, page: PageViewPage): boolean {
+  if (props.state.showWhiteSpace === false) return false;
+  if (props.disabled && sectionEmpty(section, page)) return false;
+  return availableHeight(section) >= 18 * (props.state.uiScale ?? 1);
+}
 function style(page: PageViewPage, section: HeaderFooterSection): CSSProperties {
   const { bodyScrollPosition: scroll } = props.frame.layout;
   const options = headerFooter.value;
-  const height = rowHeight(section, page);
+  const height = Math.min(rowHeight(section, page), availableHeight(section));
   const offset = props.setup.margins[section] / props.state.millimetresPerUnit;
   const anchor =
     section === "header"
@@ -145,28 +84,15 @@ function style(page: PageViewPage, section: HeaderFooterSection): CSSProperties 
     left: `${left - scroll.x}px`,
     top: `${section === "header" ? anchor - scroll.y : anchor - height - scroll.y}px`,
     width: `${width}px`,
-    minHeight: `${height}px`,
+    height: `${height}px`,
     paddingInline: options.alignWithMargins ? undefined : "4px",
     boxSizing: "border-box",
   };
 }
 function sectionEmpty(section: HeaderFooterSection, page: PageViewPage): boolean {
-  return (["left", "center", "right"] as const).every((part) => value(section, part, page) === "");
-}
-function rowActive(section: HeaderFooterSection, page: PageViewPage): boolean {
-  return (
-    activeContext.value?.section === section &&
-    activeContext.value.variant === variant(page) &&
-    activeContext.value.pageNumber === page.pageNumber
+  return (["left", "center", "right"] as const).every(
+    (part) => parseHeaderFooterRuns(value(section, part, page)).length === 0,
   );
-}
-function emitChange(
-  section: HeaderFooterSection,
-  part: HeaderFooterPart,
-  page: PageViewPage,
-  value: string,
-): void {
-  emit("change", { section, part, variant: variant(page), value });
 }
 </script>
 
@@ -185,15 +111,15 @@ function emitChange(
     @cut.stop
     @paste.stop
   >
-    <template v-for="page in renderedPages" :key="`${page.paperRect.x}:${page.paperRect.y}`">
+    <template v-for="page in state.pages" :key="`${page.paperRect.x}:${page.paperRect.y}`">
       <div
+        v-if="sectionVisible('header', page)"
         class="page-header-footer-overlay__row"
+        data-page-section-row="header"
         :style="style(page, 'header')"
         :data-paper-number="page.pageNumber"
-        :class="{ 'is-row-active': rowActive('header', page) }"
       >
         <PageHeaderFooterField
-          ref="fields"
           :value="value('header', 'left', page)"
           section="header"
           part="left"
@@ -205,14 +131,10 @@ function emitChange(
           :now="now"
           :font-scale="fontScale()"
           :ui-scale="state.uiScale ?? 1"
-          :row-active="rowActive('header', page)"
           :disabled="disabled"
-          :action-request="actionRequest"
-          @change="emitChange('header', 'left', page, $event)"
-          @edit="onFieldEdit($event, page, 'header', 'left')"
+          @open="emit('open', $event)"
         />
         <PageHeaderFooterField
-          ref="fields"
           :value="value('header', 'center', page)"
           section="header"
           part="center"
@@ -225,14 +147,10 @@ function emitChange(
           :now="now"
           :font-scale="fontScale()"
           :ui-scale="state.uiScale ?? 1"
-          :row-active="rowActive('header', page)"
           :disabled="disabled"
-          :action-request="actionRequest"
-          @change="emitChange('header', 'center', page, $event)"
-          @edit="onFieldEdit($event, page, 'header', 'center')"
+          @open="emit('open', $event)"
         />
         <PageHeaderFooterField
-          ref="fields"
           :value="value('header', 'right', page)"
           section="header"
           part="right"
@@ -244,20 +162,17 @@ function emitChange(
           :now="now"
           :font-scale="fontScale()"
           :ui-scale="state.uiScale ?? 1"
-          :row-active="rowActive('header', page)"
           :disabled="disabled"
-          :action-request="actionRequest"
-          @change="emitChange('header', 'right', page, $event)"
-          @edit="onFieldEdit($event, page, 'header', 'right')"
+          @open="emit('open', $event)"
         />
       </div>
       <div
+        v-if="sectionVisible('footer', page)"
         class="page-header-footer-overlay__row"
+        data-page-section-row="footer"
         :style="style(page, 'footer')"
-        :class="{ 'is-row-active': rowActive('footer', page) }"
       >
         <PageHeaderFooterField
-          ref="fields"
           :value="value('footer', 'left', page)"
           section="footer"
           part="left"
@@ -269,14 +184,10 @@ function emitChange(
           :now="now"
           :font-scale="fontScale()"
           :ui-scale="state.uiScale ?? 1"
-          :row-active="rowActive('footer', page)"
           :disabled="disabled"
-          :action-request="actionRequest"
-          @change="emitChange('footer', 'left', page, $event)"
-          @edit="onFieldEdit($event, page, 'footer', 'left')"
+          @open="emit('open', $event)"
         />
         <PageHeaderFooterField
-          ref="fields"
           :value="value('footer', 'center', page)"
           section="footer"
           part="center"
@@ -289,14 +200,10 @@ function emitChange(
           :now="now"
           :font-scale="fontScale()"
           :ui-scale="state.uiScale ?? 1"
-          :row-active="rowActive('footer', page)"
           :disabled="disabled"
-          :action-request="actionRequest"
-          @change="emitChange('footer', 'center', page, $event)"
-          @edit="onFieldEdit($event, page, 'footer', 'center')"
+          @open="emit('open', $event)"
         />
         <PageHeaderFooterField
-          ref="fields"
           :value="value('footer', 'right', page)"
           section="footer"
           part="right"
@@ -308,11 +215,8 @@ function emitChange(
           :now="now"
           :font-scale="fontScale()"
           :ui-scale="state.uiScale ?? 1"
-          :row-active="rowActive('footer', page)"
           :disabled="disabled"
-          :action-request="actionRequest"
-          @change="emitChange('footer', 'right', page, $event)"
-          @edit="onFieldEdit($event, page, 'footer', 'right')"
+          @open="emit('open', $event)"
         />
       </div>
     </template>
@@ -330,6 +234,11 @@ function emitChange(
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     pointer-events: auto;
+    overflow: hidden;
+    &:hover :deep(.page-header-footer-field__preview:not(:disabled)) {
+      outline: 1px solid var(--idea-border-control);
+      outline-offset: -1px;
+    }
   }
 }
 </style>

@@ -52,11 +52,10 @@ describe("PageHeaderFooterOverlay", () => {
         .get('[data-page-section="header"][data-page-part="center"]');
       expect(first.text()).toBe("First");
       await first.trigger("click");
-      const input = wrapper
-        .get('[data-paper-number="1"]')
-        .get('[data-page-section="header"][data-page-part="center"] textarea')
-        .element as HTMLTextAreaElement;
-      expect(input.value).toBe("First");
+      expect(wrapper.emitted("open")).toEqual([
+        [{ section: "header", part: "center", variant: "first" }],
+      ]);
+      expect(wrapper.find("textarea").exists()).toBe(false);
 
       const even = wrapper
         .get('[data-paper-number="2"]')
@@ -92,9 +91,7 @@ test("anchors a multiline footer above its margin and keeps physical text size w
     const footer = wrapper.findAll(".page-header-footer-overlay__row")[3]!;
     const rowStyle = String(footer.attributes("style"));
     const top = Number.parseFloat(String(/top:\s*([\d.]+)px/.exec(rowStyle)?.at(1) ?? "0"));
-    const height = Number.parseFloat(
-      String(/min-height:\s*([\d.]+)px/.exec(rowStyle)?.at(1) ?? "0"),
-    );
+    const height = Number.parseFloat(String(/height:\s*([\d.]+)px/.exec(rowStyle)?.at(1) ?? "0"));
     const bottomMargin = pageSetup.margins.footer / state.millimetresPerUnit;
     expect(top + height + bottomMargin).toBeCloseTo(2300, 4);
     expect(footer.get('[data-page-part="center"] span').attributes("style")).toContain(
@@ -105,54 +102,27 @@ test("anchors a multiline footer above its margin and keeps physical text size w
   }
 });
 
-test("keeps the second field toolbar context when an earlier blur finishes late", async () => {
+test("hides zero or insufficient margin areas without changing any header/footer text", async () => {
+  const pageSetup = setup();
   const wrapper = mount(PageHeaderFooterOverlay, {
-    attachTo: document.body,
     global: { plugins: [createAppI18n("en-US")] },
-    props: { state, frame, setup: setup(), sheetName: "Sales", disabled: false, pageCount: 2 },
+    props: { state, frame, setup: pageSetup, sheetName: "Sales", disabled: false, pageCount: 2 },
   });
   try {
-    const first = wrapper
-      .get('[data-paper-number="1"]')
-      .get('[data-page-section="header"][data-page-part="center"]');
-    await first.trigger("click");
-    const firstInput = wrapper
-      .get('[data-paper-number="1"]')
-      .get('[data-page-section="header"][data-page-part="center"] textarea');
-    await firstInput.setValue("Draft first");
-    await firstInput.trigger("blur", { relatedTarget: null });
-
-    const second = wrapper
-      .get('[data-paper-number="2"]')
-      .get('[data-page-section="header"][data-page-part="center"]');
-    await second.trigger("click");
-    await new Promise((resolve) => window.setTimeout(resolve));
-
-    const edits = wrapper.emitted("edit") ?? [];
-    expect(edits.at(-1)?.[0]).toMatchObject({ section: "header", part: "center", pageNumber: 2 });
-    expect(wrapper.find('[data-paper-number="2"] textarea').exists()).toBe(true);
+    expect(wrapper.find('[data-page-section-row="header"]').exists()).toBe(true);
+    await wrapper.setProps({
+      setup: { ...pageSetup, margins: { ...pageSetup.margins, top: 0, header: 0 } },
+    });
+    expect(wrapper.find('[data-page-section-row="header"]').exists()).toBe(false);
+    expect(wrapper.find('[data-page-section-row="footer"]').exists()).toBe(true);
+    await wrapper.setProps({ state: { ...state, showWhiteSpace: false } });
+    expect(wrapper.find("[data-page-section-row]").exists()).toBe(false);
+    await wrapper.setProps({ state, setup: pageSetup });
+    expect(wrapper.get('[data-page-section="header"][data-page-part="center"]').text()).toBe(
+      "First",
+    );
+    expect(wrapper.emitted("change")).toBeUndefined();
   } finally {
     wrapper.unmount();
-    document.body.replaceChildren();
-  }
-});
-
-test("retains an IME-editing page while visible page virtualization changes", async () => {
-  const wrapper = mount(PageHeaderFooterOverlay, {
-    attachTo: document.body,
-    global: { plugins: [createAppI18n("en-US")] },
-    props: { state, frame, setup: setup(), sheetName: "Sales", disabled: false, pageCount: 2 },
-  });
-  try {
-    const first = wrapper
-      .get('[data-paper-number="1"]')
-      .get('[data-page-section="header"][data-page-part="center"]');
-    await first.trigger("click");
-    await wrapper.get('[data-paper-number="1"] textarea').trigger("compositionstart");
-    await wrapper.setProps({ state: { ...state, pages: [state.pages[1]!] } });
-    expect(wrapper.find('[data-paper-number="1"] textarea').exists()).toBe(true);
-  } finally {
-    wrapper.unmount();
-    document.body.replaceChildren();
   }
 });

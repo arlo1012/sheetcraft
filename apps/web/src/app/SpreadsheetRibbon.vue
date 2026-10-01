@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, useId, watch } from "vue";
+import { nextTick, ref, useId } from "vue";
 import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
 import FormulaToolbar from "../modules/formula-tools/components/FormulaToolbar.vue";
 import type { CellMergeMode, CellValueConversionMode } from "@idea10/core/commands";
@@ -31,7 +31,6 @@ const props = withDefaults(
     recentFunctions?: readonly string[];
     nameCreationEnabled?: boolean;
     calculationSettings?: WorkbookCalculationSettings;
-    headerFooterEditing?: boolean;
   }>(),
   { conditionalFormattingDisabled: undefined },
 );
@@ -71,36 +70,18 @@ const emit = defineEmits<{
 
 const { t } = useAppI18n();
 type StandardCategory = "home" | "formulas" | "data" | "view";
-type RibbonCategory = StandardCategory | "header-footer";
+type RibbonCategory = StandardCategory;
 const activeCategory = ref<RibbonCategory>("home");
-const previousCategory = ref<StandardCategory>("home");
 const homeTab = ref<HTMLButtonElement>();
 const formulaTab = ref<HTMLButtonElement>();
 const dataTab = ref<HTMLButtonElement>();
 const viewTab = ref<HTMLButtonElement>();
-const headerFooterTab = ref<HTMLButtonElement>();
-watch(
-  () => props.headerFooterEditing,
-  (editing) => {
-    if (editing) {
-      if (activeCategory.value !== "header-footer") previousCategory.value = activeCategory.value;
-      activeCategory.value = "header-footer";
-    } else if (activeCategory.value === "header-footer") {
-      activeCategory.value = previousCategory.value;
-    }
-  },
-  { immediate: true },
-);
-watch(activeCategory, (category) => {
-  if (category !== "header-footer") previousCategory.value = category;
-});
 const tabId = useId();
 
 function onCategoryKeydown(event: KeyboardEvent): void {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
   const categories: RibbonCategory[] = ["home", "formulas", "data", "view"];
-  if (props.headerFooterEditing) categories.push("header-footer");
   const current = categories.indexOf(activeCategory.value);
   const index =
     event.key === "Home"
@@ -117,9 +98,7 @@ function onCategoryKeydown(event: KeyboardEvent): void {
         ? formulaTab
         : category === "data"
           ? dataTab
-          : category === "view"
-            ? viewTab
-            : headerFooterTab;
+          : viewTab;
   void nextTick(() => tab.value?.focus());
 }
 
@@ -129,7 +108,6 @@ defineSlots<{
   "worksheet-tools"?: () => unknown;
   "data-tools"?: () => unknown;
   "view-tools"?: () => unknown;
-  "header-footer-tools"?: () => unknown;
 }>();
 </script>
 
@@ -204,23 +182,6 @@ defineSlots<{
           >
             {{ t("ribbon.view") }}
           </button>
-          <button
-            v-if="headerFooterEditing"
-            :id="`${tabId}-header-footer`"
-            ref="headerFooterTab"
-            class="spreadsheet-ribbon__category"
-            :class="{ 'is-active': activeCategory === 'header-footer' }"
-            data-ribbon-category="header-footer"
-            data-page-header-footer-toolbar
-            type="button"
-            role="tab"
-            :aria-selected="activeCategory === 'header-footer'"
-            :aria-controls="`${tabId}-panel`"
-            :tabindex="activeCategory === 'header-footer' ? 0 : -1"
-            @click="activeCategory = 'header-footer'"
-          >
-            {{ t("pageLayout.headerFooterTools") }}
-          </button>
         </div>
         <slot name="file-actions" />
       </nav>
@@ -290,7 +251,6 @@ defineSlots<{
         @interaction-end="emit('formulaInteractionEnd')"
       />
       <slot v-else-if="activeCategory === 'data'" name="data-tools" />
-      <slot v-else-if="activeCategory === 'header-footer'" name="header-footer-tools" />
       <slot v-else name="view-tools" />
     </section>
   </header>

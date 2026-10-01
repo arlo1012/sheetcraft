@@ -31,7 +31,10 @@ const props = defineProps<{
   setup: SheetPageSetup;
   context?: HeaderFooterEditContext;
   disabled: boolean;
+  showOptions?: boolean;
+  showFinish?: boolean;
 }>();
+const { showOptions = true, showFinish = true } = props;
 const emit = defineEmits<{
   action: [action: HeaderFooterEditorAction];
   optionsChange: [value: SheetHeaderFooterOptions];
@@ -124,7 +127,9 @@ function selectColor(value: string): void {
             <TColorPicker
               :model-value="`#${context.format.color}`"
               format="HEX"
-              :popup-props="{ overlayClassName: 'page-header-footer-toolbar__popup' }"
+              :popup-props="{
+                overlayClassName: 'page-header-footer-toolbar__popup',
+              }"
               :disabled="disabled"
               @change="selectColor"
             />
@@ -185,6 +190,7 @@ function selectColor(value: string): void {
       </div>
     </section>
     <section
+      v-if="showOptions"
       class="page-header-footer-toolbar__group"
       data-ribbon-group="header-footer-options"
       role="group"
@@ -218,7 +224,7 @@ function selectColor(value: string): void {
       </div>
     </section>
     <section
-      v-if="context"
+      v-if="context && showFinish"
       class="page-header-footer-toolbar__group"
       data-ribbon-group="header-footer-edit"
     >

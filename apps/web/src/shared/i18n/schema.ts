@@ -827,6 +827,9 @@ export type MessageSchema = ToolMessageSchema & {
     marginValue: string;
     marginDragHint: string;
     marginDragValue: string;
+    page: string;
+    worksheet: string;
+    headerFooterDialogHint: string;
     headerFooterTools: string;
     headerFooterFormatting: string;
     headerFooterFields: string;

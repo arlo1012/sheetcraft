@@ -18,12 +18,7 @@ import {
   createSetSheetPageSetupCommand,
   type CellFormatChange,
 } from "@idea10/core/commands";
-import {
-  cloneSheetPageSetup,
-  DEFAULT_SHEET_PAGE_SETUP,
-  type SheetPageSetup,
-  type SheetHeaderFooterOptions,
-} from "@idea10/core/page-setup";
+import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@idea10/core/page-setup";
 import type { SheetViewMode } from "@idea10/sheet-engine/page-layout";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { useWorkbookFullscreen } from "../modules/workbook/composables/useWorkbookFullscreen";
@@ -45,13 +40,7 @@ import DataProofreadingDialog from "../modules/data-tools/components/DataProofre
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import ViewToolbar from "../modules/view-tools/components/ViewToolbar.vue";
 import PageSetupDialog from "../modules/page-layout/components/PageSetupDialog.vue";
-import PageHeaderFooterToolbar from "../modules/page-layout/components/PageHeaderFooterToolbar.vue";
-import type {
-  HeaderFooterActionRequest,
-  HeaderFooterEditContext,
-  HeaderFooterEditorAction,
-  HeaderFooterVariant,
-} from "../modules/page-layout/header-footer-editor";
+import type { HeaderFooterEditTarget } from "../modules/page-layout/header-footer-editor";
 import type { PageLayoutRulerUnit } from "../modules/page-layout/components/PageLayoutRulers.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
 import DuplicateValuesDialog from "../modules/data-tools/components/DuplicateValuesDialog.vue";
@@ -281,8 +270,8 @@ const showPageRulers = ref(true);
 const showPageMargins = ref(false);
 const showPageWhiteSpace = ref(true);
 const pageRulerUnit = ref<PageLayoutRulerUnit>("cm");
-const headerFooterContext = shallowRef<HeaderFooterEditContext>();
-const headerFooterActionRequest = shallowRef<HeaderFooterActionRequest>();
+const pageSetupTab = ref<"page" | "margins" | "header-footer" | "sheet">("page");
+const headerFooterTarget = shallowRef<HeaderFooterEditTarget>();
 const sheetGridRef = shallowRef<InstanceType<typeof SheetGrid> | null>(null);
 function setSheetGridRef(value: Element | ComponentPublicInstance | null): void {
   sheetGridRef.value = value as InstanceType<typeof SheetGrid> | null;
@@ -290,30 +279,25 @@ function setSheetGridRef(value: Element | ComponentPublicInstance | null): void 
 }
 function setPageWhiteSpace(value: boolean): void {
   if (sheetGridRef.value?.flushPendingEdit() === false) return;
-  headerFooterContext.value = undefined;
   showPageWhiteSpace.value = value;
-}
-function sendHeaderFooterAction(action: HeaderFooterEditorAction): void {
-  headerFooterActionRequest.value = {
-    sequence: (headerFooterActionRequest.value?.sequence ?? 0) + 1,
-    action,
-  };
-}
-function updateHeaderFooterOptions(headerFooter: SheetHeaderFooterOptions): void {
-  if (sheetGridRef.value?.flushPendingEdit() === false) return;
-  const setup = cloneSheetPageSetup(activePageSetup.value);
-  setup.headerFooter = headerFooter;
-  applyPageSetup(setup);
 }
 function openPageSetup(): void {
   if (sheetGridRef.value?.flushPendingEdit() === false) return;
+  pageSetupTab.value = "page";
+  headerFooterTarget.value = undefined;
+  pageSetupVisible.value = true;
+}
+function openHeaderFooter(target: HeaderFooterEditTarget): void {
+  if (activeSheet.value.properties.protected || sheetGridRef.value?.flushPendingEdit() === false)
+    return;
+  pageSetupTab.value = "header-footer";
+  headerFooterTarget.value = target;
   pageSetupVisible.value = true;
 }
 const activeViewMode = computed(() => pageViewModes.get(activeSheet.value.id) ?? "normal");
 const activePageSetup = computed(() => activeSheet.value.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
 function setViewMode(mode: SheetViewMode): void {
   if (sheetGridRef.value?.flushPendingEdit() === false) return;
-  headerFooterContext.value = undefined;
   pageViewModes.set(activeSheet.value.id, mode);
   void nextTick(focusCellEditor);
 }
@@ -325,26 +309,7 @@ function savePageSetup(setup: SheetPageSetup): void {
   pageSetupVisible.value = false;
   void nextTick(focusCellEditor);
 }
-function updatePageHeaderFooter(payload: {
-  section: "header" | "footer";
-  part: "left" | "center" | "right";
-  variant: HeaderFooterVariant;
-  value: string;
-}): void {
-  const setup = cloneSheetPageSetup(activePageSetup.value);
-  if (payload.variant === "odd") setup[payload.section][payload.part] = payload.value;
-  else if (setup.headerFooter) {
-    const key = `${payload.variant}${payload.section === "header" ? "Header" : "Footer"}` as
-      | "firstHeader"
-      | "firstFooter"
-      | "evenHeader"
-      | "evenFooter";
-    setup.headerFooter[key][payload.part] = payload.value;
-  }
-  executeCommand(createSetSheetPageSetupCommand(activeSheet.value.id, setup));
-}
 watch(workbookGeneration, () => {
-  headerFooterContext.value = undefined;
   pageViewModes.clear();
   pageSetupVisible.value = false;
 });
@@ -352,7 +317,6 @@ watch(
   () => activeSheet.value.id,
   () => {
     pageSetupVisible.value = false;
-    headerFooterContext.value = undefined;
   },
 );
 const duplicateInputError = computed(() => {
@@ -1411,7 +1375,7 @@ function setShowFormulaBar(visible: boolean): void {
 }
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
-  if (formulaEditorVisible.value || formulaInsertVisible.value) return;
+  if (pageSetupVisible.value || formulaEditorVisible.value || formulaInsertVisible.value) return;
   const picker = activeRangePicker.value;
   if (picker) {
     if (event.key === "Escape") picker.cancel();
@@ -1480,9 +1444,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @change="imageActions.onFileChange"
     />
     <SpreadsheetRibbon
-      :header-footer-editing="
-        Boolean(headerFooterContext) && activeViewMode === 'page-layout' && showPageWhiteSpace
-      "
       :state="activeSelectionStyle"
       :disabled="!isFormattingSupported || activeSheet.properties.protected"
       :conditional-formatting-disabled="activeSheet.properties.protected"
@@ -1679,16 +1640,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
             />
           </template>
         </WorkbookFileActions>
-      </template>
-      <template #header-footer-tools>
-        <PageHeaderFooterToolbar
-          v-if="headerFooterContext && activeViewMode === 'page-layout' && showPageWhiteSpace"
-          :setup="activePageSetup"
-          :context="headerFooterContext"
-          :disabled="activeSheet.properties.protected"
-          @action="sendHeaderFooterAction"
-          @options-change="updateHeaderFooterOptions"
-        />
       </template>
     </SpreadsheetRibbon>
 
@@ -2242,9 +2193,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @update:show-page-white-space="setPageWhiteSpace"
         :page-ruler-unit="pageRulerUnit"
         file-name="workbook.xlsx"
-        :header-footer-action-request="headerFooterActionRequest"
-        @header-footer-edit="headerFooterContext = $event"
-        @header-footer-change="updatePageHeaderFooter"
+        @open-header-footer="openHeaderFooter"
         v-model:zoom="zoom"
         :show-headers="showHeaders"
         :show-grid-lines="showGridLines"
@@ -2324,6 +2273,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     <PageSetupDialog
       v-model:visible="pageSetupVisible"
       :setup="activePageSetup"
+      :initial-tab="pageSetupTab"
+      :header-footer-target="headerFooterTarget"
       @confirm="savePageSetup"
     />
     <SheetColumnStatisticsDialog

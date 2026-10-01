@@ -319,11 +319,14 @@ describe("page layout", () => {
     expect(setup.printArea).toEqual({ start: { row: 2, column: 2 }, end: { row: 5, column: 5 } });
   });
 
-  test("clamps page margins to usable paper and header/footer ownership", () => {
+  test("clamps page margins to usable paper while shrinking header and footer distances", () => {
     const setup = { ...DEFAULT_SHEET_PAGE_SETUP };
-    expect(adjustSheetPageMargin({ setup, margin: "top", valueMm: 0 })?.margins.top).toBe(
-      setup.margins.header,
-    );
+    const top = adjustSheetPageMargin({ setup, margin: "top", valueMm: 0 })!;
+    expect(top.margins.top).toBe(0);
+    expect(top.margins.header).toBe(0);
+    const bottom = adjustSheetPageMargin({ setup, margin: "bottom", valueMm: 0 })!;
+    expect(bottom.margins.bottom).toBe(0);
+    expect(bottom.margins.footer).toBe(0);
     expect(adjustSheetPageMargin({ setup, margin: "header", valueMm: 999 })?.margins.header).toBe(
       setup.margins.top,
     );

@@ -4,6 +4,12 @@ export type HeaderFooterVariant = "odd" | "first" | "even";
 export type HeaderFooterSection = "header" | "footer";
 export type HeaderFooterPart = "left" | "center" | "right";
 
+export type HeaderFooterEditTarget = {
+  section: HeaderFooterSection;
+  part: HeaderFooterPart;
+  variant: HeaderFooterVariant;
+};
+
 export type HeaderFooterEditContext = {
   section: HeaderFooterSection;
   part: HeaderFooterPart;
@@ -17,6 +23,3 @@ export type HeaderFooterEditorAction =
   | { type: "format"; patch: Partial<HeaderFooterFormat> }
   | { type: "finish" }
   | { type: "cancel" };
-
-/** A monotonically increasing sequence lets an action be applied once per active field. */
-export type HeaderFooterActionRequest = { sequence: number; action: HeaderFooterEditorAction };

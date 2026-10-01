@@ -128,4 +128,57 @@ describe("PageLayoutRulers", () => {
       "page-layout-rulers__marker",
     );
   });
+
+  test("exposes a visible-page bottom handle and adjusts it from the keyboard", async () => {
+    const compact = {
+      ...state,
+      pages: [
+        {
+          ...state.pages[0]!,
+          paperRect: { ...state.pages[0]!.paperRect, height: 300 },
+          contentRect: { ...state.pages[0]!.contentRect, height: 140 },
+        },
+      ],
+    };
+    const wrapper = mount(PageLayoutRulers, {
+      global: { plugins: [createAppI18n("en-US")] },
+      props: { state: compact, frame, setup: DEFAULT_SHEET_PAGE_SETUP, unit: "mm" },
+    });
+
+    const bottom = wrapper.get('[data-page-ruler-margin="bottom"]');
+    await bottom.trigger("keydown", { key: "ArrowUp" });
+    expect(wrapper.emitted("marginAdjust")?.[0]?.[0]).toMatchObject({ margin: "bottom" });
+  });
+
+  test("falls back to the first visible page when the selected page is offscreen", () => {
+    const pages = [
+      { ...state.pages[0]!, paperRect: { ...state.pages[0]!.paperRect, height: 300 } },
+      {
+        ...state.pages[0]!,
+        pageNumber: 2,
+        paperRect: { ...state.pages[0]!.paperRect, y: 600, height: 300 },
+        contentRect: { ...state.pages[0]!.contentRect, y: 680, height: 140 },
+      },
+    ];
+    const wrapper = mount(PageLayoutRulers, {
+      global: { plugins: [createAppI18n("en-US")] },
+      props: {
+        state: { ...state, pages },
+        frame: {
+          ...frame,
+          layout: {
+            ...frame.layout,
+            getRangeFragments: () => [
+              { paneId: "body", rect: { x: 0, y: 900, width: 1, height: 1 } },
+            ],
+          },
+        },
+        setup: DEFAULT_SHEET_PAGE_SETUP,
+        unit: "mm",
+        selection: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+      },
+    });
+
+    expect(wrapper.get('[data-page-ruler-margin="top"]').attributes("style")).toContain("top: 95");
+  });
 });

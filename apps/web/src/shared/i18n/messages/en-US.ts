@@ -864,6 +864,10 @@ export const enUS = {
     marginValue: "{margin}: {value} mm",
     marginDragHint: "Drag to adjust the margin; Esc cancels.",
     marginDragValue: "{value} {unit}",
+    page: "Page",
+    worksheet: "Sheet",
+    headerFooterDialogHint:
+      "Select a header or footer section, insert fields or format text, then confirm to apply.",
     headerFooterTools: "Header & Footer",
     headerFooterFormatting: "Formatting",
     headerFooterFields: "Header and footer fields",

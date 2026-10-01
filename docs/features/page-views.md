@@ -39,40 +39,39 @@ use that same coordinate projection. Paper margins and gaps do not select cells;
 a selection crossing pages remains one logical range with separate visual
 fragments. Allocated blank cells remain editable outside the printable range.
 
-The top and left rulers sit outside the row/column headings, which paint only
-their visible cell fragments. They share paper/content coordinates with the cells
-and use millimetres, centimetres, or inches. Zero remains at the content origin;
-margin ticks count back toward the paper edge. The selected rows and columns are
-projected onto the ruler strips. Ruler margin markers remain available when the
-paper margin handles are hidden; dragging shows a solid guide and a live value
-in the selected unit, removed on release or cancellation. View controls toggle rulers, margin
-handles, and page white space. Double-click a page edge to collapse or restore
-its top/bottom white space; Enter/Space on that edge also works. Collapsing is
-session state, preserves the active cell, and hides header/footer editing.
+The top and left rulers are 18px strips outside the 36 by 22px headings; the current visible
+page also shows compact top and bottom markers. They share paper/content coordinates
+with cells and use millimetres, centimetres, or inches. Zero remains at the content
+origin; margin ticks count back toward the paper edge. Dragging shows a solid guide
+and a live value, removed on release or cancellation. View controls toggle rulers,
+margin handles, and page white space. Double-click a page edge, or use Enter/Space
+on that edge, to collapse or restore white space. Collapsing is session state,
+preserves the active cell, and hides page-only header/footer markers without deleting
+stored header/footer content.
 
 When margin handles are visible, all six physical margins can be dragged with
 a live pagination preview. Release submits one Core command; Escape, pointer
 cancellation, window blur, changing views/sheets, or becoming read-only discards
 the draft. Arrow keys adjust by 0.1 mm and Shift+Arrow by 1 mm. Margins retain at
-least 1 mm of printable body; header/footer offsets stay within their body margins.
+least 1 mm of printable body. Top and bottom margins can reach zero; reducing them
+shrinks the corresponding header/footer offset in the same undoable change.
 
-Each page exposes left, center, and right header/footer fields. Empty sections
-show a centered Add header/Add footer hint. Hovering or editing reveals the
-three section outlines, with the active field highlighted. Header/footer tools
-occupy a contextual tab in the existing Ribbon panel, preserving the paper
-position instead of inserting another toolbar row. They support
-multiline text and independent first, odd, and even page settings. The contextual
-editor inserts page number, page count, sheet name, file name, date, and time
-fields at the caret, and applies a font, point size, bold, italic, underline, or
-color to the edited section. Fields use readable localized markers while editing;
-XLSX control codes remain the stored representation. Imported mixed-format text
-is previewed with its styles and preserved verbatim when left unedited. Editing a
-section applies its chosen uniform format to that section.
+Each page renders static left, center, and right header/footer previews. Empty
+sections may show a compact Add header/Add footer marker when there is enough paper
+space; zero or constrained top/bottom margins hide both marker and content to avoid
+overlapping worksheet cells. Page Setup owns editing: selecting a marker opens its
+Header/Footer tab and targets the corresponding section. The dialog keeps a local
+draft until confirmation submits one Core command, supports first/odd/even variants,
+multiline text, formatting, and page number, page count, sheet name, file name, date,
+and time fields. Readable localized markers are used in the dialog; XLSX control codes
+remain stored. Imported mixed-format text is previewed with its styles and remains
+verbatim when unedited. Edited sections use the selected uniform text format. Enter
+inserts a line; Ctrl/Cmd+Enter confirms, while Cancel/Escape discards the dialog draft.
+Core rejects page-setting changes on protected sheets. Freeze settings remain saved
+and take effect again in Normal view.
 
-Enter inserts a new line; Ctrl/Cmd+Enter or blur commits, and Escape discards the
-draft. Header/footer options control first/odd/even variants, alignment with body
-margins, and scaling with the document. Core rejects page-setting changes on
-protected sheets. Freeze settings remain saved and take effect again in Normal view.
+This follows WPS Spreadsheet's page-layout flow of Add Header/Add Footer to Page
+Setup and Custom Header/Footer ([WPS guidance](https://bbs.wps.cn/topic/10938)).
 
 ## Settings and persistence
 

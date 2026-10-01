@@ -206,16 +206,18 @@ export function adjustSheetPageMargin(options: {
     case "top":
       margins.top = clampMargin(
         options.valueMm,
-        margins.header,
+        0,
         paper.height - margins.bottom - MIN_PRINTABLE_MM,
       );
+      margins.header = Math.min(margins.header, margins.top);
       break;
     case "bottom":
       margins.bottom = clampMargin(
         options.valueMm,
-        margins.footer,
+        0,
         paper.height - margins.top - MIN_PRINTABLE_MM,
       );
+      margins.footer = Math.min(margins.footer, margins.bottom);
       break;
     case "header":
       margins.header = clampMargin(options.valueMm, 0, margins.top);

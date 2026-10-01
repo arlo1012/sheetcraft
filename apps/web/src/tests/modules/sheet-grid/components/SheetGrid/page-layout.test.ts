@@ -119,32 +119,45 @@ describe("SheetGrid page-layout interaction", () => {
       grid.wrapper.unmount();
     }
   });
-  test("starts a margin drag after saving a header draft without cancelling or overwriting it", async () => {
+  test("requests a header dialog from the page preview without editing cells or creating history", async () => {
     const grid = await mountLayout();
     try {
-      await grid.wrapper.setProps({
-        onHeaderFooterChange(payload) {
-          const setup = cloneSheetPageSetup(grid.sheet.pageSetup!);
-          setup[payload.section][payload.part] = payload.value;
-          executeWorkbookCommand(
-            grid.session,
-            createSetSheetPageSetupCommand(grid.sheet.id, setup),
-          );
-        },
-      });
       await grid.wrapper
         .get('button[data-page-section="header"][data-page-part="center"]')
         .trigger("click");
-      await grid.wrapper
-        .get(".page-header-footer-field.is-editing textarea")
-        .setValue("Draft title");
-      const original = grid.sheet.pageSetup!.margins.left;
+      expect(grid.wrapper.emitted("openHeaderFooter")).toEqual([
+        [{ section: "header", part: "center", variant: "odd" }],
+      ]);
+      expect(grid.wrapper.find("[data-page-header-footer] textarea").exists()).toBe(false);
+      expect(activeCell(grid.wrapper)).toBe("A1");
+      expect(grid.session.history.undoStack).toHaveLength(0);
+    } finally {
+      grid.wrapper.unmount();
+    }
+  });
+  test("drags the top ruler to zero and restores both margins with one undo", async () => {
+    const grid = await mountLayout();
+    try {
+      await grid.wrapper.setProps({ showPageMargins: false });
+      const original = { ...grid.sheet.pageSetup!.margins };
       const unit = state(grid).millimetresPerUnit;
-      const point = await startLeft(grid);
-      await dispatch(grid, "pointermove", point.x + 5 / unit, point.y);
-      await dispatch(grid, "pointerup", point.x + 5 / unit, point.y);
-      expect(grid.sheet.pageSetup!.header.center).toContain("Draft title");
-      expect(grid.sheet.pageSetup!.margins.left).toBe(Math.round((original + 5) * 10) / 10);
+      const page = state(grid).pages[0]!;
+      const x = -getSheetRenderFrame(grid.wrapper).body.x + 5;
+      const y = page.paperRect.y + original.top / unit;
+      await grid.wrapper.get('[data-page-ruler-margin="top"]').trigger("pointerdown", {
+        ...pointer(grid, x, y),
+        button: 0,
+        pointerId: 7,
+      });
+      await dispatch(grid, "pointermove", x, y - original.top / unit - 2);
+      await dispatch(grid, "pointerup", x, y - original.top / unit - 2);
+      expect(grid.sheet.pageSetup!.margins).toMatchObject({ top: 0, header: 0 });
+      expect(grid.session.history.undoStack).toHaveLength(1);
+      expect(grid.wrapper.find('[data-page-section-row="header"]').exists()).toBe(false);
+      undoWorkbookCommand(grid.session);
+      await nextTick();
+      expect(grid.sheet.pageSetup!.margins).toEqual(original);
+      expect(grid.wrapper.find('[data-page-section-row="header"]').exists()).toBe(true);
     } finally {
       grid.wrapper.unmount();
     }

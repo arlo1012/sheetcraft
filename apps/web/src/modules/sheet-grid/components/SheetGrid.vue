@@ -29,11 +29,7 @@ import PageLayoutRulers, {
 } from "../../page-layout/components/PageLayoutRulers.vue";
 import PageLayoutMargins from "../../page-layout/components/PageLayoutMargins.vue";
 import PageWhiteSpaceControls from "../../page-layout/components/PageWhiteSpaceControls.vue";
-import type {
-  HeaderFooterActionRequest,
-  HeaderFooterEditContext,
-  HeaderFooterVariant,
-} from "../../page-layout/header-footer-editor";
+import type { HeaderFooterEditTarget } from "../../page-layout/header-footer-editor";
 import { columnIndexToLabel, getCellAddressLabel } from "@idea10/core/coordinates";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { normalizeSheetZoom } from "../../../shared/sheet-view/zoom";
@@ -224,7 +220,6 @@ const props = withDefaults(
     showPageWhiteSpace?: boolean;
     pageRulerUnit?: PageLayoutRulerUnit;
     fileName?: string;
-    headerFooterActionRequest?: HeaderFooterActionRequest;
     dateSystem?: ExcelDateSystem;
     /** Resolved for the active cell by the Web data-tools adapter. */
     validationInfo?: ActiveCellValidationInfo;
@@ -260,16 +255,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   contextAction: [request: SheetContextRequest];
   pageSetupChange: [setup: SheetPageSetup];
-  headerFooterEdit: [context: HeaderFooterEditContext | undefined];
+  openHeaderFooter: [target: HeaderFooterEditTarget];
   "update:showPageWhiteSpace": [value: boolean];
-  headerFooterChange: [
-    payload: {
-      section: "header" | "footer";
-      part: "left" | "center" | "right";
-      variant: HeaderFooterVariant;
-      value: string;
-    },
-  ];
   updateFloatingImage: [image: FloatingImage];
   deleteFloatingImage: [id: string];
   convertFloatingImageToCell: [id: string];
@@ -369,7 +356,6 @@ const headerSize = computed(() => ({
   width: headingSize.value.width + rulerInset.value,
   height: headingSize.value.height + rulerInset.value,
 }));
-const headerFooterOverlayRef = ref<InstanceType<typeof PageHeaderFooterOverlay>>();
 
 const subtotalSummaryBelow = computed(() =>
   Object.fromEntries(
@@ -890,10 +876,8 @@ const pageMarginDrag = usePageMarginDrag({
     isEditing.value ||
     Boolean(getReferenceEditor()),
   onBeforeStart: () => {
-    if (headerFooterOverlayRef.value?.flushPendingEdit() === false) return false;
     pageBreakDrag.stop();
     pageMarginDrag.stop();
-    emit("headerFooterEdit", undefined);
     stopDragSelection();
     stopFormulaReferenceDrag();
     stopDimensionResize();
@@ -1094,8 +1078,6 @@ function isRulerPoint(point: { x: number; y: number }): boolean {
   return inset > 0 && (point.x < inset || point.y < inset);
 }
 function onSurfacePointerDown(event: PointerEvent): void {
-  if (headerFooterOverlayRef.value?.flushPendingEdit() === false) return;
-  emit("headerFooterEdit", undefined);
   if (pageBreakDrag.start(event)) return;
   const point = surfacePoint(event);
   if (isRulerPoint(point)) return;
@@ -2498,7 +2480,6 @@ function clearClipboard(): void {
 }
 
 function flushPendingEdit(): boolean {
-  if (headerFooterOverlayRef.value?.flushPendingEdit() === false) return false;
   if (isComposing.value) {
     return false;
   }
@@ -2509,9 +2490,7 @@ function flushPendingEdit(): boolean {
 }
 
 function hasPendingEdit(): boolean {
-  return (
-    isComposing.value || isEditing.value || Boolean(headerFooterOverlayRef.value?.hasPendingEdit())
-  );
+  return isComposing.value || isEditing.value;
 }
 
 watch(
@@ -2696,7 +2675,6 @@ defineExpose({
       </template>
     </SheetSurface>
     <PageHeaderFooterOverlay
-      ref="headerFooterOverlayRef"
       v-if="viewMode === 'page-layout' && pageView && showPageWhiteSpace"
       :state="pageView"
       :frame="renderFrame"
@@ -2705,9 +2683,7 @@ defineExpose({
       :disabled="readOnly"
       :page-count="pagination?.pageCount ?? 0"
       :file-name="fileName ?? t('pageLayout.unnamedWorkbook')"
-      :action-request="headerFooterActionRequest"
-      @change="emit('headerFooterChange', $event)"
-      @edit="emit('headerFooterEdit', $event)"
+      @open="emit('openHeaderFooter', $event)"
     />
     <PageLayoutRulers
       v-if="viewMode === 'page-layout' && pageView && showPageRulers"

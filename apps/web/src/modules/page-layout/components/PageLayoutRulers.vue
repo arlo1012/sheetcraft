@@ -172,11 +172,13 @@ const activeVerticalPage = computed(() => {
   const fragments = selected.value;
   if (fragments.length === 0) return verticalPages.value[0];
   const scrollY = scroll.value.y;
-  return verticalPages.value.find((page) => {
-    const start = page.contentRect.y - scrollY;
-    const end = start + page.contentRect.height;
-    return fragments.some((rect) => rect.y < end && rect.y + rect.height > start);
-  });
+  return (
+    verticalPages.value.find((page) => {
+      const start = page.contentRect.y - scrollY;
+      const end = start + page.contentRect.height;
+      return fragments.some((rect) => rect.y < end && rect.y + rect.height > start);
+    }) ?? verticalPages.value[0]
+  );
 });
 function markerPosition(page: PageViewPage, margin: SheetPageMargin): number {
   const vertical = margin === "left" || margin === "right";
@@ -465,6 +467,26 @@ const tooltipStyle = computed(() => {
           emit('marginStart', { margin: 'top', page: activeVerticalPage, event: $event })
         "
         @keydown="keydown('top', $event)"
+      />
+      <button
+        v-if="markerVisible(activeVerticalPage, 'bottom')"
+        type="button"
+        class="page-layout-rulers__marker page-layout-rulers__marker--vertical"
+        :class="{ 'is-active': activeMargin === 'bottom' }"
+        :style="style(activeVerticalPage, 'bottom')"
+        :disabled="disabled"
+        role="slider"
+        :aria-label="marginName('bottom')"
+        aria-orientation="vertical"
+        :aria-valuemin="0"
+        :aria-valuemax="maximum('bottom')"
+        :aria-valuenow="setup.margins.bottom"
+        :aria-valuetext="marginValue('bottom')"
+        data-page-ruler-margin="bottom"
+        @pointerdown="
+          emit('marginStart', { margin: 'bottom', page: activeVerticalPage, event: $event })
+        "
+        @keydown="keydown('bottom', $event)"
       />
     </template>
     <output
