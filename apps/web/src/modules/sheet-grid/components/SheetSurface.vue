@@ -36,7 +36,10 @@ import {
 } from "../rendering/overlay-painter";
 import type { PageViewPaintState } from "../../page-layout/page-view-types";
 import {
+  clipPageBreakPreviewOutside,
+  clipPageBreakPreviewPrintArea,
   clipPageContents,
+  paintPageBreakPreviewBackground,
   paintPageLayoutBackground,
   paintPageBreakPreview,
 } from "../../page-layout/rendering/page-view-painter";
@@ -153,6 +156,23 @@ function paint(): void {
   context.fillRect(0, 0, frame.size.width, frame.size.height);
   context.save();
   context.translate(frame.body.x, frame.body.y);
+  const pageBreakPreview =
+    props.pageView?.mode === "page-break-preview" ? props.pageView : undefined;
+  const paintScene = (showGridLines: boolean) =>
+    paintSheetScene(context!, scene!, frame.layout, {
+      palette: {
+        ...props.environment.cells,
+        errorIndicator: props.errorIndicatorColor ?? props.environment.cells.errorIndicator,
+      },
+      showGridLines,
+      skipBackground: Boolean(props.pageView),
+      editingCell: props.editing ? props.activeCell : undefined,
+      errorCells: props.errorCells,
+      imageUrls: props.imageAssetUrls,
+      images,
+      imagePlaceholder: (id) =>
+        t(props.loadingImageAssetIds?.has(id) ? "image.loading" : "image.assetUnavailable"),
+    });
   if (props.pageView?.mode === "page-layout") {
     paintPageLayoutBackground(
       context,
@@ -162,21 +182,25 @@ function paint(): void {
       props.environment.cells.background,
     );
     clipPageContents(context, props.pageView, frame.layout.bodyScrollPosition);
+    paintScene(props.showGridLines);
+  } else if (pageBreakPreview) {
+    const printed = paintPageBreakPreviewBackground(
+      context,
+      pageBreakPreview,
+      frame.layout.bodyScrollPosition,
+      frame.layout.viewportSize,
+      props.environment.cells.background,
+    );
+    context.save();
+    if (clipPageBreakPreviewPrintArea(context, printed)) paintScene(props.showGridLines);
+    context.restore();
+    context.save();
+    clipPageBreakPreviewOutside(context, printed, frame.layout.viewportSize);
+    paintScene(false);
+    context.restore();
+  } else {
+    paintScene(props.showGridLines);
   }
-  paintSheetScene(context, scene, frame.layout, {
-    palette: {
-      ...props.environment.cells,
-      errorIndicator: props.errorIndicatorColor ?? props.environment.cells.errorIndicator,
-    },
-    showGridLines: props.showGridLines,
-    skipBackground: props.pageView?.mode === "page-layout",
-    editingCell: props.editing ? props.activeCell : undefined,
-    errorCells: props.errorCells,
-    imageUrls: props.imageAssetUrls,
-    images,
-    imagePlaceholder: (id) =>
-      t(props.loadingImageAssetIds?.has(id) ? "image.loading" : "image.assetUnavailable"),
-  });
   context.restore();
   paintSheetUnderlay(context, frame, props.overlays, props.environment.overlays);
   context.save();

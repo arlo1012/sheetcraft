@@ -8,10 +8,27 @@ commands with undo/redo.
 
 The continuous editable grid shows the printable range, page numbers, and blue
 page boundaries. Automatic boundaries are dashed; manual boundaries are solid.
-Drag an internal boundary to a row or column edge to create or move a manual
-break. Drag a manual boundary outside the print range to remove it. Page Setup
-can reset all manual breaks and change the printable range. Hidden rows and
-columns do not consume printable space; merged cells stay together.
+Hovering an internal boundary or any of the four print-area edges shows an
+adjustment cursor. Dragging snaps to visible row/column boundaries and updates
+page numbers, page boundaries, and the printable area continuously. Moving an
+internal boundary outward lowers percentage print scale as needed so the larger
+page band fits on the physical paper; the old automatic boundary does not remain.
+Dragging an internal line to the final printable edge merges the final pages.
+Moving a manual line out of the printable area in the perpendicular direction
+removes it; automatic lines cannot be removed that way.
+
+Dragging an outer edge expands or reduces the saved print area. All four corners
+use diagonal adjustment cursors and move their row and column edges together. The area always
+retains at least one cell. Non-printing cells use a uniform gray background with
+no default gridlines, while their content, explicit formatting, selection, and
+editing remain available. Hidden rows and columns do not consume printable
+space; internal boundaries avoid splitting merged cells.
+
+Preview changes stay local until release, which submits one undoable Core
+command for the final range, scale, and breaks. Escape, pointer cancellation,
+window blur, a view/sheet change, or becoming read-only discards the draft.
+Targets requiring less than the supported 10 percent print scale are rejected.
+Page Setup can reset all manual breaks and change the printable range.
 
 ## Page layout
 

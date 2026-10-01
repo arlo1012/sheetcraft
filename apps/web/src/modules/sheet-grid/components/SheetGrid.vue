@@ -335,7 +335,11 @@ const outlineHiddenColumnSet = computed(() => {
 
 const { locale, t } = useAppI18n();
 const rootRef = ref<HTMLElement | null>(null);
+const pageSetupDraft = shallowRef<SheetPageSetup>();
+const pageBoundaryPreview = shallowRef<PageViewPaintState["dragBoundary"]>();
+const pageCornerPreview = shallowRef<PageViewPaintState["dragCorner"]>();
 const pageSetup = computed(() => {
+  if (pageSetupDraft.value) return pageSetupDraft.value;
   const setup = props.pageSetup ?? props.sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP;
   const subtotalBreaks = (props.sheet.subtotalMetadata ?? []).flatMap(
     (entry) => entry.pageBreakRows ?? [],
@@ -773,6 +777,8 @@ const pageView = computed<PageViewPaintState | undefined>(() => {
     printRect: { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) },
     rowBreaks: pages.rowBreaks,
     columnBreaks: pages.columnBreaks,
+    dragBoundary: pageBoundaryPreview.value,
+    dragCorner: pageCornerPreview.value,
     pageLabel: (page) => t("pageLayout.pageNumber", { page }),
     millimetresPerUnit: (pages.printScale * 25.4) / 96,
   };
@@ -781,6 +787,8 @@ const pageBreakDrag = usePageBreakDrag({
   getState: () => pageView.value,
   getFrame: () => renderFrame.value,
   getSetup: () => pageSetup.value,
+  getPagination: () => pagination.value,
+  getMergedCells: () => props.sheet.mergedCells,
   getGeometry: () => baseGeometry.value,
   getRows: () => baseRows.value,
   getSurfacePoint: surfacePoint,
@@ -791,8 +799,17 @@ const pageBreakDrag = usePageBreakDrag({
     stopDimensionResize();
     stopAxisMoveDrag();
   },
+  onPreview: (setup, boundary, corner) => {
+    pageSetupDraft.value = setup;
+    pageBoundaryPreview.value = boundary;
+    pageCornerPreview.value = corner;
+  },
   onChange: (setup) => emit("pageSetupChange", setup),
 });
+watch(
+  () => [props.sheet.id, props.readOnly, props.pageSetup, props.sheet.pageSetup],
+  () => pageBreakDrag.stop(),
+);
 watch(
   () => props.viewMode,
   () => {

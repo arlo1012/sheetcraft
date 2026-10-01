@@ -2,6 +2,8 @@ import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core";
 import { describe, expect, test } from "vitest";
 import { createSheetGeometry } from "../geometry.js";
 import {
+  adjustSheetPageBoundary,
+  adjustSheetPrintCorner,
   createPageLayoutProjection,
   createPageLayoutViewportLayout,
   createSheetPagination,
@@ -100,5 +102,240 @@ describe("page layout", () => {
     expect(layout.freeze).toEqual({ rows: 0, columns: 0 });
     expect(fragments.length).toBe(pagination.pageCount);
     expect(fragments.every((fragment) => fragment.paneId === "body")).toBe(true);
+  });
+
+  test("adjusts all outer print boundaries without mutating the input setup", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 12,
+      columnCount: 12,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({ rowCount: 12, defaultRowHeight: 20 });
+    const setup = {
+      ...DEFAULT_SHEET_PAGE_SETUP,
+      printArea: { start: { row: 2, column: 2 }, end: { row: 5, column: 5 } },
+    };
+    const pagination = createSheetPagination({
+      geometry,
+      rows,
+      setup,
+      printRange: setup.printArea,
+    });
+    expect(
+      adjustSheetPageBoundary({
+        geometry,
+        rows,
+        setup,
+        pagination,
+        boundary: { axis: "row", kind: "print-start", index: 2 },
+        targetIndex: -99,
+      })?.printArea,
+    ).toEqual({ start: { row: 0, column: 2 }, end: { row: 5, column: 5 } });
+    expect(
+      adjustSheetPageBoundary({
+        geometry,
+        rows,
+        setup,
+        pagination,
+        boundary: { axis: "row", kind: "print-end", index: 6 },
+        targetIndex: 3,
+      })?.printArea,
+    ).toEqual({ start: { row: 2, column: 2 }, end: { row: 2, column: 5 } });
+    expect(
+      adjustSheetPageBoundary({
+        geometry,
+        rows,
+        setup,
+        pagination,
+        boundary: { axis: "column", kind: "print-start", index: 2 },
+        targetIndex: 4,
+      })?.printArea,
+    ).toEqual({ start: { row: 2, column: 4 }, end: { row: 5, column: 5 } });
+    expect(
+      adjustSheetPageBoundary({
+        geometry,
+        rows,
+        setup,
+        pagination,
+        boundary: { axis: "column", kind: "print-end", index: 6 },
+        targetIndex: 3,
+      })?.printArea,
+    ).toEqual({ start: { row: 2, column: 2 }, end: { row: 5, column: 2 } });
+    expect(setup.printArea).toEqual({ start: { row: 2, column: 2 }, end: { row: 5, column: 5 } });
+  });
+
+  test("moves all print corners atomically, clamps a collapsed range, and preserves one-axis drags", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 10,
+      columnCount: 10,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({ rowCount: 10, defaultRowHeight: 20 });
+    const setup = {
+      ...DEFAULT_SHEET_PAGE_SETUP,
+      printArea: { start: { row: 2, column: 2 }, end: { row: 5, column: 5 } },
+    };
+    const pagination = createSheetPagination({
+      geometry,
+      rows,
+      setup,
+      printRange: setup.printArea,
+    });
+    const adjust = (
+      corner: "top-left" | "top-right" | "bottom-left" | "bottom-right",
+      targetRow: number,
+      targetColumn: number,
+    ) =>
+      adjustSheetPrintCorner({ geometry, rows, setup, pagination, corner, targetRow, targetColumn })
+        ?.printArea;
+    expect(adjust("top-left", 0, 0)).toEqual({
+      start: { row: 0, column: 0 },
+      end: { row: 5, column: 5 },
+    });
+    expect(adjust("top-right", 0, 8)).toEqual({
+      start: { row: 0, column: 2 },
+      end: { row: 5, column: 7 },
+    });
+    expect(adjust("bottom-left", 8, 0)).toEqual({
+      start: { row: 2, column: 0 },
+      end: { row: 7, column: 5 },
+    });
+    expect(adjust("bottom-right", 8, 8)).toEqual({
+      start: { row: 2, column: 2 },
+      end: { row: 7, column: 7 },
+    });
+    expect(adjust("bottom-right", -3, -3)).toEqual({
+      start: { row: 2, column: 2 },
+      end: { row: 2, column: 2 },
+    });
+    expect(adjust("top-left", 0, 2)).toEqual({
+      start: { row: 0, column: 2 },
+      end: { row: 5, column: 5 },
+    });
+    expect(adjust("top-left", 2, 2)).toBeUndefined();
+    expect(setup.printArea).toEqual({ start: { row: 2, column: 2 }, end: { row: 5, column: 5 } });
+  });
+
+  test("expands an automatic boundary by lowering scale so its old auto break cannot reappear", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 4,
+      columnCount: 6,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({ rowCount: 4, defaultRowHeight: 20 });
+    const setup = { ...DEFAULT_SHEET_PAGE_SETUP, scale: 400 };
+    const range = { start: { row: 0, column: 0 }, end: { row: 3, column: 5 } };
+    const pagination = createSheetPagination({ geometry, rows, setup, printRange: range });
+    expect(pagination.columnBreaks[0]).toMatchObject({ index: 2, kind: "automatic" });
+    const adjusted = adjustSheetPageBoundary({
+      geometry,
+      rows,
+      setup,
+      pagination,
+      boundary: { axis: "column", kind: "automatic", index: 2 },
+      targetIndex: 4,
+    })!;
+    expect(adjusted.scale).toBeLessThan(400);
+    expect(adjusted.columnBreaks).toEqual([4]);
+    const after = createSheetPagination({ geometry, rows, setup: adjusted, printRange: range });
+    expect(after.columnBreaks.filter((line) => line.index < 4)).toEqual([]);
+    expect(after.columnBreaks.find((line) => line.index === 4)?.kind).toBe("manual");
+    expect(setup).toMatchObject({ scale: 400, columnBreaks: [] });
+  });
+
+  test("collapses the final page and removes crossed manual breaks only", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 4,
+      columnCount: 6,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({ rowCount: 4, defaultRowHeight: 20 });
+    const setup = { ...DEFAULT_SHEET_PAGE_SETUP, scale: 400, columnBreaks: [4] };
+    const range = { start: { row: 0, column: 0 }, end: { row: 3, column: 5 } };
+    const pagination = createSheetPagination({ geometry, rows, setup, printRange: range });
+    const adjusted = adjustSheetPageBoundary({
+      geometry,
+      rows,
+      setup,
+      pagination,
+      boundary: { axis: "column", kind: "manual", index: 4 },
+      targetIndex: 6,
+    })!;
+    expect(adjusted.columnBreaks).toEqual([]);
+    expect(adjusted.scale).toBeLessThan(400);
+    expect(
+      createSheetPagination({ geometry, rows, setup: adjusted, printRange: range }).pageCount,
+    ).toBe(2);
+  });
+
+  test("uses visible unequal row heights and supports manual deletion plus merge-safe targets", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 5,
+      columnCount: 6,
+      rowHeight: 20,
+      columnWidth: 80,
+      rowHeights: new Map([
+        [0, 100],
+        [1, 100],
+        [3, 100],
+      ]),
+    });
+    const rows = createRowVisibilityIndex({
+      rowCount: 5,
+      defaultRowHeight: 20,
+      rowHeights: new Map([
+        [0, 100],
+        [1, 100],
+        [3, 100],
+      ]),
+      hiddenRows: [2],
+    });
+    const setup = { ...DEFAULT_SHEET_PAGE_SETUP, scale: 400, columnBreaks: [2, 5] };
+    const range = { start: { row: 0, column: 0 }, end: { row: 4, column: 5 } };
+    const pagination = createSheetPagination({ geometry, rows, setup, printRange: range });
+    const rowAdjusted = adjustSheetPageBoundary({
+      geometry,
+      rows,
+      setup,
+      pagination,
+      boundary: { axis: "row", kind: "automatic", index: pagination.rowBreaks[0]!.index },
+      targetIndex: 4,
+    })!;
+    expect(rowAdjusted.scale).toBeLessThan(400);
+    expect(rowAdjusted.rowBreaks).toEqual([4]);
+    expect(
+      adjustSheetPageBoundary({
+        geometry,
+        rows,
+        setup,
+        pagination,
+        boundary: { axis: "column", kind: "automatic", index: 2 },
+        targetIndex: null,
+      }),
+    ).toBeNull();
+    expect(
+      adjustSheetPageBoundary({
+        geometry,
+        rows,
+        setup,
+        pagination,
+        boundary: { axis: "column", kind: "manual", index: 5 },
+        targetIndex: null,
+      })?.columnBreaks,
+    ).toEqual([2]);
+    const merged = adjustSheetPageBoundary({
+      geometry,
+      rows,
+      setup,
+      pagination,
+      boundary: { axis: "column", kind: "manual", index: 2 },
+      targetIndex: 3,
+      mergedCells: [{ start: { row: 0, column: 2 }, end: { row: 2, column: 3 } }],
+    })!;
+    expect(merged.columnBreaks).toContain(4);
   });
 });

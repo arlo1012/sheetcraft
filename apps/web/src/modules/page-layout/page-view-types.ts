@@ -21,6 +21,8 @@ export type PageViewPaintState = {
   printRect: Rect;
   rowBreaks: readonly PageViewBreak[];
   columnBreaks: readonly PageViewBreak[];
+  dragBoundary?: { axis: "row" | "column"; offset: number; removing: boolean };
+  dragCorner?: { x: number; y: number };
   pageLabel: (number: number) => string;
   millimetresPerUnit: number;
 };

@@ -1,4 +1,9 @@
-import { getPagePaperSize, type CellRange, type SheetPageSetup } from "@idea10/core";
+import {
+  cloneSheetPageSetup,
+  getPagePaperSize,
+  type CellRange,
+  type SheetPageSetup,
+} from "@idea10/core";
 import type { Point, Rect, SheetGeometry, Size, VisibleCellRange } from "./geometry.js";
 import type { RowVisibilityIndex, VisibleRow } from "./visibility.js";
 import {
@@ -13,6 +18,13 @@ import {
 export type SheetViewMode = "normal" | "page-break-preview" | "page-layout";
 export type PageBreak = { index: number; kind: "automatic" | "manual"; offset: number };
 export type PageAxis = { start: number; end: number; offset: number; size: number };
+export type SheetPageBoundary = {
+  axis: "row" | "column";
+  kind: "automatic" | "manual" | "print-start" | "print-end";
+  /** A boundary is immediately before the cell at this zero-based index. */
+  index: number;
+};
+export type SheetPrintCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 export type SheetPage = {
   rowPage: number;
   columnPage: number;
@@ -98,6 +110,198 @@ function lastVisibleColumn(geometry: SheetGeometry, start: number, end: number):
   for (let column = end; column >= start; column -= 1)
     if (geometry.getColumnWidth(column) > 0) return column;
   return null;
+}
+
+function getBoundaryScale(options: {
+  geometry: SheetGeometry;
+  rows: RowVisibilityIndex;
+  pagination: SheetPagination;
+  setup: SheetPageSetup;
+  axis: "row" | "column";
+  start: number;
+  end: number;
+}): number | null {
+  const { geometry, rows, pagination, setup, axis, start, end } = options;
+  if (end < start) return setup.scale;
+  const used =
+    axis === "row"
+      ? (rows.getBoundaryOffset(end + 1) ?? 0) - (rows.getBoundaryOffset(start) ?? 0)
+      : geometry.getColumnOffset(end) +
+        geometry.getColumnWidth(end) -
+        geometry.getColumnOffset(start);
+  const capacity = axis === "row" ? pagination.contentSize.height : pagination.contentSize.width;
+  if (used <= capacity) return setup.scale;
+  // Content capacity is inversely proportional to print scale. Keep the largest
+  // whole-number scale which can contain this band, rather than permitting cells
+  // to overflow the page's physical content rectangle.
+  const candidate = Math.floor((setup.scale * capacity) / used + 0.0000001);
+  if (candidate < 10) return null;
+  return Math.min(setup.scale, Math.min(400, candidate));
+}
+
+function snapBoundaryPastMerge(options: {
+  target: number;
+  axis: "row" | "column";
+  printRange: CellRange;
+  mergedCells: readonly CellRange[] | undefined;
+}): number {
+  let target = options.target;
+  if (!options.mergedCells) return target;
+  // A page boundary cannot split a merged cell. Repeating handles a target which
+  // lands at the start of a chain of adjacent merged ranges.
+  for (;;) {
+    const crossing = options.mergedCells.find((range) => {
+      const start = options.axis === "row" ? range.start.row : range.start.column;
+      const end = options.axis === "row" ? range.end.row : range.end.column;
+      const otherStart = options.axis === "row" ? range.start.column : range.start.row;
+      const otherEnd = options.axis === "row" ? range.end.column : range.end.row;
+      const printOtherStart =
+        options.axis === "row" ? options.printRange.start.column : options.printRange.start.row;
+      const printOtherEnd =
+        options.axis === "row" ? options.printRange.end.column : options.printRange.end.row;
+      return (
+        start < target &&
+        end >= target &&
+        otherStart <= printOtherEnd &&
+        otherEnd >= printOtherStart
+      );
+    });
+    if (!crossing) return target;
+    const next = (options.axis === "row" ? crossing.end.row : crossing.end.column) + 1;
+    if (next === target) return target;
+    target = next;
+  }
+}
+
+/**
+ * Produces one immutable page-setup update for a preview boundary drag.
+ * Internal outward drags lower print scale when necessary so the resulting band
+ * fits in physical paper; an impossible target below the 10% scale floor returns null.
+ */
+export function adjustSheetPageBoundary(options: {
+  geometry: SheetGeometry;
+  rows: RowVisibilityIndex;
+  setup: SheetPageSetup;
+  pagination: SheetPagination;
+  boundary: SheetPageBoundary;
+  targetIndex: number | null;
+  /** Optional merge information lets the target avoid splitting a merged cell. */
+  mergedCells?: readonly CellRange[];
+}): SheetPageSetup | null {
+  const { geometry, rows, pagination, boundary } = options;
+  const printRange = pagination.printRange;
+  const maximum = boundary.axis === "row" ? geometry.rowCount : geometry.columnCount;
+  const printStart = boundary.axis === "row" ? printRange.start.row : printRange.start.column;
+  const printEnd = boundary.axis === "row" ? printRange.end.row : printRange.end.column;
+  const setup = cloneSheetPageSetup(options.setup);
+
+  if (boundary.kind === "print-start" || boundary.kind === "print-end") {
+    if (options.targetIndex === null) return null;
+    const target =
+      boundary.kind === "print-start"
+        ? clamp(Math.floor(options.targetIndex), 0, printEnd)
+        : clamp(Math.floor(options.targetIndex), printStart + 1, maximum);
+    const nextRange: CellRange = {
+      start: { ...printRange.start },
+      end: { ...printRange.end },
+    };
+    if (boundary.axis === "row") {
+      if (boundary.kind === "print-start") nextRange.start.row = target;
+      else nextRange.end.row = target - 1;
+    } else if (boundary.kind === "print-start") nextRange.start.column = target;
+    else nextRange.end.column = target - 1;
+    if (
+      nextRange.start.row === printRange.start.row &&
+      nextRange.end.row === printRange.end.row &&
+      nextRange.start.column === printRange.start.column &&
+      nextRange.end.column === printRange.end.column
+    )
+      return null;
+    setup.printArea = nextRange;
+    return setup;
+  }
+
+  const field = boundary.axis === "row" ? "rowBreaks" : "columnBreaks";
+  if (options.targetIndex === null) {
+    if (boundary.kind !== "manual" || !setup[field].includes(boundary.index)) return null;
+    setup[field] = setup[field].filter((index) => index !== boundary.index);
+    return setup;
+  }
+
+  let target = clamp(Math.floor(options.targetIndex), printStart + 1, printEnd + 1);
+  target = snapBoundaryPastMerge({
+    target,
+    axis: boundary.axis,
+    printRange,
+    mergedCells: options.mergedCells,
+  });
+  target = clamp(target, printStart + 1, printEnd + 1);
+  if (target === boundary.index) return null;
+
+  const axes = boundary.axis === "row" ? pagination.pageRows : pagination.pageColumns;
+  const previous = axes.find((axis) => axis.end === boundary.index - 1);
+  if (!previous) return null;
+  if (target > boundary.index) {
+    const scale = getBoundaryScale({
+      geometry,
+      rows,
+      pagination,
+      setup,
+      axis: boundary.axis,
+      start: Math.max(printStart, previous.start),
+      end: target - 1,
+    });
+    if (scale === null) return null;
+    setup.scale = scale;
+  }
+
+  const crossed = target > boundary.index;
+  const retained = setup[field].filter(
+    (index) => index !== boundary.index && !(crossed && index > boundary.index && index < target),
+  );
+  // A break after the last printable cell has no printed page after it; omitting it
+  // deliberately merges the last two pages.
+  if (target <= printEnd) retained.push(target);
+  setup[field] = [...new Set(retained)].sort((left, right) => left - right);
+  return setup;
+}
+
+/** Produces one print-area update for a two-axis corner drag. */
+export function adjustSheetPrintCorner(options: {
+  geometry: SheetGeometry;
+  rows: RowVisibilityIndex;
+  setup: SheetPageSetup;
+  pagination: SheetPagination;
+  corner: SheetPrintCorner;
+  targetRow: number;
+  targetColumn: number;
+}): SheetPageSetup | null {
+  const rowKind = options.corner.startsWith("top") ? "print-start" : "print-end";
+  const columnKind = options.corner.endsWith("left") ? "print-start" : "print-end";
+  const initial = options.pagination.printRange;
+  const row = adjustSheetPageBoundary({
+    ...options,
+    boundary: {
+      axis: "row",
+      kind: rowKind,
+      index: rowKind === "print-start" ? initial.start.row : initial.end.row + 1,
+    },
+    targetIndex: options.targetRow,
+  });
+  const afterRow = row ?? cloneSheetPageSetup(options.setup);
+  const afterRange = afterRow.printArea ?? initial;
+  const column = adjustSheetPageBoundary({
+    ...options,
+    setup: afterRow,
+    pagination: { ...options.pagination, printRange: afterRange },
+    boundary: {
+      axis: "column",
+      kind: columnKind,
+      index: columnKind === "print-start" ? afterRange.start.column : afterRange.end.column + 1,
+    },
+    targetIndex: options.targetColumn,
+  });
+  return column ?? row;
 }
 
 function createRowPages(
