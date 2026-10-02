@@ -1,7 +1,24 @@
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheet-limits.js";
 import type { CellRange } from "./workbook.js";
 
-export type SheetPaperSize = "a4" | "a3" | "letter" | "legal";
+export type SheetPaperSize = "a4" | "a3" | "letter" | "legal" | "custom";
+export type SheetCustomPaperSize = { width: number; height: number };
+export type SheetPageFitToPage = { width: number; height: number };
+export type SheetPagePrintOptions = {
+  horizontalCentered: boolean;
+  verticalCentered: boolean;
+  gridLines: boolean;
+  blackAndWhite: boolean;
+  headings: boolean;
+  cellComments: "none" | "atEnd" | "asDisplayed";
+  errors: "displayed" | "blank" | "dash" | "NA";
+};
+export type SheetPrintTitleRange = { start: number; end: number };
+export type SheetPrintTitles = {
+  rows: SheetPrintTitleRange | null;
+  columns: SheetPrintTitleRange | null;
+  bottomRows: SheetPrintTitleRange | null;
+};
 export type SheetPageOrder = "downThenOver" | "overThenDown";
 export type SheetHeaderFooterParts = { left: string; center: string; right: string };
 export type SheetHeaderFooterOptions = {
@@ -26,8 +43,26 @@ export const DEFAULT_SHEET_HEADER_FOOTER_OPTIONS: SheetHeaderFooterOptions = {
   evenFooter: { left: "", center: "", right: "" },
 };
 
+export const DEFAULT_SHEET_PAGE_PRINT_OPTIONS: SheetPagePrintOptions = {
+  horizontalCentered: false,
+  verticalCentered: false,
+  gridLines: false,
+  blackAndWhite: false,
+  headings: false,
+  cellComments: "none",
+  errors: "displayed",
+};
+
+export const DEFAULT_SHEET_PRINT_TITLES: SheetPrintTitles = {
+  rows: null,
+  columns: null,
+  bottomRows: null,
+};
+
 export type SheetPageSetup = {
   paperSize: SheetPaperSize;
+  /** Millimetres before orientation is applied. */
+  customPaperSize?: SheetCustomPaperSize;
   orientation: "portrait" | "landscape";
   /** Print margins in millimetres. */
   margins: {
@@ -39,6 +74,13 @@ export type SheetPageSetup = {
     footer: number;
   };
   scale: number;
+  /** Null leaves the scale unchanged; zero means unlimited on that axis. */
+  fitToPage?: SheetPageFitToPage | null;
+  /** Null lets the renderer choose the first printed page automatically. */
+  firstPageNumber?: number | null;
+  printQuality?: number;
+  printOptions?: SheetPagePrintOptions;
+  printTitles?: SheetPrintTitles;
   printArea: CellRange | null;
   /** Zero-based first row of a new printed page. */
   rowBreaks: number[];
@@ -53,7 +95,10 @@ export type SheetPageSetup = {
   pageOrder: SheetPageOrder;
 };
 
-export const PAGE_PAPER_SIZES_MM: Record<SheetPaperSize, { width: number; height: number }> = {
+export const PAGE_PAPER_SIZES_MM: Record<
+  Exclude<SheetPaperSize, "custom">,
+  SheetCustomPaperSize
+> = {
   a4: { width: 210, height: 297 },
   a3: { width: 297, height: 420 },
   letter: { width: 215.9, height: 279.4 },
@@ -65,6 +110,11 @@ export const DEFAULT_SHEET_PAGE_SETUP: SheetPageSetup = {
   orientation: "portrait",
   margins: { top: 19.05, bottom: 19.05, left: 17.78, right: 17.78, header: 7.62, footer: 7.62 },
   scale: 100,
+  fitToPage: null,
+  firstPageNumber: null,
+  printQuality: 600,
+  printOptions: DEFAULT_SHEET_PAGE_PRINT_OPTIONS,
+  printTitles: DEFAULT_SHEET_PRINT_TITLES,
   printArea: null,
   rowBreaks: [],
   columnBreaks: [],
@@ -159,6 +209,98 @@ function normalizeHeaderFooterOptions(value: unknown): SheetHeaderFooterOptions 
   };
 }
 
+function normalizeCustomPaperSize(value: unknown): SheetCustomPaperSize {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new TypeError("Custom paper size must have width and height.");
+  const paper = value as Record<string, unknown>;
+  const dimension = (name: "width" | "height") => {
+    const item = paper[name];
+    if (typeof item !== "number" || !Number.isFinite(item) || item < 1 || item > 5000)
+      throw new RangeError(`Custom paper ${name} must be from 1 through 5000 millimetres.`);
+    return item;
+  };
+  return { width: dimension("width"), height: dimension("height") };
+}
+
+function normalizeFitToPage(value: unknown): SheetPageFitToPage | null {
+  if (value === undefined || value === null) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new TypeError("Fit to page must be an object or null.");
+  const fit = value as Record<string, unknown>;
+  const axis = (name: "width" | "height") => {
+    const item = fit[name];
+    if (!Number.isInteger(item) || (item as number) < 0 || (item as number) > 32767)
+      throw new RangeError(`Fit to page ${name} must be an integer from 0 through 32767.`);
+    return item as number;
+  };
+  const result = { width: axis("width"), height: axis("height") };
+  if (result.width === 0 && result.height === 0)
+    throw new RangeError("Fit to page cannot leave both axes unlimited.");
+  return result;
+}
+
+function normalizePrintOptions(value: unknown): SheetPagePrintOptions {
+  if (value === undefined) return { ...DEFAULT_SHEET_PAGE_PRINT_OPTIONS };
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new TypeError("Print options must be an object.");
+  const options = value as Record<string, unknown>;
+  const boolean = (
+    name: "horizontalCentered" | "verticalCentered" | "gridLines" | "blackAndWhite" | "headings",
+  ) => {
+    if (typeof options[name] !== "boolean")
+      throw new TypeError(`Print option ${name} must be a boolean.`);
+    return options[name];
+  };
+  const cellComments = options.cellComments;
+  const errors = options.errors;
+  if (cellComments !== "none" && cellComments !== "atEnd" && cellComments !== "asDisplayed")
+    throw new TypeError("Unsupported cell comment print option.");
+  if (errors !== "displayed" && errors !== "blank" && errors !== "dash" && errors !== "NA")
+    throw new TypeError("Unsupported print error option.");
+  return {
+    horizontalCentered: boolean("horizontalCentered"),
+    verticalCentered: boolean("verticalCentered"),
+    gridLines: boolean("gridLines"),
+    blackAndWhite: boolean("blackAndWhite"),
+    headings: boolean("headings"),
+    cellComments,
+    errors,
+  };
+}
+
+function normalizePrintTitles(value: unknown): SheetPrintTitles {
+  if (value === undefined) return { ...DEFAULT_SHEET_PRINT_TITLES };
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new TypeError("Print titles must be an object.");
+  const titles = value as Record<string, unknown>;
+  const range = (
+    name: "rows" | "columns" | "bottomRows",
+    maximum: number,
+  ): SheetPrintTitleRange | null => {
+    const item = titles[name];
+    if (item === undefined || item === null) return null;
+    if (!item || typeof item !== "object" || Array.isArray(item))
+      throw new TypeError(`Print title ${name} must be a range or null.`);
+    const source = item as Record<string, unknown>;
+    const start = source.start;
+    const end = source.end;
+    if (
+      !Number.isInteger(start) ||
+      !Number.isInteger(end) ||
+      (start as number) < 0 ||
+      (end as number) < (start as number) ||
+      (end as number) >= maximum
+    )
+      throw new RangeError(`Print title ${name} must be an in-sheet zero-based range.`);
+    return { start: start as number, end: end as number };
+  };
+  return {
+    rows: range("rows", MAX_SHEET_ROWS),
+    columns: range("columns", MAX_SHEET_COLUMNS),
+    bottomRows: range("bottomRows", MAX_SHEET_ROWS),
+  };
+}
+
 /** Returns a detached canonical header/footer configuration, including legacy defaults. */
 export function cloneSheetHeaderFooterOptions(
   options: SheetHeaderFooterOptions | undefined,
@@ -177,7 +319,10 @@ export function getSheetHeaderFooterOptions(
 export function normalizeSheetPageSetup(value: unknown): SheetPageSetup {
   if (!value || typeof value !== "object") throw new TypeError("Page setup must be an object.");
   const setup = value as Record<string, unknown>;
-  if (typeof setup.paperSize !== "string" || !Object.hasOwn(PAGE_PAPER_SIZES_MM, setup.paperSize))
+  if (
+    setup.paperSize !== "custom" &&
+    (typeof setup.paperSize !== "string" || !Object.hasOwn(PAGE_PAPER_SIZES_MM, setup.paperSize))
+  )
     throw new TypeError("Unsupported paper size.");
   if (setup.orientation !== "portrait" && setup.orientation !== "landscape")
     throw new TypeError("Unsupported page orientation.");
@@ -191,6 +336,12 @@ export function normalizeSheetPageSetup(value: unknown): SheetPageSetup {
     return item;
   };
   const paperSize = setup.paperSize as SheetPaperSize;
+  const customPaperSize =
+    setup.customPaperSize === undefined
+      ? undefined
+      : normalizeCustomPaperSize(setup.customPaperSize);
+  if (paperSize === "custom" && !customPaperSize)
+    throw new TypeError("Custom paper size must have width and height.");
   const margins = {
     top: margin("top"),
     bottom: margin("bottom"),
@@ -199,7 +350,10 @@ export function normalizeSheetPageSetup(value: unknown): SheetPageSetup {
     header: margin("header"),
     footer: margin("footer"),
   };
-  const paper = PAGE_PAPER_SIZES_MM[paperSize];
+  const paper =
+    paperSize === "custom"
+      ? customPaperSize!
+      : PAGE_PAPER_SIZES_MM[paperSize as Exclude<SheetPaperSize, "custom">];
   const width = setup.orientation === "landscape" ? paper.height : paper.width;
   const height = setup.orientation === "landscape" ? paper.width : paper.height;
   if (margins.left + margins.right >= width || margins.top + margins.bottom >= height)
@@ -218,11 +372,30 @@ export function normalizeSheetPageSetup(value: unknown): SheetPageSetup {
     throw new TypeError("Print area must be a cell range or null.");
   if (setup.pageOrder !== "downThenOver" && setup.pageOrder !== "overThenDown")
     throw new TypeError("Unsupported page order.");
+  const firstPageNumber: number | null =
+    setup.firstPageNumber === undefined || setup.firstPageNumber === null
+      ? null
+      : (setup.firstPageNumber as number);
+  if (
+    (!Number.isInteger(firstPageNumber) && firstPageNumber !== null) ||
+    (typeof firstPageNumber === "number" && (firstPageNumber < 1 || firstPageNumber > 32767))
+  )
+    throw new RangeError("First page number must be an integer from 1 through 32767 or null.");
+  const printQuality: number =
+    setup.printQuality === undefined ? 600 : (setup.printQuality as number);
+  if (!Number.isInteger(printQuality) || printQuality <= 0 || printQuality > 9600)
+    throw new RangeError("Print quality must be a positive integer through 9600.");
   return {
     paperSize,
+    ...(customPaperSize ? { customPaperSize } : {}),
     orientation: setup.orientation,
     margins,
     scale: setup.scale as number,
+    fitToPage: normalizeFitToPage(setup.fitToPage),
+    firstPageNumber,
+    printQuality,
+    printOptions: normalizePrintOptions(setup.printOptions),
+    printTitles: normalizePrintTitles(setup.printTitles),
     printArea: setup.printArea === null ? null : normalizeRange(setup.printArea),
     rowBreaks: normalizeBreaks(setup.rowBreaks, MAX_SHEET_ROWS, "Row"),
     columnBreaks: normalizeBreaks(setup.columnBreaks, MAX_SHEET_COLUMNS, "Column"),
@@ -238,13 +411,20 @@ export function cloneSheetPageSetup(setup: SheetPageSetup): SheetPageSetup {
 }
 
 /** Returns physical paper bounds in millimetres after orientation has been applied. */
-export function getPagePaperSize(pageSetup: Pick<SheetPageSetup, "paperSize" | "orientation">): {
+export function getPagePaperSize(
+  pageSetup: Pick<SheetPageSetup, "paperSize" | "customPaperSize" | "orientation">,
+): {
   width: number;
   height: number;
 } {
-  if (!Object.hasOwn(PAGE_PAPER_SIZES_MM, pageSetup.paperSize))
-    throw new TypeError("Unsupported paper size.");
-  const paper = PAGE_PAPER_SIZES_MM[pageSetup.paperSize];
+  const paper =
+    pageSetup.paperSize === "custom"
+      ? normalizeCustomPaperSize(pageSetup.customPaperSize)
+      : Object.hasOwn(PAGE_PAPER_SIZES_MM, pageSetup.paperSize)
+        ? PAGE_PAPER_SIZES_MM[pageSetup.paperSize]
+        : (() => {
+            throw new TypeError("Unsupported paper size.");
+          })();
   if (pageSetup.orientation === "portrait") return { ...paper };
   if (pageSetup.orientation === "landscape") return { width: paper.height, height: paper.width };
   throw new TypeError("Unsupported page orientation.");

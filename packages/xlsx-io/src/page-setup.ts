@@ -200,6 +200,57 @@ function parseRange(value: string): CellRange | null {
     : null;
 }
 
+function titleRange(value: string, axis: "row" | "column"): { start: number; end: number } | null {
+  const match =
+    axis === "row" ? /^\$?(\d+):\$?(\d+)$/i.exec(value) : /^\$?([A-Z]+):\$?([A-Z]+)$/i.exec(value);
+  if (!match) return null;
+  const index = (source: string) =>
+    axis === "row"
+      ? Number(source) - 1
+      : [...source.toUpperCase()].reduce(
+          (total, character) => total * 26 + character.charCodeAt(0) - 64,
+          0,
+        ) - 1;
+  const start = index(match[1] ?? "");
+  const end = index(match[2] ?? "");
+  return Number.isInteger(start) && Number.isInteger(end) && start >= 0 && end >= start
+    ? { start, end }
+    : null;
+}
+
+function readPrintTitles(
+  bytes: Uint8Array,
+  sheets: readonly Pick<Sheet, "name">[],
+): Array<SheetPageSetup["printTitles"]> {
+  const workbook = unzipSync(bytes)["xl/workbook.xml"];
+  const result: Array<NonNullable<SheetPageSetup["printTitles"]>> = sheets.map(() => ({
+    rows: null,
+    columns: null,
+    bottomRows: null,
+  }));
+  if (!workbook) return result;
+  for (const match of strFromU8(workbook).matchAll(
+    /<(?:\w+:)?definedName\b([^>]*?)>([\s\S]*?)<\/(?:\w+:)?definedName\s*>/gi,
+  )) {
+    const attrs = match[1] ?? "";
+    if ((attribute(attrs, "name") ?? "").toLowerCase() !== "_xlnm.print_titles") continue;
+    const index = Number(attribute(attrs, "localSheetId"));
+    if (!Number.isInteger(index) || !result[index]) continue;
+    const parts = decodeXml(match[2] ?? "").split(",");
+    for (const part of parts) {
+      const reference = part
+        .trim()
+        .replace(/^'(?:[^']|'')+'!/, "")
+        .replace(/^[^'!]+!/, "");
+      const rows = titleRange(reference, "row");
+      const columns = titleRange(reference, "column");
+      if (rows) result[index].rows = rows;
+      if (columns) result[index].columns = columns;
+    }
+  }
+  return result;
+}
+
 function readPrintAreas(
   bytes: Uint8Array,
   sheets: readonly Pick<Sheet, "name">[],
@@ -240,6 +291,7 @@ export function readXlsxPageSetups(
   report: CompatibilityReportBuilder,
 ): Array<SheetPageSetup | undefined> {
   const printAreas = readPrintAreas(bytes, sheets, report);
+  const printTitles = readPrintTitles(bytes, sheets);
   return worksheetParts(bytes).map(({ xml }, index) => {
     const margins = /<pageMargins\b([^>]*)\/?\s*>/i.exec(xml)?.[1];
     const setup = /<pageSetup\b([^>]*)\/?\s*>/i.exec(xml)?.[1];
@@ -256,12 +308,19 @@ export function readXlsxPageSetups(
     const evenFooter = headerFooterText("evenFooter");
     const firstHeader = headerFooterText("firstHeader");
     const firstFooter = headerFooterText("firstFooter");
+    const hasPrintOptions = /<printOptions\b/i.test(xml);
+    const hasFitToPage = /<pageSetUpPr\b[^>]*\bfitToPage\s*=\s*(["'])(?:1|true)\1/i.test(xml);
+    const hasPrintTitles =
+      printTitles[index]?.rows !== null || printTitles[index]?.columns !== null;
     const rowBreaks = readBreaks(xml, "rowBreaks");
     const columnBreaks = readBreaks(xml, "colBreaks");
     const hasSetup =
       !!margins ||
       !!setup ||
       !!headerFooter ||
+      hasPrintOptions ||
+      hasFitToPage ||
+      hasPrintTitles ||
       rowBreaks.length > 0 ||
       columnBreaks.length > 0 ||
       printAreas[index] !== null;
@@ -295,13 +354,28 @@ export function readXlsxPageSetups(
     const orientation = attribute(setup ?? "", "orientation");
     const scale = parseNumber(attribute(setup ?? "", "scale"));
     const pageOrder = attribute(setup ?? "", "pageOrder");
-    const fitToPage = /<pageSetUpPr\b[^>]*\bfitToPage\s*=\s*(["'])(?:1|true)\1/i.test(xml);
-    if (fitToPage)
-      report.add(
-        "feature-omitted",
-        "warning",
-        `${sheets[index]?.name ?? index + 1}.pageSetup.fitToPages`,
-      );
+    const pageSetUpPr = /<pageSetUpPr\b([^>]*)\/?\s*>/i.exec(xml)?.[1] ?? "";
+    const fitToPage = truthy(attribute(pageSetUpPr, "fitToPage"));
+    const fitToWidth = parseNumber(attribute(setup ?? "", "fitToWidth"));
+    const fitToHeight = parseNumber(attribute(setup ?? "", "fitToHeight"));
+    const customWidth = /^([0-9]+(?:\.[0-9]+)?)mm$/i.exec(
+      attribute(setup ?? "", "paperWidth") ?? "",
+    )?.[1];
+    const customHeight = /^([0-9]+(?:\.[0-9]+)?)mm$/i.exec(
+      attribute(setup ?? "", "paperHeight") ?? "",
+    )?.[1];
+    const firstPageNumber = truthy(attribute(setup ?? "", "useFirstPageNumber"))
+      ? parseNumber(attribute(setup ?? "", "firstPageNumber"))
+      : undefined;
+    const parsedQuality = parseNumber(attribute(setup ?? "", "horizontalDpi"));
+    const quality =
+      parsedQuality !== undefined &&
+      Number.isInteger(parsedQuality) &&
+      parsedQuality >= 1 &&
+      parsedQuality <= 9600
+        ? parsedQuality
+        : undefined;
+    const printOptions = /<printOptions\b([^>]*)\/?\s*>/i.exec(xml)?.[1] ?? "";
     const millimetres = (name: string) => {
       const inches = parseNumber(attribute(margins ?? "", name));
       return inches !== undefined && inches >= 0
@@ -310,7 +384,38 @@ export function readXlsxPageSetups(
     };
     return normalizeSheetPageSetup({
       ...DEFAULT_SHEET_PAGE_SETUP,
-      ...(paperSize ? { paperSize } : {}),
+      ...(customWidth && customHeight
+        ? {
+            paperSize: "custom",
+            customPaperSize: { width: Number(customWidth), height: Number(customHeight) },
+          }
+        : paperSize
+          ? { paperSize }
+          : {}),
+      ...(fitToPage ? { fitToPage: { width: fitToWidth ?? 1, height: fitToHeight ?? 1 } } : {}),
+      ...(firstPageNumber !== undefined ? { firstPageNumber } : {}),
+      ...(quality !== undefined ? { printQuality: quality } : {}),
+      printOptions: {
+        horizontalCentered: truthy(attribute(printOptions, "horizontalCentered")),
+        verticalCentered: truthy(attribute(printOptions, "verticalCentered")),
+        gridLines: truthy(attribute(printOptions, "gridLines")),
+        blackAndWhite: truthy(attribute(setup ?? "", "blackAndWhite")),
+        headings: truthy(attribute(printOptions, "headings")),
+        cellComments:
+          attribute(setup ?? "", "cellComments") === "atEnd"
+            ? "atEnd"
+            : attribute(setup ?? "", "cellComments") === "asDisplayed"
+              ? "asDisplayed"
+              : "none",
+        errors:
+          attribute(setup ?? "", "errors") === "blank"
+            ? "blank"
+            : attribute(setup ?? "", "errors") === "dash"
+              ? "dash"
+              : attribute(setup ?? "", "errors") === "NA"
+                ? "NA"
+                : "displayed",
+      },
       ...(orientation === "portrait" || orientation === "landscape" ? { orientation } : {}),
       ...(scale !== undefined ? { scale } : {}),
       ...(pageOrder === "downThenOver" || pageOrder === "overThenDown" ? { pageOrder } : {}),
@@ -344,6 +449,7 @@ export function readXlsxPageSetups(
           }
         : {}),
       printArea: printAreas[index],
+      printTitles: printTitles[index],
       rowBreaks,
       columnBreaks,
     });
@@ -365,6 +471,30 @@ function printAreaReference(sheet: Sheet, range: CellRange): string {
   const cell = (address: { row: number; column: number }) =>
     `$${columnLabel(address.column)}$${address.row + 1}`;
   return `'${sheet.name.replaceAll("'", "''")}'!${cell(range.start)}:${cell(range.end)}`;
+}
+
+function printTitleReference(
+  sheet: Sheet,
+  titles: NonNullable<SheetPageSetup["printTitles"]>,
+): string | null {
+  const name = `'${sheet.name.replaceAll("'", "''")}'!`;
+  const rows = titles.rows ? `${name}$${titles.rows.start + 1}:$${titles.rows.end + 1}` : null;
+  const columns = titles.columns
+    ? `${name}$${columnLabel(titles.columns.start)}:$${columnLabel(titles.columns.end)}`
+    : null;
+  return [rows, columns].filter((value): value is string => Boolean(value)).join(",") || null;
+}
+
+export function collectPrintTitleDefinedNames(workbook: Workbook): Array<{
+  name: string;
+  localSheetId: number;
+  reference: string;
+}> {
+  return [...workbook.sheets.values()].flatMap((sheet, index) => {
+    const reference =
+      sheet.pageSetup?.printTitles && printTitleReference(sheet, sheet.pageSetup.printTitles);
+    return reference ? [{ name: "_xlnm.Print_Titles", localSheetId: index, reference }] : [];
+  });
 }
 
 export function collectPrintAreaDefinedNames(workbook: Workbook): Array<{
@@ -410,14 +540,18 @@ function breaksXml(tag: "rowBreaks" | "colBreaks", values: readonly number[]): s
 export function writeXlsxPageSetups(
   entries: Unzipped,
   setups: readonly (SheetPageSetup | undefined)[],
+  report?: CompatibilityReportBuilder,
 ): void {
   for (const [index, setup] of setups.entries()) {
     if (!setup) continue;
+    if (setup.printTitles?.bottomRows)
+      report?.add("feature-omitted", "warning", `sheet${index + 1}.printTitles.bottomRows`);
     const path = `xl/worksheets/sheet${index + 1}.xml`;
     const entry = entries[path];
     if (!entry) continue;
     let xml = strFromU8(entry);
     const margins = setup.margins;
+    const printOptions = setup.printOptions ?? DEFAULT_SHEET_PAGE_SETUP.printOptions!;
     const inch = (value: number) => String(Number((value / MILLIMETRES_PER_INCH).toFixed(12)));
     xml = replaceElement(
       xml,
@@ -431,10 +565,42 @@ export function writeXlsxPageSetups(
       `<pageMargins left="${inch(margins.left)}" right="${inch(margins.right)}" top="${inch(margins.top)}" bottom="${inch(margins.bottom)}" header="${inch(margins.header)}" footer="${inch(margins.footer)}"/>`,
       /<headerFooter\b[^>]*(?:\/>|>[\s\S]*?<\/headerFooter>)/i,
     );
+    const printOptionsXml = [
+      printOptions.horizontalCentered ? ' horizontalCentered="1"' : "",
+      printOptions.verticalCentered ? ' verticalCentered="1"' : "",
+      printOptions.gridLines ? ' gridLines="1"' : "",
+      printOptions.headings ? ' headings="1"' : "",
+    ].join("");
+    xml = printOptionsXml
+      ? replaceElement(
+          xml,
+          "printOptions",
+          `<printOptions${printOptionsXml}/>`,
+          /<pageMargins\b[^>]*(?:\/>|>[\s\S]*?<\/pageMargins>)/i,
+        )
+      : removeElement(xml, "printOptions");
+    const pageSetUpPr = setup.fitToPage ? `<pageSetUpPr fitToPage="1"/>` : "";
+    const sheetPr = /<sheetPr\b([^>]*)\/>/i;
+    const sheetPrPair = /<sheetPr\b([^>]*)>([\s\S]*?)<\/sheetPr>/i;
+    if (sheetPr.test(xml)) {
+      xml = xml.replace(sheetPr, (match, attributes: string) =>
+        pageSetUpPr ? `<sheetPr${attributes}>${pageSetUpPr}</sheetPr>` : match,
+      );
+    } else if (sheetPrPair.test(xml)) {
+      xml = xml.replace(sheetPrPair, (_match, attributes: string, content: string) => {
+        const withoutPageSetup = removeElement(content, "pageSetUpPr");
+        return `<sheetPr${attributes}>${withoutPageSetup}${pageSetUpPr}</sheetPr>`;
+      });
+    } else if (pageSetUpPr) {
+      xml = xml.replace(
+        /<worksheet\b[^>]*>/i,
+        (match) => `${match}<sheetPr>${pageSetUpPr}</sheetPr>`,
+      );
+    }
     xml = replaceElement(
       xml,
       "pageSetup",
-      `<pageSetup paperSize="${OOXML_PAPER_SIZES.get(setup.paperSize) ?? 9}" orientation="${setup.orientation}" scale="${setup.scale}" pageOrder="${setup.pageOrder}"/>`,
+      `<pageSetup${setup.paperSize === "custom" && setup.customPaperSize ? ` paperWidth="${setup.customPaperSize.width}mm" paperHeight="${setup.customPaperSize.height}mm"` : ` paperSize="${OOXML_PAPER_SIZES.get(setup.paperSize) ?? 9}"`} orientation="${setup.orientation}"${setup.fitToPage ? ` fitToWidth="${setup.fitToPage.width}" fitToHeight="${setup.fitToPage.height}"` : ` scale="${setup.scale}"`}${setup.firstPageNumber !== null ? ` firstPageNumber="${setup.firstPageNumber}" useFirstPageNumber="1"` : ""} horizontalDpi="${setup.printQuality}" verticalDpi="${setup.printQuality}"${printOptions.blackAndWhite ? ' blackAndWhite="1"' : ""}${printOptions.cellComments === "none" ? "" : ` cellComments="${printOptions.cellComments}"`}${printOptions.errors === "displayed" ? "" : ` errors="${printOptions.errors}"`} pageOrder="${setup.pageOrder}"/>`,
       /<pageMargins\b[^>]*(?:\/>|>[\s\S]*?<\/pageMargins>)/i,
     );
     const rowBreaks = [...readBreaks(xml, "rowBreaks"), ...setup.rowBreaks];

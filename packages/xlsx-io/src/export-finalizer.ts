@@ -48,7 +48,7 @@ export function finalizeXlsxExport(
   addNativeCellImages(entries, cellImages);
   writeDefinedNames(entries, definedNames);
   writeXlsxDataMetadata(entries, dataMetadata);
-  writeXlsxPageSetups(entries, pageSetups);
+  writeXlsxPageSetups(entries, pageSetups, report);
   writeXlsxConditionalFormats(entries, conditionalFormats, report);
   if (calculation) writeWorkbookCalculationSettings(entries, calculation);
   const files: Zippable = {};

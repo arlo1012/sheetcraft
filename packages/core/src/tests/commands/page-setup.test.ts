@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   createInsertSheetAxisCommand,
+  createDeleteSheetAxisCommand,
   createMoveSheetAxisCommand,
   createSetSheetPageSetupCommand,
   tryApplyWorkbookCommand,
@@ -9,6 +10,8 @@ import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from
 import {
   DEFAULT_SHEET_HEADER_FOOTER_OPTIONS,
   DEFAULT_SHEET_PAGE_SETUP,
+  DEFAULT_SHEET_PAGE_PRINT_OPTIONS,
+  DEFAULT_SHEET_PRINT_TITLES,
   getPagePaperSize,
   getSheetHeaderFooterOptions,
 } from "../../page-setup.js";
@@ -147,5 +150,111 @@ describe("sheet page setup", () => {
     expect(
       restored.sheets.get(getActiveSheet(session.workbook).id)?.pageSetup?.headerFooter,
     ).toEqual(DEFAULT_SHEET_HEADER_FOOTER_OPTIONS);
+    expect(restored.sheets.get(getActiveSheet(session.workbook).id)?.pageSetup).toMatchObject({
+      fitToPage: null,
+      firstPageNumber: null,
+      printQuality: 600,
+      printOptions: DEFAULT_SHEET_PAGE_PRINT_OPTIONS,
+      printTitles: DEFAULT_SHEET_PRINT_TITLES,
+    });
+  });
+
+  test("normalizes custom paper and print configuration as detached page metadata", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const setup = {
+      ...DEFAULT_SHEET_PAGE_SETUP,
+      paperSize: "custom" as const,
+      customPaperSize: { width: 250, height: 350 },
+      fitToPage: { width: 1, height: 0 },
+      firstPageNumber: 3,
+      printQuality: 1200,
+      printOptions: {
+        ...DEFAULT_SHEET_PAGE_PRINT_OPTIONS,
+        gridLines: true,
+        errors: "dash" as const,
+      },
+      printTitles: {
+        rows: { start: 1, end: 2 },
+        columns: { start: 3, end: 4 },
+        bottomRows: { start: 8, end: 9 },
+      },
+    };
+    executeWorkbookCommand(session, createSetSheetPageSetupCommand(sheet.id, setup));
+    setup.customPaperSize.width = 100;
+    setup.printTitles.rows!.start = 0;
+    expect(sheet.pageSetup).toMatchObject({
+      customPaperSize: { width: 250, height: 350 },
+      fitToPage: { width: 1, height: 0 },
+      firstPageNumber: 3,
+      printQuality: 1200,
+      printOptions: { gridLines: true, errors: "dash" },
+      printTitles: { rows: { start: 1, end: 2 } },
+    });
+    expect(getPagePaperSize(sheet.pageSetup!)).toEqual({ width: 250, height: 350 });
+    expect(() =>
+      createSetSheetPageSetupCommand(sheet.id, {
+        ...DEFAULT_SHEET_PAGE_SETUP,
+        fitToPage: { width: 0, height: 0 },
+      }),
+    ).toThrow("Fit to page cannot");
+    expect(() =>
+      createSetSheetPageSetupCommand(sheet.id, {
+        ...DEFAULT_SHEET_PAGE_SETUP,
+        firstPageNumber: 32768,
+      }),
+    ).toThrow("First page number");
+    expect(() =>
+      createSetSheetPageSetupCommand(sheet.id, {
+        ...DEFAULT_SHEET_PAGE_SETUP,
+        paperSize: "a4",
+        customPaperSize: { width: 5000, height: 5000 },
+        margins: { ...DEFAULT_SHEET_PAGE_SETUP.margins, left: 110, right: 110 },
+      }),
+    ).toThrow("Page margins leave no usable paper area");
+    expect(() =>
+      createSetSheetPageSetupCommand(sheet.id, {
+        ...DEFAULT_SHEET_PAGE_SETUP,
+        paperSize: "a4",
+        customPaperSize: { width: 1, height: 1 },
+      }),
+    ).not.toThrow();
+  });
+
+  test("transforms repeated print titles with structural axes and restores them through history", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    executeWorkbookCommand(
+      session,
+      createSetSheetPageSetupCommand(sheet.id, {
+        ...DEFAULT_SHEET_PAGE_SETUP,
+        printTitles: {
+          rows: { start: 2, end: 4 },
+          columns: { start: 2, end: 3 },
+          bottomRows: { start: 10, end: 11 },
+        },
+      }),
+    );
+    executeWorkbookCommand(session, createInsertSheetAxisCommand(sheet.id, "row", 3, 2));
+    executeWorkbookCommand(session, createDeleteSheetAxisCommand(sheet.id, "column", 2, 1));
+    expect(sheet.pageSetup?.printTitles).toEqual({
+      rows: { start: 2, end: 6 },
+      columns: { start: 2, end: 2 },
+      bottomRows: { start: 12, end: 13 },
+    });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(sheet.pageSetup?.printTitles).toEqual({
+      rows: { start: 2, end: 4 },
+      columns: { start: 2, end: 3 },
+      bottomRows: { start: 10, end: 11 },
+    });
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(sheet.pageSetup?.printTitles).toEqual({
+      rows: { start: 2, end: 6 },
+      columns: { start: 2, end: 2 },
+      bottomRows: { start: 12, end: 13 },
+    });
   });
 });

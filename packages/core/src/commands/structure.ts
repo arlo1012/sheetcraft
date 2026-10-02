@@ -45,6 +45,7 @@ import { cloneCellStyle } from "../style.js";
 import {
   cloneSheetPageSetup,
   DEFAULT_SHEET_PAGE_SETUP,
+  type SheetPrintTitleRange,
   type SheetPageSetup,
 } from "../page-setup.js";
 import type {
@@ -688,11 +689,39 @@ function transformPageSetupForAxis(
       const next = transformAxisIndex(value, index, count, maximum, operation);
       return next === null || next === 0 ? [] : [next];
     });
+  const transformTitle = (
+    title: SheetPrintTitleRange | null,
+    titleAxis: SheetDimensionAxis,
+  ): SheetPrintTitleRange | null => {
+    if (!title || axis !== titleAxis) return title;
+    const titleRange: CellRange =
+      axis === "row"
+        ? {
+            start: { row: title.start, column: 0 },
+            end: { row: title.end, column: MAX_SHEET_COLUMNS - 1 },
+          }
+        : {
+            start: { row: 0, column: title.start },
+            end: { row: MAX_SHEET_ROWS - 1, column: title.end },
+          };
+    const transformed = transformRangeForAxis(titleRange, axis, index, count, maximum, operation);
+    return transformed
+      ? axis === "row"
+        ? { start: transformed.start.row, end: transformed.end.row }
+        : { start: transformed.start.column, end: transformed.end.column }
+      : null;
+  };
+  const titles = setup.printTitles!;
   return cloneSheetPageSetup({
     ...setup,
     printArea: range,
     rowBreaks: axis === "row" ? transformBreaks(setup.rowBreaks) : setup.rowBreaks,
     columnBreaks: axis === "column" ? transformBreaks(setup.columnBreaks) : setup.columnBreaks,
+    printTitles: {
+      rows: transformTitle(titles.rows, "row"),
+      columns: transformTitle(titles.columns, "column"),
+      bottomRows: transformTitle(titles.bottomRows, "row"),
+    },
   });
 }
 
@@ -1539,6 +1568,29 @@ function transformPageSetupForAxisMove(
   const range = setup.printArea
     ? transformRangeForAxisMove(setup.printArea, axis, index, count, toIndex)
     : null;
+  const transformTitle = (
+    title: SheetPrintTitleRange | null,
+    titleAxis: SheetDimensionAxis,
+  ): SheetPrintTitleRange | null => {
+    if (!title || axis !== titleAxis) return title;
+    const titleRange: CellRange =
+      axis === "row"
+        ? {
+            start: { row: title.start, column: 0 },
+            end: { row: title.end, column: MAX_SHEET_COLUMNS - 1 },
+          }
+        : {
+            start: { row: 0, column: title.start },
+            end: { row: MAX_SHEET_ROWS - 1, column: title.end },
+          };
+    const transformed = transformRangeForAxisMove(titleRange, axis, index, count, toIndex);
+    if (!transformed)
+      throw invalidCommandPayload("axis", axis, "Moving this band would split print titles.");
+    return axis === "row"
+      ? { start: transformed.start.row, end: transformed.end.row }
+      : { start: transformed.start.column, end: transformed.end.column };
+  };
+  const titles = setup.printTitles!;
   return cloneSheetPageSetup({
     ...setup,
     printArea: range,
@@ -1548,6 +1600,11 @@ function transformPageSetupForAxisMove(
       axis === "column"
         ? setup.columnBreaks.map(map).filter((value) => value > 0)
         : setup.columnBreaks,
+    printTitles: {
+      rows: transformTitle(titles.rows, "row"),
+      columns: transformTitle(titles.columns, "column"),
+      bottomRows: transformTitle(titles.bottomRows, "row"),
+    },
   });
 }
 

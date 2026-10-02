@@ -44,7 +44,11 @@ import {
 import { CompatibilityReportBuilder } from "./report.js";
 import { finalizeXlsxExport } from "./export-finalizer.js";
 import { collectDefinedNames, readDefinedNames } from "./defined-names.js";
-import { collectPrintAreaDefinedNames, readXlsxPageSetups } from "./page-setup.js";
+import {
+  collectPrintAreaDefinedNames,
+  collectPrintTitleDefinedNames,
+  readXlsxPageSetups,
+} from "./page-setup.js";
 import { readWorkbookCalculationSettings } from "./workbook-calculation.js";
 import {
   readRawWorksheetNumericValues,
@@ -958,7 +962,11 @@ export async function encodeWithExcelJs(
     bytes: finalizeXlsxExport(
       new Uint8Array(bytes),
       cellImages,
-      [...collectDefinedNames(workbook, report), ...collectPrintAreaDefinedNames(workbook)],
+      [
+        ...collectDefinedNames(workbook, report),
+        ...collectPrintAreaDefinedNames(workbook),
+        ...collectPrintTitleDefinedNames(workbook),
+      ],
       workbook.calculation,
       dataMetadata,
       conditionalFormats,

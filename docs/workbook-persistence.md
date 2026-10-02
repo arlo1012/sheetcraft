@@ -41,7 +41,10 @@ it does not implement accounts, passwords, or access control.
 V13 snapshots also persist each sheet's paper, margins, print scale, print range,
 manual page breaks, and header/footer text. Earlier snapshots receive the default
 page setup. V14 adds first/odd/even header/footer variants and behavior options;
-V13 snapshots migrate with default options. View mode, rulers, white-space
+V13 snapshots migrate with default options. V14 also stores custom paper size,
+fit page counts, first-page number, quality, centering and printing options, and
+repeated-title ranges. Existing V14 snapshots receive defaults for missing fields.
+View mode, rulers, white-space
 visibility, and margin-handle visibility remain session state. See
 [Worksheet page views](features/page-views.md).
 

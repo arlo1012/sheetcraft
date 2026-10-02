@@ -1,0 +1,25 @@
+@mixin panel {
+  min-height: 360px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--idea-space-4);
+  padding: var(--idea-tool-panel-padding);
+  border: 1px solid var(--idea-border-subtle);
+  border-radius: var(--idea-radius-default);
+
+  h3 {
+    margin: 0 0 var(--idea-space-2);
+    color: var(--idea-text-primary);
+    font-size: var(--idea-font-size-body-medium);
+    font-weight: var(--idea-font-weight-medium);
+  }
+}
+
+@mixin row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--idea-space-2);
+}

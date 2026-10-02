@@ -40,6 +40,10 @@ import DataProofreadingDialog from "../modules/data-tools/components/DataProofre
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import ViewToolbar from "../modules/view-tools/components/ViewToolbar.vue";
 import PageSetupDialog from "../modules/page-layout/components/PageSetupDialog.vue";
+import {
+  formatPickedPageSetupReference,
+  type PageSetupReferenceField,
+} from "../modules/page-layout/page-setup-inputs";
 import type { HeaderFooterEditTarget } from "../modules/page-layout/header-footer-editor";
 import type { PageLayoutRulerUnit } from "../modules/page-layout/components/PageLayoutRulers.vue";
 import DataToolsDialogs from "../modules/data-tools/components/DataToolsDialogs.vue";
@@ -266,6 +270,32 @@ const {
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
 const pageViewModes = shallowReactive(new Map<string, SheetViewMode>());
 const pageSetupVisible = ref(false);
+const pageSetupRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingPageSetupRange, reference: pickedPageSetupReference } = pageSetupRangePicker;
+const pageSetupRangeField = ref<PageSetupReferenceField>("printArea");
+async function selectPageSetupReference(
+  current: string,
+  field: PageSetupReferenceField,
+): Promise<string | undefined> {
+  const workbook = session.workbook;
+  const generation = workbookGeneration.value;
+  const sheetId = activeSheet.value.id;
+  pageSetupRangeField.value = field;
+  const selected = await pageSetupRangePicker.selectReference(current);
+  if (
+    selected === undefined ||
+    !pageSetupVisible.value ||
+    session.workbook !== workbook ||
+    workbookGeneration.value !== generation
+  )
+    return undefined;
+  const resolved = resolveRangeReference(workbook, selected, sheetId);
+  if (!resolved || resolved.sheetId !== sheetId) return undefined;
+  return formatPickedPageSetupReference(resolved.range, field);
+}
+watch(pageSetupVisible, (visible) => {
+  if (!visible) pageSetupRangePicker.cancel();
+});
 const showPageRulers = ref(true);
 const showPageMargins = ref(false);
 const showPageWhiteSpace = ref(true);
@@ -1322,6 +1352,7 @@ watch(workbookGeneration, () => {
 const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const activeRangePicker = computed(() => {
+  if (pickingPageSetupRange.value) return pageSetupRangePicker;
   if (pickingFindFormat.value) return findFormatPicker;
   if (pickingSimulationRange.value) return simulationRangePicker;
   if (pickingProofreadingRange.value) return proofreadingRangePicker;
@@ -1375,7 +1406,12 @@ function setShowFormulaBar(visible: boolean): void {
 }
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
-  if (pageSetupVisible.value || formulaEditorVisible.value || formulaInsertVisible.value) return;
+  if (
+    (pageSetupVisible.value && !pickingPageSetupRange.value) ||
+    formulaEditorVisible.value ||
+    formulaInsertVisible.value
+  )
+    return;
   const picker = activeRangePicker.value;
   if (picker) {
     if (event.key === "Escape") picker.cancel();
@@ -2179,7 +2215,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         dataToolsModalOpen ||
         formulaEditorVisible ||
         formulaInsertVisible ||
-        pageSetupVisible ||
+        (pageSetupVisible && !pickingPageSetupRange) ||
         !!modalValidationFeedback
       "
     >
@@ -2275,7 +2311,28 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :setup="activePageSetup"
       :initial-tab="pageSetupTab"
       :header-footer-target="headerFooterTarget"
+      :sheet-name="activeSheet.name"
+      file-name="workbook.xlsx"
+      :suspended="pickingPageSetupRange"
+      :select-reference="selectPageSetupReference"
       @confirm="savePageSetup"
+    />
+    <RangeReferencePicker
+      v-if="pickingPageSetupRange"
+      :reference="pickedPageSetupReference"
+      :title="
+        t(
+          pageSetupRangeField === 'printArea'
+            ? 'pageLayout.printArea'
+            : pageSetupRangeField === 'titleColumns'
+              ? 'pageLayout.titleColumns'
+              : pageSetupRangeField === 'bottomTitleRows'
+                ? 'pageLayout.bottomTitleRows'
+                : 'pageLayout.titleRows',
+        )
+      "
+      @confirm="pageSetupRangePicker.confirm"
+      @cancel="pageSetupRangePicker.cancel"
     />
     <SheetColumnStatisticsDialog
       v-if="statisticsRange"
