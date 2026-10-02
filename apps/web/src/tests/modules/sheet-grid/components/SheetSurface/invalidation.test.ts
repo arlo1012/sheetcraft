@@ -68,6 +68,27 @@ afterEach(() => {
 });
 
 describe("SheetSurface invalidation", () => {
+  test("increases the backing resolution with zoom while passing screen scale to the painters", async () => {
+    vi.stubGlobal("devicePixelRatio", 2);
+    const host = installCanvasHost();
+    const paint = vi.spyOn(scenePainter, "paintSheetScene");
+    const { wrapper } = mountCanvasGrid();
+    host.flush();
+    await wrapper.vm.$nextTick();
+    host.flush();
+    for (const zoom of [125, 200, 400]) {
+      await wrapper.setProps({ zoom });
+      host.flush();
+      const surface = wrapper.findComponent({ name: "SheetSurface" });
+      const { frame, environment } = surface.props();
+      const canvas = wrapper.get<HTMLCanvasElement>("[data-sheet-canvas]").element;
+      expect(environment.density).toBe(2);
+      expect(canvas.width).toBe(Math.ceil((frame.size.width * 2 * zoom) / 100));
+      expect(canvas.height).toBe(Math.ceil((frame.size.height * 2 * zoom) / 100));
+      expect(paint.mock.calls.at(-1)?.[3].screenScale).toBe(zoom / 100);
+    }
+  });
+
   test("refreshes the canvas palette when an ancestor display mode changes", async () => {
     const host = document.createElement("div");
     document.body.append(host);

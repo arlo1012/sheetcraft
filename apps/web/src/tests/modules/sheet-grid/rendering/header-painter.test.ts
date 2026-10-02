@@ -8,8 +8,9 @@ import {
   paintSheetHeaders,
 } from "../../../../modules/sheet-grid/rendering/header-painter";
 
-function createContext() {
+function createContext(transform = { a: 1, d: 1, e: 0, f: 0 }) {
   return {
+    getTransform: vi.fn(() => transform),
     save: vi.fn(),
     restore: vi.fn(),
     clearRect: vi.fn(),
@@ -28,7 +29,7 @@ function createContext() {
   } as unknown as CanvasRenderingContext2D;
 }
 
-function createFrame(gutter = 0, rowOutlineGutter = 0, columnOutlineGutter = 0) {
+function createFrame(gutter = 0, rowOutlineGutter = 0, columnOutlineGutter = 0, scale = 1) {
   const geometry = createSheetGeometry({
     rowCount: 8,
     columnCount: 8,
@@ -44,7 +45,7 @@ function createFrame(gutter = 0, rowOutlineGutter = 0, columnOutlineGutter = 0) 
   return createSheetRenderFrame(
     layout,
     { width: 36 + gutter + rowOutlineGutter, height: 24 + gutter + columnOutlineGutter },
-    1,
+    scale,
   );
 }
 
@@ -174,5 +175,60 @@ describe("header painter", () => {
     expect(context.lineTo).toHaveBeenCalledWith(frame.size.width, 39.5);
     expect(context.moveTo).not.toHaveBeenCalledWith(51.5, 0);
     expect(context.moveTo).not.toHaveBeenCalledWith(0, 39.5);
+  });
+
+  test("aligns header dividers and selected edges at fractional zoom with a translated backing store", () => {
+    const context = createContext({ a: 2.5, d: 2.5, e: 0.3, f: 0.7 });
+    paintSheetHeaders(context, {
+      frame: createFrame(0, 0, 0, 1.25),
+      selection: { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0, mode: "rows" },
+      quickTools: { enabled: false, gutter: 0 },
+      palette: DEFAULT_SHEET_HEADER_PALETTE,
+    });
+
+    const rowSeparator = vi
+      .mocked(context.moveTo)
+      .mock.calls.find(([, y]) => typeof y === "number" && y > 40 && y < 45)!;
+    const separatorWidth = 0.8;
+    expect(Number.isInteger((rowSeparator[1]! - separatorWidth / 2) * 2.5 + 0.7)).toBe(true);
+    expect(Number.isInteger((rowSeparator[1]! + separatorWidth / 2) * 2.5 + 0.7)).toBe(true);
+
+    const selectedEdge = vi
+      .mocked(context.fillRect)
+      .mock.calls.find(([x, _y, width]) => x > 30 && width < 2)!;
+    expect(selectedEdge[2]! * 2.5).toBe(4);
+    const rightEdge = (selectedEdge[0]! + selectedEdge[2]!) * 2.5 + 0.3;
+    expect(rightEdge).toBeCloseTo(Math.round(rightEdge), 8);
+  });
+
+  test("snaps frozen header clips at fractional zoom with a translated backing store", () => {
+    const transform = { a: 2.5, d: 2.5, e: 0.3, f: 0.7 };
+    const context = createContext(transform);
+    paintSheetHeaders(context, {
+      frame: createFrame(0, 0, 0, 1.25),
+      selection: { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0, mode: "cells" },
+      quickTools: { enabled: false, gutter: 0 },
+      palette: DEFAULT_SHEET_HEADER_PALETTE,
+    });
+
+    expect(context.rect).toHaveBeenCalledTimes(4);
+    for (const [x, y, width, height] of vi.mocked(context.rect).mock.calls) {
+      expect(x * transform.a + transform.e).toBeCloseTo(
+        Math.round(x * transform.a + transform.e),
+        8,
+      );
+      expect(y * transform.d + transform.f).toBeCloseTo(
+        Math.round(y * transform.d + transform.f),
+        8,
+      );
+      expect((x + width) * transform.a + transform.e).toBeCloseTo(
+        Math.round((x + width) * transform.a + transform.e),
+        8,
+      );
+      expect((y + height) * transform.d + transform.f).toBeCloseTo(
+        Math.round((y + height) * transform.d + transform.f),
+        8,
+      );
+    }
   });
 });

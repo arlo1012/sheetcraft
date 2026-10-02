@@ -1,4 +1,5 @@
 import type { Point, Rect, Size } from "@idea10/sheet-engine/geometry";
+import { createCanvasPixelGrid } from "../../../shared/canvas/pixel-grid";
 import type { PageViewPaintState } from "../page-view-types";
 
 export const PAGE_LAYOUT_DESKTOP_COLOR = "#e5e7eb";
@@ -15,6 +16,23 @@ function intersection(left: Rect, right: Rect): Rect | undefined {
   const width = Math.min(left.x + left.width, right.x + right.width) - x;
   const height = Math.min(left.y + left.height, right.y + right.height) - y;
   return width > 0 && height > 0 ? { x, y, width, height } : undefined;
+}
+
+function strokeRect(
+  context: CanvasRenderingContext2D,
+  rect: Rect,
+  width: number,
+  pixelGrid: ReturnType<typeof createCanvasPixelGrid>,
+): void {
+  const left = pixelGrid.strokeX(rect.x, width);
+  const top = pixelGrid.strokeY(rect.y, width);
+  context.lineWidth = width;
+  context.strokeRect(
+    left,
+    top,
+    pixelGrid.strokeX(rect.x + rect.width, width) - left,
+    pixelGrid.strokeY(rect.y + rect.height, width) - top,
+  );
 }
 
 /** The printable rectangle in body viewport coordinates, if it is visible. */
@@ -55,8 +73,9 @@ export function clipPageBreakPreviewPrintArea(
   printed: Rect | undefined,
 ): boolean {
   if (!printed) return false;
+  const clipped = createCanvasPixelGrid(context).snapRect(printed);
   context.beginPath();
-  context.rect(printed.x, printed.y, printed.width, printed.height);
+  context.rect(clipped.x, clipped.y, clipped.width, clipped.height);
   context.clip();
   return true;
 }
@@ -67,9 +86,14 @@ export function clipPageBreakPreviewOutside(
   printed: Rect | undefined,
   viewport: Size,
 ): void {
+  const pixelGrid = createCanvasPixelGrid(context);
+  const clippedViewport = pixelGrid.snapRect({ x: 0, y: 0, ...viewport });
   context.beginPath();
-  context.rect(0, 0, viewport.width, viewport.height);
-  if (printed) context.rect(printed.x, printed.y, printed.width, printed.height);
+  context.rect(clippedViewport.x, clippedViewport.y, clippedViewport.width, clippedViewport.height);
+  if (printed) {
+    const clippedPrinted = pixelGrid.snapRect(printed);
+    context.rect(clippedPrinted.x, clippedPrinted.y, clippedPrinted.width, clippedPrinted.height);
+  }
   context.clip(printed ? "evenodd" : "nonzero");
 }
 
@@ -80,7 +104,7 @@ export function clipPageContents(
 ): void {
   context.beginPath();
   for (const page of state.pages) {
-    const rect = translated(page.contentRect, scroll);
+    const rect = createCanvasPixelGrid(context).snapRect(translated(page.contentRect, scroll));
     context.rect(rect.x, rect.y, rect.width, rect.height);
   }
   context.clip();
@@ -93,7 +117,9 @@ export function paintPageLayoutBackground(
   scroll: Point,
   viewport: Size,
   paperColor: string,
+  screenScale = 1,
 ): void {
+  const pixelGrid = createCanvasPixelGrid(context, screenScale);
   context.fillStyle = PAGE_LAYOUT_DESKTOP_COLOR;
   context.fillRect(0, 0, viewport.width, viewport.height);
   for (const page of state.pages) {
@@ -104,12 +130,11 @@ export function paintPageLayoutBackground(
     context.fillStyle = paperColor;
     context.fillRect(paper.x, paper.y, paper.width, paper.height);
     context.strokeStyle = "#b8bdc6";
-    context.lineWidth = 1;
-    context.strokeRect(paper.x, paper.y, paper.width, paper.height);
+    strokeRect(context, paper, pixelGrid.screenStrokeWidth(1), pixelGrid);
     context.save();
     context.setLineDash([2, 3]);
     context.strokeStyle = "#d5d9e0";
-    context.strokeRect(content.x, content.y, content.width, content.height);
+    strokeRect(context, content, pixelGrid.screenStrokeWidth(1), pixelGrid);
     context.restore();
   }
 }
@@ -120,8 +145,10 @@ export function paintPageBreakPreview(
   state: PageViewPaintState,
   scroll: Point,
   viewport: Size,
+  screenScale = 1,
 ): void {
   const area = translated(state.printRect, scroll);
+  const pixelGrid = createCanvasPixelGrid(context, screenScale);
   context.save();
   context.fillStyle = "rgba(95,105,121,0.28)";
   context.textAlign = "center";
@@ -146,21 +173,24 @@ export function paintPageBreakPreview(
     );
   }
   context.strokeStyle = BREAK_COLOR;
-  context.lineWidth = 2;
+  const pageBreakWidth = pixelGrid.screenStrokeWidth(2);
+  context.lineWidth = pageBreakWidth;
   context.setLineDash([]);
-  context.strokeRect(area.x, area.y, area.width, area.height);
+  strokeRect(context, area, pageBreakWidth, pixelGrid);
   for (const line of state.rowBreaks) {
     context.setLineDash(line.kind === "automatic" ? [6, 4] : []);
     context.beginPath();
-    context.moveTo(area.x, line.offset - scroll.y);
-    context.lineTo(area.x + area.width, line.offset - scroll.y);
+    const y = pixelGrid.strokeY(line.offset - scroll.y, pageBreakWidth);
+    context.moveTo(pixelGrid.snapX(area.x), y);
+    context.lineTo(pixelGrid.snapX(area.x + area.width), y);
     context.stroke();
   }
   for (const line of state.columnBreaks) {
     context.setLineDash(line.kind === "automatic" ? [6, 4] : []);
     context.beginPath();
-    context.moveTo(line.offset - scroll.x, area.y);
-    context.lineTo(line.offset - scroll.x, area.y + area.height);
+    const x = pixelGrid.strokeX(line.offset - scroll.x, pageBreakWidth);
+    context.moveTo(x, pixelGrid.snapY(area.y));
+    context.lineTo(x, pixelGrid.snapY(area.y + area.height));
     context.stroke();
   }
   const dragBoundary = state.dragBoundary;
@@ -181,15 +211,18 @@ export function paintPageBreakPreview(
         : area.y < viewport.height && area.y + area.height > 0;
     if (inViewport && hasVisibleSpan && (inPrintArea || dragBoundary.removing)) {
       context.strokeStyle = dragBoundary.removing ? "#b45454" : BREAK_COLOR;
-      context.lineWidth = 3;
+      const dragWidth = pixelGrid.screenStrokeWidth(3);
+      context.lineWidth = dragWidth;
       context.setLineDash(dragBoundary.removing ? [5, 3] : []);
       context.beginPath();
       if (dragBoundary.axis === "row") {
-        context.moveTo(area.x, offset);
-        context.lineTo(area.x + area.width, offset);
+        const y = pixelGrid.strokeY(offset, dragWidth);
+        context.moveTo(pixelGrid.snapX(area.x), y);
+        context.lineTo(pixelGrid.snapX(area.x + area.width), y);
       } else {
-        context.moveTo(offset, area.y);
-        context.lineTo(offset, area.y + area.height);
+        const x = pixelGrid.strokeX(offset, dragWidth);
+        context.moveTo(x, pixelGrid.snapY(area.y));
+        context.lineTo(x, pixelGrid.snapY(area.y + area.height));
       }
       context.stroke();
     }
@@ -206,9 +239,15 @@ export function paintPageBreakPreview(
       y - radius <= viewport.height
     ) {
       context.strokeStyle = BREAK_COLOR;
-      context.lineWidth = 2;
+      const cornerWidth = pixelGrid.screenStrokeWidth(2);
+      context.lineWidth = cornerWidth;
       context.setLineDash([]);
-      context.strokeRect(x - radius, y - radius, radius * 2, radius * 2);
+      strokeRect(
+        context,
+        { x: x - radius, y: y - radius, width: radius * 2, height: radius * 2 },
+        cornerWidth,
+        pixelGrid,
+      );
     }
   }
   context.restore();

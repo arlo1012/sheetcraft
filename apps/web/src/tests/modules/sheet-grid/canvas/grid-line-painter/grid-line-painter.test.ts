@@ -9,10 +9,16 @@ function cell(x: number, y: number, style?: CellStyle, width = 20, height = 20):
   return { rect: { x, y, width, height }, style };
 }
 
-function lines(cells: Cell[]): Segment[] {
+function drawing(cells: Cell[], zoom = 1, dpr = 1) {
   const segments: Segment[] = [];
   let start = [0, 0];
   const context = {
+    getTransform: () => ({
+      a: zoom * dpr,
+      d: zoom * dpr,
+      e: zoom === 1 ? 0 : 0.3,
+      f: zoom === 1 ? 0 : -0.65,
+    }),
     beginPath() {},
     moveTo(x: number, y: number) {
       start = [x, y];
@@ -22,8 +28,12 @@ function lines(cells: Cell[]): Segment[] {
     },
     stroke() {},
   } as unknown as CanvasRenderingContext2D;
-  paintGridLines(context, cells, "#ddd");
-  return segments;
+  paintGridLines(context, cells, "#ddd", zoom);
+  return { segments, width: context.lineWidth };
+}
+
+function lines(cells: Cell[]): Segment[] {
+  return drawing(cells).segments;
 }
 
 describe("filled cell gridlines", () => {
@@ -96,8 +106,32 @@ describe("filled cell gridlines", () => {
   });
 
   test("matches adjacent fractional edges despite floating-point rounding", () => {
-    expect(lines([cell(0.1, 0, undefined, 0.2), cell(0.3, 0, { fillColor: "#f00" })])).toEqual([
-      [0.1, 19.5, 0.1 + 0.2, 19.5],
+    expect(lines([cell(10.1, 0, undefined, 20.2), cell(30.3, 0, { fillColor: "#f00" })])).toEqual([
+      [10, 19.5, 30, 19.5],
     ]);
+  });
+
+  test.each([
+    [1.25, 1, 1],
+    [1.5, 1, 1],
+    [2, 1, 1],
+    [4, 1, 1],
+    [1.25, 2, 2],
+    [0.8, 1.25, 1],
+  ])("keeps grid strokes crisp and thin at zoom %s, DPR %s", (zoom, dpr, physicalWidth) => {
+    const { segments, width } = drawing([cell(0.15, 0.3, undefined, 37.25, 19.5)], zoom, dpr);
+    const density = zoom * dpr;
+    expect(width * density).toBeCloseTo(physicalWidth);
+    expect(segments).toHaveLength(2);
+    for (const [x1, y1, x2, y2] of segments) {
+      const horizontal = y1 === y2;
+      const center = horizontal ? y1 * density - 0.65 : x1 * density + 0.3;
+      for (const edge of [center - physicalWidth / 2, center + physicalWidth / 2])
+        expect(edge).toBeCloseTo(Math.round(edge), 9);
+      const ends = horizontal
+        ? [x1 * density + 0.3, x2 * density + 0.3]
+        : [y1 * density - 0.65, y2 * density - 0.65];
+      for (const end of ends) expect(end).toBeCloseTo(Math.round(end), 9);
+    }
   });
 });

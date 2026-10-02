@@ -124,6 +124,46 @@ describe("overlay painter", () => {
     expect(context.fillRect).toHaveBeenCalledWith(0, 0, 40, 20);
   });
 
+  test.each([
+    [1.25, 1, 1],
+    [2, 1, 1],
+    [4, 1, 1],
+    [1.25, 2, 2],
+    [0.8, 1.25, 1],
+  ])("keeps selection width stable at zoom %s, DPR %s", (zoom, dpr, physicalWidth) => {
+    const frame = { ...createFrame(), scale: zoom };
+    const context = createContext();
+    const density = zoom * dpr;
+    vi.mocked(context.getTransform).mockReturnValue({
+      a: density,
+      d: density,
+      e: 0.3,
+      f: -0.65,
+    } as DOMMatrix);
+    const fragments = frame.layout.getRangeFragments({
+      start: { row: 0, column: 0 },
+      end: { row: 2, column: 2 },
+    });
+    paintSheetForeground(context, frame, { rangeRects: fragments }, palette, 0);
+    expect(context.lineWidth * density).toBeCloseTo(physicalWidth);
+    expect(context.stroke).toHaveBeenCalledTimes(8);
+    for (const [x, y, width, height] of vi.mocked(context.rect).mock.calls) {
+      for (const edge of [
+        x * density + 0.3,
+        (x + width) * density + 0.3,
+        y * density - 0.65,
+        (y + height) * density - 0.65,
+      ])
+        expect(edge).toBeCloseTo(Math.round(edge), 9);
+    }
+    for (const [index, [x1, y1]] of vi.mocked(context.moveTo).mock.calls.entries()) {
+      const [, y2] = vi.mocked(context.lineTo).mock.calls[index]!;
+      const center = y1 === y2 ? y1 * density - 0.65 : x1 * density + 0.3;
+      for (const edge of [center - physicalWidth / 2, center + physicalWidth / 2])
+        expect(edge).toBeCloseTo(Math.round(edge), 9);
+    }
+  });
+
   test("does not draw duplicate range-outline seams where frozen fragments meet", () => {
     const frame = createFrame();
     const context = createContext();
@@ -177,7 +217,7 @@ describe("overlay painter", () => {
       palette,
     );
 
-    expect(context.fillRect).toHaveBeenCalledWith(0, 43.5, 156, 1);
+    expect(context.fillRect).toHaveBeenCalledWith(0, 44, 156, 1);
     expect(context.fillRect).toHaveBeenCalledWith(36, 53, 120, 2);
     expect(context.fillText).toHaveBeenCalledWith("Insert row", 51, 72);
   });

@@ -166,6 +166,7 @@ function paint(): void {
         errorIndicator: props.errorIndicatorColor ?? props.environment.cells.errorIndicator,
       },
       showGridLines,
+      screenScale: frame.scale,
       skipBackground: Boolean(props.pageView),
       editingCell: props.editing ? props.activeCell : undefined,
       errorCells: props.errorCells,
@@ -181,6 +182,7 @@ function paint(): void {
       frame.layout.bodyScrollPosition,
       frame.layout.viewportSize,
       props.environment.cells.background,
+      frame.scale,
     );
     clipPageContents(context, props.pageView, frame.layout.bodyScrollPosition);
     paintScene(props.showGridLines);
@@ -215,6 +217,7 @@ function paint(): void {
       props.pageView,
       frame.layout.bodyScrollPosition,
       frame.layout.viewportSize,
+      frame.scale,
     );
   context.restore();
   paintSheetForeground(context, frame, props.overlays, props.environment.overlays, 0);

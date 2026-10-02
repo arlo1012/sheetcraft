@@ -1,3 +1,5 @@
+import { createCanvasPixelGrid } from "../../../shared/canvas/pixel-grid";
+
 /** Lucide GripHorizontal/GripVertical geometry at the original 12px icon size. */
 export function paintGripIcon(
   context: CanvasRenderingContext2D,
@@ -5,10 +7,11 @@ export function paintGripIcon(
   y: number,
   horizontal: boolean,
   color: string,
+  screenScale = 1,
 ): void {
   context.save();
   context.strokeStyle = color;
-  context.lineWidth = 1;
+  context.lineWidth = createCanvasPixelGrid(context, screenScale).screenStrokeWidth(1);
   for (const along of [-3.5, 0, 3.5]) {
     for (const across of [-1.5, 1.5]) {
       context.beginPath();
