@@ -66,8 +66,8 @@ shrinks the corresponding header/footer offset in the same undoable change.
 Each page renders static left, center, and right header/footer previews. Empty
 sections may show a compact Add header/Add footer marker when there is enough paper
 space; zero or constrained top/bottom margins hide both marker and content to avoid
-overlapping worksheet cells. Page Setup owns editing: selecting a marker opens Custom Header/Footer from its
-Header/Footer tab and targets the corresponding section. The custom dialog confirms
+overlapping worksheet cells. Page Setup owns editing: selecting a marker opens its Header/Footer tab.
+Selecting a preview section or Custom Header/Footer opens the corresponding editor. The custom dialog confirms
 into the outer local draft; only confirming Page Setup submits one Core command.
 Canceling either dialog discards that dialog's changes. The editor supports first/odd/even variants,
 multiline text, formatting, and page number, page count, sheet name, file name, date,

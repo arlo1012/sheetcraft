@@ -64,7 +64,6 @@ function resetDraft(): void {
   activeTab.value = props.headerFooterTarget ? "header-footer" : (props.initialTab ?? "page");
   customVisible.value = false;
   customTarget.value = undefined;
-  if (props.headerFooterTarget) openCustom(props.headerFooterTarget);
 }
 function confirm(): void {
   const printArea = parsePageSetupRange(references.value.printArea);
@@ -115,7 +114,6 @@ watch(
   (target) => {
     if (props.visible && target) {
       activeTab.value = "header-footer";
-      openCustom(target);
     }
   },
   { deep: true },
