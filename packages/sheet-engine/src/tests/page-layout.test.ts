@@ -8,6 +8,7 @@ import {
   createPageLayoutProjection,
   createPageLayoutViewportLayout,
   createSheetPagination,
+  getPageLayoutRange,
 } from "../page-layout.js";
 import { createRowVisibilityIndex } from "../visibility.js";
 
@@ -45,6 +46,188 @@ function fixture(options?: {
 }
 
 describe("page layout", () => {
+  test("rounds a compact editable range through complete terminal paper cells without adding print pages", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 100,
+      columnCount: 26,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({
+      rowCount: 100,
+      defaultRowHeight: 20,
+    });
+    const setup = { ...DEFAULT_SHEET_PAGE_SETUP, scale: 100 };
+    const printRange = {
+      start: { row: 0, column: 0 },
+      end: { row: 0, column: 0 },
+    };
+    const layoutRange = getPageLayoutRange({
+      geometry,
+      rows,
+      setup,
+      printRange,
+      contentRange: printRange,
+    });
+    const pagination = createSheetPagination({
+      geometry,
+      rows,
+      setup,
+      printRange,
+      layoutRange,
+    });
+    const finalRow = pagination.pageRows.at(-1)!;
+    const finalColumn = pagination.pageColumns.at(-1)!;
+
+    expect(layoutRange).toEqual({
+      start: { row: 0, column: 0 },
+      end: { row: finalRow.end, column: finalColumn.end },
+    });
+    expect(layoutRange.end.row).toBeGreaterThan(0);
+    expect(layoutRange.end.column).toBeGreaterThan(0);
+    expect(pagination.pageCount).toBe(1);
+    expect(
+      (rows.getBoundaryOffset(layoutRange.end.row + 2) ?? Infinity) - finalRow.offset,
+    ).toBeGreaterThan(pagination.contentSize.height);
+    expect(
+      geometry.getColumnOffset(layoutRange.end.column + 1) +
+        geometry.getColumnWidth(layoutRange.end.column + 1) -
+        finalColumn.offset,
+    ).toBeGreaterThan(pagination.contentSize.width);
+  });
+
+  test("ignores manual breaks outside the print area when completing layout-only pages", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 120,
+      columnCount: 40,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({ rowCount: 120, defaultRowHeight: 20 });
+    const setup = {
+      ...DEFAULT_SHEET_PAGE_SETUP,
+      scale: 100,
+      rowBreaks: [50],
+      columnBreaks: [20],
+    };
+    const printRange = { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } };
+    const layoutRange = getPageLayoutRange({
+      geometry,
+      rows,
+      setup,
+      printRange,
+      contentRange: { start: { row: 0, column: 0 }, end: { row: 90, column: 30 } },
+    });
+    const pagination = createSheetPagination({ geometry, rows, setup, printRange, layoutRange });
+
+    expect(pagination.pageRows.at(-1)!.end).toBe(layoutRange.end.row);
+    expect(pagination.pageColumns.at(-1)!.end).toBe(layoutRange.end.column);
+    expect(pagination.rowBreaks).toEqual([]);
+    expect(pagination.columnBreaks).toEqual([]);
+  });
+
+  test("keeps print-start boundaries while completing a layout range past the print area", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 120,
+      columnCount: 40,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({ rowCount: 120, defaultRowHeight: 20 });
+    const setup = { ...DEFAULT_SHEET_PAGE_SETUP, scale: 100 };
+    const printRange = { start: { row: 50, column: 20 }, end: { row: 50, column: 20 } };
+    const layoutRange = getPageLayoutRange({
+      geometry,
+      rows,
+      setup,
+      printRange,
+      contentRange: { start: { row: 0, column: 0 }, end: { row: 90, column: 30 } },
+    });
+    const pagination = createSheetPagination({ geometry, rows, setup, printRange, layoutRange });
+
+    expect(pagination.pageRows.some((axis) => axis.start === printRange.start.row)).toBe(true);
+    expect(pagination.pageColumns.some((axis) => axis.start === printRange.start.column)).toBe(
+      true,
+    );
+    expect(pagination.pageRows.at(-1)!.end).toBe(layoutRange.end.row);
+    expect(pagination.pageColumns.at(-1)!.end).toBe(layoutRange.end.column);
+  });
+
+  test("keeps page-layout surface bounded to layout papers instead of normal grid allocation", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 100,
+      columnCount: 26,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({
+      rowCount: 100,
+      defaultRowHeight: 20,
+    });
+    const setup = { ...DEFAULT_SHEET_PAGE_SETUP, scale: 100 };
+    const printRange = {
+      start: { row: 0, column: 0 },
+      end: { row: 0, column: 0 },
+    };
+    const layoutRange = getPageLayoutRange({
+      geometry,
+      rows,
+      setup,
+      printRange,
+      contentRange: printRange,
+    });
+    const pagination = createSheetPagination({
+      geometry,
+      rows,
+      setup,
+      printRange,
+      layoutRange,
+    });
+    const projection = createPageLayoutProjection({
+      geometry,
+      rows,
+      pagination,
+    });
+
+    expect(projection.geometry.rowCount).toBe(layoutRange.end.row + 1);
+    expect(projection.geometry.columnCount).toBe(layoutRange.end.column + 1);
+    expect(projection.rows.rowCount).toBe(layoutRange.end.row + 1);
+    expect(projection.rows.getBoundaryOffset(projection.rows.rowCount)).toBe(
+      projection.geometry.getTotalSize().height,
+    );
+    expect(projection.geometry.getTotalSize().width).toBeLessThan(geometry.getTotalSize().width);
+    expect(projection.geometry.getTotalSize().height).toBeLessThan(rows.getTotalHeight());
+  });
+
+  test("does not stretch a compact page range through trailing hidden axes", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 100,
+      columnCount: 26,
+      rowHeight: 20,
+      columnWidth: 80,
+    });
+    const rows = createRowVisibilityIndex({
+      rowCount: 100,
+      defaultRowHeight: 20,
+      hiddenRows: Array.from({ length: 99 }, (_, index) => index + 1),
+    });
+    const setup = { ...DEFAULT_SHEET_PAGE_SETUP, scale: 100 };
+    const printRange = {
+      start: { row: 0, column: 0 },
+      end: { row: 0, column: 0 },
+    };
+
+    expect(
+      getPageLayoutRange({
+        geometry,
+        rows,
+        setup,
+        printRange,
+        contentRange: printRange,
+      }).end.row,
+    ).toBe(0);
+  });
+
   test("paginates visible whole cells and preserves manual boundaries", () => {
     const { rows, pagination } = fixture({
       hiddenRows: [3],

@@ -61,8 +61,7 @@ describe("SheetGrid page views", () => {
 
     const state = pageView(wrapper);
     const first = state.pages[0]!;
-    const next = state.pages.find((page) => page.paperRect.x > first.paperRect.x);
-    expect(next).toBeDefined();
+    expect(state.pages).toHaveLength(1);
 
     await triggerSurfacePoint(wrapper, {
       x: getSheetRenderFrame(wrapper).body.x + first.paperRect.x + 1,

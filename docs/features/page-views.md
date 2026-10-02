@@ -37,7 +37,14 @@ rulers, and page gaps. A view-only 20-pixel desktop inset surrounds the paper;
 its physical size is independent of percentage print scaling. Selection, navigation, editing, borders, and images
 use that same coordinate projection. Paper margins and gaps do not select cells;
 a selection crossing pages remains one logical range with separate visual
-fragments. Allocated blank cells remain editable outside the printable range.
+fragments. Page layout has its own compact editable range, beginning with the
+content, print range, and current selection. An empty sheet starts with one paper.
+The final paper bands include all whole rows and columns that fit; these blank
+cells stay virtual and do not enlarge the saved print range or workbook content.
+Navigation expands to the required paper. Outward wheel input at a scroll edge
+adds one complete paper band on that axis, while returning to page layout drops
+unused extra papers. Ordinary grid allocation remains independent. Canvas cells,
+headers, and selection fragments are still enumerated only for the viewport.
 
 The top and left rulers are 18px strips outside the 36 by 22px headings; the current visible
 page also shows compact top and bottom markers. They share paper/content coordinates

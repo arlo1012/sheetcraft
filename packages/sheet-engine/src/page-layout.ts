@@ -16,8 +16,17 @@ import {
 
 /** The sheet rendering modes which share workbook state but use different coordinates. */
 export type SheetViewMode = "normal" | "page-break-preview" | "page-layout";
-export type PageBreak = { index: number; kind: "automatic" | "manual"; offset: number };
-export type PageAxis = { start: number; end: number; offset: number; size: number };
+export type PageBreak = {
+  index: number;
+  kind: "automatic" | "manual";
+  offset: number;
+};
+export type PageAxis = {
+  start: number;
+  end: number;
+  offset: number;
+  size: number;
+};
 export type SheetPageBoundary = {
   axis: "row" | "column";
   kind: "automatic" | "manual" | "print-start" | "print-end";
@@ -113,6 +122,52 @@ function lastVisibleColumn(geometry: SheetGeometry, start: number, end: number):
   for (let column = end; column >= start; column -= 1)
     if (geometry.getColumnWidth(column) > 0) return column;
   return null;
+}
+
+/**
+ * Finds the final visible row which fits after `start` without walking every
+ * default-height row in a long sparse sheet. A first row which is taller than
+ * a page still occupies its own page, matching the pagination contract.
+ */
+function lastRowWithinCapacity(
+  rows: RowVisibilityIndex,
+  start: number,
+  limit: number,
+  capacity: number,
+): number | null {
+  const first = firstVisibleRow(rows, start, limit);
+  if (first === null) return null;
+  const startOffset = rows.getBoundaryOffset(start) ?? 0;
+  const limitOffset = rows.getBoundaryOffset(limit + 1) ?? startOffset;
+  const probe = Math.min(limitOffset - 0.000001, startOffset + capacity - 0.000001);
+  const candidate = rows.getLogicalRowAtOffset(probe);
+  if (candidate === null || candidate < first) return first;
+  const candidateEnd = rows.getBoundaryOffset(candidate + 1) ?? startOffset;
+  if (candidateEnd <= startOffset + capacity) return Math.min(candidate, limit);
+  return rows.getPreviousVisibleRow(candidate) ?? first;
+}
+
+/** Column counterpart of `lastRowWithinCapacity`, using geometry's sparse lookup. */
+function lastColumnWithinCapacity(
+  geometry: SheetGeometry,
+  start: number,
+  limit: number,
+  capacity: number,
+): number | null {
+  const first = firstVisibleColumn(geometry, start, limit);
+  if (first === null) return null;
+  const startOffset = geometry.getColumnOffset(start);
+  const limitOffset = geometry.getColumnOffset(limit) + geometry.getColumnWidth(limit);
+  const probe = Math.min(limitOffset - 0.000001, startOffset + capacity - 0.000001);
+  const candidate = geometry.getCellAtPoint({ x: probe, y: 0 })?.column ?? null;
+  if (candidate === null || candidate < first) return first;
+  const candidateEnd = geometry.getColumnOffset(candidate) + geometry.getColumnWidth(candidate);
+  if (candidateEnd <= startOffset + capacity) return Math.min(candidate, limit);
+  const previous = geometry.getCellAtPoint({
+    x: geometry.getColumnOffset(candidate) - 0.000001,
+    y: 0,
+  })?.column;
+  return previous !== undefined && previous >= first ? previous : first;
 }
 
 function getBoundaryScale(options: {
@@ -377,23 +432,13 @@ function createRowPages(
     const nextManual = manual.find((row) => row > start && row <= range.end.row);
     const limit = nextManual === undefined ? range.end.row : nextManual - 1;
     let end = start - 1;
-    let size = 0;
-    let cursor = firstVisibleRow(rows, start, limit);
+    const cursor = lastRowWithinCapacity(rows, start, limit, capacity);
     if (cursor === null) {
       axes.push({ start, end: limit, offset: rows.getBoundaryOffset(start) ?? 0, size: 0 });
       start = limit + 1;
       continue;
     }
-    while (cursor !== null && cursor <= limit) {
-      const visible = rows.getVisibleRow(cursor)!;
-      if (end >= start && size + visible.height > capacity) break;
-      size += visible.height;
-      end = cursor;
-      const next = rows.getNextVisibleRow(cursor);
-      if (next === null || next > limit) break;
-      cursor = next;
-    }
-    if (end < start) end = cursor ?? limit;
+    end = cursor;
     const remainingRow = lastVisibleRow(rows, end + 1, limit);
     if (end < limit && (remainingRow === null || remainingRow < end + 1)) end = limit;
     // A break through a merge is moved past the merge whenever it does not make an empty page.
@@ -438,28 +483,13 @@ function createColumnPages(
     const nextManual = manual.find((column) => column > start && column <= range.end.column);
     const limit = nextManual === undefined ? range.end.column : nextManual - 1;
     let end = start - 1;
-    let size = 0;
-    let cursor = firstVisibleColumn(geometry, start, limit);
+    const cursor = lastColumnWithinCapacity(geometry, start, limit, capacity);
     if (cursor === null) {
       axes.push({ start, end: limit, offset: geometry.getColumnOffset(start), size: 0 });
       start = limit + 1;
       continue;
     }
-    while (cursor !== null && cursor <= limit) {
-      const width = geometry.getColumnWidth(cursor);
-      if (end >= start && size + width > capacity) break;
-      size += width;
-      end = cursor;
-      let next: number | null = null;
-      for (let candidate: number = cursor + 1; candidate <= limit; candidate += 1)
-        if (geometry.getColumnWidth(candidate) > 0) {
-          next = candidate;
-          break;
-        }
-      if (next === null || starts.has(next)) break;
-      cursor = next;
-    }
-    if (end < start) end = cursor ?? limit;
+    end = cursor;
     const remainingColumn = lastVisibleColumn(geometry, end + 1, limit);
     if (end < limit && (remainingColumn === null || remainingColumn < end + 1)) end = limit;
     const crossing = merged.find(
@@ -484,6 +514,190 @@ function createColumnPages(
     start = nextStart;
   }
   return { axes, breaks };
+}
+
+function getPageDimensions(setup: SheetPageSetup): {
+  paperSize: Size;
+  contentSize: Size;
+  printScale: number;
+} {
+  const paperMm = getPagePaperSize(setup);
+  const printScale = setup.scale / 100;
+  const paperSize = {
+    width: (paperMm.width * PX_PER_MM) / printScale,
+    height: (paperMm.height * PX_PER_MM) / printScale,
+  };
+  return {
+    paperSize,
+    contentSize: {
+      width: Math.max(
+        1,
+        paperSize.width -
+          (setup.margins.left * PX_PER_MM) / printScale -
+          (setup.margins.right * PX_PER_MM) / printScale,
+      ),
+      height: Math.max(
+        1,
+        paperSize.height -
+          (setup.margins.top * PX_PER_MM) / printScale -
+          (setup.margins.bottom * PX_PER_MM) / printScale,
+      ),
+    },
+    printScale,
+  };
+}
+
+function expandLayoutRangeThroughMerges(range: CellRange, merged: readonly CellRange[]): CellRange {
+  const expanded: CellRange = {
+    start: { ...range.start },
+    end: { ...range.end },
+  };
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const merge of merged) {
+      if (
+        merge.start.row <= expanded.end.row &&
+        merge.start.column <= expanded.end.column &&
+        merge.end.row >= expanded.start.row &&
+        merge.end.column >= expanded.start.column
+      ) {
+        const row = Math.max(expanded.end.row, merge.end.row);
+        const column = Math.max(expanded.end.column, merge.end.column);
+        changed ||= row !== expanded.end.row || column !== expanded.end.column;
+        expanded.end.row = row;
+        expanded.end.column = column;
+      }
+    }
+  }
+  return expanded;
+}
+
+function extendFinalRowPage(options: {
+  rows: RowVisibilityIndex;
+  range: CellRange;
+  capacity: number;
+  manual: readonly number[];
+  merged: readonly CellRange[];
+}): number {
+  const { rows, range, capacity, manual, merged } = options;
+  const last = createRowPages(rows, range, capacity, manual, merged).axes.at(-1)!;
+  const nextManual = manual.find((row) => row > last.start && row < rows.rowCount);
+  const limit = nextManual === undefined ? rows.rowCount - 1 : nextManual - 1;
+  const pageStart = rows.getBoundaryOffset(last.start) ?? 0;
+  let end = range.end.row;
+  let cursor = firstVisibleRow(rows, end + 1, limit);
+  while (cursor !== null) {
+    const cellEnd = rows.getBoundaryOffset(cursor + 1) ?? pageStart;
+    if (cellEnd - pageStart > capacity) break;
+    end = cursor;
+    cursor = firstVisibleRow(rows, cursor + 1, limit);
+  }
+  return end;
+}
+
+function extendFinalColumnPage(options: {
+  geometry: SheetGeometry;
+  range: CellRange;
+  capacity: number;
+  manual: readonly number[];
+  merged: readonly CellRange[];
+}): number {
+  const { geometry, range, capacity, manual, merged } = options;
+  const last = createColumnPages(geometry, range, capacity, manual, merged).axes.at(-1)!;
+  const nextManual = manual.find((column) => column > last.start && column < geometry.columnCount);
+  const limit = nextManual === undefined ? geometry.columnCount - 1 : nextManual - 1;
+  const pageStart = geometry.getColumnOffset(last.start);
+  let end = range.end.column;
+  let cursor = firstVisibleColumn(geometry, end + 1, limit);
+  while (cursor !== null) {
+    const cellEnd = geometry.getColumnOffset(cursor) + geometry.getColumnWidth(cursor);
+    if (cellEnd - pageStart > capacity) break;
+    end = cursor;
+    cursor = firstVisibleColumn(geometry, cursor + 1, limit);
+  }
+  return end;
+}
+
+/**
+ * Returns the editable range for page-layout view. The requested sparse-content
+ * extent remains compact, but its final row and column page bands are completed
+ * with real, unmaterialized blank cells. Print pagination remains independent.
+ */
+export function getPageLayoutRange(options: {
+  geometry: SheetGeometry;
+  rows: RowVisibilityIndex;
+  setup: SheetPageSetup;
+  printRange: CellRange;
+  contentRange: CellRange;
+  mergedCells?: readonly CellRange[];
+}): CellRange {
+  const { geometry, rows, setup } = options;
+  const printRange: CellRange = {
+    start: {
+      row: Math.min(options.printRange.start.row, options.printRange.end.row),
+      column: Math.min(options.printRange.start.column, options.printRange.end.column),
+    },
+    end: {
+      row: Math.max(options.printRange.start.row, options.printRange.end.row),
+      column: Math.max(options.printRange.start.column, options.printRange.end.column),
+    },
+  };
+  const inputEnd = {
+    row: Math.max(options.contentRange.start.row, options.contentRange.end.row, printRange.end.row),
+    column: Math.max(
+      options.contentRange.start.column,
+      options.contentRange.end.column,
+      printRange.end.column,
+    ),
+  };
+  if (
+    inputEnd.row < 0 ||
+    inputEnd.column < 0 ||
+    inputEnd.row >= geometry.rowCount ||
+    inputEnd.column >= geometry.columnCount
+  )
+    throw new RangeError("Page layout range is outside the grid.");
+  if (rows.rowCount !== geometry.rowCount)
+    throw new RangeError("Row visibility count must match geometry row count.");
+  const dimensions = getPageDimensions(setup);
+  const rowManual = [
+    ...setup.rowBreaks.filter((row) => row > printRange.start.row && row <= printRange.end.row),
+    ...(printRange.start.row > 0 ? [printRange.start.row] : []),
+  ].sort((left, right) => left - right);
+  const columnManual = [
+    ...setup.columnBreaks.filter(
+      (column) => column > printRange.start.column && column <= printRange.end.column,
+    ),
+    ...(printRange.start.column > 0 ? [printRange.start.column] : []),
+  ].sort((left, right) => left - right);
+  const merged = options.mergedCells ?? [];
+  let range: CellRange = { start: { row: 0, column: 0 }, end: inputEnd };
+  // A merge can extend one terminal axis, which in turn can expose another merge.
+  // Repeat until both axes have a complete page band around all exposed merges.
+  for (;;) {
+    range = expandLayoutRangeThroughMerges(range, merged);
+    if (range.end.row >= geometry.rowCount || range.end.column >= geometry.columnCount)
+      throw new RangeError("Merged cell is outside the grid.");
+    const end = {
+      row: extendFinalRowPage({
+        rows,
+        range,
+        capacity: dimensions.contentSize.height,
+        manual: rowManual,
+        merged,
+      }),
+      column: extendFinalColumnPage({
+        geometry,
+        range,
+        capacity: dimensions.contentSize.width,
+        manual: columnManual,
+        merged,
+      }),
+    };
+    if (end.row === range.end.row && end.column === range.end.column) return range;
+    range = { ...range, end };
+  }
 }
 
 export function createSheetPagination(options: {
@@ -514,21 +728,12 @@ export function createSheetPagination(options: {
     throw new RangeError("Print range is outside the grid.");
   if (rows.rowCount !== geometry.rowCount)
     throw new RangeError("Row visibility count must match geometry row count.");
-  const paperMm = getPagePaperSize(setup);
-  const printScale = setup.scale / 100;
-  const paperSize = {
-    width: (paperMm.width * PX_PER_MM) / printScale,
-    height: (paperMm.height * PX_PER_MM) / printScale,
-  };
+  const { paperSize, contentSize, printScale } = getPageDimensions(setup);
   const margins = {
     left: (setup.margins.left * PX_PER_MM) / printScale,
     right: (setup.margins.right * PX_PER_MM) / printScale,
     top: (setup.margins.top * PX_PER_MM) / printScale,
     bottom: (setup.margins.bottom * PX_PER_MM) / printScale,
-  };
-  const contentSize = {
-    width: Math.max(1, paperSize.width - margins.left - margins.right),
-    height: Math.max(1, paperSize.height - margins.top - margins.bottom),
   };
   const layoutSource = options.layoutRange ?? printRange;
   const layoutRange: CellRange = {
@@ -755,16 +960,31 @@ export function createPageLayoutProjection(options: {
     left: firstPaper.contentRect.x - firstPaper.paperRect.x,
     top: showWhiteSpace ? firstPaper.contentRect.y - firstPaper.paperRect.y : 0,
   };
+  const lastRowAxis = pagination.pageRows.at(-1)!;
+  const lastColumnAxis = pagination.pageColumns.at(-1)!;
   const totalWidth = Math.max(
-    base.getTotalSize().width + pagePadding * 2,
     pagination.pageColumns.length * paperStride.width -
       PAGE_GAP / pagination.printScale +
       pagePadding * 2,
+    pagePadding +
+      (pagination.pageColumns.length - 1) * paperStride.width +
+      margin.left +
+      lastColumnAxis.size +
+      pagePadding,
   );
   const totalHeight = Math.max(
-    source.getTotalHeight() + pagePadding * 2,
     pagination.pageRows.length * paperStride.height - interPageGap + pagePadding * 2,
+    pagePadding +
+      (pagination.pageRows.length - 1) * paperStride.height +
+      margin.top +
+      lastRowAxis.size +
+      pagePadding,
   );
+  const layoutRowCount = lastRowAxis.end + 1;
+  const layoutColumnCount = lastColumnAxis.end + 1;
+  const lastVisibleLayoutRow = lastVisibleRow(source, 0, lastRowAxis.end);
+  const layoutVisibleRowCount =
+    lastVisibleLayoutRow === null ? 0 : (source.getVisibleIndex(lastVisibleLayoutRow) ?? -1) + 1;
   function getPage(rowPage: number, columnPage: number): SheetPage | null {
     const page = pagination.getPage(rowPage, columnPage);
     if (!page) return null;
@@ -856,18 +1076,34 @@ export function createPageLayoutProjection(options: {
   }
   const rows: RowVisibilityIndex = {
     ...source,
+    rowCount: layoutRowCount,
+    visibleRowCount: layoutVisibleRowCount,
+    isRowVisible(row) {
+      return row >= 0 && row < layoutRowCount && source.isRowVisible(row);
+    },
+    getVisibleIndex(row) {
+      return row >= 0 && row < layoutRowCount ? source.getVisibleIndex(row) : null;
+    },
+    getLogicalRow(index) {
+      const row = source.getLogicalRow(index);
+      return row !== null && row < layoutRowCount ? row : null;
+    },
     getVisibleRow(row) {
+      if (row < 0 || row >= layoutRowCount) return null;
       const visible = source.getVisibleRow(row);
       const offset = rowOffset(row);
       return visible && offset !== null ? { ...visible, offset } : null;
     },
-    getRowOffset: rowOffset,
+    getRowOffset(row) {
+      return row >= 0 && row < layoutRowCount ? rowOffset(row) : null;
+    },
     getVisibleOffset(index) {
       const row = source.getLogicalRow(index);
-      return row === null ? null : rowOffset(row);
+      return row === null || row >= layoutRowCount ? null : rowOffset(row);
     },
     getBoundaryOffset(row) {
-      if (row === source.rowCount) return totalHeight;
+      if (row === layoutRowCount) return totalHeight;
+      if (row < 0 || row > layoutRowCount) return null;
       const pageIndex = rowPageFor(row);
       const page = pagination.pageRows[pageIndex];
       if (page)
@@ -888,6 +1124,14 @@ export function createPageLayoutProjection(options: {
       if (local < 0 || local >= page.size) return null;
       const row = source.getLogicalRowAtOffset(page.offset + local);
       return row !== null && row >= page.start && row <= page.end ? row : null;
+    },
+    getNextVisibleRow(row) {
+      const next = source.getNextVisibleRow(row);
+      return next !== null && next < layoutRowCount ? next : null;
+    },
+    getPreviousVisibleRow(row) {
+      const previous = source.getPreviousVisibleRow(row);
+      return previous !== null && previous < layoutRowCount ? previous : null;
     },
     getVisibleRowsInViewport(offset, height, overscan = 0) {
       const result: VisibleRow[] = [];
@@ -930,6 +1174,8 @@ export function createPageLayoutProjection(options: {
   };
   const projected: SheetGeometry = {
     ...base,
+    rowCount: layoutRowCount,
+    columnCount: layoutColumnCount,
     getRowOffset(row) {
       const value = rowOffset(row);
       if (value === null) throw new RangeError("Row is outside page layout print range.");
@@ -1051,6 +1297,13 @@ export function createPageLayoutViewportLayout(options: {
       height: base.viewportSize.height,
     });
     for (const page of visible) {
+      if (
+        page.range.end.row < range.start.row ||
+        page.range.start.row > range.end.row ||
+        page.range.end.column < range.start.column ||
+        page.range.start.column > range.end.column
+      )
+        continue;
       const fragment: CellRange = {
         start: {
           row: Math.max(range.start.row, page.range.start.row),

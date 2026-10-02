@@ -20,6 +20,7 @@ import {
   createPageLayoutProjection,
   createPageLayoutViewportLayout,
   createSheetPagination,
+  getPageLayoutRange,
   type SheetViewMode,
 } from "@idea10/sheet-engine/page-layout";
 import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@idea10/core/page-setup";
@@ -31,6 +32,7 @@ import {
   DEFAULT_ROW_HEIGHT,
   DEFAULT_COLUMN_WIDTH,
   MAX_SHEET_ROWS,
+  MAX_SHEET_COLUMNS,
   type CellAddress,
   type CellRange,
 } from "@idea10/core/workbook";
@@ -67,6 +69,7 @@ export function useSheetViewport(options: {
   const gridExtent = reactive<GridExtent>(createGridExtent(options.initialExtent));
   let resizeObserver: ResizeObserver | null = null;
   let stopGeometryWatch: WatchStopHandle | undefined;
+  let stopPageLayoutWatch: WatchStopHandle | undefined;
   let nativeScrollVersion = 0;
 
   function applyGridExtent(nextExtent: GridExtent): void {
@@ -75,6 +78,10 @@ export function useSheetViewport(options: {
   }
 
   function ensureGridExtentContains(address: CellAddress): void {
+    if (viewMode.value === "page-layout") {
+      ensurePageLayoutContains(address);
+      return;
+    }
     applyGridExtent(
       expandGridExtentForAddress(gridExtent, address, options.getGridExtentPolicy().growth),
     );
@@ -93,65 +100,8 @@ export function useSheetViewport(options: {
   // Metadata may reference cells beyond the initial blank-grid allocation.
   ensureGridExtentContainsMetadata();
 
-  const baseGeometry = computed(() =>
-    createSheetGeometry({
-      rowCount: gridExtent.rowCount,
-      columnCount: gridExtent.columnCount,
-      rowHeights: options.getRowHeights(),
-      columnWidths: options.getColumnWidths(),
-      columnWidth: options.getDefaultColumnWidth?.() ?? DEFAULT_COLUMN_WIDTH,
-      hiddenRows: options.getHiddenRows?.(),
-      hiddenColumns: options.getHiddenColumns?.(),
-    }),
-  );
-  const baseRows = computed(() =>
-    createRowVisibilityIndex({
-      rowCount: gridExtent.rowCount,
-      defaultRowHeight: DEFAULT_ROW_HEIGHT,
-      rowHeights: options.getRowHeights(),
-      hiddenIntervals: options.getHiddenRowIntervals(),
-      hiddenRows: options.getHiddenRows?.(),
-    }),
-  );
-  const viewMode = computed(() => options.getViewMode?.() ?? "normal");
-  const pagination = computed(() => {
-    if (viewMode.value === "normal") return undefined;
-    const setup = options.getPageSetup?.() ?? DEFAULT_SHEET_PAGE_SETUP;
-    const extent = options.getContentExtent();
-    return createSheetPagination({
-      geometry: baseGeometry.value,
-      rows: baseRows.value,
-      setup,
-      printRange: options.getPrintRange?.() ??
-        setup.printArea ?? {
-          start: { row: 0, column: 0 },
-          end: {
-            row: Math.max(0, extent.rowCount - 1),
-            column: Math.max(0, extent.columnCount - 1),
-          },
-        },
-      layoutRange: {
-        start: { row: 0, column: 0 },
-        end: { row: gridExtent.rowCount - 1, column: gridExtent.columnCount - 1 },
-      },
-      mergedCells: options.getMergedCells(),
-    });
-  });
-  const pageProjection = computed(() =>
-    viewMode.value === "page-layout" && pagination.value
-      ? createPageLayoutProjection({
-          geometry: baseGeometry.value,
-          rows: baseRows.value,
-          pagination: pagination.value,
-          showWhiteSpace: options.getShowPageWhiteSpace?.() ?? true,
-          pagePadding: options.getPagePadding?.() ?? 0,
-        })
-      : undefined,
-  );
-  const geometry = computed(() => pageProjection.value?.geometry ?? baseGeometry.value);
-  const rowVisibility = computed(() => pageProjection.value?.rows ?? baseRows.value);
-  // Sparse full-sheet metrics resolve a viewport past the current allocation without
-  // adding a render tail or materializing the intervening empty rows and columns.
+  // Full-sheet metrics stay sparse; they let a paper extend past the normal
+  // grid allocation without creating blank workbook cells.
   const extentGeometry = computed(() =>
     createSheetGeometry({
       rowHeights: options.getRowHeights(),
@@ -170,6 +120,132 @@ export function useSheetViewport(options: {
       hiddenRows: options.getHiddenRows?.(),
     }),
   );
+  const viewMode = computed(() => options.getViewMode?.() ?? "normal");
+
+  function getSelectionExtent(): GridExtent {
+    const selection = options.getSelection();
+    const mode = getSelectionMode(selection);
+    return {
+      rowCount:
+        Math.max(
+          selection.active.row,
+          mode === "cells" || mode === "rows" ? selection.anchor.row : 0,
+          mode === "cells" || mode === "rows" ? selection.focus.row : 0,
+        ) + 1,
+      columnCount:
+        Math.max(
+          selection.active.column,
+          mode === "cells" || mode === "columns" ? selection.anchor.column : 0,
+          mode === "cells" || mode === "columns" ? selection.focus.column : 0,
+        ) + 1,
+    };
+  }
+  const pageLayoutExtent = reactive<GridExtent>(getSelectionExtent());
+  const pageLayoutRange = computed(() => {
+    const setup = options.getPageSetup?.() ?? DEFAULT_SHEET_PAGE_SETUP;
+    const extent = options.getContentExtent();
+    const contentRange = {
+      start: { row: 0, column: 0 },
+      end: {
+        row: Math.max(1, extent.rowCount, pageLayoutExtent.rowCount) - 1,
+        column: Math.max(1, extent.columnCount, pageLayoutExtent.columnCount) - 1,
+      },
+    };
+    return getPageLayoutRange({
+      geometry: extentGeometry.value,
+      rows: extentRows.value,
+      setup,
+      printRange: options.getPrintRange?.() ??
+        setup.printArea ?? {
+          start: { row: 0, column: 0 },
+          end: {
+            row: Math.max(0, extent.rowCount - 1),
+            column: Math.max(0, extent.columnCount - 1),
+          },
+        },
+      contentRange,
+      mergedCells: options.getMergedCells(),
+    });
+  });
+  const renderExtent = computed<GridExtent>(() =>
+    viewMode.value === "page-layout"
+      ? {
+          rowCount: pageLayoutRange.value.end.row + 1,
+          columnCount: pageLayoutRange.value.end.column + 1,
+        }
+      : gridExtent,
+  );
+  const baseExtent = computed<GridExtent>(() => ({
+    rowCount: Math.max(gridExtent.rowCount, renderExtent.value.rowCount),
+    columnCount: Math.max(gridExtent.columnCount, renderExtent.value.columnCount),
+  }));
+
+  function ensurePageLayoutContains(address: CellAddress): void {
+    if (address.row >= renderExtent.value.rowCount)
+      pageLayoutExtent.rowCount = Math.max(pageLayoutExtent.rowCount, address.row + 1);
+    if (address.column >= renderExtent.value.columnCount)
+      pageLayoutExtent.columnCount = Math.max(pageLayoutExtent.columnCount, address.column + 1);
+  }
+
+  const baseGeometry = computed(() =>
+    createSheetGeometry({
+      rowCount: baseExtent.value.rowCount,
+      columnCount: baseExtent.value.columnCount,
+      rowHeights: options.getRowHeights(),
+      columnWidths: options.getColumnWidths(),
+      columnWidth: options.getDefaultColumnWidth?.() ?? DEFAULT_COLUMN_WIDTH,
+      hiddenRows: options.getHiddenRows?.(),
+      hiddenColumns: options.getHiddenColumns?.(),
+    }),
+  );
+  const baseRows = computed(() =>
+    createRowVisibilityIndex({
+      rowCount: baseExtent.value.rowCount,
+      defaultRowHeight: DEFAULT_ROW_HEIGHT,
+      rowHeights: options.getRowHeights(),
+      hiddenIntervals: options.getHiddenRowIntervals(),
+      hiddenRows: options.getHiddenRows?.(),
+    }),
+  );
+  const pagination = computed(() => {
+    if (viewMode.value === "normal") return undefined;
+    const setup = options.getPageSetup?.() ?? DEFAULT_SHEET_PAGE_SETUP;
+    const extent = options.getContentExtent();
+    return createSheetPagination({
+      geometry: baseGeometry.value,
+      rows: baseRows.value,
+      setup,
+      printRange: options.getPrintRange?.() ??
+        setup.printArea ?? {
+          start: { row: 0, column: 0 },
+          end: {
+            row: Math.max(0, extent.rowCount - 1),
+            column: Math.max(0, extent.columnCount - 1),
+          },
+        },
+      layoutRange:
+        viewMode.value === "page-layout"
+          ? pageLayoutRange.value
+          : {
+              start: { row: 0, column: 0 },
+              end: { row: gridExtent.rowCount - 1, column: gridExtent.columnCount - 1 },
+            },
+      mergedCells: options.getMergedCells(),
+    });
+  });
+  const pageProjection = computed(() =>
+    viewMode.value === "page-layout" && pagination.value
+      ? createPageLayoutProjection({
+          geometry: baseGeometry.value,
+          rows: baseRows.value,
+          pagination: pagination.value,
+          showWhiteSpace: options.getShowPageWhiteSpace?.() ?? true,
+          pagePadding: options.getPagePadding?.() ?? 0,
+        })
+      : undefined,
+  );
+  const geometry = computed(() => pageProjection.value?.geometry ?? baseGeometry.value);
+  const rowVisibility = computed(() => pageProjection.value?.rows ?? baseRows.value);
   const mergeResolver = computed(() => {
     const ranges = options.getMergedCells();
     return ranges.length > 0 ? new MergedCellRangeResolver(ranges) : undefined;
@@ -225,7 +301,14 @@ export function useSheetViewport(options: {
   }
 
   function getViewportExtent(): GridExtent {
-    if (viewMode.value === "page-layout") return { ...gridExtent };
+    if (viewMode.value === "page-layout") {
+      const pages =
+        pageProjection.value?.getVisiblePages({ ...scrollPosition, ...viewportSize }) ?? [];
+      return {
+        rowCount: Math.max(1, ...pages.map((page) => page.range.end.row + 1)),
+        columnCount: Math.max(1, ...pages.map((page) => page.range.end.column + 1)),
+      };
+    }
     const metrics = extentGeometry.value;
     const rows = extentRows.value;
     const freeze = options.getFreezePanes();
@@ -252,6 +335,7 @@ export function useSheetViewport(options: {
   }
 
   function ensureGridExtentCoversViewport(includeTail = true): void {
+    if (viewMode.value === "page-layout") return;
     const minimum = getViewportExtent();
     const policy = options.getGridExtentPolicy();
     if (includeTail) {
@@ -266,6 +350,20 @@ export function useSheetViewport(options: {
     const viewport = getViewportExtent();
     const content = options.getContentExtent();
     const selection = options.getSelection();
+    if (viewMode.value === "page-layout") {
+      const selected = getSelectionExtent();
+      if (axes.y)
+        pageLayoutExtent.rowCount = Math.min(
+          pageLayoutExtent.rowCount,
+          Math.max(viewport.rowCount, content.rowCount, selected.rowCount),
+        );
+      if (axes.x)
+        pageLayoutExtent.columnCount = Math.min(
+          pageLayoutExtent.columnCount,
+          Math.max(viewport.columnCount, content.columnCount, selected.columnCount),
+        );
+      return;
+    }
     const required = expandGridExtent(
       options.initialExtent,
       {
@@ -334,11 +432,20 @@ export function useSheetViewport(options: {
   watch(
     viewMode,
     () => {
+      if (viewMode.value === "page-layout") {
+        Object.assign(pageLayoutExtent, getSelectionExtent());
+      } else {
+        const selection = options.getSelection();
+        ensureGridExtentContains(selection.active);
+        ensureGridExtentContains(selection.anchor);
+        ensureGridExtentContains(selection.focus);
+        ensureGridExtentCoversViewport(false);
+      }
       setNativeScrollPosition({ x: 0, y: 0 });
       ensureSelectionVisible(options.getSelection().active, "cells");
       emitViewState();
     },
-    { flush: "post" },
+    { flush: "sync" },
   );
 
   watch(
@@ -355,6 +462,7 @@ export function useSheetViewport(options: {
     address: CellAddress,
     mode = getSelectionMode(options.getSelection()),
   ): void {
+    if (viewMode.value === "page-layout") ensurePageLayoutContains(address);
     const next = layout.value.getScrollPositionForAddress(address);
     const position = { ...scrollPosition };
     if (mode !== "rows" && mode !== "all") position.x = next.x;
@@ -401,6 +509,20 @@ export function useSheetViewport(options: {
 
   function expandAtWheelEdge(delta: Point, horizontal: boolean, vertical: boolean): void {
     const maximum = getScrollMaximum();
+    if (viewMode.value === "page-layout") {
+      const pages = pagination.value!;
+      if (vertical && delta.y > 0 && scrollPosition.y >= maximum.y - 1)
+        pageLayoutExtent.rowCount = Math.max(
+          pageLayoutExtent.rowCount,
+          Math.min(MAX_SHEET_ROWS, pages.pageRows.at(-1)!.end + 2),
+        );
+      if (horizontal && delta.x > 0 && scrollPosition.x >= maximum.x - 1)
+        pageLayoutExtent.columnCount = Math.max(
+          pageLayoutExtent.columnCount,
+          Math.min(MAX_SHEET_COLUMNS, pages.pageColumns.at(-1)!.end + 2),
+        );
+      return;
+    }
     const growth = options.getGridExtentPolicy().growth;
     applyGridExtent(
       expandGridExtent(
@@ -467,6 +589,7 @@ export function useSheetViewport(options: {
       ? createSheetGridViewState(viewState)
       : createSheetGridViewState({ gridExtent: options.initialExtent });
     applyGridExtent(next.gridExtent);
+    Object.assign(pageLayoutExtent, getSelectionExtent());
     ensureGridExtentContains(next.selection.focus);
     ensureGridExtentContains(next.selection.anchor);
     ensureGridExtentContains(next.selection.active);
@@ -493,6 +616,19 @@ export function useSheetViewport(options: {
 
   function startGeometryWatch(): void {
     stopGeometryWatch?.();
+    // A smaller paper band must still contain the current blank-cell selection.
+    // Track geometry changes rather than every click inside an already full page.
+    stopPageLayoutWatch?.();
+    stopPageLayoutWatch = watch(
+      [() => options.getPageSetup?.() ?? DEFAULT_SHEET_PAGE_SETUP, extentGeometry, extentRows],
+      () => {
+        if (viewMode.value !== "page-layout") return;
+        const selected = getSelectionExtent();
+        pageLayoutExtent.rowCount = Math.max(pageLayoutExtent.rowCount, selected.rowCount);
+        pageLayoutExtent.columnCount = Math.max(pageLayoutExtent.columnCount, selected.columnCount);
+      },
+      { deep: true, flush: "sync" },
+    );
     stopGeometryWatch = watch(
       [geometry, rowVisibility],
       ([nextGeometry, nextRows], [previousGeometry, previousRows]) => {
@@ -523,6 +659,8 @@ export function useSheetViewport(options: {
   function stopGeometryWatching(): void {
     stopGeometryWatch?.();
     stopGeometryWatch = undefined;
+    stopPageLayoutWatch?.();
+    stopPageLayoutWatch = undefined;
   }
 
   return {
@@ -535,6 +673,7 @@ export function useSheetViewport(options: {
     getCurrentViewState,
     gridCanvasStyle,
     gridExtent,
+    renderExtent,
     horizontalScrollState,
     ensureGridExtentContains,
     ensureGridExtentCoversViewport,

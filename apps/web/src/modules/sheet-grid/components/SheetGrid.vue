@@ -486,6 +486,7 @@ const {
   getCellAtClientPoint,
   gridCanvasStyle,
   gridExtent,
+  renderExtent,
   horizontalScrollState,
   ensureGridExtentContains,
   ensureGridExtentCoversViewport,
@@ -674,8 +675,8 @@ const {
 });
 const selectedRange = computed(() =>
   getSelectionRange(selection.value, {
-    rowCount: gridExtent.rowCount,
-    columnCount: gridExtent.columnCount,
+    rowCount: renderExtent.value.rowCount,
+    columnCount: renderExtent.value.columnCount,
   }),
 );
 const quickToolsAvailable = computed(
@@ -1029,11 +1030,11 @@ const overlayState = computed<SheetOverlayState>(() => {
       : [
           ...layout.value.getRangeFragments({
             start: { row: range.start.row, column: 0 },
-            end: { row: range.end.row, column: gridExtent.columnCount - 1 },
+            end: { row: range.end.row, column: renderExtent.value.columnCount - 1 },
           }),
           ...layout.value.getRangeFragments({
             start: { row: 0, column: range.start.column },
-            end: { row: gridExtent.rowCount - 1, column: range.end.column },
+            end: { row: renderExtent.value.rowCount - 1, column: range.end.column },
           }),
         ];
   return {
@@ -1587,6 +1588,10 @@ function setSelection(
   selectedImageId.value = null;
   axisContextMenu.value = undefined;
   cellContextMenu.value = undefined;
+  ensureGridExtentContains(visibleAddress);
+  ensureGridExtentContains(nextSelection.active);
+  ensureGridExtentContains(nextSelection.anchor);
+  ensureGridExtentContains(nextSelection.focus);
   const normalized = normalizeSelectionForSheet(nextSelection);
   if (!areSelectionsEqual(selection.value, normalized)) {
     // Extending a range does not change its active cell or the cell content layer.
@@ -1595,7 +1600,6 @@ function setSelection(
     }
     selection.value = normalized;
   }
-  ensureGridExtentContains(visibleAddress);
   ensureSelectionVisible(visibleAddress, nextSelection.mode);
   emitViewState();
   if (restoreFocus) {
@@ -2470,6 +2474,9 @@ function restoreViewState(viewState?: SheetGridViewState): void {
   cellContextMenu.value = undefined;
   clearPendingClipboard();
   cancelEdit(false);
+  ensureGridExtentContains(nextViewState.selection.active);
+  ensureGridExtentContains(nextViewState.selection.anchor);
+  ensureGridExtentContains(nextViewState.selection.focus);
   const normalized = normalizeSelectionForSheet(nextViewState.selection);
   selection.value = normalized;
   restoreViewport({ ...nextViewState, selection: normalized });
@@ -2588,8 +2595,8 @@ defineExpose({
     :aria-readonly="readOnly"
     :data-sheet-view="viewMode"
     :data-page-count="pagination?.pageCount"
-    :aria-rowcount="gridExtent.rowCount"
-    :aria-colcount="gridExtent.columnCount"
+    :aria-rowcount="renderExtent.rowCount"
+    :aria-colcount="renderExtent.columnCount"
     aria-multiselectable="true"
     @wheel="onWheel"
     @keydown.capture="onGridKeydown"
