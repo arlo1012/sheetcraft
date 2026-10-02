@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
-import { ColorPicker as TColorPicker } from "tdesign-vue-next/es/color-picker";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
 import {
@@ -24,6 +23,7 @@ import {
 } from "@idea10/core/page-setup";
 import type { HeaderFooterEditorAction, HeaderFooterEditContext } from "../header-footer-editor";
 import { useAppI18n } from "../../../shared/i18n";
+import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
 import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
 import RibbonToolbar from "../../../shared/ribbon/RibbonToolbar.vue";
 
@@ -61,8 +61,8 @@ function selectFont(value: SelectValue): void {
 function selectSize(value: SelectValue): void {
   if (typeof value === "number") format({ fontSize: value });
 }
-function selectColor(value: string): void {
-  format({ color: value.replace(/^#/, "") });
+function selectColor(value: string | null): void {
+  format({ color: (value ?? "#000000").replace(/^#/, "") });
 }
 </script>
 
@@ -122,18 +122,14 @@ function selectColor(value: string): void {
             @activate="format({ underline: !context.format.underline })"
             ><Underline
           /></RibbonButton>
-          <label>
-            <span class="ui-visually-hidden">{{ t("pageLayout.headerFooterColor") }}</span>
-            <TColorPicker
+          <div class="page-header-footer-toolbar__color">
+            <ColorPaletteSelect
               :model-value="`#${context.format.color}`"
-              format="HEX"
-              :popup-props="{
-                overlayClassName: 'page-header-footer-toolbar__popup',
-              }"
+              :label="t('pageLayout.headerFooterColor')"
               :disabled="disabled"
-              @change="selectColor"
+              @select="selectColor"
             />
-          </label>
+          </div>
         </div>
       </div>
     </section>
@@ -269,6 +265,10 @@ function selectColor(value: string): void {
   }
 
   &__size {
+    width: 65px;
+  }
+
+  &__color {
     width: 65px;
   }
 
