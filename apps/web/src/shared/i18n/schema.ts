@@ -830,6 +830,11 @@ export type MessageSchema = ToolMessageSchema & {
     page: string;
     worksheet: string;
     headerFooterDialogHint: string;
+    headerFooterFontHint: string;
+    headerFooterFieldsHint: string;
+    headerFooterLeft: string;
+    headerFooterCenter: string;
+    headerFooterRight: string;
     headerFooterTools: string;
     headerFooterFormatting: string;
     headerFooterFields: string;

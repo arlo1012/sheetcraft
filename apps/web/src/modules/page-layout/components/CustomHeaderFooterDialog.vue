@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
-import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
-import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
+import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
 import {
   getSheetHeaderFooterOptions,
@@ -35,7 +34,7 @@ const emit = defineEmits<{
   confirm: [setup: SheetPageSetup];
 }>();
 const { t } = useAppI18n();
-const form = ref<InstanceType<typeof TForm>>();
+const fieldRoot = ref<HTMLElement>();
 const draft = ref<SheetPageSetup>(cloneHeaderFooterDraft(props.setup));
 const setupError = ref("");
 const section = computed(() => props.target?.section ?? "header");
@@ -60,11 +59,16 @@ const changedHeaderFooterSections = new Set<string>();
 const headerFooterFormats = reactive(new Map<string, HeaderFooterFormat>());
 const activeHeaderFooterContext = ref<HeaderFooterActiveContext>();
 const fieldLabels = computed(() => headerFooterLabels(t));
-const headerFooterVariants = computed(() => [
-  { label: t("pageLayout.headerFooterOddPages"), value: "odd" },
-  { label: t("pageLayout.headerFooterFirstPage"), value: "first" },
-  { label: t("pageLayout.headerFooterEvenPages"), value: "even" },
-]);
+const showFirstPage = computed(
+  () => headerFooter.value.differentFirst || props.target?.variant === "first",
+);
+const showEvenPages = computed(
+  () => headerFooter.value.differentOddEven || props.target?.variant === "even",
+);
+const activeText = computed(() => {
+  const context = activeHeaderFooterContext.value;
+  return context ? headerFooterText.value[context.variant][context.section][context.part] : "";
+});
 const headerFooterToolbarContext = computed(() => {
   const context = activeHeaderFooterContext.value;
   if (!context) return undefined;
@@ -183,7 +187,7 @@ function headerFooterInput(
   section: HeaderFooterSection,
   part: HeaderFooterPart,
 ): HTMLTextAreaElement | null {
-  const element = form.value?.$el as HTMLElement | undefined;
+  const element = fieldRoot.value;
   return (
     element?.querySelector<HTMLTextAreaElement>(
       `[data-page-setup="${section}-${part}"] textarea`,
@@ -274,6 +278,8 @@ function headerFooterInputStyle(
     fontStyle: format.italic ? "italic" : "normal",
     textDecoration: format.underline ? "underline" : "none",
     color: `#${format.color}`,
+    height: "100px",
+    resize: "none",
   };
 }
 
@@ -286,7 +292,7 @@ function onHeaderFooterKeydown(_: unknown, context: { e: KeyboardEvent }): void 
 
 function focusHeaderFooterTarget(): void {
   const target =
-    props.target ?? ({ section: section.value, part: "center", variant: "odd" } as const);
+    props.target ?? ({ section: section.value, part: "left", variant: "odd" } as const);
   headerFooterVariant.value = target.variant;
   void nextTick(() => {
     const input = headerFooterInput(target.section, target.part);
@@ -334,8 +340,8 @@ watch(
 <template>
   <Dialog
     :visible="visible"
-    :header="t(section === 'header' ? 'pageLayout.customHeader' : 'pageLayout.customFooter')"
-    width="min(680px, calc(100vw - 32px))"
+    :header="t(section === 'header' ? 'pageLayout.header' : 'pageLayout.footer')"
+    width="min(560px, calc(100vw - 32px))"
     :confirm-btn="t('pageLayout.confirm')"
     :cancel-btn="t('pageLayout.cancel')"
     :close-on-overlay-click="false"
@@ -343,148 +349,142 @@ watch(
     @confirm="confirm"
     @close="close"
   >
-    <TForm ref="form" :data="draft" layout="vertical" class="header-footer-custom-dialog">
-      <TRadioGroup v-model="headerFooterVariant" data-page-setup="header-footer-variant"
-        ><TRadio
-          v-for="variant in headerFooterVariants"
-          :key="variant.value"
-          :value="variant.value"
-          >{{ variant.label }}</TRadio
-        ></TRadioGroup
-      >
-      <PageHeaderFooterToolbar
-        :setup="{ ...draft, headerFooter }"
-        :context="headerFooterToolbarContext"
-        :disabled="false"
-        :show-options="false"
-        :show-finish="false"
-        @action="handleHeaderFooterAction"
-      />
-      <div class="header-footer-custom-dialog__fields">
-        <template v-if="section === 'header'">
-          <TFormItem :label="t('pageLayout.headerLeft')">
-            <label class="page-setup-dialog__text-field">
-              <span class="ui-visually-hidden">{{ t("pageLayout.headerLeft") }}</span>
-              <TTextarea
-                :model-value="headerFooterText[headerFooterVariant].header.left"
-                @update:model-value="updateHeaderFooterText('header', 'left', $event)"
-                :aria-label="t('pageLayout.headerLeft')"
-                :maxlength="1024"
-                :style="headerFooterInputStyle('header', 'left')"
-                data-page-setup="header-left"
-                @focus="(_, context) => setHeaderFooterContext('header', 'left', context)"
-                @click="setHeaderFooterContext('header', 'left', $event)"
-                @keydown="onHeaderFooterKeydown"
-              />
-            </label>
-          </TFormItem>
-          <TFormItem :label="t('pageLayout.headerCenter')">
-            <label class="page-setup-dialog__text-field">
-              <span class="ui-visually-hidden">{{ t("pageLayout.headerCenter") }}</span>
-              <TTextarea
-                :model-value="headerFooterText[headerFooterVariant].header.center"
-                @update:model-value="updateHeaderFooterText('header', 'center', $event)"
-                :aria-label="t('pageLayout.headerCenter')"
-                :maxlength="1024"
-                :style="headerFooterInputStyle('header', 'center')"
-                data-page-setup="header-center"
-                @focus="(_, context) => setHeaderFooterContext('header', 'center', context)"
-                @click="setHeaderFooterContext('header', 'center', $event)"
-                @keydown="onHeaderFooterKeydown"
-              />
-            </label>
-          </TFormItem>
-          <TFormItem :label="t('pageLayout.headerRight')">
-            <label class="page-setup-dialog__text-field">
-              <span class="ui-visually-hidden">{{ t("pageLayout.headerRight") }}</span>
-              <TTextarea
-                :model-value="headerFooterText[headerFooterVariant].header.right"
-                @update:model-value="updateHeaderFooterText('header', 'right', $event)"
-                :aria-label="t('pageLayout.headerRight')"
-                :maxlength="1024"
-                :style="headerFooterInputStyle('header', 'right')"
-                data-page-setup="header-right"
-                @focus="(_, context) => setHeaderFooterContext('header', 'right', context)"
-                @click="setHeaderFooterContext('header', 'right', $event)"
-                @keydown="onHeaderFooterKeydown"
-              />
-            </label>
-          </TFormItem>
-        </template>
-        <template v-else>
-          <TFormItem :label="t('pageLayout.footerLeft')">
-            <label class="page-setup-dialog__text-field">
-              <span class="ui-visually-hidden">{{ t("pageLayout.footerLeft") }}</span>
-              <TTextarea
-                :model-value="headerFooterText[headerFooterVariant].footer.left"
-                @update:model-value="updateHeaderFooterText('footer', 'left', $event)"
-                :aria-label="t('pageLayout.footerLeft')"
-                :maxlength="1024"
-                :style="headerFooterInputStyle('footer', 'left')"
-                data-page-setup="footer-left"
-                @focus="(_, context) => setHeaderFooterContext('footer', 'left', context)"
-                @click="setHeaderFooterContext('footer', 'left', $event)"
-                @keydown="onHeaderFooterKeydown"
-              />
-            </label>
-          </TFormItem>
-          <TFormItem :label="t('pageLayout.footerCenter')">
-            <label class="page-setup-dialog__text-field">
-              <span class="ui-visually-hidden">{{ t("pageLayout.footerCenter") }}</span>
-              <TTextarea
-                :model-value="headerFooterText[headerFooterVariant].footer.center"
-                @update:model-value="updateHeaderFooterText('footer', 'center', $event)"
-                :aria-label="t('pageLayout.footerCenter')"
-                :maxlength="1024"
-                :style="headerFooterInputStyle('footer', 'center')"
-                data-page-setup="footer-center"
-                @focus="(_, context) => setHeaderFooterContext('footer', 'center', context)"
-                @click="setHeaderFooterContext('footer', 'center', $event)"
-                @keydown="onHeaderFooterKeydown"
-              />
-            </label>
-          </TFormItem>
-          <TFormItem :label="t('pageLayout.footerRight')">
-            <label class="page-setup-dialog__text-field">
-              <span class="ui-visually-hidden">{{ t("pageLayout.footerRight") }}</span>
-              <TTextarea
-                :model-value="headerFooterText[headerFooterVariant].footer.right"
-                @update:model-value="updateHeaderFooterText('footer', 'right', $event)"
-                :aria-label="t('pageLayout.footerRight')"
-                :maxlength="1024"
-                :style="headerFooterInputStyle('footer', 'right')"
-                data-page-setup="footer-right"
-                @focus="(_, context) => setHeaderFooterContext('footer', 'right', context)"
-                @click="setHeaderFooterContext('footer', 'right', $event)"
-                @keydown="onHeaderFooterKeydown"
-              />
-            </label>
-          </TFormItem>
-        </template>
+    <div ref="fieldRoot" class="header-footer-custom-dialog">
+      <TTabs v-model="headerFooterVariant" data-page-setup="header-footer-variant">
+        <TTabPanel
+          value="odd"
+          :label="
+            t(
+              showEvenPages
+                ? 'pageLayout.headerFooterOddPages'
+                : section === 'header'
+                  ? 'pageLayout.header'
+                  : 'pageLayout.footer',
+            )
+          "
+        />
+        <TTabPanel
+          v-if="showFirstPage"
+          value="first"
+          :label="t('pageLayout.headerFooterFirstPage')"
+        />
+        <TTabPanel
+          v-if="showEvenPages"
+          value="even"
+          :label="t('pageLayout.headerFooterEvenPages')"
+        />
+      </TTabs>
+      <div class="header-footer-custom-dialog__panel">
+        <div class="header-footer-custom-dialog__instructions">
+          <p>{{ t("pageLayout.headerFooterFontHint") }}</p>
+          <p>{{ t("pageLayout.headerFooterFieldsHint") }}</p>
+        </div>
+        <PageHeaderFooterToolbar
+          :context="headerFooterToolbarContext"
+          :disabled="false"
+          :active="visible"
+          :sample-text="activeText"
+          @action="handleHeaderFooterAction"
+        />
+        <div class="header-footer-custom-dialog__fields">
+          <label class="header-footer-custom-dialog__field">
+            <span>{{ t("pageLayout.headerFooterLeft") }}</span>
+            <TTextarea
+              :model-value="headerFooterText[headerFooterVariant][section].left"
+              @update:model-value="updateHeaderFooterText(section, 'left', String($event))"
+              :aria-label="
+                t(section === 'header' ? 'pageLayout.headerLeft' : 'pageLayout.footerLeft')
+              "
+              :maxlength="1024"
+              :allow-input-over-max="false"
+              :style="headerFooterInputStyle(section, 'left')"
+              :data-page-setup="`${section}-left`"
+              @focus="(_, context) => setHeaderFooterContext(section, 'left', context)"
+              @click="setHeaderFooterContext(section, 'left', $event)"
+              @keydown="onHeaderFooterKeydown"
+            />
+          </label>
+          <label class="header-footer-custom-dialog__field">
+            <span>{{ t("pageLayout.headerFooterCenter") }}</span>
+            <TTextarea
+              :model-value="headerFooterText[headerFooterVariant][section].center"
+              @update:model-value="updateHeaderFooterText(section, 'center', String($event))"
+              :aria-label="
+                t(section === 'header' ? 'pageLayout.headerCenter' : 'pageLayout.footerCenter')
+              "
+              :maxlength="1024"
+              :allow-input-over-max="false"
+              :style="headerFooterInputStyle(section, 'center')"
+              :data-page-setup="`${section}-center`"
+              @focus="(_, context) => setHeaderFooterContext(section, 'center', context)"
+              @click="setHeaderFooterContext(section, 'center', $event)"
+              @keydown="onHeaderFooterKeydown"
+            />
+          </label>
+          <label class="header-footer-custom-dialog__field">
+            <span>{{ t("pageLayout.headerFooterRight") }}</span>
+            <TTextarea
+              :model-value="headerFooterText[headerFooterVariant][section].right"
+              @update:model-value="updateHeaderFooterText(section, 'right', String($event))"
+              :aria-label="
+                t(section === 'header' ? 'pageLayout.headerRight' : 'pageLayout.footerRight')
+              "
+              :maxlength="1024"
+              :allow-input-over-max="false"
+              :style="headerFooterInputStyle(section, 'right')"
+              :data-page-setup="`${section}-right`"
+              @focus="(_, context) => setHeaderFooterContext(section, 'right', context)"
+              @click="setHeaderFooterContext(section, 'right', $event)"
+              @keydown="onHeaderFooterKeydown"
+            />
+          </label>
+        </div>
       </div>
       <p v-if="setupError" role="alert" class="header-footer-custom-dialog__error">
         {{ setupError }}
       </p>
-    </TForm>
+    </div>
   </Dialog>
 </template>
+
 <style scoped lang="scss">
 .header-footer-custom-dialog {
   display: grid;
   gap: var(--idea-space-3);
+
+  &__panel {
+    display: grid;
+    gap: var(--idea-space-3);
+    padding: var(--idea-tool-panel-padding);
+    border: 1px solid var(--idea-border-subtle);
+    border-radius: var(--idea-radius-medium);
+  }
+
+  &__instructions {
+    display: grid;
+    gap: var(--idea-space-1);
+
+    p {
+      margin: 0;
+      line-height: var(--idea-line-height-body-medium);
+    }
+  }
+
   &__fields {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--idea-space-3);
+    gap: var(--idea-space-2);
   }
+
+  &__field {
+    display: grid;
+    min-width: 0;
+    gap: var(--idea-space-1);
+  }
+
   &__error {
     margin: 0;
     color: var(--idea-status-error);
-  }
-  @media (max-width: 560px) {
-    &__fields {
-      grid-template-columns: minmax(0, 1fr);
-    }
   }
 }
 </style>

@@ -71,7 +71,7 @@ function presetValue(parts: SheetHeaderFooterParts): string {
 function selectPreset(section: "header" | "footer", value: SelectValue): void {
   const preset = presets.value.find((preset) => preset.value === value);
   if (preset) setup.value = { ...setup.value, [section]: { ...preset.parts } };
-  else if (value === "custom") emit("customEdit", { section, part: "center", variant: "odd" });
+  else if (value === "custom") emit("customEdit", { section, part: "left", variant: "odd" });
 }
 function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
   setup.value = { ...setup.value, headerFooter: { ...options.value, ...patch } };
@@ -132,7 +132,7 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
         /><TButton
           variant="outline"
           data-page-setup="custom-header"
-          @click="emit('customEdit', { section: 'header', part: 'center', variant: 'odd' })"
+          @click="emit('customEdit', { section: 'header', part: 'left', variant: 'odd' })"
           >{{ t("pageLayout.customHeader") }}</TButton
         >
       </div>
@@ -189,7 +189,7 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
         /><TButton
           variant="outline"
           data-page-setup="custom-footer"
-          @click="emit('customEdit', { section: 'footer', part: 'center', variant: 'odd' })"
+          @click="emit('customEdit', { section: 'footer', part: 'left', variant: 'odd' })"
           >{{ t("pageLayout.customFooter") }}</TButton
         >
       </div>

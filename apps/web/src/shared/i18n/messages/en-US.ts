@@ -868,6 +868,13 @@ export const enUS = {
     worksheet: "Sheet",
     headerFooterDialogHint:
       "Select a header or footer section, insert fields or format text, then confirm to apply.",
+    headerFooterFontHint:
+      "Place the cursor in an edit box, then choose Font to format that section.",
+    headerFooterFieldsHint:
+      "Place the cursor in an edit box, then choose a button to insert the page number, page count, date, time, file name or sheet name.",
+    headerFooterLeft: "Left",
+    headerFooterCenter: "Center",
+    headerFooterRight: "Right",
     headerFooterTools: "Header & Footer",
     headerFooterFormatting: "Formatting",
     headerFooterFields: "Header and footer fields",

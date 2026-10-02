@@ -1,6 +1,9 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
-import { RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
+import { Tabs as TTabs } from "tdesign-vue-next/es/tabs";
+import { Select as TSelect } from "tdesign-vue-next/es/select";
+import HeaderFooterFontDialog from "../../../../../modules/page-layout/components/HeaderFooterFontDialog.vue";
+import ColorPaletteSelect from "../../../../../shared/color/ColorPaletteSelect.vue";
 import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
 import CustomHeaderFooterDialog from "../../../../../modules/page-layout/components/CustomHeaderFooterDialog.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
@@ -15,6 +18,7 @@ describe("CustomHeaderFooterDialog", () => {
           ...DEFAULT_SHEET_PAGE_SETUP,
           headerFooter: {
             ...DEFAULT_SHEET_PAGE_SETUP.headerFooter!,
+            differentFirst: true,
             firstHeader: { left: '&"Calibri,Bold"&12&K112233Original', center: "", right: "" },
           },
         },
@@ -22,7 +26,7 @@ describe("CustomHeaderFooterDialog", () => {
     });
     try {
       const variantSelector = wrapper
-        .findAllComponents(TRadioGroup)
+        .findAllComponents(TTabs)
         .find((component) => component.attributes("data-page-setup") === "header-footer-variant");
       variantSelector!.vm.$emit("update:modelValue", "first");
       await wrapper.vm.$nextTick();
@@ -43,7 +47,7 @@ describe("CustomHeaderFooterDialog", () => {
     }
   });
 
-  test("applies toolbar formatting without text edits and confirms only on Ctrl+Enter", async () => {
+  test("keeps font changes local until confirmation and confirms text only on Ctrl+Enter", async () => {
     const wrapper = mount(CustomHeaderFooterDialog, {
       attachTo: document.body,
       global: { plugins: [createAppI18n("en-US")] },
@@ -56,10 +60,36 @@ describe("CustomHeaderFooterDialog", () => {
       },
     });
     try {
+      await wrapper.vm.$nextTick();
       const textarea = wrapper.get('[data-page-setup="header-center"] textarea');
-      await textarea.trigger("focus");
+      (textarea.element as HTMLTextAreaElement).focus();
+      await wrapper.vm.$nextTick();
       const toolbar = wrapper.findComponent({ name: "PageHeaderFooterToolbar" });
-      toolbar.vm.$emit("action", { type: "format", patch: { bold: true } });
+      await toolbar.get('[data-header-footer-action="font"]').trigger("click");
+      let font = toolbar.getComponent(HeaderFooterFontDialog);
+      const changeStyle = async (value: string) => {
+        font
+          .findAllComponents(TSelect)
+          .find((control) => control.attributes("data-header-footer-font") === "style")!
+          .vm.$emit("change", value);
+        await wrapper.vm.$nextTick();
+      };
+      await changeStyle("bold");
+      font.getComponent(ColorPaletteSelect).vm.$emit("select", "#2874A6");
+      font.findComponent({ name: "TDialog" }).vm.$emit("close");
+      await wrapper.vm.$nextTick();
+      expect(toolbar.emitted("action")).toBeUndefined();
+      await toolbar.get('[data-header-footer-action="font"]').trigger("click");
+      font = toolbar.getComponent(HeaderFooterFontDialog);
+      expect(
+        font
+          .findAllComponents(TSelect)
+          .find((control) => control.attributes("data-header-footer-font") === "style")!
+          .props("modelValue"),
+      ).toBe("regular");
+      expect(font.getComponent(ColorPaletteSelect).props("modelValue")).toBe("#000000");
+      await changeStyle("bold");
+      font.findComponent({ name: "TDialog" }).vm.$emit("confirm");
       await wrapper.vm.$nextTick();
       await textarea.trigger("keydown", { key: "Enter" });
       await textarea.trigger("keydown", { key: "Enter", ctrlKey: true, isComposing: true });

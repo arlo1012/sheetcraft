@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Radio as TRadio } from "tdesign-vue-next/es/radio";
 import CustomHeaderFooterDialog from "../../../../../modules/page-layout/components/CustomHeaderFooterDialog.vue";
+import HeaderFooterFontDialog from "../../../../../modules/page-layout/components/HeaderFooterFontDialog.vue";
 import ColorPaletteSelect from "../../../../../shared/color/ColorPaletteSelect.vue";
 import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
 import PageSetupDialog from "../../../../../modules/page-layout/components/PageSetupDialog.vue";
@@ -204,7 +205,12 @@ test("keeps custom header changes local until both dialogs confirm and discards 
         .value,
     ).toBe("Original");
     await child.get('[data-page-setup="header-center"] textarea').setValue("Draft title");
-    child.getComponent(ColorPaletteSelect).vm.$emit("select", "#2874A6");
+    await child.get('[data-page-setup="header-center"] textarea').trigger("focus");
+    await child.get('[data-header-footer-action="font"]').trigger("click");
+    const font = child.getComponent(HeaderFooterFontDialog);
+    font.getComponent(ColorPaletteSelect).vm.$emit("select", "#2874A6");
+    font.findComponent({ name: "TDialog" }).vm.$emit("confirm");
+    await wrapper.vm.$nextTick();
     child.findComponent({ name: "TDialog" }).vm.$emit("confirm");
     await wrapper.vm.$nextTick();
     expect(wrapper.emitted("confirm")).toBeUndefined();

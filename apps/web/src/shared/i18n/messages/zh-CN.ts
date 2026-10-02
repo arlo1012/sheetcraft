@@ -843,6 +843,12 @@ export const zhCN = {
     page: "页面",
     worksheet: "工作表",
     headerFooterDialogHint: "选择页眉或页脚区段，插入字段或设置文字格式；点击确定后应用。",
+    headerFooterFontHint: "将光标置于编辑框内，点击“字体”按钮设置当前区段的文字格式。",
+    headerFooterFieldsHint:
+      "要插入页码、总页数、日期、时间、文件名或工作表名，请先将光标置于编辑框内，再选择相应按钮。",
+    headerFooterLeft: "左",
+    headerFooterCenter: "中",
+    headerFooterRight: "右",
     headerFooterTools: "页眉页脚",
     headerFooterFormatting: "文字格式",
     headerFooterFields: "页眉页脚字段",
