@@ -330,13 +330,11 @@ export function paintSheetHeaders(
       ? palette.actionFocus
       : hovered?.axis === "corner"
         ? palette.hover
-        : palette.background;
+        : (state.backdrop ?? palette.background);
   context.fillRect(corner.x, corner.y, corner.width, corner.height);
   context.strokeStyle = palette.border;
   context.lineWidth = 1;
-  if (state.backdrop) {
-    context.strokeRect(corner.x + 0.5, corner.y + 0.5, corner.width - 1, corner.height - 1);
-  } else {
+  if (!state.backdrop) {
     context.beginPath();
     context.moveTo(frame.headerSize.width - 0.5, corner.y);
     context.lineTo(frame.headerSize.width - 0.5, height);

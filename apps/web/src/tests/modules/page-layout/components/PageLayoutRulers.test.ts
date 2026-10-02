@@ -102,7 +102,7 @@ describe("PageLayoutRulers", () => {
     );
     expect(wrapper.get('[data-page-ruler="horizontal"]').attributes("viewBox")).toContain(" 9");
     expect(wrapper.get(".page-layout-rulers__label").attributes("style")).toContain(
-      "font-size: 5px",
+      "font-size: 4.5px",
     );
   });
 

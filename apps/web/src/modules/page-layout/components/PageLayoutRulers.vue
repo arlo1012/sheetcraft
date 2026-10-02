@@ -351,7 +351,7 @@ const tooltipStyle = computed(() => {
         <text
           v-if="tick.label"
           class="page-layout-rulers__label"
-          :style="{ fontSize: `${10 / printScale}px` }"
+          :style="{ fontSize: `${9 / printScale}px` }"
           :x="tick.position - 2 / printScale"
           :y="10 / printScale"
           text-anchor="end"
@@ -403,7 +403,7 @@ const tooltipStyle = computed(() => {
         <text
           v-if="tick.label"
           class="page-layout-rulers__label"
-          :style="{ fontSize: `${10 / printScale}px` }"
+          :style="{ fontSize: `${9 / printScale}px` }"
           :transform="`translate(${7 / printScale} ${tick.position - 2 / printScale}) rotate(-90)`"
         >
           {{ tick.label }}
@@ -524,16 +524,16 @@ const tooltipStyle = computed(() => {
   }
   &__tick {
     stroke: currentcolor;
-    stroke-opacity: 0.45;
+    stroke-opacity: 0.35;
     stroke-width: 1;
     &--major {
-      stroke-opacity: 0.75;
+      stroke-opacity: 0.6;
     }
   }
   &__label {
     fill: currentcolor;
-    font-family: sans-serif;
-    opacity: 0.8;
+    font-family: var(--idea-font-sans);
+    opacity: 0.75;
   }
   &__marker {
     position: absolute;
