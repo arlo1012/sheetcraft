@@ -305,6 +305,7 @@ const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 28;
 const PAGE_LAYOUT_ROW_HEADER_WIDTH = 36;
 const PAGE_LAYOUT_COLUMN_HEADER_HEIGHT = 22;
+const PAGE_LAYOUT_RULER_GAP = 10;
 const AXIS_TOOL_GUTTER = 20;
 const quickToolsGutter = computed(() =>
   props.viewMode === "normal" && props.showHeaders && props.showAxisQuickTools
@@ -332,7 +333,7 @@ const pageUiScale = computed(() =>
 );
 const rulerInset = computed(() =>
   props.viewMode === "page-layout" && props.showPageRulers
-    ? PAGE_LAYOUT_RULER_SIZE / pageUiScale.value
+    ? (PAGE_LAYOUT_RULER_SIZE + PAGE_LAYOUT_RULER_GAP) / pageUiScale.value
     : 0,
 );
 const headingSize = computed(() => ({
