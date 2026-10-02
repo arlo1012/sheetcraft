@@ -277,6 +277,7 @@ export type MessageSchema = ToolMessageSchema & {
       storageUnavailable: string;
     };
     filter: {
+      colorSort: string;
       showAll: string;
       content: string;
       searchKeywords: string;

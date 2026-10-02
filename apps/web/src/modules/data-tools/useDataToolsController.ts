@@ -894,6 +894,24 @@ export function useDataToolsController(options: Options) {
     };
     filterPanel.value = { column, anchor, target };
   }
+  function openFilterSort(): void {
+    const panel = filterPanel.value;
+    if (!panel || !options.flush()) return;
+    if (!valid(panel.target)) {
+      error(t("dataTools.common.rangeChanged"));
+      return;
+    }
+    if (!filterState.value?.canSort) return;
+    sortTarget.value = { ...panel.target, range: cloneRange(panel.target.range) };
+    sortInitial.value = {
+      hasHeader: true,
+      headerLocked: true,
+      column: panel.column,
+      direction: "ascending",
+    };
+    filterPanel.value = undefined;
+    sortVisible.value = true;
+  }
   function sortFilterColumn(direction: "ascending" | "descending"): void {
     const panel = filterPanel.value;
     if (
@@ -1012,6 +1030,7 @@ export function useDataToolsController(options: Options) {
     applySubtotal,
     removeSubtotals,
     openColumnFilter,
+    openFilterSort,
     sortFilterColumn,
     applyColumnFilter,
     clearColumnFilter,

@@ -289,6 +289,7 @@ export const enUS = {
       storageUnavailable: "The list was applied but could not be saved on this device.",
     },
     filter: {
+      colorSort: "Sort by color",
       showAll: "Show all",
       content: "By content",
       searchKeywords: "Match all keywords, separated by spaces",

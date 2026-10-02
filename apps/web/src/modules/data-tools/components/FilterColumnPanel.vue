@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { ArrowDownAZ, ArrowUpAZ, FilterX } from "lucide-vue-next";
+import { ArrowDownAZ, ArrowUpAZ, FilterX, PaintBucket } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -41,6 +41,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   apply: [payload: { includedKeys: SheetFilterValue[]; criteria?: DataToolFilterCriteria }];
   sort: [direction: "ascending" | "descending"];
+  openSort: [];
   clear: [];
   close: [];
 }>();
@@ -194,6 +195,17 @@ onBeforeUnmount(() => {
           @click="emit('sort', 'descending')"
         >
           <template #icon><ArrowDownAZ :size="15" /></template>{{ t("dataTools.sort.descending") }}
+        </TButton>
+        <TButton
+          variant="text"
+          theme="default"
+          size="small"
+          aria-haspopup="dialog"
+          :disabled="disabled || !canSort"
+          @click="emit('openSort')"
+        >
+          <template #icon><PaintBucket class="idea-action-icon" aria-hidden="true" /></template>
+          {{ t("dataTools.filter.colorSort") }}
         </TButton>
       </div>
       <TTabs v-model="tab" size="medium">

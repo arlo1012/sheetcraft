@@ -281,6 +281,7 @@ export const zhCN = {
       storageUnavailable: "序列已应用，但未能保存到本机。",
     },
     filter: {
+      colorSort: "按颜色排序",
       showAll: "全部显示",
       content: "按内容",
       searchKeywords: "同时包含所有关键词，空格分隔",
