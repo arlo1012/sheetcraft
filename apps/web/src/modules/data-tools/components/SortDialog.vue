@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
+import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import { Select as TSelect, Option as TOption } from "tdesign-vue-next/es/select";
 import { BaseTable as TTable } from "tdesign-vue-next/es/table";
 import type {
@@ -41,10 +42,12 @@ const rows = ref<SortRow[]>([]);
 const selectedId = ref<number>();
 const hasHeader = ref(true);
 const caseSensitive = ref(false);
+const sortMethod = ref<NonNullable<SortDraft["sortMethod"]>>("pinyin");
 const optionsVisible = ref(false);
 const customListRowId = ref<number>();
 const customListRow = computed(() => rows.value.find((row) => row.id === customListRowId.value));
 const optionCaseSensitive = ref(false);
+const optionSortMethod = ref<NonNullable<SortDraft["sortMethod"]>>("pinyin");
 let nextId = 0;
 const maxLevels = 64;
 const selectedIndex = computed(() => rows.value.findIndex((row) => row.id === selectedId.value));
@@ -187,6 +190,7 @@ watch(
     if (!visible) return;
     hasHeader.value = props.initial?.headerLocked || (props.initial?.hasHeader ?? true);
     caseSensitive.value = props.initial?.caseSensitive ?? false;
+    sortMethod.value = props.initial?.sortMethod ?? "pinyin";
     const column =
       props.columns.find((item) => item.column === props.initial?.column) ?? props.columns[0];
     const initialLevels = props.initial?.levels?.length
@@ -240,10 +244,12 @@ function moveLevel(offset: number): void {
 }
 function openOptions(): void {
   optionCaseSensitive.value = caseSensitive.value;
+  optionSortMethod.value = sortMethod.value;
   optionsVisible.value = true;
 }
 function applyOptions(): void {
   caseSensitive.value = optionCaseSensitive.value;
+  sortMethod.value = optionSortMethod.value;
   optionsVisible.value = false;
 }
 function apply(): void {
@@ -252,6 +258,7 @@ function apply(): void {
     range: props.rangeLabel,
     hasHeader: hasHeader.value,
     caseSensitive: caseSensitive.value,
+    sortMethod: sortMethod.value,
     levels: rows.value.map((row) => ({
       column: row.column,
       direction: row.direction,
@@ -442,7 +449,7 @@ function apply(): void {
   <Dialog
     :visible="visible && optionsVisible"
     :header="t('dataTools.sort.optionsTitle')"
-    width="min(360px, calc(100vw - 32px))"
+    width="min(320px, calc(100vw - 32px))"
     placement="center"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
@@ -451,13 +458,56 @@ function apply(): void {
     @close="optionsVisible = false"
     @confirm="applyOptions"
   >
-    <TCheckbox v-model="optionCaseSensitive" data-sort-case-sensitive>{{
-      t("dataTools.sort.caseSensitive")
-    }}</TCheckbox>
+    <div class="sort-dialog-options">
+      <TCheckbox v-model="optionCaseSensitive" data-sort-case-sensitive>{{
+        t("dataTools.sort.caseSensitive")
+      }}</TCheckbox>
+      <section class="sort-dialog-options__group">
+        <strong>{{ t("dataTools.sort.orientation") }}</strong>
+        <TRadioGroup
+          value="columns"
+          direction="vertical"
+          :aria-label="t('dataTools.sort.orientation')"
+        >
+          <TRadio value="columns" data-sort-orientation="columns">{{
+            t("dataTools.sort.sortByColumns")
+          }}</TRadio>
+          <TRadio value="rows" disabled data-sort-orientation="rows">{{
+            t("dataTools.sort.sortByRows")
+          }}</TRadio>
+        </TRadioGroup>
+      </section>
+      <section class="sort-dialog-options__group">
+        <strong>{{ t("dataTools.sort.method") }}</strong>
+        <TRadioGroup
+          v-model="optionSortMethod"
+          direction="vertical"
+          :aria-label="t('dataTools.sort.method')"
+          data-sort-method
+        >
+          <TRadio value="pinyin">{{ t("dataTools.sort.pinyin") }}</TRadio>
+          <TRadio value="stroke">{{ t("dataTools.sort.stroke") }}</TRadio>
+        </TRadioGroup>
+      </section>
+    </div>
   </Dialog>
 </template>
 
 <style scoped lang="scss">
+.sort-dialog-options {
+  display: grid;
+  gap: var(--idea-space-6);
+
+  &__group {
+    display: grid;
+    gap: var(--idea-space-2);
+
+    strong {
+      font-weight: var(--idea-font-weight-semibold);
+    }
+  }
+}
+
 .sort-dialog {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

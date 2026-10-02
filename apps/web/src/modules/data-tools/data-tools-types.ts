@@ -1,4 +1,4 @@
-import type { SortKey } from "@idea10/core/commands";
+import type { SortKey, SortMethod } from "@idea10/core/commands";
 import type {
   CellRange,
   DataValidationOperator,
@@ -41,11 +41,13 @@ export type SortInitial = {
   direction: "ascending" | "descending";
   levels?: SortLevel[];
   caseSensitive?: boolean;
+  sortMethod?: SortMethod;
 };
 export type SortDraft = {
   range: string;
   hasHeader: boolean;
   caseSensitive?: boolean;
+  sortMethod?: SortMethod;
   levels: SortLevel[];
 };
 export type TextToColumnsDraft = {

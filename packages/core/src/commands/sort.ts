@@ -30,6 +30,7 @@ import type {
   SetCellContentsCommand,
   SortDirection,
   SortKey,
+  SortMethod,
   SortSheetRangeCommand,
 } from "./contracts.js";
 import { createBatchSetCellContentsCommand } from "./values.js";
@@ -79,13 +80,35 @@ function getValueRank(value: FormulaValue): number {
   return 4;
 }
 
-function compareSameRank(left: FormulaValue, right: FormulaValue, caseSensitive: boolean): number {
+type SortTextComparator = (left: string, right: string) => number;
+
+function compareLegacyText(left: string, right: string, caseSensitive: boolean): number {
+  const comparableLeft = caseSensitive ? left : left.toLowerCase();
+  const comparableRight = caseSensitive ? right : right.toLowerCase();
+  return comparableLeft < comparableRight ? -1 : comparableLeft > comparableRight ? 1 : 0;
+}
+
+function createSortTextComparator(
+  sortMethod: SortMethod | undefined,
+  caseSensitive: boolean,
+): SortTextComparator {
+  if (!sortMethod) return (left, right) => compareLegacyText(left, right, caseSensitive);
+  const collator = new Intl.Collator(`zh-u-co-${sortMethod}`, {
+    usage: "sort",
+    sensitivity: caseSensitive ? "variant" : "base",
+    caseFirst: "upper",
+    numeric: false,
+  });
+  return (left, right) => collator.compare(left, right);
+}
+
+function compareSameRank(
+  left: FormulaValue,
+  right: FormulaValue,
+  compareText: SortTextComparator,
+): number {
   if (typeof left === "number" && typeof right === "number") return left - right;
-  if (typeof left === "string" && typeof right === "string") {
-    const comparableLeft = caseSensitive ? left : left.toLowerCase();
-    const comparableRight = caseSensitive ? right : right.toLowerCase();
-    return comparableLeft < comparableRight ? -1 : comparableLeft > comparableRight ? 1 : 0;
-  }
+  if (typeof left === "string" && typeof right === "string") return compareText(left, right);
   if (typeof left === "boolean" && typeof right === "boolean") return Number(left) - Number(right);
   if (isFormulaError(left) && isFormulaError(right))
     return left.code < right.code ? -1 : left.code > right.code ? 1 : 0;
@@ -96,11 +119,11 @@ function compareSortValues(
   left: FormulaValue,
   right: FormulaValue,
   direction: SortDirection,
-  caseSensitive: boolean,
+  compareText: SortTextComparator,
 ): number {
   const rankDifference = getValueRank(left) - getValueRank(right);
   if (rankDifference !== 0) return rankDifference;
-  const sameRank = compareSameRank(left, right, caseSensitive);
+  const sameRank = compareSameRank(left, right, compareText);
   if (sameRank !== 0) return direction === "descending" ? -sameRank : sameRank;
   return 0;
 }
@@ -138,6 +161,7 @@ function compareCustomSortValues(
   right: FormulaValue,
   direction: SortDirection,
   caseSensitive: boolean,
+  compareText: SortTextComparator,
   ranks: CustomOrderRanks,
 ): number {
   const leftRank = getCustomOrderRank(left, ranks, caseSensitive);
@@ -148,7 +172,7 @@ function compareCustomSortValues(
     const difference = leftRank - rightRank;
     return direction === "descending" ? -difference : difference;
   }
-  return compareSortValues(left, right, direction, caseSensitive);
+  return compareSortValues(left, right, direction, compareText);
 }
 
 function normalizeSortColor(color: string): string {
@@ -195,6 +219,7 @@ function compareSortEntries(
   right: SortEntry,
   keys: readonly SortKey[],
   caseSensitive: boolean,
+  compareText: SortTextComparator,
   customOrderRanks: readonly (CustomOrderRanks | undefined)[],
 ): number {
   for (let index = 0; index < keys.length; index += 1) {
@@ -210,13 +235,14 @@ function compareSortEntries(
               right.values[index]!,
               key.direction,
               caseSensitive,
+              compareText,
               customRanks,
             )
           : compareSortValues(
               left.values[index]!,
               right.values[index]!,
               key.direction,
-              caseSensitive,
+              compareText,
             );
     if (compared !== 0) return compared;
   }
@@ -262,6 +288,12 @@ function validateSortCommand(
   }
   if (command.caseSensitive !== undefined && typeof command.caseSensitive !== "boolean")
     throw invalidCommandPayload("caseSensitive", command.caseSensitive);
+  if (
+    command.sortMethod !== undefined &&
+    command.sortMethod !== "pinyin" &&
+    command.sortMethod !== "stroke"
+  )
+    throw invalidCommandPayload("sortMethod", command.sortMethod);
   const keys: readonly SortKey[] = command.sortKeys?.length
     ? command.sortKeys
     : [{ column: command.keyColumn, direction: command.direction }];
@@ -366,7 +398,7 @@ export function createMultiKeySortSheetRangeCommand(
   sheetId: string,
   range: CellRange,
   sortKeys: readonly SortKey[],
-  options?: { hasHeader?: boolean; caseSensitive?: boolean },
+  options?: { hasHeader?: boolean; caseSensitive?: boolean; sortMethod?: SortMethod },
 ): SortSheetRangeCommand {
   const normalized = normalizeRange(range);
   assertCellRange(normalized);
@@ -384,6 +416,7 @@ export function createMultiKeySortSheetRangeCommand(
     ),
     ...(options?.hasHeader ? { hasHeader: true } : {}),
     ...(options?.caseSensitive !== undefined ? { caseSensitive: options.caseSensitive } : {}),
+    ...(options?.sortMethod !== undefined ? { sortMethod: options.sortMethod } : {}),
   };
 }
 
@@ -397,6 +430,7 @@ export function applySortSheetRangeCommand(
     ? command.sortKeys
     : [{ column: command.keyColumn, direction: command.direction }];
   const caseSensitive = command.caseSensitive ?? true;
+  const compareText = createSortTextComparator(command.sortMethod, caseSensitive);
   const customOrderRanks = keys.map((key) =>
     key.customOrder ? createCustomOrderRanks(key.customOrder, caseSensitive) : undefined,
   );
@@ -418,7 +452,9 @@ export function applySortSheetRangeCommand(
         ),
       };
     },
-  ).sort((left, right) => compareSortEntries(left, right, keys, caseSensitive, customOrderRanks));
+  ).sort((left, right) =>
+    compareSortEntries(left, right, keys, caseSensitive, compareText, customOrderRanks),
+  );
   const destinationBySourceRow = new Map<number, number>();
   for (let offset = 0; offset < sortedRows.length; offset += 1) {
     const source = sortedRows[offset];

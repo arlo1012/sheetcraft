@@ -223,6 +223,8 @@ export type SetSheetFilterCommand = {
 };
 
 export type SortDirection = "ascending" | "descending";
+/** Chinese collation used by an explicit value-sort option. */
+export type SortMethod = "pinyin" | "stroke";
 
 export type SortKey = {
   column: number;
@@ -245,6 +247,8 @@ export type SortSheetRangeCommand = {
   hasHeader?: boolean;
   /** Omitted preserves the legacy case-sensitive text ordering. */
   caseSensitive?: boolean;
+  /** Omitted preserves the legacy code-point text ordering. */
+  sortMethod?: SortMethod;
 };
 export type AdvancedFilterCommand = {
   type: "advancedFilter";

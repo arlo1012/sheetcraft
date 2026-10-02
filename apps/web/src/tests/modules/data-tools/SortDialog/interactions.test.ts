@@ -49,6 +49,7 @@ describe("SortDialog", () => {
       column: 0,
       direction: "descending" as const,
       caseSensitive: true,
+      sortMethod: "stroke" as const,
       levels: [
         { column: 0, direction: "descending" as const, customOrder: ["High", "Low"] },
         {
@@ -65,6 +66,7 @@ describe("SortDialog", () => {
     expect(wrapper.emitted("apply")?.at(-1)?.[0]).toMatchObject({
       levels: initial.levels,
       caseSensitive: true,
+      sortMethod: "stroke",
     });
     const order = wrapper
       .findAllComponents({ name: "TSelect" })
@@ -249,6 +251,7 @@ describe("SortDialog", () => {
       range: "A1:B8",
       hasHeader: true,
       caseSensitive: false,
+      sortMethod: "pinyin",
       levels: [
         { column: 1, direction: "descending" },
         { column: 0, direction: "ascending" },
@@ -316,23 +319,45 @@ describe("SortDialog", () => {
     await action("add");
     await action("options");
     const dialogs = wrapper.findAllComponents({ name: "TDialog" });
+    const method = () =>
+      wrapper
+        .findAllComponents({ name: "TRadioGroup" })
+        .find((item) => item.attributes("data-sort-method") !== undefined)!;
+    const orientations = wrapper
+      .findAllComponents({ name: "TRadio" })
+      .filter((item) => item.attributes("data-sort-orientation") !== undefined);
+    expect(orientations.map((item) => [item.props("value"), item.props("disabled")])).toEqual([
+      ["columns", undefined],
+      ["rows", true],
+    ]);
+    expect(method().props("modelValue")).toBe("pinyin");
     const option = wrapper.findAllComponents({ name: "TCheckbox" }).at(-1)!;
     option.vm.$emit("update:modelValue", true);
+    method().vm.$emit("update:modelValue", "stroke");
     await wrapper.vm.$nextTick();
     dialogs[1]!.vm.$emit("close");
     await wrapper.vm.$nextTick();
     confirm();
     expect(wrapper.emitted("apply")?.at(-1)?.[0]).toMatchObject({
       caseSensitive: false,
+      sortMethod: "pinyin",
       levels: [{ column: 0 }, { column: 1 }],
     });
     await action("options");
+    expect(method().props("modelValue")).toBe("pinyin");
     wrapper.findAllComponents({ name: "TCheckbox" }).at(-1)!.vm.$emit("update:modelValue", true);
+    method().vm.$emit("update:modelValue", "stroke");
     await wrapper.vm.$nextTick();
     dialogs[1]!.vm.$emit("confirm");
     await wrapper.vm.$nextTick();
     confirm();
-    expect(wrapper.emitted("apply")?.at(-1)?.[0]).toMatchObject({ caseSensitive: true });
+    expect(wrapper.emitted("apply")?.at(-1)?.[0]).toMatchObject({
+      caseSensitive: true,
+      sortMethod: "stroke",
+    });
+    await action("options");
+    expect(method().props("modelValue")).toBe("stroke");
+    dialogs[1]!.vm.$emit("close");
     dialogs[0]!.vm.$emit("close");
     expect(wrapper.emitted("close")).toHaveLength(1);
   });

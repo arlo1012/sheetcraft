@@ -249,6 +249,12 @@ export type MessageSchema = ToolMessageSchema & {
       optionsTitle: string;
       customList: string;
       caseSensitive: string;
+      orientation: string;
+      sortByColumns: string;
+      sortByRows: string;
+      method: string;
+      pinyin: string;
+      stroke: string;
       primaryKey: string;
       thenBy: string;
       column: string;

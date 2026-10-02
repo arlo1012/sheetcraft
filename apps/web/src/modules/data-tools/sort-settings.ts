@@ -62,6 +62,9 @@ export function readSortSettings(workbookId: string, target: SortTarget): SortIn
     if (
       typeof settings.hasHeader !== "boolean" ||
       typeof settings.caseSensitive !== "boolean" ||
+      (settings.sortMethod !== undefined &&
+        settings.sortMethod !== "pinyin" &&
+        settings.sortMethod !== "stroke") ||
       !isColumn(settings.column, target) ||
       !isDirection(settings.direction) ||
       !Array.isArray(settings.levels) ||
@@ -72,6 +75,7 @@ export function readSortSettings(workbookId: string, target: SortTarget): SortIn
     return {
       hasHeader: settings.hasHeader,
       caseSensitive: settings.caseSensitive,
+      ...(settings.sortMethod === undefined ? {} : { sortMethod: settings.sortMethod }),
       column: settings.column,
       direction: settings.direction as SortInitial["direction"],
       levels: settings.levels,
@@ -88,12 +92,19 @@ export function writeSortSettings(
 ): boolean {
   try {
     // Header locking is determined from the current filter when the dialog opens.
-    const { hasHeader, caseSensitive, column, direction, levels } = settings;
+    const { hasHeader, caseSensitive, sortMethod, column, direction, levels } = settings;
     globalThis.localStorage.setItem(
       storageKey(workbookId, target),
       JSON.stringify({
         version: STORAGE_VERSION,
-        settings: { hasHeader, caseSensitive: caseSensitive ?? false, column, direction, levels },
+        settings: {
+          hasHeader,
+          caseSensitive: caseSensitive ?? false,
+          sortMethod,
+          column,
+          direction,
+          levels,
+        },
       }),
     );
     return true;

@@ -10,6 +10,7 @@ const settings: SortInitial = {
   hasHeader: true,
   headerLocked: true,
   caseSensitive: true,
+  sortMethod: "stroke",
   column: 1,
   direction: "descending",
   levels: [
@@ -52,12 +53,21 @@ describe("sort settings persistence", () => {
     ).toBeUndefined();
   });
 
+  test("keeps existing range preferences without a sort method readable", () => {
+    const previousSettings = { ...settings };
+    delete previousSettings.sortMethod;
+    writeSortSettings("book", target, previousSettings);
+    expect(readSortSettings("book", target)?.levels).toEqual(settings.levels);
+    expect(readSortSettings("book", target)?.sortMethod).toBeUndefined();
+  });
+
   test("ignores malformed or unsupported snapshots and invalid sort levels", () => {
     writeSortSettings("book", target, settings);
     const key = localStorage.key(0)!;
     for (const value of [
       "invalid-json",
       JSON.stringify({ version: 2, settings }),
+      JSON.stringify({ version: 1, settings: { ...settings, sortMethod: "radical" } }),
       JSON.stringify({
         version: 1,
         settings: { ...settings, levels: [{ column: 9, direction: "ascending" }] },

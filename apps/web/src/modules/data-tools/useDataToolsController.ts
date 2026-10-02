@@ -582,6 +582,7 @@ export function useDataToolsController(options: Options) {
       execute(target, () =>
         createMultiKeySortSheetRangeCommand(target!.sheetId, target!.range, draft.levels, {
           caseSensitive: draft.caseSensitive ?? false,
+          sortMethod: draft.sortMethod,
           hasHeader,
         }),
       )
@@ -593,6 +594,7 @@ export function useDataToolsController(options: Options) {
           direction: draft.levels[0]?.direction ?? "ascending",
           levels: cloneSortLevels(draft.levels),
           caseSensitive: draft.caseSensitive ?? false,
+          sortMethod: draft.sortMethod,
         });
       sortVisible.value = false;
       options.focusSheet();

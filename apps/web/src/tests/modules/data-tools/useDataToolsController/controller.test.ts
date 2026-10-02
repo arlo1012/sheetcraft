@@ -177,6 +177,27 @@ describe("useDataToolsController", () => {
     f.controller.openSort();
     expect(f.controller.sortInitial.value.levels).toBeUndefined();
   });
+  test("applies Chinese sort methods and restores the selected method for the range", () => {
+    const f = fixture();
+    for (const [row, value] of ["姓名", "王", "张", "李"].entries()) f.set(row, 1, value);
+    const values = () =>
+      [0, 1, 2, 3].map((row) => createSheetEvaluator(f.sheet).getComputedValue({ row, column: 1 }));
+    const draft = {
+      range: "B1:B4",
+      hasHeader: true,
+      levels: [{ column: 1, direction: "ascending" as const }],
+    };
+    f.controller.openSort();
+    f.controller.applySort({ ...draft, sortMethod: "pinyin" });
+    expect(values()).toEqual(["姓名", "李", "王", "张"]);
+    f.controller.openSort();
+    expect(f.controller.sortInitial.value.sortMethod).toBe("pinyin");
+    f.controller.applySort({ ...draft, sortMethod: "stroke" });
+    expect(values()).toEqual(["姓名", "王", "张", "李"]);
+    const restored = fixture(undefined, deserializeWorkbook(serializeWorkbook(f.session.workbook)));
+    restored.controller.openSort();
+    expect(restored.controller.sortInitial.value.sortMethod).toBe("stroke");
+  });
   test("discovers column colors and applies selected color placement through Core", () => {
     const f = fixture();
     f.set(0, 1, "Name");
