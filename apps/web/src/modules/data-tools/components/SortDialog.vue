@@ -13,6 +13,9 @@ import type {
   TableRowData,
 } from "tdesign-vue-next/es/table/type";
 import { useAppI18n } from "../../../shared/i18n";
+import type { SortIcon } from "@idea10/core/commands";
+import ConditionalFormatIcon from "../../../shared/conditional-formatting/ConditionalFormatIcon.vue";
+import { sortIconKey } from "../sort-icon-options";
 import CustomSortListDialog from "./CustomSortListDialog.vue";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import type {
@@ -21,6 +24,7 @@ import type {
   SortInitial,
   SortLevel,
   SortColorColumn,
+  SortIconColumn,
 } from "../data-tools-types";
 
 type SortRow = SortLevel & { id: number };
@@ -31,8 +35,9 @@ const props = withDefaults(
     rangeLabel?: string;
     initial?: SortInitial;
     colorColumns?: readonly SortColorColumn[];
+    iconColumns?: readonly SortIconColumn[];
   }>(),
-  { rangeLabel: "", initial: undefined, colorColumns: () => [] },
+  { rangeLabel: "", initial: undefined, colorColumns: () => [], iconColumns: () => [] },
 );
 const emit = defineEmits<{ close: []; apply: [draft: SortDraft] }>();
 const { t } = useAppI18n();
@@ -63,7 +68,7 @@ const directionOptions = computed(() => [
   { label: t("dataTools.sort.descending"), value: "descending" },
 ]);
 function orderOptions(row: SortRow) {
-  if (isColorLevel(row)) return positionOptions.value;
+  if (isVisualLevel(row)) return positionOptions.value;
   return [
     ...directionOptions.value,
     ...(row.customOrder
@@ -83,14 +88,14 @@ function orderOptions(row: SortRow) {
   ];
 }
 function orderValue(row: SortRow): string {
-  return !isColorLevel(row) && row.customOrder
+  return !isVisualLevel(row) && row.customOrder
     ? row.direction === "ascending"
       ? "selected-custom"
       : "selected-custom-reversed"
     : row.direction;
 }
 function changeOrder(row: SortRow, value: unknown): void {
-  if (value === "custom" && !isColorLevel(row)) {
+  if (value === "custom" && !isVisualLevel(row)) {
     selectedId.value = row.id;
     customListRowId.value = row.id;
   } else if (value === "selected-custom" || value === "selected-custom-reversed") {
@@ -112,7 +117,7 @@ const basisOptions = computed(() => [
   { label: t("dataTools.sort.values"), value: "value" },
   { label: t("dataTools.sort.cellColor"), value: "cellColor" },
   { label: t("dataTools.sort.fontColor"), value: "fontColor" },
-  { label: t("dataTools.sort.iconTodo"), value: "icon", disabled: true },
+  { label: t("dataTools.sort.icon"), value: "icon" },
 ]);
 const positionOptions = computed(() => [
   { label: t("dataTools.sort.onTop"), value: "ascending" },
@@ -120,6 +125,33 @@ const positionOptions = computed(() => [
 ]);
 function isColorLevel(row: SortLevel): boolean {
   return row.sortOn === "cellColor" || row.sortOn === "fontColor";
+}
+function isVisualLevel(row: SortLevel): boolean {
+  return isColorLevel(row) || row.sortOn === "icon";
+}
+function iconLabel(icon: SortIcon | null): string {
+  return icon
+    ? `${t(`conditionalFormatting.${icon.iconSet}`)} (${icon.iconIndex + 1})`
+    : t("dataTools.sort.noIcon");
+}
+function iconsFor(row: SortLevel) {
+  const column = props.iconColumns.find((item) => item.column === row.column);
+  if (!column || row.sortOn !== "icon") return [];
+  const icons = new Map(column.icons.map((icon) => [sortIconKey(icon), icon]));
+  if (!hasHeader.value) icons.set(sortIconKey(column.headerIcon), column.headerIcon);
+  return [...icons].map(([value, icon]) => ({ value, icon, label: iconLabel(icon) }));
+}
+function syncIcon(row: SortRow): void {
+  if (row.sortOn !== "icon") {
+    delete row.icon;
+    return;
+  }
+  const icons = iconsFor(row);
+  if (row.icon === undefined || !icons.some((option) => option.value === sortIconKey(row.icon!))) {
+    const first = icons[0];
+    if (first) row.icon = first.icon ? { ...first.icon } : null;
+    else delete row.icon;
+  }
 }
 function colorsFor(row: SortLevel) {
   const column = props.colorColumns.find((item) => item.column === row.column);
@@ -153,24 +185,42 @@ function changeColumn(row: SortRow, value: unknown): void {
   if (typeof value !== "number") return;
   row.column = value;
   syncColor(row);
+  syncIcon(row);
 }
 function changeBasis(row: SortRow, value: unknown): void {
-  if (value !== "value" && value !== "cellColor" && value !== "fontColor") return;
+  if (value !== "value" && value !== "cellColor" && value !== "fontColor" && value !== "icon")
+    return;
   row.sortOn = value;
   if (value !== "value") delete row.customOrder;
   delete row.color;
+  delete row.icon;
   syncColor(row);
+  syncIcon(row);
 }
 function changeColor(row: SortRow, value: unknown): void {
   const option = colorsFor(row).find((option) => option.value === value);
   if (option) row.color = option.color;
 }
-watch([hasHeader, () => props.colorColumns], () => rows.value.forEach(syncColor));
+function changeIcon(row: SortRow, value: unknown): void {
+  const option = iconsFor(row).find((option) => option.value === value);
+  if (option) row.icon = option.icon ? { ...option.icon } : null;
+}
+watch([hasHeader, () => props.colorColumns, () => props.iconColumns], () => {
+  rows.value.forEach((row) => {
+    syncColor(row);
+    syncIcon(row);
+  });
+});
 const canApply = computed(
   () =>
     rows.value.length > 0 &&
-    rows.value.every(
-      (row) => !isColorLevel(row) || colorsFor(row).some((option) => option.color === row.color),
+    rows.value.every((row) =>
+      isColorLevel(row)
+        ? colorsFor(row).some((option) => option.color === row.color)
+        : row.sortOn === "icon"
+          ? row.icon !== undefined &&
+            iconsFor(row).some((option) => option.value === sortIconKey(row.icon!))
+          : true,
     ),
 );
 const tableColumns = computed<BaseTableCol[]>(() => [
@@ -201,8 +251,10 @@ watch(
     rows.value = initialLevels.map((level) => ({
       ...level,
       ...(level.customOrder ? { customOrder: [...level.customOrder] } : {}),
+      ...(level.icon ? { icon: { ...level.icon } } : {}),
       id: ++nextId,
     }));
+    rows.value.forEach(syncIcon);
     selectedId.value = rows.value[0]?.id;
   },
   { immediate: true },
@@ -214,6 +266,7 @@ function insertLevel(level: SortLevel): void {
   const row = {
     ...level,
     ...(level.customOrder ? { customOrder: [...level.customOrder] } : {}),
+    ...(level.icon ? { icon: { ...level.icon } } : {}),
     id: ++nextId,
   };
   rows.value.splice(selectedIndex.value + 1, 0, row);
@@ -264,9 +317,11 @@ function apply(): void {
       direction: row.direction,
       ...(isColorLevel(row)
         ? { sortOn: row.sortOn, color: row.color }
-        : row.customOrder
-          ? { customOrder: [...row.customOrder] }
-          : {}),
+        : row.sortOn === "icon"
+          ? { sortOn: "icon", icon: row.icon ? { ...row.icon } : null }
+          : row.customOrder
+            ? { customOrder: [...row.customOrder] }
+            : {}),
     })),
   });
 }
@@ -383,7 +438,7 @@ function apply(): void {
             />
           </template>
           <template #direction="{ row }">
-            <div class="sort-dialog__order" :class="{ 'has-color': isColorLevel(row) }">
+            <div class="sort-dialog__order" :class="{ 'has-visual': isVisualLevel(row) }">
               <TSelect
                 v-if="isColorLevel(row)"
                 data-sort-field="color"
@@ -421,6 +476,44 @@ function apply(): void {
                       aria-hidden="true"
                     />
                     {{ row.color === null ? t("dataTools.sort.noFill") : row.color.toUpperCase() }}
+                  </span>
+                </template>
+              </TSelect>
+              <TSelect
+                v-else-if="row.sortOn === 'icon'"
+                data-sort-field="icon"
+                :value="row.icon === undefined ? undefined : sortIconKey(row.icon)"
+                :popup-props="popupProps"
+                :aria-label="t('dataTools.sort.selectIcon')"
+                :placeholder="t('dataTools.sort.selectIcon')"
+                :empty="t('dataTools.sort.noIcons')"
+                :disabled="!iconsFor(row).length"
+                @update:value="changeIcon(row, $event)"
+                @focus="selectedId = row.id"
+              >
+                <TOption
+                  v-for="option in iconsFor(row)"
+                  :key="option.value"
+                  :value="option.value"
+                  :label="option.label"
+                >
+                  <span class="sort-dialog__visual-option">
+                    <ConditionalFormatIcon
+                      v-if="option.icon"
+                      :icon-set="option.icon.iconSet"
+                      :icon-index="option.icon.iconIndex"
+                    />
+                    {{ option.label }}
+                  </span>
+                </TOption>
+                <template v-if="row.icon !== undefined" #valueDisplay>
+                  <span class="sort-dialog__visual-option">
+                    <ConditionalFormatIcon
+                      v-if="row.icon"
+                      :icon-set="row.icon.iconSet"
+                      :icon-index="row.icon.iconIndex"
+                    />
+                    {{ iconLabel(row.icon) }}
                   </span>
                 </template>
               </TSelect>
@@ -540,11 +633,12 @@ function apply(): void {
     min-width: 0;
     gap: 8px;
 
-    &.has-color {
+    &.has-visual {
       grid-template-columns: minmax(0, 1fr) 108px;
     }
   }
-  &__color-option {
+  &__color-option,
+  &__visual-option {
     display: inline-flex;
     align-items: center;
     gap: 6px;

@@ -1,4 +1,4 @@
-import type { SortKey, SortMethod } from "@idea10/core/commands";
+import type { SortIcon, SortKey, SortMethod } from "@idea10/core/commands";
 import type {
   CellRange,
   DataValidationOperator,
@@ -33,6 +33,11 @@ export type SortColorColumn = {
   fontColors: string[];
   headerCellColor?: string | null;
   headerFontColor: string;
+};
+export type SortIconColumn = {
+  column: number;
+  icons: Array<SortIcon | null>;
+  headerIcon: SortIcon | null;
 };
 export type SortInitial = {
   hasHeader: boolean;

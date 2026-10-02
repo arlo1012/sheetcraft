@@ -41,6 +41,7 @@ import { resolveRangeReference } from "../../shared/range-reference/formatRangeR
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { readSortSettings, writeSortSettings } from "./sort-settings";
 import { getSortColorColumns } from "./sort-color-options";
+import { getSortIconColumns } from "./sort-icon-options";
 import { resolveTextToColumnsOptions } from "./text-to-columns-options";
 import { isValidationDraftComplete } from "./validation-draft";
 import { useDuplicateToolsController } from "./useDuplicateToolsController";
@@ -123,11 +124,11 @@ function sortRangeKey(target: Target): string {
   return JSON.stringify([target.sheetId, startRow, startColumn, endRow, endColumn]);
 }
 function cloneSortLevels(levels: readonly SortLevel[] | undefined): SortLevel[] | undefined {
-  return levels?.map((level) =>
-    level.customOrder === undefined
-      ? { ...level }
-      : { ...level, customOrder: [...level.customOrder] },
-  );
+  return levels?.map((level) => ({
+    ...level,
+    ...(level.customOrder ? { customOrder: [...level.customOrder] } : {}),
+    ...(level.icon ? { icon: { ...level.icon } } : {}),
+  }));
 }
 function cloneSortInitial(initial: SortInitial): SortInitial {
   return { ...initial, levels: cloneSortLevels(initial.levels) };
@@ -364,6 +365,14 @@ export function useDataToolsController(options: Options) {
     const target = sortTarget.value;
     return sortVisible.value && target && valid(target)
       ? getSortColorColumns(activeSheet.value, target.range)
+      : [];
+  });
+  const sortIconColumns = computed(() => {
+    const target = sortTarget.value;
+    return sortVisible.value && target && valid(target)
+      ? getSortIconColumns(activeSheet.value, target.range, options.getSheetEvaluator(), {
+          dateSystem: options.getWorkbook().dateSystem,
+        })
       : [];
   });
   const dialogRangeLabel = computed(() => {
@@ -987,6 +996,7 @@ export function useDataToolsController(options: Options) {
     columns: dialogColumns,
     sortInitial,
     sortColorColumns,
+    sortIconColumns,
     rangeLabel: dialogRangeLabel,
     splitPreview,
     splitPreviewRows,

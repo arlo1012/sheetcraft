@@ -262,7 +262,10 @@ export type MessageSchema = ToolMessageSchema & {
       sortOn: string;
       cellColor: string;
       fontColor: string;
-      iconTodo: string;
+      icon: string;
+      selectIcon: string;
+      noIcon: string;
+      noIcons: string;
       onTop: string;
       onBottom: string;
       selectColor: string;

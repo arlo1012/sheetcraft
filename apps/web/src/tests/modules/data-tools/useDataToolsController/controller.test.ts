@@ -198,6 +198,63 @@ describe("useDataToolsController", () => {
     restored.controller.openSort();
     expect(restored.controller.sortInitial.value.sortMethod).toBe("stroke");
   });
+  test("discovers icons, sorts by their placement and restores an independent saved selection", () => {
+    const f = fixture();
+    for (const [row, value] of ["Score", 10, 0, 20].entries()) f.set(row, 1, value);
+    f.sheet.conditionalFormats = [
+      {
+        id: "arrows",
+        style: {},
+        anchor: { row: 1, column: 1 },
+        ranges: [{ start: { row: 1, column: 1 }, end: { row: 3, column: 1 } }],
+        condition: {
+          kind: "iconSet",
+          iconSet: "threeArrows",
+          thresholds: [
+            { kind: "num", value: 0 },
+            { kind: "num", value: 10 },
+            { kind: "num", value: 20 },
+          ],
+        },
+      },
+    ];
+    const values = () =>
+      [0, 1, 2, 3].map((row) => createSheetEvaluator(f.sheet).getComputedValue({ row, column: 1 }));
+    f.controller.openSort();
+    expect(f.controller.sortIconColumns.value[0]?.icons).toEqual([
+      { iconSet: "threeArrows", iconIndex: 1 },
+      { iconSet: "threeArrows", iconIndex: 0 },
+      { iconSet: "threeArrows", iconIndex: 2 },
+    ]);
+    const levels = [
+      {
+        column: 1,
+        direction: "ascending" as const,
+        sortOn: "icon" as const,
+        icon: { iconSet: "threeArrows" as const, iconIndex: 2 },
+      },
+    ];
+    f.controller.applySort({ range: "B1:B4", hasHeader: true, levels });
+    expect(values()).toEqual(["Score", 20, 10, 0]);
+    f.controller.openSort();
+    f.controller.sortInitial.value.levels![0]!.icon!.iconIndex = 0;
+    f.controller.closeSort();
+    f.controller.openSort();
+    expect(f.controller.sortInitial.value.levels).toEqual(levels);
+    const restored = fixture(undefined, deserializeWorkbook(serializeWorkbook(f.session.workbook)));
+    restored.controller.openSort();
+    expect(restored.controller.sortInitial.value.levels).toEqual(levels);
+    restored.controller.applySort({
+      range: "B1:B4",
+      hasHeader: true,
+      levels: [{ ...levels[0]!, direction: "descending" }],
+    });
+    expect(
+      [0, 1, 2, 3].map((row) =>
+        createSheetEvaluator(restored.sheet).getComputedValue({ row, column: 1 }),
+      ),
+    ).toEqual(["Score", 10, 0, 20]);
+  });
   test("discovers column colors and applies selected color placement through Core", () => {
     const f = fixture();
     f.set(0, 1, "Name");

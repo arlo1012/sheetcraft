@@ -1,3 +1,4 @@
+import { isConditionalFormatIcon } from "@idea10/core/conditional-formatting";
 import type { DataToolRangeSnapshot, SortInitial, SortLevel } from "./data-tools-types";
 
 type SortTarget = Pick<DataToolRangeSnapshot, "sheetId" | "range">;
@@ -37,12 +38,21 @@ function isLevel(value: unknown, target: SortTarget): value is SortLevel {
     return false;
   if (value.sortOn === "cellColor" || value.sortOn === "fontColor")
     return (
+      value.icon === undefined &&
       value.customOrder === undefined &&
       ((value.sortOn === "cellColor" && value.color === null) ||
         (typeof value.color === "string" && value.color.trim().length > 0))
     );
+  if (value.sortOn === "icon")
+    return (
+      value.color === undefined &&
+      value.customOrder === undefined &&
+      (value.icon === null ||
+        (isRecord(value.icon) && isConditionalFormatIcon(value.icon.iconSet, value.icon.iconIndex)))
+    );
   return (
     (value.sortOn === undefined || value.sortOn === "value") &&
+    value.icon === undefined &&
     (value.customOrder === undefined ||
       (Array.isArray(value.customOrder) &&
         value.customOrder.length > 0 &&

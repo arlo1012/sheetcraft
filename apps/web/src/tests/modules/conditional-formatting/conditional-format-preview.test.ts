@@ -3,10 +3,14 @@ import type { ConditionalFormatCondition } from "@idea10/core/conditional-format
 import { describe, expect, test, vi } from "vitest";
 import ConditionalFormatPreview from "../../../modules/conditional-formatting/components/ConditionalFormatPreview.vue";
 import { paintConditionalFormatVisual } from "../../../shared/conditional-formatting/conditional-format-painter";
+import { paintConditionalFormatIcon } from "../../../shared/conditional-formatting/conditional-format-icons";
 import { createAppI18n } from "../../../shared/i18n";
 
 vi.mock("../../../shared/conditional-formatting/conditional-format-painter", () => ({
   paintConditionalFormatVisual: vi.fn(),
+}));
+vi.mock("../../../shared/conditional-formatting/conditional-format-icons", () => ({
+  paintConditionalFormatIcon: vi.fn(),
 }));
 
 describe("conditional format preview", () => {
@@ -34,17 +38,23 @@ describe("conditional format preview", () => {
       global: { plugins: [createAppI18n("en-US")] },
     });
     try {
-      expect(paintConditionalFormatVisual).toHaveBeenLastCalledWith(context, expect.anything(), {
-        iconSet: { iconSet: "threeFlags", iconIndex: 1, showValue: true },
-      });
+      expect(paintConditionalFormatIcon).toHaveBeenLastCalledWith(
+        context,
+        expect.anything(),
+        "threeFlags",
+        1,
+      );
       await wrapper.setProps({ condition: { ...condition, reverse: true } });
-      expect(paintConditionalFormatVisual).toHaveBeenLastCalledWith(context, expect.anything(), {
-        iconSet: { iconSet: "fiveArrows", iconIndex: 4, showValue: true },
-      });
-      vi.mocked(paintConditionalFormatVisual).mockClear();
+      expect(paintConditionalFormatIcon).toHaveBeenLastCalledWith(
+        context,
+        expect.anything(),
+        "fiveArrows",
+        4,
+      );
+      vi.mocked(paintConditionalFormatIcon).mockClear();
       await wrapper.setProps({ iconIndex: 1 });
-      expect(paintConditionalFormatVisual).not.toHaveBeenCalled();
-      expect(context.clearRect).toHaveBeenCalled();
+      expect(paintConditionalFormatIcon).not.toHaveBeenCalled();
+      expect(wrapper.find("canvas").exists()).toBe(false);
     } finally {
       wrapper.unmount();
       getContext.mockRestore();

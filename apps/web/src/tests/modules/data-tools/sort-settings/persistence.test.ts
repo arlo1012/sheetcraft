@@ -52,6 +52,50 @@ describe("sort settings persistence", () => {
       }),
     ).toBeUndefined();
   });
+  test("round-trips visible icon identities and no-icon levels without sharing saved objects", () => {
+    const iconSettings: SortInitial = {
+      ...settings,
+      levels: [
+        {
+          column: 1,
+          direction: "ascending",
+          sortOn: "icon",
+          icon: { iconSet: "fourArrows", iconIndex: 2 },
+        },
+        { column: 1, direction: "descending", sortOn: "icon", icon: null },
+      ],
+    };
+    writeSortSettings("book", target, iconSettings);
+    expect(readSortSettings("book", target)?.levels).toEqual(iconSettings.levels);
+    readSortSettings("book", target)!.levels![0]!.icon!.iconIndex = 0;
+    expect(readSortSettings("book", target)?.levels).toEqual(iconSettings.levels);
+    const key = localStorage.key(0)!;
+    for (const level of [
+      { column: 1, direction: "ascending", sortOn: "icon" },
+      {
+        column: 1,
+        direction: "ascending",
+        sortOn: "icon",
+        icon: { iconSet: "unknown", iconIndex: 0 },
+      },
+      {
+        column: 1,
+        direction: "ascending",
+        sortOn: "icon",
+        icon: { iconSet: "threeArrows", iconIndex: 3 },
+      },
+      { column: 1, direction: "ascending", sortOn: "icon", icon: null, color: "#ff0000" },
+      { column: 1, direction: "ascending", sortOn: "icon", icon: null, customOrder: ["A"] },
+      { column: 1, direction: "ascending", sortOn: "value", icon: null },
+      { column: 1, direction: "ascending", sortOn: "cellColor", color: "#ff0000", icon: null },
+    ]) {
+      localStorage.setItem(
+        key,
+        JSON.stringify({ version: 1, settings: { ...settings, levels: [level] } }),
+      );
+      expect(readSortSettings("book", target)).toBeUndefined();
+    }
+  });
 
   test("keeps existing range preferences without a sort method readable", () => {
     const previousSettings = { ...settings };

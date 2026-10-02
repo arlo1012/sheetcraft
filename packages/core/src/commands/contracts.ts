@@ -25,6 +25,7 @@ import type {
   SheetConditionalFormatRule,
   DefinedName,
 } from "../workbook.js";
+import type { ConditionalFormatIconSet } from "../conditional-formatting.js";
 
 export type CellContentChange = {
   sheetId: string;
@@ -226,15 +227,20 @@ export type SortDirection = "ascending" | "descending";
 /** Chinese collation used by an explicit value-sort option. */
 export type SortMethod = "pinyin" | "stroke";
 
+/** A visible conditional-format icon as it appears in a cell. */
+export type SortIcon = { iconSet: ConditionalFormatIconSet; iconIndex: number };
+
 export type SortKey = {
   column: number;
   direction: SortDirection;
   /** Omitted retains value sorting for saved commands created before color sorting. */
-  sortOn?: "value" | "cellColor" | "fontColor";
+  sortOn?: "value" | "cellColor" | "fontColor" | "icon";
   /** Explicit value order for value sorts. Unlisted values use the ordinary value comparison. */
   customOrder?: string[];
   /** Required by color sorts. `null` selects cells without a fill for `cellColor`. */
   color?: string | null;
+  /** Required by icon sorts. `null` selects cells without a visible icon. */
+  icon?: SortIcon | null;
 };
 
 export type SortSheetRangeCommand = {

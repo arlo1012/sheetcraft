@@ -18,6 +18,7 @@ import {
   getCellTextTypographyStyle,
 } from "../../../shared/cell-text/font-presentation";
 import { paintConditionalFormatVisual } from "../../../shared/conditional-formatting/conditional-format-painter";
+import ConditionalFormatIcon from "../../../shared/conditional-formatting/ConditionalFormatIcon.vue";
 import { useAppI18n } from "../../../shared/i18n";
 
 const props = withDefaults(
@@ -39,6 +40,14 @@ const { t } = useAppI18n();
 const canvas = ref<HTMLCanvasElement>();
 const visual = computed(
   () => props.condition?.kind === "dataBar" || props.condition?.kind === "iconSet",
+);
+const singleIcon = computed(
+  () => props.condition?.kind === "iconSet" && props.iconIndex !== undefined,
+);
+const displayedIcon = computed(() =>
+  props.condition?.kind === "iconSet" && props.iconIndex !== undefined
+    ? getConditionalFormatIcon(props.condition, props.iconIndex)
+    : null,
 );
 const insetColorScale = computed(() => props.wide && props.condition?.kind === "colorScale");
 const insetDataBar = computed(() => props.wide && props.condition?.kind === "dataBar");
@@ -154,10 +163,7 @@ watchPostEffect(() => {
   }
   if (condition?.kind === "iconSet") {
     const count = condition.thresholds.length;
-    const indexes =
-      props.iconIndex === undefined
-        ? Array.from({ length: count }, (_, index) => index)
-        : [props.iconIndex];
+    const indexes = Array.from({ length: count }, (_, index) => index);
     indexes.forEach((index, position) => {
       const icon = getConditionalFormatIcon(condition, index);
       if (!icon) return;
@@ -201,6 +207,13 @@ watchPostEffect(() => {
       :style="swatchStyle"
       aria-hidden="true"
     />
+    <template v-else-if="singleIcon">
+      <ConditionalFormatIcon
+        v-if="displayedIcon"
+        :icon-set="displayedIcon.iconSet"
+        :icon-index="displayedIcon.iconIndex"
+      />
+    </template>
     <canvas
       v-else-if="visual"
       ref="canvas"

@@ -2,6 +2,7 @@ import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
 import CustomSortListDialog from "../../../../modules/data-tools/components/CustomSortListDialog.vue";
 import SortDialog from "../../../../modules/data-tools/components/SortDialog.vue";
+import ConditionalFormatIcon from "../../../../shared/conditional-formatting/ConditionalFormatIcon.vue";
 import { createAppI18n } from "../../../../shared/i18n";
 
 const mounted: Array<{ unmount: () => void }> = [];
@@ -30,6 +31,18 @@ function fixture(headerLocked = false) {
         },
         { column: 1, cellColors: ["#ffff00"], fontColors: ["#20242c"], headerFontColor: "#20242c" },
       ],
+      iconColumns: [
+        {
+          column: 0,
+          icons: [
+            { iconSet: "threeArrows", iconIndex: 0 },
+            { iconSet: "fourArrows", iconIndex: 0 },
+            null,
+          ],
+          headerIcon: { iconSet: "fiveArrows", iconIndex: 4 },
+        },
+        { column: 1, icons: [{ iconSet: "threeFlags", iconIndex: 2 }], headerIcon: null },
+      ],
       initial: { hasHeader: true, headerLocked, column: 0, direction: "ascending" },
     },
   });
@@ -42,6 +55,116 @@ function fixture(headerLocked = false) {
 }
 
 describe("SortDialog", () => {
+  test("enables icon sorting, previews the exact family and copies icon conditions independently", async () => {
+    const { wrapper, action, confirm } = fixture();
+    const fields = (field: string) =>
+      wrapper
+        .findAllComponents({ name: "TSelect" })
+        .filter((item) => item.attributes("data-sort-field") === field);
+    expect(fields("basis")[0]!.props("options")).toContainEqual({
+      label: "Conditional formatting icon",
+      value: "icon",
+    });
+    const initial = {
+      hasHeader: true,
+      column: 0,
+      direction: "ascending" as const,
+      levels: [
+        {
+          column: 0,
+          direction: "ascending" as const,
+          sortOn: "icon" as const,
+          icon: { iconSet: "threeArrows" as const, iconIndex: 0 },
+        },
+      ],
+    };
+    await wrapper.setProps({ visible: false, initial });
+    await wrapper.setProps({ visible: true });
+    expect(wrapper.getComponent(ConditionalFormatIcon).props()).toMatchObject({
+      iconSet: "threeArrows",
+      iconIndex: 0,
+    });
+    expect(fields("direction")[0]!.props("options")).toEqual([
+      { label: "On top", value: "ascending" },
+      { label: "On bottom", value: "descending" },
+    ]);
+    await action("copy");
+    fields("icon")[1]!.vm.$emit("update:value", "fourArrows:0");
+    fields("direction")[1]!.vm.$emit("update:value", "descending");
+    await wrapper.vm.$nextTick();
+    confirm();
+    const draft = wrapper.emitted("apply")!.at(-1)![0] as { levels: typeof initial.levels };
+    expect(draft.levels).toEqual([
+      initial.levels[0],
+      {
+        column: 0,
+        direction: "descending",
+        sortOn: "icon",
+        icon: { iconSet: "fourArrows", iconIndex: 0 },
+      },
+    ]);
+    draft.levels[0]!.icon.iconIndex = 2;
+    expect(initial.levels[0]!.icon.iconIndex).toBe(0);
+    confirm();
+    expect(wrapper.emitted("apply")!.at(-1)![0]).toMatchObject({
+      levels: [{ icon: { iconIndex: 0 } }, { icon: { iconSet: "fourArrows" } }],
+    });
+    fields("basis")[1]!.vm.$emit("update:value", "value");
+    await wrapper.vm.$nextTick();
+    confirm();
+    expect((wrapper.emitted("apply")!.at(-1)![0] as { levels: unknown[] }).levels[1]).toEqual({
+      column: 0,
+      direction: "descending",
+    });
+    await wrapper.setProps({ visible: false });
+    await wrapper.setProps({ visible: true });
+    expect(fields("icon")).toHaveLength(1);
+    expect(fields("icon")[0]!.props("value")).toBe("threeArrows:0");
+  });
+
+  test("includes header icons only without a header and resets stale icons when the column changes", async () => {
+    const { wrapper, confirm } = fixture();
+    const field = (name: string) =>
+      wrapper
+        .findAllComponents({ name: "TSelect" })
+        .find((item) => item.attributes("data-sort-field") === name)!;
+    field("basis").vm.$emit("update:value", "icon");
+    await wrapper.vm.$nextTick();
+    await field("icon").find(".t-input").trigger("click");
+    await expect
+      .poll(() => wrapper.findAllComponents({ name: "TOption" }).map((item) => item.props("value")))
+      .toContain("fourArrows:0");
+    expect(
+      wrapper.findAllComponents({ name: "TOption" }).map((item) => item.props("value")),
+    ).not.toContain("fiveArrows:4");
+    wrapper.findComponent({ name: "TCheckbox" }).vm.$emit("update:modelValue", false);
+    await wrapper.vm.$nextTick();
+    expect(
+      wrapper.findAllComponents({ name: "TOption" }).map((item) => item.props("value")),
+    ).toContain("fiveArrows:4");
+    field("icon").vm.$emit("update:value", "fiveArrows:4");
+    await wrapper.vm.$nextTick();
+    wrapper.findComponent({ name: "TCheckbox" }).vm.$emit("update:modelValue", true);
+    await wrapper.vm.$nextTick();
+    expect(field("icon").props("value")).toBe("threeArrows:0");
+    field("icon").vm.$emit("update:value", "no-icon");
+    await wrapper.vm.$nextTick();
+    confirm();
+    expect(wrapper.emitted("apply")!.at(-1)![0]).toMatchObject({
+      levels: [{ sortOn: "icon", icon: null }],
+    });
+    field("column").vm.$emit("update:value", 1);
+    await wrapper.vm.$nextTick();
+    expect(field("icon").props("value")).toBe("threeFlags:2");
+    await wrapper.setProps({ iconColumns: [] });
+    expect(field("icon").props("disabled")).toBe(true);
+    expect(wrapper.findAllComponents({ name: "TDialog" })[0]!.props("confirmBtn")).toMatchObject({
+      disabled: true,
+    });
+    const applies = wrapper.emitted("apply")!.length;
+    confirm();
+    expect(wrapper.emitted("apply")).toHaveLength(applies);
+  });
   test("restores applied levels and options without mutating them when draft changes are cancelled", async () => {
     const { wrapper, confirm } = fixture();
     const initial = {

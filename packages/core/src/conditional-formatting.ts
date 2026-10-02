@@ -298,6 +298,18 @@ function iconSetSize(iconSet: ConditionalFormatIconSet): number {
   return iconSet.startsWith("three") ? 3 : iconSet.startsWith("four") ? 4 : 5;
 }
 
+/** Returns whether a family/index pair identifies one supported icon-set glyph. */
+export function isConditionalFormatIcon(iconSet: unknown, iconIndex: unknown): boolean {
+  return (
+    typeof iconSet === "string" &&
+    ICON_SETS.has(iconSet as ConditionalFormatIconSet) &&
+    typeof iconIndex === "number" &&
+    Number.isInteger(iconIndex) &&
+    iconIndex >= 0 &&
+    iconIndex < iconSetSize(iconSet as ConditionalFormatIconSet)
+  );
+}
+
 /**
  * Resolves the glyph to render for an ascending icon-set threshold index.
  * Reversing applies to the displayed glyph assignment, including custom choices.

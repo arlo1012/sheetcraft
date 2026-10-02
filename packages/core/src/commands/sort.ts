@@ -3,6 +3,7 @@ import { isFormulaError, type CellContent, type FormulaValue } from "../formula/
 import {
   cloneCellContent,
   createWorkbookEvaluator,
+  createSheetEvaluator,
   getCellContent,
   getCellStyle,
   setCellContent,
@@ -12,6 +13,11 @@ import {
   type SheetFilter,
   type Workbook,
 } from "../workbook.js";
+import type { ExcelDateSystem } from "../formula/date-system.js";
+import {
+  createConditionalFormatVisualResolver,
+  isConditionalFormatIcon,
+} from "../conditional-formatting.js";
 import { MergedCellRangeResolver } from "../merged-cells.js";
 import {
   cloneCellStyle,
@@ -29,6 +35,7 @@ import type {
   CellContentChange,
   SetCellContentsCommand,
   SortDirection,
+  SortIcon,
   SortKey,
   SortMethod,
   SortSheetRangeCommand,
@@ -41,7 +48,12 @@ import {
   assertCellRange,
 } from "./helpers.js";
 
-type SortEntry = { row: number; values: FormulaValue[]; colors: Array<string | null | undefined> };
+type SortEntry = {
+  row: number;
+  values: FormulaValue[];
+  colors: Array<string | null | undefined>;
+  icons: Array<SortIcon | null | undefined>;
+};
 
 function cloneRange(range: CellRange): CellRange {
   return { start: { ...range.start }, end: { ...range.end } };
@@ -195,6 +207,19 @@ export function getSortCellColor(
   return style?.fillColor ? normalizeSortColor(style.fillColor) : null;
 }
 
+/** Resolves the currently displayed conditional-format icon for icon-sort discovery and execution. */
+export function createSortCellIconResolver(
+  sheet: ReturnType<typeof getSheetOrThrow>,
+  evaluator = createSheetEvaluator(sheet),
+  options?: { dateSystem?: ExcelDateSystem },
+): (address: CellAddress) => SortIcon | null {
+  const resolveConditionalFormat = createConditionalFormatVisualResolver(sheet, evaluator, options);
+  return (address) => {
+    const icon = resolveConditionalFormat(address)?.iconSet;
+    return icon && !icon.hidden ? { iconSet: icon.iconSet, iconIndex: icon.iconIndex } : null;
+  };
+}
+
 function compareColorSortValues(
   left: string | null | undefined,
   right: string | null | undefined,
@@ -214,6 +239,26 @@ function compareColorSortValues(
   return leftMatches ? 1 : -1;
 }
 
+function compareIconSortValues(
+  left: SortIcon | null | undefined,
+  right: SortIcon | null | undefined,
+  key: SortKey,
+): number {
+  const selected = key.icon;
+  const matches = (icon: SortIcon | null | undefined): boolean =>
+    icon === null
+      ? selected === null
+      : icon !== undefined &&
+        selected !== null &&
+        selected !== undefined &&
+        icon.iconSet === selected.iconSet &&
+        icon.iconIndex === selected.iconIndex;
+  const leftMatches = matches(left);
+  const rightMatches = matches(right);
+  if (leftMatches === rightMatches) return 0;
+  return key.direction === "ascending" ? (leftMatches ? -1 : 1) : leftMatches ? 1 : -1;
+}
+
 function compareSortEntries(
   left: SortEntry,
   right: SortEntry,
@@ -229,21 +274,23 @@ function compareSortEntries(
     const compared =
       key.sortOn === "cellColor" || key.sortOn === "fontColor"
         ? compareColorSortValues(left.colors[index], right.colors[index], key)
-        : customRanks
-          ? compareCustomSortValues(
-              left.values[index]!,
-              right.values[index]!,
-              key.direction,
-              caseSensitive,
-              compareText,
-              customRanks,
-            )
-          : compareSortValues(
-              left.values[index]!,
-              right.values[index]!,
-              key.direction,
-              compareText,
-            );
+        : key.sortOn === "icon"
+          ? compareIconSortValues(left.icons[index], right.icons[index], key)
+          : customRanks
+            ? compareCustomSortValues(
+                left.values[index]!,
+                right.values[index]!,
+                key.direction,
+                caseSensitive,
+                compareText,
+                customRanks,
+              )
+            : compareSortValues(
+                left.values[index]!,
+                right.values[index]!,
+                key.direction,
+                compareText,
+              );
     if (compared !== 0) return compared;
   }
   // Stable even if the JS engine implementation changes.
@@ -316,11 +363,13 @@ function validateSortCommand(
       key.sortOn !== undefined &&
       key.sortOn !== "value" &&
       key.sortOn !== "cellColor" &&
-      key.sortOn !== "fontColor"
+      key.sortOn !== "fontColor" &&
+      key.sortOn !== "icon"
     )
       throw invalidCommandPayload("sortKeys", command.sortKeys);
     const isColorSort = key.sortOn === "cellColor" || key.sortOn === "fontColor";
-    if (isColorSort && key.customOrder !== undefined)
+    const isIconSort = key.sortOn === "icon";
+    if ((isColorSort || isIconSort) && key.customOrder !== undefined)
       throw invalidCommandPayload(
         "sortKeys",
         command.sortKeys,
@@ -338,6 +387,7 @@ function validateSortCommand(
         "Custom orders must contain at least one non-blank string.",
       );
     if (!isColorSort && "color" in key) throw invalidCommandPayload("sortKeys", command.sortKeys);
+    if (!isIconSort && "icon" in key) throw invalidCommandPayload("sortKeys", command.sortKeys);
     if (isColorSort) {
       if (!("color" in key)) throw invalidCommandPayload("sortKeys", command.sortKeys);
       if (key.color === null && key.sortOn === "fontColor")
@@ -355,6 +405,14 @@ function validateSortCommand(
           command.sortKeys,
           "Sort colors must be six-digit hex values.",
         );
+    }
+    if (isIconSort) {
+      if (!("icon" in key)) throw invalidCommandPayload("sortKeys", command.sortKeys);
+      if (
+        key.icon !== null &&
+        (!key.icon || !isConditionalFormatIcon(key.icon.iconSet, key.icon.iconIndex))
+      )
+        throw invalidCommandPayload("sortKeys", command.sortKeys, "Sort icon is not valid.");
     }
   }
   if (sheet.mergedCells.some((merged) => rangesIntersect(range, merged))) {
@@ -411,9 +469,11 @@ export function createMultiKeySortSheetRangeCommand(
     // These two fields preserve transport compatibility with old snapshots.
     keyColumn: first.column,
     direction: first.direction,
-    sortKeys: sortKeys.map((key) =>
-      key.customOrder === undefined ? { ...key } : { ...key, customOrder: [...key.customOrder] },
-    ),
+    sortKeys: sortKeys.map((key) => ({
+      ...key,
+      ...(key.customOrder === undefined ? {} : { customOrder: [...key.customOrder] }),
+      ...(key.icon === undefined || key.icon === null ? {} : { icon: { ...key.icon } }),
+    })),
     ...(options?.hasHeader ? { hasHeader: true } : {}),
     ...(options?.caseSensitive !== undefined ? { caseSensitive: options.caseSensitive } : {}),
     ...(options?.sortMethod !== undefined ? { sortMethod: options.sortMethod } : {}),
@@ -438,6 +498,9 @@ export function applySortSheetRangeCommand(
   if (dataStart >= range.end.row + 1) return null;
   const sortableRange = { ...range, start: { ...range.start, row: dataStart } };
   const evaluator = createWorkbookEvaluator(workbook, sheet.id);
+  const resolveSortIcon = createSortCellIconResolver(sheet, evaluator, {
+    dateSystem: workbook.dateSystem,
+  });
   const sortedRows = Array.from(
     { length: range.end.row - dataStart + 1 },
     (_, offset): SortEntry => {
@@ -449,6 +512,9 @@ export function applySortSheetRangeCommand(
           key.sortOn === "cellColor" || key.sortOn === "fontColor"
             ? getSortCellColor(sheet, { row, column: key.column }, key.sortOn)
             : undefined,
+        ),
+        icons: keys.map((key) =>
+          key.sortOn === "icon" ? resolveSortIcon({ row, column: key.column }) : undefined,
         ),
       };
     },

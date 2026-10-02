@@ -1526,6 +1526,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :columns="dataToolColumns"
       :sort-initial="dataSortInitial"
       :sort-color-columns="dataTools.sortColorColumns.value"
+      :sort-icon-columns="dataTools.sortIconColumns.value"
       :date-system="session.workbook.dateSystem"
       :range-label="dataToolRangeLabel"
       :split-preview="dataSplitPreview"
