@@ -345,15 +345,16 @@ const tooltipStyle = computed(() => {
           :class="{ 'page-layout-rulers__tick--major': tick.major }"
           :x1="tick.position"
           :x2="tick.position"
-          :y1="size - (tick.major ? 7 / printScale : 4 / printScale)"
+          :y1="tick.major ? 0 : size - 4 / printScale"
           :y2="size"
         />
         <text
           v-if="tick.label"
           class="page-layout-rulers__label"
           :style="{ fontSize: `${10 / printScale}px` }"
-          :x="tick.position + 2"
+          :x="tick.position - 2 / printScale"
           :y="10 / printScale"
+          text-anchor="end"
         >
           {{ tick.label }}
         </text>
@@ -394,7 +395,7 @@ const tooltipStyle = computed(() => {
         <line
           class="page-layout-rulers__tick"
           :class="{ 'page-layout-rulers__tick--major': tick.major }"
-          :x1="size - (tick.major ? 7 / printScale : 4 / printScale)"
+          :x1="tick.major ? 0 : size - 4 / printScale"
           :x2="size"
           :y1="tick.position"
           :y2="tick.position"
@@ -403,7 +404,7 @@ const tooltipStyle = computed(() => {
           v-if="tick.label"
           class="page-layout-rulers__label"
           :style="{ fontSize: `${10 / printScale}px` }"
-          :transform="`translate(${7 / printScale} ${tick.position - 2}) rotate(-90)`"
+          :transform="`translate(${7 / printScale} ${tick.position - 2 / printScale}) rotate(-90)`"
         >
           {{ tick.label }}
         </text>
