@@ -2,11 +2,13 @@ import { createFormulaError } from "../formula/types.js";
 import {
   getSheetFilterValue,
   getSheetFilterValueKey,
+  createSheetFilterColumnMatcher,
   doesSheetFilterColumnMatch,
 } from "../filter-values.js";
 export {
   getSheetFilterValue,
   getSheetFilterValueKey,
+  createSheetFilterColumnMatcher,
   doesSheetFilterColumnMatch,
 } from "../filter-values.js";
 import {
@@ -37,7 +39,7 @@ function cloneFilter(filter: SheetFilter): SheetFilter {
     columns: filter.columns.map((column) => ({
       column: column.column,
       allowedValues: column.allowedValues.map((value) => ({ ...value })),
-      ...(column.condition ? { condition: { ...column.condition } } : {}),
+      ...(column.condition ? { condition: cloneFilterCondition(column.condition) } : {}),
     })),
     ...(filter.advanced
       ? {
@@ -59,6 +61,14 @@ function cloneFilter(filter: SheetFilter): SheetFilter {
         }
       : {}),
   };
+}
+
+function cloneFilterCondition(
+  condition: NonNullable<SheetFilter["columns"][number]["condition"]>,
+): NonNullable<SheetFilter["columns"][number]["condition"]> {
+  return condition.kind === "compound"
+    ? { ...condition, conditions: [{ ...condition.conditions[0] }, { ...condition.conditions[1] }] }
+    : { ...condition };
 }
 
 function parseCellKey(key: string): CellAddress {
@@ -133,13 +143,15 @@ export function getSheetFilterColumnValueCounts(
     if (current) current.count += count;
     else entries.set(key, { value, count, ...(address ? { address } : {}) });
   };
-  const matchesOther = (row: number) =>
-    otherColumns.every((entry) =>
-      doesSheetFilterColumnMatch(
-        entry,
-        getSheetFilterValue(evaluator.getComputedValue({ row, column: entry.column })),
-      ),
-    );
+  const matchesOtherByColumn = otherColumns.map((entry) =>
+    createSheetFilterColumnMatcher(
+      sheet,
+      active ?? { range, columns: otherColumns },
+      entry,
+      evaluator.getComputedValue,
+    ),
+  );
+  const matchesOther = (row: number) => matchesOtherByColumn.every((matches) => matches(row));
   for (const row of rows)
     if (matchesOther(row)) {
       const address = { row, column };
@@ -211,11 +223,16 @@ function addHiddenInterval(intervals: HiddenRowInterval[], start: number, end: n
   else intervals.push({ start, end });
 }
 
-function doesRowMatchFilter(filter: SheetFilter, row: number, evaluator: SheetEvaluator): boolean {
-  return filter.columns.every((column) => {
-    const value = getSheetFilterValue(evaluator.getComputedValue({ row, column: column.column }));
-    return doesSheetFilterColumnMatch(column, value);
-  });
+function doesRowMatchFilter(
+  sheet: Sheet,
+  filter: SheetFilter,
+  row: number,
+  evaluator: SheetEvaluator,
+  matchers = filter.columns.map((column) =>
+    createSheetFilterColumnMatcher(sheet, filter, column, evaluator.getComputedValue),
+  ),
+): boolean {
+  return matchers.every((matches) => matches(row));
 }
 
 /**
@@ -236,6 +253,9 @@ export function createSheetFilterHiddenRowIntervals(
     return [{ start: dataStart, end: dataEnd }];
   }
   const columnSet = new Set(filter.columns.map((column) => column.column));
+  const matchers = filter.columns.map((column) =>
+    createSheetFilterColumnMatcher(sheet, filter, column, evaluator.getComputedValue),
+  );
   const candidateRows = new Set<number>();
   for (const key of sheet.cells.keys()) {
     const address = parseCellKey(key);
@@ -250,7 +270,8 @@ export function createSheetFilterHiddenRowIntervals(
   let cursor = dataStart;
   for (const row of [...candidateRows].sort((left, right) => left - right)) {
     if (!blankRowMatches) addHiddenInterval(hidden, cursor, row - 1);
-    if (!doesRowMatchFilter(filter, row, evaluator)) addHiddenInterval(hidden, row, row);
+    if (!doesRowMatchFilter(sheet, filter, row, evaluator, matchers))
+      addHiddenInterval(hidden, row, row);
     cursor = row + 1;
   }
   if (!blankRowMatches) addHiddenInterval(hidden, cursor, dataEnd);

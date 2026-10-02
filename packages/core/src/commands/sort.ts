@@ -18,13 +18,9 @@ import {
   createConditionalFormatVisualResolver,
   isConditionalFormatIcon,
 } from "../conditional-formatting.js";
+import { createCellColorResolver, getCellColor, type CellColorTarget } from "../cell-color.js";
 import { MergedCellRangeResolver } from "../merged-cells.js";
-import {
-  cloneCellStyle,
-  DEFAULT_CELL_TEXT_COLOR,
-  mergeCellStyle,
-  type CellStyle,
-} from "../style.js";
+import { cloneCellStyle, mergeCellStyle, type CellStyle } from "../style.js";
 import {
   getCellBorderTargetKey,
   getExactCellBorderPatch,
@@ -191,6 +187,10 @@ function normalizeSortColor(color: string): string {
   return color.toLowerCase();
 }
 
+function colorTarget(sortOn: "cellColor" | "fontColor"): CellColorTarget {
+  return sortOn === "cellColor" ? "fill" : "text";
+}
+
 /**
  * Returns the color represented by a cell for color-sort discovery and comparison.
  * A gradient is deliberately `undefined`: it cannot be represented by one solid color.
@@ -200,11 +200,16 @@ export function getSortCellColor(
   address: CellAddress,
   sortOn: "cellColor" | "fontColor",
 ): string | null | undefined {
-  const style = getCellStyle(sheet, address);
-  if (sortOn === "fontColor")
-    return normalizeSortColor(style?.textColor ?? DEFAULT_CELL_TEXT_COLOR);
-  if (style?.fillGradient) return undefined;
-  return style?.fillColor ? normalizeSortColor(style.fillColor) : null;
+  return getCellColor(sheet, address, colorTarget(sortOn));
+}
+
+export function createSortCellColorResolver(
+  sheet: ReturnType<typeof getSheetOrThrow>,
+  evaluator = createSheetEvaluator(sheet),
+  options?: { dateSystem?: ExcelDateSystem },
+): (address: CellAddress, sortOn: "cellColor" | "fontColor") => string | null | undefined {
+  const resolveColor = createCellColorResolver(sheet, evaluator, options);
+  return (address, sortOn) => resolveColor(address, colorTarget(sortOn));
 }
 
 /** Resolves the currently displayed conditional-format icon for icon-sort discovery and execution. */
@@ -501,6 +506,9 @@ export function applySortSheetRangeCommand(
   const resolveSortIcon = createSortCellIconResolver(sheet, evaluator, {
     dateSystem: workbook.dateSystem,
   });
+  const resolveSortColor = createSortCellColorResolver(sheet, evaluator, {
+    dateSystem: workbook.dateSystem,
+  });
   const sortedRows = Array.from(
     { length: range.end.row - dataStart + 1 },
     (_, offset): SortEntry => {
@@ -510,7 +518,7 @@ export function applySortSheetRangeCommand(
         values: keys.map((key) => evaluator.getComputedValue({ row, column: key.column })),
         colors: keys.map((key) =>
           key.sortOn === "cellColor" || key.sortOn === "fontColor"
-            ? getSortCellColor(sheet, { row, column: key.column }, key.sortOn)
+            ? resolveSortColor({ row, column: key.column }, key.sortOn)
             : undefined,
         ),
         icons: keys.map((key) =>

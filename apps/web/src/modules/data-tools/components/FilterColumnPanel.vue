@@ -2,25 +2,24 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ArrowDownAZ, ArrowUpAZ, FilterX, PaintBucket } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
-import { Input as TInput } from "tdesign-vue-next/es/input";
-import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { getSheetFilterValueKey } from "@idea10/core/commands";
-import type { SheetFilterValue } from "@idea10/core/workbook";
+import type { SheetFilterCondition, SheetFilterValue } from "@idea10/core/workbook";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
-import {
-  buildFilterCondition,
-  createFilterConditionDraft,
-  NUMBER_FILTER_OPERATORS,
-  TEXT_FILTER_OPERATORS,
-  type FilterConditionOperator,
-} from "../filter-conditions";
+import { createFilterConditionDraft, type FilterConditionOperator } from "../filter-conditions";
+import type { FilterConditionAction } from "../filter-condition-actions";
 import { getMatchingFilterValues } from "../filter-value-options";
 import type { DataToolFilterCriteria, DataToolFilterValueOption } from "../data-tools-types";
 import FilterValueList from "./FilterValueList.vue";
+import FilterColorOptions from "./FilterColorOptions.vue";
+import FilterConditionMenu from "./FilterConditionMenu.vue";
+import FilterConditionDialog from "./FilterConditionDialog.vue";
+import FilterRankDialog from "./FilterRankDialog.vue";
+
+type ColorCondition = Extract<SheetFilterCondition, { kind: "color" }>;
 
 const props = withDefaults(
   defineProps<{
@@ -30,16 +29,26 @@ const props = withDefaults(
     values: readonly DataToolFilterValueOption[];
     appliedKeys: readonly SheetFilterValue[];
     criteria?: DataToolFilterCriteria;
+    colors?: { cellColors: readonly (string | null)[]; fontColors: readonly string[] };
     preferredKind: "text" | "number" | "date";
     hasCriteria: boolean;
     canSort: boolean;
     disabled?: boolean;
     dateSystem?: ExcelDateSystem;
   }>(),
-  { disabled: false, dateSystem: "1900" },
+  {
+    disabled: false,
+    dateSystem: "1900",
+    colors: () => ({ cellColors: [], fontColors: [] }),
+  },
 );
 const emit = defineEmits<{
-  apply: [payload: { includedKeys: SheetFilterValue[]; criteria?: DataToolFilterCriteria }];
+  apply: [
+    payload: {
+      includedKeys: SheetFilterValue[];
+      criteria?: DataToolFilterCriteria;
+    },
+  ];
   sort: [direction: "ascending" | "descending"];
   openSort: [];
   clear: [];
@@ -47,12 +56,20 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 const root = ref<HTMLElement | null>(null);
+const conditionMenuRef = ref<InstanceType<typeof FilterConditionMenu> | null>(null);
 const query = ref("");
 const selected = ref<SheetFilterValue[]>([]);
-const draft = ref(createFilterConditionDraft(props.criteria, props.dateSystem));
-const tab = ref<"values" | "condition">("values");
+const colorDraft = ref<ColorCondition>();
+const tab = ref<"values" | "color">("values");
+const valuesDirty = ref(false);
+const editingAction = ref<FilterConditionAction>();
+const editing = computed(() => editingAction.value !== undefined);
+const filterDisabled = computed(() => props.disabled);
+const pendingValueCriteria = computed(() =>
+  !valuesDirty.value && props.criteria?.kind !== "color" ? props.criteria : undefined,
+);
 let opener: HTMLElement | null = null;
-const open = computed(() => props.visible);
+const open = computed(() => props.visible && !editing.value);
 const reference = computed<FloatingReference>(() => ({
   getBoundingClientRect: () =>
     new DOMRect(
@@ -65,20 +82,12 @@ const reference = computed<FloatingReference>(() => ({
 const { floatingStyles } = useDismissibleFloatingPanel(reference, root, open, {
   placement: "bottom-start",
   offset: 3,
+  additionalInside: () => [conditionMenuRef.value?.rootElement],
   onDismiss: ({ restoreFocus }) => {
     emit("close");
     if (restoreFocus) void nextTick(() => opener?.focus());
   },
 });
-const attachToPanel = () => root.value ?? document.body;
-const kindOptions = computed(() => [
-  { value: "text", label: t("dataTools.filter.textFilters") },
-  { value: "number", label: t("dataTools.filter.numberFilters") },
-  { value: "date", label: t("dataTools.filter.dateFilters") },
-]);
-const conditionLabel = computed(
-  () => kindOptions.value.find((option) => option.value === draft.value.kind)?.label,
-);
 const operatorLabels: Record<FilterConditionOperator, MessageKey> = {
   equals: "dataTools.filter.equals",
   notEquals: "dataTools.filter.notEquals",
@@ -93,16 +102,6 @@ const operatorLabels: Record<FilterConditionOperator, MessageKey> = {
   between: "dataTools.filter.between",
   notBetween: "dataTools.filter.notBetween",
 };
-const operatorOptions = computed(() =>
-  (draft.value.kind === "text" ? TEXT_FILTER_OPERATORS : NUMBER_FILTER_OPERATORS).map((value) => ({
-    value,
-    label: t(operatorLabels[value]),
-  })),
-);
-const condition = computed(() => buildFilterCondition(draft.value, props.dateSystem));
-const between = computed(
-  () => draft.value.operator === "between" || draft.value.operator === "notBetween",
-);
 const matchingValues = computed(() => getMatchingFilterValues(props.values, query.value));
 const includedKeys = computed(() => {
   const keys = new Set(selected.value.map(getSheetFilterValueKey));
@@ -110,9 +109,45 @@ const includedKeys = computed(() => {
     .filter((option) => keys.has(getSheetFilterValueKey(option.key)))
     .map((option) => option.key);
 });
+const validColor = computed(() => {
+  const color = colorDraft.value;
+  if (!color) return false;
+  return color.target === "fill"
+    ? props.colors.cellColors.includes(color.color)
+    : color.color !== null && props.colors.fontColors.includes(color.color);
+});
 const canApply = computed(
-  () => !props.disabled && (tab.value === "values" || condition.value.valid),
+  () => !filterDisabled.value && (tab.value === "values" || validColor.value),
 );
+function describeCondition(condition: SheetFilterCondition): string {
+  if (condition.kind === "compound")
+    return condition.conditions
+      .map(describeCondition)
+      .join(
+        ` ${t(condition.operator === "and" ? "dataTools.filter.and" : "dataTools.filter.or")} `,
+      );
+  if (condition.kind === "color")
+    return t("dataTools.filter.colorSummary", {
+      target: t(
+        condition.target === "fill" ? "dataTools.filter.fillColors" : "dataTools.filter.fontColors",
+      ),
+      color: condition.color?.toUpperCase() ?? t("dataTools.filter.noFillColor"),
+    });
+  if (condition.kind === "rank")
+    return t("dataTools.filter.rankSummary", {
+      direction: t(condition.bottom ? "dataTools.filter.bottom" : "dataTools.filter.top"),
+      count: condition.count,
+      unit: t(condition.percent ? "dataTools.filter.percent" : "dataTools.filter.items"),
+    });
+  if (condition.kind === "average")
+    return t(condition.above ? "dataTools.filter.aboveAverage" : "dataTools.filter.belowAverage");
+  const draft = createFilterConditionDraft(condition, props.dateSystem);
+  return `${t(operatorLabels[condition.operator])} ${draft.first}${draft.second ? ` ${t("dataTools.filter.and")} ${draft.second}` : ""}`;
+}
+const criteriaSummary = computed(() => {
+  if (tab.value === "color") return colorDraft.value ? describeCondition(colorDraft.value) : "";
+  return pendingValueCriteria.value ? describeCondition(pendingValueCriteria.value) : "";
+});
 watch(
   () => [props.visible, props.columnLabel, props.appliedKeys, props.criteria] as const,
   () => {
@@ -123,24 +158,42 @@ watch(
         ? props.values.map((option) => option.key)
         : props.appliedKeys
     ).map((value) => ({ ...value }));
-    draft.value = createFilterConditionDraft(props.criteria, props.dateSystem);
-    if (draft.value.kind === "values") draft.value.kind = props.preferredKind;
-    tab.value = props.criteria ? "condition" : "values";
+    valuesDirty.value = false;
+    colorDraft.value = props.criteria?.kind === "color" ? { ...props.criteria } : undefined;
+    tab.value = props.criteria?.kind === "color" ? "color" : "values";
+    editingAction.value = undefined;
   },
   { immediate: true },
 );
-watch(
-  () => draft.value.kind,
-  () => {
-    if (!operatorOptions.value.some((option) => option.value === draft.value.operator))
-      draft.value.operator = "equals";
-  },
-);
+function applyCondition(criteria: SheetFilterCondition): void {
+  if (!filterDisabled.value)
+    emit("apply", {
+      includedKeys: [],
+      criteria,
+    });
+}
 function apply(): void {
   if (!canApply.value) return;
-  if (tab.value === "values") emit("apply", { includedKeys: includedKeys.value });
-  else if (condition.value.valid)
-    emit("apply", { includedKeys: [], criteria: condition.value.condition });
+  if (tab.value === "color" && colorDraft.value) applyCondition(colorDraft.value);
+  else if (pendingValueCriteria.value) applyCondition(pendingValueCriteria.value);
+  else
+    emit("apply", {
+      includedKeys: includedKeys.value,
+    });
+}
+function chooseCondition(action: FilterConditionAction): void {
+  if (filterDisabled.value) return;
+  if (action === "aboveAverage" || action === "belowAverage")
+    applyCondition({ kind: "average", above: action === "aboveAverage" });
+  else editingAction.value = action;
+}
+function closeEditor(): void {
+  editingAction.value = undefined;
+  void nextTick(() =>
+    root.value
+      ?.querySelector<HTMLElement>("input:not([readonly]), button:not([disabled])")
+      ?.focus(),
+  );
 }
 function onSearchEnter(event: KeyboardEvent): void {
   if (event.target instanceof HTMLInputElement && !event.isComposing) {
@@ -161,145 +214,149 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <section
-      v-if="visible"
+      v-if="open"
       ref="root"
       class="filter-column-panel"
       role="dialog"
       :aria-label="t('dataTools.filter.filterValues') + ' ' + columnLabel"
       :style="floatingStyles"
     >
-      <div class="filter-column-panel__heading">
-        <strong :title="columnLabel">{{ columnLabel }}</strong>
-        <TButton
-          variant="text"
-          size="small"
-          :disabled="disabled || !hasCriteria"
-          @click="emit('clear')"
-        >
-          <template #icon><FilterX :size="14" /></template>{{ t("dataTools.filter.clear") }}
-        </TButton>
-      </div>
-      <div class="filter-column-panel__sort" role="group" :aria-label="t('dataTools.sort.title')">
-        <TButton
-          variant="text"
-          size="small"
-          :disabled="disabled || !canSort"
-          @click="emit('sort', 'ascending')"
-        >
-          <template #icon><ArrowUpAZ :size="15" /></template>{{ t("dataTools.sort.ascending") }}
-        </TButton>
-        <TButton
-          variant="text"
-          size="small"
-          :disabled="disabled || !canSort"
-          @click="emit('sort', 'descending')"
-        >
-          <template #icon><ArrowDownAZ :size="15" /></template>{{ t("dataTools.sort.descending") }}
-        </TButton>
-        <TButton
-          variant="text"
-          theme="default"
-          size="small"
-          aria-haspopup="dialog"
-          :disabled="disabled || !canSort"
-          @click="emit('openSort')"
-        >
-          <template #icon><PaintBucket class="idea-action-icon" aria-hidden="true" /></template>
-          {{ t("dataTools.filter.colorSort") }}
-        </TButton>
-      </div>
-      <TTabs v-model="tab" size="medium">
-        <TTabPanel value="values" :disabled="disabled" :label="t('dataTools.filter.content')">
-          <FilterValueList
-            v-model="selected"
-            v-model:query="query"
-            :values="values"
-            :disabled="disabled"
-            @keydown.enter="onSearchEnter"
-          />
-        </TTabPanel>
-        <TTabPanel value="condition" :disabled="disabled" :label="conditionLabel">
-          <div class="filter-column-panel__condition">
-            <label
-              >{{ t("dataTools.filter.filterType") }}
-              <TSelect
-                v-model="draft.kind"
-                :disabled="disabled"
-                :options="kindOptions"
-                :popup-props="{ attach: attachToPanel }"
-                :aria-label="t('dataTools.filter.filterType')"
-              />
-            </label>
-            <label
-              >{{ t("dataTools.filter.condition") }}
-              <TSelect
-                v-model="draft.operator"
-                :disabled="disabled"
-                :options="operatorOptions"
-                :popup-props="{ attach: attachToPanel }"
-                :aria-label="t('dataTools.filter.condition')"
-              />
-            </label>
-            <TInput
-              :value="draft.first"
-              :disabled="disabled"
-              :type="draft.kind === 'number' ? 'number' : 'text'"
-              :aria-label="t('dataTools.filter.condition')"
-              :placeholder="draft.kind === 'date' ? 'YYYY-MM-DD' : ''"
-              :status="!condition.valid && draft.first !== '' ? 'error' : undefined"
-              @update:value="draft.first = String($event)"
-              @enter="apply"
+      <header class="filter-column-panel__heading">
+        <div class="filter-column-panel__sort" role="group" :aria-label="t('dataTools.sort.title')">
+          <TButton
+            variant="text"
+            size="small"
+            :disabled="disabled || !canSort"
+            @click="emit('sort', 'ascending')"
+          >
+            <template #icon><ArrowUpAZ class="idea-action-icon" /></template
+            >{{ t("dataTools.sort.ascending") }}
+          </TButton>
+          <TButton
+            variant="text"
+            size="small"
+            :disabled="disabled || !canSort"
+            @click="emit('sort', 'descending')"
+          >
+            <template #icon><ArrowDownAZ class="idea-action-icon" /></template
+            >{{ t("dataTools.sort.descending") }}
+          </TButton>
+          <TButton
+            variant="text"
+            theme="default"
+            size="small"
+            aria-haspopup="dialog"
+            :disabled="disabled || !canSort"
+            @click="emit('openSort')"
+          >
+            <template #icon><PaintBucket class="idea-action-icon" aria-hidden="true" /></template>
+            {{ t("dataTools.filter.colorSort") }}
+          </TButton>
+        </div>
+      </header>
+      <TTabs v-model="tab" class="filter-column-panel__tabs" size="medium">
+        <template #action>
+          <div class="filter-column-panel__actions">
+            <FilterConditionMenu
+              ref="conditionMenuRef"
+              :kind="preferredKind"
+              :disabled="filterDisabled"
+              @select="chooseCondition"
             />
-            <template v-if="between">
-              <span>{{ t("dataTools.filter.and") }}</span>
-              <TInput
-                :value="draft.second"
-                :disabled="disabled"
-                :type="draft.kind === 'number' ? 'number' : 'text'"
-                :aria-label="t('dataTools.filter.and')"
-                :placeholder="draft.kind === 'date' ? 'YYYY-MM-DD' : ''"
-                @update:value="draft.second = String($event)"
-                @enter="apply"
-              />
-            </template>
-            <p
-              v-if="!condition.valid && (draft.first || draft.second)"
-              role="status"
-              class="filter-column-panel__error"
-            >
-              {{ t("dataTools.filter.invalidCondition") }}
-            </p>
+            <TButton
+              variant="text"
+              theme="default"
+              size="small"
+              :disabled="disabled || !hasCriteria"
+              :aria-label="t('dataTools.filter.clear')"
+              :title="t('dataTools.filter.clear')"
+              @click="emit('clear')"
+              ><template #icon><FilterX class="idea-action-icon" aria-hidden="true" /></template
+            ></TButton>
+          </div>
+        </template>
+        <TTabPanel value="values" :disabled="disabled" :label="t('dataTools.filter.content')">
+          <div class="filter-column-panel__content">
+            <FilterValueList
+              v-model="selected"
+              v-model:query="query"
+              :values="values"
+              :disabled="disabled"
+              @update:model-value="valuesDirty = true"
+              @update:query="valuesDirty = true"
+              @keydown.enter="onSearchEnter"
+            />
+          </div>
+        </TTabPanel>
+        <TTabPanel value="color" :disabled="disabled" :label="t('dataTools.filter.byColor')">
+          <div class="filter-column-panel__content">
+            <FilterColorOptions v-model="colorDraft" :colors="colors" :disabled="disabled" />
           </div>
         </TTabPanel>
       </TTabs>
-      <footer>
-        <span v-if="tab === 'values'" class="filter-column-panel__summary" role="status">
-          {{
-            t(
-              query.trim()
-                ? "dataTools.filter.searchSelectionSummary"
-                : "dataTools.filter.selectionSummary",
-              { selected: includedKeys.length, total: matchingValues.length },
-            )
-          }}
-        </span>
-        <TButton theme="primary" size="small" :disabled="!canApply" @click="apply">{{
-          t("dataTools.filter.apply")
-        }}</TButton>
-        <TButton variant="outline" size="small" @click="emit('close')">{{
-          t("dataTools.filter.cancel")
-        }}</TButton>
-      </footer>
+      <div class="filter-column-panel__bottom">
+        <p v-if="criteriaSummary" class="filter-column-panel__criteria" :title="criteriaSummary">
+          {{ criteriaSummary }}
+        </p>
+        <footer>
+          <span
+            v-if="tab === 'values' && !pendingValueCriteria"
+            class="filter-column-panel__summary"
+            role="status"
+          >
+            {{
+              t(
+                query.trim()
+                  ? "dataTools.filter.searchSelectionSummary"
+                  : "dataTools.filter.selectionSummary",
+                { selected: includedKeys.length, total: matchingValues.length },
+              )
+            }}
+          </span>
+          <TButton variant="outline" size="small" @click="emit('close')">{{
+            t("dataTools.filter.cancel")
+          }}</TButton>
+          <TButton theme="primary" size="small" :disabled="!canApply" @click="apply">{{
+            t("dataTools.filter.apply")
+          }}</TButton>
+        </footer>
+      </div>
     </section>
   </Teleport>
+  <FilterConditionDialog
+    v-if="visible && editing && editingAction !== 'rank'"
+    :visible="true"
+    :column-label="columnLabel"
+    :kind="preferredKind"
+    :initial="criteria"
+    :action="editingAction"
+    :values="values"
+    :date-system="dateSystem"
+    :disabled="filterDisabled"
+    @close="closeEditor"
+    @apply="applyCondition"
+  />
+  <FilterRankDialog
+    v-if="visible && editingAction === 'rank'"
+    :visible="true"
+    :initial="criteria?.kind === 'rank' ? criteria : undefined"
+    :disabled="filterDisabled"
+    @close="closeEditor"
+    @apply="applyCondition"
+  />
 </template>
 <style scoped lang="scss">
+@use "../../../shared/option-list/option-list";
+
 .filter-column-panel {
+  @include option-list.scrollbar;
   z-index: 2200;
   display: grid;
-  gap: 8px;
-  width: min(390px, calc(100vw - 16px));
+  gap: var(--idea-space-4);
+  width: min(420px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
   padding: var(--idea-tool-panel-padding);
+  overflow: auto;
   background: var(--idea-surface-panel);
   border: 1px solid var(--idea-border-subtle);
   border-radius: var(--idea-radius-default);
@@ -307,48 +364,57 @@ onBeforeUnmount(() => {
   &__heading {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    strong {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-weight: 500;
-    }
+    min-height: 32px;
+    gap: var(--idea-space-4);
   }
   &__sort {
     display: flex;
-    gap: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--idea-border-subtle);
+    align-items: center;
+    flex: none;
+    gap: var(--idea-space-4);
   }
-  &__condition {
-    display: grid;
-    align-content: start;
-    gap: 8px;
-    min-height: 260px;
-    padding-top: 8px;
-    label {
-      display: grid;
-      gap: 4px;
-    }
+  &__tabs {
+    min-width: 0;
+  }
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--idea-space-2);
+  }
+  &__content {
+    padding-top: var(--idea-space-4);
+  }
+  &__criteria {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--idea-text-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   &__error {
     margin: 0;
     color: var(--idea-text-danger);
   }
   &__summary {
+    min-width: 0;
     margin-right: auto;
     color: var(--idea-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  &__bottom {
+    position: sticky;
+    z-index: 1;
+    bottom: 0;
+    display: grid;
+    gap: var(--idea-space-4);
+    background: var(--idea-surface-panel);
   }
   footer {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
-    padding-top: 8px;
-    border-top: 1px solid var(--idea-border-subtle);
+    gap: var(--idea-space-4);
   }
 }
 </style>

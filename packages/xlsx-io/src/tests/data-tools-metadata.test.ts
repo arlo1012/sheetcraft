@@ -85,10 +85,121 @@ describe("XLSX data-tool metadata", () => {
   test("reports unsupported filter criteria instead of silently reducing them", async () => {
     const result = await decodeXlsx(
       await workbookWith(
-        '<autoFilter ref="A1:A3"><filterColumn colId="0"><dynamicFilter type="aboveAverage"/></filterColumn></autoFilter>',
+        '<autoFilter ref="A1:A3"><filterColumn colId="0"><dynamicFilter type="thisMonth"/></filterColumn></autoFilter>',
       ),
     );
     expect(result.report.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "filter-omitted" })]),
+    );
+  });
+
+  test("roundtrips custom pairs, rank, average, and cell/font color filters", async () => {
+    const workbook = createWorkbook({ id: "extended-filter", sheetId: "data", sheetName: "Data" });
+    const sheet = [...workbook.sheets.values()][0]!;
+    for (let column = 0; column < 7; column += 1) {
+      setCellContent(sheet, { row: 0, column }, { kind: "literal", value: `Column ${column}` });
+      setCellContent(sheet, { row: 1, column }, { kind: "literal", value: column + 1 });
+      setCellContent(sheet, { row: 2, column }, { kind: "literal", value: column + 6 });
+    }
+    sheet.filter = {
+      range: { start: { row: 0, column: 0 }, end: { row: 2, column: 6 } },
+      columns: [
+        {
+          column: 0,
+          allowedValues: [],
+          condition: {
+            kind: "compound",
+            operator: "or",
+            conditions: [
+              { kind: "number", operator: "lessThan", value: 2 },
+              { kind: "number", operator: "greaterThanOrEqual", value: 5 },
+            ],
+          },
+        },
+        {
+          column: 1,
+          allowedValues: [],
+          condition: {
+            kind: "compound",
+            operator: "and",
+            conditions: [
+              { kind: "text", operator: "contains", value: "a" },
+              { kind: "text", operator: "doesNotContain", value: "z" },
+            ],
+          },
+        },
+        {
+          column: 2,
+          allowedValues: [],
+          condition: { kind: "rank", count: 12.5, bottom: true, percent: true },
+        },
+        { column: 3, allowedValues: [], condition: { kind: "average", above: false } },
+        { column: 4, allowedValues: [], condition: { kind: "color", target: "fill", color: null } },
+        {
+          column: 5,
+          allowedValues: [],
+          condition: { kind: "color", target: "text", color: "#c00000" },
+        },
+        {
+          column: 6,
+          allowedValues: [],
+          condition: { kind: "number", operator: "notBetween", value: 3, value2: 7 },
+        },
+      ],
+    } as typeof sheet.filter;
+
+    const encoded = await encodeXlsx(workbook);
+    const entries = unzipSync(encoded.bytes);
+    const xml = strFromU8(entries["xl/worksheets/sheet1.xml"]!);
+    const styles = strFromU8(entries["xl/styles.xml"]!);
+    expect(xml).toContain(
+      '<customFilters><customFilter operator="lessThan" val="2"/><customFilter operator="greaterThanOrEqual" val="5"/></customFilters>',
+    );
+    expect(xml).toContain(
+      '<customFilters and="1"><customFilter operator="equal" val="*a*"/><customFilter operator="notEqual" val="*z*"/></customFilters>',
+    );
+    expect(xml).toContain('<top10 val="12.5" percent="1" top="0"/>');
+    expect(xml).toContain(
+      '<customFilters><customFilter operator="lessThan" val="3"/><customFilter operator="greaterThan" val="7"/></customFilters>',
+    );
+    expect(xml).toContain('<dynamicFilter type="belowAverage"/>');
+    expect(xml).toMatch(/<colorFilter dxfId="\d+" cellColor="1"\/>/);
+    expect(xml).toMatch(/<colorFilter dxfId="\d+" cellColor="0"\/>/);
+    expect(styles).toContain('<patternFill patternType="none"/>');
+    expect(styles).toContain('<color rgb="FFC00000"/>');
+
+    expect(
+      [...(await decodeXlsx(encoded.bytes)).workbook.sheets.values()][0]!.filter?.columns,
+    ).toEqual(sheet.filter!.columns);
+  });
+
+  test("imports standard not-between and validates top-percent limits", async () => {
+    const supported = await decodeXlsx(
+      await workbookWith(
+        '<autoFilter ref="A1:B3"><filterColumn colId="0"><customFilters><customFilter operator="lessThan" val="3"/><customFilter operator="greaterThan" val="7"/></customFilters></filterColumn><filterColumn colId="1"><top10 val="12.5" percent="1" top="0"/></filterColumn></autoFilter>',
+      ),
+    );
+    expect(metadata([...supported.workbook.sheets.values()][0]!).filter).toEqual({
+      range: { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } },
+      columns: [
+        {
+          column: 0,
+          allowedValues: [],
+          condition: { kind: "number", operator: "notBetween", value: 3, value2: 7 },
+        },
+        {
+          column: 1,
+          allowedValues: [],
+          condition: { kind: "rank", count: 12.5, percent: true, bottom: true },
+        },
+      ],
+    });
+    const unsupported = await decodeXlsx(
+      await workbookWith(
+        '<autoFilter ref="A1:A3"><filterColumn colId="0"><top10 val="100.1" percent="1"/></filterColumn></autoFilter>',
+      ),
+    );
+    expect(unsupported.report.issues).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: "filter-omitted" })]),
     );
   });

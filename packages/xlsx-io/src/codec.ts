@@ -48,7 +48,11 @@ import {
   readRawWorksheetNumericValues,
   readRawWorksheetTextDirections,
 } from "./raw-cell-values.js";
-import { readXlsxDataMetadata, type XlsxDataMetadata } from "./data-tools-metadata.js";
+import {
+  readXlsxDataMetadata,
+  withoutColorFiltersForExcelJs,
+  type XlsxDataMetadata,
+} from "./data-tools-metadata.js";
 import { readXlsxConditionalFormatMetadata } from "./conditional-formatting.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
@@ -500,7 +504,7 @@ export async function decodeWithExcelJs(
   const rawDataMetadata = readXlsxDataMetadata(bytes);
   const rawConditionalFormats = readXlsxConditionalFormatMetadata(bytes, report);
   const source = new ExcelJS.Workbook();
-  await source.xlsx.load(bytes);
+  await source.xlsx.load(withoutColorFiltersForExcelJs(bytes));
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
   const dateSystem = source.properties.date1904 ? "1904" : "1900";
   const calculation = readWorkbookCalculationSettings(bytes);

@@ -320,6 +320,15 @@ export function useDataToolsController(options: Options) {
       : numeric.length > 0
         ? ("number" as const)
         : ("text" as const);
+    const colorColumn = getSortColorColumns(
+      activeSheet.value,
+      {
+        start: { row: filter.range.start.row, column: panel.column },
+        end: { row: filter.range.end.row, column: panel.column },
+      },
+      options.getSheetEvaluator(),
+      { dateSystem: options.getWorkbook().dateSystem },
+    )[0];
     return {
       visible: true,
       anchor: panel.anchor,
@@ -331,6 +340,10 @@ export function useDataToolsController(options: Options) {
       values,
       appliedKeys: existing?.allowedValues ?? values.map((item) => item.key),
       criteria: existing?.condition,
+      colors: {
+        cellColors: colorColumn?.cellColors ?? [],
+        fontColors: colorColumn?.fontColors ?? [],
+      },
       preferredKind,
       hasCriteria: Boolean(existing),
       canSort: filter.range.end.row - filter.range.start.row > 1,

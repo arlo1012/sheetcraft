@@ -151,7 +151,7 @@ function differentialBoolean(xml: string, element: string): boolean | undefined 
   return !/^(0|false)$/i.test(attribute(attrs, "val") ?? "1");
 }
 
-function readDxf(xml: string | undefined): {
+export function readXlsxDxfStyle(xml: string | undefined): {
   style: SheetConditionalFormatRule["style"];
   unsupported: boolean;
 } {
@@ -340,7 +340,7 @@ function readDxf(xml: string | undefined): {
   return { style, unsupported };
 }
 
-function readDxfs(stylesXml: string | undefined): string[] {
+export function readXlsxDxfEntries(stylesXml: string | undefined): string[] {
   const container = /<(?:[a-z_][\w.-]*:)?dxfs\b[^>]*>([\s\S]*?)<\/(?:[a-z_][\w.-]*:)?dxfs>/i.exec(
     stylesXml ?? "",
   )?.[1];
@@ -933,7 +933,7 @@ export function readXlsxConditionalFormats(
   sheetIndex: number,
   report: CompatibilityReportBuilder,
 ): ConditionalFormatRead {
-  const dxfs = readDxfs(stylesXml);
+  const dxfs = readXlsxDxfEntries(stylesXml);
   const rules: SheetConditionalFormatRule[] = [];
   const priorities = new Map<string, number>();
   const dataBarsByExtensionId = new Map<string, number>();
@@ -959,7 +959,7 @@ export function readXlsxConditionalFormats(
       const dxfId = Number(attribute(attrs, "dxfId"));
       const dxf =
         Number.isInteger(dxfId) && dxfId >= 0
-          ? readDxf(dxfs[dxfId])
+          ? readXlsxDxfStyle(dxfs[dxfId])
           : { style: {}, unsupported: attribute(attrs, "dxfId") !== undefined };
       if (dxf.unsupported) report.add("style-omitted", "warning", location);
       if (visual?.unsupported) report.add("feature-omitted", "warning", location);
@@ -1242,7 +1242,7 @@ function dxfFillXml(style: ConditionalFormatStyle): string {
   return "";
 }
 
-function dxfXml(style: ConditionalFormatStyle): string {
+export function xlsxDxfXml(style: ConditionalFormatStyle): string {
   const fontFamily = typeof style.fontFamily === "string" ? style.fontFamily : undefined;
   const fontSize = typeof style.fontSize === "number" ? style.fontSize : undefined;
   const textColor = typeof style.textColor === "string" ? style.textColor : undefined;
@@ -1560,7 +1560,7 @@ export function writeXlsxConditionalFormats(
       rule.condition.kind === "colorScale"
     )
       continue;
-    const xml = dxfXml(rule.style);
+    const xml = xlsxDxfXml(rule.style);
     let id = styleIds.get(xml);
     if (id === undefined) {
       id = dxfs.length;

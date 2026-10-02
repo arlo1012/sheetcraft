@@ -2,7 +2,11 @@ import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from "fflate/br
 import { addNativeCellImages, type NativeCellImage } from "./native-cell-images.js";
 import { writeDefinedNames } from "./defined-names.js";
 import { writeWorkbookCalculationSettings } from "./workbook-calculation.js";
-import { writeXlsxDataMetadata, type XlsxDataMetadata } from "./data-tools-metadata.js";
+import {
+  writeXlsxDataMetadata,
+  writeXlsxFilterColorFormats,
+  type XlsxDataMetadata,
+} from "./data-tools-metadata.js";
 import { writeXlsxConditionalFormats } from "./conditional-formatting.js";
 import type { CompatibilityReportBuilder } from "./report.js";
 import type { WorkbookCalculationSettings } from "@idea10/core/workbook";
@@ -46,6 +50,7 @@ export function finalizeXlsxExport(
   writeDefinedNames(entries, definedNames);
   writeXlsxDataMetadata(entries, dataMetadata);
   writeXlsxConditionalFormats(entries, conditionalFormats, report);
+  writeXlsxFilterColorFormats(entries, dataMetadata);
   if (calculation) writeWorkbookCalculationSettings(entries, calculation);
   const files: Zippable = {};
   for (const [name, content] of Object.entries(entries)) {

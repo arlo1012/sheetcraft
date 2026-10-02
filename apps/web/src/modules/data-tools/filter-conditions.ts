@@ -3,10 +3,10 @@ import {
   excelSerialToDateParts,
   type ExcelDateSystem,
 } from "@idea10/core/formula";
-import type { SheetFilterCondition } from "@idea10/core/workbook";
+import type { SheetFilterValueCondition } from "@idea10/core/workbook";
 
-export type FilterConditionKind = "values" | SheetFilterCondition["kind"];
-export type FilterConditionOperator = SheetFilterCondition["operator"];
+export type FilterConditionKind = "values" | SheetFilterValueCondition["kind"];
+export type FilterConditionOperator = SheetFilterValueCondition["operator"];
 export type FilterConditionDraft = {
   kind: FilterConditionKind;
   operator: FilterConditionOperator;
@@ -42,7 +42,7 @@ function formatDate(serial: number, dateSystem: ExcelDateSystem): string {
 }
 
 export function createFilterConditionDraft(
-  condition: SheetFilterCondition | undefined,
+  condition: SheetFilterValueCondition | undefined,
   dateSystem: ExcelDateSystem,
 ): FilterConditionDraft {
   if (!condition) return { kind: "values", operator: "equals", first: "", second: "" };
@@ -84,7 +84,7 @@ function parseNumber(value: string, kind: "number" | "date", dateSystem: ExcelDa
 export function buildFilterCondition(
   draft: FilterConditionDraft,
   dateSystem: ExcelDateSystem,
-): { valid: true; condition?: SheetFilterCondition } | { valid: false } {
+): { valid: true; condition?: SheetFilterValueCondition } | { valid: false } {
   if (draft.kind === "values") return { valid: true };
   if (draft.kind === "text") {
     if (!TEXT_FILTER_OPERATORS.some((operator) => operator === draft.operator))

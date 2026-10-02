@@ -100,7 +100,7 @@ export type SheetFilterColumn = {
   allowedValues: SheetFilterValue[];
   condition?: SheetFilterCondition;
 };
-export type SheetFilterCondition =
+export type SheetFilterValueCondition =
   | {
       kind: "text";
       operator: "contains" | "doesNotContain" | "beginsWith" | "endsWith" | "equals" | "notEquals";
@@ -120,6 +120,16 @@ export type SheetFilterCondition =
       value: number;
       value2?: number;
     };
+export type SheetFilterCondition =
+  | SheetFilterValueCondition
+  | {
+      kind: "compound";
+      operator: "and" | "or";
+      conditions: [SheetFilterValueCondition, SheetFilterValueCondition];
+    }
+  | { kind: "color"; target: "fill" | "text"; color: string | null }
+  | { kind: "rank"; bottom: boolean; percent: boolean; count: number }
+  | { kind: "average"; above: boolean };
 
 /** Persisted filter criteria. Visibility is derived by the sheet-engine layer. */
 export type SheetFilter = {
@@ -1666,7 +1676,7 @@ function cloneSheetFilter(filter: SheetFilter): SheetFilter {
     columns: filter.columns.map((column) => ({
       column: column.column,
       allowedValues: column.allowedValues.map(cloneFilterValue),
-      ...(column.condition ? { condition: { ...column.condition } } : {}),
+      ...(column.condition ? { condition: cloneSheetFilterCondition(column.condition) } : {}),
     })),
     ...(filter.advanced
       ? {
@@ -1688,6 +1698,12 @@ function cloneSheetFilter(filter: SheetFilter): SheetFilter {
         }
       : {}),
   };
+}
+
+function cloneSheetFilterCondition(condition: SheetFilterCondition): SheetFilterCondition {
+  return condition.kind === "compound"
+    ? { ...condition, conditions: [{ ...condition.conditions[0] }, { ...condition.conditions[1] }] }
+    : { ...condition };
 }
 
 function normalizeFreezePanes(value: FreezePanes): FreezePanes {
@@ -1719,6 +1735,85 @@ function filterValueKey(value: SheetFilterValue): string {
     : value.kind === "error"
       ? `error:${value.code}`
       : `${value.kind}:${String(value.value)}`;
+}
+
+function normalizeSheetFilterCondition(condition: SheetFilterCondition): SheetFilterCondition {
+  const text =
+    condition.kind === "text" &&
+    typeof condition.value === "string" &&
+    ["contains", "doesNotContain", "beginsWith", "endsWith", "equals", "notEquals"].includes(
+      condition.operator,
+    );
+  const numeric =
+    (condition.kind === "number" || condition.kind === "date") &&
+    typeof condition.value === "number" &&
+    Number.isFinite(condition.value) &&
+    [
+      "equals",
+      "notEquals",
+      "greaterThan",
+      "greaterThanOrEqual",
+      "lessThan",
+      "lessThanOrEqual",
+      "between",
+      "notBetween",
+    ].includes(condition.operator) &&
+    (condition.value2 === undefined ||
+      (typeof condition.value2 === "number" && Number.isFinite(condition.value2))) &&
+    (!["between", "notBetween"].includes(condition.operator) || condition.value2 !== undefined);
+  if (text || numeric) return { ...condition };
+  if (condition.kind === "compound") {
+    if (
+      (condition.operator !== "and" && condition.operator !== "or") ||
+      !Array.isArray(condition.conditions) ||
+      condition.conditions.length !== 2
+    )
+      throw new TypeError("Invalid filter condition.");
+    const normalized = [
+      normalizeSheetFilterCondition(condition.conditions[0]),
+      normalizeSheetFilterCondition(condition.conditions[1]),
+    ];
+    if (
+      normalized.some(
+        (item) => item.kind !== "text" && item.kind !== "number" && item.kind !== "date",
+      )
+    )
+      throw new TypeError("Invalid filter condition.");
+    return {
+      kind: "compound",
+      operator: condition.operator,
+      conditions: normalized as [SheetFilterValueCondition, SheetFilterValueCondition],
+    };
+  }
+  if (condition.kind === "color") {
+    if (
+      (condition.target !== "fill" && condition.target !== "text") ||
+      (condition.color !== null &&
+        (typeof condition.color !== "string" || !/^#[0-9a-f]{6}$/i.test(condition.color))) ||
+      (condition.target === "text" && condition.color === null)
+    )
+      throw new TypeError("Invalid filter condition.");
+    return {
+      ...condition,
+      ...(typeof condition.color === "string" ? { color: condition.color.toLowerCase() } : {}),
+    };
+  }
+  if (condition.kind === "rank") {
+    if (
+      typeof condition.bottom !== "boolean" ||
+      typeof condition.percent !== "boolean" ||
+      typeof condition.count !== "number" ||
+      !Number.isFinite(condition.count) ||
+      condition.count <= 0 ||
+      (condition.percent
+        ? condition.count > 100
+        : !Number.isInteger(condition.count) || condition.count > 500)
+    )
+      throw new TypeError("Invalid filter condition.");
+    return { ...condition };
+  }
+  if (condition.kind === "average" && typeof condition.above === "boolean") return { ...condition };
+  throw new TypeError("Invalid filter condition.");
 }
 
 function normalizeSheetFilter(filter: SheetFilter | null): SheetFilter | null {
@@ -1772,35 +1867,12 @@ function normalizeSheetFilter(filter: SheetFilter | null): SheetFilter | null {
     });
     const condition = column.condition;
     if (condition !== undefined) {
-      const text =
-        condition.kind === "text" &&
-        typeof condition.value === "string" &&
-        ["contains", "doesNotContain", "beginsWith", "endsWith", "equals", "notEquals"].includes(
-          condition.operator,
-        );
-      const numeric =
-        (condition.kind === "number" || condition.kind === "date") &&
-        typeof condition.value === "number" &&
-        Number.isFinite(condition.value) &&
-        [
-          "equals",
-          "notEquals",
-          "greaterThan",
-          "greaterThanOrEqual",
-          "lessThan",
-          "lessThanOrEqual",
-          "between",
-          "notBetween",
-        ].includes(condition.operator) &&
-        (condition.value2 === undefined ||
-          (typeof condition.value2 === "number" && Number.isFinite(condition.value2))) &&
-        (!["between", "notBetween"].includes(condition.operator) || condition.value2 !== undefined);
-      if (!text && !numeric) throw new TypeError("Invalid filter condition.");
+      normalizeSheetFilterCondition(condition);
     }
     return {
       column: column.column,
       allowedValues,
-      ...(condition ? { condition: { ...condition } } : {}),
+      ...(condition ? { condition: normalizeSheetFilterCondition(condition) } : {}),
     };
   });
   columns.sort((left, right) => left.column - right.column);

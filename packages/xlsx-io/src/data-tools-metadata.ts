@@ -1,4 +1,5 @@
-import { strFromU8, strToU8, unzipSync } from "fflate/browser";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
+import { readXlsxDxfEntries, readXlsxDxfStyle, xlsxDxfXml } from "./conditional-formatting.js";
 
 export type XlsxDataValidation = {
   range: XlsxRange;
@@ -39,7 +40,7 @@ export type XlsxFilterValue =
   | { kind: "string"; value: string }
   | { kind: "error"; code: string };
 
-export type XlsxFilterCondition =
+export type XlsxSimpleFilterCondition =
   | {
       kind: "text";
       operator: "contains" | "doesNotContain" | "beginsWith" | "endsWith" | "equals" | "notEquals";
@@ -59,6 +60,17 @@ export type XlsxFilterCondition =
       value: number;
       value2?: number;
     };
+
+export type XlsxFilterCondition =
+  | XlsxSimpleFilterCondition
+  | {
+      kind: "compound";
+      operator: "and" | "or";
+      conditions: [XlsxSimpleFilterCondition, XlsxSimpleFilterCondition];
+    }
+  | { kind: "color"; target: "fill" | "text"; color: string | null }
+  | { kind: "rank"; bottom: boolean; percent: boolean; count: number }
+  | { kind: "average"; above: boolean };
 
 export type XlsxFilter = {
   range: XlsxRange;
@@ -313,26 +325,29 @@ function filterValue(value: string): XlsxFilterValue {
 function decodeCustomFilter(
   operator: string | undefined,
   value: string,
-): XlsxFilterCondition | null {
-  const text = /^(\*|\?)/.test(value) || /[~*?]/.test(value);
-  if (text) {
+): XlsxSimpleFilterCondition | null {
+  const comparison = operator ?? "equal";
+  if (/[~*?]/.test(value)) {
     const starts = value.startsWith("*");
-    const ends = value.endsWith("*") && !value.endsWith("~*");
-    const raw = value
-      .replace(/^\*/, "")
-      .replace(/(?<!~)\*$/, "")
-      .replace(/~([*?~])/g, "$1");
-    if (operator === "notEqual" && starts && ends)
+    const trailingEscapes = /(~*)\*$/.exec(value)?.[1]?.length ?? 0;
+    const ends = value.endsWith("*") && trailingEscapes % 2 === 0;
+    const raw = value.slice(starts ? 1 : 0, ends ? -1 : undefined);
+    if (comparison === "notEqual" && starts && ends)
       return { kind: "text", operator: "doesNotContain", value: raw };
-    if (operator === "equal" && starts && ends)
+    if (comparison === "equal" && starts && ends)
       return { kind: "text", operator: "contains", value: raw };
-    if (operator === "equal" && starts) return { kind: "text", operator: "endsWith", value: raw };
-    if (operator === "equal" && ends) return { kind: "text", operator: "beginsWith", value: raw };
+    if (comparison === "equal" && starts) return { kind: "text", operator: "endsWith", value: raw };
+    if (comparison === "equal" && ends) return { kind: "text", operator: "beginsWith", value: raw };
+    if (comparison === "equal") return { kind: "text", operator: "equals", value };
+    if (comparison === "notEqual") return { kind: "text", operator: "notEquals", value };
     return null;
   }
   const numeric = Number(value);
-  if (Number.isFinite(numeric)) {
-    const map: Record<string, XlsxFilterCondition["operator"]> = {
+  if (value.trim() !== "" && Number.isFinite(numeric)) {
+    const map: Record<
+      string,
+      Extract<XlsxSimpleFilterCondition, { kind: "number" | "date" }>["operator"]
+    > = {
       equal: "equals",
       notEqual: "notEquals",
       greaterThan: "greaterThan",
@@ -340,16 +355,41 @@ function decodeCustomFilter(
       lessThan: "lessThan",
       lessThanOrEqual: "lessThanOrEqual",
     };
-    return map[operator ?? "equal"]
-      ? { kind: "number", operator: map[operator ?? "equal"] as any, value: numeric }
+    const conditionOperator = map[comparison];
+    return conditionOperator
+      ? { kind: "number", operator: conditionOperator, value: numeric }
       : null;
   }
-  if (operator === "equal") return { kind: "text", operator: "equals", value };
-  if (operator === "notEqual") return { kind: "text", operator: "notEquals", value };
+  if (comparison === "equal") return { kind: "text", operator: "equals", value };
+  if (comparison === "notEqual") return { kind: "text", operator: "notEquals", value };
   return null;
 }
 
-function readFilter(xml: string): { value: XlsxFilter | null; unsupported: boolean } {
+function readColorFilter(body: string, dxfs: readonly string[]): XlsxFilterCondition | null {
+  const match = /<colorFilter\b([^>]*)\/?\s*>/i.exec(body);
+  if (!match) return null;
+  const attrs = match[1] ?? "";
+  const dxfId = Number(attribute(attrs, "dxfId"));
+  if (!Number.isInteger(dxfId) || dxfId < 0 || !dxfs[dxfId]) return null;
+  const target = truthy(attribute(attrs, "cellColor") ?? "1") ? "fill" : "text";
+  const dxf = readXlsxDxfStyle(dxfs[dxfId]);
+  if (dxf.unsupported) return null;
+  if (target === "fill") {
+    if (typeof dxf.style.fillColor === "string")
+      return { kind: "color", target, color: dxf.style.fillColor };
+    if (dxf.style.fillColor === false) return { kind: "color", target, color: null };
+  } else if (typeof dxf.style.textColor === "string")
+    return { kind: "color", target, color: dxf.style.textColor };
+  return null;
+}
+
+export function readXlsxAutoFilter(
+  xml: string,
+  dxfs: readonly string[] = [],
+): {
+  value: XlsxFilter | null;
+  unsupported: boolean;
+} {
   const match = /<autoFilter\b([^>]*)(?:\/>|>([\s\S]*?)<\/autoFilter>)/i.exec(xml);
   if (!match) return { value: null, unsupported: false };
   const range = parseRange(attribute(match[1] ?? "", "ref") ?? "");
@@ -388,11 +428,6 @@ function readFilter(xml: string): { value: XlsxFilter | null; unsupported: boole
             : (decodeCustomFilter(attribute(criteria[0]?.[1] ?? "", "operator"), value) ??
               undefined);
         if (!condition) unsupported = true;
-      } else if (
-        criteria.length === 2 &&
-        /^(0|false)?$/i.test(attribute(custom[1] ?? "", "and") ?? "")
-      ) {
-        unsupported = true;
       } else if (criteria.length === 2) {
         const first = attribute(criteria[0]?.[1] ?? "", "val");
         const second = attribute(criteria[1]?.[1] ?? "", "val");
@@ -404,22 +439,57 @@ function readFilter(xml: string): { value: XlsxFilter | null; unsupported: boole
           second === undefined
             ? null
             : decodeCustomFilter(attribute(criteria[1]?.[1] ?? "", "operator"), second);
+        const operator = truthy(attribute(custom[1] ?? "", "and")) ? "and" : "or";
         if (left?.kind === "number" && right?.kind === "number" && left.kind === right.kind) {
-          const inverse = left.operator === "greaterThan" && right.operator === "lessThan";
-          const inclusive =
-            left.operator === "greaterThanOrEqual" && right.operator === "lessThanOrEqual";
-          if (inverse || inclusive)
+          const between =
+            operator === "and" &&
+            (left.operator === "greaterThan" || left.operator === "greaterThanOrEqual") &&
+            (right.operator === "lessThan" || right.operator === "lessThanOrEqual");
+          const notBetween =
+            operator === "or" && left.operator === "lessThan" && right.operator === "greaterThan";
+          if (between || notBetween)
             condition = {
               kind: "number",
-              operator: "between",
+              operator: between ? "between" : "notBetween",
               value: left.value,
               value2: right.value,
             };
-          else unsupported = true;
-        } else unsupported = true;
+          else condition = { kind: "compound", operator, conditions: [left, right] };
+        } else if (left && right)
+          condition = { kind: "compound", operator, conditions: [left, right] };
+        else unsupported = true;
       } else unsupported = true;
     }
-    if (!filters && !custom) unsupported = true;
+    const top10 = /<top10\b([^>]*)\/?\s*>/i.exec(body);
+    if (top10) {
+      const attrs = top10[1] ?? "";
+      const count = Number(attribute(attrs, "val") ?? "10");
+      const percent = truthy(attribute(attrs, "percent"));
+      if (
+        Number.isFinite(count) &&
+        count > 0 &&
+        (percent ? count <= 100 : Number.isInteger(count) && count <= 500)
+      )
+        condition = {
+          kind: "rank",
+          count,
+          bottom: !truthy(attribute(attrs, "top") ?? "1"),
+          percent,
+        };
+      else unsupported = true;
+    }
+    const dynamic = /<dynamicFilter\b([^>]*)\/?\s*>/i.exec(body);
+    if (dynamic) {
+      const type = attribute(dynamic[1] ?? "", "type");
+      if (type === "aboveAverage" || type === "belowAverage")
+        condition = { kind: "average", above: type === "aboveAverage" };
+      else unsupported = true;
+    }
+    const color = /<colorFilter\b/i.test(body) ? readColorFilter(body, dxfs) : undefined;
+    if (color) condition = color;
+    else if (/<colorFilter\b/i.test(body)) unsupported = true;
+    if (!filters && !custom && !top10 && !dynamic && !/<colorFilter\b/i.test(body))
+      unsupported = true;
     columns.push({
       column: range.start.column + offset,
       allowedValues,
@@ -500,8 +570,10 @@ function readOutlineGroups(xml: string): XlsxOutlineGroup[] {
 }
 
 export function readXlsxDataMetadata(bytes: Uint8Array): XlsxDataMetadata[] {
+  const entries = unzipSync(bytes);
+  const dxfs = readXlsxDxfEntries(strFromU8(entries["xl/styles.xml"] ?? new Uint8Array()));
   return worksheetParts(bytes).map(({ xml }) => {
-    const filter = readFilter(xml);
+    const filter = readXlsxAutoFilter(xml, dxfs);
     const validations = readDataValidations(xml);
     return {
       filter: filter.value,
@@ -548,16 +620,16 @@ function validationXml(validation: XlsxDataValidation): string {
   return `<dataValidation ${attributes}>${formula1 !== undefined ? `<formula1>${encodeXml(formula1)}</formula1>` : ""}${validation.formula2 !== undefined ? `<formula2>${encodeXml(validation.formula2)}</formula2>` : ""}</dataValidation>`;
 }
 
-function customCriterion(condition: XlsxFilterCondition): string[] | null {
+function customCriterion(condition: XlsxSimpleFilterCondition): string[] | null {
   if (condition.kind === "text") {
-    const escaped = condition.value.replace(/~/g, "~~").replace(/\*/g, "~*").replace(/\?/g, "~?");
+    const pattern = condition.value;
     const map: Record<typeof condition.operator, [string, string]> = {
-      contains: ["equal", `*${escaped}*`],
-      doesNotContain: ["notEqual", `*${escaped}*`],
-      beginsWith: ["equal", `${escaped}*`],
-      endsWith: ["equal", `*${escaped}`],
-      equals: ["equal", escaped],
-      notEquals: ["notEqual", escaped],
+      contains: ["equal", `*${pattern}*`],
+      doesNotContain: ["notEqual", `*${pattern}*`],
+      beginsWith: ["equal", `${pattern}*`],
+      endsWith: ["equal", `*${pattern}`],
+      equals: ["equal", pattern],
+      notEquals: ["notEqual", pattern],
     };
     const [operator, value] = map[condition.operator];
     return [operator, value];
@@ -574,7 +646,10 @@ function customCriterion(condition: XlsxFilterCondition): string[] | null {
   return operator ? [operator, String(condition.value)] : null;
 }
 
-function filterXml(filter: XlsxFilter): string {
+export function writeXlsxAutoFilter(
+  filter: XlsxFilter,
+  options?: { colorDxfId?: (condition: Extract<XlsxFilterCondition, { kind: "color" }>) => number },
+): string {
   const columns = filter.columns
     .map((column) => {
       const offset = column.column - filter.range.start.column;
@@ -604,28 +679,112 @@ function filterXml(filter: XlsxFilter): string {
           return `\n<filter val="${encodeXml(text)}"/>`;
         })
         .join("");
-      const filters = values.length
-        ? `<filters${blanks ? ' blank="1"' : ""}>${items}</filters>`
-        : "";
+      let filters = values.length ? `<filters${blanks ? ' blank="1"' : ""}>${items}</filters>` : "";
       let custom = "";
       if (column.condition) {
-        if (
+        if (column.condition.kind === "compound") {
+          const criteria = column.condition.conditions.map(customCriterion);
+          if (criteria.every((criterion): criterion is string[] => criterion !== null))
+            custom = `<customFilters${column.condition.operator === "and" ? ' and="1"' : ""}>${criteria.map((criterion) => `<customFilter operator="${criterion[0]!}" val="${encodeXml(criterion[1]!)}"/>`).join("")}</customFilters>`;
+        } else if (
+          (column.condition.kind === "number" || column.condition.kind === "date") &&
           (column.condition.operator === "between" || column.condition.operator === "notBetween") &&
           column.condition.value2 !== undefined
         ) {
           const lower = column.condition.operator === "between" ? "greaterThanOrEqual" : "lessThan";
           const upper = column.condition.operator === "between" ? "lessThanOrEqual" : "greaterThan";
-          custom = `<customFilters and="1"><customFilter operator="${lower}" val="${column.condition.value}"/><customFilter operator="${upper}" val="${column.condition.value2}"/></customFilters>`;
-        } else {
+          custom = `<customFilters${column.condition.operator === "between" ? ' and="1"' : ""}><customFilter operator="${lower}" val="${column.condition.value}"/><customFilter operator="${upper}" val="${column.condition.value2}"/></customFilters>`;
+        } else if (
+          column.condition.kind === "text" ||
+          column.condition.kind === "number" ||
+          column.condition.kind === "date"
+        ) {
           const criterion = customCriterion(column.condition);
           if (criterion)
             custom = `<customFilters><customFilter operator="${criterion[0]!}" val="${encodeXml(criterion[1]!)}"/></customFilters>`;
         }
       }
-      return `<filterColumn colId="${offset}">${filters}${custom}</filterColumn>`;
+      const special =
+        column.condition?.kind === "rank"
+          ? `<top10 val="${column.condition.count}"${column.condition.percent ? ' percent="1"' : ""}${column.condition.bottom ? ' top="0"' : ""}/>`
+          : column.condition?.kind === "average"
+            ? `<dynamicFilter type="${column.condition.above ? "aboveAverage" : "belowAverage"}"/>`
+            : column.condition?.kind === "color"
+              ? `<colorFilter dxfId="${options?.colorDxfId?.(column.condition) ?? 0}"${column.condition.target === "fill" ? ' cellColor="1"' : ' cellColor="0"'}/>`
+              : "";
+      return `<filterColumn colId="${offset}">${filters}${custom}${special}</filterColumn>`;
     })
     .join("");
   return `<autoFilter ref="${rangeReference(filter.range)}">${columns}</autoFilter>`;
+}
+
+/** Allocate sheet color-filter DXFs after conditional-format DXFs are finalized. */
+export function writeXlsxFilterColorFormats(
+  entries: Record<string, Uint8Array>,
+  sheets: readonly Pick<XlsxDataMetadata, "filter">[],
+): void {
+  const styles = entries["xl/styles.xml"];
+  if (!styles) throw new Error("Missing generated XLSX styles.");
+  if (
+    !sheets.some((sheet) =>
+      sheet.filter?.columns.some((column) => column.condition?.kind === "color"),
+    )
+  )
+    return;
+  const source = strFromU8(styles);
+  const dxfs = readXlsxDxfEntries(source).map((entry) => `<dxf>${entry}</dxf>`);
+  const ids = new Map<string, number>();
+  dxfs.forEach((xml, index) => ids.set(xml, index));
+  const colorDxfId = (condition: Extract<XlsxFilterCondition, { kind: "color" }>) => {
+    const xml =
+      condition.target === "fill"
+        ? xlsxDxfXml(
+            condition.color === null
+              ? { fillColor: null, fillPattern: null }
+              : { fillColor: condition.color },
+          )
+        : xlsxDxfXml({ textColor: condition.color ?? "#000000" });
+    let id = ids.get(xml);
+    if (id === undefined) {
+      id = dxfs.length;
+      dxfs.push(xml);
+      ids.set(xml, id);
+    }
+    return id;
+  };
+  for (const [index, metadata] of sheets.entries()) {
+    if (!metadata.filter) continue;
+    const path = `xl/worksheets/sheet${index + 1}.xml`;
+    const entry = entries[path];
+    if (!entry) continue;
+    entries[path] = strToU8(
+      strFromU8(entry).replace(
+        /<autoFilter\b[^>]*(?:\/>|>[\s\S]*?<\/autoFilter>)/i,
+        writeXlsxAutoFilter(metadata.filter, { colorDxfId }),
+      ),
+    );
+  }
+  const dxfContainer = `<dxfs count="${dxfs.length}">${dxfs.join("")}</dxfs>`;
+  entries["xl/styles.xml"] = strToU8(
+    /<dxfs\b[^>]*>[\s\S]*?<\/dxfs>|<dxfs\b[^>]*\/?\s*>/i.test(source)
+      ? source.replace(/<dxfs\b[^>]*>[\s\S]*?<\/dxfs>|<dxfs\b[^>]*\/?\s*>/i, dxfContainer)
+      : source.replace(/<tableStyles\b/i, `${dxfContainer}<tableStyles`),
+  );
+}
+
+/** Load color-filter-free sheet XML in ExcelJS after raw metadata was captured. */
+export function withoutColorFiltersForExcelJs(bytes: Uint8Array): Uint8Array {
+  const entries = unzipSync(bytes);
+  let changed = false;
+  for (const [path, entry] of Object.entries(entries)) {
+    if (!/^xl\/worksheets\/sheet\d+\.xml$/i.test(path)) continue;
+    const xml = strFromU8(entry);
+    const next = xml.replace(/<colorFilter\b[^>]*\/?\s*>/gi, "");
+    if (next === xml) continue;
+    entries[path] = strToU8(next);
+    changed = true;
+  }
+  return changed ? zipSync(entries) : bytes;
 }
 
 function replaceElement(xml: string, tag: string, replacement: string, after: RegExp): string {
@@ -814,7 +973,7 @@ export function writeXlsxDataMetadata(
       xml = replaceElement(
         xml,
         "autoFilter",
-        filterXml(metadata.filter),
+        writeXlsxAutoFilter(metadata.filter),
         /<sheetData\b[^>]*(?:\/>|>[\s\S]*?<\/sheetData>)/i,
       );
     if (metadata.dataValidations.length) {
