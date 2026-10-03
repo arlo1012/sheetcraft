@@ -83,48 +83,114 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
 
 <template>
   <div class="page-setup-margins">
-    <div class="page-setup-margins__diagram">
-      <div class="page-setup-margins__top" role="group" :aria-label="t('pageLayout.marginTop')">
-        <span>{{ t("pageLayout.marginTop") }}</span
-        ><TInputNumber
-          :model-value="displayed('top')"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :decimal-places="2"
-          data-page-setup="margin-top"
-          @update:model-value="update('top', $event)"
-        />
-      </div>
-      <div
-        class="page-setup-margins__header"
-        role="group"
-        :aria-label="t('pageLayout.marginHeader')"
-      >
-        <span>{{ t("pageLayout.marginHeader") }}</span
-        ><TInputNumber
-          :model-value="displayed('header')"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :decimal-places="2"
-          data-page-setup="margin-header"
-          @update:model-value="update('header', $event)"
-        />
-      </div>
-      <div class="page-setup-margins__left" role="group" :aria-label="t('pageLayout.marginLeft')">
-        <span>{{ t("pageLayout.marginLeft") }}</span
-        ><TInputNumber
-          :model-value="displayed('left')"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :decimal-places="2"
-          data-page-setup="margin-left"
-          @update:model-value="update('left', $event)"
-        />
+    <div class="page-setup-margins__unit" role="group" :aria-label="t('dimensionUnits.unit')">
+      <span>{{ t("dimensionUnits.unit") }}</span
+      ><TSelect
+        class="page-setup-margins__unit-select"
+        :model-value="unit"
+        :options="unitOptions"
+        :aria-label="t('dimensionUnits.unit')"
+        data-page-setup="margin-unit"
+        @change="setUnit"
+      />
+    </div>
+    <div class="page-setup-margins__layout">
+      <div class="page-setup-margins__fields">
+        <div class="page-setup-margins__field" role="group" :aria-label="t('pageLayout.marginTop')">
+          <span>{{ t("pageLayout.marginTop") }}</span
+          ><TInputNumber
+            :model-value="displayed('top')"
+            theme="column"
+            class="idea-input-number--persistent-controls page-setup-margins__input"
+            :min="0"
+            :decimal-places="2"
+            data-page-setup="margin-top"
+            @update:model-value="update('top', $event)"
+          />
+        </div>
+        <div
+          class="page-setup-margins__field"
+          role="group"
+          :aria-label="t('pageLayout.marginBottom')"
+        >
+          <span>{{ t("pageLayout.marginBottom") }}</span
+          ><TInputNumber
+            :model-value="displayed('bottom')"
+            theme="column"
+            class="idea-input-number--persistent-controls page-setup-margins__input"
+            :min="0"
+            :decimal-places="2"
+            data-page-setup="margin-bottom"
+            @update:model-value="update('bottom', $event)"
+          />
+        </div>
+        <div
+          class="page-setup-margins__field"
+          role="group"
+          :aria-label="t('pageLayout.marginLeft')"
+        >
+          <span>{{ t("pageLayout.marginLeft") }}</span
+          ><TInputNumber
+            :model-value="displayed('left')"
+            theme="column"
+            class="idea-input-number--persistent-controls page-setup-margins__input"
+            :min="0"
+            :decimal-places="2"
+            data-page-setup="margin-left"
+            @update:model-value="update('left', $event)"
+          />
+        </div>
+        <div
+          class="page-setup-margins__field"
+          role="group"
+          :aria-label="t('pageLayout.marginRight')"
+        >
+          <span>{{ t("pageLayout.marginRight") }}</span
+          ><TInputNumber
+            :model-value="displayed('right')"
+            theme="column"
+            class="idea-input-number--persistent-controls page-setup-margins__input"
+            :min="0"
+            :decimal-places="2"
+            data-page-setup="margin-right"
+            @update:model-value="update('right', $event)"
+          />
+        </div>
+        <div
+          class="page-setup-margins__field"
+          role="group"
+          :aria-label="t('pageLayout.marginHeader')"
+        >
+          <span>{{ t("pageLayout.marginHeader") }}</span
+          ><TInputNumber
+            :model-value="displayed('header')"
+            theme="column"
+            class="idea-input-number--persistent-controls page-setup-margins__input"
+            :min="0"
+            :decimal-places="2"
+            data-page-setup="margin-header"
+            @update:model-value="update('header', $event)"
+          />
+        </div>
+        <div
+          class="page-setup-margins__field"
+          role="group"
+          :aria-label="t('pageLayout.marginFooter')"
+        >
+          <span>{{ t("pageLayout.marginFooter") }}</span
+          ><TInputNumber
+            :model-value="displayed('footer')"
+            theme="column"
+            class="idea-input-number--persistent-controls page-setup-margins__input"
+            :min="0"
+            :decimal-places="2"
+            data-page-setup="margin-footer"
+            @update:model-value="update('footer', $event)"
+          />
+        </div>
       </div>
       <div class="page-setup-margins__preview">
+        <span class="page-setup-margins__preview-label">{{ t("pageLayout.preview") }}</span>
         <svg
           :viewBox="`0 0 ${preview.width} ${preview.height}`"
           role="img"
@@ -162,64 +228,10 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           />
         </svg>
       </div>
-      <div class="page-setup-margins__right" role="group" :aria-label="t('pageLayout.marginRight')">
-        <span>{{ t("pageLayout.marginRight") }}</span
-        ><TInputNumber
-          :model-value="displayed('right')"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :decimal-places="2"
-          data-page-setup="margin-right"
-          @update:model-value="update('right', $event)"
-        />
-      </div>
-      <div class="page-setup-margins__unit">
-        <span>{{ t("dimensionUnits.unit") }}</span
-        ><TSelect
-          :model-value="unit"
-          :options="unitOptions"
-          :aria-label="t('dimensionUnits.unit')"
-          data-page-setup="margin-unit"
-          @change="setUnit"
-        />
-      </div>
-      <div
-        class="page-setup-margins__bottom"
-        role="group"
-        :aria-label="t('pageLayout.marginBottom')"
-      >
-        <span>{{ t("pageLayout.marginBottom") }}</span
-        ><TInputNumber
-          :model-value="displayed('bottom')"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :decimal-places="2"
-          data-page-setup="margin-bottom"
-          @update:model-value="update('bottom', $event)"
-        />
-      </div>
-      <div
-        class="page-setup-margins__footer"
-        role="group"
-        :aria-label="t('pageLayout.marginFooter')"
-      >
-        <span>{{ t("pageLayout.marginFooter") }}</span
-        ><TInputNumber
-          :model-value="displayed('footer')"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :decimal-places="2"
-          data-page-setup="margin-footer"
-          @update:model-value="update('footer', $event)"
-        />
-      </div>
     </div>
-    <section :aria-label="t('pageLayout.centerOnPage')">
+    <section class="page-setup-margins__centering" :aria-label="t('pageLayout.centerOnPage')">
       <h3>{{ t("pageLayout.centerOnPage") }}</h3>
-      <div class="page-setup-margins__centering">
+      <div class="page-setup-margins__centering-options">
         <TCheckbox
           :checked="options.verticalCentered"
           data-page-setup="center-vertically"
@@ -238,69 +250,103 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
 
 <style scoped lang="scss">
 @use "./page-setup-panel" as panel;
+
 .page-setup-margins {
   @include panel.panel;
-  &__diagram {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-areas: ". top header" "left preview right" "unit bottom footer";
-    gap: var(--idea-space-3) var(--idea-space-4);
-    align-items: center;
-    max-width: 420px;
-    margin: 0 auto;
-    width: 100%;
-    > div:not(.page-setup-margins__preview) {
-      display: grid;
-      gap: var(--idea-space-1);
-      min-width: 0;
-    }
-  }
-  &__top {
-    grid-area: top;
-  }
-  &__header {
-    grid-area: header;
-  }
-  &__left {
-    grid-area: left;
-  }
-  &__right {
-    grid-area: right;
-  }
+  min-height: 0;
+  gap: var(--idea-space-6);
+  padding: var(--idea-dialog-content-padding-block) 0 0;
+
   &__unit {
-    grid-area: unit;
-  }
-  &__bottom {
-    grid-area: bottom;
-  }
-  &__footer {
-    grid-area: footer;
-  }
-  &__preview {
-    grid-area: preview;
     display: flex;
     align-items: center;
-    justify-content: center;
-    height: 150px;
+    justify-content: flex-end;
+    gap: var(--idea-space-4);
+  }
+
+  &__unit-select {
+    width: 128px;
+    min-width: 0;
+  }
+
+  &__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 144px;
+    align-items: start;
+    gap: var(--idea-space-6);
+  }
+
+  &__fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--idea-space-5) var(--idea-space-6);
+  }
+
+  &__field {
+    display: grid;
+    gap: var(--idea-space-2);
+    min-width: 0;
+  }
+
+  &__input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  &__preview {
+    display: grid;
+    justify-items: center;
+    gap: var(--idea-space-3);
     color: var(--idea-text-muted);
+
     svg {
       width: 100%;
-      height: 140px;
+      height: 144px;
     }
   }
+
+  &__preview-label {
+    color: var(--idea-text-secondary);
+  }
+
   &__paper {
     fill: var(--idea-surface-panel);
-    stroke: var(--idea-text-primary);
+    stroke: var(--idea-border-strong);
     stroke-width: 1;
   }
+
   &__guides {
     fill: none;
     stroke: var(--idea-border-strong);
     stroke-width: 0.7;
   }
+
   &__centering {
     display: flex;
-    gap: var(--idea-space-4);
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--idea-space-4) var(--idea-space-6);
+
+    h3 {
+      margin: 0;
+    }
+  }
+
+  &__centering-options {
+    display: flex;
+    gap: var(--idea-space-6);
+  }
+}
+
+@media (max-width: 480px) {
+  .page-setup-margins {
+    &__layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    &__preview {
+      order: -1;
+    }
   }
 }
 </style>
