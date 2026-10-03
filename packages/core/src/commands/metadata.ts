@@ -369,6 +369,7 @@ function assertNoCellImages(sheet: Sheet, range: CellRange): void {
 function validateMergePlan(sheet: Sheet, ranges: readonly CellRange[], payload: unknown): void {
   try {
     validateMergedCellRanges([...sheet.mergedCells, ...ranges]);
+    const filter = sheet.filter;
     for (const range of ranges) {
       if (
         (range.start.row < sheet.freezePanes.rows && range.end.row >= sheet.freezePanes.rows) ||
@@ -377,7 +378,19 @@ function validateMergePlan(sheet: Sheet, ranges: readonly CellRange[], payload: 
       ) {
         throw new RangeError("A frozen pane boundary cannot cut through a merged cell range.");
       }
-      if (sheet.filter && doMergedCellRangesIntersect(range, sheet.filter.range)) {
+      const filterHasRelevantMergedCell = filter?.columns.some(
+        (column) =>
+          range.end.row >= filter.range.start.row + 1 &&
+          range.start.row <= filter.range.end.row &&
+          column.column >= range.start.column &&
+          column.column <= range.end.column,
+      );
+      if (
+        filter &&
+        (filter.allowMergedCells === undefined
+          ? doMergedCellRangesIntersect(range, filter.range)
+          : filter.allowMergedCells === false && filterHasRelevantMergedCell)
+      ) {
         throw new RangeError("A filter range cannot intersect merged cells.");
       }
     }

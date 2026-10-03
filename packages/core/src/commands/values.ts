@@ -27,11 +27,14 @@ import {
   createSheetSparseState,
   type CellAddress,
   type CellRange,
+  type Sheet,
+  type SheetTable,
   type Workbook,
 } from "../workbook.js";
 import { cloneCellContent } from "../workbook.js";
 import type { CellContent } from "../formula/types.js";
 import { transformFormulaForMove } from "../formula/references.js";
+import { renameTableColumnReferences } from "../formula/references.js";
 import {
   doMergedCellRangesIntersect,
   expandSelectionToMergedCellRanges,
@@ -49,6 +52,7 @@ import type {
   MoveCellRangeCommand,
   RestoreFullSheetStateCommand,
   SetCellContentsCommand,
+  WorkbookCommand,
 } from "./contracts.js";
 import {
   assertCellAddress,
@@ -220,10 +224,117 @@ export function createPasteCellContentsCommand(
   });
 }
 
+type TableMetadataEdit =
+  | { kind: "rename"; tableId: string; columnIndex: number; caption: string }
+  | { kind: "appendRow"; tableId: string }
+  | { kind: "appendColumn"; tableId: string; caption: string };
+
+function rangesIntersect(left: CellRange, right: CellRange): boolean {
+  return (
+    left.start.row <= right.end.row &&
+    left.end.row >= right.start.row &&
+    left.start.column <= right.end.column &&
+    left.end.column >= right.start.column
+  );
+}
+
+function canExpandTable(sheet: Sheet, table: SheetTable, range: CellRange): boolean {
+  return (
+    !(sheet.tables ?? []).some(
+      (entry) => entry.id !== table.id && rangesIntersect(entry.range, range),
+    ) && !sheet.mergedCells.some((merged) => doMergedCellRangesIntersect(merged, range))
+  );
+}
+
+function getUniqueTableCaption(table: SheetTable, columnIndex: number, source: string): string {
+  const base = source || `Column${columnIndex + 1}`;
+  const used = new Set(
+    table.columns
+      .filter((_, index) => index !== columnIndex)
+      .map((entry) => entry.name.trim().toLowerCase()),
+  );
+  let caption = base;
+  let suffix = 2;
+  while (used.has(caption.toLowerCase())) caption = `${base}${suffix++}`;
+  return caption;
+}
+
+function getTableMetadataEdit(
+  sheet: Sheet,
+  change: CellContentChange,
+): TableMetadataEdit | undefined {
+  const { row, column } = change.address;
+  for (const table of sheet.tables ?? []) {
+    if (
+      table.headerRow &&
+      row === table.range.start.row &&
+      column >= table.range.start.column &&
+      column <= table.range.end.column
+    ) {
+      // Formula headers keep their formula. Literal headers are always normalized
+      // into a usable, unique table caption and displayed with that same text.
+      if (change.content?.kind !== "literal" && change.content !== null) return undefined;
+      const columnIndex = column - table.range.start.column;
+      const source =
+        change.content?.kind === "literal" ? String(change.content.value ?? "").trim() : "";
+      return {
+        kind: "rename",
+        tableId: table.id,
+        columnIndex,
+        caption: getUniqueTableCaption(table, columnIndex, source),
+      };
+    }
+    if (change.content === null) continue;
+    if (
+      !table.totalRow &&
+      column >= table.range.start.column &&
+      column <= table.range.end.column &&
+      row === table.range.end.row + 1
+    ) {
+      const range = { start: { ...table.range.start }, end: { ...table.range.end, row } };
+      if (canExpandTable(sheet, table, range)) return { kind: "appendRow", tableId: table.id };
+      continue;
+    }
+    if (
+      !table.totalRow &&
+      row >= table.range.start.row &&
+      row <= table.range.end.row &&
+      column === table.range.end.column + 1
+    ) {
+      const range = { start: { ...table.range.start }, end: { ...table.range.end, column } };
+      if (canExpandTable(sheet, table, range)) {
+        const source =
+          table.headerRow && row === table.range.start.row && change.content?.kind === "literal"
+            ? String(change.content.value ?? "").trim()
+            : "";
+        return {
+          kind: "appendColumn",
+          tableId: table.id,
+          caption: getUniqueTableCaption(table, table.columns.length, source),
+        };
+      }
+    }
+  }
+  return undefined;
+}
+
+function createTableTransactionState(workbook: Workbook) {
+  return {
+    states: [...workbook.sheets.values()].map((sheet) => ({
+      sheetId: sheet.id,
+      state: createSheetSparseState(sheet),
+    })),
+    tableStyles: JSON.parse(
+      JSON.stringify(workbook.tableStyles ?? []),
+    ) as import("../table-styles.js").TableStyleDefinition[],
+    ...(workbook.defaultTableStyleId ? { defaultTableStyleId: workbook.defaultTableStyleId } : {}),
+  };
+}
+
 export function applySetCellContentsCommand(
   workbook: Workbook,
   command: SetCellContentsCommand,
-): SetCellContentsCommand | null {
+): WorkbookCommand | null {
   if (!Array.isArray(command.changes)) {
     throw invalidCommandPayload("changes", command.changes);
   }
@@ -291,6 +402,26 @@ export function applySetCellContentsCommand(
         : {}),
     } satisfies CellContentChange;
   });
+  const tableMetadataEdit =
+    normalizedChanges.length === 1
+      ? getTableMetadataEdit(
+          getSheetOrThrow(workbook, normalizedChanges[0]!.sheetId),
+          normalizedChanges[0]!,
+        )
+      : undefined;
+  if (
+    tableMetadataEdit?.kind === "rename" ||
+    (tableMetadataEdit?.kind === "appendColumn" &&
+      normalizedChanges[0]!.address.row ===
+        getSheetOrThrow(workbook, normalizedChanges[0]!.sheetId).tables?.find(
+          (table) => table.id === tableMetadataEdit.tableId,
+        )?.range.start.row)
+  )
+    normalizedChanges[0]!.content = { kind: "literal", value: tableMetadataEdit.caption };
+  const tableTransactionState = tableMetadataEdit
+    ? createTableTransactionState(workbook)
+    : undefined;
+
   const reverseChanges: CellContentChange[] = [];
   const reverseChangesByAddress = new Map<string, CellContentChange>();
   const initialStates = new Map<
@@ -404,6 +535,93 @@ export function applySetCellContentsCommand(
     });
     sheet.conditionalFormats = rules;
   }
+  // A single interactive edit owns one history entry. Keep table membership and
+  // column captions in the document rather than asking the UI to infer them.
+  if (tableMetadataEdit) {
+    const change = normalizedChanges[0]!;
+    const sheet = getSheetOrThrow(workbook, change.sheetId);
+    const table = (sheet.tables ?? []).find((entry) => entry.id === tableMetadataEdit.tableId)!;
+    const columnRenames: Array<{ tableName: string; previousName: string; nextName: string }> = [];
+    let next = table;
+    if (tableMetadataEdit.kind === "rename") {
+      const previousName = table.columns[tableMetadataEdit.columnIndex]!.name;
+      const columns = table.columns.map((entry, index) =>
+        index === tableMetadataEdit.columnIndex
+          ? { ...entry, name: tableMetadataEdit.caption }
+          : entry,
+      );
+      next = { ...table, columns };
+      if (previousName !== tableMetadataEdit.caption)
+        columnRenames.push({
+          tableName: table.name,
+          previousName,
+          nextName: tableMetadataEdit.caption,
+        });
+    } else if (tableMetadataEdit.kind === "appendRow") {
+      const row = change.address.row;
+      next = {
+        ...table,
+        range: { start: { ...table.range.start }, end: { ...table.range.end, row } },
+        filter: table.filter
+          ? {
+              ...table.filter,
+              range: {
+                start: { ...table.filter.range.start },
+                end: { ...table.filter.range.end, row },
+              },
+            }
+          : null,
+      };
+    } else {
+      const column = change.address.column;
+      const name = tableMetadataEdit.caption;
+      next = {
+        ...table,
+        columns: [...table.columns, { id: `column-${table.columns.length + 1}`, name }],
+        range: { start: { ...table.range.start }, end: { ...table.range.end, column } },
+        filter: table.filter
+          ? {
+              ...table.filter,
+              range: {
+                start: { ...table.filter.range.start },
+                end: { ...table.filter.range.end, column },
+              },
+            }
+          : null,
+      };
+    }
+    sheet.tables = (sheet.tables ?? []).map((entry) => (entry.id === next.id ? next : entry));
+    if (
+      tableMetadataEdit.kind === "appendColumn" &&
+      table.headerRow &&
+      change.address.row !== table.range.start.row
+    )
+      setCellContent(
+        sheet,
+        { row: table.range.start.row, column: change.address.column },
+        { kind: "literal", value: tableMetadataEdit.caption },
+      );
+    for (const rename of columnRenames)
+      for (const formulaSheet of workbook.sheets.values())
+        for (const [key, cell] of formulaSheet.cells) {
+          if (cell.content?.kind !== "formula") continue;
+          const source = renameTableColumnReferences(
+            cell.content.formula.source,
+            rename.tableName,
+            rename.previousName,
+            rename.nextName,
+          );
+          if (source === cell.content.formula.source) continue;
+          const separator = key.indexOf(":");
+          setCellContent(
+            formulaSheet,
+            { row: Number(key.slice(0, separator)), column: Number(key.slice(separator + 1)) },
+            { kind: "formula", formula: { source } },
+          );
+        }
+    return { type: "restoreTableTransaction", ...tableTransactionState! };
+  }
+
   if (!reverseChanges.length && !previousRules.length) return null;
   return {
     ...createBatchSetCellContentsCommand(reverseChanges),

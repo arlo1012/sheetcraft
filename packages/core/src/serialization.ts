@@ -7,6 +7,8 @@ import {
 import { normalizeExcelDateSystem, type ExcelDateSystem } from "./formula/date-system.js";
 import { parseA1FormulaReference } from "./formula/reference-model.js";
 import { normalizeCellStyle, type CellStyle } from "./style.js";
+import { cloneTableStyleDefinition } from "./table-styles.js";
+import { clonePivotTableStyleDefinition } from "./pivot-table-styles.js";
 import { normalizeImageTransform, type ImageTransform } from "./image-transform.js";
 import {
   createSheet,
@@ -14,6 +16,8 @@ import {
   createSheetSparseState,
   getWorkbookSheets,
   normalizeSheetName,
+  normalizeTableStyleDefinition,
+  normalizePivotTableStyleDefinition,
   replaceSheetSparseState,
   type CellAddress,
   type CellRange,
@@ -31,6 +35,7 @@ import {
   type SheetSubtotalMetadata,
   type SheetDuplicateRule,
   type SheetConditionalFormatRule,
+  type SheetTable,
   type Workbook,
   type DefinedName,
 } from "./workbook.js";
@@ -135,8 +140,16 @@ export type WorkbookSnapshotV9 = Omit<WorkbookSnapshotV8, "version"> & {
 export type WorkbookSnapshotV10 = Omit<WorkbookSnapshotV9, "version"> & { version: 10 };
 export type WorkbookSnapshotV11 = Omit<WorkbookSnapshotV10, "version"> & { version: 11 };
 export type WorkbookSnapshotV12 = Omit<WorkbookSnapshotV11, "version"> & { version: 12 };
+export type WorkbookSnapshotV13 = Omit<WorkbookSnapshotV12, "version" | "sheets"> & {
+  version: 13;
+  sheets: SheetSnapshot[];
+  tableStyles?: import("./table-styles.js").TableStyleDefinition[];
+  defaultTableStyleId?: string;
+  pivotTableStyles?: import("./pivot-table-styles.js").PivotTableStyleDefinition[];
+  defaultPivotTableStyleId?: string;
+};
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV12;
+export type WorkbookSnapshot = WorkbookSnapshotV13;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -146,8 +159,9 @@ export type SheetSnapshot = SheetSnapshotV7 & {
   subtotalMetadata?: SheetSubtotalMetadata[];
   duplicateRules?: SheetDuplicateRule[];
   conditionalFormats?: SheetConditionalFormatRule[];
+  tables?: SheetTable[];
 };
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -416,6 +430,11 @@ function parseFilter(value: unknown, path: string, version: SnapshotVersion): Sh
           : { condition: condition as SheetFilter["columns"][number]["condition"] }),
       };
     }),
+    ...(record.allowMergedCells === undefined
+      ? {}
+      : typeof record.allowMergedCells === "boolean"
+        ? { allowMergedCells: record.allowMergedCells }
+        : fail(`${path}.allowMergedCells`, "Expected a boolean.")),
     ...(advanced ? { advanced } : {}),
   };
 }
@@ -546,6 +565,10 @@ function parseSparseState(
             `${path}.conditionalFormats`,
           ) as SheetConditionalFormatRule[])
         : [],
+    tables:
+      version >= 13 && Object.hasOwn(record, "tables")
+        ? (asArray(record.tables, `${path}.tables`) as SheetTable[])
+        : [],
     floatingImages:
       version >= 4
         ? asArray(record.floatingImages, `${path}.floatingImages`).map((image, index) =>
@@ -567,13 +590,15 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
     version = hasValue
       ? 1
-      : Object.hasOwn(record, "conditionalFormats")
-        ? 12
-        : Object.hasOwn(record, "properties")
-          ? 7
-          : Object.hasOwn(record, "floatingImages")
-            ? 6
-            : 3;
+      : Object.hasOwn(record, "tables")
+        ? 13
+        : Object.hasOwn(record, "conditionalFormats")
+          ? 12
+          : Object.hasOwn(record, "properties")
+            ? 7
+            : Object.hasOwn(record, "floatingImages")
+              ? 6
+              : 3;
   }
   const id = asIdentifier(record.id, `${path}.id`);
   let name: string;
@@ -616,7 +641,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 12,
+    version: 13,
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
@@ -630,6 +655,12 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
         end: { ...definition.reference.end },
       },
     })),
+    tableStyles: (workbook.tableStyles ?? []).map(cloneTableStyleDefinition),
+    ...(workbook.defaultTableStyleId ? { defaultTableStyleId: workbook.defaultTableStyleId } : {}),
+    pivotTableStyles: (workbook.pivotTableStyles ?? []).map(clonePivotTableStyleDefinition),
+    ...(workbook.defaultPivotTableStyleId
+      ? { defaultPivotTableStyleId: workbook.defaultPivotTableStyleId }
+      : {}),
   };
 }
 
@@ -647,7 +678,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 9 &&
     record.version !== 10 &&
     record.version !== 11 &&
-    record.version !== 12
+    record.version !== 12 &&
+    record.version !== 13
   ) {
     throw new WorkbookDomainError(
       {
@@ -718,6 +750,36 @@ export function deserializeWorkbook(value: unknown): Workbook {
       );
     }
   }
+  const tableStyles =
+    version >= 13 && record.tableStyles !== undefined
+      ? asArray(record.tableStyles, "$.tableStyles").map((style, index) => {
+          try {
+            return normalizeTableStyleDefinition(
+              style as import("./table-styles.js").TableStyleDefinition,
+            );
+          } catch (error) {
+            return fail(
+              `$.tableStyles[${index}]`,
+              error instanceof Error ? error.message : "Invalid table style.",
+            );
+          }
+        })
+      : [];
+  const pivotTableStyles =
+    version >= 13 && record.pivotTableStyles !== undefined
+      ? asArray(record.pivotTableStyles, "$.pivotTableStyles").map((style, index) => {
+          try {
+            return normalizePivotTableStyleDefinition(
+              style as import("./pivot-table-styles.js").PivotTableStyleDefinition,
+            );
+          } catch (error) {
+            return fail(
+              `$.pivotTableStyles[${index}]`,
+              error instanceof Error ? error.message : "Invalid pivot table style.",
+            );
+          }
+        })
+      : [];
   return {
     id,
     dateSystem,
@@ -725,6 +787,14 @@ export function deserializeWorkbook(value: unknown): Workbook {
     activeSheetId,
     sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
     definedNames,
+    tableStyles,
+    pivotTableStyles,
+    ...(version >= 13 && typeof record.defaultTableStyleId === "string"
+      ? { defaultTableStyleId: record.defaultTableStyleId }
+      : {}),
+    ...(version >= 13 && typeof record.defaultPivotTableStyleId === "string"
+      ? { defaultPivotTableStyleId: record.defaultPivotTableStyleId }
+      : {}),
   };
 }
 

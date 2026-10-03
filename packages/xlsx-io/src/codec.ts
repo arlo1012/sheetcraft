@@ -50,12 +50,14 @@ import {
   readRawWorksheetNumericValues,
   readRawWorksheetTextDirections,
 } from "./raw-cell-values.js";
-import {
-  readXlsxDataMetadata,
-  withoutColorFiltersForExcelJs,
-  type XlsxDataMetadata,
-} from "./data-tools-metadata.js";
+import { readXlsxDataMetadata, type XlsxDataMetadata } from "./data-tools-metadata.js";
 import { readXlsxConditionalFormatMetadata } from "./conditional-formatting.js";
+import {
+  readXlsxTableMetadata,
+  withoutTableAutoFiltersForExcelJs,
+  xlsxPivotTableStyleId,
+  xlsxTableStyleId,
+} from "./table-styles.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
@@ -146,7 +148,11 @@ function hasColorSetFilter(filter: SheetFilter | null): boolean {
  * lives in the product extension for a future Idea10 import.
  */
 function colorSetHiddenRows(sheet: Sheet): number[] {
-  if (!hasColorSetFilter(sheet.filter)) return [];
+  if (
+    !hasColorSetFilter(sheet.filter) &&
+    !sheet.tables?.some((table) => hasColorSetFilter(table.filter))
+  )
+    return [];
   const rows: number[] = [];
   for (const interval of createSheetFilterHiddenRowIntervals(sheet)) {
     const start = Math.max(0, interval.start);
@@ -240,6 +246,55 @@ function parseAddress(value: string): { row: number; column: number } | null {
   return row >= 0 && row < MAX_SHEET_ROWS && column >= 0 && column < MAX_SHEET_COLUMNS
     ? { row, column }
     : null;
+}
+
+function rangesEqual(left: CellRange, right: CellRange): boolean {
+  return (
+    left.start.row === right.start.row &&
+    left.start.column === right.start.column &&
+    left.end.row === right.end.row &&
+    left.end.column === right.end.column
+  );
+}
+
+function rangesIntersect(left: CellRange, right: CellRange): boolean {
+  return (
+    left.start.row <= right.end.row &&
+    left.end.row >= right.start.row &&
+    left.start.column <= right.end.column &&
+    left.end.column >= right.start.column
+  );
+}
+
+function sheetFilterOutsideTables(
+  filter: SheetFilter | null,
+  tables: readonly { filter: SheetFilter | null }[],
+  report: CompatibilityReportBuilder,
+  diagnosticLocation: string,
+): SheetFilter | null {
+  if (!filter) return null;
+  for (const table of tables) {
+    if (!table.filter) continue;
+    if (rangesEqual(filter.range, table.filter.range)) return null;
+    if (rangesIntersect(filter.range, table.filter.range)) {
+      add(report, "filter-omitted", diagnosticLocation);
+      return null;
+    }
+  }
+  return filter;
+}
+
+/**
+ * XLSX has no flag corresponding to Core's merged-cell filter opt-in. A
+ * worksheet AutoFilter that intersects a valid imported merge is therefore
+ * necessarily using that opt-in when reconstructed at the Core boundary.
+ */
+function restoreMergedCellFilterSupport(
+  filter: SheetFilter | null,
+  mergedCells: readonly CellRange[],
+): SheetFilter | null {
+  if (!filter || !mergedCells.some((range) => rangesIntersect(range, filter.range))) return filter;
+  return { ...filter, allowMergedCells: true };
 }
 
 function readStyle(
@@ -529,8 +584,9 @@ export async function decodeWithExcelJs(
   const rawTextDirections = readRawWorksheetTextDirections(bytes);
   const rawDataMetadata = readXlsxDataMetadata(bytes);
   const rawConditionalFormats = readXlsxConditionalFormatMetadata(bytes, report);
+  const rawTables = readXlsxTableMetadata(bytes);
   const source = new ExcelJS.Workbook();
-  await source.xlsx.load(withoutColorFiltersForExcelJs(bytes));
+  await source.xlsx.load(withoutTableAutoFiltersForExcelJs(bytes));
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
   const dateSystem = source.properties.date1904 ? "1904" : "1900";
   const calculation = readWorkbookCalculationSettings(bytes);
@@ -552,6 +608,7 @@ export async function decodeWithExcelJs(
     const metadata = rawDataMetadata[sheetIndex];
     const derivedColorSetRows = new Set(metadata?.colorSetHiddenRows ?? []);
     const conditionalFormats = rawConditionalFormats[sheetIndex]?.rules ?? [];
+    const tables = rawTables.sheets[sheetIndex] ?? [];
     const sourceDefaultColumnWidth = sourceSheet.properties.defaultColWidth;
     const defaultColumnWidth =
       typeof sourceDefaultColumnWidth === "number" && Number.isFinite(sourceDefaultColumnWidth)
@@ -679,7 +736,15 @@ export async function decodeWithExcelJs(
       hiddenColumns,
       defaultColumnWidth,
       freezePanes,
-      filter: (metadata?.filter ?? null) as typeof sheet.filter,
+      filter: restoreMergedCellFilterSupport(
+        sheetFilterOutsideTables(
+          (metadata?.filter ?? null) as typeof sheet.filter,
+          tables,
+          report,
+          sourceSheet.name,
+        ),
+        mergedCells,
+      ),
       mergedCells,
       dataValidations: (metadata?.dataValidations ?? []).map((validation, index) => ({
         id: `xlsx-validation-${sheetIndex + 1}-${index + 1}`,
@@ -690,6 +755,7 @@ export async function decodeWithExcelJs(
         ...group,
       })),
       conditionalFormats,
+      tables,
       floatingImages: [],
     });
     return sheet;
@@ -712,6 +778,14 @@ export async function decodeWithExcelJs(
       activeSheetId: sheets[activeSheetIndex]?.id ?? sheets[0]?.id ?? "",
       sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
       definedNames: readDefinedNames(bytes, sheets, report),
+      tableStyles: rawTables.tableStyles,
+      pivotTableStyles: rawTables.pivotTableStyles,
+      ...(xlsxTableStyleId(rawTables.defaultTableStyleName)
+        ? { defaultTableStyleId: xlsxTableStyleId(rawTables.defaultTableStyleName) }
+        : {}),
+      ...(xlsxPivotTableStyleId(rawTables.defaultPivotTableStyleName)
+        ? { defaultPivotTableStyleId: xlsxPivotTableStyleId(rawTables.defaultPivotTableStyleName) }
+        : {}),
     },
     report: report.build(),
   };
@@ -889,12 +963,18 @@ export async function encodeWithExcelJs(
     let summaryBelow: boolean | undefined;
     for (const entry of subtotalMetadata)
       if (entry.summaryBelow !== undefined) summaryBelow = entry.summaryBelow;
+    const exportFilter = sheetFilterOutsideTables(
+      sheet.filter,
+      sheet.tables ?? [],
+      report,
+      sheet.name,
+    );
     dataMetadata.push({
       // Advanced Filter has different criteria semantics. Do not serialize its
       // list range as an ordinary AutoFilter and imply that it is equivalent.
-      filter: sheet.filter?.advanced
+      filter: exportFilter?.advanced
         ? null
-        : (sheet.filter as unknown as XlsxDataMetadata["filter"]),
+        : (exportFilter as unknown as XlsxDataMetadata["filter"]),
       hiddenRows: [...new Set([...(sheet.hiddenRows ?? []), ...advancedRows, ...multiColorRows])],
       colorSetHiddenRows: derivedMultiColorRows,
       dataValidations: (sheet.dataValidations ?? []).map((validation) => {
@@ -909,7 +989,7 @@ export async function encodeWithExcelJs(
       ...(summaryBelow === undefined ? {} : { summaryBelow }),
     });
     conditionalFormats.push(sheet.conditionalFormats ?? []);
-    if (sheet.filter?.advanced)
+    if (exportFilter?.advanced)
       add(report, "advanced-filter-criteria-omitted", `${sheet.name}.advancedFilter`);
     // Duplicate highlighting and duplicate-entry rejection are product-owned
     // rules. Do not serialize them as ordinary XLSX conditional formatting or
@@ -995,6 +1075,11 @@ export async function encodeWithExcelJs(
       workbook.calculation,
       dataMetadata,
       conditionalFormats,
+      [...workbook.sheets.values()],
+      workbook.tableStyles ?? [],
+      workbook.defaultTableStyleId,
+      workbook.pivotTableStyles ?? [],
+      workbook.defaultPivotTableStyleId,
       report,
     ),
     report: report.build(),

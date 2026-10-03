@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, useId } from "vue";
+import { nextTick, ref, useId, watch } from "vue";
 import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
 import FormulaToolbar from "../modules/formula-tools/components/FormulaToolbar.vue";
 import type { CellMergeMode, CellValueConversionMode } from "@idea10/core/commands";
@@ -9,6 +9,8 @@ import type { CellFormatTab } from "../modules/cell-format/components/CellFormat
 import type { ConditionalFormatQuickRule } from "../modules/conditional-formatting/components/ConditionalFormattingMenu.vue";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { TableStyleDefinition } from "@idea10/core/table-styles";
+import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
 import { useAppI18n } from "../shared/i18n";
 import LocaleSwitcher from "./LocaleSwitcher.vue";
 import type {
@@ -17,7 +19,7 @@ import type {
   MergeCellsState,
 } from "../modules/home-tools/components/data-tool-state";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     state: SelectionCellStyleState;
     disabled: boolean;
@@ -31,6 +33,11 @@ withDefaults(
     recentFunctions?: readonly string[];
     nameCreationEnabled?: boolean;
     calculationSettings?: WorkbookCalculationSettings;
+    tableStyles?: readonly TableStyleDefinition[];
+    pivotTableStyles?: readonly PivotTableStyleDefinition[];
+    selectedTableStyleId?: string;
+    selectedTableStyleColor?: string;
+    hasTable?: boolean;
   }>(),
   { conditionalFormattingDisabled: undefined },
 );
@@ -66,19 +73,41 @@ const emit = defineEmits<{
   createConditionalFormat: [kind: ConditionalFormatQuickRule];
   manageConditionalFormats: [];
   clearConditionalFormats: [scope: "selection" | "sheet"];
+  applyTableStyle: [style: TableStyleDefinition];
+  createTableStyle: [];
+  editTableStyle: [style: TableStyleDefinition];
+  createPivotTableStyle: [];
+  editPivotTableStyle: [style: PivotTableStyleDefinition];
+  clearTableStyle: [];
+  manageTable: [];
 }>();
 
 const { t } = useAppI18n();
-const activeCategory = ref<"home" | "formulas" | "data">("home");
+type Category = "home" | "formulas" | "data" | "table";
+const activeCategory = ref<Category>("home");
+let previousCategory: Exclude<Category, "table"> = "home";
 const homeTab = ref<HTMLButtonElement>();
 const formulaTab = ref<HTMLButtonElement>();
 const dataTab = ref<HTMLButtonElement>();
+const tableTab = ref<HTMLButtonElement>();
 const tabId = useId();
+
+watch(activeCategory, (category) => {
+  if (category !== "table") previousCategory = category;
+});
+watch(
+  () => props.hasTable,
+  (hasTable) => {
+    if (!hasTable && activeCategory.value === "table") activeCategory.value = previousCategory;
+  },
+);
 
 function onCategoryKeydown(event: KeyboardEvent): void {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
-  const categories = ["home", "formulas", "data"] as const;
+  const categories: Category[] = props.hasTable
+    ? ["home", "formulas", "data", "table"]
+    : ["home", "formulas", "data"];
   const current = categories.indexOf(activeCategory.value);
   const index =
     event.key === "Home"
@@ -87,7 +116,7 @@ function onCategoryKeydown(event: KeyboardEvent): void {
         ? categories.length - 1
         : (current + (event.key === "ArrowRight" ? 1 : -1) + categories.length) % categories.length;
   activeCategory.value = categories[index]!;
-  void nextTick(() => [homeTab, formulaTab, dataTab][index]?.value?.focus());
+  void nextTick(() => [homeTab, formulaTab, dataTab, tableTab][index]?.value?.focus());
 }
 
 defineSlots<{
@@ -95,6 +124,7 @@ defineSlots<{
   "row-column-tools"?: () => unknown;
   "worksheet-tools"?: () => unknown;
   "data-tools"?: () => unknown;
+  "table-tools"?: () => unknown;
 }>();
 </script>
 
@@ -154,6 +184,22 @@ defineSlots<{
           >
             {{ t("ribbon.data") }}
           </button>
+          <button
+            v-if="hasTable"
+            :id="`${tabId}-table`"
+            ref="tableTab"
+            class="spreadsheet-ribbon__category spreadsheet-ribbon__category--contextual"
+            :class="{ 'is-active': activeCategory === 'table' }"
+            data-ribbon-category="table"
+            type="button"
+            role="tab"
+            :aria-selected="activeCategory === 'table'"
+            :aria-controls="`${tabId}-panel`"
+            :tabindex="activeCategory === 'table' ? 0 : -1"
+            @click="activeCategory = 'table'"
+          >
+            {{ t("tables.tools") }}
+          </button>
         </div>
         <slot name="file-actions" />
       </nav>
@@ -175,6 +221,11 @@ defineSlots<{
         :format-painter-active="formatPainterActive"
         :data-state="dataState"
         :merge-state="mergeState"
+        :table-styles="tableStyles"
+        :pivot-table-styles="pivotTableStyles"
+        :selected-table-style-id="selectedTableStyleId"
+        :selected-table-style-color="selectedTableStyleColor"
+        :has-table="hasTable"
         @apply-borders="emit('applyBorders', $event)"
         @update-border-format="emit('updateBorderFormat', $event)"
         @open-cell-format="emit('openCellFormat', $event)"
@@ -199,6 +250,13 @@ defineSlots<{
         @create-conditional-format="emit('createConditionalFormat', $event)"
         @manage-conditional-formats="emit('manageConditionalFormats')"
         @clear-conditional-formats="emit('clearConditionalFormats', $event)"
+        @apply-table-style="emit('applyTableStyle', $event)"
+        @create-table-style="emit('createTableStyle')"
+        @edit-table-style="emit('editTableStyle', $event)"
+        @create-pivot-table-style="emit('createPivotTableStyle')"
+        @edit-pivot-table-style="emit('editPivotTableStyle', $event)"
+        @clear-table-style="emit('clearTableStyle')"
+        @manage-table="emit('manageTable')"
       >
         <template v-if="$slots['row-column-tools']" #row-column-tools>
           <slot name="row-column-tools" />
@@ -222,7 +280,8 @@ defineSlots<{
         @recalculate="emit('recalculate')"
         @interaction-end="emit('formulaInteractionEnd')"
       />
-      <slot v-else name="data-tools" />
+      <slot v-else-if="activeCategory === 'data'" name="data-tools" />
+      <slot v-else name="table-tools" />
     </section>
   </header>
 </template>
@@ -269,6 +328,10 @@ defineSlots<{
     font-weight: var(--idea-font-weight-medium);
     line-height: var(--idea-line-height-body-medium);
     white-space: nowrap;
+
+    &--contextual {
+      color: var(--idea-action-primary);
+    }
 
     &.is-active {
       color: var(--idea-action-primary);

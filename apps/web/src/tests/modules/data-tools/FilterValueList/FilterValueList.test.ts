@@ -7,6 +7,7 @@ import type { SheetFilterValue } from "@idea10/core/workbook";
 import FilterValueList from "../../../../modules/data-tools/components/FilterValueList.vue";
 import type { DataToolFilterValueOption } from "../../../../modules/data-tools/data-tools-types";
 import { createAppI18n } from "../../../../shared/i18n";
+import { readFilterPanelSettings } from "../../../../modules/data-tools/filter-panel-settings";
 
 function stringOption(value: string, count = 1): DataToolFilterValueOption {
   return { key: { kind: "string", value }, label: value, count };
@@ -18,14 +19,16 @@ function mountList(
 ) {
   const selectedRef = ref<SheetFilterValue[]>(selected);
   const query = ref("");
+  const settings = ref(readFilterPanelSettings());
   const wrapper = mount(
     defineComponent({
       components: { FilterValueList },
-      setup: () => ({ query, selected: selectedRef, values }),
+      setup: () => ({ query, selected: selectedRef, values, settings }),
       template: `
         <FilterValueList
           v-model="selected"
           v-model:query="query"
+          v-model:settings="settings"
           :values="values"
           :disabled="false"
         />
@@ -33,7 +36,7 @@ function mountList(
     }),
     { global: { plugins: [createAppI18n("en-US")] } },
   );
-  return { wrapper, selected: selectedRef, query };
+  return { wrapper, selected: selectedRef, query, settings };
 }
 
 function filterComponent(wrapper: ReturnType<typeof mount>) {
@@ -100,7 +103,28 @@ describe("FilterValueList", () => {
         .map((node) => node.text()),
     ).toEqual(["2", "10", "1"]);
 
-    await buttonWithText(wrapper, "Duplicates").trigger("click");
+    await buttonWithText(wrapper, "Select duplicates").trigger("click");
     expect(selected.value).toEqual([outside.key, ten.key, two.key]);
+  });
+
+  test("hides item counts and pins the opening selection without moving rows during edits", async () => {
+    const a = stringOption("Alpha", 2);
+    const b = stringOption("Beta", 3);
+    const c = stringOption("Gamma", 4);
+    const { wrapper, settings } = mountList([a, b, c], [c.key]);
+    settings.value.checkedFirst = true;
+    settings.value.showItemCount = false;
+    await nextTick();
+    const names = () =>
+      filterComponent(wrapper)
+        .findAll(".filter-value-list__label")
+        .map((node) => node.text());
+    expect(names()).toEqual(["Gamma", "Alpha", "Beta"]);
+    expect(
+      filterComponent(wrapper).findAll(".filter-value-list__value-text .filter-value-list__count"),
+    ).toHaveLength(0);
+    checkboxAt(wrapper, 1).vm.$emit("change", false);
+    await nextTick();
+    expect(names()).toEqual(["Gamma", "Alpha", "Beta"]);
   });
 });

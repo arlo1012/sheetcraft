@@ -2,6 +2,7 @@ import ExcelJSImport from "exceljs/dist/exceljs.min.js";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
 import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import { createWorkbook, setCellContent, setCellStyle } from "@idea10/core/workbook";
+import { createBuiltinTableStyles } from "@idea10/core/table-styles";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 
@@ -147,7 +148,7 @@ describe("XLSX data-tool metadata", () => {
           condition: { kind: "number", operator: "notBetween", value: 3, value2: 7 },
         },
       ],
-    } as typeof sheet.filter;
+    };
 
     const encoded = await encodeXlsx(workbook);
     const entries = unzipSync(encoded.bytes);
@@ -171,7 +172,7 @@ describe("XLSX data-tool metadata", () => {
 
     expect(
       [...(await decodeXlsx(encoded.bytes)).workbook.sheets.values()][0]!.filter?.columns,
-    ).toEqual(sheet.filter!.columns);
+    ).toEqual(sheet.filter.columns);
   });
 
   test("roundtrips multi-color filters without pretending OOXML supports more than one color", async () => {
@@ -223,6 +224,65 @@ describe("XLSX data-tool metadata", () => {
     expect([...(decoded.hiddenRows ?? [])]).toEqual([1]);
   });
 
+  test("restores manual rows after clearing a table-only multi-color filter", async () => {
+    const workbook = createWorkbook({
+      id: "table-multi-color-filter",
+      sheetId: "data",
+      sheetName: "Data",
+    });
+    const sheet = [...workbook.sheets.values()][0]!;
+    for (const [row, value] of ["Value", "same", "same", "same"].entries())
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value });
+    setCellStyle(sheet, { row: 1, column: 0 }, { fillColor: "#ff0000" });
+    setCellStyle(sheet, { row: 2, column: 0 }, { fillColor: "#00ff00" });
+    setCellStyle(sheet, { row: 3, column: 0 }, { fillColor: "#0000ff" });
+    (sheet.hiddenRows ??= new Set()).add(1);
+    const filter = {
+      range: { start: { row: 0, column: 0 }, end: { row: 3, column: 0 } },
+      columns: [
+        {
+          column: 0,
+          allowedValues: [],
+          condition: {
+            kind: "color-set" as const,
+            target: "fill" as const,
+            colors: ["#ff0000", "#0000ff"],
+          },
+        },
+      ],
+    };
+    sheet.tables = [
+      {
+        id: "colors",
+        name: "Colors",
+        range: filter.range,
+        columns: [{ id: "value", name: "Value" }],
+        style: createBuiltinTableStyles()[0]!,
+        headerRow: true,
+        totalRow: false,
+        firstColumn: false,
+        lastColumn: false,
+        bandedRows: true,
+        bandedColumns: false,
+        filterButton: true,
+        filter,
+      },
+    ];
+    sheet.filter = filter;
+
+    const entries = unzipSync((await encodeXlsx(workbook)).bytes);
+    expect(strFromU8(entries["xl/worksheets/sheet1.xml"]!)).toContain('hiddenRows="2"');
+    expect(strFromU8(entries["xl/tables/table1.xml"]!)).toContain("idea10:colorFilterSet");
+
+    const decoded = [...(await decodeXlsx(zipSync(entries))).workbook.sheets.values()][0]!;
+    expect(decoded.filter).toBeNull();
+    expect(decoded.tables?.[0]?.filter?.columns).toEqual(filter.columns);
+    expect([...(decoded.hiddenRows ?? [])]).toEqual([1]);
+    decoded.tables![0]!.filter = null;
+    expect(createSheetFilterHiddenRowIntervals(decoded)).toEqual([]);
+    expect([...(decoded.hiddenRows ?? [])]).toEqual([1]);
+  });
+
   test("imports standard not-between and validates top-percent limits", async () => {
     const supported = await decodeXlsx(
       await workbookWith(
@@ -244,6 +304,7 @@ describe("XLSX data-tool metadata", () => {
         },
       ],
     });
+
     const unsupported = await decodeXlsx(
       await workbookWith(
         '<autoFilter ref="A1:A3"><filterColumn colId="0"><top10 val="100.1" percent="1"/></filterColumn></autoFilter>',
@@ -328,6 +389,40 @@ describe("XLSX data-tool metadata", () => {
         expect.objectContaining({ axis: "row", start: 1, end: 2, collapsed: true }),
       ]),
     );
+  });
+
+  test("roundtrips an ordinary merged-cell filter and its hidden merged block", async () => {
+    const workbook = createWorkbook({ id: "merged-filter", sheetId: "data", sheetName: "Data" });
+    const sheet = [...workbook.sheets.values()][0]!;
+    for (const [row, value] of ["Group", "Keep", "Keep", "Skip", "Skip"].entries())
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value });
+    sheet.mergedCells.push(
+      { start: { row: 1, column: 0 }, end: { row: 2, column: 0 } },
+      { start: { row: 3, column: 0 }, end: { row: 4, column: 0 } },
+    );
+    (sheet.hiddenRows ??= new Set()).add(3);
+    sheet.hiddenRows.add(4);
+    sheet.filter = {
+      range: { start: { row: 0, column: 0 }, end: { row: 4, column: 0 } },
+      columns: [{ column: 0, allowedValues: [{ kind: "string", value: "Keep" }] }],
+      allowMergedCells: true,
+    };
+
+    const decoded = await decodeXlsx((await encodeXlsx(workbook)).bytes);
+    const imported = [...decoded.workbook.sheets.values()][0]!;
+
+    expect(imported.filter).toEqual({
+      range: { start: { row: 0, column: 0 }, end: { row: 4, column: 0 } },
+      columns: [{ column: 0, allowedValues: [{ kind: "string", value: "Keep" }] }],
+      allowMergedCells: true,
+    });
+    expect(imported.mergedCells).toEqual([
+      { start: { row: 1, column: 0 }, end: { row: 2, column: 0 } },
+      { start: { row: 3, column: 0 }, end: { row: 4, column: 0 } },
+    ]);
+    expect([...(imported.hiddenRows ?? new Set())].sort((left, right) => left - right)).toEqual([
+      3, 4,
+    ]);
   });
 
   test("writes validations when a sheet has no filter", async () => {

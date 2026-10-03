@@ -13,6 +13,8 @@ import {
   DEFAULT_FILTER_SEARCH_OPTIONS,
   type FilterSearchOptions,
 } from "../filter-value-options";
+import type { FilterPanelSettings } from "../filter-panel-settings";
+import FilterSettingsMenu from "./FilterSettingsMenu.vue";
 import FilterSearchMenu from "./FilterSearchMenu.vue";
 
 type SortField = "name" | "count";
@@ -24,6 +26,7 @@ const props = withDefaults(
     modelValue: readonly SheetFilterValue[];
     query: string;
     disabled: boolean;
+    settings: FilterPanelSettings;
     searchOptions?: FilterSearchOptions;
   }>(),
   { searchOptions: () => ({ ...DEFAULT_FILTER_SEARCH_OPTIONS }) },
@@ -32,13 +35,16 @@ const emit = defineEmits<{
   "update:modelValue": [values: SheetFilterValue[]];
   "update:query": [query: string];
   "update:searchOptions": [options: FilterSearchOptions];
+  "update:settings": [settings: FilterPanelSettings];
 }>();
 const { t } = useAppI18n();
-const sortField = ref<SortField>("name");
-const sortDirection = ref<SortDirection>("ascending");
+const sortField = computed(() => props.settings.sortField);
+const sortDirection = computed(() => props.settings.sortDirection);
 const visibleLimit = ref(100);
+const settingsMenuRef = ref<InstanceType<typeof FilterSettingsMenu> | null>(null);
 const searchMenuRef = ref<InstanceType<typeof FilterSearchMenu> | null>(null);
 defineExpose({
+  settingsMenuElement: computed(() => settingsMenuRef.value?.rootElement ?? null),
   searchMenuElement: computed(() => searchMenuRef.value?.rootElement ?? null),
 });
 const searchPlaceholder = computed(() =>
@@ -49,6 +55,14 @@ const searchPlaceholder = computed(() =>
         ? "dataTools.filter.searchPhrasePlaceholder"
         : "dataTools.filter.searchKeywords",
   ),
+);
+const openingSelection = ref(new Set(props.modelValue.map(getSheetFilterValueKey)));
+watch(
+  () => props.values,
+  () => {
+    openingSelection.value = new Set(props.modelValue.map(getSheetFilterValueKey));
+    visibleLimit.value = 100;
+  },
 );
 
 const matchingValues = computed(() =>
@@ -71,6 +85,12 @@ const someMatchingSelected = computed(
 const orderedMatchingValues = computed(() => {
   const direction = sortDirection.value === "ascending" ? 1 : -1;
   return [...matchingValues.value].sort((left, right) => {
+    if (props.settings.checkedFirst) {
+      const checked =
+        Number(openingSelection.value.has(getSheetFilterValueKey(right.key))) -
+        Number(openingSelection.value.has(getSheetFilterValueKey(left.key)));
+      if (checked) return checked;
+    }
     if (sortField.value === "count") {
       const count = (left.count - right.count) * direction;
       if (count) return count;
@@ -111,12 +131,19 @@ function updateQuery(value: string): void {
 }
 
 function setSort(field: SortField): void {
-  if (sortField.value === field)
-    sortDirection.value = sortDirection.value === "ascending" ? "descending" : "ascending";
-  else {
-    sortField.value = field;
-    sortDirection.value = field === "count" ? "descending" : "ascending";
-  }
+  const direction: SortDirection =
+    sortField.value === field
+      ? sortDirection.value === "ascending"
+        ? "descending"
+        : "ascending"
+      : field === "count"
+        ? "descending"
+        : "ascending";
+  emit("update:settings", { ...props.settings, sortField: field, sortDirection: direction });
+}
+
+function changeSettings(settings: FilterPanelSettings): void {
+  emit("update:settings", settings);
 }
 
 function toggle(option: DataToolFilterValueOption, checked: boolean): void {
@@ -164,58 +191,35 @@ function selectDuplicates(): void {
 
 <template>
   <section class="filter-value-list" :aria-label="t('dataTools.filter.listOrder')">
-    <TInput
-      :value="query"
-      :disabled="disabled"
-      :placeholder="searchPlaceholder"
-      :aria-label="searchPlaceholder"
-      type="search"
-      autocomplete="off"
-      clearable
-      @update:value="updateQuery"
-    >
-      <template #prefix-icon>
-        <FilterSearchMenu
-          ref="searchMenuRef"
-          :options="searchOptions"
-          :disabled="disabled"
-          @change="emit('update:searchOptions', $event)"
-        />
-      </template>
-    </TInput>
-    <div class="filter-value-list__tools">
-      <TCheckbox
-        :checked="allMatchingSelected"
-        :indeterminate="someMatchingSelected"
-        :disabled="disabled || matchingValues.length === 0"
-        @change="toggleAll(Boolean($event))"
-      >
-        {{ t("dataTools.filter.selectAll") }} ({{ matchingValues.length }})
-      </TCheckbox>
-      <TButton
-        variant="text"
-        size="small"
-        :disabled="disabled || !matchingValues.length"
-        @click="invertMatching"
-      >
-        {{ t("dataTools.filter.invert") }}
-      </TButton>
-      <TButton
-        variant="text"
-        size="small"
-        :disabled="disabled || !matchingValues.length"
-        @click="selectDuplicates"
-      >
-        {{ t("dataTools.filter.duplicates") }}
-      </TButton>
-    </div>
     <div
-      class="filter-value-list__ordering"
+      class="filter-value-list__search-bar"
       role="group"
       :aria-label="t('dataTools.filter.listOrder')"
     >
+      <div class="filter-value-list__search">
+        <TInput
+          :value="query"
+          :disabled="disabled"
+          :placeholder="searchPlaceholder"
+          :aria-label="searchPlaceholder"
+          type="search"
+          autocomplete="off"
+          clearable
+          @update:value="updateQuery"
+        >
+          <template #prefix-icon>
+            <FilterSearchMenu
+              ref="searchMenuRef"
+              :options="searchOptions"
+              :disabled="disabled"
+              @change="emit('update:searchOptions', $event)"
+            />
+          </template>
+        </TInput>
+      </div>
       <TButton
-        variant="text"
+        :variant="sortField === 'name' ? 'base' : 'text'"
+        theme="default"
         size="small"
         :aria-pressed="sortField === 'name'"
         :disabled="disabled"
@@ -224,13 +228,14 @@ function selectDuplicates(): void {
         {{ t("dataTools.filter.name") }}
         <ArrowUp
           v-if="sortField === 'name' && sortDirection === 'ascending'"
-          :size="14"
+          class="idea-action-icon"
           aria-hidden="true"
         />
-        <ArrowDown v-else-if="sortField === 'name'" :size="14" aria-hidden="true" />
+        <ArrowDown v-else-if="sortField === 'name'" class="idea-action-icon" aria-hidden="true" />
       </TButton>
       <TButton
-        variant="text"
+        :variant="sortField === 'count' ? 'base' : 'text'"
+        theme="default"
         size="small"
         :aria-pressed="sortField === 'count'"
         :disabled="disabled"
@@ -239,66 +244,145 @@ function selectDuplicates(): void {
         {{ t("dataTools.filter.count") }}
         <ArrowUp
           v-if="sortField === 'count' && sortDirection === 'ascending'"
-          :size="14"
+          class="idea-action-icon"
           aria-hidden="true"
         />
-        <ArrowDown v-else-if="sortField === 'count'" :size="14" aria-hidden="true" />
+        <ArrowDown v-else-if="sortField === 'count'" class="idea-action-icon" aria-hidden="true" />
       </TButton>
-    </div>
-    <div
-      class="filter-value-list__values"
-      role="group"
-      :aria-label="t('dataTools.filter.filterValues')"
-    >
-      <TCheckbox
-        v-for="option in displayedValues"
-        :key="getSheetFilterValueKey(option.key)"
-        :checked="selectedKeys.has(getSheetFilterValueKey(option.key))"
+      <FilterSettingsMenu
+        ref="settingsMenuRef"
+        :settings="settings"
         :disabled="disabled"
-        @change="toggle(option, Boolean($event))"
-      >
-        <span class="filter-value-list__label">{{ option.label }}</span>
-        <span class="filter-value-list__count">({{ option.count }})</span>
-      </TCheckbox>
-      <p v-if="matchingValues.length === 0" class="filter-value-list__empty" role="status">
-        {{ t("dataTools.filter.noMatches") }}
-      </p>
+        @change="changeSettings"
+      />
     </div>
-    <TButton
-      v-if="remainingCount"
-      class="filter-value-list__more"
-      variant="text"
-      size="small"
-      :disabled="disabled"
-      @click="visibleLimit += 100"
-    >
-      {{ t("dataTools.filter.loadMore", { count: remainingCount }) }}
-    </TButton>
+    <div class="filter-value-list__frame">
+      <div class="filter-value-list__tools">
+        <TCheckbox
+          :checked="allMatchingSelected"
+          :indeterminate="someMatchingSelected"
+          :disabled="disabled || matchingValues.length === 0"
+          @change="toggleAll(Boolean($event))"
+        >
+          {{ t("dataTools.filter.selectAll") }}
+          <span class="filter-value-list__count">({{ matchingValues.length }})</span>
+        </TCheckbox>
+        <TButton
+          variant="text"
+          size="small"
+          :disabled="disabled || !matchingValues.length"
+          @click="invertMatching"
+        >
+          {{ t("dataTools.filter.invert") }}
+        </TButton>
+        <TButton
+          variant="text"
+          size="small"
+          :disabled="disabled || !matchingValues.length"
+          @click="selectDuplicates"
+        >
+          {{ t("dataTools.filter.selectDuplicates") }}
+        </TButton>
+      </div>
+      <div
+        class="filter-value-list__values"
+        role="group"
+        :aria-label="t('dataTools.filter.filterValues')"
+      >
+        <div
+          v-for="option in displayedValues"
+          :key="getSheetFilterValueKey(option.key)"
+          class="filter-value-list__row"
+        >
+          <TCheckbox
+            class="filter-value-list__checkbox"
+            :title="option.label"
+            :checked="selectedKeys.has(getSheetFilterValueKey(option.key))"
+            :disabled="disabled"
+            @change="toggle(option, Boolean($event))"
+          >
+            <span class="filter-value-list__value-text">
+              <span class="filter-value-list__label">{{ option.label }}</span>
+              <span v-if="settings.showItemCount" class="filter-value-list__count"
+                >({{ option.count }})</span
+              >
+            </span>
+          </TCheckbox>
+        </div>
+        <p v-if="matchingValues.length === 0" class="filter-value-list__empty" role="status">
+          {{ t("dataTools.filter.noMatches") }}
+        </p>
+        <TButton
+          v-if="remainingCount"
+          class="filter-value-list__more"
+          variant="text"
+          size="small"
+          :disabled="disabled"
+          @click="visibleLimit += 100"
+        >
+          {{ t("dataTools.filter.loadMore", { count: remainingCount }) }}
+        </TButton>
+      </div>
+    </div>
   </section>
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/option-list/option-list";
+
 .filter-value-list {
   display: grid;
-  gap: 8px;
+  gap: var(--idea-space-4);
   min-width: 0;
   font: inherit;
 
-  &__tools,
-  &__ordering {
+  &__search-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    gap: var(--idea-space-2);
+  }
+
+  &__search {
+    min-width: 0;
+  }
+
+  &__frame {
+    @include option-list.surface;
+    overflow: hidden;
+  }
+
+  &__tools {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 8px;
+    gap: var(--idea-space-2) var(--idea-space-4);
     align-items: center;
+    padding-inline: var(--idea-space-4);
+    padding-bottom: var(--idea-space-2);
   }
 
   &__values {
+    @include option-list.scrollbar;
     display: grid;
     align-content: start;
-    gap: 4px;
-    height: min(230px, 30vh);
-    padding: 8px 0 4px;
+    max-height: min(300px, calc(100vh - 280px));
+    padding-top: var(--idea-space-2);
     overflow: auto;
+  }
+
+  &__row {
+    @include option-list.item;
+  }
+
+  &__checkbox {
+    display: flex;
+    width: 100%;
+  }
+
+  &__value-text {
+    display: flex;
+    align-items: center;
+    max-width: min(330px, calc(100vw - 96px));
   }
 
   &__label {
@@ -309,15 +393,15 @@ function selectDuplicates(): void {
   }
 
   &__count {
-    margin-inline-start: 6px;
+    flex: none;
+    margin-inline-start: var(--idea-space-3);
     color: var(--idea-text-secondary);
-    font-size: var(--idea-font-size-body-small, 12px);
     font-variant-numeric: tabular-nums;
   }
 
   &__empty {
     margin: 0;
-    padding: 12px 0;
+    padding: var(--idea-space-6) var(--idea-space-4);
     color: var(--idea-text-secondary);
     text-align: center;
   }

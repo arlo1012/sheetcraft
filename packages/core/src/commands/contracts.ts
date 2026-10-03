@@ -24,7 +24,10 @@ import type {
   SheetOutlineGroup,
   SheetConditionalFormatRule,
   DefinedName,
+  SheetTable,
 } from "../workbook.js";
+import type { TableStyleDefinition } from "../table-styles.js";
+import type { PivotTableStyleDefinition } from "../pivot-table-styles.js";
 import type { ConditionalFormatIconSet } from "../conditional-formatting.js";
 
 export type CellContentChange = {
@@ -46,6 +49,52 @@ export type ClearCellRangeCommand = {
   type: "clearCellRange";
   sheetId: string;
   range: CellRange;
+};
+
+export type CreateTableCommand = {
+  type: "createTable";
+  sheetId: string;
+  table: SheetTable;
+  hasHeaders?: boolean;
+};
+export type UpdateTableCommand = {
+  type: "updateTable";
+  sheetId: string;
+  tableId: string;
+  changes: Partial<Omit<SheetTable, "id" | "columns" | "filter">>;
+};
+export type ResizeTableCommand = {
+  type: "resizeTable";
+  sheetId: string;
+  tableId: string;
+  range: CellRange;
+};
+export type RemoveTableCommand = { type: "removeTable"; sheetId: string; tableId: string };
+export type ApplyTableStyleToRangeCommand = {
+  type: "applyTableStyleToRange";
+  sheetId: string;
+  range: CellRange;
+  style: TableStyleDefinition;
+  headerRows: number;
+};
+export type SetWorkbookTableStylesCommand = {
+  type: "setWorkbookTableStyles";
+  styles: TableStyleDefinition[];
+  defaultTableStyleId?: string;
+};
+export type SetWorkbookPivotTableStylesCommand = {
+  type: "setWorkbookPivotTableStyles";
+  styles: PivotTableStyleDefinition[];
+  defaultPivotTableStyleId?: string;
+};
+/** Internal inverse for table operations that also rewrite formulas on other sheets. */
+export type RestoreTableTransactionCommand = {
+  type: "restoreTableTransaction";
+  states: Array<{ sheetId: string; state: SheetSparseState }>;
+  tableStyles: TableStyleDefinition[];
+  defaultTableStyleId?: string;
+  pivotTableStyles?: PivotTableStyleDefinition[];
+  defaultPivotTableStyleId?: string;
 };
 
 export type MoveCellRangeCommand = {
@@ -307,6 +356,8 @@ export type RemoveDuplicatesCommand = {
   range: CellRange;
   keyColumns: number[];
   hasHeader?: boolean;
+  /** Targets the complete structured table even when the current selection is one cell. */
+  tableId?: string;
 };
 export type ApplySubtotalsCommand = {
   type: "applySubtotals";
@@ -608,6 +659,14 @@ export type WorkbookCommand =
   | SetDefinedNamesCommand
   | SetCellContentsCommand
   | ClearCellRangeCommand
+  | CreateTableCommand
+  | UpdateTableCommand
+  | ResizeTableCommand
+  | RemoveTableCommand
+  | ApplyTableStyleToRangeCommand
+  | SetWorkbookTableStylesCommand
+  | SetWorkbookPivotTableStylesCommand
+  | RestoreTableTransactionCommand
   | MoveCellRangeCommand
   | InsertCellsCommand
   | DeleteCellsCommand
@@ -675,6 +734,11 @@ export type WorkbookOperation =
   | "cells.insert"
   | "cells.delete"
   | "cells.clear"
+  | "table.create"
+  | "table.update"
+  | "table.remove"
+  | "table.styles"
+  | "history.restore"
   | "format.cells"
   | "format.borders"
   | "dimensions.resize"
@@ -716,6 +780,20 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "cells.edit";
     case "clearCellRange":
       return "cells.clear";
+    case "createTable":
+      return "table.create";
+    case "updateTable":
+    case "resizeTable":
+      return "table.update";
+    case "removeTable":
+      return "table.remove";
+    case "applyTableStyleToRange":
+      return "table.styles";
+    case "setWorkbookTableStyles":
+    case "setWorkbookPivotTableStyles":
+      return "table.styles";
+    case "restoreTableTransaction":
+      return "history.restore";
     case "moveCellRange":
       return "cells.move";
     case "insertCells":

@@ -103,7 +103,10 @@ import SheetCellErrorMenu, { type CellErrorDescription } from "./SheetCellErrorM
 import SheetCellNotice from "./SheetCellNotice.vue";
 import SheetSurface from "./SheetSurface.vue";
 import SheetAutoFillOptions from "./SheetAutoFillOptions.vue";
-import SheetDataControls, { type ActiveCellValidationInfo } from "./SheetDataControls.vue";
+import SheetDataControls, {
+  type ActiveCellValidationInfo,
+  type SheetFilterControl,
+} from "./SheetDataControls.vue";
 import {
   createSheetHiddenColumnIntervals,
   createSheetHiddenRowIntervals,
@@ -252,7 +255,15 @@ const emit = defineEmits<{
   fillFeedback: [feedback: GridFillFeedback];
   endFill: [];
   horizontalScrollChange: [state: SheetHorizontalScrollState];
-  filterColumnRequest: [payload: { column: number; anchor: DOMRect }];
+  filterColumnRequest: [
+    payload: {
+      column: number;
+      range: CellRange;
+      tableId?: string;
+      anchor: DOMRect;
+    },
+  ];
+  tableExpandRequest: [payload: { tableId: string; range: CellRange; next: CellAddress }];
   validationChoose: [
     payload: {
       address: CellAddress;
@@ -307,6 +318,21 @@ const subtotalSummaryBelow = computed(() =>
       metadata.summaryBelow !== false,
     ]),
   ),
+);
+const tableFilters = computed<SheetFilterControl[]>(() =>
+  (props.sheet.tables ?? [])
+    .filter((table) => table.headerRow && table.filterButton)
+    .map((table) => ({
+      tableId: table.id,
+      range: {
+        start: table.range.start,
+        end: {
+          ...table.range.end,
+          row: table.range.end.row - (table.totalRow ? 1 : 0),
+        },
+      },
+      filteredColumns: table.filter?.columns.map((entry) => entry.column),
+    })),
 );
 
 const outlineHiddenRows = computed(() =>
@@ -2005,12 +2031,40 @@ function traverseSelection(
     return;
   }
 
+  if (key === "Tab" && !reverse && requestTableExpansion(commitEdit, finishOptions)) return;
+
   moveSelection(
     key === "Tab" ? { columns: reverse ? -1 : 1 } : { rows: reverse ? -1 : 1 },
     commitEdit,
     false,
     finishOptions,
   );
+}
+
+function requestTableExpansion(commitEdit: boolean, finishOptions: CellEditFinishOptions): boolean {
+  const address = activeCell.value;
+  const table = (props.sheet.tables ?? []).find(
+    (entry) =>
+      address.row >= entry.range.start.row &&
+      address.row <= entry.range.end.row &&
+      address.column >= entry.range.start.column &&
+      address.column <= entry.range.end.column,
+  );
+  if (!table) return false;
+  const lastDataRow = table.range.end.row - (table.totalRow ? 1 : 0);
+  if (address.row !== lastDataRow || address.column !== table.range.end.column) return false;
+  if (commitEdit && !finishEdit(undefined, true, finishOptions)) return true;
+  const range = {
+    start: { ...table.range.start },
+    end: { ...table.range.end, row: table.range.end.row + 1 },
+  };
+  const next = { row: lastDataRow + 1, column: table.range.start.column };
+  emit("tableExpandRequest", { tableId: table.id, range, next });
+  const expanded = (props.sheet.tables ?? []).some(
+    (entry) => entry.id === table.id && entry.range.end.row >= range.end.row,
+  );
+  if (expanded) setActiveCell(next);
+  return true;
 }
 
 function onEditorKeydown(event: KeyboardEvent): void {
@@ -2464,6 +2518,7 @@ defineExpose({
       :frame="renderFrame"
       :filter-range="sheet.filter?.advanced ? undefined : sheet.filter?.range"
       :filtered-columns="sheet.filter?.columns.map((entry) => entry.column)"
+      :table-filters="tableFilters"
       :active-cell="activeCell"
       :validation-info="validationInfo"
       :suppress-validation-prompt="!!inputError"

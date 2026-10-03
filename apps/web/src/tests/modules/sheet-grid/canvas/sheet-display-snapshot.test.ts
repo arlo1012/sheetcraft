@@ -1,6 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
 import { reactive } from "vue";
 import { createSheet, createSheetEvaluator, setCellContent } from "@idea10/core/workbook";
+import type { SheetTable } from "@idea10/core/workbook";
+import { createBuiltinTableStyles } from "@idea10/core/table-styles";
 import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
 import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
@@ -39,6 +41,51 @@ function paintScene(display: ReturnType<typeof createSheetDisplaySnapshot>, scro
 }
 
 describe("Sheet display snapshot", () => {
+  test("layers table styles, direct cell formatting and conditional formatting in order", () => {
+    const sheet = createSheet("Table", "table");
+    const table: SheetTable = {
+      id: "sales",
+      name: "Sales",
+      range: { start: { row: 0, column: 0 }, end: { row: 3, column: 1 } },
+      columns: [
+        { id: "region", name: "Region" },
+        { id: "amount", name: "Amount" },
+      ],
+      style: createBuiltinTableStyles()[1]!,
+      headerRow: true,
+      totalRow: false,
+      firstColumn: false,
+      lastColumn: false,
+      bandedRows: true,
+      bandedColumns: false,
+      filterButton: true,
+      filter: null,
+    };
+    sheet.tables = [table];
+    sheet.cells.set("0:0", { content: { kind: "literal", value: "Region" } });
+    sheet.cells.set("1:0", {
+      content: { kind: "literal", value: 10 },
+      style: { fillColor: "#f79646" },
+    });
+    sheet.cells.set("2:0", {
+      content: { kind: "literal", value: 20 },
+      style: { fillColor: "#f79646" },
+    });
+    sheet.conditionalFormats = [
+      {
+        id: "high",
+        ranges: [{ start: { row: 2, column: 0 }, end: { row: 2, column: 0 } }],
+        anchor: { row: 2, column: 0 },
+        condition: { kind: "cellValue", operator: "greaterThan", value: 15 },
+        style: { fillColor: "#c0504d" },
+      },
+    ];
+    const display = createSheetDisplaySnapshot({ sheet, evaluator: createSheetEvaluator(sheet) });
+    expect(display.getCellStyle({ row: 0, column: 0 })?.fillColor).toBe("#4f81bd");
+    expect(display.getCellStyle({ row: 1, column: 0 })?.fillColor).toBe("#f79646");
+    expect(display.getCellStyle({ row: 2, column: 0 })?.fillColor).toBe("#c0504d");
+    expect(sheet.cells.get("0:0")?.style).toBeUndefined();
+  });
   test("evaluates document formulas once and does not rescan them for viewport scenes", () => {
     const sheet = createSheet("Snapshot", "snapshot");
     for (let row = 80; row < 100; row += 1) {

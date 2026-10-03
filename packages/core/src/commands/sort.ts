@@ -66,7 +66,10 @@ function rangesIntersect(left: CellRange, right: CellRange): boolean {
 
 function getFilterDataRange(filter: SheetFilter): CellRange {
   return {
-    start: { row: filter.range.start.row + 1, column: filter.range.start.column },
+    start: {
+      row: filter.range.start.row + 1,
+      column: filter.range.start.column,
+    },
     end: { ...filter.range.end },
   };
 }
@@ -203,6 +206,10 @@ export function getSortCellColor(
   return getCellColor(sheet, address, colorTarget(sortOn));
 }
 
+/**
+ * Creates one reusable effective-style resolver for color-sort discovery and execution.
+ * The layer order matches the sheet display: table, direct, duplicate highlight, conditional format.
+ */
 export function createSortCellColorResolver(
   sheet: ReturnType<typeof getSheetOrThrow>,
   evaluator = createSheetEvaluator(sheet),
@@ -453,7 +460,13 @@ export function createSortSheetRangeCommand(
 ): SortSheetRangeCommand {
   const normalized = normalizeRange(range);
   assertCellRange(normalized);
-  return { type: "sortSheetRange", sheetId, range: cloneRange(normalized), keyColumn, direction };
+  return {
+    type: "sortSheetRange",
+    sheetId,
+    range: cloneRange(normalized),
+    keyColumn,
+    direction,
+  };
 }
 
 /** Creates a stable, multi-column sort while retaining the legacy single-key factory. */
@@ -461,7 +474,11 @@ export function createMultiKeySortSheetRangeCommand(
   sheetId: string,
   range: CellRange,
   sortKeys: readonly SortKey[],
-  options?: { hasHeader?: boolean; caseSensitive?: boolean; sortMethod?: SortMethod },
+  options?: {
+    hasHeader?: boolean;
+    caseSensitive?: boolean;
+    sortMethod?: SortMethod;
+  },
 ): SortSheetRangeCommand {
   const normalized = normalizeRange(range);
   assertCellRange(normalized);
@@ -503,10 +520,10 @@ export function applySortSheetRangeCommand(
   if (dataStart >= range.end.row + 1) return null;
   const sortableRange = { ...range, start: { ...range.start, row: dataStart } };
   const evaluator = createWorkbookEvaluator(workbook, sheet.id);
-  const resolveSortIcon = createSortCellIconResolver(sheet, evaluator, {
+  const resolveSortColor = createSortCellColorResolver(sheet, evaluator, {
     dateSystem: workbook.dateSystem,
   });
-  const resolveSortColor = createSortCellColorResolver(sheet, evaluator, {
+  const resolveSortIcon = createSortCellIconResolver(sheet, evaluator, {
     dateSystem: workbook.dateSystem,
   });
   const sortedRows = Array.from(
@@ -568,7 +585,9 @@ export function applySortSheetRangeCommand(
       address,
       ...(cell.content === undefined
         ? {}
-        : { content: getTranslatedContent(cell.content, cell.address, address) }),
+        : {
+            content: getTranslatedContent(cell.content, cell.address, address),
+          }),
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
     });
     affected.set(getCellBorderTargetKey(cell.address), cell.address);

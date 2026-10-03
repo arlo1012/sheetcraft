@@ -2,12 +2,22 @@ import { createFormulaError } from "../formula/types.js";
 import {
   getSheetFilterValue,
   getSheetFilterValueKey,
+  getSheetFilterCellValue,
+  getSheetFilterMergedRange,
+  createSheetFilterMergedRows,
+  getSheetFilterMergedRowBlocks,
+  hasSheetFilterMergedCells,
   createSheetFilterColumnMatcher,
   doesSheetFilterColumnMatch,
 } from "../filter-values.js";
 export {
   getSheetFilterValue,
   getSheetFilterValueKey,
+  getSheetFilterCellValue,
+  getSheetFilterMergedRange,
+  createSheetFilterMergedRows,
+  getSheetFilterMergedRowBlocks,
+  hasSheetFilterMergedCells,
   createSheetFilterColumnMatcher,
   doesSheetFilterColumnMatch,
 } from "../filter-values.js";
@@ -16,6 +26,7 @@ import {
   createSheetSparseState,
   replaceSheetSparseState,
   type CellAddress,
+  type CellRange,
   type Sheet,
   type SheetEvaluator,
   type SheetFilter,
@@ -29,9 +40,18 @@ import {
   getSheetOrThrow,
   normalizeRange,
   validateCommandPayload,
+  invalidCommandPayload,
 } from "./helpers.js";
 
 export type HiddenRowInterval = { start: number; end: number };
+
+/** Includes the worksheet filter and every table-owned filter. */
+export function getSheetFilters(sheet: Sheet): SheetFilter[] {
+  return [
+    ...(sheet.filter ? [sheet.filter] : []),
+    ...(sheet.tables ?? []).flatMap((table) => (table.filter ? [table.filter] : [])),
+  ];
+}
 
 function cloneFilter(filter: SheetFilter): SheetFilter {
   return {
@@ -41,6 +61,7 @@ function cloneFilter(filter: SheetFilter): SheetFilter {
       allowedValues: column.allowedValues.map((value) => ({ ...value })),
       ...(column.condition ? { condition: cloneFilterCondition(column.condition) } : {}),
     })),
+    ...(filter.allowMergedCells === undefined ? {} : { allowMergedCells: filter.allowMergedCells }),
     ...(filter.advanced
       ? {
           advanced: {
@@ -109,17 +130,25 @@ export function getSheetFilterColumnValueCounts(
   filterRange: SheetFilter["range"],
   column: number,
   evaluator: SheetEvaluator = createSheetEvaluator(sheet),
+  options?: { allowMergedCells?: boolean },
 ): Array<{ value: SheetFilterValue; count: number; address?: CellAddress }> {
   const range = normalizeRange(filterRange);
   assertCellRange(range);
   if (!Number.isInteger(column) || column < range.start.column || column > range.end.column)
     throw new RangeError("Filter column is outside the filter range.");
-  const active = sheet.filter;
+  const active = getSheetFilters(sheet).find(
+    (filter) =>
+      filter.range.start.row === range.start.row &&
+      filter.range.end.row === range.end.row &&
+      filter.range.start.column === range.start.column &&
+      filter.range.end.column === range.end.column,
+  );
   const sameFilterRange =
     active?.range.start.row === range.start.row &&
     active.range.end.row === range.end.row &&
     active.range.start.column === range.start.column &&
     active.range.end.column === range.end.column;
+  const allowMergedCells = options?.allowMergedCells ?? active?.allowMergedCells ?? false;
   const otherColumns = sameFilterRange
     ? active.columns.filter((entry) => entry.column !== column)
     : [];
@@ -148,12 +177,41 @@ export function getSheetFilterColumnValueCounts(
   const matchesOtherByColumn = otherColumns.map((entry) =>
     createSheetFilterColumnMatcher(
       sheet,
-      active ?? { range, columns: otherColumns },
+      active ?? { range, columns: otherColumns, allowMergedCells },
       entry,
       evaluator.getComputedValue,
     ),
   );
-  const matchesOther = (row: number) => matchesOtherByColumn.every((matches) => matches(row));
+  const matchesOther = (row: number, mergedRows?: ReadonlyMap<number, readonly CellRange[]>) =>
+    matchesOtherByColumn.every((matches) => matches(row, mergedRows));
+  if (allowMergedCells && hasSheetFilterMergedCells(sheet, range, relevant)) {
+    const mergedRows = createSheetFilterMergedRows(sheet, range, relevant);
+    const blocks = getSheetFilterMergedRowBlocks(sheet, range, relevant);
+    const matchesOtherByRow = new Map<number, boolean>();
+    for (const block of blocks) {
+      let matches = true;
+      for (let blockRow = block.start; blockRow <= block.end; blockRow += 1)
+        if (!matchesOther(blockRow, mergedRows)) matches = false;
+      for (let blockRow = block.start; blockRow <= block.end; blockRow += 1)
+        matchesOtherByRow.set(blockRow, matches);
+    }
+    const handledMerges = new Set<CellRange>();
+    for (let row = range.start.row + 1; row <= range.end.row; row += 1) {
+      const address = { row, column };
+      const merged = getSheetFilterMergedRange(sheet, address, true, mergedRows);
+      if (merged) {
+        if (handledMerges.has(merged)) continue;
+        handledMerges.add(merged);
+      }
+      if (matchesOtherByRow.get(row) ?? matchesOther(row, mergedRows))
+        add(
+          getSheetFilterCellValue(sheet, address, evaluator.getComputedValue, true, mergedRows),
+          1,
+          merged ? { ...merged.start } : address,
+        );
+    }
+    return [...entries.values()].sort((left, right) => compareCountValues(left.value, right.value));
+  }
   for (const row of rows)
     if (matchesOther(row)) {
       const address = { row, column };
@@ -174,6 +232,7 @@ export function getSheetFilterColumnDistinctValues(
   filterRange: SheetFilter["range"],
   column: number,
   evaluator?: SheetEvaluator,
+  options?: { allowMergedCells?: boolean },
 ): SheetFilterValue[] {
   const range = normalizeRange(filterRange);
   assertCellRange(range);
@@ -183,6 +242,36 @@ export function getSheetFilterColumnDistinctValues(
   assertCellAddress({ row: range.start.row, column });
   if (column < range.start.column || column > range.end.column) {
     throw new RangeError("Filter column is outside the filter range.");
+  }
+  const active = getSheetFilters(sheet).find(
+    (filter) =>
+      filter.range.start.row === range.start.row &&
+      filter.range.end.row === range.end.row &&
+      filter.range.start.column === range.start.column &&
+      filter.range.end.column === range.end.column,
+  );
+  const allowMergedCells = options?.allowMergedCells ?? active?.allowMergedCells ?? false;
+  if (allowMergedCells && hasSheetFilterMergedCells(sheet, range, [column])) {
+    const mergedRows = createSheetFilterMergedRows(sheet, range, [column]);
+    const values = new Map<string, SheetFilterValue>();
+    const handledMerges = new Set<CellRange>();
+    for (let row = range.start.row + 1; row <= range.end.row; row += 1) {
+      const address = { row, column };
+      const merged = getSheetFilterMergedRange(sheet, address, true, mergedRows);
+      if (merged) {
+        if (handledMerges.has(merged)) continue;
+        handledMerges.add(merged);
+      }
+      const value = getSheetFilterCellValue(
+        sheet,
+        address,
+        (target) => (evaluator ??= createSheetEvaluator(sheet)).getComputedValue(target),
+        true,
+        mergedRows,
+      );
+      values.set(getSheetFilterValueKey(value), value);
+    }
+    return [...values.values()].sort(compareFilterValues);
   }
   const values = new Map<string, SheetFilterValue>();
   const occupiedRows = new Set<number>();
@@ -230,11 +319,12 @@ function doesRowMatchFilter(
   filter: SheetFilter,
   row: number,
   evaluator: SheetEvaluator,
+  mergedRows?: ReadonlyMap<number, readonly CellRange[]>,
   matchers = filter.columns.map((column) =>
     createSheetFilterColumnMatcher(sheet, filter, column, evaluator.getComputedValue),
   ),
 ): boolean {
-  return matchers.every((matches) => matches(row));
+  return matchers.every((matches) => matches(row, mergedRows));
 }
 
 /**
@@ -245,8 +335,24 @@ export function createSheetFilterHiddenRowIntervals(
   sheet: Sheet,
   evaluator: SheetEvaluator = createSheetEvaluator(sheet),
 ): HiddenRowInterval[] {
-  const filter = sheet.filter;
-  if (!filter) return [];
+  const filters = getSheetFilters(sheet);
+  if (!filters.length) return [];
+  const hidden = new Set<number>();
+  for (const filter of filters) {
+    for (const interval of createFilterHiddenRowIntervals(sheet, filter, evaluator))
+      for (let row = interval.start; row <= interval.end; row += 1) hidden.add(row);
+  }
+  const rows = [...hidden].sort((left, right) => left - right);
+  const intervals: HiddenRowInterval[] = [];
+  for (const row of rows) addHiddenInterval(intervals, row, row);
+  return intervals;
+}
+
+function createFilterHiddenRowIntervals(
+  sheet: Sheet,
+  filter: SheetFilter,
+  evaluator: SheetEvaluator,
+): HiddenRowInterval[] {
   if (filter.advanced) return filter.advanced.hiddenRows.map((interval) => ({ ...interval }));
   if (filter.columns.length === 0) return [];
   const dataStart = filter.range.start.row + 1;
@@ -254,10 +360,45 @@ export function createSheetFilterHiddenRowIntervals(
   if (filter.columns.some((column) => column.allowedValues.length === 0 && !column.condition)) {
     return [{ start: dataStart, end: dataEnd }];
   }
+  if (
+    filter.allowMergedCells &&
+    hasSheetFilterMergedCells(
+      sheet,
+      filter.range,
+      filter.columns.map((column) => column.column),
+    )
+  ) {
+    const mergedRows = createSheetFilterMergedRows(
+      sheet,
+      filter.range,
+      filter.columns.map((column) => column.column),
+    );
+    const blocks = getSheetFilterMergedRowBlocks(
+      sheet,
+      filter.range,
+      filter.columns.map((column) => column.column),
+    );
+    const matchers = filter.columns.map((column) =>
+      createSheetFilterColumnMatcher(sheet, filter, column, evaluator.getComputedValue),
+    );
+    const hidden: HiddenRowInterval[] = [];
+    let blockIndex = 0;
+    for (let row = dataStart; row <= dataEnd; row += 1) {
+      const block = blocks[blockIndex];
+      if (block && row === block.start) {
+        let matches = true;
+        for (let blockRow = block.start; blockRow <= block.end; blockRow += 1)
+          matches =
+            doesRowMatchFilter(sheet, filter, blockRow, evaluator, mergedRows, matchers) && matches;
+        if (!matches) addHiddenInterval(hidden, block.start, block.end);
+        row = block.end;
+        blockIndex += 1;
+      } else if (!doesRowMatchFilter(sheet, filter, row, evaluator, mergedRows, matchers))
+        addHiddenInterval(hidden, row, row);
+    }
+    return hidden;
+  }
   const columnSet = new Set(filter.columns.map((column) => column.column));
-  const matchers = filter.columns.map((column) =>
-    createSheetFilterColumnMatcher(sheet, filter, column, evaluator.getComputedValue),
-  );
   const candidateRows = new Set<number>();
   for (const key of sheet.cells.keys()) {
     const address = parseCellKey(key);
@@ -265,6 +406,9 @@ export function createSheetFilterHiddenRowIntervals(
       candidateRows.add(address.row);
     }
   }
+  const matchers = filter.columns.map((column) =>
+    createSheetFilterColumnMatcher(sheet, filter, column, evaluator.getComputedValue),
+  );
   const blankRowMatches = filter.columns.every((column) =>
     doesSheetFilterColumnMatch(column, { kind: "blank" }),
   );
@@ -272,7 +416,7 @@ export function createSheetFilterHiddenRowIntervals(
   let cursor = dataStart;
   for (const row of [...candidateRows].sort((left, right) => left - right)) {
     if (!blankRowMatches) addHiddenInterval(hidden, cursor, row - 1);
-    if (!doesRowMatchFilter(sheet, filter, row, evaluator, matchers))
+    if (!doesRowMatchFilter(sheet, filter, row, evaluator, undefined, matchers))
       addHiddenInterval(hidden, row, row);
     cursor = row + 1;
   }
@@ -295,8 +439,15 @@ export function createSetSheetFilterCriteriaCommand(
   sheetId: string,
   range: SheetFilter["range"],
   columns: SheetFilter["columns"],
+  options?: { allowMergedCells?: boolean },
 ): SetSheetFilterCommand {
-  return createSetSheetFilterCommand(sheetId, { range, columns });
+  return createSetSheetFilterCommand(sheetId, {
+    range,
+    columns,
+    ...(options?.allowMergedCells === undefined
+      ? {}
+      : { allowMergedCells: options.allowMergedCells }),
+  });
 }
 
 export function createClearSheetFilterCommand(sheetId: string): SetSheetFilterCommand {
@@ -311,8 +462,41 @@ export function applySetSheetFilterCommand(
   const filter = validateCommandPayload("filter", command.filter, () =>
     command.filter === null ? null : cloneFilter(command.filter),
   );
+  if (
+    filter &&
+    filter.allowMergedCells === false &&
+    filter.columns.some((column) =>
+      sheet.mergedCells.some(
+        (merged) =>
+          merged.end.row >= filter.range.start.row + 1 &&
+          merged.start.row <= filter.range.end.row &&
+          column.column >= merged.start.column &&
+          column.column <= merged.end.column,
+      ),
+    )
+  )
+    throw invalidCommandPayload(
+      "filter",
+      command.filter,
+      "Filtering a column containing merged cells requires allowMergedCells.",
+    );
   const previous = createSheetSparseState(sheet);
-  const state = { ...previous, filter };
+  const tableIndex = (sheet.tables ?? []).findIndex(
+    (table) =>
+      table.range.start.row === filter?.range.start.row &&
+      table.range.end.row - (table.totalRow ? 1 : 0) === filter?.range.end.row &&
+      table.range.start.column === filter?.range.start.column &&
+      table.range.end.column === filter?.range.end.column,
+  );
+  const state =
+    tableIndex < 0
+      ? { ...previous, filter }
+      : {
+          ...previous,
+          tables: (previous.tables ?? []).map((table, index) =>
+            index === tableIndex ? { ...table, filter } : table,
+          ),
+        };
   return validateCommandPayload("filter", command.filter, () =>
     replaceSheetSparseState(sheet, state),
   )

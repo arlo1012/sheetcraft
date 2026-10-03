@@ -103,7 +103,8 @@ export function createCellPresentationCache(measurer: TextMeasurer) {
       source?.content?.kind === "formula" ||
       spill ||
       options.display.sheet.duplicateRules?.length ||
-      options.display.sheet.conditionalFormats?.length
+      options.display.sheet.conditionalFormats?.length ||
+      options.display.sheet.tables?.length
         ? options.display
         : undefined;
     const cached = contents.get(key);

@@ -274,9 +274,19 @@
   visibility: hidden;
 }
 
+.idea-action-icon {
+  width: var(--idea-action-icon-size);
+  height: var(--idea-action-icon-size);
+  stroke-width: var(--idea-icon-stroke-width);
+}
+
+.idea-control-icon,
 .idea-input-action-icon {
   width: var(--idea-control-icon-size);
   height: var(--idea-control-icon-size);
+}
+
+.idea-input-action-icon {
   cursor: pointer;
 
   &[aria-disabled="true"] {

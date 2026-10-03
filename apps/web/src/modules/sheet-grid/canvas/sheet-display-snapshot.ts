@@ -5,7 +5,8 @@ import {
   createConditionalFormatVisualResolver,
 } from "@idea10/core/conditional-formatting";
 import type { ConditionalFormatVisual } from "@idea10/core/conditional-formatting";
-import type { CellStyle } from "@idea10/core/style";
+import { mergeCellStyle, type CellStyle } from "@idea10/core/style";
+import { getTableAtAddress, resolveTableCellStyle } from "@idea10/core/table-styles";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import { computed, type ComputedRef } from "vue";
 import type { CellAddress, Sheet, SheetEvaluator } from "@idea10/core/workbook";
@@ -89,11 +90,15 @@ export function createSheetDisplaySnapshot(options: {
   function getCellStyle(address: CellAddress): Readonly<CellStyle> | undefined {
     const key = addressKey(address);
     if (styles.has(key)) return styles.get(key);
-    const base =
+    const direct =
       options.sheet.cells.get(key)?.style ??
       (spills.get(key)
         ? options.sheet.cells.get(addressKey(spills.get(key)!.root))?.style
         : undefined);
+    const table = getTableAtAddress(options.sheet, address);
+    const base = table
+      ? mergeCellStyle(resolveTableCellStyle(table, address), direct ?? {})
+      : direct;
     const highlight = resolveHighlight(address);
     let style = base;
     if (highlight) {
@@ -153,6 +158,7 @@ function trackSheetDisplayDocument(sheet: Sheet): void {
   void sheet.floatingImages;
   void sheet.duplicateRules;
   void sheet.conditionalFormats;
+  void sheet.tables;
 }
 
 export function useSheetDisplaySnapshot(options: {

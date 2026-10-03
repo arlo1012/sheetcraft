@@ -11,6 +11,7 @@ const props = defineProps<{ visible: boolean; initial?: RankCondition; disabled?
 const emit = defineEmits<{ close: []; apply: [condition: RankCondition] }>();
 const { t } = useAppI18n();
 const root = ref<HTMLElement | null>(null);
+const popupProps = { attach: () => root.value ?? document.body };
 const bottom = ref(false);
 const percent = ref(false);
 const count = ref<number | undefined>(10);
@@ -63,7 +64,7 @@ function apply(): void {
           { value: true, label: t('dataTools.filter.bottom') },
         ]"
         :disabled="disabled"
-        :popup-props="{ attach: () => root ?? document.body }"
+        :popup-props="popupProps"
         :aria-label="t('dataTools.filter.rankDirection')"
       />
       <TInputNumber
@@ -83,7 +84,7 @@ function apply(): void {
           { value: true, label: t('dataTools.filter.percent') },
         ]"
         :disabled="disabled"
-        :popup-props="{ attach: () => root ?? document.body }"
+        :popup-props="popupProps"
         :aria-label="t('dataTools.filter.rankUnit')"
       />
     </div>

@@ -53,6 +53,7 @@ export function getSheetContentExtent(sheet: Sheet): GridExtent {
     include(range.end);
   }
   if (sheet.filter) include(sheet.filter.range.end);
+  for (const table of sheet.tables ?? []) include(table.range.end);
   if (sheet.floatingImages.length > 0) {
     const geometry = createSheetGeometry({
       rowHeights: sheet.rowHeights,

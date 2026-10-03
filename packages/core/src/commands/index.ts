@@ -16,6 +16,7 @@ export * from "./sheets.js";
 export * from "./structure.js";
 export * from "./sort.js";
 export * from "./values.js";
+export * from "../tables.js";
 export * from "./validation.js";
 export * from "./outline.js";
 export * from "./data-transforms.js";

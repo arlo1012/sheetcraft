@@ -90,6 +90,30 @@ export type FormulaRangeBounds = {
   end: FormulaAddress;
 };
 
+export type StructuredReferenceScope = "data" | "all" | "headers" | "totals" | "this-row";
+
+/** A parsed Excel table reference. Offsets point at the original formula source. */
+export type StructuredFormulaReference = {
+  /** Omitted for an implicit current-table reference such as `[@Amount]`. */
+  tableName?: string;
+  tableNameStart?: number;
+  tableNameEnd?: number;
+  scope: StructuredReferenceScope;
+  columns: Array<{ name: string; start: number; end: number }>;
+  start: number;
+  end: number;
+};
+
+export type FormulaStructuredReferenceResolution = {
+  value: FormulaRuntimeValue;
+  range?: {
+    bounds: FormulaRangeBounds & { sheetName?: string };
+    values: Iterable<FormulaValue>;
+    entries?: Iterable<import("./functions/contracts.js").FormulaRangeEntry>;
+    getValue?: (row: number, column: number) => FormulaValue;
+  };
+};
+
 export type FormulaExpression =
   | { kind: "number"; value: number; start: number; end: number }
   | { kind: "string"; value: string; start: number; end: number }
@@ -106,6 +130,12 @@ export type FormulaExpression =
     }
   | { kind: "range"; range: FormulaRange; start: number; end: number }
   | { kind: "axis-range"; range: FormulaAxisRange; start: number; end: number }
+  | {
+      kind: "structured-reference";
+      reference: StructuredFormulaReference;
+      start: number;
+      end: number;
+    }
   | { kind: "array"; rows: FormulaExpression[][]; start: number; end: number }
   | { kind: "error"; code: FormulaErrorCode; start: number; end: number }
   | { kind: "identifier"; name: string; start: number; end: number }
@@ -162,6 +192,10 @@ export type FormulaEvaluationResolver = {
   resolveName?: (
     name: string,
   ) => FormulaValue | (FormulaRangeBounds & { sheetName?: string }) | undefined;
+  resolveStructuredReference?: (
+    reference: StructuredFormulaReference,
+    address?: FormulaAddress,
+  ) => FormulaStructuredReferenceResolution | undefined;
 };
 
 export type FormulaAxis = "row" | "column";

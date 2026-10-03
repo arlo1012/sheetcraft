@@ -26,8 +26,102 @@ import {
   setSheetDimensionHidden,
   setDefaultColumnWidth,
 } from "../../workbook.js";
+import { createBuiltinTableStyles } from "../../table-styles.js";
 
 describe("workbook snapshots", () => {
+  test("copies a proxied table-style library into a plain independent snapshot", () => {
+    const workbook = createWorkbook({ id: "workbook", sheetId: "sheet" });
+    const style = createBuiltinTableStyles()[1]!;
+    const proxied = new Proxy({ ...style, elements: new Proxy(style.elements, {}) }, {});
+    workbook.tableStyles = [proxied];
+    const pivot = new Proxy(
+      {
+        id: "pivot",
+        name: "Pivot",
+        category: "custom" as const,
+        elements: { wholeTable: { style: { bold: true } } },
+      },
+      {},
+    );
+    workbook.pivotTableStyles = [pivot];
+    const snapshot = serializeWorkbook(workbook);
+    expect(snapshot.tableStyles?.[0]).toEqual(style);
+    expect(snapshot.tableStyles?.[0]).not.toBe(proxied);
+    expect(snapshot.tableStyles?.[0]?.elements).not.toBe(proxied.elements);
+    expect(snapshot.pivotTableStyles?.[0]).toEqual(pivot);
+    expect(snapshot.pivotTableStyles?.[0]).not.toBe(pivot);
+    const clone = (globalThis as unknown as { structuredClone(value: unknown): unknown })
+      .structuredClone;
+    expect(() => clone(snapshot)).not.toThrow();
+  });
+
+  test("rejects malformed workbook table-style libraries", () => {
+    const snapshot = serializeWorkbook(createWorkbook({ id: "workbook", sheetId: "sheet" }));
+    const invalid = {
+      ...snapshot,
+      tableStyles: [
+        { id: "custom", name: "Custom", category: "custom", elements: { unknown: { style: {} } } },
+      ],
+    };
+
+    expect(() => deserializeWorkbook(invalid)).toThrow(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          code: "invalid_snapshot",
+          details: expect.objectContaining({ path: "$.tableStyles[0]" }),
+        }),
+      }),
+    );
+  });
+
+  test("rejects malformed table metadata at the sheet-state boundary", () => {
+    const snapshot = serializeWorkbook(createWorkbook({ id: "workbook", sheetId: "sheet" }));
+    const style = createBuiltinTableStyles()[0]!;
+    const table = {
+      id: "table-1",
+      name: "SalesTable",
+      range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      columns: [{ id: "amount", name: "Amount" }],
+      style,
+      headerRow: true,
+      totalRow: false,
+      firstColumn: false,
+      lastColumn: false,
+      bandedRows: true,
+      bandedColumns: false,
+      filterButton: true,
+      filter: null,
+    };
+    for (const malformed of [
+      {
+        ...table,
+        columns: [
+          { id: "amount", name: "Amount" },
+          { id: "amount", name: "Amount" },
+        ],
+      },
+      { ...table, style: { ...style, category: "unknown" } },
+      {
+        ...table,
+        filter: {
+          range: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+          columns: [],
+        },
+      },
+      { ...table, headerRow: "true" },
+    ]) {
+      const invalid = JSON.parse(JSON.stringify(snapshot)) as unknown as {
+        sheets: Array<{ tables?: unknown }>;
+      };
+      invalid.sheets[0]!.tables = [malformed];
+      expect(() => deserializeWorkbook(invalid)).toThrow(
+        expect.objectContaining({
+          data: expect.objectContaining({ code: "invalid_snapshot" }),
+        }),
+      );
+    }
+  });
+
   test("round trips hidden axes and a sparse default column width", () => {
     const sheet = createSheet("Dimensions", "dimensions");
     setRowHeight(sheet, 2, 40);
@@ -344,7 +438,7 @@ describe("workbook snapshots", () => {
       { kind: "formula", formula: { source: "=SUM(" } },
     );
     const snapshot = serializeWorkbook(migrated);
-    expect(snapshot.version).toBe(12);
+    expect(snapshot.version).toBe(13);
     expect(snapshot.dateSystem).toBe("1900");
     expect(snapshot.sheets[0]?.cells).toContainEqual({
       address: { row: 0, column: 1 },
@@ -457,9 +551,9 @@ describe("workbook snapshots", () => {
   });
 
   test("rejects unknown snapshot versions with a stable error code", () => {
-    expect(() => deserializeWorkbook({ version: 13 })).toThrowError(
+    expect(() => deserializeWorkbook({ version: 14 })).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
-        data: { code: "unsupported_snapshot_version", details: { version: 13 } },
+        data: { code: "unsupported_snapshot_version", details: { version: 14 } },
       }),
     );
   });

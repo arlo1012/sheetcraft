@@ -3,6 +3,7 @@ import {
   MAX_SHEET_ROWS,
   cloneCellContent,
   cloneFloatingImage,
+  cloneSheetTable,
   createCellKey,
   createSheetSparseState,
   getSheetMetadata,
@@ -14,6 +15,7 @@ import {
   type SheetDimensionAxis,
   type SheetFilter,
   type SheetMetadata,
+  type SheetTable,
   type SheetSparseCell,
   type SheetSparseState,
   type Workbook,
@@ -519,6 +521,7 @@ function transformFilterForAxis(
   return {
     range,
     columns,
+    ...(filter.allowMergedCells === undefined ? {} : { allowMergedCells: filter.allowMergedCells }),
     ...(filter.advanced
       ? {
           advanced: {
@@ -549,6 +552,33 @@ function transformSheetMetadataForAxis(
   maximum: number,
   operation: "insert" | "delete",
 ): SheetMetadata {
+  const transformTableColumns = (table: SheetTable) => {
+    if (axis !== "column") return table.columns.map((column) => ({ ...column }));
+    const columns = table.columns.map((column) => ({ ...column }));
+    if (
+      operation === "insert" &&
+      index > table.range.start.column &&
+      index <= table.range.end.column
+    ) {
+      const at = index - table.range.start.column;
+      const used = new Set(columns.map((column) => column.name.toLowerCase()));
+      const added = Array.from({ length: count }, (_, offset) => {
+        const base = `Column${columns.length + offset + 1}`;
+        let name = base;
+        let suffix = 2;
+        while (used.has(name.toLowerCase())) name = `${base}${suffix++}`;
+        used.add(name.toLowerCase());
+        return { id: `${table.id}-column-${index + offset}`, name };
+      });
+      columns.splice(at, 0, ...added);
+    }
+    if (operation === "delete") {
+      const first = Math.max(index, table.range.start.column);
+      const last = Math.min(index + count - 1, table.range.end.column);
+      if (first <= last) columns.splice(first - table.range.start.column, last - first + 1);
+    }
+    return columns;
+  };
   const transformValidationFormula = (source: string | undefined) =>
     source === undefined
       ? undefined
@@ -653,6 +683,12 @@ function transformSheetMetadataForAxis(
       maximum,
       operation,
     ),
+    tables: (metadata.tables ?? []).flatMap((table) => {
+      const range = transformRangeForAxis(table.range, axis, index, count, maximum, operation);
+      if (!range) return [];
+      const filter = transformFilterForAxis(table.filter, axis, index, count, maximum, operation);
+      return [{ ...cloneSheetTable(table), range, columns: transformTableColumns(table), filter }];
+    }),
   };
 }
 
@@ -1475,6 +1511,16 @@ function transformSheetMetadataForAxisMove(
         }),
       );
       return cloneConditionalFormatRule({ ...transformedRule, ranges, anchor });
+    }),
+    tables: (metadata.tables ?? []).map((table) => {
+      const range = moveRange(table.range);
+      if (!range)
+        throw invalidCommandPayload(
+          "axis",
+          axis,
+          "Moving this row or column band would split a table.",
+        );
+      return { ...cloneSheetTable(table), range };
     }),
   };
 }

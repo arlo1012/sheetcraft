@@ -4,6 +4,7 @@ import { cloneConditionalFormatRule } from "../conditional-formatting.js";
 import {
   cloneCellContent,
   cloneFloatingImage,
+  cloneSheetTable,
   isCellAddressInBounds,
   type CellAddress,
   type CellRange,
@@ -130,6 +131,9 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
             allowedValues: column.allowedValues.map((value) => ({ ...value })),
             ...(column.condition ? { condition: { ...column.condition } } : {}),
           })),
+          ...(state.filter.allowMergedCells === undefined
+            ? {}
+            : { allowMergedCells: state.filter.allowMergedCells }),
           ...(state.filter.advanced
             ? {
                 advanced: {
@@ -190,6 +194,7 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
     ...(state.conditionalFormats
       ? { conditionalFormats: state.conditionalFormats.map(cloneConditionalFormatRule) }
       : {}),
+    ...(state.tables ? { tables: state.tables.map(cloneSheetTable) } : {}),
     floatingImages: state.floatingImages.map(cloneFloatingImage),
   };
 }

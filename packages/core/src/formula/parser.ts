@@ -7,6 +7,8 @@ import {
   type FormulaParseResult,
   type FormulaRange,
   type FormulaReference,
+  type StructuredFormulaReference,
+  type StructuredReferenceScope,
 } from "./types.js";
 import { parseA1FormulaReference } from "./reference-model.js";
 
@@ -254,7 +256,25 @@ class FormulaParser {
       return this.parseString();
     }
 
+    if (this.peek() === "[") {
+      const reference = this.parseStructuredReference(undefined, start);
+      return reference
+        ? { kind: "structured-reference", reference, start, end: reference.end }
+        : null;
+    }
+
     const identifierCandidate = IDENTIFIER_PATTERN.exec(remainder)?.[0];
+    if (identifierCandidate && this.source[this.offset + identifierCandidate.length] === "[") {
+      const tableNameStart = this.offset;
+      this.offset += identifierCandidate.length;
+      const reference = this.parseStructuredReference(
+        { name: identifierCandidate, start: tableNameStart, end: this.offset },
+        start,
+      );
+      return reference
+        ? { kind: "structured-reference", reference, start, end: reference.end }
+        : null;
+    }
     const isFunction = Boolean(
       identifierCandidate && /^\s*\(/.test(remainder.slice(identifierCandidate.length)),
     );
@@ -399,6 +419,162 @@ class FormulaParser {
     this.offset += text.length;
     return reference;
   }
+
+  private parseStructuredReference(
+    tableName: { name: string; start: number; end: number } | undefined,
+    start: number,
+  ): StructuredFormulaReference | null {
+    if (this.peek() !== "[") return null;
+    const bracketStart = this.offset;
+    let depth = 0;
+    while (!this.atEnd()) {
+      const character = this.peek()!;
+      if (character === "[") depth += 1;
+      if (character === "]") depth -= 1;
+      this.offset += 1;
+      if (depth === 0) break;
+      if (depth < 0) return null;
+    }
+    if (depth !== 0) return null;
+    const end = this.offset;
+    const bodyStart = bracketStart + 1;
+    const body = this.source.slice(bodyStart, end - 1);
+    const segments = splitStructuredReferenceSegments(body, bodyStart);
+    if (!segments?.length) return null;
+    let scope: StructuredReferenceScope = "data";
+    const columns: StructuredFormulaReference["columns"] = [];
+    for (const segment of segments) {
+      const selector = unwrapStructuredSegment(segment);
+      if (!selector) return null;
+      const normalized = selector.text.trim();
+      const implicitRow = normalized.startsWith("@");
+      const afterAt = implicitRow ? normalized.slice(1).trim() : normalized;
+      const afterAtOffset = implicitRow ? normalized.indexOf(afterAt, 1) : 0;
+      const nestedColumn = implicitRow
+        ? unwrapStructuredSegment({
+            text: afterAt,
+            start: selector.start + afterAtOffset,
+            end: selector.start + afterAtOffset + afterAt.length,
+          })
+        : null;
+      const leading = nestedColumn?.text ?? afterAt;
+      const scopeFor = structuredScope(leading);
+      if (scopeFor) {
+        if (scope !== "data" && scope !== scopeFor) return null;
+        scope = scopeFor;
+        continue;
+      }
+      const range = splitStructuredColumnRange(selector);
+      if (range) {
+        columns.push(...range);
+        continue;
+      }
+      if (!leading || leading.startsWith("#")) return null;
+      const position = nestedColumn?.start ?? selector.start + selector.text.indexOf(leading);
+      columns.push({ name: leading, start: position, end: position + leading.length });
+      if (implicitRow) scope = "this-row";
+    }
+    if (!columns.length && scope === "data") return null;
+    return {
+      ...(tableName
+        ? {
+            tableName: tableName.name,
+            tableNameStart: tableName.start,
+            tableNameEnd: tableName.end,
+          }
+        : {}),
+      scope,
+      columns,
+      start,
+      end,
+    };
+  }
+}
+
+type StructuredSegment = { text: string; start: number; end: number };
+
+function splitStructuredReferenceSegments(text: string, start: number): StructuredSegment[] | null {
+  const segments: StructuredSegment[] = [];
+  let depth = 0;
+  let segmentStart = 0;
+  for (let index = 0; index <= text.length; index += 1) {
+    const character = text[index];
+    if (character === "[") depth += 1;
+    else if (character === "]") depth -= 1;
+    if (depth < 0) return null;
+    if (index === text.length || (character === "," && depth === 0)) {
+      const raw = text.slice(segmentStart, index);
+      const trimStart = raw.search(/\S/);
+      const trimEnd = raw.trimEnd().length;
+      if (trimStart < 0) return null;
+      segments.push({
+        text: raw.slice(trimStart, trimEnd),
+        start: start + segmentStart + trimStart,
+        end: start + segmentStart + trimEnd,
+      });
+      segmentStart = index + 1;
+    }
+  }
+  return depth === 0 ? segments : null;
+}
+
+function unwrapStructuredSegment(segment: StructuredSegment): StructuredSegment | null {
+  if (!segment.text.startsWith("[") || !segment.text.endsWith("]")) return segment;
+  let depth = 0;
+  for (let index = 0; index < segment.text.length; index += 1) {
+    if (segment.text[index] === "[") depth += 1;
+    if (segment.text[index] === "]") depth -= 1;
+    if (depth === 0 && index !== segment.text.length - 1) return segment;
+  }
+  if (depth !== 0) return null;
+  const text = segment.text.slice(1, -1);
+  return { text, start: segment.start + 1, end: segment.end - 1 };
+}
+
+function structuredScope(value: string): StructuredReferenceScope | null {
+  switch (value.toLocaleLowerCase("en-US")) {
+    case "#all":
+      return "all";
+    case "#data":
+      return "data";
+    case "#headers":
+      return "headers";
+    case "#totals":
+      return "totals";
+    case "#this row":
+      return "this-row";
+    default:
+      return null;
+  }
+}
+
+function splitStructuredColumnRange(
+  segment: StructuredSegment,
+): StructuredFormulaReference["columns"] | null {
+  let depth = 0;
+  let separator = -1;
+  for (let index = 0; index < segment.text.length; index += 1) {
+    if (segment.text[index] === "[") depth += 1;
+    else if (segment.text[index] === "]") depth -= 1;
+    else if (segment.text[index] === ":" && depth === 0) separator = index;
+  }
+  if (separator < 0) return null;
+  const first = unwrapStructuredSegment({
+    text: segment.text.slice(0, separator).trim(),
+    start: segment.start,
+    end: segment.start + separator,
+  });
+  const secondRaw = segment.text.slice(separator + 1);
+  const second = unwrapStructuredSegment({
+    text: secondRaw.trim(),
+    start: segment.start + separator + 1 + (secondRaw.length - secondRaw.trimStart().length),
+    end: segment.end,
+  });
+  if (!first || !second || !first.text || !second.text) return null;
+  return [
+    { name: first.text, start: first.start, end: first.end },
+    { name: second.text, start: second.start, end: second.end },
+  ];
 }
 
 function isArrayConstantItem(expression: FormulaExpression): boolean {

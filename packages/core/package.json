@@ -79,6 +79,10 @@
       "types": "./dist/workbook.d.ts",
       "import": "./dist/workbook.js"
     },
+    "./table-styles": {
+      "types": "./dist/table-styles.d.ts",
+      "import": "./dist/table-styles.js"
+    },
     "./data-validation": {
       "types": "./dist/data-validation.d.ts",
       "import": "./dist/data-validation.js"
@@ -118,6 +122,10 @@
     "./go-to": {
       "types": "./dist/go-to.d.ts",
       "import": "./dist/go-to.js"
+    },
+    "./pivot-table-styles": {
+      "types": "./dist/pivot-table-styles.d.ts",
+      "import": "./dist/pivot-table-styles.js"
     }
   },
   "scripts": {

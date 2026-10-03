@@ -3,6 +3,8 @@ import { computed } from "vue";
 import type { CellMergeMode, CellValueConversionMode } from "@idea10/core/commands";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
+import type { TableStyleDefinition } from "@idea10/core/table-styles";
+import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
 import type { CellFormatTab } from "../../cell-format/components/CellFormatDialog.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
@@ -35,6 +37,11 @@ const props = withDefaults(
     formatPainterActive?: boolean;
     dataState?: HomeDataToolState;
     mergeState?: MergeCellsState;
+    tableStyles?: readonly TableStyleDefinition[];
+    pivotTableStyles?: readonly PivotTableStyleDefinition[];
+    selectedTableStyleId?: string;
+    selectedTableStyleColor?: string;
+    hasTable?: boolean;
   }>(),
   { conditionalFormattingDisabled: undefined },
 );
@@ -66,6 +73,13 @@ const emit = defineEmits<{
   createConditionalFormat: [kind: ConditionalFormatQuickRule];
   manageConditionalFormats: [];
   clearConditionalFormats: [scope: "selection" | "sheet"];
+  applyTableStyle: [style: TableStyleDefinition];
+  createTableStyle: [];
+  editTableStyle: [style: TableStyleDefinition];
+  createPivotTableStyle: [];
+  editPivotTableStyle: [style: PivotTableStyleDefinition];
+  clearTableStyle: [];
+  manageTable: [];
 }>();
 
 const { t } = useAppI18n();
@@ -144,9 +158,21 @@ function onKeydown(event: KeyboardEvent): void {
     <HomeStylesGroup
       :disabled="conditionalFormattingDisabled ?? disabled"
       :edit-session-id="editSessionId"
+      :table-styles="tableStyles"
+      :pivot-table-styles="pivotTableStyles"
+      :selected-table-style-id="selectedTableStyleId"
+      :selected-table-style-color="selectedTableStyleColor"
+      :has-table="hasTable"
       @create-conditional-format="emit('createConditionalFormat', $event)"
       @manage-conditional-formats="emit('manageConditionalFormats')"
       @clear-conditional-formats="emit('clearConditionalFormats', $event)"
+      @apply-table-style="emit('applyTableStyle', $event)"
+      @create-table-style="emit('createTableStyle')"
+      @edit-table-style="emit('editTableStyle', $event)"
+      @create-pivot-table-style="emit('createPivotTableStyle')"
+      @edit-pivot-table-style="emit('editPivotTableStyle', $event)"
+      @clear-table-style="emit('clearTableStyle')"
+      @manage-table="emit('manageTable')"
     />
     <HomeDataGroup
       :edit-session-id="editSessionId"

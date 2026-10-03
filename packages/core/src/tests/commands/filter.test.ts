@@ -9,7 +9,13 @@ import {
   tryApplyWorkbookCommand,
 } from "../../commands/index.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
-import { MAX_SHEET_ROWS, getActiveSheet, setCellContent } from "../../workbook.js";
+import {
+  MAX_SHEET_ROWS,
+  createWorkbookEvaluator,
+  getActiveSheet,
+  setCellContent,
+} from "../../workbook.js";
+import { deserializeWorkbook, serializeWorkbook } from "../../serialization.js";
 import { createTestWorkbookSession } from "../helpers.js";
 
 describe("sheet filter commands", () => {
@@ -87,6 +93,178 @@ describe("sheet filter commands", () => {
       range: { start: { row: 0, column: 0 }, end: { row: 3, column: 0 } },
       columns: [{ column: 0, allowedValues: [{ kind: "number", value: 1 }] }],
     });
+  });
+
+  test("filters vertical merged cells as one candidate and one visible row block", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    sheet.mergedCells = [{ start: { row: 1, column: 0 }, end: { row: 2, column: 0 } }];
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: "keep" });
+    setCellContent(sheet, { row: 3, column: 0 }, { kind: "literal", value: "drop" });
+    setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: 10 });
+    setCellContent(sheet, { row: 2, column: 1 }, { kind: "literal", value: 20 });
+    setCellContent(sheet, { row: 3, column: 1 }, { kind: "literal", value: 30 });
+    const range = { start: { row: 0, column: 0 }, end: { row: 3, column: 1 } };
+    const columns = [{ column: 0, allowedValues: [{ kind: "string" as const, value: "drop" }] }];
+
+    expect(
+      getSheetFilterColumnValueCounts(sheet, range, 0, undefined, { allowMergedCells: true }).map(
+        ({ value, count }) => [value, count],
+      ),
+    ).toEqual([
+      [{ kind: "string", value: "drop" }, 1],
+      [{ kind: "string", value: "keep" }, 1],
+    ]);
+    expect(
+      tryApplyWorkbookCommand(
+        session.workbook,
+        createSetSheetFilterCriteriaCommand(sheet.id, range, columns, { allowMergedCells: false }),
+      ),
+    ).toMatchObject({ ok: false, error: { code: "invalid_command_payload" } });
+
+    executeWorkbookCommand(
+      session,
+      createSetSheetFilterCriteriaCommand(sheet.id, range, columns, { allowMergedCells: true }),
+    );
+    expect(createSheetFilterHiddenRowIntervals(sheet)).toEqual([{ start: 1, end: 2 }]);
+    setCellContent(
+      sheet,
+      { row: 0, column: 2 },
+      { kind: "formula", formula: { source: "=SUBTOTAL(9,B2:B4)" } },
+    );
+    expect(
+      createWorkbookEvaluator(session.workbook, sheet.id).getComputedValue({ row: 0, column: 2 }),
+    ).toBe(30);
+    expect(sheet.filter?.allowMergedCells).toBe(true);
+    expect(
+      deserializeWorkbook(serializeWorkbook(session.workbook)).sheets.get(sheet.id)?.filter,
+    ).toMatchObject({ allowMergedCells: true });
+    undoWorkbookCommand(session);
+    expect(sheet.filter).toBeNull();
+    redoWorkbookCommand(session);
+    expect(sheet.filter?.allowMergedCells).toBe(true);
+  });
+
+  test("counts a merged candidate only when its connected block matches other criteria", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    sheet.mergedCells = [{ start: { row: 1, column: 0 }, end: { row: 2, column: 0 } }];
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: "East" });
+    const range = { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } };
+    const otherCriterion = [
+      { column: 1, allowedValues: [{ kind: "string" as const, value: "OK" }] },
+    ];
+    executeWorkbookCommand(
+      session,
+      createSetSheetFilterCriteriaCommand(sheet.id, range, otherCriterion, {
+        allowMergedCells: true,
+      }),
+    );
+
+    for (const [first, second] of [
+      ["OK", "NO"],
+      ["NO", "OK"],
+    ] as const) {
+      setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: first });
+      setCellContent(sheet, { row: 2, column: 1 }, { kind: "literal", value: second });
+      expect(getSheetFilterColumnValueCounts(sheet, range, 0)).toEqual([]);
+    }
+
+    executeWorkbookCommand(
+      session,
+      createSetSheetFilterCriteriaCommand(
+        sheet.id,
+        range,
+        [{ column: 0, allowedValues: [{ kind: "string", value: "East" }] }, ...otherCriterion],
+        { allowMergedCells: true },
+      ),
+    );
+    expect(createSheetFilterHiddenRowIntervals(sheet)).toEqual([{ start: 1, end: 2 }]);
+
+    setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: "OK" });
+    setCellContent(sheet, { row: 2, column: 1 }, { kind: "literal", value: "OK" });
+    expect(
+      getSheetFilterColumnValueCounts(sheet, range, 0).map(({ value, count }) => [value, count]),
+    ).toEqual([[{ kind: "string", value: "East" }, 1]]);
+    executeWorkbookCommand(
+      session,
+      createSetSheetFilterCriteriaCommand(
+        sheet.id,
+        range,
+        [{ column: 0, allowedValues: [{ kind: "string", value: "East" }] }, ...otherCriterion],
+        { allowMergedCells: true },
+      ),
+    );
+    expect(createSheetFilterHiddenRowIntervals(sheet)).toEqual([]);
+  });
+
+  test("allows an explicit merged-filter opt-out when merges are outside criterion data cells", () => {
+    const unrelated = createTestWorkbookSession();
+    const unrelatedSheet = getActiveSheet(unrelated.workbook);
+    unrelatedSheet.mergedCells = [{ start: { row: 1, column: 1 }, end: { row: 2, column: 1 } }];
+    expect(
+      executeWorkbookCommand(
+        unrelated,
+        createSetSheetFilterCriteriaCommand(
+          unrelatedSheet.id,
+          { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } },
+          [{ column: 0, allowedValues: [{ kind: "blank" }] }],
+          { allowMergedCells: false },
+        ),
+      ),
+    ).toBe(true);
+
+    const headerOnly = createTestWorkbookSession();
+    const headerOnlySheet = getActiveSheet(headerOnly.workbook);
+    headerOnlySheet.mergedCells = [{ start: { row: 0, column: 0 }, end: { row: 0, column: 1 } }];
+    expect(
+      executeWorkbookCommand(
+        headerOnly,
+        createSetSheetFilterCriteriaCommand(
+          headerOnlySheet.id,
+          { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } },
+          [{ column: 0, allowedValues: [{ kind: "blank" }] }],
+          { allowMergedCells: false },
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  test("coalesces overlapping merged filter blocks consistently for hidden rows and SUBTOTAL", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    // Deliberately reverse source order: behavior must follow row connectivity, not insertion order.
+    sheet.mergedCells = [
+      { start: { row: 2, column: 1 }, end: { row: 3, column: 1 } },
+      { start: { row: 1, column: 0 }, end: { row: 2, column: 0 } },
+    ];
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: "keep" });
+    setCellContent(sheet, { row: 3, column: 0 }, { kind: "literal", value: "keep" });
+    setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: "keep" });
+    setCellContent(sheet, { row: 2, column: 1 }, { kind: "literal", value: "drop" });
+    for (let row = 1; row <= 3; row += 1)
+      setCellContent(sheet, { row, column: 2 }, { kind: "literal", value: 10 });
+    executeWorkbookCommand(
+      session,
+      createSetSheetFilterCriteriaCommand(
+        sheet.id,
+        { start: { row: 0, column: 0 }, end: { row: 3, column: 2 } },
+        [
+          { column: 0, allowedValues: [{ kind: "string", value: "keep" }] },
+          { column: 1, allowedValues: [{ kind: "string", value: "keep" }] },
+        ],
+        { allowMergedCells: true },
+      ),
+    );
+    expect(createSheetFilterHiddenRowIntervals(sheet)).toEqual([{ start: 1, end: 3 }]);
+    setCellContent(
+      sheet,
+      { row: 0, column: 3 },
+      { kind: "formula", formula: { source: "=SUBTOTAL(9,C2:C4)" } },
+    );
+    expect(
+      createWorkbookEvaluator(session.workbook, sheet.id).getComputedValue({ row: 0, column: 3 }),
+    ).toBe(0);
   });
 
   test("keeps advanced filter metadata isolated when setting a filter", () => {

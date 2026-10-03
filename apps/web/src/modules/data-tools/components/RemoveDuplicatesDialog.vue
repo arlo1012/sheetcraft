@@ -9,6 +9,8 @@ const props = defineProps<{
   visible: boolean;
   columns: readonly DataToolColumn[];
   removalCount?: number;
+  initial?: RemoveDuplicatesDraft;
+  headerDisabled?: boolean;
 }>();
 const emit = defineEmits<{
   close: [];
@@ -28,7 +30,9 @@ watch(
   () => props.visible,
   (visible) => {
     if (visible)
-      draft.value = { hasHeader: true, columns: props.columns.map((column) => column.column) };
+      draft.value = props.initial
+        ? { ...props.initial, columns: [...props.initial.columns] }
+        : { hasHeader: true, columns: props.columns.map((column) => column.column) };
   },
   { immediate: true },
 );
@@ -65,7 +69,9 @@ function invertSelection(): void {
     @close="emit('close')"
     @confirm="emit('apply', draft)"
     ><div class="remove-duplicates-dialog">
-      <TCheckbox v-model="draft.hasHeader">{{ t("dataTools.removeDuplicates.header") }}</TCheckbox>
+      <TCheckbox v-model="draft.hasHeader" :disabled="headerDisabled">{{
+        t("dataTools.removeDuplicates.header")
+      }}</TCheckbox>
       <div class="remove-duplicates-dialog__columns">
         <div class="remove-duplicates-dialog__selection-actions">
           <TCheckbox

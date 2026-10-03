@@ -2,7 +2,10 @@ import { describe, expect, test } from "vitest";
 import {
   collectFormulaRanges,
   collectFormulaReferences,
+  convertStructuredReferencesToA1,
   parseFormula,
+  renameTableColumnReferences,
+  renameTableReferences,
 } from "../../formula/index.js";
 
 describe("formula parser", () => {
@@ -97,5 +100,88 @@ describe("formula parser", () => {
         expression: { kind: "identifier", name: "UNKNOWN", start: 1, end: 8 },
       }),
     });
+  });
+
+  test("parses Excel structured references without treating their contents as A1 text", () => {
+    const result = parseFormula(
+      "=SUM(Table1[Amount],Table1[[#Headers],[Amount]],Table1[[Column1]:[Column2]],[@[Unit Price]])",
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.ast.expression.kind !== "function") return;
+    expect(result.ast.expression.args).toEqual([
+      expect.objectContaining({
+        kind: "structured-reference",
+        reference: expect.objectContaining({
+          tableName: "Table1",
+          scope: "data",
+          columns: [expect.objectContaining({ name: "Amount", start: 12, end: 18 })],
+        }),
+      }),
+      expect.objectContaining({
+        kind: "structured-reference",
+        reference: expect.objectContaining({
+          scope: "headers",
+          columns: [expect.objectContaining({ name: "Amount" })],
+        }),
+      }),
+      expect.objectContaining({
+        kind: "structured-reference",
+        reference: expect.objectContaining({
+          scope: "data",
+          columns: [
+            expect.objectContaining({ name: "Column1" }),
+            expect.objectContaining({ name: "Column2" }),
+          ],
+        }),
+      }),
+      expect.objectContaining({
+        kind: "structured-reference",
+        reference: expect.objectContaining({
+          scope: "this-row",
+          columns: [expect.objectContaining({ name: "Unit Price" })],
+        }),
+      }),
+    ]);
+  });
+
+  test("rewrites table and table-column names only in structured-reference AST spans", () => {
+    const source = '=SUM(Table1[Amount],"Table1[Amount]")';
+    expect(renameTableReferences(source, "Table1", "Sales")).toBe(
+      '=SUM(Sales[Amount],"Table1[Amount]")',
+    );
+    expect(renameTableColumnReferences(source, "Table1", "Amount", "Net Amount")).toBe(
+      '=SUM(Table1[Net Amount],"Table1[Amount]")',
+    );
+  });
+
+  test("converts only parsed structured references to their resolved A1 bounds", () => {
+    const source = '=SUM(Table1[Amount],[@Amount],"Table1[Amount]")';
+    expect(
+      convertStructuredReferencesToA1(
+        source,
+        (reference, address) =>
+          reference.tableName
+            ? {
+                sheetName: "Ledger 2026",
+                start: { row: 1, column: 1 },
+                end: { row: 3, column: 1 },
+              }
+            : address
+              ? { start: { row: address.row, column: 1 }, end: { row: address.row, column: 1 } }
+              : null,
+        { row: 4, column: 2 },
+      ),
+    ).toBe("=SUM('Ledger 2026'!B2:B4,B5,\"Table1[Amount]\")");
+    expect(
+      convertStructuredReferencesToA1("=Missing[Amount]", () => null, { row: 0, column: 0 }),
+    ).toBe("=#REF!");
+    expect(
+      convertStructuredReferencesToA1(
+        "=SUM(Keep[Amount],Convert[Amount])",
+        () => ({ start: { row: 1, column: 0 }, end: { row: 2, column: 0 } }),
+        undefined,
+        { shouldConvert: (reference) => reference.tableName === "Convert" },
+      ),
+    ).toBe("=SUM(Keep[Amount],A2:A3)");
   });
 });

@@ -44,6 +44,7 @@ import {
   getCellMergeModeAvailability,
   getSheetFilterColumnDistinctValues,
   getSheetFilterValueKey,
+  getSheetFilters,
   type SortDirection,
   type CellFormatChange,
   type CellMergeMode,
@@ -90,6 +91,7 @@ import {
 import { validateDuplicateEntries } from "@idea10/core/duplicate-values";
 import { WorkbookDomainError } from "@idea10/core/errors";
 import type { IdFactory } from "@idea10/core/runtime";
+import { getTableAtAddress } from "@idea10/core/table-styles";
 import { useWorkbookFindController } from "../../modules/workbook/composables/useWorkbookFindController";
 import { useWorkbookGoToController } from "../../modules/workbook/composables/useWorkbookGoToController";
 import { getSelectionSummary } from "@idea10/core/selection-summary";
@@ -305,18 +307,17 @@ export function useSpreadsheetWorkspaceController(
           activeSheetEvaluator.value,
         ).map((key) => ({ key, label: formatFilterValueLabel(key) }))
       : [];
-    const activeFilter =
-      sheet.filter && filterRange && areRangesEqual(sheet.filter.range, filterRange)
-        ? sheet.filter
-        : null;
+    const activeFilter = filterRange
+      ? (getSheetFilters(sheet).find((filter) => areRangesEqual(filter.range, filterRange)) ?? null)
+      : null;
     const criterion = activeFilter?.columns.find(
       (column) => column.column === selection.activeAddress.column,
     );
     const sortRange = getSortTargetRange(selection.range, selection.activeAddress, selection.mode);
     const sortIntersectsFilter = Boolean(
-      sortRange && sheet.filter && doMergedCellRangesIntersect(sortRange, sheet.filter.range),
+      sortRange && activeFilter && doMergedCellRangesIntersect(sortRange, activeFilter.range),
     );
-    const filterDataRange = sheet.filter ? getFilterDataRange(sheet.filter.range) : null;
+    const filterDataRange = activeFilter ? getFilterDataRange(activeFilter.range) : null;
     return {
       activeCell: { ...selection.activeAddress },
       sortEnabled: Boolean(
@@ -448,6 +449,8 @@ export function useSpreadsheetWorkspaceController(
       }
     } else if (command.type === "addSheet") {
       sheetIds.add(command.sheet.id);
+    } else if (command.type === "restoreTableTransaction") {
+      for (const state of command.states) sheetIds.add(state.sheetId);
     } else if ("sheetId" in command) {
       sheetIds.add(command.sheetId);
     }
@@ -582,8 +585,10 @@ export function useSpreadsheetWorkspaceController(
     selectionMode = getSelectionModeValue(),
   ): CellRange | null {
     if (selectionMode !== "cells") return null;
-    const filter = activeSheet.value.filter;
-    if (filter && isAddressInRange(selectionAddress, filter.range)) {
+    const filter = getSheetFilters(activeSheet.value).find((candidate) =>
+      isAddressInRange(selectionAddress, candidate.range),
+    );
+    if (filter) {
       return filter.range;
     }
     return selectionRange.end.row > selectionRange.start.row ? selectionRange : null;
@@ -595,6 +600,20 @@ export function useSpreadsheetWorkspaceController(
     selectionMode = getSelectionModeValue(),
   ): CellRange | null {
     if (selectionMode !== "cells") return null;
+    const table = getTableAtAddress(activeSheet.value, selectionAddress);
+    if (table) {
+      const range = {
+        start: {
+          row: table.range.start.row + (table.headerRow ? 1 : 0),
+          column: table.range.start.column,
+        },
+        end: {
+          row: table.range.end.row - (table.totalRow ? 1 : 0),
+          column: table.range.end.column,
+        },
+      };
+      return range.end.row > range.start.row ? range : null;
+    }
     const filter = activeSheet.value.filter;
     if (filter && isAddressInRange(selectionAddress, filter.range)) {
       const range = getFilterDataRange(filter.range);
@@ -818,7 +837,9 @@ export function useSpreadsheetWorkspaceController(
     const allSelected =
       allowedValues.length === options.length &&
       options.every((option) => valuesByKey.has(getSheetFilterValueKey(option.key)));
-    const currentFilter = activeSheet.value.filter;
+    const currentFilter = getSheetFilters(activeSheet.value).find((filter) =>
+      areRangesEqual(filter.range, range),
+    );
     const columns: SheetFilter["columns"] =
       currentFilter && areRangesEqual(currentFilter.range, range)
         ? currentFilter.columns
@@ -833,13 +854,28 @@ export function useSpreadsheetWorkspaceController(
         : [];
     if (!allSelected) columns.push({ column, allowedValues });
     executeFeature(
-      () => createSetSheetFilterCriteriaCommand(activeSheet.value.id, range, columns),
+      () =>
+        createSetSheetFilterCriteriaCommand(activeSheet.value.id, range, columns, {
+          allowMergedCells: currentFilter?.allowMergedCells,
+        }),
       "data.filter",
       "workspace.filterUnavailable",
     );
   }
 
   function clearFilter(): void {
+    const table = getTableAtAddress(activeSheet.value, activeAddress.value);
+    if (table?.filter) {
+      executeFeature(
+        () =>
+          createSetSheetFilterCriteriaCommand(activeSheet.value.id, table.filter!.range, [], {
+            allowMergedCells: table.filter!.allowMergedCells,
+          }),
+        "data.filter",
+        "workspace.filterUnavailable",
+      );
+      return;
+    }
     executeFeature(
       () => createClearSheetFilterCommand(activeSheet.value.id),
       "data.filter",

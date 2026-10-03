@@ -19,6 +19,7 @@ import { resolveDataRange } from "../data-range.js";
 import type {
   RemoveDuplicatesCommand,
   RestoreFullSheetStateCommand,
+  RestoreTableTransactionCommand,
   SplitColumnCommand,
   SplitTextOptions,
 } from "./contracts.js";
@@ -29,6 +30,37 @@ import {
   invalidCommandPayload,
   normalizeRange,
 } from "./helpers.js";
+import { applyResizeTableCommand, createRestoreTableTransactionCommand } from "../tables.js";
+
+type RemoveDuplicatesTarget = {
+  range: CellRange;
+  hasHeader: boolean;
+  tableId?: string;
+  tableRange?: CellRange;
+};
+
+function removeDuplicatesTarget(
+  workbook: Workbook,
+  command: RemoveDuplicatesCommand,
+): RemoveDuplicatesTarget {
+  const sheet = getSheetOrThrow(workbook, command.sheetId);
+  if (!command.tableId)
+    return {
+      range: resolveDataRange(sheet, normalizeRange(command.range)),
+      hasHeader: command.hasHeader === true,
+    };
+  const table = (sheet.tables ?? []).find((entry) => entry.id === command.tableId);
+  if (!table) throw invalidCommandPayload("tableId", command.tableId, "Table does not exist.");
+  return {
+    range: {
+      start: { ...table.range.start, row: table.range.start.row + (table.headerRow ? 1 : 0) },
+      end: { ...table.range.end, row: table.range.end.row - (table.totalRow ? 1 : 0) },
+    },
+    hasHeader: false,
+    tableId: table.id,
+    tableRange: { start: { ...table.range.start }, end: { ...table.range.end } },
+  };
+}
 
 function snapshotBeforeChange(
   workbook: Workbook,
@@ -214,7 +246,7 @@ export function createRemoveDuplicatesCommand(
   sheetId: string,
   range: RemoveDuplicatesCommand["range"],
   keyColumns: readonly number[],
-  options?: { hasHeader?: boolean },
+  options?: { hasHeader?: boolean; tableId?: string },
 ): RemoveDuplicatesCommand {
   return {
     type: "removeDuplicates",
@@ -222,6 +254,7 @@ export function createRemoveDuplicatesCommand(
     range: { start: { ...range.start }, end: { ...range.end } },
     keyColumns: [...keyColumns],
     ...(options?.hasHeader ? { hasHeader: true } : {}),
+    ...(options?.tableId ? { tableId: options.tableId } : {}),
   };
 }
 
@@ -230,12 +263,12 @@ export function getRemoveDuplicatesCount(
   workbook: Workbook,
   command: RemoveDuplicatesCommand,
 ): number {
-  const sheet = getSheetOrThrow(workbook, command.sheetId);
-  const range = resolveDataRange(sheet, normalizeRange(command.range));
+  const target = removeDuplicatesTarget(workbook, command);
+  const range = target.range;
   const evaluator = createWorkbookEvaluator(workbook, command.sheetId);
   const seen = new Set<string>();
   let duplicates = 0;
-  for (let row = range.start.row + (command.hasHeader ? 1 : 0); row <= range.end.row; row += 1) {
+  for (let row = range.start.row + (target.hasHeader ? 1 : 0); row <= range.end.row; row += 1) {
     const key = JSON.stringify(
       command.keyColumns.map((column) => evaluator.getComputedValue({ row, column })),
     );
@@ -265,9 +298,10 @@ function cloneForRowMove(
 export function applyRemoveDuplicatesCommand(
   workbook: Workbook,
   command: RemoveDuplicatesCommand,
-): RestoreFullSheetStateCommand | null {
-  const { sheet, previous } = snapshotBeforeChange(workbook, command.sheetId);
-  const range = resolveDataRange(sheet, normalizeRange(command.range));
+): RestoreFullSheetStateCommand | RestoreTableTransactionCommand | null {
+  const sheet = getSheetOrThrow(workbook, command.sheetId);
+  const target = removeDuplicatesTarget(workbook, command);
+  const range = target.range;
   assertCellRange(range);
   if (
     !command.keyColumns.length ||
@@ -277,7 +311,7 @@ export function applyRemoveDuplicatesCommand(
     )
   )
     throw invalidCommandPayload("keyColumns", command.keyColumns);
-  const start = range.start.row + (command.hasHeader ? 1 : 0);
+  const start = range.start.row + (target.hasHeader ? 1 : 0);
   const evaluator = createWorkbookEvaluator(workbook, command.sheetId);
   const seen = new Set<string>();
   const retained: number[] = [];
@@ -291,6 +325,9 @@ export function applyRemoveDuplicatesCommand(
     }
   }
   if (retained.length === range.end.row - start + 1) return null;
+  const previous = target.tableId
+    ? createRestoreTableTransactionCommand(workbook)
+    : createSheetSparseState(sheet);
   for (let offset = 0; offset <= range.end.row - start; offset += 1) {
     const destinationRow = start + offset;
     const sourceRow = retained[offset];
@@ -310,5 +347,20 @@ export function applyRemoveDuplicatesCommand(
       setCellStyle(sheet, destination, cloneCellStyle(getCellStyle(sheet, source)));
     }
   }
-  return restore(command.sheetId, previous, true);
+  if (target.tableId && target.tableRange) {
+    applyResizeTableCommand(workbook, {
+      type: "resizeTable",
+      sheetId: command.sheetId,
+      tableId: target.tableId,
+      range: {
+        start: { ...target.tableRange.start },
+        end: {
+          ...target.tableRange.end,
+          row: target.tableRange.end.row - (range.end.row - start + 1 - retained.length),
+        },
+      },
+    });
+    return previous as RestoreTableTransactionCommand;
+  }
+  return restore(command.sheetId, previous as ReturnType<typeof createSheetSparseState>, true);
 }

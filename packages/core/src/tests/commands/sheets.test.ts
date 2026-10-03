@@ -10,6 +10,8 @@ import {
   applyWorkbookCommand,
   createBatchSetCellContentsCommand,
 } from "../../commands/index.js";
+import { createCreateTableCommand } from "../../tables.js";
+import { createBuiltinTableStyles } from "../../table-styles.js";
 import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from "../../history.js";
 import { WorkbookDomainError } from "../../errors.js";
 import {
@@ -18,6 +20,7 @@ import {
   getWorkbookSheets,
   setActiveSheet,
   setCellStyle,
+  setCellContent,
   setCellValue,
   setColumnWidth,
   setRowHeight,
@@ -45,6 +48,54 @@ describe("sheet commands", () => {
       initialSheetId,
       "sheet-2",
     ]);
+  });
+
+  test("duplicates tables with independent identities and rewrites only copied structured references", () => {
+    const session = createTestWorkbookSession();
+    const source = session.workbook.sheets.get(session.workbook.activeSheetId)!;
+    const table = {
+      id: "table-1",
+      name: "Sales",
+      range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+      columns: [{ id: "amount", name: "Amount" }],
+      style: createBuiltinTableStyles()[0]!,
+      headerRow: true,
+      totalRow: false,
+      firstColumn: false,
+      lastColumn: false,
+      bandedRows: true,
+      bandedColumns: false,
+      filterButton: true,
+      filter: null,
+    };
+    applyWorkbookCommand(session.workbook, createCreateTableCommand(source.id, table));
+    setCellContent(
+      source,
+      { row: 1, column: 0 },
+      {
+        kind: "formula",
+        formula: { source: "=SUM(Sales[Amount])" },
+      },
+    );
+
+    executeWorkbookCommand(
+      session,
+      createDuplicateSheetCommand(session.workbook, source.id, { id: "sheet-2" }),
+    );
+    const copy = session.workbook.sheets.get("sheet-2")!;
+    expect(source.tables?.[0]).toMatchObject({ id: "table-1", name: "Sales" });
+    expect(copy.tables?.[0]).toMatchObject({ id: "table-1-copy", name: "Sales2" });
+    expect(copy.cells.get("1:0")?.content).toMatchObject({
+      formula: { source: "=SUM(Sales2[Amount])" },
+    });
+    expect(source.cells.get("1:0")?.content).toMatchObject({
+      formula: { source: "=SUM(Sales[Amount])" },
+    });
+
+    undoWorkbookCommand(session);
+    expect(session.workbook.sheets.has("sheet-2")).toBe(false);
+    redoWorkbookCommand(session);
+    expect(session.workbook.sheets.get("sheet-2")?.tables?.[0]?.name).toBe("Sales2");
   });
 
   test("renames and deletes sheets reversibly while selecting the next sheet after active deletion", () => {

@@ -3,11 +3,15 @@ import type { DataTableMessageSchema } from "../../modules/data-tools/data-table
 import type { ProofreadingMessageSchema } from "../../modules/data-tools/proofreading-messages";
 import type { FormulaToolsMessageSchema } from "../../modules/formula-tools/formula-tools-messages";
 import type { ConditionalFormattingMessageSchema } from "../../modules/conditional-formatting/conditional-formatting-messages";
+import type { TableStylesMessageSchema } from "../../modules/table-styles/table-style-messages";
+import type { TableMessageSchema } from "../../modules/table-styles/table-messages";
 
 export type AppLocale = "zh-CN" | "en-US";
 
 type ToolMessageSchema = FormulaToolsMessageSchema &
   ConditionalFormattingMessageSchema &
+  TableStylesMessageSchema &
+  TableMessageSchema &
   SimulationMessageSchema &
   DataTableMessageSchema &
   ProofreadingMessageSchema;
@@ -272,6 +276,7 @@ export type MessageSchema = ToolMessageSchema & {
       selectColor: string;
       noFill: string;
       noColors: string;
+      defaultFontColor: string;
       values: string;
       confirm: string;
     };
@@ -317,13 +322,6 @@ export type MessageSchema = ToolMessageSchema & {
       rankUnit: string;
       colorSummary: string;
       rankSummary: string;
-      selectDuplicates: string;
-      settings: string;
-      colorSort: string;
-      sortFillColors: string;
-      sortFontColors: string;
-      sortFillColor: string;
-      sortFontColor: string;
       showAll: string;
       content: string;
       searchKeywords: string;
@@ -337,6 +335,24 @@ export type MessageSchema = ToolMessageSchema & {
       disablePinyinSearch: string;
       invert: string;
       duplicates: string;
+      selectDuplicates: string;
+      settings: string;
+      colorSort: string;
+      sortFillColors: string;
+      sortFontColors: string;
+      sortFillColor: string;
+      sortFontColor: string;
+      showItemCount: string;
+      showTotalCount: string;
+      showCriteria: string;
+      checkedFirst: string;
+      allowMergedCells: string;
+      sortCountDescending: string;
+      sortNameAscending: string;
+      recordSummary: string;
+      criteriaSummary: string;
+      mergeDisabled: string;
+      moreValues: string;
       name: string;
       count: string;
       noMatches: string;

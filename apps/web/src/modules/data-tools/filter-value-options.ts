@@ -46,22 +46,22 @@ function getSearchableLabel(label: string, includePinyin: boolean): SearchableLa
 }
 
 function matchesToken(label: SearchableLabel, token: string, includePinyin: boolean): boolean {
-  return (
+  return Boolean(
     label.normalized.includes(token) ||
     (includePinyin &&
       (label.pinyin?.includes(token) ||
         label.pinyinCompact?.includes(token.replaceAll(" ", "")) ||
-        label.initials?.includes(token.replaceAll(" ", ""))))
+        label.initials?.includes(token.replaceAll(" ", "")))),
   );
 }
 
 function matchesPhrase(label: SearchableLabel, phrase: string, includePinyin: boolean): boolean {
-  return (
+  return Boolean(
     label.normalized.includes(phrase) ||
     (includePinyin &&
       (label.pinyin?.includes(phrase) ||
         (!phrase.includes(" ") &&
-          (label.pinyinCompact?.includes(phrase) || label.initials?.includes(phrase)))))
+          (label.pinyinCompact?.includes(phrase) || label.initials?.includes(phrase))))),
   );
 }
 

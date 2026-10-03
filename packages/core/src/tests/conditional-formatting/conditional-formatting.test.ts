@@ -230,12 +230,12 @@ describe("conditional-formatting resolver", () => {
   });
 
   test("rejects bare multi-cell references while accepting scalar formulas and one-cell ranges", () => {
-    const base = {
+    const base: Omit<SheetConditionalFormatRule, "condition"> = {
       id: "formula-shape",
       ranges: [{ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }],
       anchor: { row: 0, column: 0 },
       style: { bold: true },
-    } as const;
+    };
     const ruleWith = (condition: SheetConditionalFormatRule["condition"]) => ({
       ...base,
       condition,

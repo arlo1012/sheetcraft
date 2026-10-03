@@ -21,6 +21,7 @@ import {
   setCellStyle,
 } from "../../workbook.js";
 import { datePartsToExcelSerial } from "../../formula/date-system.js";
+import { createBuiltinTableStyles } from "../../table-styles.js";
 import { createTestWorkbookSession } from "../helpers.js";
 
 describe("data transforms", () => {
@@ -403,6 +404,128 @@ describe("data transforms", () => {
       value: "outside",
     });
     expect(undoWorkbookCommand(session)).toBe(true);
+    expect(createSheetSparseState(sheet)).toEqual(before);
+  });
+
+  test("deduplicates the complete table from a one-cell target, shrinks it, and relocates totals atomically", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    for (const [row, values] of [
+      ["Name", "Amount"],
+      ["Ada", 10],
+      ["Ada", 20],
+      ["Lin", 30],
+      ["Total", 60],
+    ].entries())
+      values.forEach((value, column) =>
+        setCellContent(sheet, { row, column }, { kind: "literal", value }),
+      );
+    setCellContent(sheet, { row: 2, column: 3 }, { kind: "literal", value: "outside" });
+    sheet.tables = [
+      {
+        id: "sales",
+        name: "Sales",
+        range: { start: { row: 0, column: 0 }, end: { row: 4, column: 1 } },
+        columns: [
+          { id: "name", name: "Name" },
+          { id: "amount", name: "Amount" },
+        ],
+        style: createBuiltinTableStyles()[0]!,
+        headerRow: true,
+        totalRow: true,
+        firstColumn: false,
+        lastColumn: false,
+        bandedRows: true,
+        bandedColumns: false,
+        filterButton: true,
+        filter: null,
+      },
+    ];
+
+    executeWorkbookCommand(
+      session,
+      createRemoveDuplicatesCommand(
+        sheet.id,
+        { start: { row: 2, column: 0 }, end: { row: 2, column: 0 } },
+        [0],
+        { tableId: "sales" },
+      ),
+    );
+    expect(sheet.tables[0]?.range.end.row).toBe(3);
+    expect(getCellContent(sheet, { row: 1, column: 0 })).toMatchObject({ value: "Ada" });
+    expect(getCellContent(sheet, { row: 2, column: 0 })).toMatchObject({ value: "Lin" });
+    expect(getCellContent(sheet, { row: 3, column: 0 })).toMatchObject({ kind: "formula" });
+    expect(getCellContent(sheet, { row: 2, column: 3 })).toMatchObject({ value: "outside" });
+
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(sheet.tables[0]?.range.end.row).toBe(4);
+    expect(getCellContent(sheet, { row: 2, column: 0 })).toMatchObject({ value: "Ada" });
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(sheet.tables[0]?.range.end.row).toBe(3);
+  });
+
+  test("uses headerless table rows even when the legacy header option says otherwise", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    for (const row of [0, 1]) {
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value: "Ada" });
+      setCellContent(sheet, { row, column: 1 }, { kind: "literal", value: 10 });
+    }
+    sheet.tables = [
+      {
+        id: "headerless",
+        name: "Headerless",
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 1 } },
+        columns: [
+          { id: "name", name: "Name" },
+          { id: "amount", name: "Amount" },
+        ],
+        style: createBuiltinTableStyles()[0]!,
+        headerRow: false,
+        totalRow: false,
+        firstColumn: false,
+        lastColumn: false,
+        bandedRows: true,
+        bandedColumns: false,
+        filterButton: true,
+        filter: null,
+      },
+    ];
+
+    executeWorkbookCommand(
+      session,
+      createRemoveDuplicatesCommand(
+        sheet.id,
+        { start: { row: 1, column: 0 }, end: { row: 1, column: 1 } },
+        [0, 1],
+        { hasHeader: true, tableId: "headerless" },
+      ),
+    );
+    expect(sheet.tables[0]?.range).toEqual({
+      start: { row: 0, column: 0 },
+      end: { row: 0, column: 1 },
+    });
+    expect(getCellContent(sheet, { row: 0, column: 0 })).toMatchObject({ value: "Ada" });
+  });
+
+  test("rejects a stale table target before changing the selected cells", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "Ada" });
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: "Ada" });
+    const before = createSheetSparseState(sheet);
+
+    expect(() =>
+      executeWorkbookCommand(
+        session,
+        createRemoveDuplicatesCommand(
+          sheet.id,
+          { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+          [0],
+          { tableId: "removed-table" },
+        ),
+      ),
+    ).toThrow("Table does not exist");
     expect(createSheetSparseState(sheet)).toEqual(before);
   });
 

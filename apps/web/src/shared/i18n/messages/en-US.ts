@@ -4,10 +4,14 @@ import { proofreadingEnUS } from "../../../modules/data-tools/proofreading-messa
 import type { MessageSchema } from "../schema";
 import { formulaToolsEnUS } from "../../../modules/formula-tools/formula-tools-messages.en-US";
 import { conditionalFormattingEnUS } from "../../../modules/conditional-formatting/conditional-formatting-messages.en-US";
+import { tableStylesEnUS } from "../../../modules/table-styles/table-style-messages.en-US";
+import { tablesEnUS } from "../../../modules/table-styles/table-messages.en-US";
 
 export const enUS = {
   ...formulaToolsEnUS,
   ...conditionalFormattingEnUS,
+  ...tableStylesEnUS,
+  ...tablesEnUS,
   ...simulationEnUS,
   ...dataTableEnUS,
   ...proofreadingEnUS,
@@ -284,6 +288,7 @@ export const enUS = {
       selectColor: "Choose color",
       noFill: "No fill",
       noColors: "No available colors",
+      defaultFontColor: "Default font color",
       values: "Cell values",
       confirm: "Sort",
     },
@@ -330,13 +335,6 @@ export const enUS = {
       rankUnit: "Items or percent",
       colorSummary: "{target}: {color}",
       rankSummary: "{direction} {count} {unit}",
-      selectDuplicates: "Select duplicates",
-      settings: "Filter settings",
-      colorSort: "Sort by color",
-      sortFillColors: "Sort by cell color",
-      sortFontColors: "Sort by font color",
-      sortFillColor: "Sort by cell color {color}",
-      sortFontColor: "Sort by font color {color}",
       showAll: "Show all",
       content: "By content",
       searchKeywords: "Match all keywords, separated by spaces",
@@ -350,6 +348,25 @@ export const enUS = {
       disablePinyinSearch: "Disable pinyin search",
       invert: "Invert",
       duplicates: "Duplicates",
+      selectDuplicates: "Select duplicates",
+      settings: "Filter settings",
+      colorSort: "Sort by color",
+      sortFillColors: "Sort by cell color",
+      sortFontColors: "Sort by font color",
+      sortFillColor: "Sort by cell color {color}",
+      sortFontColor: "Sort by font color {color}",
+      showItemCount: "Show item counts",
+      showTotalCount: "Show total item count",
+      showCriteria: "Show filter criteria",
+      checkedFirst: "Show checked items first when opening",
+      allowMergedCells: "Allow filtering merged cells",
+      sortCountDescending: "Sort by count, descending",
+      sortNameAscending: "Sort by name, ascending",
+      recordSummary: "{selected} of {total} records selected",
+      criteriaSummary: "Filter criteria: {condition}",
+      mergeDisabled:
+        "This filter column contains merged cells. Enable “Allow filtering merged cells”.",
+      moreValues: "and {count} more",
       name: "Name",
       count: "Count",
       noMatches: "No matching values",

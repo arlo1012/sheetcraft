@@ -2,7 +2,7 @@
 import { ChevronDown, Minus, Plus } from "lucide-vue-next";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { columnIndexToLabel } from "@idea10/core/coordinates";
-import type { CellAddress, SheetDimensionAxis } from "@idea10/core/workbook";
+import type { CellAddress, CellRange, SheetDimensionAxis } from "@idea10/core/workbook";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
 import {
   createOutlinePanes,
@@ -23,10 +23,17 @@ export type ActiveCellValidationInfo = Readonly<{
   prompt?: Readonly<{ title?: string; message: string }>;
 }>;
 
+export type SheetFilterControl = Readonly<{
+  range: CellRange;
+  filteredColumns?: readonly number[];
+  tableId?: string;
+}>;
+
 const props = defineProps<{
   frame: SheetRenderFrame;
   filterRange?: Readonly<{ start: CellAddress; end: CellAddress }>;
   filteredColumns?: readonly number[];
+  tableFilters?: readonly SheetFilterControl[];
   activeCell: CellAddress;
   validationInfo?: ActiveCellValidationInfo;
   suppressValidationPrompt?: boolean;
@@ -38,7 +45,14 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  filterColumnRequest: [payload: { column: number; anchor: DOMRect }];
+  filterColumnRequest: [
+    payload: {
+      column: number;
+      range: CellRange;
+      tableId?: string;
+      anchor: DOMRect;
+    },
+  ];
   validationChoose: [payload: { address: CellAddress; value: string | number | boolean }];
   outlineToggle: [payload: { id: string; collapsed: boolean }];
   outlineLevel: [payload: { axis: SheetDimensionAxis; level: number }];
@@ -79,32 +93,42 @@ function surfaceRect(address: CellAddress) {
 }
 
 const filterButtons = computed(() => {
-  const range = props.filterRange;
-  if (!range) return [];
-  const start = Math.min(range.start.column, range.end.column);
-  const end = Math.max(range.start.column, range.end.column);
-  const row = Math.min(range.start.row, range.end.row);
+  const filters = [
+    ...(props.filterRange
+      ? [{ range: props.filterRange, filteredColumns: props.filteredColumns, tableId: undefined }]
+      : []),
+    ...(props.tableFilters ?? []),
+  ];
   const buttons: Array<{
     column: number;
+    range: Readonly<{ start: CellAddress; end: CellAddress }>;
+    tableId?: string;
     style: Record<string, string>;
     active: boolean;
   }> = [];
-  const visibleColumns = new Set<number>();
-  props.frame.layout.forEachVisibleCell((address) => {
-    if (address.row === row && address.column >= start && address.column <= end)
-      visibleColumns.add(address.column);
-  });
-  for (const column of visibleColumns) {
-    const rect = surfaceRect({ row, column });
-    if (!rect || rect.width < 22 || rect.height < 18) continue;
-    buttons.push({
-      column,
-      active: props.filteredColumns?.includes(column) ?? false,
-      style: {
-        left: `${rect.left + rect.width - 18}px`,
-        top: `${rect.top + Math.max(1, (rect.height - 16) / 2)}px`,
-      },
+  for (const filter of filters) {
+    const start = Math.min(filter.range.start.column, filter.range.end.column);
+    const end = Math.max(filter.range.start.column, filter.range.end.column);
+    const row = Math.min(filter.range.start.row, filter.range.end.row);
+    const visibleColumns = new Set<number>();
+    props.frame.layout.forEachVisibleCell((address) => {
+      if (address.row === row && address.column >= start && address.column <= end)
+        visibleColumns.add(address.column);
     });
+    for (const column of visibleColumns) {
+      const rect = surfaceRect({ row, column });
+      if (!rect || rect.width < 22 || rect.height < 18) continue;
+      buttons.push({
+        column,
+        range: filter.range,
+        ...(filter.tableId ? { tableId: filter.tableId } : {}),
+        active: filter.filteredColumns?.includes(column) ?? false,
+        style: {
+          left: `${rect.left + rect.width - 18}px`,
+          top: `${rect.top + Math.max(1, (rect.height - 16) / 2)}px`,
+        },
+      });
+    }
   }
   return buttons;
 });
@@ -185,9 +209,14 @@ const columnOutlinePanes = computed(() =>
     : [],
 );
 
-function requestColumnFilter(column: number, event: MouseEvent): void {
+function requestColumnFilter(
+  button: (typeof filterButtons.value)[number],
+  event: MouseEvent,
+): void {
   emit("filterColumnRequest", {
-    column,
+    column: button.column,
+    range: { start: { ...button.range.start }, end: { ...button.range.end } },
+    ...(button.tableId ? { tableId: button.tableId } : {}),
     anchor: (event.currentTarget as HTMLElement).getBoundingClientRect(),
   });
 }
@@ -210,7 +239,7 @@ watch(
   <div class="sheet-data-controls" aria-hidden="false">
     <span
       v-for="button in filterButtons"
-      :key="button.column"
+      :key="`${button.tableId ?? 'sheet'}:${button.column}`"
       v-icon-action="readOnly"
       class="sheet-data-controls__filter"
       :style="button.style"
@@ -218,7 +247,7 @@ watch(
       :aria-label="`${t('dataTools.filter.openColumn')} ${columnIndexToLabel(button.column)}`"
       :title="t('dataTools.filter.openColumn')"
       @pointerdown.stop
-      @click.stop="requestColumnFilter(button.column, $event)"
+      @click.stop="requestColumnFilter(button, $event)"
     >
       <ChevronDown :size="13" aria-hidden="true" />
     </span>

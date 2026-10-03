@@ -73,6 +73,42 @@ describe("formula evaluation", () => {
     expect(evaluateFormula("=SUM(A1#)", formulaResolver)).toBe(6);
   });
 
+  test("delegates structured table references with their formula row context", () => {
+    const calls: Array<{ scope: string; address?: { row: number; column: number } }> = [];
+    const formulaResolver: FormulaEvaluationResolver = {
+      resolveCell: () => null,
+      resolveRange: () => [],
+      resolveStructuredReference: (reference, address) => {
+        calls.push({ scope: reference.scope, address });
+        if (reference.scope === "this-row") return { value: 7 };
+        return {
+          value: { kind: "formula-array", rows: [[2], [3]] },
+          range: {
+            bounds: { start: { row: 1, column: 1 }, end: { row: 2, column: 1 } },
+            values: [2, 3],
+          },
+        };
+      },
+    };
+
+    expect(
+      evaluateFormula("=SUM(Table1[Amount])", formulaResolver, { address: { row: 4, column: 2 } }),
+    ).toBe(5);
+    expect(evaluateFormula("=[@Amount]", formulaResolver, { address: { row: 4, column: 2 } })).toBe(
+      7,
+    );
+    expect(calls).toEqual([
+      { scope: "data", address: { row: 4, column: 2 } },
+      { scope: "this-row", address: { row: 4, column: 2 } },
+    ]);
+  });
+
+  test("returns REF for a structured reference when no table resolver can find it", () => {
+    expect(evaluateFormula("=MissingTable[Amount]", resolver(new Map()))).toEqual(
+      createFormulaError("REF"),
+    );
+  });
+
   test("does not evaluate the unselected scalar IF branch", () => {
     expect(evaluateFormula("=IF(FALSE,#REF!,42)", resolver(new Map()))).toBe(42);
   });

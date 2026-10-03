@@ -41,8 +41,10 @@ describe("fixed conditional-format shortcut dialogs", () => {
     });
     mounted.push(wrapper);
     const dialog = wrapper.findComponent(ConditionalFormatQuickDialog);
-    expect(document.body.textContent).not.toContain("Select a rule type");
-    expect(document.body.textContent).not.toContain("Applies to");
+    const quickDialog = document.querySelector('[role="dialog"][aria-label="Greater than"]');
+    expect(quickDialog).not.toBeNull();
+    expect(quickDialog?.textContent).not.toContain("Select a rule type");
+    expect(quickDialog?.textContent).not.toContain("Applies to");
     dialog.findComponent(Input).vm.$emit("update:modelValue", "10");
     await nextTick();
     dialog.findComponent(Dialog).vm.$emit("confirm");

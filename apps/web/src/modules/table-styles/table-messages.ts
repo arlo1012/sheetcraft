@@ -1,0 +1,36 @@
+export type TableMessageSchema = {
+  tables: {
+    create: string;
+    applyStyle: string;
+    sourceRange: string;
+    styleOnly: string;
+    headerRows: string;
+    convertAndApply: string;
+    invalidHeaderRows: string;
+    settings: string;
+    tools: string;
+    resize: string;
+    range: string;
+    selectRange: string;
+    hasHeaders: string;
+    generatedHeaders: string;
+    name: string;
+    headerRow: string;
+    totalRow: string;
+    firstColumn: string;
+    lastColumn: string;
+    bandedRows: string;
+    bandedColumns: string;
+    filterButton: string;
+    styleOptions: string;
+    convertToRange: string;
+    convertHint: string;
+    structuredHint: string;
+    invalidRange: string;
+    invalidName: string;
+    overlap: string;
+    failed: string;
+    confirm: string;
+    cancel: string;
+  };
+};

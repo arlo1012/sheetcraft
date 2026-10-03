@@ -4,42 +4,61 @@ import {
   type ConditionalFormatResolverOptions,
 } from "./conditional-formatting.js";
 import { createDuplicateHighlightResolver } from "./duplicate-values.js";
-import { DEFAULT_CELL_TEXT_COLOR, type CellStyle } from "./style.js";
+import { getTableAtAddress, resolveTableCellStyle } from "./table-styles.js";
+import { DEFAULT_CELL_TEXT_COLOR, mergeCellStyle, type CellStyle } from "./style.js";
 import { getCellStyle, type CellAddress, type Sheet, type SheetEvaluator } from "./workbook.js";
 
 export type CellColorTarget = "fill" | "text";
 
-function styleColor(
+export function normalizeCellColor(color: string): string {
+  return color.toLowerCase();
+}
+
+function getStyleColor(
   style: Readonly<CellStyle> | undefined,
   target: CellColorTarget,
 ): string | null | undefined {
-  if (target === "text") return (style?.textColor ?? DEFAULT_CELL_TEXT_COLOR).toLowerCase();
+  if (target === "text") return normalizeCellColor(style?.textColor ?? DEFAULT_CELL_TEXT_COLOR);
   if (style?.fillGradient) return undefined;
-  return style?.fillColor ? style.fillColor.toLowerCase() : null;
+  return style?.fillColor ? normalizeCellColor(style.fillColor) : null;
 }
 
-/** Resolves direct formatting, duplicate highlighting, and conditional-format overlays. */
+/** Resolves the solid color currently visible in a cell, including display overlays. */
 export function createCellColorResolver(
   sheet: Sheet,
   evaluator: SheetEvaluator,
   options?: ConditionalFormatResolverOptions,
 ): (address: CellAddress, target: CellColorTarget) => string | null | undefined {
-  const duplicate = createDuplicateHighlightResolver(sheet, evaluator);
-  const conditional = createConditionalFormatResolver(sheet, evaluator, options);
-  return (address, target) =>
-    styleColor(
-      applyConditionalFormatStyle(
-        { ...getCellStyle(sheet, address), ...duplicate(address) },
-        conditional(address),
-      ),
+  const resolveDuplicateHighlight = createDuplicateHighlightResolver(sheet, evaluator);
+  const resolveConditionalFormat = createConditionalFormatResolver(sheet, evaluator, options);
+  return (address, target) => {
+    const direct = getCellStyle(sheet, address);
+    const table = getTableAtAddress(sheet, address);
+    const base = table
+      ? mergeCellStyle(resolveTableCellStyle(table, address), direct ?? {})
+      : direct;
+    const highlight = resolveDuplicateHighlight(address);
+    let style: CellStyle | undefined = base ? { ...base } : undefined;
+    if (highlight) {
+      style = { ...base, ...highlight };
+      if (highlight.fillColor) {
+        delete style.fillGradient;
+        delete style.fillPattern;
+        delete style.fillPatternColor;
+      }
+    }
+    return getStyleColor(
+      applyConditionalFormatStyle(style, resolveConditionalFormat(address)),
       target,
     );
+  };
 }
 
+/** Resolves only the directly persisted cell color, without display overlays. */
 export function getCellColor(
   sheet: Sheet,
   address: CellAddress,
   target: CellColorTarget,
 ): string | null | undefined {
-  return styleColor(getCellStyle(sheet, address), target);
+  return getStyleColor(getCellStyle(sheet, address), target);
 }

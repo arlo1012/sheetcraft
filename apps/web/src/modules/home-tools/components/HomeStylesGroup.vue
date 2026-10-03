@@ -1,16 +1,32 @@
 <script setup lang="ts">
-import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
-import { TableProperties } from "lucide-vue-next";
+import type { TableStyleDefinition } from "@idea10/core/table-styles";
+import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
+import TableStylesMenu from "../../table-styles/components/TableStylesMenu.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import ConditionalFormattingMenu, {
   type ConditionalFormatQuickRule,
 } from "../../conditional-formatting/components/ConditionalFormattingMenu.vue";
 
-defineProps<{ disabled?: boolean; editSessionId?: string }>();
+defineProps<{
+  disabled?: boolean;
+  editSessionId?: string;
+  tableStyles?: readonly TableStyleDefinition[];
+  pivotTableStyles?: readonly PivotTableStyleDefinition[];
+  selectedTableStyleId?: string;
+  selectedTableStyleColor?: string;
+  hasTable?: boolean;
+}>();
 const emit = defineEmits<{
   createConditionalFormat: [kind: ConditionalFormatQuickRule];
   manageConditionalFormats: [];
   clearConditionalFormats: [scope: "selection" | "sheet"];
+  applyTableStyle: [style: TableStyleDefinition];
+  createTableStyle: [];
+  editTableStyle: [style: TableStyleDefinition];
+  createPivotTableStyle: [];
+  editPivotTableStyle: [style: PivotTableStyleDefinition];
+  clearTableStyle: [];
+  manageTable: [];
 }>();
 
 const { t } = useAppI18n();
@@ -24,15 +40,22 @@ const { t } = useAppI18n();
     :aria-label="t('format.styleRuleTools')"
   >
     <div class="home-styles-group__row" data-ribbon-row="1">
-      <RibbonMenuButton
-        full-width
-        :label="t('app.unavailableFeature', { feature: t('ribbon.tableStyles') })"
-        :text="t('ribbon.tableStyles')"
-        disabled
-        data-ribbon-placeholder="table-styles"
-      >
-        <TableProperties aria-hidden="true" />
-      </RibbonMenuButton>
+      <TableStylesMenu
+        :disabled="disabled"
+        :edit-session-id="editSessionId"
+        :custom-styles="tableStyles"
+        :custom-pivot-styles="pivotTableStyles"
+        :selected-style-id="selectedTableStyleId"
+        :selected-accent-color="selectedTableStyleColor"
+        :has-table="hasTable"
+        @apply="emit('applyTableStyle', $event)"
+        @create="emit('createTableStyle')"
+        @edit="emit('editTableStyle', $event)"
+        @create-pivot="emit('createPivotTableStyle')"
+        @edit-pivot="emit('editPivotTableStyle', $event)"
+        @clear="emit('clearTableStyle')"
+        @manage="emit('manageTable')"
+      />
     </div>
     <div class="home-styles-group__row" data-ribbon-row="2">
       <ConditionalFormattingMenu

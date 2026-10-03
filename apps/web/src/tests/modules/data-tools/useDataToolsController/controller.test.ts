@@ -6,18 +6,28 @@ import {
   createAddSheetCommand,
   createSetCellContentCommand,
   createSetSheetDataValidationsCommand,
+  createSheetFilterHiddenRowIntervals,
 } from "@idea10/core/commands";
-import { executeWorkbookCommand, createWorkbookSession } from "@idea10/core/history";
+import {
+  executeWorkbookCommand,
+  createWorkbookSession,
+  undoWorkbookCommand,
+  redoWorkbookCommand,
+} from "@idea10/core/history";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
+import { createBuiltinTableStyles } from "@idea10/core/table-styles";
 import {
   createSheetEvaluator,
   getActiveSheet,
   setActiveSheet,
   setCellStyle,
+  setCellContent,
+  getCellContent,
   type Workbook,
 } from "@idea10/core/workbook";
 import { createAppI18n } from "../../../../shared/i18n";
 import { useDataToolsController } from "../../../../modules/data-tools/useDataToolsController";
+import { readFilterPanelSettings } from "../../../../modules/data-tools/filter-panel-settings";
 
 function fixture(
   selection = {
@@ -75,40 +85,6 @@ function fixture(
 describe("useDataToolsController", () => {
   beforeEach(() => localStorage.clear());
 
-  test("color-sorts an opened filter range immediately with selected colors first", () => {
-    const f = fixture();
-    f.set(0, 0, "Name");
-    f.set(0, 1, "Amount");
-    f.set(1, 0, "Ada");
-    f.set(1, 1, 20);
-    f.set(2, 0, "Zed");
-    f.set(2, 1, 10);
-    f.set(3, 0, "Mia");
-    f.set(3, 1, 30);
-    setCellStyle(f.sheet, { row: 2, column: 1 }, { fillColor: "#ff0000", textColor: "#00ff00" });
-    f.controller.toggleFilter();
-    const rows = () => {
-      const evaluator = createSheetEvaluator(f.sheet);
-      return Array.from({ length: 4 }, (_, row) => evaluator.getComputedValue({ row, column: 0 }));
-    };
-    const open = () => f.controller.openColumnFilter(1);
-
-    open();
-    f.controller.sortFilterColumnColor({ sortOn: "cellColor", color: "#ff0000" });
-    expect(rows()).toEqual(["Name", "Zed", "Ada", "Mia"]);
-    expect(f.controller.filterState.value).toBeUndefined();
-    expect(f.controller.sortVisible.value).toBe(false);
-
-    undoWorkbookCommand(f.session);
-    open();
-    f.controller.sortFilterColumnColor({ sortOn: "fontColor", color: "#00ff00" });
-    expect(rows()).toEqual(["Name", "Zed", "Ada", "Mia"]);
-
-    undoWorkbookCommand(f.session);
-    open();
-    f.controller.sortFilterColumnColor({ sortOn: "cellColor", color: null });
-    expect(rows()).toEqual(["Name", "Ada", "Mia", "Zed"]);
-  });
   test("restores applied sort settings after reloading the serialized workbook", () => {
     const f = fixture();
     f.set(0, 1, "Priority");
@@ -372,6 +348,67 @@ describe("useDataToolsController", () => {
     f.controller.applyColumnFilter({ includedKeys: [] });
     expect(f.sheet.filter?.columns.find((item) => item.column === 1)?.allowedValues).toEqual([]);
   });
+  test("persists display preferences without replacing an open filter's value or selection inputs", () => {
+    const f = fixture();
+    f.set(0, 1, "Team");
+    f.set(1, 1, "East");
+    f.set(2, 1, "West");
+    f.controller.toggleFilter();
+    f.controller.openColumnFilter(1);
+    const state = f.controller.filterState.value!;
+    const settings = {
+      ...state.settings,
+      showItemCount: false,
+      showTotalCount: true,
+      showCriteria: true,
+      checkedFirst: true,
+      sortField: "count" as const,
+      sortDirection: "descending" as const,
+    };
+    f.controller.updateFilterPanelSettings(settings);
+
+    expect(f.controller.filterState.value).toBe(state);
+    expect(f.controller.filterState.value!.values).toBe(state.values);
+    expect(f.controller.filterState.value!.appliedKeys).toBe(state.appliedKeys);
+    expect(readFilterPanelSettings()).toEqual(settings);
+
+    const restored = fixture(undefined, deserializeWorkbook(serializeWorkbook(f.session.workbook)));
+    restored.controller.openColumnFilter(1);
+    expect(restored.controller.filterState.value!.settings).toEqual(settings);
+  });
+  test("retains merged-filter behavior when reapplying or clearing criteria", () => {
+    const f = fixture();
+    f.set(0, 1, "Team");
+    f.set(0, 2, "Amount");
+    f.set(1, 1, "East");
+    f.set(3, 1, "West");
+    f.set(4, 1, "East");
+    for (let row = 1; row <= 4; row += 1) f.set(row, 2, row * 10);
+    f.sheet.mergedCells = [{ start: { row: 1, column: 1 }, end: { row: 2, column: 1 } }];
+    f.controller.toggleFilter();
+    f.controller.openColumnFilter(1);
+    expect(f.controller.filterState.value).toMatchObject({
+      includesMergedCells: true,
+      canSort: false,
+      values: [
+        { key: { kind: "string", value: "East" }, count: 2 },
+        { key: { kind: "string", value: "West" }, count: 1 },
+      ],
+    });
+    f.controller.applyColumnFilter({
+      includedKeys: [{ kind: "string", value: "East" }],
+      allowMergedCells: true,
+    });
+    f.controller.reapplyFilter();
+    expect(f.sheet.filter?.allowMergedCells).toBe(true);
+    expect(createSheetFilterHiddenRowIntervals(f.sheet)).toEqual([{ start: 3, end: 3 }]);
+
+    f.controller.openColumnFilter(1);
+    f.controller.clearColumnFilter();
+    expect(f.sheet.filter).toMatchObject({ allowMergedCells: true, columns: [] });
+    f.controller.clearFilter();
+    expect(f.sheet.filter).toMatchObject({ allowMergedCells: true, columns: [] });
+  });
   test("sorts the opened filter column and its full table when the active cell is elsewhere", () => {
     const f = fixture();
     f.set(0, 0, "Name");
@@ -389,6 +426,155 @@ describe("useDataToolsController", () => {
     expect(evaluator.getComputedValue({ row: 0, column: 1 })).toBe("Amount");
     expect(evaluator.getComputedValue({ row: 1, column: 1 })).toBe(10);
     expect(evaluator.getComputedValue({ row: 1, column: 0 })).toBe("Z");
+  });
+  test("color-sorts an opened filter range immediately with selected colors first", () => {
+    const f = fixture();
+    f.set(0, 0, "Name");
+    f.set(0, 1, "Amount");
+    f.set(1, 0, "Ada");
+    f.set(1, 1, 20);
+    f.set(2, 0, "Zed");
+    f.set(2, 1, 10);
+    f.set(3, 0, "Mia");
+    f.set(3, 1, 30);
+    setCellStyle(f.sheet, { row: 2, column: 1 }, { fillColor: "#ff0000", textColor: "#00ff00" });
+    f.controller.toggleFilter();
+    const rows = () => {
+      const evaluator = createSheetEvaluator(f.sheet);
+      return Array.from({ length: 4 }, (_, row) => evaluator.getComputedValue({ row, column: 0 }));
+    };
+    const open = () => f.controller.openColumnFilter(1);
+
+    open();
+    f.controller.sortFilterColumnColor({ sortOn: "cellColor", color: "#ff0000" });
+    expect(rows()).toEqual(["Name", "Zed", "Ada", "Mia"]);
+    expect(f.controller.filterState.value).toBeUndefined();
+    expect(f.controller.sortVisible.value).toBe(false);
+
+    undoWorkbookCommand(f.session);
+    open();
+    f.controller.sortFilterColumnColor({ sortOn: "fontColor", color: "#00ff00" });
+    expect(rows()).toEqual(["Name", "Zed", "Ada", "Mia"]);
+
+    undoWorkbookCommand(f.session);
+    open();
+    f.controller.sortFilterColumnColor({ sortOn: "cellColor", color: null });
+    expect(rows()).toEqual(["Name", "Ada", "Mia", "Zed"]);
+  });
+  test("color-sorts the opened table column while keeping its header, total, and paired values", () => {
+    const f = fixture();
+    for (const [row, values] of [
+      ["Name", "Amount"],
+      ["Ada", 20],
+      ["Zed", 10],
+      ["Mia", 30],
+      ["Total", 60],
+    ].entries())
+      for (const [offset, value] of values.entries()) f.set(row, offset + 1, value!);
+    setCellStyle(f.sheet, { row: 2, column: 1 }, { fillColor: "#ff0000", textColor: "#00ff00" });
+    const range = { start: { row: 0, column: 1 }, end: { row: 3, column: 2 } };
+    f.sheet.tables = [
+      {
+        id: "sales",
+        name: "Sales",
+        range: { ...range, end: { row: 4, column: 2 } },
+        columns: [
+          { id: "name", name: "Name" },
+          { id: "amount", name: "Amount" },
+        ],
+        style: createBuiltinTableStyles()[0]!,
+        headerRow: true,
+        totalRow: true,
+        firstColumn: false,
+        lastColumn: false,
+        bandedRows: false,
+        bandedColumns: false,
+        filterButton: true,
+        filter: null,
+      },
+    ];
+    f.selection.address = { row: 20, column: 9 };
+    f.selection.range = { start: f.selection.address, end: f.selection.address };
+    const open = () => f.controller.openColumnFilter({ column: 1, range, tableId: "sales" });
+    open();
+    f.controller.openFilterSort();
+    expect(f.controller.sortInitial.value).toMatchObject({ column: 1, headerLocked: true });
+    expect(f.controller.sortColorColumns.value[0]!.cellColors).toContain("#ff0000");
+    expect(f.controller.sortColorColumns.value[0]!.fontColors).toContain("#00ff00");
+    f.controller.applySort({
+      range: "B1:C4",
+      hasHeader: true,
+      levels: [{ column: 1, sortOn: "cellColor", color: "#ff0000", direction: "ascending" }],
+    });
+    const rows = () => {
+      const evaluator = createSheetEvaluator(getActiveSheet(f.session.workbook));
+      return Array.from({ length: 5 }, (_, row) => [
+        evaluator.getComputedValue({ row, column: 1 }),
+        evaluator.getComputedValue({ row, column: 2 }),
+      ]);
+    };
+    expect(rows()).toEqual([
+      ["Name", "Amount"],
+      ["Zed", 10],
+      ["Ada", 20],
+      ["Mia", 30],
+      ["Total", 60],
+    ]);
+    expect(f.controller.filterState.value).toBeUndefined();
+    undoWorkbookCommand(f.session);
+    open();
+    f.controller.openFilterSort();
+    f.controller.applySort({
+      range: "B1:C4",
+      hasHeader: true,
+      levels: [{ column: 1, sortOn: "fontColor", color: "#00ff00", direction: "descending" }],
+    });
+    expect(rows()).toEqual([
+      ["Name", "Amount"],
+      ["Ada", 20],
+      ["Mia", 30],
+      ["Zed", 10],
+      ["Total", 60],
+    ]);
+  });
+  test("applies a column filter to the requested structured table", () => {
+    const f = fixture();
+    f.set(5, 2, "Region");
+    f.set(5, 3, "Amount");
+    f.set(6, 2, "East");
+    f.set(6, 3, 10);
+    f.set(7, 2, "West");
+    f.set(7, 3, 20);
+    const range = { start: { row: 5, column: 2 }, end: { row: 7, column: 3 } };
+    f.sheet.tables = [
+      {
+        id: "table-1",
+        name: "Table1",
+        range,
+        columns: [
+          { id: "region", name: "Region" },
+          { id: "amount", name: "Amount" },
+        ],
+        style: createBuiltinTableStyles()[0]!,
+        headerRow: true,
+        totalRow: false,
+        firstColumn: false,
+        lastColumn: false,
+        bandedRows: true,
+        bandedColumns: false,
+        filterButton: true,
+        filter: null,
+      },
+    ];
+
+    f.controller.openColumnFilter({ column: 2, range, tableId: "table-1" });
+    expect(f.controller.filterState.value?.columnLabel).toBe("Region (C)");
+    f.controller.applyColumnFilter({ includedKeys: [{ kind: "string", value: "East" }] });
+
+    expect(f.sheet.tables[0]!.filter?.columns).toEqual([
+      { column: 2, allowedValues: [{ kind: "string", value: "East" }] },
+    ]);
+    expect(f.sheet.filter).toBeNull();
   });
   test("enables outline actions only for eligible groups at the active cell", () => {
     const f = fixture();
@@ -573,6 +759,72 @@ describe("useDataToolsController", () => {
     expect(f.controller.duplicateCount.value).toBe(2);
     f.controller.updateRemoveDuplicatesDraft({ hasHeader: true, columns: [0, 1] });
     expect(f.controller.duplicateCount.value).toBe(1);
+  });
+
+  test("removes duplicates from the whole table and relocates totals in one undo step", () => {
+    const f = fixture();
+    for (const [offset, values] of [
+      ["Region", "Amount"],
+      ["East", 10],
+      ["East", 10],
+      ["West", 20],
+    ].entries())
+      for (const [column, value] of values.entries()) f.set(offset + 5, column + 2, value!);
+    f.set(6, 4, "Untouched");
+    setCellContent(
+      f.sheet,
+      { row: 9, column: 3 },
+      { kind: "formula", formula: { source: "=SUBTOTAL(109,D7:D9)" } },
+    );
+    f.sheet.tables = [
+      {
+        id: "sales",
+        name: "Sales",
+        range: { start: { row: 5, column: 2 }, end: { row: 9, column: 3 } },
+        columns: [
+          { id: "region", name: "Region" },
+          { id: "amount", name: "Amount" },
+        ],
+        style: createBuiltinTableStyles()[0]!,
+        headerRow: true,
+        totalRow: true,
+        firstColumn: false,
+        lastColumn: false,
+        bandedRows: true,
+        bandedColumns: false,
+        filterButton: true,
+        filter: null,
+      },
+    ];
+    f.controller.openTableRemoveDuplicates("sales");
+    expect(f.controller.removeDuplicatesInitial.value).toEqual({
+      hasHeader: true,
+      columns: [2, 3],
+    });
+    expect(f.controller.removeDuplicatesIsTable.value).toBe(true);
+    expect(f.controller.columns.value.map((entry) => entry.column)).toEqual([2, 3]);
+    expect(f.controller.duplicateCount.value).toBe(1);
+    const historyLength = f.session.history.undoStack.length;
+    f.controller.applyRemoveDuplicates({ hasHeader: false, columns: [2, 3] });
+    expect(f.controller.removeDuplicatesVisible.value).toBe(false);
+    expect(f.session.history.undoStack).toHaveLength(historyLength + 1);
+    expect(getActiveSheet(f.session.workbook).tables?.[0]?.range.end.row).toBe(8);
+    expect(getCellContent(getActiveSheet(f.session.workbook), { row: 8, column: 3 })).toMatchObject(
+      { kind: "formula", formula: { source: "=SUBTOTAL(109,D7:D8)" } },
+    );
+    expect(getCellContent(getActiveSheet(f.session.workbook), { row: 6, column: 4 })).toMatchObject(
+      { value: "Untouched" },
+    );
+    undoWorkbookCommand(f.session);
+    expect(getActiveSheet(f.session.workbook).tables?.[0]?.range.end.row).toBe(9);
+    expect(getCellContent(getActiveSheet(f.session.workbook), { row: 7, column: 2 })).toMatchObject(
+      { value: "East" },
+    );
+    redoWorkbookCommand(f.session);
+    expect(getActiveSheet(f.session.workbook).tables?.[0]?.range.end.row).toBe(8);
+    f.controller.openRemoveDuplicates();
+    expect(f.controller.removeDuplicatesIsTable.value).toBe(false);
+    expect(f.controller.removeDuplicatesInitial.value).toBeUndefined();
   });
 
   test("replaces one validation cell without losing outer custom-rule fragments", () => {

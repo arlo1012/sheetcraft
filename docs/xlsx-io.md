@@ -2,6 +2,15 @@
 
 `@idea10/xlsx-io` is a runtime-neutral byte adapter. It accepts `Uint8Array`, returns Core `Workbook` values, and never reads files, creates browser blobs, or replaces a document. Web owns the Worker, file chooser, confirmation and persistence transaction.
 
+[Structured tables](features/table-styles.md) exchange native table parts, column
+names, structured formula sources, table filters, header/total rows, style options,
+and custom table-style DXFs. Table-style definitions share the existing DXF list
+with conditional formatting. Product theme presets export explicit definitions;
+unknown Excel built-in styles use an approximate product style when imported.
+Custom PivotTable style definitions and their independent default also persist
+in `styles.xml`, using native style elements and the same DXF pool. This support
+does not create PivotTable cache or data parts.
+
 Conditional-format export compacts exact duplicate non-formula rules within each worksheet, retaining the first occurrence and the relative priority of remaining rules. It shares identical differential styles across worksheets and omits unused empty styles. Compaction affects only the export copy; the editable document and history remain unchanged. Formula rules are retained because volatile evaluations can differ. Distinct ranges, anchors, conditions and stop flags are preserved; ranges are never combined because that would change statistics-based rules.
 
 Web does not display compatibility reports. Exports download directly; imports only confirm replacement of the current document and local copy. Processing failures use a short dismissible error dialog. Compatibility diagnostics remain internal to the adapter for development tests and documentation, not as user-facing warnings or an export confirmation step.

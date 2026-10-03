@@ -17,6 +17,7 @@ function intersects(left: CellRange, right: CellRange): boolean {
 
 function hasDerivedStyles(sheet: Sheet, range: CellRange): boolean {
   return Boolean(
+    (sheet.tables ?? []).some((table) => intersects(table.range, range)) ||
     (sheet.duplicateRules ?? []).some(
       (rule) => rule.kind === "highlight" && intersects(rule.range, range),
     ) ||

@@ -46,6 +46,8 @@ withDefaults(
       options?: RangeReferenceSelectionOptions,
     ) => Promise<string | undefined>;
     duplicateCount?: number;
+    removeDuplicatesInitial?: RemoveDuplicatesDraft;
+    removeDuplicatesIsTable?: boolean;
     validationInitial?: DataValidationInitial;
     validationSuspended?: boolean;
     selectValidationReference?: (
@@ -115,6 +117,8 @@ const emit = defineEmits<{
   />
   <RemoveDuplicatesDialog
     :visible="removeDuplicatesVisible"
+    :initial="removeDuplicatesInitial"
+    :header-disabled="removeDuplicatesIsTable"
     :columns="columns"
     :removal-count="duplicateCount"
     @close="emit('closeRemoveDuplicates')"

@@ -82,6 +82,16 @@ import {
 import { applyDeleteDefinedNameCommand, applyUpsertDefinedNameCommand } from "./names.js";
 import { applySetDefinedNamesCommand } from "./names-from-selection.js";
 import {
+  applyCreateTableCommand,
+  applyApplyTableStyleToRangeCommand,
+  applyRemoveTableCommand,
+  applyRestoreTableTransactionCommand,
+  applyResizeTableCommand,
+  applySetWorkbookTableStylesCommand,
+  applySetWorkbookPivotTableStylesCommand,
+  applyUpdateTableCommand,
+} from "../tables.js";
+import {
   applyClearCellRangeCommand,
   applyMoveCellRangeCommand,
   applySetCellContentsCommand,
@@ -112,6 +122,11 @@ function assertCommandDoesNotModifyProtectedSheet(
   switch (command.type) {
     case "setCellContents":
     case "clearCellRange":
+    case "createTable":
+    case "applyTableStyleToRange":
+    case "updateTable":
+    case "resizeTable":
+    case "removeTable":
     case "moveCellRange":
     case "insertCells":
     case "deleteCells":
@@ -193,6 +208,22 @@ export function applyWorkbookCommand(
         return applySetCellContentsCommand(workbook, command);
       case "clearCellRange":
         return applyClearCellRangeCommand(workbook, command);
+      case "createTable":
+        return applyCreateTableCommand(workbook, command);
+      case "applyTableStyleToRange":
+        return applyApplyTableStyleToRangeCommand(workbook, command);
+      case "updateTable":
+        return applyUpdateTableCommand(workbook, command);
+      case "resizeTable":
+        return applyResizeTableCommand(workbook, command);
+      case "removeTable":
+        return applyRemoveTableCommand(workbook, command);
+      case "setWorkbookTableStyles":
+        return applySetWorkbookTableStylesCommand(workbook, command);
+      case "setWorkbookPivotTableStyles":
+        return applySetWorkbookPivotTableStylesCommand(workbook, command);
+      case "restoreTableTransaction":
+        return applyRestoreTableTransactionCommand(workbook, command);
       case "moveCellRange":
         return applyMoveCellRangeCommand(workbook, command);
       case "insertCells":

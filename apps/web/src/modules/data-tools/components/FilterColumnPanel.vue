@@ -17,6 +17,7 @@ import {
   DEFAULT_FILTER_SEARCH_OPTIONS,
   type FilterSearchOptions,
 } from "../filter-value-options";
+import { readFilterPanelSettings, type FilterPanelSettings } from "../filter-panel-settings";
 import type {
   DataToolFilterCriteria,
   DataToolFilterValueOption,
@@ -44,11 +45,15 @@ const props = withDefaults(
     hasCriteria: boolean;
     canSort: boolean;
     disabled?: boolean;
+    settings?: FilterPanelSettings;
+    includesMergedCells?: boolean;
     dateSystem?: ExcelDateSystem;
   }>(),
   {
     disabled: false,
     dateSystem: "1900",
+    settings: readFilterPanelSettings,
+    includesMergedCells: false,
     colors: () => ({ cellColors: [], fontColors: [] }),
   },
 );
@@ -57,12 +62,14 @@ const emit = defineEmits<{
     payload: {
       includedKeys: SheetFilterValue[];
       criteria?: DataToolFilterCriteria;
+      allowMergedCells: boolean;
     },
   ];
   sort: [direction: "ascending" | "descending"];
   openSort: [];
   sortColor: [sort: FilterColorSort];
   clear: [];
+  "update:settings": [settings: FilterPanelSettings];
   close: [];
 }>();
 const { t } = useAppI18n();
@@ -78,7 +85,9 @@ const tab = ref<"values" | "color">("values");
 const valuesDirty = ref(false);
 const editingAction = ref<FilterConditionAction>();
 const editing = computed(() => editingAction.value !== undefined);
-const filterDisabled = computed(() => props.disabled);
+const filterDisabled = computed(
+  () => props.disabled || (props.includesMergedCells && !props.settings.allowMergedCells),
+);
 function isColorCondition(
   condition: SheetFilterCondition | undefined,
 ): condition is ColorCondition {
@@ -102,6 +111,7 @@ const { floatingStyles } = useDismissibleFloatingPanel(reference, root, open, {
   placement: "bottom-start",
   offset: 3,
   additionalInside: () => [
+    valueListRef.value?.settingsMenuElement,
     conditionMenuRef.value?.rootElement,
     colorSortMenuRef.value?.rootElement,
     valueListRef.value?.searchMenuElement,
@@ -150,6 +160,16 @@ const validColor = computed(() => {
 const canApply = computed(
   () => !filterDisabled.value && (tab.value === "values" || validColor.value),
 );
+const recordTotals = computed(() => {
+  const keys = new Set(includedKeys.value.map(getSheetFilterValueKey));
+  let selectedCount = 0;
+  let total = 0;
+  for (const option of matchingValues.value) {
+    total += option.count;
+    if (keys.has(getSheetFilterValueKey(option.key))) selectedCount += option.count;
+  }
+  return { selected: selectedCount, total };
+});
 function describeCondition(condition: Exclude<SheetFilterCondition, ColorCondition>): string {
   if (condition.kind === "compound")
     return condition.conditions
@@ -169,7 +189,19 @@ function describeCondition(condition: Exclude<SheetFilterCondition, ColorConditi
   return `${t(operatorLabels[condition.operator])} ${draft.first}${draft.second ? ` ${t("dataTools.filter.and")} ${draft.second}` : ""}`;
 }
 const criteriaSummary = computed(() => {
-  return pendingValueCriteria.value ? describeCondition(pendingValueCriteria.value) : "";
+  if (pendingValueCriteria.value) return describeCondition(pendingValueCriteria.value);
+  if (query.value.trim()) return `${t("dataTools.filter.searchValues")}：${query.value.trim()}`;
+  if (includedKeys.value.length === props.values.length) return t("dataTools.filter.showAll");
+  if (includedKeys.value.length === 0) return t("dataTools.filter.selectNone");
+  const keys = new Set(includedKeys.value.map(getSheetFilterValueKey));
+  const labels = props.values
+    .filter((option) => keys.has(getSheetFilterValueKey(option.key)))
+    .slice(0, 3)
+    .map((option) => option.label)
+    .join(", ");
+  return includedKeys.value.length > 3
+    ? `${labels} · ${t("dataTools.filter.moreValues", { count: includedKeys.value.length - 3 })}`
+    : labels;
 });
 watch(
   () => [props.visible, props.columnLabel, props.appliedKeys, props.criteria] as const,
@@ -202,6 +234,7 @@ function applyCondition(criteria: SheetFilterCondition): void {
     emit("apply", {
       includedKeys: [],
       criteria,
+      allowMergedCells: props.settings.allowMergedCells,
     });
 }
 function apply(): void {
@@ -211,6 +244,7 @@ function apply(): void {
   else
     emit("apply", {
       includedKeys: includedKeys.value,
+      allowMergedCells: props.settings.allowMergedCells,
     });
 }
 function chooseCondition(action: FilterConditionAction): void {
@@ -309,9 +343,11 @@ onBeforeUnmount(() => {
               :search-options="searchOptions"
               :values="values"
               :disabled="disabled"
+              :settings="settings"
               @update:model-value="valuesDirty = true"
               @update:query="valuesDirty = true"
               @update:search-options="updateSearchOptions"
+              @update:settings="emit('update:settings', $event)"
               @keydown.enter="onSearchEnter"
             />
           </div>
@@ -322,13 +358,20 @@ onBeforeUnmount(() => {
           </div>
         </TTabPanel>
       </TTabs>
+      <p
+        v-if="includesMergedCells && !settings.allowMergedCells"
+        class="filter-column-panel__error"
+        role="alert"
+      >
+        {{ t("dataTools.filter.mergeDisabled") }}
+      </p>
       <div class="filter-column-panel__bottom">
         <p
-          v-if="tab === 'values' && criteriaSummary"
+          v-if="tab === 'values' && settings.showCriteria"
           class="filter-column-panel__criteria"
           :title="criteriaSummary"
         >
-          {{ criteriaSummary }}
+          {{ t("dataTools.filter.criteriaSummary", { condition: criteriaSummary }) }}
         </p>
         <footer>
           <span
@@ -337,12 +380,14 @@ onBeforeUnmount(() => {
             role="status"
           >
             {{
-              t(
-                query.trim()
-                  ? "dataTools.filter.searchSelectionSummary"
-                  : "dataTools.filter.selectionSummary",
-                { selected: includedKeys.length, total: matchingValues.length },
-              )
+              settings.showTotalCount
+                ? t("dataTools.filter.recordSummary", recordTotals)
+                : t(
+                    query.trim()
+                      ? "dataTools.filter.searchSelectionSummary"
+                      : "dataTools.filter.selectionSummary",
+                    { selected: includedKeys.length, total: matchingValues.length },
+                  )
             }}
           </span>
           <TButton theme="default" variant="base" size="small" @click="emit('close')">{{

@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { MergedCellRangeResolver } from "@idea10/core";
 import type { ConditionalFormatCondition } from "@idea10/core/conditional-formatting";
+import { createBuiltinTableStyles } from "@idea10/core/table-styles";
 import {
   createSheet,
   createSheetEvaluator,
@@ -68,6 +69,47 @@ function fixture() {
 }
 
 describe("Canvas cell presentation cache", () => {
+  test("refreshes existing header text when a table style is applied, changed, and cleared", () => {
+    const { sheet, render, refreshDisplay } = fixture();
+    setCellValue(sheet, { row: 0, column: 0 }, "Amount");
+    setCellValue(sheet, { row: 1, column: 0 }, 12);
+    refreshDisplay();
+    expect(cell(render(), 0, 0).content.style?.textColor).toBeUndefined();
+    const header = sheet.cells.get("0:0");
+    const style = createBuiltinTableStyles().find((entry) => entry.id === "table-medium-1")!;
+    sheet.tables = [
+      {
+        id: "table",
+        name: "Table1",
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+        columns: [{ id: "amount", name: "Amount" }],
+        style,
+        headerRow: true,
+        totalRow: false,
+        firstColumn: false,
+        lastColumn: false,
+        bandedRows: true,
+        bandedColumns: false,
+        filterButton: true,
+        filter: null,
+      },
+    ];
+    refreshDisplay();
+    expect(cell(render(), 0, 0).content.style?.textColor).toBe("#ffffff");
+    expect(cell(render(), 0, 0).content.textLayout?.font.weight).toBe(700);
+    sheet.tables[0]!.style = {
+      ...style,
+      elements: { headerRow: { style: { textColor: "#ff0000", bold: true } } },
+    };
+    refreshDisplay();
+    expect(cell(render(), 0, 0).content.style?.textColor).toBe("#ff0000");
+    sheet.tables[0]!.style = { ...style, elements: {} };
+    refreshDisplay();
+    expect(cell(render(), 0, 0).content.style?.textColor).toBeUndefined();
+    expect(cell(render(), 0, 0).content.textLayout?.font.weight).toBe(400);
+    expect(sheet.cells.get("0:0")).toBe(header);
+  });
+
   test("updates duplicate highlights after offscreen edits and restores base styles on clear", () => {
     const { sheet, render, refreshDisplay } = fixture();
     setCellValue(sheet, { row: 0, column: 0 }, "Alpha");

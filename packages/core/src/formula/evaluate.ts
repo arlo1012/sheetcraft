@@ -281,6 +281,10 @@ function evaluateExpression(
       resolver,
     );
   }
+  if (expression.kind === "structured-reference") {
+    const resolved = resolver.resolveStructuredReference?.(expression.reference, options?.address);
+    return resolved?.value ?? createFormulaError("REF");
+  }
   if (expression.kind === "array")
     return formulaArray(
       expression.rows.map((row) =>
@@ -436,6 +440,19 @@ function functionArgument(
       getValue: (row, column) =>
         resolver.resolveCell({ row, column, ...(sheetName ? { sheetName } : {}) }),
     };
+  }
+  if (expression.kind === "structured-reference") {
+    const resolved = resolver.resolveStructuredReference?.(expression.reference, options?.address);
+    if (resolved?.range) {
+      const { range } = resolved;
+      return {
+        kind: "range",
+        values: range.values,
+        ...(range.entries ? { entries: range.entries } : {}),
+        bounds: range.bounds,
+        ...(range.getValue ? { getValue: range.getValue } : {}),
+      };
+    }
   }
   const reference = expression.kind === "reference" ? expression.reference : null;
   return {

@@ -1,4 +1,4 @@
-import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
+import { strFromU8, strToU8, unzipSync } from "fflate/browser";
 import { readXlsxDxfEntries, readXlsxDxfStyle, xlsxDxfXml } from "./conditional-formatting.js";
 
 export type XlsxDataValidation = {
@@ -368,6 +368,26 @@ function decodeCustomFilter(
   return null;
 }
 
+function excelSerial(year: number, month: number, day: number): number {
+  return Math.floor((Date.UTC(year, month - 1, day) - Date.UTC(1899, 11, 30)) / 86_400_000);
+}
+
+function dateGroupCondition(body: string): XlsxSimpleFilterCondition | null {
+  const groups = [...body.matchAll(/<dateGroupItem\b([^>]*)\/?\s*>/gi)];
+  if (groups.length !== 1) return null;
+  const attrs = groups[0]?.[1] ?? "";
+  const year = Number(attribute(attrs, "year"));
+  const month = Number(attribute(attrs, "month"));
+  const day = Number(attribute(attrs, "day"));
+  if (!Number.isInteger(year) || year < 1900 || year > 9999) return null;
+  const hasMonth = Number.isInteger(month) && month >= 1 && month <= 12;
+  const hasDay = hasMonth && Number.isInteger(day) && day >= 1 && day <= 31;
+  const start = excelSerial(year, hasMonth ? month : 1, hasDay ? day : 1);
+  if (hasDay) return { kind: "date", operator: "equals", value: start };
+  const end = hasMonth ? excelSerial(year, month + 1, 1) - 1 : excelSerial(year + 1, 1, 1) - 1;
+  return { kind: "date", operator: "between", value: start, value2: end };
+}
+
 function readColorFilter(body: string, dxfs: readonly string[]): XlsxFilterCondition | null {
   const match = /<colorFilter\b([^>]*)\/?\s*>/i.exec(body);
   if (!match) return null;
@@ -485,7 +505,9 @@ export function readXlsxAutoFilter(
         if (value === undefined) unsupported = true;
         else allowedValues.push(filterValue(value));
       }
-      if (/<dateGroupItem\b/i.test(filters[2] ?? "")) unsupported = true;
+      const dateCondition = dateGroupCondition(filters[2] ?? "");
+      if (/<dateGroupItem\b/i.test(filters[2] ?? "") && !dateCondition) unsupported = true;
+      if (dateCondition && allowedValues.length === 0) condition = dateCondition;
     }
     const custom = /<customFilters\b([^>]*)>([\s\S]*?)<\/customFilters>/i.exec(body);
     if (custom) {
@@ -524,10 +546,19 @@ export function readXlsxAutoFilter(
               value: left.value,
               value2: right.value,
             };
-          else condition = { kind: "compound", operator, conditions: [left, right] };
-        } else if (left && right)
-          condition = { kind: "compound", operator, conditions: [left, right] };
-        else unsupported = true;
+          else
+            condition = {
+              kind: "compound",
+              operator,
+              conditions: [left, right],
+            };
+        } else if (left && right) {
+          condition = {
+            kind: "compound",
+            operator,
+            conditions: [left, right],
+          };
+        } else unsupported = true;
       } else unsupported = true;
     }
     const top10 = /<top10\b([^>]*)\/?\s*>/i.exec(body);
@@ -717,6 +748,13 @@ function customCriterion(condition: XlsxSimpleFilterCondition): string[] | null 
   return operator ? [operator, String(condition.value)] : null;
 }
 
+function dateGroupXml(serial: number): string | null {
+  if (!Number.isFinite(serial)) return null;
+  const date = new Date(Date.UTC(1899, 11, 30) + Math.trunc(serial) * 86_400_000);
+  if (Number.isNaN(date.getTime())) return null;
+  return `<filters><dateGroupItem year="${date.getUTCFullYear()}" month="${date.getUTCMonth() + 1}" day="${date.getUTCDate()}" dateTimeGrouping="day"/></filters>`;
+}
+
 export function writeXlsxAutoFilter(
   filter: XlsxFilter,
   options?: { colorDxfId?: (condition: Extract<XlsxFilterCondition, { kind: "color" }>) => number },
@@ -761,6 +799,8 @@ export function writeXlsxAutoFilter(
           const criteria = column.condition.conditions.map(customCriterion);
           if (criteria.every((criterion): criterion is string[] => criterion !== null))
             custom = `<customFilters${column.condition.operator === "and" ? ' and="1"' : ""}>${criteria.map((criterion) => `<customFilter operator="${criterion[0]!}" val="${encodeXml(criterion[1]!)}"/>`).join("")}</customFilters>`;
+        } else if (column.condition.kind === "date" && column.condition.operator === "equals") {
+          filters = dateGroupXml(column.condition.value) ?? filters;
         } else if (
           (column.condition.kind === "number" || column.condition.kind === "date") &&
           (column.condition.operator === "between" || column.condition.operator === "notBetween") &&
@@ -842,18 +882,32 @@ function writeIdea10ColorFilterSetExtension(
   return withoutExisting.replace(/<\/table>/i, `<extLst>${extension}</extLst></table>`);
 }
 
-/** Allocate sheet color-filter DXFs after conditional-format DXFs are finalized. */
+/**
+ * Color filters address differential styles by global styles.xml index. This runs
+ * after conditional-format and table-style writers have allocated their DXFs, then
+ * rewrites only the autoFilters owned by the export workbook.
+ */
 export function writeXlsxFilterColorFormats(
   entries: Record<string, Uint8Array>,
-  sheets: readonly Pick<XlsxDataMetadata, "filter">[],
+  sheets: readonly {
+    filter: XlsxFilter | null;
+    tables?: readonly { name: string; filter: XlsxFilter | null }[];
+  }[],
 ): void {
   const styles = entries["xl/styles.xml"];
   if (!styles) throw new Error("Missing generated XLSX styles.");
   if (
-    !sheets.some((sheet) =>
-      sheet.filter?.columns.some(
-        (column) => column.condition?.kind === "color" || column.condition?.kind === "color-set",
-      ),
+    !sheets.some(
+      (sheet) =>
+        sheet.filter?.columns.some(
+          (column) => column.condition?.kind === "color" || column.condition?.kind === "color-set",
+        ) ||
+        sheet.tables?.some((table) =>
+          table.filter?.columns.some(
+            (column) =>
+              column.condition?.kind === "color" || column.condition?.kind === "color-set",
+          ),
+        ),
     )
   )
     return;
@@ -861,7 +915,7 @@ export function writeXlsxFilterColorFormats(
   const dxfs = readXlsxDxfEntries(source).map((entry) => `<dxf>${entry}</dxf>`);
   const ids = new Map<string, number>();
   dxfs.forEach((xml, index) => ids.set(xml, index));
-  const colorDxfId = (condition: Extract<XlsxFilterCondition, { kind: "color" }>) => {
+  const dxfId = (condition: Extract<XlsxFilterCondition, { kind: "color" }>) => {
     const xml =
       condition.target === "fill"
         ? xlsxDxfXml(
@@ -878,17 +932,42 @@ export function writeXlsxFilterColorFormats(
     }
     return id;
   };
-  for (const [index, metadata] of sheets.entries()) {
-    if (!metadata.filter) continue;
+  const options = { colorDxfId: dxfId };
+  for (const [index, sheet] of sheets.entries()) {
+    if (!sheet.filter) continue;
     const path = `xl/worksheets/sheet${index + 1}.xml`;
     const entry = entries[path];
     if (!entry) continue;
+    const xml = strFromU8(entry);
     entries[path] = strToU8(
-      strFromU8(entry).replace(
+      xml.replace(
         /<autoFilter\b[^>]*(?:\/>|>[\s\S]*?<\/autoFilter>)/i,
-        writeXlsxAutoFilter(metadata.filter, { colorDxfId }),
+        writeXlsxAutoFilter(sheet.filter, options),
       ),
     );
+  }
+  const tables = new Map(
+    sheets.flatMap((sheet) =>
+      (sheet.tables ?? []).flatMap((table) =>
+        table.filter ? [[table.name, table.filter] as const] : [],
+      ),
+    ),
+  );
+  for (const [path, entry] of Object.entries(entries)) {
+    if (!/^xl\/tables\/table\d+\.xml$/i.test(path)) continue;
+    const xml = strFromU8(entry);
+    const name = /<table\b([^>]*)>/i.exec(xml)?.[1];
+    const filter = name
+      ? tables.get(attribute(name, "displayName") ?? attribute(name, "name") ?? "")
+      : undefined;
+    if (!filter) continue;
+    entries[path] = strToU8(
+      xml.replace(
+        /<autoFilter\b[^>]*(?:\/>|>[\s\S]*?<\/autoFilter>)/i,
+        writeXlsxAutoFilter(filter, options),
+      ),
+    );
+    entries[path] = strToU8(writeIdea10ColorFilterSetExtension(strFromU8(entries[path]!), filter));
   }
   const dxfContainer = `<dxfs count="${dxfs.length}">${dxfs.join("")}</dxfs>`;
   entries["xl/styles.xml"] = strToU8(
@@ -896,21 +975,6 @@ export function writeXlsxFilterColorFormats(
       ? source.replace(/<dxfs\b[^>]*>[\s\S]*?<\/dxfs>|<dxfs\b[^>]*\/?\s*>/i, dxfContainer)
       : source.replace(/<tableStyles\b/i, `${dxfContainer}<tableStyles`),
   );
-}
-
-/** Load color-filter-free sheet XML in ExcelJS after raw metadata was captured. */
-export function withoutColorFiltersForExcelJs(bytes: Uint8Array): Uint8Array {
-  const entries = unzipSync(bytes);
-  let changed = false;
-  for (const [path, entry] of Object.entries(entries)) {
-    if (!/^xl\/worksheets\/sheet\d+\.xml$/i.test(path)) continue;
-    const xml = strFromU8(entry);
-    const next = xml.replace(/<colorFilter\b[^>]*\/?\s*>/gi, "");
-    if (next === xml) continue;
-    entries[path] = strToU8(next);
-    changed = true;
-  }
-  return changed ? zipSync(entries) : bytes;
 }
 
 function replaceElement(xml: string, tag: string, replacement: string, after: RegExp): string {

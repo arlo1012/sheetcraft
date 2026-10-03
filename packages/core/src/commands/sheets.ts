@@ -10,6 +10,7 @@ import {
   restoreFormulaSources,
   rewriteQualifiedReferencesForSheet,
 } from "../formula/workbook-references.js";
+import { renameTableReferences } from "../formula/references.js";
 import {
   createSheet,
   getNextDuplicateSheetName,
@@ -145,6 +146,24 @@ export function createAddSheetCommand(
   };
 }
 
+function getDuplicateTableId(used: Set<string>, sourceId: string): string {
+  const base = `${sourceId}-copy`;
+  let id = base;
+  let suffix = 2;
+  while (used.has(id)) id = `${base}-${suffix++}`;
+  used.add(id);
+  return id;
+}
+
+function getDuplicateTableName(used: Set<string>, sourceName: string): string {
+  const base = sourceName.trim();
+  let name = `${base}2`;
+  let suffix = 3;
+  while (used.has(name.toLowerCase())) name = `${base}${suffix++}`;
+  used.add(name.toLowerCase());
+  return name;
+}
+
 export function createDuplicateSheetCommand(
   workbook: Workbook,
   sourceSheetId: string,
@@ -160,6 +179,29 @@ export function createDuplicateSheetCommand(
   assertSheetNameAvailable(workbook, name);
   const sheetId = resolveSheetId(workbook, options);
   const sheet = serializeSheet(source);
+  const usedTableIds = new Set(
+    [...workbook.sheets.values()].flatMap((entry) => (entry.tables ?? []).map((table) => table.id)),
+  );
+  const usedTableNames = new Set([
+    ...[...workbook.sheets.values()].flatMap((entry) =>
+      (entry.tables ?? []).map((table) => table.name.toLowerCase()),
+    ),
+    ...[...workbook.definedNames.values()].map((definition) => definition.name.toLowerCase()),
+  ]);
+  const renamedTables = new Map<string, string>();
+  sheet.tables = (sheet.tables ?? []).map((table) => {
+    const name = getDuplicateTableName(usedTableNames, table.name);
+    renamedTables.set(table.name.toLowerCase(), name);
+    return { ...table, id: getDuplicateTableId(usedTableIds, table.id), name };
+  });
+  for (const cell of sheet.cells) {
+    if (cell.content?.kind !== "formula") continue;
+    let source = cell.content.formula.source;
+    for (const [previousName, nextName] of renamedTables)
+      source = renameTableReferences(source, previousName, nextName);
+    if (source !== cell.content.formula.source)
+      cell.content = { kind: "formula", formula: { source } };
+  }
   sheet.id = sheetId;
   sheet.name = name;
   sheet.properties = {

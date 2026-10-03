@@ -128,7 +128,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
       "false",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(11);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(10);
     expect(
       wrapper.get('[data-ribbon-action="conditional-formatting"]').attributes("disabled"),
     ).toBeUndefined();
@@ -248,5 +248,30 @@ describe("SpreadsheetRibbon", () => {
     );
     await wrapper.get('[data-ribbon-category="formulas"]').trigger("keydown", { key: "Home" });
     expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
+  });
+
+  test("shows contextual Table tools and restores the previous category on leaving a table", async () => {
+    const wrapper = mount(SpreadsheetRibbon, {
+      props: { state: createDefaultSelectionCellStyleState(), disabled: false },
+      global: { plugins: [createAppI18n("zh-CN")] },
+      slots: { "table-tools": "<div data-table-panel>表格快捷设置</div>" },
+    });
+    expect(wrapper.find('[data-ribbon-category="table"]').exists()).toBe(false);
+    await wrapper.setProps({ hasTable: true });
+    expect(wrapper.get('[data-ribbon-category="table"]').text()).toBe("表格工具");
+    expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="data"]').trigger("click");
+    await wrapper.get('[data-ribbon-category="data"]').trigger("keydown", { key: "ArrowRight" });
+    expect(wrapper.get("[data-table-panel]").text()).toBe("表格快捷设置");
+    expect(wrapper.get('[role="tabpanel"]').attributes("aria-labelledby")).toBe(
+      wrapper.get('[data-ribbon-category="table"]').attributes("id"),
+    );
+    await wrapper.setProps({ hasTable: false });
+    expect(wrapper.find('[data-ribbon-category="table"]').exists()).toBe(false);
+    expect(wrapper.find("[data-table-panel]").exists()).toBe(false);
+    expect(wrapper.get('[data-ribbon-category="data"]').attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-ribbon-category="data"]').trigger("keydown", { key: "ArrowRight" });
+    expect(wrapper.get('[data-ribbon-category="home"]').attributes("aria-selected")).toBe("true");
+    wrapper.unmount();
   });
 });

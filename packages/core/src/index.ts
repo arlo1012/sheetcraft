@@ -23,3 +23,6 @@ export * from "./data-outline.js";
 export * from "./data-range.js";
 export * from "./duplicate-values.js";
 export * from "./conditional-formatting.js";
+export * from "./table-styles.js";
+export * from "./pivot-table-styles.js";
+export * from "./tables.js";

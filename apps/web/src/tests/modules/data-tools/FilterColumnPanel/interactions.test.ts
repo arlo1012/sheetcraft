@@ -57,7 +57,7 @@ describe("filter column panel", () => {
     const apply = () => w.findAllComponents(TButton).find((button) => button.text() === "Apply")!;
     await apply().trigger("click");
     expect(w.emitted("apply")?.[0]).toEqual([
-      { includedKeys: [{ kind: "string", value: "North Alpha" }] },
+      { includedKeys: [{ kind: "string", value: "North Alpha" }], allowMergedCells: true },
     ]);
     await search.setValue("");
     await apply().trigger("click");
@@ -76,6 +76,7 @@ describe("filter column panel", () => {
       {
         includedKeys: [],
         criteria: { kind: "number", operator: "equals", value: 12 },
+        allowMergedCells: true,
       },
     ]);
     await w.setProps({ criteria: { kind: "number", operator: "equals", value: 12 } });
@@ -141,6 +142,7 @@ describe("filter column panel", () => {
       {
         includedKeys: [],
         criteria: { kind: "color", target: "fill", color: null },
+        allowMergedCells: true,
       },
     ]);
     await new DOMWrapper(document.body)
@@ -151,6 +153,7 @@ describe("filter column panel", () => {
       {
         includedKeys: [],
         criteria: { kind: "color", target: "text", color: "#008000" },
+        allowMergedCells: true,
       },
     ]);
     await button("Cancel").trigger("click");
@@ -166,7 +169,7 @@ describe("filter column panel", () => {
     expect(new DOMWrapper(document.body).find(".filter-condition-menu").exists()).toBe(false);
     await choose("aboveAverage");
     expect(w.emitted("apply")?.[0]).toEqual([
-      { includedKeys: [], criteria: { kind: "average", above: true } },
+      { includedKeys: [], criteria: { kind: "average", above: true }, allowMergedCells: true },
     ]);
     await new DOMWrapper(document.body).get('[aria-label="Clear filter"]').trigger("click");
     expect(w.emitted("clear")).toHaveLength(1);
@@ -178,6 +181,7 @@ describe("filter column panel", () => {
       {
         includedKeys: [],
         criteria: { kind: "number", operator: "equals", value: 2 },
+        allowMergedCells: true,
       },
     ]);
     await new DOMWrapper(document.body)
@@ -185,7 +189,7 @@ describe("filter column panel", () => {
       .setValue("south");
     await button("Apply").trigger("click");
     expect(w.emitted("apply")?.[1]).toEqual([
-      { includedKeys: [{ kind: "string", value: "South Alpha" }] },
+      { includedKeys: [{ kind: "string", value: "South Alpha" }], allowMergedCells: true },
     ]);
   });
 });

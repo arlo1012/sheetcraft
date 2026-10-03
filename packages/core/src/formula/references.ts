@@ -10,9 +10,53 @@ import {
   type FormulaExpression,
   type FormulaRange,
   type FormulaReference,
+  type StructuredFormulaReference,
 } from "./types.js";
 
 type Replacement = { start: number; end: number; text: string };
+
+export type StructuredReferenceA1Bounds = {
+  start: FormulaAddress;
+  end: FormulaAddress;
+  /** Include this sheet qualifier in the generated A1 reference when provided. */
+  sheetName?: string;
+};
+
+/**
+ * Converts parser-confirmed structured references to their current A1 bounds.
+ * The caller owns workbook/table lookup, including the formula cell's row context.
+ */
+export function convertStructuredReferencesToA1(
+  source: string,
+  resolve: (
+    reference: StructuredFormulaReference,
+    formulaAddress?: FormulaAddress,
+  ) => StructuredReferenceA1Bounds | null,
+  formulaAddress?: FormulaAddress,
+  options?: {
+    /** Keep references outside this conversion's target table unchanged. */
+    shouldConvert?: (
+      reference: StructuredFormulaReference,
+      formulaAddress?: FormulaAddress,
+    ) => boolean;
+  },
+): string {
+  const ast = getFormulaAst(source);
+  if (!ast) return source;
+  const replacements: Replacement[] = [];
+  walkExpression(ast.expression, (expression) => {
+    if (expression.kind !== "structured-reference") return;
+    if (options?.shouldConvert && !options.shouldConvert(expression.reference, formulaAddress))
+      return;
+    const bounds = resolve(expression.reference, formulaAddress);
+    replacements.push({
+      start: expression.start,
+      end: expression.end,
+      text: bounds ? formatStructuredReferenceA1(bounds) : "#REF!",
+    });
+  });
+  return applyReplacements(source, replacements);
+}
 
 function columnIndexToLabel(column: number): string {
   let value = column + 1;
@@ -66,6 +110,19 @@ function formatReference(reference: FormulaReference, address: FormulaAddress): 
   return `${reference.columnAbsolute ? "$" : ""}${columnIndexToLabel(address.column)}${
     reference.rowAbsolute ? "$" : ""
   }${address.row + 1}`;
+}
+
+function formatStructuredReferenceA1(bounds: StructuredReferenceA1Bounds): string {
+  const start = `${columnIndexToLabel(bounds.start.column)}${bounds.start.row + 1}`;
+  const end = `${columnIndexToLabel(bounds.end.column)}${bounds.end.row + 1}`;
+  const qualifier = bounds.sheetName
+    ? `${formatStructuredReferenceSheetName(bounds.sheetName)}!`
+    : "";
+  return `${qualifier}${start}${start === end ? "" : `:${end}`}`;
+}
+
+function formatStructuredReferenceSheetName(name: string): string {
+  return /^[\p{L}\p{N}_.]+$/u.test(name) ? name : `'${name.replaceAll("'", "''")}'`;
 }
 
 function formatAxisRange(
@@ -133,6 +190,59 @@ export function formulaHasArrayConstant(sourceOrAst: string | FormulaAst): boole
     if (expression.kind === "array") found = true;
   });
   return found;
+}
+
+/** Rewrites only parser-confirmed table names, never text inside strings or identifiers. */
+export function renameTableReferences(
+  source: string,
+  previousName: string,
+  nextName: string,
+): string {
+  const ast = getFormulaAst(source);
+  if (!ast) return source;
+  const replacements: Replacement[] = [];
+  walkExpression(ast.expression, (expression) => {
+    if (
+      expression.kind === "structured-reference" &&
+      expression.reference.tableName?.toLocaleLowerCase("en-US") ===
+        previousName.toLocaleLowerCase("en-US") &&
+      expression.reference.tableNameStart !== undefined &&
+      expression.reference.tableNameEnd !== undefined
+    ) {
+      replacements.push({
+        start: expression.reference.tableNameStart,
+        end: expression.reference.tableNameEnd,
+        text: nextName,
+      });
+    }
+  });
+  return applyReplacements(source, replacements);
+}
+
+/** Rewrites parser-confirmed column selectors for one named table. */
+export function renameTableColumnReferences(
+  source: string,
+  tableName: string,
+  previousName: string,
+  nextName: string,
+): string {
+  const ast = getFormulaAst(source);
+  if (!ast) return source;
+  const replacements: Replacement[] = [];
+  walkExpression(ast.expression, (expression) => {
+    if (
+      expression.kind !== "structured-reference" ||
+      expression.reference.tableName?.toLocaleLowerCase("en-US") !==
+        tableName.toLocaleLowerCase("en-US")
+    )
+      return;
+    for (const column of expression.reference.columns) {
+      if (column.name.toLocaleLowerCase("en-US") === previousName.toLocaleLowerCase("en-US")) {
+        replacements.push({ start: column.start, end: column.end, text: nextName });
+      }
+    }
+  });
+  return applyReplacements(source, replacements);
 }
 
 /** Collects references/ranges from an expression selected by the runtime scheduler. */

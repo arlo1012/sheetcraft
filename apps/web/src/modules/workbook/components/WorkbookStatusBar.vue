@@ -13,6 +13,7 @@ import WorkbookViewControls from "./WorkbookViewControls.vue";
 const props = withDefaults(
   defineProps<{
     sheets: readonly Sheet[];
+    sheetTabsDisabled?: boolean;
     activeSheetId: string;
     editSessionId?: string;
     selectionSummary: SelectionSummary;
@@ -102,6 +103,7 @@ function formatNumber(value: number): string {
       <div
         :id="sheetsRegionId"
         class="workbook-status-bar__sheets"
+        :inert="sheetTabsDisabled"
         :data-cell-edit-session="editSessionId"
       >
         <WorkbookSheetTabs

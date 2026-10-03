@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   createMultiKeySortSheetRangeCommand,
   createSortSheetRangeCommand,
+  createSortCellColorResolver,
   getSortCellColor,
   tryApplyWorkbookCommand,
 } from "../../commands/index.js";
@@ -9,6 +10,7 @@ import { executeWorkbookCommand, redoWorkbookCommand, undoWorkbookCommand } from
 import {
   createSheetSparseState,
   createSheet,
+  createWorkbookEvaluator,
   getActiveSheet,
   getCellContent,
   getCellStyle,
@@ -519,6 +521,71 @@ describe("sheet range sorting", () => {
       { kind: "literal", value: "green-2" },
       { kind: "literal", value: "none-1" },
     ]);
+  });
+
+  test("resolves table, direct, and conditional-format colors for discovery and sorting", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const range = { start: { row: 0, column: 0 }, end: { row: 2, column: 1 } };
+    sheet.tables = [
+      {
+        id: "table",
+        name: "Sales",
+        range,
+        columns: [
+          { id: "value", name: "Value" },
+          { id: "label", name: "Label" },
+        ],
+        style: {
+          id: "green",
+          name: "Green",
+          category: "custom",
+          elements: { wholeTable: { style: { fillColor: "#00aa00" } } },
+        },
+        headerRow: true,
+        totalRow: false,
+        firstColumn: false,
+        lastColumn: false,
+        bandedRows: false,
+        bandedColumns: false,
+        filterButton: false,
+        filter: null,
+      },
+    ];
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "Value" });
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: 1 });
+    setCellContent(sheet, { row: 2, column: 0 }, { kind: "literal", value: 2 });
+    setCellContent(sheet, { row: 1, column: 1 }, { kind: "literal", value: "first" });
+    setCellContent(sheet, { row: 2, column: 1 }, { kind: "literal", value: "second" });
+    setCellStyle(sheet, { row: 1, column: 0 }, { fillColor: "#0000ff" });
+    sheet.conditionalFormats = [
+      {
+        id: "high",
+        ranges: [{ start: { row: 1, column: 0 }, end: { row: 2, column: 0 } }],
+        anchor: { row: 1, column: 0 },
+        condition: { kind: "cellValue", operator: "greaterThan", value: 1 },
+        style: { fillColor: "#ff0000" },
+      },
+    ];
+    const resolveColor = createSortCellColorResolver(
+      sheet,
+      createWorkbookEvaluator(session.workbook, sheet.id),
+      { dateSystem: session.workbook.dateSystem },
+    );
+    expect(resolveColor({ row: 1, column: 0 }, "cellColor")).toBe("#0000ff");
+    expect(resolveColor({ row: 1, column: 1 }, "cellColor")).toBe("#00aa00");
+    expect(resolveColor({ row: 2, column: 0 }, "cellColor")).toBe("#ff0000");
+
+    executeWorkbookCommand(
+      session,
+      createMultiKeySortSheetRangeCommand(
+        sheet.id,
+        range,
+        [{ column: 0, direction: "ascending", sortOn: "cellColor", color: "#ff0000" }],
+        { hasHeader: true },
+      ),
+    );
+    expect(getCellContent(sheet, { row: 1, column: 1 })).toMatchObject({ value: "second" });
   });
 
   test("sorts automatic and explicit font colors by the selected normalized color", () => {

@@ -1,7 +1,7 @@
 import { evaluateFormulaRuntime, evaluateFormulaRuntimeAst } from "./formula/evaluate.js";
 import { calculateIterativeComponents } from "./formula/iterative-calculation.js";
 import { isSheetRowFiltered } from "./filter-values.js";
-import { isFormulaArray, scalarize } from "./formula/runtime.js";
+import { formulaArray, isFormulaArray, scalarize } from "./formula/runtime.js";
 import {
   DEFAULT_WORKBOOK_CALCULATION_SETTINGS,
   type WorkbookCalculationSettings,
@@ -22,7 +22,18 @@ import {
   type FormulaFunctionArgument,
 } from "./formula/functions.js";
 import { getFormulaAst } from "./formula/parser.js";
+import { parseA1FormulaReference } from "./formula/reference-model.js";
 import { isSimulationTableRoot, parseSimulationTableFormula } from "./data-table-formula.js";
+import { resolveTableReferenceBounds } from "./tables.js";
+import {
+  TABLE_STYLE_ELEMENTS,
+  type TableStyleDefinition,
+  type TableStyleElementFormat,
+} from "./table-styles.js";
+import {
+  PIVOT_TABLE_STYLE_ELEMENTS,
+  type PivotTableStyleDefinition,
+} from "./pivot-table-styles.js";
 import {
   createFormulaError,
   isFormulaError,
@@ -30,13 +41,21 @@ import {
   type CellContent,
   type FormulaErrorCode,
   type FormulaExpression,
+  type StructuredFormulaReference,
   type FormulaValue,
   type FormulaRuntimeValue,
 } from "./formula/types.js";
 import { doMergedCellRangesIntersect, validateMergedCellRanges } from "./merged-cells.js";
 import type { IdFactory } from "./runtime.js";
 import { isSheetAddressInBounds, MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheet-limits.js";
-import { areCellStylesEqual, cloneCellStyle, normalizeCellStyle, type CellStyle } from "./style.js";
+import {
+  areCellStylesEqual,
+  cloneCellStyle,
+  normalizeCellStyle,
+  normalizeCellStylePatch,
+  type CellStyle,
+  type CellStylePatch,
+} from "./style.js";
 import {
   areImageTransformsEqual,
   cloneImageTransform,
@@ -136,6 +155,8 @@ export type SheetFilterCondition =
 export type SheetFilter = {
   range: CellRange;
   columns: SheetFilterColumn[];
+  /** Enables merged cells to participate as one row block using their top-left value. */
+  allowMergedCells?: boolean;
   advanced?: {
     criteria?: { sheetId: string; range: CellRange };
     uniqueOnly: boolean;
@@ -152,6 +173,25 @@ export type SheetMetadata = {
   subtotalMetadata?: SheetSubtotalMetadata[];
   duplicateRules?: SheetDuplicateRule[];
   conditionalFormats?: SheetConditionalFormatRule[];
+  tables?: SheetTable[];
+};
+
+export type SheetTableColumn = { id: string; name: string };
+/** A structured table, with an inclusive worksheet range. */
+export type SheetTable = {
+  id: string;
+  name: string;
+  range: CellRange;
+  columns: SheetTableColumn[];
+  style: TableStyleDefinition;
+  headerRow: boolean;
+  totalRow: boolean;
+  firstColumn: boolean;
+  lastColumn: boolean;
+  bandedRows: boolean;
+  bandedColumns: boolean;
+  filterButton: boolean;
+  filter: SheetFilter | null;
 };
 
 export type DataValidationType =
@@ -260,6 +300,7 @@ export type Sheet = {
   subtotalMetadata?: SheetSubtotalMetadata[];
   duplicateRules?: SheetDuplicateRule[];
   conditionalFormats?: SheetConditionalFormatRule[];
+  tables?: SheetTable[];
   floatingImages: FloatingImage[];
 };
 
@@ -289,6 +330,7 @@ export type SheetSparseState = {
   subtotalMetadata?: SheetSubtotalMetadata[];
   duplicateRules?: SheetDuplicateRule[];
   conditionalFormats?: SheetConditionalFormatRule[];
+  tables?: SheetTable[];
   floatingImages: FloatingImage[];
 };
 
@@ -300,6 +342,10 @@ export type Workbook = {
   sheets: Map<string, Sheet>;
   activeSheetId: string;
   definedNames: Map<string, DefinedName>;
+  tableStyles?: TableStyleDefinition[];
+  defaultTableStyleId?: string;
+  pivotTableStyles?: PivotTableStyleDefinition[];
+  defaultPivotTableStyleId?: string;
 };
 
 /** A workbook- or sheet-scoped name that points at one rectangular range. */
@@ -340,6 +386,7 @@ export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory)
     subtotalMetadata: [],
     duplicateRules: [],
     conditionalFormats: [],
+    tables: [],
     floatingImages: [],
   };
 }
@@ -372,6 +419,8 @@ export function createWorkbook(options?: {
     sheets: new Map([[sheet.id, sheet]]),
     activeSheetId: sheet.id,
     definedNames: new Map(),
+    tableStyles: [],
+    pivotTableStyles: [],
   };
 }
 
@@ -681,6 +730,7 @@ export function createWorkbookEvaluator(
         next.kind === "array" ||
         next.kind === "range" ||
         next.kind === "axis-range" ||
+        next.kind === "structured-reference" ||
         next.kind === "spill" ||
         next.kind === "identifier"
       )
@@ -862,6 +912,48 @@ export function createWorkbookEvaluator(
       };
     });
   };
+  const tableReferenceBounds = (
+    fromSheetId: string,
+    reference: StructuredFormulaReference,
+    address?: CellAddress,
+  ) => resolveTableReferenceBounds(workbook, fromSheetId, reference, address);
+  const structuredReferenceResolution = (
+    fromSheetId: string,
+    reference: StructuredFormulaReference,
+    address: CellAddress | undefined,
+    read = valueFor,
+  ) => {
+    const bounds = tableReferenceBounds(fromSheetId, reference, address);
+    if (!bounds) return undefined;
+    const sheet = workbook.sheets.get(bounds.sheetId);
+    if (!sheet) return undefined;
+    const rows: FormulaValue[][] = [];
+    for (let row = bounds.start.row; row <= bounds.end.row; row += 1) {
+      const values: FormulaValue[] = [];
+      for (let column = bounds.start.column; column <= bounds.end.column; column += 1)
+        values.push(read(bounds.sheetId, { row, column }));
+      rows.push(values);
+    }
+    return {
+      value: formulaArray(rows),
+      range: {
+        bounds: { start: bounds.start, end: bounds.end, sheetName: sheet.name },
+        values: resolveRange(
+          fromSheetId,
+          { ...bounds.start, sheetName: sheet.name },
+          bounds.end,
+          read,
+        ),
+        entries: resolveRangeEntries(
+          fromSheetId,
+          { ...bounds.start, sheetName: sheet.name },
+          bounds.end,
+          read,
+        ),
+        getValue: (row: number, column: number) => read(bounds.sheetId, { row, column }),
+      },
+    };
+  };
   const resolverFor = (fromSheetId: string, read = valueFor) => ({
     resolveSpill: (target: CellAddress & { sheetName?: string }): FormulaRuntimeValue => {
       const targetSheetId = sheetForName(target.sheetName, fromSheetId);
@@ -899,6 +991,8 @@ export function createWorkbookEvaluator(
           }
         : undefined;
     },
+    resolveStructuredReference: (reference: StructuredFormulaReference, address?: CellAddress) =>
+      structuredReferenceResolution(fromSheetId, reference, address, read),
   });
   const dependenciesFor = (
     fromSheetId: string,
@@ -988,6 +1082,11 @@ export function createWorkbookEvaluator(
                   column: MAX_SHEET_COLUMNS - 1,
                 };
           if (targetSheetId) addRange(targetSheetId, start, end, exclusions);
+          return;
+        }
+        if (current.kind === "structured-reference") {
+          const bounds = tableReferenceBounds(fromSheetId, current.reference, address);
+          if (bounds) addRange(bounds.sheetId, bounds.start, bounds.end, exclusions);
           return;
         }
         if (current.kind === "array") {
@@ -1679,6 +1778,7 @@ function cloneSheetFilter(filter: SheetFilter): SheetFilter {
       allowedValues: column.allowedValues.map(cloneFilterValue),
       ...(column.condition ? { condition: cloneSheetFilterCondition(column.condition) } : {}),
     })),
+    ...(filter.allowMergedCells === undefined ? {} : { allowMergedCells: filter.allowMergedCells }),
     ...(filter.advanced
       ? {
           advanced: {
@@ -1772,9 +1872,10 @@ function normalizeSheetFilterCondition(condition: SheetFilterCondition): SheetFi
       condition.conditions.length !== 2
     )
       throw new TypeError("Invalid filter condition.");
+    const [first, second] = condition.conditions;
     const normalized = [
-      normalizeSheetFilterCondition(condition.conditions[0]),
-      normalizeSheetFilterCondition(condition.conditions[1]),
+      normalizeSheetFilterCondition(first),
+      normalizeSheetFilterCondition(second),
     ];
     if (
       normalized.some(
@@ -1866,6 +1967,8 @@ function normalizeSheetFilter(filter: SheetFilter | null): SheetFilter | null {
   if (!Array.isArray(filter.columns)) {
     throw new TypeError("Invalid sheet filter.");
   }
+  if (filter.allowMergedCells !== undefined && typeof filter.allowMergedCells !== "boolean")
+    throw new TypeError("Invalid sheet filter.");
   const columns = filter.columns.map((column) => {
     if (!column || typeof column !== "object" || !Number.isInteger(column.column)) {
       throw new TypeError("Invalid filter column.");
@@ -1960,7 +2063,182 @@ function normalizeSheetFilter(filter: SheetFilter | null): SheetFilter | null {
       };
     } else advanced = { uniqueOnly: source.uniqueOnly, hiddenRows };
   }
-  return { range: normalizedRange, columns, ...(advanced ? { advanced } : {}) };
+  return {
+    range: normalizedRange,
+    columns,
+    ...(filter.allowMergedCells === undefined ? {} : { allowMergedCells: filter.allowMergedCells }),
+    ...(advanced ? { advanced } : {}),
+  };
+}
+
+function normalizeStyleElements(
+  source: unknown,
+  keys: readonly string[],
+): Partial<Record<string, TableStyleElementFormat>> {
+  if (!source || typeof source !== "object" || Array.isArray(source))
+    throw new TypeError("Invalid table style.");
+  const elements: Partial<Record<string, TableStyleElementFormat>> = {};
+  for (const [key, format] of Object.entries(source)) {
+    if (
+      !keys.includes(key) ||
+      !format ||
+      typeof format !== "object" ||
+      !format.style ||
+      typeof format.style !== "object" ||
+      Array.isArray(format.style) ||
+      (format.stripeSize !== undefined &&
+        (!Number.isSafeInteger(format.stripeSize) || format.stripeSize < 1))
+    )
+      throw new TypeError("Invalid table style element format.");
+    const normalizeBorder = (border: unknown): import("./style.js").CellBorder | null => {
+      const normalized = normalizeCellStylePatch({
+        borderTop: border as CellStylePatch["borderTop"],
+      }).borderTop;
+      if (normalized === false) throw new TypeError("Invalid table style border.");
+      return normalized ?? null;
+    };
+    elements[key] = {
+      style: normalizeCellStylePatch(format.style),
+      ...(format.stripeSize === undefined ? {} : { stripeSize: format.stripeSize }),
+      ...(format.innerHorizontal === undefined
+        ? {}
+        : { innerHorizontal: normalizeBorder(format.innerHorizontal) }),
+      ...(format.innerVertical === undefined
+        ? {}
+        : { innerVertical: normalizeBorder(format.innerVertical) }),
+    };
+  }
+  return elements;
+}
+
+function normalizeStyleDefinition<T extends string>(
+  style: {
+    id: string;
+    name: string;
+    category: "light" | "medium" | "dark" | "custom";
+    accentColor?: string;
+    elements: Partial<Record<T, TableStyleElementFormat>>;
+  },
+  keys: readonly string[],
+): typeof style {
+  if (
+    !style ||
+    typeof style !== "object" ||
+    typeof style.id !== "string" ||
+    !style.id.trim() ||
+    typeof style.name !== "string" ||
+    !style.name.trim() ||
+    !["light", "medium", "dark", "custom"].includes(style.category) ||
+    (style.accentColor !== undefined && typeof style.accentColor !== "string")
+  )
+    throw new TypeError("Invalid table style.");
+  return {
+    id: style.id,
+    name: style.name,
+    category: style.category,
+    ...(style.accentColor === undefined ? {} : { accentColor: style.accentColor }),
+    elements: normalizeStyleElements(style.elements, keys) as Partial<
+      Record<T, TableStyleElementFormat>
+    >,
+  };
+}
+
+export function normalizeTableStyleDefinition(style: TableStyleDefinition): TableStyleDefinition {
+  return normalizeStyleDefinition(style, TABLE_STYLE_ELEMENTS);
+}
+
+export function normalizePivotTableStyleDefinition(
+  style: PivotTableStyleDefinition,
+): PivotTableStyleDefinition {
+  return normalizeStyleDefinition(style, PIVOT_TABLE_STYLE_ELEMENTS);
+}
+
+function normalizeSheetTable(table: SheetTable): SheetTable {
+  if (
+    !table ||
+    typeof table !== "object" ||
+    typeof table.id !== "string" ||
+    !table.id.trim() ||
+    typeof table.name !== "string" ||
+    !table.name.trim() ||
+    !/^[\p{L}_][\p{L}\p{N}_]*$/u.test(table.name) ||
+    parseA1FormulaReference(table.name) ||
+    /^R\d+C\d+$/i.test(table.name) ||
+    /^(TRUE|FALSE)$/i.test(table.name) ||
+    !isCellAddressInBounds(table.range?.start) ||
+    !isCellAddressInBounds(table.range?.end) ||
+    !Array.isArray(table.columns) ||
+    ![
+      table.headerRow,
+      table.totalRow,
+      table.firstColumn,
+      table.lastColumn,
+      table.bandedRows,
+      table.bandedColumns,
+      table.filterButton,
+    ].every((value) => typeof value === "boolean")
+  )
+    throw new TypeError("Invalid table metadata.");
+  const range = {
+    start: {
+      row: Math.min(table.range.start.row, table.range.end.row),
+      column: Math.min(table.range.start.column, table.range.end.column),
+    },
+    end: {
+      row: Math.max(table.range.start.row, table.range.end.row),
+      column: Math.max(table.range.start.column, table.range.end.column),
+    },
+  };
+  const minimumRows = 1 + Number(table.headerRow) + Number(table.totalRow);
+  if (
+    range.end.row - range.start.row + 1 < minimumRows ||
+    table.columns.length !== range.end.column - range.start.column + 1
+  )
+    throw new RangeError(
+      "A table requires at least one data row in addition to its header and total rows, with one column definition per column.",
+    );
+  const columnIds = new Set<string>();
+  const columnNames = new Set<string>();
+  const columns = table.columns.map((column) => {
+    if (
+      !column ||
+      typeof column.id !== "string" ||
+      !column.id.trim() ||
+      typeof column.name !== "string" ||
+      !column.name.trim()
+    )
+      throw new TypeError("Invalid table column.");
+    const name = column.name.trim();
+    if (columnIds.has(column.id) || columnNames.has(name.toLocaleLowerCase("en-US")))
+      throw new TypeError("Table column IDs and names must be unique.");
+    columnIds.add(column.id);
+    columnNames.add(name.toLocaleLowerCase("en-US"));
+    return { id: column.id, name };
+  });
+  const filter = normalizeSheetFilter(table.filter);
+  if (
+    filter &&
+    (filter.range.start.row < range.start.row ||
+      filter.range.end.row > range.end.row ||
+      filter.range.start.column < range.start.column ||
+      filter.range.end.column > range.end.column)
+  )
+    throw new RangeError("A table filter must remain inside its table range.");
+  return {
+    id: table.id,
+    name: table.name.trim(),
+    range,
+    columns,
+    style: normalizeTableStyleDefinition(table.style),
+    headerRow: table.headerRow,
+    totalRow: table.totalRow,
+    firstColumn: table.firstColumn,
+    lastColumn: table.lastColumn,
+    bandedRows: table.bandedRows,
+    bandedColumns: table.bandedColumns,
+    filterButton: table.filterButton,
+    filter,
+  };
 }
 
 function normalizeSheetMetadata(
@@ -1974,6 +2252,7 @@ function normalizeSheetMetadata(
     | "subtotalMetadata"
     | "duplicateRules"
     | "conditionalFormats"
+    | "tables"
   >,
 ): SheetMetadata {
   const freezePanes = normalizeFreezePanes(state.freezePanes);
@@ -1988,7 +2267,21 @@ function normalizeSheetMetadata(
     throw new RangeError("A frozen pane boundary cannot cut through a merged cell range.");
   }
   const filter = normalizeSheetFilter(state.filter);
-  if (filter && mergedCells.some((range) => doMergedCellRangesIntersect(range, filter.range))) {
+  const hasRelevantMergedFilterCell = filter?.columns.some((column) =>
+    mergedCells.some(
+      (range) =>
+        range.end.row >= filter.range.start.row + 1 &&
+        range.start.row <= filter.range.end.row &&
+        column.column >= range.start.column &&
+        column.column <= range.end.column,
+    ),
+  );
+  if (
+    filter &&
+    (filter.allowMergedCells === undefined
+      ? mergedCells.some((range) => doMergedCellRangesIntersect(range, filter.range))
+      : filter.allowMergedCells === false && hasRelevantMergedFilterCell)
+  ) {
     throw new RangeError("A filter range cannot intersect merged cells.");
   }
   const dataValidations = (state.dataValidations ?? []).map((rule) => {
@@ -2065,6 +2358,15 @@ function normalizeSheetMetadata(
     };
   });
   const conditionalFormats = normalizeConditionalFormatRules(state.conditionalFormats ?? []);
+  const tables = (state.tables ?? []).map(normalizeSheetTable);
+  const tableIds = new Set<string>();
+  const tableNames = new Set<string>();
+  for (const table of tables) {
+    if (tableIds.has(table.id) || tableNames.has(table.name.toLocaleLowerCase("en-US")))
+      throw new TypeError("Table IDs and names must be unique within a sheet.");
+    tableIds.add(table.id);
+    tableNames.add(table.name.toLocaleLowerCase("en-US"));
+  }
   if (new Set(dataValidations.map((rule) => rule.id)).size !== dataValidations.length)
     throw new Error("Duplicate data validation ID.");
   const outlineGroups = normalizeOutlineGroups(state.outlineGroups ?? []);
@@ -2110,6 +2412,7 @@ function normalizeSheetMetadata(
     subtotalMetadata,
     duplicateRules,
     conditionalFormats,
+    tables,
   };
 }
 
@@ -2146,6 +2449,7 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
     range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
   }));
   sheet.conditionalFormats = (normalized.conditionalFormats ?? []).map(cloneConditionalFormatRule);
+  sheet.tables = (normalized.tables ?? []).map(cloneSheetTable);
   return true;
 }
 
@@ -2260,6 +2564,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     subtotalMetadata: metadata.subtotalMetadata ?? [],
     duplicateRules: metadata.duplicateRules ?? [],
     conditionalFormats: metadata.conditionalFormats ?? [],
+    tables: metadata.tables ?? [],
     floatingImages,
   };
 }
@@ -2277,6 +2582,7 @@ function areSheetSparseStatesEqual(left: SheetSparseState, right: SheetSparseSta
     JSON.stringify(left.duplicateRules ?? []) !== JSON.stringify(right.duplicateRules ?? []) ||
     JSON.stringify(left.conditionalFormats ?? []) !==
       JSON.stringify(right.conditionalFormats ?? []) ||
+    JSON.stringify(left.tables ?? []) !== JSON.stringify(right.tables ?? []) ||
     left.floatingImages.length !== right.floatingImages.length
   ) {
     return false;
@@ -2353,6 +2659,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
       range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
     })),
     conditionalFormats: (sheet.conditionalFormats ?? []).map(cloneConditionalFormatRule),
+    tables: (sheet.tables ?? []).map(cloneSheetTable),
     floatingImages: sheet.floatingImages.map(cloneFloatingImage),
   });
 }
@@ -2409,8 +2716,36 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
     range: { start: { ...rule.range.start }, end: { ...rule.range.end } },
   }));
   sheet.conditionalFormats = (nextState.conditionalFormats ?? []).map(cloneConditionalFormatRule);
+  sheet.tables = (nextState.tables ?? []).map(cloneSheetTable);
   sheet.floatingImages = nextState.floatingImages.map(cloneFloatingImage);
   return true;
+}
+
+export function cloneSheetTable(table: SheetTable): SheetTable {
+  return {
+    ...table,
+    range: { start: { ...table.range.start }, end: { ...table.range.end } },
+    columns: table.columns.map((column) => ({ ...column })),
+    style: {
+      ...table.style,
+      elements: Object.fromEntries(
+        Object.entries(table.style.elements).map(([key, format]) => [
+          key,
+          format
+            ? {
+                ...format,
+                style: { ...format.style },
+                ...(format.innerHorizontal
+                  ? { innerHorizontal: { ...format.innerHorizontal } }
+                  : {}),
+                ...(format.innerVertical ? { innerVertical: { ...format.innerVertical } } : {}),
+              }
+            : format,
+        ]),
+      ),
+    },
+    filter: table.filter ? cloneSheetFilter(table.filter) : null,
+  };
 }
 
 export function cloneFloatingImage(image: FloatingImage): FloatingImage {

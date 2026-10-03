@@ -16,6 +16,7 @@ import {
   createSetSheetOutlineGroupsCollapsedCommand,
   createSplitColumnCommand,
   getRemoveDuplicatesCount,
+  getSheetFilters,
   getSheetFilterColumnValueCounts,
   getSheetFilterValueKey,
   previewSplitColumn,
@@ -40,6 +41,11 @@ import { useAppI18n } from "../../shared/i18n";
 import { resolveRangeReference } from "../../shared/range-reference/formatRangeReference";
 import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 import { readSortSettings, writeSortSettings } from "./sort-settings";
+import {
+  readFilterPanelSettings,
+  writeFilterPanelSettings,
+  type FilterPanelSettings,
+} from "./filter-panel-settings";
 import { getSortColorColumns } from "./sort-color-options";
 import { getSortIconColumns } from "./sort-icon-options";
 import { resolveTextToColumnsOptions } from "./text-to-columns-options";
@@ -137,6 +143,12 @@ function cloneSortInitial(initial: SortInitial): SortInitial {
 
 export function useDataToolsController(options: Options) {
   const { t, locale } = useAppI18n();
+  const filterPanelSettings = ref(readFilterPanelSettings());
+
+  function updateFilterPanelSettings(settings: FilterPanelSettings): void {
+    Object.assign(filterPanelSettings.value, settings);
+    writeFilterPanelSettings(settings);
+  }
   const analysisOptions = {
     ...options,
     getRevision: options.getRevision ?? options.getGeneration,
@@ -166,13 +178,19 @@ export function useDataToolsController(options: Options) {
   let sortSettingsGeneration: number | undefined;
   const sortSettings = new Map<string, SortInitial>();
   const textTarget = ref<Target>();
-  const duplicateTarget = ref<Target>();
+  const duplicateTarget = ref<Target & { tableId?: string }>();
+  const removeDuplicatesInitial = ref<RemoveDuplicatesDraft>();
   const validationTarget = ref<Target>();
   const subtotalTarget = ref<Target>();
   const splitDraft = ref<TextToColumnsDraft>();
   const duplicateDraft = ref<RemoveDuplicatesDraft>();
   const validationInitial = ref<DataValidationInitial>();
-  const filterPanel = ref<{ column: number; anchor?: DataToolFilterAnchor; target: Target }>();
+  const filterPanel = ref<{
+    column: number;
+    anchor?: DataToolFilterAnchor;
+    target: Target;
+    tableId?: string;
+  }>();
   const activeSheet = computed(() => getActiveSheet(options.getWorkbook()));
   const disabled = computed(() => options.isBusy() || activeSheet.value.properties.protected);
   const selectedOutlineRoots = computed(() =>
@@ -281,16 +299,30 @@ export function useDataToolsController(options: Options) {
       };
     });
   }
+  function filterForRange(range: CellRange) {
+    return getSheetFilters(activeSheet.value).find(
+      (filter) =>
+        filter.range.start.row === range.start.row &&
+        filter.range.start.column === range.start.column &&
+        filter.range.end.row === range.end.row &&
+        filter.range.end.column === range.end.column,
+    );
+  }
   const filterState = computed(() => {
     const panel = filterPanel.value;
-    const filter = activeSheet.value.filter;
-    if (!panel || !filter || panel.target.sheetId !== activeSheet.value.id) return undefined;
+    if (!panel || panel.target.sheetId !== activeSheet.value.id) return undefined;
+    const filter = filterForRange(panel.target.range) ?? {
+      range: panel.target.range,
+      columns: [],
+    };
     const existing = filter.columns.find((item) => item.column === panel.column);
+    const evaluator = options.getSheetEvaluator();
     const counts = getSheetFilterColumnValueCounts(
       activeSheet.value,
       filter.range,
       panel.column,
-      options.getSheetEvaluator(),
+      evaluator,
+      { allowMergedCells: filterPanelSettings.value.allowMergedCells },
     );
     const values = counts.map(({ value: key, count, address }) => ({
       key,
@@ -306,7 +338,7 @@ export function useDataToolsController(options: Options) {
                 { locale: locale.value, dateSystem: options.getWorkbook().dateSystem },
               ).text,
     }));
-    const header = options.getSheetEvaluator().getComputedValue({
+    const header = evaluator.getComputedValue({
       row: filter.range.start.row,
       column: panel.column,
     });
@@ -327,13 +359,12 @@ export function useDataToolsController(options: Options) {
         start: { row: filter.range.start.row, column: panel.column },
         end: { row: filter.range.end.row, column: panel.column },
       },
-      options.getSheetEvaluator(),
+      evaluator,
       { dateSystem: options.getWorkbook().dateSystem },
     )[0];
     return {
       visible: true,
       anchor: panel.anchor,
-      column: panel.column,
       columnLabel:
         header !== null && typeof header !== "object" && String(header).trim()
           ? `${header} (${columnLabel})`
@@ -347,7 +378,18 @@ export function useDataToolsController(options: Options) {
       },
       preferredKind,
       hasCriteria: Boolean(existing),
-      canSort: filter.range.end.row - filter.range.start.row > 1,
+      canSort:
+        filter.range.end.row - filter.range.start.row > 1 &&
+        !activeSheet.value.mergedCells.some((merge) => intersects(merge, filter.range)),
+      includesMergedCells: activeSheet.value.mergedCells.some(
+        (merge) =>
+          merge.end.row > filter.range.start.row &&
+          merge.start.row <= filter.range.end.row &&
+          [panel.column, ...filter.columns.map((entry) => entry.column)].some(
+            (column) => column >= merge.start.column && column <= merge.end.column,
+          ),
+      ),
+      settings: filterPanelSettings.value,
       disabled: disabled.value,
     };
   });
@@ -368,6 +410,14 @@ export function useDataToolsController(options: Options) {
   const dialogColumns = computed(() => {
     const target = visibleDialogTarget.value;
     if (!target) return [];
+    const tableId = removeDuplicatesVisible.value ? duplicateTarget.value?.tableId : undefined;
+    const table = tableId && activeSheet.value.tables?.find((entry) => entry.id === tableId);
+    if (table)
+      return table.columns.map((entry, offset) => ({
+        column: table.range.start.column + offset,
+        label: columnName(table.range.start.column + offset),
+        header: entry.name,
+      }));
     const columns = columnsFor(target);
     if (!subtotalVisible.value) return columns;
     const generatedColumns = new Set(
@@ -378,7 +428,9 @@ export function useDataToolsController(options: Options) {
   const sortColorColumns = computed(() => {
     const target = sortTarget.value;
     return sortVisible.value && target && valid(target)
-      ? getSortColorColumns(activeSheet.value, target.range)
+      ? getSortColorColumns(activeSheet.value, target.range, options.getSheetEvaluator(), {
+          dateSystem: options.getWorkbook().dateSystem,
+        })
       : [];
   });
   const sortIconColumns = computed(() => {
@@ -494,7 +546,7 @@ export function useDataToolsController(options: Options) {
           target.sheetId,
           target.range,
           duplicateDraft.value?.columns ?? [target.range.start.column],
-          { hasHeader: duplicateDraft.value?.hasHeader },
+          { hasHeader: duplicateDraft.value?.hasHeader, tableId: target.tableId },
         ),
       );
     } catch {
@@ -507,14 +559,18 @@ export function useDataToolsController(options: Options) {
     execute(target, () =>
       activeSheet.value.filter
         ? createClearSheetFilterCommand(target.sheetId)
-        : createSetSheetFilterCriteriaCommand(target.sheetId, target.range, []),
+        : createSetSheetFilterCriteriaCommand(target.sheetId, target.range, [], {
+            allowMergedCells: filterPanelSettings.value.allowMergedCells,
+          }),
     );
   }
   function clearFilter(): void {
     const target = capture();
     if (target && activeSheet.value.filter)
       execute(target, () =>
-        createSetSheetFilterCriteriaCommand(target.sheetId, activeSheet.value.filter!.range, []),
+        createSetSheetFilterCriteriaCommand(target.sheetId, activeSheet.value.filter!.range, [], {
+          allowMergedCells: activeSheet.value.filter!.allowMergedCells,
+        }),
       );
   }
   function reapplyFilter(): void {
@@ -529,7 +585,9 @@ export function useDataToolsController(options: Options) {
             uniqueOnly: filter.advanced.uniqueOnly,
             overwrite: false,
           })
-        : createSetSheetFilterCriteriaCommand(target.sheetId, filter.range, filter.columns),
+        : createSetSheetFilterCriteriaCommand(target.sheetId, filter.range, filter.columns, {
+            allowMergedCells: filter.allowMergedCells,
+          }),
     );
     options.recalculate?.();
   }
@@ -697,8 +755,23 @@ export function useDataToolsController(options: Options) {
     if (target) {
       duplicateTarget.value = target;
       duplicateDraft.value = undefined;
+      removeDuplicatesInitial.value = undefined;
       removeDuplicatesVisible.value = true;
     }
+  }
+  function openTableRemoveDuplicates(tableId: string): void {
+    const target = capture(false);
+    if (!target) return;
+    const table = activeSheet.value.tables?.find((entry) => entry.id === tableId);
+    if (!table) return;
+    duplicateTarget.value = { ...target, range: cloneRange(table.range), tableId };
+    const initial = {
+      hasHeader: table.headerRow,
+      columns: table.columns.map((_, offset) => table.range.start.column + offset),
+    };
+    removeDuplicatesInitial.value = initial;
+    duplicateDraft.value = initial;
+    removeDuplicatesVisible.value = true;
   }
   function applyRemoveDuplicates(draft: RemoveDuplicatesDraft): void {
     const target = duplicateTarget.value;
@@ -710,6 +783,7 @@ export function useDataToolsController(options: Options) {
       execute(target, () =>
         createRemoveDuplicatesCommand(target!.sheetId, target!.range, draft.columns, {
           hasHeader: draft.hasHeader,
+          tableId: target!.tableId,
         }),
       )
     )
@@ -908,16 +982,32 @@ export function useDataToolsController(options: Options) {
     if (execute(target, () => createRemoveSubtotalsCommand(target!.sheetId)))
       subtotalVisible.value = false;
   }
-  function openColumnFilter(column: number, anchor?: DataToolFilterAnchor): void {
+  function openColumnFilter(
+    request:
+      | number
+      | {
+          column: number;
+          range: CellRange;
+          tableId?: string;
+          anchor?: DataToolFilterAnchor;
+        },
+    anchor?: DataToolFilterAnchor,
+  ): void {
     if (options.isBusy() || !options.flush() || activeSheet.value.properties.protected) return;
-    const filter = activeSheet.value.filter;
-    if (!filter) return;
+    const column = typeof request === "number" ? request : request.column;
+    const range = typeof request === "number" ? activeSheet.value.filter?.range : request.range;
+    if (!range) return;
     const target = {
       sheetId: activeSheet.value.id,
       generation: options.getGeneration(),
-      range: cloneRange(filter.range),
+      range: cloneRange(range),
     };
-    filterPanel.value = { column, anchor, target };
+    filterPanel.value = {
+      column,
+      anchor: typeof request === "number" ? anchor : request.anchor,
+      target,
+      ...(typeof request === "number" || !request.tableId ? {} : { tableId: request.tableId }),
+    };
   }
   function openFilterSort(): void {
     const panel = filterPanel.value;
@@ -972,10 +1062,11 @@ export function useDataToolsController(options: Options) {
   function applyColumnFilter(payload: {
     includedKeys: DataToolFilterValueOption["key"][];
     criteria?: DataToolFilterCriteria;
+    allowMergedCells?: boolean;
   }): void {
     const panel = filterPanel.value;
-    const filter = activeSheet.value.filter;
-    if (!panel || !filter) return;
+    if (!panel) return;
+    const filter = filterForRange(panel.target.range) ?? { range: panel.target.range, columns: [] };
     const nextColumns = filter.columns.filter((item) => item.column !== panel.column);
     const selected = new Set(payload.includedKeys.map(getSheetFilterValueKey));
     const available = filterState.value?.values ?? [];
@@ -991,14 +1082,16 @@ export function useDataToolsController(options: Options) {
       });
     if (
       execute(panel.target, () =>
-        createSetSheetFilterCriteriaCommand(panel.target.sheetId, filter.range, nextColumns),
+        createSetSheetFilterCriteriaCommand(panel.target.sheetId, filter.range, nextColumns, {
+          allowMergedCells: payload.allowMergedCells ?? filter.allowMergedCells,
+        }),
       )
     )
       filterPanel.value = undefined;
   }
   function clearColumnFilter(): void {
     const panel = filterPanel.value;
-    const filter = activeSheet.value.filter;
+    const filter = panel && filterForRange(panel.target.range);
     if (
       panel &&
       filter &&
@@ -1007,6 +1100,7 @@ export function useDataToolsController(options: Options) {
           panel.target.sheetId,
           filter.range,
           filter.columns.filter((item) => item.column !== panel.column),
+          { allowMergedCells: filter.allowMergedCells },
         ),
       )
     )
@@ -1041,9 +1135,12 @@ export function useDataToolsController(options: Options) {
     hasSubtotals: computed(() => Boolean(activeSheet.value.subtotalMetadata?.length)),
     filterActive,
     filterState,
+    updateFilterPanelSettings,
     sortVisible,
     textToColumnsVisible,
     removeDuplicatesVisible,
+    removeDuplicatesInitial,
+    removeDuplicatesIsTable: computed(() => Boolean(duplicateTarget.value?.tableId)),
     validationVisible,
     subtotalVisible,
     toggleFilter,
@@ -1061,6 +1158,7 @@ export function useDataToolsController(options: Options) {
       duplicateDraft.value = draft;
     },
     openRemoveDuplicates,
+    openTableRemoveDuplicates,
     applyRemoveDuplicates,
     openValidation,
     applyValidation,
@@ -1093,6 +1191,7 @@ export function useDataToolsController(options: Options) {
     closeRemoveDuplicates: () => {
       removeDuplicatesVisible.value = false;
       duplicateTarget.value = undefined;
+      removeDuplicatesInitial.value = undefined;
     },
     closeValidation: () => {
       validationVisible.value = false;

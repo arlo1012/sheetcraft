@@ -40,6 +40,29 @@ describe("sheet content extent", () => {
     expect(getSheetContentExtent(sheet)).toEqual({ rowCount: 34, columnCount: 19 });
   });
 
+  test("keeps an empty structured table's full range reachable", () => {
+    const sheet = createTestSheet();
+    sheet.tables = [
+      {
+        id: "table-1",
+        name: "Table1",
+        range: { start: { row: 20, column: 2 }, end: { row: 33, column: 18 } },
+        columns: [],
+        style: { id: "TableStyleMedium2", name: "Medium 2", category: "medium", elements: {} },
+        headerRow: true,
+        totalRow: false,
+        firstColumn: false,
+        lastColumn: false,
+        bandedRows: true,
+        bandedColumns: false,
+        filterButton: true,
+        filter: null,
+      },
+    ];
+
+    expect(getSheetContentExtent(sheet)).toEqual({ rowCount: 34, columnCount: 19 });
+  });
+
   test("includes a floating image's transformed occupied range and releases it on removal", () => {
     const sheet = createTestSheet();
     sheet.floatingImages.push({

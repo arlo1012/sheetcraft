@@ -1,7 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { createWorkbookSession } from "@idea10/core/history";
-import { getActiveSheet, setCellStyle } from "@idea10/core/workbook";
+import {
+  createSheetEvaluator,
+  getActiveSheet,
+  setCellContent,
+  setCellStyle,
+} from "@idea10/core/workbook";
 import { DEFAULT_CELL_TEXT_COLOR } from "@idea10/core/style";
 import { getSortColorColumns } from "../../../../modules/data-tools/sort-color-options";
 
@@ -50,5 +55,30 @@ describe("getSortColorColumns", () => {
     });
     expect(column?.cellColors).toEqual([]);
     expect(column?.fontColors).toEqual([DEFAULT_CELL_TEXT_COLOR]);
+  });
+
+  test("discovers conditional-format colors through the same effective-style resolver as sorting", () => {
+    const sheet = getActiveSheet(
+      createWorkbookSession({ idFactory: createSequentialIdFactory() }).workbook,
+    );
+    setCellContent(sheet, { row: 1, column: 0 }, { kind: "literal", value: 5 });
+    setCellContent(sheet, { row: 2, column: 0 }, { kind: "literal", value: 1 });
+    sheet.conditionalFormats = [
+      {
+        id: "green-values",
+        ranges: [{ start: { row: 1, column: 0 }, end: { row: 2, column: 0 } }],
+        anchor: { row: 1, column: 0 },
+        condition: { kind: "cellValue", operator: "greaterThan", value: 3 },
+        style: { fillColor: "#00FF00", textColor: "#112233" },
+      },
+    ];
+
+    const [column] = getSortColorColumns(
+      sheet,
+      { start: { row: 0, column: 0 }, end: { row: 2, column: 0 } },
+      createSheetEvaluator(sheet),
+    );
+    expect(column?.cellColors).toEqual(["#00ff00", null]);
+    expect(column?.fontColors).toEqual(["#112233", DEFAULT_CELL_TEXT_COLOR]);
   });
 });

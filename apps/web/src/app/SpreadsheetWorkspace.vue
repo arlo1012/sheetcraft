@@ -22,6 +22,12 @@ import { useDuplicateErrorChecks } from "../modules/data-tools/useDuplicateError
 import type { ErrorCheckSettings } from "../modules/data-tools/duplicate-error-preferences";
 import DuplicateErrorCheckOptionsDialog from "../modules/data-tools/components/DuplicateErrorCheckOptionsDialog.vue";
 import DataTableDialog from "../modules/data-tools/components/DataTableDialog.vue";
+import CreateTableDialog from "../modules/table-styles/components/CreateTableDialog.vue";
+import TableSettingsDialog from "../modules/table-styles/components/TableSettingsDialog.vue";
+import ResizeTableDialog from "../modules/table-styles/components/ResizeTableDialog.vue";
+import TableToolsToolbar from "../modules/table-styles/components/TableToolsToolbar.vue";
+import NewTableStyleDialog from "../modules/table-styles/components/NewTableStyleDialog.vue";
+import { useTableStylesController } from "../modules/table-styles/useTableStylesController";
 import GoalSeekDialog from "../modules/data-tools/components/GoalSeekDialog.vue";
 import PlanningSolverDialog from "../modules/data-tools/components/PlanningSolverDialog.vue";
 import DataProofreadingDialog from "../modules/data-tools/components/DataProofreadingDialog.vue";
@@ -246,6 +252,38 @@ const {
 } = useSpreadsheetWorkspaceController();
 
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
+const tableActions = useTableStylesController({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getAddress: () => activeAddress.value,
+  getSelection: () => activeSelectionRange.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  isBusy: () =>
+    loading.value || fileBusy.value || xlsxBusy.value || activeSheet.value.properties.protected,
+  finishEditing: () => cellEditSession.finish(),
+  execute: executeCommand,
+  focus: focusCellEditor,
+});
+const {
+  activeTable,
+  customStyles: customTableStyles,
+  defaultStyleId: defaultTableStyleId,
+  customPivotStyles: customPivotTableStyles,
+  defaultPivotStyleId: defaultPivotTableStyleId,
+  createInitial: createTableInitial,
+  settingsTarget: tableSettingsTarget,
+  resizeTarget: tableResizeTarget,
+  styleDraft: tableStyleDraft,
+  pivotStyleDraft: pivotTableStyleDraft,
+  error: tableError,
+  modalOpen: tableModalOpen,
+} = tableActions;
+const tableRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
+const { active: pickingTableRange, reference: pickedTableReference } = tableRangePicker;
+watch(tableModalOpen, (open) => {
+  if (!open) tableRangePicker.cancel();
+});
 const duplicateInputError = computed(() => {
   const feedback = validationFeedback.value;
   if (feedback?.source !== "duplicate" || feedback.target.sheetId !== activeSheet.value.id)
@@ -782,6 +820,8 @@ const {
   sortVisible: dataSortVisible,
   textToColumnsVisible: dataTextToColumnsVisible,
   removeDuplicatesVisible: dataRemoveDuplicatesVisible,
+  removeDuplicatesInitial: dataRemoveDuplicatesInitial,
+  removeDuplicatesIsTable: dataRemoveDuplicatesIsTable,
   validationVisible: dataValidationVisible,
   subtotalVisible: dataSubtotalVisible,
   advancedFilterVisible: dataAdvancedFilterVisible,
@@ -1251,6 +1291,7 @@ watch(workbookGeneration, () => {
 const nameRangePicker = useRangeReferencePicker(() => activeSheet.value.name);
 const { active: pickingNameRange, reference: pickedNameReference } = nameRangePicker;
 const activeRangePicker = computed(() => {
+  if (pickingTableRange.value) return tableRangePicker;
   if (pickingFindFormat.value) return findFormatPicker;
   if (pickingSimulationRange.value) return simulationRangePicker;
   if (pickingProofreadingRange.value) return proofreadingRangePicker;
@@ -1298,6 +1339,18 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     else if (event.key === "Tab") return;
     event.preventDefault();
     event.stopPropagation();
+    return;
+  }
+  if (
+    event.key.toLowerCase() === "t" &&
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    !event.isComposing
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    tableActions.requestCreate();
     return;
   }
   if (
@@ -1371,12 +1424,18 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :recent-functions="recentFunctions"
       :name-creation-enabled="!formulaToolsDisabled"
       :calculation-settings="calculationSettings"
+      :table-styles="customTableStyles"
+      :pivot-table-styles="customPivotTableStyles"
+      :selected-table-style-id="activeTable?.style.id"
+      :selected-table-style-color="activeTable?.style.accentColor"
+      :has-table="!!activeTable"
       :inert="
         loading ||
         fileBusy ||
         xlsxBusy ||
         !!cellFormatSelection ||
         !!conditionalFormattingSelection ||
+        tableModalOpen ||
         !!findFormatDraft ||
         namesVisible ||
         pickingReferenceRange ||
@@ -1392,6 +1451,13 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @create-conditional-format="openConditionalFormatting"
       @manage-conditional-formats="openConditionalFormatting()"
       @clear-conditional-formats="clearConditionalFormatRules"
+      @apply-table-style="tableActions.applyStyle"
+      @create-table-style="tableActions.openStyle()"
+      @edit-table-style="tableActions.openStyle($event)"
+      @create-pivot-table-style="tableActions.openPivotStyle()"
+      @edit-pivot-table-style="tableActions.openPivotStyle($event)"
+      @clear-table-style="tableActions.clearStyle"
+      @manage-table="tableActions.openSettings"
       @apply-style="applyCellStyle"
       @convert-number-type="convertNumberType"
       @adjust-decimals="adjustNumberFormatDecimals"
@@ -1415,6 +1481,28 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @undo="undo"
       @redo="redo"
     >
+      <template #table-tools>
+        <TableToolsToolbar
+          v-if="activeTable"
+          :table="activeTable"
+          :custom-styles="customTableStyles"
+          :custom-pivot-styles="customPivotTableStyles"
+          :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
+          :edit-session-id="cellEditSession.id"
+          @rename="tableActions.renameTable"
+          @change-options="tableActions.updateTable"
+          @resize="tableActions.openResize"
+          @remove-duplicates="dataTools.openTableRemoveDuplicates(activeTable.id)"
+          @convert="tableActions.convertToRange"
+          @apply-style="tableActions.applyStyle"
+          @create-style="tableActions.openStyle()"
+          @edit-style="tableActions.openStyle($event)"
+          @create-pivot-style="tableActions.openPivotStyle()"
+          @edit-pivot-style="tableActions.openPivotStyle($event)"
+          @clear-style="tableActions.clearStyle"
+          @settings="tableActions.openSettings"
+        />
+      </template>
       <template #data-tools>
         <DataToolbar
           :disabled="dataToolsDisabled"
@@ -1539,6 +1627,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :split-picking="pickingSplitRange"
       :select-split-reference="selectSplitReference"
       :duplicate-count="dataDuplicateCount"
+      :remove-duplicates-initial="dataRemoveDuplicatesInitial"
+      :remove-duplicates-is-table="dataRemoveDuplicatesIsTable"
       :validation-initial="dataValidationInitial"
       :validation-suspended="pickingValidationRange"
       :select-validation-reference="selectValidationReference"
@@ -1839,6 +1929,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @open-sort="dataTools.openFilterSort"
       @apply="dataTools.applyColumnFilter"
       @clear="dataTools.clearColumnFilter"
+      @update:settings="dataTools.updateFilterPanelSettings"
       @close="dataTools.closeColumnFilter"
     />
     <DataValidationFeedbackDialog
@@ -1879,6 +1970,61 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :initial-tab="cellFormatInitialTab"
       @confirm="confirmCellFormat"
       @cancel="closeCellFormat"
+    />
+    <CreateTableDialog
+      v-if="createTableInitial"
+      :initial="createTableInitial"
+      :error="tableError"
+      :suspended="pickingTableRange"
+      :select-reference="tableRangePicker.selectReference"
+      @confirm="tableActions.confirmCreate"
+      @cancel="tableActions.close"
+    />
+    <TableSettingsDialog
+      v-if="tableSettingsTarget"
+      :initial="tableSettingsTarget.initial"
+      :error="tableError"
+      :suspended="pickingTableRange"
+      :select-reference="tableRangePicker.selectReference"
+      @confirm="tableActions.confirmSettings"
+      @convert="tableActions.convertToRange"
+      @cancel="tableActions.close"
+    />
+    <ResizeTableDialog
+      v-if="tableResizeTarget"
+      :initial="tableResizeTarget.range"
+      :error="tableError"
+      :suspended="pickingTableRange"
+      :select-reference="tableRangePicker.selectReference"
+      @confirm="tableActions.confirmResize"
+      @cancel="tableActions.close"
+    />
+    <NewTableStyleDialog
+      v-if="tableStyleDraft"
+      :style="tableStyleDraft.style"
+      :existing-names="customTableStyles.map((style) => style.name)"
+      :default-style-id="defaultTableStyleId"
+      :date-system="session.workbook.dateSystem"
+      @confirm="tableActions.confirmStyle"
+      @cancel="tableActions.close"
+    />
+    <NewTableStyleDialog
+      v-if="pivotTableStyleDraft"
+      kind="pivot"
+      :style="pivotTableStyleDraft.style"
+      :existing-names="customPivotTableStyles.map((style) => style.name)"
+      :default-style-id="defaultPivotTableStyleId"
+      :date-system="session.workbook.dateSystem"
+      @confirm-pivot="tableActions.confirmPivotStyle"
+      @cancel="tableActions.close"
+    />
+    <RangeReferencePicker
+      v-if="pickingTableRange"
+      :reference="pickedTableReference"
+      :edit-session-id="cellEditSession.id"
+      :title="t('tables.selectRange')"
+      @confirm="tableRangePicker.confirm"
+      @cancel="tableRangePicker.cancel"
     />
     <ConditionalFormatManagerDialog
       v-if="conditionalFormattingSelection"
@@ -1937,6 +2083,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!cellFormatSelection ||
         !!findFormatDraft ||
         pickingReferenceRange ||
+        tableModalOpen ||
         dataToolsModalOpen ||
         formulaEditorVisible ||
         formulaInsertVisible ||
@@ -2053,6 +2200,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!cellFormatSelection ||
         !!findFormatDraft ||
         dataToolsModalOpen ||
+        (tableModalOpen && !pickingTableRange) ||
         formulaEditorVisible ||
         formulaInsertVisible ||
         !!modalValidationFeedback
@@ -2086,7 +2234,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @ignore-all-cell-errors="ignoreAllDuplicateErrors"
         @edit-error-in-formula-bar="editErrorInFormulaBar"
         @error-check-options="openDuplicateErrorOptions"
-        @filter-column-request="dataTools.openColumnFilter($event.column, $event.anchor)"
+        @filter-column-request="dataTools.openColumnFilter($event)"
+        @table-expand-request="tableActions.expandTable"
         @validation-choose="chooseValidationValue"
         @outline-toggle="toggleOutline"
         @outline-level="showOutlineLevel"
@@ -2161,6 +2310,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @close="contextActions.closePanels()"
     />
     <WorkbookStatusBar
+      :sheet-tabs-disabled="pickingTableRange"
       :edit-session-id="
         cellEditSession.state.draft.startsWith('=') ? cellEditSession.id : undefined
       "
@@ -2175,7 +2325,13 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :fullscreen="fullscreen"
       :fullscreen-available="fullscreenAvailable"
       @toggle-fullscreen="toggleFullscreen"
-      :inert="loading || fileBusy || xlsxBusy || !!cellFormatSelection"
+      :inert="
+        loading ||
+        fileBusy ||
+        xlsxBusy ||
+        !!cellFormatSelection ||
+        (tableModalOpen && !pickingTableRange)
+      "
       :sheets="sheets"
       :active-sheet-id="session.workbook.activeSheetId"
       :selection-summary="activeSelectionSummary"
