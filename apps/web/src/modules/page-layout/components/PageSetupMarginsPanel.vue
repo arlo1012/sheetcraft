@@ -206,6 +206,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
       <div class="page-setup-margins__unit">
         <span>{{ t("dimensionUnits.unit") }}</span
         ><TSelect
+          class="page-setup-margins__unit-select"
           :model-value="unit"
           :options="unitOptions"
           :aria-label="t('dimensionUnits.unit')"
@@ -280,6 +281,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
     width: 100%;
     > div:not(.page-setup-margins__preview) {
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: var(--idea-space-1);
       min-width: 0;
     }
@@ -298,6 +300,10 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
   }
   &__unit {
     grid-area: unit;
+  }
+  &__unit-select {
+    width: 100%;
+    min-width: 0;
   }
   &__bottom {
     grid-area: bottom;
