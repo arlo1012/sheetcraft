@@ -325,7 +325,7 @@ onBeforeUnmount(() => {
               )
             }}
           </span>
-          <TButton variant="outline" size="small" @click="emit('close')">{{
+          <TButton theme="default" variant="base" size="small" @click="emit('close')">{{
             t("dataTools.filter.cancel")
           }}</TButton>
           <TButton theme="primary" size="small" :disabled="!canApply" @click="apply">{{
