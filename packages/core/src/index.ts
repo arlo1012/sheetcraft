@@ -1,5 +1,6 @@
 export * from "./clipboard.js";
 export * from "./cell-autofill.js";
+export * from "./cell-styles.js";
 export * from "./commands/index.js";
 export * from "./coordinates.js";
 export * from "./dimension-units.js";

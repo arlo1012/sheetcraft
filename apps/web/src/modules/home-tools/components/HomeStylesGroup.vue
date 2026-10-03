@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import type { CellStyleDefinition } from "@idea10/core/cell-styles";
 import type { TableStyleDefinition } from "@idea10/core/table-styles";
 import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
+import CellStylesMenu from "../../cell-styles/components/CellStylesMenu.vue";
 import TableStylesMenu from "../../table-styles/components/TableStylesMenu.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import ConditionalFormattingMenu, {
@@ -9,7 +11,9 @@ import ConditionalFormattingMenu, {
 
 defineProps<{
   disabled?: boolean;
+  cellStylesDisabled?: boolean;
   editSessionId?: string;
+  cellStyles?: readonly CellStyleDefinition[];
   tableStyles?: readonly TableStyleDefinition[];
   pivotTableStyles?: readonly PivotTableStyleDefinition[];
   selectedTableStyleId?: string;
@@ -20,6 +24,10 @@ const emit = defineEmits<{
   createConditionalFormat: [kind: ConditionalFormatQuickRule];
   manageConditionalFormats: [];
   clearConditionalFormats: [scope: "selection" | "sheet"];
+  applyNamedCellStyle: [style: CellStyleDefinition];
+  createCellStyle: [];
+  editCellStyle: [style: CellStyleDefinition];
+  mergeCellStyles: [];
   applyTableStyle: [style: TableStyleDefinition];
   createTableStyle: [];
   editTableStyle: [style: TableStyleDefinition];
@@ -40,6 +48,15 @@ const { t } = useAppI18n();
     :aria-label="t('format.styleRuleTools')"
   >
     <div class="home-styles-group__row" data-ribbon-row="1">
+      <CellStylesMenu
+        :disabled="cellStylesDisabled ?? disabled"
+        :edit-session-id="editSessionId"
+        :custom-styles="cellStyles ?? []"
+        @apply="emit('applyNamedCellStyle', $event)"
+        @create="emit('createCellStyle')"
+        @edit="emit('editCellStyle', $event)"
+        @merge="emit('mergeCellStyles')"
+      />
       <TableStylesMenu
         :disabled="disabled"
         :edit-session-id="editSessionId"

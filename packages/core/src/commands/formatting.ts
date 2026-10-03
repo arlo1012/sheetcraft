@@ -17,6 +17,7 @@ import {
   type CellStylePatch,
   type CellNumberFormat,
 } from "../style.js";
+import { getCellStyleDefinitionPatch, type CellStyleDefinition } from "../cell-styles.js";
 import {
   createSheetSparseState,
   getCellStyle,
@@ -70,7 +71,7 @@ function assertSupportedRange(range: CellRange): void {
 export function createApplyCellStyleCommand(
   sheetId: string,
   range: CellRange,
-  patch: CellStylePatch,
+  patch: CellStylePatch | CellStyleDefinition,
 ): ApplyCellStyleCommand {
   const normalizedRange = normalizeRange(range);
   assertCellRange(normalizedRange);
@@ -79,7 +80,13 @@ export function createApplyCellStyleCommand(
     type: "applyCellStyle",
     sheetId,
     range: normalizedRange,
-    patch: validateCommandPayload("patch", patch, () => normalizeCellStylePatch(patch)),
+    patch: validateCommandPayload("patch", patch, () =>
+      normalizeCellStylePatch(
+        "category" in patch && "style" in patch
+          ? getCellStyleDefinitionPatch(patch as CellStyleDefinition)
+          : (patch as CellStylePatch),
+      ),
+    ),
   };
 }
 

@@ -79,6 +79,7 @@ import {
   applySetWorkbookDateSystemCommand,
   applySetWorkbookCalculationCommand,
 } from "./workbook-settings.js";
+import { applySetWorkbookCellStylesCommand } from "./cell-styles.js";
 import { applyDeleteDefinedNameCommand, applyUpsertDefinedNameCommand } from "./names.js";
 import { applySetDefinedNamesCommand } from "./names-from-selection.js";
 import {
@@ -198,6 +199,8 @@ export function applyWorkbookCommand(
         return applySetWorkbookDateSystemCommand(workbook, command);
       case "setWorkbookCalculation":
         return applySetWorkbookCalculationCommand(workbook, command);
+      case "setWorkbookCellStyles":
+        return applySetWorkbookCellStylesCommand(workbook, command);
       case "setDefinedNames":
         return applySetDefinedNamesCommand(workbook, command);
       case "upsertDefinedName":

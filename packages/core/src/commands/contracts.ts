@@ -28,6 +28,7 @@ import type {
 } from "../workbook.js";
 import type { TableStyleDefinition } from "../table-styles.js";
 import type { PivotTableStyleDefinition } from "../pivot-table-styles.js";
+import type { CellStyleDefinition } from "../cell-styles.js";
 import type { ConditionalFormatIconSet } from "../conditional-formatting.js";
 
 export type CellContentChange = {
@@ -86,6 +87,10 @@ export type SetWorkbookPivotTableStylesCommand = {
   type: "setWorkbookPivotTableStyles";
   styles: PivotTableStyleDefinition[];
   defaultPivotTableStyleId?: string;
+};
+export type SetWorkbookCellStylesCommand = {
+  type: "setWorkbookCellStyles";
+  styles: CellStyleDefinition[];
 };
 /** Internal inverse for table operations that also rewrite formulas on other sheets. */
 export type RestoreTableTransactionCommand = {
@@ -666,6 +671,7 @@ export type WorkbookCommand =
   | ApplyTableStyleToRangeCommand
   | SetWorkbookTableStylesCommand
   | SetWorkbookPivotTableStylesCommand
+  | SetWorkbookCellStylesCommand
   | RestoreTableTransactionCommand
   | MoveCellRangeCommand
   | InsertCellsCommand
@@ -728,6 +734,7 @@ export type WorkbookCommand =
 export type WorkbookOperation =
   | "workbook.dateSystem"
   | "workbook.calculation"
+  | "workbook.cellStyles"
   | "cells.edit"
   | "cells.paste"
   | "cells.move"
@@ -776,6 +783,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "workbook.dateSystem";
     case "setWorkbookCalculation":
       return "workbook.calculation";
+    case "setWorkbookCellStyles":
+      return "workbook.cellStyles";
     case "setCellContents":
       return "cells.edit";
     case "clearCellRange":

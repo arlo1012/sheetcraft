@@ -27,6 +27,9 @@ import TableSettingsDialog from "../modules/table-styles/components/TableSetting
 import ResizeTableDialog from "../modules/table-styles/components/ResizeTableDialog.vue";
 import TableToolsToolbar from "../modules/table-styles/components/TableToolsToolbar.vue";
 import NewTableStyleDialog from "../modules/table-styles/components/NewTableStyleDialog.vue";
+import NewCellStyleDialog from "../modules/cell-styles/components/NewCellStyleDialog.vue";
+import MergeCellStylesDialog from "../modules/cell-styles/components/MergeCellStylesDialog.vue";
+import { useCellStylesController } from "../modules/cell-styles/useCellStylesController";
 import { useTableStylesController } from "../modules/table-styles/useTableStylesController";
 import GoalSeekDialog from "../modules/data-tools/components/GoalSeekDialog.vue";
 import PlanningSolverDialog from "../modules/data-tools/components/PlanningSolverDialog.vue";
@@ -252,6 +255,28 @@ const {
 } = useSpreadsheetWorkspaceController();
 
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
+const cellStyleActions = useCellStylesController({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getAddress: () => activeAddress.value,
+  getSelection: () => activeSelectionRange.value,
+  getGeneration: () => workbookGeneration.value,
+  getRevision: () => workbookRevision.value,
+  isBusy: () =>
+    loading.value || fileBusy.value || xlsxBusy.value || activeSheet.value.properties.protected,
+  finishEditing: () => cellEditSession.finish(),
+  execute: executeCommand,
+  focus: focusCellEditor,
+});
+const {
+  customStyles: customCellStyles,
+  styleDraft: cellStyleDraft,
+  mergeOpen: cellStylesMergeOpen,
+  modalOpen: cellStylesModalOpen,
+  importedStyles: importedCellStyles,
+  mergeLoading: cellStylesMergeLoading,
+  error: cellStylesError,
+} = cellStyleActions;
 const tableActions = useTableStylesController({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1424,6 +1449,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       :recent-functions="recentFunctions"
       :name-creation-enabled="!formulaToolsDisabled"
       :calculation-settings="calculationSettings"
+      :cell-styles="customCellStyles"
       :table-styles="customTableStyles"
       :pivot-table-styles="customPivotTableStyles"
       :selected-table-style-id="activeTable?.style.id"
@@ -1435,6 +1461,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         xlsxBusy ||
         !!cellFormatSelection ||
         !!conditionalFormattingSelection ||
+        cellStylesModalOpen ||
         tableModalOpen ||
         !!findFormatDraft ||
         namesVisible ||
@@ -1451,6 +1478,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @create-conditional-format="openConditionalFormatting"
       @manage-conditional-formats="openConditionalFormatting()"
       @clear-conditional-formats="clearConditionalFormatRules"
+      @apply-named-cell-style="cellStyleActions.applyStyle"
+      @create-cell-style="cellStyleActions.createStyle"
+      @edit-cell-style="cellStyleActions.editStyle"
+      @merge-cell-styles="cellStyleActions.openMerge"
       @apply-table-style="tableActions.applyStyle"
       @create-table-style="tableActions.openStyle()"
       @edit-table-style="tableActions.openStyle($event)"
@@ -1999,6 +2030,24 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @confirm="tableActions.confirmResize"
       @cancel="tableActions.close"
     />
+    <NewCellStyleDialog
+      v-if="cellStyleDraft"
+      :style="cellStyleDraft.style"
+      :initial-style="cellStyleDraft.initialStyle"
+      :existing-names="customCellStyles.map((style) => style.name)"
+      :date-system="session.workbook.dateSystem"
+      @confirm="cellStyleActions.saveStyle"
+      @cancel="cellStyleActions.close"
+    />
+    <MergeCellStylesDialog
+      v-if="cellStylesMergeOpen"
+      :styles="importedCellStyles"
+      :loading="cellStylesMergeLoading"
+      :error="cellStylesError"
+      @select-file="cellStyleActions.importMergeFile"
+      @confirm="cellStyleActions.mergeStyles"
+      @cancel="cellStyleActions.close"
+    />
     <NewTableStyleDialog
       v-if="tableStyleDraft"
       :style="tableStyleDraft.style"
@@ -2083,6 +2132,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!cellFormatSelection ||
         !!findFormatDraft ||
         pickingReferenceRange ||
+        cellStylesModalOpen ||
         tableModalOpen ||
         dataToolsModalOpen ||
         formulaEditorVisible ||
@@ -2200,6 +2250,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!cellFormatSelection ||
         !!findFormatDraft ||
         dataToolsModalOpen ||
+        cellStylesModalOpen ||
         (tableModalOpen && !pickingTableRange) ||
         formulaEditorVisible ||
         formulaInsertVisible ||
@@ -2330,6 +2381,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         fileBusy ||
         xlsxBusy ||
         !!cellFormatSelection ||
+        cellStylesModalOpen ||
         (tableModalOpen && !pickingTableRange)
       "
       :sheets="sheets"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { CellStyleDefinition } from "@idea10/core/cell-styles";
 import { computed } from "vue";
 import type { CellMergeMode, CellValueConversionMode } from "@idea10/core/commands";
 import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@idea10/core/style";
@@ -37,6 +38,7 @@ const props = withDefaults(
     formatPainterActive?: boolean;
     dataState?: HomeDataToolState;
     mergeState?: MergeCellsState;
+    cellStyles?: readonly CellStyleDefinition[];
     tableStyles?: readonly TableStyleDefinition[];
     pivotTableStyles?: readonly PivotTableStyleDefinition[];
     selectedTableStyleId?: string;
@@ -73,6 +75,10 @@ const emit = defineEmits<{
   createConditionalFormat: [kind: ConditionalFormatQuickRule];
   manageConditionalFormats: [];
   clearConditionalFormats: [scope: "selection" | "sheet"];
+  applyNamedCellStyle: [style: CellStyleDefinition];
+  createCellStyle: [];
+  editCellStyle: [style: CellStyleDefinition];
+  mergeCellStyles: [];
   applyTableStyle: [style: TableStyleDefinition];
   createTableStyle: [];
   editTableStyle: [style: TableStyleDefinition];
@@ -156,8 +162,10 @@ function onKeydown(event: KeyboardEvent): void {
       </div>
     </section>
     <HomeStylesGroup
+      :cell-styles-disabled="disabled"
       :disabled="conditionalFormattingDisabled ?? disabled"
       :edit-session-id="editSessionId"
+      :cell-styles="cellStyles"
       :table-styles="tableStyles"
       :pivot-table-styles="pivotTableStyles"
       :selected-table-style-id="selectedTableStyleId"
@@ -166,6 +174,10 @@ function onKeydown(event: KeyboardEvent): void {
       @create-conditional-format="emit('createConditionalFormat', $event)"
       @manage-conditional-formats="emit('manageConditionalFormats')"
       @clear-conditional-formats="emit('clearConditionalFormats', $event)"
+      @apply-named-cell-style="emit('applyNamedCellStyle', $event)"
+      @create-cell-style="emit('createCellStyle')"
+      @edit-cell-style="emit('editCellStyle', $event)"
+      @merge-cell-styles="emit('mergeCellStyles')"
       @apply-table-style="emit('applyTableStyle', $event)"
       @create-table-style="emit('createTableStyle')"
       @edit-table-style="emit('editTableStyle', $event)"

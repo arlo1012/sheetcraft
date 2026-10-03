@@ -34,6 +34,7 @@ import {
   PIVOT_TABLE_STYLE_ELEMENTS,
   type PivotTableStyleDefinition,
 } from "./pivot-table-styles.js";
+import type { CellStyleDefinition } from "./cell-styles.js";
 import {
   createFormulaError,
   isFormulaError,
@@ -346,6 +347,8 @@ export type Workbook = {
   defaultTableStyleId?: string;
   pivotTableStyles?: PivotTableStyleDefinition[];
   defaultPivotTableStyleId?: string;
+  /** Workbook-local custom cell-style definitions. Gallery builtins are not persisted here. */
+  cellStyles?: CellStyleDefinition[];
 };
 
 /** A workbook- or sheet-scoped name that points at one rectangular range. */
@@ -421,6 +424,7 @@ export function createWorkbook(options?: {
     definedNames: new Map(),
     tableStyles: [],
     pivotTableStyles: [],
+    cellStyles: [],
   };
 }
 

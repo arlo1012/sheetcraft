@@ -39,6 +39,10 @@
       "types": "./dist/cell-autofill.d.ts",
       "import": "./dist/cell-autofill.js"
     },
+    "./cell-styles": {
+      "types": "./dist/cell-styles.d.ts",
+      "import": "./dist/cell-styles.js"
+    },
     "./commands": {
       "types": "./dist/commands/index.d.ts",
       "import": "./dist/commands/index.js"

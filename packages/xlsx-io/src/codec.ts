@@ -1,4 +1,5 @@
 import ExcelJSImport from "exceljs/dist/exceljs.min.js";
+import { unzipSync } from "fflate/browser";
 import { readExcelBorder, writeExcelBorder } from "./border.js";
 import { createFormulaCacheEligibility, formulaCacheValue } from "./formula-cache.js";
 import { fromExcelNumberFormat, toExcelNumberFormat } from "./number-format.js";
@@ -58,6 +59,7 @@ import {
   xlsxPivotTableStyleId,
   xlsxTableStyleId,
 } from "./table-styles.js";
+import { readXlsxCellStyles } from "./cell-styles.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
@@ -585,6 +587,7 @@ export async function decodeWithExcelJs(
   const rawDataMetadata = readXlsxDataMetadata(bytes);
   const rawConditionalFormats = readXlsxConditionalFormatMetadata(bytes, report);
   const rawTables = readXlsxTableMetadata(bytes);
+  const cellStyles = readXlsxCellStyles(unzipSync(bytes)["xl/styles.xml"]);
   const source = new ExcelJS.Workbook();
   await source.xlsx.load(withoutTableAutoFiltersForExcelJs(bytes));
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
@@ -780,6 +783,7 @@ export async function decodeWithExcelJs(
       definedNames: readDefinedNames(bytes, sheets, report),
       tableStyles: rawTables.tableStyles,
       pivotTableStyles: rawTables.pivotTableStyles,
+      ...(cellStyles.length ? { cellStyles } : {}),
       ...(xlsxTableStyleId(rawTables.defaultTableStyleName)
         ? { defaultTableStyleId: xlsxTableStyleId(rawTables.defaultTableStyleName) }
         : {}),
@@ -1080,6 +1084,7 @@ export async function encodeWithExcelJs(
       workbook.defaultTableStyleId,
       workbook.pivotTableStyles ?? [],
       workbook.defaultPivotTableStyleId,
+      workbook.cellStyles,
       report,
     ),
     report: report.build(),

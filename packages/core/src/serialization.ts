@@ -9,6 +9,11 @@ import { parseA1FormulaReference } from "./formula/reference-model.js";
 import { normalizeCellStyle, type CellStyle } from "./style.js";
 import { cloneTableStyleDefinition } from "./table-styles.js";
 import { clonePivotTableStyleDefinition } from "./pivot-table-styles.js";
+import {
+  cloneCellStyleDefinition,
+  normalizeWorkbookCellStyles,
+  type CellStyleDefinition,
+} from "./cell-styles.js";
 import { normalizeImageTransform, type ImageTransform } from "./image-transform.js";
 import {
   createSheet,
@@ -148,8 +153,12 @@ export type WorkbookSnapshotV13 = Omit<WorkbookSnapshotV12, "version" | "sheets"
   pivotTableStyles?: import("./pivot-table-styles.js").PivotTableStyleDefinition[];
   defaultPivotTableStyleId?: string;
 };
+export type WorkbookSnapshotV14 = Omit<WorkbookSnapshotV13, "version"> & {
+  version: 14;
+  cellStyles?: CellStyleDefinition[];
+};
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV13;
+export type WorkbookSnapshot = WorkbookSnapshotV14;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -161,7 +170,7 @@ export type SheetSnapshot = SheetSnapshotV7 & {
   conditionalFormats?: SheetConditionalFormatRule[];
   tables?: SheetTable[];
 };
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -641,7 +650,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 13,
+    version: 14,
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
@@ -661,6 +670,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
     ...(workbook.defaultPivotTableStyleId
       ? { defaultPivotTableStyleId: workbook.defaultPivotTableStyleId }
       : {}),
+    cellStyles: (workbook.cellStyles ?? []).map(cloneCellStyleDefinition),
   };
 }
 
@@ -679,7 +689,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 10 &&
     record.version !== 11 &&
     record.version !== 12 &&
-    record.version !== 13
+    record.version !== 13 &&
+    record.version !== 14
   ) {
     throw new WorkbookDomainError(
       {
@@ -780,6 +791,21 @@ export function deserializeWorkbook(value: unknown): Workbook {
           }
         })
       : [];
+  const cellStyles =
+    version >= 14 && record.cellStyles !== undefined
+      ? (() => {
+          try {
+            return normalizeWorkbookCellStyles(
+              asArray(record.cellStyles, "$.cellStyles") as CellStyleDefinition[],
+            );
+          } catch (error) {
+            return fail(
+              "$.cellStyles",
+              error instanceof Error ? error.message : "Invalid cell styles.",
+            );
+          }
+        })()
+      : [];
   return {
     id,
     dateSystem,
@@ -789,6 +815,7 @@ export function deserializeWorkbook(value: unknown): Workbook {
     definedNames,
     tableStyles,
     pivotTableStyles,
+    cellStyles,
     ...(version >= 13 && typeof record.defaultTableStyleId === "string"
       ? { defaultTableStyleId: record.defaultTableStyleId }
       : {}),

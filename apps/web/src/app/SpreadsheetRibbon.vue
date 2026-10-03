@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { CellStyleDefinition } from "@idea10/core/cell-styles";
 import { nextTick, ref, useId, watch } from "vue";
 import HomeFormatToolbar from "../modules/home-tools/components/HomeFormatToolbar.vue";
 import FormulaToolbar from "../modules/formula-tools/components/FormulaToolbar.vue";
@@ -33,6 +34,7 @@ const props = withDefaults(
     recentFunctions?: readonly string[];
     nameCreationEnabled?: boolean;
     calculationSettings?: WorkbookCalculationSettings;
+    cellStyles?: readonly CellStyleDefinition[];
     tableStyles?: readonly TableStyleDefinition[];
     pivotTableStyles?: readonly PivotTableStyleDefinition[];
     selectedTableStyleId?: string;
@@ -73,6 +75,10 @@ const emit = defineEmits<{
   createConditionalFormat: [kind: ConditionalFormatQuickRule];
   manageConditionalFormats: [];
   clearConditionalFormats: [scope: "selection" | "sheet"];
+  applyNamedCellStyle: [style: CellStyleDefinition];
+  createCellStyle: [];
+  editCellStyle: [style: CellStyleDefinition];
+  mergeCellStyles: [];
   applyTableStyle: [style: TableStyleDefinition];
   createTableStyle: [];
   editTableStyle: [style: TableStyleDefinition];
@@ -221,6 +227,7 @@ defineSlots<{
         :format-painter-active="formatPainterActive"
         :data-state="dataState"
         :merge-state="mergeState"
+        :cell-styles="cellStyles"
         :table-styles="tableStyles"
         :pivot-table-styles="pivotTableStyles"
         :selected-table-style-id="selectedTableStyleId"
@@ -250,6 +257,10 @@ defineSlots<{
         @create-conditional-format="emit('createConditionalFormat', $event)"
         @manage-conditional-formats="emit('manageConditionalFormats')"
         @clear-conditional-formats="emit('clearConditionalFormats', $event)"
+        @apply-named-cell-style="emit('applyNamedCellStyle', $event)"
+        @create-cell-style="emit('createCellStyle')"
+        @edit-cell-style="emit('editCellStyle', $event)"
+        @merge-cell-styles="emit('mergeCellStyles')"
         @apply-table-style="emit('applyTableStyle', $event)"
         @create-table-style="emit('createTableStyle')"
         @edit-table-style="emit('editTableStyle', $event)"
