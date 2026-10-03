@@ -334,7 +334,8 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
           :disabled="readonly"
           @click="addRule"
         >
-          <template #icon><Plus /></template>{{ t("conditionalFormatting.newRuleAction") }}
+          <template #icon><Plus class="idea-action-icon" aria-hidden="true" /></template>
+          {{ t("conditionalFormatting.newRuleAction") }}
         </TButton>
       </div>
       <ConditionalFormatRulesTable
@@ -396,11 +397,6 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
   &__new {
     margin-left: auto;
     flex-shrink: 0;
-    svg {
-      width: var(--idea-action-icon-size);
-      height: var(--idea-action-icon-size);
-      stroke-width: var(--idea-icon-stroke-width);
-    }
   }
   &__error {
     margin: 0;

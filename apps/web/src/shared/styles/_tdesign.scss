@@ -208,6 +208,17 @@
   }
 }
 
+// Lucide icons supplied through Button icon/suffix slots share one alignment contract.
+.t-button > svg.lucide,
+.t-button__suffix > svg.lucide {
+  display: block;
+  flex: 0 0 auto;
+  align-self: center;
+  width: var(--idea-action-icon-size);
+  height: var(--idea-action-icon-size);
+  stroke-width: var(--idea-icon-stroke-width);
+}
+
 .t-button:not(.t-size-s, .t-size-l, .t-button--shape-square, .t-button--shape-circle) {
   padding-right: 12px;
   padding-left: 12px;
