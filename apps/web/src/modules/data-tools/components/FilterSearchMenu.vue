@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
 import { ChevronDown, Search } from "lucide-vue-next";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -12,8 +11,7 @@ import type { FilterSearchOptions } from "../filter-value-options";
 const props = defineProps<{ options: FilterSearchOptions; disabled?: boolean }>();
 const emit = defineEmits<{ change: [options: FilterSearchOptions] }>();
 const { t } = useAppI18n();
-const buttonRef = ref<InstanceType<typeof TButton> | null>(null);
-const triggerRef = computed<HTMLElement | null>(() => buttonRef.value?.$el ?? null);
+const triggerRef = ref<HTMLElement | null>(null);
 const surfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `filter-search-${useId().replaceAll(":", "")}`;
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
@@ -32,26 +30,28 @@ function change(options: Partial<FilterSearchOptions>): void {
 </script>
 
 <template>
-  <TButton
-    ref="buttonRef"
+  <span
+    ref="triggerRef"
     class="filter-search-menu__trigger"
-    :variant="open ? 'base' : 'text'"
-    theme="default"
-    size="small"
-    :disabled="disabled"
+    role="button"
+    :tabindex="disabled ? -1 : 0"
+    :aria-disabled="disabled || undefined"
     :aria-label="t('dataTools.filter.searchOptions')"
     :title="t('dataTools.filter.searchOptions')"
     aria-haspopup="menu"
     :aria-expanded="open"
     :aria-controls="menuId"
-    @click="toggleMenu"
+    @mousedown.stop.prevent
+    @click.stop="toggleMenu"
+    @keydown.enter.stop.prevent="toggleMenu()"
+    @keydown.space.stop.prevent="toggleMenu()"
     @keydown="onTriggerKeydown"
   >
     <span class="filter-search-menu__icons" aria-hidden="true">
       <Search class="filter-search-menu__search-icon" />
       <ChevronDown class="filter-search-menu__arrow" :class="{ 'is-open': open }" />
     </span>
-  </TButton>
+  </span>
   <Teleport to="body">
     <MenuSurface
       v-if="open"
@@ -103,8 +103,18 @@ function change(options: Partial<FilterSearchOptions>): void {
   z-index: 2201;
 
   &__trigger {
-    width: 32px;
-    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--idea-action-primary);
+      outline-offset: 2px;
+    }
+
+    &[aria-disabled="true"] {
+      cursor: not-allowed;
+    }
   }
 
   &__icons {

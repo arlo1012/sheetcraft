@@ -1,5 +1,6 @@
+import { nextTick } from "vue";
 import { DOMWrapper, mount } from "@vue/test-utils";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import type { SheetFilterCondition } from "@idea10/core/workbook";
 import FilterColumnPanel from "../../../../modules/data-tools/components/FilterColumnPanel.vue";
 import { createAppI18n } from "../../../../shared/i18n";
@@ -35,7 +36,7 @@ function panel(criteria?: SheetFilterCondition) {
 }
 const body = () => new DOMWrapper(document.body);
 const search = () => body().get('input[type="search"]');
-const options = () => body().get('button[aria-label="Search options"]');
+const options = () => body().get('[role="button"][aria-label="Search options"]');
 const visible = () =>
   body()
     .findAll(".filter-value-list__label")
@@ -57,6 +58,28 @@ async function apply() {
 }
 
 describe("filter search options", () => {
+  test("opens from the input icon without forwarding the click to the input", async () => {
+    const w = panel();
+    await nextTick();
+    const input = search().element as HTMLInputElement;
+    input.focus();
+    const focusInput = vi.spyOn(input, "focus");
+    await options().trigger("mousedown");
+    await options().trigger("click");
+    expect(focusInput).not.toHaveBeenCalled();
+    expect(body().find(".filter-search-menu").exists()).toBe(true);
+    expect(document.activeElement?.getAttribute("role")).toBe("menuitemradio");
+    await body().get(".filter-search-menu").trigger("keydown", { key: "Escape" });
+    expect(document.activeElement).toBe(options().element);
+    await options().trigger("keydown", { key: "Enter" });
+    expect(body().find(".filter-search-menu").exists()).toBe(true);
+    await body().get(".filter-search-menu").trigger("keydown", { key: "Escape" });
+    await options().trigger("keydown", { key: " " });
+    expect(body().find(".filter-search-menu").exists()).toBe(true);
+    expect(w.emitted("close")).toBeUndefined();
+    focusInput.mockRestore();
+  });
+
   test("switches all/any/phrase matching and applies the same values displayed in the list", async () => {
     const w = panel();
     await search().setValue("north america");
