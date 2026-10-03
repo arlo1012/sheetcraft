@@ -385,7 +385,7 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
   grid-template-rows: auto minmax(0, 1fr);
   height: min(340px, calc(100dvh - 180px));
   min-height: 0;
-  gap: 12px;
+  gap: var(--idea-space-4);
   &__scope {
     display: flex;
     align-items: center;
