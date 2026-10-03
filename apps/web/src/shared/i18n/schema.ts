@@ -319,6 +319,10 @@ export type MessageSchema = ToolMessageSchema & {
       selectDuplicates: string;
       settings: string;
       colorSort: string;
+      sortFillColors: string;
+      sortFontColors: string;
+      sortFillColor: string;
+      sortFontColor: string;
       showAll: string;
       content: string;
       searchKeywords: string;

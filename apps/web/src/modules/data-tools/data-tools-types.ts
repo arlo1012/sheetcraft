@@ -23,6 +23,9 @@ export type DataToolCapabilities = {
   clearFilter: boolean;
 };
 export type DataToolFilterCriteria = SheetFilterColumn["condition"];
+export type FilterColorSort =
+  | { sortOn: "cellColor"; color: string | null }
+  | { sortOn: "fontColor"; color: string };
 export type DataToolFilterAnchor = { x: number; y: number; width?: number; height?: number };
 export type DataToolColumn = { column: number; label: string; header?: string };
 export type DataToolRangeSnapshot = { sheetId: string; generation: number; range: CellRange };

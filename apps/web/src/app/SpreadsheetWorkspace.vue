@@ -1835,6 +1835,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       v-bind="dataFilterState"
       :date-system="session.workbook.dateSystem"
       @sort="dataTools.sortFilterColumn"
+      @sort-color="dataTools.sortFilterColumnColor"
       @open-sort="dataTools.openFilterSort"
       @apply="dataTools.applyColumnFilter"
       @clear="dataTools.clearColumnFilter"

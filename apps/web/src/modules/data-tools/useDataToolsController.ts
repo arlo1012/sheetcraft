@@ -61,6 +61,7 @@ import type {
   DataToolFilterCriteria,
   DataToolFilterValueOption,
   DataToolRangeSnapshot,
+  FilterColorSort,
   DataValidationDraft,
   DataValidationInitial,
   RemoveDuplicatesDraft,
@@ -951,6 +952,23 @@ export function useDataToolsController(options: Options) {
     )
       filterPanel.value = undefined;
   }
+  function sortFilterColumnColor(payload: FilterColorSort): void {
+    const panel = filterPanel.value;
+    if (!panel || !filterState.value?.canSort) return;
+    if (
+      execute(panel.target, () =>
+        createMultiKeySortSheetRangeCommand(
+          panel.target.sheetId,
+          panel.target.range,
+          [{ column: panel.column, direction: "ascending", ...payload }],
+          { hasHeader: true },
+        ),
+      )
+    ) {
+      filterPanel.value = undefined;
+      sortVisible.value = false;
+    }
+  }
   function applyColumnFilter(payload: {
     includedKeys: DataToolFilterValueOption["key"][];
     criteria?: DataToolFilterCriteria;
@@ -1057,6 +1075,7 @@ export function useDataToolsController(options: Options) {
     openColumnFilter,
     openFilterSort,
     sortFilterColumn,
+    sortFilterColumnColor,
     applyColumnFilter,
     clearColumnFilter,
     closeColumnFilter: () => {

@@ -75,6 +75,40 @@ function fixture(
 describe("useDataToolsController", () => {
   beforeEach(() => localStorage.clear());
 
+  test("color-sorts an opened filter range immediately with selected colors first", () => {
+    const f = fixture();
+    f.set(0, 0, "Name");
+    f.set(0, 1, "Amount");
+    f.set(1, 0, "Ada");
+    f.set(1, 1, 20);
+    f.set(2, 0, "Zed");
+    f.set(2, 1, 10);
+    f.set(3, 0, "Mia");
+    f.set(3, 1, 30);
+    setCellStyle(f.sheet, { row: 2, column: 1 }, { fillColor: "#ff0000", textColor: "#00ff00" });
+    f.controller.toggleFilter();
+    const rows = () => {
+      const evaluator = createSheetEvaluator(f.sheet);
+      return Array.from({ length: 4 }, (_, row) => evaluator.getComputedValue({ row, column: 0 }));
+    };
+    const open = () => f.controller.openColumnFilter(1);
+
+    open();
+    f.controller.sortFilterColumnColor({ sortOn: "cellColor", color: "#ff0000" });
+    expect(rows()).toEqual(["Name", "Zed", "Ada", "Mia"]);
+    expect(f.controller.filterState.value).toBeUndefined();
+    expect(f.controller.sortVisible.value).toBe(false);
+
+    undoWorkbookCommand(f.session);
+    open();
+    f.controller.sortFilterColumnColor({ sortOn: "fontColor", color: "#00ff00" });
+    expect(rows()).toEqual(["Name", "Zed", "Ada", "Mia"]);
+
+    undoWorkbookCommand(f.session);
+    open();
+    f.controller.sortFilterColumnColor({ sortOn: "cellColor", color: null });
+    expect(rows()).toEqual(["Name", "Ada", "Mia", "Zed"]);
+  });
   test("restores applied sort settings after reloading the serialized workbook", () => {
     const f = fixture();
     f.set(0, 1, "Priority");

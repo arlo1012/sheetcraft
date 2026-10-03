@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { ArrowDownAZ, ArrowUpAZ, FilterX, PaintBucket } from "lucide-vue-next";
+import { ArrowDownAZ, ArrowUpAZ, FilterX } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { getSheetFilterValueKey } from "@idea10/core/commands";
@@ -17,9 +17,14 @@ import {
   DEFAULT_FILTER_SEARCH_OPTIONS,
   type FilterSearchOptions,
 } from "../filter-value-options";
-import type { DataToolFilterCriteria, DataToolFilterValueOption } from "../data-tools-types";
+import type {
+  DataToolFilterCriteria,
+  DataToolFilterValueOption,
+  FilterColorSort,
+} from "../data-tools-types";
 import FilterValueList from "./FilterValueList.vue";
 import FilterColorOptions from "./FilterColorOptions.vue";
+import FilterColorSortMenu from "./FilterColorSortMenu.vue";
 import FilterConditionMenu from "./FilterConditionMenu.vue";
 import FilterConditionDialog from "./FilterConditionDialog.vue";
 import FilterRankDialog from "./FilterRankDialog.vue";
@@ -56,12 +61,14 @@ const emit = defineEmits<{
   ];
   sort: [direction: "ascending" | "descending"];
   openSort: [];
+  sortColor: [sort: FilterColorSort];
   clear: [];
   close: [];
 }>();
 const { t } = useAppI18n();
 const root = ref<HTMLElement | null>(null);
 const valueListRef = ref<InstanceType<typeof FilterValueList> | null>(null);
+const colorSortMenuRef = ref<InstanceType<typeof FilterColorSortMenu> | null>(null);
 const conditionMenuRef = ref<InstanceType<typeof FilterConditionMenu> | null>(null);
 const query = ref("");
 const searchOptions = ref<FilterSearchOptions>({ ...DEFAULT_FILTER_SEARCH_OPTIONS });
@@ -96,6 +103,7 @@ const { floatingStyles } = useDismissibleFloatingPanel(reference, root, open, {
   offset: 3,
   additionalInside: () => [
     conditionMenuRef.value?.rootElement,
+    colorSortMenuRef.value?.rootElement,
     valueListRef.value?.searchMenuElement,
   ],
   onDismiss: ({ restoreFocus }) => {
@@ -265,17 +273,13 @@ onBeforeUnmount(() => {
             <template #icon><ArrowDownAZ class="idea-action-icon" /></template>
             {{ t("dataTools.sort.descending") }}
           </TButton>
-          <TButton
-            variant="text"
-            theme="default"
-            size="small"
-            aria-haspopup="dialog"
+          <FilterColorSortMenu
+            ref="colorSortMenuRef"
+            :colors="colors"
             :disabled="disabled || !canSort"
-            @click="emit('openSort')"
-          >
-            <template #icon><PaintBucket class="idea-action-icon" aria-hidden="true" /></template>
-            {{ t("dataTools.filter.colorSort") }}
-          </TButton>
+            @select="emit('sortColor', $event)"
+            @custom="emit('openSort')"
+          />
         </div>
       </header>
       <TTabs v-model="tab" class="filter-column-panel__tabs" size="medium">
