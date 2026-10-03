@@ -68,7 +68,7 @@
     outline-offset: -1px;
   }
   &:focus-visible {
-    outline: 2px solid var(--idea-action-primary);
-    outline-offset: -2px;
+    outline: none;
+    background: var(--idea-keyboard-focus-bg);
   }
 }

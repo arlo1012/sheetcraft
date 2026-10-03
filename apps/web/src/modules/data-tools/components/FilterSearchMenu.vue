@@ -106,10 +106,12 @@ function change(options: Partial<FilterSearchOptions>): void {
     display: inline-flex;
     align-items: center;
     cursor: pointer;
+    border-radius: var(--idea-radius-small);
 
     &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
-      outline-offset: 2px;
+      outline: none;
+      background: var(--idea-keyboard-focus-bg);
+      box-shadow: var(--idea-keyboard-focus-shadow);
     }
 
     &[aria-disabled="true"] {

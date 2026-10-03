@@ -130,12 +130,11 @@ function onKeydown(event: KeyboardEvent): void {
   }
 
   &:focus-visible:not(&--disabled) {
-    box-shadow: inset 0 0 0 1px var(--idea-action-primary);
+    background: var(--idea-keyboard-focus-bg);
   }
 
   &--compound:has(&__command:focus-visible):not(&--disabled) {
-    background: var(--idea-surface-hover);
-    box-shadow: inset 0 0 0 1px var(--idea-action-primary);
+    background: var(--idea-keyboard-focus-bg);
   }
 
   &--danger:not(&--disabled) {

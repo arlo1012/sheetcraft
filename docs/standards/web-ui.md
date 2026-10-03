@@ -68,6 +68,11 @@ CSS pixels at 100% scale; size and line height are a pair.
 - Ribbon/status interactive icons use `--idea-icon-button-hover-bg`; keep foreground
   color stable on hover.
 
+- Keyboard focus uses the shared `--idea-keyboard-focus-bg` and
+  `--idea-keyboard-focus-shadow` tokens: menu/list rows use a tinted background;
+  compact triggers use a soft halo and their existing corner radius. Avoid dark
+  rectangular outlines. Keep keyboard focus visible and checked/selected indicators distinct.
+
 ## Ribbon and menus
 
 - Action icons use two sizes, owned by the shared controls: compact ribbon actions

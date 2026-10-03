@@ -300,8 +300,8 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
     }
 
     &:focus-visible {
-      border-color: var(--idea-action-primary);
-      box-shadow: 0 0 0 2px var(--idea-action-focus);
+      border-color: var(--idea-action-focus);
+      box-shadow: var(--idea-keyboard-focus-shadow);
     }
 
     &[aria-disabled="true"] {
