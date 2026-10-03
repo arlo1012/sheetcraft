@@ -77,6 +77,7 @@ function resetManualBreaks(): void {
       :label="t('pageLayout.printArea')"
       :status="errors.printArea ? 'error' : undefined"
       ><RangeReferenceInput
+        class="page-setup-sheet__reference"
         :model-value="references.printArea"
         :label="t('pageLayout.printArea')"
         :show-picker="true"
@@ -90,13 +91,15 @@ function resetManualBreaks(): void {
         </p>
       </template>
     </TFormItem>
-    <section :aria-label="t('pageLayout.printTitles')">
+    <section class="page-setup-sheet__section" :aria-label="t('pageLayout.printTitles')">
+      <h3>{{ t("pageLayout.printTitles") }}</h3>
       <div class="page-setup-sheet__titles">
         <TFormItem
           name="titleRows"
           :label="t('pageLayout.titleRows')"
           :status="errors.titleRows ? 'error' : undefined"
           ><RangeReferenceInput
+            class="page-setup-sheet__reference"
             :model-value="references.titleRows"
             :label="t('pageLayout.titleRows')"
             :show-picker="true"
@@ -115,6 +118,7 @@ function resetManualBreaks(): void {
           :label="t('pageLayout.titleColumns')"
           :status="errors.titleColumns ? 'error' : undefined"
           ><RangeReferenceInput
+            class="page-setup-sheet__reference"
             :model-value="references.titleColumns"
             :label="t('pageLayout.titleColumns')"
             :show-picker="true"
@@ -133,6 +137,7 @@ function resetManualBreaks(): void {
           :label="t('pageLayout.bottomTitleRows')"
           :status="errors.bottomTitleRows ? 'error' : undefined"
           ><RangeReferenceInput
+            class="page-setup-sheet__reference"
             :model-value="references.bottomTitleRows"
             :label="t('pageLayout.bottomTitleRows')"
             :show-picker="true"
@@ -148,9 +153,10 @@ function resetManualBreaks(): void {
         </TFormItem>
       </div>
     </section>
-    <section :aria-label="t('pageLayout.printSettings')">
+    <section class="page-setup-sheet__section" :aria-label="t('pageLayout.printSettings')">
+      <h3>{{ t("pageLayout.printSettings") }}</h3>
       <div class="page-setup-sheet__print-options">
-        <TFormItem :label="t('pageLayout.printSettings')">
+        <TFormItem :label-width="0">
           <div class="page-setup-sheet__flags">
             <TCheckbox
               :checked="options.gridLines"
@@ -194,33 +200,43 @@ function resetManualBreaks(): void {
         </div>
       </div>
     </section>
-    <TFormItem :label="t('pageLayout.pageOrder')">
+    <TFormItem class="page-setup-sheet__section" :label="t('pageLayout.pageOrder')">
       <div class="page-setup-sheet__order" data-page-setup="page-order">
         <TRadio
           :checked="setup.pageOrder === 'downThenOver'"
           @change="setup = { ...setup, pageOrder: 'downThenOver' }"
-          >{{ t("pageLayout.downThenOver") }}</TRadio
+          ><span class="page-setup-sheet__order-option"
+            ><ArrowDown aria-hidden="true" />{{ t("pageLayout.downThenOver") }}</span
+          ></TRadio
         ><TRadio
           :checked="setup.pageOrder === 'overThenDown'"
           @change="setup = { ...setup, pageOrder: 'overThenDown' }"
-          >{{ t("pageLayout.overThenDown") }}</TRadio
-        ><ArrowDown v-if="setup.pageOrder === 'downThenOver'" aria-hidden="true" /><ArrowRight
-          v-else
-          aria-hidden="true"
-        />
+          ><span class="page-setup-sheet__order-option"
+            ><ArrowRight aria-hidden="true" />{{ t("pageLayout.overThenDown") }}</span
+          ></TRadio
+        >
       </div>
     </TFormItem>
-    <div class="page-setup-dialog__breaks">
+    <TFormItem>
       <TButton variant="outline" @click="resetManualBreaks">{{
         t("pageLayout.resetManualBreaks")
       }}</TButton>
-    </div>
+    </TFormItem>
   </TForm>
 </template>
 <style scoped lang="scss">
 @use "./page-setup-panel" as panel;
 .page-setup-sheet {
   @include panel.panel;
+  &__reference {
+    width: 100%;
+    min-width: 0;
+  }
+  &__section {
+    min-width: 0;
+    border-top: 1px solid var(--idea-border-subtle);
+    padding-top: var(--idea-space-3);
+  }
   &__titles {
     display: grid;
     gap: var(--idea-space-2);
@@ -230,10 +246,10 @@ function resetManualBreaks(): void {
     gap: var(--idea-space-3);
   }
   &__flags {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--idea-space-2);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--idea-space-2) var(--idea-space-4);
+    width: 100%;
   }
   &__print-selects {
     display: grid;
@@ -241,11 +257,18 @@ function resetManualBreaks(): void {
   }
   &__order {
     display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--idea-space-2);
+  }
+  &__order-option {
+    display: inline-flex;
     align-items: center;
-    gap: var(--idea-space-4);
+    gap: var(--idea-space-2);
+    vertical-align: middle;
     svg {
-      width: 24px;
-      height: 24px;
+      width: var(--idea-action-icon-size);
+      height: var(--idea-action-icon-size);
       color: var(--idea-text-secondary);
     }
   }

@@ -241,6 +241,8 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     height: 70px;
+    box-sizing: border-box;
+    border: 1px solid var(--idea-border-control);
     margin-bottom: var(--idea-space-2);
     background: var(--idea-surface-panel);
   }
