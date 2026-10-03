@@ -70,9 +70,11 @@ overlapping worksheet cells. Page Setup owns editing: selecting a marker opens i
 Selecting a preview section or Custom Header/Footer opens the corresponding editor. The custom dialog confirms
 into the outer local draft; only confirming Page Setup submits one Core command.
 Canceling either dialog discards that dialog's changes. The custom editor uses a compact
-row of field buttons above three side-by-side sections; A opens a local font dialog
-with the shared font catalog and color palette. Font changes apply only after that
-dialog confirms. First/even tabs appear when their variants are enabled or targeted.
+row of field buttons above three side-by-side sections; A opens the same detailed
+font panel used by cell formatting, with family/style/size lists, underline, color,
+effects, and preview. Header/footer sizes are 1-409 points; accounting underline is
+not offered. Font changes apply only after that dialog confirms. First/even tabs
+appear when their variants are enabled or targeted.
 The editor supports first/odd/even variants,
 multiline text, formatting, and page number, page count, sheet name, file name, date,
 and time fields. Readable localized markers are used in the dialog; XLSX control codes

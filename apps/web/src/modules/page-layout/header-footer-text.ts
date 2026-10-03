@@ -4,7 +4,9 @@ export type HeaderFooterFormat = {
   fontSize: number;
   bold: boolean;
   italic: boolean;
-  underline: boolean;
+  underline: boolean | "double";
+  strikethrough?: boolean;
+  fontScript?: "superscript" | "subscript";
   /** Six-digit RGB without a leading hash. */
   color: string;
 };
@@ -68,7 +70,9 @@ function normalizeFormat(format: HeaderFooterFormat): HeaderFooterFormat {
     ),
     bold: Boolean(format.bold),
     italic: Boolean(format.italic),
-    underline: Boolean(format.underline),
+    underline: format.underline === "double" ? "double" : Boolean(format.underline),
+    ...(format.strikethrough ? { strikethrough: true } : {}),
+    ...(format.fontScript ? { fontScript: format.fontScript } : {}),
     color: normalizeColor(format.color),
   };
 }
@@ -84,6 +88,8 @@ function appendText(runs: HeaderFooterRun[], text: string, format: HeaderFooterF
     previous.format.bold === format.bold &&
     previous.format.italic === format.italic &&
     previous.format.underline === format.underline &&
+    previous.format.strikethrough === format.strikethrough &&
+    previous.format.fontScript === format.fontScript &&
     previous.format.color === format.color
   ) {
     previous.text += text;
@@ -153,16 +159,35 @@ export function parseHeaderFooterRuns(
       index += 7;
       continue;
     }
-    if (next === "B" || next === "I" || next === "U") {
+    if (next === "B" || next === "I") {
       flush();
       format = {
         ...format,
-        ...(next === "B"
-          ? { bold: !format.bold }
-          : next === "I"
-            ? { italic: !format.italic }
-            : { underline: !format.underline }),
+        ...(next === "B" ? { bold: !format.bold } : { italic: !format.italic }),
       };
+      index += 1;
+      continue;
+    }
+    if (next === "U" || next === "E") {
+      flush();
+      const underline = next === "U" ? true : "double";
+      format = { ...format, underline: format.underline === underline ? false : underline };
+      index += 1;
+      continue;
+    }
+    if (next === "S") {
+      flush();
+      format = { ...format, strikethrough: !format.strikethrough || undefined };
+      index += 1;
+      continue;
+    }
+    if (next === "X" || next === "Y") {
+      flush();
+      const script = next === "X" ? "superscript" : "subscript";
+      // OOXML ignores the other script while the current script remains enabled.
+      if (!format.fontScript || format.fontScript === script) {
+        format = { ...format, fontScript: format.fontScript === script ? undefined : script };
+      }
       index += 1;
       continue;
     }
@@ -268,7 +293,7 @@ export function applyHeaderFooterSectionFormat(value: string, format: HeaderFoot
       index += 7;
       continue;
     }
-    if (next === "B" || next === "I" || next === "U") {
+    if (["B", "I", "U", "E", "S", "X", "Y"].includes(next)) {
       index += 1;
       continue;
     }
@@ -278,5 +303,12 @@ export function applyHeaderFooterSectionFormat(value: string, format: HeaderFoot
   const style =
     `${normalized.bold ? "Bold" : ""}${normalized.bold && normalized.italic ? " " : ""}${normalized.italic ? "Italic" : ""}` ||
     "Regular";
-  return `&"${normalized.fontFamily},${style}"&${normalized.fontSize}&K${normalized.color}${normalized.underline ? "&U" : ""}${body}`;
+  const underline = normalized.underline === "double" ? "&E" : normalized.underline ? "&U" : "";
+  const script =
+    normalized.fontScript === "superscript"
+      ? "&X"
+      : normalized.fontScript === "subscript"
+        ? "&Y"
+        : "";
+  return `&"${normalized.fontFamily},${style}"&${normalized.fontSize}&K${normalized.color}${underline}${normalized.strikethrough ? "&S" : ""}${script}${body}`;
 }

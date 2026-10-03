@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch, type CSSProperties } from "vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { TabPanel as TTabPanel, Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
@@ -24,6 +24,7 @@ import {
 import type { HeaderFooterEditTarget, HeaderFooterEditorAction } from "../header-footer-editor";
 import type { HeaderFooterFormat } from "../header-footer-text";
 import PageHeaderFooterToolbar from "./PageHeaderFooterToolbar.vue";
+import { getHeaderFooterTypographyStyle } from "../header-footer-font-presentation";
 const props = defineProps<{
   visible: boolean;
   setup: SheetPageSetup;
@@ -259,7 +260,7 @@ function focusHeaderFooterInput(
 function headerFooterInputStyle(
   section: HeaderFooterSection,
   part: HeaderFooterPart,
-): Record<string, string | number | boolean> {
+): CSSProperties {
   const context = activeHeaderFooterContext.value;
   const variant =
     context?.section === section && context.part === part
@@ -272,12 +273,7 @@ function headerFooterInputStyle(
     parseHeaderFooterRuns(raw)[0]?.format ??
     DEFAULT_HEADER_FOOTER_FORMAT;
   return {
-    fontFamily: format.fontFamily,
-    fontSize: `${format.fontSize}pt`,
-    fontWeight: format.bold ? "bold" : "normal",
-    fontStyle: format.italic ? "italic" : "normal",
-    textDecoration: format.underline ? "underline" : "none",
-    color: `#${format.color}`,
+    ...getHeaderFooterTypographyStyle(format),
     height: "100px",
     resize: "none",
   };

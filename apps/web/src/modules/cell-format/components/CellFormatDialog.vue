@@ -9,7 +9,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import CellFormatAlignmentPanel from "./CellFormatAlignmentPanel.vue";
 import CellFormatBorderPanel from "./CellFormatBorderPanel.vue";
 import CellFormatFillPanel from "./CellFormatFillPanel.vue";
-import CellFormatFontPanel from "./CellFormatFontPanel.vue";
+import FontFormatPanel from "../../../shared/font-format/FontFormatPanel.vue";
 import CellFormatNumberPanel from "./CellFormatNumberPanel.vue";
 import { rememberCustomNumberFormat } from "../number-format/custom-formats";
 import type { CellFormatBorderCapabilities } from "../border-capabilities";
@@ -214,7 +214,7 @@ function confirm(): void {
           >
             {{ t("cellFormat.font") }}
           </button></template
-        ><CellFormatFontPanel
+        ><FontFormatPanel
           :state="state"
           :patch="stylePatch"
           :sample-value="sampleValue"

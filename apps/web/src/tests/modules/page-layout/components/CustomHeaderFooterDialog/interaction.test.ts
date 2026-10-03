@@ -2,6 +2,9 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, test } from "vitest";
 import { Tabs as TTabs } from "tdesign-vue-next/es/tabs";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
+import { Input as TInput } from "tdesign-vue-next/es/input";
+import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
+import FontFormatPanel from "../../../../../shared/font-format/FontFormatPanel.vue";
 import HeaderFooterFontDialog from "../../../../../modules/page-layout/components/HeaderFooterFontDialog.vue";
 import ColorPaletteSelect from "../../../../../shared/color/ColorPaletteSelect.vue";
 import { DEFAULT_SHEET_PAGE_SETUP } from "@idea10/core/page-setup";
@@ -67,12 +70,12 @@ describe("CustomHeaderFooterDialog", () => {
       const toolbar = wrapper.findComponent({ name: "PageHeaderFooterToolbar" });
       await toolbar.get('[data-header-footer-action="font"]').trigger("click");
       let font = toolbar.getComponent(HeaderFooterFontDialog);
+      expect(font.props("visible")).toBe(true);
+      expect(font.findComponent(FontFormatPanel).exists()).toBe(true);
       const changeStyle = async (value: string) => {
-        font
-          .findAllComponents(TSelect)
-          .find((control) => control.attributes("data-header-footer-font") === "style")!
-          .vm.$emit("change", value);
-        await wrapper.vm.$nextTick();
+        await font
+          .get(`[data-cell-format-font-style-list] [data-option-list-value="${value}"]`)
+          .trigger("click");
       };
       await changeStyle("bold");
       font.getComponent(ColorPaletteSelect).vm.$emit("select", "#2874A6");
@@ -83,12 +86,22 @@ describe("CustomHeaderFooterDialog", () => {
       font = toolbar.getComponent(HeaderFooterFontDialog);
       expect(
         font
-          .findAllComponents(TSelect)
-          .find((control) => control.attributes("data-header-footer-font") === "style")!
-          .props("modelValue"),
-      ).toBe("regular");
+          .get('[data-cell-format-font-style-list] [data-option-list-value="regular"]')
+          .attributes("aria-selected"),
+      ).toBe("true");
       expect(font.getComponent(ColorPaletteSelect).props("modelValue")).toBe("#000000");
       await changeStyle("bold");
+      await font
+        .get('[data-cell-format-font-family-list] [data-option-list-value="Inter"]')
+        .trigger("click");
+      const size = font.get("[data-cell-format-font-size]").getComponent(TInput);
+      size.vm.$emit("change", "13");
+      size.vm.$emit("blur");
+      font.get("[data-cell-format-underline]").getComponent(TSelect).vm.$emit("change", "double");
+      font.get("[data-cell-format-strikethrough]").getComponent(TCheckbox).vm.$emit("change", true);
+      font.get("[data-cell-format-superscript]").getComponent(TCheckbox).vm.$emit("change", true);
+      font.getComponent(ColorPaletteSelect).vm.$emit("select", "#2874A6");
+      await wrapper.vm.$nextTick();
       font.findComponent({ name: "TDialog" }).vm.$emit("confirm");
       await wrapper.vm.$nextTick();
       await textarea.trigger("keydown", { key: "Enter" });
@@ -98,7 +111,7 @@ describe("CustomHeaderFooterDialog", () => {
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("confirm")?.[0]?.[0]).toEqual(
         expect.objectContaining({
-          header: expect.objectContaining({ center: expect.stringContaining("Bold") }),
+          header: expect.objectContaining({ center: '&"Inter,Bold"&13&K2874A6&E&S&XTitle' }),
         }),
       );
     } finally {

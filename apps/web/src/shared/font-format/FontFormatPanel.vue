@@ -3,27 +3,33 @@ import { computed } from "vue";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
-import type { CellStylePatch } from "@idea10/core/style";
-import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import {
+  getCellTextRenderFontSize,
   getCellTextTypographyStyle,
   getCellTextScriptStyle,
   getCellTextUnderlineStyle,
   getCellTextStrikethroughStyle,
-} from "../../../shared/cell-text/font-presentation";
-import { useAppI18n } from "../../../shared/i18n";
-import { useFontFormatPanel } from "../font/useFontFormatPanel";
-import OptionList from "../../../shared/option-list/OptionList.vue";
-import CellFormatColorControl from "./CellFormatColorControl.vue";
+} from "../cell-text/font-presentation";
+import { useAppI18n } from "../i18n";
+import {
+  useFontFormatPanel,
+  type FontFormatOptions,
+  type FontFormatPatch,
+  type FontFormatState,
+} from "./useFontFormatPanel";
+import OptionList from "../option-list/OptionList.vue";
+import ColorPaletteSelect from "../color/ColorPaletteSelect.vue";
 
 const props = defineProps<{
-  state: SelectionCellStyleState;
-  patch: CellStylePatch;
+  state: FontFormatState;
+  patch: FontFormatPatch;
   sampleValue: string | number | boolean | null;
+  options?: FontFormatOptions;
 }>();
-const emit = defineEmits<{ "update:patch": [patch: CellStylePatch] }>();
+const emit = defineEmits<{ "update:patch": [patch: FontFormatPatch] }>();
 const { t } = useAppI18n();
 const {
+  defaultColor,
   family,
   familyInput,
   familyMixed,
@@ -74,9 +80,9 @@ const previewText = computed(() =>
 </script>
 
 <template>
-  <section class="cell-format-font" :aria-label="t('cellFormat.font')">
-    <div class="cell-format-font__lists">
-      <div class="cell-format-font__field" role="group" :aria-label="t('format.fontFamily')">
+  <section class="font-format" :aria-label="t('cellFormat.font')">
+    <div class="font-format__lists">
+      <div class="font-format__field" role="group" :aria-label="t('format.fontFamily')">
         <span>{{ t("format.fontFamily") }}</span>
         <TInput
           :model-value="familyInput"
@@ -90,7 +96,7 @@ const previewText = computed(() =>
           @enter="commitFamilyInput"
         />
         <OptionList
-          class="cell-format-font__list"
+          class="font-format__list"
           :model-value="family"
           :search-text="familyInput"
           :options="familyListOptions"
@@ -103,7 +109,7 @@ const previewText = computed(() =>
           >
         </OptionList>
       </div>
-      <div class="cell-format-font__field" role="group" :aria-label="t('cellFormat.fontStyle')">
+      <div class="font-format__field" role="group" :aria-label="t('cellFormat.fontStyle')">
         <span>{{ t("cellFormat.fontStyle") }}</span>
         <TInput
           :model-value="fontStyleInput"
@@ -116,7 +122,7 @@ const previewText = computed(() =>
           @enter="commitFontStyleInput"
         />
         <OptionList
-          class="cell-format-font__list"
+          class="font-format__list"
           :model-value="fontStyle"
           :search-text="fontStyleInput"
           :options="styleListOptions"
@@ -136,7 +142,7 @@ const previewText = computed(() =>
           >
         </OptionList>
       </div>
-      <div class="cell-format-font__field" role="group" :aria-label="t('format.fontSize')">
+      <div class="font-format__field" role="group" :aria-label="t('format.fontSize')">
         <span>{{ t("format.fontSize") }}</span>
         <TInput
           :model-value="sizeInput"
@@ -150,7 +156,7 @@ const previewText = computed(() =>
           @enter="commitSizeInput"
         />
         <OptionList
-          class="cell-format-font__list"
+          class="font-format__list"
           :model-value="size === undefined ? undefined : String(size)"
           :search-text="sizeInput"
           :options="sizeListOptions"
@@ -160,8 +166,8 @@ const previewText = computed(() =>
         />
       </div>
     </div>
-    <div class="cell-format-font__appearance">
-      <div class="cell-format-font__field" role="group" :aria-label="t('format.underline')">
+    <div class="font-format__appearance">
+      <div class="font-format__field" role="group" :aria-label="t('format.underline')">
         <span>{{ t("format.underline") }}</span>
         <TSelect
           :model-value="underline"
@@ -172,20 +178,20 @@ const previewText = computed(() =>
           @change="setUnderline"
         />
       </div>
-      <div class="cell-format-font__field" role="group" :aria-label="t('format.textColor')">
+      <div class="font-format__field" role="group" :aria-label="t('format.textColor')">
         <span>{{ t("format.textColor") }}</span>
-        <CellFormatColorControl
+        <ColorPaletteSelect
           :model-value="color"
           :mixed="colorMixed"
           :label="t('format.textColor')"
-          default-color="#20242c"
+          :default-color="defaultColor"
           data-cell-format-font-color
           @select="setColor"
         />
       </div>
     </div>
-    <div class="cell-format-font__bottom">
-      <div class="cell-format-font__effects" role="group" :aria-label="t('cellFormat.fontEffects')">
+    <div class="font-format__bottom">
+      <div class="font-format__effects" role="group" :aria-label="t('cellFormat.fontEffects')">
         <h3>{{ t("cellFormat.fontEffects") }}</h3>
         <TCheckbox
           :checked="strikethrough === 'on'"
@@ -209,15 +215,18 @@ const previewText = computed(() =>
           >{{ t("cellFormat.subscript") }}</TCheckbox
         >
       </div>
-      <div class="cell-format-font__preview-group">
+      <div class="font-format__preview-group">
         <h3>{{ t("cellFormat.preview") }}</h3>
-        <div class="cell-format-font__preview" :aria-label="t('cellFormat.preview')">
-          <div class="cell-format-font__preview-content">
-            <span class="cell-format-font__preview-rule" aria-hidden="true" />
+        <div class="font-format__preview" :aria-label="t('cellFormat.preview')">
+          <div class="font-format__preview-content">
+            <span class="font-format__preview-rule" aria-hidden="true" />
             <span
-              class="cell-format-font__preview-text"
+              class="font-format__preview-text"
               :style="{
                 ...getCellTextTypographyStyle(previewStyle, { includeDecorations: false }),
+                ...(options?.sizeUnit === 'pt'
+                  ? { fontSize: `${getCellTextRenderFontSize(previewStyle)}pt` }
+                  : {}),
                 ...getCellTextScriptStyle(previewStyle),
                 ...getCellTextUnderlineStyle(previewStyle),
               }"
@@ -226,7 +235,7 @@ const previewText = computed(() =>
                 previewText
               }}</span></span
             >
-            <span class="cell-format-font__preview-rule" aria-hidden="true" />
+            <span class="font-format__preview-rule" aria-hidden="true" />
           </div>
         </div>
       </div>
@@ -235,7 +244,7 @@ const previewText = computed(() =>
 </template>
 
 <style scoped lang="scss">
-.cell-format-font {
+.font-format {
   display: grid;
   gap: 16px;
   color: var(--idea-text-primary);
@@ -308,7 +317,7 @@ const previewText = computed(() =>
   }
 }
 @media (max-width: 480px) {
-  .cell-format-font {
+  .font-format {
     &__lists {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       > :first-child {

@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { previewHeaderFooterRuns } from "../header-footer-text";
+import {
+  getHeaderFooterScriptStyle,
+  getHeaderFooterTypographyStyle,
+} from "../header-footer-font-presentation";
 import type {
   HeaderFooterEditTarget,
   HeaderFooterPart,
@@ -82,13 +86,9 @@ function open(): void {
       v-for="(run, index) in previewRuns"
       :key="index"
       :style="{
-        fontFamily: run.format.fontFamily,
-        fontSize: `${(run.format.fontSize * 4 * fontScale) / 3}px`,
+        ...getHeaderFooterTypographyStyle(run.format, fontScale),
+        ...getHeaderFooterScriptStyle(run.format),
         lineHeight: 1.2,
-        fontWeight: run.format.bold ? 700 : 400,
-        fontStyle: run.format.italic ? 'italic' : 'normal',
-        textDecoration: run.format.underline ? 'underline' : 'none',
-        color: `#${run.format.color}`,
       }"
       >{{ run.text }}</span
     >

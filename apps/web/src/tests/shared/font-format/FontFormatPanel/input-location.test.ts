@@ -4,20 +4,20 @@ import { describe, expect, test } from "vitest";
 import { defineComponent, ref } from "vue";
 import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
 import type { CellStylePatch } from "@idea10/core/style";
-import CellFormatFontPanel from "../../../../../modules/cell-format/components/CellFormatFontPanel.vue";
-import { createAppI18n } from "../../../../../shared/i18n";
+import FontFormatPanel from "../../../../shared/font-format/FontFormatPanel.vue";
+import { createAppI18n } from "../../../../shared/i18n";
 
 function mountPanel() {
   const Harness = defineComponent({
-    components: { CellFormatFontPanel },
+    components: { FontFormatPanel },
     setup() {
       const patch = ref<CellStylePatch>({});
       return { state: createDefaultSelectionCellStyleState(), patch };
     },
-    template: `<CellFormatFontPanel :state="state" :patch="patch" :sample-value="'AaBbCc'" @update:patch="patch = { ...patch, ...$event }" />`,
+    template: `<FontFormatPanel :state="state" :patch="patch" :sample-value="'AaBbCc'" @update:patch="patch = { ...patch, ...$event }" />`,
   });
   const wrapper = mount(Harness, { global: { plugins: [createAppI18n("en-US")] } });
-  return { wrapper, panel: wrapper.getComponent(CellFormatFontPanel) };
+  return { wrapper, panel: wrapper.getComponent(FontFormatPanel) };
 }
 
 describe("font input location", () => {

@@ -6,25 +6,25 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { createDefaultSelectionCellStyleState } from "@idea10/core/style-state";
 import type { CellStylePatch } from "@idea10/core/style";
-import CellFormatFontPanel from "../../../../../modules/cell-format/components/CellFormatFontPanel.vue";
-import CellFormatColorControl from "../../../../../modules/cell-format/components/CellFormatColorControl.vue";
-import { createAppI18n } from "../../../../../shared/i18n";
+import FontFormatPanel from "../../../../shared/font-format/FontFormatPanel.vue";
+import ColorPaletteSelect from "../../../../shared/color/ColorPaletteSelect.vue";
+import { createAppI18n } from "../../../../shared/i18n";
 
 function mountPanel(state = createDefaultSelectionCellStyleState()) {
   const Harness = defineComponent({
-    components: { CellFormatFontPanel },
+    components: { FontFormatPanel },
     setup() {
       const patch = ref<CellStylePatch>({});
       return { state, patch };
     },
-    template: `<CellFormatFontPanel :state="state" :patch="patch" :sample-value="'AaBbCc'" @update:patch="patch = { ...patch, ...$event }" />`,
+    template: `<FontFormatPanel :state="state" :patch="patch" :sample-value="'AaBbCc'" @update:patch="patch = { ...patch, ...$event }" />`,
   });
   const wrapper = mount(Harness, { global: { plugins: [createAppI18n("en-US")] } });
-  const panel = wrapper.getComponent(CellFormatFontPanel);
+  const panel = wrapper.getComponent(FontFormatPanel);
   return { wrapper, panel, patch: () => panel.props("patch") };
 }
 
-describe("CellFormatFontPanel", () => {
+describe("FontFormatPanel", () => {
   test("leaves untouched mixed fields out of the patch", async () => {
     const state = createDefaultSelectionCellStyleState();
     state.fontFamily = { value: undefined, mixed: true };
@@ -184,7 +184,7 @@ describe("CellFormatFontPanel", () => {
     state.textColor = { value: "#ff0000", mixed: false };
     const { wrapper, panel, patch } = mountPanel(state);
     try {
-      panel.getComponent(CellFormatColorControl).vm.$emit("select", null);
+      panel.getComponent(ColorPaletteSelect).vm.$emit("select", null);
       await wrapper.vm.$nextTick();
       expect(patch()).toEqual({ textColor: null });
       expect(panel.get<HTMLElement>("[data-cell-format-font-preview]").element.style.color).toBe(

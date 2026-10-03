@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 import {
   applyHeaderFooterSectionFormat,
+  parseHeaderFooterRuns,
+  DEFAULT_HEADER_FOOTER_FORMAT,
   decodeHeaderFooterText,
   encodeHeaderFooterText,
   previewHeaderFooterRuns,
@@ -102,4 +104,49 @@ describe("header and footer text", () => {
     });
     expect(formatted).toBe('&"Aptos,Bold"&14&K123ABC&UOld\n&P&Q');
   });
+});
+
+test("keeps underline, strike and script controls out of text and separates their runs", () => {
+  const runs = parseHeaderFooterRuns(
+    "Plain&Edouble&Edone&Sstrike&Sdone&Xsup&Yignored&Xnormal&Ysub&Yend",
+  );
+  expect(runs.map(({ text }) => text)).toEqual([
+    "Plain",
+    "double",
+    "done",
+    "strike",
+    "done",
+    "supignored",
+    "normal",
+    "sub",
+    "end",
+  ]);
+  expect(runs[1]?.format.underline).toBe("double");
+  expect(runs[2]?.format.underline).toBe(false);
+  expect(runs[3]?.format.strikethrough).toBe(true);
+  expect(runs[4]?.format.strikethrough).toBeUndefined();
+  expect(runs[5]?.format.fontScript).toBe("superscript");
+  expect(runs[6]?.format.fontScript).toBeUndefined();
+  expect(runs[7]?.format.fontScript).toBe("subscript");
+  expect(runs[8]?.format.fontScript).toBeUndefined();
+});
+
+test("replaces old font effects without consuming fields or escaped ampersands", () => {
+  const format = {
+    ...DEFAULT_HEADER_FOOTER_FORMAT,
+    underline: "double" as const,
+    strikethrough: true,
+    fontScript: "subscript" as const,
+  };
+  const value = applyHeaderFooterSectionFormat(
+    '&"Calibri,Bold"&96&K112233&U&S&XTitle && Co\n&P/&N &Q',
+    format,
+  );
+  expect(value).toBe('&"Arial,Regular"&10&K000000&E&S&YTitle && Co\n&P/&N &Q');
+  const runs = parseHeaderFooterRuns(value);
+  expect(runs[0]?.format).toEqual(format);
+  expect(decodeHeaderFooterText(value, labels)).toBe("Title & Co\n&[Page]/&[Pages] &Q");
+  expect(encodeHeaderFooterText("&[Page]", labels, format)).toBe(
+    '&"Arial,Regular"&10&K000000&E&S&Y&P',
+  );
 });
