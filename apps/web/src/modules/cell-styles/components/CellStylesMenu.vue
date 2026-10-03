@@ -70,6 +70,7 @@ function merge(): void {
       :disabled="disabled"
       :expanded="open"
       :menu-id="panelId"
+      full-width
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
       ><Palette aria-hidden="true" />

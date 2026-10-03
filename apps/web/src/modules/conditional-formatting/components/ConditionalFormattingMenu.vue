@@ -156,7 +156,7 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
       :disabled="disabled"
       :expanded="open"
       :menu-id="panelId"
-      full-width
+      variant="tall"
       @activate="toggleMenu"
       @keydown="onTriggerKeydown"
       ><TableProperties aria-hidden="true"
