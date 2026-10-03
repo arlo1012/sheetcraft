@@ -456,8 +456,6 @@ watch(
     display: grid;
     gap: var(--idea-space-3);
     padding: var(--idea-tool-panel-padding);
-    border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-medium);
   }
 
   &__instructions {

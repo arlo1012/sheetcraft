@@ -44,7 +44,7 @@ watch(
   >
     <TButton
       shape="square"
-      variant="outline"
+      variant="text"
       :title="t('pageLayout.headerFooterFont')"
       :aria-label="t('pageLayout.headerFooterFont')"
       :disabled="inactive"
@@ -54,57 +54,57 @@ watch(
     >
     <TButton
       shape="square"
-      variant="outline"
+      variant="text"
       :title="t('pageLayout.headerFooterPageNumber')"
       :aria-label="t('pageLayout.headerFooterPageNumber')"
       :disabled="inactive"
       @click="emit('action', { type: 'insertField', field: 'pageNumber' })"
-      ><template #icon><Hash /></template
+      ><template #icon><Hash class="page-header-footer-toolbar__icon" /></template
     ></TButton>
     <TButton
       shape="square"
-      variant="outline"
+      variant="text"
       :title="t('pageLayout.headerFooterPageCount')"
       :aria-label="t('pageLayout.headerFooterPageCount')"
       :disabled="inactive"
       @click="emit('action', { type: 'insertField', field: 'pageCount' })"
-      ><template #icon><Files /></template
+      ><template #icon><Files class="page-header-footer-toolbar__icon" /></template
     ></TButton>
     <TButton
       shape="square"
-      variant="outline"
+      variant="text"
       :title="t('pageLayout.headerFooterDate')"
       :aria-label="t('pageLayout.headerFooterDate')"
       :disabled="inactive"
       @click="emit('action', { type: 'insertField', field: 'date' })"
-      ><template #icon><Calendar /></template
+      ><template #icon><Calendar class="page-header-footer-toolbar__icon" /></template
     ></TButton>
     <TButton
       shape="square"
-      variant="outline"
+      variant="text"
       :title="t('pageLayout.headerFooterTime')"
       :aria-label="t('pageLayout.headerFooterTime')"
       :disabled="inactive"
       @click="emit('action', { type: 'insertField', field: 'time' })"
-      ><template #icon><Clock /></template
+      ><template #icon><Clock class="page-header-footer-toolbar__icon" /></template
     ></TButton>
     <TButton
       shape="square"
-      variant="outline"
+      variant="text"
       :title="t('pageLayout.headerFooterFileName')"
       :aria-label="t('pageLayout.headerFooterFileName')"
       :disabled="inactive"
       @click="emit('action', { type: 'insertField', field: 'fileName' })"
-      ><template #icon><File /></template
+      ><template #icon><File class="page-header-footer-toolbar__icon" /></template
     ></TButton>
     <TButton
       shape="square"
-      variant="outline"
+      variant="text"
       :title="t('pageLayout.headerFooterSheetName')"
       :aria-label="t('pageLayout.headerFooterSheetName')"
       :disabled="inactive"
       @click="emit('action', { type: 'insertField', field: 'sheetName' })"
-      ><template #icon><Sheet /></template
+      ><template #icon><Sheet class="page-header-footer-toolbar__icon" /></template
     ></TButton>
   </div>
   <HeaderFooterFontDialog
@@ -122,9 +122,15 @@ watch(
   align-items: center;
   gap: var(--idea-space-2);
 
+  &__icon {
+    width: var(--idea-action-icon-size);
+    height: var(--idea-action-icon-size);
+    stroke-width: var(--idea-icon-stroke-width);
+  }
+
   &__font {
     font-family: var(--idea-font-sans);
-    font-size: var(--idea-font-size-title-small);
+    font-size: var(--idea-font-size-body-medium);
     line-height: 1;
   }
 }
