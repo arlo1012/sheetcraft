@@ -334,7 +334,7 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
           :disabled="readonly"
           @click="addRule"
         >
-          <template #icon><Plus class="idea-action-icon" aria-hidden="true" /></template>
+          <template #icon><Plus class="idea-control-icon" aria-hidden="true" /></template>
           {{ t("conditionalFormatting.newRuleAction") }}
         </TButton>
       </div>
