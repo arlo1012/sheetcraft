@@ -14,7 +14,7 @@ import { pixelsToDimensionValue, dimensionValueToPixels } from "@idea10/core/dim
 import { useAppI18n } from "../../../shared/i18n";
 
 const setup = defineModel<SheetPageSetup>("setup", { required: true });
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 type Unit = "pt" | "mm" | "cm" | "in";
 type Margin = keyof SheetPageSetup["margins"];
 const unit = ref<Unit>("pt");
@@ -90,47 +90,103 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
 </script>
 
 <template>
-  <TForm class="page-setup-margins idea-form-grid" :data="setup" label-align="top">
+  <TForm
+    class="page-setup-margins idea-form-grid"
+    :data="setup"
+    label-align="right"
+    :label-width="locale === 'zh-CN' ? 96 : 144"
+  >
     <div class="page-setup-margins__diagram">
-      <TFormItem class="page-setup-margins__top" :label="t('pageLayout.marginTop')"
-        ><TInputNumber
-          :model-value="displayed('top')"
-          :aria-label="t('pageLayout.marginTop')"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :decimal-places="2"
-          :input-props="{ onFocus: selectMarginValue }"
-          data-page-setup="margin-top"
-          @update:model-value="update('top', $event)"
-        />
-      </TFormItem>
-      <TFormItem class="page-setup-margins__header" :label="t('pageLayout.marginHeader')"
-        ><TInputNumber
-          :model-value="displayed('header')"
-          :aria-label="t('pageLayout.marginHeader')"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :decimal-places="2"
-          :input-props="{ onFocus: selectMarginValue }"
-          data-page-setup="margin-header"
-          @update:model-value="update('header', $event)"
-        />
-      </TFormItem>
-      <TFormItem class="page-setup-margins__left" :label="t('pageLayout.marginLeft')"
-        ><TInputNumber
-          :model-value="displayed('left')"
-          :aria-label="t('pageLayout.marginLeft')"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :decimal-places="2"
-          :input-props="{ onFocus: selectMarginValue }"
-          data-page-setup="margin-left"
-          @update:model-value="update('left', $event)"
-        />
-      </TFormItem>
+      <div class="page-setup-margins__fields">
+        <TFormItem :label="t('dimensionUnits.unit')"
+          ><TSelect
+            class="page-setup-margins__unit-select"
+            :model-value="unit"
+            :options="unitOptions"
+            :aria-label="t('dimensionUnits.unit')"
+            data-page-setup="margin-unit"
+            @change="setUnit"
+          />
+        </TFormItem>
+        <TFormItem :label="t('pageLayout.marginTop')"
+          ><TInputNumber
+            :model-value="displayed('top')"
+            :aria-label="t('pageLayout.marginTop')"
+            theme="column"
+            class="idea-input-number--persistent-controls"
+            :min="0"
+            :decimal-places="2"
+            :input-props="{ onFocus: selectMarginValue }"
+            data-page-setup="margin-top"
+            @update:model-value="update('top', $event)"
+          />
+        </TFormItem>
+        <TFormItem :label="t('pageLayout.marginBottom')"
+          ><TInputNumber
+            :model-value="displayed('bottom')"
+            :aria-label="t('pageLayout.marginBottom')"
+            theme="column"
+            class="idea-input-number--persistent-controls"
+            :min="0"
+            :decimal-places="2"
+            :input-props="{ onFocus: selectMarginValue }"
+            data-page-setup="margin-bottom"
+            @update:model-value="update('bottom', $event)"
+          />
+        </TFormItem>
+        <TFormItem :label="t('pageLayout.marginLeft')"
+          ><TInputNumber
+            :model-value="displayed('left')"
+            :aria-label="t('pageLayout.marginLeft')"
+            theme="column"
+            class="idea-input-number--persistent-controls"
+            :min="0"
+            :decimal-places="2"
+            :input-props="{ onFocus: selectMarginValue }"
+            data-page-setup="margin-left"
+            @update:model-value="update('left', $event)"
+          />
+        </TFormItem>
+        <TFormItem :label="t('pageLayout.marginRight')"
+          ><TInputNumber
+            :model-value="displayed('right')"
+            :aria-label="t('pageLayout.marginRight')"
+            theme="column"
+            class="idea-input-number--persistent-controls"
+            :min="0"
+            :decimal-places="2"
+            :input-props="{ onFocus: selectMarginValue }"
+            data-page-setup="margin-right"
+            @update:model-value="update('right', $event)"
+          />
+        </TFormItem>
+        <TFormItem :label="t('pageLayout.marginHeader')"
+          ><TInputNumber
+            :model-value="displayed('header')"
+            :aria-label="t('pageLayout.marginHeader')"
+            theme="column"
+            class="idea-input-number--persistent-controls"
+            :min="0"
+            :decimal-places="2"
+            :input-props="{ onFocus: selectMarginValue }"
+            data-page-setup="margin-header"
+            @update:model-value="update('header', $event)"
+          />
+        </TFormItem>
+        <TFormItem :label="t('pageLayout.marginFooter')"
+          ><TInputNumber
+            :model-value="displayed('footer')"
+            :aria-label="t('pageLayout.marginFooter')"
+            theme="column"
+            class="idea-input-number--persistent-controls"
+            :min="0"
+            :decimal-places="2"
+            :input-props="{ onFocus: selectMarginValue }"
+            data-page-setup="margin-footer"
+            @update:model-value="update('footer', $event)"
+          />
+        </TFormItem>
+      </div>
       <div class="page-setup-margins__preview">
         <svg
           :viewBox="`0 0 ${preview.width} ${preview.height}`"
@@ -198,55 +254,6 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           />
         </svg>
       </div>
-      <TFormItem class="page-setup-margins__right" :label="t('pageLayout.marginRight')"
-        ><TInputNumber
-          :model-value="displayed('right')"
-          :aria-label="t('pageLayout.marginRight')"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :decimal-places="2"
-          :input-props="{ onFocus: selectMarginValue }"
-          data-page-setup="margin-right"
-          @update:model-value="update('right', $event)"
-        />
-      </TFormItem>
-      <TFormItem class="page-setup-margins__unit" :label="t('dimensionUnits.unit')"
-        ><TSelect
-          class="page-setup-margins__unit-select"
-          :model-value="unit"
-          :options="unitOptions"
-          :aria-label="t('dimensionUnits.unit')"
-          data-page-setup="margin-unit"
-          @change="setUnit"
-        />
-      </TFormItem>
-      <TFormItem class="page-setup-margins__bottom" :label="t('pageLayout.marginBottom')"
-        ><TInputNumber
-          :model-value="displayed('bottom')"
-          :aria-label="t('pageLayout.marginBottom')"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :decimal-places="2"
-          :input-props="{ onFocus: selectMarginValue }"
-          data-page-setup="margin-bottom"
-          @update:model-value="update('bottom', $event)"
-        />
-      </TFormItem>
-      <TFormItem class="page-setup-margins__footer" :label="t('pageLayout.marginFooter')"
-        ><TInputNumber
-          :model-value="displayed('footer')"
-          :aria-label="t('pageLayout.marginFooter')"
-          theme="column"
-          class="idea-input-number--persistent-controls"
-          :min="0"
-          :decimal-places="2"
-          :input-props="{ onFocus: selectMarginValue }"
-          data-page-setup="margin-footer"
-          @update:model-value="update('footer', $event)"
-        />
-      </TFormItem>
     </div>
     <TFormItem :label="t('pageLayout.centerOnPage')">
       <div class="page-setup-margins__centering">
@@ -272,44 +279,20 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
   @include panel.panel;
   &__diagram {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-areas: ". top header" "left preview right" "unit bottom footer";
-    gap: var(--idea-space-3) var(--idea-space-4);
+    grid-template-columns: minmax(0, 1fr) 140px;
+    gap: var(--idea-space-4);
     align-items: center;
-    max-width: 420px;
-    margin: 0 auto;
-    width: 100%;
-    > div:not(.page-setup-margins__preview) {
-      min-width: 0;
-    }
   }
-  &__top {
-    grid-area: top;
-  }
-  &__header {
-    grid-area: header;
-  }
-  &__left {
-    grid-area: left;
-  }
-  &__right {
-    grid-area: right;
-  }
-  &__unit {
-    grid-area: unit;
+  &__fields {
+    display: grid;
+    gap: var(--idea-space-2);
+    min-width: 0;
   }
   &__unit-select {
     width: 100%;
     min-width: 0;
   }
-  &__bottom {
-    grid-area: bottom;
-  }
-  &__footer {
-    grid-area: footer;
-  }
   &__preview {
-    grid-area: preview;
     display: flex;
     align-items: center;
     justify-content: center;

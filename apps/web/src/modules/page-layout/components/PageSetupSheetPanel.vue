@@ -28,7 +28,7 @@ const props = defineProps<{
     field: PageSetupReferenceField,
   ) => Promise<string | undefined>;
 }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const options = computed(() => setup.value.printOptions ?? DEFAULT_SHEET_PAGE_PRINT_OPTIONS);
 const commentOptions = computed(() => [
   { value: "none", label: t("pageLayout.commentsNone") },
@@ -66,7 +66,12 @@ function resetManualBreaks(): void {
 }
 </script>
 <template>
-  <TForm class="page-setup-sheet idea-form-grid" :data="references" label-align="top">
+  <TForm
+    class="page-setup-sheet idea-form-grid"
+    :data="references"
+    label-align="right"
+    :label-width="locale === 'zh-CN' ? 104 : 176"
+  >
     <TFormItem
       name="printArea"
       :label="t('pageLayout.printArea')"
@@ -86,7 +91,6 @@ function resetManualBreaks(): void {
       </template>
     </TFormItem>
     <section :aria-label="t('pageLayout.printTitles')">
-      <h3>{{ t("pageLayout.printTitles") }}</h3>
       <div class="page-setup-sheet__titles">
         <TFormItem
           name="titleRows"
@@ -145,9 +149,8 @@ function resetManualBreaks(): void {
       </div>
     </section>
     <section :aria-label="t('pageLayout.printSettings')">
-      <h3>{{ t("pageLayout.printSettings") }}</h3>
       <div class="page-setup-sheet__print-options">
-        <TFormItem :label-width="0">
+        <TFormItem :label="t('pageLayout.printSettings')">
           <div class="page-setup-sheet__flags">
             <TCheckbox
               :checked="options.gridLines"
@@ -220,12 +223,10 @@ function resetManualBreaks(): void {
   @include panel.panel;
   &__titles {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--idea-space-2) var(--idea-space-3);
+    gap: var(--idea-space-2);
   }
   &__print-options {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--idea-space-3);
   }
   &__flags {

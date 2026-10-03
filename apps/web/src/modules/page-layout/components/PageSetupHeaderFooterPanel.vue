@@ -21,7 +21,7 @@ const props = withDefaults(defineProps<{ sheetName?: string; fileName?: string }
   fileName: "Workbook.xlsx",
 });
 const emit = defineEmits<{ customEdit: [target: HeaderFooterEditTarget] }>();
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const options = computed(() => getSheetHeaderFooterOptions(setup.value));
 const presets = computed(() => [
   {
@@ -83,8 +83,8 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
   <TForm
     class="page-setup-header-footer idea-form-grid"
     :data="setup"
-    label-align="left"
-    :label-width="48"
+    label-align="right"
+    :label-width="locale === 'zh-CN' ? 96 : 144"
   >
     <section :aria-label="t('pageLayout.header')">
       <div class="page-setup-header-footer__preview" :aria-label="t('pageLayout.headerPreview')">

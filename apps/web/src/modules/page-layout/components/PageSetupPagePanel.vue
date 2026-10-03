@@ -12,7 +12,7 @@ import { getPagePaperSize, type SheetPageSetup } from "@idea10/core/page-setup";
 import { useAppI18n } from "../../../shared/i18n";
 
 const setup = defineModel<SheetPageSetup>("setup", { required: true });
-const { t } = useAppI18n();
+const { t, locale } = useAppI18n();
 const lastFit = ref({
   width: setup.value.fitToPage?.width ?? 1,
   height: setup.value.fitToPage?.height ?? 1,
@@ -100,8 +100,13 @@ function setQuality(value: SelectValue): void {
 </script>
 
 <template>
-  <TForm class="page-setup-page idea-form-grid" :data="setup" label-align="left" :label-width="96">
-    <TFormItem :label="t('pageLayout.orientation')" label-align="top">
+  <TForm
+    class="page-setup-page idea-form-grid"
+    :data="setup"
+    label-align="right"
+    :label-width="locale === 'zh-CN' ? 96 : 144"
+  >
+    <TFormItem :label="t('pageLayout.orientation')">
       <div class="page-setup-page__orientation" data-page-setup="orientation">
         <TRadio
           :checked="setup.orientation === 'portrait'"
@@ -117,41 +122,44 @@ function setQuality(value: SelectValue): void {
         >
       </div>
     </TFormItem>
-    <section :aria-label="t('pageLayout.scaling')">
-      <h3>{{ t("pageLayout.scaling") }}</h3>
-      <div class="page-setup-page__scaling-row">
-        <TRadio :checked="!fitting" @change="setScalingMode(false)">{{
-          t("pageLayout.scale")
-        }}</TRadio>
-        <TInputNumber
-          :model-value="setup.scale"
-          :disabled="fitting"
-          theme="column"
-          class="idea-input-number--persistent-controls page-setup-page__scale"
-          :min="10"
-          :max="400"
-          :decimal-places="0"
-          :aria-label="t('pageLayout.scale')"
-          data-page-setup="scale"
-          @update:model-value="typeof $event === 'number' && patch({ scale: $event })"
-        />
-        <span>% {{ t("pageLayout.normalSize") }}</span>
-      </div>
-      <div class="page-setup-page__scaling-row">
-        <TRadio :checked="fitting" @change="setScalingMode(true)">{{
-          t("pageLayout.fitToPages")
-        }}</TRadio>
-        <TSelect
-          :model-value="fitPreset"
-          :options="fitOptions"
-          :disabled="!fitting"
-          :aria-label="t('pageLayout.fitToPages')"
-          data-page-setup="fit-preset"
-          @change="setFitPreset"
-        />
-      </div>
+    <div class="page-setup-page__fields">
+      <TFormItem :label="t('pageLayout.scaling')">
+        <div class="page-setup-page__scaling">
+          <div class="page-setup-page__scaling-row">
+            <TRadio :checked="!fitting" @change="setScalingMode(false)">{{
+              t("pageLayout.scale")
+            }}</TRadio>
+            <TInputNumber
+              :model-value="setup.scale"
+              :disabled="fitting"
+              theme="column"
+              class="idea-input-number--persistent-controls page-setup-page__scale"
+              :min="10"
+              :max="400"
+              :decimal-places="0"
+              :aria-label="t('pageLayout.scale')"
+              data-page-setup="scale"
+              @update:model-value="typeof $event === 'number' && patch({ scale: $event })"
+            />
+            <span>% {{ t("pageLayout.normalSize") }}</span>
+          </div>
+          <div class="page-setup-page__scaling-row">
+            <TRadio :checked="fitting" @change="setScalingMode(true)">{{
+              t("pageLayout.fitToPages")
+            }}</TRadio>
+            <TSelect
+              :model-value="fitPreset"
+              :options="fitOptions"
+              :disabled="!fitting"
+              :aria-label="t('pageLayout.fitToPages')"
+              data-page-setup="fit-preset"
+              @change="setFitPreset"
+            />
+          </div>
+        </div>
+      </TFormItem>
       <div v-if="fitting && fitPreset === 'custom'" class="page-setup-page__fit-dimensions">
-        <TFormItem :label="t('pageLayout.fitWidth')" label-align="top"
+        <TFormItem :label="t('pageLayout.fitWidth')"
           ><TInputNumber
             :model-value="setup.fitToPage?.width"
             :aria-label="t('pageLayout.fitWidth')"
@@ -163,7 +171,7 @@ function setQuality(value: SelectValue): void {
             @update:model-value="setFit('width', $event)"
           />
         </TFormItem>
-        <TFormItem :label="t('pageLayout.fitHeight')" label-align="top"
+        <TFormItem :label="t('pageLayout.fitHeight')" :help="t('pageLayout.fitUnlimited')"
           ><TInputNumber
             :model-value="setup.fitToPage?.height"
             :aria-label="t('pageLayout.fitHeight')"
@@ -175,9 +183,8 @@ function setQuality(value: SelectValue): void {
             @update:model-value="setFit('height', $event)"
           />
         </TFormItem>
-        <span class="page-setup-page__hint">{{ t("pageLayout.fitUnlimited") }}</span>
       </div>
-    </section>
+    </div>
     <div class="page-setup-page__fields">
       <TFormItem :label="t('pageLayout.paperSize')">
         <div class="page-setup-page__paper-select">
@@ -193,7 +200,7 @@ function setQuality(value: SelectValue): void {
         </div>
       </TFormItem>
       <div v-if="setup.paperSize === 'custom'" class="page-setup-page__paper-dimensions">
-        <TFormItem :label="t('pageLayout.paperWidth')" label-align="top"
+        <TFormItem :label="t('pageLayout.paperWidth')"
           ><TInputNumber
             :model-value="setup.customPaperSize?.width"
             :aria-label="t('pageLayout.paperWidth')"
@@ -206,7 +213,7 @@ function setQuality(value: SelectValue): void {
             @update:model-value="setPaperDimension('width', $event)"
           />
         </TFormItem>
-        <TFormItem :label="t('pageLayout.paperHeight')" label-align="top"
+        <TFormItem :label="t('pageLayout.paperHeight')"
           ><TInputNumber
             :model-value="setup.customPaperSize?.height"
             :aria-label="t('pageLayout.paperHeight')"
@@ -258,6 +265,10 @@ function setQuality(value: SelectValue): void {
       transform: rotate(90deg);
     }
   }
+  &__scaling {
+    width: 100%;
+    min-width: 0;
+  }
   &__scaling-row {
     display: flex;
     align-items: center;
@@ -297,16 +308,7 @@ function setQuality(value: SelectValue): void {
   &__paper-dimensions,
   &__fit-dimensions {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--idea-space-2);
-    margin-left: 96px;
-  }
-  &__fit-dimensions {
-    margin: var(--idea-space-2) 0 0 116px;
-  }
-  &__hint {
-    grid-column: 1 / -1;
-    color: var(--idea-text-secondary);
   }
 }
 </style>
