@@ -433,8 +433,8 @@
   --td-comp-size-xxxxl: 40px;
 }
 
-.filter-column-panel__tabs > .t-tabs__header {
-  --td-component-stroke: transparent;
+.filter-column-panel__tabs > .t-tabs__header .t-tabs__operations--right {
+  border-bottom: 0;
 }
 
 .t-tabs__nav-item.t-is-active {
