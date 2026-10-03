@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { computed, nextTick, ref, useId } from "vue";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
@@ -58,6 +58,13 @@ const preview = computed(() => {
     footerY: height - (setup.value.margins.footer / paper.height) * height,
   };
 });
+function selectMarginValue(_value: unknown, { e }: { e: FocusEvent }): void {
+  const input = e.target;
+  if (!(input instanceof HTMLInputElement)) return;
+  void nextTick(() => {
+    if (document.activeElement === input) input.select();
+  });
+}
 function displayed(name: Margin): number {
   return Number(
     pixelsToDimensionValue((setup.value.margins[name] * 96) / 25.4, unit.value).toFixed(2),
@@ -92,6 +99,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           class="idea-input-number--persistent-controls"
           :min="0"
           :decimal-places="2"
+          :input-props="{ onFocus: selectMarginValue }"
           data-page-setup="margin-top"
           @update:model-value="update('top', $event)"
         />
@@ -108,6 +116,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           class="idea-input-number--persistent-controls"
           :min="0"
           :decimal-places="2"
+          :input-props="{ onFocus: selectMarginValue }"
           data-page-setup="margin-header"
           @update:model-value="update('header', $event)"
         />
@@ -120,6 +129,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           class="idea-input-number--persistent-controls"
           :min="0"
           :decimal-places="2"
+          :input-props="{ onFocus: selectMarginValue }"
           data-page-setup="margin-left"
           @update:model-value="update('left', $event)"
         />
@@ -199,6 +209,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           class="idea-input-number--persistent-controls"
           :min="0"
           :decimal-places="2"
+          :input-props="{ onFocus: selectMarginValue }"
           data-page-setup="margin-right"
           @update:model-value="update('right', $event)"
         />
@@ -226,6 +237,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           class="idea-input-number--persistent-controls"
           :min="0"
           :decimal-places="2"
+          :input-props="{ onFocus: selectMarginValue }"
           data-page-setup="margin-bottom"
           @update:model-value="update('bottom', $event)"
         />
@@ -242,6 +254,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           class="idea-input-number--persistent-controls"
           :min="0"
           :decimal-places="2"
+          :input-props="{ onFocus: selectMarginValue }"
           data-page-setup="margin-footer"
           @update:model-value="update('footer', $event)"
         />

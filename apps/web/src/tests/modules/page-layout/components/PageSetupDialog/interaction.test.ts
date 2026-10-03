@@ -262,3 +262,45 @@ test("passes the correct range field to the picker and validates title boundarie
     document.body.replaceChildren();
   }
 });
+
+test("replaces decimal margins when editing a formatted value again", async () => {
+  const wrapper = mount(PageSetupDialog, {
+    attachTo: document.body,
+    global: { plugins: [createAppI18n("en-US")] },
+    props: { visible: true, initialTab: "margins", setup: DEFAULT_SHEET_PAGE_SETUP },
+  });
+  const margins = ["top", "bottom", "left", "right", "header", "footer"] as const;
+  const distances = new Set<string>(["header", "footer"]);
+  try {
+    for (const margin of margins) {
+      const input = wrapper.get<HTMLInputElement>(`[data-page-setup="margin-${margin}"] input`);
+      for (const value of distances.has(margin) ? ["5.50", "6.25"] : ["25.50", "26.25"]) {
+        input.element.focus();
+        await wrapper.vm.$nextTick();
+        for (const character of value) {
+          const element = input.element;
+          const start = element.selectionStart ?? 0;
+          const end = element.selectionEnd ?? start;
+          element.value = element.value.slice(0, start) + character + element.value.slice(end);
+          element.setSelectionRange(start + 1, start + 1);
+          await input.trigger("input");
+        }
+        input.element.blur();
+        await wrapper.vm.$nextTick();
+        expect(input.element.value).toBe(value);
+      }
+    }
+    wrapper.findComponent({ name: "TDialog" }).vm.$emit("confirm");
+    await wrapper.vm.$nextTick();
+    const setup = wrapper.emitted("confirm")?.[0]?.[0] as typeof DEFAULT_SHEET_PAGE_SETUP;
+    for (const margin of margins) {
+      expect(setup.margins[margin]).toBeCloseTo(
+        ((distances.has(margin) ? 6.25 : 26.25) * 25.4) / 72,
+        8,
+      );
+    }
+  } finally {
+    wrapper.unmount();
+    document.body.replaceChildren();
+  }
+});
