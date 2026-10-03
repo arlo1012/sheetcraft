@@ -147,7 +147,7 @@ function choose(target: ColorCondition["target"], color: string | null): void {
 .filter-color-options {
   display: grid;
   align-content: start;
-  gap: var(--idea-space-6);
+  gap: var(--idea-space-5);
 
   &__group {
     display: grid;
@@ -161,27 +161,27 @@ function choose(target: ColorCondition["target"], color: string | null): void {
   &__choices {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--idea-space-6);
+    gap: var(--idea-space-4);
     padding: 0 var(--idea-space-2) var(--idea-space-2);
   }
 
   &__choice {
     position: relative;
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     flex: none;
   }
 
   &__button {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
   }
 
   &__swatch,
   &__font {
     box-sizing: border-box;
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
     border: 1px solid var(--idea-border-control);
     border-radius: 50%;
   }
@@ -204,29 +204,30 @@ function choose(target: ColorCondition["target"], color: string | null): void {
     display: grid;
     place-items: center;
     background: var(--idea-surface-panel);
-    font-size: 20px;
+    font-size: 18px;
     font-weight: var(--idea-font-weight-semibold);
     line-height: 1;
   }
 
   &__check {
     position: absolute;
-    right: -4px;
-    bottom: -4px;
+    right: -2px;
+    bottom: -2px;
+    z-index: 1;
     display: grid;
     place-items: center;
     box-sizing: border-box;
     width: 14px;
     height: 14px;
-    border: 2px solid var(--idea-surface-panel);
+    border: 1px solid var(--idea-surface-panel);
     border-radius: 50%;
     color: var(--idea-text-inverse);
     background: var(--idea-status-success);
     pointer-events: none;
 
     svg {
-      width: 9px;
-      height: 9px;
+      width: 10px;
+      height: 10px;
       stroke-width: 3;
     }
   }
