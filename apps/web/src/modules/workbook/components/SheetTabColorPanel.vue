@@ -77,10 +77,5 @@ defineExpose({ dismiss, rootElement: panelRef });
   border: 1px solid var(--idea-border-control);
   border-radius: var(--idea-radius-medium);
   box-shadow: var(--idea-shadow-floating);
-
-  &:focus-visible {
-    outline: 2px solid var(--idea-action-primary);
-    outline-offset: 2px;
-  }
 }
 </style>

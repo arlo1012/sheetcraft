@@ -357,8 +357,6 @@ function selectHighlightColor(value: string | null): void {
 
     &:focus-visible {
       z-index: 1;
-      outline: 1px solid var(--idea-action-primary);
-      outline-offset: -1px;
     }
 
     &:disabled {
@@ -473,11 +471,6 @@ function selectHighlightColor(value: string | null): void {
     border: 1px solid var(--idea-border-control);
     border-radius: var(--idea-radius-medium);
     box-shadow: var(--idea-shadow-floating);
-
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
-      outline-offset: 2px;
-    }
   }
 
   @media (max-width: 640px) {

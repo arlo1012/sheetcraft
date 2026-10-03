@@ -245,10 +245,6 @@ onBeforeUnmount(() => endDrag?.());
       left: 0;
       width: 100%;
     }
-    &:focus-visible {
-      outline: 2px solid var(--td-brand-color);
-      outline-offset: -2px;
-    }
   }
   p {
     margin: 4px 0 0;

@@ -270,11 +270,6 @@ defineSlots<{
     line-height: var(--idea-line-height-body-medium);
     white-space: nowrap;
 
-    &:focus-visible {
-      outline: 1px solid var(--idea-action-primary);
-      outline-offset: -3px;
-    }
-
     &.is-active {
       color: var(--idea-action-primary);
     }

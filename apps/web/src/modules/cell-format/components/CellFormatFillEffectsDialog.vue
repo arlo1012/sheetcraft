@@ -278,10 +278,7 @@ watch(() => props.gradient, resetDraft, { immediate: true });
     &:hover {
       border-color: var(--idea-action-primary-hover);
     }
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-focus);
-      outline-offset: 2px;
-    }
+
     &--selected {
       border: 2px solid var(--idea-action-primary);
     }

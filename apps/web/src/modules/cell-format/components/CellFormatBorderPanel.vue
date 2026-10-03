@@ -375,10 +375,7 @@ const previewState = computed<SelectionBorderState>(() => ({
       &:hover:not(:disabled) .cell-format-border-panel__preset-icon {
         background: var(--idea-icon-button-hover-bg);
       }
-      &:focus-visible {
-        outline: 2px solid var(--idea-action-focus);
-        outline-offset: 2px;
-      }
+
       &:disabled {
         color: var(--idea-text-muted);
         opacity: 0.45;

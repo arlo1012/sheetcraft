@@ -375,8 +375,7 @@ watch(
   border: 0;
   border-radius: var(--idea-radius-small);
 }
-.worksheet-operations-menu__hidden-sheets button:hover,
-.worksheet-operations-menu__hidden-sheets button:focus-visible {
+.worksheet-operations-menu__hidden-sheets button:hover {
   background: var(--idea-surface-hover);
   outline: none;
 }

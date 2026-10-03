@@ -191,11 +191,6 @@ function selectMode(mode: CellFillMode): void {
     &[aria-expanded="true"] {
       background: var(--idea-surface-hover);
     }
-
-    &:focus-visible {
-      outline: 1px solid var(--idea-action-primary);
-      outline-offset: 1px;
-    }
   }
 
   &__chevron {

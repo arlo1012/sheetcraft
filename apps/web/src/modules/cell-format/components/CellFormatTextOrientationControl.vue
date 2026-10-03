@@ -72,7 +72,7 @@ function endDialDrag(event: PointerEvent): void {
         {{ t("cellFormat.orientationText") }}
       </button>
       <div
-        class="cell-format-text-orientation__dial"
+        class="cell-format-text-orientation__dial idea-focus-container"
         :class="{ 'is-disabled': modelValue === 'vertical' }"
       >
         <svg viewBox="0 0 100 144" preserveAspectRatio="none" aria-hidden="true">
@@ -190,10 +190,6 @@ function endDialDrag(event: PointerEvent): void {
       color: var(--idea-action-primary);
       background: var(--idea-surface-secondary);
     }
-    &:focus-visible {
-      outline: 1px solid var(--idea-text-muted);
-      outline-offset: 2px;
-    }
   }
 
   &__dial {
@@ -219,10 +215,6 @@ function endDialDrag(event: PointerEvent): void {
       opacity: 0;
       cursor: crosshair;
       touch-action: none;
-    }
-    &:has(input:focus-visible) {
-      outline: 1px solid var(--idea-text-muted);
-      outline-offset: 2px;
     }
     &.is-disabled {
       opacity: 0.45;

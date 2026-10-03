@@ -270,10 +270,6 @@ function confirm(): void {
   border: 0;
   background: transparent;
   cursor: pointer;
-  &:focus-visible {
-    outline: 1px solid var(--idea-action-primary);
-    outline-offset: 4px;
-  }
 }
 .cell-format-dialog__tabs {
   display: flex;

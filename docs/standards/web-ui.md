@@ -72,6 +72,8 @@ CSS pixels at 100% scale; size and line height are a pair.
   `--idea-keyboard-focus-shadow` tokens: menu/list rows use a tinted background;
   compact triggers use a soft halo and their existing corner radius. Avoid dark
   rectangular outlines. Keep keyboard focus visible and checked/selected indicators distinct.
+  Ordinary controls inherit the shared focus stylesheet; do not add feature-local
+  focus decorations. Canvas/SVG editing may retain target-specific focus feedback.
 
 ## Ribbon and menus
 

@@ -227,7 +227,6 @@ watch(
     cursor: pointer;
 
     &:hover:not(:disabled),
-    &:focus-visible,
     &[aria-expanded="true"] {
       background: var(--idea-icon-button-hover-bg);
     }

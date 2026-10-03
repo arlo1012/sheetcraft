@@ -213,9 +213,6 @@ function setGradient(gradient: CellFillGradient): void {
     &:hover {
       background: var(--idea-surface-hover);
     }
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-focus);
-    }
   }
   &__no-fill {
     width: 100%;

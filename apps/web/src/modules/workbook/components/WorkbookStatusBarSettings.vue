@@ -172,11 +172,6 @@ function selectNumberFormat(numberFormat: StatusBarNumberFormat): void {
     &[aria-expanded="true"] {
       background: var(--idea-icon-button-hover-bg);
     }
-
-    &:focus-visible {
-      outline: 1px solid var(--idea-action-primary);
-      outline-offset: -1px;
-    }
   }
 
   &__menu {

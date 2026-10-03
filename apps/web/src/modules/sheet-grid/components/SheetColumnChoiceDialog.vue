@@ -137,12 +137,10 @@ watch(
     background: transparent;
     border: 0;
 
-    &:hover:not(:disabled),
-    &:focus-visible {
+    &:hover:not(:disabled) {
       background: var(--idea-surface-hover);
       outline: none;
     }
-
     &:disabled {
       cursor: not-allowed;
       opacity: 0.6;

@@ -108,12 +108,6 @@ function change(options: Partial<FilterSearchOptions>): void {
     cursor: pointer;
     border-radius: var(--idea-radius-small);
 
-    &:focus-visible {
-      outline: none;
-      background: var(--idea-keyboard-focus-bg);
-      box-shadow: var(--idea-keyboard-focus-shadow);
-    }
-
     &[aria-disabled="true"] {
       cursor: not-allowed;
     }

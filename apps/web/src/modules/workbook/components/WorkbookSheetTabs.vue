@@ -702,11 +702,6 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     &.is-active {
       font-weight: var(--idea-font-weight-medium);
     }
-
-    &:focus-visible {
-      outline: 1px solid currentColor;
-      outline-offset: -2px;
-    }
   }
 
   &__name {
@@ -745,12 +740,6 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
 
     &:hover:not(:disabled) {
       background: var(--idea-icon-button-hover-bg);
-    }
-
-    &:focus-visible {
-      background: var(--idea-icon-button-hover-bg);
-      outline: 1px solid var(--idea-action-primary);
-      outline-offset: -1px;
     }
 
     &:disabled {

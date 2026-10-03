@@ -190,12 +190,6 @@ function onWheel(event: WheelEvent): void {
       background: var(--idea-icon-button-hover-bg);
     }
 
-    &:focus-visible {
-      outline: 1px solid var(--idea-action-primary);
-      outline-offset: -1px;
-      background: var(--idea-icon-button-hover-bg);
-    }
-
     &:disabled {
       color: var(--idea-text-disabled);
       cursor: default;

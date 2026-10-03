@@ -473,8 +473,7 @@ watch(
     cursor: pointer;
     pointer-events: auto;
 
-    &:hover,
-    &:focus-visible {
+    &:hover {
       color: var(--idea-action-primary);
       background: var(--idea-action-hover);
       outline: none;
@@ -504,8 +503,7 @@ watch(
     svg {
       position: relative;
     }
-    &:hover::before,
-    &:focus-visible::before {
+    &:hover::before {
       border-color: var(--idea-action-primary);
       background: var(--idea-action-hover);
     }
@@ -521,7 +519,6 @@ watch(
 
   &__validation {
     &:hover:not(:disabled),
-    &:focus-visible,
     &[aria-expanded="true"] {
       color: var(--idea-text-secondary);
       background: var(--idea-icon-button-hover-bg);
@@ -628,8 +625,7 @@ watch(
       font-size: 12px;
       line-height: 1;
     }
-    button:hover,
-    button:focus-visible {
+    button:hover {
       color: var(--idea-action-primary);
       background: var(--idea-action-hover);
       outline: none;

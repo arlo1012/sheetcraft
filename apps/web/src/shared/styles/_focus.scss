@@ -1,0 +1,12 @@
+// Shared keyboard focus for ordinary controls; canvas/SVG editing owns its feedback.
+:where(button, [role="button"], [role="tab"]):not(svg, svg *):focus-visible:not(:disabled):not(
+    [aria-disabled="true"]
+  ) {
+  outline: none;
+  box-shadow: var(--idea-keyboard-focus-shadow);
+}
+
+.idea-focus-container:has(:focus-visible) {
+  outline: none;
+  box-shadow: var(--idea-keyboard-focus-shadow);
+}

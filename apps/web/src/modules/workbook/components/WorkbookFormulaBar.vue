@@ -594,11 +594,6 @@ defineExpose({
       color: var(--idea-text-primary);
     }
 
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
-      outline-offset: 3px;
-    }
-
     &[aria-disabled="true"] {
       cursor: default;
       opacity: 0.4;

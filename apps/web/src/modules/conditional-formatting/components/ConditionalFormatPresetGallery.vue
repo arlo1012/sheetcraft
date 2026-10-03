@@ -278,11 +278,7 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
     &:hover {
       background: var(--idea-surface-secondary);
     }
-    &:focus-visible {
-      background: var(--idea-surface-secondary);
-      outline: 1px solid var(--idea-action-primary);
-      outline-offset: -1px;
-    }
+
     &:active {
       background: var(--idea-surface-active);
     }

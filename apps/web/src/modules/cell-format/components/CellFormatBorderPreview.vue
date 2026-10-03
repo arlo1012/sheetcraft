@@ -256,10 +256,7 @@ const { t } = useAppI18n();
         border-style: dashed;
         color: var(--idea-text-muted);
       }
-      &:focus-visible {
-        outline: 2px solid var(--idea-action-focus);
-        outline-offset: 1px;
-      }
+
       &:disabled {
         opacity: 0.45;
         cursor: not-allowed;

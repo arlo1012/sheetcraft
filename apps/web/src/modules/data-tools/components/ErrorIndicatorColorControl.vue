@@ -111,10 +111,7 @@ watch(
   &__trigger:hover:not(:disabled) {
     background: var(--idea-surface-hover);
   }
-  &__trigger:focus-visible {
-    outline: 2px solid var(--idea-action-focus);
-    outline-offset: 1px;
-  }
+
   &__trigger:disabled {
     color: var(--idea-text-disabled);
     cursor: not-allowed;

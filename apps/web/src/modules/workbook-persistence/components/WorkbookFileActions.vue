@@ -235,10 +235,7 @@ function onFileChange(event: Event): void {
     &:hover:not(:disabled) {
       background: var(--idea-surface-hover);
     }
-    &:focus-visible {
-      outline: 1px solid var(--idea-action-primary);
-      outline-offset: -2px;
-    }
+
     &:disabled {
       color: var(--idea-text-disabled);
       cursor: default;

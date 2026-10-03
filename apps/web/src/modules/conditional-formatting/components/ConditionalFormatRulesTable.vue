@@ -257,10 +257,7 @@ function moveAction(id: string, index: number, offset: -1 | 1): void {
     &:hover {
       color: var(--idea-action-primary);
     }
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
-      outline-offset: 1px;
-    }
+
     &[aria-disabled="true"] {
       cursor: default;
       opacity: 0.45;

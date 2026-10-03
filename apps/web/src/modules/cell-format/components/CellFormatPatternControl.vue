@@ -190,10 +190,6 @@ function onKeydown(event: KeyboardEvent): void {
       border-color: var(--idea-action-primary);
       background: var(--idea-surface-selected);
     }
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-focus);
-      outline-offset: -2px;
-    }
   }
   &__swatch {
     height: 28px;

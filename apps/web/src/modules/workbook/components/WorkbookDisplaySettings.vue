@@ -110,11 +110,6 @@ const { open, floatingStyles, toggleMenu, onTriggerKeydown } = useMenu({
     &[aria-expanded="true"] {
       background: var(--idea-icon-button-hover-bg);
     }
-
-    &:focus-visible {
-      outline: 2px solid var(--idea-action-primary);
-      outline-offset: -2px;
-    }
   }
 
   &__icon {

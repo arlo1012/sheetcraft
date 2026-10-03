@@ -265,12 +265,6 @@ watch(
       background: var(--idea-surface-hover);
     }
 
-    &:focus-visible {
-      border-color: var(--idea-action-primary);
-      box-shadow: 0 0 0 2px var(--idea-action-focus);
-      outline: none;
-    }
-
     &:disabled {
       color: var(--idea-text-secondary);
       cursor: default;
