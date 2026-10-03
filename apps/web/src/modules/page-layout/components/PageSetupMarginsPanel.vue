@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId } from "vue";
+import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
@@ -89,12 +90,12 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
 </script>
 
 <template>
-  <div class="page-setup-margins">
+  <TForm class="page-setup-margins idea-form-grid" :data="setup" label-align="top">
     <div class="page-setup-margins__diagram">
-      <div class="page-setup-margins__top" role="group" :aria-label="t('pageLayout.marginTop')">
-        <span>{{ t("pageLayout.marginTop") }}</span
+      <TFormItem class="page-setup-margins__top" :label="t('pageLayout.marginTop')"
         ><TInputNumber
           :model-value="displayed('top')"
+          :aria-label="t('pageLayout.marginTop')"
           theme="column"
           class="idea-input-number--persistent-controls"
           :min="0"
@@ -103,15 +104,11 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           data-page-setup="margin-top"
           @update:model-value="update('top', $event)"
         />
-      </div>
-      <div
-        class="page-setup-margins__header"
-        role="group"
-        :aria-label="t('pageLayout.marginHeader')"
-      >
-        <span>{{ t("pageLayout.marginHeader") }}</span
+      </TFormItem>
+      <TFormItem class="page-setup-margins__header" :label="t('pageLayout.marginHeader')"
         ><TInputNumber
           :model-value="displayed('header')"
+          :aria-label="t('pageLayout.marginHeader')"
           theme="column"
           class="idea-input-number--persistent-controls"
           :min="0"
@@ -120,11 +117,11 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           data-page-setup="margin-header"
           @update:model-value="update('header', $event)"
         />
-      </div>
-      <div class="page-setup-margins__left" role="group" :aria-label="t('pageLayout.marginLeft')">
-        <span>{{ t("pageLayout.marginLeft") }}</span
+      </TFormItem>
+      <TFormItem class="page-setup-margins__left" :label="t('pageLayout.marginLeft')"
         ><TInputNumber
           :model-value="displayed('left')"
+          :aria-label="t('pageLayout.marginLeft')"
           theme="column"
           class="idea-input-number--persistent-controls"
           :min="0"
@@ -133,7 +130,7 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           data-page-setup="margin-left"
           @update:model-value="update('left', $event)"
         />
-      </div>
+      </TFormItem>
       <div class="page-setup-margins__preview">
         <svg
           :viewBox="`0 0 ${preview.width} ${preview.height}`"
@@ -201,10 +198,10 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           />
         </svg>
       </div>
-      <div class="page-setup-margins__right" role="group" :aria-label="t('pageLayout.marginRight')">
-        <span>{{ t("pageLayout.marginRight") }}</span
+      <TFormItem class="page-setup-margins__right" :label="t('pageLayout.marginRight')"
         ><TInputNumber
           :model-value="displayed('right')"
+          :aria-label="t('pageLayout.marginRight')"
           theme="column"
           class="idea-input-number--persistent-controls"
           :min="0"
@@ -213,9 +210,8 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           data-page-setup="margin-right"
           @update:model-value="update('right', $event)"
         />
-      </div>
-      <div class="page-setup-margins__unit">
-        <span>{{ t("dimensionUnits.unit") }}</span
+      </TFormItem>
+      <TFormItem class="page-setup-margins__unit" :label="t('dimensionUnits.unit')"
         ><TSelect
           class="page-setup-margins__unit-select"
           :model-value="unit"
@@ -224,15 +220,11 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           data-page-setup="margin-unit"
           @change="setUnit"
         />
-      </div>
-      <div
-        class="page-setup-margins__bottom"
-        role="group"
-        :aria-label="t('pageLayout.marginBottom')"
-      >
-        <span>{{ t("pageLayout.marginBottom") }}</span
+      </TFormItem>
+      <TFormItem class="page-setup-margins__bottom" :label="t('pageLayout.marginBottom')"
         ><TInputNumber
           :model-value="displayed('bottom')"
+          :aria-label="t('pageLayout.marginBottom')"
           theme="column"
           class="idea-input-number--persistent-controls"
           :min="0"
@@ -241,15 +233,11 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           data-page-setup="margin-bottom"
           @update:model-value="update('bottom', $event)"
         />
-      </div>
-      <div
-        class="page-setup-margins__footer"
-        role="group"
-        :aria-label="t('pageLayout.marginFooter')"
-      >
-        <span>{{ t("pageLayout.marginFooter") }}</span
+      </TFormItem>
+      <TFormItem class="page-setup-margins__footer" :label="t('pageLayout.marginFooter')"
         ><TInputNumber
           :model-value="displayed('footer')"
+          :aria-label="t('pageLayout.marginFooter')"
           theme="column"
           class="idea-input-number--persistent-controls"
           :min="0"
@@ -258,10 +246,9 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           data-page-setup="margin-footer"
           @update:model-value="update('footer', $event)"
         />
-      </div>
+      </TFormItem>
     </div>
-    <section :aria-label="t('pageLayout.centerOnPage')">
-      <h3>{{ t("pageLayout.centerOnPage") }}</h3>
+    <TFormItem :label="t('pageLayout.centerOnPage')">
       <div class="page-setup-margins__centering">
         <TCheckbox
           :checked="options.verticalCentered"
@@ -275,8 +262,8 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
           >{{ t("pageLayout.centerHorizontally") }}</TCheckbox
         >
       </div>
-    </section>
-  </div>
+    </TFormItem>
+  </TForm>
 </template>
 
 <style scoped lang="scss">
@@ -293,9 +280,6 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
     margin: 0 auto;
     width: 100%;
     > div:not(.page-setup-margins__preview) {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--idea-space-1);
       min-width: 0;
     }
   }

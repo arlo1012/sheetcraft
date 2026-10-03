@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Radio as TRadio } from "tdesign-vue-next/es/radio";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -65,9 +66,11 @@ function resetManualBreaks(): void {
 }
 </script>
 <template>
-  <div class="page-setup-sheet">
-    <div class="page-setup-sheet__reference">
-      <span>{{ t("pageLayout.printArea") }}</span
+  <TForm class="page-setup-sheet idea-form-grid" :data="references" label-align="top">
+    <TFormItem
+      name="printArea"
+      :label="t('pageLayout.printArea')"
+      :status="errors.printArea ? 'error' : undefined"
       ><RangeReferenceInput
         :model-value="references.printArea"
         :label="t('pageLayout.printArea')"
@@ -76,15 +79,19 @@ function resetManualBreaks(): void {
         data-page-setup="print-area"
         @update:model-value="setReference('printArea', $event)"
       />
-      <p v-if="errors.printArea" role="alert" class="page-setup-sheet__error">
-        {{ errors.printArea }}
-      </p>
-    </div>
+      <template v-if="errors.printArea" #tips
+        ><p role="alert" class="page-setup-sheet__error">
+          {{ errors.printArea }}
+        </p>
+      </template>
+    </TFormItem>
     <section :aria-label="t('pageLayout.printTitles')">
       <h3>{{ t("pageLayout.printTitles") }}</h3>
       <div class="page-setup-sheet__titles">
-        <div class="page-setup-sheet__reference">
-          <span>{{ t("pageLayout.titleRows") }}</span
+        <TFormItem
+          name="titleRows"
+          :label="t('pageLayout.titleRows')"
+          :status="errors.titleRows ? 'error' : undefined"
           ><RangeReferenceInput
             :model-value="references.titleRows"
             :label="t('pageLayout.titleRows')"
@@ -93,12 +100,16 @@ function resetManualBreaks(): void {
             data-page-setup="title-rows"
             @update:model-value="setReference('titleRows', $event)"
           />
-          <p v-if="errors.titleRows" role="alert" class="page-setup-sheet__error">
-            {{ errors.titleRows }}
-          </p>
-        </div>
-        <div class="page-setup-sheet__reference">
-          <span>{{ t("pageLayout.titleColumns") }}</span
+          <template v-if="errors.titleRows" #tips
+            ><p role="alert" class="page-setup-sheet__error">
+              {{ errors.titleRows }}
+            </p>
+          </template>
+        </TFormItem>
+        <TFormItem
+          name="titleColumns"
+          :label="t('pageLayout.titleColumns')"
+          :status="errors.titleColumns ? 'error' : undefined"
           ><RangeReferenceInput
             :model-value="references.titleColumns"
             :label="t('pageLayout.titleColumns')"
@@ -107,12 +118,16 @@ function resetManualBreaks(): void {
             data-page-setup="title-columns"
             @update:model-value="setReference('titleColumns', $event)"
           />
-          <p v-if="errors.titleColumns" role="alert" class="page-setup-sheet__error">
-            {{ errors.titleColumns }}
-          </p>
-        </div>
-        <div class="page-setup-sheet__reference">
-          <span>{{ t("pageLayout.bottomTitleRows") }}</span
+          <template v-if="errors.titleColumns" #tips
+            ><p role="alert" class="page-setup-sheet__error">
+              {{ errors.titleColumns }}
+            </p>
+          </template>
+        </TFormItem>
+        <TFormItem
+          name="bottomTitleRows"
+          :label="t('pageLayout.bottomTitleRows')"
+          :status="errors.bottomTitleRows ? 'error' : undefined"
           ><RangeReferenceInput
             :model-value="references.bottomTitleRows"
             :label="t('pageLayout.bottomTitleRows')"
@@ -121,38 +136,41 @@ function resetManualBreaks(): void {
             data-page-setup="bottom-title-rows"
             @update:model-value="setReference('bottomTitleRows', $event)"
           />
-          <p v-if="errors.bottomTitleRows" role="alert" class="page-setup-sheet__error">
-            {{ errors.bottomTitleRows }}
-          </p>
-        </div>
+          <template v-if="errors.bottomTitleRows" #tips
+            ><p role="alert" class="page-setup-sheet__error">
+              {{ errors.bottomTitleRows }}
+            </p>
+          </template>
+        </TFormItem>
       </div>
     </section>
     <section :aria-label="t('pageLayout.printSettings')">
       <h3>{{ t("pageLayout.printSettings") }}</h3>
       <div class="page-setup-sheet__print-options">
-        <div class="page-setup-sheet__flags">
-          <TCheckbox
-            :checked="options.gridLines"
-            data-page-setup="print-gridlines"
-            @change="patchOptions({ gridLines: Boolean($event) })"
-            >{{ t("pageLayout.printGridLines") }}</TCheckbox
-          >
-          <TCheckbox
-            :checked="options.blackAndWhite"
-            data-page-setup="black-and-white"
-            @change="patchOptions({ blackAndWhite: Boolean($event) })"
-            >{{ t("pageLayout.blackAndWhite") }}</TCheckbox
-          >
-          <TCheckbox
-            :checked="options.headings"
-            data-page-setup="print-headings"
-            @change="patchOptions({ headings: Boolean($event) })"
-            >{{ t("pageLayout.printHeadings") }}</TCheckbox
-          >
-        </div>
+        <TFormItem :label-width="0">
+          <div class="page-setup-sheet__flags">
+            <TCheckbox
+              :checked="options.gridLines"
+              data-page-setup="print-gridlines"
+              @change="patchOptions({ gridLines: Boolean($event) })"
+              >{{ t("pageLayout.printGridLines") }}</TCheckbox
+            >
+            <TCheckbox
+              :checked="options.blackAndWhite"
+              data-page-setup="black-and-white"
+              @change="patchOptions({ blackAndWhite: Boolean($event) })"
+              >{{ t("pageLayout.blackAndWhite") }}</TCheckbox
+            >
+            <TCheckbox
+              :checked="options.headings"
+              data-page-setup="print-headings"
+              @change="patchOptions({ headings: Boolean($event) })"
+              >{{ t("pageLayout.printHeadings") }}</TCheckbox
+            >
+          </div>
+        </TFormItem>
         <div class="page-setup-sheet__print-selects">
-          <div class="page-setup-sheet__reference">
-            <span>{{ t("pageLayout.cellComments") }}</span
+          <TFormItem :label="t('pageLayout.cellComments')"
             ><TSelect
               :model-value="options.cellComments"
               :options="commentOptions"
@@ -160,9 +178,8 @@ function resetManualBreaks(): void {
               data-page-setup="cell-comments"
               @change="setComments"
             />
-          </div>
-          <div class="page-setup-sheet__reference">
-            <span>{{ t("pageLayout.cellErrors") }}</span
+          </TFormItem>
+          <TFormItem :label="t('pageLayout.cellErrors')"
             ><TSelect
               :model-value="options.errors"
               :options="errorOptions"
@@ -170,12 +187,11 @@ function resetManualBreaks(): void {
               data-page-setup="cell-errors"
               @change="setErrors"
             />
-          </div>
+          </TFormItem>
         </div>
       </div>
     </section>
-    <section :aria-label="t('pageLayout.pageOrder')">
-      <h3>{{ t("pageLayout.pageOrder") }}</h3>
+    <TFormItem :label="t('pageLayout.pageOrder')">
       <div class="page-setup-sheet__order" data-page-setup="page-order">
         <TRadio
           :checked="setup.pageOrder === 'downThenOver'"
@@ -190,23 +206,18 @@ function resetManualBreaks(): void {
           aria-hidden="true"
         />
       </div>
-    </section>
+    </TFormItem>
     <div class="page-setup-dialog__breaks">
       <TButton variant="outline" @click="resetManualBreaks">{{
         t("pageLayout.resetManualBreaks")
       }}</TButton>
     </div>
-  </div>
+  </TForm>
 </template>
 <style scoped lang="scss">
 @use "./page-setup-panel" as panel;
 .page-setup-sheet {
   @include panel.panel;
-  &__reference {
-    display: grid;
-    gap: var(--idea-space-1);
-    min-width: 0;
-  }
   &__titles {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

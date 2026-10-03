@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import { Radio as TRadio } from "tdesign-vue-next/es/radio";
@@ -99,9 +100,8 @@ function setQuality(value: SelectValue): void {
 </script>
 
 <template>
-  <div class="page-setup-page">
-    <section :aria-label="t('pageLayout.orientation')">
-      <h3>{{ t("pageLayout.orientation") }}</h3>
+  <TForm class="page-setup-page idea-form-grid" :data="setup" label-align="left" :label-width="96">
+    <TFormItem :label="t('pageLayout.orientation')" label-align="top">
       <div class="page-setup-page__orientation" data-page-setup="orientation">
         <TRadio
           :checked="setup.orientation === 'portrait'"
@@ -116,7 +116,7 @@ function setQuality(value: SelectValue): void {
           }}</TRadio
         >
       </div>
-    </section>
+    </TFormItem>
     <section :aria-label="t('pageLayout.scaling')">
       <h3>{{ t("pageLayout.scaling") }}</h3>
       <div class="page-setup-page__scaling-row">
@@ -151,10 +151,10 @@ function setQuality(value: SelectValue): void {
         />
       </div>
       <div v-if="fitting && fitPreset === 'custom'" class="page-setup-page__fit-dimensions">
-        <div role="group" :aria-label="t('pageLayout.fitWidth')">
-          <span>{{ t("pageLayout.fitWidth") }}</span
+        <TFormItem :label="t('pageLayout.fitWidth')" label-align="top"
           ><TInputNumber
             :model-value="setup.fitToPage?.width"
+            :aria-label="t('pageLayout.fitWidth')"
             theme="column"
             class="idea-input-number--persistent-controls"
             :min="0"
@@ -162,11 +162,11 @@ function setQuality(value: SelectValue): void {
             :decimal-places="0"
             @update:model-value="setFit('width', $event)"
           />
-        </div>
-        <div role="group" :aria-label="t('pageLayout.fitHeight')">
-          <span>{{ t("pageLayout.fitHeight") }}</span
+        </TFormItem>
+        <TFormItem :label="t('pageLayout.fitHeight')" label-align="top"
           ><TInputNumber
             :model-value="setup.fitToPage?.height"
+            :aria-label="t('pageLayout.fitHeight')"
             theme="column"
             class="idea-input-number--persistent-controls"
             :min="0"
@@ -174,13 +174,12 @@ function setQuality(value: SelectValue): void {
             :decimal-places="0"
             @update:model-value="setFit('height', $event)"
           />
-        </div>
+        </TFormItem>
         <span class="page-setup-page__hint">{{ t("pageLayout.fitUnlimited") }}</span>
       </div>
     </section>
     <div class="page-setup-page__fields">
-      <div class="page-setup-page__row" role="group" :aria-label="t('pageLayout.paperSize')">
-        <span>{{ t("pageLayout.paperSize") }}</span>
+      <TFormItem :label="t('pageLayout.paperSize')">
         <div class="page-setup-page__paper-select">
           <TSelect
             :model-value="setup.paperSize"
@@ -192,12 +191,12 @@ function setQuality(value: SelectValue): void {
             t("pageLayout.customPaper")
           }}</TButton>
         </div>
-      </div>
+      </TFormItem>
       <div v-if="setup.paperSize === 'custom'" class="page-setup-page__paper-dimensions">
-        <div role="group" :aria-label="t('pageLayout.paperWidth')">
-          <span>{{ t("pageLayout.paperWidth") }}</span
+        <TFormItem :label="t('pageLayout.paperWidth')" label-align="top"
           ><TInputNumber
             :model-value="setup.customPaperSize?.width"
+            :aria-label="t('pageLayout.paperWidth')"
             theme="column"
             class="idea-input-number--persistent-controls"
             :min="1"
@@ -206,11 +205,11 @@ function setQuality(value: SelectValue): void {
             suffix="mm"
             @update:model-value="setPaperDimension('width', $event)"
           />
-        </div>
-        <div role="group" :aria-label="t('pageLayout.paperHeight')">
-          <span>{{ t("pageLayout.paperHeight") }}</span
+        </TFormItem>
+        <TFormItem :label="t('pageLayout.paperHeight')" label-align="top"
           ><TInputNumber
             :model-value="setup.customPaperSize?.height"
+            :aria-label="t('pageLayout.paperHeight')"
             theme="column"
             class="idea-input-number--persistent-controls"
             :min="1"
@@ -219,10 +218,9 @@ function setQuality(value: SelectValue): void {
             suffix="mm"
             @update:model-value="setPaperDimension('height', $event)"
           />
-        </div>
+        </TFormItem>
       </div>
-      <div class="page-setup-page__row" role="group" :aria-label="t('pageLayout.printQuality')">
-        <span>{{ t("pageLayout.printQuality") }}</span
+      <TFormItem :label="t('pageLayout.printQuality')"
         ><TSelect
           :model-value="setup.printQuality ?? 600"
           :options="qualityOptions"
@@ -230,18 +228,17 @@ function setQuality(value: SelectValue): void {
           data-page-setup="print-quality"
           @change="setQuality"
         />
-      </div>
-      <div class="page-setup-page__row">
-        <span>{{ t("pageLayout.firstPageNumber") }}</span
+      </TFormItem>
+      <TFormItem :label="t('pageLayout.firstPageNumber')"
         ><TInput
           v-model="firstPageText"
           :aria-label="t('pageLayout.firstPageNumber')"
           :placeholder="t('pageLayout.automaticPageNumber')"
           data-page-setup="first-page-number"
         />
-      </div>
+      </TFormItem>
     </div>
-  </div>
+  </TForm>
 </template>
 
 <style scoped lang="scss">
@@ -265,7 +262,9 @@ function setQuality(value: SelectValue): void {
     display: flex;
     align-items: center;
     gap: var(--idea-space-2);
-    margin-top: var(--idea-space-2);
+    & + & {
+      margin-top: var(--idea-space-2);
+    }
     > :first-child {
       flex: none;
       width: 108px;
@@ -282,10 +281,8 @@ function setQuality(value: SelectValue): void {
     display: grid;
     gap: var(--idea-space-2);
   }
-  &__row {
-    @include panel.row;
-  }
   &__paper-select {
+    width: 100%;
     display: flex;
     gap: var(--idea-space-2);
     min-width: 0;
@@ -303,10 +300,6 @@ function setQuality(value: SelectValue): void {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--idea-space-2);
     margin-left: 96px;
-    > div {
-      display: grid;
-      gap: var(--idea-space-1);
-    }
   }
   &__fit-dimensions {
     margin: var(--idea-space-2) 0 0 116px;

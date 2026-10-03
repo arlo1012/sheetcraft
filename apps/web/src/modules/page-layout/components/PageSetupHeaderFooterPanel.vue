@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
 import { Button as TButton } from "tdesign-vue-next/es/button";
@@ -79,7 +80,12 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
 </script>
 
 <template>
-  <div class="page-setup-header-footer">
+  <TForm
+    class="page-setup-header-footer idea-form-grid"
+    :data="setup"
+    label-align="left"
+    :label-width="48"
+  >
     <section :aria-label="t('pageLayout.header')">
       <div class="page-setup-header-footer__preview" :aria-label="t('pageLayout.headerPreview')">
         <PageHeaderFooterField
@@ -121,21 +127,22 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
           @open="emit('customEdit', $event)"
         />
       </div>
-      <div class="page-setup-header-footer__row">
-        <span>{{ t("pageLayout.header") }}</span
-        ><TSelect
-          :model-value="presetValue(setup.header)"
-          :options="presetOptions"
-          :aria-label="t('pageLayout.header')"
-          data-page-setup="header-preset"
-          @change="selectPreset('header', $event)"
-        /><TButton
-          variant="outline"
-          data-page-setup="custom-header"
-          @click="emit('customEdit', { section: 'header', part: 'left', variant: 'odd' })"
-          >{{ t("pageLayout.customHeader") }}</TButton
-        >
-      </div>
+      <TFormItem :label="t('pageLayout.header')"
+        ><div class="page-setup-header-footer__row">
+          <TSelect
+            :model-value="presetValue(setup.header)"
+            :options="presetOptions"
+            :aria-label="t('pageLayout.header')"
+            data-page-setup="header-preset"
+            @change="selectPreset('header', $event)"
+          /><TButton
+            variant="outline"
+            data-page-setup="custom-header"
+            @click="emit('customEdit', { section: 'header', part: 'left', variant: 'odd' })"
+            >{{ t("pageLayout.customHeader") }}</TButton
+          >
+        </div>
+      </TFormItem>
     </section>
     <section :aria-label="t('pageLayout.footer')">
       <div class="page-setup-header-footer__preview" :aria-label="t('pageLayout.footerPreview')">
@@ -178,49 +185,52 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
           @open="emit('customEdit', $event)"
         />
       </div>
-      <div class="page-setup-header-footer__row">
-        <span>{{ t("pageLayout.footer") }}</span
-        ><TSelect
-          :model-value="presetValue(setup.footer)"
-          :options="presetOptions"
-          :aria-label="t('pageLayout.footer')"
-          data-page-setup="footer-preset"
-          @change="selectPreset('footer', $event)"
-        /><TButton
-          variant="outline"
-          data-page-setup="custom-footer"
-          @click="emit('customEdit', { section: 'footer', part: 'left', variant: 'odd' })"
-          >{{ t("pageLayout.customFooter") }}</TButton
+      <TFormItem :label="t('pageLayout.footer')"
+        ><div class="page-setup-header-footer__row">
+          <TSelect
+            :model-value="presetValue(setup.footer)"
+            :options="presetOptions"
+            :aria-label="t('pageLayout.footer')"
+            data-page-setup="footer-preset"
+            @change="selectPreset('footer', $event)"
+          /><TButton
+            variant="outline"
+            data-page-setup="custom-footer"
+            @click="emit('customEdit', { section: 'footer', part: 'left', variant: 'odd' })"
+            >{{ t("pageLayout.customFooter") }}</TButton
+          >
+        </div>
+      </TFormItem>
+    </section>
+    <TFormItem :label-width="0">
+      <div class="page-setup-header-footer__options">
+        <TCheckbox
+          :checked="options.differentOddEven"
+          data-page-setup-option="different-odd-even"
+          @change="patchOptions({ differentOddEven: Boolean($event) })"
+          >{{ t("pageLayout.headerFooterDifferentOddEven") }}</TCheckbox
+        >
+        <TCheckbox
+          :checked="options.differentFirst"
+          data-page-setup-option="different-first"
+          @change="patchOptions({ differentFirst: Boolean($event) })"
+          >{{ t("pageLayout.headerFooterDifferentFirst") }}</TCheckbox
+        >
+        <TCheckbox
+          :checked="options.scaleWithDocument"
+          data-page-setup-option="scale-with-document"
+          @change="patchOptions({ scaleWithDocument: Boolean($event) })"
+          >{{ t("pageLayout.headerFooterScaleWithDocument") }}</TCheckbox
+        >
+        <TCheckbox
+          :checked="options.alignWithMargins"
+          data-page-setup-option="align-with-margins"
+          @change="patchOptions({ alignWithMargins: Boolean($event) })"
+          >{{ t("pageLayout.headerFooterAlignWithMargins") }}</TCheckbox
         >
       </div>
-    </section>
-    <div class="page-setup-header-footer__options">
-      <TCheckbox
-        :checked="options.differentOddEven"
-        data-page-setup-option="different-odd-even"
-        @change="patchOptions({ differentOddEven: Boolean($event) })"
-        >{{ t("pageLayout.headerFooterDifferentOddEven") }}</TCheckbox
-      >
-      <TCheckbox
-        :checked="options.differentFirst"
-        data-page-setup-option="different-first"
-        @change="patchOptions({ differentFirst: Boolean($event) })"
-        >{{ t("pageLayout.headerFooterDifferentFirst") }}</TCheckbox
-      >
-      <TCheckbox
-        :checked="options.scaleWithDocument"
-        data-page-setup-option="scale-with-document"
-        @change="patchOptions({ scaleWithDocument: Boolean($event) })"
-        >{{ t("pageLayout.headerFooterScaleWithDocument") }}</TCheckbox
-      >
-      <TCheckbox
-        :checked="options.alignWithMargins"
-        data-page-setup-option="align-with-margins"
-        @change="patchOptions({ alignWithMargins: Boolean($event) })"
-        >{{ t("pageLayout.headerFooterAlignWithMargins") }}</TCheckbox
-      >
-    </div>
-  </div>
+    </TFormItem>
+  </TForm>
 </template>
 
 <style scoped lang="scss">
@@ -236,7 +246,8 @@ function patchOptions(patch: Partial<SheetHeaderFooterOptions>): void {
   }
   &__row {
     display: grid;
-    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
     gap: var(--idea-space-2);
     align-items: center;
   }
