@@ -267,7 +267,7 @@ test("makes protected sheets read-only", async () => {
   wrapper.getComponent(Select).vm.$emit("update:modelValue", "sheet:locked");
   await wrapper.vm.$nextTick();
 
-  expect(wrapper.get('[data-cf-action="new"]').attributes("aria-disabled")).toBe("true");
+  expect(wrapper.get('[data-cf-action="new"]').attributes("disabled")).toBeDefined();
   for (const action of ["edit", "delete"]) {
     expect(
       wrapper

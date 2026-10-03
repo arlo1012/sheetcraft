@@ -56,13 +56,13 @@ CSS pixels at 100% scale; size and line height are a pair.
   content, and footer. Keep row/control padding and gaps separate. Menu hover and
   selection backgrounds span the width. Suggestions, tooltips, input assists, and
   compact floating toolbars retain their own density.
-- Icons must not be wrapped in a native `button` or library `Button`, regardless
-  of their purpose or location. Make interactive icon containers the triggers, with accessible naming,
-  keyboard activation, focus, and disabled states. Input prefix/suffix icons use
-  the control's icon slots directly; the input owns spacing. Stop trigger clicks
-  from bubbling into the input's focus handler. Use the shared `vIconAction`
-  directive for activation and disabled semantics on icon containers; keep labels
-  and layout in the owning component.
+- Only controls whose entire visible content is a single icon omit the native
+  `button` or library `Button` wrapper. Controls with text, icon + text, or
+  composite content keep their button component and normal button styling.
+  Use `vIconAction` for keyboard activation and disabled semantics on standalone
+  icon containers, with an accessible name. Single input prefix/suffix icons use
+  the control's icon slots directly; the input owns spacing. Stop action clicks
+  from bubbling into the input's focus handler.
 - `InputNumber`: use `theme="column"` and
   `idea-input-number--persistent-controls`. Wrap in a labelled group, not a native
   label that forwards events to its buttons. Compact number-format fields use

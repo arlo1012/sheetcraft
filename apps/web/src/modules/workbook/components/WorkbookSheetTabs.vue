@@ -65,7 +65,7 @@ function setTabColor(sheet: Sheet, color: string | null): void {
 const renamingSheetId = ref<string>();
 const renameValue = ref("");
 const renameInput = ref<HTMLInputElement>();
-const tabButtons = new Map<string, HTMLElement>();
+const tabButtons = new Map<string, HTMLButtonElement>();
 const tabList = ref<HTMLDivElement>();
 const hasOverflow = ref(false);
 const canScrollLeft = ref(false);
@@ -87,7 +87,7 @@ function setRenameInput(input: Element | ComponentPublicInstance | null): void {
 }
 
 function setTabButton(sheetId: string, element: Element | ComponentPublicInstance | null): void {
-  if (element instanceof HTMLElement) {
+  if (element instanceof HTMLButtonElement) {
     tabButtons.set(sheetId, element);
   } else {
     tabButtons.delete(sheetId);
@@ -485,12 +485,12 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
             @keydown.enter.prevent="commitRename(sheet)"
             @keydown.escape.prevent="cancelRename"
           />
-          <span
+          <button
             v-else
-            v-icon-action
             :ref="(element) => setTabButton(sheet.id, element)"
             class="workbook-sheet-tabs__tab"
             :class="{ 'is-active': sheet.id === props.activeSheetId }"
+            type="button"
             role="tab"
             :aria-selected="sheet.id === props.activeSheetId"
             aria-haspopup="menu"
@@ -521,7 +521,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
               :aria-label="t('sheetTabs.protectedHint')"
             />
             <span class="workbook-sheet-tabs__name">{{ sheet.name }}</span>
-          </span>
+          </button>
         </div>
       </div>
     </div>

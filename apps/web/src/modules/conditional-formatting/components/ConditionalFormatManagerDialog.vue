@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { computed, ref, watch } from "vue";
 import { Plus } from "lucide-vue-next";
-import { vIconAction } from "../../../shared/focus/icon-action";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   cloneConditionalFormatRule,
@@ -326,15 +326,16 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
           :aria-label="t('conditionalFormatting.ruleScope')"
           :options="scopeOptions"
         />
-        <span
-          v-icon-action="readonly"
+        <TButton
           class="conditional-format-manager__new"
+          variant="outline"
           data-cf-action="new"
           :aria-label="t('conditionalFormatting.newRule')"
+          :disabled="readonly"
           @click="addRule"
         >
-          <Plus aria-hidden="true" />{{ t("conditionalFormatting.newRuleAction") }}
-        </span>
+          <template #icon><Plus /></template>{{ t("conditionalFormatting.newRuleAction") }}
+        </TButton>
       </div>
       <ConditionalFormatRulesTable
         :rows="tableRows"
@@ -393,33 +394,8 @@ watch(() => [props.visible, props.rules, props.createKind, props.sheets, props.s
     width: 180px;
   }
   &__new {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    min-width: var(--td-comp-size-m);
-    height: var(--td-comp-size-m);
-    padding: 0 calc(var(--td-comp-paddingLR-l) - 1px);
-    border: 1px solid var(--td-border-level-2-color);
-    border-radius: var(--td-radius-default);
-    background: var(--td-bg-color-specialcomponent);
-    color: var(--td-text-color-primary);
-    font: var(--td-font-body-medium);
-    cursor: pointer;
     margin-left: auto;
     flex-shrink: 0;
-
-    &:hover:not([aria-disabled="true"]) {
-      border-color: var(--td-brand-color-hover);
-      background: var(--td-bg-color-container-hover);
-      color: var(--td-brand-color-hover);
-    }
-    &[aria-disabled="true"] {
-      cursor: not-allowed;
-      border-color: var(--td-border-level-2-color);
-      background: var(--td-bg-color-component-disabled);
-      color: var(--td-text-color-disabled);
-    }
     svg {
       width: var(--idea-action-icon-size);
       height: var(--idea-action-icon-size);

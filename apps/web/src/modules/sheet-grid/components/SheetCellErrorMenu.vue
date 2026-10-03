@@ -3,7 +3,6 @@ import { ChevronDown, CircleAlert } from "lucide-vue-next";
 import { computed, ref, useId, watch } from "vue";
 import type { CellAddress } from "@idea10/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
-import { vIconAction } from "../../../shared/focus/icon-action";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -46,7 +45,7 @@ const description = computed<CellErrorDescription>(
       ignoreAllHint: t("dataTools.duplicates.errorChecks.ignoreAllHint"),
     },
 );
-const triggerRef = ref<HTMLElement | null>(null);
+const triggerRef = ref<HTMLButtonElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `sheet-cell-error-menu-${useId().replaceAll(":", "")}`;
 const overlay = computed(() => {
@@ -119,12 +118,13 @@ watch(
 </script>
 
 <template>
-  <span
+  <button
     v-if="visible && overlay.visible"
-    v-icon-action="disabled"
     ref="triggerRef"
+    type="button"
     class="sheet-cell-error-menu__trigger"
     :style="overlay.style"
+    :disabled="disabled"
     :aria-label="description.label"
     :aria-controls="open ? menuId : undefined"
     :aria-expanded="open"
@@ -142,7 +142,7 @@ watch(
       :size="10"
       aria-hidden="true"
     />
-  </span>
+  </button>
   <Teleport to="body">
     <MenuSurface
       v-if="open"
@@ -226,12 +226,12 @@ watch(
     border-radius: var(--idea-radius-small);
     cursor: pointer;
 
-    &:hover:not([aria-disabled="true"]),
+    &:hover:not(:disabled),
     &[aria-expanded="true"] {
       background: var(--idea-icon-button-hover-bg);
     }
 
-    &[aria-disabled="true"] {
+    &:disabled {
       cursor: default;
       opacity: 0.55;
     }

@@ -60,14 +60,14 @@ describe("WorkbookFindDialog", () => {
       },
     });
     const body = new DOMWrapper(document.body);
-    await body.get("[role='button'][aria-controls='find-options']").trigger("click");
+    await body.get("button[aria-controls='find-options']").trigger("click");
     expect(wrapper.emitted("updateExpanded")).toEqual([[true]]);
     await wrapper.setProps({ expanded: true });
     const scope = wrapper.findAllComponents(TSelect)[0];
     scope?.vm.$emit("change", "workbook");
-    await body.get("[role='button'][aria-controls='find-options']").trigger("click");
+    await body.get("button[aria-controls='find-options']").trigger("click");
     await wrapper.setProps({ expanded: false });
-    await body.get("[role='button'][aria-controls='find-options']").trigger("click");
+    await body.get("button[aria-controls='find-options']").trigger("click");
     await wrapper.setProps({ expanded: true });
     expect(wrapper.emitted("updateOptions")).toEqual([[{ scope: "workbook" }]]);
     expect(body.find("[data-find-format='clear']").exists()).toBe(false);
@@ -82,8 +82,7 @@ describe("WorkbookFindDialog", () => {
     });
     const body = new DOMWrapper(document.body);
     const findAll = () => body.findAll("button").find((button) => button.text() === "Find all")!;
-    const hasFormat = () =>
-      body.findAll("[role=button]").some((button) => button.text() === "Format");
+    const hasFormat = () => body.findAll("button").some((button) => button.text() === "Format");
     expect(hasFormat()).toBe(false);
     expect(findAll().element.disabled).toBe(true);
     await wrapper.setProps({ expanded: true });
@@ -105,9 +104,7 @@ describe("WorkbookFindDialog", () => {
     const input = body.get<HTMLInputElement>("[data-search-input] input");
     input.element.setSelectionRange(1, 1);
     await flushPromises();
-    await body
-      .get("[role='button'][aria-label='Special content']")
-      .trigger("keydown", { key: "Enter" });
+    await body.get("button[aria-label='Special content']").trigger("click");
     await vi.waitFor(() =>
       expect(body.find("[data-find-special='line-break']").exists()).toBe(true),
     );

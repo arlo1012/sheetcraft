@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { Button } from "tdesign-vue-next/es/button";
 import { Dropdown, DropdownItem, DropdownMenu } from "tdesign-vue-next/es/dropdown";
 import { ChevronDown } from "lucide-vue-next";
 import type { SheetSearchFormat } from "@idea10/core/search";
 import WorkbookFindFormatPreview from "./WorkbookFindFormatPreview.vue";
 import { useAppI18n } from "../../../shared/i18n";
-import { vIconAction } from "../../../shared/focus/icon-action";
 import type { WorkbookFindFormatMode } from "../workbook-find-types";
 defineProps<{ format?: SheetSearchFormat; summary?: string }>();
 const emit = defineEmits<{
@@ -32,15 +32,10 @@ const formatOpen = ref(false);
       onVisibleChange: (visible) => (formatOpen = visible),
     }"
   >
-    <span
-      v-icon-action
-      class="workbook-find-format-control__trigger"
-      aria-haspopup="menu"
-      :aria-expanded="formatOpen"
-    >
+    <Button variant="outline" aria-haspopup="menu" :aria-expanded="formatOpen">
       {{ t("navigation.findFormat") }}
-      <ChevronDown :size="14" aria-hidden="true" />
-    </span>
+      <template #suffix><ChevronDown :size="14" /></template>
+    </Button>
     <template #dropdown>
       <DropdownMenu>
         <DropdownItem @click="emit('configureFormat')">
@@ -65,23 +60,3 @@ const formatOpen = ref(false);
     </template>
   </Dropdown>
 </template>
-
-<style scoped lang="scss">
-.workbook-find-format-control__trigger {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  gap: var(--idea-space-1);
-  padding: 0 var(--idea-space-3);
-  color: var(--idea-text-primary);
-  background: var(--idea-surface-panel);
-  border: 1px solid var(--idea-border-subtle);
-  border-radius: var(--idea-radius-small);
-  cursor: pointer;
-
-  &:hover,
-  &[aria-expanded="true"] {
-    background: var(--idea-surface-hover);
-  }
-}
-</style>

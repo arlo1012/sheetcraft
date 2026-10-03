@@ -4,7 +4,6 @@ import type { CellFillMode } from "@idea10/core/cell-autofill";
 import { computed, ref, useId } from "vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import { useAppI18n } from "../../../shared/i18n";
-import { vIconAction } from "../../../shared/focus/icon-action";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 
@@ -24,7 +23,7 @@ const emit = defineEmits<{
   select: [mode: CellFillMode];
 }>();
 const { t } = useAppI18n();
-const triggerRef = ref<HTMLElement | null>(null);
+const triggerRef = ref<HTMLButtonElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `sheet-auto-fill-options-${useId().replaceAll(":", "")}`;
 const triggerStyle = computed(() => ({
@@ -65,10 +64,10 @@ function selectMode(mode: CellFillMode): void {
 </script>
 
 <template>
-  <span
+  <button
     v-if="visible"
-    v-icon-action
     ref="triggerRef"
+    type="button"
     class="sheet-auto-fill-options__trigger"
     :style="triggerStyle"
     :aria-label="t('autoFill.options')"
@@ -88,7 +87,7 @@ function selectMode(mode: CellFillMode): void {
       :size="chevronSize"
       aria-hidden="true"
     />
-  </span>
+  </button>
   <Teleport to="body">
     <MenuSurface
       v-if="menuOpen"

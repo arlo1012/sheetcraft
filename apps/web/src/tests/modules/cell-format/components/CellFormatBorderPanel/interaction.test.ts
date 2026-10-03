@@ -128,7 +128,7 @@ describe("CellFormatBorderPanel", () => {
     const wrapper = mountPanel({
       capabilities: { innerHorizontal: false, innerVertical: false },
     });
-    expect(wrapper.get('[data-border-preset="inner"]').attributes("aria-disabled")).toBe("true");
+    expect(wrapper.get('[data-border-preset="inner"]').attributes("disabled")).toBeDefined();
     expect(wrapper.get('[data-border-side="innerHorizontal"]').attributes("aria-disabled")).toBe(
       "true",
     );

@@ -247,20 +247,35 @@ onBeforeUnmount(() => {
     >
       <header class="filter-column-panel__heading">
         <div class="filter-column-panel__sort" role="group" :aria-label="t('dataTools.sort.title')">
-          <span v-icon-action="disabled || !canSort" @click="emit('sort', 'ascending')">
-            <ArrowUpAZ class="idea-action-icon" />{{ t("dataTools.sort.ascending") }}
-          </span>
-          <span v-icon-action="disabled || !canSort" @click="emit('sort', 'descending')">
-            <ArrowDownAZ class="idea-action-icon" />{{ t("dataTools.sort.descending") }}
-          </span>
-          <span
-            v-icon-action="disabled || !canSort"
+          <TButton
+            variant="text"
+            size="small"
+            :disabled="disabled || !canSort"
+            @click="emit('sort', 'ascending')"
+          >
+            <template #icon><ArrowUpAZ class="idea-action-icon" /></template>
+            {{ t("dataTools.sort.ascending") }}
+          </TButton>
+          <TButton
+            variant="text"
+            size="small"
+            :disabled="disabled || !canSort"
+            @click="emit('sort', 'descending')"
+          >
+            <template #icon><ArrowDownAZ class="idea-action-icon" /></template>
+            {{ t("dataTools.sort.descending") }}
+          </TButton>
+          <TButton
+            variant="text"
+            theme="default"
+            size="small"
             aria-haspopup="dialog"
+            :disabled="disabled || !canSort"
             @click="emit('openSort')"
           >
-            <PaintBucket class="idea-action-icon" aria-hidden="true" />
+            <template #icon><PaintBucket class="idea-action-icon" aria-hidden="true" /></template>
             {{ t("dataTools.filter.colorSort") }}
-          </span>
+          </TButton>
         </div>
       </header>
       <TTabs v-model="tab" class="filter-column-panel__tabs" size="medium">
@@ -386,11 +401,6 @@ onBeforeUnmount(() => {
     align-items: center;
     flex: none;
     gap: var(--idea-space-4);
-
-    > [role="button"] {
-      min-height: 24px;
-      padding-inline: var(--idea-space-2);
-    }
   }
   &__tabs {
     min-width: 0;

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { vIconAction } from "../focus/icon-action";
 import { ChevronRight } from "lucide-vue-next";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
@@ -50,7 +49,7 @@ const focusedSwatch = ref(0);
 const swatchButtons = new Map<number, HTMLButtonElement>();
 const disabledRecentColors = null as unknown as string[];
 const rootRef = ref<HTMLElement | null>(null);
-const moreButtonRef = ref<HTMLElement | null>(null);
+const moreButtonRef = ref<HTMLButtonElement | null>(null);
 const selectInputProps = createColorPickerSelectInputProps(getPanelAttach);
 const allowedColorSet = computed(() => {
   if (props.allowedColors === undefined) return undefined;
@@ -317,17 +316,17 @@ function getPanelAttach(): HTMLElement {
         </div>
       </div>
 
-      <span
+      <button
         v-if="!isRestricted"
         ref="moreButtonRef"
-        v-icon-action
+        type="button"
         class="color-palette__more"
         data-color-action="more"
         @click="openMore"
       >
         <span>{{ t("colorPalette.more") }}</span>
         <ChevronRight :size="14" aria-hidden="true" />
-      </span>
+      </button>
       <button
         v-if="clearable"
         type="button"

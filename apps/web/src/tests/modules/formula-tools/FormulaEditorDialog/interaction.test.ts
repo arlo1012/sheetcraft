@@ -46,7 +46,7 @@ describe("FormulaEditorDialog", () => {
   test("opens the existing browser and inserts a function through the controlled change event", async () => {
     const wrapper = mountEditor("");
     await nextTick();
-    await wrapper.get("[role='button'][aria-label='Choose function']").trigger("click");
+    await wrapper.get("button[aria-label='Choose function']").trigger("click");
     const browser = wrapper.findComponent(FormulaFunctionBrowser);
     expect(browser.props("visible")).toBe(true);
     browser.vm.$emit("insertFunction", "SUM");

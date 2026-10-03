@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
 import { ChevronDown, Search } from "lucide-vue-next";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -11,7 +12,8 @@ import type { FilterSearchOptions } from "../filter-value-options";
 const props = defineProps<{ options: FilterSearchOptions; disabled?: boolean }>();
 const emit = defineEmits<{ change: [options: FilterSearchOptions] }>();
 const { t } = useAppI18n();
-const triggerRef = ref<HTMLElement | null>(null);
+const buttonRef = ref<InstanceType<typeof TButton> | null>(null);
+const triggerRef = computed<HTMLElement | null>(() => buttonRef.value?.$el ?? null);
 const surfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `filter-search-${useId().replaceAll(":", "")}`;
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
@@ -30,12 +32,14 @@ function change(options: Partial<FilterSearchOptions>): void {
 </script>
 
 <template>
-  <span
-    ref="triggerRef"
+  <TButton
+    ref="buttonRef"
     class="filter-search-menu__trigger"
     role="button"
-    :tabindex="disabled ? -1 : 0"
-    :aria-disabled="disabled || undefined"
+    variant="text"
+    theme="default"
+    size="small"
+    :disabled="disabled"
     :aria-label="t('dataTools.filter.searchOptions')"
     :title="t('dataTools.filter.searchOptions')"
     aria-haspopup="menu"
@@ -51,7 +55,7 @@ function change(options: Partial<FilterSearchOptions>): void {
       <Search class="filter-search-menu__search-icon" />
       <ChevronDown class="filter-search-menu__arrow" :class="{ 'is-open': open }" />
     </span>
-  </span>
+  </TButton>
   <Teleport to="body">
     <MenuSurface
       v-if="open"
@@ -103,14 +107,8 @@ function change(options: Partial<FilterSearchOptions>): void {
   z-index: 2201;
 
   &__trigger {
-    display: inline-flex;
-    align-items: center;
-    cursor: pointer;
-    border-radius: var(--idea-radius-small);
-
-    &[aria-disabled="true"] {
-      cursor: not-allowed;
-    }
+    width: 32px;
+    height: 24px;
   }
 
   &__icons {

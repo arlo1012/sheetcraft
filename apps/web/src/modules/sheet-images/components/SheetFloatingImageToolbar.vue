@@ -33,7 +33,7 @@ const { t } = useAppI18n();
 const toolbarRef = ref<HTMLElement | null>(null);
 const toolbarAnchor = computed(() => props.anchor);
 const toolbarOpen = computed(() => true);
-const rotateTriggerRef = ref<HTMLElement | null>(null);
+const rotateTriggerRef = ref<HTMLButtonElement | null>(null);
 const rotateMenuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const rotateMenuRef = computed<HTMLElement | null>(
   () => rotateMenuSurfaceRef.value?.rootElement ?? null,
@@ -156,10 +156,11 @@ watch(
         >
           <Crop :size="16" aria-hidden="true" />
         </span>
-        <span
+        <button
           ref="rotateTriggerRef"
-          v-icon-action="disabled"
           class="sheet-floating-image-toolbar__action sheet-floating-image-toolbar__rotate"
+          type="button"
+          :disabled="disabled"
           :aria-label="t('image.rotate')"
           :title="t('image.rotate')"
           aria-haspopup="menu"
@@ -171,7 +172,7 @@ watch(
         >
           <RotateCw :size="16" aria-hidden="true" />
           <ChevronDown :size="11" aria-hidden="true" />
-        </span>
+        </button>
         <span
           v-icon-action="disabled || !canRestore"
           class="sheet-floating-image-toolbar__action"
@@ -257,10 +258,11 @@ watch(
       content: "";
     }
 
-    &:hover:not([aria-disabled="true"]) {
+    &:hover:not(:disabled):not([aria-disabled="true"]) {
       background: var(--idea-surface-hover);
     }
 
+    &:disabled,
     &[aria-disabled="true"] {
       color: var(--idea-text-secondary);
       cursor: default;

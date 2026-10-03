@@ -7,7 +7,6 @@ import { Input as TInput } from "tdesign-vue-next/es/input";
 import { getSheetFilterValueKey } from "@idea10/core/commands";
 import type { SheetFilterValue } from "@idea10/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
-import { vIconAction } from "../../../shared/focus/icon-action";
 import type { DataToolFilterValueOption } from "../data-tools-types";
 import {
   getMatchingFilterValues,
@@ -215,7 +214,13 @@ function selectDuplicates(): void {
       role="group"
       :aria-label="t('dataTools.filter.listOrder')"
     >
-      <span :aria-pressed="sortField === 'name'" v-icon-action="disabled" @click="setSort('name')">
+      <TButton
+        variant="text"
+        size="small"
+        :aria-pressed="sortField === 'name'"
+        :disabled="disabled"
+        @click="setSort('name')"
+      >
         {{ t("dataTools.filter.name") }}
         <ArrowUp
           v-if="sortField === 'name' && sortDirection === 'ascending'"
@@ -223,10 +228,12 @@ function selectDuplicates(): void {
           aria-hidden="true"
         />
         <ArrowDown v-else-if="sortField === 'name'" :size="14" aria-hidden="true" />
-      </span>
-      <span
+      </TButton>
+      <TButton
+        variant="text"
+        size="small"
         :aria-pressed="sortField === 'count'"
-        v-icon-action="disabled"
+        :disabled="disabled"
         @click="setSort('count')"
       >
         {{ t("dataTools.filter.count") }}
@@ -236,7 +243,7 @@ function selectDuplicates(): void {
           aria-hidden="true"
         />
         <ArrowDown v-else-if="sortField === 'count'" :size="14" aria-hidden="true" />
-      </span>
+      </TButton>
     </div>
     <div
       class="filter-value-list__values"
@@ -283,11 +290,6 @@ function selectDuplicates(): void {
     flex-wrap: wrap;
     gap: 4px 8px;
     align-items: center;
-  }
-
-  &__ordering > [role="button"] {
-    min-height: 24px;
-    padding-inline: var(--idea-space-2);
   }
 
   &__values {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Plus, Trash2 } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -189,9 +190,15 @@ const methodHint = computed(() =>
       <section class="simulation-dialog__section" :aria-label="tr('simulation.variables')">
         <div class="simulation-dialog__section-title">
           <strong>{{ tr("simulation.variables") }}</strong>
-          <span v-icon-action="busy" @click="draft.variables.push(blankVariable())">
+          <TButton
+            theme="primary"
+            variant="text"
+            size="small"
+            :disabled="busy"
+            @click="draft.variables.push(blankVariable())"
+          >
             <Plus class="simulation-dialog__action-icon" />{{ tr("simulation.addVariable") }}
-          </span>
+          </TButton>
         </div>
         <div v-for="(item, index) in draft.variables" :key="item.id" class="simulation-dialog__row">
           <RangeReferenceInput
@@ -234,9 +241,15 @@ const methodHint = computed(() =>
       <section class="simulation-dialog__section" :aria-label="tr('simulation.constraints')">
         <div class="simulation-dialog__section-title">
           <strong>{{ tr("simulation.constraints") }}</strong>
-          <span v-icon-action="busy" @click="draft.constraints.push(blankConstraint())">
+          <TButton
+            theme="primary"
+            variant="text"
+            size="small"
+            :disabled="busy"
+            @click="draft.constraints.push(blankConstraint())"
+          >
             <Plus class="simulation-dialog__action-icon" />{{ tr("simulation.addConstraint") }}
-          </span>
+          </TButton>
         </div>
         <div
           v-for="(item, index) in draft.constraints"
@@ -343,10 +356,6 @@ const methodHint = computed(() =>
     strong {
       font-weight: 500;
     }
-  }
-  &__section-title > [role="button"] {
-    min-height: 24px;
-    padding-inline: var(--idea-space-2);
   }
   &__row,
   &__constraint {

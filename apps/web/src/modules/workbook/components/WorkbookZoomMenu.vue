@@ -5,7 +5,6 @@ import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { ref, useId } from "vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import { useAppI18n } from "../../../shared/i18n";
-import { vIconAction } from "../../../shared/focus/icon-action";
 import { MAX_SHEET_ZOOM, MIN_SHEET_ZOOM } from "../../../shared/sheet-view/zoom";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
@@ -14,7 +13,7 @@ import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 const props = defineProps<{ zoom: number }>();
 const emit = defineEmits<{ select: [zoom: number]; fitSelection: [] }>();
 const { t } = useAppI18n();
-const triggerRef = ref<HTMLElement | null>(null);
+const triggerRef = ref<HTMLButtonElement | null>(null);
 const menuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const customZoom = ref<InputNumberValue>(props.zoom);
 const menuId = `workbook-zoom-menu-${useId().replaceAll(":", "")}`;
@@ -50,9 +49,9 @@ function fitSelection(): void {
 </script>
 
 <template>
-  <span
-    v-icon-action
+  <button
     ref="triggerRef"
+    type="button"
     class="workbook-zoom-menu__trigger"
     :aria-label="t('statusBar.zoomLevel', { value: zoom })"
     :aria-controls="open ? menuId : undefined"
@@ -66,7 +65,7 @@ function fitSelection(): void {
     <span>{{ zoom }}%</span>
     <ChevronUp v-if="open" :size="12" aria-hidden="true" />
     <ChevronDown v-else :size="12" aria-hidden="true" />
-  </span>
+  </button>
   <Teleport to="body">
     <MenuSurface
       v-if="open"

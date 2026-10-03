@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
 import { Filter } from "lucide-vue-next";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { useAppI18n } from "../../../shared/i18n";
-import { vIconAction } from "../../../shared/focus/icon-action";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -15,8 +15,8 @@ const props = withDefaults(
 );
 const emit = defineEmits<{ select: [action: FilterConditionAction] }>();
 const { t } = useAppI18n();
-const buttonRef = ref<HTMLElement | null>(null);
-const triggerRef = computed<HTMLElement | null>(() => buttonRef.value);
+const buttonRef = ref<InstanceType<typeof TButton> | null>(null);
+const triggerRef = computed<HTMLElement | null>(() => buttonRef.value?.$el ?? null);
 const surfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `filter-condition-${useId().replaceAll(":", "")}`;
 const label = computed(() => t(`dataTools.filter.${props.kind}Filters`));
@@ -35,9 +35,12 @@ function select(action: FilterConditionAction): void {
 </script>
 
 <template>
-  <span
+  <TButton
     ref="buttonRef"
-    v-icon-action="disabled"
+    variant="text"
+    theme="default"
+    size="small"
+    :disabled="disabled"
     :aria-label="label"
     :title="label"
     aria-haspopup="menu"
@@ -46,9 +49,9 @@ function select(action: FilterConditionAction): void {
     @click="toggleMenu"
     @keydown="onTriggerKeydown"
   >
-    <Filter class="idea-action-icon" aria-hidden="true" />
+    <template #icon><Filter class="idea-action-icon" aria-hidden="true" /></template>
     {{ label }}
-  </span>
+  </TButton>
   <Teleport to="body">
     <MenuSurface
       v-if="open"

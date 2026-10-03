@@ -86,8 +86,8 @@ describe("CustomSortListDialog", () => {
     const { wrapper, click, confirm } = fixture();
     await click('[data-sort-list="builtin:weekday-short-en"]');
     expect(wrapper.findComponent({ name: "TTextarea" }).props("readonly")).toBe(true);
-    expect(document.querySelector("[data-sort-list-delete]")?.getAttribute("aria-disabled")).toBe(
-      "true",
+    expect(document.querySelector<HTMLButtonElement>("[data-sort-list-delete]")?.disabled).toBe(
+      true,
     );
     confirm();
     expect(wrapper.emitted("apply")?.[0]?.[0]).toEqual([
@@ -107,8 +107,8 @@ describe("CustomSortListDialog", () => {
     await new DOMWrapper(document.querySelector("textarea")!).setValue("High\nMedium\nLow\nHigh\n");
     await click("[data-sort-list-add]");
     expect(readCustomSortLists()).toEqual([]);
-    expect(document.querySelector("[data-sort-list-delete]")?.getAttribute("aria-disabled")).toBe(
-      "false",
+    expect(document.querySelector<HTMLButtonElement>("[data-sort-list-delete]")?.disabled).toBe(
+      false,
     );
     confirm();
     expect(wrapper.emitted("apply")?.[0]?.[0]).toEqual(["High", "Medium", "Low"]);
