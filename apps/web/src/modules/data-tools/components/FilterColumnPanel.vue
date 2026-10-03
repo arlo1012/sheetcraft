@@ -378,6 +378,7 @@ onBeforeUnmount(() => {
     align-items: center;
     min-height: 32px;
     gap: var(--idea-space-4);
+    border-bottom: 1px solid var(--idea-border-subtle);
   }
   &__sort {
     display: flex;
