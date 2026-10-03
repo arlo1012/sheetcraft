@@ -71,11 +71,11 @@ describe("TextToColumnsDialog flow regressions", () => {
     const source = dialog.get(".text-to-columns-dialog__source");
     await source.get("input").setValue("B3:B4");
     expect(dialog.emitted("draftChange")?.at(-1)?.[0]).toMatchObject({ source: "B3:B4" });
-    await source.get("button").trigger("click");
+    await source.get("[data-select-formula-reference]").trigger("click");
     await nextTick();
     expect(selectReference).toHaveBeenLastCalledWith("B3:B4", { singleCell: false });
     expect(dialog.emitted("draftChange")?.at(-1)?.[0]).toMatchObject({ source: "B3:B8" });
-    await source.get("button").trigger("click");
+    await source.get("[data-select-formula-reference]").trigger("click");
     await nextTick();
     expect(dialog.emitted("draftChange")?.at(-1)?.[0]).toMatchObject({ source: "B3:B8" });
   });

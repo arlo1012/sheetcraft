@@ -4,16 +4,19 @@ import { nextTick, ref } from "vue";
 import { useAppI18n } from "../i18n";
 import { SquareMousePointer } from "lucide-vue-next";
 
-const props = defineProps<{
-  disabled?: boolean;
-  clearable?: boolean;
-  label?: string;
-  placeholder?: string;
-  pickLabel?: string;
-  showPicker?: boolean;
-  insertReference?: boolean;
-  selectReference?: (current: string) => Promise<string | undefined>;
-}>();
+const props = withDefaults(
+  defineProps<{
+    disabled?: boolean;
+    clearable?: boolean;
+    label?: string;
+    placeholder?: string;
+    pickLabel?: string;
+    showPicker?: boolean;
+    insertReference?: boolean;
+    selectReference?: (current: string) => Promise<string | undefined>;
+  }>(),
+  { showPicker: true },
+);
 const reference = defineModel<string>({ required: true });
 const emit = defineEmits<{ enter: [] }>();
 const { t } = useAppI18n();
@@ -89,8 +92,8 @@ async function pickReference(): Promise<void> {
     >
       <template #suffixIcon>
         <SquareMousePointer
-          class="idea-input-action-icon"
           v-if="showPicker !== false"
+          class="idea-input-action-icon"
           :aria-disabled="disabled || !selectReference"
           :aria-label="pickLabel ?? t('formulaTools.selectRange')"
           data-select-formula-reference

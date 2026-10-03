@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Trash2 } from "lucide-vue-next";
+import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { BaseTable as TTable } from "tdesign-vue-next/es/table";
 import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
