@@ -8,6 +8,7 @@ import type {
   CellStyle,
   CellStylePatch,
 } from "../style.js";
+import type { CellHyperlink, CellNamedStyleBinding } from "../workbook.js";
 import type {
   CellAddress,
   CellRange,
@@ -36,6 +37,8 @@ export type CellContentChange = {
   address: CellAddress;
   content: CellContent | null;
   style?: CellStyle | null;
+  namedStyle?: CellNamedStyleBinding | null;
+  hyperlink?: CellHyperlink | null;
 };
 
 export type SetCellContentsCommand = {
@@ -91,6 +94,13 @@ export type SetWorkbookPivotTableStylesCommand = {
 export type SetWorkbookCellStylesCommand = {
   type: "setWorkbookCellStyles";
   styles: CellStyleDefinition[];
+  /** Internal binding snapshots used to restore deletions and named-style edits exactly. */
+  namedStyleCells?: Array<{
+    sheetId: string;
+    address: CellAddress;
+    style: CellStyle | null;
+    namedStyle: CellNamedStyleBinding | null;
+  }>;
 };
 /** Internal inverse for table operations that also rewrite formulas on other sheets. */
 export type RestoreTableTransactionCommand = {
@@ -147,6 +157,31 @@ export type ApplyCellStyleCommand = {
   sheetId: string;
   range: CellRange;
   patch: CellStylePatch;
+  styleId?: string;
+  includes?: import("../cell-styles.js").CellStyleInclude[];
+};
+
+export type SetCellHyperlinkCommand = {
+  type: "setCellHyperlink";
+  sheetId: string;
+  address: CellAddress;
+  hyperlink: CellHyperlink | null;
+  /** When provided, atomically replaces the displayed literal text. */
+  displayText?: string;
+  /** Internal complete inverse used to undo a hyperlink edit without losing a formula or formatting. */
+  restore?: {
+    content: CellContent | null;
+    style: CellStyle | null;
+    namedStyle: CellNamedStyleBinding | null;
+    hyperlink: CellHyperlink | null;
+  };
+};
+
+export type MarkCellHyperlinkVisitedCommand = {
+  type: "markCellHyperlinkVisited";
+  sheetId: string;
+  address: CellAddress;
+  visited?: boolean;
 };
 
 export type ApplyCellBordersCommand = {
@@ -188,7 +223,11 @@ export type AdjustCellIndentCommand = {
 export type RestoreCellStylesCommand = {
   type: "restoreCellStyles";
   sheetId: string;
-  changes: Array<{ address: CellAddress; style: CellStyle | null }>;
+  changes: Array<{
+    address: CellAddress;
+    style: CellStyle | null;
+    namedStyle?: CellNamedStyleBinding | null;
+  }>;
 };
 
 export type ResizeSheetDimensionCommand = {
@@ -679,6 +718,8 @@ export type WorkbookCommand =
   | RestoreCellShiftCommand
   | BatchDeleteSheetAxesCommand
   | ApplyCellStyleCommand
+  | SetCellHyperlinkCommand
+  | MarkCellHyperlinkVisitedCommand
   | ApplyCellBordersCommand
   | ApplyCellFormatCommand
   | AdjustCellNumberFormatDecimalsCommand
@@ -814,6 +855,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
     case "batchDeleteSheetAxes":
       return "history.restore";
     case "applyCellStyle":
+    case "setCellHyperlink":
+    case "markCellHyperlinkVisited":
     case "adjustCellNumberFormatDecimals":
     case "adjustCellIndent":
       return "format.cells";

@@ -289,12 +289,20 @@ function createCellPasteCommand(
   if (payload.kind === "all") {
     const contents = getTranslatedContents(sheet, payload, plan);
     if (payload.styles) assertMatrixShape(payload.styles, plan);
+    if (payload.namedStyles) assertMatrixShape(payload.namedStyles, plan);
+    if (payload.hyperlinks) assertMatrixShape(payload.hyperlinks, plan);
     if (!payload.plan.preserveHiddenRows) {
       return createPasteCellContentsCommand(
         sheet.id,
         payload.plan.anchor,
         contents,
-        payload.styles ? { styles: payload.styles } : undefined,
+        payload.styles || payload.namedStyles || payload.hyperlinks
+          ? {
+              ...(payload.styles ? { styles: payload.styles } : {}),
+              ...(payload.namedStyles ? { namedStyles: payload.namedStyles } : {}),
+              ...(payload.hyperlinks ? { hyperlinks: payload.hyperlinks } : {}),
+            }
+          : undefined,
       );
     }
     return createBatchSetCellContentsCommand(
@@ -304,6 +312,12 @@ function createCellPasteCommand(
           address: targetAddress(payload.plan, plan.rows, rowIndex, columnIndex),
           content,
           ...(payload.styles ? { style: payload.styles[rowIndex]?.[columnIndex] ?? null } : {}),
+          ...(payload.namedStyles
+            ? { namedStyle: payload.namedStyles[rowIndex]?.[columnIndex] ?? null }
+            : {}),
+          ...(payload.hyperlinks
+            ? { hyperlink: payload.hyperlinks[rowIndex]?.[columnIndex] ?? null }
+            : {}),
         })),
       ),
     );
@@ -343,6 +357,7 @@ function createCellPasteCommand(
   }
 
   assertMatrixShape(payload.styles, plan);
+  if (payload.namedStyles) assertMatrixShape(payload.namedStyles, plan);
   if (!payload.plan.preserveHiddenRows) {
     return createPasteCellContentsCommand(
       sheet.id,
@@ -352,7 +367,10 @@ function createCellPasteCommand(
           getCellContent(sheet, targetAddress(payload.plan, plan.rows, row, column)),
         ),
       ),
-      { styles: payload.styles },
+      {
+        styles: payload.styles,
+        ...(payload.namedStyles ? { namedStyles: payload.namedStyles } : {}),
+      },
     );
   }
   return createBatchSetCellContentsCommand(
@@ -364,6 +382,9 @@ function createCellPasteCommand(
           address,
           content: getCellContent(sheet, address),
           style,
+          ...(payload.namedStyles
+            ? { namedStyle: payload.namedStyles[rowIndex]?.[columnIndex] ?? null }
+            : {}),
         };
       }),
     ),

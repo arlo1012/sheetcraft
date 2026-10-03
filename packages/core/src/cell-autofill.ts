@@ -6,8 +6,12 @@ import { doMergedCellRangesIntersect } from "./merged-cells.js";
 import { cloneCellStyle, type CellStyle } from "./style.js";
 import {
   cloneCellContent,
+  cloneCellHyperlink,
+  cloneCellNamedStyleBinding,
   getCellContent,
   getCellStyle,
+  getCellHyperlink,
+  getCellNamedStyle,
   isCellAddressInBounds,
   type CellAddress,
   type CellRange,
@@ -51,6 +55,8 @@ type CapturedCell = Readonly<{
   address: CellAddress;
   content: CellContent | null;
   style: CellStyle | undefined;
+  namedStyle: import("./workbook.js").CellNamedStyleBinding | undefined;
+  hyperlink: import("./workbook.js").CellHyperlink | undefined;
 }>;
 export type CellFillPlan = Readonly<{
   sheetId: string;
@@ -206,6 +212,8 @@ export function captureCellFill(
       address,
       content: content ? cloneCellContent(content) : null,
       style: cloneCellStyle(getCellStyle(sheet, address) as CellStyle | undefined),
+      namedStyle: cloneCellNamedStyleBinding(getCellNamedStyle(sheet, address)),
+      hyperlink: cloneCellHyperlink(getCellHyperlink(sheet, address)),
     };
   };
   const source = addresses(sourceRange).map(capture),
@@ -506,6 +514,11 @@ export function createCellFillCommand(
         address: target.address,
         content: mode === "fillFormatsOnly" ? original.content : generated,
         style: mode === "fillWithoutFormatting" ? (original.style ?? null) : (source.style ?? null),
+        namedStyle:
+          mode === "fillWithoutFormatting"
+            ? (original.namedStyle ?? null)
+            : (source.namedStyle ?? null),
+        hyperlink: mode === "copy" ? (source.hyperlink ?? null) : (original.hyperlink ?? null),
       };
     }),
     { reconcileBorders: true },

@@ -2,6 +2,8 @@ import {
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
   cloneCellContent,
+  cloneCellHyperlink,
+  cloneCellNamedStyleBinding,
   cloneFloatingImage,
   cloneSheetTable,
   createCellKey,
@@ -171,6 +173,8 @@ function cloneAxisSlice(slice: SheetAxisSparseSlice): SheetAxisSparseSlice {
       address: { ...cell.address },
       ...(cell.content === undefined ? {} : { content: cloneCellContent(cell.content) }),
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
+      ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
+      ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
     })),
     dimensions: slice.dimensions.map((dimension) => ({ ...dimension })),
     ...(slice.hiddenIndexes ? { hiddenIndexes: [...slice.hiddenIndexes] } : {}),
@@ -841,6 +845,8 @@ function captureSheetAxisSlice(
             address,
             ...(cell.content === undefined ? {} : { content: cloneCellContent(cell.content) }),
             ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
+            ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
+            ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
           },
         ]
       : [];
@@ -900,6 +906,8 @@ function restoreSheetAxisSlice(
     sheet.cells.set(key, {
       ...(cell.content === undefined ? {} : { content: cloneCellContent(cell.content) }),
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
+      ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
+      ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
     });
     changed = true;
   }

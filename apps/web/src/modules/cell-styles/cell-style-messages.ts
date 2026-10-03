@@ -76,8 +76,15 @@ export type CellStylesMessageSchema = {
       fontBold: string;
       fontItalic: string;
       noBorder: string;
-      borderConfigured: string;
-      fillConfigured: string;
+      decimalPlaces: string;
+      indent: string;
+      rotation: string;
+      gradientFill: string;
+      borderTop: string;
+      borderRight: string;
+      borderBottom: string;
+      borderLeft: string;
+      borderDiagonal: string;
 
       newTitle: string;
       editTitle: string;

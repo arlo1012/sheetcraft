@@ -62,7 +62,13 @@ function isUnsafePath(name: string): boolean {
 function decodeXmlEntities(value: string): string {
   return value.replace(/&(#x[0-9a-f]+|#\d+|amp|apos|gt|lt|quot);/gi, (entity, token: string) => {
     const normalized = token.toLowerCase();
-    const named: Record<string, string> = { amp: "&", apos: "'", gt: ">", lt: "<", quot: '"' };
+    const named: Record<string, string> = {
+      amp: "&",
+      apos: "'",
+      gt: ">",
+      lt: "<",
+      quot: '"',
+    };
     if (normalized in named) return named[normalized] ?? entity;
     const codePoint = normalized.startsWith("#x")
       ? Number.parseInt(normalized.slice(2), 16)
@@ -136,10 +142,16 @@ function hasCustomizedPageSetup(xml: string): boolean {
 
 function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBuilder): void {
   const normalized = decodeXmlEntities(xml);
-  if (
-    xmlAttributeValues(xml, "targetmode").some((value) => value.trim().toLowerCase() === "external")
-  )
-    report.add("external-content", "block", name);
+  const externalRelationship = /<Relationship\b([^>]*)\/?\s*>/gi;
+  const hasExternalNonHyperlinkRelationship = [...normalized.matchAll(externalRelationship)].some(
+    (entry) => {
+      const attrs = entry[1] ?? "";
+      const targetMode = /\bTargetMode\s*=\s*(["'])External\1/i.test(attrs);
+      const isHyperlink = /\bType\s*=\s*(["'])[^"']*\/hyperlink\1/i.test(attrs);
+      return targetMode && !isHyperlink;
+    },
+  );
+  if (hasExternalNonHyperlinkRelationship) report.add("external-content", "block", name);
   if (/macroenabled|vbaproject|oleobject|activex|embeddedpackage/i.test(normalized))
     report.add("macro-content", "block", name);
 
@@ -160,7 +172,6 @@ function inspectXmlPart(name: string, xml: string, report: CompatibilityReportBu
       [
         "sheetProtection",
         "protectedRanges",
-        "hyperlinks",
         "rowBreaks",
         "colBreaks",
         "headerFooter",
@@ -325,7 +336,13 @@ export async function preflightXlsxArchive(
       fail("archive-invalid", report, name);
     if (readAscii(bytes, localOffset + 30, localNameLength) !== name)
       fail("archive-invalid", report, name);
-    archiveEntries.push({ name, compression, compressedOffset, compressedSize, uncompressedSize });
+    archiveEntries.push({
+      name,
+      compression,
+      compressedOffset,
+      compressedSize,
+      uncompressedSize,
+    });
     totalUncompressed += uncompressedSize;
     cursor = recordEnd;
   }

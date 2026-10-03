@@ -1,3 +1,4 @@
+import { hyperlinksZhCN } from "../../../modules/hyperlinks/hyperlink-messages.zh-CN";
 import { cellStylesZhCN } from "../../../modules/cell-styles/cell-style-messages.zh-CN";
 import { simulationZhCN } from "../../../modules/data-tools/simulation-messages.zh-CN";
 import { dataTableZhCN } from "../../../modules/data-tools/data-table-messages.zh-CN";
@@ -11,6 +12,7 @@ import { tablesZhCN } from "../../../modules/table-styles/table-messages.zh-CN";
 export const zhCN = {
   ...formulaToolsZhCN,
   ...conditionalFormattingZhCN,
+  ...hyperlinksZhCN,
   ...cellStylesZhCN,
   ...tableStylesZhCN,
   ...tablesZhCN,

@@ -49,6 +49,39 @@ export function readRawWorksheetTextDirections(
   });
 }
 
+/** ExcelJS exposes a hyperlink cell as a link object and can hide its formula. */
+export function readRawWorksheetFormulas(
+  bytes: Uint8Array,
+): readonly ReadonlyMap<string, string>[] {
+  const entries = unzipSync(bytes);
+  const workbook = entries["xl/workbook.xml"];
+  const relationships = entries["xl/_rels/workbook.xml.rels"];
+  if (!workbook || !relationships) return [];
+  const targets = readWorksheetTargets(strFromU8(workbook), strFromU8(relationships));
+  return targets.map((target) => {
+    const worksheet = entries[target];
+    const formulas = new Map<string, string>();
+    if (!worksheet) return formulas;
+    for (const cell of strFromU8(worksheet).matchAll(/<c\b([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/gi)) {
+      const address = readAttribute(cell[1] ?? "", "r");
+      const formula = /<f\b[^>]*>([\s\S]*?)<\/f>/i.exec(cell[2] ?? "")?.[1];
+      if (address && formula !== undefined) formulas.set(address.toUpperCase(), `=${formula}`);
+    }
+    return formulas;
+  });
+}
+
+/** Workbook-order worksheet part names resolved through workbook relationships. */
+export function readXlsxWorksheetPartTargets(
+  entries: Record<string, Uint8Array>,
+): readonly string[] {
+  const workbook = entries["xl/workbook.xml"];
+  const relationships = entries["xl/_rels/workbook.xml.rels"];
+  return workbook && relationships
+    ? readWorksheetTargets(strFromU8(workbook), strFromU8(relationships))
+    : [];
+}
+
 function readWorksheetTargets(workbookXml: string, relationshipsXml: string): readonly string[] {
   const relationships = new Map<string, string>();
   for (const relationship of relationshipsXml.matchAll(/<Relationship\b([^>]*)\/?\s*>/gi)) {

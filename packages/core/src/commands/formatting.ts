@@ -17,12 +17,20 @@ import {
   type CellStylePatch,
   type CellNumberFormat,
 } from "../style.js";
-import { getCellStyleDefinitionPatch, type CellStyleDefinition } from "../cell-styles.js";
+import {
+  applyCellStyleIncludes,
+  getCellStyleDefinitionPatch,
+  getCellStylePatchIncludes,
+  normalizeCellStyleIncludes,
+  type CellStyleDefinition,
+} from "../cell-styles.js";
 import {
   createSheetSparseState,
   getCellStyle,
+  getCellNamedStyle,
+  cloneCellNamedStyleBinding,
   replaceSheetSparseState,
-  setCellStyle,
+  setCellNamedStyle,
   type CellAddress,
   type CellRange,
   type Workbook,
@@ -76,17 +84,24 @@ export function createApplyCellStyleCommand(
   const normalizedRange = normalizeRange(range);
   assertCellRange(normalizedRange);
   assertSupportedRange(normalizedRange);
+  const definition =
+    "category" in patch && "style" in patch ? (patch as CellStyleDefinition) : undefined;
+  const normalizedPatch = validateCommandPayload("patch", patch, () =>
+    normalizeCellStylePatch(
+      definition ? getCellStyleDefinitionPatch(definition) : (patch as CellStylePatch),
+    ),
+  );
+  const includes = definition
+    ? definition.includes === undefined
+      ? getCellStylePatchIncludes(normalizedPatch)
+      : normalizeCellStyleIncludes(definition.includes)
+    : undefined;
   return {
     type: "applyCellStyle",
     sheetId,
     range: normalizedRange,
-    patch: validateCommandPayload("patch", patch, () =>
-      normalizeCellStylePatch(
-        "category" in patch && "style" in patch
-          ? getCellStyleDefinitionPatch(patch as CellStyleDefinition)
-          : (patch as CellStylePatch),
-      ),
-    ),
+    patch: normalizedPatch,
+    ...(definition ? { styleId: definition.id, includes } : {}),
   };
 }
 
@@ -213,8 +228,32 @@ function applyStylePatches(
   const reverseChanges: RestoreCellStylesCommand["changes"] = [];
   for (const { address, patch } of patches.values()) {
     const previousStyle = cloneCellStyle(getCellStyle(sheet, address) as CellStyle | undefined);
-    if (!setCellStyle(sheet, address, mergeCellStyle(previousStyle, patch))) continue;
-    reverseChanges.push({ address: { ...address }, style: previousStyle ?? null });
+    const previousNamedStyle = cloneCellNamedStyleBinding(getCellNamedStyle(sheet, address));
+    const nextNamedStyle = previousNamedStyle
+      ? {
+          ...previousNamedStyle,
+          overrides: [
+            ...new Set([
+              ...(previousNamedStyle.overrides ?? []),
+              ...(Object.keys(patch) as Array<keyof CellStyle>),
+            ]),
+          ],
+        }
+      : undefined;
+    if (
+      !setCellNamedStyle(
+        sheet,
+        address,
+        normalizeCellStyle(mergeCellStyle(previousStyle, patch)),
+        nextNamedStyle,
+      )
+    )
+      continue;
+    reverseChanges.push({
+      address: { ...address },
+      style: previousStyle ?? null,
+      namedStyle: previousNamedStyle ?? null,
+    });
   }
   return reverseChanges.length > 0 ? createRestoreCellStylesCommand(sheetId, reverseChanges) : null;
 }
@@ -293,7 +332,35 @@ export function applyCellStyleCommand(
         addTargetBorderPatch(targets, physicalAddress, visibleBorderPatch);
     }
   }
-  return reconcileAndApply(workbook, command.sheetId, mergeResolver, patches, targets);
+  if (!command.styleId || !command.includes) {
+    return reconcileAndApply(workbook, command.sheetId, mergeResolver, patches, targets);
+  }
+  const includes = normalizeCellStyleIncludes(command.includes);
+  const sheetReverse: RestoreCellStylesCommand["changes"] = [];
+  for (const { address, patch } of patches.values()) {
+    const previousStyle = cloneCellStyle(getCellStyle(sheet, address) as CellStyle | undefined);
+    const previousNamedStyle = cloneCellNamedStyleBinding(getCellNamedStyle(sheet, address));
+    const nextStyle = mergeCellStyle(
+      undefined,
+      applyCellStyleIncludes(previousStyle, patch, includes),
+    );
+    const priorOverrides = new Set(previousNamedStyle?.overrides ?? []);
+    for (const key of Object.keys(patch) as Array<keyof CellStyle>) priorOverrides.delete(key);
+    if (
+      setCellNamedStyle(sheet, address, nextStyle, {
+        styleId: command.styleId,
+        includes,
+        ...(priorOverrides.size ? { overrides: [...priorOverrides] } : {}),
+      })
+    ) {
+      sheetReverse.push({
+        address: { ...address },
+        style: previousStyle ?? null,
+        namedStyle: previousNamedStyle ?? null,
+      });
+    }
+  }
+  return sheetReverse.length ? createRestoreCellStylesCommand(command.sheetId, sheetReverse) : null;
 }
 
 function adjustNumberFormat(
@@ -757,7 +824,11 @@ export function applyRestoreCellStylesCommand(
     const previousStyle = cloneCellStyle(
       getCellStyle(sheet, change.address) as CellStyle | undefined,
     );
-    if (setCellStyle(sheet, change.address, change.style)) {
+    const restoredNamedStyle: import("../workbook.js").CellNamedStyleBinding | null | undefined =
+      "namedStyle" in change
+        ? ((change as RestoreCellStylesCommand["changes"][number]).namedStyle ?? null)
+        : getCellNamedStyle(sheet, change.address);
+    if (setCellNamedStyle(sheet, change.address, change.style, restoredNamedStyle)) {
       reverseChanges.push({ address: { ...change.address }, style: previousStyle ?? null });
     }
   }

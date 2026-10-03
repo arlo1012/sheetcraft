@@ -69,6 +69,7 @@ const emit = defineEmits<{
   merge: [mode: CellMergeMode];
   unmerge: [];
   insertImage: [mode: "cell" | "floating"];
+  insertHyperlink: [];
   undo: [];
   redo: [];
   toggleProtection: [];
@@ -250,6 +251,7 @@ defineSlots<{
         @merge="emit('merge', $event)"
         @unmerge="emit('unmerge')"
         @insert-image="emit('insertImage', $event)"
+        @insert-hyperlink="emit('insertHyperlink')"
         @undo="emit('undo')"
         @redo="emit('redo')"
         @toggle-protection="emit('toggleProtection')"

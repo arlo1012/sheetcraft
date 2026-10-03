@@ -2,12 +2,17 @@ import { translateFormulaForCopy } from "../formula/references.js";
 import { isFormulaError, type CellContent, type FormulaValue } from "../formula/types.js";
 import {
   cloneCellContent,
+  cloneCellHyperlink,
+  cloneCellNamedStyleBinding,
   createWorkbookEvaluator,
   createSheetEvaluator,
   getCellContent,
+  getCellHyperlink,
   getCellStyle,
+  getCellNamedStyle,
+  setCellHyperlink,
+  setCellNamedStyle,
   setCellContent,
-  setCellStyle,
   type CellAddress,
   type CellRange,
   type SheetFilter,
@@ -29,20 +34,20 @@ import {
 } from "./borders.js";
 import type {
   CellContentChange,
-  SetCellContentsCommand,
   SortDirection,
   SortIcon,
   SortKey,
   SortMethod,
   SortSheetRangeCommand,
+  WorkbookCommand,
 } from "./contracts.js";
-import { createBatchSetCellContentsCommand } from "./values.js";
 import {
   getSheetOrThrow,
   invalidCommandPayload,
   normalizeRange,
   assertCellRange,
 } from "./helpers.js";
+import { createBatchSetCellContentsCommand } from "./values.js";
 
 type SortEntry = {
   row: number;
@@ -505,7 +510,7 @@ export function createMultiKeySortSheetRangeCommand(
 export function applySortSheetRangeCommand(
   workbook: Workbook,
   command: SortSheetRangeCommand,
-): SetCellContentsCommand | null {
+): WorkbookCommand | null {
   const sheet = getSheetOrThrow(workbook, command.sheetId);
   const range = validateSortCommand(command, sheet);
   const keys: readonly SortKey[] = command.sortKeys?.length
@@ -568,12 +573,20 @@ export function applySortSheetRangeCommand(
         address,
         ...(cell.content === undefined ? {} : { content: cloneCellContent(cell.content) }),
         ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
+        ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
+        ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
       },
     ];
   });
   const nextByAddress = new Map<
     string,
-    { address: CellAddress; content?: CellContent; style?: CellStyle }
+    {
+      address: CellAddress;
+      content?: CellContent;
+      style?: CellStyle;
+      namedStyle?: import("../workbook.js").CellNamedStyleBinding;
+      hyperlink?: import("../workbook.js").CellHyperlink;
+    }
   >();
   const affected = new Map<string, CellAddress>();
   for (const cell of captured) {
@@ -589,6 +602,8 @@ export function applySortSheetRangeCommand(
             content: getTranslatedContent(cell.content, cell.address, address),
           }),
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
+      ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
+      ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
     });
     affected.set(getCellBorderTargetKey(cell.address), cell.address);
     affected.set(key, address);
@@ -603,13 +618,16 @@ export function applySortSheetRangeCommand(
       address: { ...address },
       content: getCellContent(sheet, address),
       style: cloneCellStyle(getCellStyle(sheet, address) as CellStyle | undefined) ?? null,
+      namedStyle: cloneCellNamedStyleBinding(getCellNamedStyle(sheet, address)) ?? null,
+      hyperlink: cloneCellHyperlink(getCellHyperlink(sheet, address)) ?? null,
     });
   };
   for (const [key, address] of affected) {
     captureInverse(address);
     const next = nextByAddress.get(key);
     setCellContent(sheet, address, next?.content ?? null);
-    setCellStyle(sheet, address, next?.style ?? null);
+    setCellNamedStyle(sheet, address, next?.style ?? null, next?.namedStyle ?? null);
+    setCellHyperlink(sheet, address, next?.hyperlink ?? null);
   }
 
   const mergeResolver = new MergedCellRangeResolver(sheet.mergedCells);
@@ -624,7 +642,12 @@ export function applySortSheetRangeCommand(
   reconcileCellBorderTargets(targets, (rawAddress, patch) => {
     const address = mergeResolver.getAnchor(rawAddress) ?? rawAddress;
     captureInverse(address);
-    setCellStyle(sheet, address, mergeCellStyle(getCellStyle(sheet, address), patch));
+    setCellNamedStyle(
+      sheet,
+      address,
+      mergeCellStyle(getCellStyle(sheet, address), patch),
+      getCellNamedStyle(sheet, address),
+    );
   });
   return createBatchSetCellContentsCommand([...inverseByAddress.values()]);
 }

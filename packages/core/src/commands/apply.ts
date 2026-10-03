@@ -80,6 +80,10 @@ import {
   applySetWorkbookCalculationCommand,
 } from "./workbook-settings.js";
 import { applySetWorkbookCellStylesCommand } from "./cell-styles.js";
+import {
+  applyMarkCellHyperlinkVisitedCommand,
+  applySetCellHyperlinkCommand,
+} from "./hyperlinks.js";
 import { applyDeleteDefinedNameCommand, applyUpsertDefinedNameCommand } from "./names.js";
 import { applySetDefinedNamesCommand } from "./names-from-selection.js";
 import {
@@ -107,6 +111,29 @@ function assertCommandDoesNotModifyProtectedSheet(
   workbook: Workbook,
   command: WorkbookCommand,
 ): void {
+  if (command.type === "setWorkbookCellStyles") {
+    const currentById = new Map((workbook.cellStyles ?? []).map((style) => [style.id, style]));
+    const nextById = new Map(command.styles.map((style) => [style.id, style]));
+    const changedStyleIds = new Set<string>();
+    for (const [id, current] of currentById) {
+      if (JSON.stringify(current) !== JSON.stringify(nextById.get(id))) changedStyleIds.add(id);
+    }
+    if (changedStyleIds.size) {
+      const affected = [...workbook.sheets.values()].find(
+        (sheet) =>
+          sheet.properties.protected &&
+          [...sheet.cells.values()].some(
+            (cell) => cell.namedStyle && changedStyleIds.has(cell.namedStyle.styleId),
+          ),
+      );
+      if (affected) {
+        throw new WorkbookDomainError(
+          { code: "sheet_protected", details: { sheetId: toWorkbookErrorDetail(affected.id) } },
+          `Sheet ${affected.id} is protected.`,
+        );
+      }
+    }
+  }
   const sheetIds =
     command.type === "setCellContents"
       ? [
@@ -133,6 +160,8 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "deleteCells":
     case "restoreCellShift":
     case "applyCellStyle":
+    case "setCellHyperlink":
+    case "markCellHyperlinkVisited":
     case "applyCellBorders":
     case "applyCellFormat":
     case "adjustCellNumberFormatDecimals":
@@ -238,6 +267,10 @@ export function applyWorkbookCommand(
         return applyBatchDeleteSheetAxesCommand(workbook, command);
       case "applyCellStyle":
         return applyCellStyleCommand(workbook, command);
+      case "setCellHyperlink":
+        return applySetCellHyperlinkCommand(workbook, command);
+      case "markCellHyperlinkVisited":
+        return applyMarkCellHyperlinkVisitedCommand(workbook, command);
       case "applyCellBorders":
         return applyCellBordersCommand(workbook, command);
       case "applyCellFormat":

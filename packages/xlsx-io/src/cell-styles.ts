@@ -1,10 +1,51 @@
-import type { CellStyleDefinition } from "@idea10/core/cell-styles";
+import {
+  CELL_STYLE_INCLUDES,
+  normalizeCellStyleIncludes,
+  type CellStyleDefinition,
+  type CellStyleInclude,
+} from "@idea10/core/cell-styles";
+import type { CellStyle } from "@idea10/core/style";
+import type { CellNamedStyleBinding, Sheet } from "@idea10/core/workbook";
 import { createClearCellStylePatch } from "@idea10/core/style";
-import { strFromU8 } from "fflate/browser";
+import { strFromU8, strToU8, type Zippable } from "fflate/browser";
 import { toExcelNumberFormat } from "./number-format.js";
 import { readXlsxDxfStyle, xlsxDxfXml } from "./conditional-formatting.js";
+import { materializeXlsxStyleColors } from "./xlsx-colors.js";
+import { readXlsxWorksheetPartTargets } from "./raw-cell-values.js";
 
 type Xf = Readonly<{ attributes: string; body: string }>;
+
+const INCLUDE_STYLE_KEYS: Record<CellStyleInclude, Array<keyof CellStyle>> = {
+  number: ["numberFormat"],
+  alignment: [
+    "horizontalAlign",
+    "verticalAlign",
+    "indent",
+    "shrinkToFit",
+    "textDirection",
+    "textRotation",
+    "wrapText",
+  ],
+  font: [
+    "fontFamily",
+    "fontSize",
+    "bold",
+    "italic",
+    "underline",
+    "strikethrough",
+    "fontScript",
+    "textColor",
+  ],
+  border: [
+    "borderTop",
+    "borderRight",
+    "borderBottom",
+    "borderLeft",
+    "borderDiagonalUp",
+    "borderDiagonalDown",
+  ],
+  fill: ["fillColor", "fillPattern", "fillPatternColor", "fillGradient"],
+};
 
 function decodeXml(value: string): string {
   return value.replace(
@@ -17,7 +58,13 @@ function encodeXml(value: string): string {
   return value.replace(
     /[&<>"']/g,
     (character) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character]!,
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&apos;",
+      })[character]!,
   );
 }
 
@@ -129,9 +176,15 @@ function styleFromXf(
 }
 
 /** Read named cell styles directly because ExcelJS only exposes materialized cell XFs. */
-export function readXlsxCellStyles(stylesXml: Uint8Array | undefined): CellStyleDefinition[] {
+export function readXlsxCellStyles(
+  stylesXml: Uint8Array | undefined,
+  themeXml?: Uint8Array,
+): CellStyleDefinition[] {
   if (!stylesXml) return [];
-  const xml = strFromU8(stylesXml);
+  const xml = materializeXlsxStyleColors(
+    strFromU8(stylesXml),
+    themeXml ? strFromU8(themeXml) : undefined,
+  );
   const fonts = entryXml(collection(xml, "fonts") ?? "", "font");
   const fills = entryXml(collection(xml, "fills") ?? "", "fill");
   const borders = entryXml(collection(xml, "borders") ?? "", "border");
@@ -166,6 +219,82 @@ export function readXlsxCellStyles(stylesXml: Uint8Array | undefined): CellStyle
       name,
       category: "custom",
       style: styleFromXf(base[index], fonts, fills, borders, numberFormats),
+    });
+  }
+  return result;
+}
+
+/**
+ * Excel keeps the named-style reference on cellXfs (`xfId`) while ExcelJS only
+ * exposes its materialized result. Recover that provenance for Core so edits to
+ * a named style continue to update imported cells.
+ */
+export function readXlsxNamedCellStyleBindings(
+  stylesXml: Uint8Array | undefined,
+): Map<number, CellNamedStyleBinding> {
+  const result = new Map<number, CellNamedStyleBinding>();
+  if (!stylesXml) return result;
+  const xml = strFromU8(stylesXml);
+  const base = xfs(collection(xml, "cellStyleXfs"));
+  const named = new Map<number, { styleId: string; includes: CellStyleInclude[] }>();
+  for (const entry of (collection(xml, "cellStyles") ?? "").matchAll(
+    /<cellStyle\s+([^>]*)\/?\s*>/gi,
+  )) {
+    const attrs = entry[1] ?? "";
+    const name = attribute(attrs, "name");
+    const xfId = Number(attribute(attrs, "xfId"));
+    const builtinId = Number(attribute(attrs, "builtinId"));
+    if (
+      !name ||
+      name.toLowerCase() === "normal" ||
+      !Number.isInteger(xfId) ||
+      xfId < 0 ||
+      !base[xfId] ||
+      (Number.isInteger(builtinId) && builtinId >= 0)
+    )
+      continue;
+    const includes = CELL_STYLE_INCLUDES.filter((include) => {
+      const flag =
+        include === "number"
+          ? "applyNumberFormat"
+          : include === "alignment"
+            ? "applyAlignment"
+            : include === "font"
+              ? "applyFont"
+              : include === "border"
+                ? "applyBorder"
+                : "applyFill";
+      return /^(1|true)$/i.test(attribute(base[xfId]!.attributes, flag) ?? "");
+    });
+    named.set(xfId, {
+      styleId: `xlsx-cell-style-${name}`,
+      // XLSX often omits apply flags on cellStyleXfs. Its style components still
+      // define the group, so fall back to all groups for that interoperable form.
+      includes: includes.length ? includes : [...CELL_STYLE_INCLUDES],
+    });
+  }
+  for (const [index, xf] of xfs(collection(xml, "cellXfs")).entries()) {
+    const xfId = Number(attribute(xf.attributes, "xfId"));
+    const binding = named.get(xfId);
+    if (!binding) continue;
+    const overrides: Array<keyof CellStyle> = [];
+    for (const include of CELL_STYLE_INCLUDES) {
+      const flag =
+        include === "number"
+          ? "applyNumberFormat"
+          : include === "alignment"
+            ? "applyAlignment"
+            : include === "font"
+              ? "applyFont"
+              : include === "border"
+                ? "applyBorder"
+                : "applyFill";
+      if (/^(1|true)$/i.test(attribute(xf.attributes, flag) ?? ""))
+        overrides.push(...INCLUDE_STYLE_KEYS[include]);
+    }
+    result.set(index, {
+      ...binding,
+      ...(overrides.length ? { overrides } : {}),
     });
   }
   return result;
@@ -252,8 +381,9 @@ function serializeCellStyles(xml: string, styles: readonly CellStyleDefinition[]
       }
     }
     const xfId = styleXfs.length;
+    const includes = normalizeCellStyleIncludes(definition.includes);
     styleXfs.push(
-      `<xf numFmtId="${numFmtId}" fontId="${fontId}" fillId="${fillId}" borderId="${borderId}"${numFmtId ? ' applyNumberFormat="1"' : ""}${fontId ? ' applyFont="1"' : ""}${fillId ? ' applyFill="1"' : ""}${borderId ? ' applyBorder="1"' : ""}>${namedAlignment(definition.style)}</xf>`,
+      `<xf numFmtId="${numFmtId}" fontId="${fontId}" fillId="${fillId}" borderId="${borderId}"${includes.includes("number") ? ' applyNumberFormat="1"' : ""}${includes.includes("font") ? ' applyFont="1"' : ""}${includes.includes("fill") ? ' applyFill="1"' : ""}${includes.includes("border") ? ' applyBorder="1"' : ""}${includes.includes("alignment") ? ' applyAlignment="1"' : ""}>${namedAlignment(definition.style)}</xf>`,
     );
     cellStyles.push(
       `<cellStyle name="${encodeXml(definition.name)}" xfId="${xfId}"${definition.builtinId === undefined ? "" : ` builtinId="${definition.builtinId}"`}/>`,
@@ -273,4 +403,101 @@ export function writeXlsxCellStyles(
   styles: readonly CellStyleDefinition[] | undefined,
 ): string {
   return styles?.length ? serializeCellStyles(stylesXml, styles) : stylesXml;
+}
+
+function applyXfAttributes(
+  attributes: string,
+  xfId: number,
+  overrides: readonly (keyof CellStyle)[],
+): string {
+  const groups: Record<CellStyleInclude, boolean> = {
+    number: INCLUDE_STYLE_KEYS.number.some((key) => overrides.includes(key)),
+    alignment: INCLUDE_STYLE_KEYS.alignment.some((key) => overrides.includes(key)),
+    font: INCLUDE_STYLE_KEYS.font.some((key) => overrides.includes(key)),
+    border: INCLUDE_STYLE_KEYS.border.some((key) => overrides.includes(key)),
+    fill: INCLUDE_STYLE_KEYS.fill.some((key) => overrides.includes(key)),
+  };
+  const without = attributes
+    .replace(/\s+xfId\s*=\s*(["'])[^"']*\1/gi, "")
+    .replace(/\s+apply(?:NumberFormat|Alignment|Font|Border|Fill)\s*=\s*(["'])[^"']*\1/gi, "");
+  return `${without} xfId="${xfId}"${groups.number ? ' applyNumberFormat="1"' : ""}${groups.alignment ? ' applyAlignment="1"' : ""}${groups.font ? ' applyFont="1"' : ""}${groups.border ? ' applyBorder="1"' : ""}${groups.fill ? ' applyFill="1"' : ""}`;
+}
+
+function cellReference(row: number, column: number): string {
+  let value = column + 1;
+  let result = "";
+  while (value > 0) {
+    result = String.fromCharCode(65 + ((value - 1) % 26)) + result;
+    value = Math.floor((value - 1) / 26);
+  }
+  return `${result}${row + 1}`;
+}
+
+/** Writes cellXf `xfId` provenance for Core cells bound to a named style. */
+export function writeXlsxNamedCellStyleBindings(
+  entries: Zippable,
+  sheets: readonly Sheet[],
+  definitions: readonly CellStyleDefinition[] | undefined,
+): void {
+  const stylesEntry = entries["xl/styles.xml"];
+  if (!(stylesEntry instanceof Uint8Array)) return;
+  let stylesXml = strFromU8(stylesEntry);
+  const nameToXfId = new Map<string, number>();
+  for (const entry of (collection(stylesXml, "cellStyles") ?? "").matchAll(
+    /<cellStyle\s+([^>]*)\/?\s*>/gi,
+  )) {
+    const attrs = entry[1] ?? "";
+    const name = attribute(attrs, "name");
+    const xfId = Number(attribute(attrs, "xfId"));
+    if (name && Number.isInteger(xfId) && xfId >= 0)
+      nameToXfId.set(`xlsx-cell-style-${name}`, xfId);
+  }
+  if (!nameToXfId.size) return;
+  const definitionNames = new Map(
+    definitions?.map((definition) => [definition.id, definition.name]),
+  );
+  const cellXfs = xfs(collection(stylesXml, "cellXfs"));
+  const worksheetParts = readXlsxWorksheetPartTargets(entries as Record<string, Uint8Array>);
+  const generated = new Map<string, number>();
+  for (const [sheetIndex, sheet] of sheets.entries()) {
+    const part = worksheetParts[sheetIndex];
+    const entry = part ? entries[part] : undefined;
+    if (!(entry instanceof Uint8Array)) continue;
+    let worksheetXml = strFromU8(entry);
+    for (const [key, cell] of sheet.cells) {
+      const binding = cell.namedStyle;
+      if (!binding) continue;
+      const baseXfId =
+        nameToXfId.get(binding.styleId) ??
+        nameToXfId.get(`xlsx-cell-style-${definitionNames.get(binding.styleId) ?? ""}`);
+      if (baseXfId === undefined) continue;
+      const [row, column] = key.split(":").map(Number);
+      if (row === undefined || column === undefined) continue;
+      const reference = cellReference(row, column);
+      const match = [...worksheetXml.matchAll(/<c\b([^>]*)>/gi)].find(
+        (candidate) => attribute(candidate[1] ?? "", "r")?.toUpperCase() === reference,
+      );
+      if (!match) continue;
+      const attributes = match[1] ?? "";
+      const sourceIndex = Number(attribute(attributes, "s") ?? "0");
+      const source = cellXfs[sourceIndex] ?? cellXfs[0];
+      if (!source) continue;
+      const signature = `${source.attributes}\u0000${source.body}\u0000${baseXfId}\u0000${(binding.overrides ?? []).join(",")}`;
+      let styleIndex = generated.get(signature);
+      if (styleIndex === undefined) {
+        styleIndex = cellXfs.length;
+        generated.set(signature, styleIndex);
+        cellXfs.push({
+          attributes: applyXfAttributes(source.attributes, baseXfId, binding.overrides ?? []),
+          body: source.body,
+        });
+      }
+      const updated = attributes.replace(/\s+s\s*=\s*(["'])[^"']*\1/i, "");
+      worksheetXml = worksheetXml.replace(match[0], `<c${updated} s="${styleIndex}">`);
+    }
+    entries[part!] = strToU8(worksheetXml);
+  }
+  const serialized = cellXfs.map((xf) => `<xf${xf.attributes}>${xf.body}</xf>`).join("");
+  stylesXml = replaceCollection(stylesXml, "cellXfs", "xf", serialized);
+  entries["xl/styles.xml"] = strToU8(stylesXml);
 }

@@ -1,8 +1,46 @@
 import {
   createClearCellStylePatch,
   normalizeCellStylePatch,
+  type CellStyle,
   type CellStylePatch,
 } from "./style.js";
+
+/** The format groups which Excel exposes in the Style dialog. */
+export type CellStyleInclude = "number" | "alignment" | "font" | "border" | "fill";
+
+export const CELL_STYLE_INCLUDES = ["number", "alignment", "font", "border", "fill"] as const;
+
+const INCLUDE_KEYS: Record<CellStyleInclude, readonly (keyof CellStyle)[]> = {
+  number: ["numberFormat"],
+  alignment: [
+    "horizontalAlign",
+    "verticalAlign",
+    "indent",
+    "shrinkToFit",
+    "textDirection",
+    "textRotation",
+    "wrapText",
+  ],
+  font: [
+    "fontFamily",
+    "fontSize",
+    "bold",
+    "italic",
+    "underline",
+    "strikethrough",
+    "fontScript",
+    "textColor",
+  ],
+  border: [
+    "borderTop",
+    "borderRight",
+    "borderBottom",
+    "borderLeft",
+    "borderDiagonalUp",
+    "borderDiagonalDown",
+  ],
+  fill: ["fillColor", "fillPattern", "fillPatternColor", "fillGradient"],
+};
 
 /** Groups used by the Cell Styles gallery. Names are localized by the UI from stable IDs. */
 export type CellStyleCategory =
@@ -18,9 +56,55 @@ export type CellStyleDefinition = {
   name: string;
   category: CellStyleCategory;
   style: CellStylePatch;
+  /** Selected format groups in the Style dialog. Omitted means all groups for legacy definitions. */
+  includes?: CellStyleInclude[];
   /** WPS/XLSX builtin style identifier when one is available. */
   builtinId?: number;
 };
+
+export function normalizeCellStyleIncludes(
+  includes: readonly CellStyleInclude[] | undefined,
+): CellStyleInclude[] {
+  if (includes === undefined) return [...CELL_STYLE_INCLUDES];
+  if (!Array.isArray(includes)) throw new TypeError("Cell style includes must be an array.");
+  const seen = new Set<CellStyleInclude>();
+  for (const include of includes) {
+    if (!CELL_STYLE_INCLUDES.includes(include))
+      throw new TypeError("Cell style include is invalid.");
+    if (seen.has(include)) throw new TypeError("Cell style includes must be unique.");
+    seen.add(include);
+  }
+  return CELL_STYLE_INCLUDES.filter((include) => seen.has(include));
+}
+
+/** Returns the format groups touched by a patch. */
+export function getCellStylePatchIncludes(patch: CellStylePatch): CellStyleInclude[] {
+  const normalized = normalizeCellStylePatch(patch);
+  return CELL_STYLE_INCLUDES.filter((include) =>
+    INCLUDE_KEYS[include].some((key) => key in normalized),
+  );
+}
+
+/** Copies only the selected format groups, clearing old values in those groups first. */
+export function applyCellStyleIncludes(
+  base: Readonly<CellStyle> | undefined,
+  patch: CellStylePatch,
+  includes: readonly CellStyleInclude[],
+  preservedKeys: readonly (keyof CellStyle)[] = [],
+): CellStylePatch {
+  const next: CellStylePatch = base ? { ...base } : {};
+  const mutable = next as Record<string, unknown>;
+  const normalized = normalizeCellStylePatch(patch);
+  const preserved = new Set<keyof CellStyle>(preservedKeys);
+  for (const include of normalizeCellStyleIncludes(includes)) {
+    for (const key of INCLUDE_KEYS[include]) {
+      if (preserved.has(key)) continue;
+      if (key in normalized) mutable[key] = normalized[key];
+      else delete mutable[key];
+    }
+  }
+  return next;
+}
 
 const CATEGORIES = new Set<CellStyleCategory>([
   "goodBadNeutral",
@@ -58,6 +142,9 @@ export function normalizeCellStyleDefinition(value: CellStyleDefinition): CellSt
     name,
     category: value.category,
     style: normalizeCellStylePatch(value.style),
+    ...(value.includes === undefined
+      ? {}
+      : { includes: normalizeCellStyleIncludes(value.includes) }),
     ...(value.builtinId !== undefined ? { builtinId: value.builtinId } : {}),
   };
 }

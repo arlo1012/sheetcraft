@@ -68,6 +68,7 @@ const emit = defineEmits<{
   merge: [mode: CellMergeMode];
   unmerge: [];
   insertImage: [mode: "cell" | "floating"];
+  insertHyperlink: [];
   undo: [];
   redo: [];
   toggleProtection: [];
@@ -199,7 +200,11 @@ function onKeydown(event: KeyboardEvent): void {
       @freeze="emit('freeze', $event)"
       @unfreeze="emit('unfreeze')"
     />
-    <HomeInsertGroup :disabled="disabled" @insert-image="emit('insertImage', $event)" />
+    <HomeInsertGroup
+      :disabled="disabled"
+      @insert-image="emit('insertImage', $event)"
+      @insert-hyperlink="emit('insertHyperlink')"
+    />
     <HomeAutomationGroup />
     <HomeUtilityGroup />
   </RibbonToolbar>

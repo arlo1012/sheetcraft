@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import { computed, ref, toRaw, watch } from "vue";
 import { Button as TButton } from "tdesign-vue-next/es/button";
+import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
-import { createBuiltinCellStyles, type CellStyleDefinition } from "@idea10/core/cell-styles";
+import {
+  CELL_STYLE_INCLUDES,
+  createBuiltinCellStyles,
+  type CellStyleDefinition,
+  type CellStyleInclude,
+} from "@idea10/core/cell-styles";
 import { cellStyleLabel } from "../cell-style-presentation";
 import type { CellFormatChange } from "@idea10/core/commands";
 import {
   DEFAULT_CELL_FONT_FAMILY,
   DEFAULT_CELL_FONT_SIZE,
+  type CellBorder,
   type CellStylePatch,
 } from "@idea10/core/style";
 import CellFormatDialog from "../../cell-format/components/CellFormatDialog.vue";
@@ -28,14 +35,16 @@ const props = withDefaults(
     style?: CellStyleDefinition;
     initialStyle: CellStylePatch;
     dateSystem?: "1900" | "1904";
+    error?: string;
   }>(),
-  { style: undefined, dateSystem: "1900" },
+  { style: undefined, dateSystem: "1900", error: "" },
 );
 const emit = defineEmits<{ confirm: [style: CellStyleDefinition]; cancel: [] }>();
 const { t } = useAppI18n();
 const idFactory = createBrowserIdFactory();
 const formatDialogOpen = ref(false);
 const name = ref("");
+const includes = ref<CellStyleInclude[]>([...CELL_STYLE_INCLUDES]);
 const draft = ref<CellStyleDefinition>(makeDraft());
 
 const title = computed(() =>
@@ -54,6 +63,7 @@ const duplicateName = computed(() => {
   );
 });
 const draftFormat = computed<StyleFormatDraft>(() => ({ style: draft.value.style }));
+const hasIncludes = computed(() => includes.value.length > 0);
 
 function nextName(): string {
   const existing = new Set(props.existingNames.map((value) => value.trim().toLocaleLowerCase()));
@@ -68,12 +78,14 @@ function makeDraft(): CellStyleDefinition {
     ? (JSON.parse(JSON.stringify(toRaw(props.style))) as CellStyleDefinition)
     : undefined;
   name.value = style?.name ?? nextName();
+  includes.value = style?.includes ? [...style.includes] : [...CELL_STYLE_INCLUDES];
   return (
     style ?? {
       id: idFactory("cell-style-custom"),
       name: name.value,
       category: "custom",
       style: { ...props.initialStyle },
+      includes: [...CELL_STYLE_INCLUDES],
     }
   );
 }
@@ -83,54 +95,101 @@ function saveFormat(change: CellFormatChange): void {
   formatDialogOpen.value = false;
 }
 function confirm(): void {
-  if (!name.value.trim() || duplicateName.value) return;
-  emit("confirm", { ...draft.value, name: name.value.trim(), category: "custom" });
+  if (!name.value.trim() || duplicateName.value || !hasIncludes.value) return;
+  emit("confirm", {
+    ...draft.value,
+    includes: CELL_STYLE_INCLUDES.filter((kind) => includes.value.includes(kind)),
+    name: name.value.trim(),
+    category: "custom",
+  });
 }
-function formatSummary(kind: "number" | "alignment" | "font" | "border" | "fill"): string {
+function setInclude(kind: CellStyleInclude, checked: boolean): void {
+  includes.value = checked
+    ? [...new Set([...includes.value, kind])]
+    : includes.value.filter((value) => value !== kind);
+}
+function formatSummary(kind: CellStyleInclude): string {
   const style = draft.value.style;
   if (kind === "number") return numberSummary(style);
-  if (kind === "alignment")
-    return `${t(alignmentKey("horizontal", style.horizontalAlign || "general"))}, ${t(alignmentKey("vertical", style.verticalAlign || "bottom"))}`;
+  if (kind === "alignment") return alignmentSummary(style);
   if (kind === "font")
-    return `${style.fontFamily || DEFAULT_CELL_FONT_FAMILY}, ${style.fontSize || DEFAULT_CELL_FONT_SIZE}, ${fontSummary(style)}`;
-  if (kind === "border")
-    return style.borderTop || style.borderRight || style.borderBottom || style.borderLeft
-      ? t("cellStyles.dialog.borderConfigured")
-      : t("cellStyles.dialog.noBorder");
-  return style.fillColor || style.fillPattern || style.fillGradient
-    ? t("cellStyles.dialog.fillConfigured")
-    : t("cellFormat.noFill");
+    return [
+      style.fontFamily || DEFAULT_CELL_FONT_FAMILY,
+      `${style.fontSize || DEFAULT_CELL_FONT_SIZE} pt`,
+      fontSummary(style),
+    ]
+      .filter(Boolean)
+      .join(", ");
+  if (kind === "border") return borderSummary(style);
+  return fillSummary(style);
 }
 
 function numberSummary(style: CellStylePatch): string {
   const format = style.numberFormat;
   if (!format) return t("cellFormat.general");
+  if ("code" in format) return format.code;
+  const digits = "fractionDigits" in format ? format.fractionDigits : undefined;
+  const fraction =
+    digits === undefined ? "" : `; ${t("cellStyles.dialog.decimalPlaces", { count: digits })}`;
   switch (format.kind) {
     case "number":
-      return t("cellFormat.numeric");
+      return `${t("cellFormat.numeric")}${fraction}`;
     case "percent":
-      return t("cellFormat.percent");
+      return `${t("cellFormat.percent")}${fraction}`;
     case "currency":
-      return t("cellFormat.currency");
+      return `${format.currencySymbol || format.currency || t("cellFormat.currency")}${fraction}`;
     case "accounting":
-      return t("cellFormat.accounting");
-    case "date":
-      return t("cellFormat.date");
-    case "time":
-      return t("cellFormat.time");
-    case "fraction":
-      return t("cellFormat.fraction");
+      return `${format.currencySymbol || format.currency || t("cellFormat.accounting")}${fraction}`;
     case "scientific":
-      return t("cellFormat.scientific");
+      return `${t("cellFormat.scientific")}${fraction}`;
     case "text":
       return t("cellFormat.text");
-    case "custom":
-      return t("cellFormat.custom");
-    case "special":
-      return t("cellFormat.special");
     default:
       return t("cellFormat.general");
   }
+}
+function alignmentSummary(style: CellStylePatch): string {
+  const values = [
+    t(alignmentKey("horizontal", style.horizontalAlign || "general")),
+    t(alignmentKey("vertical", style.verticalAlign || "bottom")),
+  ];
+  if (style.wrapText) values.push(t("cellFormat.wrapText"));
+  if (style.shrinkToFit) values.push(t("cellFormat.shrinkToFit"));
+  if (style.indent) values.push(t("cellStyles.dialog.indent", { value: style.indent }));
+  if (style.textRotation === "vertical") values.push(t("cellFormat.verticalText"));
+  else if (style.textRotation)
+    values.push(t("cellStyles.dialog.rotation", { value: style.textRotation }));
+  return values.join(", ");
+}
+function borderSummary(style: CellStylePatch): string {
+  const configured = [
+    borderSummaryItem("cellStyles.dialog.borderTop", style.borderTop),
+    borderSummaryItem("cellStyles.dialog.borderRight", style.borderRight),
+    borderSummaryItem("cellStyles.dialog.borderBottom", style.borderBottom),
+    borderSummaryItem("cellStyles.dialog.borderLeft", style.borderLeft),
+    borderSummaryItem(
+      "cellStyles.dialog.borderDiagonal",
+      style.borderDiagonalUp || style.borderDiagonalDown,
+    ),
+  ].filter((item): item is string => Boolean(item));
+  return configured.join(", ") || t("cellStyles.dialog.noBorder");
+}
+function borderSummaryItem(
+  label:
+    | "cellStyles.dialog.borderTop"
+    | "cellStyles.dialog.borderRight"
+    | "cellStyles.dialog.borderBottom"
+    | "cellStyles.dialog.borderLeft"
+    | "cellStyles.dialog.borderDiagonal",
+  border: CellBorder | false | null | undefined,
+): string | undefined {
+  return border ? `${t(label)}: ${border.style} ${border.color}` : undefined;
+}
+function fillSummary(style: CellStylePatch): string {
+  if (style.fillGradient)
+    return t("cellStyles.dialog.gradientFill", { count: style.fillGradient.stops.length });
+  const values = [style.fillColor, style.fillPattern, style.fillPatternColor].filter(Boolean);
+  return values.join(", ") || t("cellFormat.noFill");
 }
 function alignmentKey(
   axis: "horizontal" | "vertical",
@@ -171,10 +230,15 @@ function alignmentKey(
   return labels[axis][value as never];
 }
 function fontSummary(style: CellStylePatch): string {
-  if (style.bold && style.italic) return t("cellFormat.fontBoldItalic");
-  if (style.bold) return t("cellStyles.dialog.fontBold");
-  if (style.italic) return t("cellStyles.dialog.fontItalic");
-  return t("cellFormat.fontRegular");
+  const values = [];
+  if (style.bold) values.push(t("cellStyles.dialog.fontBold"));
+  if (style.italic) values.push(t("cellStyles.dialog.fontItalic"));
+  if (style.underline) values.push(t("format.underline"));
+  if (style.strikethrough) values.push(t("ribbon.strikethrough"));
+  if (style.fontScript === "superscript") values.push(t("cellFormat.superscript"));
+  if (style.fontScript === "subscript") values.push(t("cellFormat.subscript"));
+  if (style.textColor) values.push(style.textColor);
+  return values.join(", ") || t("cellFormat.fontRegular");
 }
 
 watch(
@@ -195,7 +259,7 @@ watch(
     :header="title"
     :confirm-btn="{
       content: t('cellStyles.dialog.confirm'),
-      disabled: !name.trim() || duplicateName,
+      disabled: !name.trim() || duplicateName || !hasIncludes,
     }"
     :cancel-btn="t('cellStyles.dialog.cancel')"
     :close-on-overlay-click="false"
@@ -221,13 +285,19 @@ watch(
         }}</TButton>
         <p v-if="duplicateName" role="alert">{{ t("cellStyles.dialog.styleNameExists") }}</p>
       </div>
+      <p v-if="error" class="new-cell-style-dialog__error" role="alert">{{ error }}</p>
       <section class="new-cell-style-dialog__summary" :aria-label="t('cellStyles.dialog.summary')">
         <h3>{{ t("cellStyles.dialog.summary") }}</h3>
         <dl>
-          <template
-            v-for="item in ['number', 'alignment', 'font', 'border', 'fill'] as const"
-            :key="item"
-            ><dt>{{ t(`cellStyles.dialog.${item}`) }}</dt>
+          <template v-for="item in CELL_STYLE_INCLUDES" :key="item"
+            ><dt>
+              <TCheckbox
+                :model-value="includes.includes(item)"
+                :data-cell-style-include="item"
+                @update:model-value="setInclude(item, $event)"
+                >{{ t(`cellStyles.dialog.${item}`) }}</TCheckbox
+              >
+            </dt>
             <dd>{{ formatSummary(item) }}</dd></template
           >
         </dl>
@@ -269,6 +339,11 @@ watch(
   color: var(--idea-status-error);
   font-size: var(--idea-font-size-body-small);
 }
+.new-cell-style-dialog__error {
+  margin: 0;
+  color: var(--idea-status-error);
+  font-size: var(--idea-font-size-body-small);
+}
 .new-cell-style-dialog__summary h3 {
   margin: 0 0 7px;
   font-size: var(--idea-font-size-body-medium);
@@ -288,6 +363,9 @@ watch(
 }
 .new-cell-style-dialog dt {
   color: var(--idea-text-secondary);
+}
+.new-cell-style-dialog dt :deep(.t-checkbox) {
+  margin: 0;
 }
 .new-cell-style-dialog dd {
   margin: 0;

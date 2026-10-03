@@ -18,6 +18,7 @@ import {
 import {
   createSheetEvaluator,
   getDefaultColumnWidth,
+  normalizeCellHyperlink,
   replaceSheetSparseState,
   type CellRange,
   type Sheet,
@@ -48,6 +49,7 @@ import { finalizeXlsxExport } from "./export-finalizer.js";
 import { collectDefinedNames, readDefinedNames } from "./defined-names.js";
 import { readWorkbookCalculationSettings } from "./workbook-calculation.js";
 import {
+  readRawWorksheetFormulas,
   readRawWorksheetNumericValues,
   readRawWorksheetTextDirections,
 } from "./raw-cell-values.js";
@@ -59,7 +61,8 @@ import {
   xlsxPivotTableStyleId,
   xlsxTableStyleId,
 } from "./table-styles.js";
-import { readXlsxCellStyles } from "./cell-styles.js";
+import { readXlsxCellStyles, readXlsxNamedCellStyleBindings } from "./cell-styles.js";
+import { readXlsxHyperlinks, readXlsxWorksheetStyleIds } from "./hyperlinks.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
   createXlsxImageExporter,
@@ -89,7 +92,11 @@ type BrowserRow = {
 };
 type BrowserWorksheet = XlsxImageWorksheet & {
   name: string;
-  properties: { defaultRowHeight?: number; defaultColWidth?: number; tabColor?: { argb: string } };
+  properties: {
+    defaultRowHeight?: number;
+    defaultColWidth?: number;
+    tabColor?: { argb: string };
+  };
   views?: Array<Record<string, unknown>> | null;
   columns?: Array<{ number?: number; width?: number; hidden?: boolean }>;
   autoFilter?: unknown;
@@ -99,7 +106,7 @@ type BrowserWorksheet = XlsxImageWorksheet & {
       number?: number;
       height?: number;
       hidden?: boolean;
-      cells?: Array<{ address?: string }>;
+      cells?: Array<{ address?: string; style?: number }>;
     }>;
   };
   getColumn: (index: number) => { width?: number; hidden?: boolean };
@@ -109,9 +116,11 @@ type BrowserWorksheet = XlsxImageWorksheet & {
     callback: (row: BrowserRow, rowNumber: number) => void,
   ) => void;
   mergeCells: (range: string) => void;
-  getCell: (
-    address: string,
-  ) => BrowserCell & { value: unknown; style: Record<string, unknown>; numFmt?: string };
+  getCell: (address: string) => BrowserCell & {
+    value: unknown;
+    style: Record<string, unknown>;
+    numFmt?: string;
+  };
 };
 
 type BrowserWorkbook = XlsxImageWorkbook & {
@@ -562,12 +571,15 @@ function readContent(
   }
   if (!value || typeof value !== "object") return undefined;
   const record = value as Record<string, unknown>;
+  if (typeof record.text === "string") return { kind: "literal", value: record.text };
   if (typeof record.formula === "string") {
     if (record.result !== undefined && record.result !== null)
       add(report, "formula-cache-discarded", issueLocation);
     return {
       kind: "formula",
-      formula: { source: record.formula.startsWith("=") ? record.formula : `=${record.formula}` },
+      formula: {
+        source: record.formula.startsWith("=") ? record.formula : `=${record.formula}`,
+      },
     };
   }
   if (typeof record.error === "string") {
@@ -583,11 +595,18 @@ export async function decodeWithExcelJs(
 ): Promise<{ workbook: Workbook; report: XlsxCompatibilityReport }> {
   const report = new CompatibilityReportBuilder();
   const rawNumericValues = readRawWorksheetNumericValues(bytes);
+  const rawFormulas = readRawWorksheetFormulas(bytes);
   const rawTextDirections = readRawWorksheetTextDirections(bytes);
   const rawDataMetadata = readXlsxDataMetadata(bytes);
   const rawConditionalFormats = readXlsxConditionalFormatMetadata(bytes, report);
   const rawTables = readXlsxTableMetadata(bytes);
-  const cellStyles = readXlsxCellStyles(unzipSync(bytes)["xl/styles.xml"]);
+  const archive = unzipSync(bytes);
+  const cellStyles = readXlsxCellStyles(archive["xl/styles.xml"], archive["xl/theme/theme1.xml"]);
+  const namedStyleBindings = readXlsxNamedCellStyleBindings(archive["xl/styles.xml"]);
+  const rawHyperlinks = readXlsxHyperlinks(archive, (sheetIndex, reference) =>
+    add(report, "feature-omitted", `worksheet${sheetIndex + 1}.hyperlink:${reference}`),
+  );
+  const rawStyleIds = readXlsxWorksheetStyleIds(archive);
   const source = new ExcelJS.Workbook();
   await source.xlsx.load(withoutTableAutoFiltersForExcelJs(bytes));
   if (source.worksheets.length === 0) throw new Error("The workbook contains no worksheets.");
@@ -603,6 +622,8 @@ export async function decodeWithExcelJs(
       address: { row: number; column: number };
       content?: CellContent;
       style?: CellStyle;
+      hyperlink?: import("@idea10/core/workbook").CellHyperlink;
+      namedStyle?: import("@idea10/core/workbook").CellNamedStyleBinding;
     }> = [];
     const rowHeights: Array<{ index: number; size: number }> = [];
     const columnWidths: Array<{ index: number; size: number }> = [];
@@ -655,7 +676,7 @@ export async function decodeWithExcelJs(
         const issueLocation = `${sourceSheet.name}!${address(cellAddress.row, cellAddress.column)}`;
         const content = readContent(
           cell.value,
-          cell.formula,
+          cell.formula ?? rawFormulas[sheetIndex]?.get(modelCell.address.toUpperCase()),
           cell.result,
           dateSystem,
           issueLocation,
@@ -669,7 +690,19 @@ export async function decodeWithExcelJs(
           report,
           rawTextDirections[sheetIndex]?.get(modelCell.address.toUpperCase()),
         );
-        if (content || style) {
+        const rawHyperlink = rawHyperlinks[sheetIndex]?.get(modelCell.address.toUpperCase());
+        let hyperlink: import("@idea10/core/workbook").CellHyperlink | undefined;
+        if (rawHyperlink) {
+          try {
+            hyperlink = normalizeCellHyperlink(rawHyperlink);
+          } catch {
+            add(report, "feature-omitted", `${issueLocation}.hyperlink`);
+          }
+        }
+        const namedStyle = namedStyleBindings.get(
+          rawStyleIds[sheetIndex]?.get(modelCell.address.toUpperCase()) ?? -1,
+        );
+        if (content || style || hyperlink) {
           importedCells += 1;
           if (importedCells > MAX_SPARSE_CELLS) {
             report.add("archive-limit", "block", issueLocation);
@@ -682,6 +715,8 @@ export async function decodeWithExcelJs(
             address: cellAddress,
             ...(content ? { content } : {}),
             ...(style ? { style } : {}),
+            ...(hyperlink ? { hyperlink } : {}),
+            ...(namedStyle ? { namedStyle } : {}),
           });
         }
       }
@@ -785,10 +820,14 @@ export async function decodeWithExcelJs(
       pivotTableStyles: rawTables.pivotTableStyles,
       ...(cellStyles.length ? { cellStyles } : {}),
       ...(xlsxTableStyleId(rawTables.defaultTableStyleName)
-        ? { defaultTableStyleId: xlsxTableStyleId(rawTables.defaultTableStyleName) }
+        ? {
+            defaultTableStyleId: xlsxTableStyleId(rawTables.defaultTableStyleName),
+          }
         : {}),
       ...(xlsxPivotTableStyleId(rawTables.defaultPivotTableStyleName)
-        ? { defaultPivotTableStyleId: xlsxPivotTableStyleId(rawTables.defaultPivotTableStyleName) }
+        ? {
+            defaultPivotTableStyleId: xlsxPivotTableStyleId(rawTables.defaultPivotTableStyleName),
+          }
         : {}),
     },
     report: report.build(),
@@ -848,7 +887,11 @@ function writeStyle(
       type: "pattern",
       pattern: style.fillPattern,
       ...(style.fillPatternColor
-        ? { fgColor: { argb: `FF${style.fillPatternColor.slice(1).toUpperCase()}` } }
+        ? {
+            fgColor: {
+              argb: `FF${style.fillPatternColor.slice(1).toUpperCase()}`,
+            },
+          }
         : {}),
       ...(style.fillColor
         ? { bgColor: { argb: `FF${style.fillColor.slice(1).toUpperCase()}` } }
@@ -931,7 +974,13 @@ export async function encodeWithExcelJs(
     const output = target.addWorksheet(sheet.name, {
       views:
         sheet.freezePanes.rows || sheet.freezePanes.columns
-          ? [{ state: "frozen", ySplit: sheet.freezePanes.rows, xSplit: sheet.freezePanes.columns }]
+          ? [
+              {
+                state: "frozen",
+                ySplit: sheet.freezePanes.rows,
+                xSplit: sheet.freezePanes.columns,
+              },
+            ]
           : undefined,
     });
     output.properties.defaultRowHeight = (DEFAULT_ROW_HEIGHT * 3) / 4;

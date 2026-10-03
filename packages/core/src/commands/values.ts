@@ -21,6 +21,12 @@ import {
 } from "../style.js";
 import {
   getCellStyle,
+  getCellHyperlink,
+  getCellNamedStyle,
+  cloneCellHyperlink,
+  cloneCellNamedStyleBinding,
+  setCellHyperlink,
+  setCellNamedStyle,
   getCellContent,
   setCellStyle,
   setCellContent,
@@ -122,6 +128,12 @@ export function createBatchSetCellContentsCommand(
               ) ?? null,
           }
         : {}),
+      ...("namedStyle" in change
+        ? { namedStyle: cloneCellNamedStyleBinding(change.namedStyle ?? undefined) ?? null }
+        : {}),
+      ...("hyperlink" in change
+        ? { hyperlink: cloneCellHyperlink(change.hyperlink ?? undefined) ?? null }
+        : {}),
     })),
     ...(options?.reconcileBorders ? { reconcileBorders: true } : {}),
   };
@@ -164,6 +176,8 @@ export function createPasteCellContentsCommand(
   options?: {
     clearRange?: CellRange;
     styles?: readonly (readonly (CellStyle | null)[])[];
+    namedStyles?: readonly (readonly (import("../workbook.js").CellNamedStyleBinding | null)[])[];
+    hyperlinks?: readonly (readonly (import("../workbook.js").CellHyperlink | null)[])[];
   },
 ): SetCellContentsCommand {
   const size = validateCommandPayload("contents", contents, () => getCellMatrixSize(contents));
@@ -184,18 +198,39 @@ export function createPasteCellContentsCommand(
       "Pasted cell styles must match the pasted value matrix.",
     );
   }
+  for (const [label, matrix] of [
+    ["namedStyles", options?.namedStyles],
+    ["hyperlinks", options?.hyperlinks],
+  ] as const) {
+    if (
+      matrix &&
+      (matrix.length !== size.rowCount || matrix.some((row) => row.length !== size.columnCount))
+    ) {
+      throw invalidCommandPayload(
+        label,
+        matrix,
+        `Pasted ${label} must match the pasted value matrix.`,
+      );
+    }
+  }
 
   const changes = new Map<string, CellContentChange>();
   const setChange = (
     address: CellAddress,
     content: CellContent | null,
     style?: CellStyle | null,
+    namedStyle?: import("../workbook.js").CellNamedStyleBinding | null,
+    hyperlink?: import("../workbook.js").CellHyperlink | null,
   ) => {
     changes.set(`${address.row}:${address.column}`, {
       sheetId,
       address: { ...address },
       content,
       ...(style === undefined ? {} : { style: style ? cloneCellStyle(style) : null }),
+      ...(namedStyle === undefined
+        ? {}
+        : { namedStyle: cloneCellNamedStyleBinding(namedStyle) ?? null }),
+      ...(hyperlink === undefined ? {} : { hyperlink: cloneCellHyperlink(hyperlink) ?? null }),
     });
   };
 
@@ -216,6 +251,8 @@ export function createPasteCellContentsCommand(
         address,
         content,
         options?.styles ? (options.styles[row]?.[column] ?? null) : undefined,
+        options?.namedStyles ? (options.namedStyles[row]?.[column] ?? null) : undefined,
+        options?.hyperlinks ? (options.hyperlinks[row]?.[column] ?? null) : undefined,
       );
     }
   }
@@ -400,6 +437,22 @@ export function applySetCellContentsCommand(
               ) ?? null,
           }
         : {}),
+      ...(Object.hasOwn(change, "namedStyle")
+        ? {
+            namedStyle:
+              validateCommandPayload(`changes.${index}.namedStyle`, change.namedStyle, () =>
+                cloneCellNamedStyleBinding(change.namedStyle ?? undefined),
+              ) ?? null,
+          }
+        : {}),
+      ...(Object.hasOwn(change, "hyperlink")
+        ? {
+            hyperlink:
+              validateCommandPayload(`changes.${index}.hyperlink`, change.hyperlink, () =>
+                cloneCellHyperlink(change.hyperlink ?? undefined),
+              ) ?? null,
+          }
+        : {}),
     } satisfies CellContentChange;
   });
   const tableMetadataEdit =
@@ -431,10 +484,15 @@ export function applySetCellContentsCommand(
       address: CellAddress;
       content: CellContent | null;
       style: CellStyle | undefined;
+      namedStyle: import("../workbook.js").CellNamedStyleBinding | undefined;
+      hyperlink: import("../workbook.js").CellHyperlink | undefined;
     }
   >();
   const getChangeKey = (sheetId: string, address: CellAddress) =>
     `${sheetId}:${address.row}:${address.column}`;
+  const normalizedChangesByAddress = new Map(
+    normalizedChanges.map((change) => [getChangeKey(change.sheetId, change.address), change]),
+  );
 
   for (const change of normalizedChanges) {
     const sheet = getSheetOrThrow(workbook, change.sheetId);
@@ -445,6 +503,8 @@ export function applySetCellContentsCommand(
       address: { ...change.address },
       content: getCellContent(sheet, change.address),
       style: cloneCellStyle(getCellStyle(sheet, change.address) as CellStyle | undefined),
+      namedStyle: cloneCellNamedStyleBinding(getCellNamedStyle(sheet, change.address)),
+      hyperlink: cloneCellHyperlink(getCellHyperlink(sheet, change.address)),
     });
   }
 
@@ -452,7 +512,12 @@ export function applySetCellContentsCommand(
     sheetId: string,
     address: CellAddress,
     includeStyle: boolean,
-    fallback?: { content: CellContent | null; style: CellStyle | undefined },
+    fallback?: {
+      content: CellContent | null;
+      style: CellStyle | undefined;
+      namedStyle: import("../workbook.js").CellNamedStyleBinding | undefined;
+      hyperlink: import("../workbook.js").CellHyperlink | undefined;
+    },
   ) => {
     const key = getChangeKey(sheetId, address);
     const previous =
@@ -460,6 +525,7 @@ export function applySetCellContentsCommand(
       (fallback ? { sheetId, address: { ...address }, ...fallback } : undefined);
     if (!previous)
       throw new Error(`Missing previous state for cell ${address.row}:${address.column}.`);
+    const originalChange = normalizedChangesByAddress.get(key);
     const existing = reverseChangesByAddress.get(key);
     if (existing) {
       if (includeStyle && !("style" in existing))
@@ -471,6 +537,12 @@ export function applySetCellContentsCommand(
       address: { ...address },
       content: previous.content,
       ...(includeStyle ? { style: previous.style ?? null } : {}),
+      ...(originalChange && "namedStyle" in originalChange
+        ? { namedStyle: previous.namedStyle ?? null }
+        : {}),
+      ...(originalChange && "hyperlink" in originalChange
+        ? { hyperlink: previous.hyperlink ?? null }
+        : {}),
     };
     reverseChanges.unshift(reverseChange);
     reverseChangesByAddress.set(key, reverseChange);
@@ -481,7 +553,20 @@ export function applySetCellContentsCommand(
     const valueChanged = setCellContent(sheet, change.address, change.content);
     const styleChanged =
       "style" in change ? setCellStyle(sheet, change.address, change.style) : false;
-    if (valueChanged || styleChanged) {
+    const namedStyleChanged =
+      "namedStyle" in change
+        ? setCellNamedStyle(
+            sheet,
+            change.address,
+            getCellStyle(sheet, change.address),
+            (change as CellContentChange).namedStyle,
+          )
+        : false;
+    const hyperlinkChanged =
+      "hyperlink" in change
+        ? setCellHyperlink(sheet, change.address, (change as CellContentChange).hyperlink)
+        : false;
+    if (valueChanged || styleChanged || namedStyleChanged || hyperlinkChanged) {
       recordReverseChange(change.sheetId, change.address, "style" in change);
     }
   }
@@ -521,6 +606,8 @@ export function applySetCellContentsCommand(
           recordReverseChange(sheetId, address, true, {
             content: previousContent,
             style: previousStyle,
+            namedStyle: cloneCellNamedStyleBinding(getCellNamedStyle(sheet, address)),
+            hyperlink: cloneCellHyperlink(getCellHyperlink(sheet, address)),
           });
         }
       }
@@ -709,6 +796,8 @@ export function applyMoveCellRangeCommand(
             address,
             content: cell.content ? cloneCellContent(cell.content) : undefined,
             style: cloneCellStyle(cell.style),
+            namedStyle: cloneCellNamedStyleBinding(cell.namedStyle),
+            hyperlink: cloneCellHyperlink(cell.hyperlink),
           },
         ]
       : [];
@@ -727,6 +816,8 @@ export function applyMoveCellRangeCommand(
   for (const address of affected.values()) {
     setCellContent(sheet, address, null);
     setCellStyle(sheet, address, null);
+    setCellNamedStyle(sheet, address, null, null);
+    setCellHyperlink(sheet, address, null);
   }
   for (const cell of captured) {
     const address = {
@@ -734,7 +825,8 @@ export function applyMoveCellRangeCommand(
       column: command.destination.column + cell.address.column - source.start.column,
     };
     setCellContent(sheet, address, cell.content ?? null);
-    setCellStyle(sheet, address, cell.style ?? null);
+    setCellNamedStyle(sheet, address, cell.style ?? null, cell.namedStyle ?? null);
+    setCellHyperlink(sheet, address, cell.hyperlink ?? null);
     affected.set(`${address.row}:${address.column}`, address);
   }
   for (const [key, cell] of sheet.cells)
@@ -757,7 +849,12 @@ export function applyMoveCellRangeCommand(
       patch: getExactCellBorderPatch(getCellStyle(sheet, address)),
     });
   reconcileCellBorderTargets(targets, (address, patch) =>
-    setCellStyle(sheet, address, mergeCellStyle(getCellStyle(sheet, address), patch)),
+    setCellNamedStyle(
+      sheet,
+      address,
+      mergeCellStyle(getCellStyle(sheet, address), patch),
+      getCellNamedStyle(sheet, address),
+    ),
   );
   sheet.conditionalFormats = conditionalFormats;
   rewriteConditionalFormatQualifiedReferencesForSheet(

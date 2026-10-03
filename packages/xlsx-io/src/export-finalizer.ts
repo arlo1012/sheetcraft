@@ -9,7 +9,8 @@ import {
 } from "./data-tools-metadata.js";
 import { writeXlsxConditionalFormats } from "./conditional-formatting.js";
 import { writeXlsxTableMetadata } from "./table-styles.js";
-import { writeXlsxCellStyles } from "./cell-styles.js";
+import { writeXlsxCellStyles, writeXlsxNamedCellStyleBindings } from "./cell-styles.js";
+import { writeXlsxHyperlinks } from "./hyperlinks.js";
 import type { CompatibilityReportBuilder } from "./report.js";
 import type { Sheet, WorkbookCalculationSettings } from "@idea10/core/workbook";
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
@@ -21,7 +22,11 @@ import type { CellStyleDefinition } from "@idea10/core/cell-styles";
 export function finalizeXlsxExport(
   bytes: Uint8Array,
   cellImages: readonly NativeCellImage[],
-  definedNames: readonly { name: string; localSheetId?: number; reference: string }[] = [],
+  definedNames: readonly {
+    name: string;
+    localSheetId?: number;
+    reference: string;
+  }[] = [],
   calculation?: WorkbookCalculationSettings,
   dataMetadata: readonly Omit<
     XlsxDataMetadata,
@@ -73,9 +78,11 @@ export function finalizeXlsxExport(
     entries,
     sheets as unknown as Parameters<typeof writeXlsxFilterColorFormats>[1],
   );
+  writeXlsxHyperlinks(entries, sheets);
   entries["xl/styles.xml"] = strToU8(
     writeXlsxCellStyles(strFromU8(entries["xl/styles.xml"]!), cellStyles),
   );
+  writeXlsxNamedCellStyleBindings(entries, sheets, cellStyles);
   if (calculation) writeWorkbookCalculationSettings(entries, calculation);
   const files: Zippable = {};
   for (const [name, content] of Object.entries(entries)) {

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
-import { ChartNoAxesColumn, CirclePlus, Table2 } from "lucide-vue-next";
+import RibbonButton from "../../../shared/ribbon/RibbonButton.vue";
+import { ChartNoAxesColumn, Link2, Table2 } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
 import ImageInsertMenu from "./ImageInsertMenu.vue";
 
 defineProps<{ disabled: boolean }>();
-const emit = defineEmits<{ insertImage: [mode: "cell" | "floating"] }>();
+const emit = defineEmits<{ insertImage: [mode: "cell" | "floating"]; insertHyperlink: [] }>();
 const { t } = useAppI18n();
 </script>
 
@@ -16,17 +17,15 @@ const { t } = useAppI18n();
     role="group"
     :aria-label="t('ribbon.insertTools')"
   >
-    <RibbonMenuButton
+    <RibbonButton
       variant="tall"
-      :label="t('app.unavailableFeature', { feature: t('ribbon.insert') })"
-      :text="t('ribbon.insert')"
-      disabled
-      data-ribbon-layout="tall"
-      data-ribbon-placeholder="insert"
-      data-ribbon-span="2"
-    >
-      <CirclePlus aria-hidden="true" />
-    </RibbonMenuButton>
+      :label="t('hyperlinks.insert')"
+      :text="t('hyperlinks.insert')"
+      :disabled="disabled"
+      data-ribbon-action="insert-hyperlink"
+      @activate="emit('insertHyperlink')"
+      ><Link2 aria-hidden="true"
+    /></RibbonButton>
     <ImageInsertMenu :disabled="disabled" @insert-image="emit('insertImage', $event)" />
     <div class="home-insert-group__stack" data-ribbon-stack="chart-pivot">
       <RibbonMenuButton

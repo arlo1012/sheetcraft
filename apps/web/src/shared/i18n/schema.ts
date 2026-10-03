@@ -1,3 +1,4 @@
+import type { HyperlinkMessageSchema } from "../../modules/hyperlinks/hyperlink-messages";
 import type { CellStylesMessageSchema } from "../../modules/cell-styles/cell-style-messages";
 import type { SimulationMessageSchema } from "../../modules/data-tools/simulation-messages";
 import type { DataTableMessageSchema } from "../../modules/data-tools/data-table-messages";
@@ -13,6 +14,7 @@ type ToolMessageSchema = FormulaToolsMessageSchema &
   ConditionalFormattingMessageSchema &
   TableStylesMessageSchema &
   CellStylesMessageSchema &
+  HyperlinkMessageSchema &
   TableMessageSchema &
   SimulationMessageSchema &
   DataTableMessageSchema &

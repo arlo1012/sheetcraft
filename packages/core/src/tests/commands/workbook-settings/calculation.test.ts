@@ -22,7 +22,7 @@ describe("workbook calculation settings", () => {
       createSetWorkbookCalculationCommand(session.workbook, settings),
     );
     const snapshot = serializeWorkbook(session.workbook);
-    expect(snapshot.version).toBe(14);
+    expect(snapshot.version).toBe(15);
     expect(deserializeWorkbook(snapshot).calculation).toEqual(settings);
     expect(undoWorkbookCommand(session)).toBe(true);
     expect(session.workbook.calculation).toEqual({

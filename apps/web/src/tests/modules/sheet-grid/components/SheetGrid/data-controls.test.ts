@@ -119,7 +119,9 @@ describe("SheetGrid data controls", () => {
     expect(columnControls).toHaveLength(2);
     expect(
       columnControls.every((control) =>
-        control.element.parentElement?.classList.contains("sheet-data-controls__column-outline-track"),
+        control.element.parentElement?.classList.contains(
+          "sheet-data-controls__column-outline-track",
+        ),
       ),
     ).toBe(true);
   });

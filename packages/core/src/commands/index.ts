@@ -35,6 +35,7 @@ export * from "./workbook-settings.js";
 export * from "./duplicates.js";
 export * from "./conditional-formatting.js";
 export * from "./cell-styles.js";
+export * from "./hyperlinks.js";
 export * from "./data-comparison.js";
 
 export * from "./lookup-fill.js";

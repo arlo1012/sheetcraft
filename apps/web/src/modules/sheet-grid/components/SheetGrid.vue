@@ -40,6 +40,7 @@ import {
   MIN_ROW_HEIGHT,
   createSheetEvaluator,
   getCellContent,
+  getCellHyperlink,
   getDefaultColumnWidth,
   type FloatingImage,
   type CellAddress,
@@ -280,6 +281,7 @@ const emit = defineEmits<{
   ignoreAllCellErrors: [];
   editErrorInFormulaBar: [];
   errorCheckOptions: [];
+  openHyperlink: [address: CellAddress];
   "update:zoom": [zoom: number];
 }>();
 
@@ -860,6 +862,14 @@ const overlayState = computed<SheetOverlayState>(() => {
   };
 });
 const imageHoverCursor = ref<string>();
+const hoveredHyperlink = shallowRef<{ address: CellAddress; title: string }>();
+const hyperlinkPointerGesture = shallowRef<{
+  address: CellAddress;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  moved: boolean;
+}>();
 const surfaceCursor = computed(() => {
   const hit = headerState.value.hovered;
   if (dimensionResize.value)
@@ -867,7 +877,9 @@ const surfaceCursor = computed(() => {
   if (axisMoveDrag.value?.active) return "grabbing";
   if (hit?.action === "resize") return hit.axis === "row" ? "row-resize" : "col-resize";
   if (hit?.action === "grip") return "grab";
-  return hit ? "pointer" : (imageHoverCursor.value ?? "cell");
+  return hit
+    ? "pointer"
+    : (imageHoverCursor.value ?? (hoveredHyperlink.value ? "pointer" : "cell"));
 });
 function surfacePoint(event: MouseEvent) {
   return clientPointToElementSurface(
@@ -885,16 +897,69 @@ function onSurfacePointerDown(event: PointerEvent): void {
   if (address) {
     headerInput.focus(undefined);
     event.preventDefault();
+    const hyperlink = getCellHyperlink(props.sheet, address);
+    if (hyperlink && !event.shiftKey && !props.formatPainterActive && !getReferenceEditor()) {
+      hyperlinkPointerGesture.value = {
+        address,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+      };
+      window.addEventListener("pointermove", onHyperlinkPointerMove);
+      window.addEventListener("pointerup", onHyperlinkPointerUp);
+      window.addEventListener("pointercancel", cancelHyperlinkPointerGesture);
+    }
     onCellMouseDown(address, event);
   }
 }
 function onSurfacePointerMove(event: PointerEvent): void {
   headerInput.onPointerMove(surfacePoint(event));
   imageHoverCursor.value = imageLayerRef.value?.getSurfaceCursor(imagePoint(event));
+  const address = getSurfaceCell(renderFrame.value, surfacePoint(event));
+  const hyperlink = address && getCellHyperlink(props.sheet, address);
+  hoveredHyperlink.value = hyperlink
+    ? { address, title: hyperlink.tooltip || hyperlink.target }
+    : undefined;
 }
 function onSurfacePointerLeave(): void {
   headerInput.onPointerLeave();
   imageHoverCursor.value = undefined;
+  hoveredHyperlink.value = undefined;
+}
+function clearHyperlinkPointerGesture(): void {
+  hyperlinkPointerGesture.value = undefined;
+  window.removeEventListener("pointermove", onHyperlinkPointerMove);
+  window.removeEventListener("pointerup", onHyperlinkPointerUp);
+  window.removeEventListener("pointercancel", cancelHyperlinkPointerGesture);
+}
+function cancelHyperlinkPointerGesture(event?: PointerEvent): void {
+  if (
+    event &&
+    hyperlinkPointerGesture.value &&
+    event.pointerId !== hyperlinkPointerGesture.value.pointerId
+  )
+    return;
+  clearHyperlinkPointerGesture();
+}
+function onHyperlinkPointerMove(event: PointerEvent): void {
+  const gesture = hyperlinkPointerGesture.value;
+  if (!gesture || event.pointerId !== gesture.pointerId) return;
+  if (Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) >= 3)
+    gesture.moved = true;
+}
+function onHyperlinkPointerUp(event: PointerEvent): void {
+  const gesture = hyperlinkPointerGesture.value;
+  if (!gesture || event.pointerId !== gesture.pointerId) return;
+  clearHyperlinkPointerGesture();
+  const completedAddress = getSurfaceCell(renderFrame.value, surfacePoint(event));
+  if (
+    !gesture.moved &&
+    completedAddress &&
+    areCellAddressesEqual(gesture.address, completedAddress)
+  ) {
+    emit("openHyperlink", gesture.address);
+  }
 }
 function onSurfaceContextMenu(event: MouseEvent): void {
   const point = surfacePoint(event);
@@ -2077,6 +2142,20 @@ function onEditorKeydown(event: KeyboardEvent): void {
   }
 
   if (
+    !isEditing.value &&
+    event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    event.key === "Enter" &&
+    getSelectionMode(selection.value) === "cells" &&
+    getCellHyperlink(props.sheet, activeCell.value)
+  ) {
+    event.preventDefault();
+    emit("openHyperlink", activeCell.value);
+    return;
+  }
+
+  if (
     event.altKey &&
     !event.ctrlKey &&
     !event.metaKey &&
@@ -2362,6 +2441,7 @@ onBeforeUnmount(() => {
   stopDragSelection();
   stopFormulaReferenceDrag();
   stopDimensionResize();
+  clearHyperlinkPointerGesture();
   clearPendingClipboard();
 });
 
@@ -2447,6 +2527,7 @@ defineExpose({
       :error-indicator-color="errorIndicatorColor"
       :label="headerLabel"
       :cursor="surfaceCursor"
+      :title="hoveredHyperlink?.title"
       :show-grid-lines="showGridLines"
       :locale="locale"
       :date-system="dateSystem"

@@ -12,7 +12,11 @@ import {
   createWorkbook,
   getActiveSheet,
   getCellContent,
+  getCellHyperlink,
+  getCellNamedStyle,
   getCellStyle,
+  setCellHyperlink,
+  setCellNamedStyle,
   setCellContent,
   setCellStyle,
   setCellValue,
@@ -61,6 +65,92 @@ function filteredPlan(rows: number[], rowCount = rows.length) {
 }
 
 describe("createGridPasteCommand", () => {
+  test("copies named style and hyperlink metadata with ordinary cell content", () => {
+    const sheet = getActiveSheet(createWorkbook({ idFactory: createSequentialIdFactory() }));
+    const source = { row: 0, column: 0 };
+    const destination = { row: 2, column: 3 };
+    setCellValue(sheet, source, "source");
+    setCellNamedStyle(
+      sheet,
+      source,
+      { bold: true },
+      { styleId: "source-style", includes: ["font"] },
+    );
+    setCellHyperlink(sheet, source, { target: "https://example.com/source" });
+    setCellValue(sheet, destination, "destination");
+    setCellNamedStyle(
+      sheet,
+      destination,
+      { italic: true },
+      { styleId: "destination-style", includes: ["font"] },
+    );
+    setCellHyperlink(sheet, destination, { target: "https://example.com/destination" });
+
+    const session = execute(sheet, {
+      kind: "all",
+      plan: {
+        anchor: destination,
+        range: { start: destination, end: destination },
+        values: [["source"]],
+      },
+      contents: [[{ kind: "literal", value: "source" }]],
+      sourceRange: { start: source, end: source },
+      styles: [[{ bold: true }]],
+      namedStyles: [[{ styleId: "source-style", includes: ["font"] }]],
+      hyperlinks: [[{ target: "https://example.com/source" }]],
+    });
+
+    expect(getCellNamedStyle(sheet, destination)).toEqual({
+      styleId: "source-style",
+      includes: ["font"],
+    });
+    expect(getCellHyperlink(sheet, destination)).toEqual({ target: "https://example.com/source" });
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(getCellNamedStyle(sheet, destination)).toEqual({
+      styleId: "destination-style",
+      includes: ["font"],
+    });
+    expect(getCellHyperlink(sheet, destination)).toEqual({
+      target: "https://example.com/destination",
+    });
+  });
+
+  test("keeps target metadata for values only and retains its hyperlink for formats only", () => {
+    const sheet = getActiveSheet(createWorkbook({ idFactory: createSequentialIdFactory() }));
+    const address = { row: 2, column: 3 };
+    setCellValue(sheet, address, "before");
+    setCellNamedStyle(
+      sheet,
+      address,
+      { italic: true },
+      { styleId: "target-style", includes: ["font"] },
+    );
+    setCellHyperlink(sheet, address, { target: "https://example.com/target" });
+
+    execute(sheet, {
+      kind: "values",
+      plan: { anchor: address, range: { start: address, end: address }, values: [[42]] },
+    });
+    expect(getCellContent(sheet, address)).toEqual({ kind: "literal", value: 42 });
+    expect(getCellNamedStyle(sheet, address)).toEqual({
+      styleId: "target-style",
+      includes: ["font"],
+    });
+    expect(getCellHyperlink(sheet, address)).toEqual({ target: "https://example.com/target" });
+
+    execute(sheet, {
+      kind: "formats",
+      plan: { anchor: address, range: { start: address, end: address }, values: [[null]] },
+      styles: [[{ bold: true }]],
+      namedStyles: [[{ styleId: "source-style", includes: ["font"] }]],
+    });
+    expect(getCellNamedStyle(sheet, address)).toEqual({
+      styleId: "source-style",
+      includes: ["font"],
+    });
+    expect(getCellHyperlink(sheet, address)).toEqual({ target: "https://example.com/target" });
+  });
+
   test("clears sparse destination column tail cells represented by a whole-column copy", () => {
     const sheet = getActiveSheet(createWorkbook({ idFactory: createSequentialIdFactory() }));
     setCellValue(sheet, { row: 2, column: 1 }, "source");

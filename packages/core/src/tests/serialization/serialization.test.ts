@@ -11,6 +11,8 @@ import {
   createWorkbook,
   getActiveSheet,
   getCellStyle,
+  getCellHyperlink,
+  getCellNamedStyle,
   getCellValue,
   getWorkbookSheets,
   insertSheet,
@@ -19,6 +21,8 @@ import {
   setCellStyle,
   getCellContent,
   setCellContent,
+  setCellHyperlink,
+  setCellNamedStyle,
   setCellValue,
   setColumnWidth,
   setRowHeight,
@@ -29,6 +33,15 @@ import {
 import { createBuiltinTableStyles } from "../../table-styles.js";
 
 describe("workbook snapshots", () => {
+  test("round-trips standalone sheet hyperlink and named-style metadata", () => {
+    const sheet = createSheet("Sheet 1", "sheet-1");
+    const address = { row: 0, column: 0 };
+    setCellNamedStyle(sheet, address, { bold: true }, { styleId: "accent", includes: ["font"] });
+    setCellHyperlink(sheet, address, { target: "#'Report sheet'!B3" });
+    const restored = deserializeSheet(serializeSheet(sheet));
+    expect(getCellNamedStyle(restored, address)).toMatchObject({ styleId: "accent" });
+    expect(getCellHyperlink(restored, address)?.target).toBe("#'Report sheet'!B3");
+  });
   test("copies a proxied table-style library into a plain independent snapshot", () => {
     const workbook = createWorkbook({ id: "workbook", sheetId: "sheet" });
     const style = createBuiltinTableStyles()[1]!;
@@ -438,7 +451,7 @@ describe("workbook snapshots", () => {
       { kind: "formula", formula: { source: "=SUM(" } },
     );
     const snapshot = serializeWorkbook(migrated);
-    expect(snapshot.version).toBe(14);
+    expect(snapshot.version).toBe(15);
     expect(snapshot.dateSystem).toBe("1900");
     expect(snapshot.sheets[0]?.cells).toContainEqual({
       address: { row: 0, column: 1 },
@@ -551,9 +564,9 @@ describe("workbook snapshots", () => {
   });
 
   test("rejects unknown snapshot versions with a stable error code", () => {
-    expect(() => deserializeWorkbook({ version: 15 })).toThrowError(
+    expect(() => deserializeWorkbook({ version: 16 })).toThrowError(
       expect.objectContaining<Partial<WorkbookDomainError>>({
-        data: { code: "unsupported_snapshot_version", details: { version: 15 } },
+        data: { code: "unsupported_snapshot_version", details: { version: 16 } },
       }),
     );
   });

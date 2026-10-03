@@ -14,8 +14,14 @@ import {
   createSheetEvaluator,
   getCellStyle,
   getCellContent,
+  getCellHyperlink,
+  getCellNamedStyle,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_ROWS,
+  cloneCellHyperlink,
+  cloneCellNamedStyleBinding,
+  type CellHyperlink,
+  type CellNamedStyleBinding,
   type CellRange,
   type Sheet,
   type SheetEvaluator,
@@ -52,6 +58,8 @@ import {
 } from "./gridClipboardRows";
 
 export type CellStyleMatrix = Array<Array<CellStyle | null>>;
+export type CellNamedStyleMatrix = Array<Array<CellNamedStyleBinding | null>>;
+export type CellHyperlinkMatrix = Array<Array<CellHyperlink | null>>;
 
 export type GridPastePlan = PastePlan & {
   /** Physical destination row for each row in values; omitted for ordinary rectangular pastes. */
@@ -74,6 +82,8 @@ export type GridPastePayload =
       /** Physical source rows before filtered copies compact their value matrix. */
       sourceRows?: number[];
       styles?: CellStyleMatrix;
+      namedStyles?: CellNamedStyleMatrix;
+      hyperlinks?: CellHyperlinkMatrix;
       conditionalFormats?: SheetConditionalFormatRule[];
       /** Original external TSV fields for Text-number-format targets. */
       rawTextValues?: string[][];
@@ -83,6 +93,7 @@ export type GridPastePayload =
       kind: "formats";
       plan: GridPastePlan;
       styles: CellStyleMatrix;
+      namedStyles?: CellNamedStyleMatrix;
       conditionalFormats?: SheetConditionalFormatRule[];
       sourceRange?: CellRange;
       sourceRows?: number[];
@@ -119,6 +130,8 @@ type PendingClipboard = {
   contents: CellContentMatrix;
   values: CellValueMatrix;
   styles: CellStyleMatrix;
+  namedStyles: CellNamedStyleMatrix;
+  hyperlinks: CellHyperlinkMatrix;
   conditionalFormats: SheetConditionalFormatRule[];
   sourceRows?: number[];
   revision: number;
@@ -141,6 +154,38 @@ export function getCellRangeStyles(sheet: Sheet, range: CellRange): CellStyleMat
     styles.push(rowStyles);
   }
   return styles;
+}
+
+export function getCellRangeNamedStyles(sheet: Sheet, range: CellRange): CellNamedStyleMatrix {
+  const startRow = Math.min(range.start.row, range.end.row);
+  const endRow = Math.max(range.start.row, range.end.row);
+  const startColumn = Math.min(range.start.column, range.end.column);
+  const endColumn = Math.max(range.start.column, range.end.column);
+  const styles: CellNamedStyleMatrix = [];
+  for (let row = startRow; row <= endRow; row += 1) {
+    const rowStyles: Array<CellNamedStyleBinding | null> = [];
+    for (let column = startColumn; column <= endColumn; column += 1) {
+      rowStyles.push(cloneCellNamedStyleBinding(getCellNamedStyle(sheet, { row, column })) ?? null);
+    }
+    styles.push(rowStyles);
+  }
+  return styles;
+}
+
+export function getCellRangeHyperlinks(sheet: Sheet, range: CellRange): CellHyperlinkMatrix {
+  const startRow = Math.min(range.start.row, range.end.row);
+  const endRow = Math.max(range.start.row, range.end.row);
+  const startColumn = Math.min(range.start.column, range.end.column);
+  const endColumn = Math.max(range.start.column, range.end.column);
+  const hyperlinks: CellHyperlinkMatrix = [];
+  for (let row = startRow; row <= endRow; row += 1) {
+    const rowHyperlinks: Array<CellHyperlink | null> = [];
+    for (let column = startColumn; column <= endColumn; column += 1) {
+      rowHyperlinks.push(cloneCellHyperlink(getCellHyperlink(sheet, { row, column })) ?? null);
+    }
+    hyperlinks.push(rowHyperlinks);
+  }
+  return hyperlinks;
 }
 
 export function useGridClipboard(options: {
@@ -244,6 +289,8 @@ export function useGridClipboard(options: {
     const contents: CellContentMatrix = [];
     const values: CellValueMatrix = [];
     const styles: CellStyleMatrix = [];
+    const namedStyles: CellNamedStyleMatrix = [];
+    const hyperlinks: CellHyperlinkMatrix = [];
     const evaluator = options.getEvaluator?.() ?? createSheetEvaluator(sheet);
     for (const row of rows) {
       const rowRange = {
@@ -260,6 +307,8 @@ export function useGridClipboard(options: {
         }),
       );
       styles.push(getCellRangeStyles(sheet, rowRange)[0]!);
+      namedStyles.push(getCellRangeNamedStyles(sheet, rowRange)[0]!);
+      hyperlinks.push(getCellRangeHyperlinks(sheet, rowRange)[0]!);
     }
     const text = serializeCellValuesToTsv(values);
     const token = createToken();
@@ -272,6 +321,8 @@ export function useGridClipboard(options: {
       contents,
       values,
       styles,
+      namedStyles,
+      hyperlinks,
       conditionalFormats: (sheet.conditionalFormats ?? []).map(cloneConditionalFormatRule),
       sourceRows: compressed ? rows : undefined,
       revision: getRevision(),
@@ -565,6 +616,14 @@ export function useGridClipboard(options: {
       axis && isMatchingLocalClipboard && pending
         ? extendAxisMatrix(pending.styles, axis, targetRange, null)
         : pending?.styles;
+    const plannedNamedStyles =
+      axis && isMatchingLocalClipboard && pending
+        ? extendAxisMatrix(pending.namedStyles, axis, targetRange, null)
+        : pending?.namedStyles;
+    const plannedHyperlinks =
+      axis && isMatchingLocalClipboard && pending
+        ? extendAxisMatrix(pending.hyperlinks, axis, targetRange, null)
+        : pending?.hyperlinks;
     const plannedSourceRange =
       axis && isMatchingLocalClipboard && pending
         ? extendAxisRange(pending.range, axis, targetRange)
@@ -620,6 +679,10 @@ export function useGridClipboard(options: {
           plannedStyles ?? matchingFormatSource.styles,
           getCellMatrixSize(plan.values),
         ),
+        namedStyles: tileCellMatrix(
+          plannedNamedStyles ?? matchingFormatSource.namedStyles,
+          getCellMatrixSize(plan.values),
+        ),
         conditionalFormats: matchingFormatSource.conditionalFormats,
         sourceRange: plannedSourceRange ?? matchingFormatSource.range,
         sourceRows: matchingFormatSource.sourceRows,
@@ -649,6 +712,20 @@ export function useGridClipboard(options: {
           styles:
             isMatchingLocalClipboard && pending
               ? tileCellMatrix(plannedStyles ?? pending.styles, getCellMatrixSize(plan.values))
+              : undefined,
+          namedStyles:
+            isMatchingLocalClipboard && pending
+              ? tileCellMatrix(
+                  plannedNamedStyles ?? pending.namedStyles,
+                  getCellMatrixSize(plan.values),
+                )
+              : undefined,
+          hyperlinks:
+            isMatchingLocalClipboard && pending
+              ? tileCellMatrix(
+                  plannedHyperlinks ?? pending.hyperlinks,
+                  getCellMatrixSize(plan.values),
+                )
               : undefined,
           ...(isMatchingLocalClipboard && pending
             ? { conditionalFormats: pending.conditionalFormats }

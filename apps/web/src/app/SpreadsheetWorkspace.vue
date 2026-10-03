@@ -27,6 +27,8 @@ import TableSettingsDialog from "../modules/table-styles/components/TableSetting
 import ResizeTableDialog from "../modules/table-styles/components/ResizeTableDialog.vue";
 import TableToolsToolbar from "../modules/table-styles/components/TableToolsToolbar.vue";
 import NewTableStyleDialog from "../modules/table-styles/components/NewTableStyleDialog.vue";
+import HyperlinkDialog from "../modules/hyperlinks/components/HyperlinkDialog.vue";
+import { useHyperlinksController } from "../modules/hyperlinks/useHyperlinksController";
 import NewCellStyleDialog from "../modules/cell-styles/components/NewCellStyleDialog.vue";
 import MergeCellStylesDialog from "../modules/cell-styles/components/MergeCellStylesDialog.vue";
 import { useCellStylesController } from "../modules/cell-styles/useCellStylesController";
@@ -255,6 +257,24 @@ const {
 } = useSpreadsheetWorkspaceController();
 
 const cellEditSession = useCellEditSession({ onCommit: commitCell });
+const hyperlinkActions = useHyperlinksController({
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getAddress: () => activeAddress.value,
+  getGeneration: () => workbookGeneration.value,
+  isBusy: () => loading.value || fileBusy.value || xlsxBusy.value,
+  finishEditing: () => cellEditSession.finish(),
+  execute: executeCommand,
+  navigate: (sheetId, address) => {
+    selectSheet(sheetId);
+    void nextTick(() => navigateToAddress(formatCellAddress(address)));
+  },
+  openExternal: (target) => {
+    window.open(target, "_blank", "noopener,noreferrer");
+  },
+  focus: focusCellEditor,
+});
+const { draft: hyperlinkDraft, error: hyperlinkError } = hyperlinkActions;
 const cellStyleActions = useCellStylesController({
   getWorkbook: () => session.workbook,
   getSheet: () => activeSheet.value,
@@ -1356,7 +1376,7 @@ function onWorkspaceWheel(event: WheelEvent): void {
 }
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
-  if (formulaEditorVisible.value || formulaInsertVisible.value) return;
+  if (formulaEditorVisible.value || formulaInsertVisible.value || hyperlinkDraft.value) return;
   const picker = activeRangePicker.value;
   if (picker) {
     if (event.key === "Escape") picker.cancel();
@@ -1364,6 +1384,19 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     else if (event.key === "Tab") return;
     event.preventDefault();
     event.stopPropagation();
+    return;
+  }
+  if (
+    event.key.toLowerCase() === "k" &&
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    !event.isComposing &&
+    !cellEditSession.state.composing
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    hyperlinkActions.edit();
     return;
   }
   if (
@@ -1461,6 +1494,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         xlsxBusy ||
         !!cellFormatSelection ||
         !!conditionalFormattingSelection ||
+        !!hyperlinkDraft ||
         cellStylesModalOpen ||
         tableModalOpen ||
         !!findFormatDraft ||
@@ -1472,6 +1506,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!modalValidationFeedback
       "
       @insert-image="imageActions.requestInsert"
+      @insert-hyperlink="hyperlinkActions.edit"
       @apply-borders="applyCellBorders"
       @update-border-format="updateBorderFormat"
       @open-cell-format="openCellFormat"
@@ -2030,10 +2065,19 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @confirm="tableActions.confirmResize"
       @cancel="tableActions.close"
     />
+    <HyperlinkDialog
+      v-if="hyperlinkDraft"
+      :draft="hyperlinkDraft"
+      :error="hyperlinkError"
+      @confirm="hyperlinkActions.save"
+      @remove="hyperlinkActions.remove"
+      @cancel="hyperlinkActions.close"
+    />
     <NewCellStyleDialog
       v-if="cellStyleDraft"
       :style="cellStyleDraft.style"
       :initial-style="cellStyleDraft.initialStyle"
+      :error="cellStylesError"
       :existing-names="customCellStyles.map((style) => style.name)"
       :date-system="session.workbook.dateSystem"
       @confirm="cellStyleActions.saveStyle"
@@ -2132,6 +2176,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!cellFormatSelection ||
         !!findFormatDraft ||
         pickingReferenceRange ||
+        !!hyperlinkDraft ||
         cellStylesModalOpen ||
         tableModalOpen ||
         dataToolsModalOpen ||
@@ -2250,6 +2295,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         !!cellFormatSelection ||
         !!findFormatDraft ||
         dataToolsModalOpen ||
+        !!hyperlinkDraft ||
         cellStylesModalOpen ||
         (tableModalOpen && !pickingTableRange) ||
         formulaEditorVisible ||
@@ -2287,6 +2333,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @error-check-options="openDuplicateErrorOptions"
         @filter-column-request="dataTools.openColumnFilter($event)"
         @table-expand-request="tableActions.expandTable"
+        @open-hyperlink="hyperlinkActions.open"
         @validation-choose="chooseValidationValue"
         @outline-toggle="toggleOutline"
         @outline-level="showOutlineLevel"
@@ -2381,6 +2428,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         fileBusy ||
         xlsxBusy ||
         !!cellFormatSelection ||
+        !!hyperlinkDraft ||
         cellStylesModalOpen ||
         (tableModalOpen && !pickingTableRange)
       "

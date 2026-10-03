@@ -3,6 +3,8 @@ import { cloneCellStyle, type CellStyle } from "../style.js";
 import { cloneConditionalFormatRule } from "../conditional-formatting.js";
 import {
   cloneCellContent,
+  cloneCellHyperlink,
+  cloneCellNamedStyleBinding,
   cloneFloatingImage,
   cloneSheetTable,
   isCellAddressInBounds,
@@ -111,6 +113,8 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
       address: { ...cell.address },
       ...(cell.content === undefined ? {} : { content: cloneCellContent(cell.content) }),
       ...(cell.style ? { style: cloneCellStyle(cell.style) } : {}),
+      ...(cell.namedStyle ? { namedStyle: cloneCellNamedStyleBinding(cell.namedStyle) } : {}),
+      ...(cell.hyperlink ? { hyperlink: cloneCellHyperlink(cell.hyperlink) } : {}),
     })),
     rowHeights: state.rowHeights.map((dimension) => ({ ...dimension })),
     columnWidths: state.columnWidths.map((dimension) => ({ ...dimension })),

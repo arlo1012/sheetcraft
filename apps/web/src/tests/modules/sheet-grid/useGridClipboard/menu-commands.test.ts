@@ -3,6 +3,8 @@ import { describe, expect, test, vi } from "vitest";
 import {
   createWorkbook,
   getActiveSheet,
+  setCellHyperlink,
+  setCellNamedStyle,
   setCellContent,
   setCellStyle,
   setCellValue,
@@ -275,6 +277,32 @@ describe("useGridClipboard menu commands", () => {
     expect(fixture.feedback).toEqual(["copied", "pasted"]);
   });
 
+  test("retains local hyperlink and named-style metadata for an ordinary paste", async () => {
+    const fixture = createFixture();
+    const source = { row: 0, column: 0 };
+    setCellValue(fixture.sheet, source, "source");
+    setCellNamedStyle(
+      fixture.sheet,
+      source,
+      { bold: true },
+      { styleId: "report-label", includes: ["font"] },
+    );
+    setCellHyperlink(fixture.sheet, source, {
+      target: "https://example.com/report",
+      tooltip: "Open report",
+    });
+
+    await fixture.clipboard.copySelection();
+    fixture.setSelection(createCellSelection({ row: 2, column: 3 }));
+    await fixture.clipboard.pasteSelection();
+
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "all",
+      namedStyles: [[{ styleId: "report-label", includes: ["font"] }]],
+      hyperlinks: [[{ target: "https://example.com/report", tooltip: "Open report" }]],
+    });
+  });
+
   test("uses an injected workbook evaluator for formula copy values", async () => {
     const evaluator: SheetEvaluator = { getComputedValue: vi.fn(() => 42) };
     const fixture = createFixture({ evaluator });
@@ -502,6 +530,28 @@ describe("useGridClipboard menu commands", () => {
     expect(fixture.feedback).toEqual(["copied", "valuesPasted"]);
   });
 
+  test("keeps named-style metadata with formats only but excludes hyperlinks", async () => {
+    const fixture = createFixture();
+    const source = { row: 0, column: 0 };
+    setCellNamedStyle(
+      fixture.sheet,
+      source,
+      { italic: true },
+      { styleId: "note", includes: ["font"] },
+    );
+    setCellHyperlink(fixture.sheet, source, { target: "https://example.com/note" });
+    await fixture.clipboard.copySelection();
+    fixture.setSelection(createCellSelection({ row: 2, column: 3 }));
+
+    await fixture.clipboard.pasteFormatsSelection();
+
+    expect(fixture.pastes[0]).toMatchObject({
+      kind: "formats",
+      namedStyles: [[{ styleId: "note", includes: ["font"] }]],
+    });
+    expect(fixture.pastes[0]).not.toHaveProperty("hyperlinks");
+  });
+
   test("pastes tiled local formatting and revalidates the clipboard token", async () => {
     const fixture = createFixture();
     setCellStyle(fixture.sheet, { row: 0, column: 0 }, { bold: true });
@@ -519,6 +569,7 @@ describe("useGridClipboard menu commands", () => {
       kind: "formats",
       conditionalFormats: [],
       sourceRange: { start: { row: 0, column: 0 }, end: { row: 0, column: 0 } },
+      sourceRows: undefined,
       plan: {
         anchor: { row: 2, column: 2 },
         range: { start: { row: 2, column: 2 }, end: { row: 3, column: 3 } },
@@ -530,6 +581,10 @@ describe("useGridClipboard menu commands", () => {
       styles: [
         [{ bold: true }, { bold: true }],
         [{ bold: true }, { bold: true }],
+      ],
+      namedStyles: [
+        [null, null],
+        [null, null],
       ],
     });
 

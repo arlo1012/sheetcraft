@@ -25,6 +25,8 @@ import {
   normalizePivotTableStyleDefinition,
   replaceSheetSparseState,
   type CellAddress,
+  type CellHyperlink,
+  type CellNamedStyleBinding,
   type CellRange,
   type CellValue,
   type FreezePanes,
@@ -42,6 +44,8 @@ import {
   type SheetConditionalFormatRule,
   type SheetTable,
   type Workbook,
+  normalizeCellHyperlink,
+  normalizeCellNamedStyleBinding,
   type DefinedName,
 } from "./workbook.js";
 import { createFormulaError, isFormulaErrorCode, type CellContent } from "./formula/types.js";
@@ -117,7 +121,10 @@ export type WorkbookSnapshotV5 = Omit<WorkbookSnapshotV4, "version" | "sheets"> 
   version: 5;
   sheets: SheetSnapshotV5[];
 };
-export type CellSnapshotV6 = CellSnapshotV5;
+export type CellSnapshotV6 = CellSnapshotV5 & {
+  namedStyle?: CellNamedStyleBinding;
+  hyperlink?: CellHyperlink;
+};
 export type SheetSnapshotV6 = Omit<SheetSnapshotV5, "cells"> & {
   cells: CellSnapshotV6[];
 };
@@ -157,8 +164,9 @@ export type WorkbookSnapshotV14 = Omit<WorkbookSnapshotV13, "version"> & {
   version: 14;
   cellStyles?: CellStyleDefinition[];
 };
+export type WorkbookSnapshotV15 = Omit<WorkbookSnapshotV14, "version"> & { version: 15 };
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV14;
+export type WorkbookSnapshot = WorkbookSnapshotV15;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -170,7 +178,7 @@ export type SheetSnapshot = SheetSnapshotV7 & {
   conditionalFormats?: SheetConditionalFormatRule[];
   tables?: SheetTable[];
 };
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -296,7 +304,7 @@ function parseCellContent(value: unknown, path: string, version: SnapshotVersion
   return fail(`${path}.kind`, "Invalid cell content kind for this snapshot version.");
 }
 
-function parseCell(value: unknown, path: string, version: SnapshotVersion): CellSnapshotV4 {
+function parseCell(value: unknown, path: string, version: SnapshotVersion): CellSnapshotV6 {
   const record = asRecord(value, path);
   const hasContent = Object.hasOwn(record, "content");
   const hasValue = Object.hasOwn(record, "value");
@@ -309,7 +317,12 @@ function parseCell(value: unknown, path: string, version: SnapshotVersion): Cell
         : "V1 cells use value, not content.",
     );
   }
-  if ((version === 1 && !hasValue && !hasStyle) || (version !== 1 && !hasContent && !hasStyle)) {
+  const hasNamedStyle = version >= 15 && Object.hasOwn(record, "namedStyle");
+  const hasHyperlink = version >= 15 && Object.hasOwn(record, "hyperlink");
+  if (
+    (version === 1 && !hasValue && !hasStyle) ||
+    (version !== 1 && !hasContent && !hasStyle && !hasNamedStyle && !hasHyperlink)
+  ) {
     return fail(path, "Expected content or style.");
   }
 
@@ -328,6 +341,12 @@ function parseCell(value: unknown, path: string, version: SnapshotVersion): Cell
           }
         : {}),
     ...(hasStyle ? { style: parseStyle(record.style, `${path}.style`) } : {}),
+    ...(hasNamedStyle
+      ? { namedStyle: normalizeCellNamedStyleBinding(record.namedStyle as CellNamedStyleBinding) }
+      : {}),
+    ...(hasHyperlink
+      ? { hyperlink: normalizeCellHyperlink(record.hyperlink as CellHyperlink) }
+      : {}),
   };
 }
 
@@ -599,15 +618,20 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
       return fail(`${path}.cells`, "Cannot mix V1 value and V2 content cells.");
     version = hasValue
       ? 1
-      : Object.hasOwn(record, "tables")
-        ? 13
-        : Object.hasOwn(record, "conditionalFormats")
-          ? 12
-          : Object.hasOwn(record, "properties")
-            ? 7
-            : Object.hasOwn(record, "floatingImages")
-              ? 6
-              : 3;
+      : cells.some((cell) => {
+            const item = asRecord(cell, `${path}.cells`);
+            return Object.hasOwn(item, "namedStyle") || Object.hasOwn(item, "hyperlink");
+          })
+        ? 15
+        : Object.hasOwn(record, "tables")
+          ? 13
+          : Object.hasOwn(record, "conditionalFormats")
+            ? 12
+            : Object.hasOwn(record, "properties")
+              ? 7
+              : Object.hasOwn(record, "floatingImages")
+                ? 6
+                : 3;
   }
   const id = asIdentifier(record.id, `${path}.id`);
   let name: string;
@@ -650,7 +674,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 14,
+    version: 15,
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
@@ -690,7 +714,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 11 &&
     record.version !== 12 &&
     record.version !== 13 &&
-    record.version !== 14
+    record.version !== 14 &&
+    record.version !== 15
   ) {
     throw new WorkbookDomainError(
       {

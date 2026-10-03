@@ -1,3 +1,4 @@
+import { hyperlinksEnUS } from "../../../modules/hyperlinks/hyperlink-messages.en-US";
 import { cellStylesEnUS } from "../../../modules/cell-styles/cell-style-messages.en-US";
 import { simulationEnUS } from "../../../modules/data-tools/simulation-messages.en-US";
 import { dataTableEnUS } from "../../../modules/data-tools/data-table-messages.en-US";
@@ -11,6 +12,7 @@ import { tablesEnUS } from "../../../modules/table-styles/table-messages.en-US";
 export const enUS = {
   ...formulaToolsEnUS,
   ...conditionalFormattingEnUS,
+  ...hyperlinksEnUS,
   ...cellStylesEnUS,
   ...tableStylesEnUS,
   ...tablesEnUS,

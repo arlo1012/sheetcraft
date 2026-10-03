@@ -90,3 +90,87 @@ test("format confirmation updates only the style draft until the parent confirms
   wrapper.unmount();
   document.body.replaceChildren();
 });
+
+test("saves the selected style groups while retaining the complete format draft", async () => {
+  const wrapper = mount(NewCellStyleDialog, {
+    attachTo: document.body,
+    props: {
+      existingNames: [],
+      initialStyle: {
+        numberFormat: { kind: "custom", code: "#,##0.00;[Red]-#,##0.00" },
+        horizontalAlign: "center",
+        verticalAlign: "middle",
+        wrapText: true,
+        indent: 2,
+        textRotation: 45,
+        fillColor: "#c6efce",
+        borderBottom: { style: "thin", color: "#112233" },
+      },
+    },
+    global: { plugins: [createAppI18n("en-US")] },
+  });
+
+  expect(wrapper.text()).toContain("#,##0.00;[Red]-#,##0.00");
+  expect(wrapper.text()).toContain("Wrap text");
+  expect(wrapper.text()).toContain("Indent 2");
+  expect(wrapper.text()).toContain("Rotation 45°");
+  expect(wrapper.text()).toContain("Bottom: thin #112233");
+
+  for (const group of ["alignment", "font", "border", "fill"]) {
+    await wrapper.get(`[data-cell-style-include="${group}"] input`).setValue(false);
+  }
+  await wrapper.findComponent(Dialog).vm.$emit("confirm");
+  expect(wrapper.emitted("confirm")?.[0]?.[0]).toMatchObject({
+    includes: ["number"],
+    style: {
+      fillColor: "#c6efce",
+      borderBottom: { style: "thin", color: "#112233" },
+    },
+  });
+  wrapper.unmount();
+  document.body.replaceChildren();
+});
+
+test("uses explicit style groups when editing and treats legacy styles as all groups", () => {
+  const explicit = mount(NewCellStyleDialog, {
+    attachTo: document.body,
+    props: {
+      existingNames: ["Number only"],
+      style: {
+        id: "number-only",
+        name: "Number only",
+        category: "custom",
+        includes: ["number"],
+        style: { numberFormat: { kind: "percent", fractionDigits: 1 } },
+      },
+      initialStyle: {},
+    },
+    global: { plugins: [createAppI18n("en-US")] },
+  });
+  expect(
+    (explicit.get('[data-cell-style-include="number"] input').element as HTMLInputElement).checked,
+  ).toBe(true);
+  expect(
+    (explicit.get('[data-cell-style-include="font"] input').element as HTMLInputElement).checked,
+  ).toBe(false);
+  explicit.unmount();
+  document.body.replaceChildren();
+
+  const legacy = mount(NewCellStyleDialog, {
+    attachTo: document.body,
+    props: {
+      existingNames: ["Legacy"],
+      style: { id: "legacy", name: "Legacy", category: "custom", style: {} },
+      initialStyle: {},
+    },
+    global: { plugins: [createAppI18n("en-US")] },
+  });
+  for (const group of ["number", "alignment", "font", "border", "fill"]) {
+    expect(
+      (legacy.get(`[data-cell-style-include="${group}"] input`).element as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+  }
+  legacy.unmount();
+  document.body.replaceChildren();
+});

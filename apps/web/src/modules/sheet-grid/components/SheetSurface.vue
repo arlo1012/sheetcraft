@@ -49,6 +49,7 @@ const props = withDefaults(
     errorCells?: ReadonlySet<string>;
     errorIndicatorColor?: string | null;
     label: string;
+    title?: string;
     cursor?: string;
     showGridLines?: boolean;
     locale?: string;
@@ -227,6 +228,7 @@ defineExpose({ invalidate });
       data-sheet-surface
       tabindex="0"
       :aria-label="label"
+      :title="title"
       :style="{ cursor }"
       @pointerdown="emit('pointerdown', $event)"
       @pointermove="emit('pointermove', $event)"
