@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { useAppI18n } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import type { SheetHorizontalScrollState } from "../horizontal-scroll";
 
 const props = defineProps<{
@@ -119,16 +120,15 @@ function onWheel(event: WheelEvent): void {
 
 <template>
   <div class="sheet-horizontal-scrollbar">
-    <button
+    <span
+      v-icon-action="!canScrollLeft"
       class="sheet-horizontal-scrollbar__button"
-      type="button"
-      :disabled="!canScrollLeft"
       :aria-label="t('grid.scrollLeft')"
       :title="t('grid.scrollLeft')"
       @click="scrollByStep(-1)"
     >
       <ChevronLeft :size="10" aria-hidden="true" />
-    </button>
+    </span>
     <div
       ref="trackRef"
       class="sheet-horizontal-scrollbar__track"
@@ -152,16 +152,15 @@ function onWheel(event: WheelEvent): void {
     >
       <div ref="thumbRef" class="sheet-horizontal-scrollbar__thumb" :style="thumbStyle" />
     </div>
-    <button
+    <span
+      v-icon-action="!canScrollRight"
       class="sheet-horizontal-scrollbar__button"
-      type="button"
-      :disabled="!canScrollRight"
       :aria-label="t('grid.scrollRight')"
       :title="t('grid.scrollRight')"
       @click="scrollByStep(1)"
     >
       <ChevronRight :size="10" aria-hidden="true" />
-    </button>
+    </span>
   </div>
 </template>
 
@@ -186,11 +185,11 @@ function onWheel(event: WheelEvent): void {
     background: transparent;
     cursor: pointer;
 
-    &:hover:not(:disabled) {
+    &:hover:not([aria-disabled="true"]) {
       background: var(--idea-icon-button-hover-bg);
     }
 
-    &:disabled {
+    &[aria-disabled="true"] {
       color: var(--idea-text-disabled);
       cursor: default;
     }

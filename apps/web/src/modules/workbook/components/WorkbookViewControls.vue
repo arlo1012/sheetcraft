@@ -16,6 +16,7 @@ import WorkbookZoomMenu from "./WorkbookZoomMenu.vue";
 import WorkbookDisplaySettings from "./WorkbookDisplaySettings.vue";
 import { computed, nextTick, ref, useId } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   MAX_SHEET_ZOOM,
@@ -87,7 +88,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const colorTriggerRef = ref<HTMLButtonElement | null>(null);
+const colorTriggerRef = ref<HTMLElement | null>(null);
 const colorPanelRef = ref<HTMLDivElement | null>(null);
 const colorPickerOpen = ref(false);
 const colorPanelId = `workbook-highlight-color-${useId().replaceAll(":", "")}`;
@@ -170,8 +171,8 @@ function selectHighlightColor(value: string | null): void {
 
 <template>
   <div class="workbook-view-controls" :aria-label="t('statusBar.viewAndZoom')" role="group">
-    <button
-      type="button"
+    <span
+      v-icon-action
       class="workbook-view-controls__button workbook-view-controls__eye-comfort"
       :class="{ 'is-active': eyeComfortEnabled }"
       :aria-label="t('statusBar.eyeComfortMode')"
@@ -181,7 +182,7 @@ function selectHighlightColor(value: string | null): void {
       @click="emit('update:eyeComfortEnabled', !eyeComfortEnabled)"
     >
       <Eye :size="15" aria-hidden="true" />
-    </button>
+    </span>
     <WorkbookDisplaySettings
       :show-headers="showHeaders"
       :show-grid-lines="showGridLines"
@@ -195,8 +196,8 @@ function selectHighlightColor(value: string | null): void {
       :class="{ 'is-active': highlightEnabled }"
       :style="highlightStyles"
     >
-      <button
-        type="button"
+      <span
+        v-icon-action
         class="workbook-view-controls__button workbook-view-controls__highlight-toggle"
         :aria-label="t('statusBar.highlightRowColumn')"
         :aria-pressed="highlightEnabled"
@@ -211,10 +212,10 @@ function selectHighlightColor(value: string | null): void {
           :stroke-width="1.8"
           aria-hidden="true"
         />
-      </button>
-      <button
+      </span>
+      <span
+        v-icon-action
         ref="colorTriggerRef"
-        type="button"
         class="workbook-view-controls__button workbook-view-controls__color-trigger"
         :aria-label="t('statusBar.highlightColor')"
         :aria-controls="colorPickerOpen ? colorPanelId : undefined"
@@ -226,12 +227,12 @@ function selectHighlightColor(value: string | null): void {
         @keydown="onColorTriggerKeydown"
       >
         <ChevronDown :size="12" aria-hidden="true" />
-      </button>
+      </span>
     </div>
 
-    <button
+    <span
+      v-icon-action
       v-if="fullscreenAvailable"
-      type="button"
       class="workbook-view-controls__button"
       :aria-label="t(fullscreen ? 'statusBar.exitFullscreen' : 'statusBar.fullscreen')"
       :aria-pressed="fullscreen"
@@ -241,20 +242,19 @@ function selectHighlightColor(value: string | null): void {
     >
       <Minimize2 v-if="fullscreen" :size="15" aria-hidden="true" />
       <Maximize2 v-else :size="15" aria-hidden="true" />
-    </button>
+    </span>
 
     <div class="workbook-view-controls__zoom" role="group" :aria-label="t('statusBar.zoomSlider')">
-      <button
-        type="button"
+      <span
+        v-icon-action="normalizeSheetZoom(zoom) <= MIN_SHEET_ZOOM"
         class="workbook-view-controls__button"
-        :disabled="normalizeSheetZoom(zoom) <= MIN_SHEET_ZOOM"
         :aria-label="t('statusBar.zoomOut')"
         :title="t('statusBar.zoomOut')"
         data-view-control="zoom-out"
         @click="updateZoom(zoom - SHEET_ZOOM_STEP)"
       >
         <Minus :size="15" aria-hidden="true" />
-      </button>
+      </span>
       <div class="workbook-view-controls__slider" data-view-control="zoom-slider">
         <input
           class="workbook-view-controls__slider-input"
@@ -274,17 +274,16 @@ function selectHighlightColor(value: string | null): void {
         @select="updateZoom"
         @fit-selection="emit('fitSelection')"
       />
-      <button
-        type="button"
+      <span
+        v-icon-action="normalizeSheetZoom(zoom) >= MAX_SHEET_ZOOM"
         class="workbook-view-controls__button"
-        :disabled="normalizeSheetZoom(zoom) >= MAX_SHEET_ZOOM"
         :aria-label="t('statusBar.zoomIn')"
         :title="t('statusBar.zoomIn')"
         data-view-control="zoom-in"
         @click="updateZoom(zoom + SHEET_ZOOM_STEP)"
       >
         <Plus :size="15" aria-hidden="true" />
-      </button>
+      </span>
     </div>
 
     <Teleport to="body">
@@ -350,7 +349,7 @@ function selectHighlightColor(value: string | null): void {
     color: inherit;
     cursor: pointer;
 
-    &:hover:not(:disabled),
+    &:hover:not([aria-disabled="true"]),
     &[aria-expanded="true"] {
       background: var(--idea-icon-button-hover-bg);
     }
@@ -359,7 +358,7 @@ function selectHighlightColor(value: string | null): void {
       z-index: 1;
     }
 
-    &:disabled {
+    &[aria-disabled="true"] {
       color: var(--idea-text-disabled);
       cursor: default;
     }

@@ -96,12 +96,14 @@ describe("workspace zoom gestures", () => {
       await wheel(grid.element, -100);
       expect(slider.element.value).toBe("400");
       expect(sheet.element.style.zoom).toBe("4");
-      expect(wrapper.get('[data-view-control="zoom-in"]').attributes("disabled")).toBeDefined();
+      expect(wrapper.get('[data-view-control="zoom-in"]').attributes("aria-disabled")).toBe("true");
       await slider.setValue("10");
       await wheel(grid.element, 100);
       expect(slider.element.value).toBe("10");
       expect(sheet.element.style.zoom).toBe("0.1");
-      expect(wrapper.get('[data-view-control="zoom-out"]').attributes("disabled")).toBeDefined();
+      expect(wrapper.get('[data-view-control="zoom-out"]').attributes("aria-disabled")).toBe(
+        "true",
+      );
     } finally {
       wrapper.unmount();
     }

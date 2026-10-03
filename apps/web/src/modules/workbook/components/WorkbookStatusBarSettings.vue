@@ -2,6 +2,7 @@
 import { Check, ListChecks } from "lucide-vue-next";
 import { ref, useId } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -11,7 +12,7 @@ import type { StatusBarNumberFormat, StatusBarSettings } from "../composables/us
 const props = defineProps<{ modelValue: StatusBarSettings }>();
 const emit = defineEmits<{ "update:modelValue": [value: StatusBarSettings] }>();
 const { t } = useAppI18n();
-const triggerRef = ref<HTMLButtonElement | null>(null);
+const triggerRef = ref<HTMLElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `status-bar-settings-${useId().replaceAll(":", "")}`;
 const { open, floatingStyles, toggleMenu, onTriggerKeydown } = useMenu({
@@ -36,10 +37,10 @@ function selectNumberFormat(numberFormat: StatusBarNumberFormat): void {
 </script>
 
 <template>
-  <button
+  <span
+    v-icon-action
     ref="triggerRef"
     class="workbook-status-bar-settings__trigger"
-    type="button"
     :aria-label="t('statusBar.statisticsSettings')"
     :title="t('statusBar.statisticsSettings')"
     :aria-controls="open ? menuId : undefined"
@@ -50,7 +51,7 @@ function selectNumberFormat(numberFormat: StatusBarNumberFormat): void {
     @keydown="onTriggerKeydown"
   >
     <ListChecks :size="16" aria-hidden="true" />
-  </button>
+  </span>
 
   <Teleport to="body">
     <MenuSurface

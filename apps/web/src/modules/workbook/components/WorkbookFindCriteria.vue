@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { Button } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dropdown, DropdownItem, DropdownMenu } from "tdesign-vue-next/es/dropdown";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -9,6 +8,7 @@ import type { SheetSearchFormat } from "@idea10/core/search";
 import WorkbookFindFormatControl from "./WorkbookFindFormatControl.vue";
 import WorkbookFindQueryInput from "./WorkbookFindQueryInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import type { WorkbookFindFormatMode, WorkbookFindOptions } from "../workbook-find-types";
 
 defineProps<{
@@ -156,15 +156,16 @@ defineExpose({ focusQuery });
           onVisibleChange: (visible) => (specialOpen = visible),
         }"
       >
-        <Button
-          variant="outline"
+        <span
+          v-icon-action
+          class="workbook-find-criteria__tool-trigger"
           :aria-label="t('navigation.findSpecialContent')"
           aria-haspopup="menu"
           :aria-expanded="specialOpen"
         >
           {{ t("navigation.findSpecialContent") }}
-          <template #suffix><ChevronDown :size="14" /></template>
-        </Button>
+          <ChevronDown :size="14" aria-hidden="true" />
+        </span>
         <template #dropdown>
           <DropdownMenu>
             <DropdownItem divider @click="insertSpecial('^l')">
@@ -188,15 +189,19 @@ defineExpose({ focusQuery });
           </DropdownMenu>
         </template>
       </Dropdown>
-      <Button
-        variant="outline"
+      <span
+        v-icon-action
+        class="workbook-find-criteria__tool-trigger"
         :aria-expanded="expanded"
         aria-controls="find-options"
         @click="emit('updateExpanded', !expanded)"
         >{{ t("navigation.findOptions")
-        }}<template #suffix
-          ><ChevronUp v-if="expanded" :size="14" /><ChevronDown v-else :size="14" /></template
-      ></Button>
+        }}<ChevronUp v-if="expanded" :size="14" aria-hidden="true" /><ChevronDown
+          v-else
+          :size="14"
+          aria-hidden="true"
+        />
+      </span>
     </div>
   </section>
 </template>
@@ -245,6 +250,23 @@ defineExpose({ focusQuery });
     flex-wrap: wrap;
     gap: var(--idea-space-2);
     min-width: 0;
+  }
+  &__tool-trigger {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    gap: var(--idea-space-1);
+    padding: 0 var(--idea-space-3);
+    color: var(--idea-text-primary);
+    background: var(--idea-surface-panel);
+    border: 1px solid var(--idea-border-subtle);
+    border-radius: var(--idea-radius-small);
+    cursor: pointer;
+
+    &:hover,
+    &[aria-expanded="true"] {
+      background: var(--idea-surface-hover);
+    }
   }
   &__special-content {
     display: flex;

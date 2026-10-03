@@ -39,7 +39,7 @@ function rotateMenu() {
 describe("SheetFloatingImageToolbar", () => {
   test("shows the compact crop, rotate, and restore actions above the image", () => {
     mountToolbar({ canRestore: false });
-    const controls = toolbar().findAll("button");
+    const controls = toolbar().findAll('[role="button"]');
 
     expect(toolbar().attributes("role")).toBe("toolbar");
     expect(toolbar().attributes("style")).toContain("position: fixed");
@@ -52,7 +52,7 @@ describe("SheetFloatingImageToolbar", () => {
       "aria-haspopup": "menu",
       "aria-expanded": "false",
     });
-    expect((controls[2]!.element as HTMLButtonElement).disabled).toBe(true);
+    expect(controls[2]?.attributes("aria-disabled")).toBe("true");
   });
 
   test("orders rotation then flip choices and restores focus after keyboard selection", async () => {
@@ -109,7 +109,7 @@ describe("SheetFloatingImageToolbar", () => {
 
   test("replaces the strip with crop confirmation controls and cancels crop on Escape", async () => {
     const wrapper = mountToolbar({ cropping: true });
-    const controls = toolbar().findAll("button");
+    const controls = toolbar().findAll('[role="button"]');
 
     expect(
       controls.map((control) => control.attributes("data-floating-image-toolbar-action")),
@@ -124,8 +124,8 @@ describe("SheetFloatingImageToolbar", () => {
 
   test("disables every action without removing the concise control strip", () => {
     mountToolbar({ disabled: true, canRestore: true });
-    for (const control of toolbar().findAll("button")) {
-      expect((control.element as HTMLButtonElement).disabled).toBe(true);
+    for (const control of toolbar().findAll('[role="button"]')) {
+      expect(control.attributes("aria-disabled")).toBe("true");
     }
   });
 });

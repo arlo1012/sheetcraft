@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { TriangleAlert, X } from "lucide-vue-next";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import { computed, ref } from "vue";
 import type { CellAddress } from "@idea10/core/workbook";
 import type { SheetRenderFrame } from "../rendering/sheet-render-frame";
@@ -87,16 +88,16 @@ const overlay = computed(() => {
     <div class="sheet-cell-notice__content">
       <div v-if="title || closeLabel" class="sheet-cell-notice__header">
         <strong v-if="title">{{ title }}</strong>
-        <button
+        <span
           v-if="closeLabel"
-          type="button"
+          v-icon-action
           class="sheet-cell-notice__close"
           :aria-label="closeLabel"
           @pointerdown.prevent.stop
           @click.stop="emit('close')"
         >
           <X :size="18" aria-hidden="true" />
-        </button>
+        </span>
       </div>
       <p v-if="message">{{ message }}</p>
     </div>

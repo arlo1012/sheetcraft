@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SelectionBorderState } from "@idea10/core/style-state";
 import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import { useAppI18n } from "../../../shared/i18n";
 import CellFormatBorderPreviewEdge from "./CellFormatBorderPreviewEdge.vue";
 import type { CellFormatBorderCapabilities } from "../border-capabilities";
@@ -16,8 +17,8 @@ const { t } = useAppI18n();
 <template>
   <div class="cell-format-border-preview">
     <div class="cell-format-border-preview__horizontal-controls">
-      <button
-        type="button"
+      <span
+        v-icon-action
         :data-border-side="'top'"
         :aria-label="t('format.borderTop')"
         :title="t('format.borderTop')"
@@ -25,20 +26,19 @@ const { t } = useAppI18n();
         @click="emit('toggle', 'top')"
       >
         <CellBorderPresetIcon preset="top" />
-      </button>
-      <button
-        type="button"
+      </span>
+      <span
+        v-icon-action="capabilities?.innerHorizontal === false"
         :data-border-side="'innerHorizontal'"
-        :disabled="capabilities?.innerHorizontal === false"
         :aria-label="t('format.borderInnerHorizontal')"
         :title="t('format.borderInnerHorizontal')"
         :aria-pressed="state.innerHorizontal.mixed ? 'mixed' : Boolean(state.innerHorizontal.value)"
         @click="emit('toggle', 'innerHorizontal')"
       >
         <CellBorderPresetIcon preset="innerHorizontal" />
-      </button>
-      <button
-        type="button"
+      </span>
+      <span
+        v-icon-action
         :data-border-side="'bottom'"
         :aria-label="t('format.borderBottom')"
         :title="t('format.borderBottom')"
@@ -46,7 +46,7 @@ const { t } = useAppI18n();
         @click="emit('toggle', 'bottom')"
       >
         <CellBorderPresetIcon preset="bottom" />
-      </button>
+      </span>
     </div>
     <div class="cell-format-border-preview__surface">
       <div
@@ -158,8 +158,8 @@ const { t } = useAppI18n();
       </svg>
     </div>
     <div class="cell-format-border-preview__vertical-controls">
-      <button
-        type="button"
+      <span
+        v-icon-action
         :data-border-side="'diagonalUp'"
         :aria-label="t('format.borderDiagonalUp')"
         :title="t('format.borderDiagonalUp')"
@@ -167,9 +167,9 @@ const { t } = useAppI18n();
         @click="emit('toggle', 'diagonalUp')"
       >
         <CellBorderPresetIcon preset="diagonalUp" />
-      </button>
-      <button
-        type="button"
+      </span>
+      <span
+        v-icon-action
         :data-border-side="'left'"
         :aria-label="t('format.borderLeft')"
         :title="t('format.borderLeft')"
@@ -177,20 +177,19 @@ const { t } = useAppI18n();
         @click="emit('toggle', 'left')"
       >
         <CellBorderPresetIcon preset="left" />
-      </button>
-      <button
-        type="button"
+      </span>
+      <span
+        v-icon-action="capabilities?.innerVertical === false"
         :data-border-side="'innerVertical'"
-        :disabled="capabilities?.innerVertical === false"
         :aria-label="t('format.borderInnerVertical')"
         :title="t('format.borderInnerVertical')"
         :aria-pressed="state.innerVertical.mixed ? 'mixed' : Boolean(state.innerVertical.value)"
         @click="emit('toggle', 'innerVertical')"
       >
         <CellBorderPresetIcon preset="innerVertical" />
-      </button>
-      <button
-        type="button"
+      </span>
+      <span
+        v-icon-action
         :data-border-side="'right'"
         :aria-label="t('format.borderRight')"
         :title="t('format.borderRight')"
@@ -198,9 +197,9 @@ const { t } = useAppI18n();
         @click="emit('toggle', 'right')"
       >
         <CellBorderPresetIcon preset="right" />
-      </button>
-      <button
-        type="button"
+      </span>
+      <span
+        v-icon-action
         :data-border-side="'diagonalDown'"
         :aria-label="t('format.borderDiagonalDown')"
         :title="t('format.borderDiagonalDown')"
@@ -208,7 +207,7 @@ const { t } = useAppI18n();
         @click="emit('toggle', 'diagonalDown')"
       >
         <CellBorderPresetIcon preset="diagonalDown" />
-      </button>
+      </span>
     </div>
   </div>
 </template>
@@ -232,7 +231,7 @@ const { t } = useAppI18n();
   }
   &__horizontal-controls,
   &__vertical-controls {
-    > button {
+    > span {
       display: grid;
       flex: none;
       place-items: center;
@@ -245,7 +244,7 @@ const { t } = useAppI18n();
       color: var(--idea-text-primary);
       cursor: pointer;
 
-      &:hover:not(:disabled) {
+      &:hover:not([aria-disabled="true"]) {
         background: var(--idea-icon-button-hover-bg);
       }
       &[aria-pressed="true"] {
@@ -257,7 +256,7 @@ const { t } = useAppI18n();
         color: var(--idea-text-muted);
       }
 
-      &:disabled {
+      &[aria-disabled="true"] {
         opacity: 0.45;
         cursor: not-allowed;
       }

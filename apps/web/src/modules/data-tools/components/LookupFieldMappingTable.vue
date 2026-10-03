@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Trash2 } from "lucide-vue-next";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import { BaseTable as TTable } from "tdesign-vue-next/es/table";
 import type { BaseTableCol } from "tdesign-vue-next/es/table/type";
 import TableHeightWrapper from "../../../shared/table/TableHeightWrapper.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import type { DataToolColumn } from "../data-tools-types";
 import type { LookupFillFieldDraft } from "../lookup-fill-types";
 
@@ -93,15 +93,13 @@ function change(index: number, key: keyof LookupFillFieldDraft, value: unknown):
             />
           </template>
           <template #remove="{ rowIndex }">
-            <TButton
-              variant="text"
-              shape="square"
-              :disabled="busy"
+            <span
+              v-icon-action="busy"
               :aria-label="t('dataTools.lookupFill.removeField')"
               :title="t('dataTools.lookupFill.removeField')"
               @click="emit('remove', rowIndex)"
               ><Trash2 :size="15"
-            /></TButton>
+            /></span>
           </template>
         </TTable>
       </TableHeightWrapper>
@@ -135,6 +133,10 @@ function change(index: number, key: keyof LookupFillFieldDraft, value: unknown):
     height: 220px;
     min-width: 0;
     min-height: 0;
+  }
+  &__table [role="button"] {
+    width: 28px;
+    height: 28px;
   }
 }
 </style>

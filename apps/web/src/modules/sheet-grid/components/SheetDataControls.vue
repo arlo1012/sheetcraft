@@ -12,6 +12,7 @@ import {
 } from "../outline-layout";
 import SheetCellNotice from "./SheetCellNotice.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import MenuSearch from "../../../shared/menu/MenuSearch.vue";
@@ -44,7 +45,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const validationTriggerRef = ref<HTMLButtonElement | null>(null);
+const validationTriggerRef = ref<HTMLElement | null>(null);
 const validationMenuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const validationMenuId = `sheet-validation-menu-${useId().replaceAll(":", "")}`;
 const validationSearch = ref("");
@@ -207,26 +208,25 @@ watch(
 
 <template>
   <div class="sheet-data-controls" aria-hidden="false">
-    <button
+    <span
       v-for="button in filterButtons"
       :key="button.column"
-      type="button"
+      v-icon-action="readOnly"
       class="sheet-data-controls__filter"
       :style="button.style"
       :class="{ 'is-active': button.active }"
       :aria-label="`${t('dataTools.filter.openColumn')} ${columnIndexToLabel(button.column)}`"
       :title="t('dataTools.filter.openColumn')"
-      :disabled="readOnly"
       @pointerdown.stop
       @click.stop="requestColumnFilter(button.column, $event)"
     >
       <ChevronDown :size="13" aria-hidden="true" />
-    </button>
+    </span>
 
     <template v-if="validationButtonStyle && validationInfo">
-      <button
+      <span
         ref="validationTriggerRef"
-        type="button"
+        v-icon-action="readOnly"
         class="sheet-data-controls__validation"
         :style="validationButtonStyle"
         :aria-label="t('dataTools.validation.openList')"
@@ -234,13 +234,12 @@ watch(
         :aria-expanded="validationOpen"
         :aria-controls="validationOpen ? validationMenuId : undefined"
         aria-haspopup="menu"
-        :disabled="readOnly"
         @pointerdown.stop
         @click.stop="toggleValidation"
         @keydown.stop="onValidationTriggerKeydown"
       >
         <ChevronDown :size="13" aria-hidden="true" />
-      </button>
+      </span>
       <Teleport to="body">
         <MenuSurface
           v-if="validationOpen"
@@ -326,9 +325,9 @@ watch(
           }"
           aria-hidden="true"
         />
-        <button
+        <span
           v-if="track.button"
-          type="button"
+          v-icon-action="readOnly"
           class="sheet-data-controls__outline sheet-data-controls__outline--row"
           :style="{ top: `${track.buttonAtStart ? 0 : track.length - 16}px` }"
           :data-outline-id="track.group.id"
@@ -339,7 +338,6 @@ watch(
             t(track.group.collapsed ? 'dataTools.outline.expand' : 'dataTools.outline.collapse')
           "
           :aria-expanded="!track.group.collapsed"
-          :disabled="readOnly"
           @pointerdown.stop
           @click.stop="
             emit('outlineToggle', { id: track.group.id, collapsed: !track.group.collapsed })
@@ -347,7 +345,7 @@ watch(
         >
           <Plus v-if="track.group.collapsed" :size="10" :stroke-width="2.5" aria-hidden="true" />
           <Minus v-else :size="10" :stroke-width="2.5" aria-hidden="true" />
-        </button>
+        </span>
       </div>
     </div>
 
@@ -381,9 +379,9 @@ watch(
           :class="{ 'has-start': track.start, 'has-button': track.button }"
           aria-hidden="true"
         />
-        <button
+        <span
           v-if="track.button"
-          type="button"
+          v-icon-action="readOnly"
           class="sheet-data-controls__outline sheet-data-controls__outline--column"
           :data-outline-id="track.group.id"
           :aria-label="
@@ -393,7 +391,6 @@ watch(
             t(track.group.collapsed ? 'dataTools.outline.expand' : 'dataTools.outline.collapse')
           "
           :aria-expanded="!track.group.collapsed"
-          :disabled="readOnly"
           @pointerdown.stop
           @click.stop="
             emit('outlineToggle', { id: track.group.id, collapsed: !track.group.collapsed })
@@ -401,7 +398,7 @@ watch(
         >
           <Plus v-if="track.group.collapsed" :size="10" :stroke-width="2.5" aria-hidden="true" />
           <Minus v-else :size="10" :stroke-width="2.5" aria-hidden="true" />
-        </button>
+        </span>
       </div>
     </div>
 
@@ -453,7 +450,7 @@ watch(
   inset: 0;
   pointer-events: none;
 
-  button {
+  [role="button"] {
     font: inherit;
   }
 
@@ -482,7 +479,7 @@ watch(
       color: var(--idea-action-primary);
       background: var(--idea-action-subtle, var(--idea-action-hover));
     }
-    &:disabled {
+    &[aria-disabled="true"] {
       cursor: default;
       opacity: 0.52;
     }
@@ -503,7 +500,7 @@ watch(
     svg {
       position: relative;
     }
-    &:hover::before {
+    &:hover:not([aria-disabled="true"])::before {
       border-color: var(--idea-action-primary);
       background: var(--idea-action-hover);
     }
@@ -518,7 +515,7 @@ watch(
   }
 
   &__validation {
-    &:hover:not(:disabled),
+    &:hover:not([aria-disabled="true"]),
     &[aria-expanded="true"] {
       color: var(--idea-text-secondary);
       background: var(--idea-icon-button-hover-bg);

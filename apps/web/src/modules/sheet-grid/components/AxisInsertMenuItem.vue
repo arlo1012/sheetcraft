@@ -4,6 +4,7 @@ import { InputNumber as TInputNumber } from "tdesign-vue-next/es/input-number";
 import type { InputNumberValue } from "tdesign-vue-next/es/input-number/type";
 import { computed, ref } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 
 const props = defineProps<{
@@ -62,16 +63,15 @@ function insert(): void {
           :aria-label="`${label} · ${t('axisMenu.insertCount')}`"
           :data-axis-insert-count="action"
         />
-        <button
-          type="button"
+        <span
+          v-icon-action="disabled || !valid"
           class="axis-insert-menu-item__confirm"
-          :disabled="disabled || !valid"
           :aria-label="`${t('cellFormat.confirm')} · ${label}`"
           :data-axis-insert-confirm="action"
           @click="insert"
         >
           <Check :size="14" aria-hidden="true" />
-        </button>
+        </span>
       </div>
     </template>
   </MenuItem>
@@ -96,11 +96,11 @@ function insert(): void {
     color: var(--idea-text-secondary);
     background: transparent;
     cursor: pointer;
-    &:hover:not(:disabled) {
+    &:hover:not([aria-disabled="true"]) {
       background: var(--idea-icon-button-hover-bg);
     }
 
-    &:disabled {
+    &[aria-disabled="true"] {
       color: var(--idea-text-disabled);
       cursor: default;
     }

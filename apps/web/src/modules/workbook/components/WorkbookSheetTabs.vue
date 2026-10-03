@@ -18,6 +18,7 @@ import {
   type ComponentPublicInstance,
 } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import type { Sheet, SheetProperties } from "@idea10/core/workbook";
 import { getVisibleSheets } from "../sheet-navigation";
 import { getSheetTabColorStyles } from "../sheet-tab-color";
@@ -64,7 +65,7 @@ function setTabColor(sheet: Sheet, color: string | null): void {
 const renamingSheetId = ref<string>();
 const renameValue = ref("");
 const renameInput = ref<HTMLInputElement>();
-const tabButtons = new Map<string, HTMLButtonElement>();
+const tabButtons = new Map<string, HTMLElement>();
 const tabList = ref<HTMLDivElement>();
 const hasOverflow = ref(false);
 const canScrollLeft = ref(false);
@@ -86,7 +87,7 @@ function setRenameInput(input: Element | ComponentPublicInstance | null): void {
 }
 
 function setTabButton(sheetId: string, element: Element | ComponentPublicInstance | null): void {
-  if (element instanceof HTMLButtonElement) {
+  if (element instanceof HTMLElement) {
     tabButtons.set(sheetId, element);
   } else {
     tabButtons.delete(sheetId);
@@ -413,46 +414,42 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
         @restore="emit('restore', $event)"
         @open="closeMenu()"
       />
-      <button
+      <span
+        v-icon-action="!canScrollLeft"
         class="workbook-sheet-tabs__scroll"
-        type="button"
-        :disabled="!canScrollLeft"
         :aria-label="t('sheetTabs.scrollFirst')"
         :title="t('sheetTabs.scrollFirst')"
         @click="scrollTabsToEdge(-1)"
       >
         <ChevronFirst :size="12" aria-hidden="true" />
-      </button>
-      <button
+      </span>
+      <span
+        v-icon-action="!canScrollLeft"
         class="workbook-sheet-tabs__scroll"
-        type="button"
-        :disabled="!canScrollLeft"
         :aria-label="t('sheetTabs.scrollLeft')"
         :title="t('sheetTabs.scrollLeft')"
         @click="scrollTabs(-1)"
       >
         <ChevronLeft :size="12" aria-hidden="true" />
-      </button>
-      <button
+      </span>
+      <span
+        v-icon-action="!canScrollRight"
         class="workbook-sheet-tabs__scroll"
-        type="button"
-        :disabled="!canScrollRight"
         :aria-label="t('sheetTabs.scrollRight')"
         :title="t('sheetTabs.scrollRight')"
         @click="scrollTabs(1)"
       >
         <ChevronRight :size="12" aria-hidden="true" />
-      </button>
-      <button
+      </span>
+      <span
+        v-icon-action="!canScrollRight"
         class="workbook-sheet-tabs__scroll"
-        type="button"
-        :disabled="!canScrollRight"
         :aria-label="t('sheetTabs.scrollLast')"
         :title="t('sheetTabs.scrollLast')"
         @click="scrollTabsToEdge(1)"
       >
         <ChevronLast :size="12" aria-hidden="true" />
-      </button>
+      </span>
     </div>
     <div
       ref="tabList"
@@ -488,12 +485,12 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
             @keydown.enter.prevent="commitRename(sheet)"
             @keydown.escape.prevent="cancelRename"
           />
-          <button
+          <span
             v-else
+            v-icon-action
             :ref="(element) => setTabButton(sheet.id, element)"
             class="workbook-sheet-tabs__tab"
             :class="{ 'is-active': sheet.id === props.activeSheetId }"
-            type="button"
             role="tab"
             :aria-selected="sheet.id === props.activeSheetId"
             aria-haspopup="menu"
@@ -524,13 +521,13 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
               :aria-label="t('sheetTabs.protectedHint')"
             />
             <span class="workbook-sheet-tabs__name">{{ sheet.name }}</span>
-          </button>
+          </span>
         </div>
       </div>
     </div>
-    <button
+    <span
+      v-icon-action
       class="workbook-sheet-tabs__add"
-      type="button"
       :aria-label="t('sheetTabs.add')"
       :title="t('sheetTabs.add')"
       @click="
@@ -539,7 +536,7 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
       "
     >
       <Plus :size="16" aria-hidden="true" />
-    </button>
+    </span>
     <SheetTabMenu
       v-if="menuSheet"
       :sheet="menuSheet"
@@ -738,11 +735,11 @@ function onTabKeydown(sheetId: string, event: KeyboardEvent): void {
     color: var(--idea-text-secondary);
     cursor: pointer;
 
-    &:hover:not(:disabled) {
+    &:hover:not([aria-disabled="true"]) {
       background: var(--idea-icon-button-hover-bg);
     }
 
-    &:disabled {
+    &[aria-disabled="true"] {
       color: var(--idea-text-disabled);
       cursor: default;
     }

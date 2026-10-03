@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Plus, Trash2 } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -10,6 +9,7 @@ import { Select as TSelect } from "tdesign-vue-next/es/select";
 import SimulationResultPanel from "./SimulationResultPanel.vue";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import type { RangeReferenceSelectionOptions } from "../../../shared/range-reference/useRangeReferencePicker";
 import type { SimulationMessageKey } from "../simulation-messages";
 import type {
@@ -189,15 +189,9 @@ const methodHint = computed(() =>
       <section class="simulation-dialog__section" :aria-label="tr('simulation.variables')">
         <div class="simulation-dialog__section-title">
           <strong>{{ tr("simulation.variables") }}</strong>
-          <TButton
-            theme="primary"
-            variant="text"
-            size="small"
-            :disabled="busy"
-            @click="draft.variables.push(blankVariable())"
-          >
+          <span v-icon-action="busy" @click="draft.variables.push(blankVariable())">
             <Plus class="simulation-dialog__action-icon" />{{ tr("simulation.addVariable") }}
-          </TButton>
+          </span>
         </div>
         <div v-for="(item, index) in draft.variables" :key="item.id" class="simulation-dialog__row">
           <RangeReferenceInput
@@ -228,29 +222,21 @@ const methodHint = computed(() =>
             :aria-label="tr('simulation.upperBound')"
             inputmode="decimal"
           />
-          <TButton
-            variant="text"
-            shape="square"
-            :disabled="busy"
+          <span
+            v-icon-action="busy"
             :aria-label="tr('simulation.removeVariable')"
             @click="removeVariable(index)"
           >
             <Trash2 class="simulation-dialog__action-icon" />
-          </TButton>
+          </span>
         </div>
       </section>
       <section class="simulation-dialog__section" :aria-label="tr('simulation.constraints')">
         <div class="simulation-dialog__section-title">
           <strong>{{ tr("simulation.constraints") }}</strong>
-          <TButton
-            theme="primary"
-            variant="text"
-            size="small"
-            :disabled="busy"
-            @click="draft.constraints.push(blankConstraint())"
-          >
+          <span v-icon-action="busy" @click="draft.constraints.push(blankConstraint())">
             <Plus class="simulation-dialog__action-icon" />{{ tr("simulation.addConstraint") }}
-          </TButton>
+          </span>
         </div>
         <div
           v-for="(item, index) in draft.constraints"
@@ -289,15 +275,13 @@ const methodHint = computed(() =>
             :placeholder="tr('simulation.rightSide')"
             :select-reference="selectRangeReference"
           />
-          <TButton
-            variant="text"
-            shape="square"
-            :disabled="busy"
+          <span
+            v-icon-action="busy"
             :aria-label="tr('simulation.removeConstraint')"
             @click="removeConstraint(index)"
           >
             <Trash2 class="simulation-dialog__action-icon" />
-          </TButton>
+          </span>
         </div>
       </section>
       <TCheckbox v-model="draft.nonnegative" :disabled="busy">{{
@@ -360,6 +344,10 @@ const methodHint = computed(() =>
       font-weight: 500;
     }
   }
+  &__section-title > [role="button"] {
+    min-height: 24px;
+    padding-inline: var(--idea-space-2);
+  }
   &__row,
   &__constraint {
     display: grid;
@@ -369,6 +357,11 @@ const methodHint = computed(() =>
     > * {
       min-width: 0;
     }
+  }
+  &__row > [role="button"],
+  &__constraint > [role="button"] {
+    width: 28px;
+    height: 28px;
   }
   &__constraint {
     grid-template-columns: minmax(140px, 1fr) 110px minmax(140px, 1fr) 28px;

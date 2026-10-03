@@ -2,6 +2,7 @@
 import { Check, Settings, Table2 } from "lucide-vue-next";
 import { ref, useId } from "vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
@@ -18,7 +19,7 @@ const emit = defineEmits<{
   "update:showAxisQuickTools": [value: boolean];
 }>();
 const { t } = useAppI18n();
-const triggerRef = ref<HTMLButtonElement | null>(null);
+const triggerRef = ref<HTMLElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const menuId = `workbook-display-settings-${useId().replaceAll(":", "")}`;
 const { open, floatingStyles, toggleMenu, onTriggerKeydown } = useMenu({
@@ -30,10 +31,10 @@ const { open, floatingStyles, toggleMenu, onTriggerKeydown } = useMenu({
 </script>
 
 <template>
-  <button
+  <span
+    v-icon-action
     ref="triggerRef"
     class="workbook-display-settings__trigger"
-    type="button"
     :aria-label="t('statusBar.displaySettings')"
     :title="t('statusBar.displaySettings')"
     :aria-controls="open ? menuId : undefined"
@@ -47,7 +48,7 @@ const { open, floatingStyles, toggleMenu, onTriggerKeydown } = useMenu({
       <Table2 :size="15" :stroke-width="1.7" />
       <Settings class="workbook-display-settings__icon-cog" :size="7" :stroke-width="2" />
     </span>
-  </button>
+  </span>
 
   <Teleport to="body">
     <MenuSurface

@@ -2,6 +2,7 @@
 import type { CellBorder, CellBorderAction, CellBorderPreset } from "@idea10/core/style";
 import { useAppI18n } from "../../../shared/i18n";
 import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
+import { vIconAction } from "../../../shared/focus/icon-action";
 
 const props = defineProps<{
   border: CellBorder;
@@ -24,8 +25,8 @@ function selectPreset(preset: CellBorderPreset): void {
 
 <template>
   <div class="border-preset-grid" :aria-label="t('format.borderPresets')">
-    <button
-      type="button"
+    <span
+      v-icon-action
       role="menuitem"
       data-border-menu-item
       data-border-preset="none"
@@ -34,9 +35,9 @@ function selectPreset(preset: CellBorderPreset): void {
       @click="selectPreset('none')"
     >
       <CellBorderPresetIcon preset="none" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitem"
       data-border-menu-item
       data-border-preset="all"
@@ -45,9 +46,9 @@ function selectPreset(preset: CellBorderPreset): void {
       @click="selectPreset('all')"
     >
       <CellBorderPresetIcon preset="all" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitem"
       data-border-menu-item
       data-border-preset="outer"
@@ -56,9 +57,9 @@ function selectPreset(preset: CellBorderPreset): void {
       @click="selectPreset('outer')"
     >
       <CellBorderPresetIcon preset="outer" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitem"
       data-border-menu-item
       data-border-preset="inner"
@@ -67,9 +68,9 @@ function selectPreset(preset: CellBorderPreset): void {
       @click="selectPreset('inner')"
     >
       <CellBorderPresetIcon preset="inner" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitem"
       data-border-menu-item
       data-border-preset="top"
@@ -78,9 +79,9 @@ function selectPreset(preset: CellBorderPreset): void {
       @click="selectPreset('top')"
     >
       <CellBorderPresetIcon preset="top" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitem"
       data-border-menu-item
       data-border-preset="innerHorizontal"
@@ -89,9 +90,9 @@ function selectPreset(preset: CellBorderPreset): void {
       @click="selectPreset('innerHorizontal')"
     >
       <CellBorderPresetIcon preset="innerHorizontal" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitem"
       data-border-menu-item
       data-border-preset="innerVertical"
@@ -100,9 +101,9 @@ function selectPreset(preset: CellBorderPreset): void {
       @click="selectPreset('innerVertical')"
     >
       <CellBorderPresetIcon preset="innerVertical" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitem"
       data-border-menu-item
       data-border-preset="left"
@@ -111,9 +112,9 @@ function selectPreset(preset: CellBorderPreset): void {
       @click="selectPreset('left')"
     >
       <CellBorderPresetIcon preset="left" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitem"
       data-border-menu-item
       data-border-preset="bottom"
@@ -122,9 +123,9 @@ function selectPreset(preset: CellBorderPreset): void {
       @click="selectPreset('bottom')"
     >
       <CellBorderPresetIcon preset="bottom" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitem"
       data-border-menu-item
       data-border-preset="right"
@@ -133,9 +134,9 @@ function selectPreset(preset: CellBorderPreset): void {
       @click="selectPreset('right')"
     >
       <CellBorderPresetIcon preset="right" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitem"
       data-border-menu-item
       data-border-preset="diagonalUp"
@@ -144,9 +145,9 @@ function selectPreset(preset: CellBorderPreset): void {
       @click="selectPreset('diagonalUp')"
     >
       <CellBorderPresetIcon preset="diagonalUp" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitem"
       data-border-menu-item
       data-border-preset="diagonalDown"
@@ -155,7 +156,7 @@ function selectPreset(preset: CellBorderPreset): void {
       @click="selectPreset('diagonalDown')"
     >
       <CellBorderPresetIcon preset="diagonalDown" />
-    </button>
+    </span>
   </div>
 </template>
 
@@ -168,7 +169,7 @@ function selectPreset(preset: CellBorderPreset): void {
   gap: 2px;
   padding-bottom: 5px;
 
-  > button {
+  > span {
     display: inline-flex;
     align-items: center;
     justify-content: center;

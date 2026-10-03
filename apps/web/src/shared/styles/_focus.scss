@@ -10,3 +10,26 @@
   outline: none;
   box-shadow: var(--idea-keyboard-focus-shadow);
 }
+
+// Direct icon actions share alignment and feedback without button chrome.
+:where(.idea-icon-action) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--idea-space-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+:where(
+  .idea-icon-action:hover,
+  .idea-icon-action[aria-pressed="true"],
+  .idea-icon-action[aria-expanded="true"]
+):not([aria-disabled="true"]) {
+  background: var(--idea-icon-button-hover-bg);
+}
+
+:where(.idea-icon-action[aria-disabled="true"]) {
+  color: var(--idea-text-disabled);
+  cursor: not-allowed;
+}

@@ -10,6 +10,7 @@ import type { SelectionBorderState } from "@idea10/core/style-state";
 import BorderLinePreview from "../../../shared/borders/BorderLinePreview.vue";
 import BorderLineStylePanel from "../../../shared/borders/BorderLineStylePanel.vue";
 import CellBorderPresetIcon from "../../../shared/borders/CellBorderPresetIcon.vue";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import CellFormatBorderPreview from "./CellFormatBorderPreview.vue";
 import CellFormatColorControl from "./CellFormatColorControl.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -229,8 +230,8 @@ const previewState = computed<SelectionBorderState>(() => ({
         <div class="cell-format-border-panel__section">
           <h3>{{ t("format.borderPresets") }}</h3>
           <div class="cell-format-border-panel__presets">
-            <button
-              type="button"
+            <span
+              v-icon-action
               data-border-preset="none"
               :aria-label="t('format.borderNone')"
               @click="selectPreset('none')"
@@ -239,9 +240,9 @@ const previewState = computed<SelectionBorderState>(() => ({
                 ><CellBorderPresetIcon preset="none"
               /></span>
               <span>{{ t("format.borderNone") }}</span>
-            </button>
-            <button
-              type="button"
+            </span>
+            <span
+              v-icon-action
               data-border-preset="outer"
               :aria-label="t('format.borderOuter')"
               @click="selectPreset('outer')"
@@ -250,11 +251,10 @@ const previewState = computed<SelectionBorderState>(() => ({
                 ><CellBorderPresetIcon preset="outer"
               /></span>
               <span>{{ t("format.borderOuter") }}</span>
-            </button>
-            <button
-              type="button"
+            </span>
+            <span
+              v-icon-action="!isAvailable('innerHorizontal') && !isAvailable('innerVertical')"
               data-border-preset="inner"
-              :disabled="!isAvailable('innerHorizontal') && !isAvailable('innerVertical')"
               :aria-label="t('format.borderInner')"
               @click="selectPreset('inner')"
             >
@@ -262,9 +262,9 @@ const previewState = computed<SelectionBorderState>(() => ({
                 ><CellBorderPresetIcon preset="inner"
               /></span>
               <span>{{ t("format.borderInner") }}</span>
-            </button>
-            <button
-              type="button"
+            </span>
+            <span
+              v-icon-action
               data-border-preset="all"
               :aria-label="t('format.borderAll')"
               @click="selectPreset('all')"
@@ -273,7 +273,7 @@ const previewState = computed<SelectionBorderState>(() => ({
                 ><CellBorderPresetIcon preset="all"
               /></span>
               <span>{{ t("format.borderAll") }}</span>
-            </button>
+            </span>
           </div>
         </div>
         <div class="cell-format-border-panel__section">
@@ -357,7 +357,7 @@ const previewState = computed<SelectionBorderState>(() => ({
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
 
-    > button {
+    > span {
       display: grid;
       justify-items: center;
       align-content: start;
@@ -372,11 +372,11 @@ const previewState = computed<SelectionBorderState>(() => ({
       text-align: center;
       cursor: pointer;
 
-      &:hover:not(:disabled) .cell-format-border-panel__preset-icon {
+      &:hover:not([aria-disabled="true"]) .cell-format-border-panel__preset-icon {
         background: var(--idea-icon-button-hover-bg);
       }
 
-      &:disabled {
+      &[aria-disabled="true"] {
         color: var(--idea-text-muted);
         opacity: 0.45;
         cursor: not-allowed;

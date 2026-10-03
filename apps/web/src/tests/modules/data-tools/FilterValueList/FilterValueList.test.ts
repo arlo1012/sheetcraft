@@ -1,6 +1,5 @@
 import { mount } from "@vue/test-utils";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import { defineComponent, nextTick, ref } from "vue";
 import { describe, expect, test } from "vitest";
 import type { SheetFilterValue } from "@idea10/core/workbook";
@@ -46,7 +45,7 @@ function checkboxAt(wrapper: ReturnType<typeof mount>, index: number) {
 
 function buttonWithText(wrapper: ReturnType<typeof mount>, text: string) {
   return filterComponent(wrapper)
-    .findAllComponents(TButton)
+    .findAll("button, [role=button]")
     .find((button) => button.text().includes(text))!;
 }
 

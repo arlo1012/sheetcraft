@@ -8,6 +8,7 @@ import { Input as TInput, type InputValue } from "tdesign-vue-next/es/input";
 import { Radio as TRadio, RadioGroup as TRadioGroup } from "tdesign-vue-next/es/radio";
 import RangeReferenceInput from "../../../shared/range-reference/RangeReferenceInput.vue";
 import { useAppI18n } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import type { RangeReferenceSelectionOptions } from "../../../shared/range-reference/useRangeReferencePicker";
 import type { DropdownListDraft, DropdownListInitial } from "../dropdown-list-types";
 
@@ -211,56 +212,46 @@ async function selectRange(current: string): Promise<string | undefined> {
           }}</TRadio>
         </TRadioGroup>
         <div class="dropdown-list-dialog__actions">
-          <TButton
-            variant="text"
-            shape="square"
-            :disabled="draft.mode !== 'manual'"
+          <span
+            v-icon-action="draft.mode !== 'manual'"
             :title="t('dataTools.dropdown.add')"
             :aria-label="t('dataTools.dropdown.add')"
             data-dropdown-add
             @click="addItem"
             ><PlusCircle :size="17"
-          /></TButton>
-          <TButton
-            variant="text"
-            shape="square"
-            :disabled="draft.mode !== 'manual' || !canEditSelected"
+          /></span>
+          <span
+            v-icon-action="draft.mode !== 'manual' || !canEditSelected"
             :title="t('dataTools.dropdown.remove')"
             :aria-label="t('dataTools.dropdown.remove')"
             data-dropdown-remove
             @click="removeSelected"
             ><Trash2 :size="17"
-          /></TButton>
-          <TButton
-            variant="text"
-            shape="square"
-            :disabled="draft.mode !== 'manual' || selectedIndex >= draft.items.length - 1"
+          /></span>
+          <span
+            v-icon-action="draft.mode !== 'manual' || selectedIndex >= draft.items.length - 1"
             :title="t('dataTools.dropdown.moveDown')"
             :aria-label="t('dataTools.dropdown.moveDown')"
             data-dropdown-move-down
             @click="moveSelected(1)"
             ><ChevronDown :size="17"
-          /></TButton>
-          <TButton
-            variant="text"
-            shape="square"
-            :disabled="draft.mode !== 'manual' || selectedIndex <= 0"
+          /></span>
+          <span
+            v-icon-action="draft.mode !== 'manual' || selectedIndex <= 0"
             :title="t('dataTools.dropdown.moveUp')"
             :aria-label="t('dataTools.dropdown.moveUp')"
             data-dropdown-move-up
             @click="moveSelected(-1)"
             ><ChevronUp :size="17"
-          /></TButton>
-          <TButton
-            variant="text"
-            shape="square"
-            :disabled="draft.mode !== 'manual' || !canEditSelected"
+          /></span>
+          <span
+            v-icon-action="draft.mode !== 'manual' || !canEditSelected"
             :title="t('dataTools.dropdown.edit')"
             :aria-label="t('dataTools.dropdown.edit')"
             data-dropdown-edit
             @click="beginEdit()"
             ><Pencil :size="16"
-          /></TButton>
+          /></span>
         </div>
       </div>
       <div
@@ -356,6 +347,11 @@ async function selectRange(current: string): Promise<string | undefined> {
   display: flex;
   gap: 1px;
   margin-left: auto;
+
+  > [role="button"] {
+    width: 24px;
+    height: 24px;
+  }
 }
 .dropdown-list-dialog__list {
   @include option-list.surface;

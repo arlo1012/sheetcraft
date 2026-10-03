@@ -128,11 +128,13 @@ describe("CellFormatBorderPanel", () => {
     const wrapper = mountPanel({
       capabilities: { innerHorizontal: false, innerVertical: false },
     });
-    expect(wrapper.get('[data-border-preset="inner"]').attributes("disabled")).toBeDefined();
-    expect(
-      wrapper.get('[data-border-side="innerHorizontal"]').attributes("disabled"),
-    ).toBeDefined();
-    expect(wrapper.get('[data-border-side="innerVertical"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.get('[data-border-preset="inner"]').attributes("aria-disabled")).toBe("true");
+    expect(wrapper.get('[data-border-side="innerHorizontal"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
+    expect(wrapper.get('[data-border-side="innerVertical"]').attributes("aria-disabled")).toBe(
+      "true",
+    );
     expect(wrapper.findAll(".cell-format-border-preview__samples > span")).toHaveLength(1);
     await wrapper
       .get('[data-border-preview-edge="innerHorizontal"]')

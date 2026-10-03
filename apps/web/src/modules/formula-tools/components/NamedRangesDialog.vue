@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { Check, X } from "lucide-vue-next";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
@@ -301,26 +302,24 @@ watch(
       >
         <span>{{ t("formulaTools.reference") }}</span>
         <div class="named-ranges-dialog__reference-controls">
-          <TButton
-            variant="outline"
-            shape="square"
-            :disabled="!referenceChanged"
+          <span
+            v-icon-action="!referenceChanged"
+            class="named-ranges-dialog__reference-action"
             :aria-label="t('formulaTools.resetReference')"
             :title="t('formulaTools.resetReference')"
             data-name-reference-reset
             @click="resetReference"
             ><X :size="15"
-          /></TButton>
-          <TButton
-            variant="outline"
-            shape="square"
-            :disabled="!referenceChanged || !referenceDraft.trim()"
+          /></span>
+          <span
+            v-icon-action="!referenceChanged || !referenceDraft.trim()"
+            class="named-ranges-dialog__reference-action"
             :aria-label="t('formulaTools.saveReference')"
             :title="t('formulaTools.saveReference')"
             data-name-reference-save
             @click="saveReference"
             ><Check :size="15"
-          /></TButton>
+          /></span>
           <RangeReferenceInput
             v-model="referenceDraft"
             :disabled="!selectedRange"
@@ -390,6 +389,25 @@ watch(
     font-size: var(--idea-font-size-body-medium);
     line-height: var(--idea-line-height-body-medium);
   }
+  &__reference-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--idea-radius-small);
+    cursor: pointer;
+
+    &:hover:not([aria-disabled="true"]) {
+      background: var(--idea-icon-button-hover-bg);
+    }
+
+    &[aria-disabled="true"] {
+      color: var(--idea-text-disabled);
+      cursor: not-allowed;
+    }
+  }
+
   &__reference-controls {
     display: grid;
     grid-template-columns: auto auto minmax(0, 1fr);

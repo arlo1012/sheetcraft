@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { Check, Plus, Trash2 } from "lucide-vue-next";
-import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Textarea as TTextarea } from "tdesign-vue-next/es/textarea";
 import { MessagePlugin } from "tdesign-vue-next/es/message";
 import { useAppI18n } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import OptionList from "../../../shared/option-list/OptionList.vue";
 import { createBrowserIdFactory } from "../../../shared/runtime/browser-id-factory";
 import {
@@ -167,35 +167,28 @@ function apply(): void {
             data-sort-list-entries
           />
           <div class="custom-sort-list-dialog__actions">
-            <TButton
+            <span
               v-if="selectedCustomList"
-              variant="text"
-              :disabled="!canSaveChanges"
+              v-icon-action="!canSaveChanges"
               data-sort-list-save
               @click="saveChanges"
             >
-              <template #icon><Check :size="15" aria-hidden="true" /></template>
+              <Check :size="15" aria-hidden="true" />
               {{ t("dataTools.customSort.saveChanges") }}
-            </TButton>
-            <TButton
+            </span>
+            <span
               v-else
-              variant="text"
-              :disabled="selectedId !== NEW_LIST_ID || !parsedEntries.length"
+              v-icon-action="selectedId !== NEW_LIST_ID || !parsedEntries.length"
               data-sort-list-add
               @click="addList"
             >
-              <template #icon><Plus :size="15" aria-hidden="true" /></template>
+              <Plus :size="15" aria-hidden="true" />
               {{ t("dataTools.customSort.add") }}
-            </TButton>
-            <TButton
-              variant="text"
-              :disabled="!canDelete"
-              data-sort-list-delete
-              @click="deleteList"
-            >
-              <template #icon><Trash2 :size="15" aria-hidden="true" /></template>
+            </span>
+            <span v-icon-action="!canDelete" data-sort-list-delete @click="deleteList">
+              <Trash2 :size="15" aria-hidden="true" />
               {{ t("dataTools.customSort.delete") }}
-            </TButton>
+            </span>
           </div>
         </div>
       </div>
@@ -237,6 +230,11 @@ function apply(): void {
   }
   &__actions {
     display: flex;
+
+    > [role="button"] {
+      min-height: 28px;
+      padding-inline: var(--idea-space-3);
+    }
   }
 }
 </style>

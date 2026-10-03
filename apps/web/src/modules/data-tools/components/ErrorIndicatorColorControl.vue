@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-vue-next";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import { vIconAction } from "../../../shared/focus/icon-action";
 
 const props = defineProps<{
   label: string;
@@ -11,7 +12,7 @@ const props = defineProps<{
   disabled: boolean;
 }>();
 const emit = defineEmits<{ select: [color: string | null] }>();
-const triggerRef = ref<HTMLButtonElement | null>(null);
+const triggerRef = ref<HTMLElement | null>(null);
 const panelRef = ref<HTMLDivElement | null>(null);
 const open = ref(false);
 const panelId = `error-indicator-color-${useId().replaceAll(":", "")}`;
@@ -53,11 +54,10 @@ watch(
 
 <template>
   <div class="error-indicator-color-control">
-    <button
+    <span
       ref="triggerRef"
-      type="button"
+      v-icon-action="disabled"
       class="error-indicator-color-control__trigger"
-      :disabled="disabled"
       :aria-label="label"
       :aria-controls="open ? panelId : undefined"
       :aria-expanded="open"
@@ -70,7 +70,7 @@ watch(
         <span>{{ valueLabel }}</span>
       </span>
       <ChevronDown :size="14" aria-hidden="true" />
-    </button>
+    </span>
     <div
       v-if="open"
       :id="panelId"
@@ -108,11 +108,11 @@ watch(
     border: 1px solid var(--idea-border-control);
     border-radius: var(--idea-radius-default);
   }
-  &__trigger:hover:not(:disabled) {
+  &__trigger:hover:not([aria-disabled="true"]) {
     background: var(--idea-surface-hover);
   }
 
-  &__trigger:disabled {
+  &__trigger[aria-disabled="true"] {
     color: var(--idea-text-disabled);
     cursor: not-allowed;
   }

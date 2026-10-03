@@ -7,6 +7,7 @@ import { getSheetFilterValueKey } from "@idea10/core/commands";
 import type { SheetFilterCondition, SheetFilterValue } from "@idea10/core/workbook";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { createFilterConditionDraft, type FilterConditionOperator } from "../filter-conditions";
@@ -246,35 +247,20 @@ onBeforeUnmount(() => {
     >
       <header class="filter-column-panel__heading">
         <div class="filter-column-panel__sort" role="group" :aria-label="t('dataTools.sort.title')">
-          <TButton
-            variant="text"
-            size="small"
-            :disabled="disabled || !canSort"
-            @click="emit('sort', 'ascending')"
-          >
-            <template #icon><ArrowUpAZ class="idea-action-icon" /></template
-            >{{ t("dataTools.sort.ascending") }}
-          </TButton>
-          <TButton
-            variant="text"
-            size="small"
-            :disabled="disabled || !canSort"
-            @click="emit('sort', 'descending')"
-          >
-            <template #icon><ArrowDownAZ class="idea-action-icon" /></template
-            >{{ t("dataTools.sort.descending") }}
-          </TButton>
-          <TButton
-            variant="text"
-            theme="default"
-            size="small"
+          <span v-icon-action="disabled || !canSort" @click="emit('sort', 'ascending')">
+            <ArrowUpAZ class="idea-action-icon" />{{ t("dataTools.sort.ascending") }}
+          </span>
+          <span v-icon-action="disabled || !canSort" @click="emit('sort', 'descending')">
+            <ArrowDownAZ class="idea-action-icon" />{{ t("dataTools.sort.descending") }}
+          </span>
+          <span
+            v-icon-action="disabled || !canSort"
             aria-haspopup="dialog"
-            :disabled="disabled || !canSort"
             @click="emit('openSort')"
           >
-            <template #icon><PaintBucket class="idea-action-icon" aria-hidden="true" /></template>
+            <PaintBucket class="idea-action-icon" aria-hidden="true" />
             {{ t("dataTools.filter.colorSort") }}
-          </TButton>
+          </span>
         </div>
       </header>
       <TTabs v-model="tab" class="filter-column-panel__tabs" size="medium">
@@ -286,16 +272,13 @@ onBeforeUnmount(() => {
               :disabled="filterDisabled"
               @select="chooseCondition"
             />
-            <TButton
-              variant="text"
-              theme="default"
-              size="small"
-              :disabled="disabled || !hasCriteria"
+            <span
+              v-icon-action="disabled || !hasCriteria"
               :aria-label="t('dataTools.filter.clear')"
               :title="t('dataTools.filter.clear')"
               @click="emit('clear')"
-              ><template #icon><FilterX class="idea-action-icon" aria-hidden="true" /></template
-            ></TButton>
+              ><FilterX class="idea-action-icon" aria-hidden="true" />
+            </span>
           </div>
         </template>
         <TTabPanel value="values" :disabled="disabled" :label="t('dataTools.filter.content')">
@@ -403,6 +386,11 @@ onBeforeUnmount(() => {
     align-items: center;
     flex: none;
     gap: var(--idea-space-4);
+
+    > [role="button"] {
+      min-height: 24px;
+      padding-inline: var(--idea-space-2);
+    }
   }
   &__tabs {
     min-width: 0;
@@ -411,6 +399,11 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     gap: var(--idea-space-2);
+
+    > [role="button"] {
+      width: 24px;
+      height: 24px;
+    }
   }
   &__content {
     padding-top: var(--idea-space-4);

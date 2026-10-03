@@ -50,7 +50,7 @@ describe("sheet tab overflow navigation", () => {
       "Scroll sheet tabs right",
       "Scroll to last sheet tab",
     ]);
-    expect(buttons.every((button) => button.attributes("disabled") === "")).toBe(true);
+    expect(buttons.every((button) => button.attributes("aria-disabled") === "true")).toBe(true);
     expect(wrapper.find('[aria-label="All sheets"]').exists()).toBe(true);
   });
 
@@ -59,15 +59,15 @@ describe("sheet tab overflow navigation", () => {
     await list.trigger("scroll");
     const first = wrapper.get('[aria-label="Scroll to first sheet tab"]');
     const last = wrapper.get('[aria-label="Scroll to last sheet tab"]');
-    expect(first.attributes("disabled")).toBe("");
-    expect(last.attributes("disabled")).toBeUndefined();
+    expect(first.attributes("aria-disabled")).toBe("true");
+    expect(last.attributes("aria-disabled")).toBe("false");
     await last.trigger("click");
     expect(list.element.scrollLeft).toBe(160);
-    expect(last.attributes("disabled")).toBe("");
-    expect(first.attributes("disabled")).toBeUndefined();
+    expect(last.attributes("aria-disabled")).toBe("true");
+    expect(first.attributes("aria-disabled")).toBe("false");
     await first.trigger("click");
     expect(list.element.scrollLeft).toBe(0);
-    expect(first.attributes("disabled")).toBe("");
+    expect(first.attributes("aria-disabled")).toBe("true");
     expect(wrapper.emitted("select")).toBeUndefined();
   });
 
@@ -76,13 +76,13 @@ describe("sheet tab overflow navigation", () => {
     await list.trigger("scroll");
     const previous = wrapper.get('[aria-label="Scroll sheet tabs left"]');
     const next = wrapper.get('[aria-label="Scroll sheet tabs right"]');
-    expect(previous.attributes("disabled")).toBe("");
+    expect(previous.attributes("aria-disabled")).toBe("true");
 
     await next.trigger("click");
     expect(list.element.scrollLeft).toBe(84);
     await next.trigger("click");
     expect(list.element.scrollLeft).toBe(160);
-    expect(next.attributes("disabled")).toBe("");
+    expect(next.attributes("aria-disabled")).toBe("true");
 
     const wheel = new WheelEvent("wheel", { deltaY: -2, deltaMode: 1, cancelable: true });
     list.element.dispatchEvent(wheel);

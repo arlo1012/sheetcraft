@@ -13,6 +13,7 @@ import type {
   TableRowData,
 } from "tdesign-vue-next/es/table/type";
 import { useAppI18n } from "../../../shared/i18n";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import type { SortIcon } from "@idea10/core/commands";
 import ConditionalFormatIcon from "../../../shared/conditional-formatting/ConditionalFormatIcon.vue";
 import { sortIconKey } from "../sort-icon-options";
@@ -364,26 +365,22 @@ function apply(): void {
             @click="copyLevel"
             >{{ t("dataTools.sort.copyLevel") }}</TButton
           >
-          <TButton
-            variant="outline"
-            shape="square"
+          <span
+            v-icon-action="selectedIndex <= 0"
             data-sort-action="up"
             :aria-label="t('dataTools.sort.moveUp')"
             :title="t('dataTools.sort.moveUp')"
-            :disabled="selectedIndex <= 0"
             @click="moveLevel(-1)"
             ><ArrowUp :size="15"
-          /></TButton>
-          <TButton
-            variant="outline"
-            shape="square"
+          /></span>
+          <span
+            v-icon-action="selectedIndex < 0 || selectedIndex >= rows.length - 1"
             data-sort-action="down"
             :aria-label="t('dataTools.sort.moveDown')"
             :title="t('dataTools.sort.moveDown')"
-            :disabled="selectedIndex < 0 || selectedIndex >= rows.length - 1"
             @click="moveLevel(1)"
             ><ArrowDown :size="15"
-          /></TButton>
+          /></span>
           <TButton variant="outline" data-sort-action="options" @click="openOptions">{{
             t("dataTools.sort.options")
           }}</TButton>
@@ -621,6 +618,12 @@ function apply(): void {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+
+    > [data-sort-action="up"],
+    > [data-sort-action="down"] {
+      width: 32px;
+      height: 32px;
+    }
   }
   &__column {
     display: grid;

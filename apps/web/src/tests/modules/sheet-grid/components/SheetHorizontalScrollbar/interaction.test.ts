@@ -110,11 +110,11 @@ describe("horizontal worksheet scrollbar", () => {
     expect(wrapper.emitted("scroll")?.at(-1)).toEqual([448]);
 
     await wrapper.setProps({ state: { position: 0, viewportSize: 500, contentSize: 2500 } });
-    expect(leftButton?.attributes("disabled")).toBe("");
-    expect(rightButton?.attributes("disabled")).toBeUndefined();
+    expect(leftButton?.attributes("aria-disabled")).toBe("true");
+    expect(rightButton?.attributes("aria-disabled")).toBe("false");
     await wrapper.setProps({ state: { position: 2000, viewportSize: 500, contentSize: 2500 } });
-    expect(leftButton?.attributes("disabled")).toBeUndefined();
-    expect(rightButton?.attributes("disabled")).toBe("");
+    expect(leftButton?.attributes("aria-disabled")).toBe("false");
+    expect(rightButton?.attributes("aria-disabled")).toBe("true");
     wrapper.unmount();
   });
 });

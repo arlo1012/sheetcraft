@@ -2,6 +2,7 @@
 import { EyeOff, Layers, Pin } from "lucide-vue-next";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuRadioItem from "../../../shared/menu/MenuRadioItem.vue";
@@ -17,7 +18,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ select: [sheetId: string]; restore: [sheetId: string]; open: [] }>();
 const { t } = useAppI18n();
-const triggerRef = ref<HTMLButtonElement | null>(null);
+const triggerRef = ref<HTMLElement | null>(null);
 const menuSurfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const searchInputRef = ref<InstanceType<typeof MenuSearch> | null>(null);
 const menuRef = computed<HTMLElement | null>(() => menuSurfaceRef.value?.rootElement ?? null);
@@ -85,10 +86,10 @@ watch(open, (isOpen) => {
 </script>
 
 <template>
-  <button
+  <span
+    v-icon-action
     ref="triggerRef"
     class="workbook-sheet-navigator__trigger"
-    type="button"
     :aria-label="t('sheetTabs.allSheets')"
     :title="t('sheetTabs.allSheets')"
     aria-haspopup="menu"
@@ -99,7 +100,7 @@ watch(open, (isOpen) => {
     @keydown="onTriggerKeydown"
   >
     <Layers :size="16" aria-hidden="true" />
-  </button>
+  </span>
 
   <Teleport to="body">
     <MenuSurface

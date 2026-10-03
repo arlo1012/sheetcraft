@@ -2,6 +2,7 @@
 import type { CellBorderLineStyle } from "@idea10/core/style";
 import BorderLinePreview from "./BorderLinePreview.vue";
 import { useAppI18n } from "../i18n";
+import { vIconAction } from "../focus/icon-action";
 
 withDefaults(
   defineProps<{
@@ -30,8 +31,8 @@ const { t } = useAppI18n();
     >
       {{ t("format.borderLineNone") }}
     </button>
-    <button
-      type="button"
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="hair"
       :aria-label="t('format.borderLineHair')"
@@ -39,9 +40,9 @@ const { t } = useAppI18n();
       @click="emit('select', 'hair')"
     >
       <BorderLinePreview line-style="hair" :color="color" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="dotted"
       :aria-label="t('format.borderLineDotted')"
@@ -49,9 +50,9 @@ const { t } = useAppI18n();
       @click="emit('select', 'dotted')"
     >
       <BorderLinePreview line-style="dotted" :color="color" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="dashDot"
       :aria-label="t('format.borderLineDashDot')"
@@ -59,9 +60,9 @@ const { t } = useAppI18n();
       @click="emit('select', 'dashDot')"
     >
       <BorderLinePreview line-style="dashDot" :color="color" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="dashDotDot"
       :aria-label="t('format.borderLineDashDotDot')"
@@ -69,9 +70,9 @@ const { t } = useAppI18n();
       @click="emit('select', 'dashDotDot')"
     >
       <BorderLinePreview line-style="dashDotDot" :color="color" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="dashed"
       :aria-label="t('format.borderLineDashed')"
@@ -79,9 +80,9 @@ const { t } = useAppI18n();
       @click="emit('select', 'dashed')"
     >
       <BorderLinePreview line-style="dashed" :color="color" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="thin"
       :aria-label="t('format.borderLineThin')"
@@ -89,9 +90,9 @@ const { t } = useAppI18n();
       @click="emit('select', 'thin')"
     >
       <BorderLinePreview line-style="thin" :color="color" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="slantDashDot"
       :aria-label="t('format.borderLineSlantDashDot')"
@@ -99,9 +100,9 @@ const { t } = useAppI18n();
       @click="emit('select', 'slantDashDot')"
     >
       <BorderLinePreview line-style="slantDashDot" :color="color" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="mediumDashDotDot"
       :aria-label="t('format.borderLineMediumDashDotDot')"
@@ -109,9 +110,9 @@ const { t } = useAppI18n();
       @click="emit('select', 'mediumDashDotDot')"
     >
       <BorderLinePreview line-style="mediumDashDotDot" :color="color" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="mediumDashDot"
       :aria-label="t('format.borderLineMediumDashDot')"
@@ -119,9 +120,9 @@ const { t } = useAppI18n();
       @click="emit('select', 'mediumDashDot')"
     >
       <BorderLinePreview line-style="mediumDashDot" :color="color" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="mediumDashed"
       :aria-label="t('format.borderLineMediumDashed')"
@@ -129,9 +130,9 @@ const { t } = useAppI18n();
       @click="emit('select', 'mediumDashed')"
     >
       <BorderLinePreview line-style="mediumDashed" :color="color" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="medium"
       :aria-label="t('format.borderLineMedium')"
@@ -139,9 +140,9 @@ const { t } = useAppI18n();
       @click="emit('select', 'medium')"
     >
       <BorderLinePreview line-style="medium" :color="color" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="thick"
       :aria-label="t('format.borderLineThick')"
@@ -149,9 +150,9 @@ const { t } = useAppI18n();
       @click="emit('select', 'thick')"
     >
       <BorderLinePreview line-style="thick" :color="color" />
-    </button>
-    <button
-      type="button"
+    </span>
+    <span
+      v-icon-action
       role="menuitemradio"
       data-border-line-option="double"
       :aria-label="t('format.borderLineDouble')"
@@ -159,7 +160,7 @@ const { t } = useAppI18n();
       @click="emit('select', 'double')"
     >
       <BorderLinePreview line-style="double" :color="color" />
-    </button>
+    </span>
   </div>
 </template>
 
@@ -171,7 +172,7 @@ const { t } = useAppI18n();
   grid-auto-flow: column;
   gap: 4px;
 
-  > button {
+  > [role="menuitemradio"] {
     display: grid;
     place-items: center;
     width: 100%;

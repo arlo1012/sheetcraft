@@ -60,7 +60,9 @@ CSS pixels at 100% scale; size and line height are a pair.
   of their purpose or location. Make interactive icon containers the triggers, with accessible naming,
   keyboard activation, focus, and disabled states. Input prefix/suffix icons use
   the control's icon slots directly; the input owns spacing. Stop trigger clicks
-  from bubbling into the input's focus handler.
+  from bubbling into the input's focus handler. Use the shared `vIconAction`
+  directive for activation and disabled semantics on icon containers; keep labels
+  and layout in the owning component.
 - `InputNumber`: use `theme="column"` and
   `idea-input-number--persistent-controls`. Wrap in a labelled group, not a native
   label that forwards events to its buttons. Compact number-format fields use

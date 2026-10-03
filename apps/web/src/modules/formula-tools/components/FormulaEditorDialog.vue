@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { Button } from "tdesign-vue-next/es/button";
+import { vIconAction } from "../../../shared/focus/icon-action";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { Textarea } from "tdesign-vue-next/es/textarea";
@@ -256,15 +256,15 @@ watch(
             <strong>{{ targetLabel }}</strong>
           </span>
         </div>
-        <Button
-          variant="text"
-          size="small"
+        <span
+          v-icon-action
+          class="formula-editor-dialog__function-action"
           :aria-label="t('formulaTools.formulaEditorEditFunction')"
           @click="functionBrowserVisible = true"
         >
-          <template #icon><FunctionSquare :size="15" aria-hidden="true" /></template>
+          <FunctionSquare :size="15" aria-hidden="true" />
           {{ t("formulaTools.formulaEditorEditFunction") }}
-        </Button>
+        </span>
       </div>
 
       <div class="formula-editor-dialog__body narrow-scrollbar">
@@ -400,6 +400,12 @@ watch(
     align-items: center;
     gap: var(--idea-space-4);
     min-width: 0;
+  }
+
+  &__function-action {
+    min-height: 24px;
+    padding: 0 var(--idea-space-2);
+    border-radius: var(--idea-radius-small);
   }
 
   &__heading {
