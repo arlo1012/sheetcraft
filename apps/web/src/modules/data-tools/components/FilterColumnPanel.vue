@@ -19,7 +19,7 @@ import FilterConditionMenu from "./FilterConditionMenu.vue";
 import FilterConditionDialog from "./FilterConditionDialog.vue";
 import FilterRankDialog from "./FilterRankDialog.vue";
 
-type ColorCondition = Extract<SheetFilterCondition, { kind: "color" }>;
+type ColorCondition = Extract<SheetFilterCondition, { kind: "color" | "color-set" }>;
 
 const props = withDefaults(
   defineProps<{
@@ -65,8 +65,13 @@ const valuesDirty = ref(false);
 const editingAction = ref<FilterConditionAction>();
 const editing = computed(() => editingAction.value !== undefined);
 const filterDisabled = computed(() => props.disabled);
+function isColorCondition(
+  condition: SheetFilterCondition | undefined,
+): condition is ColorCondition {
+  return condition?.kind === "color" || condition?.kind === "color-set";
+}
 const pendingValueCriteria = computed(() =>
-  !valuesDirty.value && props.criteria?.kind !== "color" ? props.criteria : undefined,
+  !valuesDirty.value && !isColorCondition(props.criteria) ? props.criteria : undefined,
 );
 let opener: HTMLElement | null = null;
 const open = computed(() => props.visible && !editing.value);
@@ -112,27 +117,26 @@ const includedKeys = computed(() => {
 const validColor = computed(() => {
   const color = colorDraft.value;
   if (!color) return false;
-  return color.target === "fill"
-    ? props.colors.cellColors.includes(color.color)
-    : color.color !== null && props.colors.fontColors.includes(color.color);
+  const colors = color.kind === "color" ? [color.color] : color.colors;
+  return (
+    colors.length > 0 &&
+    colors.every((value) =>
+      color.target === "fill"
+        ? props.colors.cellColors.includes(value)
+        : value !== null && props.colors.fontColors.includes(value),
+    )
+  );
 });
 const canApply = computed(
   () => !filterDisabled.value && (tab.value === "values" || validColor.value),
 );
-function describeCondition(condition: SheetFilterCondition): string {
+function describeCondition(condition: Exclude<SheetFilterCondition, ColorCondition>): string {
   if (condition.kind === "compound")
     return condition.conditions
       .map(describeCondition)
       .join(
         ` ${t(condition.operator === "and" ? "dataTools.filter.and" : "dataTools.filter.or")} `,
       );
-  if (condition.kind === "color")
-    return t("dataTools.filter.colorSummary", {
-      target: t(
-        condition.target === "fill" ? "dataTools.filter.fillColors" : "dataTools.filter.fontColors",
-      ),
-      color: condition.color?.toUpperCase() ?? t("dataTools.filter.noFillColor"),
-    });
   if (condition.kind === "rank")
     return t("dataTools.filter.rankSummary", {
       direction: t(condition.bottom ? "dataTools.filter.bottom" : "dataTools.filter.top"),
@@ -145,7 +149,6 @@ function describeCondition(condition: SheetFilterCondition): string {
   return `${t(operatorLabels[condition.operator])} ${draft.first}${draft.second ? ` ${t("dataTools.filter.and")} ${draft.second}` : ""}`;
 }
 const criteriaSummary = computed(() => {
-  if (tab.value === "color") return colorDraft.value ? describeCondition(colorDraft.value) : "";
   return pendingValueCriteria.value ? describeCondition(pendingValueCriteria.value) : "";
 });
 watch(
@@ -159,8 +162,13 @@ watch(
         : props.appliedKeys
     ).map((value) => ({ ...value }));
     valuesDirty.value = false;
-    colorDraft.value = props.criteria?.kind === "color" ? { ...props.criteria } : undefined;
-    tab.value = props.criteria?.kind === "color" ? "color" : "values";
+    const condition = props.criteria;
+    colorDraft.value = isColorCondition(condition)
+      ? condition.kind === "color-set"
+        ? { ...condition, colors: [...condition.colors] }
+        : { ...condition }
+      : undefined;
+    tab.value = isColorCondition(condition) ? "color" : "values";
     editingAction.value = undefined;
   },
   { immediate: true },
@@ -295,7 +303,11 @@ onBeforeUnmount(() => {
         </TTabPanel>
       </TTabs>
       <div class="filter-column-panel__bottom">
-        <p v-if="criteriaSummary" class="filter-column-panel__criteria" :title="criteriaSummary">
+        <p
+          v-if="tab === 'values' && criteriaSummary"
+          class="filter-column-panel__criteria"
+          :title="criteriaSummary"
+        >
           {{ criteriaSummary }}
         </p>
         <footer>

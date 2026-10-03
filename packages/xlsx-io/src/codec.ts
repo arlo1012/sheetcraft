@@ -19,9 +19,11 @@ import {
   getDefaultColumnWidth,
   replaceSheetSparseState,
   type CellRange,
+  type Sheet,
   type SheetFilter,
   type Workbook,
 } from "@idea10/core/workbook";
+import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
 import type { SheetConditionalFormatRule } from "@idea10/core/conditional-formatting";
 import {
   CELL_FILL_PATTERNS,
@@ -123,6 +125,30 @@ type BrowserWorkbook = XlsxImageWorkbook & {
 function advancedHiddenRows(filter: SheetFilter | null): number[] {
   const rows: number[] = [];
   for (const interval of filter?.advanced?.hiddenRows ?? []) {
+    const start = Math.max(0, interval.start);
+    const end = Math.min(MAX_SHEET_ROWS - 1, interval.end);
+    for (let row = start; row <= end; row += 1) {
+      rows.push(row);
+      if (rows.length > MAX_SPARSE_CELLS)
+        throw new RangeError("The workbook exceeds the XLSX v1 hidden-row export limit.");
+    }
+  }
+  return rows;
+}
+
+function hasColorSetFilter(filter: SheetFilter | null): boolean {
+  return Boolean(filter?.columns.some((column) => column.condition?.kind === "color-set"));
+}
+
+/**
+ * Excel's AutoFilter can only express one color. Preserve the current visible
+ * rows when a product multi-color filter is exported, while its full criterion
+ * lives in the product extension for a future Idea10 import.
+ */
+function colorSetHiddenRows(sheet: Sheet): number[] {
+  if (!hasColorSetFilter(sheet.filter)) return [];
+  const rows: number[] = [];
+  for (const interval of createSheetFilterHiddenRowIntervals(sheet)) {
     const start = Math.max(0, interval.start);
     const end = Math.min(MAX_SHEET_ROWS - 1, interval.end);
     for (let row = start; row <= end; row += 1) {
@@ -524,6 +550,7 @@ export async function decodeWithExcelJs(
     const hiddenRows: number[] = [];
     const hiddenColumns: number[] = [];
     const metadata = rawDataMetadata[sheetIndex];
+    const derivedColorSetRows = new Set(metadata?.colorSetHiddenRows ?? []);
     const conditionalFormats = rawConditionalFormats[sheetIndex]?.rules ?? [];
     const sourceDefaultColumnWidth = sourceSheet.properties.defaultColWidth;
     const defaultColumnWidth =
@@ -539,6 +566,7 @@ export async function decodeWithExcelJs(
       const rowIndex = rowNumber - 1;
       if (
         row.hidden === true &&
+        !derivedColorSetRows.has(rowIndex) &&
         !metadata?.outlineGroups.some(
           (group) =>
             group.axis === "row" &&
@@ -839,7 +867,13 @@ export async function encodeWithExcelJs(
       output.getRow(index + 1).height = (size * 3) / 4;
     }
     const advancedRows = advancedHiddenRows(sheet.filter);
-    for (const index of new Set([...(sheet.hiddenRows ?? []), ...advancedRows])) {
+    const multiColorRows = colorSetHiddenRows(sheet);
+    const derivedMultiColorRows = multiColorRows.filter((row) => !sheet.hiddenRows?.has(row));
+    for (const index of new Set([
+      ...(sheet.hiddenRows ?? []),
+      ...advancedRows,
+      ...multiColorRows,
+    ])) {
       output.getRow(index + 1).hidden = true;
     }
     for (const [index, size] of sheet.columnWidths) {
@@ -861,7 +895,8 @@ export async function encodeWithExcelJs(
       filter: sheet.filter?.advanced
         ? null
         : (sheet.filter as unknown as XlsxDataMetadata["filter"]),
-      hiddenRows: [...new Set([...(sheet.hiddenRows ?? []), ...advancedRows])],
+      hiddenRows: [...new Set([...(sheet.hiddenRows ?? []), ...advancedRows, ...multiColorRows])],
+      colorSetHiddenRows: derivedMultiColorRows,
       dataValidations: (sheet.dataValidations ?? []).map((validation) => {
         const { id: _id, ...value } = validation as { id?: unknown } & Record<string, unknown>;
         return value as XlsxDataMetadata["dataValidations"][number];

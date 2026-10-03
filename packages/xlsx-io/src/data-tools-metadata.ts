@@ -69,6 +69,7 @@ export type XlsxFilterCondition =
       conditions: [XlsxSimpleFilterCondition, XlsxSimpleFilterCondition];
     }
   | { kind: "color"; target: "fill" | "text"; color: string | null }
+  | { kind: "color-set"; target: "fill" | "text"; colors: Array<string | null> }
   | { kind: "rank"; bottom: boolean; percent: boolean; count: number }
   | { kind: "average"; above: boolean };
 
@@ -92,6 +93,8 @@ export type XlsxDataMetadata = {
   filter: XlsxFilter | null;
   /** Rows hidden to preserve an already-applied advanced filter result. */
   hiddenRows: number[];
+  /** Rows hidden only to preserve a product multi-color filter's open state. */
+  colorSetHiddenRows?: number[];
   dataValidations: XlsxDataValidation[];
   outlineGroups: XlsxOutlineGroup[];
   /** Zero-based first rows of subsequent printed pages. */
@@ -383,6 +386,73 @@ function readColorFilter(body: string, dxfs: readonly string[]): XlsxFilterCondi
   return null;
 }
 
+const IDEA10_COLOR_FILTER_SETS_URI = "{F05D2C50-AD53-4CE0-8F27-4BE69CF538D1}";
+const IDEA10_COLOR_FILTER_SETS_NAMESPACE = "https://idea10.dev/xlsx/filter/v1";
+
+function idea10ColorFilterSetExtension(xml: string): string | null {
+  const extension = new RegExp(
+    `<ext\\b(?=[^>]*\\buri=["']${IDEA10_COLOR_FILTER_SETS_URI.replace(/[{}]/g, "\\$&")}["'])[^>]*>([\\s\\S]*?)<\\/ext>`,
+    "i",
+  ).exec(xml);
+  return extension?.[1] ?? null;
+}
+
+function readIdea10ColorFilterSets(xml: string, filter: XlsxFilter | null): XlsxFilter | null {
+  if (!filter) return filter;
+  const extension = idea10ColorFilterSetExtension(xml);
+  if (!extension) return filter;
+  const columns = filter.columns.map((column) => ({ ...column }));
+  for (const entry of extension.matchAll(
+    /<idea10:colorFilterSet\b([^>]*)>([\s\S]*?)<\/idea10:colorFilterSet>/gi,
+  )) {
+    const attributes = entry[1] ?? "";
+    const column = Number(attribute(attributes, "column"));
+    const target = attribute(attributes, "target");
+    if (
+      !Number.isInteger(column) ||
+      column < filter.range.start.column ||
+      column > filter.range.end.column ||
+      (target !== "fill" && target !== "text")
+    )
+      continue;
+    const colors = [...(entry[2] ?? "").matchAll(/<idea10:color\b([^>]*)\/?\s*>/gi)]
+      .map((color) => attribute(color[1] ?? "", "value"))
+      .filter(
+        (color): color is string => typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color),
+      )
+      .map((color) => color.toLowerCase());
+    const hasNoFill = /<idea10:noFill\s*\/?\s*>/i.test(entry[2] ?? "");
+    const normalized = [...new Set([...colors, ...(hasNoFill ? [null] : [])])];
+    if (!normalized.length || (target === "text" && hasNoFill)) continue;
+    const index = columns.findIndex((candidate) => candidate.column === column);
+    const condition: XlsxFilterCondition = {
+      kind: "color-set",
+      target,
+      colors: normalized,
+    };
+    if (index === -1) columns.push({ column, allowedValues: [], condition });
+    else columns[index] = { ...columns[index]!, condition };
+  }
+  return { ...filter, columns };
+}
+
+function readIdea10ColorFilterSetHiddenRows(xml: string): number[] {
+  const extension = idea10ColorFilterSetExtension(xml);
+  const container = extension
+    ? /<idea10:colorFilterSets\b([^>]*)>/i.exec(extension)?.[1]
+    : undefined;
+  const rows = attribute(container ?? "", "hiddenRows");
+  if (!rows) return [];
+  return [
+    ...new Set(
+      rows
+        .split(",")
+        .map(Number)
+        .filter((row) => Number.isInteger(row) && row >= 0),
+    ),
+  ];
+}
+
 export function readXlsxAutoFilter(
   xml: string,
   dxfs: readonly string[] = [],
@@ -496,7 +566,7 @@ export function readXlsxAutoFilter(
       ...(condition ? { condition } : {}),
     });
   }
-  return { value: { range, columns }, unsupported };
+  return { value: readIdea10ColorFilterSets(xml, { range, columns }), unsupported };
 }
 
 function groupsFromLevels(
@@ -578,6 +648,7 @@ export function readXlsxDataMetadata(bytes: Uint8Array): XlsxDataMetadata[] {
     return {
       filter: filter.value,
       hiddenRows: [],
+      colorSetHiddenRows: readIdea10ColorFilterSetHiddenRows(xml),
       dataValidations: validations.values,
       outlineGroups: readOutlineGroups(xml),
       unsupportedFilters: filter.unsupported,
@@ -652,6 +723,10 @@ export function writeXlsxAutoFilter(
 ): string {
   const columns = filter.columns
     .map((column) => {
+      // OOXML can express exactly one color criterion. A color-set is stored
+      // in the product extension below, so do not reinterpret it as matching
+      // its cell values (equal values may have different colors).
+      if (column.condition?.kind === "color-set" && column.allowedValues.length === 0) return "";
       const offset = column.column - filter.range.start.column;
       const values = column.allowedValues;
       const blanks = values.some((value) => value.kind === "blank");
@@ -718,6 +793,55 @@ export function writeXlsxAutoFilter(
   return `<autoFilter ref="${rangeReference(filter.range)}">${columns}</autoFilter>`;
 }
 
+/**
+ * OOXML's colorFilter is singular.  A multi-color filter is retained in this
+ * product extension. Only an explicitly supplied value criterion is emitted;
+ * deriving values from colors would falsely narrow the file.
+ */
+function writeIdea10ColorFilterSets(
+  filter: XlsxFilter | null,
+  hiddenRows: readonly number[] = [],
+): string {
+  const entries = (filter?.columns ?? [])
+    .filter((column) => column.condition?.kind === "color-set")
+    .map((column) => {
+      const condition = column.condition as Extract<XlsxFilterCondition, { kind: "color-set" }>;
+      const colors = condition.colors
+        .map((color) =>
+          color === null
+            ? "<idea10:noFill/>"
+            : `<idea10:color value="${encodeXml(color.toUpperCase())}"/>`,
+        )
+        .join("");
+      return `<idea10:colorFilterSet column="${column.column}" target="${condition.target}">${colors}</idea10:colorFilterSet>`;
+    })
+    .join("");
+  return entries || hiddenRows.length
+    ? `<ext uri="${IDEA10_COLOR_FILTER_SETS_URI}"><idea10:colorFilterSets xmlns:idea10="${IDEA10_COLOR_FILTER_SETS_NAMESPACE}"${hiddenRows.length ? ` hiddenRows="${hiddenRows.join(",")}"` : ""}>${entries}</idea10:colorFilterSets></ext>`
+    : "";
+}
+
+function writeIdea10ColorFilterSetExtension(
+  xml: string,
+  filter: XlsxFilter | null,
+  hiddenRows: readonly number[] = [],
+): string {
+  const extension = writeIdea10ColorFilterSets(filter, hiddenRows);
+  if (!extension) return xml;
+  const existing = new RegExp(
+    `<ext\\b(?=[^>]*\\buri=["']${IDEA10_COLOR_FILTER_SETS_URI.replace(/[{}]/g, "\\$&")}["'])[^>]*(?:\\/>|>[\\s\\S]*?<\\/ext>)`,
+    "i",
+  );
+  const withoutExisting = xml.replace(existing, "");
+  if (/<extLst\b[^>]*\/>/i.test(withoutExisting))
+    return withoutExisting.replace(/<extLst\b[^>]*\/>/i, `<extLst>${extension}</extLst>`);
+  if (/<extLst\b[^>]*>/i.test(withoutExisting))
+    return withoutExisting.replace(/<\/extLst>/i, `${extension}</extLst>`);
+  if (/<\/worksheet>/i.test(withoutExisting))
+    return withoutExisting.replace(/<\/worksheet>/i, `<extLst>${extension}</extLst></worksheet>`);
+  return withoutExisting.replace(/<\/table>/i, `<extLst>${extension}</extLst></table>`);
+}
+
 /** Allocate sheet color-filter DXFs after conditional-format DXFs are finalized. */
 export function writeXlsxFilterColorFormats(
   entries: Record<string, Uint8Array>,
@@ -727,7 +851,9 @@ export function writeXlsxFilterColorFormats(
   if (!styles) throw new Error("Missing generated XLSX styles.");
   if (
     !sheets.some((sheet) =>
-      sheet.filter?.columns.some((column) => column.condition?.kind === "color"),
+      sheet.filter?.columns.some(
+        (column) => column.condition?.kind === "color" || column.condition?.kind === "color-set",
+      ),
     )
   )
     return;
@@ -976,6 +1102,8 @@ export function writeXlsxDataMetadata(
         writeXlsxAutoFilter(metadata.filter),
         /<sheetData\b[^>]*(?:\/>|>[\s\S]*?<\/sheetData>)/i,
       );
+    if (metadata.filter || metadata.colorSetHiddenRows?.length)
+      xml = writeIdea10ColorFilterSetExtension(xml, metadata.filter, metadata.colorSetHiddenRows);
     if (metadata.dataValidations.length) {
       const after = /<autoFilter\b/i.test(xml)
         ? /<autoFilter\b[^>]*(?:\/>|>[\s\S]*?<\/autoFilter>)/i

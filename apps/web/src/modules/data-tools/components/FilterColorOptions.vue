@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { Check } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import type { SheetFilterCondition } from "@idea10/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 
-type ColorCondition = Extract<SheetFilterCondition, { kind: "color" }>;
+type ColorCondition = Extract<SheetFilterCondition, { kind: "color" | "color-set" }>;
 
 const props = withDefaults(
   defineProps<{
@@ -17,7 +18,7 @@ const props = withDefaults(
   }>(),
   { modelValue: undefined, disabled: false },
 );
-const emit = defineEmits<{ "update:modelValue": [condition: ColorCondition] }>();
+const emit = defineEmits<{ "update:modelValue": [condition: ColorCondition | undefined] }>();
 const { t } = useAppI18n();
 
 const cellColors = computed(() => [...new Set(props.colors.cellColors)]);
@@ -28,12 +29,33 @@ function label(color: string | null): string {
 }
 
 function selected(target: ColorCondition["target"], color: string | null): boolean {
-  return props.modelValue?.target === target && props.modelValue.color === color;
+  const condition = props.modelValue;
+  return (
+    condition?.target === target &&
+    (condition.kind === "color" ? condition.color === color : condition.colors.includes(color))
+  );
 }
 
 function choose(target: ColorCondition["target"], color: string | null): void {
   if (props.disabled) return;
-  emit("update:modelValue", { kind: "color", target, color });
+  const condition = props.modelValue;
+  const current =
+    condition?.target === target
+      ? condition.kind === "color"
+        ? [condition.color]
+        : condition.colors
+      : [];
+  const colors = current.includes(color)
+    ? current.filter((value) => value !== color)
+    : [...current, color];
+  emit(
+    "update:modelValue",
+    colors.length === 0
+      ? undefined
+      : colors.length === 1
+        ? { kind: "color", target, color: colors[0]! }
+        : { kind: "color-set", target, colors },
+  );
 }
 </script>
 
@@ -46,26 +68,38 @@ function choose(target: ColorCondition["target"], color: string | null): void {
         role="group"
         :aria-label="t('dataTools.filter.fillColors')"
       >
-        <TButton
+        <span
           v-for="color in cellColors"
           :key="color ?? 'no-fill'"
-          shape="circle"
-          variant="outline"
-          :theme="selected('fill', color) ? 'primary' : 'default'"
-          size="small"
-          :disabled="disabled"
-          :aria-pressed="selected('fill', color)"
-          :aria-label="t('dataTools.filter.chooseFillColor', { color: label(color) })"
-          :title="t('dataTools.filter.chooseFillColor', { color: label(color) })"
-          @click="choose('fill', color)"
+          class="filter-color-options__choice"
         >
+          <TButton
+            class="filter-color-options__button"
+            shape="circle"
+            variant="text"
+            theme="default"
+            size="medium"
+            :disabled="disabled"
+            :aria-pressed="selected('fill', color)"
+            :aria-label="t('dataTools.filter.chooseFillColor', { color: label(color) })"
+            :title="t('dataTools.filter.chooseFillColor', { color: label(color) })"
+            @click="choose('fill', color)"
+          >
+            <span
+              class="filter-color-options__swatch"
+              :class="{ 'is-no-fill': color === null }"
+              :style="color === null ? undefined : { backgroundColor: color }"
+              aria-hidden="true"
+            />
+          </TButton>
           <span
-            class="filter-color-options__swatch"
-            :class="{ 'is-no-fill': color === null }"
-            :style="color === null ? undefined : { backgroundColor: color }"
+            v-if="selected('fill', color)"
+            class="filter-color-options__check"
             aria-hidden="true"
-          />
-        </TButton>
+          >
+            <Check />
+          </span>
+        </span>
         <span v-if="!cellColors.length" class="filter-color-options__empty">{{
           t("dataTools.filter.noColors")
         }}</span>
@@ -78,21 +112,29 @@ function choose(target: ColorCondition["target"], color: string | null): void {
         role="group"
         :aria-label="t('dataTools.filter.fontColors')"
       >
-        <TButton
-          v-for="color in fontColors"
-          :key="color"
-          shape="circle"
-          variant="outline"
-          :theme="selected('text', color) ? 'primary' : 'default'"
-          size="small"
-          :disabled="disabled"
-          :aria-pressed="selected('text', color)"
-          :aria-label="t('dataTools.filter.chooseFontColor', { color: label(color) })"
-          :title="t('dataTools.filter.chooseFontColor', { color: label(color) })"
-          @click="choose('text', color)"
-        >
-          <span class="filter-color-options__font" :style="{ color }" aria-hidden="true">A</span>
-        </TButton>
+        <span v-for="color in fontColors" :key="color" class="filter-color-options__choice">
+          <TButton
+            class="filter-color-options__button"
+            shape="circle"
+            variant="text"
+            theme="default"
+            size="medium"
+            :disabled="disabled"
+            :aria-pressed="selected('text', color)"
+            :aria-label="t('dataTools.filter.chooseFontColor', { color: label(color) })"
+            :title="t('dataTools.filter.chooseFontColor', { color: label(color) })"
+            @click="choose('text', color)"
+          >
+            <span class="filter-color-options__font" :style="{ color }" aria-hidden="true">A</span>
+          </TButton>
+          <span
+            v-if="selected('text', color)"
+            class="filter-color-options__check"
+            aria-hidden="true"
+          >
+            <Check />
+          </span>
+        </span>
         <span v-if="!fontColors.length" class="filter-color-options__empty">{{
           t("dataTools.filter.noColors")
         }}</span>
@@ -119,31 +161,74 @@ function choose(target: ColorCondition["target"], color: string | null): void {
   &__choices {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--idea-space-3);
+    gap: var(--idea-space-6);
+    padding: 0 var(--idea-space-2) var(--idea-space-2);
+  }
+
+  &__choice {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    flex: none;
+  }
+
+  &__button {
+    width: 28px;
+    height: 28px;
+  }
+
+  &__swatch,
+  &__font {
+    box-sizing: border-box;
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--idea-border-control);
+    border-radius: 50%;
   }
 
   &__swatch {
     display: block;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
 
     &.is-no-fill {
-      border: 1px solid var(--idea-border-control);
       background: linear-gradient(
         135deg,
         transparent 46%,
-        var(--idea-status-error) 48%,
-        var(--idea-status-error) 52%,
+        var(--idea-border-control) 48%,
+        var(--idea-border-control) 52%,
         transparent 54%
       );
     }
   }
 
   &__font {
-    font-size: 18px;
+    display: grid;
+    place-items: center;
+    background: var(--idea-surface-panel);
+    font-size: 20px;
     font-weight: var(--idea-font-weight-semibold);
     line-height: 1;
+  }
+
+  &__check {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--idea-surface-panel);
+    border-radius: 50%;
+    color: var(--idea-text-inverse);
+    background: var(--idea-status-success);
+    pointer-events: none;
+
+    svg {
+      width: 9px;
+      height: 9px;
+      stroke-width: 3;
+    }
   }
 
   &__empty {

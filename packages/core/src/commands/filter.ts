@@ -68,7 +68,9 @@ function cloneFilterCondition(
 ): NonNullable<SheetFilter["columns"][number]["condition"]> {
   return condition.kind === "compound"
     ? { ...condition, conditions: [{ ...condition.conditions[0] }, { ...condition.conditions[1] }] }
-    : { ...condition };
+    : condition.kind === "color-set"
+      ? { ...condition, colors: [...condition.colors] }
+      : { ...condition };
 }
 
 function parseCellKey(key: string): CellAddress {

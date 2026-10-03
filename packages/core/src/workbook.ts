@@ -128,6 +128,7 @@ export type SheetFilterCondition =
       conditions: [SheetFilterValueCondition, SheetFilterValueCondition];
     }
   | { kind: "color"; target: "fill" | "text"; color: string | null }
+  | { kind: "color-set"; target: "fill" | "text"; colors: Array<string | null> }
   | { kind: "rank"; bottom: boolean; percent: boolean; count: number }
   | { kind: "average"; above: boolean };
 
@@ -1703,7 +1704,9 @@ function cloneSheetFilter(filter: SheetFilter): SheetFilter {
 function cloneSheetFilterCondition(condition: SheetFilterCondition): SheetFilterCondition {
   return condition.kind === "compound"
     ? { ...condition, conditions: [{ ...condition.conditions[0] }, { ...condition.conditions[1] }] }
-    : { ...condition };
+    : condition.kind === "color-set"
+      ? { ...condition, colors: [...condition.colors] }
+      : { ...condition };
 }
 
 function normalizeFreezePanes(value: FreezePanes): FreezePanes {
@@ -1797,6 +1800,27 @@ function normalizeSheetFilterCondition(condition: SheetFilterCondition): SheetFi
       ...condition,
       ...(typeof condition.color === "string" ? { color: condition.color.toLowerCase() } : {}),
     };
+  }
+  if (condition.kind === "color-set") {
+    if (
+      (condition.target !== "fill" && condition.target !== "text") ||
+      !Array.isArray(condition.colors) ||
+      condition.colors.length === 0
+    )
+      throw new TypeError("Invalid filter condition.");
+    const colors = [
+      ...new Set(
+        condition.colors.map((color) => {
+          if (
+            (color !== null && (typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color))) ||
+            (condition.target === "text" && color === null)
+          )
+            throw new TypeError("Invalid filter condition.");
+          return typeof color === "string" ? color.toLowerCase() : null;
+        }),
+      ),
+    ];
+    return { kind: "color-set", target: condition.target, colors };
   }
   if (condition.kind === "rank") {
     if (

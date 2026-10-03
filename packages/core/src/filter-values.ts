@@ -137,9 +137,15 @@ export function createSheetFilterColumnMatcher(
     ? values.reduce((sum, value) => sum + value, 0) / values.length
     : Number.NaN;
   const resolveColor =
-    condition?.kind === "color"
+    condition?.kind === "color" || condition?.kind === "color-set"
       ? createCellColorResolver(sheet, { getComputedValue: getValue })
       : undefined;
+  const selectedColors =
+    condition?.kind === "color"
+      ? new Set([condition.color === null ? null : condition.color.toLowerCase()])
+      : condition?.kind === "color-set"
+        ? new Set(condition.colors.map((color) => (color === null ? null : color.toLowerCase())))
+        : undefined;
   return (row) => {
     const address = { row, column: column.column };
     const value = getSheetFilterValue(getValue(address));
@@ -147,11 +153,10 @@ export function createSheetFilterColumnMatcher(
       (condition !== undefined && column.allowedValues.length === 0) ||
       column.allowedValues.some((allowed) => areSheetFilterValuesEqual(allowed, value));
     if (!valuesMatch || !condition) return valuesMatch;
-    if (condition.kind === "color")
-      return (
-        resolveColor!(address, condition.target) ===
-        (condition.color === null ? null : condition.color.toLowerCase())
-      );
+    if (condition.kind === "color" || condition.kind === "color-set") {
+      const color = resolveColor!(address, condition.target);
+      return color !== undefined && selectedColors!.has(color);
+    }
     if (condition.kind === "rank") {
       if (value.kind !== "number" || !Number.isFinite(value.value) || !sorted.length) return false;
       const count = Math.min(

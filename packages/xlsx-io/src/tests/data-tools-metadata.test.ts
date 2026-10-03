@@ -1,6 +1,7 @@
 import ExcelJSImport from "exceljs/dist/exceljs.min.js";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate/browser";
-import { createWorkbook, setCellContent } from "@idea10/core/workbook";
+import { createSheetFilterHiddenRowIntervals } from "@idea10/core/commands";
+import { createWorkbook, setCellContent, setCellStyle } from "@idea10/core/workbook";
 import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 
@@ -171,6 +172,55 @@ describe("XLSX data-tool metadata", () => {
     expect(
       [...(await decodeXlsx(encoded.bytes)).workbook.sheets.values()][0]!.filter?.columns,
     ).toEqual(sheet.filter!.columns);
+  });
+
+  test("roundtrips multi-color filters without pretending OOXML supports more than one color", async () => {
+    const workbook = createWorkbook({
+      id: "multi-color-filter",
+      sheetId: "data",
+      sheetName: "Data",
+    });
+    const sheet = [...workbook.sheets.values()][0]!;
+    setCellContent(sheet, { row: 0, column: 0 }, { kind: "literal", value: "Value" });
+    for (const row of [1, 2, 3])
+      setCellContent(sheet, { row, column: 0 }, { kind: "literal", value: "same" });
+    setCellStyle(sheet, { row: 1, column: 0 }, { fillColor: "#ff0000" });
+    setCellStyle(sheet, { row: 2, column: 0 }, { fillColor: "#00ff00" });
+    setCellStyle(sheet, { row: 3, column: 0 }, { fillColor: "#0000ff" });
+    (sheet.hiddenRows ??= new Set()).add(1);
+    sheet.filter = {
+      range: { start: { row: 0, column: 0 }, end: { row: 3, column: 0 } },
+      columns: [
+        {
+          column: 0,
+          allowedValues: [],
+          condition: {
+            kind: "color-set",
+            target: "fill",
+            colors: ["#ff0000", "#0000ff"],
+          },
+        },
+      ],
+    };
+
+    const encoded = await encodeXlsx(workbook);
+    const xml = strFromU8(unzipSync(encoded.bytes)["xl/worksheets/sheet1.xml"]!);
+    expect(xml).not.toContain("<colorFilter");
+    expect(xml).toContain('uri="{F05D2C50-AD53-4CE0-8F27-4BE69CF538D1}"');
+    expect(xml).toContain('<idea10:color value="#FF0000"/>');
+    expect(xml).toContain('<idea10:color value="#0000FF"/>');
+    expect(xml).toContain('hiddenRows="2"');
+    expect(xml).toMatch(/<row[^>]*r="2"[^>]*hidden="1"/);
+    expect(xml).toMatch(/<row[^>]*r="3"[^>]*hidden="1"/);
+    expect(xml).not.toMatch(/<row[^>]*r="4"[^>]*hidden="1"/);
+
+    const decoded = [...(await decodeXlsx(encoded.bytes)).workbook.sheets.values()][0]!;
+    expect(decoded.filter?.columns).toEqual(sheet.filter.columns);
+    expect([...(decoded.hiddenRows ?? [])]).toEqual([1]);
+    expect(createSheetFilterHiddenRowIntervals(decoded)).toEqual([{ start: 2, end: 2 }]);
+    decoded.filter = null;
+    expect(createSheetFilterHiddenRowIntervals(decoded)).toEqual([]);
+    expect([...(decoded.hiddenRows ?? [])]).toEqual([1]);
   });
 
   test("imports standard not-between and validates top-percent limits", async () => {
