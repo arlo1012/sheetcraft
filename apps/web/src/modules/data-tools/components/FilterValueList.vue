@@ -8,27 +8,52 @@ import { getSheetFilterValueKey } from "@idea10/core/commands";
 import type { SheetFilterValue } from "@idea10/core/workbook";
 import { useAppI18n } from "../../../shared/i18n";
 import type { DataToolFilterValueOption } from "../data-tools-types";
-import { getMatchingFilterValues } from "../filter-value-options";
+import {
+  getMatchingFilterValues,
+  DEFAULT_FILTER_SEARCH_OPTIONS,
+  type FilterSearchOptions,
+} from "../filter-value-options";
+import FilterSearchMenu from "./FilterSearchMenu.vue";
 
 type SortField = "name" | "count";
 type SortDirection = "ascending" | "descending";
 
-const props = defineProps<{
-  values: readonly DataToolFilterValueOption[];
-  modelValue: readonly SheetFilterValue[];
-  query: string;
-  disabled: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    values: readonly DataToolFilterValueOption[];
+    modelValue: readonly SheetFilterValue[];
+    query: string;
+    disabled: boolean;
+    searchOptions?: FilterSearchOptions;
+  }>(),
+  { searchOptions: () => ({ ...DEFAULT_FILTER_SEARCH_OPTIONS }) },
+);
 const emit = defineEmits<{
   "update:modelValue": [values: SheetFilterValue[]];
   "update:query": [query: string];
+  "update:searchOptions": [options: FilterSearchOptions];
 }>();
 const { t } = useAppI18n();
 const sortField = ref<SortField>("name");
 const sortDirection = ref<SortDirection>("ascending");
 const visibleLimit = ref(100);
+const searchMenuRef = ref<InstanceType<typeof FilterSearchMenu> | null>(null);
+defineExpose({
+  searchMenuElement: computed(() => searchMenuRef.value?.rootElement ?? null),
+});
+const searchPlaceholder = computed(() =>
+  t(
+    props.searchOptions.mode === "any"
+      ? "dataTools.filter.searchAnyPlaceholder"
+      : props.searchOptions.mode === "phrase"
+        ? "dataTools.filter.searchPhrasePlaceholder"
+        : "dataTools.filter.searchKeywords",
+  ),
+);
 
-const matchingValues = computed(() => getMatchingFilterValues(props.values, props.query));
+const matchingValues = computed(() =>
+  getMatchingFilterValues(props.values, props.query, props.searchOptions),
+);
 const selectedKeys = computed(() => new Set(props.modelValue.map(getSheetFilterValueKey)));
 const allMatchingSelected = computed(
   () =>
@@ -62,7 +87,7 @@ const remainingCount = computed(() =>
 );
 
 watch(
-  () => props.query,
+  () => [props.query, props.searchOptions] as const,
   () => {
     visibleLimit.value = 100;
   },
@@ -142,11 +167,22 @@ function selectDuplicates(): void {
     <TInput
       :value="query"
       :disabled="disabled"
-      :placeholder="t('dataTools.filter.searchKeywords')"
-      :aria-label="t('dataTools.filter.searchKeywords')"
+      :placeholder="searchPlaceholder"
+      :aria-label="searchPlaceholder"
+      type="search"
+      autocomplete="off"
       clearable
       @update:value="updateQuery"
-    />
+    >
+      <template #prefix-icon>
+        <FilterSearchMenu
+          ref="searchMenuRef"
+          :options="searchOptions"
+          :disabled="disabled"
+          @change="emit('update:searchOptions', $event)"
+        />
+      </template>
+    </TInput>
     <div class="filter-value-list__tools">
       <TCheckbox
         :checked="allMatchingSelected"

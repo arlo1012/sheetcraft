@@ -322,6 +322,14 @@ export type MessageSchema = ToolMessageSchema & {
       showAll: string;
       content: string;
       searchKeywords: string;
+      searchOptions: string;
+      searchAllKeywords: string;
+      searchAnyKeyword: string;
+      searchEntireString: string;
+      searchAnyPlaceholder: string;
+      searchPhrasePlaceholder: string;
+      enablePinyinSearch: string;
+      disablePinyinSearch: string;
       invert: string;
       duplicates: string;
       name: string;

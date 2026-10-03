@@ -11,7 +11,11 @@ import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismiss
 import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { createFilterConditionDraft, type FilterConditionOperator } from "../filter-conditions";
 import type { FilterConditionAction } from "../filter-condition-actions";
-import { getMatchingFilterValues } from "../filter-value-options";
+import {
+  getMatchingFilterValues,
+  DEFAULT_FILTER_SEARCH_OPTIONS,
+  type FilterSearchOptions,
+} from "../filter-value-options";
 import type { DataToolFilterCriteria, DataToolFilterValueOption } from "../data-tools-types";
 import FilterValueList from "./FilterValueList.vue";
 import FilterColorOptions from "./FilterColorOptions.vue";
@@ -56,8 +60,10 @@ const emit = defineEmits<{
 }>();
 const { t } = useAppI18n();
 const root = ref<HTMLElement | null>(null);
+const valueListRef = ref<InstanceType<typeof FilterValueList> | null>(null);
 const conditionMenuRef = ref<InstanceType<typeof FilterConditionMenu> | null>(null);
 const query = ref("");
+const searchOptions = ref<FilterSearchOptions>({ ...DEFAULT_FILTER_SEARCH_OPTIONS });
 const selected = ref<SheetFilterValue[]>([]);
 const colorDraft = ref<ColorCondition>();
 const tab = ref<"values" | "color">("values");
@@ -87,7 +93,10 @@ const reference = computed<FloatingReference>(() => ({
 const { floatingStyles } = useDismissibleFloatingPanel(reference, root, open, {
   placement: "bottom-start",
   offset: 3,
-  additionalInside: () => [conditionMenuRef.value?.rootElement],
+  additionalInside: () => [
+    conditionMenuRef.value?.rootElement,
+    valueListRef.value?.searchMenuElement,
+  ],
   onDismiss: ({ restoreFocus }) => {
     emit("close");
     if (restoreFocus) void nextTick(() => opener?.focus());
@@ -107,7 +116,9 @@ const operatorLabels: Record<FilterConditionOperator, MessageKey> = {
   between: "dataTools.filter.between",
   notBetween: "dataTools.filter.notBetween",
 };
-const matchingValues = computed(() => getMatchingFilterValues(props.values, query.value));
+const matchingValues = computed(() =>
+  getMatchingFilterValues(props.values, query.value, searchOptions.value),
+);
 const includedKeys = computed(() => {
   const keys = new Set(selected.value.map(getSheetFilterValueKey));
   return matchingValues.value
@@ -173,6 +184,10 @@ watch(
   },
   { immediate: true },
 );
+function updateSearchOptions(options: FilterSearchOptions): void {
+  searchOptions.value = options;
+  if (query.value.trim()) valuesDirty.value = true;
+}
 function applyCondition(criteria: SheetFilterCondition): void {
   if (!filterDisabled.value)
     emit("apply", {
@@ -286,12 +301,15 @@ onBeforeUnmount(() => {
         <TTabPanel value="values" :disabled="disabled" :label="t('dataTools.filter.content')">
           <div class="filter-column-panel__content">
             <FilterValueList
+              ref="valueListRef"
               v-model="selected"
               v-model:query="query"
+              :search-options="searchOptions"
               :values="values"
               :disabled="disabled"
               @update:model-value="valuesDirty = true"
               @update:query="valuesDirty = true"
+              @update:search-options="updateSearchOptions"
               @keydown.enter="onSearchEnter"
             />
           </div>
