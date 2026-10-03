@@ -365,7 +365,7 @@ function apply(): void {
       </div>
       <TableHeightWrapper v-slot="{ height }">
         <TTable
-          class="idea-table--mini"
+          class="idea-table--row-dividers"
           row-key="id"
           :data="rows"
           :columns="tableColumns"
