@@ -136,15 +136,15 @@ defineExpose({ focusFirstStyle });
 }
 .cell-style-gallery__tile {
   min-width: 0;
-  padding: 0;
+  padding: 3px;
   overflow: hidden;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--idea-radius-small);
   background: transparent;
   cursor: pointer;
 }
 .cell-style-gallery__tile:hover {
-  border-color: var(--idea-border-control);
+  background: var(--idea-surface-secondary);
 }
 .cell-style-gallery__tile:disabled {
   opacity: 0.5;
