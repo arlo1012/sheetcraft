@@ -252,6 +252,7 @@ export const enUS = {
       title: "Sort",
       range: "Range",
       header: "My data has headers",
+      actions: "Actions",
       addLevel: "Add level",
       deleteLevel: "Delete level",
       copyLevel: "Copy level",

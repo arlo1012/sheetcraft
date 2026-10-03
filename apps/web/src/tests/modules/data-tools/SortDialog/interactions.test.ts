@@ -50,8 +50,17 @@ function fixture(headerLocked = false) {
   const action = async (name: string) => {
     await new DOMWrapper(document.querySelector(`[data-sort-action="${name}"]`)!).trigger("click");
   };
+  const rowAction = async (
+    rowIndex: number,
+    name: string,
+    event: "click" | "keydown" = "click",
+    options: Record<string, unknown> = {},
+  ) => {
+    const row = wrapper.findAll("[data-sort-row]")[rowIndex]!;
+    await row.get(`[data-sort-action="${name}"]`).trigger(event, options);
+  };
   const confirm = () => wrapper.findAllComponents({ name: "TDialog" })[0]!.vm.$emit("confirm");
-  return { wrapper, action, confirm };
+  return { wrapper, action, rowAction, confirm };
 }
 
 describe("SortDialog", () => {
@@ -357,8 +366,8 @@ describe("SortDialog", () => {
     confirm();
     expect(wrapper.emitted("apply")).toBeUndefined();
   });
-  test("copies independently, reorders selected levels, and removes the selected level", async () => {
-    const { wrapper, action, confirm } = fixture();
+  test("copies independently and lets each row reorder or remove itself", async () => {
+    const { wrapper, action, rowAction, confirm } = fixture();
     await action("copy");
     const selects = wrapper.findAllComponents({ name: "TSelect" });
     selects
@@ -368,7 +377,15 @@ describe("SortDialog", () => {
       .filter((item) => item.attributes("data-sort-field") === "direction")[1]!
       .vm.$emit("update:value", "descending");
     await wrapper.vm.$nextTick();
-    await action("up");
+    const firstUp = wrapper.findAll("[data-sort-row]")[0]!.get('[data-sort-action="up"]');
+    const lastDown = wrapper.findAll("[data-sort-row]")[1]!.get('[data-sort-action="down"]');
+    expect(firstUp.attributes("aria-disabled")).toBe("true");
+    expect(firstUp.attributes("tabindex")).toBe("-1");
+    expect(lastDown.attributes("aria-disabled")).toBe("true");
+    expect(lastDown.attributes("tabindex")).toBe("-1");
+
+    // The copied second row remains selected; operate on the unselected first row by keyboard.
+    await rowAction(0, "down", "keydown", { key: "Enter" });
     confirm();
     expect(wrapper.emitted("apply")?.at(-1)?.[0]).toEqual({
       range: "A1:B8",
@@ -380,26 +397,25 @@ describe("SortDialog", () => {
         { column: 0, direction: "ascending" },
       ],
     });
-    await action("down");
-    await action("delete");
+    // Remove the moved row using its action cell.
+    await rowAction(1, "delete");
     confirm();
     expect(wrapper.emitted("apply")?.at(-1)?.[0]).toMatchObject({
-      levels: [{ column: 0, direction: "ascending" }],
+      levels: [{ column: 1, direction: "descending" }],
     });
     await action("add");
     confirm();
     expect(wrapper.emitted("apply")?.at(-1)?.[0]).toMatchObject({
       levels: [
+        { column: 1, direction: "descending" },
         { column: 0, direction: "ascending" },
-        { column: 1, direction: "ascending" },
       ],
     });
-    // Clicking a previous row changes the toolbar target.
-    await new DOMWrapper(document.querySelector("[data-sort-row]")!).trigger("click");
-    await action("delete");
+    // The newly added second row is selected; delete the unselected first row.
+    await rowAction(0, "delete");
     confirm();
     expect(wrapper.emitted("apply")?.at(-1)?.[0]).toMatchObject({
-      levels: [{ column: 1, direction: "ascending" }],
+      levels: [{ column: 0, direction: "ascending" }],
     });
   });
 

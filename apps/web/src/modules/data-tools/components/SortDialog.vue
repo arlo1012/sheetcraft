@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { ArrowDown, ArrowUp } from "lucide-vue-next";
+import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from "lucide-vue-next";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Dialog } from "tdesign-vue-next/es/dialog";
@@ -57,7 +57,6 @@ const optionSortMethod = ref<NonNullable<SortDraft["sortMethod"]>>("pinyin");
 let nextId = 0;
 const maxLevels = 64;
 const selectedIndex = computed(() => rows.value.findIndex((row) => row.id === selectedId.value));
-const selectedRow = computed(() => rows.value[selectedIndex.value]);
 const columnOptions = computed(() =>
   props.columns.map((column) => ({
     label: hasHeader.value && column.header ? `${column.label} (${column.header})` : column.label,
@@ -228,6 +227,7 @@ const tableColumns = computed<BaseTableCol[]>(() => [
   { colKey: "column", title: t("dataTools.sort.column"), width: 300 },
   { colKey: "basis", title: t("dataTools.sort.sortOn"), width: 150 },
   { colKey: "direction", title: t("dataTools.sort.order") },
+  { colKey: "actions", title: t("dataTools.sort.actions"), width: 144, align: "center" },
 ]);
 const rowAttributes: TableRowAttributes<TableRowData> = ({ row }) => ({
   "data-sort-row": String(row.id),
@@ -263,14 +263,14 @@ watch(
 function selectRows(keys: Array<string | number>): void {
   if (typeof keys[0] === "number") selectedId.value = keys[0];
 }
-function insertLevel(level: SortLevel): void {
+function insertLevel(level: SortLevel, afterIndex = selectedIndex.value): void {
   const row = {
     ...level,
     ...(level.customOrder ? { customOrder: [...level.customOrder] } : {}),
     ...(level.icon ? { icon: { ...level.icon } } : {}),
     id: ++nextId,
   };
-  rows.value.splice(selectedIndex.value + 1, 0, row);
+  rows.value.splice(afterIndex + 1, 0, row);
   selectedId.value = row.id;
 }
 function addLevel(): void {
@@ -280,21 +280,23 @@ function addLevel(): void {
     props.columns[0];
   if (column) insertLevel({ column: column.column, direction: "ascending" });
 }
-function copyLevel(): void {
-  if (selectedRow.value && rows.value.length < maxLevels) insertLevel(selectedRow.value);
+function copyLevel(index: number): void {
+  const row = rows.value[index];
+  if (row && rows.value.length < maxLevels) insertLevel(row, index);
 }
-function removeLevel(): void {
-  const index = selectedIndex.value;
+function removeLevel(index: number): void {
   if (rows.value.length <= 1 || index < 0) return;
   rows.value.splice(index, 1);
   selectedId.value = rows.value[Math.min(index, rows.value.length - 1)]?.id;
 }
-function moveLevel(offset: number): void {
-  const index = selectedIndex.value;
+function moveLevel(index: number, offset: -1 | 1): void {
   const target = index + offset;
   if (index < 0 || target < 0 || target >= rows.value.length) return;
   const [row] = rows.value.splice(index, 1);
-  if (row) rows.value.splice(target, 0, row);
+  if (row) {
+    rows.value.splice(target, 0, row);
+    selectedId.value = row.id;
+  }
 }
 function openOptions(): void {
   optionCaseSensitive.value = caseSensitive.value;
@@ -349,38 +351,10 @@ function apply(): void {
             data-sort-action="add"
             :disabled="!columns.length || rows.length >= maxLevels"
             @click="addLevel"
-            >{{ t("dataTools.sort.addLevel") }}</TButton
           >
-          <TButton
-            variant="outline"
-            data-sort-action="delete"
-            :disabled="!selectedRow || rows.length <= 1"
-            @click="removeLevel"
-            >{{ t("dataTools.sort.deleteLevel") }}</TButton
-          >
-          <TButton
-            variant="outline"
-            data-sort-action="copy"
-            :disabled="!selectedRow || rows.length >= maxLevels"
-            @click="copyLevel"
-            >{{ t("dataTools.sort.copyLevel") }}</TButton
-          >
-          <span
-            v-icon-action="selectedIndex <= 0"
-            data-sort-action="up"
-            :aria-label="t('dataTools.sort.moveUp')"
-            :title="t('dataTools.sort.moveUp')"
-            @click="moveLevel(-1)"
-            ><ArrowUp :size="15"
-          /></span>
-          <span
-            v-icon-action="selectedIndex < 0 || selectedIndex >= rows.length - 1"
-            data-sort-action="down"
-            :aria-label="t('dataTools.sort.moveDown')"
-            :title="t('dataTools.sort.moveDown')"
-            @click="moveLevel(1)"
-            ><ArrowDown :size="15"
-          /></span>
+            <template #icon><Plus class="idea-control-icon" aria-hidden="true" /></template>
+            {{ t("dataTools.sort.addLevel") }}
+          </TButton>
           <TButton variant="outline" data-sort-action="options" @click="openOptions">{{
             t("dataTools.sort.options")
           }}</TButton>
@@ -401,6 +375,7 @@ function apply(): void {
           :disable-space-inactive-row="true"
           size="small"
           table-layout="fixed"
+          vertical-align="middle"
           :height="height"
           :bordered="false"
           hover
@@ -525,6 +500,42 @@ function apply(): void {
               />
             </div>
           </template>
+          <template #actions="{ rowIndex }">
+            <div class="sort-dialog__row-actions" @dblclick.stop>
+              <span
+                v-icon-action="rows.length >= maxLevels"
+                data-sort-action="copy"
+                :aria-label="t('dataTools.sort.copyLevel')"
+                :title="t('dataTools.sort.copyLevel')"
+                @click.stop="copyLevel(rowIndex)"
+                ><Copy class="idea-action-icon" aria-hidden="true"
+              /></span>
+              <span
+                v-icon-action="rows.length <= 1"
+                data-sort-action="delete"
+                :aria-label="t('dataTools.sort.deleteLevel')"
+                :title="t('dataTools.sort.deleteLevel')"
+                @click.stop="removeLevel(rowIndex)"
+                ><Trash2 class="idea-action-icon" aria-hidden="true"
+              /></span>
+              <span
+                v-icon-action="rowIndex === 0"
+                data-sort-action="up"
+                :aria-label="t('dataTools.sort.moveUp')"
+                :title="t('dataTools.sort.moveUp')"
+                @click.stop="moveLevel(rowIndex, -1)"
+                ><ArrowUp class="idea-action-icon" aria-hidden="true"
+              /></span>
+              <span
+                v-icon-action="rowIndex === rows.length - 1"
+                data-sort-action="down"
+                :aria-label="t('dataTools.sort.moveDown')"
+                :title="t('dataTools.sort.moveDown')"
+                @click.stop="moveLevel(rowIndex, 1)"
+                ><ArrowDown class="idea-action-icon" aria-hidden="true"
+              /></span>
+            </div>
+          </template>
         </TTable>
       </TableHeightWrapper>
     </div>
@@ -604,7 +615,7 @@ function apply(): void {
   height: min(300px, calc(100dvh - 180px));
   min-height: 0;
   min-width: 0;
-  gap: 12px;
+  gap: var(--idea-space-4);
   color: var(--idea-text-primary);
 
   &__toolbar {
@@ -617,12 +628,17 @@ function apply(): void {
   &__actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--idea-space-4);
+  }
+  &__row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--idea-space-2);
 
-    > [data-sort-action="up"],
-    > [data-sort-action="down"] {
-      width: 32px;
-      height: 32px;
+    > span {
+      width: 24px;
+      height: 28px;
     }
   }
   &__column {

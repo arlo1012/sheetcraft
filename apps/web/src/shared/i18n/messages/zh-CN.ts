@@ -244,6 +244,7 @@ export const zhCN = {
       title: "排序",
       range: "选定区域",
       header: "数据包含标题",
+      actions: "操作",
       addLevel: "添加条件",
       deleteLevel: "删除条件",
       copyLevel: "复制条件",

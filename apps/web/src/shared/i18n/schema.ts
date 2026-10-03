@@ -240,6 +240,7 @@ export type MessageSchema = ToolMessageSchema & {
       title: string;
       range: string;
       header: string;
+      actions: string;
       addLevel: string;
       deleteLevel: string;
       copyLevel: string;
