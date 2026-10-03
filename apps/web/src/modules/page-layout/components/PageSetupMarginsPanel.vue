@@ -41,7 +41,7 @@ const preview = computed(() => {
     1,
     height - y - (setup.value.margins.bottom / paper.height) * height,
   );
-  const cellsWidth = Math.min(52, contentWidth),
+  const cellsWidth = Math.min(64, contentWidth),
     cellsHeight = Math.min(72, contentHeight);
   return {
     width,
@@ -83,123 +83,76 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
 
 <template>
   <div class="page-setup-margins">
-    <div class="page-setup-margins__unit" role="group" :aria-label="t('dimensionUnits.unit')">
-      <span>{{ t("dimensionUnits.unit") }}</span
-      ><TSelect
-        class="page-setup-margins__unit-select"
-        :model-value="unit"
-        :options="unitOptions"
-        :aria-label="t('dimensionUnits.unit')"
-        data-page-setup="margin-unit"
-        @change="setUnit"
-      />
-    </div>
-    <div class="page-setup-margins__layout">
-      <div class="page-setup-margins__fields">
-        <div class="page-setup-margins__field" role="group" :aria-label="t('pageLayout.marginTop')">
-          <span>{{ t("pageLayout.marginTop") }}</span
-          ><TInputNumber
-            :model-value="displayed('top')"
-            theme="column"
-            class="idea-input-number--persistent-controls page-setup-margins__input"
-            :min="0"
-            :decimal-places="2"
-            data-page-setup="margin-top"
-            @update:model-value="update('top', $event)"
-          />
-        </div>
-        <div
-          class="page-setup-margins__field"
-          role="group"
-          :aria-label="t('pageLayout.marginBottom')"
-        >
-          <span>{{ t("pageLayout.marginBottom") }}</span
-          ><TInputNumber
-            :model-value="displayed('bottom')"
-            theme="column"
-            class="idea-input-number--persistent-controls page-setup-margins__input"
-            :min="0"
-            :decimal-places="2"
-            data-page-setup="margin-bottom"
-            @update:model-value="update('bottom', $event)"
-          />
-        </div>
-        <div
-          class="page-setup-margins__field"
-          role="group"
-          :aria-label="t('pageLayout.marginLeft')"
-        >
-          <span>{{ t("pageLayout.marginLeft") }}</span
-          ><TInputNumber
-            :model-value="displayed('left')"
-            theme="column"
-            class="idea-input-number--persistent-controls page-setup-margins__input"
-            :min="0"
-            :decimal-places="2"
-            data-page-setup="margin-left"
-            @update:model-value="update('left', $event)"
-          />
-        </div>
-        <div
-          class="page-setup-margins__field"
-          role="group"
-          :aria-label="t('pageLayout.marginRight')"
-        >
-          <span>{{ t("pageLayout.marginRight") }}</span
-          ><TInputNumber
-            :model-value="displayed('right')"
-            theme="column"
-            class="idea-input-number--persistent-controls page-setup-margins__input"
-            :min="0"
-            :decimal-places="2"
-            data-page-setup="margin-right"
-            @update:model-value="update('right', $event)"
-          />
-        </div>
-        <div
-          class="page-setup-margins__field"
-          role="group"
-          :aria-label="t('pageLayout.marginHeader')"
-        >
-          <span>{{ t("pageLayout.marginHeader") }}</span
-          ><TInputNumber
-            :model-value="displayed('header')"
-            theme="column"
-            class="idea-input-number--persistent-controls page-setup-margins__input"
-            :min="0"
-            :decimal-places="2"
-            data-page-setup="margin-header"
-            @update:model-value="update('header', $event)"
-          />
-        </div>
-        <div
-          class="page-setup-margins__field"
-          role="group"
-          :aria-label="t('pageLayout.marginFooter')"
-        >
-          <span>{{ t("pageLayout.marginFooter") }}</span
-          ><TInputNumber
-            :model-value="displayed('footer')"
-            theme="column"
-            class="idea-input-number--persistent-controls page-setup-margins__input"
-            :min="0"
-            :decimal-places="2"
-            data-page-setup="margin-footer"
-            @update:model-value="update('footer', $event)"
-          />
-        </div>
+    <div class="page-setup-margins__diagram">
+      <div class="page-setup-margins__top" role="group" :aria-label="t('pageLayout.marginTop')">
+        <span>{{ t("pageLayout.marginTop") }}</span
+        ><TInputNumber
+          :model-value="displayed('top')"
+          theme="column"
+          class="idea-input-number--persistent-controls"
+          :min="0"
+          :decimal-places="2"
+          data-page-setup="margin-top"
+          @update:model-value="update('top', $event)"
+        />
+      </div>
+      <div
+        class="page-setup-margins__header"
+        role="group"
+        :aria-label="t('pageLayout.marginHeader')"
+      >
+        <span>{{ t("pageLayout.marginHeader") }}</span
+        ><TInputNumber
+          :model-value="displayed('header')"
+          theme="column"
+          class="idea-input-number--persistent-controls"
+          :min="0"
+          :decimal-places="2"
+          data-page-setup="margin-header"
+          @update:model-value="update('header', $event)"
+        />
+      </div>
+      <div class="page-setup-margins__left" role="group" :aria-label="t('pageLayout.marginLeft')">
+        <span>{{ t("pageLayout.marginLeft") }}</span
+        ><TInputNumber
+          :model-value="displayed('left')"
+          theme="column"
+          class="idea-input-number--persistent-controls"
+          :min="0"
+          :decimal-places="2"
+          data-page-setup="margin-left"
+          @update:model-value="update('left', $event)"
+        />
       </div>
       <div class="page-setup-margins__preview">
-        <span class="page-setup-margins__preview-label">{{ t("pageLayout.preview") }}</span>
         <svg
           :viewBox="`0 0 ${preview.width} ${preview.height}`"
           role="img"
           :aria-label="t('pageLayout.marginPreview')"
         >
           <defs>
-            <pattern :id="gridPatternId" width="8" height="6" patternUnits="userSpaceOnUse">
-              <path d="M 8 0 L 0 0 0 6" fill="none" stroke="currentColor" stroke-width="0.5" />
+            <pattern
+              :id="gridPatternId"
+              :x="preview.cellsX"
+              :y="preview.cellsY"
+              :width="preview.cellsWidth / 4"
+              :height="preview.cellsHeight / 12"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                :d="`M ${preview.cellsWidth / 4} 0 H 0 V ${preview.cellsHeight / 12}`"
+                class="page-setup-margins__cell-grid"
+                vector-effect="non-scaling-stroke"
+              />
             </pattern>
+            <clipPath :id="`${gridPatternId}-print-area`">
+              <rect
+                :x="preview.x"
+                :y="preview.y"
+                :width="preview.contentWidth"
+                :height="preview.contentHeight"
+              />
+            </clipPath>
           </defs>
           <rect
             x="0.5"
@@ -208,30 +161,94 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
             :height="preview.height - 1"
             class="page-setup-margins__paper"
           />
-          <rect
-            :x="preview.cellsX"
-            :y="preview.cellsY"
-            :width="preview.cellsWidth"
-            :height="preview.cellsHeight"
-            :fill="`url(#${gridPatternId})`"
-          />
-          <rect
-            :x="preview.x"
-            :y="preview.y"
-            :width="preview.contentWidth"
-            :height="preview.contentHeight"
+          <g :clip-path="`url(#${gridPatternId}-print-area)`">
+            <rect
+              :x="preview.cellsX"
+              :y="preview.cellsY"
+              :width="preview.cellsWidth"
+              :height="preview.cellsHeight"
+              class="page-setup-margins__sample-sheet"
+            />
+            <rect
+              :x="preview.cellsX"
+              :y="preview.cellsY"
+              :width="preview.cellsWidth"
+              :height="preview.cellsHeight"
+              :fill="`url(#${gridPatternId})`"
+              class="page-setup-margins__sample-outline"
+              vector-effect="non-scaling-stroke"
+            />
+          </g>
+          <path
+            :d="`M ${preview.x} 0 V ${preview.height} M ${preview.x + preview.contentWidth} 0 V ${preview.height} M 0 ${preview.y} H ${preview.width} M 0 ${preview.y + preview.contentHeight} H ${preview.width}`"
             class="page-setup-margins__guides"
+            vector-effect="non-scaling-stroke"
           />
           <path
             :d="`M 0 ${preview.headerY} H ${preview.width} M 0 ${preview.footerY} H ${preview.width}`"
-            class="page-setup-margins__guides"
+            class="page-setup-margins__header-footer-guides"
+            vector-effect="non-scaling-stroke"
           />
         </svg>
       </div>
+      <div class="page-setup-margins__right" role="group" :aria-label="t('pageLayout.marginRight')">
+        <span>{{ t("pageLayout.marginRight") }}</span
+        ><TInputNumber
+          :model-value="displayed('right')"
+          theme="column"
+          class="idea-input-number--persistent-controls"
+          :min="0"
+          :decimal-places="2"
+          data-page-setup="margin-right"
+          @update:model-value="update('right', $event)"
+        />
+      </div>
+      <div class="page-setup-margins__unit">
+        <span>{{ t("dimensionUnits.unit") }}</span
+        ><TSelect
+          :model-value="unit"
+          :options="unitOptions"
+          :aria-label="t('dimensionUnits.unit')"
+          data-page-setup="margin-unit"
+          @change="setUnit"
+        />
+      </div>
+      <div
+        class="page-setup-margins__bottom"
+        role="group"
+        :aria-label="t('pageLayout.marginBottom')"
+      >
+        <span>{{ t("pageLayout.marginBottom") }}</span
+        ><TInputNumber
+          :model-value="displayed('bottom')"
+          theme="column"
+          class="idea-input-number--persistent-controls"
+          :min="0"
+          :decimal-places="2"
+          data-page-setup="margin-bottom"
+          @update:model-value="update('bottom', $event)"
+        />
+      </div>
+      <div
+        class="page-setup-margins__footer"
+        role="group"
+        :aria-label="t('pageLayout.marginFooter')"
+      >
+        <span>{{ t("pageLayout.marginFooter") }}</span
+        ><TInputNumber
+          :model-value="displayed('footer')"
+          theme="column"
+          class="idea-input-number--persistent-controls"
+          :min="0"
+          :decimal-places="2"
+          data-page-setup="margin-footer"
+          @update:model-value="update('footer', $event)"
+        />
+      </div>
     </div>
-    <section class="page-setup-margins__centering" :aria-label="t('pageLayout.centerOnPage')">
+    <section :aria-label="t('pageLayout.centerOnPage')">
       <h3>{{ t("pageLayout.centerOnPage") }}</h3>
-      <div class="page-setup-margins__centering-options">
+      <div class="page-setup-margins__centering">
         <TCheckbox
           :checked="options.verticalCentered"
           data-page-setup="center-vertically"
@@ -250,103 +267,86 @@ function center(name: "horizontalCentered" | "verticalCentered", value: boolean)
 
 <style scoped lang="scss">
 @use "./page-setup-panel" as panel;
-
 .page-setup-margins {
   @include panel.panel;
-  min-height: 0;
-  gap: var(--idea-space-6);
-  padding: var(--idea-dialog-content-padding-block) 0 0;
-
+  &__diagram {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas: ". top header" "left preview right" "unit bottom footer";
+    gap: var(--idea-space-3) var(--idea-space-4);
+    align-items: center;
+    max-width: 420px;
+    margin: 0 auto;
+    width: 100%;
+    > div:not(.page-setup-margins__preview) {
+      display: grid;
+      gap: var(--idea-space-1);
+      min-width: 0;
+    }
+  }
+  &__top {
+    grid-area: top;
+  }
+  &__header {
+    grid-area: header;
+  }
+  &__left {
+    grid-area: left;
+  }
+  &__right {
+    grid-area: right;
+  }
   &__unit {
+    grid-area: unit;
+  }
+  &__bottom {
+    grid-area: bottom;
+  }
+  &__footer {
+    grid-area: footer;
+  }
+  &__preview {
+    grid-area: preview;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: var(--idea-space-4);
-  }
-
-  &__unit-select {
-    width: 128px;
-    min-width: 0;
-  }
-
-  &__layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 144px;
-    align-items: start;
-    gap: var(--idea-space-6);
-  }
-
-  &__fields {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--idea-space-5) var(--idea-space-6);
-  }
-
-  &__field {
-    display: grid;
-    gap: var(--idea-space-2);
-    min-width: 0;
-  }
-
-  &__input {
-    width: 100%;
-    min-width: 0;
-  }
-
-  &__preview {
-    display: grid;
-    justify-items: center;
-    gap: var(--idea-space-3);
+    justify-content: center;
+    height: 150px;
     color: var(--idea-text-muted);
-
     svg {
       width: 100%;
-      height: 144px;
+      height: 140px;
     }
   }
-
-  &__preview-label {
-    color: var(--idea-text-secondary);
-  }
-
   &__paper {
     fill: var(--idea-surface-panel);
-    stroke: var(--idea-border-strong);
+    stroke: var(--idea-text-primary);
     stroke-width: 1;
   }
-
+  &__sample-sheet {
+    fill: var(--idea-surface-panel);
+  }
+  &__cell-grid,
+  &__sample-outline {
+    stroke: var(--idea-border-control);
+    stroke-width: 0.6;
+  }
+  &__cell-grid {
+    fill: none;
+  }
   &__guides {
     fill: none;
-    stroke: var(--idea-border-strong);
-    stroke-width: 0.7;
+    stroke: var(--idea-border-control);
+    stroke-width: 0.65;
   }
-
+  &__header-footer-guides {
+    fill: none;
+    stroke: var(--idea-border-control);
+    stroke-width: 0.6;
+    stroke-dasharray: 1 2;
+  }
   &__centering {
     display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--idea-space-4) var(--idea-space-6);
-
-    h3 {
-      margin: 0;
-    }
-  }
-
-  &__centering-options {
-    display: flex;
-    gap: var(--idea-space-6);
-  }
-}
-
-@media (max-width: 480px) {
-  .page-setup-margins {
-    &__layout {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    &__preview {
-      order: -1;
-    }
+    gap: var(--idea-space-4);
   }
 }
 </style>
