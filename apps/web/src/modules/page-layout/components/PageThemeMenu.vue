@@ -10,6 +10,7 @@ import { useAppI18n } from "../../../shared/i18n";
 import { useFloatingPanel } from "../../../shared/floating/useFloatingPanel";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
+import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
 import MenuSurface from "../../../shared/menu/MenuSurface.vue";
 import { useMenu } from "../../../shared/menu/useMenu";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
@@ -399,18 +400,6 @@ watch(
               </button>
             </div>
           </GallerySection>
-          <div class="page-theme-menu__colors-footer">
-            <button
-              type="button"
-              class="page-theme-menu__custom-action"
-              @click="
-                closeMenu();
-                colorsDialogVisible = true;
-              "
-            >
-              {{ t("pageTools.customizeColors") }}
-            </button>
-          </div>
         </li>
         <li v-else-if="activeCategory === 'fonts'" class="page-theme-menu__content" role="none">
           <section class="page-theme-menu__fonts-panel">
@@ -474,6 +463,16 @@ watch(
             </button>
           </div>
         </li>
+        <MenuSeparator v-if="activeCategory === 'colors'" />
+        <MenuItem
+          v-if="activeCategory === 'colors'"
+          @select="
+            closeMenu();
+            colorsDialogVisible = true;
+          "
+        >
+          {{ t("pageTools.customizeColors") }}
+        </MenuItem>
       </MenuSurface>
     </Teleport>
     <CustomThemeColorsDialog
@@ -512,25 +511,15 @@ watch(
   padding: 8px;
 }
 .page-theme-menu__submenu--colors {
+  grid-template-rows: minmax(0, 1fr) auto auto;
   height: min(700px, calc(100vh - 16px));
   padding: 0;
   overflow: hidden;
 }
 .page-theme-menu__colors-panel {
   display: grid;
-  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr) auto;
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
   min-height: 0;
-}
-.page-theme-menu__colors-footer {
-  padding: var(--idea-space-1) var(--idea-tool-panel-padding);
-  border-top: 1px solid var(--idea-border-subtle);
-  background: var(--idea-surface-panel);
-
-  .page-theme-menu__custom-action {
-    position: static;
-    width: 100%;
-    margin: 0;
-  }
 }
 .page-theme-menu__content {
   list-style: none;
