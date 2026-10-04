@@ -132,7 +132,11 @@ watch(
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/option-list/option-list";
+
 .custom-theme-colors-dialog {
+  @include option-list.scrollbar;
+
   display: grid;
   max-height: calc(100vh - 180px);
   gap: 12px;

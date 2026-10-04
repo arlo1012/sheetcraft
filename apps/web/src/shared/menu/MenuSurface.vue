@@ -115,7 +115,11 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
 </template>
 
 <style scoped lang="scss">
+@use "../option-list/option-list";
+
 .idea-menu-surface {
+  @include option-list.scrollbar;
+
   display: grid;
   width: max-content;
   max-width: calc(100vw - var(--idea-space-4) - var(--idea-space-4));

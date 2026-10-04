@@ -257,6 +257,8 @@ function manage(): void {
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/option-list/option-list";
+
 .table-styles-menu {
   display: contents;
 
@@ -278,6 +280,8 @@ function manage(): void {
   }
 
   &__galleries {
+    @include option-list.scrollbar;
+
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
