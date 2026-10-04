@@ -1,12 +1,5 @@
 <script setup lang="ts">
-import {
-  Eye,
-  Maximize2,
-  Minimize2,
-  PanelsTopLeft,
-  Settings2,
-  TableProperties,
-} from "lucide-vue-next";
+import { Eye, Maximize2, Minimize2, PanelsTopLeft, TableProperties } from "lucide-vue-next";
 import { computed } from "vue";
 import { Checkbox as TCheckbox } from "tdesign-vue-next/es/checkbox";
 import { Select as TSelect } from "tdesign-vue-next/es/select";
@@ -64,7 +57,6 @@ const emit = defineEmits<{
   fitSelection: [];
   freeze: [mode: "panes" | "top-row" | "first-column"];
   unfreeze: [];
-  pageSetup: [];
 }>();
 const { t } = useAppI18n();
 const pageRulerUnitOptions = computed(() => [
@@ -141,14 +133,7 @@ const pageRulerUnitOptions = computed(() => [
         @activate="emit('update:viewMode', 'page-layout')"
         ><PanelsTopLeft aria-hidden="true"
       /></RibbonButton>
-      <RibbonButton
-        variant="tall"
-        :label="t('pageLayout.pageSetup')"
-        :text="t('pageLayout.pageSetup')"
-        data-view-tool="page-setup"
-        @activate="emit('pageSetup')"
-        ><Settings2 aria-hidden="true"
-      /></RibbonButton>
+      <!-- TODO: expose the existing PageSetupDialog from the future Page toolbar. -->
       <!-- TODO: custom views need persisted view-state snapshots, not a local visual toggle. -->
       <RibbonButton
         variant="tall"

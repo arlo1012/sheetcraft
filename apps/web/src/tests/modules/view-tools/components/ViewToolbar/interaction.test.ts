@@ -43,19 +43,18 @@ describe("ViewToolbar", () => {
       wrapper.unmount();
     }
   });
-  test("switches each real workbook view and opens page setup", async () => {
+  test("switches each real workbook view", async () => {
     const wrapper = mountToolbar();
     await wrapper.get('[data-view-tool="page-break-preview"]').trigger("click");
     await wrapper.get('[data-view-tool="page-layout-view"]').trigger("click");
     await wrapper.get('[data-view-tool="normal-view"]').trigger("click");
-    await wrapper.get('[data-view-tool="page-setup"]').trigger("click");
 
     expect(wrapper.emitted("update:viewMode")).toEqual([
       ["page-break-preview"],
       ["page-layout"],
       ["normal"],
     ]);
-    expect(wrapper.emitted("pageSetup")).toEqual([[]]);
+    expect(wrapper.find('[data-view-tool="page-setup"]').exists()).toBe(false);
   });
 
   test("keeps custom views and task pane unavailable", () => {

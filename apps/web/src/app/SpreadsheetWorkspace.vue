@@ -311,12 +311,6 @@ function setPageWhiteSpace(value: boolean): void {
   if (sheetGridRef.value?.flushPendingEdit() === false) return;
   showPageWhiteSpace.value = value;
 }
-function openPageSetup(): void {
-  if (sheetGridRef.value?.flushPendingEdit() === false) return;
-  pageSetupTab.value = "page";
-  headerFooterTarget.value = undefined;
-  pageSetupVisible.value = true;
-}
 function openHeaderFooter(target: HeaderFooterEditTarget): void {
   if (activeSheet.value.properties.protected || sheetGridRef.value?.flushPendingEdit() === false)
     return;
@@ -1546,7 +1540,6 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         <ViewToolbar
           :view-mode="activeViewMode"
           @update:view-mode="setViewMode"
-          @page-setup="openPageSetup"
           v-model:show-page-rulers="showPageRulers"
           v-model:show-page-margins="showPageMargins"
           :show-page-white-space="showPageWhiteSpace"
