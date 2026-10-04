@@ -303,8 +303,7 @@ watch(
         class="page-theme-menu__submenu"
         :body-scrollable="activeCategory !== 'colors'"
         :class="{
-          'page-theme-menu__submenu--with-action':
-            activeCategory === 'colors' || activeCategory === 'fonts',
+          'page-theme-menu__submenu--colors': activeCategory === 'colors',
         }"
         :style="submenuStyles"
         :label="
@@ -319,7 +318,7 @@ watch(
         @keydown="onSubmenuKeydown"
       >
         <template #body>
-          <div v-if="activeCategory === 'theme'" class="page-theme-menu__content" role="none">
+          <GallerySection v-if="activeCategory === 'theme'">
             <div
               class="page-theme-menu__gallery"
               role="radiogroup"
@@ -347,7 +346,7 @@ watch(
                 /><em>{{ preset.name }}</em>
               </button>
             </div>
-          </div>
+          </GallerySection>
           <div
             v-else-if="activeCategory === 'colors'"
             class="page-theme-menu__content page-theme-menu__colors-panel"
@@ -392,6 +391,7 @@ watch(
                   data-theme-choice
                   type="button"
                   class="page-theme-menu__color-row"
+                  :aria-pressed="preset.name === defaultColors.name"
                   @click="applyColors(preset)"
                 >
                   <span class="page-theme-menu__color-swatches"
@@ -405,11 +405,7 @@ watch(
               </div>
             </GallerySection>
           </div>
-          <div
-            v-else-if="activeCategory === 'fonts'"
-            class="page-theme-menu__content page-theme-menu__fonts-scroll"
-            role="none"
-          >
+          <GallerySection v-else-if="activeCategory === 'fonts'" :title="t('pageTools.themeFonts')">
             <section class="page-theme-menu__fonts-panel">
               <button
                 v-for="preset in [...PAGE_THEME_FONT_PRESETS, ...customFonts]"
@@ -438,8 +434,8 @@ watch(
                 >
               </button>
             </section>
-          </div>
-          <div v-else class="page-theme-menu__content" role="none">
+          </GallerySection>
+          <GallerySection v-else>
             <div
               class="page-theme-menu__gallery"
               role="radiogroup"
@@ -461,7 +457,7 @@ watch(
                 <ThemeEffectPreview v-bind="effect" /><em>{{ effect.name }}</em>
               </button>
             </div>
-          </div>
+          </GallerySection>
         </template>
         <template v-if="activeCategory === 'colors' || activeCategory === 'fonts'" #footer>
           <MenuSeparator v-if="activeCategory === 'colors' || activeCategory === 'fonts'" />
@@ -501,39 +497,26 @@ watch(
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/gallery/gallery-choice" as gallery;
+
 .page-theme-menu {
   min-width: 0;
 }
 .page-theme-menu__root {
   width: 132px;
 }
-.page-theme-menu__root :deep(.idea-menu-item__trailing) {
-  display: grid;
-  place-items: center;
-}
-.page-theme-menu__root :deep(.lucide) {
-  width: 15px;
-  height: 15px;
-}
 .page-theme-menu__submenu {
   z-index: var(--idea-layer-submenu);
   width: min(480px, calc(100vw - 24px));
   max-height: min(700px, calc(100vh - 16px));
-  padding: 8px;
 }
-.page-theme-menu__submenu--with-action {
+.page-theme-menu__submenu--colors {
   height: min(700px, calc(100vh - 16px));
-  padding: 0;
-  overflow: hidden;
 }
 .page-theme-menu__colors-panel {
   display: grid;
   grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
   min-height: 0;
-}
-.page-theme-menu__fonts-scroll {
-  min-height: 0;
-  padding: var(--idea-tool-panel-padding);
 }
 .page-theme-menu__content {
   list-style: none;
@@ -545,27 +528,15 @@ watch(
 }
 .page-theme-menu__theme-preview,
 .page-theme-menu__effect-preview {
+  @include gallery.choice(var(--idea-space-2));
+
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 2px;
-  padding: 5px;
   border: 1px solid var(--idea-border-subtle);
   background: var(--idea-surface-panel);
   color: var(--idea-text-primary);
   text-align: center;
-  cursor: pointer;
-}
-.page-theme-menu__theme-preview:hover,
-.page-theme-menu__effect-preview:hover,
-.page-theme-menu__theme-preview.is-selected,
-.page-theme-menu__effect-preview.is-selected {
-  border-color: var(--idea-border-control);
-  background: var(--idea-surface-hover);
-}
-.page-theme-menu__theme-preview:focus-visible,
-.page-theme-menu__effect-preview:focus-visible {
-  outline: none;
-  box-shadow: var(--idea-keyboard-focus-shadow);
 }
 .page-theme-menu__theme-preview > span {
   grid-column: 1 / -1;
@@ -600,24 +571,16 @@ watch(
 }
 .page-theme-menu__color-row,
 .page-theme-menu__font-row {
+  @include gallery.choice(var(--idea-space-2));
+
   display: grid;
   grid-template-columns: 144px minmax(0, 1fr);
   align-items: center;
-  min-height: 28px;
-  gap: 8px;
-  padding: 2px 4px;
-  border: 0;
-  background: transparent;
+  min-height: 30px;
+  gap: var(--idea-space-4);
   color: var(--idea-text-primary);
   text-align: left;
   font: inherit;
-  cursor: pointer;
-}
-.page-theme-menu__color-row:hover,
-.page-theme-menu__font-row:hover,
-.page-theme-menu__color-row.is-selected,
-.page-theme-menu__font-row.is-selected {
-  background: var(--idea-surface-hover);
 }
 .page-theme-menu__color-swatches {
   display: grid;

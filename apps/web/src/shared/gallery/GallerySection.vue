@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import type { VNode } from "vue";
 
-defineProps<{ title?: string; inline?: boolean; scrollable?: boolean }>();
+withDefaults(
+  defineProps<{
+    title?: string;
+    inline?: boolean;
+    scrollable?: boolean;
+    /** Keep group titles when the child gallery already owns its content inset. */
+    contentInset?: boolean;
+  }>(),
+  { contentInset: true },
+);
 defineSlots<{ default(): VNode[]; actions?(): VNode[] }>();
 </script>
 
@@ -10,7 +19,10 @@ defineSlots<{ default(): VNode[]; actions?(): VNode[] }>();
   <section
     v-else
     class="idea-gallery-section"
-    :class="{ 'idea-gallery-section--scrollable': scrollable }"
+    :class="{
+      'idea-gallery-section--scrollable': scrollable,
+      'idea-gallery-section--content-inset': contentInset,
+    }"
     :aria-label="title"
   >
     <div v-if="title || $slots.actions" class="idea-gallery-section__header">
@@ -44,7 +56,7 @@ defineSlots<{ default(): VNode[]; actions?(): VNode[] }>();
     line-height: var(--idea-line-height-body-medium);
   }
 
-  &__content {
+  &--content-inset &__content {
     padding: var(--idea-space-3) var(--idea-tool-panel-padding);
   }
 

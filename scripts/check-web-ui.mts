@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { compileString } from "sass";
 
 export type WebUiViolation = {
   file: string;
@@ -13,6 +14,11 @@ const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceExtensions = new Set([".ts", ".tsx", ".vue", ".css", ".scss"]);
 const ignoredDirectories = new Set(["dist", "node_modules", ".git", "coverage"]);
 const rawMenuExceptions = new Set(["apps/web/src/shared/borders/BorderLineStylePanel.vue"]);
+const sharedSurfaceFiles = new Set([
+  "apps/web/src/shared/floating/FloatingPanelSurface.vue",
+  "apps/web/src/shared/menu/MenuSurface.vue",
+]);
+const protectedSurfaceProperty = /^(?:(?:padding|border|background)(?:-|$)|box-shadow$)/u;
 
 function toPosixPath(path: string): string {
   return path.split(sep).join("/");
@@ -71,6 +77,76 @@ function hasSharedMenuOwnership(relativePath: string): boolean {
   );
 }
 
+function staticSurfaceClasses(source: string): Map<string, number> {
+  const classes = new Map<string, number>();
+  const surfaceTag = /<(?:MenuSurface|FloatingPanelSurface)\b([\s\S]*?)>/gu;
+  for (const tag of source.matchAll(surfaceTag)) {
+    const attributes = tag[1];
+    const tagIndex = tag.index ?? 0;
+    for (const match of attributes.matchAll(/(?:^|\s)class\s*=\s*(["'])(.*?)\1/gu)) {
+      for (const className of match[2].split(/\s+/u)) {
+        if (className) classes.set(className, tagIndex);
+      }
+    }
+    for (const match of attributes.matchAll(/:class\s*=\s*(["'])([\s\S]*?)\1/gu)) {
+      for (const className of match[2].matchAll(/["']([^"']+)["']/gu)) {
+        classes.set(className[1], tagIndex);
+      }
+    }
+  }
+  return classes;
+}
+
+function isSurfaceSelector(selector: string, className: string): boolean {
+  const escapedClass = className.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const match = new RegExp(`\\.${escapedClass}(?![-_a-zA-Z0-9])`, "u").exec(selector);
+  if (!match) return false;
+  const suffix = selector.slice((match.index ?? 0) + match[0].length);
+  return !/[\s>+~]|::/u.test(suffix);
+}
+
+function checkSurfaceStyles(
+  root: string,
+  file: string,
+  source: string,
+  relativePath: string,
+  violations: WebUiViolation[],
+): void {
+  if (sharedSurfaceFiles.has(relativePath)) return;
+  const surfaceClasses = staticSurfaceClasses(source);
+  if (surfaceClasses.size === 0) return;
+
+  const styleBlocks = [...source.matchAll(/<style(?:\s[^>]*)?>([\s\S]*?)<\/style>/gu)];
+  for (const style of styleBlocks) {
+    const css = compileString(style[1], {
+      quietDeps: true,
+      url: pathToFileURL(file),
+    }).css;
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/gu)) {
+      const selectors = rule[1]
+        .split(",")
+        .map((selector) => selector.trim())
+        .filter(Boolean);
+      const surfaceClass = [...surfaceClasses.keys()].find((className) =>
+        selectors.some((selector) => isSurfaceSelector(selector, className)),
+      );
+      if (!surfaceClass) continue;
+      for (const declaration of rule[2].matchAll(/(?:^|;)\s*([a-z-]+)\s*:/gu)) {
+        const property = declaration[1];
+        if (!protectedSurfaceProperty.test(property)) continue;
+        addViolation(
+          violations,
+          root,
+          file,
+          source,
+          surfaceClasses.get(surfaceClass) ?? 0,
+          `Keep direct ${property} styling on MenuSurface/FloatingPanelSurface; feature surfaces may set size, placement, and layer only.`,
+        );
+      }
+    }
+  }
+}
+
 function checkFile(root: string, file: string, violations: WebUiViolation[]): void {
   const source = readFileSync(file, "utf8");
   const relativePath = toPosixPath(relative(root, file));
@@ -102,6 +178,8 @@ function checkFile(root: string, file: string, violations: WebUiViolation[]): vo
       );
     }
   }
+
+  checkSurfaceStyles(root, file, source, relativePath, violations);
 
   const numericOverlayLayer = /\bz-index\s*:\s*(?:3[1-9]|[4-9]\d|[1-9]\d{2,})\b/gu;
   for (const match of source.matchAll(numericOverlayLayer)) {

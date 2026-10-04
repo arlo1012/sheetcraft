@@ -190,6 +190,12 @@ function onKeydown(event: KeyboardEvent): void {
     color: var(--idea-text-secondary);
     font-size: var(--idea-font-size-body-small);
     line-height: var(--idea-line-height-body-small);
+
+    :deep(svg.lucide) {
+      width: var(--idea-menu-icon-size);
+      height: var(--idea-menu-icon-size);
+      stroke-width: var(--idea-icon-stroke-width);
+    }
   }
 }
 </style>

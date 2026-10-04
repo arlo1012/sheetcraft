@@ -233,6 +233,8 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/gallery/gallery-choice";
+
 .conditional-format-gallery {
   width: 240px;
 
@@ -253,23 +255,11 @@ function paintIcons(element: HTMLCanvasElement | null, iconSet: ConditionalForma
 
   &__tile,
   &__icon-tile {
+    @include gallery-choice.choice(0);
+
     display: grid;
     place-items: center;
     min-width: 0;
-    padding: 0;
-    border: 0;
-    border-radius: var(--idea-radius-small);
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-
-    &:hover {
-      background: var(--idea-surface-secondary);
-    }
-
-    &:active {
-      background: var(--idea-surface-active);
-    }
   }
 
   &__tile {

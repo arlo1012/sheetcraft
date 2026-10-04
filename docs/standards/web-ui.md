@@ -18,6 +18,13 @@
   padding, border, radius, shadow, scrollbar, and interaction states. Use product
   tokens; TDesign adaptation belongs in the shared adapter, never a feature-local
   `.t-*` override.
+- Using a shared surface does not permit restyling its shell: do not override
+  its padding, background, border, radius, or shadow from a consumer class.
+  `MenuSurface` and `FloatingPanelSurface` share the same chrome. Content insets
+  belong to the content component; grouped galleries use `GallerySection`.
+  Use `contentInset=false` only when a section contains groups that already own
+  their insets. Gallery choice buttons use `shared/gallery/gallery-choice` for
+  hover, selected, focus, and disabled states; previews keep domain-specific drawing.
 
 | Pattern                   | Reference                                                        |
 | ------------------------- | ---------------------------------------------------------------- |
@@ -103,7 +110,8 @@ owns a plain popover/panel surface; `useMenu` plus `MenuSurface` owns a command
 menu; `useContextMenu` opens that menu from a pointer or keyboard anchor; and
 `useSubmenu` owns submenu disclosure and focus transfer. `MenuSurface` body and
 footer slots support searchable/scrolling content and fixed actions without a
-feature recreating the surface. Use `bodyScrollable=false` when the body contains
+feature recreating the surface. Use the `items` slot for menu rows (it supplies
+the inner list), and `body` for gallery/content blocks. Use `bodyScrollable=false` when the body contains
 independently scrolling groups, as in theme colors. A feature owns its commands, variable content,
 placement, and size limits; the primitives own positioning, dismissal, focus
 return, menu roles, rows, surface treatment, and overlay layer.

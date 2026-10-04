@@ -153,110 +153,114 @@ function deletePreset(preset: WatermarkPreset): void {
         :label="t('pageDecoration.watermark')"
         class="page-watermark-menu__surface"
       >
-        <li class="page-watermark-menu__gallery" role="none">
-          <GallerySection :title="t('pageDecoration.customWatermarks')">
-            <div
-              class="page-watermark-menu__grid"
-              role="group"
-              :aria-label="t('pageDecoration.customWatermarks')"
-            >
+        <template #body>
+          <div class="page-watermark-menu__gallery">
+            <GallerySection :title="t('pageDecoration.customWatermarks')">
               <div
-                v-for="preset in presets"
-                :key="preset.id"
-                class="page-watermark-menu__card-wrap"
+                class="page-watermark-menu__grid"
+                role="group"
+                :aria-label="t('pageDecoration.customWatermarks')"
+              >
+                <div
+                  v-for="preset in presets"
+                  :key="preset.id"
+                  class="page-watermark-menu__card-wrap"
+                >
+                  <button
+                    type="button"
+                    class="page-watermark-menu__card"
+                    :disabled="disabled"
+                    :data-watermark-preset-id="preset.id"
+                    :title="preset.name"
+                    :aria-label="preset.name"
+                    @click="applyPreset(preset, 'sheet')"
+                    @contextmenu.prevent="openPresetActions(preset, false)"
+                    @keydown="openPresetActionsFromKeyboard($event, preset)"
+                  >
+                    <img
+                      v-if="imageUrl(preset.watermark)"
+                      :src="imageUrl(preset.watermark)"
+                      class="page-watermark-menu__image-preview"
+                      :class="{
+                        'page-watermark-menu__image-preview--washout':
+                          preset.watermark.image?.washout,
+                      }"
+                      :style="{
+                        transform: `rotate(${preset.watermark.image?.angle ?? 0}deg)`,
+                      }"
+                      alt=""
+                    />
+                    <span
+                      v-if="preset.watermark.text || !imageUrl(preset.watermark)"
+                      class="page-watermark-menu__text-preview"
+                      :style="{
+                        color: preset.watermark.color,
+                        fontFamily: preset.watermark.fontFamily,
+                        fontSize: `${Math.min(22, Math.max(12, preset.watermark.fontSize * 0.55))}px`,
+                        opacity: preset.watermark.opacity,
+                        transform: `rotate(${preset.watermark.angle}deg)`,
+                      }"
+                      >{{ previewText(preset.watermark) }}</span
+                    >
+                  </button>
+                  <button
+                    :ref="actionTriggerRef(preset.id)"
+                    type="button"
+                    class="page-watermark-menu__more"
+                    :data-watermark-preset-actions="preset.id"
+                    :aria-label="t('pageDecoration.presetActions', { name: preset.name })"
+                    :aria-controls="activePreset?.id === preset.id ? submenuId : undefined"
+                    :aria-expanded="activePreset?.id === preset.id"
+                    @click.stop="togglePresetActions(preset)"
+                  >
+                    <Ellipsis aria-hidden="true" />
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  class="page-watermark-menu__card page-watermark-menu__add"
+                  :disabled="disabled"
+                  :aria-label="t('pageDecoration.addWatermark')"
+                  @click="custom"
+                >
+                  <Plus aria-hidden="true" /><span>{{ t("pageDecoration.clickToAdd") }}</span>
+                </button>
+              </div>
+            </GallerySection>
+            <GallerySection :title="t('pageDecoration.presetWatermarks')">
+              <div
+                class="page-watermark-menu__grid"
+                role="group"
+                :aria-label="t('pageDecoration.presetWatermarks')"
               >
                 <button
+                  v-for="preset in builtinWatermarks"
+                  :key="preset.id"
                   type="button"
                   class="page-watermark-menu__card"
                   :disabled="disabled"
-                  :data-watermark-preset-id="preset.id"
-                  :title="preset.name"
-                  :aria-label="preset.name"
-                  @click="applyPreset(preset, 'sheet')"
-                  @contextmenu.prevent="openPresetActions(preset, false)"
-                  @keydown="openPresetActionsFromKeyboard($event, preset)"
+                  :aria-label="preset.text"
+                  @click="apply(preset.text)"
                 >
-                  <img
-                    v-if="imageUrl(preset.watermark)"
-                    :src="imageUrl(preset.watermark)"
-                    class="page-watermark-menu__image-preview"
-                    :class="{
-                      'page-watermark-menu__image-preview--washout':
-                        preset.watermark.image?.washout,
-                    }"
-                    :style="{
-                      transform: `rotate(${preset.watermark.image?.angle ?? 0}deg)`,
-                    }"
-                    alt=""
-                  />
                   <span
-                    v-if="preset.watermark.text || !imageUrl(preset.watermark)"
                     class="page-watermark-menu__text-preview"
-                    :style="{
-                      color: preset.watermark.color,
-                      fontFamily: preset.watermark.fontFamily,
-                      fontSize: `${Math.min(22, Math.max(12, preset.watermark.fontSize * 0.55))}px`,
-                      opacity: preset.watermark.opacity,
-                      transform: `rotate(${preset.watermark.angle}deg)`,
-                    }"
-                    >{{ previewText(preset.watermark) }}</span
+                    :style="{ transform: 'rotate(-45deg)' }"
+                    >{{ preset.text }}</span
                   >
                 </button>
-                <button
-                  :ref="actionTriggerRef(preset.id)"
-                  type="button"
-                  class="page-watermark-menu__more"
-                  :data-watermark-preset-actions="preset.id"
-                  :aria-label="t('pageDecoration.presetActions', { name: preset.name })"
-                  :aria-controls="activePreset?.id === preset.id ? submenuId : undefined"
-                  :aria-expanded="activePreset?.id === preset.id"
-                  @click.stop="togglePresetActions(preset)"
-                >
-                  <Ellipsis aria-hidden="true" />
-                </button>
               </div>
-              <button
-                type="button"
-                class="page-watermark-menu__card page-watermark-menu__add"
-                :disabled="disabled"
-                :aria-label="t('pageDecoration.addWatermark')"
-                @click="custom"
-              >
-                <Plus aria-hidden="true" /><span>{{ t("pageDecoration.clickToAdd") }}</span>
-              </button>
-            </div>
-          </GallerySection>
-          <GallerySection :title="t('pageDecoration.presetWatermarks')">
-            <div
-              class="page-watermark-menu__grid"
-              role="group"
-              :aria-label="t('pageDecoration.presetWatermarks')"
-            >
-              <button
-                v-for="preset in builtinWatermarks"
-                :key="preset.id"
-                type="button"
-                class="page-watermark-menu__card"
-                :disabled="disabled"
-                :aria-label="preset.text"
-                @click="apply(preset.text)"
-              >
-                <span
-                  class="page-watermark-menu__text-preview"
-                  :style="{ transform: 'rotate(-45deg)' }"
-                  >{{ preset.text }}</span
-                >
-              </button>
-            </div>
-          </GallerySection>
-        </li>
-        <MenuSeparator />
-        <MenuItem :disabled="!watermark" @select="editDocument">{{
-          t("pageDecoration.editDocumentWatermark")
-        }}</MenuItem>
-        <MenuItem :disabled="!watermark" @select="remove">{{
-          t("pageDecoration.removeDocumentWatermark")
-        }}</MenuItem>
+            </GallerySection>
+          </div>
+        </template>
+        <template #footer>
+          <MenuSeparator />
+          <MenuItem :disabled="!watermark" @select="editDocument">{{
+            t("pageDecoration.editDocumentWatermark")
+          }}</MenuItem>
+          <MenuItem :disabled="!watermark" @select="remove">{{
+            t("pageDecoration.removeDocumentWatermark")
+          }}</MenuItem>
+        </template>
       </MenuSurface>
     </Teleport>
     <Teleport to="body">
@@ -289,6 +293,7 @@ function deletePreset(preset: WatermarkPreset): void {
 
 <style scoped lang="scss">
 @use "../../../shared/ribbon/ribbon-layout" as ribbon;
+@use "../../../shared/gallery/gallery-choice";
 
 .page-watermark-menu {
   @include ribbon.tool;
@@ -296,11 +301,6 @@ function deletePreset(preset: WatermarkPreset): void {
   &__surface {
     width: 410px;
     max-width: calc(100vw - 16px);
-    padding: 0 0 var(--idea-menu-padding);
-  }
-
-  &__gallery {
-    list-style: none;
   }
 
   &__grid {
@@ -315,32 +315,16 @@ function deletePreset(preset: WatermarkPreset): void {
   }
 
   &__card {
+    @include gallery-choice.choice(var(--idea-space-2));
+
     display: grid;
     width: 100%;
     aspect-ratio: 0.82;
     place-items: center;
-    padding: var(--idea-space-2);
     overflow: hidden;
     color: #b7b7b7;
     background: var(--idea-surface-panel);
     border: 1px solid var(--idea-border-subtle);
-    border-radius: var(--idea-radius-small);
-    cursor: pointer;
-
-    &:hover:not(:disabled) {
-      background: var(--idea-surface-hover);
-    }
-
-    &:focus-visible:not(:disabled) {
-      border-color: var(--idea-action-primary);
-      outline: none;
-      box-shadow: 0 0 0 1px var(--idea-action-primary);
-    }
-
-    &:disabled {
-      cursor: default;
-      opacity: 0.5;
-    }
   }
 
   &__text-preview {

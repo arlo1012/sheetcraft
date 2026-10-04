@@ -11,7 +11,9 @@ withDefaults(
 );
 
 const slots = useSlots();
-const hasStructuredContent = computed(() => Boolean(slots.header || slots.body || slots.footer));
+const hasStructuredContent = computed(() =>
+  Boolean(slots.header || slots.body || slots.items || slots.footer),
+);
 const rootElement = ref<HTMLUListElement | null>(null);
 const { move: moveRovingFocus } = useRovingFocus();
 let itemObserver: MutationObserver | undefined;
@@ -134,11 +136,14 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
       <li v-if="$slots.header" class="idea-menu-surface__header" role="none">
         <slot name="header" />
       </li>
-      <li v-if="$slots.body" class="idea-menu-surface__body" role="none">
-        <slot name="body" />
+      <li v-if="$slots.body || $slots.items" class="idea-menu-surface__body" role="none">
+        <ul v-if="$slots.items" class="idea-menu-surface__list" role="presentation">
+          <slot name="items" />
+        </ul>
+        <slot v-else name="body" />
       </li>
       <li v-if="$slots.footer" class="idea-menu-surface__footer" role="none">
-        <ul class="idea-menu-surface__footer-list" role="presentation">
+        <ul class="idea-menu-surface__list idea-menu-surface__footer-list" role="presentation">
           <slot name="footer" />
         </ul>
       </li>
@@ -149,9 +154,11 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
 
 <style scoped lang="scss">
 @use "../option-list/option-list";
+@use "../floating/floating-panel" as panel;
 
 .idea-menu-surface {
   @include option-list.scrollbar;
+  @include panel.chrome;
 
   display: grid;
   width: max-content;
@@ -163,11 +170,7 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
   overflow-y: auto;
   overscroll-behavior: contain;
   list-style: none;
-  background: var(--idea-surface-panel);
-  border: 1px solid var(--idea-border-subtle);
   outline: none;
-  border-radius: var(--idea-radius-default);
-  box-shadow: var(--idea-shadow-menu);
 
   &--structured {
     display: flex;
@@ -180,7 +183,7 @@ defineExpose({ focusFirstItem, focusLastItem, rootElement });
     flex: 0 0 auto;
   }
 
-  &__footer-list {
+  &__list {
     padding: 0;
     margin: 0;
     list-style: none;

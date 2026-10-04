@@ -347,7 +347,6 @@ function onMenuKeydown(event: KeyboardEvent): void {
   }
   &__submenu {
     max-height: calc(100vh - 32px);
-    overflow-y: auto;
   }
   &__chevron {
     width: var(--idea-control-icon-size);

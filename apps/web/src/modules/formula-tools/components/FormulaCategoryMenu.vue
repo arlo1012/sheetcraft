@@ -2,7 +2,6 @@
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
-import FloatingPanelSurface from "../../../shared/floating/FloatingPanelSurface.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import RibbonMenuButton from "../../../shared/ribbon/RibbonMenuButton.vue";
 import {
@@ -25,9 +24,8 @@ const emit = defineEmits<{ insertFunction: [name: string] }>();
 const { t } = useAppI18n();
 const triggerRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const triggerElement = computed(() => triggerRef.value?.rootElement ?? null);
-const panelSurfaceRef = ref<InstanceType<typeof FloatingPanelSurface> | null>(null);
-const panelRef = computed(() => panelSurfaceRef.value?.rootElement ?? null);
 const menuRef = ref<InstanceType<typeof MenuSurface> | null>(null);
+const panelRef = computed(() => menuRef.value?.rootElement ?? null);
 const searchInputRef = ref<{ focus(): void } | null>(null);
 const open = ref(false);
 const query = ref("");
@@ -123,34 +121,31 @@ watch(open, (isOpen) => {
       <slot name="icon" />
     </RibbonMenuButton>
     <Teleport to="body">
-      <FloatingPanelSurface
+      <MenuSurface
         v-if="open"
         :id="panelId"
-        ref="panelSurfaceRef"
+        ref="menuRef"
         class="formula-category-menu__panel"
+        :class="{ 'formula-category-menu__panel--searchable': hasSearch }"
         :label="label"
         :style="floatingStyles"
-        padding="menu"
-        :scrollable="false"
         :data-cell-edit-session="editSessionId"
       >
-        <div v-if="hasSearch" class="formula-category-menu__search">
-          <TInput
-            ref="searchInputRef"
-            v-model="query"
-            type="search"
-            clearable
-            :aria-label="t('formulaTools.searchFunctions')"
-            :placeholder="t('formulaTools.searchFunctions')"
-            data-formula-category-search
-            @keydown="onSearchKeydown"
-          />
-        </div>
-        <MenuSurface
-          ref="menuRef"
-          class="formula-category-menu__list narrow-scrollbar"
-          :label="label"
-        >
+        <template v-if="hasSearch" #header>
+          <div class="formula-category-menu__search">
+            <TInput
+              ref="searchInputRef"
+              v-model="query"
+              type="search"
+              clearable
+              :aria-label="t('formulaTools.searchFunctions')"
+              :placeholder="t('formulaTools.searchFunctions')"
+              data-formula-category-search
+              @keydown="onSearchKeydown"
+            />
+          </div>
+        </template>
+        <template #items>
           <MenuItem
             v-for="entry in matchingFunctions"
             :key="entry.name"
@@ -167,8 +162,8 @@ watch(open, (isOpen) => {
           >
             {{ t("formulaTools.noFunctions") }}
           </li>
-        </MenuSurface>
-      </FloatingPanelSurface>
+        </template>
+      </MenuSurface>
     </Teleport>
   </div>
 </template>
@@ -186,18 +181,12 @@ watch(open, (isOpen) => {
   }
 
   &__panel {
-    display: flex;
-    flex-direction: column;
     max-width: calc(100vw - 24px);
     max-height: min(360px, calc(100vh - 24px));
-  }
 
-  &__list {
-    min-height: 0;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
+    &--searchable {
+      width: min(320px, calc(100vw - var(--idea-space-4) - var(--idea-space-4)));
+    }
   }
 
   &__search {

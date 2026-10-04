@@ -8,6 +8,7 @@ import {
   type TableStyleDefinition,
 } from "@idea10/core/table-styles";
 import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
+import GallerySection from "../../../shared/gallery/GallerySection.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
@@ -222,12 +223,11 @@ function manage(): void {
               @edit="edit"
               @delete="deleteStyle"
             />
-            <section
+            <GallerySection
               v-if="customPivotStyles.length"
-              class="table-styles-menu__pivot"
-              :aria-label="t('tableStyles.pivotStyles')"
+              :title="t('tableStyles.pivotStyles')"
+              :content-inset="false"
             >
-              <span>{{ t("tableStyles.pivotStyles") }}</span>
               <TableStyleGallery
                 ref="pivotGalleryRef"
                 kind="pivot"
@@ -239,7 +239,7 @@ function manage(): void {
                 @edit="editPivot"
                 @delete="deletePivot"
               />
-            </section>
+            </GallerySection>
           </div>
         </template>
         <template #footer>
@@ -279,19 +279,6 @@ function manage(): void {
 
     > * + * {
       margin-top: 8px;
-    }
-  }
-
-  &__pivot {
-    display: grid;
-    gap: 6px;
-    color: var(--idea-text-primary);
-
-    > span {
-      padding-inline: var(--idea-space-5);
-      color: var(--idea-text-secondary);
-      font-size: var(--idea-font-size-body-small);
-      font-weight: var(--idea-font-weight-medium);
     }
   }
 

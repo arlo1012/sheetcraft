@@ -225,6 +225,8 @@ defineExpose({ contextMenuElement });
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/gallery/gallery-choice";
+
 .table-style-gallery {
   display: grid;
 
@@ -249,28 +251,12 @@ defineExpose({ contextMenuElement });
   }
 
   &__tile {
+    @include gallery-choice.choice;
+
     width: 100%;
     display: grid;
     place-items: center;
     min-width: 0;
-    padding: 3px;
-    border: 0;
-    border-radius: var(--idea-radius-small);
-    background: transparent;
-    cursor: pointer;
-
-    &:hover {
-      background: var(--idea-surface-secondary);
-    }
-
-    &.is-selected {
-      background: var(--idea-action-primary-subtle);
-    }
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: default;
-    }
   }
 
   &__more {

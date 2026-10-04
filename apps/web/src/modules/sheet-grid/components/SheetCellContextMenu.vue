@@ -436,11 +436,9 @@ function onSubmenuKeydown(event: KeyboardEvent): void {
 }
 .sheet-cell-context-menu {
   width: max-content;
-  border-radius: var(--idea-radius-default);
   &--submenu {
     z-index: var(--idea-layer-context-submenu);
     width: max-content;
-    border-radius: var(--idea-radius-default);
   }
   &--counted {
     min-width: 248px;

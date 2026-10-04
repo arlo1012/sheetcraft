@@ -69,4 +69,50 @@ describe("checkWebUi", () => {
 
     expect(checkWebUi(root)).toEqual([]);
   });
+
+  it("reserves surface chrome even when nested SCSS expands a surface modifier", () => {
+    const root = fixture({
+      "apps/web/src/modules/example/Surface.vue": `
+        <template>
+          <MenuSurface class="example-surface" :class="{ 'example-surface--open': open }" />
+        </template>
+        <style scoped lang="scss">
+        .example-surface {
+          width: 280px;
+          // Surface chrome must still be detected after a SCSS comment.
+          border: 0;
+          &:hover { background: white; }
+          &--open {
+            padding: 0;
+            border-radius: 0;
+          }
+        }
+        section .example-surface { box-shadow: none; }
+        </style>`,
+    });
+
+    expect(checkWebUi(root).map((violation) => violation.rule)).toEqual([
+      "Keep direct border styling on MenuSurface/FloatingPanelSurface; feature surfaces may set size, placement, and layer only.",
+      "Keep direct background styling on MenuSurface/FloatingPanelSurface; feature surfaces may set size, placement, and layer only.",
+      "Keep direct padding styling on MenuSurface/FloatingPanelSurface; feature surfaces may set size, placement, and layer only.",
+      "Keep direct border-radius styling on MenuSurface/FloatingPanelSurface; feature surfaces may set size, placement, and layer only.",
+      "Keep direct box-shadow styling on MenuSurface/FloatingPanelSurface; feature surfaces may set size, placement, and layer only.",
+    ]);
+  });
+
+  it("does not treat descendant previews or unrelated classes as surface chrome", () => {
+    const root = fixture({
+      "apps/web/src/modules/example/Surface.vue": `
+        <template><FloatingPanelSurface class="example-surface" /></template>
+        <style scoped lang="scss">
+        .example-surface {
+          width: 320px;
+          .preview { padding: 8px; border: 1px solid black; background: white; box-shadow: none; }
+        }
+        .unrelated { padding: 8px; border-radius: 8px; }
+        </style>`,
+    });
+
+    expect(checkWebUi(root)).toEqual([]);
+  });
 });

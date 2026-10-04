@@ -171,6 +171,8 @@ defineExpose({ focusFirstStyle, contextMenuElement });
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/gallery/gallery-choice";
+
 .cell-style-gallery {
   display: grid;
 }
@@ -184,14 +186,11 @@ defineExpose({ focusFirstStyle, contextMenuElement });
   min-width: 0;
 }
 .cell-style-gallery__tile {
+  @include gallery-choice.choice;
+
   width: 100%;
   min-width: 0;
-  padding: 3px;
   overflow: hidden;
-  border: 0;
-  border-radius: var(--idea-radius-small);
-  background: transparent;
-  cursor: pointer;
 }
 .cell-style-gallery__more {
   position: absolute;
@@ -213,12 +212,5 @@ defineExpose({ focusFirstStyle, contextMenuElement });
 .cell-style-gallery__item:focus-within .cell-style-gallery__more,
 .cell-style-gallery__more:focus-visible {
   visibility: visible;
-}
-.cell-style-gallery__tile:hover {
-  background: var(--idea-surface-secondary);
-}
-.cell-style-gallery__tile:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 </style>

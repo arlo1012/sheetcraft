@@ -152,7 +152,6 @@ function requestClear(mode: "contents" | "formats" | "all"): void {
       <MenuSurface
         ref="menuSurfaceRef"
         class="sheet-axis-context-menu"
-        :class="{ 'sheet-axis-context-menu--unframed': !state }"
         :label="t(axis === 'row' ? 'axisMenu.rowActions' : 'axisMenu.columnActions')"
       >
         <li role="none">
@@ -286,10 +285,6 @@ function requestClear(mode: "contents" | "formats" | "all"): void {
 }
 .sheet-axis-context-menu {
   width: max-content;
-  border-radius: var(--idea-radius-default);
-  &--unframed {
-    border-radius: var(--idea-radius-default);
-  }
   &__size-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
