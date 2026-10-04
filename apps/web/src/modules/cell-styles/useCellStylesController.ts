@@ -119,6 +119,12 @@ export function useCellStylesController(options: {
     if (execute(createSetWorkbookCellStylesCommand(next))) close();
   }
 
+  function deleteStyle(style: CellStyleDefinition): void {
+    if (!begin()) return;
+    const next = customStyles.value.filter((existing) => existing.id !== style.id);
+    if (execute(createSetWorkbookCellStylesCommand(next))) void nextTick(options.focus);
+  }
+
   function openMerge(): void {
     if (!begin()) return;
     importedStyles.value = [];
@@ -175,6 +181,7 @@ export function useCellStylesController(options: {
     createStyle,
     editStyle,
     saveStyle,
+    deleteStyle,
     openMerge,
     importMergeFile,
     mergeStyles,

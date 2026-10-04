@@ -22,6 +22,13 @@ export type SheetWatermark = {
   };
 };
 
+/** A workbook-local watermark saved for reuse in the watermark gallery. */
+export type WatermarkPreset = {
+  id: string;
+  name: string;
+  watermark: SheetWatermark;
+};
+
 export type SheetPageDecoration = {
   /** An image asset ID. Asset bytes live in the image asset store, never in snapshots. */
   backgroundAssetId?: string;
@@ -123,4 +130,30 @@ export function cloneSheetPageDecoration(
         }
       : {}),
   };
+}
+
+/** Validates and deep-clones workbook-local watermark presets. */
+export function normalizeWatermarkPresets(value: unknown): WatermarkPreset[] {
+  if (!Array.isArray(value)) throw new TypeError("Watermark presets must be an array.");
+  const ids = new Set<string>();
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry))
+      throw new TypeError("Watermark preset must be an object.");
+    const preset = entry as WatermarkPreset;
+    const id = typeof preset.id === "string" ? preset.id.trim() : "";
+    const name = typeof preset.name === "string" ? preset.name.trim() : "";
+    if (!id || id.length > 256) throw new TypeError("Watermark preset ID is invalid.");
+    if (ids.has(id)) throw new TypeError("Watermark preset IDs must be unique.");
+    if (!name || name.length > 256) throw new TypeError("Watermark preset name is invalid.");
+    const watermark = normalizeSheetPageDecoration({ watermark: preset.watermark }).watermark;
+    if (!watermark) throw new TypeError("Watermark preset must contain text or an image.");
+    ids.add(id);
+    return { id, name, watermark };
+  });
+}
+
+export function cloneWatermarkPresets(
+  value: readonly WatermarkPreset[] | undefined,
+): WatermarkPreset[] {
+  return normalizeWatermarkPresets(value ?? []);
 }

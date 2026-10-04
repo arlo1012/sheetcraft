@@ -81,12 +81,15 @@ const emit = defineEmits<{
   applyNamedCellStyle: [style: CellStyleDefinition];
   createCellStyle: [];
   editCellStyle: [style: CellStyleDefinition];
+  deleteCellStyle: [style: CellStyleDefinition];
   mergeCellStyles: [];
   applyTableStyle: [style: TableStyleDefinition];
   createTableStyle: [];
   editTableStyle: [style: TableStyleDefinition];
+  deleteTableStyle: [style: TableStyleDefinition];
   createPivotTableStyle: [];
   editPivotTableStyle: [style: PivotTableStyleDefinition];
+  deletePivotTableStyle: [style: PivotTableStyleDefinition];
   clearTableStyle: [];
   manageTable: [];
 }>();
@@ -302,12 +305,15 @@ defineSlots<{
         @apply-named-cell-style="emit('applyNamedCellStyle', $event)"
         @create-cell-style="emit('createCellStyle')"
         @edit-cell-style="emit('editCellStyle', $event)"
+        @delete-cell-style="emit('deleteCellStyle', $event)"
         @merge-cell-styles="emit('mergeCellStyles')"
         @apply-table-style="emit('applyTableStyle', $event)"
         @create-table-style="emit('createTableStyle')"
         @edit-table-style="emit('editTableStyle', $event)"
+        @delete-table-style="emit('deleteTableStyle', $event)"
         @create-pivot-table-style="emit('createPivotTableStyle')"
         @edit-pivot-table-style="emit('editPivotTableStyle', $event)"
+        @delete-pivot-table-style="emit('deletePivotTableStyle', $event)"
         @clear-table-style="emit('clearTableStyle')"
         @manage-table="emit('manageTable')"
       >

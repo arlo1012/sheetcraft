@@ -8,6 +8,7 @@ export const tableStylesEnUS = {
     allStyles: "All presets",
     themeStyles: "Browse by color",
     newStyle: "New table style",
+    delete: "Delete",
     clearStyle: "Clear table style",
     light: "Light",
     medium: "Medium",

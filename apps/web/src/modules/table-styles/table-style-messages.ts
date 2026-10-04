@@ -6,6 +6,7 @@ export type TableStylesMessageSchema = {
     allStyles: string;
     themeStyles: string;
     newStyle: string;
+    delete: string;
     clearStyle: string;
     light: string;
     medium: string;

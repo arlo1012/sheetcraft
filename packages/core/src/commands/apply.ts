@@ -28,6 +28,7 @@ import { applySetSheetPageSetupCommand } from "./page-setup.js";
 import {
   applySetSheetPageDecorationCommand,
   applySetSheetsWatermarkCommand,
+  applySetWorkbookWatermarkPresetsCommand,
 } from "./page-decoration.js";
 import { applyAdvancedFilterCommand } from "./advanced-filter.js";
 import { applySplitColumnCommand, applyRemoveDuplicatesCommand } from "./data-transforms.js";
@@ -207,6 +208,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "setSheetPageSetup":
     case "setSheetPageDecoration":
     case "setSheetsWatermark":
+    case "setWorkbookWatermarkPresets":
     case "mergeCells":
     case "unmergeCells":
     case "setSheetFilter":
@@ -337,6 +339,8 @@ export function applyWorkbookCommand(
         return applySetSheetPageDecorationCommand(workbook, command);
       case "setSheetsWatermark":
         return applySetSheetsWatermarkCommand(workbook, command);
+      case "setWorkbookWatermarkPresets":
+        return applySetWorkbookWatermarkPresetsCommand(workbook, command);
       case "mergeCells":
         return applyMergeCellsCommand(workbook, command);
       case "unmergeCells":

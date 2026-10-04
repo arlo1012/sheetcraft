@@ -30,12 +30,15 @@ const emit = defineEmits<{
   applyNamedCellStyle: [style: CellStyleDefinition];
   createCellStyle: [];
   editCellStyle: [style: CellStyleDefinition];
+  deleteCellStyle: [style: CellStyleDefinition];
   mergeCellStyles: [];
   applyTableStyle: [style: TableStyleDefinition];
   createTableStyle: [];
   editTableStyle: [style: TableStyleDefinition];
+  deleteTableStyle: [style: TableStyleDefinition];
   createPivotTableStyle: [];
   editPivotTableStyle: [style: PivotTableStyleDefinition];
+  deletePivotTableStyle: [style: PivotTableStyleDefinition];
   clearTableStyle: [];
   manageTable: [];
 }>();
@@ -71,8 +74,10 @@ const { t } = useAppI18n();
           @apply="emit('applyTableStyle', $event)"
           @create="emit('createTableStyle')"
           @edit="emit('editTableStyle', $event)"
+          @delete="emit('deleteTableStyle', $event)"
           @create-pivot="emit('createPivotTableStyle')"
           @edit-pivot="emit('editPivotTableStyle', $event)"
+          @delete-pivot="emit('deletePivotTableStyle', $event)"
           @clear="emit('clearTableStyle')"
           @manage="emit('manageTable')"
         />
@@ -86,6 +91,7 @@ const { t } = useAppI18n();
           @apply="emit('applyNamedCellStyle', $event)"
           @create="emit('createCellStyle')"
           @edit="emit('editCellStyle', $event)"
+          @delete="emit('deleteCellStyle', $event)"
           @merge="emit('mergeCellStyles')"
         />
       </div>

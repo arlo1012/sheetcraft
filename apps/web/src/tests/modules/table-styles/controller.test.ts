@@ -241,6 +241,41 @@ describe("table style workspace integration", () => {
     expect(tables.customStyles.value).toEqual([tableStyle]);
   });
 
+  test("deletes custom table and pivot styles, clears their defaults, and restores both with undo", () => {
+    const { workspace, tables, sheet } = fixture();
+    const tableStyle: TableStyleDefinition = {
+      id: "report",
+      name: "Report",
+      category: "custom",
+      elements: { headerRow: { style: { fillColor: "#4bacc6" } } },
+    };
+    const pivotStyle: PivotTableStyleDefinition = {
+      id: "pivot-report",
+      name: "Pivot report",
+      category: "custom",
+      elements: { totalRow: { style: { bold: true } } },
+    };
+    tables.confirmStyle({ style: tableStyle, setAsDefault: true });
+    tables.requestCreate();
+    tables.confirmCreate({ ...tables.createInitial.value!, range: "A1:B3", hasHeaders: true });
+    tables.confirmPivotStyle({ style: pivotStyle, setAsDefault: true });
+
+    tables.deleteStyle(tableStyle);
+    expect(tables.customStyles.value).toEqual([]);
+    expect(tables.defaultStyleId.value).toBeUndefined();
+    expect(sheet.tables?.[0]?.style).toEqual(tableStyle);
+    workspace.undo();
+    expect(tables.customStyles.value).toEqual([tableStyle]);
+    expect(tables.defaultStyleId.value).toBe(tableStyle.id);
+
+    tables.deletePivotStyle(pivotStyle);
+    expect(tables.customPivotStyles.value).toEqual([]);
+    expect(tables.defaultPivotStyleId.value).toBeUndefined();
+    workspace.undo();
+    expect(tables.customPivotStyles.value).toEqual([pivotStyle]);
+    expect(tables.defaultPivotStyleId.value).toBe(pivotStyle.id);
+  });
+
   test("discards pivot style drafts on cancel and when another document opens", async () => {
     const { workspace, tables } = fixture();
     tables.openPivotStyle();

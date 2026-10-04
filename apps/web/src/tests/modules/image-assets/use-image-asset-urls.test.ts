@@ -48,6 +48,20 @@ const asset = (id: string) => ({
 });
 afterEach(() => vi.unstubAllGlobals());
 describe("useImageAssetUrls", () => {
+  test("retains pictures used only by saved watermark presets", () => {
+    const workbook = createWorkbook({ id: "preset-book", sheetId: "sheet" });
+    workbook.watermarkPresets = [
+      {
+        id: "logo-preset",
+        name: "Logo",
+        watermark: {
+          ...DEFAULT_SHEET_WATERMARK,
+          image: { assetId: "saved-logo", scale: null, washout: true, angle: 0 },
+        },
+      },
+    ];
+    expect(collectWorkbookImageAssetIds(workbook)).toEqual(new Set(["saved-logo"]));
+  });
   test("collects image-only watermarks for display and portable saves", () => {
     const workbook = createWorkbook({ id: "watermarked", sheetId: "sheet" });
     getActiveSheet(workbook).pageDecoration = {

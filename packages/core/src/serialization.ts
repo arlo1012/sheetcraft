@@ -49,7 +49,13 @@ import {
   type DefinedName,
 } from "./workbook.js";
 import type { SheetPageSetup } from "./page-setup.js";
-import { normalizeSheetPageDecoration, type SheetPageDecoration } from "./page-decoration.js";
+import {
+  cloneWatermarkPresets,
+  normalizeSheetPageDecoration,
+  normalizeWatermarkPresets,
+  type SheetPageDecoration,
+  type WatermarkPreset,
+} from "./page-decoration.js";
 import { createFormulaError, isFormulaErrorCode, type CellContent } from "./formula/types.js";
 import {
   cloneWorkbookTheme,
@@ -178,8 +184,12 @@ export type WorkbookSnapshotV17 = Omit<WorkbookSnapshotV16, "version"> & {
   version: 17;
   theme: WorkbookTheme;
 };
+export type WorkbookSnapshotV18 = Omit<WorkbookSnapshotV17, "version"> & {
+  version: 18;
+  watermarkPresets: WatermarkPreset[];
+};
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV17;
+export type WorkbookSnapshot = WorkbookSnapshotV18;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -193,7 +203,25 @@ export type SheetSnapshot = SheetSnapshotV7 & {
   pageSetup?: SheetPageSetup;
   pageDecoration?: SheetPageDecoration;
 };
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17;
+type SnapshotVersion =
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | 11
+  | 12
+  | 13
+  | 14
+  | 15
+  | 16
+  | 17
+  | 18;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -699,7 +727,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 17,
+    version: 18,
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     theme: cloneWorkbookTheme(workbook.theme),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
@@ -721,6 +749,7 @@ export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
       ? { defaultPivotTableStyleId: workbook.defaultPivotTableStyleId }
       : {}),
     cellStyles: (workbook.cellStyles ?? []).map(cloneCellStyleDefinition),
+    watermarkPresets: cloneWatermarkPresets(workbook.watermarkPresets),
   };
 }
 
@@ -743,7 +772,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 14 &&
     record.version !== 15 &&
     record.version !== 16 &&
-    record.version !== 17
+    record.version !== 17 &&
+    record.version !== 18
   ) {
     throw new WorkbookDomainError(
       {
@@ -867,6 +897,19 @@ export function deserializeWorkbook(value: unknown): Workbook {
           }
         })()
       : [];
+  const watermarkPresets =
+    version >= 18
+      ? (() => {
+          try {
+            return normalizeWatermarkPresets(record.watermarkPresets);
+          } catch (error) {
+            return fail(
+              "$.watermarkPresets",
+              error instanceof Error ? error.message : "Invalid watermark presets.",
+            );
+          }
+        })()
+      : [];
   return {
     id,
     dateSystem,
@@ -878,6 +921,7 @@ export function deserializeWorkbook(value: unknown): Workbook {
     tableStyles,
     pivotTableStyles,
     cellStyles,
+    watermarkPresets,
     ...(version >= 13 && typeof record.defaultTableStyleId === "string"
       ? { defaultTableStyleId: record.defaultTableStyleId }
       : {}),

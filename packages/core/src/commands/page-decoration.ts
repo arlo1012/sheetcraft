@@ -1,11 +1,18 @@
 import {
   cloneSheetPageDecoration,
   normalizeSheetPageDecoration,
+  cloneWatermarkPresets,
+  normalizeWatermarkPresets,
   type SheetPageDecoration,
   type SheetWatermark,
+  type WatermarkPreset,
 } from "../page-decoration.js";
 import type { Workbook } from "../workbook.js";
-import type { SetSheetPageDecorationCommand, SetSheetsWatermarkCommand } from "./contracts.js";
+import type {
+  SetSheetPageDecorationCommand,
+  SetSheetsWatermarkCommand,
+  SetWorkbookWatermarkPresetsCommand,
+} from "./contracts.js";
 import { getSheetOrThrow, validateCommandPayload } from "./helpers.js";
 
 export function createSetSheetPageDecorationCommand(
@@ -53,6 +60,7 @@ function normalizeWatermark(watermark: SheetWatermark | undefined): SheetWaterma
 export function createSetSheetsWatermarkCommand(
   sheetIds: string[],
   watermark: SheetWatermark | undefined,
+  presets?: readonly WatermarkPreset[],
 ): SetSheetsWatermarkCommand {
   const ids = validateCommandPayload("sheetIds", sheetIds, () => normalizeSheetIds(sheetIds));
   return {
@@ -65,7 +73,38 @@ export function createSetSheetsWatermarkCommand(
           ),
         }
       : {}),
+    ...(presets === undefined
+      ? {}
+      : {
+          watermarkPresets: validateCommandPayload("watermarkPresets", presets, () =>
+            normalizeWatermarkPresets(presets),
+          ),
+        }),
   };
+}
+
+export function createSetWorkbookWatermarkPresetsCommand(
+  presets: readonly WatermarkPreset[],
+): SetWorkbookWatermarkPresetsCommand {
+  return {
+    type: "setWorkbookWatermarkPresets",
+    presets: validateCommandPayload("watermarkPresets", presets, () =>
+      normalizeWatermarkPresets(presets),
+    ),
+  };
+}
+
+export function applySetWorkbookWatermarkPresetsCommand(
+  workbook: Workbook,
+  command: SetWorkbookWatermarkPresetsCommand,
+): SetWorkbookWatermarkPresetsCommand | null {
+  const presets = validateCommandPayload("watermarkPresets", command.presets, () =>
+    normalizeWatermarkPresets(command.presets),
+  );
+  const previous = cloneWatermarkPresets(workbook.watermarkPresets);
+  if (JSON.stringify(previous) === JSON.stringify(presets)) return null;
+  workbook.watermarkPresets = cloneWatermarkPresets(presets);
+  return createSetWorkbookWatermarkPresetsCommand(previous);
 }
 
 export function applySetSheetsWatermarkCommand(
@@ -95,6 +134,13 @@ export function applySetSheetsWatermarkCommand(
   if (restoreEntries && sheetIds.some((sheetId) => !restoreBySheetId.has(sheetId)))
     throw new TypeError("Watermark inverse contains an unexpected sheet.");
 
+  const nextPresets =
+    command.watermarkPresets === undefined
+      ? undefined
+      : validateCommandPayload("watermarkPresets", command.watermarkPresets, () =>
+          normalizeWatermarkPresets(command.watermarkPresets),
+        );
+
   // Resolve every target before changing one, so unknown IDs cannot cause partial edits.
   const sheets = sheetIds.map((sheetId) => getSheetOrThrow(workbook, sheetId));
   const previous = sheets.map((sheet) => ({
@@ -109,16 +155,24 @@ export function applySetSheetsWatermarkCommand(
       ...(nextWatermark ? { watermark: nextWatermark } : {}),
     });
   });
+  const previousPresets = cloneWatermarkPresets(workbook.watermarkPresets);
   if (
     next.every(
       (decoration, index) =>
         JSON.stringify(decoration) ===
         JSON.stringify(cloneSheetPageDecoration(sheets[index]!.pageDecoration)),
-    )
+    ) &&
+    (nextPresets === undefined || JSON.stringify(previousPresets) === JSON.stringify(nextPresets))
   )
     return null;
   sheets.forEach((sheet, index) => {
     sheet.pageDecoration = next[index]!;
   });
-  return { type: "setSheetsWatermark", sheetIds, watermarks: previous };
+  if (nextPresets !== undefined) workbook.watermarkPresets = cloneWatermarkPresets(nextPresets);
+  return {
+    type: "setSheetsWatermark",
+    sheetIds,
+    watermarks: previous,
+    ...(nextPresets === undefined ? {} : { watermarkPresets: previousPresets }),
+  };
 }

@@ -8,6 +8,7 @@ export const tableStylesZhCN = {
     allStyles: "全部预设",
     themeStyles: "按色系查看",
     newStyle: "新建表格样式",
+    delete: "删除",
     clearStyle: "清除表格样式",
     light: "浅色",
     medium: "中等",

@@ -83,6 +83,7 @@ import {
   cloneSheetPageDecoration,
   normalizeSheetPageDecoration,
   type SheetPageDecoration,
+  type WatermarkPreset,
 } from "./page-decoration.js";
 import {
   cloneConditionalFormatRule,
@@ -395,6 +396,8 @@ export type Workbook = {
   defaultPivotTableStyleId?: string;
   /** Workbook-local custom cell-style definitions. Gallery builtins are not persisted here. */
   cellStyles?: CellStyleDefinition[];
+  /** Workbook-local watermarks saved for reuse in the watermark gallery. */
+  watermarkPresets?: WatermarkPreset[];
 };
 
 /** A workbook- or sheet-scoped name that points at one rectangular range. */
@@ -474,6 +477,7 @@ export function createWorkbook(options?: {
     tableStyles: [],
     pivotTableStyles: [],
     cellStyles: [],
+    watermarkPresets: [],
   };
 }
 

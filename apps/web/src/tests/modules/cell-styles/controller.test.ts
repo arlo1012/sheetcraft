@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { serializeWorkbook } from "@idea10/core/serialization";
 import type { CellStyleDefinition } from "@idea10/core/cell-styles";
-import { getCellStyle } from "@idea10/core/workbook";
+import { getCellNamedStyle, getCellStyle } from "@idea10/core/workbook";
 import { createSheetGridViewState } from "@idea10/sheet-engine/view-state";
 import { useSpreadsheetWorkspaceController } from "../../../app/composables/useSpreadsheetWorkspaceController";
 import { useCellStylesController } from "../../../modules/cell-styles/useCellStylesController";
@@ -101,6 +101,34 @@ describe("cell styles controller", () => {
 
     styles.applyStyle(workspace.session.workbook.cellStyles![0]!);
     expect(getCellStyle(workspace.activeSheet.value, { row: 0, column: 0 })).toBeUndefined();
+  });
+
+  test("deletes a custom style while preserving its applied formatting and restores it with undo", () => {
+    const { workspace, styles } = fixture();
+    const style: CellStyleDefinition = {
+      id: "report-label",
+      name: "Report label",
+      category: "custom",
+      style: { bold: true, fillColor: "#c6efce" },
+    };
+    styles.saveStyle(style);
+    styles.applyStyle(style);
+    expect(getCellNamedStyle(workspace.activeSheet.value, { row: 0, column: 0 })?.styleId).toBe(
+      style.id,
+    );
+
+    styles.deleteStyle(style);
+    expect(workspace.session.workbook.cellStyles).toEqual([]);
+    expect(getCellStyle(workspace.activeSheet.value, { row: 0, column: 0 })).toMatchObject(
+      style.style,
+    );
+    expect(getCellNamedStyle(workspace.activeSheet.value, { row: 0, column: 0 })).toBeUndefined();
+
+    workspace.undo();
+    expect(workspace.session.workbook.cellStyles).toEqual([style]);
+    expect(getCellNamedStyle(workspace.activeSheet.value, { row: 0, column: 0 })?.styleId).toBe(
+      style.id,
+    );
   });
 
   test("merges by name and remaps colliding incoming IDs", () => {

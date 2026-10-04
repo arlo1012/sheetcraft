@@ -1,15 +1,16 @@
 import { describe, expect, test } from "vitest";
-import { mount } from "@vue/test-utils";
+import { DOMWrapper, mount } from "@vue/test-utils";
 import { Button as TButton } from "tdesign-vue-next/es/button";
 import CellFormatDialog from "../../../modules/cell-format/components/CellFormatDialog.vue";
 import { Dialog } from "tdesign-vue-next/es/dialog";
 import { createBuiltinCellStyles } from "@idea10/core/cell-styles";
 import { createAppI18n } from "../../../shared/i18n";
 import CellStyleGallery from "../../../modules/cell-styles/components/CellStyleGallery.vue";
+import CellStylesMenu from "../../../modules/cell-styles/components/CellStylesMenu.vue";
 import NewCellStyleDialog from "../../../modules/cell-styles/components/NewCellStyleDialog.vue";
 
 describe("cell styles components", () => {
-  test("localizes builtins, preserves custom names, and opens custom editing from the keyboard", async () => {
+  test("localizes builtins, preserves custom names, and exposes custom actions", async () => {
     const custom = {
       id: "custom-report",
       name: "销售看板",
@@ -26,8 +27,32 @@ describe("cell styles components", () => {
     expect(wrapper.text()).not.toContain("cellStyles.builtin.");
     const tile = wrapper.get('[data-cell-style-id="custom-report"]');
     expect(tile.attributes("title")).toContain("销售看板");
-    await tile.trigger("keydown", { key: "F10", shiftKey: true });
-    expect(wrapper.emitted("edit")).toEqual([[custom]]);
+    await tile.trigger("contextmenu");
+    await new DOMWrapper(document.body).get('[data-custom-style-action="delete"]').trigger("click");
+    expect(wrapper.emitted("delete")).toEqual([[custom]]);
+    wrapper.unmount();
+    document.body.replaceChildren();
+  });
+
+  test("keeps the parent menu open while deleting a custom style from its teleported context menu", async () => {
+    const custom = {
+      id: "custom-report",
+      name: "Report",
+      category: "custom" as const,
+      style: {},
+    };
+    const wrapper = mount(CellStylesMenu, {
+      attachTo: document.body,
+      props: { customStyles: [custom] },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
+    await wrapper.get('[data-ribbon-action="cell-styles"]').trigger("click");
+    const body = new DOMWrapper(document.body);
+    await body.get('[data-cell-style-id="custom-report"]').trigger("contextmenu");
+    const action = body.get('[data-custom-style-action="delete"]');
+    await action.trigger("pointerdown");
+    await action.trigger("click");
+    expect(wrapper.emitted("delete")).toEqual([[custom]]);
     wrapper.unmount();
     document.body.replaceChildren();
   });

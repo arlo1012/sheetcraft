@@ -4,6 +4,9 @@ import type { ImageAssetStore } from "./imageAssetStore";
 
 export function collectWorkbookImageAssetIds(workbook: Workbook): Set<string> {
   const ids = new Set<string>();
+  for (const preset of workbook.watermarkPresets ?? []) {
+    if (preset.watermark.image) ids.add(preset.watermark.image.assetId);
+  }
   for (const sheet of workbook.sheets.values()) {
     if (sheet.pageDecoration?.backgroundAssetId) ids.add(sheet.pageDecoration.backgroundAssetId);
     if (sheet.pageDecoration?.watermark?.image)

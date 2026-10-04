@@ -29,8 +29,10 @@ const emit = defineEmits<{
   applyStyle: [style: TableStyleDefinition];
   createStyle: [];
   editStyle: [style: TableStyleDefinition];
+  deleteStyle: [style: TableStyleDefinition];
   createPivotStyle: [];
   editPivotStyle: [style: PivotTableStyleDefinition];
+  deletePivotStyle: [style: PivotTableStyleDefinition];
   clearStyle: [];
   settings: [];
 }>();
@@ -203,6 +205,7 @@ function onNameKeydown(_value: string | number, context: { e: KeyboardEvent }): 
         :disabled="disabled"
         @select="emit('applyStyle', $event as TableStyleDefinition)"
         @edit="emit('editStyle', $event as TableStyleDefinition)"
+        @delete="emit('deleteStyle', $event as TableStyleDefinition)"
       />
       <div class="table-tools-toolbar__stack">
         <TableStylesMenu
@@ -216,8 +219,10 @@ function onNameKeydown(_value: string | number, context: { e: KeyboardEvent }): 
           @apply="emit('applyStyle', $event)"
           @create="emit('createStyle')"
           @edit="emit('editStyle', $event)"
+          @delete="emit('deleteStyle', $event)"
           @create-pivot="emit('createPivotStyle')"
           @edit-pivot="emit('editPivotStyle', $event)"
+          @delete-pivot="emit('deletePivotStyle', $event)"
           @clear="emit('clearStyle')"
           @manage="emit('settings')"
         />

@@ -1,8 +1,13 @@
 import { computed, readonly, ref } from "vue";
-import type { SheetPageDecoration, SheetWatermark } from "@idea10/core/page-decoration";
+import type {
+  SheetPageDecoration,
+  SheetWatermark,
+  WatermarkPreset,
+} from "@idea10/core/page-decoration";
 import type { Sheet, Workbook } from "@idea10/core/workbook";
 import type { ImageAssetStore } from "../image-assets/imageAssetStore";
 import { ImageAssetError, prepareImageAsset } from "../image-assets/prepareImageAsset";
+import { createBrowserIdFactory } from "../../shared/runtime/browser-id-factory";
 
 export type PageDecorationFeedback = "invalidImage" | "failed" | "protectedSheets";
 export type WatermarkScope = "sheet" | "workbook";
@@ -15,11 +20,17 @@ export function usePageDecorationActions(options: {
   getGeneration?: () => number;
   flushPendingEdits: () => boolean;
   setDecoration: (sheetId: string, decoration: SheetPageDecoration) => void;
-  setWatermarks: (sheetIds: string[], watermark: SheetWatermark | undefined) => void;
+  setWatermarks: (
+    sheetIds: string[],
+    watermark: SheetWatermark | undefined,
+    presets?: readonly WatermarkPreset[],
+  ) => void;
+  setPresets: (presets: readonly WatermarkPreset[]) => void;
 }) {
   const busy = ref(false);
   const feedback = ref<PageDecorationFeedback>();
   let watermarkRequest = 0;
+  const idFactory = createBrowserIdFactory();
   const current = computed(() => options.getSheet().pageDecoration ?? {});
   const isCurrent = (workbook: Workbook, sheetId: string, generation: number | undefined) =>
     options.getWorkbook() === workbook &&
@@ -72,6 +83,7 @@ export function usePageDecorationActions(options: {
     watermark: SheetWatermark,
     scope: WatermarkScope,
     imageFile?: File,
+    savePreset?: { id?: string; name: string },
   ): Promise<boolean> {
     if (busy.value || !options.flushPendingEdits()) return false;
     const workbook = options.getWorkbook();
@@ -103,7 +115,17 @@ export function usePageDecorationActions(options: {
         feedback.value = "protectedSheets";
         return false;
       }
-      options.setWatermarks(sheetIds, draft);
+      const presets = savePreset
+        ? [
+            ...(workbook.watermarkPresets ?? []).filter((preset) => preset.id !== savePreset.id),
+            {
+              id: savePreset.id ?? idFactory("watermark"),
+              name: savePreset.name,
+              watermark: draft,
+            },
+          ]
+        : undefined;
+      options.setWatermarks(sheetIds, draft, presets);
       return true;
     } catch (error) {
       if (request === watermarkRequest)
@@ -116,6 +138,13 @@ export function usePageDecorationActions(options: {
 
   function cancelWatermark(): void {
     watermarkRequest += 1;
+  }
+
+  function deletePreset(preset: WatermarkPreset): void {
+    if (busy.value || !options.flushPendingEdits()) return;
+    options.setPresets(
+      (options.getWorkbook().watermarkPresets ?? []).filter((entry) => entry.id !== preset.id),
+    );
   }
 
   function removeWatermark(): void {
@@ -132,6 +161,7 @@ export function usePageDecorationActions(options: {
     setWatermark,
     applyWatermark,
     cancelWatermark,
+    deletePreset,
     removeWatermark,
   };
 }

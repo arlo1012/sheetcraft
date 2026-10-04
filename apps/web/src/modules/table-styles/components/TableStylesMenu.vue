@@ -44,8 +44,10 @@ const emit = defineEmits<{
   apply: [style: TableStyleDefinition];
   create: [];
   edit: [style: TableStyleDefinition];
+  delete: [style: TableStyleDefinition];
   createPivot: [];
   editPivot: [style: PivotTableStyleDefinition];
+  deletePivot: [style: PivotTableStyleDefinition];
   clear: [];
   manage: [];
 }>();
@@ -57,6 +59,8 @@ const triggerRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const surfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const triggerElement = computed(() => triggerRef.value?.rootElement ?? null);
 const panelId = `table-styles-menu-${useId().replaceAll(":", "")}`;
+const galleryRef = ref<{ contextMenuElement: () => HTMLElement | null } | null>(null);
+const pivotGalleryRef = ref<{ contextMenuElement: () => HTMLElement | null } | null>(null);
 const styles = computed(() => [...createBuiltinTableStyles(), ...props.customStyles]);
 const visibleStyles = computed(() =>
   expanded.value
@@ -85,6 +89,10 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   menuSurfaceRef: surfaceRef,
   disabled: computed(() => props.disabled),
   placement: "bottom-start",
+  additionalInside: () => [
+    galleryRef.value?.contextMenuElement(),
+    pivotGalleryRef.value?.contextMenuElement(),
+  ],
   onDismiss: () => {
     expanded.value = false;
   },
@@ -114,6 +122,14 @@ function createPivot(): void {
 function editPivot(style: TableStyleDefinition | PivotTableStyleDefinition): void {
   dismiss("programmatic", true);
   emit("editPivot", style as PivotTableStyleDefinition);
+}
+function deleteStyle(style: TableStyleDefinition | PivotTableStyleDefinition): void {
+  dismiss("programmatic", true);
+  emit("delete", style as TableStyleDefinition);
+}
+function deletePivot(style: TableStyleDefinition | PivotTableStyleDefinition): void {
+  dismiss("programmatic", true);
+  emit("deletePivot", style as PivotTableStyleDefinition);
 }
 function clear(): void {
   dismiss("programmatic", true);
@@ -192,6 +208,7 @@ function manage(): void {
         </section>
         <div class="table-styles-menu__galleries">
           <TableStyleGallery
+            ref="galleryRef"
             class="table-styles-menu__gallery"
             :styles="visibleStyles"
             :selected-style-id="selectedStyleId"
@@ -200,6 +217,7 @@ function manage(): void {
             :compact="expanded"
             @select="apply"
             @edit="edit"
+            @delete="deleteStyle"
           />
           <section
             v-if="customPivotStyles.length"
@@ -208,6 +226,7 @@ function manage(): void {
           >
             <span>{{ t("tableStyles.pivotStyles") }}</span>
             <TableStyleGallery
+              ref="pivotGalleryRef"
               kind="pivot"
               :styles="customPivotStyles"
               show-categories
@@ -215,6 +234,7 @@ function manage(): void {
               :columns="4"
               @select="editPivot"
               @edit="editPivot"
+              @delete="deletePivot"
             />
           </section>
         </div>

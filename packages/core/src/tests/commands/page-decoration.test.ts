@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  createSetWorkbookWatermarkPresetsCommand,
   createSetSheetsWatermarkCommand,
   createSetSheetPageDecorationCommand,
   tryApplyWorkbookCommand,
@@ -122,5 +123,67 @@ describe("sheet page decorations", () => {
       backgroundAssetId: "second-background",
       watermark: { text: "Old", fontSize: 24, color: "#c0c0c0", opacity: 0.5, angle: -45 },
     });
+  });
+
+  test("saves a preset and applies it in one history action", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const watermark = {
+      text: "Internal",
+      fontSize: 24,
+      color: "#c0c0c0",
+      opacity: 0.5,
+      angle: -45,
+    };
+    const presets = [{ id: "preset-internal", name: "Internal", watermark }];
+
+    expect(
+      executeWorkbookCommand(
+        session,
+        createSetSheetsWatermarkCommand([sheet.id], watermark, presets),
+      ),
+    ).toBe(true);
+    expect(sheet.pageDecoration?.watermark).toEqual(watermark);
+    expect(session.workbook.watermarkPresets).toEqual(presets);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(sheet.pageDecoration?.watermark).toBeUndefined();
+    expect(session.workbook.watermarkPresets).toEqual([]);
+    expect(redoWorkbookCommand(session)).toBe(true);
+    expect(deserializeWorkbook(serializeWorkbook(session.workbook)).watermarkPresets).toEqual(
+      presets,
+    );
+  });
+
+  test("deleting saved presets preserves applied sheet watermark metadata", () => {
+    const session = createTestWorkbookSession();
+    const sheet = getActiveSheet(session.workbook);
+    const watermark = {
+      text: "Confidential",
+      fontSize: 36,
+      color: "#c0c0c0",
+      opacity: 0.5,
+      angle: -45,
+      image: { assetId: "asset-watermark", scale: null, washout: true, angle: 0 },
+    };
+    sheet.pageDecoration = { watermark };
+    session.workbook.watermarkPresets = [{ id: "preset-1", name: "Confidential", watermark }];
+
+    expect(executeWorkbookCommand(session, createSetWorkbookWatermarkPresetsCommand([]))).toBe(
+      true,
+    );
+    expect(session.workbook.watermarkPresets).toEqual([]);
+    expect(sheet.pageDecoration.watermark).toEqual(watermark);
+    expect(undoWorkbookCommand(session)).toBe(true);
+    expect(session.workbook.watermarkPresets).toHaveLength(1);
+    expect(sheet.pageDecoration.watermark).toEqual(watermark);
+  });
+
+  test("defaults the saved watermark gallery for pre-catalog snapshots", () => {
+    const workbook = createTestWorkbookSession().workbook;
+    const snapshot = serializeWorkbook(workbook);
+    const { watermarkPresets: _watermarkPresets, ...preCatalogSnapshot } = snapshot;
+    expect(deserializeWorkbook({ ...preCatalogSnapshot, version: 17 }).watermarkPresets).toEqual(
+      [],
+    );
   });
 });

@@ -31,6 +31,17 @@ export type PageDecorationMessageSchema = {
     noCopy: string;
     internalUse: string;
     customWatermark: string;
+    customWatermarks: string;
+    presetWatermarks: string;
+    addWatermark: string;
+    clickToAdd: string;
+    presetActions: string;
+    applyToWorkbook: string;
+    applyToCurrentSheet: string;
+    editWatermark: string;
+    deleteWatermark: string;
+    editDocumentWatermark: string;
+    removeDocumentWatermark: string;
     watermarkText: string;
     fontSize: string;
     color: string;

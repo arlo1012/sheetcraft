@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { TableStyleDefinition } from "@idea10/core/table-styles";
 import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
-import { nextTick } from "vue";
+import { computed, markRaw, nextTick, shallowRef } from "vue";
+import { MoreHorizontal } from "lucide-vue-next";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
+import CustomStyleContextMenu from "../../../shared/gallery/CustomStyleContextMenu.vue";
+import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import { useAppI18n, type MessageKey } from "../../../shared/i18n";
 import TableStylePreview from "./TableStylePreview.vue";
 
@@ -30,6 +33,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   select: [style: TableStyleDefinition | PivotTableStyleDefinition];
   edit: [style: TableStyleDefinition | PivotTableStyleDefinition];
+  delete: [style: TableStyleDefinition | PivotTableStyleDefinition];
 }>();
 const { t } = useAppI18n();
 const categories = ["light", "medium", "dark", "custom"] as const;
@@ -40,6 +44,13 @@ const categoryLabels = {
   custom: "tableStyles.custom",
 } satisfies Record<(typeof categories)[number], MessageKey>;
 const buttons = new Map<string, HTMLButtonElement>();
+const contextMenu = shallowRef<{
+  style: TableStyleDefinition | PivotTableStyleDefinition;
+  trigger: HTMLElement;
+  anchor: FloatingReference;
+}>();
+const contextStyle = computed(() => contextMenu.value?.style);
+const contextMenuRef = shallowRef<InstanceType<typeof CustomStyleContextMenu> | null>(null);
 const orderedStyles = () =>
   categories.flatMap((category) => props.styles.filter((style) => style.category === category));
 
@@ -67,6 +78,56 @@ function setButtonRef(style: TableStyleDefinition | PivotTableStyleDefinition) {
     if (element instanceof HTMLButtonElement) buttons.set(style.id, element);
     else buttons.delete(style.id);
   };
+}
+function openContextMenu(
+  style: TableStyleDefinition | PivotTableStyleDefinition,
+  trigger: HTMLElement,
+  x: number,
+  y: number,
+): void {
+  contextMenu.value = {
+    style,
+    trigger,
+    anchor: markRaw({
+      contextElement: trigger,
+      getBoundingClientRect: () => new DOMRect(x, y, 0, 0),
+    }),
+  };
+}
+function onTileContextMenu(
+  event: MouseEvent,
+  style: TableStyleDefinition | PivotTableStyleDefinition,
+): void {
+  event.preventDefault();
+  if (style.category !== "custom") return;
+  event.stopPropagation();
+  openContextMenu(style, event.currentTarget as HTMLButtonElement, event.clientX, event.clientY);
+}
+function onMoreClick(
+  event: MouseEvent,
+  style: TableStyleDefinition | PivotTableStyleDefinition,
+): void {
+  event.preventDefault();
+  event.stopPropagation();
+  const trigger = event.currentTarget as HTMLElement;
+  const rect = trigger.getBoundingClientRect();
+  openContextMenu(style, trigger, rect.left, rect.bottom);
+}
+function closeContextMenu(restoreFocus: boolean): void {
+  const trigger = contextMenu.value?.trigger;
+  contextMenu.value = undefined;
+  if (restoreFocus && trigger?.isConnected)
+    void nextTick(() => trigger.focus({ preventScroll: true }));
+}
+function editContextStyle(): void {
+  const style = contextStyle.value;
+  closeContextMenu(false);
+  if (style) emit("edit", style);
+}
+function deleteContextStyle(): void {
+  const style = contextStyle.value;
+  closeContextMenu(false);
+  if (style) emit("delete", style);
 }
 function onTileKeydown(
   event: KeyboardEvent,
@@ -104,6 +165,12 @@ function onTileKeydown(
   const target = all[Math.max(0, Math.min(all.length - 1, next))];
   if (target) void nextTick(() => buttons.get(target.id)?.focus());
 }
+
+function contextMenuElement(): HTMLElement | null {
+  return contextMenuRef.value?.rootElement ?? null;
+}
+
+defineExpose({ contextMenuElement });
 </script>
 
 <template>
@@ -123,33 +190,58 @@ function onTileKeydown(
           :class="{ 'table-style-gallery__grid--compact': compact }"
           role="grid"
         >
-          <button
+          <div
             v-for="style in styles.filter((item) => item.category === category)"
             :key="style.id"
-            :ref="setButtonRef(style)"
-            type="button"
-            class="table-style-gallery__tile"
-            :class="{ 'is-selected': style.id === selectedStyleId }"
-            :aria-label="displayName(style)"
-            :aria-pressed="style.id === selectedStyleId"
-            :title="displayName(style)"
-            :disabled="disabled"
-            :data-table-style-id="style.id"
-            role="gridcell"
-            @click="emit('select', style)"
-            @contextmenu.prevent="style.category === 'custom' && emit('edit', style)"
-            @keydown="onTileKeydown($event, style)"
+            class="table-style-gallery__item"
           >
-            <TableStylePreview
-              :kind="kind"
-              :style="style"
-              :selected="style.id === selectedStyleId"
-              :compact="compact"
-            />
-          </button>
+            <button
+              :ref="setButtonRef(style)"
+              type="button"
+              class="table-style-gallery__tile"
+              :class="{ 'is-selected': style.id === selectedStyleId }"
+              :aria-label="displayName(style)"
+              :aria-pressed="style.id === selectedStyleId"
+              :title="displayName(style)"
+              :disabled="disabled"
+              :data-table-style-id="style.id"
+              role="gridcell"
+              @click="emit('select', style)"
+              @contextmenu="onTileContextMenu($event, style)"
+              @keydown="onTileKeydown($event, style)"
+            >
+              <TableStylePreview
+                :kind="kind"
+                :style="style"
+                :selected="style.id === selectedStyleId"
+                :compact="compact"
+              />
+            </button>
+            <button
+              v-if="style.category === 'custom'"
+              type="button"
+              class="table-style-gallery__more"
+              :aria-label="`${displayName(style)} · ${t('tableStyles.editTitle')}`"
+              :disabled="disabled"
+              @click="onMoreClick($event, style)"
+            >
+              <MoreHorizontal :size="14" />
+            </button>
+          </div>
         </div>
       </GallerySection>
     </template>
+    <CustomStyleContextMenu
+      v-if="contextMenu && contextStyle"
+      ref="contextMenuRef"
+      :anchor="contextMenu.anchor"
+      :label="contextStyle.name"
+      :edit-label="t(kind === 'pivot' ? 'tableStyles.pivotEditTitle' : 'tableStyles.editTitle')"
+      :delete-label="t('tableStyles.delete')"
+      @edit="editContextStyle"
+      @delete="deleteContextStyle"
+      @close="closeContextMenu"
+    />
   </div>
 </template>
 
@@ -172,7 +264,13 @@ function onTileKeydown(
     gap: 4px;
   }
 
+  &__item {
+    position: relative;
+    min-width: 0;
+  }
+
   &__tile {
+    width: 100%;
     display: grid;
     place-items: center;
     min-width: 0;
@@ -194,6 +292,29 @@ function onTileKeydown(
       opacity: 0.5;
       cursor: default;
     }
+  }
+
+  &__more {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    color: var(--idea-text-secondary);
+    visibility: hidden;
+    background: var(--idea-surface-panel);
+    border: 1px solid var(--idea-border-subtle);
+    border-radius: var(--idea-radius-small);
+    cursor: pointer;
+  }
+
+  &__item:hover &__more,
+  &__item:focus-within &__more,
+  &__more:focus-visible {
+    visibility: visible;
   }
 
   &__grid--compact {

@@ -71,6 +71,7 @@ export const cellStylesEnUS = {
       mergeStyles: "Merge styles…",
       editStyle: "Modify style…",
       edit: "Modify style…",
+      delete: "Delete",
       format: "Format…",
       apply: "Apply style",
     },

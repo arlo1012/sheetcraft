@@ -313,6 +313,12 @@ export function useTableStylesController(options: {
         : defaultStyleId.value;
     if (execute(createSetWorkbookTableStylesCommand(next, defaultId))) close();
   }
+  function deleteStyle(style: TableStyleDefinition): void {
+    if (!begin()) return;
+    const next = customStyles.value.filter((existing) => existing.id !== style.id);
+    const defaultId = defaultStyleId.value === style.id ? undefined : defaultStyleId.value;
+    if (execute(createSetWorkbookTableStylesCommand(next, defaultId))) void nextTick(options.focus);
+  }
   function openPivotStyle(style?: PivotTableStyleDefinition): void {
     if (begin()) pivotStyleDraft.value = { style };
   }
@@ -328,6 +334,14 @@ export function useTableStylesController(options: {
         ? undefined
         : defaultPivotStyleId.value;
     if (execute(createSetWorkbookPivotTableStylesCommand(next, defaultId))) close();
+  }
+  function deletePivotStyle(style: PivotTableStyleDefinition): void {
+    if (!begin()) return;
+    const next = customPivotStyles.value.filter((existing) => existing.id !== style.id);
+    const defaultId =
+      defaultPivotStyleId.value === style.id ? undefined : defaultPivotStyleId.value;
+    if (execute(createSetWorkbookPivotTableStylesCommand(next, defaultId)))
+      void nextTick(options.focus);
   }
   function expandTable(payload: { tableId: string; range: CellRange }): void {
     if (begin())
@@ -361,8 +375,10 @@ export function useTableStylesController(options: {
     clearStyle,
     openStyle,
     confirmStyle,
+    deleteStyle,
     openPivotStyle,
     confirmPivotStyle,
+    deletePivotStyle,
     expandTable,
     close,
   };

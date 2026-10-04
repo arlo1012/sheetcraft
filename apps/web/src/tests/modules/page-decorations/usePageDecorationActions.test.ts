@@ -33,6 +33,7 @@ describe("page decoration image actions", () => {
       flushPendingEdits: () => true,
       setDecoration,
       setWatermarks: vi.fn(),
+      setPresets: vi.fn(),
     });
     const pending = actions.setBackgroundFile(file);
     workbook = createWorkbook({ idFactory: createSequentialIdFactory() });
@@ -54,18 +55,21 @@ describe("page decoration image actions", () => {
       flushPendingEdits: () => true,
       setDecoration: vi.fn(),
       setWatermarks,
+      setPresets: vi.fn(),
     });
     const watermark = {
       ...DEFAULT_SHEET_WATERMARK,
       text: "",
       image: { assetId: "preview", scale: null, washout: true, angle: 0 },
     };
-    expect(await actions.applyWatermark(watermark, "workbook", file)).toBe(true);
+    expect(
+      await actions.applyWatermark(watermark, "workbook", file, { id: "custom", name: "Company" }),
+    ).toBe(true);
     expect(await store.get(asset.id)).toBe(asset);
-    expect(setWatermarks).toHaveBeenCalledWith([...workbook.sheets.keys()], {
-      ...watermark,
-      image: { ...watermark.image, assetId: asset.id },
-    });
+    const saved = { ...watermark, image: { ...watermark.image, assetId: asset.id } };
+    expect(setWatermarks).toHaveBeenCalledWith([...workbook.sheets.keys()], saved, [
+      { id: "custom", name: "Company", watermark: saved },
+    ]);
     expect(watermark.image.assetId).toBe("preview");
   });
 
@@ -85,6 +89,7 @@ describe("page decoration image actions", () => {
       flushPendingEdits: () => true,
       setDecoration: vi.fn(),
       setWatermarks,
+      setPresets: vi.fn(),
     });
     const pending = actions.applyWatermark(
       {

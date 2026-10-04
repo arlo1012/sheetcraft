@@ -18,6 +18,7 @@ import {
   createSetSheetPageSetupCommand,
   createSetSheetPageDecorationCommand,
   createSetSheetsWatermarkCommand,
+  createSetWorkbookWatermarkPresetsCommand,
   type CellFormatChange,
 } from "@idea10/core/commands";
 import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@idea10/core/page-setup";
@@ -56,7 +57,7 @@ import PagePrintPreview from "../modules/page-layout/components/PagePrintPreview
 import PageThemeMenu from "../modules/page-layout/components/PageThemeMenu.vue";
 import { usePageThemeController } from "../modules/page-layout/usePageThemeController";
 import PageBackgroundMenu from "../modules/page-decorations/components/PageBackgroundMenu.vue";
-import type { SheetWatermark } from "@idea10/core/page-decoration";
+import type { SheetWatermark, WatermarkPreset } from "@idea10/core/page-decoration";
 import PageWatermarkMenu from "../modules/page-decorations/components/PageWatermarkMenu.vue";
 import WatermarkDialog from "../modules/page-decorations/components/WatermarkDialog.vue";
 import {
@@ -406,6 +407,8 @@ const showPageBreaks = computed({
 });
 const printPreviewVisible = ref(false);
 const watermarkVisible = ref(false);
+const editingWatermarkPreset = shallowRef<WatermarkPreset>();
+const watermarkDialogValue = shallowRef<SheetWatermark>();
 const showPageRulers = ref(true);
 const showPageMargins = ref(false);
 const showPageWhiteSpace = ref(true);
@@ -485,15 +488,30 @@ async function saveCustomWatermark(
   imageFile?: File,
 ): Promise<void> {
   if (loading.value || fileBusy.value || xlsxBusy.value) return;
-  if (await decorations.applyWatermark(watermark, scope, imageFile)) {
+  if (
+    await decorations.applyWatermark(watermark, scope, imageFile, {
+      id: editingWatermarkPreset.value?.id,
+      name:
+        watermark.text.trim() ||
+        imageFile?.name ||
+        editingWatermarkPreset.value?.name ||
+        t("pageDecoration.imageWatermark"),
+    })
+  ) {
     watermarkVisible.value = false;
   }
 }
-function openWatermark(): void {
+function openWatermark(preset?: WatermarkPreset, watermark?: SheetWatermark): void {
   if (loading.value || fileBusy.value || xlsxBusy.value || activeSheet.value.properties.protected)
     return;
   if (sheetGridRef.value?.flushPendingEdit() === false) return;
+  editingWatermarkPreset.value = preset;
+  watermarkDialogValue.value = preset?.watermark ?? watermark;
   watermarkVisible.value = true;
+}
+function applyWatermarkPreset(preset: WatermarkPreset, scope: WatermarkScope): void {
+  if (loading.value || fileBusy.value || xlsxBusy.value) return;
+  void decorations.applyWatermark(preset.watermark, scope);
 }
 function openPrintPreview(): void {
   if (loading.value || fileBusy.value || xlsxBusy.value) return;
@@ -894,8 +912,9 @@ const decorations = usePageDecorationActions({
   flushPendingEdits: () => cellEditSession.finish(),
   setDecoration: (sheetId, decoration) =>
     executeCommand(createSetSheetPageDecorationCommand(sheetId, decoration)),
-  setWatermarks: (sheetIds, watermark) =>
-    executeCommand(createSetSheetsWatermarkCommand(sheetIds, watermark)),
+  setWatermarks: (sheetIds, watermark, presets) =>
+    executeCommand(createSetSheetsWatermarkCommand(sheetIds, watermark, presets)),
+  setPresets: (presets) => executeCommand(createSetWorkbookWatermarkPresetsCommand(presets)),
 });
 watch(watermarkVisible, (visible) => {
   if (!visible) decorations.cancelWatermark();
@@ -1766,12 +1785,15 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @apply-named-cell-style="cellStyleActions.applyStyle"
       @create-cell-style="cellStyleActions.createStyle"
       @edit-cell-style="cellStyleActions.editStyle"
+      @delete-cell-style="cellStyleActions.deleteStyle"
       @merge-cell-styles="cellStyleActions.openMerge"
       @apply-table-style="tableActions.applyStyle"
       @create-table-style="tableActions.openStyle()"
       @edit-table-style="tableActions.openStyle($event)"
+      @delete-table-style="tableActions.deleteStyle"
       @create-pivot-table-style="tableActions.openPivotStyle()"
       @edit-pivot-table-style="tableActions.openPivotStyle($event)"
+      @delete-pivot-table-style="tableActions.deletePivotStyle"
       @clear-table-style="tableActions.clearStyle"
       @manage-table="tableActions.openSettings"
       @apply-style="applyCellStyle"
@@ -1813,8 +1835,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @apply-style="tableActions.applyStyle"
           @create-style="tableActions.openStyle()"
           @edit-style="tableActions.openStyle($event)"
+          @delete-style="tableActions.deleteStyle"
           @create-pivot-style="tableActions.openPivotStyle()"
           @edit-pivot-style="tableActions.openPivotStyle($event)"
+          @delete-pivot-style="tableActions.deletePivotStyle"
           @clear-style="tableActions.clearStyle"
           @settings="tableActions.openSettings"
         />
@@ -1856,6 +1880,8 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
             />
             <PageWatermarkMenu
               :watermark="pageDecoration.watermark"
+              :presets="session.workbook.watermarkPresets"
+              :image-asset-urls="imageAssetUrls"
               :disabled="
                 loading ||
                 fileBusy ||
@@ -1865,6 +1891,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
               "
               @apply="applyWatermark"
               @custom="openWatermark"
+              @edit-document="openWatermark(undefined, pageDecoration.watermark)"
+              @apply-preset="applyWatermarkPreset"
+              @edit-preset="openWatermark"
+              @delete-preset="decorations.deletePreset"
               @remove="decorations.removeWatermark"
             />
           </template>
@@ -1883,8 +1913,10 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
               @apply="tableActions.applyStyle"
               @create="tableActions.openStyle()"
               @edit="tableActions.openStyle($event)"
+              @delete="tableActions.deleteStyle"
               @create-pivot="tableActions.openPivotStyle()"
               @edit-pivot="tableActions.openPivotStyle($event)"
+              @delete-pivot="tableActions.deletePivotStyle"
               @clear="tableActions.clearStyle"
               @manage="tableActions.openSettings"
             />
@@ -2767,7 +2799,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
     />
     <WatermarkDialog
       v-model:visible="watermarkVisible"
-      :watermark="pageDecoration.watermark"
+      :watermark="watermarkDialogValue"
       :image-asset-urls="imageAssetUrls"
       :busy="decorationBusy"
       @save="saveCustomWatermark"

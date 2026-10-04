@@ -69,6 +69,7 @@ export type CellStylesMessageSchema = {
       mergeStyles: string;
       editStyle: string;
       edit: string;
+      delete: string;
       format: string;
       apply: string;
     };

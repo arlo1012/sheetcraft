@@ -24,13 +24,17 @@ const emit = defineEmits<{
   apply: [style: CellStyleDefinition];
   create: [];
   edit: [style: CellStyleDefinition];
+  delete: [style: CellStyleDefinition];
   merge: [];
 }>();
 const { t } = useAppI18n();
 const triggerRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
 const surfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const triggerElement = computed(() => triggerRef.value?.rootElement ?? null);
-const galleryRef = ref<{ focusFirstStyle: () => void } | null>(null);
+const galleryRef = ref<{
+  focusFirstStyle: () => void;
+  contextMenuElement: () => HTMLElement | null;
+} | null>(null);
 const panelId = `cell-styles-menu-${useId().replaceAll(":", "")}`;
 const styles = computed(() => [...createBuiltinCellStyles(props.theme), ...props.customStyles]);
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
@@ -38,6 +42,7 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
   menuSurfaceRef: surfaceRef,
   disabled: computed(() => props.disabled),
   placement: "bottom-start",
+  additionalInside: () => [galleryRef.value?.contextMenuElement()],
   defaultFocus: "menu",
   onOpen: () => {
     void nextTick(() => nextTick(() => galleryRef.value?.focusFirstStyle()));
@@ -55,6 +60,10 @@ function create(): void {
 function edit(style: CellStyleDefinition): void {
   dismiss("programmatic", true);
   emit("edit", style);
+}
+function deleteStyle(style: CellStyleDefinition): void {
+  dismiss("programmatic", true);
+  emit("delete", style);
 }
 function merge(): void {
   dismiss("programmatic", true);
@@ -93,6 +102,7 @@ function merge(): void {
           :disabled="disabled"
           @select="apply"
           @edit="edit"
+          @delete="deleteStyle"
         />
         <MenuSeparator />
         <MenuItem @select="create"

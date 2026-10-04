@@ -981,6 +981,8 @@ export async function encodeWithExcelJs(
   target.properties.date1904 = workbook.dateSystem === "1904";
   target.calcProperties.fullCalcOnLoad = true;
   let encodedCells = 0;
+  if (workbook.watermarkPresets?.length)
+    add(report, "feature-omitted", "workbook.watermarkPresets");
   for (const [sheetIndex, sheet] of [...workbook.sheets.values()].entries()) {
     pageSetups.push(sheet.pageSetup);
     // Tiled watermarks have no native worksheet field; do not silently claim XLSX fidelity.

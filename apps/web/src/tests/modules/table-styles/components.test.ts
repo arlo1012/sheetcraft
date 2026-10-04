@@ -97,7 +97,7 @@ describe("table style gallery", () => {
     expect(wrapper.emitted("select")?.[0]).toEqual([styles[3]]);
   });
 
-  test("opens a custom style editor from its context-menu pointer and keyboard actions", async () => {
+  test("opens custom style actions from its context-menu pointer", async () => {
     const custom = {
       id: "custom-report",
       name: "Report",
@@ -111,9 +111,8 @@ describe("table style gallery", () => {
     });
     const tile = wrapper.get('[data-table-style-id="custom-report"]');
     await tile.trigger("contextmenu");
-    await tile.trigger("keydown", { key: "F10", shiftKey: true });
-
-    expect(wrapper.emitted("edit")).toEqual([[custom], [custom]]);
+    await new DOMWrapper(document.body).get('[data-custom-style-action="delete"]').trigger("click");
+    expect(wrapper.emitted("delete")).toEqual([[custom]]);
     wrapper.unmount();
     document.body.replaceChildren();
   });
@@ -253,6 +252,23 @@ describe("table style gallery", () => {
     );
     await menu.get('[data-table-style-id="pivot-custom-report"]').trigger("click");
     expect(wrapper.emitted("editPivot")?.[0]).toEqual([editablePivotStyle]);
+    wrapper.unmount();
+    document.body.replaceChildren();
+  });
+
+  test("keeps the parent menu open while deleting a custom style from its teleported context menu", async () => {
+    const wrapper = mount(TableStylesMenu, {
+      attachTo: document.body,
+      props: { customStyles: [editableStyle] },
+      global: { plugins: [createAppI18n("en-US")] },
+    });
+    await wrapper.get('[data-ribbon-action="table-styles"]').trigger("click");
+    const body = new DOMWrapper(document.body);
+    await body.get('[data-table-style-id="table-custom-report"]').trigger("contextmenu");
+    const action = body.get('[data-custom-style-action="delete"]');
+    await action.trigger("pointerdown");
+    await action.trigger("click");
+    expect(wrapper.emitted("delete")).toEqual([[editableStyle]]);
     wrapper.unmount();
     document.body.replaceChildren();
   });

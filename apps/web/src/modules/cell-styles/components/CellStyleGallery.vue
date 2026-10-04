@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { CellStyleDefinition } from "@idea10/core/cell-styles";
-import { nextTick } from "vue";
+import { computed, markRaw, nextTick, shallowRef } from "vue";
+import { MoreHorizontal } from "lucide-vue-next";
+import type { FloatingReference } from "../../../shared/floating/useFloatingPanel";
 import GallerySection from "../../../shared/gallery/GallerySection.vue";
+import CustomStyleContextMenu from "../../../shared/gallery/CustomStyleContextMenu.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   CELL_STYLE_CATEGORIES,
@@ -17,9 +20,17 @@ const props = withDefaults(
 const emit = defineEmits<{
   select: [style: CellStyleDefinition];
   edit: [style: CellStyleDefinition];
+  delete: [style: CellStyleDefinition];
 }>();
 const { t } = useAppI18n();
 const buttons = new Map<string, HTMLButtonElement>();
+const contextMenu = shallowRef<{
+  style: CellStyleDefinition;
+  trigger: HTMLElement;
+  anchor: FloatingReference;
+}>();
+const contextStyle = computed(() => contextMenu.value?.style);
+const contextMenuRef = shallowRef<InstanceType<typeof CustomStyleContextMenu> | null>(null);
 
 function focusFirstStyle(): void {
   const first = orderedStyles()[0];
@@ -39,6 +50,50 @@ function orderedStyles(): CellStyleDefinition[] {
   return CELL_STYLE_CATEGORIES.flatMap((category) =>
     props.styles.filter((style) => style.category === category),
   );
+}
+function openContextMenu(
+  style: CellStyleDefinition,
+  trigger: HTMLElement,
+  x: number,
+  y: number,
+): void {
+  contextMenu.value = {
+    style,
+    trigger,
+    anchor: markRaw({
+      contextElement: trigger,
+      getBoundingClientRect: () => new DOMRect(x, y, 0, 0),
+    }),
+  };
+}
+function onTileContextMenu(event: MouseEvent, style: CellStyleDefinition): void {
+  event.preventDefault();
+  if (style.category !== "custom") return;
+  event.stopPropagation();
+  openContextMenu(style, event.currentTarget as HTMLButtonElement, event.clientX, event.clientY);
+}
+function onMoreClick(event: MouseEvent, style: CellStyleDefinition): void {
+  event.preventDefault();
+  event.stopPropagation();
+  const trigger = event.currentTarget as HTMLElement;
+  const rect = trigger.getBoundingClientRect();
+  openContextMenu(style, trigger, rect.left, rect.bottom);
+}
+function closeContextMenu(restoreFocus: boolean): void {
+  const trigger = contextMenu.value?.trigger;
+  contextMenu.value = undefined;
+  if (restoreFocus && trigger?.isConnected)
+    void nextTick(() => trigger.focus({ preventScroll: true }));
+}
+function editContextStyle(): void {
+  const style = contextStyle.value;
+  closeContextMenu(false);
+  if (style) emit("edit", style);
+}
+function deleteContextStyle(): void {
+  const style = contextStyle.value;
+  closeContextMenu(false);
+  if (style) emit("delete", style);
 }
 function onKeydown(event: KeyboardEvent, style: CellStyleDefinition): void {
   if (
@@ -69,7 +124,11 @@ function onKeydown(event: KeyboardEvent, style: CellStyleDefinition): void {
   if (target) void nextTick(() => buttons.get(target.id)?.focus());
 }
 
-defineExpose({ focusFirstStyle });
+function contextMenuElement(): HTMLElement | null {
+  return contextMenuRef.value?.rootElement ?? null;
+}
+
+defineExpose({ focusFirstStyle, contextMenuElement });
 </script>
 
 <template>
@@ -84,29 +143,50 @@ defineExpose({ focusFirstStyle });
           role="group"
           :aria-label="t(CELL_STYLE_CATEGORY_LABELS[category])"
         >
-          <button
+          <div
             v-for="style in styles.filter((item) => item.category === category)"
             :key="style.id"
-            :ref="styleRef(style)"
-            type="button"
-            class="cell-style-gallery__tile"
-            :disabled="disabled"
-            :aria-label="label(style)"
-            :title="
-              style.category === 'custom'
-                ? `${label(style)} · ${t('cellStyles.actions.edit')}`
-                : label(style)
-            "
-            :data-cell-style-id="style.id"
-            @click="emit('select', style)"
-            @contextmenu.prevent="style.category === 'custom' && emit('edit', style)"
-            @keydown="onKeydown($event, style)"
+            class="cell-style-gallery__item"
           >
-            <CellStylePreview :style="style" :label="label(style)" />
-          </button>
+            <button
+              :ref="styleRef(style)"
+              type="button"
+              class="cell-style-gallery__tile"
+              :disabled="disabled"
+              :aria-label="label(style)"
+              :title="label(style)"
+              :data-cell-style-id="style.id"
+              @click="emit('select', style)"
+              @contextmenu="onTileContextMenu($event, style)"
+              @keydown="onKeydown($event, style)"
+            >
+              <CellStylePreview :style="style" :label="label(style)" />
+            </button>
+            <button
+              v-if="style.category === 'custom'"
+              type="button"
+              class="cell-style-gallery__more"
+              :aria-label="`${label(style)} · ${t('cellStyles.actions.edit')}`"
+              :disabled="disabled"
+              @click="onMoreClick($event, style)"
+            >
+              <MoreHorizontal :size="14" />
+            </button>
+          </div>
         </div>
       </GallerySection>
     </template>
+    <CustomStyleContextMenu
+      v-if="contextMenu && contextStyle"
+      ref="contextMenuRef"
+      :anchor="contextMenu.anchor"
+      :label="contextStyle.name"
+      :edit-label="t('cellStyles.actions.edit')"
+      :delete-label="t('cellStyles.actions.delete')"
+      @edit="editContextStyle"
+      @delete="deleteContextStyle"
+      @close="closeContextMenu"
+    />
   </div>
 </template>
 
@@ -119,7 +199,12 @@ defineExpose({ focusFirstStyle });
   grid-template-columns: repeat(var(--cell-style-columns), minmax(0, 1fr));
   gap: 4px;
 }
+.cell-style-gallery__item {
+  position: relative;
+  min-width: 0;
+}
 .cell-style-gallery__tile {
+  width: 100%;
   min-width: 0;
   padding: 3px;
   overflow: hidden;
@@ -127,6 +212,27 @@ defineExpose({ focusFirstStyle });
   border-radius: var(--idea-radius-small);
   background: transparent;
   cursor: pointer;
+}
+.cell-style-gallery__more {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--idea-text-secondary);
+  visibility: hidden;
+  background: var(--idea-surface-panel);
+  border: 1px solid var(--idea-border-subtle);
+  border-radius: var(--idea-radius-small);
+  cursor: pointer;
+}
+.cell-style-gallery__item:hover .cell-style-gallery__more,
+.cell-style-gallery__item:focus-within .cell-style-gallery__more,
+.cell-style-gallery__more:focus-visible {
+  visibility: visible;
 }
 .cell-style-gallery__tile:hover {
   background: var(--idea-surface-secondary);

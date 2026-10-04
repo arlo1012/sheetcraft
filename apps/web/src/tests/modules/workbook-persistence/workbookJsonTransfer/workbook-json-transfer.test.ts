@@ -89,6 +89,16 @@ describe("workbook JSON transfer", () => {
 
   test("derives imported image identity and dimensions from real PNG bytes", async () => {
     const workbook = createTestWorkbook();
+    workbook.watermarkPresets = [
+      {
+        id: "logo-preset",
+        name: "Logo",
+        watermark: {
+          ...DEFAULT_SHEET_WATERMARK,
+          image: { assetId: "untrusted-id", scale: null, washout: true, angle: 0 },
+        },
+      },
+    ];
     getActiveSheet(workbook).pageDecoration = {
       watermark: {
         ...DEFAULT_SHEET_WATERMARK,
@@ -140,6 +150,9 @@ describe("workbook JSON transfer", () => {
       "untrusted-id",
     );
     expect(getActiveSheet(imported).pageDecoration?.watermark?.image?.assetId).toBe(
+      (content as { kind: "image"; image: { assetId: string } }).image.assetId,
+    );
+    expect(imported.watermarkPresets?.[0]?.watermark.image?.assetId).toBe(
       (content as { kind: "image"; image: { assetId: string } }).image.assetId,
     );
   });

@@ -71,6 +71,7 @@ export const cellStylesZhCN = {
       mergeStyles: "合并样式…",
       editStyle: "修改样式…",
       edit: "修改样式…",
+      delete: "删除",
       format: "格式…",
       apply: "应用样式",
     },
