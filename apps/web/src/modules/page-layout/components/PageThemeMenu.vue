@@ -302,7 +302,10 @@ watch(
         :id="submenuId"
         ref="submenuSurfaceRef"
         class="page-theme-menu__submenu"
-        :class="{ 'page-theme-menu__submenu--colors': activeCategory === 'colors' }"
+        :class="{
+          'page-theme-menu__submenu--with-action':
+            activeCategory === 'colors' || activeCategory === 'fonts',
+        }"
         :style="submenuStyles"
         :label="
           activeCategory === 'theme'
@@ -401,7 +404,11 @@ watch(
             </div>
           </GallerySection>
         </li>
-        <li v-else-if="activeCategory === 'fonts'" class="page-theme-menu__content" role="none">
+        <li
+          v-else-if="activeCategory === 'fonts'"
+          class="page-theme-menu__content page-theme-menu__fonts-scroll"
+          role="none"
+        >
           <section class="page-theme-menu__fonts-panel">
             <button
               v-for="preset in [...PAGE_THEME_FONT_PRESETS, ...customFonts]"
@@ -427,16 +434,7 @@ watch(
                 ><em :style="{ fontFamily: preset.bodyEastAsia || preset.bodyFont }">{{
                   preset.bodyEastAsia || preset.bodyFont
                 }}</em></span
-              ></button
-            ><button
-              type="button"
-              class="page-theme-menu__custom-action"
-              @click="
-                closeMenu();
-                fontsDialogVisible = true;
-              "
-            >
-              {{ t("pageTools.customizeFonts") }}
+              >
             </button>
           </section>
         </li>
@@ -463,7 +461,7 @@ watch(
             </button>
           </div>
         </li>
-        <MenuSeparator v-if="activeCategory === 'colors'" />
+        <MenuSeparator v-if="activeCategory === 'colors' || activeCategory === 'fonts'" />
         <MenuItem
           v-if="activeCategory === 'colors'"
           @select="
@@ -472,6 +470,16 @@ watch(
           "
         >
           {{ t("pageTools.customizeColors") }}
+        </MenuItem>
+        <MenuItem
+          v-if="activeCategory === 'fonts'"
+          class="page-theme-menu__custom-action"
+          @select="
+            closeMenu();
+            fontsDialogVisible = true;
+          "
+        >
+          {{ t("pageTools.customizeFonts") }}
         </MenuItem>
       </MenuSurface>
     </Teleport>
@@ -489,6 +497,8 @@ watch(
 </template>
 
 <style scoped lang="scss">
+@use "../../../shared/option-list/option-list";
+
 .page-theme-menu {
   min-width: 0;
 }
@@ -510,7 +520,7 @@ watch(
   max-height: min(700px, calc(100vh - 16px));
   padding: 8px;
 }
-.page-theme-menu__submenu--colors {
+.page-theme-menu__submenu--with-action {
   grid-template-rows: minmax(0, 1fr) auto auto;
   height: min(700px, calc(100vh - 16px));
   padding: 0;
@@ -520,6 +530,14 @@ watch(
   display: grid;
   grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
   min-height: 0;
+}
+.page-theme-menu__fonts-scroll {
+  @include option-list.scrollbar;
+
+  min-height: 0;
+  padding: var(--idea-tool-panel-padding);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .page-theme-menu__content {
   list-style: none;
@@ -577,8 +595,7 @@ watch(
   display: grid;
   gap: 2px;
 }
-.page-theme-menu__refresh,
-.page-theme-menu__custom-action {
+.page-theme-menu__refresh {
   border: 0;
   background: transparent;
   color: var(--idea-text-link);
@@ -613,20 +630,6 @@ watch(
 }
 .page-theme-menu__color-swatches i {
   height: 16px;
-}
-.page-theme-menu__custom-action {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  min-height: 30px;
-  margin-top: 6px;
-  padding: 0 4px;
-  background: var(--idea-surface-panel);
-  text-align: left;
-
-  &:hover {
-    background: var(--idea-surface-hover);
-  }
 }
 .page-theme-menu__font-row {
   grid-template-columns: 44px minmax(0, 1fr);
