@@ -33,6 +33,8 @@ export {
 } from "./split-text.js";
 export * from "./subtotal.js";
 export * from "./workbook-settings.js";
+export * from "./workbook-theme.js";
+export * from "./page-decoration.js";
 export * from "./duplicates.js";
 export * from "./conditional-formatting.js";
 export * from "./cell-styles.js";

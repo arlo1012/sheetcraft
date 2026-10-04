@@ -133,7 +133,6 @@ const pageRulerUnitOptions = computed(() => [
         @activate="emit('update:viewMode', 'page-layout')"
         ><PanelsTopLeft aria-hidden="true"
       /></RibbonButton>
-      <!-- TODO: expose the existing PageSetupDialog from the future Page toolbar. -->
       <!-- TODO: custom views need persisted view-state snapshots, not a local visual toggle. -->
       <RibbonButton
         variant="tall"

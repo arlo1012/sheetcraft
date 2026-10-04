@@ -40,6 +40,11 @@ import {
   type CellStyleInclude,
 } from "./cell-styles.js";
 import {
+  cloneWorkbookTheme,
+  DEFAULT_WORKBOOK_THEME,
+  type WorkbookTheme,
+} from "./workbook-theme.js";
+import {
   createFormulaError,
   isFormulaError,
   isFormulaErrorCode,
@@ -74,6 +79,11 @@ import {
   normalizeSheetPageSetup,
   type SheetPageSetup,
 } from "./page-setup.js";
+import {
+  cloneSheetPageDecoration,
+  normalizeSheetPageDecoration,
+  type SheetPageDecoration,
+} from "./page-decoration.js";
 import {
   cloneConditionalFormatRule,
   normalizeConditionalFormatRules,
@@ -186,6 +196,7 @@ export type SheetMetadata = {
   conditionalFormats?: SheetConditionalFormatRule[];
   tables?: SheetTable[];
   pageSetup?: SheetPageSetup;
+  pageDecoration?: SheetPageDecoration;
 };
 
 export type SheetTableColumn = { id: string; name: string };
@@ -330,6 +341,7 @@ export type Sheet = {
   conditionalFormats?: SheetConditionalFormatRule[];
   tables?: SheetTable[];
   pageSetup?: SheetPageSetup;
+  pageDecoration?: SheetPageDecoration;
   floatingImages: FloatingImage[];
 };
 
@@ -363,6 +375,7 @@ export type SheetSparseState = {
   conditionalFormats?: SheetConditionalFormatRule[];
   tables?: SheetTable[];
   pageSetup?: SheetPageSetup;
+  pageDecoration?: SheetPageDecoration;
   floatingImages: FloatingImage[];
 };
 
@@ -371,6 +384,8 @@ export type Workbook = {
   /** Interpretation of date serials; cell numbers are not converted when this changes. */
   dateSystem: ExcelDateSystem;
   calculation: WorkbookCalculationSettings;
+  /** Document-level colors and fonts used by theme-bound cell and table styles. */
+  theme: WorkbookTheme;
   sheets: Map<string, Sheet>;
   activeSheetId: string;
   definedNames: Map<string, DefinedName>;
@@ -422,6 +437,7 @@ export function createSheet(name = "Sheet1", id?: string, idFactory?: IdFactory)
     conditionalFormats: [],
     tables: [],
     pageSetup: cloneSheetPageSetup(DEFAULT_SHEET_PAGE_SETUP),
+    pageDecoration: {},
     floatingImages: [],
   };
 }
@@ -451,6 +467,7 @@ export function createWorkbook(options?: {
     id: options?.id ?? createRequiredId("workbook", idFactory),
     dateSystem: normalizeExcelDateSystem(options?.dateSystem ?? "1900"),
     calculation: { ...DEFAULT_WORKBOOK_CALCULATION_SETTINGS },
+    theme: cloneWorkbookTheme(DEFAULT_WORKBOOK_THEME),
     sheets: new Map([[sheet.id, sheet]]),
     activeSheetId: sheet.id,
     definedNames: new Map(),
@@ -695,6 +712,7 @@ export function createSheetEvaluator(sheet: Sheet): SheetEvaluator {
       id: "isolated-sheet-evaluator",
       dateSystem: "1900",
       calculation: { ...DEFAULT_WORKBOOK_CALCULATION_SETTINGS },
+      theme: cloneWorkbookTheme(DEFAULT_WORKBOOK_THEME),
       sheets: new Map([[sheet.id, sheet]]),
       activeSheetId: sheet.id,
       definedNames: new Map(),
@@ -2487,6 +2505,7 @@ function normalizeSheetMetadata(
     | "conditionalFormats"
     | "tables"
     | "pageSetup"
+    | "pageDecoration"
   >,
 ): SheetMetadata {
   const freezePanes = normalizeFreezePanes(state.freezePanes);
@@ -2602,6 +2621,7 @@ function normalizeSheetMetadata(
     tableNames.add(table.name.toLocaleLowerCase("en-US"));
   }
   const pageSetup = normalizeSheetPageSetup(state.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
+  const pageDecoration = normalizeSheetPageDecoration(state.pageDecoration);
   if (new Set(dataValidations.map((rule) => rule.id)).size !== dataValidations.length)
     throw new Error("Duplicate data validation ID.");
   const outlineGroups = normalizeOutlineGroups(state.outlineGroups ?? []);
@@ -2649,6 +2669,7 @@ function normalizeSheetMetadata(
     conditionalFormats,
     tables,
     pageSetup,
+    pageDecoration,
   };
 }
 
@@ -2687,6 +2708,7 @@ export function setSheetMetadata(sheet: Sheet, metadata: SheetMetadata): boolean
   sheet.conditionalFormats = (normalized.conditionalFormats ?? []).map(cloneConditionalFormatRule);
   sheet.tables = (normalized.tables ?? []).map(cloneSheetTable);
   sheet.pageSetup = cloneSheetPageSetup(normalized.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
+  sheet.pageDecoration = cloneSheetPageDecoration(normalized.pageDecoration);
   return true;
 }
 
@@ -2807,6 +2829,7 @@ function normalizeSheetSparseState(state: SheetSparseState): SheetSparseState {
     conditionalFormats: metadata.conditionalFormats ?? [],
     tables: metadata.tables ?? [],
     pageSetup: cloneSheetPageSetup(metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
+    pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
     floatingImages,
   };
 }
@@ -2907,6 +2930,7 @@ export function createSheetSparseState(sheet: Sheet): SheetSparseState {
     conditionalFormats: (sheet.conditionalFormats ?? []).map(cloneConditionalFormatRule),
     tables: (sheet.tables ?? []).map(cloneSheetTable),
     pageSetup: cloneSheetPageSetup(sheet.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
+    pageDecoration: cloneSheetPageDecoration(sheet.pageDecoration),
     floatingImages: sheet.floatingImages.map(cloneFloatingImage),
   });
 }
@@ -2968,6 +2992,7 @@ export function replaceSheetSparseState(sheet: Sheet, state: SheetSparseState): 
   sheet.tables = (nextState.tables ?? []).map(cloneSheetTable);
   sheet.tables = (nextState.tables ?? []).map(cloneSheetTable);
   sheet.pageSetup = cloneSheetPageSetup(nextState.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP);
+  sheet.pageDecoration = cloneSheetPageDecoration(nextState.pageDecoration);
   sheet.floatingImages = nextState.floatingImages.map(cloneFloatingImage);
   return true;
 }

@@ -19,10 +19,14 @@ import TableStyleGallery from "./TableStyleGallery.vue";
 
 const props = withDefaults(
   defineProps<{
+    variant?: "compact" | "tall";
+    label?: string;
     customStyles?: readonly TableStyleDefinition[];
     customPivotStyles?: readonly PivotTableStyleDefinition[];
     selectedStyleId?: string;
     selectedAccentColor?: string;
+    /** Current document theme's primary accent for quick table styles. */
+    themeAccentColor?: string;
     hasTable?: boolean;
     disabled?: boolean;
     editSessionId?: string;
@@ -46,7 +50,7 @@ const emit = defineEmits<{
   manage: [];
 }>();
 const { t } = useAppI18n();
-const accentColor = ref<string>(TABLE_STYLE_THEME_COLORS[1]);
+const accentColor = ref<string>(props.themeAccentColor ?? TABLE_STYLE_THEME_COLORS[1]);
 const expanded = ref(false);
 const maxMenuHeight = ref("calc(100vh - 32px)");
 const triggerRef = ref<InstanceType<typeof RibbonMenuButton> | null>(null);
@@ -85,7 +89,8 @@ const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu(
     expanded.value = false;
   },
   onOpen: () => {
-    if (props.selectedAccentColor) accentColor.value = props.selectedAccentColor;
+    accentColor.value =
+      props.selectedAccentColor ?? props.themeAccentColor ?? TABLE_STYLE_THEME_COLORS[1];
     void nextTick(updateMenuHeight);
   },
 });
@@ -125,8 +130,9 @@ function manage(): void {
     <RibbonMenuButton
       ref="triggerRef"
       data-ribbon-action="table-styles"
-      :label="t('ribbon.tableStyles')"
-      :text="t('ribbon.tableStyles')"
+      :label="label ?? t('ribbon.tableStyles')"
+      :text="label ?? t('ribbon.tableStyles')"
+      :variant="variant"
       :disabled="disabled"
       :expanded="open"
       :menu-id="panelId"

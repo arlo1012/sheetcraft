@@ -51,6 +51,30 @@ function dispatchPointer(
 }
 
 describe("SheetGrid page views", () => {
+  test("calculates normal-view pagination only while page breaks are shown", async () => {
+    const { wrapper } = mountSheetGrid({
+      beforeMount(sheet) {
+        sheet.pageSetup = {
+          ...DEFAULT_SHEET_PAGE_SETUP,
+          scale: 400,
+          printArea: { start: { row: 0, column: 0 }, end: { row: 59, column: 3 } },
+        };
+      },
+    });
+    const surface = wrapper.getComponent(SheetSurface);
+    expect(surface.props("pageView")).toBeUndefined();
+    expect(surface.props("pageBreakGuides")).toBeUndefined();
+
+    await wrapper.setProps({ showPageBreaks: true });
+
+    expect(surface.props("pageView")).toBeUndefined();
+    expect(
+      (
+        surface.props("pageBreakGuides") as { rowBreaks: readonly { kind: string }[] }
+      ).rowBreaks.some((line) => line.kind === "automatic"),
+    ).toBe(true);
+  });
+
   test("maps a page-layout cell click to its logical address while paper margins and gaps keep the selection", async () => {
     const { wrapper } = mountSheetGrid();
     await wrapper.setProps({ viewMode: "page-layout" });

@@ -47,7 +47,7 @@ describe("formula and image foundation snapshots", () => {
     });
     const snapshot = serializeWorkbook(workbook);
     const restored = deserializeWorkbook(JSON.parse(JSON.stringify(snapshot)));
-    expect(snapshot.version).toBe(16);
+    expect(snapshot.version).toBe(17);
     expect(snapshot.dateSystem).toBe("1904");
     expect(serializeWorkbook(restored)).toEqual(snapshot);
     expect(getCellContent(getActiveSheet(restored), { row: 0, column: 1 })).toEqual({

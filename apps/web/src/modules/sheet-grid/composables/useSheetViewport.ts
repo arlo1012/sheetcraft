@@ -45,6 +45,7 @@ export function useSheetViewport(options: {
   getViewMode?: () => SheetViewMode;
   getPageSetup?: () => SheetPageSetup;
   getPrintRange?: () => CellRange;
+  getShowPageBreaks?: () => boolean;
   getShowPageWhiteSpace?: () => boolean;
   getPagePadding?: () => number;
   getScale?: () => number;
@@ -208,7 +209,7 @@ export function useSheetViewport(options: {
     }),
   );
   const pagination = computed(() => {
-    if (viewMode.value === "normal") return undefined;
+    if (viewMode.value === "normal" && !options.getShowPageBreaks?.()) return undefined;
     const setup = options.getPageSetup?.() ?? DEFAULT_SHEET_PAGE_SETUP;
     const extent = options.getContentExtent();
     return createSheetPagination({

@@ -221,6 +221,7 @@ const props = withDefaults(
     pageSetup?: SheetPageSetup;
     showPageRulers?: boolean;
     showPageMargins?: boolean;
+    showPageBreaks?: boolean;
     showPageWhiteSpace?: boolean;
     pageRulerUnit?: PageLayoutRulerUnit;
     fileName?: string;
@@ -250,6 +251,7 @@ const props = withDefaults(
     viewMode: "normal",
     showPageRulers: true,
     showPageMargins: false,
+    showPageBreaks: false,
     showPageWhiteSpace: true,
     pageRulerUnit: "cm",
     dateSystem: "1900",
@@ -341,9 +343,6 @@ const columnOutlineDepth = computed(() => getOutlineDepth("column"));
 const rowOutlineGutter = computed(() => getOutlineGutterSize(rowOutlineDepth.value));
 const columnOutlineHeaderHeight = computed(() => getOutlineGutterSize(columnOutlineDepth.value));
 
-const pageUiScale = computed(() =>
-  props.viewMode === "page-layout" ? pageSetup.value.scale / 100 : 1,
-);
 const rulerInset = computed(() =>
   props.viewMode === "page-layout" && props.showPageRulers
     ? (PAGE_LAYOUT_RULER_SIZE + PAGE_LAYOUT_RULER_GAP) / pageUiScale.value
@@ -430,7 +429,7 @@ const pageSetup = computed(() => {
 const scale = computed(
   () =>
     (normalizeSheetZoom(props.zoom) / 100) *
-    (props.viewMode === "page-layout" ? pageSetup.value.scale / 100 : 1),
+    (props.viewMode === "page-layout" ? pageUiScale.value : 1),
 );
 const effectiveFreeze = computed(() =>
   props.viewMode === "normal" ? props.sheet.freezePanes : { rows: 0, columns: 0 },
@@ -537,6 +536,7 @@ const {
   viewportSize,
 } = useSheetViewport({
   getViewMode: () => props.viewMode,
+  getShowPageBreaks: () => props.showPageBreaks,
   getShowPageWhiteSpace: () => props.showPageWhiteSpace,
   getPagePadding: () => 20 / pageUiScale.value,
   getPageSetup: () => pageSetup.value,
@@ -586,6 +586,11 @@ const {
   },
   onViewStateChange: (viewState) => emit("viewStateChange", viewState),
 });
+const pageUiScale = computed(() =>
+  props.viewMode === "page-layout"
+    ? (pagination.value?.printScale ?? pageSetup.value.scale / 100)
+    : 1,
+);
 const { start: startDragSelection, stop: stopDragSelection } = useDragSelection({
   getScale: () => scale.value,
   getCellAtClientPoint,
@@ -844,7 +849,11 @@ const renderFrame = computed(() =>
     headingOrigin.value,
   ),
 );
+const pageBreakGuides = computed(() =>
+  props.viewMode === "normal" && props.showPageBreaks ? pagination.value : undefined,
+);
 const pageView = computed<PageViewPaintState | undefined>(() => {
+  if (props.viewMode === "normal") return undefined;
   const pages = pagination.value;
   if (!pages) return undefined;
   const range = pages.printRange;
@@ -2769,6 +2778,7 @@ defineExpose({
       :frame="renderFrame"
       :environment="environment"
       :page-view="pageView"
+      :page-break-guides="pageBreakGuides"
       :headers="headerPaintState"
       :overlays="overlayState"
       :paint-images="paintSurfaceImages"
@@ -2784,6 +2794,7 @@ defineExpose({
       :date-system="dateSystem"
       :image-asset-urls="imageAssetUrls"
       :loading-image-asset-ids="loadingImageAssetIds"
+      :page-decoration="sheet.pageDecoration"
       @pointerdown="onSurfacePointerDown"
       @pointermove="onSurfacePointerMove"
       @pointerleave="onSurfacePointerLeave"

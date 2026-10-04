@@ -138,7 +138,9 @@ export function useTableStylesController(options: {
     return (
       customStyles.value.find((style) => style.id === defaultStyleId.value) ??
       createBuiltinTableStyles().find((style) => style.id === defaultStyleId.value) ??
-      createThemedTableStyles().find((style) => style.id === defaultStyleId.value) ??
+      createThemedTableStyles(options.getWorkbook().theme.accentColors[0]).find(
+        (style) => style.id === defaultStyleId.value,
+      ) ??
       createBuiltinTableStyles().find((style) => style.id === "table-medium-2")!
     );
   }

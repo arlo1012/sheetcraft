@@ -47,6 +47,7 @@ import {
 } from "@idea10/core/workbook";
 import { CompatibilityReportBuilder } from "./report.js";
 import { finalizeXlsxExport } from "./export-finalizer.js";
+import { readXlsxWorkbookTheme } from "./workbook-theme.js";
 import { collectDefinedNames, readDefinedNames } from "./defined-names.js";
 import {
   collectPrintAreaDefinedNames,
@@ -619,6 +620,7 @@ export async function decodeWithExcelJs(
   const pageSetups = readXlsxPageSetups(bytes, source.worksheets, report);
   const dateSystem = source.properties.date1904 ? "1904" : "1900";
   const calculation = readWorkbookCalculationSettings(bytes);
+  const theme = readXlsxWorkbookTheme(archive["xl/theme/theme1.xml"]);
   let importedCells = 0;
   const sheets = source.worksheets.map((sourceSheet, sheetIndex) => {
     const sheet = createSheet(
@@ -821,6 +823,7 @@ export async function decodeWithExcelJs(
       id: workbookId(),
       dateSystem,
       calculation,
+      theme,
       activeSheetId: sheets[activeSheetIndex]?.id ?? sheets[0]?.id ?? "",
       sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
       definedNames: readDefinedNames(bytes, sheets, report),
@@ -974,11 +977,22 @@ export async function encodeWithExcelJs(
   > = [];
   const conditionalFormats: SheetConditionalFormatRule[][] = [];
   const pageSetups: Array<SheetPageSetup | undefined> = [];
+  const sheetBackgrounds: Array<string | undefined> = [];
   target.properties.date1904 = workbook.dateSystem === "1904";
   target.calcProperties.fullCalcOnLoad = true;
   let encodedCells = 0;
   for (const [sheetIndex, sheet] of [...workbook.sheets.values()].entries()) {
     pageSetups.push(sheet.pageSetup);
+    // Text watermarks have no native worksheet field; do not silently claim XLSX fidelity.
+    if (sheet.pageDecoration?.watermark) add(report, "feature-omitted", `${sheet.name}.watermark`);
+    sheetBackgrounds.push(
+      sheet.pageDecoration?.backgroundAssetId
+        ? imageExporter.registerSheetBackground(
+            sheet.pageDecoration.backgroundAssetId,
+            `${sheet.name}.background`,
+          )
+        : undefined,
+    );
     const evaluator = createSheetEvaluator(sheet);
     const isFormulaCacheEligible = createFormulaCacheEligibility(sheet);
     const output = target.addWorksheet(sheet.name, {
@@ -1149,7 +1163,9 @@ export async function encodeWithExcelJs(
       workbook.defaultPivotTableStyleId,
       workbook.cellStyles,
       pageSetups,
+      workbook.theme,
       report,
+      sheetBackgrounds,
     ),
     report: report.build(),
   };

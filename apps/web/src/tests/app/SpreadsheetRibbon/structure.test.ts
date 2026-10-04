@@ -29,7 +29,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get("header").attributes("aria-label")).toBe("Workbook tools");
     expect(wrapper.get("nav").attributes("aria-label")).toBe("Ribbon categories");
     expect(wrapper.get('[data-ribbon-category="home"]').text()).toBe("Home");
-    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(4);
+    expect(wrapper.findAll(".spreadsheet-ribbon__category")).toHaveLength(5);
     expect(wrapper.get(".spreadsheet-ribbon__panel").attributes("aria-labelledby")).toBe(
       wrapper.get('[data-ribbon-category="home"]').attributes("id"),
     );
@@ -128,7 +128,7 @@ describe("SpreadsheetRibbon", () => {
     expect(wrapper.get('[data-ribbon-action="wrap-text"]').attributes("aria-pressed")).toBe(
       "false",
     );
-    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(10);
+    expect(wrapper.findAll("[data-ribbon-placeholder]")).toHaveLength(9);
     expect(
       wrapper.get('[data-ribbon-action="conditional-formatting"]').attributes("disabled"),
     ).toBeUndefined();

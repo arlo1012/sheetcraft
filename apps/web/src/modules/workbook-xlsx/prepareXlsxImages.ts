@@ -62,6 +62,8 @@ function collectImageReferences(snapshot: WorkbookSnapshot): readonly ImageRefer
   const workbook = deserializeWorkbook(snapshot);
   const references: ImageReference[] = [];
   for (const sheet of getWorkbookSheets(workbook)) {
+    if (sheet.pageDecoration?.backgroundAssetId)
+      references.push({ assetId: sheet.pageDecoration.backgroundAssetId });
     for (const cell of sheet.cells.values()) {
       if (cell.content?.kind !== "image") continue;
       references.push({

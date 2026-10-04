@@ -5,7 +5,7 @@ import { getImagePresentation } from "../../../shared/images/imagePresentation";
 /** Decoded sources belong to the viewport, not to individual cell components. */
 export function createCanvasImageCache(onChange: () => void) {
   const images = new Map<string, HTMLImageElement>();
-  function get(url: string): HTMLImageElement | undefined {
+  function source(url: string): HTMLImageElement {
     let image = images.get(url);
     if (!image) {
       image = new Image();
@@ -14,7 +14,15 @@ export function createCanvasImageCache(onChange: () => void) {
       images.set(url, image);
       image.src = url;
     }
+    return image;
+  }
+  function get(url: string): HTMLImageElement | undefined {
+    const image = source(url);
     return image.complete && image.naturalWidth > 0 ? image : undefined;
+  }
+  async function load(url: string): Promise<void> {
+    const image = source(url);
+    await image.decode();
   }
   function retain(urls: ReadonlySet<string>): void {
     for (const [url, image] of images) {
@@ -23,7 +31,7 @@ export function createCanvasImageCache(onChange: () => void) {
       images.delete(url);
     }
   }
-  return { get, retain, dispose: () => retain(new Set()) };
+  return { get, load, retain, dispose: () => retain(new Set()) };
 }
 
 export type CanvasImageCache = ReturnType<typeof createCanvasImageCache>;

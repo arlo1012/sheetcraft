@@ -1,3 +1,6 @@
+import { pageDecorationZhCN } from "../../../modules/page-decorations/page-decoration-messages.zh-CN";
+import { pagePrintZhCN } from "../../../modules/page-layout/page-print-messages.zh-CN";
+import { pageToolsZhCN } from "../../../modules/page-layout/page-tools-messages.zh-CN";
 import { hyperlinksZhCN } from "../../../modules/hyperlinks/hyperlink-messages.zh-CN";
 import { cellStylesZhCN } from "../../../modules/cell-styles/cell-style-messages.zh-CN";
 import { simulationZhCN } from "../../../modules/data-tools/simulation-messages.zh-CN";
@@ -10,6 +13,9 @@ import { tableStylesZhCN } from "../../../modules/table-styles/table-style-messa
 import { tablesZhCN } from "../../../modules/table-styles/table-messages.zh-CN";
 
 export const zhCN = {
+  ...pageDecorationZhCN,
+  ...pagePrintZhCN,
+  ...pageToolsZhCN,
   ...formulaToolsZhCN,
   ...conditionalFormattingZhCN,
   ...hyperlinksZhCN,

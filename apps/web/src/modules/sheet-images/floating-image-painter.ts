@@ -1,3 +1,4 @@
+import { createCanvasImageCache } from "../sheet-grid/canvas/image-painter";
 import type { FloatingImage, ImageTransform } from "@idea10/core/workbook";
 import {
   getFloatingImageViewportFragments,
@@ -16,27 +17,7 @@ export type FloatingImageCanvasCache = ReturnType<typeof createFloatingImageCanv
 
 /** Shares decoded image sources across the whole Sheet surface. */
 export function createFloatingImageCanvasCache(onChange: () => void) {
-  const images = new Map<string, HTMLImageElement>();
-  function get(url: string): HTMLImageElement | undefined {
-    let image = images.get(url);
-    if (!image) {
-      image = new Image();
-      image.onload = onChange;
-      image.onerror = onChange;
-      images.set(url, image);
-      image.src = url;
-    }
-    return image.complete && image.naturalWidth > 0 ? image : undefined;
-  }
-  function retain(urls: ReadonlySet<string>): void {
-    for (const [url, image] of images) {
-      if (urls.has(url)) continue;
-      image.onload = null;
-      image.onerror = null;
-      images.delete(url);
-    }
-  }
-  return { get, retain, dispose: () => retain(new Set()) };
+  return createCanvasImageCache(onChange);
 }
 
 function clip(context: CanvasRenderingContext2D, rect: Rect): void {

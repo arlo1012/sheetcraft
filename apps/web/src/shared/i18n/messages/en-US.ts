@@ -1,3 +1,6 @@
+import { pageDecorationEnUS } from "../../../modules/page-decorations/page-decoration-messages.en-US";
+import { pagePrintEnUS } from "../../../modules/page-layout/page-print-messages.en-US";
+import { pageToolsEnUS } from "../../../modules/page-layout/page-tools-messages.en-US";
 import { hyperlinksEnUS } from "../../../modules/hyperlinks/hyperlink-messages.en-US";
 import { cellStylesEnUS } from "../../../modules/cell-styles/cell-style-messages.en-US";
 import { simulationEnUS } from "../../../modules/data-tools/simulation-messages.en-US";
@@ -10,6 +13,9 @@ import { tableStylesEnUS } from "../../../modules/table-styles/table-style-messa
 import { tablesEnUS } from "../../../modules/table-styles/table-messages.en-US";
 
 export const enUS = {
+  ...pageDecorationEnUS,
+  ...pagePrintEnUS,
+  ...pageToolsEnUS,
   ...formulaToolsEnUS,
   ...conditionalFormattingEnUS,
   ...hyperlinksEnUS,

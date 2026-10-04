@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import type { CellAddress } from "@idea10/core/workbook";
+import type { SheetPageDecoration } from "@idea10/core/page-decoration";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import type { Rect, SheetGeometry } from "@idea10/sheet-engine/geometry";
 import type { RowVisibilityIndex } from "@idea10/sheet-engine/visibility";
@@ -35,6 +36,7 @@ import {
   paintSheetChrome,
 } from "../rendering/overlay-painter";
 import type { PageViewPaintState } from "../../page-layout/page-view-types";
+import type { SheetPagination } from "@idea10/sheet-engine/page-layout";
 import {
   clipPageBreakPreviewOutside,
   clipPageBreakPreviewPrintArea,
@@ -44,6 +46,11 @@ import {
   PAGE_LAYOUT_DESKTOP_COLOR,
   paintPageBreakPreview,
 } from "../../page-layout/rendering/page-view-painter";
+import {
+  paintSheetBackground,
+  paintSheetWatermark,
+} from "../../page-decorations/page-decoration-painter";
+import { paintPageBreakGuides } from "../../page-layout/rendering/page-break-guides";
 
 const props = withDefaults(
   defineProps<{
@@ -53,6 +60,7 @@ const props = withDefaults(
     frame: SheetRenderFrame;
     environment: SheetRenderEnvironment;
     pageView?: PageViewPaintState;
+    pageBreakGuides?: Pick<SheetPagination, "rowBreaks" | "columnBreaks">;
     headers: Omit<HeaderPaintState, "frame" | "palette">;
     overlays: SheetOverlayState;
     activeCell: CellAddress;
@@ -68,6 +76,7 @@ const props = withDefaults(
     imageAssetUrls?: ReadonlyMap<string, string>;
     loadingImageAssetIds?: ReadonlySet<string>;
     paintImages?: (context: CanvasRenderingContext2D) => void;
+    pageDecoration?: SheetPageDecoration;
   }>(),
   { showGridLines: true, locale: "en-US", dateSystem: "1900" },
 );
@@ -91,6 +100,7 @@ let borderPlan: SheetBorderPaintPlan | undefined;
 let context: CanvasRenderingContext2D | null = null;
 let scheduler: ReturnType<typeof createSheetRenderScheduler> | undefined;
 const images = createCanvasImageCache(() => invalidate());
+const backgroundImages = createCanvasImageCache(() => invalidate());
 const sizeStyle = computed(() => ({
   width: `${props.frame.size.width}px`,
   height: `${props.frame.size.height}px`,
@@ -158,6 +168,16 @@ function paint(): void {
   context.fillRect(0, 0, frame.size.width, frame.size.height);
   context.save();
   context.translate(frame.body.x, frame.body.y);
+  const backgroundUrl = props.pageDecoration?.backgroundAssetId
+    ? props.imageAssetUrls?.get(props.pageDecoration.backgroundAssetId)
+    : undefined;
+  const paintBackground = () =>
+    paintSheetBackground(
+      context!,
+      backgroundUrl,
+      backgroundUrl ? backgroundImages.get(backgroundUrl) : undefined,
+      frame,
+    );
   const pageBreakPreview =
     props.pageView?.mode === "page-break-preview" ? props.pageView : undefined;
   const paintScene = (showGridLines: boolean) =>
@@ -168,7 +188,7 @@ function paint(): void {
       },
       showGridLines,
       screenScale: frame.scale,
-      skipBackground: Boolean(props.pageView),
+      skipBackground: Boolean(props.pageView) || Boolean(backgroundUrl),
       editingCell: props.editing ? props.activeCell : undefined,
       errorCells: props.errorCells,
       imageUrls: props.imageAssetUrls,
@@ -186,6 +206,9 @@ function paint(): void {
       frame.scale,
     );
     clipPageContents(context, props.pageView, frame.layout.bodyScrollPosition);
+    // Background images tile on-screen only; a page-layout view still represents the sheet surface.
+    paintBackground();
+    paintSheetWatermark(context, props.pageDecoration, frame, props.pageView);
     paintScene(props.showGridLines);
   } else if (pageBreakPreview) {
     const printed = paintPageBreakPreviewBackground(
@@ -195,6 +218,8 @@ function paint(): void {
       frame.layout.viewportSize,
       props.environment.cells.background,
     );
+    paintBackground();
+    paintSheetWatermark(context, props.pageDecoration, frame, props.pageView);
     context.save();
     if (clipPageBreakPreviewPrintArea(context, printed)) paintScene(props.showGridLines);
     context.restore();
@@ -203,6 +228,7 @@ function paint(): void {
     paintScene(false);
     context.restore();
   } else {
+    paintBackground();
     paintScene(props.showGridLines);
   }
   context.restore();
@@ -212,6 +238,7 @@ function paint(): void {
   if (props.pageView?.mode === "page-layout")
     clipPageContents(context, props.pageView, frame.layout.bodyScrollPosition);
   paintSheetBorders(context, borderPlan, frame.layout);
+  if (props.pageBreakGuides) paintPageBreakGuides(context, frame, props.pageBreakGuides);
   if (props.pageView?.mode === "page-break-preview")
     paintPageBreakPreview(
       context,
@@ -260,17 +287,14 @@ watch(
   { immediate: true, flush: "post" },
 );
 watch([() => props.frame, () => props.environment], () => invalidate(), { flush: "post" });
-watch(
-  () => props.pageView,
-  () => invalidate(),
-  { flush: "post" },
-);
+watch([() => props.pageView, () => props.pageBreakGuides], () => invalidate(), { flush: "post" });
 watch(
   [
     () => props.showGridLines,
     () => props.errorCells,
     () => props.errorIndicatorColor,
     () => props.imageAssetUrls,
+    () => props.pageDecoration,
     () => props.loadingImageAssetIds,
     () => props.editing,
     () => (props.editing ? `${props.activeCell.row}:${props.activeCell.column}` : ""),
@@ -290,6 +314,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   scheduler?.dispose();
   images.dispose();
+  backgroundImages.dispose();
 });
 defineExpose({ invalidate });
 </script>

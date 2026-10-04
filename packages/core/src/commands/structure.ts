@@ -52,6 +52,7 @@ import {
   type SheetPrintTitleRange,
   type SheetPageSetup,
 } from "../page-setup.js";
+import { cloneSheetPageDecoration } from "../page-decoration.js";
 import type {
   DeleteSheetAxisCommand,
   InsertSheetAxisCommand,
@@ -264,6 +265,7 @@ function cloneSheetMetadata(metadata: SheetMetadata): SheetMetadata {
     conditionalFormats: (metadata.conditionalFormats ?? []).map(cloneConditionalFormatRule),
     tables: (metadata.tables ?? []).map(cloneSheetTable),
     pageSetup: cloneSheetPageSetup(metadata.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
+    pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
   };
 }
 
@@ -710,6 +712,7 @@ function transformSheetMetadataForAxis(
       return [{ ...cloneSheetTable(table), range, columns: transformTableColumns(table), filter }];
     }),
     pageSetup,
+    pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
   };
 }
 
@@ -1608,6 +1611,7 @@ function transformSheetMetadataForAxisMove(
       return { ...cloneSheetTable(table), range };
     }),
     pageSetup,
+    pageDecoration: cloneSheetPageDecoration(metadata.pageDecoration),
   };
 }
 
@@ -1772,6 +1776,7 @@ export function applyMoveSheetAxisCommand(
     conditionalFormats: metadata.conditionalFormats,
     tables: metadata.tables,
     pageSetup: metadata.pageSetup,
+    pageDecoration: metadata.pageDecoration,
     floatingImages: previousState.floatingImages.map((image) => ({
       ...image,
       anchor:

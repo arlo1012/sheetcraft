@@ -58,7 +58,12 @@ describe("floating image canvas painter", () => {
       setLineDash: vi.fn(),
     };
     const decoded = { naturalWidth: 200, naturalHeight: 100 } as HTMLImageElement;
-    const cache = { get: vi.fn(() => decoded), retain: vi.fn(), dispose: vi.fn() };
+    const cache = {
+      get: vi.fn(() => decoded),
+      load: vi.fn(async () => {}),
+      retain: vi.fn(),
+      dispose: vi.fn(),
+    };
     paintFloatingImages(context as unknown as CanvasRenderingContext2D, {
       state: {
         images: [

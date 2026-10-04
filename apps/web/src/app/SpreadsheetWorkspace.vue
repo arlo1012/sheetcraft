@@ -16,6 +16,7 @@ import {
   createSetSheetOutlineGroupCollapsedCommand,
   createSetSheetOutlineLevelCommand,
   createSetSheetPageSetupCommand,
+  createSetSheetPageDecorationCommand,
   type CellFormatChange,
 } from "@idea10/core/commands";
 import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@idea10/core/page-setup";
@@ -50,6 +51,21 @@ import PlanningSolverDialog from "../modules/data-tools/components/PlanningSolve
 import DataProofreadingDialog from "../modules/data-tools/components/DataProofreadingDialog.vue";
 import DataToolbar from "../modules/data-tools/components/DataToolbar.vue";
 import ViewToolbar from "../modules/view-tools/components/ViewToolbar.vue";
+import PagePrintPreview from "../modules/page-layout/components/PagePrintPreview.vue";
+import PageThemeMenu from "../modules/page-layout/components/PageThemeMenu.vue";
+import { usePageThemeController } from "../modules/page-layout/usePageThemeController";
+import PageBackgroundMenu from "../modules/page-decorations/components/PageBackgroundMenu.vue";
+import type { SheetWatermark } from "@idea10/core/page-decoration";
+import PageWatermarkMenu from "../modules/page-decorations/components/PageWatermarkMenu.vue";
+import WatermarkDialog from "../modules/page-decorations/components/WatermarkDialog.vue";
+import { usePageDecorationActions } from "../modules/page-decorations/usePageDecorationActions";
+import PageToolbar from "../modules/page-layout/components/PageToolbar.vue";
+import TableStylesMenu from "../modules/table-styles/components/TableStylesMenu.vue";
+import {
+  getPageBreakPatch,
+  type PageBreakAction,
+  type PageSetupTab,
+} from "../modules/page-layout/page-toolbar-actions";
 import PageSetupDialog from "../modules/page-layout/components/PageSetupDialog.vue";
 import {
   formatPickedPageSetupReference,
@@ -379,6 +395,13 @@ async function selectPageSetupReference(
 watch(pageSetupVisible, (visible) => {
   if (!visible) pageSetupRangePicker.cancel();
 });
+const showPageBreaksBySheet = shallowReactive(new Map<string, boolean>());
+const showPageBreaks = computed({
+  get: () => showPageBreaksBySheet.get(activeSheet.value.id) ?? false,
+  set: (show: boolean) => showPageBreaksBySheet.set(activeSheet.value.id, show),
+});
+const printPreviewVisible = ref(false);
+const watermarkVisible = ref(false);
 const showPageRulers = ref(true);
 const showPageMargins = ref(false);
 const showPageWhiteSpace = ref(true);
@@ -411,19 +434,79 @@ function setViewMode(mode: SheetViewMode): void {
 function applyPageSetup(setup: SheetPageSetup): void {
   executeCommand(createSetSheetPageSetupCommand(activeSheet.value.id, setup));
 }
+function openPageSetup(tab: PageSetupTab): void {
+  if (
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    activeSheet.value.properties.protected ||
+    sheetGridRef.value?.flushPendingEdit() === false
+  )
+    return;
+  headerFooterTarget.value = undefined;
+  pageSetupTab.value = tab;
+  pageSetupVisible.value = true;
+}
+function changePageSetup(patch: Partial<SheetPageSetup>): void {
+  if (
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    activeSheet.value.properties.protected ||
+    sheetGridRef.value?.flushPendingEdit() === false
+  )
+    return;
+  applyPageSetup({ ...activePageSetup.value, ...patch });
+}
+function setPrintAreaFromSelection(): void {
+  const { start, end } = activeSelectionRange.value;
+  changePageSetup({ printArea: { start: { ...start }, end: { ...end } } });
+}
+function changePageBreak(action: PageBreakAction): void {
+  changePageSetup(
+    getPageBreakPatch(
+      activePageSetup.value,
+      activeAddress.value,
+      activeSelectionMode.value,
+      action,
+    ),
+  );
+}
+function applyWatermark(watermark: SheetWatermark): void {
+  decorations.setWatermark(watermark);
+  setViewMode("page-layout");
+}
+function openWatermark(): void {
+  if (loading.value || fileBusy.value || xlsxBusy.value || activeSheet.value.properties.protected)
+    return;
+  if (sheetGridRef.value?.flushPendingEdit() === false) return;
+  watermarkVisible.value = true;
+}
+function openPrintPreview(): void {
+  if (loading.value || fileBusy.value || xlsxBusy.value) return;
+  if (sheetGridRef.value?.flushPendingEdit() === false) return;
+  printPreviewVisible.value = true;
+}
 function savePageSetup(setup: SheetPageSetup): void {
+  if (loading.value || fileBusy.value || xlsxBusy.value || activeSheet.value.properties.protected)
+    return;
   applyPageSetup(setup);
   pageSetupVisible.value = false;
   void nextTick(focusCellEditor);
 }
 watch(workbookGeneration, () => {
   pageViewModes.clear();
+  showPageBreaksBySheet.clear();
+  printPreviewVisible.value = false;
+  watermarkVisible.value = false;
   pageSetupVisible.value = false;
 });
 watch(
   () => activeSheet.value.id,
   () => {
     pageSetupVisible.value = false;
+    printPreviewVisible.value = false;
+    watermarkVisible.value = false;
   },
 );
 const duplicateInputError = computed(() => {
@@ -780,6 +863,30 @@ function onCancelFormulaEdit(sheetId?: string): void {
 }
 
 const assetStore = props.imageAssetStore ?? createIndexedDbImageAssetStore();
+const pageThemeController = usePageThemeController({
+  isBusy: () =>
+    loading.value ||
+    fileBusy.value ||
+    xlsxBusy.value ||
+    [...session.workbook.sheets.values()].some((sheet) => sheet.properties.protected),
+  finishEditing: () => cellEditSession.finish(),
+  execute: executeCommand,
+  focus: focusCellEditor,
+});
+const decorations = usePageDecorationActions({
+  assetStore,
+  getWorkbook: () => session.workbook,
+  getSheet: () => activeSheet.value,
+  getGeneration: () => workbookGeneration.value,
+  flushPendingEdits: () => cellEditSession.finish(),
+  setDecoration: (sheetId, decoration) =>
+    executeCommand(createSetSheetPageDecorationCommand(sheetId, decoration)),
+});
+const { busy: decorationBusy, current: pageDecoration, feedback: decorationFeedback } = decorations;
+watch(decorationFeedback, (feedback) => {
+  if (feedback) void MessagePlugin.error(t(`pageDecoration.${feedback}`));
+});
+
 const {
   urls: imageAssetUrls,
   loading: loadingImageAssetIds,
@@ -1487,6 +1594,8 @@ function setShowFormulaBar(visible: boolean): void {
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (
+    printPreviewVisible.value ||
+    watermarkVisible.value ||
     (pageSetupVisible.value && !pickingPageSetupRange.value) ||
     formulaEditorVisible.value ||
     formulaInsertVisible.value ||
@@ -1586,6 +1695,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       @change="imageActions.onFileChange"
     />
     <SpreadsheetRibbon
+      :theme="session.workbook.theme"
       :state="activeSelectionStyle"
       :disabled="!isFormattingSupported || activeSheet.properties.protected"
       :conditional-formatting-disabled="activeSheet.properties.protected"
@@ -1690,6 +1800,78 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
           @clear-style="tableActions.clearStyle"
           @settings="tableActions.openSettings"
         />
+      </template>
+      <template #page-tools>
+        <PageToolbar
+          :setup="activePageSetup"
+          :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
+          :busy="loading || fileBusy || xlsxBusy"
+          :active-cell="activeAddress"
+          :selection-mode="activeSelectionMode"
+          :view-mode="activeViewMode"
+          v-model:show-page-breaks="showPageBreaks"
+          :edit-session-id="cellEditSession.id"
+          @change="changePageSetup"
+          @open-setup="openPageSetup"
+          @set-print-area="setPrintAreaFromSelection"
+          @page-break="changePageBreak"
+          @print-preview="openPrintPreview"
+          @update:view-mode="setViewMode"
+        >
+          <template #appearance>
+            <PageThemeMenu
+              :theme="session.workbook.theme"
+              :disabled="
+                loading ||
+                fileBusy ||
+                xlsxBusy ||
+                [...session.workbook.sheets.values()].some((sheet) => sheet.properties.protected)
+              "
+              @apply="pageThemeController.apply"
+            />
+            <PageBackgroundMenu
+              :has-background="!!pageDecoration.backgroundAssetId"
+              :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
+              :busy="decorationBusy"
+              @select-file="decorations.setBackgroundFile"
+              @remove="decorations.removeBackground"
+            />
+            <PageWatermarkMenu
+              :watermark="pageDecoration.watermark"
+              :disabled="
+                loading ||
+                fileBusy ||
+                xlsxBusy ||
+                decorationBusy ||
+                activeSheet.properties.protected
+              "
+              @apply="applyWatermark"
+              @custom="openWatermark"
+              @remove="decorations.removeWatermark"
+            />
+          </template>
+          <template #beautify>
+            <TableStylesMenu
+              variant="tall"
+              :label="t('pageTools.beautify')"
+              :theme-accent-color="session.workbook.theme.accentColors[0]"
+              :custom-styles="customTableStyles"
+              :custom-pivot-styles="customPivotTableStyles"
+              :selected-style-id="activeTable?.style.id"
+              :selected-accent-color="activeTable?.style.accentColor"
+              :has-table="!!activeTable"
+              :disabled="loading || fileBusy || xlsxBusy || activeSheet.properties.protected"
+              :edit-session-id="cellEditSession.id"
+              @apply="tableActions.applyStyle"
+              @create="tableActions.openStyle()"
+              @edit="tableActions.openStyle($event)"
+              @create-pivot="tableActions.openPivotStyle()"
+              @edit-pivot="tableActions.openPivotStyle($event)"
+              @clear="tableActions.clearStyle"
+              @manage="tableActions.openSettings"
+            />
+          </template>
+        </PageToolbar>
       </template>
       <template #view-tools>
         <ViewToolbar
@@ -2457,11 +2639,14 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         (tableModalOpen && !pickingTableRange) ||
         formulaEditorVisible ||
         formulaInsertVisible ||
+        printPreviewVisible ||
+        watermarkVisible ||
         (pageSetupVisible && !pickingPageSetupRange) ||
         !!modalValidationFeedback
       "
     >
       <SheetGrid
+        :show-page-breaks="showPageBreaks"
         :view-mode="activeViewMode"
         :page-setup="activePageSetup"
         @page-setup-change="applyPageSetup"
@@ -2550,6 +2735,24 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         @horizontal-scroll-change="updateHorizontalScrollState"
       />
     </div>
+    <PagePrintPreview
+      v-if="printPreviewVisible"
+      v-model:visible="printPreviewVisible"
+      :sheet="activeSheet"
+      :evaluator="activeSheetEvaluator"
+      :setup="activePageSetup"
+      :workbook-revision="workbookRevision"
+      :image-asset-urls="imageAssetUrls"
+      :locale="locale"
+      :date-system="session.workbook.dateSystem"
+      file-name="workbook.xlsx"
+    />
+    <WatermarkDialog
+      v-model:visible="watermarkVisible"
+      :watermark="pageDecoration.watermark"
+      @save="applyWatermark"
+      @remove="decorations.removeWatermark"
+    />
     <PageSetupDialog
       v-model:visible="pageSetupVisible"
       :setup="activePageSetup"

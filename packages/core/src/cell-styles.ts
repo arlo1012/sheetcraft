@@ -4,6 +4,7 @@ import {
   type CellStyle,
   type CellStylePatch,
 } from "./style.js";
+import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "./workbook-theme.js";
 
 /** The format groups which Excel exposes in the Style dialog. */
 export type CellStyleInclude = "number" | "alignment" | "font" | "border" | "fill";
@@ -208,9 +209,16 @@ const THEME_COLORS = [
 ] as const;
 
 /** Builtins mirror the WPS/Excel gallery at a semantic level; IDs are the stable product contract. */
-export function createBuiltinCellStyles(): CellStyleDefinition[] {
+export function createBuiltinCellStyles(
+  theme: WorkbookTheme = DEFAULT_WORKBOOK_THEME,
+): CellStyleDefinition[] {
   const frame = { style: "thin", color: "#808080" } as const;
   const framed = { borderTop: frame, borderRight: frame, borderBottom: frame, borderLeft: frame };
+  // Preserve the established Office gallery exactly; non-Office themes supply themed heading fonts.
+  const headingFont =
+    theme.headingFont === DEFAULT_WORKBOOK_THEME.headingFont
+      ? {}
+      : { fontFamily: theme.headingFont };
   const styles: CellStyleDefinition[] = [
     builtin("normal", "Normal", "goodBadNeutral", createClearCellStylePatch(), 0),
     builtin("good", "Good", "goodBadNeutral", { textColor: "#006100", fillColor: "#c6efce" }),
@@ -246,33 +254,47 @@ export function createBuiltinCellStyles(): CellStyleDefinition[] {
       italic: true,
       textColor: "#7f7f7f",
     }),
-    builtin("title", "Title", "titles", { fontSize: 20, bold: true, textColor: "#1f4e79" }),
+    builtin("title", "Title", "titles", {
+      ...headingFont,
+      fontSize: 20,
+      bold: true,
+      textColor: theme.accentColors[0],
+    }),
     builtin("heading-1", "Heading 1", "titles", {
       fontSize: 16,
       bold: true,
-      textColor: "#1f4e79",
-      borderBottom: { style: "thin", color: "#5b9bd5" },
+      ...headingFont,
+      textColor: theme.accentColors[0],
+      borderBottom: { style: "thin", color: theme.accentColors[0] },
     }),
     builtin("heading-2", "Heading 2", "titles", {
       fontSize: 14,
       bold: true,
-      textColor: "#1f4e79",
-      borderBottom: { style: "thin", color: "#9dc3e6" },
+      ...headingFont,
+      textColor: theme.accentColors[0],
+      borderBottom: { style: "thin", color: theme.accentColors[1] },
     }),
     builtin("heading-3", "Heading 3", "titles", {
       fontSize: 12,
       bold: true,
-      textColor: "#1f4e79",
-      borderBottom: { style: "thin", color: "#bdd7ee" },
+      ...headingFont,
+      textColor: theme.accentColors[0],
+      borderBottom: { style: "thin", color: theme.accentColors[2] },
     }),
-    builtin("heading-4", "Heading 4", "titles", { bold: true, textColor: "#1f4e79" }),
+    builtin("heading-4", "Heading 4", "titles", {
+      ...headingFont,
+      bold: true,
+      textColor: theme.accentColors[0],
+    }),
     builtin("total", "Total", "titles", {
       bold: true,
-      borderTop: { style: "thin", color: "#1f4e79" },
-      borderBottom: { style: "double", color: "#1f4e79" },
+      ...headingFont,
+      borderTop: { style: "thin", color: theme.accentColors[0] },
+      borderBottom: { style: "double", color: theme.accentColors[0] },
     }),
   ];
-  for (const [colorId, color, subtle, light, accent] of THEME_COLORS) {
+  for (const [index, [colorId, fallback, subtle, light, accent]] of THEME_COLORS.entries()) {
+    const color = theme.accentColors[index]! ?? fallback;
     styles.push(
       builtin(`theme-${colorId}-strong`, `${colorId} Strong`, "theme", {
         bold: true,

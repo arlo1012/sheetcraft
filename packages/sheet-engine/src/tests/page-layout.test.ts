@@ -96,6 +96,33 @@ describe("page layout", () => {
     ).toBeGreaterThan(pagination.contentSize.width);
   });
 
+  test("fits automatic pagination to the requested page count and ignores manual breaks", () => {
+    const geometry = createSheetGeometry({
+      rowCount: 80,
+      columnCount: 8,
+      rowHeight: 80,
+      columnWidth: 120,
+    });
+    const rows = createRowVisibilityIndex({ rowCount: 80, defaultRowHeight: 80 });
+    const setup = {
+      ...DEFAULT_SHEET_PAGE_SETUP,
+      scale: 400,
+      fitToPage: { width: 1, height: 1 },
+      rowBreaks: [2, 4, 6],
+      columnBreaks: [2, 4],
+    };
+    const pagination = createSheetPagination({
+      geometry,
+      rows,
+      setup,
+      printRange: { start: { row: 0, column: 0 }, end: { row: 79, column: 7 } },
+    });
+    expect(pagination.printScale).toBeLessThan(1);
+    expect(pagination.pageCount).toBe(1);
+    expect(pagination.rowBreaks).not.toContainEqual(expect.objectContaining({ kind: "manual" }));
+    expect(pagination.columnBreaks).not.toContainEqual(expect.objectContaining({ kind: "manual" }));
+  });
+
   test("ignores manual breaks outside the print area when completing layout-only pages", () => {
     const geometry = createSheetGeometry({
       rowCount: 120,

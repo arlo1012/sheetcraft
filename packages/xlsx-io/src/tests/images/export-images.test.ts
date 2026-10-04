@@ -7,6 +7,7 @@ import {
   setRowHeight,
 } from "@idea10/core/workbook";
 import { serializeWorkbook } from "@idea10/core/serialization";
+import { createBuiltinTableStyles } from "@idea10/core/table-styles";
 import { describe, expect, test } from "vitest";
 import { encodeXlsx, type XlsxImageAsset } from "../../index.js";
 
@@ -48,6 +49,36 @@ function text(entries: ReadonlyMap<string, Uint8Array>, name: string): string {
 }
 
 describe("XLSX image export", () => {
+  test("writes an OOXML tiled worksheet background relationship", async () => {
+    const workbook = createWorkbook({ id: "workbook", sheetId: "sheet" });
+    const sheet = getActiveSheet(workbook);
+    sheet.pageDecoration = { backgroundAssetId: "background" };
+    sheet.tables = [
+      {
+        id: "table",
+        name: "Table1",
+        range: { start: { row: 0, column: 0 }, end: { row: 1, column: 0 } },
+        columns: [{ id: "column", name: "Name" }],
+        style: createBuiltinTableStyles()[0]!,
+        headerRow: true,
+        totalRow: false,
+        firstColumn: false,
+        lastColumn: false,
+        bandedRows: true,
+        bandedColumns: false,
+        filterButton: true,
+      },
+    ];
+    const archive = entries(
+      (await encodeXlsx(workbook, { images: [asset("background", PNG_A, 2, 2)] })).bytes,
+    );
+    const sheetXml = text(archive, "xl/worksheets/sheet1.xml");
+    expect(sheetXml).toContain("<picture r:id=");
+    expect(sheetXml.indexOf("<picture ")).toBeLessThan(sheetXml.indexOf("<tableParts"));
+    expect(text(archive, "xl/worksheets/_rels/sheet1.xml.rels")).toContain("../media/image1.png");
+    expect(archive.get("xl/media/image1.png")).toEqual(PNG_A);
+  });
+
   test("writes native cell media and fixed-size floating anchors without changing Core state", async () => {
     const workbook = createWorkbook({ id: "workbook", sheetId: "sheet" });
     const sheet = getActiveSheet(workbook);

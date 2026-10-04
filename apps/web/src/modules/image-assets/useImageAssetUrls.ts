@@ -5,6 +5,7 @@ import type { ImageAssetStore } from "./imageAssetStore";
 export function collectWorkbookImageAssetIds(workbook: Workbook): Set<string> {
   const ids = new Set<string>();
   for (const sheet of workbook.sheets.values()) {
+    if (sheet.pageDecoration?.backgroundAssetId) ids.add(sheet.pageDecoration.backgroundAssetId);
     for (const cell of sheet.cells.values()) {
       const content = cell.content;
       if (content?.kind === "image") ids.add(content.image.assetId);

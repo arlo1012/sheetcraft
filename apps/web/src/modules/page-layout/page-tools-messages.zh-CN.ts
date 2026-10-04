@@ -1,0 +1,31 @@
+import type { PageToolsMessageSchema } from "./page-tools-messages";
+
+export const pageToolsZhCN = {
+  pageTools: {
+    label: "页面工具",
+    tab: "页面",
+    printPreview: "打印预览",
+    printArea: "打印区域",
+    setPrintArea: "设置打印区域",
+    clearPrintArea: "取消打印区域",
+    printTitles: "打印标题",
+    printScaling: "打印缩放",
+    printGridLines: "打印网格线",
+    printHeadings: "打印行号列标",
+    showPageBreaks: "显示分页符",
+    insertPageBreak: "插入分页符",
+    removePageBreak: "删除分页符",
+    resetPageBreaks: "重置所有分页符",
+    marginsNormal: "常规",
+    marginsNarrow: "窄",
+    marginsWide: "宽",
+    customMargins: "自定义页边距…",
+    noScaling: "无缩放",
+    customScaling: "自定义缩放…",
+    beautify: "表格美化",
+    breaks: "分页",
+    appearance: "页面外观",
+    theme: "主题",
+    themeDescription: "更改文档中主题单元格样式和表格使用的颜色与字体。",
+  },
+} satisfies PageToolsMessageSchema;

@@ -2,6 +2,7 @@ import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createSequentialIdFactory } from "@idea10/core/runtime";
 import { deserializeWorkbook, serializeWorkbook } from "@idea10/core/serialization";
+import { DEFAULT_WORKBOOK_THEME } from "@idea10/core/workbook-theme";
 import {
   createSheet,
   createWorkbook,
@@ -87,6 +88,7 @@ describe("sheet management workspace integration", () => {
       id: "roundtrip",
       dateSystem: "1900",
       calculation: { mode: "automatic", iterative: false, maxIterations: 100, maxChange: 0.001 },
+      theme: DEFAULT_WORKBOOK_THEME,
       activeSheetId: firstId,
       sheets: new Map([[firstId, sheet]]),
       definedNames: new Map(),

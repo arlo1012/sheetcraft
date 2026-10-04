@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, useId } from "vue";
 import { Combine, Palette, Plus } from "lucide-vue-next";
 import { createBuiltinCellStyles, type CellStyleDefinition } from "@idea10/core/cell-styles";
+import type { WorkbookTheme } from "@idea10/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
 import MenuItem from "../../../shared/menu/MenuItem.vue";
 import MenuSeparator from "../../../shared/menu/MenuSeparator.vue";
@@ -15,6 +16,7 @@ const props = withDefaults(
     disabled?: boolean;
     editSessionId?: string;
     customStyles?: readonly CellStyleDefinition[];
+    theme?: WorkbookTheme;
   }>(),
   { disabled: false, editSessionId: undefined, customStyles: () => [] },
 );
@@ -30,7 +32,7 @@ const surfaceRef = ref<InstanceType<typeof MenuSurface> | null>(null);
 const triggerElement = computed(() => triggerRef.value?.rootElement ?? null);
 const galleryRef = ref<{ focusFirstStyle: () => void } | null>(null);
 const panelId = `cell-styles-menu-${useId().replaceAll(":", "")}`;
-const styles = computed(() => [...createBuiltinCellStyles(), ...props.customStyles]);
+const styles = computed(() => [...createBuiltinCellStyles(props.theme), ...props.customStyles]);
 const { open, floatingStyles, dismiss, toggleMenu, onTriggerKeydown } = useMenu({
   triggerRef: triggerElement,
   menuSurfaceRef: surfaceRef,

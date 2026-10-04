@@ -1,3 +1,6 @@
+import type { PageDecorationMessageSchema } from "../../modules/page-decorations/page-decoration-messages";
+import type { PagePrintMessageSchema } from "../../modules/page-layout/page-print-messages";
+import type { PageToolsMessageSchema } from "../../modules/page-layout/page-tools-messages";
 import type { HyperlinkMessageSchema } from "../../modules/hyperlinks/hyperlink-messages";
 import type { CellStylesMessageSchema } from "../../modules/cell-styles/cell-style-messages";
 import type { SimulationMessageSchema } from "../../modules/data-tools/simulation-messages";
@@ -10,7 +13,10 @@ import type { TableMessageSchema } from "../../modules/table-styles/table-messag
 
 export type AppLocale = "zh-CN" | "en-US";
 
-type ToolMessageSchema = FormulaToolsMessageSchema &
+type ToolMessageSchema = PageDecorationMessageSchema &
+  PagePrintMessageSchema &
+  PageToolsMessageSchema &
+  FormulaToolsMessageSchema &
   ConditionalFormattingMessageSchema &
   TableStylesMessageSchema &
   CellStylesMessageSchema &

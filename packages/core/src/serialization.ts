@@ -49,7 +49,14 @@ import {
   type DefinedName,
 } from "./workbook.js";
 import type { SheetPageSetup } from "./page-setup.js";
+import { normalizeSheetPageDecoration, type SheetPageDecoration } from "./page-decoration.js";
 import { createFormulaError, isFormulaErrorCode, type CellContent } from "./formula/types.js";
+import {
+  cloneWorkbookTheme,
+  DEFAULT_WORKBOOK_THEME,
+  normalizeWorkbookTheme,
+  type WorkbookTheme,
+} from "./workbook-theme.js";
 
 export type CellSnapshotV1 = {
   address: CellAddress;
@@ -167,8 +174,12 @@ export type WorkbookSnapshotV14 = Omit<WorkbookSnapshotV13, "version"> & {
 };
 export type WorkbookSnapshotV15 = Omit<WorkbookSnapshotV14, "version"> & { version: 15 };
 export type WorkbookSnapshotV16 = Omit<WorkbookSnapshotV15, "version"> & { version: 16 };
+export type WorkbookSnapshotV17 = Omit<WorkbookSnapshotV16, "version"> & {
+  version: 17;
+  theme: WorkbookTheme;
+};
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV16;
+export type WorkbookSnapshot = WorkbookSnapshotV17;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -180,8 +191,9 @@ export type SheetSnapshot = SheetSnapshotV7 & {
   conditionalFormats?: SheetConditionalFormatRule[];
   tables?: SheetTable[];
   pageSetup?: SheetPageSetup;
+  pageDecoration?: SheetPageDecoration;
 };
-type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16;
+type SnapshotVersion = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -604,6 +616,10 @@ function parseSparseState(
       version >= 13 && Object.hasOwn(record, "pageSetup")
         ? (record.pageSetup as SheetPageSetup)
         : undefined,
+    pageDecoration:
+      version >= 17 && Object.hasOwn(record, "pageDecoration")
+        ? normalizeSheetPageDecoration(record.pageDecoration)
+        : undefined,
     floatingImages:
       version >= 4
         ? asArray(record.floatingImages, `${path}.floatingImages`).map((image, index) =>
@@ -630,15 +646,17 @@ function parseSheet(value: unknown, path: string, version?: SnapshotVersion): Sh
             return Object.hasOwn(item, "namedStyle") || Object.hasOwn(item, "hyperlink");
           })
         ? 15
-        : Object.hasOwn(record, "tables") || Object.hasOwn(record, "pageSetup")
-          ? 13
-          : Object.hasOwn(record, "conditionalFormats")
-            ? 12
-            : Object.hasOwn(record, "properties")
-              ? 7
-              : Object.hasOwn(record, "floatingImages")
-                ? 6
-                : 3;
+        : Object.hasOwn(record, "pageDecoration")
+          ? 17
+          : Object.hasOwn(record, "tables") || Object.hasOwn(record, "pageSetup")
+            ? 13
+            : Object.hasOwn(record, "conditionalFormats")
+              ? 12
+              : Object.hasOwn(record, "properties")
+                ? 7
+                : Object.hasOwn(record, "floatingImages")
+                  ? 6
+                  : 3;
   }
   const id = asIdentifier(record.id, `${path}.id`);
   let name: string;
@@ -681,8 +699,9 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 16,
+    version: 17,
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
+    theme: cloneWorkbookTheme(workbook.theme),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
     id: workbook.id,
     activeSheetId: workbook.activeSheetId,
@@ -723,7 +742,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 13 &&
     record.version !== 14 &&
     record.version !== 15 &&
-    record.version !== 16
+    record.version !== 16 &&
+    record.version !== 17
   ) {
     throw new WorkbookDomainError(
       {
@@ -794,6 +814,14 @@ export function deserializeWorkbook(value: unknown): Workbook {
       );
     }
   }
+  let theme = cloneWorkbookTheme(DEFAULT_WORKBOOK_THEME);
+  if (version >= 17) {
+    try {
+      theme = normalizeWorkbookTheme(record.theme as WorkbookTheme);
+    } catch (error) {
+      return fail("$.theme", error instanceof Error ? error.message : "Invalid workbook theme.");
+    }
+  }
   const tableStyles =
     version >= 13 && record.tableStyles !== undefined
       ? asArray(record.tableStyles, "$.tableStyles").map((style, index) => {
@@ -843,6 +871,7 @@ export function deserializeWorkbook(value: unknown): Workbook {
     id,
     dateSystem,
     calculation,
+    theme,
     activeSheetId,
     sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
     definedNames,

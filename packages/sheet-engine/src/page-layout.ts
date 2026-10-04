@@ -516,13 +516,16 @@ function createColumnPages(
   return { axes, breaks };
 }
 
-function getPageDimensions(setup: SheetPageSetup): {
+function getPageDimensions(
+  setup: SheetPageSetup,
+  scale = setup.scale,
+): {
   paperSize: Size;
   contentSize: Size;
   printScale: number;
 } {
   const paperMm = getPagePaperSize(setup);
-  const printScale = setup.scale / 100;
+  const printScale = scale / 100;
   const paperSize = {
     width: (paperMm.width * PX_PER_MM) / printScale,
     height: (paperMm.height * PX_PER_MM) / printScale,
@@ -545,6 +548,46 @@ function getPageDimensions(setup: SheetPageSetup): {
     },
     printScale,
   };
+}
+
+/**
+ * Resolves the largest valid print scale for a fit-to-page request. Manual
+ * breaks are intentionally excluded: Excel fit-to-page recalculates automatic
+ * pagination instead of preserving explicit breaks.
+ */
+export function calculateSheetPrintScale(options: {
+  geometry: SheetGeometry;
+  rows: RowVisibilityIndex;
+  setup: SheetPageSetup;
+  printRange: CellRange;
+  mergedCells?: readonly CellRange[];
+}): number {
+  const { setup, geometry, rows } = options;
+  if (!setup.fitToPage) return setup.scale / 100;
+  const range = options.printRange;
+  const merged = options.mergedCells ?? [];
+  const fits = (scale: number) => {
+    const dimensions = getPageDimensions(setup, scale);
+    const rowCount = createRowPages(rows, range, dimensions.contentSize.height, [], merged).axes
+      .length;
+    const columnCount = createColumnPages(geometry, range, dimensions.contentSize.width, [], merged)
+      .axes.length;
+    return (
+      (setup.fitToPage!.height === 0 || rowCount <= setup.fitToPage!.height) &&
+      (setup.fitToPage!.width === 0 || columnCount <= setup.fitToPage!.width)
+    );
+  };
+  let low = 10;
+  let high = 400;
+  let winner = 10;
+  while (low <= high) {
+    const scale = Math.floor((low + high) / 2);
+    if (fits(scale)) {
+      winner = scale;
+      low = scale + 1;
+    } else high = scale - 1;
+  }
+  return winner / 100;
 }
 
 function expandLayoutRangeThroughMerges(range: CellRange, merged: readonly CellRange[]): CellRange {
@@ -660,15 +703,26 @@ export function getPageLayoutRange(options: {
     throw new RangeError("Page layout range is outside the grid.");
   if (rows.rowCount !== geometry.rowCount)
     throw new RangeError("Row visibility count must match geometry row count.");
-  const dimensions = getPageDimensions(setup);
+  const printScale = calculateSheetPrintScale({
+    geometry,
+    rows,
+    setup,
+    printRange,
+    mergedCells: options.mergedCells,
+  });
+  const dimensions = getPageDimensions(setup, printScale * 100);
   const rowManual = [
-    ...setup.rowBreaks.filter((row) => row > printRange.start.row && row <= printRange.end.row),
+    ...(setup.fitToPage
+      ? []
+      : setup.rowBreaks.filter((row) => row > printRange.start.row && row <= printRange.end.row)),
     ...(printRange.start.row > 0 ? [printRange.start.row] : []),
   ].sort((left, right) => left - right);
   const columnManual = [
-    ...setup.columnBreaks.filter(
-      (column) => column > printRange.start.column && column <= printRange.end.column,
-    ),
+    ...(setup.fitToPage
+      ? []
+      : setup.columnBreaks.filter(
+          (column) => column > printRange.start.column && column <= printRange.end.column,
+        )),
     ...(printRange.start.column > 0 ? [printRange.start.column] : []),
   ].sort((left, right) => left - right);
   const merged = options.mergedCells ?? [];
@@ -728,7 +782,14 @@ export function createSheetPagination(options: {
     throw new RangeError("Print range is outside the grid.");
   if (rows.rowCount !== geometry.rowCount)
     throw new RangeError("Row visibility count must match geometry row count.");
-  const { paperSize, contentSize, printScale } = getPageDimensions(setup);
+  const printScale = calculateSheetPrintScale({
+    geometry,
+    rows,
+    setup,
+    printRange,
+    mergedCells: options.mergedCells,
+  });
+  const { paperSize, contentSize } = getPageDimensions(setup, printScale * 100);
   const margins = {
     left: (setup.margins.left * PX_PER_MM) / printScale,
     right: (setup.margins.right * PX_PER_MM) / printScale,
@@ -774,7 +835,9 @@ export function createSheetPagination(options: {
     layoutRange,
     contentSize.height,
     [
-      ...setup.rowBreaks.filter((row) => row > printRange.start.row && row <= printRange.end.row),
+      ...(setup.fitToPage
+        ? []
+        : setup.rowBreaks.filter((row) => row > printRange.start.row && row <= printRange.end.row)),
       ...(printRange.start.row > layoutRange.start.row ? [printRange.start.row] : []),
     ],
     merged,
@@ -784,9 +847,11 @@ export function createSheetPagination(options: {
     layoutRange,
     contentSize.width,
     [
-      ...setup.columnBreaks.filter(
-        (column) => column > printRange.start.column && column <= printRange.end.column,
-      ),
+      ...(setup.fitToPage
+        ? []
+        : setup.columnBreaks.filter(
+            (column) => column > printRange.start.column && column <= printRange.end.column,
+          )),
       ...(printRange.start.column > layoutRange.start.column ? [printRange.start.column] : []),
     ],
     merged,

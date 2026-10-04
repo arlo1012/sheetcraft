@@ -2,6 +2,7 @@ import { WorkbookDomainError, toWorkbookErrorDetail } from "../errors.js";
 import { cloneCellStyle, type CellStyle } from "../style.js";
 import { cloneConditionalFormatRule } from "../conditional-formatting.js";
 import { cloneSheetPageSetup, DEFAULT_SHEET_PAGE_SETUP } from "../page-setup.js";
+import { cloneSheetPageDecoration } from "../page-decoration.js";
 import {
   cloneCellContent,
   cloneCellHyperlink,
@@ -201,6 +202,7 @@ export function cloneSparseState(state: SheetSparseState): SheetSparseState {
       : {}),
     ...(state.tables ? { tables: state.tables.map(cloneSheetTable) } : {}),
     pageSetup: cloneSheetPageSetup(state.pageSetup ?? DEFAULT_SHEET_PAGE_SETUP),
+    pageDecoration: cloneSheetPageDecoration(state.pageDecoration),
     floatingImages: state.floatingImages.map(cloneFloatingImage),
   };
 }

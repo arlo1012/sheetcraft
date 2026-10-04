@@ -25,6 +25,7 @@ import {
 } from "./dimensions.js";
 import { applySetSheetFilterCommand } from "./filter.js";
 import { applySetSheetPageSetupCommand } from "./page-setup.js";
+import { applySetSheetPageDecorationCommand } from "./page-decoration.js";
 import { applyAdvancedFilterCommand } from "./advanced-filter.js";
 import { applySplitColumnCommand, applyRemoveDuplicatesCommand } from "./data-transforms.js";
 import { applyApplySubtotalsCommand, applyRemoveSubtotalsCommand } from "./subtotal.js";
@@ -80,6 +81,7 @@ import {
   applySetWorkbookDateSystemCommand,
   applySetWorkbookCalculationCommand,
 } from "./workbook-settings.js";
+import { applySetWorkbookThemeCommand } from "./workbook-theme.js";
 import { applySetWorkbookCellStylesCommand } from "./cell-styles.js";
 import {
   applyMarkCellHyperlinkVisitedCommand,
@@ -112,6 +114,27 @@ function assertCommandDoesNotModifyProtectedSheet(
   workbook: Workbook,
   command: WorkbookCommand,
 ): void {
+  if (command.type === "setWorkbookTheme" && !command.cellStates && !command.tableStyles) {
+    const affected = [...workbook.sheets.values()].find(
+      (sheet) =>
+        sheet.properties.protected &&
+        ([...sheet.cells.values()].some(
+          (cell) =>
+            cell.namedStyle &&
+            (cell.namedStyle.styleId.startsWith("theme-") ||
+              ["title", "heading-1", "heading-2", "heading-3", "heading-4", "total"].includes(
+                cell.namedStyle.styleId,
+              )),
+        ) ||
+          (sheet.tables ?? []).some((table) => table.style.id.startsWith("table-wps-"))),
+    );
+    if (affected) {
+      throw new WorkbookDomainError(
+        { code: "sheet_protected", details: { sheetId: toWorkbookErrorDetail(affected.id) } },
+        `Sheet ${affected.id} is protected.`,
+      );
+    }
+  }
   if (command.type === "setWorkbookCellStyles") {
     const currentById = new Map((workbook.cellStyles ?? []).map((style) => [style.id, style]));
     const nextById = new Map(command.styles.map((style) => [style.id, style]));
@@ -177,6 +200,7 @@ function assertCommandDoesNotModifyProtectedSheet(
     case "restoreSheetDimensionState":
     case "setSheetFreezePanes":
     case "setSheetPageSetup":
+    case "setSheetPageDecoration":
     case "mergeCells":
     case "unmergeCells":
     case "setSheetFilter":
@@ -230,6 +254,8 @@ export function applyWorkbookCommand(
         return applySetWorkbookDateSystemCommand(workbook, command);
       case "setWorkbookCalculation":
         return applySetWorkbookCalculationCommand(workbook, command);
+      case "setWorkbookTheme":
+        return applySetWorkbookThemeCommand(workbook, command);
       case "setWorkbookCellStyles":
         return applySetWorkbookCellStylesCommand(workbook, command);
       case "setDefinedNames":
@@ -301,6 +327,8 @@ export function applyWorkbookCommand(
         return applySetSheetFreezePanesCommand(workbook, command);
       case "setSheetPageSetup":
         return applySetSheetPageSetupCommand(workbook, command);
+      case "setSheetPageDecoration":
+        return applySetSheetPageDecorationCommand(workbook, command);
       case "mergeCells":
         return applyMergeCellsCommand(workbook, command);
       case "unmergeCells":

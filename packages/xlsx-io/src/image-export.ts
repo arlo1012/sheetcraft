@@ -141,6 +141,10 @@ export function createXlsxImageExporter(
   }
 
   return {
+    registerSheetBackground(assetId: string, issueLocation: string): string {
+      const asset = requireAsset(assetId, undefined, issueLocation);
+      return `xl/media/image${addAsset(asset) + 1}.${asset.extension}`;
+    },
     registerCellImage(
       image: CellImage,
       issueLocation: string,

@@ -66,6 +66,21 @@ async function startLeft(grid: Grid) {
 }
 
 describe("SheetGrid page-layout interaction", () => {
+  test("uses fitted scale for cells while keeping the physical paper size stable", async () => {
+    const grid = await mountLayout();
+    try {
+      await grid.wrapper.setProps({
+        pageSetup: { ...grid.sheet.pageSetup!, fitToPage: { width: 1, height: 1 } },
+      });
+      const frame = getSheetRenderFrame(grid.wrapper);
+      const page = state(grid).pages[0]!;
+      expect(page.paperRect.width * frame.scale).toBeCloseTo(((210 * 96) / 25.4) * 1.5);
+      expect(frame.scale).toBeLessThan(3);
+    } finally {
+      grid.wrapper.unmount();
+    }
+  });
+
   test("keeps the initial paper inset at 20 visual pixels while scaling document content", async () => {
     const grid = await mountLayout();
     try {

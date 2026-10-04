@@ -83,6 +83,9 @@ function isEnvelope(value: unknown): value is PortableEnvelope {
 
 function rewriteImageReferences(workbook: Workbook, ids: ReadonlyMap<string, string>): void {
   for (const sheet of workbook.sheets.values()) {
+    if (sheet.pageDecoration?.backgroundAssetId)
+      sheet.pageDecoration.backgroundAssetId =
+        ids.get(sheet.pageDecoration.backgroundAssetId) ?? sheet.pageDecoration.backgroundAssetId;
     for (const cell of sheet.cells.values()) {
       if (cell.content?.kind === "image")
         cell.content.image.assetId =

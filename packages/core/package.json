@@ -83,6 +83,10 @@
       "types": "./dist/workbook.d.ts",
       "import": "./dist/workbook.js"
     },
+    "./workbook-theme": {
+      "types": "./dist/workbook-theme.d.ts",
+      "import": "./dist/workbook-theme.js"
+    },
     "./table-styles": {
       "types": "./dist/table-styles.d.ts",
       "import": "./dist/table-styles.js"
@@ -90,6 +94,10 @@
     "./page-setup": {
       "types": "./dist/page-setup.d.ts",
       "import": "./dist/page-setup.js"
+    },
+    "./page-decoration": {
+      "types": "./dist/page-decoration.d.ts",
+      "import": "./dist/page-decoration.js"
     },
     "./data-validation": {
       "types": "./dist/data-validation.d.ts",

@@ -2,6 +2,7 @@
 import type { CellStyleDefinition } from "@idea10/core/cell-styles";
 import type { TableStyleDefinition } from "@idea10/core/table-styles";
 import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
+import type { WorkbookTheme } from "@idea10/core/workbook-theme";
 import CellStylesMenu from "../../cell-styles/components/CellStylesMenu.vue";
 import TableStylesMenu from "../../table-styles/components/TableStylesMenu.vue";
 import { useAppI18n } from "../../../shared/i18n";
@@ -18,7 +19,9 @@ defineProps<{
   pivotTableStyles?: readonly PivotTableStyleDefinition[];
   selectedTableStyleId?: string;
   selectedTableStyleColor?: string;
+  themeAccentColor?: string;
   hasTable?: boolean;
+  theme?: WorkbookTheme;
 }>();
 const emit = defineEmits<{
   createConditionalFormat: [kind: ConditionalFormatQuickRule];
@@ -63,6 +66,7 @@ const { t } = useAppI18n();
           :custom-pivot-styles="pivotTableStyles"
           :selected-style-id="selectedTableStyleId"
           :selected-accent-color="selectedTableStyleColor"
+          :theme-accent-color="themeAccentColor"
           :has-table="hasTable"
           @apply="emit('applyTableStyle', $event)"
           @create="emit('createTableStyle')"
@@ -78,6 +82,7 @@ const { t } = useAppI18n();
           :disabled="cellStylesDisabled ?? disabled"
           :edit-session-id="editSessionId"
           :custom-styles="cellStyles ?? []"
+          :theme="theme"
           @apply="emit('applyNamedCellStyle', $event)"
           @create="emit('createCellStyle')"
           @edit="emit('editCellStyle', $event)"

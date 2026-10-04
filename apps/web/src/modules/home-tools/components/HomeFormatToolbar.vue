@@ -6,6 +6,7 @@ import type { CellBorderAction, CellBorderFormatPatch, CellStylePatch } from "@i
 import type { SelectionCellStyleState } from "@idea10/core/style-state";
 import type { TableStyleDefinition } from "@idea10/core/table-styles";
 import type { PivotTableStyleDefinition } from "@idea10/core/pivot-table-styles";
+import type { WorkbookTheme } from "@idea10/core/workbook-theme";
 import type { CellFormatTab } from "../../cell-format/components/CellFormatDialog.vue";
 import { useAppI18n } from "../../../shared/i18n";
 import { getWorkbookHistoryShortcut } from "../../../shared/keyboard/workbook-history-shortcuts";
@@ -43,7 +44,9 @@ const props = withDefaults(
     pivotTableStyles?: readonly PivotTableStyleDefinition[];
     selectedTableStyleId?: string;
     selectedTableStyleColor?: string;
+    themeAccentColor?: string;
     hasTable?: boolean;
+    theme?: WorkbookTheme;
   }>(),
   { conditionalFormattingDisabled: undefined },
 );
@@ -171,7 +174,9 @@ function onKeydown(event: KeyboardEvent): void {
       :pivot-table-styles="pivotTableStyles"
       :selected-table-style-id="selectedTableStyleId"
       :selected-table-style-color="selectedTableStyleColor"
+      :theme-accent-color="themeAccentColor"
       :has-table="hasTable"
+      :theme="theme"
       @create-conditional-format="emit('createConditionalFormat', $event)"
       @manage-conditional-formats="emit('manageConditionalFormats')"
       @clear-conditional-formats="emit('clearConditionalFormats', $event)"

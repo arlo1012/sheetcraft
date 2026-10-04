@@ -32,6 +32,8 @@ import type { PivotTableStyleDefinition } from "../pivot-table-styles.js";
 import type { CellStyleDefinition } from "../cell-styles.js";
 import type { ConditionalFormatIconSet } from "../conditional-formatting.js";
 import type { SheetPageSetup } from "../page-setup.js";
+import type { SheetPageDecoration } from "../page-decoration.js";
+import type { WorkbookTheme } from "../workbook-theme.js";
 
 export type CellContentChange = {
   sheetId: string;
@@ -654,6 +656,11 @@ export type SetSheetPageSetupCommand = {
   sheetId: string;
   pageSetup: SheetPageSetup;
 };
+export type SetSheetPageDecorationCommand = {
+  type: "setSheetPageDecoration";
+  sheetId: string;
+  decoration: SheetPageDecoration;
+};
 export type ClearSheetConditionalFormatsCommand = {
   type: "clearSheetConditionalFormats";
   sheetId: string;
@@ -702,10 +709,24 @@ export type SetWorkbookCalculationCommand = {
   type: "setWorkbookCalculation";
   calculation: WorkbookCalculationSettings;
 };
+export type SetWorkbookThemeCommand = {
+  type: "setWorkbookTheme";
+  theme: WorkbookTheme;
+  /** Internal exact snapshots used for undoing theme-bound named cell styles. */
+  cellStates?: Array<{
+    sheetId: string;
+    address: CellAddress;
+    style: CellStyle | null;
+    namedStyle: CellNamedStyleBinding | null;
+  }>;
+  /** Internal exact snapshots used for undoing theme-bound structured table styles. */
+  tableStyles?: Array<{ sheetId: string; tableId: string; style: TableStyleDefinition | null }>;
+};
 
 export type WorkbookCommand =
   | SetWorkbookDateSystemCommand
   | SetWorkbookCalculationCommand
+  | SetWorkbookThemeCommand
   | SetDefinedNamesCommand
   | SetCellContentsCommand
   | ClearCellRangeCommand
@@ -753,6 +774,7 @@ export type WorkbookCommand =
   | ClearSheetDuplicateRulesCommand
   | SetSheetConditionalFormatsCommand
   | SetSheetPageSetupCommand
+  | SetSheetPageDecorationCommand
   | ClearSheetConditionalFormatsCommand
   | ClearSheetDataValidationsCommand
   | AddSheetOutlineGroupCommand
@@ -782,6 +804,7 @@ export type WorkbookCommand =
 export type WorkbookOperation =
   | "workbook.dateSystem"
   | "workbook.calculation"
+  | "workbook.theme"
   | "workbook.cellStyles"
   | "cells.edit"
   | "cells.paste"
@@ -802,6 +825,7 @@ export type WorkbookOperation =
   | "dimensions.defaultWidth"
   | "view.freeze"
   | "page.setup"
+  | "page.decoration"
   | "cells.merge"
   | "cells.unmerge"
   | "data.filter"
@@ -832,6 +856,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "workbook.dateSystem";
     case "setWorkbookCalculation":
       return "workbook.calculation";
+    case "setWorkbookTheme":
+      return "workbook.theme";
     case "setWorkbookCellStyles":
       return "workbook.cellStyles";
     case "setCellContents":
@@ -891,6 +917,8 @@ export function getWorkbookOperation(command: WorkbookCommand): WorkbookOperatio
       return "view.freeze";
     case "setSheetPageSetup":
       return "page.setup";
+    case "setSheetPageDecoration":
+      return "page.decoration";
     case "mergeCells":
       return "cells.merge";
     case "unmergeCells":
