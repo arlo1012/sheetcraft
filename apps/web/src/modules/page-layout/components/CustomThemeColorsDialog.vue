@@ -96,8 +96,8 @@ watch(
     @confirm="save"
     @close="close"
   >
-    <TForm class="custom-theme-colors-dialog" label-align="top">
-      <TFormItem :label="t('pageTools.themeSchemeName')">
+    <TForm class="custom-theme-colors-dialog idea-form-grid" label-align="left">
+      <TFormItem :label="t('pageTools.themeSchemeName')" label-width="48px">
         <div ref="nameInputRef" class="custom-theme-colors-dialog__name">
           <TInput v-model="draft.name" autofocus clearable :status="error ? 'error' : undefined" />
         </div>
@@ -112,7 +112,6 @@ watch(
           <TFormItem
             v-for="[field, label] in fields"
             :key="field"
-            class="custom-theme-colors-dialog__color-row"
             :label="label"
             label-align="left"
             label-width="180px"
@@ -190,9 +189,6 @@ watch(
   display: grid;
   align-content: start;
   gap: 8px;
-}
-.custom-theme-colors-dialog__color-row {
-  margin-bottom: 0;
 }
 .custom-theme-colors-dialog__preview {
   display: grid;
