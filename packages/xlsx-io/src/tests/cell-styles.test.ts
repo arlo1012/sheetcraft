@@ -19,6 +19,7 @@ import { describe, expect, test } from "vitest";
 import { decodeXlsx, encodeXlsx } from "../index.js";
 import { readXlsxCellStyles } from "../cell-styles.js";
 import { readXlsxHyperlinks, writeXlsxHyperlinks } from "../hyperlinks.js";
+import { materializeXlsxStyleColors } from "../xlsx-colors.js";
 
 describe("named cell styles", () => {
   test("writes and restores a custom style through cellStyleXfs and cellStyles", async () => {
@@ -185,9 +186,16 @@ describe("named cell styles", () => {
       `<?xml version="1.0"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:themeElements><a:clrScheme name="test"><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="222222"/></a:dk2><a:lt2><a:srgbClr val="EEEEEE"/></a:lt2><a:accent1><a:srgbClr val="336699"/></a:accent1><a:accent2><a:srgbClr val="000000"/></a:accent2><a:accent3><a:srgbClr val="000000"/></a:accent3><a:accent4><a:srgbClr val="000000"/></a:accent4><a:accent5><a:srgbClr val="000000"/></a:accent5><a:accent6><a:srgbClr val="000000"/></a:accent6></a:clrScheme></a:themeElements></a:theme>`,
     );
     expect(readXlsxCellStyles(styles, theme)[0]?.style).toMatchObject({
-      textColor: "#4D6073",
+      textColor: "#264C73",
       fillColor: "#FF0000",
     });
+  });
+
+  test("uses HSL lightness for theme tints", () => {
+    const styles = `<styleSheet><fonts><font><color theme="4" tint="0.5"/></font><font><color theme="4" tint="-0.5"/></font></fonts></styleSheet>`;
+    const theme = `<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:clrScheme><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt2><a:srgbClr val="EEEEEE"/></a:lt2><a:dk2><a:srgbClr val="1F1F1F"/></a:dk2><a:accent1><a:srgbClr val="FF0000"/></a:accent1><a:accent2><a:srgbClr val="000000"/></a:accent2><a:accent3><a:srgbClr val="000000"/></a:accent3><a:accent4><a:srgbClr val="000000"/></a:accent4><a:accent5><a:srgbClr val="000000"/></a:accent5><a:accent6><a:srgbClr val="000000"/></a:accent6></a:clrScheme></a:theme>`;
+    expect(materializeXlsxStyleColors(styles, theme)).toContain('rgb="FFFF8080"');
+    expect(materializeXlsxStyleColors(styles, theme)).toContain('rgb="FF800000"');
   });
 
   test("adds hyperlinks after validations without colliding with existing relationships", () => {

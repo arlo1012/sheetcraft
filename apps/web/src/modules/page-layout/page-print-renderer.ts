@@ -5,6 +5,7 @@ import {
   type Sheet,
   type SheetEvaluator,
 } from "@idea10/core/workbook";
+import type { WorkbookTheme } from "@idea10/core/workbook-theme";
 import {
   DEFAULT_SHEET_PAGE_SETUP,
   cloneSheetPageSetup,
@@ -32,6 +33,7 @@ import {
   createFloatingImageCanvasCache,
   paintFloatingImages,
 } from "../sheet-images/floating-image-painter";
+import { getDrawingThemeEffects } from "../sheet-images/drawing-theme-effects";
 import { paintWatermarkInRect } from "../page-decorations/page-decoration-painter";
 import { previewHeaderFooterRuns, type HeaderFooterRun } from "./header-footer-text";
 
@@ -185,6 +187,7 @@ function createPreviewPages(
 
 export function createPrintPreviewDocument(options: {
   sheet: Sheet;
+  theme?: WorkbookTheme;
   evaluator: SheetEvaluator;
   setup?: SheetPageSetup;
   sheetName?: string;
@@ -199,6 +202,7 @@ export function createPrintPreviewDocument(options: {
   );
   const baseDisplay = createSheetDisplaySnapshot({
     sheet: options.sheet,
+    theme: options.theme,
     evaluator: options.evaluator,
     revision: options.revision,
     dateSystem: options.dateSystem,
@@ -513,6 +517,7 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
     document: PrintPreviewDocument;
     page: PrintPreviewPage;
     imageAssetUrls?: ReadonlyMap<string, string>;
+    theme?: WorkbookTheme;
     scale?: number;
     density?: number;
   }): void {
@@ -652,6 +657,7 @@ export function createPrintPreviewRenderer(onImageLoad?: () => void) {
           },
           loadingLabel: "",
           unavailableLabel: "",
+          effects: getDrawingThemeEffects(options.theme),
         });
       context.restore();
     };

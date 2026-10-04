@@ -2,6 +2,8 @@
 import { Select as TSelect } from "tdesign-vue-next/es/select";
 import type { SelectValue } from "tdesign-vue-next/es/select/type";
 import { computed, ref } from "vue";
+import { resolveThemeFontFamily } from "@idea10/core/workbook-theme";
+import { useWorkbookTheme } from "../../../shared/color/workbook-theme-context";
 import {
   DEFAULT_CELL_FONT_FAMILY,
   DEFAULT_CELL_FONT_SIZE,
@@ -41,19 +43,37 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
+const workbookTheme = useWorkbookTheme();
 const fontFamilyPopupVisible = ref(false);
 const fontSizePopupVisible = ref(false);
-const fontFamilyOptions = computed(() =>
-  CELL_FONT_FAMILY_PRESETS.map((family) => ({
+const fontFamilyOptions = computed(() => [
+  ...(workbookTheme?.value
+    ? [
+        {
+          label: `${t("pageTools.themeHeadingFont")} (${workbookTheme.value.fonts?.headingEastAsia ?? workbookTheme.value.headingFont})`,
+          value: "theme:major",
+        },
+        {
+          label: `${t("pageTools.themeBodyFont")} (${workbookTheme.value.fonts?.bodyEastAsia ?? workbookTheme.value.bodyFont})`,
+          value: "theme:minor",
+        },
+      ]
+    : []),
+  ...CELL_FONT_FAMILY_PRESETS.map((family) => ({
     label: family === DEFAULT_CELL_FONT_FAMILY ? t("format.defaultFont") : family,
     value: family,
   })),
-);
-const fontFamilyValue = computed(() =>
-  props.state.fontFamily.mixed
-    ? undefined
-    : (props.state.fontFamily.value ?? DEFAULT_CELL_FONT_FAMILY),
-);
+]);
+const fontFamilyValue = computed(() => {
+  if (props.state.fontFamily.mixed) return undefined;
+  const family = props.state.fontFamily.value;
+  if (workbookTheme?.value) {
+    if (family === resolveThemeFontFamily(workbookTheme.value, "major")) return "theme:major";
+    if (!family || family === resolveThemeFontFamily(workbookTheme.value, "minor"))
+      return "theme:minor";
+  }
+  return family ?? DEFAULT_CELL_FONT_FAMILY;
+});
 const fontSizeValue = computed(() =>
   props.state.fontSize.mixed ? undefined : (props.state.fontSize.value ?? DEFAULT_CELL_FONT_SIZE),
 );
@@ -80,6 +100,14 @@ const resolvedFontSizePopupProps = computed(() => ({
 
 function setFontFamily(value: SelectValue): void {
   if (typeof value !== "string" || !value) {
+    return;
+  }
+  if ((value === "theme:major" || value === "theme:minor") && workbookTheme?.value) {
+    const role = value === "theme:major" ? "major" : "minor";
+    emit("applyStyle", {
+      fontFamily: resolveThemeFontFamily(workbookTheme.value, role),
+      fontTheme: role,
+    });
     return;
   }
   emit("applyStyle", {

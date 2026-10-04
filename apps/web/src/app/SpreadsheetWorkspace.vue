@@ -5,6 +5,7 @@ import type { SheetGoToOptions } from "@idea10/core/go-to";
 import {
   computed,
   nextTick,
+  provide,
   ref,
   shallowRef,
   shallowReactive,
@@ -56,6 +57,7 @@ import ViewToolbar from "../modules/view-tools/components/ViewToolbar.vue";
 import PagePrintPreview from "../modules/page-layout/components/PagePrintPreview.vue";
 import PageThemeMenu from "../modules/page-layout/components/PageThemeMenu.vue";
 import { usePageThemeController } from "../modules/page-layout/usePageThemeController";
+import { workbookThemeKey } from "../shared/color/workbook-theme-context";
 import PageBackgroundMenu from "../modules/page-decorations/components/PageBackgroundMenu.vue";
 import type { SheetWatermark, WatermarkPreset } from "@idea10/core/page-decoration";
 import PageWatermarkMenu from "../modules/page-decorations/components/PageWatermarkMenu.vue";
@@ -895,6 +897,12 @@ function onCancelFormulaEdit(sheetId?: string): void {
 }
 
 const assetStore = props.imageAssetStore ?? createIndexedDbImageAssetStore();
+const workbookTheme = computed(() => {
+  void workbookRevision.value;
+  return session.workbook.theme;
+});
+provide(workbookThemeKey, workbookTheme);
+const themeDialogVisible = ref(false);
 const pageThemeController = usePageThemeController({
   isBusy: () =>
     loading.value ||
@@ -1632,6 +1640,7 @@ function setShowFormulaBar(visible: boolean): void {
 
 function onWorkspaceKeydown(event: KeyboardEvent): void {
   if (
+    themeDialogVisible.value ||
     backgroundConflictVisible.value ||
     printPreviewVisible.value ||
     watermarkVisible.value ||
@@ -1864,7 +1873,9 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         >
           <template #appearance>
             <PageThemeMenu
-              :theme="session.workbook.theme"
+              :theme="workbookTheme"
+              :context-key="String(workbookGeneration)"
+              @update:dialog-visible="themeDialogVisible = $event"
               :disabled="
                 loading ||
                 fileBusy ||
@@ -2698,12 +2709,14 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
         formulaInsertVisible ||
         printPreviewVisible ||
         backgroundConflictVisible ||
+        themeDialogVisible ||
         watermarkVisible ||
         (pageSetupVisible && !pickingPageSetupRange) ||
         !!modalValidationFeedback
       "
     >
       <SheetGrid
+        :theme="workbookTheme"
         :show-page-breaks="showPageBreaks"
         :view-mode="activeViewMode"
         :page-setup="activePageSetup"
@@ -2794,6 +2807,7 @@ function onWorkspaceKeydown(event: KeyboardEvent): void {
       />
     </div>
     <PagePrintPreview
+      :theme="workbookTheme"
       v-if="printPreviewVisible"
       v-model:visible="printPreviewVisible"
       :sheet="activeSheet"

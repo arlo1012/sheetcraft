@@ -8,6 +8,11 @@ import {
   type CellFillGradientStop,
   type CellFillPatternStyle,
 } from "./cell-fill.js";
+import {
+  normalizeThemeColorReference,
+  type ThemeColorReference,
+  type ThemeFontRole,
+} from "./workbook-theme.js";
 
 export {
   CELL_FILL_PATTERNS,
@@ -162,6 +167,8 @@ export type CellBorderFormatPatch = {
 
 export type CellStyle = {
   fontFamily?: string;
+  /** Live major/minor binding; fontFamily stores its resolved display cache. */
+  fontTheme?: ThemeFontRole;
   fontSize?: number;
   bold?: true;
   italic?: true;
@@ -169,7 +176,11 @@ export type CellStyle = {
   strikethrough?: true;
   fontScript?: CellFontScript;
   textColor?: string;
+  /** Live theme color binding; textColor stores its resolved RGB cache. */
+  textColorTheme?: ThemeColorReference;
   fillColor?: string;
+  /** Live theme color binding; fillColor stores its resolved RGB cache. */
+  fillColorTheme?: ThemeColorReference;
   fillPattern?: CellFillPatternStyle;
   fillPatternColor?: string;
   fillGradient?: CellFillGradient;
@@ -195,6 +206,7 @@ export type CellStylePatch = {
 
 export const CELL_STYLE_KEYS = [
   "fontFamily",
+  "fontTheme",
   "fontSize",
   "bold",
   "italic",
@@ -202,7 +214,9 @@ export const CELL_STYLE_KEYS = [
   "strikethrough",
   "fontScript",
   "textColor",
+  "textColorTheme",
   "fillColor",
+  "fillColorTheme",
   "fillPattern",
   "fillPatternColor",
   "fillGradient",
@@ -458,8 +472,8 @@ function normalizeFontFamily(value: unknown): string {
     throw new TypeError("Cell font family must be a string.");
   }
   const family = value.trim();
-  if (!family || family.length > 80) {
-    throw new RangeError("Cell font family must contain between 1 and 80 characters.");
+  if (!family || family.length > 256) {
+    throw new RangeError("Cell font family must contain between 1 and 256 characters.");
   }
   return family;
 }
@@ -730,6 +744,11 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
   if (key === "fontFamily") {
     return normalizeFontFamily(value) as CellStyle[Key];
   }
+  if (key === "fontTheme") {
+    if (value !== "major" && value !== "minor")
+      throw new TypeError("Cell theme font must be major or minor.");
+    return value as CellStyle[Key];
+  }
   if (key === "fontSize") {
     return normalizeFontSize(value) as CellStyle[Key];
   }
@@ -757,6 +776,9 @@ function normalizeStyleValue<Key extends keyof CellStyle>(
           ? "Cell fill color"
           : "Cell fill pattern color",
     ) as CellStyle[Key];
+  }
+  if (key === "textColorTheme" || key === "fillColorTheme") {
+    return normalizeThemeColorReference(value as ThemeColorReference) as CellStyle[Key];
   }
   if (key === "fillPattern") {
     return normalizeFillPattern(value) as CellStyle[Key];
@@ -843,6 +865,18 @@ export function mergeCellStyle(
     }
   }
   mergeCellFillFields(merged, normalizedPatch);
+  // A direct color/font is an explicit override; selecting a theme reference is the inverse.
+  if ("fontFamily" in normalizedPatch && !("fontTheme" in normalizedPatch)) delete merged.fontTheme;
+  if ("fontTheme" in normalizedPatch && !("fontFamily" in normalizedPatch))
+    delete merged.fontFamily;
+  if ("textColor" in normalizedPatch && !("textColorTheme" in normalizedPatch))
+    delete merged.textColorTheme;
+  if ("textColorTheme" in normalizedPatch && !("textColor" in normalizedPatch))
+    delete merged.textColor;
+  if ("fillColor" in normalizedPatch && !("fillColorTheme" in normalizedPatch))
+    delete merged.fillColorTheme;
+  if ("fillColorTheme" in normalizedPatch && !("fillColor" in normalizedPatch))
+    delete merged.fillColor;
   return normalizeCellStyle(merged);
 }
 
@@ -850,6 +884,7 @@ export function mergeCellStyle(
 function normalizeCellFillFields(style: CellStyle): void {
   if (style.fillGradient) {
     delete style.fillColor;
+    delete style.fillColorTheme;
     delete style.fillPattern;
     delete style.fillPatternColor;
     return;
@@ -867,6 +902,7 @@ function mergeCellFillFields(style: CellStyle, patch: CellStylePatch): void {
 
   if (gradient) {
     delete style.fillColor;
+    delete style.fillColorTheme;
     delete style.fillPattern;
     delete style.fillPatternColor;
     return;

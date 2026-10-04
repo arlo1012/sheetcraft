@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, watch } from "vue";
+import type { ThemeColorReference } from "@idea10/core/workbook-theme";
 import ColorPalette from "../../../shared/color/ColorPalette.vue";
 import { useDismissibleFloatingPanel } from "../../../shared/floating/useDismissibleFloatingPanel";
 import { useAppI18n } from "../../../shared/i18n";
@@ -10,13 +11,14 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<{
   label: string;
   value: string | null;
+  reference?: ThemeColorReference;
   defaultColor: string;
   defaultLabel: string;
   disabled: boolean;
 }>();
 
 const emit = defineEmits<{
-  change: [color: string | null];
+  change: [color: string | null, reference?: ThemeColorReference];
 }>();
 
 const { t } = useAppI18n();
@@ -52,16 +54,18 @@ function togglePanel(): void {
   }
 }
 
-function selectColor(color: string | null): void {
+function selectColor(color: string | null, reference?: ThemeColorReference): void {
   if (props.disabled) return;
   const defaultColor = props.defaultColor.toLowerCase();
-  emit("change", color?.toLowerCase() === defaultColor ? null : color);
+  if (reference) emit("change", color, reference);
+  else emit("change", color?.toLowerCase() === defaultColor ? null : color);
   closePanel(true);
 }
 
 function applyCurrentColor(): void {
   if (props.disabled) return;
-  emit("change", props.value);
+  if (props.reference) emit("change", props.value, props.reference);
+  else emit("change", props.value);
   closePanel(false);
 }
 

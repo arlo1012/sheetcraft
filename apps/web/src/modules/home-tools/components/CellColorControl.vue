@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
+import { resolveThemeColor, type ThemeColorReference } from "@idea10/core/workbook-theme";
+import { useWorkbookTheme } from "../../../shared/color/workbook-theme-context";
 import {
   DEFAULT_CELL_FILL_COLOR,
   DEFAULT_CELL_TEXT_COLOR,
@@ -18,7 +20,14 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useAppI18n();
-const selectedColor = ref<string | null>(props.kind === "text" ? "#ff0000" : "#ffff00");
+const workbookTheme = useWorkbookTheme();
+const rememberedColor = ref<string | null>(props.kind === "text" ? "#ff0000" : "#ffff00");
+const selectedReference = ref<ThemeColorReference>();
+const selectedColor = computed(() =>
+  selectedReference.value && workbookTheme?.value
+    ? resolveThemeColor(workbookTheme.value, selectedReference.value)
+    : rememberedColor.value,
+);
 const defaultColor = computed(() =>
   props.kind === "text" ? DEFAULT_CELL_TEXT_COLOR : DEFAULT_CELL_FILL_COLOR,
 );
@@ -30,10 +39,16 @@ const defaultLabel = computed(() =>
   t(props.kind === "text" ? "cellFormat.automatic" : "cellFormat.noFill"),
 );
 
-function applyColor(color: string | null): void {
+function applyColor(color: string | null, reference?: ThemeColorReference): void {
   if (props.disabled) return;
-  selectedColor.value = color;
-  emit("applyStyle", props.kind === "text" ? { textColor: color } : { fillColor: color });
+  rememberedColor.value = color;
+  selectedReference.value = reference;
+  emit(
+    "applyStyle",
+    props.kind === "text"
+      ? { textColor: color, ...(reference ? { textColorTheme: reference } : {}) }
+      : { fillColor: color, ...(reference ? { fillColorTheme: reference } : {}) },
+  );
 }
 </script>
 
@@ -42,6 +57,7 @@ function applyColor(color: string | null): void {
     <CellColorPicker
       :label="label"
       :value="selectedColor"
+      :reference="selectedReference"
       :default-color="defaultColor"
       :default-label="defaultLabel"
       :disabled="disabled"

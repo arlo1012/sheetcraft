@@ -6,6 +6,7 @@ import { Button as TButton } from "tdesign-vue-next/es/button";
 import { ChevronLeft, ChevronRight, Printer } from "lucide-vue-next";
 import type { Sheet, SheetEvaluator } from "@idea10/core/workbook";
 import type { SheetPageSetup } from "@idea10/core/page-setup";
+import type { WorkbookTheme } from "@idea10/core/workbook-theme";
 import { useAppI18n } from "../../../shared/i18n";
 import {
   createPrintPreviewDocument,
@@ -24,6 +25,7 @@ const props = withDefaults(
     dateSystem?: "1900" | "1904";
     workbookRevision?: number;
     imageAssetUrls?: ReadonlyMap<string, string>;
+    theme?: WorkbookTheme;
   }>(),
   { fileName: "workbook.xlsx", locale: "en-US", dateSystem: "1900" },
 );
@@ -42,6 +44,7 @@ const renderer = createPrintPreviewRenderer(() => {
 const documentPreview = computed<PrintPreviewDocument | undefined>(() => {
   try {
     const result = createPrintPreviewDocument({
+      theme: props.theme,
       sheet: props.sheet,
       evaluator: props.evaluator,
       setup: props.setup,
@@ -84,6 +87,7 @@ function render(): void {
         document,
         page,
         imageAssetUrls: props.imageAssetUrls,
+        theme: props.theme,
         scale: 0.15,
         density: 1,
       });
@@ -94,6 +98,7 @@ function render(): void {
       document,
       page: activePage.value,
       imageAssetUrls: props.imageAssetUrls,
+      theme: props.theme,
       scale: 0.6,
       density: 1,
     });
@@ -135,6 +140,7 @@ async function print(): Promise<void> {
         document,
         page,
         imageAssetUrls: props.imageAssetUrls,
+        theme: props.theme,
         scale: 1,
         density: 2,
       });
@@ -172,7 +178,14 @@ async function print(): Promise<void> {
   }
 }
 watch(
-  [() => props.visible, documentPreview, () => props.imageAssetUrls, repaint, selected],
+  [
+    () => props.visible,
+    documentPreview,
+    () => props.imageAssetUrls,
+    () => props.theme,
+    repaint,
+    selected,
+  ],
   async () => {
     if (!props.visible) return;
     if (selected.value >= pages.value.length) selected.value = Math.max(0, pages.value.length - 1);

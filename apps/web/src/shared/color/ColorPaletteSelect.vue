@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import type { ThemeColorReference } from "@idea10/core/workbook-theme";
 import { useAppI18n } from "../i18n";
 import PanelSelect from "../panel-select/PanelSelect.vue";
 import ColorPalette from "./ColorPalette.vue";
@@ -13,13 +14,16 @@ const props = withDefaults(
     mixed?: boolean;
     disabled?: boolean;
     showValue?: boolean;
+    showDefault?: boolean;
   }>(),
-  { defaultColor: "#000000", mixed: false, disabled: false, showValue: false },
+  { defaultColor: "#000000", mixed: false, disabled: false, showValue: false, showDefault: true },
 );
-const emit = defineEmits<{ select: [color: string | null] }>();
+const emit = defineEmits<{ select: [color: string | null, reference?: ThemeColorReference] }>();
 const { t } = useAppI18n();
 const color = computed(() => props.modelValue ?? props.defaultColor);
-const automatic = computed(() => color.value.toLowerCase() === props.defaultColor.toLowerCase());
+const automatic = computed(
+  () => props.showDefault && color.value.toLowerCase() === props.defaultColor.toLowerCase(),
+);
 const resolvedDefaultLabel = computed(() => props.defaultLabel ?? t("cellFormat.automatic"));
 const valueLabel = computed(() => {
   if (props.mixed) return t("format.mixed");
@@ -27,8 +31,13 @@ const valueLabel = computed(() => {
   return automatic.value ? resolvedDefaultLabel.value : color.value.toUpperCase();
 });
 
-function select(value: string | null, close: () => void): void {
-  emit("select", value);
+function select(
+  value: string | null,
+  reference: ThemeColorReference | undefined,
+  close: () => void,
+): void {
+  if (reference) emit("select", value, reference);
+  else emit("select", value);
   close();
 }
 </script>
@@ -66,7 +75,8 @@ function select(value: string | null, close: () => void): void {
         :default-color="defaultColor"
         :default-label="resolvedDefaultLabel"
         :mixed="mixed"
-        @select="select($event, close)"
+        :show-default="showDefault"
+        @select="(value, reference) => select(value, reference, close)"
       />
     </template>
   </PanelSelect>

@@ -1,4 +1,5 @@
 import { computed, ref, watch } from "vue";
+import type { ThemeColorReference } from "@idea10/core/workbook-theme";
 import {
   DEFAULT_CELL_FONT_FAMILY,
   DEFAULT_CELL_FONT_SIZE,
@@ -23,7 +24,7 @@ type FontFormatKey =
   | "textColor"
   | "strikethrough"
   | "fontScript";
-export type FontFormatPatch = Pick<CellStylePatch, FontFormatKey>;
+export type FontFormatPatch = Pick<CellStylePatch, FontFormatKey | "textColorTheme" | "fontTheme">;
 export type FontFormatState = Pick<
   SelectionCellStyleState,
   Exclude<FontFormatKey, "underline"> | "underlineStyle"
@@ -245,8 +246,15 @@ export function useFontFormatPanel(props: Props, update: (patch: FontFormatPatch
   function setScript(value: CellFontScript, checked: boolean): void {
     update({ fontScript: checked ? value : null });
   }
-  function setColor(value: string | null): void {
-    update({ textColor: value });
+  function setColor(value: string | null, reference?: ThemeColorReference): void {
+    update({
+      textColor: value,
+      ...(reference
+        ? { textColorTheme: reference }
+        : props.patch.textColorTheme
+          ? { textColorTheme: null }
+          : {}),
+    });
   }
   const previewStyle = computed<CellStyle>(() => ({
     fontFamily: family.value ?? defaultFamily.value,

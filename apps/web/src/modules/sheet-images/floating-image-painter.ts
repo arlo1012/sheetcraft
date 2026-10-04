@@ -7,10 +7,12 @@ import {
 import type { Rect } from "@idea10/sheet-engine/geometry";
 import type { SheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import { getImagePresentation } from "../../shared/images/imagePresentation";
+import { hasVisibleDrawingThemeEffects, type DrawingThemeEffects } from "./drawing-theme-effects";
 
 export type FloatingImagePaintState = Readonly<{
   images: readonly FloatingImage[];
   revision: number;
+  effects?: DrawingThemeEffects;
 }>;
 
 export type FloatingImageCanvasCache = ReturnType<typeof createFloatingImageCanvasCache>;
@@ -26,7 +28,7 @@ function clip(context: CanvasRenderingContext2D, rect: Rect): void {
   context.clip();
 }
 
-function paintImage(
+function paintImageContent(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement,
   rect: Rect,
@@ -34,7 +36,6 @@ function paintImage(
 ): void {
   const geometry = getImagePresentation(transform, image.naturalWidth, image.naturalHeight);
   if (geometry.width <= 0 || geometry.height <= 0) return;
-  context.save();
   context.translate(rect.x, rect.y);
   context.scale(rect.width / geometry.width, rect.height / geometry.height);
   const rotation = transform?.rotation ?? 0;
@@ -58,7 +59,77 @@ function paintImage(
     geometry.cropWidth,
     geometry.cropHeight,
   );
+}
+
+function paintThemeOutline(
+  context: CanvasRenderingContext2D,
+  rect: Rect,
+  effects: DrawingThemeEffects,
+): void {
+  const outlineWidth = Math.max(0, effects.outlineWidth);
+  if (outlineWidth > 0) {
+    context.save();
+    context.lineWidth = outlineWidth;
+    context.strokeStyle = "rgb(54 78 110 / 72%)";
+    const inset = outlineWidth / 2;
+    context.strokeRect(
+      rect.x + inset,
+      rect.y + inset,
+      Math.max(0, rect.width - outlineWidth),
+      Math.max(0, rect.height - outlineWidth),
+    );
+    context.restore();
+  }
+  if (effects.bevel) {
+    context.save();
+    context.lineWidth = 1;
+    context.strokeStyle = "rgb(255 255 255 / 76%)";
+    context.beginPath();
+    context.moveTo(rect.x + 0.5, rect.y + rect.height - 0.5);
+    context.lineTo(rect.x + 0.5, rect.y + 0.5);
+    context.lineTo(rect.x + rect.width - 0.5, rect.y + 0.5);
+    context.stroke();
+    context.strokeStyle = "rgb(0 0 0 / 40%)";
+    context.beginPath();
+    context.moveTo(rect.x + rect.width - 0.5, rect.y + 0.5);
+    context.lineTo(rect.x + rect.width - 0.5, rect.y + rect.height - 0.5);
+    context.lineTo(rect.x + 0.5, rect.y + rect.height - 0.5);
+    context.stroke();
+    context.restore();
+  }
+}
+
+function paintImage(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  rect: Rect,
+  transform: ImageTransform | undefined,
+  effects: DrawingThemeEffects | undefined,
+): void {
+  context.save();
+  if (effects?.shadow === "soft") {
+    context.shadowColor = "rgb(0 0 0 / 28%)";
+    context.shadowBlur = 8;
+    context.shadowOffsetX = 2;
+    context.shadowOffsetY = 3;
+  } else if (effects?.shadow === "hard") {
+    context.shadowColor = "rgb(0 0 0 / 42%)";
+    context.shadowBlur = 1;
+    context.shadowOffsetX = 3;
+    context.shadowOffsetY = 3;
+  }
+  paintImageContent(context, image, rect, transform);
   context.restore();
+
+  if (effects?.reflection) {
+    context.save();
+    context.globalAlpha = 0.22;
+    context.translate(0, 2 * (rect.y + rect.height));
+    context.scale(1, -1);
+    paintImageContent(context, image, rect, transform);
+    context.restore();
+  }
+  if (effects) paintThemeOutline(context, rect, effects);
 }
 
 function paintPlaceholder(
@@ -131,6 +202,7 @@ export function paintFloatingImages(
     palette: FloatingImagePaintPalette;
     loadingLabel: string;
     unavailableLabel: string;
+    effects?: DrawingThemeEffects;
   },
 ): void {
   const visibleUrls = new Set<string>();
@@ -139,11 +211,22 @@ export function paintFloatingImages(
     options.layout,
   )) {
     context.save();
-    clip(context, fragment.clippedRect);
+    const pane = options.layout.panes[fragment.paneId];
+    // Effects may extend beyond the image bounds but must not cross frozen panes.
+    clip(context, pane.clip);
     const url = options.assetUrls.get(fragment.image.assetId);
     if (url) visibleUrls.add(url);
     const image = url ? options.cache.get(url) : undefined;
-    if (image) paintImage(context, image, fragment.rect, fragment.image.transform);
+    if (image)
+      paintImage(
+        context,
+        image,
+        fragment.rect,
+        fragment.image.transform,
+        hasVisibleDrawingThemeEffects(options.effects ?? options.state.effects)
+          ? (options.effects ?? options.state.effects)
+          : undefined,
+      );
     else {
       paintPlaceholder(
         context,

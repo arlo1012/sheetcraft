@@ -68,6 +68,7 @@ describe("workbook command transport", () => {
       conditionalFormats: [],
       tables: [],
       pageSetup: DEFAULT_SHEET_PAGE_SETUP,
+      pageDecoration: {},
       floatingImages: [],
     });
     expectTransportSafe(command);

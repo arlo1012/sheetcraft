@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import type { ThemeColorReference } from "@idea10/core/workbook-theme";
 import {
   CELL_FILL_PATTERNS,
   mergeCellStyle,
@@ -56,14 +57,23 @@ function isPattern(value: unknown): value is CellFillPatternStyle {
 function clearFill(): void {
   emit("update:patch", {
     fillColor: null,
+    ...(props.patch.fillColorTheme ? { fillColorTheme: null } : {}),
     fillPattern: null,
     fillPatternColor: null,
     fillGradient: null,
   });
 }
-function setColor(color: string | null): void {
+function setColor(color: string | null, reference?: ThemeColorReference): void {
   if (color === null) return clearFill();
-  emit("update:patch", { fillColor: color, fillGradient: null });
+  emit("update:patch", {
+    fillColor: color,
+    fillGradient: null,
+    ...(reference
+      ? { fillColorTheme: reference }
+      : props.patch.fillColorTheme
+        ? { fillColorTheme: null }
+        : {}),
+  });
 }
 function setPattern(value: unknown): void {
   if (value === "none") emit("update:patch", { fillPattern: null, fillPatternColor: null });

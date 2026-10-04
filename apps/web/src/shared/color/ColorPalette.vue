@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ChevronRight } from "lucide-vue-next";
+import type { ThemeColorReference } from "@idea10/core/workbook-theme";
 import { ColorPickerPanel } from "tdesign-vue-next/es/color-picker";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useAppI18n } from "../i18n";
+import { useWorkbookTheme } from "./workbook-theme-context";
+import { createWorkbookThemePalette } from "./workbook-theme-palette";
 import { createColorPickerSelectInputProps } from "../tdesign/colorPickerPopup";
 import {
   PRESET_COLORS,
@@ -38,8 +41,9 @@ const props = withDefaults(
   },
 );
 
-const emit = defineEmits<{ select: [color: string | null] }>();
+const emit = defineEmits<{ select: [color: string | null, reference?: ThemeColorReference] }>();
 const { t } = useAppI18n();
+const workbookTheme = useWorkbookTheme();
 const recentColors = ref<string[]>([]);
 const showingMore = ref(false);
 const draftColor = ref(
@@ -61,7 +65,14 @@ const allowedColorSet = computed(() => {
 });
 const allowedColors = computed(() => [...(allowedColorSet.value ?? [])]);
 const isRestricted = computed(() => allowedColorSet.value !== undefined);
-const themeColors = computed(() => (isRestricted.value ? allowedColors.value : PRESET_COLORS));
+const themeSwatches = computed(() =>
+  workbookTheme?.value ? createWorkbookThemePalette(workbookTheme.value) : undefined,
+);
+const themeColors = computed(() =>
+  isRestricted.value
+    ? allowedColors.value
+    : (themeSwatches.value?.map((swatch) => swatch.color) ?? PRESET_COLORS),
+);
 const standardColors = computed(() => (isRestricted.value ? [] : STANDARD_COLORS));
 const paletteRecentColors = computed(() => (isRestricted.value ? [] : recentColors.value));
 const allSwatches = computed(() => [
@@ -111,11 +122,12 @@ function canChooseColor(color: string | undefined): color is string {
   );
 }
 
-function chooseColor(color: string): void {
+function chooseColor(color: string, reference?: ThemeColorReference): void {
   const normalized = normalizeColor(color);
   if (!canChooseColor(normalized)) return;
   recentColors.value = recordRecentColor(normalized);
-  emit("select", normalized);
+  if (reference) emit("select", normalized, reference);
+  else emit("select", normalized);
 }
 
 function isColorSelected(color: string): boolean {
@@ -238,7 +250,9 @@ function getPanelAttach(): HTMLElement {
             :aria-label="t('colorPalette.colorValue', { value: color.toUpperCase() })"
             :title="t('colorPalette.colorValue', { value: color.toUpperCase() })"
             :tabindex="focusedSwatch === index ? 0 : -1"
-            @click="chooseColor(color)"
+            @click="
+              chooseColor(color, isRestricted ? undefined : themeSwatches?.[index]?.reference)
+            "
             @keydown="onSwatchKeydown($event, index, gridColumns)"
           />
         </div>

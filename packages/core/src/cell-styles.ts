@@ -4,7 +4,11 @@ import {
   type CellStyle,
   type CellStylePatch,
 } from "./style.js";
-import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "./workbook-theme.js";
+import {
+  DEFAULT_WORKBOOK_THEME,
+  resolveThemeFontFamily,
+  type WorkbookTheme,
+} from "./workbook-theme.js";
 
 /** The format groups which Excel exposes in the Style dialog. */
 export type CellStyleInclude = "number" | "alignment" | "font" | "border" | "fill";
@@ -24,6 +28,7 @@ const INCLUDE_KEYS: Record<CellStyleInclude, readonly (keyof CellStyle)[]> = {
   ],
   font: [
     "fontFamily",
+    "fontTheme",
     "fontSize",
     "bold",
     "italic",
@@ -31,6 +36,7 @@ const INCLUDE_KEYS: Record<CellStyleInclude, readonly (keyof CellStyle)[]> = {
     "strikethrough",
     "fontScript",
     "textColor",
+    "textColorTheme",
   ],
   border: [
     "borderTop",
@@ -40,7 +46,7 @@ const INCLUDE_KEYS: Record<CellStyleInclude, readonly (keyof CellStyle)[]> = {
     "borderDiagonalUp",
     "borderDiagonalDown",
   ],
-  fill: ["fillColor", "fillPattern", "fillPatternColor", "fillGradient"],
+  fill: ["fillColor", "fillColorTheme", "fillPattern", "fillPatternColor", "fillGradient"],
 };
 
 /** Groups used by the Cell Styles gallery. Names are localized by the UI from stable IDs. */
@@ -214,13 +220,19 @@ export function createBuiltinCellStyles(
 ): CellStyleDefinition[] {
   const frame = { style: "thin", color: "#808080" } as const;
   const framed = { borderTop: frame, borderRight: frame, borderBottom: frame, borderLeft: frame };
-  // Preserve the established Office gallery exactly; non-Office themes supply themed heading fonts.
-  const headingFont =
-    theme.headingFont === DEFAULT_WORKBOOK_THEME.headingFont
-      ? {}
-      : { fontFamily: theme.headingFont };
+  // Named title styles stay bound to the theme; direct fontFamily values remain user overrides.
+  const headingFont = {
+    fontFamily: resolveThemeFontFamily(theme, "major"),
+    fontTheme: "major" as const,
+  };
   const styles: CellStyleDefinition[] = [
-    builtin("normal", "Normal", "goodBadNeutral", createClearCellStylePatch(), 0),
+    builtin(
+      "normal",
+      "Normal",
+      "goodBadNeutral",
+      { fontFamily: resolveThemeFontFamily(theme, "minor"), fontTheme: "minor" },
+      0,
+    ),
     builtin("good", "Good", "goodBadNeutral", { textColor: "#006100", fillColor: "#c6efce" }),
     builtin("bad", "Bad", "goodBadNeutral", { textColor: "#9c0006", fillColor: "#ffc7ce" }),
     builtin("neutral", "Neutral", "goodBadNeutral", { textColor: "#9c6500", fillColor: "#ffeb9c" }),
@@ -259,12 +271,14 @@ export function createBuiltinCellStyles(
       fontSize: 20,
       bold: true,
       textColor: theme.accentColors[0],
+      textColorTheme: { slot: "accent1" },
     }),
     builtin("heading-1", "Heading 1", "titles", {
       fontSize: 16,
       bold: true,
       ...headingFont,
       textColor: theme.accentColors[0],
+      textColorTheme: { slot: "accent1" },
       borderBottom: { style: "thin", color: theme.accentColors[0] },
     }),
     builtin("heading-2", "Heading 2", "titles", {
@@ -272,6 +286,7 @@ export function createBuiltinCellStyles(
       bold: true,
       ...headingFont,
       textColor: theme.accentColors[0],
+      textColorTheme: { slot: "accent1" },
       borderBottom: { style: "thin", color: theme.accentColors[1] },
     }),
     builtin("heading-3", "Heading 3", "titles", {
@@ -279,12 +294,14 @@ export function createBuiltinCellStyles(
       bold: true,
       ...headingFont,
       textColor: theme.accentColors[0],
+      textColorTheme: { slot: "accent1" },
       borderBottom: { style: "thin", color: theme.accentColors[2] },
     }),
     builtin("heading-4", "Heading 4", "titles", {
       ...headingFont,
       bold: true,
       textColor: theme.accentColors[0],
+      textColorTheme: { slot: "accent1" },
     }),
     builtin("total", "Total", "titles", {
       bold: true,

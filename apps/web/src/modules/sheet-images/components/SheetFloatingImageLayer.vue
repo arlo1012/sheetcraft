@@ -28,6 +28,7 @@ import type { FloatingReference } from "../../../shared/floating/useFloatingPane
 import { useAppI18n } from "../../../shared/i18n";
 import SheetFloatingImageContextMenu from "./SheetFloatingImageContextMenu.vue";
 import SheetFloatingImageSelection from "./SheetFloatingImageSelection.vue";
+import type { DrawingThemeEffects } from "../drawing-theme-effects";
 
 import { useFloatingImageEditing } from "../useFloatingImageEditing";
 import {
@@ -50,6 +51,8 @@ const MINIMUM_IMAGE_SIZE = 24;
 const props = withDefaults(
   defineProps<{
     images: readonly FloatingImage[];
+    /** Canvas renders image effects; the DOM layer retains this for overlays and future object handles. */
+    effects?: DrawingThemeEffects;
     layout: SheetViewportLayout;
     assetUrls: ReadonlyMap<string, string>;
     loadingAssetIds?: ReadonlySet<string>;
@@ -468,7 +471,7 @@ function requestDelete(): void {
 }
 
 function getPaintState(): FloatingImagePaintState {
-  return { images: displayImages(), revision: paintRevision.value };
+  return { images: displayImages(), revision: paintRevision.value, effects: props.effects };
 }
 
 function emitPaintState(): void {
@@ -555,7 +558,14 @@ watch(
 );
 
 watch(
-  [() => props.images, previewImage, crop, () => props.layout, () => props.assetUrls],
+  [
+    () => props.images,
+    previewImage,
+    crop,
+    () => props.layout,
+    () => props.assetUrls,
+    () => props.effects,
+  ],
   emitPaintState,
   { deep: false, flush: "post", immediate: true },
 );

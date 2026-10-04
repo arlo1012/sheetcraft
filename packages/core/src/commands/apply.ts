@@ -122,13 +122,17 @@ function assertCommandDoesNotModifyProtectedSheet(
     const affected = [...workbook.sheets.values()].find(
       (sheet) =>
         sheet.properties.protected &&
-        ([...sheet.cells.values()].some(
-          (cell) =>
-            cell.namedStyle &&
-            (cell.namedStyle.styleId.startsWith("theme-") ||
-              ["title", "heading-1", "heading-2", "heading-3", "heading-4", "total"].includes(
-                cell.namedStyle.styleId,
-              )),
+        ([...sheet.cells.values()].some((cell) =>
+          Boolean(
+            cell.style?.textColorTheme ||
+            cell.style?.fillColorTheme ||
+            cell.style?.fontTheme ||
+            (cell.namedStyle &&
+              (cell.namedStyle.styleId.startsWith("theme-") ||
+                ["title", "heading-1", "heading-2", "heading-3", "heading-4", "total"].includes(
+                  cell.namedStyle.styleId,
+                ))),
+          ),
         ) ||
           (sheet.tables ?? []).some((table) => table.style.id.startsWith("table-wps-"))),
     );

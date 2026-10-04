@@ -73,7 +73,7 @@ describe("named cell styles", () => {
       true,
     );
     const snapshot = serializeWorkbook(session.workbook);
-    expect(snapshot.version).toBe(18);
+    expect(snapshot.version).toBe(19);
     expect(snapshot.cellStyles).toEqual([custom]);
     expect(deserializeWorkbook(snapshot).cellStyles).toEqual([custom]);
     expect(() =>

@@ -1,4 +1,6 @@
-import { onBeforeUnmount, onMounted, shallowRef } from "vue";
+import { computed, onBeforeUnmount, onMounted, shallowRef } from "vue";
+import { resolveThemeFontFamily } from "@idea10/core/workbook-theme";
+import { useWorkbookTheme } from "../../../shared/color/workbook-theme-context";
 import { DEFAULT_CELL_FONT_FAMILY } from "@idea10/core/style";
 import { cellTextFontRevision } from "../../../shared/cell-text/text-metrics";
 import { DEFAULT_SHEET_HEADER_PALETTE, type SheetHeaderPalette } from "./header-painter";
@@ -25,6 +27,7 @@ const referenceColors = [
 
 /** Theme and DPR have one lifecycle per sheet. Font loading uses the shared metrics revision. */
 export function useSheetRenderEnvironment(getRoot: () => HTMLElement | null) {
+  const workbookTheme = useWorkbookTheme();
   const environment = shallowRef<SheetRenderEnvironment>({
     density: 1,
     fontFamily: DEFAULT_CELL_FONT_FAMILY,
@@ -129,5 +132,12 @@ export function useSheetRenderEnvironment(getRoot: () => HTMLElement | null) {
     observer?.disconnect();
     densityQuery?.removeEventListener("change", observeDensity);
   });
-  return { environment, fontRevision: cellTextFontRevision };
+  return {
+    environment: computed(() =>
+      workbookTheme?.value
+        ? { ...environment.value, fontFamily: resolveThemeFontFamily(workbookTheme.value, "minor") }
+        : environment.value,
+    ),
+    fontRevision: cellTextFontRevision,
+  };
 }

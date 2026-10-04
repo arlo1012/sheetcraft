@@ -67,6 +67,7 @@ describe("XLSX image export", () => {
         bandedRows: true,
         bandedColumns: false,
         filterButton: true,
+        filter: null,
       },
     ];
     const archive = entries(

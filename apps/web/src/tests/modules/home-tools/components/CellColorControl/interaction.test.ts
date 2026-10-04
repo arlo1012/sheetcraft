@@ -1,16 +1,22 @@
 import { DOMWrapper, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, test } from "vitest";
+import { nextTick, shallowRef, type ShallowRef } from "vue";
+import { DEFAULT_WORKBOOK_THEME, type WorkbookTheme } from "@idea10/core/workbook-theme";
+import { workbookThemeKey } from "../../../../../shared/color/workbook-theme-context";
 import CellColorControl from "../../../../../modules/home-tools/components/CellColorControl.vue";
 import { createAppI18n } from "../../../../../shared/i18n";
 
 const mountedWrappers: Array<{ host: HTMLElement; wrapper: ReturnType<typeof mount> }> = [];
 
-function mountControl(kind: "text" | "fill", disabled = false) {
+function mountControl(kind: "text" | "fill", disabled = false, theme?: ShallowRef<WorkbookTheme>) {
   const host = document.createElement("div");
   document.body.append(host);
   const wrapper = mount(CellColorControl, {
     attachTo: host,
-    global: { plugins: [createAppI18n("en-US")] },
+    global: {
+      plugins: [createAppI18n("en-US")],
+      provide: theme ? { [workbookThemeKey as symbol]: theme } : {},
+    },
     props: { kind, disabled },
   });
   mountedWrappers.push({ host, wrapper });
@@ -29,6 +35,32 @@ afterEach(() => {
 });
 
 describe("CellColorControl", () => {
+  test("keeps a chosen theme swatch live when the document palette changes", async () => {
+    const theme = shallowRef<WorkbookTheme>({ ...DEFAULT_WORKBOOK_THEME });
+    const wrapper = mountControl("fill", false, theme);
+    await wrapper.get("[data-ribbon-split-menu]").trigger("click");
+    await new DOMWrapper(document.body).get('[data-color-swatch="#4f81bd"]').trigger("click");
+    expect(emittedPatches(wrapper)).toEqual([
+      { fillColor: "#4f81bd", fillColorTheme: { slot: "accent1" } },
+    ]);
+    theme.value = {
+      ...theme.value,
+      accentColors: [
+        "#112233",
+        ...theme.value.accentColors.slice(1),
+      ] as WorkbookTheme["accentColors"],
+    };
+    await nextTick();
+    await wrapper.get("[data-ribbon-split-main]").trigger("click");
+    expect(emittedPatches(wrapper).at(-1)).toEqual({
+      fillColor: "#112233",
+      fillColorTheme: { slot: "accent1" },
+    });
+    await wrapper.get("[data-ribbon-split-menu]").trigger("click");
+    await new DOMWrapper(document.body).get('[data-color-swatch="#ff0000"]').trigger("click");
+    expect(emittedPatches(wrapper).at(-1)).toEqual({ fillColor: "#ff0000" });
+  });
+
   test("keeps keyboard opening on the menu button and closes when disabled", async () => {
     const wrapper = mountControl("text");
     const main = wrapper.get<HTMLButtonElement>("[data-ribbon-split-main]");

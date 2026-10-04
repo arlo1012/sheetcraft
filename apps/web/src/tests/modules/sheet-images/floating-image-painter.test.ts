@@ -90,4 +90,51 @@ describe("floating image canvas painter", () => {
     expect(context.clip).toHaveBeenCalledTimes(4);
     expect(cache.retain).toHaveBeenCalledWith(new Set(["blob:asset-1"]));
   });
+
+  test("applies supported theme effects while retaining frozen-pane clipping", () => {
+    const context = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      clip: vi.fn(),
+      translate: vi.fn(),
+      scale: vi.fn(),
+      rotate: vi.fn(),
+      drawImage: vi.fn(),
+      fillRect: vi.fn(),
+      stroke: vi.fn(),
+      strokeRect: vi.fn(),
+      fillText: vi.fn(),
+      setLineDash: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+    };
+    const cache = {
+      get: vi.fn(() => ({ naturalWidth: 200, naturalHeight: 100 }) as HTMLImageElement),
+      load: vi.fn(async () => {}),
+      retain: vi.fn(),
+      dispose: vi.fn(),
+    };
+    paintFloatingImages(context as unknown as CanvasRenderingContext2D, {
+      state: { images: [image], revision: 1 },
+      layout: createLayout(),
+      assetUrls: new Map([["asset-1", "blob:asset-1"]]),
+      cache,
+      palette,
+      loadingLabel: "Loading",
+      unavailableLabel: "Unavailable",
+      effects: {
+        shadow: "soft",
+        reflection: true,
+        bevel: true,
+        outlineWidth: 2,
+        gradient: false,
+      },
+    });
+    expect(context.drawImage).toHaveBeenCalledTimes(8);
+    expect(context.strokeRect).toHaveBeenCalledTimes(4);
+    expect(context.stroke).toHaveBeenCalledTimes(8);
+    expect(context.clip).toHaveBeenCalledTimes(4);
+  });
 });

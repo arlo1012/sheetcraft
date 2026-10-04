@@ -6,6 +6,12 @@ import {
 } from "@idea10/core/conditional-formatting";
 import type { ConditionalFormatVisual } from "@idea10/core/conditional-formatting";
 import { mergeCellStyle, type CellStyle } from "@idea10/core/style";
+import {
+  DEFAULT_WORKBOOK_THEME,
+  resolveThemeColor,
+  resolveThemeFontFamily,
+  type WorkbookTheme,
+} from "@idea10/core/workbook-theme";
 import { getTableAtAddress, resolveTableCellStyle } from "@idea10/core/table-styles";
 import type { ExcelDateSystem } from "@idea10/core/formula";
 import { computed, type ComputedRef } from "vue";
@@ -53,6 +59,7 @@ export function createSheetDisplaySnapshot(options: {
   evaluator: SheetEvaluator;
   revision?: number;
   dateSystem?: ExcelDateSystem;
+  theme?: WorkbookTheme;
 }): SheetDisplaySnapshot {
   const contentExtent = getSheetContentExtent(options.sheet);
 
@@ -99,10 +106,17 @@ export function createSheetDisplaySnapshot(options: {
     const base = table
       ? mergeCellStyle(resolveTableCellStyle(table, address), direct ?? {})
       : direct;
+    const theme = options.theme ?? DEFAULT_WORKBOOK_THEME;
+    let style = base ? { ...base } : undefined;
+    if (style?.textColorTheme) style.textColor = resolveThemeColor(theme, style.textColorTheme);
+    if (style?.fillColorTheme) style.fillColor = resolveThemeColor(theme, style.fillColorTheme);
+    if (style?.fontTheme) style.fontFamily = resolveThemeFontFamily(theme, style.fontTheme);
+    if (options.theme && !style?.fontFamily) {
+      style = { ...style, fontFamily: resolveThemeFontFamily(theme, "minor") };
+    }
     const highlight = resolveHighlight(address);
-    let style = base;
     if (highlight) {
-      style = { ...base, ...highlight };
+      style = { ...style, ...highlight };
       if (highlight.fillColor) {
         delete style.fillGradient;
         delete style.fillPattern;
@@ -166,6 +180,7 @@ export function useSheetDisplaySnapshot(options: {
   getEvaluator: () => SheetEvaluator;
   getRevision?: () => number | undefined;
   getDateSystem?: () => ExcelDateSystem;
+  getTheme?: () => WorkbookTheme | undefined;
 }): ComputedRef<SheetDisplaySnapshot> {
   return computed(() => {
     const sheet = options.getSheet();
@@ -177,6 +192,7 @@ export function useSheetDisplaySnapshot(options: {
       evaluator,
       revision,
       dateSystem: options.getDateSystem?.(),
+      theme: options.getTheme?.(),
     });
   });
 }

@@ -16,6 +16,7 @@ import type {
 } from "../context-menu-contracts";
 import { formatCellContentForInput } from "@idea10/core/input";
 import type { ExcelDateSystem } from "@idea10/core/formula";
+import type { WorkbookTheme } from "@idea10/core/workbook-theme";
 import { DEFAULT_SHEET_PAGE_SETUP, type SheetPageSetup } from "@idea10/core/page-setup";
 import type { SheetViewMode } from "@idea10/sheet-engine/page-layout";
 import type { PageViewPaintState } from "../../page-layout/page-view-types";
@@ -131,6 +132,7 @@ import {
   paintFloatingImages,
   type FloatingImagePaintState,
 } from "../../sheet-images/floating-image-painter";
+import { getDrawingThemeEffects } from "../../sheet-images/drawing-theme-effects";
 import { useSheetDisplaySnapshot } from "../canvas/sheet-display-snapshot";
 import { createSheetRenderFrame, getSurfaceCell } from "../rendering/sheet-render-frame";
 import { useSheetRenderEnvironment } from "../rendering/useSheetRenderEnvironment";
@@ -190,6 +192,8 @@ const props = withDefaults(
   defineProps<{
     contextMenuState?: SheetContextMenuState;
     sheet: Sheet;
+    /** Workbook-level effects for drawable sheet objects. */
+    theme?: WorkbookTheme;
     evaluator?: SheetEvaluator;
     workbookRevision?: number;
     applyPaste?: (payload: GridPastePayload) => GridPasteResult;
@@ -492,6 +496,7 @@ const display = useSheetDisplaySnapshot({
   getEvaluator: () => sheetEvaluator.value,
   getRevision: () => props.workbookRevision,
   getDateSystem: () => props.dateSystem,
+  getTheme: () => props.theme,
 });
 const contentExtent = computed(() => display.value.contentExtent);
 const {
@@ -972,6 +977,7 @@ const imagePaintState = shallowRef<FloatingImagePaintState>({
   revision: 0,
 });
 const floatingImageCache = createFloatingImageCanvasCache(() => surfaceRef.value?.invalidate());
+const drawingThemeEffects = computed(() => getDrawingThemeEffects(props.theme));
 const paintSurfaceImages = computed(() => {
   const state = imagePaintState.value;
   const currentLayout = layout.value;
@@ -2964,6 +2970,7 @@ defineExpose({
         @paint-state-change="imagePaintState = $event"
         :scale="scale"
         :images="sheet.floatingImages"
+        :effects="drawingThemeEffects"
         :layout="layout"
         :asset-urls="resolvedImageUrls"
         :loading-asset-ids="loadingImageAssetIds"

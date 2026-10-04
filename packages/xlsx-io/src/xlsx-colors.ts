@@ -1,8 +1,8 @@
 const DEFAULT_THEME = [
-  "000000",
   "FFFFFF",
-  "1F497D",
+  "000000",
   "EEECE1",
+  "1F497D",
   "4F81BD",
   "C0504D",
   "9BBB59",
@@ -40,10 +40,10 @@ function themeColors(themeXml: string | undefined): readonly string[] {
   const scheme = /<a:clrScheme\b[^>]*>([\s\S]*?)<\/a:clrScheme>/i.exec(themeXml)?.[1];
   if (!scheme) return DEFAULT_THEME;
   const names = [
-    "dk1",
     "lt1",
-    "dk2",
+    "dk1",
     "lt2",
+    "dk2",
     "accent1",
     "accent2",
     "accent3",
@@ -78,37 +78,17 @@ function tint(color: string, amount: number | undefined): string {
     hue /= 6;
   }
   const adjusted = factor < 0 ? lightness * (1 + factor) : lightness + (1 - lightness) * factor;
+  const upper =
+    adjusted < 0.5 ? adjusted * (1 + saturation) : adjusted + saturation - adjusted * saturation;
+  const lower = 2 * adjusted - upper;
   const hueValue = (part: number) => {
     let value = part;
     if (value < 0) value += 1;
     if (value > 1) value -= 1;
-    if (value < 1 / 6)
-      return (
-        adjusted +
-        (saturation === 0
-          ? 0
-          : (adjusted < 0.5
-              ? adjusted * (1 + saturation)
-              : adjusted + saturation - adjusted * saturation) - adjusted) *
-          6 *
-          value
-      );
-    if (value < 1 / 2)
-      return adjusted < 0.5
-        ? adjusted * (1 + saturation)
-        : adjusted + saturation - adjusted * saturation;
-    if (value < 2 / 3)
-      return (
-        adjusted +
-        (saturation === 0
-          ? 0
-          : (adjusted < 0.5
-              ? adjusted * (1 + saturation)
-              : adjusted + saturation - adjusted * saturation) - adjusted) *
-          (2 / 3 - value) *
-          6
-      );
-    return adjusted;
+    if (value < 1 / 6) return lower + (upper - lower) * 6 * value;
+    if (value < 1 / 2) return upper;
+    if (value < 2 / 3) return lower + (upper - lower) * (2 / 3 - value) * 6;
+    return lower;
   };
   const values =
     saturation === 0

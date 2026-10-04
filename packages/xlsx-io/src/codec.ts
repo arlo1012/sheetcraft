@@ -69,6 +69,7 @@ import {
   xlsxTableStyleId,
 } from "./table-styles.js";
 import { readXlsxCellStyles, readXlsxNamedCellStyleBindings } from "./cell-styles.js";
+import { readXlsxThemeStyleBindings } from "./theme-style-bindings.js";
 import { readXlsxHyperlinks, readXlsxWorksheetStyleIds } from "./hyperlinks.js";
 import type { NativeCellImage } from "./native-cell-images.js";
 import {
@@ -610,6 +611,7 @@ export async function decodeWithExcelJs(
   const archive = unzipSync(bytes);
   const cellStyles = readXlsxCellStyles(archive["xl/styles.xml"], archive["xl/theme/theme1.xml"]);
   const namedStyleBindings = readXlsxNamedCellStyleBindings(archive["xl/styles.xml"]);
+  const themeStyleBindings = readXlsxThemeStyleBindings(archive["xl/styles.xml"]);
   const rawHyperlinks = readXlsxHyperlinks(archive, (sheetIndex, reference) =>
     add(report, "feature-omitted", `worksheet${sheetIndex + 1}.hyperlink:${reference}`),
   );
@@ -692,13 +694,17 @@ export async function decodeWithExcelJs(
           report,
           rawNumericValues[sheetIndex]?.get(modelCell.address.toUpperCase()),
         );
-        const style = readStyle(
+        let style = readStyle(
           cell.style,
           cell.numFmt,
           issueLocation,
           report,
           rawTextDirections[sheetIndex]?.get(modelCell.address.toUpperCase()),
         );
+        const themeStyle = themeStyleBindings.get(
+          rawStyleIds[sheetIndex]?.get(modelCell.address.toUpperCase()) ?? -1,
+        );
+        if (themeStyle) style = { ...style, ...themeStyle };
         const rawHyperlink = rawHyperlinks[sheetIndex]?.get(modelCell.address.toUpperCase());
         let hyperlink: import("@idea10/core/workbook").CellHyperlink | undefined;
         if (rawHyperlink) {

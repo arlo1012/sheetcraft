@@ -11,10 +11,12 @@ import {
   setCellNamedStyle,
   type Workbook,
 } from "../workbook.js";
-import { cloneCellStyle, mergeCellStyle } from "../style.js";
+import { cloneCellStyle, mergeCellStyle, type CellStyle } from "../style.js";
 import {
   cloneWorkbookTheme,
   normalizeWorkbookTheme,
+  resolveThemeColor,
+  resolveThemeFontFamily,
   type WorkbookTheme,
 } from "../workbook-theme.js";
 import type { SetWorkbookThemeCommand } from "./contracts.js";
@@ -52,7 +54,11 @@ function cellStates(workbook: Workbook, command: SetWorkbookThemeCommand) {
       const [row, column] = key.split(":").map(Number);
       const address = { row: row!, column: column! };
       const namedStyle = getCellNamedStyle(sheet, address);
-      return namedStyle && THEMED_STYLE_IDS.has(namedStyle.styleId)
+      const style = getCellStyle(sheet, address);
+      return (namedStyle && THEMED_STYLE_IDS.has(namedStyle.styleId)) ||
+        style?.textColorTheme ||
+        style?.fillColorTheme ||
+        style?.fontTheme
         ? [
             {
               sheetId: sheet.id,
@@ -64,6 +70,31 @@ function cellStates(workbook: Workbook, command: SetWorkbookThemeCommand) {
         : [];
     }),
   );
+}
+
+/**
+ * Theme-bound styles carry a resolved RGB/font cache for renderers and XLSX,
+ * while retaining their live references for later theme changes. This only
+ * touches explicitly bound sparse cells; direct formatting has no reference
+ * and is deliberately left intact.
+ */
+function materializeThemeReferences(
+  workbook: Workbook,
+  theme: WorkbookTheme,
+  states: ReturnType<typeof cellStates>,
+): void {
+  for (const state of states) {
+    const sheet = workbook.sheets.get(state.sheetId);
+    if (!sheet) continue;
+    const style = cloneCellStyle(getCellStyle(sheet, state.address));
+    if (!style) continue;
+    const next: CellStyle = { ...style };
+    if (next.textColorTheme) next.textColor = resolveThemeColor(theme, next.textColorTheme);
+    if (next.fillColorTheme) next.fillColor = resolveThemeColor(theme, next.fillColorTheme);
+    if (next.fontTheme) next.fontFamily = resolveThemeFontFamily(theme, next.fontTheme);
+    const namedStyle = getCellNamedStyle(sheet, state.address);
+    setCellNamedStyle(sheet, state.address, next, namedStyle);
+  }
 }
 
 function tableStates(workbook: Workbook, command: SetWorkbookThemeCommand) {
@@ -127,6 +158,7 @@ export function applySetWorkbookThemeCommand(
       );
       setCellNamedStyle(sheet, state.address, style, binding);
     }
+    materializeThemeReferences(workbook, theme, cells);
   }
   if (command.tableStyles) {
     for (const state of command.tableStyles) {

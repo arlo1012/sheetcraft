@@ -3,6 +3,7 @@ import { reactive } from "vue";
 import { createSheet, createSheetEvaluator, setCellContent } from "@idea10/core/workbook";
 import type { SheetTable } from "@idea10/core/workbook";
 import { createBuiltinTableStyles } from "@idea10/core/table-styles";
+import { DEFAULT_WORKBOOK_THEME, resolveThemeFontFamily } from "@idea10/core/workbook-theme";
 import { createSheetGeometry } from "@idea10/sheet-engine/geometry";
 import { createSheetViewportLayout } from "@idea10/sheet-engine/viewport-layout";
 import { createRowVisibilityIndex } from "@idea10/sheet-engine/visibility";
@@ -41,6 +42,40 @@ function paintScene(display: ReturnType<typeof createSheetDisplaySnapshot>, scro
 }
 
 describe("Sheet display snapshot", () => {
+  test("resolves live theme colors and multilingual fonts without rewriting direct formatting", () => {
+    const sheet = createSheet("Theme", "theme");
+    const theme = {
+      ...DEFAULT_WORKBOOK_THEME,
+      bodyFont: "Calibri",
+      fonts: { name: "Custom", headingEastAsia: "黑体", bodyEastAsia: "宋体" },
+    };
+    sheet.cells.set("0:0", {
+      content: { kind: "literal", value: "Hello 世界" },
+      style: { fillColor: "#abcdef", fillColorTheme: { slot: "accent1" }, fontTheme: "major" },
+    });
+    sheet.cells.set("0:1", {
+      content: { kind: "literal", value: "Fixed" },
+      style: { fillColor: "#123456", fontFamily: "Arial" },
+    });
+    const display = createSheetDisplaySnapshot({
+      sheet,
+      theme,
+      evaluator: createSheetEvaluator(sheet),
+    });
+    expect(display.getCellStyle({ row: 0, column: 0 })).toMatchObject({
+      fillColor: theme.accentColors[0],
+      fontFamily: resolveThemeFontFamily(theme, "major"),
+    });
+    expect(display.getCellStyle({ row: 0, column: 1 })).toMatchObject({
+      fillColor: "#123456",
+      fontFamily: "Arial",
+    });
+    expect(display.getCellStyle({ row: 1, column: 0 })?.fontFamily).toBe(
+      resolveThemeFontFamily(theme, "minor"),
+    );
+    expect(sheet.cells.get("0:0")?.style?.fillColor).toBe("#abcdef");
+  });
+
   test("layers table styles, direct cell formatting and conditional formatting in order", () => {
     const sheet = createSheet("Table", "table");
     const table: SheetTable = {
@@ -51,7 +86,7 @@ describe("Sheet display snapshot", () => {
         { id: "region", name: "Region" },
         { id: "amount", name: "Amount" },
       ],
-      style: createBuiltinTableStyles()[1]!,
+      style: createBuiltinTableStyles().find((style) => style.id === "table-light-9")!,
       headerRow: true,
       totalRow: false,
       firstColumn: false,

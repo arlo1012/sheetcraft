@@ -188,8 +188,10 @@ export type WorkbookSnapshotV18 = Omit<WorkbookSnapshotV17, "version"> & {
   version: 18;
   watermarkPresets: WatermarkPreset[];
 };
+/** Theme schemes and live cell-style bindings are versioned to preserve them across clients. */
+export type WorkbookSnapshotV19 = Omit<WorkbookSnapshotV18, "version"> & { version: 19 };
 /** Current write format. Earlier versions remain available for migration inputs. */
-export type WorkbookSnapshot = WorkbookSnapshotV18;
+export type WorkbookSnapshot = WorkbookSnapshotV19;
 export type SheetSnapshot = SheetSnapshotV7 & {
   hiddenRows?: number[];
   hiddenColumns?: number[];
@@ -221,7 +223,8 @@ type SnapshotVersion =
   | 15
   | 16
   | 17
-  | 18;
+  | 18
+  | 19;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -727,7 +730,7 @@ export function deserializeSheet(value: unknown): Sheet {
 
 export function serializeWorkbook(workbook: Workbook): WorkbookSnapshot {
   return {
-    version: 18,
+    version: 19,
     calculation: normalizeWorkbookCalculationSettings(workbook.calculation),
     theme: cloneWorkbookTheme(workbook.theme),
     dateSystem: normalizeExcelDateSystem(workbook.dateSystem),
@@ -773,7 +776,8 @@ export function deserializeWorkbook(value: unknown): Workbook {
     record.version !== 15 &&
     record.version !== 16 &&
     record.version !== 17 &&
-    record.version !== 18
+    record.version !== 18 &&
+    record.version !== 19
   ) {
     throw new WorkbookDomainError(
       {

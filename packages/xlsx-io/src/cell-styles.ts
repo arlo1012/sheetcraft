@@ -35,6 +35,8 @@ const INCLUDE_STYLE_KEYS: Record<CellStyleInclude, Array<keyof CellStyle>> = {
     "strikethrough",
     "fontScript",
     "textColor",
+    "fontTheme",
+    "textColorTheme",
   ],
   border: [
     "borderTop",
@@ -44,7 +46,7 @@ const INCLUDE_STYLE_KEYS: Record<CellStyleInclude, Array<keyof CellStyle>> = {
     "borderDiagonalUp",
     "borderDiagonalDown",
   ],
-  fill: ["fillColor", "fillPattern", "fillPatternColor", "fillGradient"],
+  fill: ["fillColor", "fillColorTheme", "fillPattern", "fillPatternColor", "fillGradient"],
 };
 
 function decodeXml(value: string): string {
