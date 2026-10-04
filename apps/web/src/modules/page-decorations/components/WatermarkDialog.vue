@@ -120,6 +120,7 @@ function drawPreview(): void {
   );
 }
 function chooseImage(): void {
+  if (!imageEnabled.value || props.busy) return;
   imageInput.value?.click();
 }
 function imageChanged(event: Event): void {
@@ -129,8 +130,8 @@ function imageChanged(event: Event): void {
   if (file) selectImageFile(file);
 }
 function imageDraggedOver(event: DragEvent): void {
-  imageDragOver.value = !props.busy;
-  if (event.dataTransfer) event.dataTransfer.dropEffect = props.busy ? "none" : "copy";
+  imageDragOver.value = imageEnabled.value && !props.busy;
+  if (event.dataTransfer) event.dataTransfer.dropEffect = imageDragOver.value ? "copy" : "none";
 }
 function imageDropped(event: DragEvent): void {
   imageDragOver.value = false;
@@ -140,13 +141,12 @@ function imageDropped(event: DragEvent): void {
   if (file) selectImageFile(file);
 }
 function selectImageFile(file: File): void {
-  if (props.busy || !file.type.startsWith("image/")) return;
+  if (!imageEnabled.value || props.busy || !file.type.startsWith("image/")) return;
   clearLocalImage();
   imageFile.value = file;
   localImageUrl.value = URL.createObjectURL(file);
   imageDraft.value = { assetId: previewAssetId, scale: null, washout: true, angle: 0 };
   draft.value.image = { ...imageDraft.value };
-  imageEnabled.value = true;
   loadPreviewImage(localImageUrl.value);
 }
 function close(): void {
@@ -223,7 +223,7 @@ onBeforeUnmount(clearLocalImage);
             class="watermark-dialog__choose-image"
             :class="{ 'is-drag-over': imageDragOver }"
             type="button"
-            :disabled="busy"
+            :disabled="!imageEnabled || busy"
             @click="chooseImage"
             @dragover.prevent.stop="imageDraggedOver"
             @dragleave="imageDragOver = false"
