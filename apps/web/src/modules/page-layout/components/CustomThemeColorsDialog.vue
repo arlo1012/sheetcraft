@@ -5,6 +5,7 @@ import { Form as TForm, FormItem as TFormItem } from "tdesign-vue-next/es/form";
 import { Input as TInput } from "tdesign-vue-next/es/input";
 import { useAppI18n } from "../../../shared/i18n";
 import ColorPaletteSelect from "../../../shared/color/ColorPaletteSelect.vue";
+import ThemeColorPreview from "./ThemeColorPreview.vue";
 
 export type ThemeColorScheme = {
   name: string;
@@ -28,10 +29,10 @@ const draft = ref<ThemeColorScheme>(clone(props.colors));
 const error = ref<string | null>(null);
 const nameInputRef = ref<HTMLElement | null>(null);
 const fields = computed<ReadonlyArray<readonly [ColorField, string]>>(() => [
-  ["dark1", t("pageTools.dark1")] as const,
   ["light1", t("pageTools.light1")] as const,
-  ["dark2", t("pageTools.dark2")] as const,
+  ["dark1", t("pageTools.dark1")] as const,
   ["light2", t("pageTools.light2")] as const,
+  ["dark2", t("pageTools.dark2")] as const,
   ...Array.from(
     { length: 6 },
     (_, index) =>
@@ -42,11 +43,6 @@ const fields = computed<ReadonlyArray<readonly [ColorField, string]>>(() => [
   ),
   ["hyperlink", t("pageTools.hyperlink")] as const,
   ["followedHyperlink", t("pageTools.followedHyperlink")] as const,
-]);
-const previewColors = computed(() => [
-  draft.value.dark1,
-  draft.value.light1,
-  ...draft.value.accentColors,
 ]);
 function clone(colors: ThemeColorScheme): ThemeColorScheme {
   return { ...colors, accentColors: [...colors.accentColors] as ThemeColorScheme["accentColors"] };
@@ -93,7 +89,7 @@ watch(
     :header="t('pageTools.customThemeColors')"
     :confirm-btn="t('pageTools.save')"
     :cancel-btn="t('pageTools.cancel')"
-    width="min(680px, calc(100vw - 32px))"
+    width="min(620px, calc(100vw - 32px))"
     placement="center"
     :close-on-overlay-click="false"
     :confirm-on-enter="false"
@@ -101,30 +97,64 @@ watch(
     @close="close"
   >
     <TForm class="custom-theme-colors-dialog" label-align="top">
-      <TFormItem :label="t('pageTools.themeSchemeName')"
-        ><span ref="nameInputRef"
-          ><TInput v-model="draft.name" autofocus :status="error ? 'error' : undefined" /></span
-      ></TFormItem>
+      <TFormItem :label="t('pageTools.themeSchemeName')">
+        <div ref="nameInputRef" class="custom-theme-colors-dialog__name">
+          <TInput v-model="draft.name" autofocus clearable :status="error ? 'error' : undefined" />
+        </div>
+      </TFormItem>
       <p v-if="error" class="custom-theme-colors-dialog__error" role="alert">{{ error }}</p>
-      <div class="custom-theme-colors-dialog__colors">
-        <TFormItem v-for="[field, label] in fields" :key="field" :label="label">
-          <ColorPaletteSelect
-            :model-value="colorFor(field)"
+      <div class="custom-theme-colors-dialog__content">
+        <section
+          class="custom-theme-colors-dialog__colors"
+          :aria-label="t('pageTools.themeColorSlots')"
+        >
+          <strong>{{ t("pageTools.themeColorSlots") }}</strong>
+          <TFormItem
+            v-for="[field, label] in fields"
+            :key="field"
+            class="custom-theme-colors-dialog__color-row"
             :label="label"
-            :show-default="false"
-            @select="setColor(field, $event)"
-          />
-        </TFormItem>
+            label-align="left"
+            label-width="180px"
+          >
+            <ColorPaletteSelect
+              :model-value="colorFor(field)"
+              :label="label"
+              :show-default="false"
+              @select="setColor(field, $event)"
+            />
+          </TFormItem>
+        </section>
+        <section class="custom-theme-colors-dialog__preview" :aria-label="t('pageTools.preview')">
+          <strong>{{ t("pageTools.preview") }}</strong>
+          <div class="custom-theme-colors-dialog__preview-grid">
+            <ThemeColorPreview
+              :label="t('pageTools.lightModePreview', { index: 1 })"
+              :background="draft.light1"
+              :foreground="draft.dark1"
+              :accent-colors="draft.accentColors"
+            />
+            <ThemeColorPreview
+              :label="t('pageTools.lightModePreview', { index: 2 })"
+              :background="draft.light2"
+              :foreground="draft.dark2"
+              :accent-colors="draft.accentColors"
+            />
+            <ThemeColorPreview
+              :label="t('pageTools.darkModePreview', { index: 1 })"
+              :background="draft.dark1"
+              :foreground="draft.light1"
+              :accent-colors="draft.accentColors"
+            />
+            <ThemeColorPreview
+              :label="t('pageTools.darkModePreview', { index: 2 })"
+              :background="draft.dark2"
+              :foreground="draft.light2"
+              :accent-colors="draft.accentColors"
+            />
+          </div>
+        </section>
       </div>
-      <section class="custom-theme-colors-dialog__preview" :aria-label="t('pageTools.preview')">
-        <strong>{{ t("pageTools.preview") }}</strong
-        ><span
-          ><i
-            v-for="(color, index) in previewColors"
-            :key="index"
-            :style="{ backgroundColor: color }"
-        /></span>
-      </section>
     </TForm>
   </TDialog>
 </template>
@@ -148,26 +178,46 @@ watch(
   font-size: 12px;
   line-height: 18px;
 }
+.custom-theme-colors-dialog__name {
+  width: 100%;
+}
+.custom-theme-colors-dialog__content {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(0, 1fr);
+  gap: 16px;
+}
 .custom-theme-colors-dialog__colors {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 16px;
+  align-content: start;
+  gap: 8px;
+}
+.custom-theme-colors-dialog__color-row {
+  margin-bottom: 0;
 }
 .custom-theme-colors-dialog__preview {
   display: grid;
+  align-content: start;
   gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--idea-border-subtle);
+  padding-left: 12px;
+  border-left: 1px solid var(--idea-border-subtle);
+}
+.custom-theme-colors-dialog__content strong {
   font-size: 12px;
   line-height: 20px;
 }
-.custom-theme-colors-dialog__preview span {
+.custom-theme-colors-dialog__preview-grid {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 3px;
-  max-width: 260px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 8px;
 }
-.custom-theme-colors-dialog__preview i {
-  height: 20px;
+@media (max-width: 560px) {
+  .custom-theme-colors-dialog__content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .custom-theme-colors-dialog__preview {
+    padding: 12px 0 0;
+    border-top: 1px solid var(--idea-border-subtle);
+    border-left: 0;
+  }
 }
 </style>
